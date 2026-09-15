@@ -26,6 +26,11 @@
  * Randomness is the server's: a print's outcome seed is 32 random bytes
  * written on the row, offers are seeded from a per-player secret the client
  * never receives. Nothing a request carries can steer a roll.
+ *
+ * SHELVED BY DEFAULT. While the game is under development every route below
+ * refuses a customer with 503 FARM_SHELVED and an admin is let through; the
+ * one switch is `admin_settings.printerFarmShelved` — see "the shelving
+ * switch" below GET /status.
  */
 
 import { Hono } from 'hono';
@@ -559,6 +564,121 @@ function findPrinter(state: FarmState, id: string): FarmPrinterRow {
 function profileUpdate(userId: string, set: Record<string, string | number | null>, nowIso: string): SqlStatement {
   return updateStatement({ table: 'farm_profiles', id: userId, set: { ...set, updated_at: nowIso } }, userId);
 }
+
+// ------------------------------------------------------------ the shelving switch
+
+/**
+ * THE GAME IS SHELVED — «قريبا — تحت التطوير», by one row, on the server.
+ *
+ * The owner asked for the Printer Farm to be marked coming-soon and for its
+ * page not to be shown to customers. Hiding the page in the SPA hides nothing:
+ * this file is the game engine, it pays coins, burns filament and moves jobs,
+ * and anyone with curl reaches it. So the refusal lives HERE, in front of every
+ * player route, and the client's redirect is only presentation on top of it.
+ *
+ * ONE SWITCH, IN THE HOUSE'S STORE. `admin_settings.printerFarmShelved` holds
+ * `{"open": true}` and nothing else opens the game: a missing row, an empty
+ * value, unparseable JSON, `{"open": "true"}` — every one of them reads as
+ * SHELVED. That default is deliberate. The game ships closed, so the deploy
+ * itself carries out the owner's instruction instead of waiting for someone to
+ * remember a database write, and a database that has lost the row closes the
+ * game rather than quietly opening it.
+ *
+ * It is a SETTINGS ROW and not a section of `printerFarmConfig` on purpose.
+ * The config document is balancing, it is versioned, and a write to it needs a
+ * matching `expected_version` — exactly the wrong thing to fight with at the
+ * moment you want a game closed or reopened right now. This row has no version
+ * to lose a race on. It is written by ONE route (PUT /api/admin/farm/shelved),
+ * which audits it, so flipping it is traceable and needs no deploy.
+ *
+ * NOTHING IS DELETED BY SHELVING. No table is dropped, no coin is clawed back,
+ * no session is removed: the refusal is a door, and every farm behind it stays
+ * exactly as its player left it.
+ */
+export const FARM_SHELVED_SETTING_KEY = 'printerFarmShelved';
+
+/**
+ * Whether the stored value opens the game. Only the literal `{"open": true}`
+ * does; everything else — absent, blank, malformed, a string "true", a number —
+ * leaves the game shelved, because a value nobody can read is not a decision
+ * anybody made.
+ */
+export function farmOpenFromSetting(value: string | null | undefined): boolean {
+  if (typeof value !== 'string' || value.trim() === '') return false;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return false;
+    return (parsed as { open?: unknown }).open === true;
+  } catch {
+    return false;
+  }
+}
+
+/** True while the game is closed to players. One indexed read on a tiny table. */
+export async function farmIsShelved(db: D1Database): Promise<boolean> {
+  const row = await db
+    .prepare('SELECT value FROM admin_settings WHERE key = ?')
+    .bind(FARM_SHELVED_SETTING_KEY)
+    .first<{ value: string }>();
+  return !farmOpenFromSetting(row?.value);
+}
+
+/**
+ * THE ADMIN DOOR. The owner and every platform admin keep playing while the
+ * game is shelved, because that is how it gets finished and tested. This is
+ * the same server-side role check the rest of the admin surface runs on
+ * (`users.role`, set by the server, never a client flag) — not a new secret,
+ * not a query parameter, not a header anybody can send.
+ */
+export function farmAdminDoor(user: SessionUser | null | undefined): boolean {
+  return user?.role === 'admin';
+}
+
+/**
+ * 503, not 404. The route exists, it is answering, and it is telling the truth
+ * about why it will not act: the game is under development. A 404 would say
+ * "there was never a farm here", which is a lie the client would then have to
+ * translate into «قريبا» anyway, and which would make reopening the game look
+ * like a new feature rather than an open door. 403 would be a lie too — the
+ * caller is not forbidden, the game is closed to everyone at once. `code` is
+ * what the client keys off; `details.shelved` says it is the switch, not an
+ * outage.
+ */
+export function farmShelvedRefusal(): HttpError {
+  return new HttpError(
+    503,
+    'لعبة المزرعة تحت التطوير — قريبا / The printer farm is under development and is not open to players yet',
+    'FARM_SHELVED',
+    { shelved: true }
+  );
+}
+
+/**
+ * PUBLIC, AND ALWAYS ANSWERS. Registered before the guard so the hub can ask
+ * "is the farm open?" without being refused, and can then say «قريبا» because
+ * the SERVER said so — which is what lets the owner lift the shelving with one
+ * settings write and no deploy. `may_play` folds the admin door in, so an
+ * admin's own hub shows the working game while a customer's shows the notice.
+ */
+farmRoutes.get('/status', async (c) => {
+  const shelved = await farmIsShelved(c.env.DB);
+  const admin = farmAdminDoor(c.get('user'));
+  // Never cached: this is the answer that decides whether a page is shown.
+  c.header('Cache-Control', 'no-store');
+  return c.json({ success: true, shelved, admin, may_play: !shelved || admin });
+});
+
+/**
+ * The gate itself. It sits in front of EVERY farm route below — the public
+ * leaderboard included, because a shelved game publishing live standings is
+ * the same surface the owner asked to close — and in front of the auth
+ * middleware, so a signed-out caller is told the game is shelved rather than
+ * being asked to sign in for a game that will refuse them anyway.
+ */
+farmRoutes.use('*', async (c, next) => {
+  if ((await farmIsShelved(c.env.DB)) && !farmAdminDoor(c.get('user'))) throw farmShelvedRefusal();
+  await next();
+});
 
 // ---------------------------------------------------------------- public read
 

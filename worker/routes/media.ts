@@ -6,7 +6,7 @@ import { audit } from '../lib/audit';
 import { validateOutboundUrl } from '../lib/fetchGuard';
 import { sniff } from './uploads';
 import { extractPageImages, imageCandidates, isVendorHost } from '../lib/pageImages';
-import { buildMediaKey, headMediaObject, isSafeMediaKey, mediaBucket, putMediaObject } from '../lib/mediaStorage';
+import { buildMediaKey, headMediaObject, isSafeMediaKey, mediaBucket, probeMediaBucket, putMediaObject } from '../lib/mediaStorage';
 import { currentMediaReferences, hasDedicatedBucket, inventoryLegacyMedia, planLegacyMediaKey } from '../lib/mediaMigration';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { newId } from '../lib/crypto';
@@ -341,6 +341,82 @@ mediaRoutes.get('/migration/inventory', requireAdmin, async (c) => {
   const limitRaw = Number(c.req.query('limit') || 250);
   const page = await inventoryLegacyMedia(c.env, cursor, Number.isInteger(limitRaw) ? limitRaw : 250);
   return c.json({ success: true, dry_run: true, ...page });
+});
+
+/**
+ * IS THE MIGRATION FINISHED, AND ARE THE DEDICATED BUCKETS REAL?
+ *
+ * Read-only. It answers the two questions a bucket move creates and that
+ * nothing else in the product can answer.
+ *
+ * 1. DOES THE BUCKET EACH BINDING NAMES ACTUALLY EXIST. A wrangler config
+ *    naming a bucket nobody created deploys perfectly happily — a bucket name
+ *    is not checked against the account — and then fails per request, at the
+ *    first R2 call. `probeMediaBucket` asks R2 directly instead of trusting
+ *    the config, so an unprovisioned binding is visible BEFORE a customer
+ *    finds it.
+ *
+ * 2. HOW MUCH IS STILL ONLY IN THE LEGACY BUCKET. That is exactly what the
+ *    read-through fallback in `mediaStorage.ts` is covering for, so when this
+ *    reaches zero the `media_legacy_fallback` log goes quiet and the legacy
+ *    bucket has stopped being load-bearing.
+ *
+ * Bounded like the inventory: one cursor-driven page per call, and the
+ * per-object destination check is capped, so a status call can never turn into
+ * a full-bucket scan. `complete` is null — not false — for a partial page,
+ * because a page that is not the whole bucket cannot support either answer.
+ */
+mediaRoutes.get('/migration/status', requireAdmin, async (c) => {
+  await rateLimit(c, 'media_migration_status', 120, 3600);
+  if (!c.env.BUCKET) throw unavailable('Legacy R2 binding is not configured', 'R2_NOT_CONFIGURED');
+
+  const [publicBucket, privateBucket] = await Promise.all([
+    probeMediaBucket(c.env, 'public'),
+    probeMediaBucket(c.env, 'private'),
+  ]);
+
+  const cursor = c.req.query('cursor') || undefined;
+  const limitRaw = Number(c.req.query('limit') || 50);
+  const limit = Number.isInteger(limitRaw) ? Math.min(200, Math.max(1, limitRaw)) : 50;
+  const page = await c.env.BUCKET.list({ cursor, limit });
+
+  const objects: Array<{ key: string; size: number; visibility: string; copied: boolean }> = [];
+  let pendingBytes = 0;
+  for (const object of page.objects) {
+    const plan = planLegacyMediaKey(object.key, true);
+    // The destination key is the SOURCE key: `buildMediaKey` deliberately does
+    // not encode visibility into the path, so a copy between buckets keeps
+    // every database reference valid. `plan.destinationKey` differs only for
+    // the UIUx/* rename, which is the apply endpoint's job because it has to
+    // rewrite settings in the same D1 batch.
+    let copied = false;
+    if (publicBucket.reachable && privateBucket.reachable) {
+      copied = (await mediaBucket(c.env, plan.visibility).head(object.key)) !== null;
+    }
+    if (!copied) pendingBytes += object.size;
+    objects.push({ key: object.key, size: object.size, visibility: plan.visibility, copied });
+  }
+
+  const wholeBucket = !cursor && !page.truncated;
+  const pending = objects.filter((o) => !o.copied).length;
+  return c.json({
+    success: true,
+    dry_run: true,
+    buckets: { public: publicBucket, private: privateBucket },
+    legacy: {
+      checked: objects.length,
+      still_only_in_legacy: pending,
+      already_copied: objects.length - pending,
+      pending_bytes: pendingBytes,
+      cursor: page.truncated ? page.cursor : null,
+      truncated: page.truncated,
+      objects,
+    },
+    // Never claim "finished" from a partial page, and never from a bucket the
+    // destination probe could not even reach.
+    complete:
+      wholeBucket && publicBucket.reachable && privateBucket.reachable ? pending === 0 : null,
+  });
 });
 
 function replaceExactMedia(value: unknown, oldKey: string, newKey: string): unknown {

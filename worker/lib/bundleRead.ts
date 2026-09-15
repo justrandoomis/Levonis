@@ -67,6 +67,7 @@ import { effectiveAvailability } from '@levonis/pricing/availability';
 import { typeForTransport, type ShippingType } from '@levonis/pricing/shippingType';
 import { parseProductRow, primaryMedia, type ProductDoc } from './productModel';
 import { capacityFrom, snapshotFrom } from './productOverlay';
+import { isSchemaMissing } from './membershipBenefits';
 
 // ---------------------------------------------------------------- the rows
 
@@ -116,6 +117,66 @@ export const COMPOSITION_COLUMNS = `p.*,
 export const COMPOSITION_FROM = `FROM products p
   LEFT JOIN bundle_config cfg ON cfg.product_id = p.id
   LEFT JOIN offer_windows w ON w.subject_type = 'product' AND w.subject_id = p.id`;
+
+/**
+ * THE SAME SELECT WITHOUT THE OFFER JOIN — for a shop where migration 0060 was
+ * never applied.
+ *
+ * `offer_windows` is an OPTIONAL feature, but it is joined into the row that
+ * describes a bundle, so its absence took down every screen that reads one —
+ * including a CART that merely contains a bundle line. A LEFT JOIN to a table
+ * that does not exist is not a null, it is a hard SQLite error.
+ *
+ * Dropping the join is exactly equivalent to "no offer is running": the
+ * `ofw_*` columns come back absent, and `windowFromJoin` already returns null
+ * the moment `ofw_id` is null or undefined. So the bundle prices at its
+ * ordinary price, which is the honest answer, rather than vanishing from the
+ * customer's cart or 500ing the page.
+ */
+export const COMPOSITION_FROM_NO_OFFERS = `FROM products p
+  LEFT JOIN bundle_config cfg ON cfg.product_id = p.id`;
+
+/**
+ * The same column list with every `w.<col> AS ofw_<x>` rewritten to
+ * `NULL AS ofw_<x>`, DERIVED from the real list rather than written out again
+ * — a second hand-maintained copy would drift the first time a column is
+ * added, and drift here means a query that compiles and returns the wrong
+ * shape. Selecting NULL keeps the row's shape identical, which is what lets
+ * `windowFromJoin` answer "no offer" without any caller knowing.
+ */
+export const COMPOSITION_COLUMNS_NO_OFFERS = COMPOSITION_COLUMNS.replace(
+  /\bw\.[A-Za-z_]+\s+AS\s+(ofw_[A-Za-z_]+)/g,
+  'NULL AS $1'
+);
+
+/**
+ * Run a composition SELECT, and answer it WITHOUT the offer join if and only
+ * if the offer table is not installed. `build` receives the FROM clause so a
+ * caller keeps its own WHERE and its own binds; it is called at most twice and
+ * the second call is reached only after the first has already refused with
+ * `no such table`.
+ */
+export async function compositionSelect(
+  db: D1Database,
+  build: (columns: string, from: string) => string,
+  binds: readonly unknown[] = []
+): Promise<Record<string, unknown>[]> {
+  try {
+    const r = await db
+      .prepare(build(COMPOSITION_COLUMNS, COMPOSITION_FROM))
+      .bind(...binds)
+      .all<Record<string, unknown>>();
+    return r.results ?? [];
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+    console.warn('offers (migration 0060) not installed — bundles priced with no offer');
+    const r = await db
+      .prepare(build(COMPOSITION_COLUMNS_NO_OFFERS, COMPOSITION_FROM_NO_OFFERS))
+      .bind(...binds)
+      .all<Record<string, unknown>>();
+    return r.results ?? [];
+  }
+}
 
 const num = (v: unknown): number | null => (v === null || v === undefined || v === '' ? null : Number(v));
 
@@ -1071,9 +1132,10 @@ export async function loadCompositionBySlug(
   db: D1Database,
   slug: string
 ): Promise<Record<string, unknown> | null> {
-  const row = await db
-    .prepare(`SELECT ${COMPOSITION_COLUMNS} ${COMPOSITION_FROM} WHERE p.slug = ? AND p.composition <> '' LIMIT 1`)
-    .bind(slug)
-    .first<Record<string, unknown>>();
-  return row ?? null;
+  const rows = await compositionSelect(
+    db,
+    (cols, from) => `SELECT ${cols} ${from} WHERE p.slug = ? AND p.composition <> '' LIMIT 1`,
+    [slug]
+  );
+  return rows[0] ?? null;
 }

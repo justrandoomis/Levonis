@@ -49,6 +49,14 @@
 import type { Env } from './types';
 import { safeParse } from './types';
 import { newId } from './crypto';
+import { getTierStatus } from './entitlements';
+import {
+  applyMultiplierX100,
+  multipliedPointsSql,
+  multiplierSql,
+  rewardMultiplierX100,
+  tierNameSql,
+} from './pointsMultiplier';
 
 // ---------------------------------------------------------------- pure math
 
@@ -181,14 +189,27 @@ export function recomputeReversal(
   currentPoints: number,
   currentEligibleIqd: number,
   portionIqd: number | undefined,
-  iqdPerPoint: number
+  iqdPerPoint: number,
+  /**
+   * The subscription multiplier the accrual was FROZEN at (100 = none).
+   * Without it a partial return would recompute the target from the base rate
+   * alone and claw back the multiplied half of what the customer keeps: a PRO
+   * who earned 1,500 on 75,000 IQD and returns half would be left with 375
+   * instead of 750. The order's own frozen multiplier is passed in, never a
+   * freshly-resolved one, so a membership that lapsed after the purchase
+   * cannot change what a return costs.
+   */
+  multiplierX100 = 100
 ): { removePoints: number; removeEligible: number; remainingEligible: number; targetPoints: number } {
   const points = Math.max(0, Math.trunc(Number(currentPoints) || 0));
   const eligible = Math.max(0, Math.trunc(Number(currentEligibleIqd) || 0));
   const portion = portionIqd === undefined ? eligible : Math.max(0, Math.trunc(Number(portionIqd) || 0));
   const removeEligible = Math.min(portion, eligible);
   const remainingEligible = eligible - removeEligible;
-  const targetPoints = pointsForEligibleIqd(remainingEligible, iqdPerPoint);
+  const targetPoints = applyMultiplierX100(
+    pointsForEligibleIqd(remainingEligible, iqdPerPoint),
+    multiplierX100
+  );
   return {
     removePoints: Math.max(0, points - targetPoints),
     removeEligible,
@@ -291,7 +312,24 @@ export interface AccrualPlan {
   source_ref: string;
   order_id: string;
   user_id: string;
+  /**
+   * Points the accrual will carry AFTER the subscription multiplier.
+   *
+   * Exact when the caller supplied `multiplierX100` (or used the async
+   * `buildPurchaseAccrual`, which resolves it). When it did not, the
+   * multiplier is resolved by the INSERT itself inside the checkout
+   * transaction and this field reports the un-multiplied base — see
+   * `multiplier_resolved_in_statement`, which says which of the two happened.
+   */
   points: number;
+  /** Points before the multiplier. Always exact. */
+  base_points: number;
+  /** 100 / 150 / 200, or null when the INSERT resolves it in-statement. */
+  multiplier_x100: number | null;
+  /** The tier the multiplier came from, or null when resolved in-statement. */
+  tier_at_award: string | null;
+  /** True when the row's multiplier is decided by SQL at commit time. */
+  multiplier_resolved_in_statement: boolean;
   eligible_iqd: number;
   rule: PointsRule;
   purchase_at: string;
@@ -310,6 +348,16 @@ export interface PurchaseAccrualInput {
   rule: PointsRule;
   /** True when nothing is due on delivery (wallet/points covered the total). */
   settledAtPurchase: boolean;
+  /**
+   * The subscription reward multiplier, ALREADY RESOLVED by the caller
+   * (100 / 150 / 200). Omit it and the INSERT resolves it itself from
+   * `memberships` and `restriction_cases` at the instant the checkout
+   * transaction commits — which is the safer default, because there is then
+   * no window between reading the membership and writing the award.
+   */
+  multiplierX100?: number;
+  /** The tier that multiplier came from; only read when multiplierX100 is given. */
+  tier?: string;
 }
 
 /**
@@ -323,41 +371,82 @@ export function buildPurchaseAccrualStatements(
   env: Env,
   input: PurchaseAccrualInput
 ): { statements: D1PreparedStatement[]; accrual: AccrualPlan } {
-  const points = pointsForEligibleIqd(input.netEligibleIqd, input.rule.iqd_per_point);
+  const base = pointsForEligibleIqd(input.netEligibleIqd, input.rule.iqd_per_point);
   const eligible = Math.max(0, Math.trunc(Number(input.netEligibleIqd) || 0));
+  const supplied = input.multiplierX100 !== undefined;
+  const multiplier = supplied ? Math.max(100, Math.trunc(Number(input.multiplierX100) || 100)) : null;
   const accrual: AccrualPlan = {
     id: newId('pac'),
     source_ref: `order:${input.orderId}:accrual`,
     order_id: input.orderId,
     user_id: input.userId,
-    points,
+    points: multiplier === null ? base : applyMultiplierX100(base, multiplier),
+    base_points: base,
+    multiplier_x100: multiplier,
+    tier_at_award: multiplier === null ? null : String(input.tier ?? ''),
+    multiplier_resolved_in_statement: multiplier === null,
     eligible_iqd: eligible,
     rule: input.rule,
     purchase_at: input.purchaseAt,
     available_at: availableAtFrom(input.purchaseAt),
     settled_at: input.settledAtPurchase ? input.purchaseAt : null,
   };
+
+  // THE MULTIPLIER IS FROZEN HERE, IN THIS STATEMENT, IN THE CHECKOUT
+  // TRANSACTION. Whether it arrives as a bound constant (?12/?13) or is read
+  // out of `memberships` by the SELECT itself, `points`, `base_points`,
+  // `multiplier_x100` and `tier_at_award` are all written together, once, and
+  // never recomputed. Release reads `points` off the row seven days later, so
+  // a subscription that lapses in between cannot rewrite what was earned —
+  // and a subscription bought in between cannot inflate it either.
+  const multExpr = multiplier === null ? multiplierSql('?4', '?9') : '?12';
+  const tierExpr = multiplier === null ? tierNameSql('?4', '?9') : '?13';
   const statements = [
     env.DB.prepare(
       `INSERT INTO points_accruals
-         (id, source_ref, order_id, user_id, kind, points, eligible_iqd, iqd_per_point, rule_version,
+         (id, source_ref, order_id, user_id, kind, points, base_points, multiplier_x100, tier_at_award,
+          eligible_iqd, iqd_per_point, rule_version,
           state, purchase_at, available_at, settled_at, reason)
-       VALUES (?, ?, ?, ?, 'purchase', ?, ?, ?, ?, 'pending', ?, ?, ?, 'purchase')`
+       SELECT ?1, ?2, ?3, ?4, 'purchase',
+              ${multipliedPointsSql('?5', 'm.mult')}, ?5, m.mult, m.tier,
+              ?6, ?7, ?8, 'pending', ?9, ?10, ?11, 'purchase'
+         FROM (SELECT ${multExpr} AS mult, ${tierExpr} AS tier) m`
     ).bind(
       accrual.id,
       accrual.source_ref,
       accrual.order_id,
       accrual.user_id,
-      accrual.points,
+      accrual.base_points,
       accrual.eligible_iqd,
       accrual.rule.iqd_per_point,
       accrual.rule.version,
       accrual.purchase_at,
       accrual.available_at,
-      accrual.settled_at
+      accrual.settled_at,
+      ...(multiplier === null ? [] : [multiplier, accrual.tier_at_award]),
     ),
   ];
   return { statements, accrual };
+}
+
+/**
+ * The same plan with the multiplier resolved BEFORE the batch, so every number
+ * in `AccrualPlan` is exact and a caller can show the customer what they are
+ * about to earn. Prefer it wherever an await is available; the statements it
+ * returns still carry the multiplier as a bound constant, so the row is
+ * written atomically with the order exactly as before.
+ */
+export async function buildPurchaseAccrual(
+  env: Env,
+  input: PurchaseAccrualInput
+): Promise<{ statements: D1PreparedStatement[]; accrual: AccrualPlan }> {
+  if (input.multiplierX100 !== undefined) return buildPurchaseAccrualStatements(env, input);
+  const status = await getTierStatus(env.DB, input.userId);
+  return buildPurchaseAccrualStatements(env, {
+    ...input,
+    multiplierX100: rewardMultiplierX100(status),
+    tier: status.tier,
+  });
 }
 
 /**
@@ -735,14 +824,14 @@ export async function reversePointsForOrder(
 ): Promise<ReversalResult> {
   const purchase = await env.DB.prepare(
     `SELECT a.id, a.user_id, a.state, a.iqd_per_point, a.rule_version, a.eligible_iqd,
-            o.merchandise_iqd AS gross_merchandise
+            a.multiplier_x100, o.merchandise_iqd AS gross_merchandise
        FROM points_accruals a JOIN orders o ON o.id = a.order_id
       WHERE a.order_id = ? AND a.kind = 'purchase'`
   )
     .bind(orderId)
     .first<{
       id: string; user_id: string; state: string; iqd_per_point: number; rule_version: string;
-      eligible_iqd: number; gross_merchandise: number | null;
+      eligible_iqd: number; multiplier_x100: number | null; gross_merchandise: number | null;
     }>();
   if (!purchase) return legacyReverse(env, orderId, reason, opts);
   if (purchase.state === 'cancelled') return { reversed: false, points: 0, reason: 'accrual_cancelled' };
@@ -767,11 +856,16 @@ export async function reversePointsForOrder(
           Number(purchase.eligible_iqd) || 0,
           Number(purchase.gross_merchandise) || 0
         );
+  // The order's OWN frozen multiplier, never a freshly-resolved one: a
+  // membership that lapsed (or was bought) after the purchase must not change
+  // what a return costs the customer.
+  const frozenMultiplier = Math.max(100, Number(purchase.multiplier_x100) || 100);
   const { removePoints, removeEligible } = recomputeReversal(
     currentPoints,
     currentEligible,
     portionNet,
-    Number(purchase.iqd_per_point) || 0
+    Number(purchase.iqd_per_point) || 0,
+    frozenMultiplier
   );
 
   if (removePoints <= 0 && removeEligible <= 0) {
@@ -789,9 +883,9 @@ export async function reversePointsForOrder(
     env.DB.prepare(
       `INSERT INTO points_accruals
          (id, source_ref, order_id, user_id, kind, points, eligible_iqd, iqd_per_point, rule_version,
-          state, purchase_at, available_at, released_at, reason)
+          multiplier_x100, tier_at_award, state, purchase_at, available_at, released_at, reason)
        SELECT ?1, ?2, ?3, p.user_id, 'reversal', ?4, ?5, p.iqd_per_point, p.rule_version,
-              ?6, p.purchase_at, p.available_at, ?7, ?8
+              p.multiplier_x100, p.tier_at_award, ?6, p.purchase_at, p.available_at, ?7, ?8
          FROM points_accruals p WHERE p.order_id = ?3 AND p.kind = 'purchase'`
     ).bind(
       rowId,

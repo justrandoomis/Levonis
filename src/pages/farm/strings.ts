@@ -284,6 +284,30 @@ export interface FarmStrings {
   hubRedeem: string;
   hubRedeemDesc: string;
 
+  /**
+   * SHELVED — «قريبا — تحت التطوير».
+   *
+   * The owner asked for the farm to be marked coming-soon and for its page not
+   * to be shown to customers while it is being built. The hub keeps LISTING the
+   * game and wears these words; a card that vanished would read as cancelled.
+   * The server's switch decides when they are shown (worker/routes/farm.ts),
+   * so nothing here is a claim the client made up.
+   *
+   * Nested on purpose: one block, one meaning, and it stays together when the
+   * Sorani below is replaced by the owner's own wording.
+   */
+  shelved: {
+    /** The card's chip: the one word the owner wrote. */
+    badge: string;
+    title: string;
+    body: string;
+    /** Under a hub row that leads into the shelved game. */
+    linkNote: string;
+    /** An admin's card says who it is closed to, and where the switch lives. */
+    adminBadge: string;
+    adminBody: string;
+  };
+
   // leaderboards
   lbTitle: string;
   lbBoardReputation: string;
@@ -364,6 +388,7 @@ const ERRORS_AR: Record<string, string> = {
   FEATURE_LOCKED: 'هذه الميزة غير مفتوحة لمزرعتك بعد.',
   LAST_PRINTER: 'لا يمكن بيع آخر طابعة: ثمنها مع رصيدك لا يكفي لشراء طابعة أخرى.',
   IDEMPOTENCY_KEY_REUSED: 'تعارض في الطلب — أُعيدت قراءة الحالة، حاول مرة أخرى.',
+  FARM_SHELVED: 'لعبة المزرعة تحت التطوير ولم تُفتح بعد — قريبا.',
 };
 
 const ERRORS_EN: Record<string, string> = {
@@ -405,6 +430,7 @@ const ERRORS_EN: Record<string, string> = {
   FEATURE_LOCKED: 'This feature is not unlocked for your farm yet.',
   LAST_PRINTER: 'Your last printer cannot be sold: its price plus your balance would not buy another one.',
   IDEMPOTENCY_KEY_REUSED: 'Request conflict — the state has been re-read, please try again.',
+  FARM_SHELVED: 'The printer farm is under development and is not open yet.',
 };
 
 const ERRORS_CKB: Record<string, string> = {
@@ -446,6 +472,8 @@ const ERRORS_CKB: Record<string, string> = {
   FEATURE_LOCKED: 'ئەم تایبەتمەندییە هێشتا بۆ کێڵگەکەت نەکراوەتەوە.',
   LAST_PRINTER: 'دوایین چاپکەر نافرۆشرێت: نرخەکەی لەگەڵ باڵانسەکەت بەشی کڕینی چاپکەرێکی دیکە ناکات.',
   IDEMPOTENCY_KEY_REUSED: 'ناکۆکی داواکاری — دۆخەکە دووبارە خوێندرایەوە، هەوڵ بدەوە.',
+  // Arabic: the Sorani for this sentence is the owner's to write by hand.
+  FARM_SHELVED: 'لعبة المزرعة تحت التطوير ولم تُفتح بعد — قريبا.',
 };
 
 const LEDGER_AR: Record<string, string> = {
@@ -783,6 +811,15 @@ const ar: FarmStrings = {
   hubRedeem: 'تحويل العملات',
   hubRedeemDesc: 'قواعد تحويل عملات المزرعة إلى نقاط ليفونيس.',
 
+  shelved: {
+    badge: 'قريبا',
+    title: 'المزرعة تحت التطوير',
+    body: 'اللعبة قيد التطوير الآن ولم تُفتح للاعبين بعد. لم يضع أحد شيئًا: كل ما جمعته المزارع محفوظ كما هو، وتعود اللعبة من حيث توقفت عند فتحها.',
+    linkNote: 'يفتح مع اللعبة',
+    adminBadge: 'مغلقة على اللاعبين',
+    adminBody: 'أنت تدخلها كمشرف — اللاعبون يرون إشعار «قريبا» فقط. الفتح من لوحة الإدارة ← مزرعة الطابعات.',
+  },
+
   lbTitle: 'لوحات المتصدرين',
   lbBoardReputation: 'السمعة',
   lbBoardFarmValue: 'قيمة المزرعة',
@@ -1081,6 +1118,15 @@ const en: FarmStrings = {
   hubRedeem: 'Coin conversion',
   hubRedeemDesc: 'The rules for turning Farm Coins into Levonis Points.',
 
+  shelved: {
+    badge: 'In development',
+    title: 'The farm is under development',
+    body: 'The game is still being built and is not open to players yet. Nothing was lost: every farm is stored exactly as its owner left it, and play resumes where it stopped.',
+    linkNote: 'Opens with the game',
+    adminBadge: 'Closed to players',
+    adminBody: 'You are entering as an admin — players only see the notice. The switch is in Admin → Printer Farm.',
+  },
+
   lbTitle: 'Leaderboards',
   lbBoardReputation: 'Reputation',
   lbBoardFarmValue: 'Farm value',
@@ -1377,6 +1423,20 @@ const ckb: FarmStrings = {
   hubProfileDesc: 'ئاست و ئامار و ناوبانگت.',
   hubRedeem: 'گۆڕینی دراو',
   hubRedeemDesc: 'ڕێساکانی گۆڕینی دراوی کێڵگە بۆ خاڵی لیڤۆنیس.',
+
+  // THE ARABIC TEXT, ON PURPOSE. The shelving notice is new copy and the
+  // Sorani for it is the owner's to write by hand — machine-written Kurdish is
+  // not allowed on this site. A Kurdish reader sees the Arabic sentence, which
+  // is true, rather than an invented one that might not be. Replace these six
+  // values with the owner's wording; nothing else has to change.
+  shelved: {
+    badge: 'قريبا',
+    title: 'المزرعة تحت التطوير',
+    body: 'اللعبة قيد التطوير الآن ولم تُفتح للاعبين بعد. لم يضع أحد شيئًا: كل ما جمعته المزارع محفوظ كما هو، وتعود اللعبة من حيث توقفت عند فتحها.',
+    linkNote: 'يفتح مع اللعبة',
+    adminBadge: 'مغلقة على اللاعبين',
+    adminBody: 'أنت تدخلها كمشرف — اللاعبون يرون إشعار «قريبا» فقط. الفتح من لوحة الإدارة ← مزرعة الطابعات.',
+  },
 
   lbTitle: 'خشتەی پێشەنگان',
   lbBoardReputation: 'ناوبانگ',

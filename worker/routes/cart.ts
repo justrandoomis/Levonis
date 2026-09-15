@@ -62,7 +62,9 @@ import {
   activeBenefitRules,
   ancestryFor,
   catalogAncestry,
+  degradeIfSchemaMissing,
   fallbackFor,
+  isSchemaMissing,
   resolveMembershipBenefits,
   resolveOrderBenefits,
 } from '../lib/membershipBenefits';
@@ -649,28 +651,99 @@ function compositionCartItem(
   };
 }
 
+// ------------------------------------------------------------ the cart rows
+
+/**
+ * THE SELECTION COLUMNS ON A CART LINE, AND THE VALUE EACH ONE HAS WHEN ITS
+ * MIGRATION HAS NOT RUN.
+ *
+ * `cart_items` has been widened four times since 0001 — `transport_method`
+ * and `warranty_plan_id` (0002), `option_value_ids` (0023), `fulfillment_type`
+ * (0073) — and `loadCart` names every one of them. Name a column a database
+ * does not have and SQLite refuses the WHOLE statement, so on a deployment
+ * that is one migration ahead of its database this single SELECT took the
+ * cart screen down with `no such column: ci.fulfillment_type` while the
+ * orders, points, farm and home screens — which never read a cart line —
+ * carried on working. That is the shape of the reported defect exactly.
+ *
+ * THE DEFAULT HERE IS NOT A GUESS. Each one is the DEFAULT the migration
+ * itself declares, and SQLite can only answer `no such column` for a column
+ * that is not in the table — which means no row has ever stored a value for
+ * it, which means the default is the value every row holds. `selectionFromCartRow`
+ * already reads exactly these defaults for a line written before the column
+ * existed, so a cart read this way is priced by the same code, down the same
+ * branch, as a legacy line: nothing is approximated and no price moves.
+ */
+const CART_LINE_COLUMNS: ReadonlyArray<{ name: string; sqlDefault: string }> = [
+  { name: 'option_id', sqlDefault: "''" },
+  { name: 'option_value_ids', sqlDefault: "'[]'" }, // 0023
+  { name: 'color_id', sqlDefault: "''" },
+  { name: 'shipping_method_id', sqlDefault: "''" },
+  { name: 'transport_method', sqlDefault: "''" }, // 0002
+  { name: 'fulfillment_type', sqlDefault: "''" }, // 0073
+  { name: 'warranty_plan_id', sqlDefault: "''" }, // 0002
+];
+
+const cartLineSql = (projection: string) =>
+  `SELECT ci.id AS cart_item_id, ci.qty, ${projection}, p.*
+     FROM cart_items ci JOIN products p ON p.id = ci.product_id
+    WHERE ci.user_id = ? ORDER BY ci.created_at DESC`;
+
+/**
+ * The cart's lines, read with the columns this database actually has.
+ *
+ * The fast path is the statement the code has always run, unchanged and at no
+ * extra cost. The introspection below is paid for ONLY after that statement
+ * has already refused for a missing column, which on a correctly migrated
+ * database never happens. `cart_items` itself being absent is NOT recovered
+ * from — the rebuilt statement still selects from it and still throws, because
+ * a cart with no cart table is not a cart that should quietly render empty.
+ */
+async function cartLineRows(db: D1Database, userId: string): Promise<Record<string, unknown>[]> {
+  const named = CART_LINE_COLUMNS.map((col) => `ci.${col.name}`).join(', ');
+  try {
+    return (await db.prepare(cartLineSql(named)).bind(userId).all<Record<string, unknown>>()).results ?? [];
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+    console.error(`cart line columns behind the deployment: ${e instanceof Error ? e.message : String(e)}`);
+    const { results } = await db.prepare('PRAGMA table_info(cart_items)').all<{ name: string }>();
+    const present = new Set((results ?? []).map((r) => String(r.name)));
+    const projection = CART_LINE_COLUMNS.map((col) =>
+      present.has(col.name) ? `ci.${col.name}` : `${col.sqlDefault} AS ${col.name}`
+    ).join(', ');
+    return (await db.prepare(cartLineSql(projection)).bind(userId).all<Record<string, unknown>>()).results ?? [];
+  }
+}
+
 // ------------------------------------------------------------------- routes
 
 async function loadCart(c: Context<AppContext>) {
   const user = c.get('user')!;
   const { tier, active: tierActive, status, ctx } = await cartPricing(c);
-  const { results } = await c.env.DB.prepare(
-    `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.option_value_ids, ci.color_id,
-            ci.shipping_method_id, ci.transport_method, ci.fulfillment_type, ci.warranty_plan_id, p.*
-       FROM cart_items ci JOIN products p ON p.id = ci.product_id
-      WHERE ci.user_id = ? ORDER BY ci.created_at DESC`
-  )
-    .bind(user.id)
-    .all<Record<string, unknown>>();
+  const results = await cartLineRows(c.env.DB, user.id);
 
   // Display-only: which lines carry the explicit support-gift eligibility
   // flag. One extra query for the whole cart, never per line, and it feeds
   // no price anywhere.
   const activeIds = results.filter((r) => r.status === 'active').map((r) => String(r.id ?? ''));
   const [eligibleIds, printerIds, poolMemberIds] = await Promise.all([
-    supportEligibleProductIds(c.env.DB, activeIds),
-    // Which lines are printers (owner's catalog flag), so the cart can show
-    // the home-delivery note beside them. Informational — never a price.
+    // A DISPLAY FLAG IS NOT WORTH A 500 (the `soft` pattern in
+    // worker/routes/admin.ts, added after one `chats.order_id` lookup took the
+    // whole fulfilment modal down). §3.3 says a support code has ZERO monetary
+    // effect, so an unflagged line is a missing sentence, never a wrong price.
+    degradeIfSchemaMissing('support gift eligibility (migration 0016)', () => supportEligibleProductIds(c.env.DB, activeIds), new Set<string>()),
+    /**
+     * Which lines are printers (owner's catalog flag), so the cart can show
+     * the home-delivery note beside them.
+     *
+     * NOT DEGRADED, and the asymmetry with the two reads around it is the
+     * whole point: `isPrinter` is handed to `resolveUnitPrice` and to
+     * `pricedPlans`, where it decides the warranty base months a percent plan
+     * is charged on. It is a PRICE input, so an unreadable answer must stop
+     * the screen rather than quietly reprice an extended warranty. It reads
+     * `catalogs`/`product_catalogs` (0002) — required schema — which is the
+     * same line drawn from the other side.
+     */
     printerProductIds(c.env.DB, activeIds),
     /**
      * §8.2 ROW 18 IS A PUBLICATION RULE, NOT A CATALOGUE-ROUTE RULE.
@@ -686,8 +759,17 @@ async function loadCart(c: Context<AppContext>) {
      *
      * One indexed read for the whole cart (`idx_mystery_entries_product`),
      * resolved once and passed down beside the tier context (§14).
+     *
+     * THIS ONE IS A DISCLOSURE GATE, so degrading it needs its own argument
+     * rather than the general one: masking exists to hide WHICH products a
+     * live pool draws from, and 0061's tables are where a pool is stored. If
+     * `mystery_pool_entries` is not in the database then no pool has ever been
+     * created, no product is a candidate for one, and there is nothing for the
+     * mask to hide. A pool that DOES exist behind a locked or unreadable table
+     * is a different matter entirely, and `isSchemaMissing` refuses to absorb
+     * that: it still throws, and the stock count stays unpublished.
      */
-    activePoolProductIds(c.env.DB, activeIds),
+    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, activeIds), new Set<string>()),
   ]);
 
   // One batched read of every product's relational structure — never N+1.
@@ -711,9 +793,19 @@ async function loadCart(c: Context<AppContext>) {
   // Scheduled special offers on the ORDINARY lines — one chunked read for the
   // whole cart. The same `offer_windows` row a bundle uses, on the same
   // subject key, resolved by the same function the card and the door use.
-  const lineOffers = await loadOffers(
-    c.env.DB,
-    results.filter((r) => r.status === 'active' && String(r.composition ?? '') === '').map((r) => subjectOf(String(r.id)))
+  // A store with no 0060 has no offer window and no offer limit, so every
+  // line prices at the ladder price — which is the price it would get from an
+  // empty `offer_windows` anyway. An offer that EXISTS but cannot be read is
+  // not absorbed (see `isSchemaMissing`): quoting the ladder price over a live
+  // discount would overcharge the customer, and that is worth an error page.
+  const lineOffers = await degradeIfSchemaMissing(
+    'special offers (migration 0060)',
+    () =>
+      loadOffers(
+        c.env.DB,
+        results.filter((r) => r.status === 'active' && String(r.composition ?? '') === '').map((r) => subjectOf(String(r.id)))
+      ),
+    new Map<string, OfferView>()
   );
   const nowMs = Date.now();
   // A bundle's printers are its COMPONENTS' — the parent row is never in a
@@ -1417,7 +1509,14 @@ cartRoutes.post('/items', async (c) => {
     // The owner's catalog flag decides whether an extended warranty may ride
     // on this line at all — "this system applies to printers only".
     warrantyPlanId ? isPrinterProduct(c.env.DB, productId) : Promise.resolve(false),
-    loadOffers(c.env.DB, [subjectOf(productId)]),
+    // Same rule as the cart read: no 0060 means no window exists, so the
+    // ladder price IS this line's price. Anything other than a missing table
+    // still refuses the add rather than storing a line at the wrong price.
+    degradeIfSchemaMissing(
+      'special offers (migration 0060)',
+      () => loadOffers(c.env.DB, [subjectOf(productId)]),
+      new Map<string, OfferView>()
+    ),
   ]);
   refuseNonPrinterWarranty(isPrinter, warrantyPlanId);
   const view = views.get(productId);
@@ -1466,7 +1565,14 @@ cartRoutes.post('/items', async (c) => {
   // left" for the rest names the drawn colour without buying anything. The
   // coarse branch returns `available: null`, so both refusals take their
   // existing count-free path with no new branch.
-  const coarseStock = (await activePoolProductIds(c.env.DB, [String(product.id)])).size > 0;
+  const coarseStock =
+    (
+      await degradeIfSchemaMissing(
+        'mystery pools (migration 0061)',
+        () => activePoolProductIds(c.env.DB, [String(product.id)]),
+        new Set<string>()
+      )
+    ).size > 0;
   const availability = saleAvailability(doc, {
     optionValueIds,
     colorId: colorId || null,
@@ -1852,7 +1958,14 @@ cartRoutes.patch('/items/:id', async (c) => {
 
   // §8.2 row 18, on the PATCH door as well: "Only N left" from a qty bump is
   // the same oracle the add path carried.
-  const coarseStock = (await activePoolProductIds(c.env.DB, [String(existing.product_id)])).size > 0;
+  const coarseStock =
+    (
+      await degradeIfSchemaMissing(
+        'mystery pools (migration 0061)',
+        () => activePoolProductIds(c.env.DB, [String(existing.product_id)]),
+        new Set<string>()
+      )
+    ).size > 0;
   const availability = saleAvailability(doc, {
     optionValueIds,
     colorId: colorId || null,

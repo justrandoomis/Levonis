@@ -24,7 +24,7 @@ import type { ProductDoc } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY, type MemberFallback } from '../lib/pricing';
 import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
 import { pricingTierContext } from '../lib/entitlements';
-import { activeBenefitRules, ancestryFor, catalogAncestry, fallbackFor } from '../lib/membershipBenefits';
+import { activeBenefitRules, ancestryFor, catalogAncestry, degradeIfSchemaMissing, fallbackFor } from '../lib/membershipBenefits';
 import type { BenefitRule } from '@levonis/pricing/membershipBenefits';
 import type { TierStatus } from '../lib/entitlements';
 import { rateLimit } from '../lib/ratelimit';
@@ -296,6 +296,18 @@ const QTY_CEILING = 99; // matches the cart/checkout per-line cap
 /** The per-line cap a product in an ACTIVE mystery pool is sold under, so its
  *  exact remaining stock is never published as a quantity limit (§8.2 row 18). */
 export const POOL_MEMBER_MAX_QTY = 10;
+
+
+/**
+ * THE EMPTY OFFER MAP, typed off `loadOffers` itself so it cannot drift.
+ *
+ * An absent `offer_windows` (migration 0060) means NO OFFER IS RUNNING, and a
+ * product with no offer is priced at its ordinary price — which is exactly
+ * what every reader does with an empty map. Degrading here is what stops one
+ * uninstalled optional feature from taking the whole catalogue down, which is
+ * the failure mode that actually happened on this shop.
+ */
+const EMPTY_OFFERS = (): Awaited<ReturnType<typeof loadOffers>> => new Map();
 
 export function saleAvailability(
   doc: AvailabilityDoc,
@@ -1693,10 +1705,10 @@ productRoutes.get('/', async (c) => {
       c.env.DB,
       results.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
     ),
-    loadOffers(c.env.DB, results.map((r) => subjectOf(String(r.id)))),
+    degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(c.env.DB, results.map((r) => subjectOf(String(r.id)))), EMPTY_OFFERS()),
     // §8.2 row 18, for the LISTING too: a card carries `stock`, and a grid
     // captured before and after a purchase is the same two GETs.
-    activePoolProductIds(c.env.DB, results.map((r) => String(r.id))),
+    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, results.map((r) => String(r.id))), new Set<string>()),
   ]);
   /**
    * A COMPOSITION ROW IS SERIALIZED BY THE COMPOSITION BUILDER, HERE TOO (§9).
@@ -1818,11 +1830,11 @@ productRoutes.get('/:slug', async (c) => {
     // once per request and passed down — never once per option value or
     // colour. A product that is in no pool costs one empty query and the
     // payload is byte-identical to today's.
-    const poolMember = (await activePoolProductIds(c.env.DB, [String(row.id)])).size > 0;
+    const poolMember = (await degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, [String(row.id)]), new Set<string>())).size > 0;
     // Hoisted out of the call below: the SAME window has to price the display
     // block and the per-selection levels, or the page would paint an offer
     // price on the card and a ladder price the moment a variant was tapped.
-    const offer = (await loadOffers(c.env.DB, [subjectOf(String(row.id))])).get(offerKey(subjectOf(String(row.id))));
+    const offer = (await degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(c.env.DB, [subjectOf(String(row.id))]), EMPTY_OFFERS())).get(offerKey(subjectOf(String(row.id))));
     const out = publicWithDisplayPrice(row, ctx, relations, undefined, offer, poolMember);
     // A fact about the product, not a price: the storefront renders the
     // home-delivery note beside a printer's price block from this flag.
@@ -2132,7 +2144,7 @@ productRoutes.post('/:slug/quote', async (c) => {
     // against the REAL inventory snapshot and colour links, and asking for a
     // transport is asking for the pre-order journey (same rule as the cart).
     availability: saleAvailability(doc, {
-      coarseStock: (await activePoolProductIds(c.env.DB, [String(row.id)])).size > 0,
+      coarseStock: (await degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, [String(row.id)]), new Set<string>())).size > 0,
       optionValueIds,
       colorId,
       qty,
@@ -2254,7 +2266,7 @@ homeRoutes.get('/', async (c) => {
   const [homeViews, homePooled] = await Promise.all([
     loadRelationsViews(c.env.DB, [...homeRows.values()]),
     // §8.2 row 18 on the home rails too: the same card, the same `stock` field.
-    activePoolProductIds(c.env.DB, [...homeRows.keys()].map(String)),
+    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, [...homeRows.keys()].map(String)), new Set<string>()),
   ]);
 
   return c.json({

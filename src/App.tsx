@@ -203,6 +203,14 @@ const PrinterFarm = React.lazy(() => import('./pages/farm/PrinterFarm'));
 const GameProfile = React.lazy(() => import('./pages/games/GameProfile'));
 const GameRedeem = React.lazy(() => import('./pages/games/GameRedeem'));
 import FarmSkeleton, { GamesPageSkeleton } from './pages/farm/FarmSkeleton';
+/**
+ * THE GAME IS SHELVED — «قريبا — تحت التطوير» (worker/routes/farm.ts). The
+ * gate asks GET /api/farm/status and replaces a customer onto /games, where
+ * the hub says why, instead of rendering a page whose every call the server
+ * refuses. Eager on purpose and text-free: it wraps the lazy routes from
+ * outside, so it must not drag the game's chunk into the first bundle.
+ */
+import { FarmGate } from './pages/farm/shelved';
 import BrowseMissionTimer from './components/BrowseMissionTimer';
 const Policies = React.lazy(() => import('./pages/Policies'));
 const Support = React.lazy(() => import('./pages/Support'));
@@ -359,10 +367,15 @@ function AppContent() {
             <Route path="/addresses" element={<ProtectedRoute><Addresses /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
             <Route path="/store-checkout" element={<ProtectedRoute><StoreCheckout /></ProtectedRoute>} />
-            {/* OPEN TO GUESTS. The games hub shows a guest an honest sign-in
-                panel and fetches nothing for them; the leaderboards read the
-                one public farm route (GET /api/farm/leaderboard). The farm
-                itself is a member page: every /api/farm call is requireAuth. */}
+            {/* OPEN TO GUESTS, AND THE ONE GAMES PAGE THAT STAYS OPEN. The
+                hub shows a guest an honest sign-in panel and fetches nothing
+                for them. While the farm is shelved it is also where every
+                other games route lands: the hub keeps LISTING the game with
+                the «قريبا — تحت التطوير» notice, so a redirect here explains
+                itself instead of dead-ending. It is never wrapped in FarmGate —
+                that would be a loop, and the notice would have nowhere to live.
+                The farm itself is a member page: every /api/farm call is
+                requireAuth behind the shelving guard. */}
             <Route
               path="/games"
               element={
@@ -371,38 +384,57 @@ function AppContent() {
                 </Suspense>
               }
             />
+            {/* The boards are the shelved game's own standings, so they wait
+                with it: «في صفحة الألعاب» covered the page, not one card. */}
             <Route
               path="/leaderboards"
               element={
-                <Suspense fallback={<GamesPageSkeleton />}>
-                  <Leaderboards />
-                </Suspense>
+                <FarmGate fallback={<GamesPageSkeleton />}>
+                  <Suspense fallback={<GamesPageSkeleton />}>
+                    <Leaderboards />
+                  </Suspense>
+                </FarmGate>
               }
             />
+            {/* THE PAGE THE OWNER ASKED NOT TO SHOW. A redirect, not an
+                in-page notice: «ولا تعرض الصفحة للمستخدمين» means the page is
+                not shown, and an in-page state would still be the farm page,
+                with its chrome and its refused calls. `replace` leaves no
+                history entry, so a stale link, a bookmark and the back button
+                all end at the hub, which carries the «قريبا» card. */}
             <Route
               path="/games/printer-farm"
               element={
                 <ProtectedRoute>
-                  <Suspense fallback={<FarmSkeleton />}>
-                    <PrinterFarm />
-                  </Suspense>
+                  <FarmGate>
+                    <Suspense fallback={<FarmSkeleton />}>
+                      <PrinterFarm />
+                    </Suspense>
+                  </FarmGate>
                 </ProtectedRoute>
               }
             />
+            {/* The farm profile and the conversion rules read the same
+                shelved API; they follow the game rather than showing a player
+                an error box. */}
             <Route
               path="/games/profile"
               element={
-                <Suspense fallback={<GamesPageSkeleton />}>
-                  <GameProfile />
-                </Suspense>
+                <FarmGate fallback={<GamesPageSkeleton />}>
+                  <Suspense fallback={<GamesPageSkeleton />}>
+                    <GameProfile />
+                  </Suspense>
+                </FarmGate>
               }
             />
             <Route
               path="/games/redeem"
               element={
-                <Suspense fallback={<GamesPageSkeleton />}>
-                  <GameRedeem />
-                </Suspense>
+                <FarmGate fallback={<GamesPageSkeleton />}>
+                  <Suspense fallback={<GamesPageSkeleton />}>
+                    <GameRedeem />
+                  </Suspense>
+                </FarmGate>
               }
             />
             <Route path="/support" element={<Support />} />

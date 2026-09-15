@@ -90,6 +90,14 @@ export interface FarmAdminStrings {
   // public preview
   publicTitle: string;
   publicBody: string;
+
+  // the shelving switch — who may play, «قريبا — تحت التطوير» while it is shut
+  shelvedTitle: string;
+  shelvedBody: string;
+  /** The switch's own label: what turning it ON means. */
+  shelvedSwitch: string;
+  /** Where the switch stands right now, in a sentence. */
+  shelvedState: (open: boolean) => string;
   publicNone: string;
   publicLegendPublic: string;
   publicLegendPrivate: string;
@@ -262,6 +270,11 @@ const ar: FarmAdminStrings = {
 
   publicTitle: 'ما يصل إلى اللاعب',
   publicBody: 'مقتطف للقراءة فقط من الخادم: الأقسام التي يستلمها العميل في /api/farm/config. الأقسام الخاصة لا تخرج من الخادم أبدًا.',
+
+  shelvedTitle: 'فتح اللعبة للاعبين',
+  shelvedBody: 'مفتاح واحد على الخادم. وهي مغلقة الآن: يرى اللاعبون بطاقة «قريبا — تحت التطوير» في صفحة الألعاب، ويرفض الخادم كل طلبات اللعبة برمز FARM_SHELVED، بينما يدخلها المشرفون للتطوير والاختبار. الإغلاق لا يحذف شيئًا — لا مزرعة ولا عملة ولا طلب — والفتح يعيد كل شيء كما كان، بلا نشر جديد.',
+  shelvedSwitch: 'افتح اللعبة للاعبين',
+  shelvedState: (open) => (open ? 'اللعبة مفتوحة للاعبين الآن.' : 'اللعبة مغلقة — يرى اللاعبون إشعار «قريبا».'),
   publicNone: 'لم يُرجع الخادم مقتطفًا عامًا.',
   publicLegendPublic: 'يصل إلى اللاعب',
   publicLegendPrivate: 'خاص بالخادم',
@@ -430,6 +443,11 @@ const en: FarmAdminStrings = {
 
   publicTitle: 'What reaches the player',
   publicBody: 'A read-only excerpt from the server: the sections a customer receives from /api/farm/config. Private sections never leave the server.',
+
+  shelvedTitle: 'Player access',
+  shelvedBody: 'One switch, on the server. While it is shut, players see an «قريبا — تحت التطوير» card on the games page and every game request is refused with FARM_SHELVED, while admins still get in to build and test. Shutting it deletes nothing — no farm, no coin, no job — and opening it restores everything exactly as it was, with no deploy.',
+  shelvedSwitch: 'Open the game to players',
+  shelvedState: (open) => (open ? 'The game is open to players.' : 'The game is closed — players see the notice.'),
   publicNone: 'The server returned no public excerpt.',
   publicLegendPublic: 'reaches the player',
   publicLegendPrivate: 'server only',
@@ -598,6 +616,13 @@ const ckb: FarmAdminStrings = {
 
   publicTitle: 'ئەوەی دەگاتە یاریزان',
   publicBody: 'پارچەیەکی تەنها-خوێندنەوە لە سێرڤەر: ئەو بەشانەی کڕیار لە /api/farm/config وەریدەگرێت. بەشە تایبەتەکان هەرگیز لە سێرڤەر دەرناچن.',
+
+  // THE ARABIC TEXT, ON PURPOSE — the Sorani for the shelving switch is the
+  // owner's to write by hand; machine-written Kurdish is not allowed here.
+  shelvedTitle: 'فتح اللعبة للاعبين',
+  shelvedBody: 'مفتاح واحد على الخادم. وهي مغلقة الآن: يرى اللاعبون بطاقة «قريبا — تحت التطوير» في صفحة الألعاب، ويرفض الخادم كل طلبات اللعبة برمز FARM_SHELVED، بينما يدخلها المشرفون للتطوير والاختبار. الإغلاق لا يحذف شيئًا — لا مزرعة ولا عملة ولا طلب — والفتح يعيد كل شيء كما كان، بلا نشر جديد.',
+  shelvedSwitch: 'افتح اللعبة للاعبين',
+  shelvedState: (open) => (open ? 'اللعبة مفتوحة للاعبين الآن.' : 'اللعبة مغلقة — يرى اللاعبون إشعار «قريبا».'),
   publicNone: 'سێرڤەر هیچ پارچەیەکی گشتی نەگەڕاندەوە.',
   publicLegendPublic: 'دەگاتە یاریزان',
   publicLegendPrivate: 'تەنها سێرڤەر',

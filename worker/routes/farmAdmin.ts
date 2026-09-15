@@ -29,7 +29,7 @@ import {
   type FarmConfig, type FarmConfigSection,
 } from '../lib/farm/config';
 import { BALANCE_SQL, isInsufficientCoins, isLedgerReplay, ledgerInsertStatement, requestLedgerId } from '../lib/farm/ledger';
-import { ensureFarmState, loadFarmConfig, loadFarmState, stateBody } from './farm';
+import { FARM_SHELVED_SETTING_KEY, ensureFarmState, farmIsShelved, loadFarmConfig, loadFarmState, stateBody } from './farm';
 import type { FarmEventRow, FarmJobRow } from '../lib/farm/types';
 
 export const farmAdminRoutes = new Hono<AppContext>();
@@ -124,6 +124,52 @@ farmAdminRoutes.post('/config/:section/reset', async (c) => {
   await setSetting(c.env.DB, 'printerFarmConfig', next);
   await audit(c.env.DB, admin.id, 'farm.config_reset', section, { version: next.version, before: current[section] });
   return c.json({ success: true, version: next.version, config: next, problems: [] });
+});
+
+// ---------------------------------------------------------------- shelving
+
+/**
+ * THE ONE SWITCH that decides whether customers may play — «قريبا — تحت
+ * التطوير» while it is closed (worker/routes/farm.ts, "the shelving switch").
+ *
+ * Read and written here, and nowhere else, so every flip is audited with who
+ * did it and which way it went. It is NOT part of `printerFarmConfig`: that
+ * document is balancing and needs a matching `expected_version`, and a version
+ * race is the last thing anybody wants between them and closing a game.
+ *
+ * SCOPE. CLOSING is a safety action any platform admin may take — shutting a
+ * door harms nobody. OPENING starts an economy that mints Farm Coins, so it
+ * follows the same rule as `limits` and `rewards` (mandate §11): the owner or
+ * a financial admin only. An assistant can therefore stop the game in an
+ * incident but cannot turn the coin faucet back on.
+ */
+farmAdminRoutes.get('/shelved', async (c) => {
+  const shelved = await farmIsShelved(c.env.DB);
+  return c.json({ success: true, shelved, key: FARM_SHELVED_SETTING_KEY });
+});
+
+farmAdminRoutes.put('/shelved', async (c) => {
+  const admin = c.get('user')!;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  if (typeof body.open !== 'boolean') {
+    throw badRequest('open must be true or false', 'FARM_OPEN_REQUIRED');
+  }
+  const open = body.open;
+  if (open) requireFinancial(c);
+  const before = await farmIsShelved(c.env.DB);
+  const nowIso = new Date().toISOString();
+  // The same upsert `setSetting` uses; the key is not a typed SETTING_DEFAULTS
+  // entry because the generic settings PUT must not be able to open a game
+  // without an audit row naming who opened it.
+  await c.env.DB
+    .prepare('INSERT INTO admin_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .bind(FARM_SHELVED_SETTING_KEY, JSON.stringify({ open, updated_at: nowIso, by: admin.id }))
+    .run();
+  await audit(c.env.DB, admin.id, 'farm.shelved_update', FARM_SHELVED_SETTING_KEY, {
+    before_shelved: before,
+    after_shelved: !open,
+  });
+  return c.json({ success: true, shelved: !open, changed: before !== !open });
 });
 
 // ---------------------------------------------------------------- players

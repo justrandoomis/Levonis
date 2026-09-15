@@ -98,7 +98,9 @@ const STRINGS = {
     loadingMore: 'جارٍ التحميل…',
     loadMoreFailed: 'تعذر تحميل المزيد.',
     cancelledNotice: (id: string) => `أُلغي الطلب ${id}.`,
-    reviewThanks: 'شكرًا — مراجعتك بانتظار الاعتماد.',
+    // POST /api/reviews writes status='published' and answers published:true —
+    // the review is LIVE, and only the separate gift/points decision waits.
+    reviewThanks: 'شكرًا — نُشرت مراجعتك. اعتماد المكافأة قرار منفصل.',
   },
   en: {
     title: 'My Orders',
@@ -125,7 +127,7 @@ const STRINGS = {
     loadingMore: 'Loading…',
     loadMoreFailed: 'Could not load more.',
     cancelledNotice: (id: string) => `Order ${id} was cancelled.`,
-    reviewThanks: 'Thank you — your review is awaiting approval.',
+    reviewThanks: 'Thank you — your review is published. Reward approval is separate.',
   },
   ckb: {
     title: 'داواکارییەکانم',
@@ -152,7 +154,11 @@ const STRINGS = {
     loadingMore: 'بارکردن…',
     loadMoreFailed: 'زیاتر بار نەکرا.',
     cancelledNotice: (id: string) => `داواکاری ${id} هەڵوەشێنرایەوە.`,
-    reviewThanks: 'سوپاس — پێداچوونەوەکەت چاوەڕێی پەسەندکردنە.',
+    // OWNER: Sorani to be written by hand. The previous Kurdish line said the
+    // review was "awaiting approval", which the server contradicts — it
+    // publishes immediately — so the ARABIC wording stands in until you write
+    // the Sorani yourself. Nothing here is machine-translated Kurdish.
+    reviewThanks: 'شكرًا — نُشرت مراجعتك. اعتماد المكافأة قرار منفصل.',
   },
 };
 

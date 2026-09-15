@@ -67,6 +67,7 @@ import { adminCompositionAnalyticsRoutes } from './routes/bundles';
 import { farmRoutes } from './routes/farm';
 import { farmAdminRoutes } from './routes/farmAdmin';
 import { configureEventBus } from './lib/eventBus';
+import { safeErrorCode } from './lib/membershipBenefits';
 import { gatewayAssertion } from './entrypoints/gatewayAssertion';
 
 const app = new Hono<AppContext>();
@@ -261,6 +262,37 @@ app.notFound((c) => {
   return c.env.ASSETS.fetch(c.req.raw);
 });
 
+// THE ONE THING A 500 MAY TELL THE CUSTOMER.
+//
+// «حدث خطأ من جهتنا» is true and useless: it cannot tell a customer whether to
+// retry in ten seconds, come back later, or call the shop. `safeErrorCode`
+// (worker/lib/membershipBenefits.ts, beside the `no such table` predicate the
+// cart's own degrade is built on, so there is ONE definition of what that
+// error means rather than two that can drift) recognises exactly two causes
+// and names them:
+//
+//   SERVICE_SETUP  the deployment is ahead of its database — a table or column
+//                  the code reads has not been created yet. Retrying now will
+//                  fail identically; the owner has to run the migration.
+//   SERVICE_BUSY   the database was locked or busy for this request. Retrying
+//                  in a moment genuinely does work.
+//
+// WHAT DOES NOT CROSS THIS LINE. No stack, no table name, no column name, no
+// SQL and no driver text ever reaches a customer — only which of the two
+// shapes it was, as a code the storefront turns into its own sentence in the
+// customer's own language (`src/components/ui/AsyncStates.tsx`). The full
+// error keeps going to the server log, where it already went.
+//
+// LINE COMMENTS, NOT A BLOCK, and that is not a style choice: the naive
+// comment stripper in tests/storefrontIsolation.test.ts treats the slash-star
+// inside the '/api/admin/*' mount string far above as a comment opener, so the
+// first block terminator below it swallows the admin host guard that test
+// asserts on. Same reason as the note at the bottom of this file.
+const SAFE_ERROR_TEXT: Record<'SERVICE_SETUP' | 'SERVICE_BUSY', string> = {
+  SERVICE_SETUP: 'Part of the store has not finished being set up. Please try again shortly.',
+  SERVICE_BUSY: 'The store is busy right now. Please try again in a moment.',
+};
+
 app.onError((err, c) => {
   if (err instanceof HttpError) {
     return c.json(
@@ -270,7 +302,13 @@ app.onError((err, c) => {
   }
   // Detailed diagnostics stay server-side; clients get a safe generic error.
   console.error('Unhandled error', c.req.method, c.req.path, err);
-  return c.json({ success: false, error: 'Something went wrong. Please try again.' }, 500);
+  const code = safeErrorCode(err);
+  return c.json(
+    code
+      ? { success: false, error: SAFE_ERROR_TEXT[code], code }
+      : { success: false, error: 'Something went wrong. Please try again.' },
+    500
+  );
 });
 
 export default {

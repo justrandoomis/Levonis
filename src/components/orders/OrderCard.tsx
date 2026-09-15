@@ -28,7 +28,8 @@ const STRINGS = {
     hideTrack: 'إخفاء التتبع',
     details: 'التفاصيل',
     cancel: 'إلغاء',
-    review: 'تقييم',
+    review: 'تقييم المنتجات',
+    reviewedAll: 'قيّمت كل منتجات هذا الطلب',
     total: 'المجموع',
     due: 'المتبقي عند التسليم',
     bnplDue: 'رصيد BNPL',
@@ -46,7 +47,8 @@ const STRINGS = {
     hideTrack: 'Hide tracking',
     details: 'Details',
     cancel: 'Cancel',
-    review: 'Review',
+    review: 'Rate products',
+    reviewedAll: 'Every product in this order is rated',
     total: 'Total',
     due: 'Due on delivery',
     bnplDue: 'BNPL balance',
@@ -65,6 +67,8 @@ const STRINGS = {
     details: 'وردەکاری',
     cancel: 'هەڵوەشاندنەوە',
     review: 'هەڵسەنگاندن',
+    // OWNER: Sorani to be written by hand — the Arabic stands in on purpose.
+    reviewedAll: 'قيّمت كل منتجات هذا الطلب',
     total: 'کۆی گشتی',
     due: 'ماوە لە کاتی گەیاندن',
     bnplDue: 'قەرزی BNPL',
@@ -124,10 +128,26 @@ export default function OrderCard({
   const extraLines = Math.max(0, order.items.length - 1);
   const due = dueOnDelivery(order);
   const bnplDue = order.status === 'cancelled' ? 0 : Number(order.financial?.bnpl_due_iqd ?? order.bnpl_due_iqd) || 0;
+  /**
+   * The review verb, and the honest alternative to hiding it.
+   *
+   * `reviewedProductIds === null` means "/api/reviews/mine has not answered",
+   * so the verb is offered and the sheet asks the server — an unknown is never
+   * read as "already done". When the set IS known and every catalog line in
+   * the order is in it, the card SAYS the order is fully rated instead of
+   * quietly dropping the button, which read as a missing feature.
+   *
+   * Lines with no `product_id` (a mystery spool) carry no review and are
+   * excluded from both counts — the same lines the server's
+   * GET /api/reviews/order/:orderId leaves out.
+   */
+  const reviewableLines = order.items.filter((it) => !!it.product_id);
   const canReview =
     order.status === 'delivered' &&
     (reviewedProductIds === null ||
-      order.items.some((it) => it.product_id && !reviewedProductIds.has(it.product_id)));
+      reviewableLines.some((it) => !reviewedProductIds.has(it.product_id!)));
+  const allReviewed =
+    order.status === 'delivered' && reviewedProductIds !== null && reviewableLines.length > 0 && !canReview;
 
   return (
     <article
@@ -265,6 +285,15 @@ export default function OrderCard({
               <Star className="w-3.5 h-3.5" aria-hidden />
               {s.review}
             </button>
+          )}
+          {allReviewed && (
+            <span
+              data-review-all-done={order.id}
+              className="inline-flex items-center gap-1.5 min-h-[40px] px-3 text-[12.5px] font-bold text-emerald-300/80"
+            >
+              <Star className="w-3.5 h-3.5" fill="currentColor" aria-hidden />
+              {s.reviewedAll}
+            </span>
           )}
         </div>
 

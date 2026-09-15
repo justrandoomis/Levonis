@@ -36,6 +36,7 @@ import {
 import type { EditorCtx } from './editors';
 import { SectionPanel, type SectionNote } from './SectionPanel';
 import { PublicPreview } from './PublicPreview';
+import { ShelvedPanel } from './ShelvedPanel';
 import { PlayersPanel } from './PlayersPanel';
 import { isPlainObject, jsonEqual, orderedSections, privateKeys, problemsFor, type JsonObject } from './schema';
 import { adminStrings } from './strings';
@@ -232,6 +233,10 @@ export default function AdminFarmConfig() {
           {s.refresh}
         </button>
       </div>
+
+      {/* WHO MAY PLAY, before any balancing: while the game is shelved none of
+          the numbers below reach a customer at all. */}
+      <ShelvedPanel s={s} />
 
       {pageNote && (
         <p role={pageNote.ok ? 'status' : 'alert'} className={`text-[12px] ${pageNote.ok ? 'text-emerald-300' : 'text-red-400'}`} data-farm-page-note>

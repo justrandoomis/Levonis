@@ -40,12 +40,46 @@ export function classifyError(err: unknown): AsyncErrorKind {
   return 'error';
 }
 
+/**
+ * WHICH 500 THIS IS, WHEN THE SERVER COULD SAY SAFELY.
+ *
+ * THE DEFECT. The cart answered 500 for days and every customer who reached it
+ * read «خطأ في الخادم / حدث خطأ من جهتنا» beside a retry button that could not
+ * possibly work: the worker had been deployed ahead of its migrations, so one
+ * SELECT was naming a table the database did not have. "Something went wrong
+ * on our side" is true of that, and of a five-second lock, and of a bug — three
+ * situations with three different right answers for the person reading it.
+ *
+ * `app.onError` in `worker/index.ts` now puts exactly two of them on the
+ * refusal as a code — SERVICE_SETUP and SERVICE_BUSY, decided by
+ * `safeErrorCode` in worker/lib/membershipBenefits.ts — and deliberately
+ * nothing else: no table name, no column name, no SQL and no stack ever
+ * reaches a customer. This turns that code into the right sentence in the
+ * customer's own language, which is why the mapping lives here and not in the
+ * worker's one English string.
+ *
+ * Anything else, including an unknown code from an older or newer worker, keeps
+ * the generic server message it has always had.
+ */
+export type ServerCause = 'setup' | 'busy';
+
+export function serverCause(err: unknown): ServerCause | null {
+  if (!(err instanceof ApiError) || err.status < 500) return null;
+  if (err.code === 'SERVICE_SETUP') return 'setup';
+  if (err.code === 'SERVICE_BUSY') return 'busy';
+  return null;
+}
+
 const STRINGS = {
   ar: {
     networkTitle: 'لا يوجد اتصال',
     networkDesc: 'تحقق من اتصالك بالإنترنت ثم أعد المحاولة.',
     serverTitle: 'خطأ في الخادم',
     serverDesc: 'حدث خطأ من جهتنا. حاول مرة أخرى.',
+    setupTitle: 'جزء من المتجر قيد التجهيز',
+    setupDesc: 'هذه الصفحة تعتمد على جزء من المتجر لم يكتمل تجهيزه بعد. إعادة المحاولة لن تفيد قبل اكتماله — أبلغ المتجر إن استمر الأمر.',
+    busyTitle: 'المتجر مزدحم الآن',
+    busyDesc: 'تعذّر الوصول إلى بياناتك للحظة. أعد المحاولة بعد ثوانٍ.',
     errorTitle: 'تعذر التحميل',
     forbiddenTitle: 'غير مصرّح',
     forbiddenDesc: 'ليس لديك صلاحية لعرض هذا المحتوى.',
@@ -63,6 +97,11 @@ const STRINGS = {
     networkDesc: 'Check your internet connection and try again.',
     serverTitle: 'Server error',
     serverDesc: 'Something went wrong on our side. Please try again.',
+    setupTitle: 'Part of the store is still being set up',
+    setupDesc:
+      'This page depends on a part of the store that is not finished yet. Retrying will not help until it is — tell the shop if it keeps happening.',
+    busyTitle: 'The store is busy right now',
+    busyDesc: 'We could not reach your data for a moment. Please try again in a few seconds.',
     errorTitle: 'Failed to load',
     forbiddenTitle: 'Not allowed',
     forbiddenDesc: 'You do not have permission to view this content.',
@@ -80,6 +119,15 @@ const STRINGS = {
     networkDesc: 'پەیوەندیت بە ئینتەرنێتەوە بپشکنە و دووبارە هەوڵ بدەوە.',
     serverTitle: 'هەڵەی ڕاژەکار',
     serverDesc: 'هەڵەیەک لە لای ئێمە ڕوویدا. دووبارە هەوڵ بدەوە.',
+    // THESE FOUR CARRY THE ARABIC TEXT ON PURPOSE. Sorani is never generated
+    // here; a Kurdish sentence nobody who speaks Kurdish wrote is worse than
+    // an Arabic one the reader can follow. The owner writes these four by
+    // hand — setupTitle, setupDesc, busyTitle, busyDesc — and the Arabic
+    // stands in until they do.
+    setupTitle: 'جزء من المتجر قيد التجهيز',
+    setupDesc: 'هذه الصفحة تعتمد على جزء من المتجر لم يكتمل تجهيزه بعد. إعادة المحاولة لن تفيد قبل اكتماله — أبلغ المتجر إن استمر الأمر.',
+    busyTitle: 'المتجر مزدحم الآن',
+    busyDesc: 'تعذّر الوصول إلى بياناتك للحظة. أعد المحاولة بعد ثوانٍ.',
     errorTitle: 'بارکردن سەرکەوتوو نەبوو',
     forbiddenTitle: 'ڕێگەپێنەدراوە',
     forbiddenDesc: 'دەسەڵاتت نییە بۆ بینینی ئەم ناوەڕۆکە.',
@@ -175,11 +223,16 @@ export function ErrorState({
 
   const serverMessage =
     kind === 'error' && error instanceof ApiError && error.message ? error.message : '';
+  // A 500 the server was able to name gets the sentence that names it; every
+  // other 500 keeps the generic one.
+  const cause = kind === 'server' ? serverCause(error) : null;
+  const serverTitle = cause === 'setup' ? s.setupTitle : cause === 'busy' ? s.busyTitle : s.serverTitle;
+  const serverDesc = cause === 'setup' ? s.setupDesc : cause === 'busy' ? s.busyDesc : s.serverDesc;
   const title =
     kind === 'network'
       ? s.networkTitle
       : kind === 'server'
-        ? s.serverTitle
+        ? serverTitle
         : kind === 'forbidden'
           ? s.forbiddenTitle
           : s.errorTitle;
@@ -187,7 +240,7 @@ export function ErrorState({
     kind === 'network'
       ? s.networkDesc
       : kind === 'server'
-        ? s.serverDesc
+        ? serverDesc
         : kind === 'forbidden'
           ? s.forbiddenDesc
           : serverMessage || undefined;

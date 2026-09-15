@@ -42,8 +42,7 @@
 import { badRequest, HttpError } from './http';
 import { safeParse } from './types';
 import {
-  COMPOSITION_COLUMNS,
-  COMPOSITION_FROM,
+  compositionSelect,
   compositionMaxQty,
   type ComponentChoice,
   type ResolvedBundle,
@@ -204,12 +203,13 @@ export async function loadCompositionRows(
   const ids = [...new Set(productIds.filter(Boolean))];
   for (let i = 0; i < ids.length; i += CHUNK) {
     const part = ids.slice(i, i + CHUNK);
-    const { results } = await db
-      .prepare(
-        `SELECT ${COMPOSITION_COLUMNS} ${COMPOSITION_FROM} WHERE p.id IN (${part.map(() => '?').join(', ')})`
-      )
-      .bind(...part)
-      .all<Record<string, unknown>>();
+    // A cart that merely CONTAINS a bundle must not die because the optional
+    // offers table is not installed. See `compositionSelect`.
+    const results = await compositionSelect(
+      db,
+      (cols, from) => `SELECT ${cols} ${from} WHERE p.id IN (${part.map(() => '?').join(', ')})`,
+      part
+    );
     for (const r of results) out.set(String(r.id), r);
   }
   return out;

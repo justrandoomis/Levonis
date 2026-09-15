@@ -21,7 +21,7 @@ import { HttpError, requireMainHost } from '../worker/lib/http';
 import { classifyHost } from '../worker/lib/hosts';
 import { farmAdminRoutes } from '../worker/routes/farmAdmin';
 import { adminRoutes } from '../worker/routes/admin';
-import { farmRoutes } from '../worker/routes/farm';
+import { FARM_SHELVED_SETTING_KEY, farmRoutes } from '../worker/routes/farm';
 import { FARM_CONFIG_DEFAULTS } from '../worker/lib/farm/config';
 
 function setup() {
@@ -35,6 +35,12 @@ function setup() {
       ('boss','Admin','a@x.co','h','admin','boss'),
       ('helper','Assistant','h@x.co','h','admin','helper');
   `);
+  // THE GAME IS OPEN FOR THIS SUITE. The Printer Farm ships SHELVED — with no
+  // `printerFarmShelved` row every player route answers 503 FARM_SHELVED
+  // (worker/routes/farm.ts) — and everything below is the game as it is
+  // PLAYED, so the switch is turned on here, through the same row an admin
+  // writes. tests/farmShelved.test.ts owns the closed half.
+  raw.exec(`INSERT INTO admin_settings (key,value) VALUES ('${FARM_SHELVED_SETTING_KEY}','{"open":true}')`);
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
 

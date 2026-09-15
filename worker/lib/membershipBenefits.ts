@@ -39,6 +39,117 @@ import type { MemberFallback, Tier } from '@levonis/pricing/pricing';
 import { hasEntitlement, type MembershipEntitlement, type TierStatus } from './entitlements';
 import { auditStatements } from './audit';
 
+/* ------------------------------ when the feature was never installed ------ */
+
+/**
+ * IS THIS FAILURE "THE TABLE IS NOT THERE", AND NOTHING ELSE?
+ *
+ * THE DEFECT THIS EXISTS FOR. Code always reaches a deployment a moment
+ * before its migration does. `GET /api/cart` is the only customer screen that
+ * PRICES A MEMBERSHIP, so it is the only one that reads
+ * `membership_benefit_rules` (0074) — and on a database where 0074 has not
+ * been applied, `activeBenefitRules` threw `no such table` before a single
+ * cart row had been read. The orders, points and farm screens never touch
+ * that table, so the worker looked alive while the cart answered 500 and the
+ * customer got «خطأ في الخادم / حدث خطأ من جهتنا» with a retry button that
+ * could never succeed. `worker/routes/admin.ts` hit the same wall on
+ * 2026-08-30 with `chats.order_id` and answered it the same way.
+ *
+ * WHY THIS IS AN HONEST DEGRADE AND NOT A SWALLOWED ERROR — the whole
+ * argument, because getting it wrong means selling at the wrong price:
+ *
+ *   A TABLE THAT DOES NOT EXIST HOLDS NO ROWS. Every reader guarded by this
+ *   helper already has a defined, correct answer for "no rows": no benefit
+ *   rule means the regular price, no offer window means the regular price, no
+ *   mystery pool means no product is a pool member. Returning that answer is
+ *   not an approximation of the truth, it IS the truth — there is no discount
+ *   being withheld and no price being guessed, because there is no
+ *   configuration to read.
+ *
+ * WHAT IT MUST NEVER ABSORB. A lock, a busy database, an I/O error or a
+ * malformed page are all failures to READ rows that may well exist. Treating
+ * those as "no rows" would price a PRO member at the regular price while
+ * their discount sat unread in the table — a silent wrong price, which is
+ * worse than an error page. So only `no such table` / `no such column`
+ * returns true here; every other error is rethrown by the callers below and
+ * still reaches the customer as a 500.
+ *
+ * REQUIRED SCHEMA IS NOT GUARDED AT ALL. `catalogs` (0002) scopes a rule to a
+ * section: if it is unreadable, rules that DO exist would quietly stop
+ * matching and the member would be undercharged or overcharged. It is left to
+ * throw, deliberately. The line is: a missing OPTIONAL feature table degrades,
+ * a missing REQUIRED table fails loudly.
+ */
+export function isSchemaMissing(e: unknown): boolean {
+  const seen = new Set<unknown>();
+  let cursor: unknown = e;
+  while (cursor && !seen.has(cursor)) {
+    seen.add(cursor);
+    const message =
+      cursor instanceof Error ? cursor.message : typeof cursor === 'string' ? cursor : '';
+    // D1 wraps SQLite's own wording: `D1_ERROR: no such table: x: SQLITE_ERROR`.
+    if (/no such (?:table|column)\b/i.test(message)) return true;
+    cursor = cursor instanceof Error ? (cursor as { cause?: unknown }).cause : null;
+  }
+  return false;
+}
+
+/**
+ * Run an OPTIONAL feature's read; answer `fallback` when — and only when —
+ * the feature's schema is not installed. `label` names the feature in the
+ * server log so an owner can see which migration is missing; nothing about it
+ * reaches the customer.
+ */
+export async function degradeIfSchemaMissing<T>(
+  label: string,
+  run: () => Promise<T>,
+  fallback: T
+): Promise<T> {
+  try {
+    return await run();
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+    console.error(`optional feature not installed (${label}): ${e instanceof Error ? e.message : String(e)}`);
+    return fallback;
+  }
+}
+
+/**
+ * THE CUSTOMER-SAFE NAME FOR A DATABASE FAILURE THAT ESCAPED — the other half
+ * of the same question, so `no such table` is decided in ONE place.
+ *
+ * Not everything can degrade. A missing REQUIRED table, a missing column on
+ * the cart's own SELECT, a lock: those still reach `app.onError` in
+ * worker/index.ts as a 500, and until now the customer read «حدث خطأ من
+ * جهتنا» — a sentence equally true of a five-second lock, a missing migration
+ * and an outright bug, which are three situations with three different right
+ * answers for the person reading it.
+ *
+ * Two of them are recognisable here and safe to name at that altitude:
+ *
+ *   SERVICE_SETUP  the deployment is ahead of its database. Retrying now fails
+ *                  identically; only the owner running the migration fixes it.
+ *   SERVICE_BUSY   the database was locked or busy. Retrying in a moment works.
+ *
+ * The code is ALL that crosses: no stack, no table name, no column name, no
+ * SQL, no driver text. The storefront turns the code into a sentence in the
+ * customer's own language (`src/components/ui/AsyncStates.tsx`), because an
+ * English string chosen by the worker is the wrong sentence on an Arabic-first
+ * shop. Anything unrecognised returns null and keeps the generic message.
+ */
+export function safeErrorCode(err: unknown): 'SERVICE_SETUP' | 'SERVICE_BUSY' | null {
+  if (isSchemaMissing(err)) return 'SERVICE_SETUP';
+  const seen = new Set<unknown>();
+  let cursor: unknown = err;
+  while (cursor && !seen.has(cursor)) {
+    seen.add(cursor);
+    const message = cursor instanceof Error ? cursor.message : typeof cursor === 'string' ? cursor : '';
+    if (/\b(?:SQLITE_BUSY|SQLITE_LOCKED)\b|database (?:is|table is) locked/i.test(message)) return 'SERVICE_BUSY';
+    cursor = cursor instanceof Error ? (cursor as { cause?: unknown }).cause : null;
+  }
+  return null;
+}
+
 const RULE_COLUMNS =
   'id, tier, benefit_type, scope, category_id, sub_category_id, product_id, discount_mode, percent, ' +
   'fixed_iqd, max_discount_iqd, cap_scope, max_quantity, min_subtotal_iqd, free_shipping_threshold_iqd, ' +
@@ -164,12 +275,26 @@ export async function allBenefitRules(db: D1Database): Promise<BenefitRule[]> {
 }
 
 /** The rules a checkout may apply: switched on. The date window and the scope
- *  are decided per line by the pure selector, which needs the clock anyway. */
+ *  are decided per line by the pure selector, which needs the clock anyway.
+ *
+ *  THE ONE PLACE 0074's ABSENCE IS ANSWERED. Every customer-facing reader of
+ *  the rules comes through here — the cart quote, the product page's
+ *  membership teaser, the subscription page's benefit list and the checkout's
+ *  own settlement — so a store whose 0074 has not been applied loses the
+ *  BENEFITS on all four and keeps the four SCREENS, instead of losing the
+ *  screens. There are no rules to apply, so every price it produces is the
+ *  regular price, which is the correct price; see `degradeIfSchemaMissing`. */
 export async function activeBenefitRules(db: D1Database): Promise<BenefitRule[]> {
-  const { results } = await db
-    .prepare(`SELECT ${RULE_COLUMNS} FROM membership_benefit_rules WHERE enabled = 1`)
-    .all<RuleRow>();
-  return (results ?? []).map(ruleFromRow).filter((r): r is BenefitRule => r !== null);
+  return degradeIfSchemaMissing(
+    'membership_benefit_rules (migration 0074)',
+    async () => {
+      const { results } = await db
+        .prepare(`SELECT ${RULE_COLUMNS} FROM membership_benefit_rules WHERE enabled = 1`)
+        .all<RuleRow>();
+      return (results ?? []).map(ruleFromRow).filter((r): r is BenefitRule => r !== null);
+    },
+    [] as BenefitRule[]
+  );
 }
 
 /**
@@ -441,12 +566,26 @@ export { shippingAfterBenefit };
 
 /* -------------------------------------------------------- the versioning */
 
-/** The version an order placed right now is priced under. */
+/**
+ * The version an order placed right now is priced under.
+ *
+ * `null` already means "no rule set has ever been written", which is exactly
+ * what an uninstalled 0074 is, and `orders.benefit_version_id` is nullable for
+ * that case. The WRITE side is untouched: `saveBenefitRule` and `appendVersion`
+ * still throw on a missing table, because failing to RECORD a rule change
+ * silently is a different and much worse thing than failing to read one.
+ */
 export async function currentBenefitVersionId(db: D1Database): Promise<number | null> {
-  const row = await db
-    .prepare('SELECT id FROM membership_benefit_versions ORDER BY id DESC LIMIT 1')
-    .first<{ id: number }>();
-  return row ? Number(row.id) : null;
+  return degradeIfSchemaMissing(
+    'membership_benefit_versions (migration 0074)',
+    async () => {
+      const row = await db
+        .prepare('SELECT id FROM membership_benefit_versions ORDER BY id DESC LIMIT 1')
+        .first<{ id: number }>();
+      return row ? Number(row.id) : null;
+    },
+    null as number | null
+  );
 }
 
 export interface RuleWrite {

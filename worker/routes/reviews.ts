@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isPrinterProduct } from '../lib/printerIdentity';
+import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
 import type { AppContext, Env } from '../lib/types';
 import { safeParse } from '../lib/types';
 import {
@@ -640,6 +640,99 @@ reviewRoutes.get('/eligibility/:productId', requireAuth, async (c) => {
     is_printer: isPrinter,
     // null = not configured (honest state); a number = configured award.
     review_points: points,
+  });
+});
+
+/**
+ * GET /api/reviews/order/:orderId — WHAT IS LEFT TO REVIEW IN ONE ORDER.
+ *
+ * The per-product `/eligibility/:productId` answers one product at a time, so
+ * the order sheet had to ask again on every tap and could never say "nothing
+ * left" before the customer had clicked through each line. This answers the
+ * whole order in one round trip.
+ *
+ * It is a READ of the same rules POST / enforces, never a second set of them:
+ *
+ *  - the order must be the caller's own (someone else's id is a 404, exactly
+ *    as `computeFacts` gives);
+ *  - `delivered` is the same test — `delivered_at` present OR status
+ *    'delivered' — and while it is false every line is `not_delivered`;
+ *  - a line is reviewable only if its product still exists in the catalog,
+ *    because `reviews.product_id` has a FK to it;
+ *  - lines are DEDUPED BY PRODUCT, because UNIQUE(user_id, product_id) from
+ *    0003 means two lines of the same product collapse into one review. The
+ *    sheet must not offer a second row that the server would then refuse.
+ *
+ * `remaining` is what the caller needs to decide between a form and a
+ * "nothing left to review" message, and it counts only what POST would accept.
+ */
+reviewRoutes.get('/order/:orderId', requireAuth, async (c) => {
+  const user = c.get('user')!;
+  const orderId = c.req.param('orderId') ?? '';
+  const order = await c.env.DB.prepare('SELECT id, status, delivered_at FROM orders WHERE id = ? AND user_id = ?')
+    .bind(orderId, user.id)
+    .first<{ id: string; status: string; delivered_at: string | null }>();
+  if (!order) throw notFound('Order not found');
+  const delivered = !!order.delivered_at || order.status === 'delivered';
+
+  // One pass: every catalog-backed line of the order with this customer's
+  // review of that product beside it, if any. The JOIN on products drops
+  // mystery spools (NULL product_id) and products since deleted — neither can
+  // carry a review row.
+  const { results: rows } = await c.env.DB.prepare(
+    `SELECT oi.id AS order_item_id, oi.product_id,
+            oi.name_snapshot, oi.image_snapshot, oi.option_snapshot,
+            r.id AS review_id
+       FROM order_items oi
+       JOIN products p ON p.id = oi.product_id
+       LEFT JOIN reviews r ON r.product_id = oi.product_id AND r.user_id = ?
+      WHERE oi.order_id = ?
+      ORDER BY oi.rowid`
+  )
+    .bind(user.id, orderId)
+    .all<{
+      order_item_id: string;
+      product_id: string;
+      name_snapshot: string;
+      image_snapshot: string;
+      option_snapshot: string;
+      review_id: string | null;
+    }>();
+
+  const seen = new Set<string>();
+  const unique = (rows ?? []).filter((r) => !seen.has(r.product_id) && seen.add(r.product_id));
+  const printers = await printerProductIds(c.env.DB, unique.map((r) => r.product_id));
+  const points = await getReviewPointsValue(c.env.DB);
+
+  const lines = [];
+  for (const r of unique) {
+    // The same view the per-product endpoint returns, so the sheet reads one
+    // shape whichever endpoint answered.
+    const existing = r.review_id ? await loadMyReview(c.env.DB, user.id, r.review_id) : null;
+    const isSystem = !!existing && (existing.source === 'system' || existing.system_generated === true);
+    lines.push({
+      order_item_id: r.order_item_id,
+      product_id: r.product_id,
+      name: r.name_snapshot,
+      image: r.image_snapshot,
+      variant: r.option_snapshot,
+      is_printer: printers.has(r.product_id),
+      existing_review: existing,
+      // A system-written marker is replaceable by the real buyer; a review
+      // they wrote themselves is not (POST answers that with 409).
+      can_replace_system_review: isSystem,
+      state: !delivered ? 'not_delivered' : existing && !isSystem ? 'reviewed' : 'reviewable',
+    });
+  }
+
+  return c.json({
+    success: true,
+    order_id: order.id,
+    delivered,
+    // null = not configured (honest state); a number = configured award.
+    review_points: points,
+    remaining: lines.filter((l) => l.state === 'reviewable').length,
+    lines,
   });
 });
 

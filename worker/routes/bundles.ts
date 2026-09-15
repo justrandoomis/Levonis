@@ -56,7 +56,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { bumpMetric, bundleAnalytics, mysteryAnalytics } from '../lib/compositionAnalytics';
 import { benefits } from '../lib/entitlements';
 import { SESSION_COOKIE_NAME } from '../lib/session';
-import { COMPOSITION_COLUMNS, COMPOSITION_FROM } from '../lib/bundleRead';
+import { compositionSelect } from '../lib/bundleRead';
 import {
   compositionCard,
   compositionDetail,
@@ -136,15 +136,15 @@ bundlesRoutes.get('/', async (c) => {
   }
   if (featured) where += ' AND p.is_featured = 1';
 
-  const [{ results }, ctx] = await Promise.all([
-    c.env.DB.prepare(
-      `SELECT ${COMPOSITION_COLUMNS} ${COMPOSITION_FROM}
+  const [results, ctx] = await Promise.all([
+    compositionSelect(
+      c.env.DB,
+      (cols, from) => `SELECT ${cols} ${from}
         WHERE ${where}
         ORDER BY p.display_order ASC, p.created_at DESC
-        LIMIT ? OFFSET ?`
-    )
-      .bind(...params, limit, offset)
-      .all<Record<string, unknown>>(),
+        LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    ),
     pricingCtx(c),
   ]);
 

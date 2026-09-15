@@ -1,0 +1,527 @@
+# ---------------------------------------------------------------------------
+#   MOVE THE LEGACY MEDIA BUCKET INTO THE PUBLIC / PRIVATE PAIR
+# ---------------------------------------------------------------------------
+# The live store (`levonis-staging`, which is what serves levonis-iq.com —
+# docs/WORKERS.md) binds three R2 buckets:
+#
+#     BUCKET      -> levonis-files-staging            22 objects, 6.28 MB
+#     R2_PUBLIC   -> levonis-media-public-staging      0 objects
+#     R2_PRIVATE  -> levonis-media-private-staging     0 objects
+#
+# Every byte of the store's media is in the LEGACY bucket and the two dedicated
+# buckets are empty. `worker/lib/mediaStorage.ts` reads the dedicated bucket
+# first and the legacy one second, so the site works — but only because of that
+# fallback. This workflow is what ends the fallback.
+#
+# THE ONE-COPY RULE
+# -----------------
+# levonis-files-staging holds the owner's ONLY copy of the store's photography.
+# So:
+#
+#   * job 1 COPIES and VERIFIES. It deletes nothing, ever, under any input.
+#   * job 2 DELETES the legacy SOURCE objects, behind a SECOND typed
+#     confirmation. It cannot start unless job 1 finished green in the same
+#     run, and it re-verifies each object at its destination immediately before
+#     deleting that object's source.
+#   * neither job creates, renames or deletes a BUCKET. Which buckets should
+#     cease to exist is the owner's decision and is made in the dashboard.
+#
+# KEYS ARE NOT REWRITTEN
+# ----------------------
+# An object keeps its exact key; only its bucket changes. That is deliberate,
+# and it is what makes this safe: `buildMediaKey` does not encode visibility
+# into the path, so every `r2_key` and `/files/...` reference in D1 stays valid
+# with no database write at all. The one rename this system does want —
+# `UIUx/*` to `ui/levonis/*` — is NOT done here, because it has to rewrite the
+# `settings` rows in the same D1 batch. `POST /api/admin/media/migration/apply`
+# is what does that, one object at a time, and it already exists.
+#
+# WHICH BUCKET EACH OBJECT GOES TO
+# --------------------------------
+# Decided by `planLegacyMediaKey` in `worker/lib/mediaMigration.ts` — the same
+# function the Worker and the admin API use, imported and executed here rather
+# than restated. There is exactly one split rule in this repository, and the
+# runner below contains no second opinion about what is public.
+name: 38 - Move legacy media into the public/private buckets (gated, copy-then-verify)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type MIGRATE-MEDIA to copy + verify. Deletes nothing.'
+        required: true
+        default: ''
+      source_bucket:
+        description: 'Legacy bucket to read FROM'
+        required: true
+        default: 'levonis-files-staging'
+      public_bucket:
+        description: 'Destination for anonymous-public objects'
+        required: true
+        default: 'levonis-media-public-staging'
+      private_bucket:
+        description: 'Destination for everything else'
+        required: true
+        default: 'levonis-media-private-staging'
+      delete_confirm:
+        description: 'SECOND GATE. Leave EMPTY on the first run. Type DELETE-LEGACY-SOURCE to also delete the verified source objects afterwards.'
+        required: false
+        default: ''
+
+concurrency: media-bucket-move
+
+jobs:
+  # =========================================================================
+  # JOB 1 — COPY AND VERIFY. WRITES ONLY. DELETES NOTHING.
+  # =========================================================================
+  copy:
+    name: Copy legacy objects and verify every copy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # R2's data plane is S3-only. wrangler 4.127 has `r2 object get/put/delete`
+      # but NO way to LIST a bucket's objects, and a migration that cannot
+      # enumerate its source is not a migration. These two secrets are an R2 API
+      # token (Object Read & Write) — a DIFFERENT credential from
+      # CLOUDFLARE_API_TOKEN, created once in the dashboard.
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      # Recent AWS CLI v2 releases send CRC32 trailers by default and validate
+      # them on responses. R2 is S3-compatible, not S3, and this checksum
+      # negotiation is the one place that regularly bites. `when_required` keeps
+      # the CLI to the classic behaviour. Object integrity does NOT rest on
+      # this: every copy is independently verified below.
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+    steps:
+      - name: Confirmation gate
+        run: |
+          [ "${{ inputs.confirm }}" = "MIGRATE-MEDIA" ] \
+            || { echo "::error::type MIGRATE-MEDIA in the confirm input — aborting, nothing was touched"; exit 1; }
+
+      - name: Refuse to move a bucket onto itself
+        run: |
+          set -e
+          SRC='${{ inputs.source_bucket }}'
+          PUB='${{ inputs.public_bucket }}'
+          PRI='${{ inputs.private_bucket }}'
+          for name in "$SRC" "$PUB" "$PRI"; do
+            case "$name" in
+              ''|*[!a-z0-9-]*)
+                echo "::error::\"$name\" is not a plain R2 bucket name (lowercase, digits, hyphen)"; exit 1 ;;
+            esac
+          done
+          if [ "$SRC" = "$PUB" ] || [ "$SRC" = "$PRI" ] || [ "$PUB" = "$PRI" ]; then
+            echo "::error::source, public and private must be three DIFFERENT buckets"; exit 1
+          fi
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: Preflight — credentials, tooling, and that all three buckets exist
+        run: |
+          set -e
+          command -v aws >/dev/null \
+            || { echo "::error::the AWS CLI is not on this runner, and R2's object API is S3-only"; exit 1; }
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] \
+            || { echo "::error::secret CLOUDFLARE_ACCOUNT_ID is not set"; exit 1; }
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "::error::R2_S3_ACCESS_KEY_ID / R2_S3_SECRET_ACCESS_KEY are not set."
+            echo "::error::Create them once: Cloudflare dashboard -> R2 -> API -> Manage API tokens"
+            echo "::error::-> Create token, permission 'Object Read & Write', scoped to the three"
+            echo "::error::buckets named in the inputs. Save the Access Key ID and the Secret Access"
+            echo "::error::Key as those two repository secrets. CLOUDFLARE_API_TOKEN cannot be used:"
+            echo "::error::it is a Cloudflare API token and R2's object API speaks S3."
+            exit 1
+          fi
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          echo "R2_ENDPOINT=$ENDPOINT" >> "$GITHUB_ENV"
+          for b in '${{ inputs.source_bucket }}' '${{ inputs.public_bucket }}' '${{ inputs.private_bucket }}'; do
+            aws s3api head-bucket --endpoint-url "$ENDPOINT" --bucket "$b" >/dev/null 2>&1 \
+              || { echo "::error::bucket \"$b\" does not exist on this account, or this token cannot see it. Nothing was copied."; exit 1; }
+            echo "bucket ok: $b"
+          done
+
+      # WHY THE RUNNER IS GENERATED AND NOT COMMITTED
+      # The gate and the thing the gate guards live in one file, so they cannot
+      # drift apart, and the runner is written into scripts/ so that
+      # `tests/tsconfig.json` (which includes ../scripts/**/*.ts) typechecks it
+      # against the real repository BEFORE it is allowed to touch R2. The file
+      # exists only inside a CI checkout; nothing commits it. Job 2 does not
+      # re-generate it — it downloads the exact bytes job 1 ran.
+      - name: Generate the move runner
+        run: |
+          cat > ./scripts/media-bucket-move.gen.ts <<'TSEOF'
+          /**
+           * Legacy R2 media move — copy + verify (MODE=copy), or verify + prune
+           * (MODE=prune). Generated by .github/workflows/media-bucket-move.yml
+           * and never committed.
+           *
+           * Which bucket an object belongs in is decided by `planLegacyMediaKey`,
+           * this repository's single split rule, imported below.
+           */
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
+          import { tmpdir } from 'node:os';
+          import { join } from 'node:path';
+          import { planLegacyMediaKey } from '../worker/lib/mediaMigration';
+          import { isSafeMediaKey } from '../worker/lib/mediaStorage';
+
+          function required(name: string): string {
+            const value = process.env[name];
+            if (!value) throw new Error(`${name} is not set`);
+            return value;
+          }
+
+          const MODE = process.env.MODE === 'prune' ? 'prune' : 'copy';
+          const SOURCE = required('SOURCE_BUCKET');
+          const PUBLIC_BUCKET = required('PUBLIC_BUCKET');
+          const PRIVATE_BUCKET = required('PRIVATE_BUCKET');
+          const ENDPOINT = required('R2_ENDPOINT');
+          const MANIFEST = required('MANIFEST');
+
+          /**
+           * One `aws s3api` call. Arguments are passed as an array — nothing here
+           * is ever assembled into a shell string, so a key containing a quote or
+           * a space cannot become a command.
+           */
+          function aws(args: string[], expectJson = true): any {
+            const [operation, ...rest] = args;
+            const out = execFileSync(
+              'aws',
+              ['s3api', operation, '--endpoint-url', ENDPOINT, '--output', 'json', ...rest],
+              { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 }
+            );
+            if (!expectJson) return null;
+            const text = out.trim();
+            return text ? JSON.parse(text) : null;
+          }
+
+          function awsOrNull(args: string[]): any {
+            try {
+              return aws(args);
+            } catch {
+              // head-object on an absent key exits non-zero. That is an answer,
+              // not a failure, and it is the answer this script asks for most.
+              return null;
+            }
+          }
+
+          interface SourceObject { key: string; size: number; etag: string }
+
+          /**
+           * Every object in the bucket, paged to the very end. `--no-paginate`
+           * turns OFF the CLI's own merging so the cursor is explicit and this
+           * loop is the only thing deciding when the listing is complete — a
+           * silently truncated listing is a silently incomplete migration.
+           */
+          function listAll(bucket: string): SourceObject[] {
+            const found: SourceObject[] = [];
+            let token: string | null = null;
+            do {
+              const args = ['list-objects-v2', '--bucket', bucket, '--no-paginate', '--max-keys', '1000'];
+              if (token) args.push('--continuation-token', token);
+              const page = aws(args) ?? {};
+              for (const item of page.Contents ?? []) {
+                found.push({ key: String(item.Key), size: Number(item.Size), etag: String(item.ETag ?? '') });
+              }
+              token = page.IsTruncated ? String(page.NextContinuationToken) : null;
+            } while (token);
+            return found;
+          }
+
+          const scratch = mkdtempSync(join(tmpdir(), 'r2move-'));
+          function sha256(bucket: string, key: string, tag: string): string {
+            const file = join(scratch, tag + '-' + createHash('sha1').update(key).digest('hex'));
+            aws(['get-object', '--bucket', bucket, '--key', key, file]);
+            return createHash('sha256').update(readFileSync(file)).digest('hex');
+          }
+
+          /** An ETag is the content MD5 only when the object is single-part. */
+          function simpleEtag(etag: string): string | null {
+            const clean = etag.replace(/"/g, '');
+            return clean && !clean.includes('-') ? clean : null;
+          }
+
+          interface Proof { ok: boolean; method: string; detail: string }
+
+          /**
+           * A copy is "done" only when the destination is PROVEN to hold the same
+           * bytes. Size always; ETag when both sides are single-part, because then
+           * it is the MD5 of the content. When either side is multipart the ETags
+           * are not comparable at all, so both objects are downloaded and SHA-256
+           * compared — slower, and the only honest answer.
+           */
+          function verify(destBucket: string, source: SourceObject): Proof {
+            const head = awsOrNull(['head-object', '--bucket', destBucket, '--key', source.key]);
+            if (!head) return { ok: false, method: 'missing', detail: 'destination has no such object' };
+            if (Number(head.ContentLength) !== source.size) {
+              return { ok: false, method: 'size', detail: 'dest ' + head.ContentLength + ' B vs source ' + source.size + ' B' };
+            }
+            const a = simpleEtag(source.etag);
+            const b = simpleEtag(String(head.ETag ?? ''));
+            if (a && b) {
+              return a === b
+                ? { ok: true, method: 'etag', detail: a }
+                : { ok: false, method: 'etag', detail: a + ' != ' + b };
+            }
+            const sa = sha256(SOURCE, source.key, 'src');
+            const sb = sha256(destBucket, source.key, 'dst');
+            return sa === sb
+              ? { ok: true, method: 'sha256', detail: sa }
+              : { ok: false, method: 'sha256', detail: sa + ' != ' + sb };
+          }
+
+          interface Row {
+            key: string;
+            visibility: string;
+            destination: string;
+            bytes: number;
+            outcome: string;
+            method: string;
+            detail: string;
+          }
+
+          const rows: Row[] = [];
+          const blocked: Row[] = [];
+
+          if (MODE === 'copy') {
+            const objects = listAll(SOURCE);
+            const total = objects.reduce((n, o) => n + o.size, 0);
+            console.log(SOURCE + ': ' + objects.length + ' object(s), ' + total + ' B');
+            for (const object of objects) {
+              // An unsafe key is one the Worker's own `isSafeMediaKey` refuses to
+              // serve from ANY bucket. Copying it would create a second
+              // unreachable copy and let the run call that progress.
+              if (!isSafeMediaKey(object.key)) {
+                blocked.push({
+                  key: object.key, visibility: '-', destination: '-', bytes: object.size,
+                  outcome: 'BLOCKED', method: 'unsafe-key',
+                  detail: 'the Worker will not serve this key from any bucket; rename or move it by hand',
+                });
+                continue;
+              }
+              // THE SPLIT RULE. Imported, not reimplemented. `referenced` is true
+              // because THIS job copies everything: whether an object is still
+              // referenced decides whether it may eventually be deleted, not
+              // where it lives, and nothing is deleted here.
+              const plan = planLegacyMediaKey(object.key, true);
+              const destination = plan.visibility === 'public' ? PUBLIC_BUCKET : PRIVATE_BUCKET;
+
+              // Re-runnable: an object already in place is verified, not re-copied.
+              const existing = awsOrNull(['head-object', '--bucket', destination, '--key', object.key]);
+              let action = 'already-present';
+              if (!existing || Number(existing.ContentLength) !== object.size) {
+                // Server-side copy: the bytes never traverse this runner.
+                const encoded = object.key.split('/').map(encodeURIComponent).join('/');
+                aws(['copy-object', '--bucket', destination, '--key', object.key,
+                     '--copy-source', SOURCE + '/' + encoded, '--metadata-directive', 'COPY']);
+                action = 'copied';
+              }
+              const proof = verify(destination, object);
+              rows.push({
+                key: object.key, visibility: plan.visibility, destination, bytes: object.size,
+                outcome: proof.ok ? 'VERIFIED (' + action + ')' : 'FAILED',
+                method: proof.method, detail: proof.detail,
+              });
+              console.log((proof.ok ? 'ok   ' : 'FAIL ') + plan.visibility.padEnd(7) + ' ' +
+                destination + '  ' + object.key + '  [' + action + '/' + proof.method + ']');
+            }
+          } else {
+            // PRUNE. The manifest proves job 1 verified these keys in this run.
+            // This re-proves it NOW, object by object, and deletes each source
+            // only after that object's own destination has just answered for it.
+            const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'));
+            if (!manifest.verified_all || (manifest.blocked ?? []).length > 0) {
+              throw new Error('the copy manifest is not a clean pass — refusing to delete anything');
+            }
+            const sources = new Map<string, SourceObject>(
+              listAll(SOURCE).map((o): [string, SourceObject] => [o.key, o])
+            );
+            for (const row of manifest.rows as Row[]) {
+              const source = sources.get(row.key);
+              if (!source) {
+                // Already pruned by an earlier run. Re-running is a no-op, not an error.
+                rows.push({ ...row, outcome: 'ALREADY-GONE', method: 're-list', detail: 'not in the legacy bucket' });
+                continue;
+              }
+              const proof = verify(row.destination, source);
+              if (!proof.ok) {
+                blocked.push({ ...row, outcome: 'KEPT', method: proof.method, detail: proof.detail });
+                continue;
+              }
+              aws(['delete-object', '--bucket', SOURCE, '--key', row.key], false);
+              rows.push({ ...row, outcome: 'SOURCE-DELETED', method: proof.method, detail: proof.detail });
+              console.log('pruned ' + row.key + ' (re-verified in ' + row.destination + ' by ' + proof.method + ')');
+            }
+          }
+
+          const failures = rows.filter((r) => r.outcome === 'FAILED').length;
+          const verifiedAll = failures === 0 && blocked.length === 0;
+          writeFileSync(MANIFEST, JSON.stringify({
+            mode: MODE, source: SOURCE, public_bucket: PUBLIC_BUCKET, private_bucket: PRIVATE_BUCKET,
+            generated_at: new Date().toISOString(), verified_all: verifiedAll, rows, blocked,
+          }, null, 2));
+
+          const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+          if (summaryPath) {
+            const lines = [
+              '## ' + (MODE === 'copy' ? 'Copy + verify' : 'Prune verified sources'), '',
+              'Source `' + SOURCE + '` -> `' + PUBLIC_BUCKET + '` / `' + PRIVATE_BUCKET + '`', '',
+              '| key | visibility | destination | bytes | outcome | proof |',
+              '|---|---|---|---|---|---|',
+            ];
+            for (const r of [...rows, ...blocked]) {
+              lines.push('| `' + r.key + '` | ' + r.visibility + ' | ' + r.destination + ' | ' +
+                r.bytes + ' | ' + r.outcome + ' | ' + r.method + ': ' + r.detail + ' |');
+            }
+            lines.push('', verifiedAll
+              ? '**' + rows.length + ' object(s) byte-verified at the destination.' +
+                (MODE === 'copy' ? ' Nothing was deleted by this job.**' : '**')
+              : '**' + failures + ' failed, ' + blocked.length + ' blocked. Deletion is refused.**');
+            writeFileSync(summaryPath, lines.join('\n') + '\n', { flag: 'a' });
+          }
+
+          if (!verifiedAll) {
+            console.error('\n' + failures + ' object(s) failed verification, ' + blocked.length + ' blocked.');
+            console.error('Nothing has been deleted. Fix or hand-move those objects, then re-run —');
+            console.error('objects already verified are skipped, so a re-run is cheap and safe.');
+            process.exit(1);
+          }
+          TSEOF
+          test -s ./scripts/media-bucket-move.gen.ts || { echo "::error::runner was not written"; exit 1; }
+          wc -l ./scripts/media-bucket-move.gen.ts
+
+      # The runner is typechecked against the real worker/ sources it imports
+      # BEFORE it is allowed near R2. A migration script that does not compile
+      # against the split rule it claims to use is not using it.
+      - name: Typecheck the runner against the repository it imports from
+        run: npx tsc --noEmit -p tests/tsconfig.json
+
+      - name: COPY every legacy object to its bucket, then verify every copy
+        env:
+          MODE: copy
+          SOURCE_BUCKET: ${{ inputs.source_bucket }}
+          PUBLIC_BUCKET: ${{ inputs.public_bucket }}
+          PRIVATE_BUCKET: ${{ inputs.private_bucket }}
+          MANIFEST: ${{ runner.temp }}/media-move-manifest.json
+        run: npx tsx ./scripts/media-bucket-move.gen.ts
+
+      # ONE directory, so the artifact's internal layout is flat and known.
+      # (upload-artifact@v4 roots a multi-path upload at the paths' common
+      # ancestor, which for a runner.temp path and a workspace path is several
+      # directories above both — job 2 would then not find either file.)
+      - name: Stage the manifest and the runner for job 2
+        run: |
+          set -e
+          mkdir -p "${{ runner.temp }}/artifact"
+          cp "${{ runner.temp }}/media-move-manifest.json" "${{ runner.temp }}/artifact/media-move-manifest.json"
+          cp ./scripts/media-bucket-move.gen.ts "${{ runner.temp }}/artifact/media-bucket-move.gen.ts"
+          ls -l "${{ runner.temp }}/artifact"
+
+      # The manifest is the ONLY thing that can unlock job 2, and it is uploaded
+      # only if every step above exited zero. There is no path to the delete job
+      # that does not pass through a green verification.
+      - name: Upload the verification manifest and the exact runner that produced it
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-move-manifest
+          path: ${{ runner.temp }}/artifact
+          if-no-files-found: error
+          retention-days: 30
+
+  # =========================================================================
+  # JOB 2 — DELETE THE LEGACY SOURCE OBJECTS. SEPARATELY GATED.
+  # =========================================================================
+  # It cannot run unless ALL of these hold:
+  #   * job 1 succeeded in THIS run (`needs: copy`), and
+  #   * the owner typed the second phrase, and
+  #   * the manifest job 1 produced is for these exact buckets and says every
+  #     object verified, and
+  #   * each object's destination re-answers for it, right now, one at a time.
+  #
+  # It deletes OBJECTS from the legacy bucket. It never deletes a bucket.
+  prune:
+    name: Delete the verified legacy source objects (second gate)
+    needs: copy
+    if: ${{ inputs.delete_confirm != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+    steps:
+      - name: Second confirmation gate
+        run: |
+          [ "${{ inputs.delete_confirm }}" = "DELETE-LEGACY-SOURCE" ] \
+            || { echo "::error::type DELETE-LEGACY-SOURCE to delete the verified source objects — aborting, nothing deleted"; exit 1; }
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      # The manifest AND the exact runner job 1 executed. Job 2 re-generates
+      # nothing, so the code that verified and the code that deletes are the
+      # same bytes.
+      - uses: actions/download-artifact@v4
+        with:
+          name: media-move-manifest
+          path: ${{ runner.temp }}/from-copy
+
+      - name: Refuse a manifest that is not a clean pass, or is for other buckets
+        run: |
+          set -e
+          cp "${{ runner.temp }}/from-copy/media-bucket-move.gen.ts" ./scripts/media-bucket-move.gen.ts
+          cp "${{ runner.temp }}/from-copy/media-move-manifest.json" "${{ runner.temp }}/media-move-manifest.json"
+          MANIFEST="${{ runner.temp }}/media-move-manifest.json" \
+          WANT_SOURCE='${{ inputs.source_bucket }}' \
+          WANT_PUBLIC='${{ inputs.public_bucket }}' \
+          WANT_PRIVATE='${{ inputs.private_bucket }}' \
+          node -e '
+            const m = JSON.parse(require("fs").readFileSync(process.env.MANIFEST, "utf8"));
+            const want = {
+              source: process.env.WANT_SOURCE,
+              public_bucket: process.env.WANT_PUBLIC,
+              private_bucket: process.env.WANT_PRIVATE,
+            };
+            for (const [k, v] of Object.entries(want)) {
+              if (m[k] !== v) { console.error("::error::manifest " + k + " is " + m[k] + ", this run asked for " + v); process.exit(1); }
+            }
+            if (m.mode !== "copy") { console.error("::error::manifest is not from a copy job"); process.exit(1); }
+            if (!m.verified_all) { console.error("::error::manifest says verification did not pass"); process.exit(1); }
+            console.log("manifest accepted: " + m.rows.length + " verified object(s)");
+          '
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || { echo "::error::secret CLOUDFLARE_ACCOUNT_ID is not set"; exit 1; }
+          echo "R2_ENDPOINT=https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" >> "$GITHUB_ENV"
+
+      - name: RE-VERIFY each object, then delete only that object's source
+        env:
+          MODE: prune
+          SOURCE_BUCKET: ${{ inputs.source_bucket }}
+          PUBLIC_BUCKET: ${{ inputs.public_bucket }}
+          PRIVATE_BUCKET: ${{ inputs.private_bucket }}
+          MANIFEST: ${{ runner.temp }}/media-move-manifest.json
+        run: npx tsx ./scripts/media-bucket-move.gen.ts
+
+      - name: Upload the prune manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-prune-manifest
+          path: ${{ runner.temp }}/media-move-manifest.json
+          if-no-files-found: warn
+          retention-days: 30

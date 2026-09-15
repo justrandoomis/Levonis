@@ -95,6 +95,7 @@ import {
   ancestryFor,
   catalogAncestry,
   currentBenefitVersionId,
+  degradeIfSchemaMissing,
   resolveOrderBenefits,
   resolveProductBenefits,
 } from '../lib/membershipBenefits';
@@ -1564,7 +1565,24 @@ async function computeCheckout(
    */
   const ordinaryRows = rows.filter((r) => String(r.composition ?? '') === '');
   const offerNow = Date.now();
-  const lineOffers = await loadOffers(c.env.DB, ordinaryRows.map((r) => subjectOf(String(r.id))));
+  /**
+   * AN OFFER IS OPTIONAL; BEING ABLE TO PAY IS NOT.
+   *
+   * The cart learned to survive a shop whose optional feature tables are not
+   * installed — but the CHECKOUT has its own reads, and a customer who reaches
+   * a cart that renders and then cannot pay is worse served than one who was
+   * told at the door. An absent `offer_windows` means no offer is running, and
+   * a line with no offer prices at its ordinary price, which is exactly what
+   * this map answers with when it is empty. It is NOT degraded when the table
+   * exists and the query fails for any other reason: that is a real fault and
+   * must stay loud rather than quietly dropping a discount the customer was
+   * shown in their cart.
+   */
+  const lineOffers = await degradeIfSchemaMissing(
+    'offers (migration 0060)',
+    () => loadOffers(c.env.DB, ordinaryRows.map((r) => subjectOf(String(r.id)))),
+    new Map<string, Awaited<ReturnType<typeof loadOffers>> extends Map<string, infer V> ? V : never>()
+  );
   /** Which ordinary subjects contributed a live offer price or gate to this
    *  order — the subjects a redemption row is written for, so `offer_limits`
    *  works on an ordinary product with no new machinery at all. */
@@ -1648,7 +1666,14 @@ async function computeCheckout(
      * mystery purchase, and read the pick off the difference — with the money
      * never leaving their wallet.
      */
-    activePoolProductIds(c.env.DB, [...rows.map((r) => String(r.id)), ...memberIds, ...drawnIds]),
+    // A shop with no mystery pools installed has no pool members, which is what
+    // an empty set says. The §14 leak this guards against needs a pool to leak
+    // FROM, so the guard is vacuous — not weakened — when 0061 is absent.
+    degradeIfSchemaMissing(
+      'mystery pools (migration 0061)',
+      () => activePoolProductIds(c.env.DB, [...rows.map((r) => String(r.id)), ...memberIds, ...drawnIds]),
+      new Set<string>()
+    ),
     /**
      * THE MEMBER PRODUCTS WITH THEIR RELATIONAL OVERLAY — the pre-order cells
      * and route quotas included. The composition read model loads them to

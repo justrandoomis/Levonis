@@ -1,0 +1,469 @@
+/**
+ * THE MEDIA BUCKETS: which binding points where, and what happens when the
+ * bucket a binding names does not exist.
+ *
+ * WHY THIS FILE EXISTS. `wrangler.jsonc` binds `R2_PUBLIC` and `R2_PRIVATE`
+ * for production to `levonis-media-public` and `levonis-media-private`, and
+ * NEITHER bucket exists on the account. A wrangler config is not validated
+ * against the account at deploy time, so nothing anywhere said so.
+ *
+ * `mediaBucket()` resolves a binding with `env.R2_PUBLIC ?? env.BUCKET`, which
+ * answers exactly one question — "is there a binding?" — and a binding to a
+ * bucket that was never created is a perfectly ordinary `R2Bucket` object:
+ * not null, not undefined. So `??` never fired, the legacy fallback below it
+ * was unreachable, and the R2 rejection propagated straight out of
+ * `getMediaObject` into a 500 for every image on the page, with a perfectly
+ * good legacy copy one line further down.
+ *
+ * The tests below hold three things still:
+ *   1. a bound-but-missing bucket is survivable and is reported;
+ *   2. the legacy fallback is LOGGED, so "is the migration finished?" is
+ *      answerable from the Worker's logs instead of from belief;
+ *   3. the split rule has exactly one implementation, and the migration
+ *      workflow imports it rather than restating it.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import {
+  deleteMediaObject,
+  getMediaObject,
+  headMediaObject,
+  mediaBindingName,
+  mediaBucket,
+  MediaBucketUnavailableError,
+  probeMediaBucket,
+  putMediaObject,
+} from '../worker/lib/mediaStorage';
+import { planLegacyMediaKey } from '../worker/lib/mediaMigration';
+
+// --------------------------------------------------------------- R2 stubs
+
+/** A bucket that exists. */
+class LiveBucket {
+  objects = new Map<string, Uint8Array>();
+  async get(key: string) {
+    const value = this.objects.get(key);
+    return value ? ({ key, size: value.length } as unknown as R2ObjectBody) : null;
+  }
+  async head(key: string) {
+    const value = this.objects.get(key);
+    return value ? ({ key, size: value.length } as unknown as R2Object) : null;
+  }
+  async put(key: string, value: ArrayBuffer | ArrayBufferView) {
+    this.objects.set(key, new Uint8Array(value as ArrayBuffer));
+  }
+  async delete(key: string) {
+    this.objects.delete(key);
+  }
+}
+
+/**
+ * A bucket that is BOUND and does not exist. Every operation rejects the way
+ * R2 does — which is the whole point: it is indistinguishable from a healthy
+ * binding until something actually calls it.
+ */
+class MissingBucket {
+  calls = 0;
+  private boom(): never {
+    this.calls += 1;
+    throw new Error('The specified bucket does not exist.');
+  }
+  async get(_key: string): Promise<never> { return this.boom(); }
+  async head(_key: string): Promise<never> { return this.boom(); }
+  async put(_key: string, _value: unknown): Promise<never> { return this.boom(); }
+  async delete(_key: string): Promise<never> { return this.boom(); }
+}
+
+interface Captured<T> { result: T; warn: string[]; error: string[] }
+
+/** Runs `fn` with console.warn/error captured, and always restores them. */
+async function capture<T>(fn: () => Promise<T>): Promise<Captured<T>> {
+  const warn: string[] = [];
+  const error: string[] = [];
+  const realWarn = console.warn;
+  const realError = console.error;
+  console.warn = (...args: unknown[]) => { warn.push(args.join(' ')); };
+  console.error = (...args: unknown[]) => { error.push(args.join(' ')); };
+  try {
+    return { result: await fn(), warn, error };
+  } finally {
+    console.warn = realWarn;
+    console.error = realError;
+  }
+}
+
+const KEY = 'products/prd_1/gallery/abc123.webp';
+const PRIVATE_KEY = 'chat/u1/attachments/abc123.webp';
+
+// ------------------------------------------------ 1. the bound-missing bucket
+
+test('a binding to a bucket that does not exist is survived, not propagated as a 500', async () => {
+  const legacy = new LiveBucket();
+  legacy.objects.set(KEY, new Uint8Array([1, 2, 3]));
+  const broken = new MissingBucket();
+  const env = { BUCKET: legacy, R2_PUBLIC: broken, R2_PRIVATE: new LiveBucket() } as never;
+
+  // `??` cannot see the difference: the binding is present, so `mediaBucket`
+  // hands back the broken bucket and the legacy one is never reached by it.
+  assert.equal(mediaBucket(env, 'public'), broken as never);
+  assert.equal(mediaBindingName(env, 'public'), 'R2_PUBLIC');
+
+  const { result, error } = await capture(() => getMediaObject(env, 'public', KEY));
+  assert.ok(result, 'the legacy copy must still be served when the dedicated bucket is missing');
+  assert.equal(broken.calls, 1, 'the dedicated bucket must be tried first, exactly once');
+  assert.equal(error.length, 1, 'the unusable binding must be reported exactly once');
+  assert.match(error[0], /^media_primary_bucket_unavailable /);
+  const event = JSON.parse(error[0].slice('media_primary_bucket_unavailable '.length));
+  assert.equal(event.reason, 'primary_unavailable');
+  assert.equal(event.operation, 'get');
+  assert.equal(event.binding, 'R2_PUBLIC');
+  assert.equal(event.key, KEY);
+  assert.match(event.error, /does not exist/);
+});
+
+test('head survives the same way, and a miss in both buckets is still just a miss', async () => {
+  const legacy = new LiveBucket();
+  const broken = new MissingBucket();
+  const env = { BUCKET: legacy, R2_PUBLIC: new LiveBucket(), R2_PRIVATE: broken } as never;
+
+  legacy.objects.set(PRIVATE_KEY, new Uint8Array([9]));
+  const found = await capture(() => headMediaObject(env, 'private', PRIVATE_KEY));
+  assert.ok(found.result, 'a private object must still be reachable through legacy');
+  assert.equal(found.error.length, 1);
+
+  // Nothing anywhere holds this key. That is not a fallback and must not be
+  // logged as migration residue.
+  const absent = await capture(() => headMediaObject(env, 'private', 'chat/u1/attachments/nope.webp'));
+  assert.equal(absent.result, null);
+  assert.equal(absent.warn.length, 0, 'a miss in both buckets says nothing about the migration');
+});
+
+test('a bucket that does not exist is detectable before a customer finds it', async () => {
+  const env = { BUCKET: new LiveBucket(), R2_PUBLIC: new LiveBucket(), R2_PRIVATE: new MissingBucket() } as never;
+  const good = await probeMediaBucket(env, 'public');
+  assert.deepEqual(
+    { binding: good.binding, dedicated: good.dedicated, reachable: good.reachable, error: good.error },
+    { binding: 'R2_PUBLIC', dedicated: true, reachable: true, error: null }
+  );
+  const bad = await probeMediaBucket(env, 'private');
+  assert.equal(bad.binding, 'R2_PRIVATE');
+  assert.equal(bad.dedicated, true);
+  assert.equal(bad.reachable, false, 'a bucket that does not exist must not report as reachable');
+  assert.match(String(bad.error), /does not exist/);
+});
+
+// ------------------------------------------- 2. the migration-progress signal
+
+test('the legacy fallback is logged when it is used, and silent once the object has moved', async () => {
+  const legacy = new LiveBucket();
+  const dedicated = new LiveBucket();
+  const env = { BUCKET: legacy, R2_PUBLIC: dedicated, R2_PRIVATE: new LiveBucket() } as never;
+
+  // Before the move: only the legacy bucket has it.
+  legacy.objects.set(KEY, new Uint8Array([7]));
+  const before = await capture(() => getMediaObject(env, 'public', KEY));
+  assert.ok(before.result);
+  assert.equal(before.warn.length, 1, 'a legacy read is what says the migration is unfinished');
+  assert.match(before.warn[0], /^media_legacy_fallback /);
+  const event = JSON.parse(before.warn[0].slice('media_legacy_fallback '.length));
+  assert.equal(event.reason, 'legacy_hit');
+  assert.equal(event.binding, 'R2_PUBLIC');
+  assert.equal(event.key, KEY);
+
+  // After the move: the dedicated bucket answers and the log goes quiet. That
+  // silence is the owner's "the migration is actually finished" signal.
+  dedicated.objects.set(KEY, new Uint8Array([7]));
+  const after = await capture(() => getMediaObject(env, 'public', KEY));
+  assert.ok(after.result);
+  assert.equal(after.warn.length, 0, 'once the object is in its own bucket nothing may still report residue');
+  assert.equal(after.error.length, 0);
+});
+
+// ---------------------------------------------------- 3. writes never fall back
+
+test('a write NEVER falls back to the legacy bucket, and names the binding when it fails', async () => {
+  const legacy = new LiveBucket();
+  const broken = new MissingBucket();
+  const env = { DB: undefined, BUCKET: legacy, R2_PUBLIC: broken, R2_PRIVATE: new LiveBucket() } as never;
+
+  const { error } = await capture(async () => {
+    await assert.rejects(
+      () =>
+        putMediaObject(
+          env,
+          { key: KEY, visibility: 'public', domain: 'products', mime: 'image/webp', bytes: 1 },
+          new Uint8Array([1])
+        ),
+      (e: unknown) => {
+        assert.ok(e instanceof MediaBucketUnavailableError, 'the failure must name the binding, not just R2');
+        assert.equal(e.binding, 'R2_PUBLIC');
+        assert.match(e.message, /R2_PUBLIC/);
+        return true;
+      }
+    );
+  });
+
+  // The whole point of the migration is to STOP filling the legacy bucket.
+  assert.equal(legacy.objects.size, 0, 'a failed dedicated write must never be re-routed into the legacy bucket');
+  assert.equal(error.length, 1);
+  assert.match(error[0], /^media_primary_bucket_unavailable /);
+  assert.equal(JSON.parse(error[0].slice('media_primary_bucket_unavailable '.length)).operation, 'put');
+});
+
+test('a delete still clears the legacy copy when the dedicated binding is broken', async () => {
+  const legacy = new LiveBucket();
+  legacy.objects.set(PRIVATE_KEY, new Uint8Array([4]));
+  const broken = new MissingBucket();
+  const env = { BUCKET: legacy, R2_PUBLIC: new LiveBucket(), R2_PRIVATE: broken } as never;
+
+  await capture(async () => {
+    // No fake success: the caller is told the delete did not fully succeed…
+    await assert.rejects(() => deleteMediaObject(env, 'private', PRIVATE_KEY));
+  });
+  // …but the legacy copy — the one the read-through fallback would have served
+  // straight back to the world — is gone all the same.
+  assert.equal(legacy.objects.has(PRIVATE_KEY), false, 'stopping at the broken binding would leave the file readable');
+});
+
+// -------------------------------------------------------- 4. the split rule
+
+test('ONE split rule decides public vs private, and everything unrecognised is private', () => {
+  // Public: only namespaces that are already served to anyone who asks.
+  for (const key of [
+    'products/prd_1/gallery/a.webp',
+    'products/import/abc.webp',
+    'avatars/u1/a.webp',
+    'community/u1/a.webp',
+    'users/u1/avatar/a.webp',
+    'merchants/m1/logos/a.webp',
+    'ui/levonis/logo/a.webp',
+    'UIUx/Logo/a.png',
+    'brands/b1/a.webp',
+    'services/s1/a.webp',
+  ]) {
+    assert.equal(planLegacyMediaKey(key, true).visibility, 'public', key);
+  }
+
+  // Private: everything authorised per request, and everything unknown.
+  for (const key of [
+    'chat/u1/attachments/a.webp',
+    'receipts/u1/evidence/a.pdf',
+    'reviews/r1/a.webp',
+    'reviews-evidence/u1/a.webp',
+    'kyc/u1/a.pdf',
+    'warranty/w1/a.pdf',
+    'claims/c1/a.webp',
+    'orders/o1/a.webp',
+    'imports/i1/a.csv',
+    'requests/r1/a.stl',
+    'support/s1/a.webp',
+    'something-nobody-has-seen-before/a.bin',
+  ]) {
+    assert.equal(planLegacyMediaKey(key, true).visibility, 'private', key);
+  }
+});
+
+test('an object keeps its key when it only changes bucket, so D1 references stay valid', () => {
+  // This is what lets the migration workflow copy without a single database
+  // write: visibility selects the BUCKET and is never encoded in the path.
+  for (const key of ['products/prd_1/gallery/a.webp', 'chat/u1/attachments/a.webp', 'receipts/u1/e/a.pdf']) {
+    assert.equal(planLegacyMediaKey(key, true).destinationKey, key, key);
+  }
+  // The one exception is the UIUx rename, and it is exactly why the workflow
+  // must not perform it: it needs a matching `settings` rewrite in the same
+  // D1 batch, which only the admin apply endpoint does.
+  assert.notEqual(planLegacyMediaKey('UIUx/Logo/Levonis-Mark.png', true).destinationKey, 'UIUx/Logo/Levonis-Mark.png');
+});
+
+// --------------------------------------------- 5. the binding map, from config
+
+const repoFile = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+const stripComments = (text: string) =>
+  text.split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
+
+/** Every `binding -> bucket_name` pair declared in one slice of a config. */
+function bucketBindings(section: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const pattern = /"binding":\s*"([A-Z0-9_]+)",\s*"bucket_name":\s*"([a-z0-9-]+)"/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(section)) !== null) out[match[1]] = match[2];
+  return out;
+}
+
+function storeConfigSections(): Record<'production' | 'staging' | 'dark', Record<string, string>> {
+  const bare = stripComments(repoFile('wrangler.jsonc'));
+  const envAt = bare.indexOf('"env"');
+  const stagingAt = bare.indexOf('"staging"');
+  const darkAt = bare.indexOf('"dark"');
+  assert.ok(envAt > 0 && stagingAt > envAt && darkAt > stagingAt, 'wrangler.jsonc no longer has the expected env layout');
+  return {
+    production: bucketBindings(bare.slice(0, envAt)),
+    staging: bucketBindings(bare.slice(stagingAt, darkAt)),
+    dark: bucketBindings(bare.slice(darkAt)),
+  };
+}
+
+/**
+ * The seven buckets that exist on this Cloudflare account, read from the
+ * owner's R2 dashboard. Anything a config binds that is not here does not
+ * exist, and a Worker bound to it fails at request time.
+ */
+const BUCKETS_ON_THE_ACCOUNT = [
+  'levonis',
+  'levonis-files',
+  'levonis-files-staging',
+  'levonis-media-private-staging',
+  'levonis-media-public-staging',
+  'levonis-studio-files',
+  'levonis-studio-files-staging',
+];
+
+/** Bound by a config, absent from the account. Each one is a latent 500. */
+const BOUND_BUT_NOT_PROVISIONED = [
+  'levonis-media-public',
+  'levonis-media-private',
+  'levonis-files-dark',
+  'levonis-media-public-dark',
+  'levonis-media-private-dark',
+];
+
+test('every binding in every environment points where this repository says it does', () => {
+  const store = storeConfigSections();
+  assert.deepEqual(store.production, {
+    BUCKET: 'levonis-files',
+    R2_PUBLIC: 'levonis-media-public',
+    R2_PRIVATE: 'levonis-media-private',
+  });
+  assert.deepEqual(store.staging, {
+    BUCKET: 'levonis-files-staging',
+    R2_PUBLIC: 'levonis-media-public-staging',
+    R2_PRIVATE: 'levonis-media-private-staging',
+  });
+  assert.deepEqual(store.dark, {
+    BUCKET: 'levonis-files-dark',
+    R2_PUBLIC: 'levonis-media-public-dark',
+    R2_PRIVATE: 'levonis-media-private-dark',
+  });
+
+  // Studio is a SEPARATE application with its own account resources. Its two
+  // buckets are referenced by something, and it must never be handed the
+  // store's — docs/STUDIO_PLAN.md decision 4.
+  const studio = stripComments(repoFile('studio/wrangler.jsonc'));
+  const studioAt = studio.indexOf('"staging"');
+  assert.deepEqual(bucketBindings(studio.slice(0, studioAt)), { BUCKET: 'levonis-studio-files' });
+  assert.deepEqual(bucketBindings(studio.slice(studioAt)), { BUCKET: 'levonis-studio-files-staging' });
+  for (const name of ['levonis-files', 'levonis-media-public', 'levonis-media-private']) {
+    assert.ok(!studio.includes(`"bucket_name": "${name}"`), `Studio must not bind the store bucket ${name}`);
+  }
+});
+
+test('the Worker that actually serves levonis-iq.com binds only buckets that exist', () => {
+  // docs/WORKERS.md: levonis-iq.com is served by `levonis-staging`, which is
+  // wrangler.jsonc's env.staging block. This is the one environment where a
+  // missing bucket would be a live outage rather than a latent one.
+  for (const [binding, bucket] of Object.entries(storeConfigSections().staging)) {
+    assert.ok(
+      BUCKETS_ON_THE_ACCOUNT.includes(bucket),
+      `LIVE binding ${binding} points at ${bucket}, which is not on the account`
+    );
+  }
+});
+
+test('every bucket a config binds is classified as existing or as knowingly unprovisioned', () => {
+  // A new binding to a bucket nobody created must not slip in unnoticed again.
+  const store = storeConfigSections();
+  const bound = new Set<string>([
+    ...Object.values(store.production),
+    ...Object.values(store.staging),
+    ...Object.values(store.dark),
+    ...Object.values(bucketBindings(stripComments(repoFile('studio/wrangler.jsonc')))),
+  ]);
+  for (const bucket of bound) {
+    assert.ok(
+      BUCKETS_ON_THE_ACCOUNT.includes(bucket) || BOUND_BUT_NOT_PROVISIONED.includes(bucket),
+      `${bucket} is bound by a wrangler config but is in neither inventory — say which it is`
+    );
+  }
+  // And the reverse claim the report rests on: `levonis` is bound by nothing.
+  for (const config of ['wrangler.jsonc', 'studio/wrangler.jsonc']) {
+    assert.ok(
+      !/"bucket_name":\s*"levonis"/.test(repoFile(config)),
+      `${config} now binds the bucket "levonis", which nothing referenced before`
+    );
+  }
+});
+
+// ------------------------------------------------------- 6. the move workflow
+
+const WORKFLOW = '.github/workflows/media-bucket-move.yml';
+
+/** The runner exactly as the workflow's heredoc writes it to disk. */
+function embeddedRunner(): string {
+  const text = repoFile(WORKFLOW);
+  const lines = text.split('\n').map((line) => line.replace(/^ {10}/, ''));
+  const start = lines.findIndex((l) => l.startsWith("cat > ./scripts/media-bucket-move.gen.ts <<'TSEOF'"));
+  const end = lines.findIndex((l, i) => i > start && l === 'TSEOF');
+  assert.ok(start >= 0 && end > start, 'the workflow no longer embeds a runner the way this test reads it');
+  return lines.slice(start + 1, end).join('\n');
+}
+
+test('the move workflow is gated twice and job 1 cannot delete anything', () => {
+  const text = repoFile(WORKFLOW);
+  assert.match(text, /\[ "\$\{\{ inputs\.confirm \}\}" = "MIGRATE-MEDIA" \]/, 'job 1 must be gated on a typed phrase');
+  assert.match(text, /\[ "\$\{\{ inputs\.delete_confirm \}\}" = "DELETE-LEGACY-SOURCE" \]/, 'job 2 needs its OWN phrase');
+  assert.match(text, /\n {2}prune:\n(?: {4}.*\n)* {4}needs: copy\n/, 'the delete job must depend on the verified copy job');
+  assert.match(text, /\n {4}if: \$\{\{ inputs\.delete_confirm != '' \}\}\n/, 'the delete job must be skipped unless the owner asked for it');
+
+  const runner = embeddedRunner();
+  // An absent MODE must land in the copy branch, never the delete branch.
+  assert.match(runner, /const MODE = process\.env\.MODE === 'prune' \? 'prune' : 'copy';/);
+
+  const copyAt = runner.indexOf("if (MODE === 'copy') {");
+  const pruneAt = runner.indexOf('const manifest = JSON.parse(readFileSync(MANIFEST');
+  const deleteAt = runner.indexOf("'delete-object'");
+  const refuseAt = runner.indexOf('refusing to delete anything');
+  assert.ok(copyAt > 0 && pruneAt > copyAt, 'the copy branch must come first');
+  assert.ok(deleteAt > pruneAt, 'the only delete must live inside the prune branch');
+  assert.ok(refuseAt > pruneAt && refuseAt < deleteAt, 'the prune branch must refuse an unverified manifest BEFORE it deletes');
+  assert.equal(runner.split("'delete-object'").length - 1, 1, 'there must be exactly one delete in the whole runner');
+  // Buckets are the owner's decision, in the dashboard. Not this workflow's.
+  for (const forbidden of ['delete-bucket', 'bucket delete', 'create-bucket', 'bucket create']) {
+    assert.ok(!text.includes(forbidden), `the workflow must never ${forbidden}`);
+  }
+});
+
+test('the workflow verifies every copy before it calls it done', () => {
+  const runner = embeddedRunner();
+  // Size is necessary and not sufficient; the content proof is the other half.
+  assert.match(runner, /ContentLength\) !== source\.size/);
+  assert.match(runner, /method: 'etag'/);
+  assert.match(runner, /method: 'sha256'/);
+  // Re-runnable: an object already at its destination is verified, not re-sent.
+  assert.match(runner, /head-object', '--bucket', destination/);
+  // A partial listing is a partial migration; the cursor must be followed out.
+  assert.match(runner, /NextContinuationToken/);
+  assert.match(runner, /--no-paginate/);
+});
+
+test('the workflow reuses the repository split rule instead of restating it', () => {
+  const runner = embeddedRunner();
+  assert.match(runner, /import \{ planLegacyMediaKey \} from '\.\.\/worker\/lib\/mediaMigration';/);
+  assert.match(runner, /const plan = planLegacyMediaKey\(object\.key, true\);/);
+  assert.match(runner, /plan\.visibility === 'public' \? PUBLIC_BUCKET : PRIVATE_BUCKET/);
+  // A second copy of the rule is exactly what must not appear. The prefix
+  // tests in `isAnonymousPublicMediaKey` are the shape it would take.
+  assert.ok(!/startsWith\(['"]/.test(runner), 'the runner must not carry its own prefix rule');
+  assert.ok(!runner.includes('isAnonymousPublicMediaKey'), 'the runner must go through planLegacyMediaKey, not around it');
+});
+
+test('the docs the owner follows name the same buckets the config binds', () => {
+  const doc = repoFile('docs/MEDIA_STORAGE.md');
+  const store = storeConfigSections();
+  for (const bucket of [...Object.values(store.production), ...Object.values(store.staging)]) {
+    assert.ok(doc.includes(bucket), `docs/MEDIA_STORAGE.md does not mention ${bucket}`);
+  }
+  assert.ok(doc.includes('MIGRATE-MEDIA'), 'the doc must tell the owner what to type');
+  assert.ok(doc.includes('DELETE-LEGACY-SOURCE'), 'the doc must tell the owner the second phrase');
+  assert.ok(doc.includes('media_legacy_fallback'), 'the doc must say how to tell the migration is finished');
+});
