@@ -19,41 +19,99 @@
  */
 
 :root {
-  /* LEVONIS identity (store tokens) */
-  --levo-olive: #1B2010;
-  --levo-olive-dark: #0F1208;
-  --levo-olive-light: #2B3318;
-  --levo-gold: #BAA369;
-  --levo-gold-light: #FFE55C;
+  /*
+   * THE BLACK SYSTEM.
+   *
+   * The Studio used to be dark OLIVE — #0A0C05 shell, #1B2010 surfaces — a
+   * tint carried over from the store's green identity. Against a 3D bed it
+   * read as a colour cast on every surface, and on an OLED phone a tinted
+   * near-black still lights every pixel. The owner asked for black, so the
+   * base IS black and elevation is carried by neutral greys instead of hue.
+   *
+   * ELEVATION IS A LADDER, NOT A GLOW. Each step up is a lighter neutral, and
+   * a surface is told apart from the one under it by that step plus a 1px
+   * hairline — never by a shadow (invisible on black) and never by an accent
+   * border. Steps are deliberately close together: on black, small luminance
+   * differences read clearly, and large ones look like separate apps.
+   *
+   *   canvas/shell  #000000   the bed, and the page behind everything
+   *   header        #0A0A0B   fixed chrome
+   *   panel         #111113   sheets and side panels
+   *   surface       #17171A   cards, inputs, resting controls
+   *   surfaceStrong #212125   a raised or pressed control
+   *
+   * THE GOLD STAYS, AND STAYS RARE. #BAA369 is Levonis and is the one accent
+   * in the app. It marks the primary action, the current selection and
+   * membership — nothing else. It is never simultaneously the border, the
+   * background, the text and the shadow of one element.
+   *
+   * SEMANTICS ARE APPLE'S DARK-MODE SYSTEM COLOURS, which are tuned for exactly
+   * this: saturated enough to read on black without vibrating.
+   */
 
-  /* Studio dark surfaces derived from the olive family */
-  --shell: #0A0C05;
-  --header: #10130A;
-  --panel: #14180C;
-  --surface: #1B2010;
-  --surface-strong: #232A14;
-  --canvas: #070903;
-  --line: #2E3719;
-  --line-soft: #1F2611;
-  --text: #EEF4EF;
-  --muted: #A0A48C;
+  /* Neutral elevation ladder */
+  --shell: #000000;
+  --canvas: #000000;
+  --header: #0A0A0B;
+  --panel: #111113;
+  --surface: #17171A;
+  --surface-strong: #212125;
+  --line: #2C2C31;
+  --line-soft: #1C1C20;
+
+  /* Type. `muted` is quiet by luminance, not only by size (skill §5). */
+  --text: #F5F5F7;
+  --muted: #98989F;
+
+  /* The single accent */
+  --levo-gold: #BAA369;
   --accent: var(--levo-gold);
   --accent-strong: #9C8752;
-  --accent-ink: #221A08;
-  --accent-tint: #26210F;
-  --accent-tint-border: #57492A;
+  --accent-ink: #171106;          /* text ON a gold fill */
+  --accent-tint: #1C180E;         /* gold at rest, as a surface */
+  --accent-tint-border: #463C24;
   --on-accent-tint: #E4D5AC;
-  --muted-on-tint: #B7AA83;
-  --danger: #E5786A;
-  --danger-surface: #3B2320;
-  --warning: #DBA84E;
-  --warning-surface: #38301A;
-  --header-height: 62px;
-  --mobile-bar-height: 70px;
-  --radius-sm: 5px;
-  --radius: 7px;
-  --radius-lg: 9px;
-  --shadow: 0 12px 30px #030805;
+  --muted-on-tint: #ADA183;
+
+  /* Apple dark-mode semantics */
+  --danger: #FF453A;
+  --danger-surface: #2A1411;
+  --warning: #FF9F0A;
+  --warning-surface: #2B1C06;
+  --success: #30D158;
+  --success-surface: #0E2A16;
+
+  /*
+   * TOUCH GEOMETRY. 44px is the floor for anything tappable; the bars are
+   * sized so a thumb reaches them and the safe-area insets are ADDED to them
+   * rather than eating into them.
+   */
+  --header-height: 56px;
+  --mobile-bar-height: 64px;
+  --tap-min: 44px;
+
+  /* Radii: soft enough to feel like a touch UI, tight enough to stay technical. */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-sheet: 22px;
+
+  /* Used only where a surface genuinely floats above another (sheets). */
+  --shadow: 0 -8px 32px rgba(0, 0, 0, 0.72);
+
+  /*
+   * THE PROJECTS PANEL USED A SECOND, BLUE DESIGN SYSTEM.
+   * components/projects-panel.tsx styles itself from --levo-panel-* with
+   * hardcoded fallbacks including a blue #3d6ef7 accent — a different product's
+   * palette living inside this one. Mapping those names onto the ladder above
+   * makes the panel obey the black system without touching its markup.
+   */
+  --levo-panel-fg: var(--text);
+  --levo-panel-inset: var(--surface);
+  --levo-panel-card: var(--panel);
+  --levo-panel-border: var(--line);
+  --levo-accent: var(--accent);
+  --levo-danger: var(--danger);
 }
 
 * { box-sizing: border-box; }

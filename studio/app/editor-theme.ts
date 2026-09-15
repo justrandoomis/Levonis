@@ -23,38 +23,43 @@
 
 /** Store-derived identity tokens (values copied from src/index.css). */
 export const LEVONIS_TOKENS = {
-  /** The store's very dark olive family. ~100 call sites across both apps
-   *  reference these by token name, so the names stay and the values move. */
-  olive: "#1B2010",
-  oliveDark: "#0F1208",
-  oliveLight: "#2B3318",
-  /** Store gold family. */
+  /** Store gold family — the one accent the Studio spends. */
   gold: "#BAA369",
   goldLight: "#FFE55C",
   /** Store type stack (Cairo is the store's face; system fallbacks apply). */
   fontSans: '"Cairo", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif',
 } as const;
 
-/** Studio dark surfaces, derived from the green family above. */
+/**
+ * Studio surfaces — the BLACK system. Mirrors `:root` in app/globals.css, whose
+ * comment carries the full rationale; the short version is that the base is
+ * true black and elevation is a ladder of neutral greys rather than a hue.
+ *
+ * These values cross into the ENGINE's shadow roots via EDITOR_SHADOW_CSS
+ * below, so the vendored slicer's chrome sits on the same ladder as ours
+ * instead of showing its own palette through.
+ */
 export const STUDIO_SURFACES = {
-  shell: "#0A0C05",
-  header: "#10130A",
-  panel: "#14180C",
-  surface: "#1B2010",
-  surfaceStrong: "#232A14",
-  canvas: "#070903",
-  line: "#2E3719",
-  lineSoft: "#1F2611",
-  text: "#EEF4EF",
-  muted: "#A0A48C",
+  shell: "#000000",
+  header: "#0A0A0B",
+  panel: "#111113",
+  surface: "#17171A",
+  surfaceStrong: "#212125",
+  canvas: "#000000",
+  line: "#2C2C31",
+  lineSoft: "#1C1C20",
+  text: "#F5F5F7",
+  muted: "#98989F",
   accent: LEVONIS_TOKENS.gold,
   accentStrong: "#9C8752",
-  accentSoft: "#2A2A16",
-  accentInk: "#221A08",
-  danger: "#E5786A",
-  dangerSurface: "#3B2320",
-  warning: "#DBA84E",
-  warningSurface: "#38301A",
+  accentSoft: "#1C180E",
+  accentInk: "#171106",
+  danger: "#FF453A",
+  dangerSurface: "#2A1411",
+  warning: "#FF9F0A",
+  warningSurface: "#2B1C06",
+  success: "#30D158",
+  successSurface: "#0E2A16",
 } as const;
 
 const T = STUDIO_SURFACES;
