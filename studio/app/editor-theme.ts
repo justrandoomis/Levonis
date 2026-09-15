@@ -60,6 +60,18 @@ export const STUDIO_SURFACES = {
   warningSurface: "#2B1C06",
   success: "#30D158",
   successSurface: "#0E2A16",
+  /*
+   * Mirrors the tokens of the same name in globals.css, whose :root comment
+   * carries the reasoning. They are here because these values cross into the
+   * ENGINE's shadow roots through EDITOR_SHADOW_CSS below, and a shadow root
+   * cannot see the page's custom properties unless we put them there.
+   *
+   * `shadowCast` is the one that was wrong rather than missing: the engine
+   * chrome cast an olive-tinted shadow, hex 040806, onto a black canvas.
+   */
+  shadowCast: "#000000",
+  idle: "#5B5B63",
+  track: "#3A3A40",
 } as const;
 
 const T = STUDIO_SURFACES;
@@ -93,7 +105,7 @@ export const EDITOR_SHADOW_CSS = `
   .tb-btn, .tb-icon, .tb-tabs, .tb-tabs button { background: ${T.surface}; border-color: ${T.line}; border-radius: 6px; color: ${T.text}; }
   .tb-tabs button.on, .left-rail button.on { background: ${T.accent}; color: ${T.accentInk}; }
   .viewport-col { background: ${T.canvas}; }
-  .vp-top-toolbar, .plate-bar, .brush-panel, .stats-card, .help-card { background: ${T.header}; border-color: ${T.line}; border-radius: 7px; box-shadow: 0 10px 24px #040806; }
+  .vp-top-toolbar, .plate-bar, .brush-panel, .stats-card, .help-card { background: ${T.header}; border-color: ${T.line}; border-radius: 7px; box-shadow: 0 10px 24px ${T.shadowCast}; }
   .vp-top-toolbar button:hover:not(:disabled), .left-rail button:hover { background: ${T.surfaceStrong}; }
   .sidebar { background: ${T.panel}; color: ${T.text}; border-color: ${T.line}; }
   .sidebar-scroll, .side-bottom { background: ${T.panel}; }
@@ -139,7 +151,7 @@ export const EDITOR_SHADOW_CSS = `
     .vp-status { bottom: 72px; left: 9px; right: 58px; font-size: 10px; }
     .bed-warn, .stats-card { left: 8px; bottom: 116px; max-width: calc(100% - 68px); }
     .brush-panel { top: 8px; left: 8px; width: min(280px, calc(100vw - 16px)); }
-    .sidebar { position: absolute; z-index: 14; top: 0; right: 0; bottom: 62px; width: min(94vw, 420px); flex-basis: auto; box-shadow: -16px 0 34px #040806; }
+    .sidebar { position: absolute; z-index: 14; top: 0; right: 0; bottom: 62px; width: min(94vw, 420px); flex-basis: auto; box-shadow: -16px 0 34px ${T.shadowCast}; }
     :host([data-levo-sidebar="closed"]) .sidebar { display: none; }
     :host([data-levo-sidebar="open"]) .sidebar { display: flex; }
     .sidebar-scroll { padding: 8px 8px 82px; }
