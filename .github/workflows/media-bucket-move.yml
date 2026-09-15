@@ -538,9 +538,12 @@ jobs:
           }
           probe "UiUx/Logo/Logo.webp" public
           # One representative key per customer-data domain this migration filed
-          # as private. receipts/ and chat/ are refused 403 ("Sign in to access
-          # this file"); reviews/ and reviews-evidence/ fall through to 404.
-          # Both are correct refusals - only a 200 carrying a body is not.
+          # as private. All four are refused by the SAME check: /files/* answers
+          # an anonymous request for any non-public key with 403 "Sign in to
+          # access this file" before it looks at the prefix at all, so the
+          # per-domain branches below it (owner, chat participant) are never
+          # reached without a session. Any refusal is correct here - only a 200
+          # carrying a body is not, and that is what this step is looking for.
           probe "receipts/usr_04834acf6e1e4bf1bd6f/3994c9ee34f64aa9a2c4.png" private
           probe "chat/usr_7eeadbc88ab04da7856d/a4af69669be943e0ada9.jpg" private
           probe "reviews/usr_934b7beb1ff24ce2b6b6/4aa60f3409074d8f8fb2.png" private
