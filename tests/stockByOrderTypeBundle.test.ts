@@ -641,3 +641,40 @@ test('a bundle on a route with its OWN places is not refused because the shared 
   assert.deepEqual(cell(raw), { capacity: 0, capacity_reserved: 0 }, 'and the empty shared pool was not touched');
   assert.deepEqual(modelShelf(raw), { stock: 9, reserved: 0 }, 'nor the shelf');
 });
+
+test('the cart publishes the ceiling of the counter the line will actually spend', async () => {
+  const raw = seedCatalogue();
+  // The shared pool has five; AIR holds its own quota of one. A cart line on
+  // air will spend air's one — so a cart that published the pool's five would
+  // invite the customer to raise the quantity to a number the checkout refuses.
+  // The reverse error is just as bad: quoting the pool when the route holds
+  // MORE would cap a customer who could buy it.
+  addModelPreorder(raw, { shelf: 9, pool: 5, routeQuota: { air: 1 } });
+  transportDefaults(raw);
+  addBundle(raw, {
+    id: 'prd_model',
+    slug: 'modelbundle',
+    priceIqd: 600_000,
+    components: [{ id: 'bc_model', product: 'p_model', qty: 1, optionValueIds: ['v_model'] }],
+  });
+  const db = asD1(raw);
+
+  assert.equal((await cartAdd(db, { productId: 'prd_model', qty: 1, transportMethod: 'air' })).success, true);
+  const cart = await json(await get(appFor(db), '/api/cart'));
+  const line = cart.items.find((i: { productId: string }) => i.productId === 'prd_model');
+  assert.ok(line, JSON.stringify(cart));
+  assert.equal(
+    line.availability.max_qty,
+    1,
+    `the cart must quote air's own quota, not the shared pool: ${JSON.stringify(line.availability)}`
+  );
+
+  // And the door agrees, which is the whole point: the number the cart shows
+  // is the number the checkout enforces. Two on air against a quota of one is
+  // refused even though the shared pool has five sitting beside it.
+  raw.exec('DELETE FROM cart_items');
+  const two = await addThenBuy(db, { productId: 'prd_model', qty: 2, transportMethod: 'air' });
+  assert.equal(two.success, false, `two cannot be bought against a quota of one: ${JSON.stringify(two)}`);
+  assert.deepEqual(route(raw, 'air'), { capacity: 1, capacity_reserved: 0 });
+  assert.deepEqual(cell(raw), { capacity: 5, capacity_reserved: 0 }, 'and the pool was never the counter');
+});

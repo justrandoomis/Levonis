@@ -535,7 +535,16 @@ export async function resolveCartBundles(
   const lines: CompositionLineInput[] = [];
   for (const r of rows) {
     const row = joined.get(String(r.id));
-    if (row) lines.push({ key: String(r.cart_item_id), row, choices: choices.get(String(r.cart_item_id)) });
+    if (row)
+      lines.push({
+        key: String(r.cart_item_id),
+        row,
+        choices: choices.get(String(r.cart_item_id)),
+        // 0075. The line's OWN route, so the ceiling the cart publishes is the
+        // counter the checkout will actually spend — the shared pool and a
+        // route's own quota are different counters, not different numbers.
+        transportMethod: String(r.transport_method ?? ''),
+      });
   }
   return resolveCompositionLines(db, lines, {
     tier,
@@ -1186,7 +1195,9 @@ async function addCompositionLine(
   if (!row) throw notFound('Product not found or unavailable');
   const resolvedMap = await resolveCompositionLines(
     c.env.DB,
-    [{ key: productId, row, choices }],
+    // The route the customer is asking for, so the door judges the counter it
+    // is about to spend rather than the shared pool.
+    [{ key: productId, row, choices, transportMethod }],
     { tier, tierActive, proPolicy: ctx.proPolicy, transportDefaults: ctx.transportDefaults, status, nowMs: Date.now() }
   );
 
@@ -1639,12 +1650,14 @@ async function patchCompositionLine(
   const joined = await loadCompositionRows(c.env.DB, [productId]);
   const row = joined.get(productId);
   if (!row) throw notFound('Cart item not found');
+  const method = String(existing.transport_method ?? '');
   const resolvedMap = await resolveCompositionLines(
     c.env.DB,
-    [{ key: productId, row, choices }],
+    // The line's STORED route — the same one the mystery pre-pass below reads,
+    // and the one the checkout will resolve this line with.
+    [{ key: productId, row, choices, transportMethod: method }],
     { tier, tierActive, proPolicy: ctx.proPolicy, transportDefaults: ctx.transportDefaults, status, nowMs: Date.now() }
   );
-  const method = String(existing.transport_method ?? '');
   let mysteryCtx: MysteryContext | null = null;
   if (isMystery) {
     const ctxs = await resolveMysteryLines(

@@ -317,6 +317,20 @@ export interface CompositionLineInput {
   key: string;
   row: Record<string, unknown>;
   choices?: Map<string, ComponentChoice>;
+  /**
+   * THE ROUTE THIS LINE IS ACTUALLY ON — `cart_items.transport_method`.
+   *
+   * A CARD has none: nobody has chosen a journey yet, and the card's question
+   * is "can this be bought at all", so a pre-order component is read against
+   * the best counter over the routes its member offers. A CART LINE does have
+   * one, and must use it: the checkout resolves that line with exactly this
+   * value, and a route holding its own quota is a different counter from the
+   * shared pool. Reading the pool for a line that will spend air's quota makes
+   * the cart publish a ceiling the sale does not have — too low and it caps a
+   * customer who could buy more, too high and it promises places that are not
+   * there. Absent = card; present = line.
+   */
+  transportMethod?: string;
 }
 
 /**
@@ -349,7 +363,7 @@ export async function resolveCompositionLines(
     const id = String(line.row.id);
     out.set(
       line.key,
-      resolveOne(line.row, byBundle.get(id) ?? [], choicesByComponent, members, viewer, line.choices)
+      resolveOne(line.row, byBundle.get(id) ?? [], choicesByComponent, members, viewer, line.choices, line.transportMethod)
     );
   }
   return out;
@@ -361,7 +375,9 @@ function resolveOne(
   choicesByComponent: Map<string, BundleComponentChoiceRow[]>,
   members: Map<string, MemberRow>,
   viewer: CompositionViewer,
-  chosen?: Map<string, ComponentChoice>
+  chosen?: Map<string, ComponentChoice>,
+  /** The line's real route, or undefined for a card. See CompositionLineInput. */
+  lineRoute?: string
 ): ResolvedBundle {
   const doc = parseProductRow(row);
   const config = configFromRow(row);
@@ -370,7 +386,7 @@ function resolveOne(
 
   // ---- every component, at the viewer's tier, against real stock ----------
   const partial = componentRows.map((c) =>
-    resolveComponent(c, choicesByComponent.get(c.id) ?? [], members, viewer, chosen?.get(c.id))
+    resolveComponent(c, choicesByComponent.get(c.id) ?? [], members, viewer, chosen?.get(c.id), lineRoute)
   );
   const shipping = shippingPlan(partial);
   const components: ResolvedComponentView[] = partial.map((p, i) => ({
@@ -450,7 +466,9 @@ function resolveComponent(
   allowList: BundleComponentChoiceRow[],
   members: Map<string, MemberRow>,
   viewer: CompositionViewer,
-  chosen?: ComponentChoice
+  chosen?: ComponentChoice,
+  /** The line's real route, or undefined for a card. See CompositionLineInput. */
+  lineRoute?: string
 ): PartialComponent {
   const member = members.get(c.member_product_id) ?? null;
   const doc = member ? member.doc : parseProductRow({ id: c.member_product_id });
@@ -549,17 +567,27 @@ function resolveComponent(
    */
   if (!unavailable && member && effectiveAvailability({ availability_type: '' }, saleTypes0) === 'pre_order') {
     const capacity = capacityFrom(member.view, selection.option_value_ids);
-    const routes = doc.preorder_transports.filter((t) => t.active !== false).map((t) => String(t.method));
-    // '' asks the shared pool; each method asks that route's own quota when it
-    // holds one and the pool when it does not. `rank` is the same "untracked
-    // beats a big number beats zero" order the choice loop above uses, so the
-    // most permissive real answer wins and an unanswerable one never does.
-    let bestCap: StockResolution | null = null;
-    for (const method of ['', ...routes]) {
-      const res = resolveForOrderType('pre_order', snapshot, selection, capacity, method);
-      if (bestCap === null || rank(res) > rank(bestCap)) bestCap = res;
+    if (lineRoute !== undefined) {
+      // A LINE. The checkout resolves this very line with this very route, so
+      // the cart asks the identical question and the two cannot publish
+      // different ceilings for the same sale.
+      resolution = resolveForOrderType('pre_order', snapshot, selection, capacity, lineRoute);
+    } else {
+      // A CARD. No journey has been chosen, so the honest question is "is there
+      // ANY route this can be bought on". '' asks the shared pool; each method
+      // asks that route's own quota when it holds one and the pool when it does
+      // not. `rank` is the same "untracked beats a big number beats zero" order
+      // the choice loop above uses, so the most permissive real answer wins and
+      // an unanswerable one never does. A card can only over-promise, and the
+      // line and the door both correct it before anything moves.
+      const routes = doc.preorder_transports.filter((t) => t.active !== false).map((t) => String(t.method));
+      let bestCap: StockResolution | null = null;
+      for (const method of ['', ...routes]) {
+        const res = resolveForOrderType('pre_order', snapshot, selection, capacity, method);
+        if (bestCap === null || rank(res) > rank(bestCap)) bestCap = res;
+      }
+      if (bestCap) resolution = bestCap;
     }
-    if (bestCap) resolution = bestCap;
   }
 
   const saleTypes = saleTypes0;
