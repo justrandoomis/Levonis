@@ -44,7 +44,6 @@
 
 import {
   bundleAvailability,
-  componentOrderType,
   COMPOSITION_LOW_BUNDLES,
   loadBundleComponents,
   loadCompositionMembers,
@@ -521,38 +520,46 @@ function resolveComponent(
    * A PRE-ORDER COMPONENT IS READ AGAINST ITS IMPORT QUOTA, NOT THE SHELF.
    *
    * Everything above answers `resolveStock`, which only ever knows about a
-   * shelf. For a member that sells as a pre-order that is the WRONG COUNTER in
-   * both directions: a model with an empty shelf and four import places read as
-   * sold out, so `POST /api/cart/items` refused the bundle OUT_OF_STOCK while
+   * shelf. For a member that travels as a pre-order that is the WRONG COUNTER
+   * in both directions: a model with an empty shelf and four import places read
+   * as sold out, so `POST /api/cart/items` refused the bundle OUT_OF_STOCK while
    * the identical standalone pre-order line was accepted; and a model with a
    * full quota and stock on the shelf read as freely available.
    *
-   * THE ROUTE IS DELIBERATELY NOT PASSED HERE, and this is the one place in the
-   * change where that is the right answer rather than a shortcut. Which route a
-   * component travels on is decided by `shippingPlan(partial)` — AFTER every
-   * component has been resolved, because the plan is a property of the whole
-   * bundle — so no route exists at this point in the read. Asking for the
-   * shared pool is the honest answer to "can this bundle be bought at all":
-   * it is the counter every route without its own quota spends, and a route
-   * that holds one has at most its own smaller number, never a larger one.
-   * The CHECKOUT re-asks with the buyer's real `cart_items.transport_method`
-   * (worker/routes/orders.ts), and that answer — not this one — is what moves
-   * a counter. This function describes; the door decides.
+   * THE CONDITION IS `preorderOnly`, AND IT MATCHES `shippingPlan` EXACTLY.
+   * That function — the one that decides each component's journey a few lines
+   * below, and whose answer the CHECKOUT re-reads to pick the counter it
+   * actually moves — returns 'direct' for every component that is not
+   * `preorderOnly`, because a member that sells both ways travels with the
+   * bundle rather than on an import. Reading a dual-mode member against its
+   * import quota here would make this pass and that one aim at different rows
+   * for the same component: the cart would refuse a bundle whose member had a
+   * full quota and a stocked shelf, then the checkout would sell it off the
+   * shelf. The two must agree, so they are asked the same question.
+   *
+   * WHICH ROUTE, ACROSS ALL OF THEM. `shippingPlan` needs every component
+   * before it can freeze a journey, so no route exists at this point in the
+   * read. Asking only the shared pool would refuse a bundle whose route holds
+   * its own places — air with five free while the pool is empty — so the
+   * answer here is the BEST counter over the routes the member offers. It is
+   * the honest answer to "can this bundle be bought at all", and it can only
+   * be more permissive than the door, never less: the CHECKOUT re-asks with
+   * the buyer's real `cart_items.transport_method` and that answer, not this
+   * one, is what moves a counter. This function describes; the door decides.
    */
-  if (!unavailable && member && componentOrderType({ sale_types: saleTypes0, shipping_type: 'preorder_air' }) === 'pre_order') {
-    resolution = resolveForOrderType(
-      'pre_order',
-      snapshot,
-      selection,
-      capacityFrom(member.view, selection.option_value_ids),
-      ''
-    );
-  }
-  if (unavailable) {
-    resolution.targets = [];
-    resolution.tracked = true;
-    resolution.available = 0;
-    resolution.error = 'COMPONENT_UNAVAILABLE';
+  if (!unavailable && member && effectiveAvailability({ availability_type: '' }, saleTypes0) === 'pre_order') {
+    const capacity = capacityFrom(member.view, selection.option_value_ids);
+    const routes = doc.preorder_transports.filter((t) => t.active !== false).map((t) => String(t.method));
+    // '' asks the shared pool; each method asks that route's own quota when it
+    // holds one and the pool when it does not. `rank` is the same "untracked
+    // beats a big number beats zero" order the choice loop above uses, so the
+    // most permissive real answer wins and an unanswerable one never does.
+    let bestCap: StockResolution | null = null;
+    for (const method of ['', ...routes]) {
+      const res = resolveForOrderType('pre_order', snapshot, selection, capacity, method);
+      if (bestCap === null || rank(res) > rank(bestCap)) bestCap = res;
+    }
+    if (bestCap) resolution = bestCap;
   }
 
   const saleTypes = saleTypes0;

@@ -588,3 +588,56 @@ test('a DIRECT bundle component is still read against the shelf — the read fix
   assert.equal(placed.success, false, `an empty shelf still stops a direct component: ${JSON.stringify(placed)}`);
   assert.deepEqual(cell(raw), { capacity: 4, capacity_reserved: 0 }, 'and the import quota was not spent instead');
 });
+
+// ============================== the read model and the door must AGREE
+//
+// Both cases below were shipped broken by the first attempt at the read-model
+// fix and found by three independent reviewers. They are the two ways a
+// descriptive pass can disagree with the authoritative one, and a disagreement
+// is worse than either answer alone: the cart refuses what the checkout would
+// have sold, or the cart promises what the checkout will refuse.
+
+test('a member that sells BOTH ways is read the way the door will sell it — direct', async () => {
+  const raw = seedCatalogue();
+  addModelPreorder(raw, { shelf: 9, pool: 0 });
+  // Sells both ways. `shippingPlan` freezes such a component onto 'direct'
+  // (it is not `preorderOnly`), and the checkout re-reads that, so the counter
+  // is the SHELF. A read model that asked the import quota instead would
+  // refuse this bundle for a full quota the sale is never going to touch.
+  raw.exec(`UPDATE products SET sale_types = '["direct_sale","pre_order"]' WHERE id = 'p_model'`);
+  transportDefaults(raw);
+  addBundle(raw, {
+    id: 'prd_model',
+    slug: 'modelbundle',
+    priceIqd: 600_000,
+    components: [{ id: 'bc_model', product: 'p_model', qty: 1, optionValueIds: ['v_model'] }],
+  });
+  const db = asD1(raw);
+
+  const placed = await addThenBuy(db, { productId: 'prd_model', qty: 1 });
+  assert.equal(placed.success, true, `the full import quota is not this sale's counter: ${JSON.stringify(placed)}`);
+  assert.deepEqual(modelShelf(raw), { stock: 9, reserved: 1 }, 'the shelf is — and it is what moved');
+  assert.deepEqual(cell(raw), { capacity: 0, capacity_reserved: 0 }, 'the quota was neither read as blocking nor spent');
+});
+
+test('a bundle on a route with its OWN places is not refused because the shared pool is empty', async () => {
+  const raw = seedCatalogue();
+  // The pool is empty but air holds five of its own. The standalone line has
+  // always been sellable here; a read model that only ever asked the shared
+  // pool refused the bundle with five free places sitting on the route.
+  addModelPreorder(raw, { shelf: 9, pool: 0, routeQuota: { air: 5 } });
+  transportDefaults(raw);
+  addBundle(raw, {
+    id: 'prd_model',
+    slug: 'modelbundle',
+    priceIqd: 600_000,
+    components: [{ id: 'bc_model', product: 'p_model', qty: 1, optionValueIds: ['v_model'] }],
+  });
+  const db = asD1(raw);
+
+  const placed = await addThenBuy(db, { productId: 'prd_model', qty: 1, transportMethod: 'air' });
+  assert.equal(placed.success, true, JSON.stringify(placed));
+  assert.deepEqual(route(raw, 'air'), { capacity: 5, capacity_reserved: 1 }, "air's own quota is what was spent");
+  assert.deepEqual(cell(raw), { capacity: 0, capacity_reserved: 0 }, 'and the empty shared pool was not touched');
+  assert.deepEqual(modelShelf(raw), { stock: 9, reserved: 0 }, 'nor the shelf');
+});
