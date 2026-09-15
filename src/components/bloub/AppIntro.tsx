@@ -12,17 +12,92 @@ import {
 import { readPointer, watchPointer } from './pointer';
 import { watchInterest, centreOf, type InterestTarget } from './interest';
 import { POSES, type Pose } from './character/expressions';
-import { isTravelWorthAnimating, planTravel, sampleTravel, type TravelPlan, type TravelSample } from './character/travel';
+import { isTravelWorthAnimating, planTravel, sampleTravel, type TravelFrame, type TravelPlan, type TravelSample } from './character/travel';
 import {
-  CHARACTER_CANVAS, bootstrapCharacterFrame, characterLayout, characterTransform,
-  measureCharacterAnchor, setCharacterRenderFailed, type CharacterFrame,
+  CHARACTER_CANVAS, bootstrapCharacterFrame, characterLayout, characterTransform, layoutViewport,
+  measureCharacterAnchor, setCharacterRenderFailed, visibleViewport, type CharacterFrame,
 } from './anchors';
 export { signalBloub } from './events';
 export { measureHomeTarget } from './anchors';
 
 function centerFrame(): CharacterFrame {
   if (typeof window === 'undefined') return { x: 0, y: 0, size: 112 };
-  return bootstrapCharacterFrame(window.visualViewport ?? { width: window.innerWidth, height: window.innerHeight });
+  // `visibleViewport()` hands back the visible area with its origin already
+  // carried out, so this frame is in the same layout coordinates every anchor
+  // rectangle is in. See the coordinate-space note in anchors.ts.
+  return bootstrapCharacterFrame(visibleViewport());
+}
+
+/**
+ * HOW LONG THE CHARACTER WILL WAIT FOR A PAGE THAT MAY NEVER ARRIVE.
+ *
+ * The bootstrap pin — full size, dead centre — is the right answer for the
+ * first second of a cold load and the wrong answer for ever. Its only exit was
+ * a readiness flag owned by a promise, so one request whose body stalled left
+ * the character parked at 320px in the middle of a page the viewer had already
+ * been reading for a minute, re-centring itself on every scroll and every
+ * rotation. That is a UI state with an unbounded lifetime, which is a hang.
+ *
+ * The deadline is the exit: comfortably longer than any real first paint, far
+ * shorter than a wait nobody is ever going to be released from. It is a SAFETY
+ * NET, not the mechanism — the ordinary path still docks the moment readiness
+ * settles, and a failed request settles exactly like a successful one.
+ */
+const BOOT_PIN_MAX_MS = 6000;
+
+/**
+ * How long the character holds its position through a lazy-route handoff.
+ *
+ * Most focused pages bring their own header a few hundred milliseconds after
+ * the reserved fallback slot appears, and docking on the slot only to dock
+ * again on the header is two journeys for one navigation. Holding still is the
+ * better answer — but only for as long as the handoff plausibly takes.
+ */
+const HANDOFF_MAX_MS = 3000;
+
+/**
+ * How long a docked character keeps its place after its anchor disappears.
+ *
+ * Long enough to cover a route change that unmounts one header and mounts
+ * another a commit later, short enough that a coordinate from a dead layout
+ * never becomes the character's permanent address.
+ */
+const ORPHAN_GRACE_MS = 700;
+
+/**
+ * A rotation does not finish when the event announcing it fires.
+ *
+ * iOS reports `resize` while the safe-area insets, the URL bar and the layout
+ * viewport are all still moving, and both anchor slots are `clamp()`-pinned to
+ * a constant box at every tablet width — so the ResizeObserver watching them
+ * never fires for a rotation that moves the anchor 180px sideways. One
+ * trailing measurement after the viewport stops changing is what makes the
+ * rectangle the character docks to the FINAL one.
+ */
+const SETTLE_MS = 250;
+
+/**
+ * THE SAME JOURNEY, AIMED SOMEWHERE ELSE.
+ *
+ * A resize arriving mid-flight used to build a whole new plan with a fresh
+ * `startedAt`. A continuous resize — a desktop window drag, an iPad rotation,
+ * a keyboard sliding up — fires one of those every frame, so the journey was
+ * restarted every frame: `elapsed` never reached `plan.total`, the journey
+ * never finished, the corrective re-measure at rest never ran, and because the
+ * scale curve deliberately does not begin until a tenth of the travel beat has
+ * passed, one frame of progress moves the size by exactly zero. The body
+ * trailed the anchor by a few frames and stayed the size it had been before
+ * the viewport started moving. That is the crawl.
+ *
+ * Keeping `from`, the beat durations and the start time and replacing only the
+ * DESTINATION leaves the clock running, so the journey still lands. The sample
+ * shifts by the same few pixels the anchor moved — which is the correction —
+ * and nothing about the departure replays.
+ */
+function retargetTravel(plan: TravelPlan, to: TravelFrame): TravelPlan {
+  const dx = to.x + to.size / 2 - (plan.from.x + plan.from.size / 2);
+  const dy = to.y + to.size / 2 - (plan.from.y + plan.from.size / 2);
+  return { ...plan, to, distance: Math.hypot(dx, dy), angle: Math.atan2(dy, dx) };
 }
 
 class CharacterBoundary extends React.Component<{ children: React.ReactNode; onFailure: () => void }, { failed: boolean }> {
@@ -111,6 +186,26 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     from: null, state: expression.state, since: 0, sequence: expression.sequence,
   });
 
+  /**
+   * THE ONLY WRITER OF `transform` ON THIS NODE.
+   *
+   * It used to have two: this imperative write, on the animation clock, and
+   * React's own inline style, on the render clock. React's style diff compares
+   * the string from the PREVIOUS render with the string from this one, so a
+   * render that started mid-journey and committed a frame later put back the
+   * position the ref held when the render began — a backwards jump of one
+   * render's worth of travel, and the only way a stale frame could ever reach
+   * the DOM. The inline style no longer carries `transform` at all; the layout
+   * effect below re-asserts the LIVE frame before every paint instead, which
+   * is always at least as fresh as what a render could have produced.
+   */
+  const writeFrame = React.useCallback((frame: CharacterFrame) => {
+    frameRef.current = frame;
+    if (character.current) character.current.style.transform = characterTransform(frame);
+  }, []);
+
+  React.useLayoutEffect(() => { writeFrame(frameRef.current); });
+
   React.useLayoutEffect(() => {
     readyRef.current = ready;
     mascot.activity('bootstrap', ready ? null : 'loading');
@@ -153,11 +248,30 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     let observed: HTMLElement | null = null;
     let running = false;
     const epoch = performance.now();
+    let observedContainer: HTMLElement | null = null;
+    let settleTimer = 0;
+    /** When measure() first REFUSED to dock, so every refusal has a deadline. */
+    let waitingSince = 0;
     const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => schedule(false));
 
-    const writeFrame = (frame: CharacterFrame) => {
-      frameRef.current = frame;
-      if (character.current) character.current.style.transform = characterTransform(frame);
+    /**
+     * Come back on our own, once, after `ms`.
+     *
+     * Every refusal below is waiting on something that may never happen, and
+     * nothing else in the system is going to wake this measurement if it does
+     * not. This is a single-shot timer that is reset, never stacked, so it can
+     * never become a poll: at most one pending measurement exists at a time.
+     */
+    const remeasureAfter = (ms: number) => {
+      window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(() => { settleTimer = 0; schedule(false); }, ms);
+    };
+
+    const occupy = (element: HTMLElement | null) => {
+      if (occupied === element) return;
+      occupied?.removeAttribute('data-bloub-occupied');
+      occupied = element;
+      occupied?.setAttribute('data-bloub-occupied', 'true');
     };
 
     const finishJourney = () => {
@@ -195,10 +309,13 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       const target = interest.current;
       const frame = frameRef.current;
       const centre = { x: frame.x + frame.size / 2, y: frame.y + frame.size / 2 };
-      const viewport = {
-        w: window.visualViewport?.width ?? window.innerWidth,
-        h: window.visualViewport?.height ?? window.innerHeight,
-      };
+      // THE LAYOUT VIEWPORT, because `centre` came from a client rectangle
+      // and `pointer` from clientX/clientY. Dividing a layout-space distance
+      // by the VISUAL viewport's diagonal put two coordinate spaces in one
+      // fraction: a pinch-zoom or a raised keyboard shrinks the visual
+      // viewport while leaving every client coordinate exactly where it was,
+      // so the character's reach changed without anything it measures moving.
+      const viewport = layoutViewport();
 
       if (pointer.present && pointer.movedAt > lastActivity.current) {
         // New activity: re-roll how long this engagement will be held, so the
@@ -289,6 +406,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       frameId = 0;
       const animate = animateNext;
       animateNext = false;
+      const now = performance.now();
       // The noticed control may have scrolled since the pointer arrived on it.
       // Re-measured HERE, on the same rAF-throttled pass the character's own
       // dock uses, and never inside the draw loop.
@@ -300,29 +418,96 @@ export default function AppIntro({ ready }: { ready: boolean }) {
           if (centre) { noticed.x = centre.x; noticed.y = centre.y; }
         }
       }
+      if (occupied && !occupied.isConnected) occupy(null);
       const target = measureCharacterAnchor();
       if (observed !== (target?.element ?? null)) {
         if (observed) resizeObserver?.unobserve(observed);
         observed = target?.element ?? null;
         if (observed) resizeObserver?.observe(observed);
       }
+      // WATCH THE BOX THAT MOVES THE ANCHOR, NOT ONLY THE ANCHOR.
+      // Both slots are `clamp()`-pinned to a constant size at every width above
+      // about 474px, so on a tablet the anchor's own box is byte-identical in
+      // portrait and landscape and an observer on it alone is silent through
+      // the one event that moves it furthest. Its layout container is not.
+      const container = target ? (target.element.offsetParent as HTMLElement | null) ?? target.element.parentElement : null;
+      if (observedContainer !== container) {
+        if (observedContainer) resizeObserver?.unobserve(observedContainer);
+        observedContainer = container;
+        if (observedContainer) resizeObserver?.observe(observedContainer);
+      }
       const pending = !readyRef.current || characterLayout.pending() || !!target?.busy;
       mascot.activity('anchor-loading', pending ? 'loading' : null);
-      if (!completedRef.current && pending) {
-        // Still waiting on the real page. The character holds the centre of
-        // the viewport at full size and gets on with being alive there — this
-        // is the one moment it has the screen to itself.
+
+      // NOTHING TO DOCK TO AT ALL, AND NOWHERE IT HAS EVER DOCKED.
+      // The viewport centre is the character's defined home before there is a
+      // page, so holding it here is a POSITION and not a wait — it is
+      // recomputed absolutely on every pass, and there is no other frame that
+      // would be more correct. This is the one refusal with no deadline.
+      if (!target && !completedRef.current) {
         writeFrame(centerFrame());
         return;
       }
-      // During a lazy-route handoff keep the same node at its last position.
-      // Registration wakes this observer as soon as the real header exists.
-      if (!target || (characterLayout.pending() && target.kind === 'top-fallback')) return;
-      if (occupied !== target.element) {
-        occupied?.removeAttribute('data-bloub-occupied');
-        occupied = target.element;
+
+      /**
+       * ORPHANED: DOCKED SOMEWHERE THAT NO LONGER EXISTS.
+       *
+       * Every anchor has gone — a header unmounted a commit before its
+       * replacement mounts, typically. Holding still covers that, and used to
+       * be all this did, which meant a window that never closed left the
+       * character drawn at a coordinate belonging to a dead layout while the
+       * page scrolled underneath it. Past the grace the honest answer is that
+       * it has nowhere legitimate to be, so it is not drawn. It comes back,
+       * docked, the instant an anchor registers.
+       */
+      if (!target) {
+        if (!waitingSince) waitingSince = now;
+        const left = ORPHAN_GRACE_MS - (now - waitingSince);
+        if (left > 0) { remeasureAfter(left); return; }
+        occupy(null);
+        journeyRef.current = null;
+        setPhase('hidden');
+        return;
       }
-      occupied.setAttribute('data-bloub-occupied', 'true');
+
+      /**
+       * WHY A DOCK IS BEING REFUSED — AND THEREFORE FOR HOW MUCH LONGER.
+       *
+       * Both of these are right for a moment and indefensible for a minute,
+       * and both used to be a bare `return` whose only exit was an upstream
+       * promise settling. They now share one stopwatch, so "still booting" and
+       * "a signal that is never going to arrive" stop being the same state.
+       */
+      const refusal: 'boot' | 'handoff' | null =
+        !completedRef.current && pending ? 'boot'
+          : pending && target.kind === 'top-fallback' ? 'handoff'
+            : null;
+
+      if (refusal) {
+        if (!waitingSince) waitingSince = now;
+        const left = (refusal === 'boot' ? BOOT_PIN_MAX_MS : HANDOFF_MAX_MS) - (now - waitingSince);
+        if (left > 0) {
+          // 'boot' holds the viewport centre; 'handoff' holds whatever the
+          // character already has, because it is standing on a real dock.
+          if (refusal === 'boot') writeFrame(centerFrame());
+          remeasureAfter(left);
+          return;
+        }
+        // Past the deadline with a real anchor in hand: dock SILENTLY. Not a
+        // journey — a first dock would plan a 0.34s wind-up and a cross-screen
+        // travel, and a mascot barging into a page the viewer has been reading
+        // for ten seconds is worse than one that was merely late.
+        occupy(target.element);
+        writeFrame(target.frame);
+        journeyRef.current = null;
+        completedRef.current = true;
+        waitingSince = 0;
+        setPhase('docked');
+        mascot.navigationComplete();
+        return;
+      }
+      waitingSince = 0;
+      occupy(target.element);
 
       const next = target.frame;
       const last = frameRef.current;
@@ -351,8 +536,20 @@ export default function AppIntro({ ready }: { ready: boolean }) {
         return;
       }
 
+      // A VIEWPORT THAT IS STILL MOVING MUST NOT RESTART THE JOURNEY.
+      // Re-planning here resets `startedAt`, and a resize that fires every
+      // frame therefore resets it every frame — the journey never reaches
+      // `plan.total`, never finishes, and its size never leaves the value it
+      // had when the viewport started moving. Retargeting keeps the clock and
+      // replaces only the destination, so it still lands, on the new anchor.
+      // A route change (animate) is a genuinely new intention and still plans.
+      if (inFlight && !animate) {
+        journeyRef.current = { ...inFlight, plan: retargetTravel(inFlight.plan, next) };
+        return;
+      }
+
       const plan = planTravel(last, next, { reduced: reducedRef.current, boot, continuation: !!inFlight });
-      if (!animate && !boot && !inFlight) {
+      if (!animate && !boot) {
         writeFrame(next);
         setPhase('docked');
         return;
@@ -382,7 +579,12 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     scheduleRef.current = schedule;
 
     const unsubscribe = characterLayout.subscribe(() => schedule(true));
-    const onResize = () => schedule(false);
+    const onResize = () => {
+      schedule(false);
+      // ...and once more when it stops. See SETTLE_MS: the geometry this event
+      // announces is not the geometry the page ends up with.
+      remeasureAfter(SETTLE_MS);
+    };
     const onVisibility = () => {
       setPageVisible(!document.hidden);
       mascot.setVisible(!document.hidden);
@@ -437,9 +639,18 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     });
 
     window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
     window.visualViewport?.addEventListener('resize', onResize);
     window.visualViewport?.addEventListener('scroll', onResize);
+    // The capture-phase listener is the app's every scroller at once, and it is
+    // still the only thing that catches an in-page layout shift moving a sticky
+    // header. It stays until something cheaper covers that case.
     document.addEventListener('scroll', onResize, true);
+    // The layout viewport itself. Unlike the anchor slots — whose boxes are
+    // clamp()-pinned to a constant at every tablet width — this changes on
+    // every rotation and every URL-bar collapse, which is precisely when the
+    // anchor moves furthest without changing size.
+    resizeObserver?.observe(document.documentElement);
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener(BLOUB_EVENT, onState);
     writeFrame(frameRef.current);
@@ -455,6 +666,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       mascot.activity('interest', null);
       scheduleRef.current = () => {};
       stop();
+      window.clearTimeout(settleTimer);
       window.cancelAnimationFrame(frameId);
       journeyRef.current = null;
       mascot.activity('anchor-loading', null);
@@ -462,13 +674,14 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       occupied?.removeAttribute('data-bloub-occupied');
       resizeObserver?.disconnect();
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
       window.visualViewport?.removeEventListener('resize', onResize);
       window.visualViewport?.removeEventListener('scroll', onResize);
       document.removeEventListener('scroll', onResize, true);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener(BLOUB_EVENT, onState);
     };
-  }, [failed]);
+  }, [failed, writeFrame]);
 
   React.useEffect(() => {
     if (firstPath.current === location.pathname) return;
@@ -505,7 +718,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       data-bloub-rendered={failed ? 'false' : 'true'} data-mascot-state={expression.state} aria-live="polite" aria-busy={!failed && phase === 'loading'}>
       <div className="lv-app-intro__veil" aria-hidden="true" />
       <div ref={character} className="lv-app-intro__character"
-        style={{ width: CHARACTER_CANVAS, height: CHARACTER_CANVAS, transform: characterTransform(frameRef.current) }}>
+        style={{ width: CHARACTER_CANVAS, height: CHARACTER_CANVAS }}>
         <CharacterBoundary onFailure={() => setFailed(true)}>
           <BloubHome ref={handle} state={expression.state} reduced={reduced} className="h-full w-full" />
         </CharacterBoundary>

@@ -54,9 +54,13 @@ test('blinking squashes the eye vertically on screen and leaves its width alone'
 });
 
 test('an eye tilt is mirrored between the two eyes, which head roll can never do', () => {
-  // Concern needs the eye TOPS to diverge; anger needs them to converge. Head
-  // roll tips both the same way, so only per-eye tilt reaches those. What has
-  // to mirror is the SCREEN ANGLE of each capsule's long axis.
+  // Concern needs the eye TOPS to CONVERGE (Λ, the raised inner brow); anger
+  // is the tops diverging into a V. Head roll tips both the same way, so only
+  // per-eye tilt reaches either. What has to mirror is the SCREEN ANGLE of each
+  // capsule's long axis. This comment used to state the rule backwards and the
+  // assertion below used to encode the backwards version, which is how an angry
+  // error face shipped and stayed green; tests/mascotGaze.test.ts now derives
+  // the sign from the projection instead of anybody's vocabulary.
   const poses = eyePoses(REST_GAZE);
   const lean = (i: 0 | 1, tilt: number) => {
     const [, , c, d] = eyeMatrix(poses[i], tilt, 1);
@@ -71,7 +75,7 @@ test('an eye tilt is mirrored between the two eyes, which head roll can never do
   const rolledLean = (i: 0 | 1) => { const [, , c, d] = eyeMatrix(rolled[i], 0, 1); return Math.atan2(d, c); };
   assert.ok(Math.sign(rolledLean(0) - lean(0, 0)) === Math.sign(rolledLean(1) - lean(1, 0)), 'roll moves both the same way');
   assert.equal(POSES.error.eyes[0].tilt, -POSES.error.eyes[1].tilt, 'concern is authored as a mirrored pair');
-  assert.ok(POSES.error.eyes[0].tilt < 0, 'worry diverges the tops; converging them would read as anger');
+  assert.ok(POSES.error.eyes[0].tilt > 0, 'worry CONVERGES the tops; diverging them is the angry-brow geometry');
 });
 
 /* --------------------------------------------------- idle is not a loop */

@@ -49,8 +49,6 @@ const BloubHome = React.forwardRef<CharacterHandle, Props>(function BloubHome({ 
   const mouth = React.useRef<SVGPathElement>(null);
   const eyeA = React.useRef<SVGEllipseElement>(null);
   const eyeB = React.useRef<SVGEllipseElement>(null);
-  const glowA = React.useRef<SVGEllipseElement>(null);
-  const glowB = React.useRef<SVGEllipseElement>(null);
   const alert = React.useRef<SVGGElement>(null);
 
   /** Last value written to each node. Writing an attribute invalidates the
@@ -73,7 +71,6 @@ const BloubHome = React.forwardRef<CharacterHandle, Props>(function BloubHome({ 
         put(mouth.current, 'mouth', 'd', r.mouth);
         put(mouth.current, 'mouthWeight', 'stroke-width', String(r.mouthWeight));
         const eyes = [eyeA.current, eyeB.current];
-        const glows = [glowA.current, glowB.current];
         for (let i = 0; i < 2; i++) {
           const node = eyes[i];
           const eye = r.eyes[i]!;
@@ -81,14 +78,6 @@ const BloubHome = React.forwardRef<CharacterHandle, Props>(function BloubHome({ 
           put(node, `eye${i}t`, 'transform', eye.matrix);
           put(node, `eye${i}x`, 'rx', String(eye.rx));
           put(node, `eye${i}y`, 'ry', String(eye.ry));
-          // The glow shares the eye's matrix exactly and only scales its
-          // radii, so there is no second place for it to be wrong.
-          const glow = glows[i];
-          if (glow) {
-            put(glow, `glow${i}t`, 'transform', eye.matrix);
-            put(glow, `glow${i}x`, 'rx', String(Math.round(eye.rx * 210) / 100));
-            put(glow, `glow${i}y`, 'ry', String(Math.round(eye.ry * 150) / 100));
-          }
           // An eye that has gone round the side of the head is not drawn
           // small, it is not drawn. Scaling it to nothing leaves a sliver
           // clinging to the limb.
@@ -96,7 +85,6 @@ const BloubHome = React.forwardRef<CharacterHandle, Props>(function BloubHome({ 
           if (written.current[`eye${i}v`] !== shown) {
             written.current[`eye${i}v`] = shown;
             node.style.display = shown;
-            if (glow) glow.style.display = shown;
           }
         }
         const alertOpacity = String(r.alert);
@@ -159,13 +147,6 @@ const BloubHome = React.forwardRef<CharacterHandle, Props>(function BloubHome({ 
           <stop offset="0" stopColor="#8f9a63" stopOpacity="0.16" />
           <stop offset="1" stopColor="#8f9a63" stopOpacity="0" />
         </radialGradient>
-        {/* A breath of warmth around each eye, so the cream sits IN the olive
-            rather than being punched through it. Again: transparent at its own
-            edge, so it can never read as a ring. */}
-        <radialGradient id="levonis-bloub-eyeglow" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0.45" stopColor="#f6edd6" stopOpacity="0.3" />
-          <stop offset="1" stopColor="#f6edd6" stopOpacity="0" />
-        </radialGradient>
       </defs>
 
       {/* No stroke. The brief is explicit that the character has no outer
@@ -177,10 +158,16 @@ const BloubHome = React.forwardRef<CharacterHandle, Props>(function BloubHome({ 
 
       {/* Eyes carry no transform of their own in the markup: the whole pose,
           including where each eye sits, how it is inclined and how far the lid
-          has come down, is one matrix written per frame. The glow rides the
-          SAME matrix, so it cannot drift off the eye it belongs to. */}
-      <ellipse ref={glowA} data-bloub-eyeglow="0" rx={FIRST.eyes[0].rx * 2.1} ry={FIRST.eyes[0].ry * 1.5} transform={FIRST.eyes[0].matrix} fill="url(#levonis-bloub-eyeglow)" />
-      <ellipse ref={glowB} data-bloub-eyeglow="1" rx={FIRST.eyes[1].rx * 2.1} ry={FIRST.eyes[1].ry * 1.5} transform={FIRST.eyes[1].matrix} fill="url(#levonis-bloub-eyeglow)" />
+          has come down, is one matrix written per frame.
+
+          They are two flat cream shapes and NOTHING ELSE — no halo, no filter,
+          no second translucent copy. Each eye used to be backed by a radial
+          gradient at 2.1x its width and 1.5x its height, which is three times
+          its area, and whose first stop sat at 0.45 so the wash was flat before
+          it began to fade: two lit patches spanning 36 of the body's 84 units.
+          The eyes did not glow, the body around them did. What actually makes
+          the cream sit IN the olive is already here and costs nothing — the
+          fill gradient behind them and the gloss lens passing over their tops. */}
       <ellipse ref={eyeA} data-bloub-eye="0" rx={FIRST.eyes[0].rx} ry={FIRST.eyes[0].ry} transform={FIRST.eyes[0].matrix} fill="#f7efda" />
       <ellipse ref={eyeB} data-bloub-eye="1" rx={FIRST.eyes[1].rx} ry={FIRST.eyes[1].ry} transform={FIRST.eyes[1].matrix} fill="#f7efda" />
 

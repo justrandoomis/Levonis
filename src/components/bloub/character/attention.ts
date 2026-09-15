@@ -18,16 +18,33 @@ import { clamp } from './math';
  */
 export interface Attention {
   /**
-   * Unit direction from the character to the thing it attends to, in SCREEN
-   * space: x grows right, y grows DOWN. The engine flips y itself when it
-   * turns this into a pitch, because a head that looks up is a positive pitch
-   * and a point above the character has a negative y.
+   * HOW FAR OFF-CENTRE THE TARGET IS, PER AXIS, -1..1 — a signed excursion,
+   * not a unit direction. Screen space: x grows right, y grows DOWN, and the
+   * engine flips y itself when it turns this into a pitch, because a head that
+   * looks up is a positive pitch and a point above the character has a
+   * negative y.
+   *
+   * It was a unit direction, and that is what made the gaze so small. A unit
+   * vector divides each axis by the full hypotenuse, so on a character docked
+   * at the bottom of a tall phone the vertical distance ate almost the whole
+   * horizontal signal — the eyes turned sideways as a function of how far UP
+   * the pointer was — and a perfect diagonal lost 29% before anything else
+   * touched it. Normalising each axis against its own half-viewport instead
+   * means a corner of the screen is 1 on BOTH axes, cardinals and diagonals
+   * reach equally far, and the excursion grows towards the edges rather than
+   * away from them.
    */
   x: number;
   y: number;
   /** 0..1 — how much of the gaze the target claims. Zero is indistinguishable
    *  from having no target at all, which is what makes releasing attention a
-   *  fade rather than a switch. */
+   *  fade rather than a switch.
+   *
+   *  It is how much the character CARES, and deliberately not how far it looks.
+   *  Those were the same number once, which meant a pointer in a far corner
+   *  produced a SMALLER gaze than one right beside the character — the exact
+   *  inverse of what reaching for something looks like. How far now comes from
+   *  `x`/`y`; this stays the release ramp and the priority damper. */
   weight: number;
   /**
    * 0..1 — how INTERESTING it is, which is a different question from how
@@ -43,16 +60,46 @@ export interface Attention {
 export const NO_ATTENTION: Attention = Object.freeze({ x: 0, y: 0, weight: 0, curiosity: 0 });
 
 /**
- * How far away a thing can be and still be worth turning towards, as a
- * fraction of the viewport's diagonal.
+ * How near a thing has to be to be INTERESTING, as a fraction of the
+ * viewport's diagonal.
  *
- * Generous on purpose. The character usually lives in the bottom navigation
- * bar, so on a phone almost everything the user touches is within a third of
- * a diagonal of it, and a tighter reach would mean the mascot ignored the page
- * it sits under. What keeps this from becoming a mascot that stares at
- * everything is the SHAPE of the falloff below, not the radius.
+ * This used to gate `weight` as well, and that was the second half of the
+ * small-gaze defect: on a 390x844 phone it made the weight exactly zero for
+ * everything above y=232 — the top 27% of the screen — so the character did
+ * not merely look less hard at the far corners, it did not look at them at
+ * all, and upper-left and upper-right produced byte-identical frames. Distance
+ * belongs to curiosity, which is the question it was always asking (how
+ * interesting, not how far). Turning towards something is not rationed.
  */
 const REACH = 0.62;
+
+/**
+ * The smallest half-viewport an axis may be normalised against, as a fraction
+ * of the viewport's short side.
+ *
+ * The character lives in the navigation bar, so there are a few dozen pixels of
+ * screen BELOW it. Without a floor, a pointer ten pixels under its chin would
+ * be a full-excursion target and the eyes would slam down. 0.12 of the short
+ * side is 47px on a phone and 96px on a laptop, and it only ever binds on that
+ * one starved axis.
+ */
+const MIN_SPAN = 0.12;
+
+/**
+ * FROM "how far off-centre" TO "how far to look": gentle near the character,
+ * and exactly full at the viewport edge.
+ *
+ * A linear map makes the eyes twitch at every small pointer move. A pure power
+ * curve fixes that and makes the near half of the screen do nothing at all.
+ * Blending the two keeps a real slope at the origin (0.55) while still reaching
+ * 1.0 exactly at the edge rather than clamping early: half the distance out
+ * gives 40% of the excursion, so the last stretch towards a corner is where
+ * most of the movement is — which is what reaching for something looks like.
+ */
+function reachCurve(n: number): number {
+  const a = Math.min(1, Math.abs(n));
+  return Math.sign(n) * (0.55 * a + 0.45 * a ** 2.2);
+}
 
 /**
  * Where curiosity starts, as a fraction of REACH.
@@ -93,11 +140,12 @@ export interface AttentionInput {
 /**
  * The attention a pointer at `point` earns.
  *
- * The falloff is deliberately not linear in distance. Linear falloff gives a
- * character that is always half-interested in everything, which reads as
- * vacancy rather than attention. A smoothstep concentrates the response near
- * the character and lets it genuinely ignore the far corners of a desktop
- * window — and ignoring things is most of what makes noticing them legible.
+ * Two answers, and keeping them separate is the point. WHERE to look is a
+ * per-axis excursion that grows all the way to the edge of the screen, because
+ * a creature reaches further for a thing that is further away. HOW INTERESTED
+ * to be falls off with distance on a quadratic band, because a character that
+ * is always half-interested in everything reads as vacancy rather than as
+ * attention — and ignoring things is most of what makes noticing them legible.
  */
 export function attentionFrom(input: AttentionInput): Attention {
   const engagement = clamp(input.engagement);
@@ -113,22 +161,27 @@ export function attentionFrom(input: AttentionInput): Attention {
     return { x: 0, y: 0, weight: engagement, curiosity: engagement };
   }
 
-  const diagonal = Math.hypot(Math.max(1, input.viewport.w), Math.max(1, input.viewport.h));
-  const reach = diagonal * REACH;
-  const near = clamp(1 - distance / reach);
-  // smoothstep: flat at both ends, steep in the middle.
-  const proximity = near * near * (3 - 2 * near);
+  const vw = Math.max(1, input.viewport.w);
+  const vh = Math.max(1, input.viewport.h);
+  // Each axis against ITS OWN half of the viewport, on the side the target is
+  // actually on: the character is docked low and off-centre, so the screen
+  // above it is nothing like the screen below it, and one shared radius would
+  // mean the eyes could reach the top edge or the bottom edge but not both.
+  const span = MIN_SPAN * Math.min(vw, vh);
+  const spanX = Math.max(dx < 0 ? input.center.x : vw - input.center.x, span);
+  const spanY = Math.max(dy < 0 ? input.center.y : vh - input.center.y, span);
 
+  const near = clamp(1 - distance / (Math.hypot(vw, vh) * REACH));
   const curiousBand = clamp((near - (1 - CURIOUS_AT)) / CURIOUS_AT);
   const interest = curiousBand * curiousBand;
 
   return {
-    x: dx / distance,
-    y: dy / distance,
-    // A DELIBERATE target is worth looking at from across the room: the
-    // character noticing the checkout button is the whole point of §10, and
+    x: reachCurve(dx / spanX),
+    y: reachCurve(dy / spanY),
+    weight: engagement,
+    // A DELIBERATE target is worth being interested in from across the room:
+    // the character noticing the checkout button is the whole point of §10, and
     // that button is often nowhere near the navigation bar.
-    weight: clamp((input.deliberate ? Math.max(proximity, 0.72) : proximity) * engagement),
     curiosity: clamp((input.deliberate ? Math.max(interest, 0.6) : interest) * engagement),
   };
 }

@@ -214,6 +214,213 @@ async function neverCapturesTheGesture(page) {
   await frames(page,200);
 }
 
+/** Distance between the character's centre and its anchor's centre, in CSS px.
+ *  One measurement, taken now — no waiting, because the question these checks
+ *  ask is whether the character is ALREADY where it belongs. */
+const offsetFromAnchor=(page,kind)=>page.evaluate(kind=>{
+  const a=document.querySelector(`[data-bloub-anchor="${kind}"]`)?.getBoundingClientRect();
+  const b=document.querySelector('.lv-app-intro__character')?.getBoundingClientRect();
+  if(!a||!b) return Number.POSITIVE_INFINITY;
+  return Math.hypot(a.x+a.width/2-b.x-b.width/2, a.y+a.height/2-b.y-b.height/2);
+},kind);
+
+/** Both eye centres in viewBox units, averaged over a window of real frames so
+ *  idle drift and saccades do not read as gaze. */
+const meanEyes=(page,ms)=>page.evaluate(ms=>new Promise(done=>{
+  const acc=[[0,0],[0,0]]; let n=0; const t0=performance.now();
+  const step=()=>{
+    const got=[0,1].map(i=>{
+      const m=document.querySelector(`[data-bloub-eye="${i}"]`)?.getAttribute('transform')?.match(/matrix\(([^)]+)\)/);
+      return m?m[1].trim().split(/\s+/).map(Number):null;
+    });
+    if(got[0]&&got[1]){
+      for(let i=0;i<2;i++){acc[i][0]+=got[i][4];acc[i][1]+=got[i][5];}
+      n++;
+    }
+    if(performance.now()-t0<ms) requestAnimationFrame(step);
+    else done(n?acc.map(([x,y])=>({x:x/n,y:y/n})):null);
+  };
+  requestAnimationFrame(step);
+}),ms);
+
+/** The body's own width in viewBox units, so the gaze budget below is a real
+ *  fraction of the face rather than a fraction of the canvas around it. */
+const bodyWidth=page=>page.locator('[data-bloub-body]').evaluate(e=>e.getBBox().width);
+
+/**
+ * THE OWNER'S MANUAL GAZE TEST, RUN BY MACHINE.
+ *
+ * "Pointer at far-left → eyes clearly look left" and the eight cases after it,
+ * with the acceptance the owner wrote out: if the difference between these
+ * states is barely visible, the range is still too small.
+ *
+ * Measured off the eye's own matrix, which is where the whole head pose lands,
+ * and reported as a PERCENTAGE OF THE BODY WIDTH — the number the owner's
+ * 15-22% horizontal and 12-18% vertical bands are expressed in.
+ */
+async function gazeReach(page,width,height) {
+  const dock=await page.locator('.lv-app-intro__character').boundingBox();
+  const cx=dock.x+dock.width/2, cy=dock.y+dock.height/2;
+  const body=await bodyWidth(page);
+  const edge=6;
+  const cases={
+    left:       {x:edge,        y:cy-40},
+    right:      {x:width-edge,  y:cy-40},
+    up:         {x:cx,          y:edge},
+    down:       {x:cx,          y:height-edge},
+    upLeft:     {x:edge,        y:edge},
+    upRight:    {x:width-edge,  y:edge},
+    downLeft:   {x:edge,        y:height-edge},
+    downRight:  {x:width-edge,  y:height-edge},
+  };
+  const seen={};
+  // THE NEUTRAL REFERENCE IS REST, NOT THE MIDDLE OF THE SCREEN. A pointer
+  // parked near the character is not a neutral gaze — it is the character
+  // looking at the pointer from very close, which for a bottom-docked mascot
+  // means looking straight up. The only honest zero is the gaze it holds once
+  // it has let go (§7), so that is what everything below is measured against.
+  await page.mouse.move(cx,Math.max(edge,cy-4),{steps:6});
+  await frames(page,5400);
+  seen.centre=await meanEyes(page,420);
+  assert.ok(seen.centre,'sampled the resting gaze');
+  for(const [name,pt] of Object.entries(cases)) {
+    await page.mouse.move(pt.x,pt.y,{steps:8});
+    await frames(page,1200);
+    seen[name]=await meanEyes(page,220);
+    assert.ok(seen[name],`sampled the eyes while looking ${name}`);
+  }
+  // Average the pair: the two eyes move by different amounts under the sphere
+  // projection — that is the point of it — so the PAIR's centre is what says
+  // where the character is looking.
+  const mid=n=>({x:(seen[n][0].x+seen[n][1].x)/2, y:(seen[n][0].y+seen[n][1].y)/2});
+  const p=Object.fromEntries(['centre',...Object.keys(cases)].map(n=>[n,mid(n)]));
+
+  const hTravel=p.right.x-p.left.x;
+  const vTravel=p.down.y-p.up.y;
+  const hPct=hTravel/body*100, vPct=vTravel/body*100;
+
+  // 1. DIRECTION IS UNAMBIGUOUS. Left is left of centre, right is right of it,
+  //    up is above, down is below — no partial credit.
+  assert.ok(p.left.x<p.centre.x, `far-left looks left (${p.left.x.toFixed(2)} vs centre ${p.centre.x.toFixed(2)})`);
+  assert.ok(p.right.x>p.centre.x, `far-right looks right (${p.right.x.toFixed(2)} vs centre ${p.centre.x.toFixed(2)})`);
+  assert.ok(p.up.y<p.centre.y, `top looks up (${p.up.y.toFixed(2)} vs centre ${p.centre.y.toFixed(2)})`);
+  assert.ok(p.down.y>p.centre.y, `bottom looks down (${p.down.y.toFixed(2)} vs centre ${p.centre.y.toFixed(2)})`);
+
+  // 2. THE RANGE IS THE OWNER'S. 15-22% of the face across, 12-18% down, with a
+  //    little headroom above for visual tuning. Under the floor is the defect
+  //    the owner reported; far over it stops looking like a face.
+  assert.ok(hPct>=15 && hPct<=26, `horizontal gaze travel is ${hPct.toFixed(1)}% of the ${body.toFixed(1)}-unit face (owner asks 15-22%)`);
+  assert.ok(vPct>=12 && vPct<=22, `vertical gaze travel is ${vPct.toFixed(1)}% of the face (owner asks 12-18%)`);
+
+  // 3. THE DIAGONALS ARE REAL DIAGONALS, not 0.707 shadows of the cardinals. A
+  //    unit-direction model cannot pass this: it spends the same budget across
+  //    two axes and reaches 71% of each.
+  for(const [name,hx,vy] of [['upLeft',-1,-1],['upRight',1,-1],['downLeft',-1,1],['downRight',1,1]]) {
+    const h=(p[name].x-p.centre.x)/(hx<0?p.left.x-p.centre.x:p.right.x-p.centre.x);
+    const v=(p[name].y-p.centre.y)/(vy<0?p.up.y-p.centre.y:p.down.y-p.centre.y);
+    assert.ok(h>0.8,`${name} reaches ${(h*100).toFixed(0)}% of the matching cardinal horizontally`);
+    assert.ok(v>0.8,`${name} reaches ${(v*100).toFixed(0)}% of the matching cardinal vertically`);
+  }
+
+  // 4. EVERY ONE OF THE NINE IS TELLABLE FROM EVERY OTHER. The character is
+  //    usually drawn at about 80 CSS px, so one viewBox unit is 0.8px — the
+  //    floor below is a shade over a pixel of real separation on screen.
+  const names=['centre',...Object.keys(cases)];
+  let closest={gap:Infinity,pair:''};
+  for(let i=0;i<names.length;i++) for(let j=i+1;j<names.length;j++) {
+    const gap=Math.hypot(p[names[i]].x-p[names[j]].x,p[names[i]].y-p[names[j]].y);
+    if(gap<closest.gap) closest={gap,pair:`${names[i]}/${names[j]}`};
+  }
+  assert.ok(closest.gap>1.4,
+    `the two closest gaze states (${closest.pair}) are ${closest.gap.toFixed(2)} viewBox units apart — ${(closest.gap*0.8).toFixed(2)}px at the docked size`);
+
+  // 5. FARTHER MEANS FARTHER. The owner asks for the pointer approaching the
+  //    outer viewport to reach MUCH further, which is the opposite of a model
+  //    that loses interest with distance.
+  await page.mouse.move(cx-(cx-edge)*0.5,cy-40,{steps:8});
+  await frames(page,1200);
+  const half=await meanEyes(page,220);
+  const halfway=(half[0].x+half[1].x)/2;
+  assert.ok(p.left.x<halfway-0.6,
+    `the screen edge pulls the gaze further than halfway to it (edge ${p.left.x.toFixed(2)} vs half ${halfway.toFixed(2)})`);
+
+  return {hPct,vPct,closest:closest.gap,body};
+}
+
+/**
+ * §3 — THE CHARACTER STAYS ON ITS ANCHOR THROUGH EVERY VIEWPORT CHANGE.
+ *
+ * Two different failures hide behind "it drifts", and they need two different
+ * checks. A DISCRETE change — a rotation, a breakpoint, the URL bar collapsing
+ * — is one jump, and the character must land back on the anchor. A CONTINUOUS
+ * change — a dragged window edge — is a hundred of them in a second, and it is
+ * the one that exposes accumulation: an implementation that adds each delta to
+ * the last is correct after one step and visibly behind after a hundred.
+ *
+ * So the second check runs the SAME total change at two granularities. Lag
+ * scales with the distance; accumulation scales with the number of steps.
+ */
+async function staysAnchored(page,kind,sizes) {
+  let worst=0;
+  for(const [w,h] of sizes) {
+    await page.setViewportSize({width:w,height:h});
+    await aligned(page,kind);
+    worst=Math.max(worst,await offsetFromAnchor(page,kind));
+  }
+  return worst;
+}
+
+async function noCrawlDuringDrag(page,kind,from,to) {
+  const walk=async steps=>{
+    await page.setViewportSize({width:from.w,height:from.h});
+    await aligned(page,kind);
+    for(let i=1;i<=steps;i++) {
+      const k=i/steps;
+      await page.setViewportSize({
+        width:Math.round(from.w+(to.w-from.w)*k),
+        height:Math.round(from.h+(to.h-from.h)*k),
+      });
+    }
+    await frames(page,900);
+    return offsetFromAnchor(page,kind);
+  };
+  const coarse=await walk(4);
+  const fine=await walk(40);
+  assert.ok(fine<2.5,`after 40 resize steps the character is ${fine.toFixed(2)}px off its anchor`);
+  assert.ok(coarse<2.5,`after 4 resize steps the character is ${coarse.toFixed(2)}px off its anchor`);
+  // Ten times the events for the same distance must not mean a bigger error.
+  assert.ok(fine<=coarse+1.2,
+    `the error grows with the NUMBER of resize events (4 steps ${coarse.toFixed(2)}px, 40 steps ${fine.toFixed(2)}px) — that is accumulation, not lag`);
+  return {coarse,fine};
+}
+
+/** §2 — nothing on the face glows. Asserted against the live DOM and the
+ *  resolved styles, not against the source, because a halo can arrive from a
+ *  stylesheet the markup never mentions. */
+async function noFaceGlow(page) {
+  const found=await page.evaluate(()=>{
+    const svg=document.querySelector('svg.lv-bloub');
+    if(!svg) return ['no svg'];
+    const bad=[];
+    if(svg.querySelector('[data-bloub-eyeglow], filter, feGaussianBlur, feDropShadow')) bad.push('a glow node survives in the markup');
+    if(/eyeglow/i.test(svg.innerHTML)) bad.push('an eyeglow gradient is still declared');
+    for(const node of [svg,...svg.querySelectorAll('*')]) {
+      const s=getComputedStyle(node);
+      const label=node.getAttribute('data-bloub-eye')!==null?'eye'
+        :node.hasAttribute('data-bloub-mouth')?'mouth'
+        :node.tagName.toLowerCase();
+      if(s.filter&&s.filter!=='none') bad.push(`${label} carries filter: ${s.filter}`);
+      if(s.boxShadow&&s.boxShadow!=='none') bad.push(`${label} carries box-shadow: ${s.boxShadow}`);
+      if(s.textShadow&&s.textShadow!=='none') bad.push(`${label} carries text-shadow: ${s.textShadow}`);
+    }
+    // The body's own integrated highlight must SURVIVE — the owner kept it.
+    if(!svg.querySelector('[data-bloub-gloss]')) bad.push('the body highlight was removed too');
+    if(svg.querySelectorAll('[data-bloub-eye]').length!==2) bad.push('there are no longer exactly two eyes');
+    return bad;
+  });
+  assert.deepEqual(found,[],`the face must not glow: ${found.join('; ')}`);
+}
+
 async function aligned(page,kind) {
   await page.waitForFunction(kind=>{
     const a=document.querySelector(`[data-bloub-anchor="${kind}"]`)?.getBoundingClientRect();
@@ -293,6 +500,7 @@ for(const [engineName,engine] of engines) {
         await animatedEyes(page);
         if(width===390&&lang==='ar') await page.screenshot({path:`${out}/${engineName}-${lang}-intro.png`});
         await click(page,'#ready'); await aligned(page,'bottom-home'); await state(page,'idle');
+        await noFaceGlow(page);
         const home=await dimensions(page,'bottom-home');
         assert.ok(intro.width>=home.svg.w*1.9,'intro substantially larger than docked');
         await page.screenshot({path:`${out}/${engineName}-${lang}-${width}-home.png`});
@@ -348,6 +556,19 @@ for(const [engineName,engine] of engines) {
           await noticesDeclaredControls(page);
           assert.deepEqual(errors,[]);
           console.log(`ok ${engineName} ${lang} ${width}: gaze swung ${gaze.swing.toFixed(2)} units across the viewport, let go to within ${gaze.forgot.toFixed(2)}, noticed only declared controls, never took the scroll`);
+          cases++;
+
+          // THE OWNER'S FOUR ACCEPTANCE CRITERIA, in real motion. These change
+          // the viewport, so they run last and put it back.
+          const reach=await gazeReach(page,width,844);
+          const anchored=await staysAnchored(page,'bottom-home',
+            [[320,568],[390,844],[430,932],[768,1024],[1024,768],[1440,900],[1180,820],[390,844]]);
+          const drag=await noCrawlDuringDrag(page,'bottom-home',{w:390,h:844},{w:1180,h:820});
+          await page.setViewportSize({width,height:844});
+          await aligned(page,'bottom-home'); await state(page,'idle');
+          await noFaceGlow(page);
+          assert.deepEqual(errors,[]);
+          console.log(`ok ${engineName} ${lang} ${width}: gaze reaches ${reach.hPct.toFixed(1)}% x ${reach.vPct.toFixed(1)}% of the ${reach.body.toFixed(1)}-unit face, nine states ${reach.closest.toFixed(2)} units apart at worst; anchored within ${anchored.toFixed(2)}px across 8 viewports; drag left it ${drag.fine.toFixed(2)}px off after 40 steps vs ${drag.coarse.toFixed(2)}px after 4`);
           cases++;
         }
       } catch(e) {

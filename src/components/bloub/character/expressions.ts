@@ -23,7 +23,14 @@ import { EYE_SPLIT, REST_GAZE, type HeadGaze } from './face';
 
 /** Per-eye geometry. `w`/`h` multiply the neutral eye; `tilt` is degrees
  * within the sphere's surface, positive tipping the capsule's top towards
- * screen right; `open` is the lid before idle blinking is added. */
+ * screen right; `open` is the lid before idle blinking is added.
+ *
+ * COMPUTED, not asserted: at tilt +17 the top of the screen-LEFT capsule moves
+ * 2.35 units RIGHT, i.e. inwards. So a POSITIVE tilt on `eyes[0]` converges the
+ * two tops (Λ) and a negative one diverges them (V). tests/mascotGaze.test.ts
+ * re-derives that from eyePoses/eyeMatrix rather than trusting this sentence,
+ * because a comment asserting the opposite is exactly how the angry face
+ * shipped. */
 export interface EyeCfg {
   w: number;
   h: number;
@@ -91,7 +98,11 @@ export interface Pose {
 }
 
 const eye = (w = 1, h = 1, tilt = 0, open = 1): EyeCfg => ({ w, h, tilt, open });
-/** Both eyes alike, tilts mirrored — the only way to get concern or displeasure. */
+/** Both eyes alike, tilts mirrored — the only lever that reaches concern, since
+ * head roll can only ever tip both the same way. `tilt` is given to the
+ * screen-LEFT eye, so a POSITIVE argument converges the tops (Λ, concern or a
+ * squeezed smile) and a negative one diverges them (V, the angry brow). No pose
+ * in this table is allowed to be negative. */
 const pair = (w = 1, h = 1, tilt = 0, open = 1): [EyeCfg, EyeCfg] => [eye(w, h, tilt, open), eye(w, h, -tilt, open)];
 const mouth = (width = 1, curve = 1, open = 0, y = 0, weight = 1): MouthCfg => ({ width, curve, open, y, weight });
 
@@ -125,7 +136,12 @@ export const POSES: Record<MascotState, Pose> = {
    */
   loading: make({
     gaze: { yaw: 4, pitch: 11, roll: -2 },
-    eyes: pair(0.94, 0.84),
+    // Barely narrowed, where this used to be 0.94 x 0.84. At the 80px the
+    // character is drawn, a sixth off the height of the capsule is not
+    // "attending", it is a squint — and "loading, then failed" is the commonest
+    // state pair in the app, so that squint was the first half of every angry
+    // frame the user saw. Concentration is a fraction of a unit, not a sixth.
+    eyes: pair(1.0, 0.92),
     mouth: mouth(0.7, 0.2, 0, 0.6, 0.9),
     sweep: 1,
     wander: 0.45,
@@ -223,32 +239,53 @@ export const POSES: Record<MascotState, Pose> = {
   }),
 
   /**
-   * Something failed. Eye tops DIVERGE outwards, which is the geometry of
-   * worry; converging them would read as anger, and the character is never
-   * angry at the person using it. The mouth flattens rather than frowning
-   * hard — alarm, not sulking.
+   * Something failed — and the character is CONCERNED about it, never cross.
+   *
+   * This pose shipped inverted: it tilted the tops apart into a V, narrowed the
+   * eyes and hung the heaviest frown in the table under them, which is the
+   * canonical angry face, under a comment claiming a V was the geometry of
+   * worry. It is not. Worry CONVERGES the tops (Λ) — that is the raised inner
+   * brow — so the tilt is positive here and nothing in the table is negative.
+   *
+   * Three things carry it beyond the sign. The eyes stay TALLER and wider than
+   * neutral (1.08 of a 19.3-unit capsule): on a tall eye a converging tilt
+   * reads as worry, on a narrowed one it reads as a pinch, and a pinch is the
+   * other half of a glower. The mouth is a small open "o" — `open` deepens the
+   * bow in the SMILE direction while lifting the corners, so a round little
+   * mouth is a short `width` plus a large `open`, never a negative `curve`; its
+   * stroke drops to 1.0 because a flat mouth at a heavy weight is a set jaw.
+   * And the head comes UP and cocks four degrees: alarm looks AT you and tips
+   * to one side, sulking looks at the floor. Roll is safe to spend on that —
+   * it tips both eyes the same way and can never make the mirrored V.
    */
   error: make({
-    gaze: { yaw: 0, pitch: -4, roll: 0 },
-    split: EYE_SPLIT + 1,
-    eyes: pair(1.12, 0.86, -17),
-    mouth: mouth(0.8, -0.75, 0.1, 0.45, 1.1),
-    wander: 0.35,
-    wobble: 0.011,
-    wobbleRate: 0.9,
+    gaze: { yaw: -3, pitch: 4, roll: 4 },
+    split: EYE_SPLIT + 2,
+    eyes: pair(1.16, 1.08, 7),
+    mouth: mouth(0.36, 0.1, 0.8, 0.2, 1),
+    wander: 0.4,
+    wobble: 0.012,
+    wobbleRate: 0.75,
+    swell: 1.015,
     blend: 0.16,
     ease: easings.easeOutQuint,
   }),
 
-  /** A smaller concern. Same grammar as error, dialled down, so the two read
-   * as the same character at two intensities rather than two moods. */
+  /** A smaller concern. Same four levers as error at about half the amplitude,
+   * so the two read as one character at two intensities rather than two moods.
+   * Worth being careful with: `warning` fires far more often than `error`, so
+   * whatever grammar it uses is the one users actually live with — which is
+   * why it faithfully reproduced the angry geometry for as long as error did.
+   * The mouth here is very nearly the flat line a small concern wants, lifted
+   * just enough that its stroke cannot read as a stern bar. */
   warning: make({
-    gaze: { yaw: 3, pitch: -1, roll: -2 },
-    eyes: pair(1.06, 0.92, -11),
-    mouth: mouth(0.72, -0.35, 0.05, 0.35, 1),
-    wander: 0.45,
+    gaze: { yaw: 4, pitch: 2, roll: 3 },
+    split: EYE_SPLIT + 1,
+    eyes: pair(1.08, 1.02, 4),
+    mouth: mouth(0.58, 0.05, 0.3, 0.3, 0.9),
+    wander: 0.5,
     wobble: 0.008,
-    wobbleRate: 0.6,
+    wobbleRate: 0.5,
     blend: 0.2,
     ease: easings.easeOutQuint,
   }),
@@ -347,12 +384,24 @@ export const POSES: Record<MascotState, Pose> = {
  *
  * Under the sphere projection these are real head angles, not pixel offsets,
  * so the far eye narrows and the near one moves further — the whole set of
- * cues that makes a turn read as a turn. Past about 34 degrees of yaw the far
- * eye starts to leave round the limb, which is striking once and wrong as a
- * constant state, so tracking stops short of it.
+ * cues that makes a turn read as a turn.
+ *
+ * These used to be 27/19, held down by a note claiming the far eye leaves round
+ * the limb past ~34 degrees. It does not: its depth crosses zero at 77. The
+ * real ceiling is the two capsules MERGING, because orthographic projection
+ * shrinks the gap between them by cos(yaw) — which is `splitFor`'s job in
+ * face.ts, and which the engine's clamp on the COMPOSED gaze backstops. With
+ * both of those in place this term is nowhere near any limit (the composed gaze
+ * peaks around 30 of the 38 available), so it is set by how far a character
+ * SHOULD turn rather than by how far it safely can. Measured through the whole
+ * pipeline on a 390x844 phone, the eight edge probes move the eye 17.3 viewBox
+ * units horizontally and 14.8 vertically — 20.6% and 17.6% of the body's width,
+ * against the 9.05 units / 11% the browser measured before. Raising it further
+ * costs nothing structurally and everything in restraint: past about 24 the
+ * eyes start to read as swivelling rather than as a head turning.
  */
-const TRACK_YAW = 27;
-const TRACK_PITCH = 19;
+const TRACK_YAW = 22;
+const TRACK_PITCH = 22;
 
 /**
  * THE FACE, TOLD WHAT IT IS LOOKING AT.
@@ -373,7 +422,9 @@ const TRACK_PITCH = 19;
  *  - `curiosity` alone opens the eyes and moves them very slightly apart,
  *    which is the face widening rather than merely turning;
  *  - the mouth shortens and lifts a little. This is the smallest of the four
- *    changes and the one that stops a widened pair of eyes reading as alarm.
+ *    changes and the one that stops a widened pair of eyes reading as alarm;
+ *  - and each eye changes SHAPE a few percent with where it is pointed, which
+ *    is the difference between a head that turns and a mask that swivels.
  *
  * Returns the SAME pose object when there is nothing to attend to, so the
  * common case allocates nothing.
@@ -387,15 +438,36 @@ export function applyAttention(pose: Pose, attention: Attention | null, reduced 
   const swing = reduced ? 0.45 : 1;
   const open = reduced ? 0 : c;
 
-  const yaw = attention.x * TRACK_YAW;
+  // `x`/`y` are signed per-axis excursions in -1..1, already shaped by
+  // attention.ts's response curve — NOT a unit direction. That distinction is
+  // the whole of §4: a unit vector divides each axis by the full hypotenuse, so
+  // on a bottom-docked character the vertical distance ate the horizontal
+  // signal and a diagonal arrived at 0.707 of a cardinal. A viewport corner is
+  // now 1 on BOTH axes, which is what makes a diagonal read as a diagonal.
+  const nx = clamp(attention.x, -1, 1);
+  const ny = clamp(attention.y, -1, 1);
+  const yaw = nx * TRACK_YAW;
   // Screen y grows downwards; a head that looks up has a POSITIVE pitch.
-  const pitch = -attention.y * TRACK_PITCH;
+  const pitch = -ny * TRACK_PITCH;
 
   const widen = 1 + open * 0.14;
   const tall = 1 + open * 0.1;
+  // THE EYE CHANGES SHAPE WITH WHERE IT IS POINTED, by a few percent of itself:
+  // a capsule aimed hard sideways shows a little more width, one aimed up opens
+  // and one aimed down hoods. Half a unit on an 8.6-wide eye — nobody sees it
+  // happen, and its absence is what reads as a decal rather than a face. It
+  // rides `morph` rather than `swing` so the motion preference drops it
+  // outright: the gaze is semantic and survives, this is not.
+  const morph = reduced ? 0 : 1;
+  const leanW = 1 + morph * 0.06 * Math.abs(nx);
+  const leanH = 1 + morph * (ny < 0 ? 0.07 * -ny : -0.08 * ny);
+  // A LEAN: the SAME sign on both eyes. Mirrored tilt is the register concern
+  // is authored in, and tracking must never write into it, or looking left
+  // would come with a free expression nobody asked for.
+  const leanTilt = morph * 3.5 * nx;
   const eyes: [EyeCfg, EyeCfg] = [
-    { ...pose.eyes[0], w: pose.eyes[0].w * widen, h: pose.eyes[0].h * tall },
-    { ...pose.eyes[1], w: pose.eyes[1].w * widen, h: pose.eyes[1].h * tall },
+    { ...pose.eyes[0], w: pose.eyes[0].w * widen * leanW, h: pose.eyes[0].h * tall * leanH, tilt: pose.eyes[0].tilt + leanTilt },
+    { ...pose.eyes[1], w: pose.eyes[1].w * widen * leanW, h: pose.eyes[1].h * tall * leanH, tilt: pose.eyes[1].tilt + leanTilt },
   ];
 
   return {
@@ -426,10 +498,17 @@ export function applyAttention(pose: Pose, attention: Attention | null, reduced 
  * for restraint, and at this scale it is not consciously visible — what is
  * visible is its absence, because a head that turns while the mass behind it
  * stays perfectly still reads as a mask rather than as a body.
+ *
+ * Scaled by the excursion's MAGNITUDE and not by weight alone. Weight is now
+ * how much the character cares, which is 1 for as long as a pointer exists —
+ * multiplying by it by itself leant the body three percent permanently, and
+ * leant it to screen right when the pointer was sitting on the character and
+ * there was no direction to lean in at all. Magnitude also gives the engine its
+ * guard for free: no excursion, no lean, so no axis to misread.
  */
 export function attentionLean(attention: Attention | null, reduced = false): number {
   if (!attention || reduced) return 0;
-  return clamp(attention.weight) * 0.03;
+  return clamp(Math.hypot(attention.x, attention.y)) * clamp(attention.weight) * 0.03;
 }
 
 /** Linear blend of two poses. Every field interpolates; nothing switches. A

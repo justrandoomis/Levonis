@@ -75,34 +75,53 @@ const look = (point: { x: number; y: number } | null, over: Partial<Parameters<t
 
 test('the character looks TOWARDS the pointer, in every direction', () => {
   const above = look({ x: DOCK.x, y: 200 });
-  assert.ok(above.y < -0.9, 'something above has a negative screen y');
+  assert.ok(above.y < 0, 'something above has a negative screen y');
   const right = look({ x: 1200, y: DOCK.y });
-  assert.ok(right.x > 0.9);
+  assert.ok(right.x > 0);
   const left = look({ x: 40, y: DOCK.y });
-  assert.ok(left.x < -0.9);
+  assert.ok(left.x < 0);
   const diagonal = look({ x: 900, y: 400 });
   assert.ok(diagonal.x > 0 && diagonal.y < 0, 'up and to the right is both at once');
-  // A unit direction, always — the magnitude lives in `weight`.
-  for (const a of [above, right, left, diagonal]) {
-    assert.ok(Math.abs(Math.hypot(a.x, a.y) - 1) < 1e-9, 'direction is normalised');
-  }
+
+  // THE CONTRACT, and it is no longer a unit direction. Each axis is a signed
+  // excursion against ITS OWN half of the viewport, so the edge of the screen
+  // is exactly 1 on that axis whatever the other one is doing.
+  assert.ok(Math.abs(look({ x: 0, y: DOCK.y }).x + 1) < 1e-9, 'the left edge is exactly -1 across');
+  assert.ok(Math.abs(look({ x: VIEWPORT.w, y: DOCK.y }).x - 1) < 1e-9, 'and the right edge exactly +1');
+  assert.ok(Math.abs(look({ x: DOCK.x, y: 0 }).y + 1) < 1e-9, 'the top edge is exactly -1 up');
+
+  // The thing a unit vector made impossible: a corner is nearly full excursion
+  // on BOTH axes at once, not 0.707 of each. Diagonals are where the old
+  // mapping lost the most — on a bottom-docked character the vertical distance
+  // dominated the hypotenuse and ate the horizontal signal everywhere.
+  const corner = look({ x: 6, y: 6 });
+  assert.ok(Math.min(Math.abs(corner.x), Math.abs(corner.y)) > 0.9,
+    `a corner reaches both axes: ${corner.x.toFixed(3)}, ${corner.y.toFixed(3)}`);
 });
 
-test('attention falls off with distance, and only the near band is curious', () => {
+test('INTEREST falls off with distance; how far the eyes reach does the opposite', () => {
   const near = look({ x: DOCK.x + 60, y: DOCK.y - 60 });
   const middle = look({ x: DOCK.x + 420, y: DOCK.y - 300 });
   const far = look({ x: 20, y: 20 });
 
-  assert.ok(near.weight > middle.weight, 'closer is attended to more');
-  assert.ok(middle.weight > far.weight);
-  assert.ok(far.weight < 0.12, 'the opposite corner of a desktop is nearly ignored');
-
+  // Distance is a question about INTEREST, which is what it was always asking.
+  assert.ok(near.curiosity > middle.curiosity, 'closer is more interesting');
   assert.ok(near.curiosity > 0.35, 'a pointer right beside the character is interesting');
   assert.equal(middle.curiosity, 0, 'and half a screen away is not — curiosity is not tracking');
-  assert.equal(far.curiosity, 0);
+  assert.equal(far.curiosity, 0, 'the opposite corner of a desktop is not interesting at all');
   // The brief says do not exaggerate: even at its closest this is a fraction,
   // not a stare.
   assert.ok(near.curiosity <= 1);
+
+  // …and it is NOT a question about how far to look. Distance used to gate the
+  // gaze as well, which meant the character reached LESS far for a thing that
+  // was further away — it peaked at its own x and retreated towards both edges,
+  // and on a phone it went to exactly zero over the top quarter of the screen.
+  assert.ok(Math.hypot(far.x, far.y) > Math.hypot(near.x, near.y),
+    `the further out the pointer, the FURTHER the eyes reach (${Math.hypot(far.x, far.y).toFixed(2)} vs ${Math.hypot(near.x, near.y).toFixed(2)})`);
+  // Weight is the release ramp and the priority damper, and nothing else.
+  assert.equal(far.weight, 1, 'a live pointer is a live pointer wherever it is');
+  assert.equal(look({ x: 20, y: 20 }, { engagement: 0.4 }).weight, 0.4, 'and weight is the engagement handed in');
 });
 
 test('nothing to look at is not the same as looking at the centre', () => {
@@ -119,9 +138,8 @@ test('a DELIBERATE control is worth looking at from across the room', () => {
   const corner = { x: 40, y: 40 };
   const casual = look(corner);
   const control = look(corner, { deliberate: true });
-  assert.ok(casual.weight < 0.12, 'a cursor drifting up there is nearly ignored…');
-  assert.ok(control.weight > 0.7, '…the checkout button in the same place is not');
-  assert.ok(control.curiosity > 0.5);
+  assert.ok(casual.curiosity < 0.12, 'a cursor drifting up there is nearly ignored…');
+  assert.ok(control.curiosity > 0.5, '…the checkout button in the same place is not');
   // The DIRECTION is identical: importance changes how hard it looks, never
   // where.
   assert.equal(casual.x, control.x);
@@ -181,8 +199,11 @@ test('the character holds a gaze for two to three seconds, then lets go slowly',
 
 test('attention moves the gaze, the eyes, the mouth, the split and the body together', () => {
   const rest = POSES.idle;
-  const attention: Attention = { x: 1, y: -1 / Math.SQRT2, weight: 1, curiosity: 1 };
-  const looking = applyAttention(rest, { ...attention, x: 1 / Math.SQRT2 });
+  // The corner of the viewport, in the new contract: full excursion on BOTH
+  // axes. Under the old unit-direction contract this pair could not exist —
+  // a diagonal cost each axis 0.707 — which is most of why the gaze was small.
+  const attention: Attention = { x: 1, y: -1, weight: 1, curiosity: 1 };
+  const looking = applyAttention(rest, attention);
 
   assert.ok(looking.gaze.yaw > rest.gaze.yaw + 10, 'the head turned');
   assert.ok(looking.gaze.pitch > rest.gaze.pitch, 'and lifted, because the target is above');
@@ -508,7 +529,7 @@ test('the character has no outer outline, and its highlight is a fill', () => {
   // …and that gradient ends in nothing, which is what makes the shape's own
   // edge invisible.
   assert.match(svg, /id="levonis-bloub-gloss"[\s\S]{0,400}stopOpacity="0"\s*\/>/);
-  // No pupils anywhere: the eyes are two solid cream shapes and their glow.
+  // No pupils anywhere: the eyes are two solid cream shapes and nothing else.
   assert.equal(/pupil/i.test(svg), false);
   assert.equal((svg.match(/data-bloub-eye=/g) ?? []).length, 2);
 });

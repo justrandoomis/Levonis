@@ -137,6 +137,31 @@ export function eyePoses(gaze: HeadGaze, scale = FACE_R, split = EYE_SPLIT): [Ey
 }
 
 /**
+ * HOLD THE PROJECTED EYE SEPARATION THROUGH A TURN.
+ *
+ * Orthographic projection shrinks the on-screen gap between the eyes by
+ * cos(yaw): at 30 degrees they are 13% closer than at rest, and far enough
+ * round they merge into one shape — which is the REAL ceiling on how far this
+ * character can look, not the limb the old tracking comment blamed (the far
+ * eye's depth does not cross zero until 77 degrees).
+ *
+ * The fix is not to spread the eyes permanently. The resting spacing is about
+ * 1.5 eye-widths and that ratio is what makes the pair read as a face at all,
+ * so this gives back exactly the foreshortening and nothing else: solve for the
+ * angular split whose projection equals the resting projection. At yaw 0 it
+ * adds nothing; at 30 it adds two degrees.
+ *
+ * Capped at +3.5 because the solution runs away as cos(yaw) approaches zero,
+ * and the asin argument is clamped for the same reason — past about 77 degrees
+ * there is no split that works, and NaN in an eye matrix renders as nothing at
+ * all, which is invisible in a diff.
+ */
+export function splitFor(base: number, yaw: number): number {
+  const want = Math.sin(deg(base)) / Math.max(0.2, Math.cos(deg(yaw)));
+  return Math.min(base + 3.5, (Math.asin(Math.min(0.98, want)) * 180) / Math.PI);
+}
+
+/**
  * Compose an eye's own tilt and its lid closure onto the tangent frame.
  *
  * `tilt` is the eye rotating inside the surface it is painted on — this is the
@@ -298,8 +323,15 @@ const SACCADES: Array<{ at: number; yaw: number; pitch: number }> = (() => {
   while (t < SPAN - 1) {
     out.push({
       at: t,
-      yaw: (SACCADE_RNG() * 2 - 1) * 11,
-      pitch: (SACCADE_RNG() * 2 - 1) * 7,
+      // Larger than the 11/7 this carried, and only here: once the character
+      // can genuinely follow a pointer to the edge of the screen, an idle
+      // glance that covers less ground than the tracking does reads as a
+      // tracker with an idle animation rather than as a creature that also
+      // looks around. The continuous drift in `liveliness` is deliberately NOT
+      // grown to match — the flick is a discrete jump between long holds, and
+      // widening the drift instead is what would read as nervous.
+      yaw: (SACCADE_RNG() * 2 - 1) * 15,
+      pitch: (SACCADE_RNG() * 2 - 1) * 10,
     });
     // Between 1.8s and 6.3s of stillness. The long end matters more than the
     // short end: it is the long holds that make the short moves read as

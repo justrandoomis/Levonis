@@ -82,10 +82,53 @@ async function requestRaw<T>(method: string, path: string, body?: unknown, opts?
       : null;
   const onCallerAbort = () => controller.abort();
   opts?.signal?.addEventListener('abort', onCallerAbort);
-  let res: Response;
+  /**
+   * THE DEADLINE COVERS THE BODY, NOT JUST THE HEADERS.
+   *
+   * `await fetch(...)` resolves the moment the response HEADERS arrive. The
+   * body is still streaming, and reading it is a second await with its own
+   * chance to hang. The timer used to be cleared between the two, which left
+   * `await res.json()` running with no deadline and no signal — so a response
+   * whose headers arrived and whose body then stalled produced a promise that
+   * NEVER SETTLED. Not rejected: never settled.
+   *
+   * That is a far worse failure than a slow request, because every consumer in
+   * this app releases its loading state in a `finally`, and a `finally` cannot
+   * run for a promise that does not settle. One stalled body froze
+   * `AuthContext`'s isLoaded, Home's critical-ready flag and the pages' busy
+   * flags at their initial values for the life of the tab — which is how the
+   * mascot came to sit at bootstrap size in the middle of a fully rendered
+   * page, still waiting for an app that had already arrived.
+   *
+   * One try/finally around BOTH awaits fixes it: the AbortController's
+   * deadline now also aborts a stalled body read, and it surfaces as the
+   * ordinary network error the retry UI already knows how to show.
+   */
   try {
-    res = await fetch(path, init);
-  } catch {
+    const res = await fetch(path, init);
+    let data: { success?: boolean; error?: string; code?: string; details?: Record<string, unknown> } & T;
+    try {
+      data = await res.json();
+    } catch (err) {
+      // An abort landing DURING the body read is the deadline or the caller,
+      // never a malformed payload. Rethrow it so the classification below —
+      // which is the one place that can tell those two apart — decides.
+      if (controller.signal.aborted) throw err;
+      throw new ApiError(res.status, res.ok ? 'Invalid server response' : `Server error (${res.status})`);
+    }
+    if (!res.ok || data.success === false) {
+      throw new ApiError(
+        res.status,
+        data.error || `Server error (${res.status})`,
+        data.code,
+        data.details,
+        data as unknown as Record<string, unknown>
+      );
+    }
+    return data;
+  } catch (err) {
+    // Everything this function decided to throw is already the right error.
+    if (err instanceof ApiError) throw err;
     // A caller-cancelled request is not a failure to report: the effect that
     // started it has already moved on, and its own cleanup owns the state.
     // A DEADLINE, though, is a real failure the customer must be able to see
@@ -96,22 +139,6 @@ async function requestRaw<T>(method: string, path: string, body?: unknown, opts?
     if (timer) clearTimeout(timer);
     opts?.signal?.removeEventListener('abort', onCallerAbort);
   }
-  let data: { success?: boolean; error?: string; code?: string; details?: Record<string, unknown> } & T;
-  try {
-    data = await res.json();
-  } catch {
-    throw new ApiError(res.status, res.ok ? 'Invalid server response' : `Server error (${res.status})`);
-  }
-  if (!res.ok || data.success === false) {
-    throw new ApiError(
-      res.status,
-      data.error || `Server error (${res.status})`,
-      data.code,
-      data.details,
-      data as unknown as Record<string, unknown>
-    );
-  }
-  return data;
 }
 
 async function request<T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> {

@@ -1,9 +1,9 @@
 import type { MascotState } from '../../../lib/mascot';
 import { bodyPoints, bouncePath, glossPath, pathFromPoints } from './body';
-import { EYE_H, EYE_W, FACE_R, eyeMatrix, eyePoses, liveliness, saccade, type HeadGaze } from './face';
+import { EYE_H, EYE_W, FACE_R, eyeMatrix, eyePoses, liveliness, saccade, splitFor, type HeadGaze } from './face';
 import { POSES, applyAttention, attentionLean, blendPose, type Pose } from './expressions';
 import type { Attention } from './attention';
-import { clamp, deg, lerp, r2 } from './math';
+import { clamp, deg, lerp, loopNoise, r2 } from './math';
 import type { TravelSample } from './travel';
 
 /**
@@ -111,11 +111,33 @@ export interface CharacterRender {
   driftY: number;
 }
 
-/** How far the gaze is allowed to swing towards a destination. Past roughly
- * this the far eye starts to leave round the limb, which is a real and
- * attractive effect but not one to spend on every page change. */
+/** How far the gaze is allowed to swing towards a destination. A journey is
+ * worth a bigger turn than a pointer but not the whole range: the lead has to
+ * read as intent, and a head at its stop reads as strain. */
 const LEAD_YAW = 26;
 const LEAD_PITCH = 20;
+
+/**
+ * THE CEILING ON THE COMPOSED GAZE.
+ *
+ * Every contribution — tracking, idle drift, the saccade, the loading sweep,
+ * the travel lead, the introduction — is ADDED, and they stack. Bounding any
+ * one of them guards nothing, which is why `loading` used to merge its own two
+ * eyes in the corner where the sweep landed on top of a fully tracked turn, at
+ * a composed yaw no single term ever reaches. So the limit is applied once,
+ * here, to the sum, immediately before the projection reads it.
+ *
+ * 38 and 30 are measured, not chosen. Swept across every pose, both signs, the
+ * split hold on and the curiosity widening applied: the far eye's depth never
+ * falls below 0.41, the two eye ellipses stay 1.9 units apart, and the eye ink
+ * stays 2.8 units inside the silhouette. At 45 they touch.
+ *
+ * A hard clamp rather than a tanh soft knee: the soft version is tidier and
+ * compresses the ENTIRE range to spare a tail that is almost never reached —
+ * 12% of the excursion given back for nothing.
+ */
+const GAZE_YAW_MAX = 38;
+const GAZE_PITCH_MAX = 30;
 
 /**
  * The searching sweep.
@@ -274,6 +296,12 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
     }
   }
 
+  gaze = {
+    yaw: clamp(gaze.yaw, -GAZE_YAW_MAX, GAZE_YAW_MAX),
+    pitch: clamp(gaze.pitch, -GAZE_PITCH_MAX, GAZE_PITCH_MAX),
+    roll: gaze.roll,
+  };
+
   const points = bodyPoints({
     radius: BODY_R,
     t,
@@ -293,11 +321,33 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
   // it stays anchored on the surface instead of sliding across a shape that
   // is changing under it.
   const faceScale = 1 + stretch * 0.35;
-  const poses = eyePoses(gaze, FACE_R, pose.split);
+  // The split is held open against the turn's own foreshortening, so the pair
+  // keeps the spacing that makes it read as a face instead of closing up into
+  // one mark at the far end of a look.
+  const poses = eyePoses(gaze, FACE_R, splitFor(pose.split, gaze.yaw));
+
+  /**
+   * A FACE IS NOT SYMMETRICAL.
+   *
+   * While the character is interested, one eye opens a third of a unit more
+   * than the other and the near one tips a degree — the difference between a
+   * creature looking at you and a matched pair of ellipses. Two incommensurable
+   * noise periods, so it breathes rather than settling into a fixed
+   * lopsidedness, and it rides `curiosity` so it exists only while there is
+   * something to be curious about.
+   *
+   * Applied to the RENDER and never to the pose: the pose is handed back as the
+   * next blend's `from`, and asymmetry baked into it would compound every time
+   * a state changed.
+   */
+  const interest = reduced ? 0 : clamp(attention?.curiosity ?? 0);
+  const odd = interest * 0.035 * loopNoise(t, 8.3, 0.6);
+  const oddTilt = interest * 1.2 * loopNoise(t, 6.7, 2.2);
+
   const eyes = poses.map((p, i) => {
     const cfg = pose.eyes[i]!;
     const lid = Math.min(clamp(cfg.open), clamp(lidLife));
-    const [a, b, c, d] = eyeMatrix(p, cfg.tilt, lid);
+    const [a, b, c, d] = eyeMatrix(p, cfg.tilt + (i === 0 ? oddTilt : 0), lid);
     // Stretch the eye placement with the body but not the eye itself: eyes
     // that stretch with the head look like a reflection, not a face.
     const ex = CENTER + p.x * faceScale * (1 + squash * 0.9) + driftX;
@@ -305,7 +355,7 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
     return {
       matrix: `matrix(${r2(a)} ${r2(b)} ${r2(c)} ${r2(d)} ${r2(ex)} ${r2(ey)})`,
       rx: r2((EYE_W * cfg.w) / 2),
-      ry: r2((EYE_H * cfg.h) / 2),
+      ry: r2((EYE_H * cfg.h * (1 + (i === 0 ? odd : -odd))) / 2),
       visible: p.depth > -0.05,
     } satisfies EyeRender;
   }) as [EyeRender, EyeRender];

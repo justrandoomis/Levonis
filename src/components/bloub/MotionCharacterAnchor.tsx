@@ -47,16 +47,25 @@ export function MotionCharacterHome({ busy = false, kind = 'top-header' }: { bus
  * A page's own header takes precedence; there is never a second Home row once
  * that header mounts. No fixed top/left guesses or covering existing controls.
  *
- * It also stays out of the way WHILE a route is still loading. Most focused
- * pages do bring their own header, so mounting this one during the lazy-load
- * window only to unmount it a moment later pushed the whole page down and let
- * it spring back — a visible jolt for a slot nothing was going to use. While
- * the load is pending the character simply holds its previous position, which
- * is what AppIntro's measurement already does for exactly this case.
+ * IT MOUNTS EVEN WHILE A ROUTE IS STILL LOADING, and that is a deliberate
+ * reversal. Suppressing it during the lazy-load window was meant to avoid a
+ * layout jolt for a slot nothing was going to use, and the argument holds only
+ * while some OTHER anchor exists. On the focused routes it serves — the ones
+ * where the bottom navigation is gone — there is no other anchor, so the
+ * suppression left the character with no legal destination in the whole
+ * document for the length of the load, and a load that never settles (a route
+ * flag stuck `busy`) made that permanent: the character stayed frozen at a
+ * coordinate belonging to a layout that no longer existed while the page
+ * scrolled underneath it. An always-present destination is worth a slot that
+ * appears for a few hundred milliseconds over black.
+ *
+ * The jolt it was protecting against is handled where it belongs instead:
+ * AppIntro holds the character's current position through a short handoff
+ * rather than docking it here and again on the page's own header.
  */
 export function MotionCharacterFallbackHeader() {
   React.useSyncExternalStore(characterLayout.subscribe, characterLayout.snapshot, characterLayout.serverSnapshot);
-  if (characterLayout.hasPageAnchor() || characterLayout.pending()) return null;
+  if (characterLayout.hasPageAnchor()) return null;
   return (
     <div data-bloub-fallback-header className="lv-character-fallback-header">
       <MotionCharacterHome kind="top-fallback" />
@@ -64,7 +73,15 @@ export function MotionCharacterFallbackHeader() {
   );
 }
 
-/** Page-owned critical loading; failure settlement must set busy=false too. */
+/**
+ * Page-owned critical loading; failure settlement must set busy=false too.
+ *
+ * The release is the effect's own cleanup and nothing else, which is what
+ * makes the counter leak-proof by construction: React runs it on unmount AND
+ * before every re-run, so there is no path where `busy` goes false, or the
+ * page goes away, without the hold being given back. A caller's `finally`
+ * only has to flip the flag — it cannot forget to release.
+ */
 export function useCharacterBusy(busy: boolean): void {
   React.useLayoutEffect(() => {
     if (busy) return beginCharacterRouteLoad();
