@@ -82,11 +82,24 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       # R2's data plane is S3-only. wrangler 4.127 has `r2 object get/put/delete`
       # but NO way to LIST a bucket's objects, and a migration that cannot
-      # enumerate its source is not a migration. These two secrets are an R2 API
-      # token (Object Read & Write) — a DIFFERENT credential from
-      # CLOUDFLARE_API_TOKEN, created once in the dashboard.
-      AWS_ACCESS_KEY_ID: ${{ secrets.R2_S3_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_S3_SECRET_ACCESS_KEY }}
+      # enumerate its source is not a migration. These are an R2 API token
+      # (Object Read & Write) — a DIFFERENT credential from
+      # CLOUDFLARE_API_TOKEN, which is a Cloudflare API token and cannot speak
+      # S3.
+      #
+      # TWO NAMES, ONE CREDENTIAL. This repository already held the R2 token as
+      # CLOUDFLARE_R2_*, so that pair is read FIRST and the R2_S3_* pair is only
+      # a fallback for a repository that named it the other way. An unset secret
+      # is the empty string, which `||` treats as false — so this resolves to
+      # whichever pair exists, and asking an owner to mint a second token for a
+      # credential they already have would be pure ceremony, and one more live
+      # key to keep safe.
+      #
+      # The VALUES never appear anywhere: they are read straight into the
+      # process environment, the guard below tests only whether they are empty,
+      # and GitHub masks a registered secret in every log line regardless.
+      AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID || secrets.R2_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY || secrets.R2_S3_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: auto
       # Recent AWS CLI v2 releases send CRC32 trailers by default and validate
       # them on responses. R2 is S3-compatible, not S3, and this checksum
@@ -132,11 +145,13 @@ jobs:
           [ -n "$CLOUDFLARE_ACCOUNT_ID" ] \
             || { echo "::error::secret CLOUDFLARE_ACCOUNT_ID is not set"; exit 1; }
           if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-            echo "::error::R2_S3_ACCESS_KEY_ID / R2_S3_SECRET_ACCESS_KEY are not set."
-            echo "::error::Create them once: Cloudflare dashboard -> R2 -> API -> Manage API tokens"
-            echo "::error::-> Create token, permission 'Object Read & Write', scoped to the three"
-            echo "::error::buckets named in the inputs. Save the Access Key ID and the Secret Access"
-            echo "::error::Key as those two repository secrets. CLOUDFLARE_API_TOKEN cannot be used:"
+            echo "::error::No R2 S3 credential is configured. This job reads, in order:"
+            echo "::error::  CLOUDFLARE_R2_ACCESS_KEY_ID / CLOUDFLARE_R2_SECRET_ACCESS_KEY"
+            echo "::error::  R2_S3_ACCESS_KEY_ID / R2_S3_SECRET_ACCESS_KEY"
+            echo "::error::If one pair already exists, check its NAME matches one of those exactly."
+            echo "::error::Otherwise create one: Cloudflare dashboard -> R2 -> API -> Manage API"
+            echo "::error::tokens -> Create token, permission 'Object Read & Write', scoped to the"
+            echo "::error::three buckets named in the inputs. CLOUDFLARE_API_TOKEN cannot be used:"
             echo "::error::it is a Cloudflare API token and R2's object API speaks S3."
             exit 1
           fi
@@ -456,8 +471,9 @@ jobs:
     timeout-minutes: 30
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.R2_S3_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_S3_SECRET_ACCESS_KEY }}
+      # Same pair, same precedence as job 1 — see the note there.
+      AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID || secrets.R2_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY || secrets.R2_S3_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: auto
       AWS_REQUEST_CHECKSUM_CALCULATION: when_required
       AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
