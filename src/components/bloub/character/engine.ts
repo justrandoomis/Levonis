@@ -307,7 +307,16 @@ export function sampleCharacter(input: CharacterInput): CharacterRender {
     t,
     wobble: reduced ? 0 : pose.wobble,
     wobbleRate: pose.wobbleRate,
-    swell: pose.swell * (reduced ? 1 : life.breath),
+    // UNDER THE MOTION PREFERENCE THE BODY DOES NOT CHANGE SIZE AT ALL.
+    // `life.breath` was already neutralised here; `pose.swell` was not, and it
+    // is the same kind of thing — a whole-body scale. Several reactions carry
+    // one (a percent and a half for a concern, four for an order), and because
+    // it rides the blend it kept moving for the length of that blend after the
+    // preference had been honoured everywhere else. A body quietly growing and
+    // shrinking is precisely the vestibular motion the preference exists to
+    // remove; the expression itself is carried by the eyes, the mouth and the
+    // gaze, which all survive it.
+    swell: reduced ? 1 : pose.swell * life.breath,
     stretch,
     axis,
     trail,
