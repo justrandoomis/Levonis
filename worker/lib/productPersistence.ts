@@ -2555,19 +2555,58 @@ export function verifyApplied(
    * change may not edit; a section the client cannot name would be worse than
    * the honest label that already exists.
    *
-   * `capacity` IS COMPARED EXACTLY. It is a setting this save wrote, exactly
-   * like `stock` on a value.
+   * FOUR CHECKS, AND WHAT EACH IS ABLE TO DISAGREE WITH. That question is the
+   * whole point: a net whose two sides are written by the same statement
+   * reports "clean" for every input and is worse than no net, because it is
+   * read as evidence.
    *
-   * `capacity_reserved` IS COMPARED ONE-SIDED — a mismatch only when units
-   * were LOST (stored below what the rows held when the plan was built).
-   * Nothing in a save may lower a hold: the replace carries it verbatim, and a
-   * drop to 0 is the stranding failure this whole feature exists to prevent.
-   * It may legitimately RISE between the plan and the read-back, because a
-   * checkout on another request reserves against the same row, and failing an
-   * admin's apply for someone else's purchase would be a false alarm. (The
-   * narrow converse — a `deduct` committing in that same window — would report
-   * a mismatch the operator can simply retry, which is the safe side of a
-   * safety net.)
+   *  1. `capacity` — COMPARED EXACTLY against what the plan asked for. A
+   *     setting this save wrote, exactly like `stock` on a value. `?? null`
+   *     and NEVER `?? 0` on either side: an absent column is UNTRACKED, and
+   *     reading it as zero would report a clean apply as a mismatch and a
+   *     sold-out pre-order as correct.
+   *
+   *  2. THE ROW ID — compared against the id the plan was going to write
+   *     under. `inventory_ledger.scope_id` names this exact row for every unit
+   *     it holds, so a row that came back under a DIFFERENT id has orphaned
+   *     every one of them: the release for a live pre-order matches nothing
+   *     and the units are stranded invisibly. Nothing in this shop legitimately
+   *     re-ids a cell — a checkout moves counters, it never rewrites identity —
+   *     so this check has no race window at all, and it fires for exactly the
+   *     failure the hold-preserving replace exists to prevent. Only rows the
+   *     plan already knew are checked: a cell being created has no previous id
+   *     to keep.
+   *
+   *  3. THE HOLD — a mismatch only when units were LOST (stored BELOW what the
+   *     row held when the plan was built). This check was dead until now, and
+   *     saying why matters more than the check: `fulfillmentStatements` used to
+   *     re-insert each row BINDING that same plan-time number, so the stored
+   *     value was forced to equal the number it was being compared against and
+   *     the comparison could not fail for the failure it was added for. It is
+   *     live now because the writer no longer names `capacity_reserved` at all
+   *     — a surviving row keeps whatever it is holding — so a zero here means
+   *     the row really was deleted and re-created, which is the stranding
+   *     failure. The window it cannot tell apart is a concurrent `release` or
+   *     `deduct` on the same row; that reports a mismatch an operator re-reads
+   *     and dismisses, which is the safe side of a safety net. A hold that
+   *     GREW is never reported: somebody else's checkout is not this admin's
+   *     failed apply.
+   *
+   *  4. THE QUOTA AGAINST THE HOLD THE ROW IS ACTUALLY CARRYING — both sides
+   *     read back AFTER the commit, so neither comes from the plan. This is
+   *     the one check that can see what `refuseStrandedCapacity` structurally
+   *     cannot: that guard judges a read taken before the batch, so a checkout
+   *     that reserves in the window between them leaves a quota legally written
+   *     BELOW the units now held (oversold), or written to NULL while units are
+   *     held — and once the column is NULL the deduct guard
+   *     `<on_hand> IS NOT NULL AND …` can never match again, so those units can
+   *     be neither deducted nor released. The two keys are named after the two
+   *     refusals the admin door raises for the same states
+   *     (CAPACITY_BELOW_RESERVED, CAPACITY_UNTRACKED_WHILE_HELD), because the
+   *     descriptive pass and the door must say the same words about the same
+   *     counter. Raised only when the capacity LANDED as asked: when it did
+   *     not, check 1 already names that row, and a second line about it would
+   *     be noise rather than a second fact.
    */
   if (plan.cells) {
     const storedCells = stored.view.fulfillments ?? [];
@@ -2576,10 +2615,29 @@ export function verifyApplied(
     const routeOf = new Map(storedRoutes.map((t) => [`${t.fulfillment_id}|${t.method}`, t] as const));
     const capMiss = (key: string, requested: unknown, storedValue: unknown) =>
       out.push({ section: 'inventory', key, requested, stored: storedValue });
-    /** A hold that came back SMALLER than the row was holding is units lost. */
-    const heldMiss = (key: string, held: number, storedValue: number) => {
-      if (storedValue < held) capMiss(key, held, storedValue);
+
+    /** One counter row — a cell or one of its routes; they carry the same two
+     *  columns and the same four questions. */
+    const checkCounter = (
+      where: string,
+      requestedCapacity: number | null,
+      planned: { id: string; capacity_reserved: number } | undefined,
+      storedRow: { id: string; capacity?: number | null; capacity_reserved?: number | null }
+    ) => {
+      const storedCapacity = storedRow.capacity ?? null;
+      const landed = storedCapacity === requestedCapacity;
+      if (!landed) capMiss(`${where}.capacity`, requestedCapacity, storedCapacity);
+      const held = Number(storedRow.capacity_reserved ?? 0);
+      if (planned) {
+        if (storedRow.id !== planned.id) capMiss(`${where}.id`, planned.id, storedRow.id);
+        if (held < planned.capacity_reserved) capMiss(`${where}.capacity_reserved`, planned.capacity_reserved, held);
+      }
+      if (landed && held > 0) {
+        if (storedCapacity === null) capMiss(`${where}.capacity_untracked_while_held`, null, held);
+        else if (storedCapacity < held) capMiss(`${where}.capacity_below_reserved`, storedCapacity, held);
+      }
     };
+
     for (const cell of plan.cells.requested) {
       const where = `fulfillment.${cell.option_id}.${cell.fulfillment_type}`;
       const s = cellOf.get(`${cell.option_id}|${cell.fulfillment_type}`);
@@ -2587,15 +2645,7 @@ export function verifyApplied(
         capMiss(`${where}.cell`, cell.capacity, null);
         continue;
       }
-      // `?? null` and NEVER `?? 0` on either side: an absent column is
-      // UNTRACKED, and reading it as zero here would report a clean apply as
-      // a mismatch and a sold-out pre-order as correct.
-      if ((s.capacity ?? null) !== cell.capacity) capMiss(`${where}.capacity`, cell.capacity, s.capacity ?? null);
-      heldMiss(
-        `${where}.capacity_reserved`,
-        plan.cells.held.cells.get(cellKey(cell.option_id, cell.fulfillment_type))?.capacity_reserved ?? 0,
-        Number(s.capacity_reserved ?? 0)
-      );
+      checkCounter(where, cell.capacity, plan.cells.held.cells.get(cellKey(cell.option_id, cell.fulfillment_type)), s);
       for (const t of cell.transports) {
         const rWhere = `${where}.${t.method}`;
         const sr = routeOf.get(`${s.id}|${t.method}`);
@@ -2603,17 +2653,18 @@ export function verifyApplied(
           capMiss(`${rWhere}.route`, t.capacity, null);
           continue;
         }
-        if ((sr.capacity ?? null) !== t.capacity) capMiss(`${rWhere}.capacity`, t.capacity, sr.capacity ?? null);
-        heldMiss(
-          `${rWhere}.capacity_reserved`,
-          plan.cells.held.transports.get(transportKey(cell.option_id, cell.fulfillment_type, t.method))
-            ?.capacity_reserved ?? 0,
-          Number(sr.capacity_reserved ?? 0)
+        checkCounter(
+          rWhere,
+          t.capacity,
+          plan.cells.held.transports.get(transportKey(cell.option_id, cell.fulfillment_type, t.method)),
+          sr
         );
       }
     }
     // A replace leaves EXACTLY the payload's set. A row the file did not
-    // describe but that survived the delete is a counter nobody is looking at.
+    // describe but that survived the delete is a counter nobody is looking at
+    // — and since the delete now refuses to drop a row that is holding units,
+    // this is also how a removal lost to that refusal is reported.
     if (storedCells.length !== plan.cells.requested.length) {
       capMiss('fulfillment.cells', plan.cells.requested.length, storedCells.length);
     }

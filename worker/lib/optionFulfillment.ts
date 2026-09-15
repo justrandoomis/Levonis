@@ -263,9 +263,13 @@ export function parseFulfillmentPayload(
  * units are stranded for ever, invisibly. So a cell that is still in the
  * payload KEEPS ITS ID.
  *
- * `capacity_reserved` — the units currently held. It is never sent by an admin
- * form and never derived from one; it is carried across the replace verbatim,
- * because it is the reservation itself, not a setting.
+ * `capacity_reserved` — the units held AT THE MOMENT OF THE READ. It is never
+ * sent by an admin form and never derived from one, and `fulfillmentStatements`
+ * DOES NOT WRITE IT BACK: a number read before the batch is stale by the time
+ * the batch runs, and writing it back is how a checkout that committed in
+ * between had its hold erased. The count here is read-only evidence, used to
+ * REFUSE a save that would strand a hold (`refuseStrandedCapacity`) and to
+ * report one that vanished (`verifyApplied`). The row keeps its own count.
  */
 export interface ExistingCells {
   /** key: `<option_id>|<fulfillment_type>` */
@@ -440,19 +444,41 @@ export function refuseStrandedCapacity(existing: ExistingCells, cells: Fulfillme
 /**
  * THE STATEMENTS THAT MAKE THE PRODUCT'S CELLS EXACTLY THIS SET.
  *
- * Delete-then-insert rather than a diff, for the same reason the structure
- * writer replaces: a cell's SETTINGS have no identity a customer ever sees —
- * it IS (model, order type) — so rewriting them loses nothing, while diffing
- * would need an id the admin form has no reason to carry. The transports go
- * first because they name a fulfilment row.
+ * AN UPSERT PER SURVIVING ROW, NOT A DELETE-THEN-INSERT. A cell's SETTINGS
+ * have no identity a customer ever sees — it IS (model, order type) — so
+ * rewriting them loses nothing. Its HELD UNITS and its ROW ID are not
+ * settings: `inventory_ledger.scope_id` names this exact row for every
+ * pre-order unit it is holding, and `capacity_reserved` is the hold itself.
  *
- * ITS ROW IDENTITY AND ITS HELD UNITS DO SURVIVE, WHEN THE CALLER SUPPLIES
- * THEM. `existing` is what the product currently has; a cell still present in
- * the payload is re-inserted under ITS OWN id with ITS OWN `capacity_reserved`,
- * so a pre-order hold taken before the save is still releasable after it. A
- * caller that passes nothing behaves exactly as this function did before 0075
- * — correct for a catalogue where no cell tracks capacity, which is every
- * catalogue until an admin sets one.
+ * SO THIS WRITER NEVER NAMES `capacity_reserved`, IN EITHER TABLE. That is the
+ * shape `product_option_values` has always had — its upsert lists `stock` and
+ * never `reserved`, which is why an ordinary relations save cannot lose a
+ * model's reservation — and it is the only shape that is correct under
+ * concurrency. The previous version re-inserted the row binding the count the
+ * caller had READ WHEN THE PLAN WAS BUILT, so a checkout that reserved a unit
+ * between that read and this batch had its hold written back to the stale
+ * number: the ledger kept the reserve row, the counter did not, and the
+ * release for that live order could then never match. A held count is not a
+ * setting a save may carry in its hand; it belongs to the row, and the row is
+ * the only thing that knows it.
+ *
+ * WHAT IS STILL A REPLACE. Whatever the payload describes is what the product
+ * has afterwards: a cell or route the payload dropped is DELETED here, exactly
+ * as before. Only the rows that survive are addressed by id, so the delete is
+ * "everything of this product except these ids" rather than "everything".
+ *
+ * THE DELETE ASKS THE ROW, TOO. A row that is holding units is not deleted,
+ * whatever the plan-time read believed — including a cell whose CASCADE would
+ * take a holding route down with it. `refuseStrandedCapacity` already refuses
+ * such a save at the door, but it judges a read taken before the batch, and in
+ * the window between them a checkout can take a hold on the very row the
+ * payload drops. Losing the admin's removal is recoverable and is reported by
+ * the read-back net (`verifyApplied`, section `inventory`); stranding a
+ * customer's units is neither.
+ *
+ * A caller that passes no `existing` map keeps the pre-0075 behaviour exactly:
+ * nothing is kept, so the delete is unrestricted and every row is written
+ * fresh.
  */
 export function fulfillmentStatements(
   db: { prepare(sql: string): D1PreparedStatement },
@@ -461,14 +487,70 @@ export function fulfillmentStatements(
   makeId: () => string = () => newId('ofl'),
   existing?: ExistingCells
 ): D1PreparedStatement[] {
+  /**
+   * One pass to settle every row id BEFORE any statement is built: the delete
+   * needs the ids that survive, and the upserts need the same ids. Deriving
+   * them twice is how the two lists drift apart and a surviving row is deleted
+   * anyway.
+   */
+  const planned = cells.map((cell) => {
+    const kept = existing?.cells.get(cellKey(cell.option_id, cell.fulfillment_type));
+    return {
+      cell,
+      id: kept?.id ?? makeId(),
+      /** Only a row that ALREADY EXISTS may be excluded from the delete. */
+      survives: !!kept,
+      transports: cell.transports.map((t) => {
+        const keptRoute = existing?.transports.get(
+          transportKey(cell.option_id, cell.fulfillment_type, t.method)
+        );
+        return { t, id: keptRoute?.id ?? makeId(), survives: !!keptRoute };
+      }),
+    };
+  });
+
+  const keptCellIds = planned.filter((p) => p.survives).map((p) => p.id);
+  const keptRouteIds = planned.flatMap((p) => p.transports.filter((r) => r.survives).map((r) => r.id));
+
+  /**
+   * THE SURVIVORS RIDE AS ONE JSON PARAMETER, not one placeholder each — the
+   * same idiom, for the same reason, as the bundle component cleanup in
+   * worker/lib/bundleCart.ts. `parseFulfillmentPayload` accepts up to 200
+   * cells and each may carry three routes, which is more ids than D1 accepts
+   * bound parameters in one query, and a `NOT IN` list cannot be chunked the
+   * way a positive one can: each chunk would delete the rows every other chunk
+   * is keeping. `json_each` of an empty array yields no rows, and `x NOT IN
+   * (<empty>)` is TRUE, so a caller that supplies no `existing` map gets
+   * exactly the unrestricted delete this function performed before 0075.
+   */
   const out: D1PreparedStatement[] = [
-    db.prepare('DELETE FROM product_option_transports WHERE product_id = ?').bind(productId),
-    db.prepare('DELETE FROM product_option_fulfillment WHERE product_id = ?').bind(productId),
+    // A route that is holding units survives the replace rather than taking
+    // its hold with it. NULL `capacity_reserved` cannot occur (NOT NULL
+    // DEFAULT 0, migration 0075) and is not coalesced away here either.
+    db
+      .prepare(
+        `DELETE FROM product_option_transports
+          WHERE product_id = ?
+            AND capacity_reserved = 0
+            AND id NOT IN (SELECT value FROM json_each(?))`
+      )
+      .bind(productId, JSON.stringify(keptRouteIds)),
+    // …and neither does a cell, directly or through the CASCADE that would
+    // drop its routes with it.
+    db
+      .prepare(
+        `DELETE FROM product_option_fulfillment
+          WHERE product_id = ?
+            AND capacity_reserved = 0
+            AND id NOT IN (SELECT value FROM json_each(?))
+            AND NOT EXISTS (SELECT 1 FROM product_option_transports t
+                             WHERE t.fulfillment_id = product_option_fulfillment.id
+                               AND t.capacity_reserved > 0)`
+      )
+      .bind(productId, JSON.stringify(keptCellIds)),
   ];
 
-  for (const cell of cells) {
-    const kept = existing?.cells.get(cellKey(cell.option_id, cell.fulfillment_type));
-    const id = kept?.id ?? makeId();
+  for (const { cell, id, transports } of planned) {
     out.push(
       db
         .prepare(
@@ -477,8 +559,26 @@ export function fulfillmentStatements(
               regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd,
               regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd,
               lead_time_text, lead_time_min_days, lead_time_max_days, sort,
-              capacity, capacity_reserved)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+              capacity)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+           ON CONFLICT (id) DO UPDATE SET
+             product_id = excluded.product_id,
+             option_id = excluded.option_id,
+             fulfillment_type = excluded.fulfillment_type,
+             enabled = excluded.enabled,
+             regular_price_iqd = excluded.regular_price_iqd,
+             prime_price_iqd = excluded.prime_price_iqd,
+             pro_price_iqd = excluded.pro_price_iqd,
+             cost_iqd = excluded.cost_iqd,
+             regular_adjust_iqd = excluded.regular_adjust_iqd,
+             prime_adjust_iqd = excluded.prime_adjust_iqd,
+             pro_adjust_iqd = excluded.pro_adjust_iqd,
+             cost_adjust_iqd = excluded.cost_adjust_iqd,
+             lead_time_text = excluded.lead_time_text,
+             lead_time_min_days = excluded.lead_time_min_days,
+             lead_time_max_days = excluded.lead_time_max_days,
+             sort = excluded.sort,
+             capacity = excluded.capacity`
         )
         .bind(
           id,
@@ -500,15 +600,13 @@ export function fulfillmentStatements(
           cell.sort,
           // A direct-sale cell is parsed with `capacity: null` and could carry
           // nothing else — the parser refuses it — so this is the pre-order
-          // pool or nothing.
-          cell.capacity,
-          kept?.capacity_reserved ?? 0
+          // pool or nothing. `capacity_reserved` is ABSENT from both halves of
+          // this statement: a new row takes the column's DEFAULT 0, and an
+          // existing row keeps whatever it is holding right now.
+          cell.capacity
         )
     );
-    for (const t of cell.transports) {
-      const keptRoute = existing?.transports.get(
-        transportKey(cell.option_id, cell.fulfillment_type, t.method)
-      );
+    for (const { t, id: routeId } of transports) {
       out.push(
         db
           .prepare(
@@ -517,11 +615,30 @@ export function fulfillmentStatements(
                 regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd,
                 regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd,
                 lead_time_text, lead_time_min_days, lead_time_max_days, sort,
-                capacity, capacity_reserved)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+                capacity)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             ON CONFLICT (id) DO UPDATE SET
+               product_id = excluded.product_id,
+               fulfillment_id = excluded.fulfillment_id,
+               method = excluded.method,
+               enabled = excluded.enabled,
+               surcharge_iqd = excluded.surcharge_iqd,
+               regular_price_iqd = excluded.regular_price_iqd,
+               prime_price_iqd = excluded.prime_price_iqd,
+               pro_price_iqd = excluded.pro_price_iqd,
+               cost_iqd = excluded.cost_iqd,
+               regular_adjust_iqd = excluded.regular_adjust_iqd,
+               prime_adjust_iqd = excluded.prime_adjust_iqd,
+               pro_adjust_iqd = excluded.pro_adjust_iqd,
+               cost_adjust_iqd = excluded.cost_adjust_iqd,
+               lead_time_text = excluded.lead_time_text,
+               lead_time_min_days = excluded.lead_time_min_days,
+               lead_time_max_days = excluded.lead_time_max_days,
+               sort = excluded.sort,
+               capacity = excluded.capacity`
           )
           .bind(
-            keptRoute?.id ?? makeId(),
+            routeId,
             productId,
             id,
             t.method,
@@ -539,8 +656,8 @@ export function fulfillmentStatements(
             t.lead_time_min_days,
             t.lead_time_max_days,
             t.sort,
-            t.capacity,
-            keptRoute?.capacity_reserved ?? 0
+            // As above: this route's own quota, never its hold.
+            t.capacity
           )
       );
     }

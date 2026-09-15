@@ -31,7 +31,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { resolveStock, isLowStock, resolveCapacity } from '../lib/inventory';
 import { COMPOSITION_LOW_BUNDLES } from '../lib/bundleComposition';
 import type { SaleModeName } from '../lib/bundleComposition';
-import type { CapacitySnapshot, InventorySnapshot } from '../lib/inventory';
+import type { CapacitySnapshot, InventorySnapshot, OrderType } from '../lib/inventory';
 import { colorVisibility } from '../lib/productRelations';
 import type { ColorLinkRow, GroupSelection } from '../lib/productRelations';
 import {
@@ -666,6 +666,34 @@ export function saleAvailability(
     },
     qty_ok: input.qty === undefined ? true : input.qty >= 1 && input.qty <= maxQty,
   };
+}
+
+/**
+ * THE ORDER TYPE ONE CART LINE ALREADY IS — the checkout's own rule, in the one
+ * place both doors read it from (0073/0075, DECISION 4).
+ *
+ * `POST /api/orders` types every bare line as: the stored `fulfillment_type`
+ * when the customer stated one, else pre-order when the line carries a
+ * transport method, else direct sale. That chain decided which counter the
+ * sale moves while `GET /api/cart` knew only the FIRST step of it, so a LEGACY
+ * line — `cart_items.fulfillment_type = ''` with a stored `transport_method`,
+ * exactly the shape migration 0073 leaves behind — was described by the cart
+ * as a direct sale off the shelf and then judged and refused by the door as a
+ * pre-order against a full import quota. Two answers about two different
+ * counters for one line.
+ *
+ * `''` IS RETURNED WHEN THE LINE ITSELF SAYS NOTHING — no stored type and no
+ * transport — and it is deliberately not the checkout's third step. That step
+ * is a DEFAULT, not a fact about the line, and `saleAvailability`'s own
+ * descriptive fallback is the right answer for a line whose own row states
+ * nothing: turning the absence of a fact into a stated direct sale would make
+ * the cart refuse `DIRECT_SALE_NOT_ENABLED` on a pre-order-only product the
+ * checkout is perfectly willing to take. The checkout applies that third step
+ * itself, as `|| 'direct_sale'`, which is byte for byte what it did before.
+ */
+export function statedOrderType(stated: string, transportMethod: string): '' | OrderType {
+  if (stated === 'pre_order' || stated === 'direct_sale') return stated;
+  return transportMethod ? 'pre_order' : '';
 }
 
 /**
@@ -1993,7 +2021,37 @@ productRoutes.post('/:slug/quote', async (c) => {
   ]);
   const doc = applyRelations(parseProductRow(row), relations);
 
-  const optionId = typeof body.optionId === 'string' && body.optionId ? body.optionId : null;
+  const rawOptionId = typeof body.optionId === 'string' && body.optionId ? body.optionId : null;
+  /**
+   * §7: ONE VALUE PER OPTION GROUP — THE WHOLE SELECTION, exactly as the cart
+   * add door parses it.
+   *
+   * This endpoint used to read `optionId` alone and hand `saleAvailability` a
+   * single value, so on a MULTI-GROUP product the page published a different
+   * counter from the one the add door charges: a product whose only tracked
+   * pre-order quota lives on the SECOND group's value answered
+   * `preorder.capacity {tracked: false, available: null, max_qty: 99}` and
+   * `qty_ok: true` — a stepper to 99 — and `POST /api/cart/items` then refused
+   * the same selection `QTY_UNAVAILABLE` "Only 1 left". A descriptive pass and
+   * the door must answer about the SAME counter; the only way to guarantee
+   * that is to ask with the same selection.
+   *
+   * The legacy single `optionId` is folded in (and kept first when it is the
+   * only thing sent), so a client that has not learned the field is byte-for-
+   * byte unaffected.
+   */
+  const rawValueIds: unknown[] = Array.isArray(body.optionValueIds) ? body.optionValueIds : [];
+  const optionValueIds: string[] = [
+    ...new Set<string>([
+      ...rawValueIds.filter((x): x is string => typeof x === 'string' && x.length > 0),
+      ...(rawOptionId ? [rawOptionId] : []),
+    ]),
+  ].slice(0, 12);
+  // The resolver prices ONE option and the first selected value carries the
+  // override — `resolveCartLine`'s rule, so the quote and the cart cannot
+  // price the same selection differently. With only `optionId` sent this IS
+  // `optionId`, which is what every existing caller sends.
+  const optionId = optionValueIds[0] ?? null;
   const colorId = typeof body.colorId === 'string' && body.colorId ? body.colorId : null;
   const transportMethod = typeof body.transportMethod === 'string' ? body.transportMethod : null;
   // 0073. The ORDER TYPE as its own answer. Absent = the page has not asked
@@ -2047,7 +2105,7 @@ productRoutes.post('/:slug/quote', async (c) => {
     // transport is asking for the pre-order journey (same rule as the cart).
     availability: saleAvailability(doc, {
       coarseStock: (await activePoolProductIds(c.env.DB, [String(row.id)])).size > 0,
-      optionId,
+      optionValueIds,
       colorId,
       qty,
       transportDefaults: ctx.transportDefaults,
@@ -2064,8 +2122,12 @@ productRoutes.post('/:slug/quote', async (c) => {
       preferredType: fulfillmentType ?? (transportMethod ? 'pre_order' : null),
       // 0075. The pre-order counter for the MODEL this selection names, and
       // the route it named, so the page's transport rows show what is really
-      // left instead of an unconditional 99.
-      capacity: capacityFrom(relations, optionId ?? ''),
+      // left instead of an unconditional 99. THE WHOLE SELECTION, never one
+      // value of it: `capacityFrom` scans the selected values for the one that
+      // carries a tracked pre-order cell and REFUSES an ambiguous pair, and a
+      // single value hides both the quota on another group's value and the
+      // ambiguity the door would raise.
+      capacity: capacityFrom(relations, optionValueIds),
       transportMethod,
     }),
     viewer_tier: viewerTier(ctx),

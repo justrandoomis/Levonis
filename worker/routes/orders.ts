@@ -74,7 +74,7 @@ import {
 import type { PreorderPricing } from '../lib/pricing';
 import { printerProductIds } from '../lib/printerIdentity';
 import { refuseNonPrinterWarranty } from '../lib/warrantyPlans';
-import { saleAvailability } from './products';
+import { saleAvailability, statedOrderType } from './products';
 import { capacityFrom, EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/productOverlay';
 import {
   isCapacityScope,
@@ -819,6 +819,16 @@ function priceCompositionLine(
       // INSERT binds NULL in its place (§7.7).
       product_id: cand.product_id,
       option_value_ids: [],
+      /**
+       * THE COUNTER THIS SPOOL SPENDS, picked by the POOL'S order type and
+       * nothing else (0075, DECISION 4). `loadCandidates` resolves it through
+       * `resolveForOrderType` + `capacityFrom`, so these are the drawn
+       * member's SHELF rows in a direct pool and its (model x pre-order)
+       * capacity — or the chosen route's own quota — in a pre-order one. They
+       * used to be the shelf either way, which made a pre-order mystery take a
+       * unit from under the direct buyer racing it while the import quota it
+       * was really spending went uncounted.
+       */
       stock_targets: cand.targets,
       // The OFFER's title and cover, never the filament's — the invoice, the
       // receipt, the courier payload and every e-mail read this field.
@@ -1137,10 +1147,21 @@ function refuseAggregateDemand(lines: ComputedLine[], poolMemberIds: ReadonlySet
   for (const [, d] of demand) {
     if (d.available !== null && d.needed > d.available) {
       if (d.preorder) {
+        /**
+         * COUNT-FREE FOR A MYSTERY-POOL MEMBER, ON THIS BRANCH TOO (§8.2 row
+         * 18). Since 0075 reached the mystery door a PRE-ORDER spool reserves
+         * the drawn member's import quota rather than its shelf, so this is
+         * the branch a mystery line now lands on — and "Only 1 pre-order
+         * place(s) left" would name a candidate's own counter, which is the
+         * before-and-after oracle the coarse rule exists to close. The
+         * `d.coarse` test below used to guard only the shelf sentences.
+         */
         throw badRequest(
-          d.available === 0
-            ? `The pre-order quota for "${d.name}" is full`
-            : `Only ${d.available} pre-order place(s) left for "${d.name}"`,
+          d.coarse
+            ? `The pre-order quota for "${d.name}" cannot cover this order`
+            : d.available === 0
+              ? `The pre-order quota for "${d.name}" is full`
+              : `Only ${d.available} pre-order place(s) left for "${d.name}"`,
           'PREORDER_CAPACITY_EXHAUSTED'
         );
       }
@@ -1809,12 +1830,12 @@ async function computeCheckout(
        * leave the shelf alone exactly as a prepaid one does. `priceLines` runs
        * twice, once per basis, and both passes resolve the same targets.
        */
-      const orderType: OrderType =
-        sel.fulfillmentType === 'pre_order' || sel.fulfillmentType === 'direct_sale'
-          ? sel.fulfillmentType
-          : sel.transportMethod
-            ? 'pre_order'
-            : 'direct_sale';
+      // `statedOrderType` IS this chain's first two steps, and it is the same
+      // function `GET /api/cart` types the line with — one rule, one place, so
+      // the read model and this door cannot answer about different counters for
+      // one row. The `|| 'direct_sale'` is the third step, unchanged: a line
+      // whose own row states nothing is a direct sale here.
+      const orderType: OrderType = statedOrderType(sel.fulfillmentType, sel.transportMethod) || 'direct_sale';
       const capacity = view ? capacityFrom(view, sel.optionValueIds ?? []) : null;
       // The checkout must not trust a cart row written before the cart refused
       // incomplete selections (or one a product acquired options after): a
@@ -1864,10 +1885,15 @@ async function computeCheckout(
         // quota is full, which is a different fact and a different wait, and
         // the existing code would have named the wrong one.
         if (orderType === 'pre_order') {
+          // Count-free for a mystery-pool member here as well: a pre-order
+          // pool is bounded by these same capacity rows, so the number would
+          // be an oracle on the pick (§8.2 row 18).
           throw badRequest(
-            stockRes.available === 0
-              ? `The pre-order quota for "${displayName}" is full`
-              : `Only ${stockRes.available} pre-order place(s) left for "${displayName}"`,
+            poolMemberIds.has(String(row.id))
+              ? `The pre-order quota for "${displayName}" cannot cover this order`
+              : stockRes.available === 0
+                ? `The pre-order quota for "${displayName}" is full`
+                : `Only ${stockRes.available} pre-order place(s) left for "${displayName}"`,
             'PREORDER_CAPACITY_EXHAUSTED'
           );
         }

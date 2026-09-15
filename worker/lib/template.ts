@@ -40,6 +40,21 @@ export const TEMPLATE_VERSION = 2;
 export const NULL_TOKEN = '__NULL__';
 export const CLEAR_TOKEN = '__CLEAR__';
 
+/**
+ * 0075 — THE SENTENCE A `capacity` TYPED IN THE WRONG PLACE EARNS.
+ *
+ * Arabic first, then English, like every other refusal in this file. It names
+ * BOTH keys that carry a pre-order number — the shared pool and one route's
+ * own quota — and the key that carries the direct-sale number, because the
+ * whole reason the mistake is made is that the admin does not know which of
+ * the three they want. See `parseTemplate`'s `ignoreKey`.
+ */
+export const MISPLACED_CAPACITY =
+  'السعة تخص الطلب المسبق وحده: اكتبها في options.N.preorder.capacity (الحوض المشترك للموديل) ' +
+  'أو options.N.preorder.transports.M.capacity (حصة طريقة واحدة)، ومخزون البيع المباشر هو options.N.stock. / ' +
+  'capacity belongs to a pre-order only: write options.N.preorder.capacity (the model shared pool) ' +
+  "or options.N.preorder.transports.M.capacity (one route's own quota); direct-sale stock is options.N.stock.";
+
 // ---------------------------------------------------------------- registry
 
 export type TemplateFieldType =
@@ -423,9 +438,12 @@ const GROUP_SPECS: GroupSpec[] = [
             '  Give a route a number → that route holds its own quota and does NOT also spend the pool.',
             '  Never copy one quantity onto all three routes.',
             'الطريق الذي لا يذكره الملف يُحفظ كما هو بحصته وسعره — لحذف كل الطرق اكتب options.N.preorder.transports=__CLEAR__',
-            'ثم اذكر الطرق التي تريد بقاءها في نفس الملف.',
+            'ثم اذكر الطرق التي تريد بقاءها في نفس الملف؛ الطريق الذي تعيد ذكره يحتفظ بحصته وسعره كما هما،',
+            'ولإلغاء تتبّع حصته اكتبها صراحةً: options.N.preorder.transports.M.capacity=__NULL__',
             '  A route the file does not name is PRESERVED with its quota and its price.',
-            '  options.N.preorder.transports=__CLEAR__ removes every route; name the ones you want after it.',
+            '  options.N.preorder.transports=__CLEAR__ removes every route the same file does not name again;',
+            '  a route you do name again keeps its stored quota and price — untracking one is said out loud,',
+            '  options.N.preorder.transports.M.capacity=__NULL__.',
           ],
           fields: [
             f('method', 'enum', 'options', 'air | sea | land — كيف يصل الجهاز إلى العراق. ليست طريقة التوصيل داخل العراق.', { required: true, enumValues: ['air', 'sea', 'land'] as const }),
@@ -774,6 +792,38 @@ export function parseTemplate(text: string): ParsedTemplate {
   };
   const err = (line: number, key: string, message: string) => out.errors.push({ line, key, message });
 
+  /**
+   * 0075 — A KEY THE FORMAT DOES NOT DECLARE, dropped with a warning; EXCEPT
+   * a misplaced `capacity`, which is refused BY NAME.
+   *
+   * `options.1.capacity=44` is the spelling an admin reaching for "how many
+   * may I pre-order" types beside `options.1.stock`, and it is not a key this
+   * format has ever had: it fell through to `unknown_keys`, earned the generic
+   * «unknown key "…" was ignored» warning, and the apply then SUCCEEDED with
+   * the cell still untracked — unlimited pre-orders under a number the admin
+   * believes they typed. `options.N.direct.capacity` was already refused by
+   * name (`CellSpec.refused`) on exactly that reasoning, and the sheet refuses
+   * the same mistake by name on every non-`fulfillment` row
+   * (worker/lib/importCsv.ts). This is the third statement of one rule, in the
+   * one place every unknown key in this format passes through, so a capacity
+   * typed anywhere the format has no box for it — `capacity=44`,
+   * `options.1.capacity=44`, `colors.1.capacity=44` — is an ERROR naming the
+   * two keys that carry the number, instead of a warning nobody reads.
+   *
+   * Only the LAST segment is examined, so the two real keys
+   * (`options.N.preorder.capacity` and
+   * `options.N.preorder.transports.M.capacity`) are declared fields that never
+   * reach here, and `spec.capacity` — a spec-sheet field id, which may legally
+   * be called anything — is taken by the `spec.` branch long before this.
+   */
+  const ignoreKey = (line: number, key: string) => {
+    if (key.slice(key.lastIndexOf('.') + 1) === 'capacity') {
+      err(line, key, MISPLACED_CAPACITY);
+      return;
+    }
+    out.unknown_keys.push(key);
+  };
+
   if (typeof text !== 'string') {
     err(1, '', 'template text is missing');
     return out;
@@ -924,7 +974,7 @@ export function parseTemplate(text: string): ParsedTemplate {
         if (rowIndex < 1 || rowIndex > 500) { err(lineNo, key, 'row index must be between 1 and 500'); continue; }
         const rowKey = rm[2];
         const rowSpec = groupSpec.rowFields.find((r) => r.key === rowKey);
-        if (!rowSpec) { out.unknown_keys.push(key); continue; }
+        if (!rowSpec) { ignoreKey(lineNo, key); continue; }
         if (seenGroupField.has(key)) { err(lineNo, key, 'duplicate key'); continue; }
         seenGroupField.add(key);
         item.rows ??= [];
@@ -994,7 +1044,7 @@ export function parseTemplate(text: string): ParsedTemplate {
           const listIndex = parseInt(lm[2], 10);
           if (listIndex < 1 || listIndex > 50) { err(lineNo, key, 'index must be between 1 and 50'); continue; }
           const listField = cellSpec.list.fields.find((x) => x.key === lm[3]);
-          if (!listField) { out.unknown_keys.push(key); continue; }
+          if (!listField) { ignoreKey(lineNo, key); continue; }
           if (seenGroupField.has(key)) { err(lineNo, key, 'duplicate key'); continue; }
           seenGroupField.add(key);
           cell.list ??= [];
@@ -1012,7 +1062,7 @@ export function parseTemplate(text: string): ParsedTemplate {
         if (refusal) { err(lineNo, key, refusal); continue; }
 
         const cellField = cellSpec.fields.find((x) => x.key === rest);
-        if (!cellField) { out.unknown_keys.push(key); continue; }
+        if (!cellField) { ignoreKey(lineNo, key); continue; }
         if (seenGroupField.has(key)) { err(lineNo, key, 'duplicate key'); continue; }
         seenGroupField.add(key);
         const pv = coerce(cellField, value, lineNo, key, out.errors);
@@ -1021,7 +1071,7 @@ export function parseTemplate(text: string): ParsedTemplate {
       }
 
       const fieldSpec = groupSpec.fields.find((x) => x.key === sub);
-      if (!fieldSpec) { out.unknown_keys.push(key); continue; }
+      if (!fieldSpec) { ignoreKey(lineNo, key); continue; }
       if (seenGroupField.has(key)) { err(lineNo, key, 'duplicate key'); continue; }
       seenGroupField.add(key);
       const pf = coerce(fieldSpec, value, lineNo, key, out.errors);
@@ -1029,7 +1079,7 @@ export function parseTemplate(text: string): ParsedTemplate {
       continue;
     }
 
-    out.unknown_keys.push(key);
+    ignoreKey(lineNo, key);
   }
 
   if (out.header.template_version === null && !out.errors.some((e) => e.key === 'template_version')) {
@@ -1998,7 +2048,15 @@ function buildCells(
 
     // `options.N.<cell>=__CLEAR__` removes it. Nothing else does: a file that
     // simply does not mention a cell leaves it exactly as it was.
-    if (parsed.cleared) { kept.delete(type); continue; }
+    // Named in `cleared_fields` for the same reason the list clear below is:
+    // a removal the preview does not report is a removal the admin approves
+    // without seeing it, and this one takes the cell's whole pre-order pool
+    // with it.
+    if (parsed.cleared) {
+      kept.delete(type);
+      result?.cleared_fields.push(`${g.name}.${it.index}.${cellName}`);
+      continue;
+    }
 
     const cell: LooseItem = { ...(kept.get(type) ?? {}), fulfillment_type: type };
     /**
@@ -2057,17 +2115,38 @@ function buildCells(
      *
      * REMOVING A ROUTE therefore needs a statement of its own, and it is the
      * idiom this format already uses one level up:
-     * `options.N.preorder.transports=__CLEAR__` empties the list, and any
-     * route the same file then names is written fresh. That keeps "the file
-     * did not mention it" and "the owner deleted it" two different things,
-     * which is the whole reason `options.N.preorder=__CLEAR__` exists.
+     * `options.N.preorder.transports=__CLEAR__` empties the list, and the
+     * routes the same file then names are the ones that remain. That keeps
+     * "the file did not mention it" and "the owner deleted it" two different
+     * things, which is the whole reason `options.N.preorder=__CLEAR__` exists.
+     *
+     * __CLEAR__ IS A STATEMENT ABOUT THE LIST, NOT ABOUT A ROUTE'S SETTINGS
+     * (0075, and the defect this paragraph exists for). It used to empty the
+     * merge base as well as the tail, so a route RE-LISTED after it was
+     * written FRESH: `transports=__CLEAR__` followed by
+     * `transports.1.method=air` with no capacity line replaced air's stored
+     * quota of 10 with NULL — UNTRACKED, i.e. unlimited pre-orders on that
+     * route — and reported success with empty errors, empty warnings and an
+     * empty `cleared_fields`. That is the loss this file's own omission rule
+     * forbids («a field the file omits is one the importer PRESERVES»), it is
+     * the opposite of what the notes above this list promise the reader
+     * («اذكر الطرق التي تريد بقاءها» — name the routes you want to KEEP), and
+     * it silently charges NOTHING for a pre-order the owner meant to cap.
+     *
+     * So the merge base is always the STORED list and only the tail is
+     * emptied: the routes the file re-lists keep their quota, their surcharge
+     * and their lead time unless the same file states otherwise, and the ones
+     * it does not re-list are gone. Untracking a route is still available, and
+     * still has to be said out loud: `transports.M.capacity=__NULL__`.
      */
     if (cellSpec.list && (parsed.list || parsed.listCleared)) {
-      const prevList =
-        parsed.listCleared || !Array.isArray(cell[cellSpec.list.name])
-          ? []
-          : (cell[cellSpec.list.name] as LooseItem[]);
-      const byMethod = new Map(prevList.map((x) => [String(x.method ?? ''), x]));
+      const storedList = Array.isArray(cell[cellSpec.list.name])
+        ? (cell[cellSpec.list.name] as LooseItem[])
+        : [];
+      const byMethod = new Map(storedList.map((x) => [String(x.method ?? ''), x]));
+      // Cleared: nothing the file leaves unnamed survives. Not cleared: every
+      // unnamed route is preserved, exactly as it was.
+      const prevList = parsed.listCleared ? [] : storedList;
       const named = new Set<string>();
       const out: LooseItem[] = [];
       for (const entry of parsed.list ?? []) {
@@ -2087,6 +2166,23 @@ function buildCells(
         if (!named.has(String(prev.method ?? ''))) out.push({ ...prev });
       }
       cell[cellSpec.list.name] = out;
+      /**
+       * AND THE PREVIEW SAYS SO. `cleared_fields` is the field that exists to
+       * name what a file cleared, and a list clear left it empty — the one
+       * screen an admin checks before applying showed no loss at all. The
+       * removed routes are named too, because "every route" is not a list an
+       * admin can read back off the file.
+       */
+      if (parsed.listCleared && result) {
+        const listKey = `${g.name}.${it.index}.${cellName}.${cellSpec.list.name}`;
+        result.cleared_fields.push(listKey);
+        const dropped = storedList
+          .map((x) => String(x.method ?? ''))
+          .filter((m) => m && !named.has(m));
+        if (dropped.length) {
+          result.warnings.push(`${listKey}=${CLEAR_TOKEN} removed ${dropped.join(', ')}`);
+        }
+      }
     }
     kept.set(type, cell);
   }

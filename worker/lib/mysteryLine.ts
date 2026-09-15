@@ -134,10 +134,22 @@ export async function resolveMysteryLines(
     if (!poolCache.has(id)) poolCache.set(id, await loadPool(db, id));
     return poolCache.get(id) ?? null;
   };
-  const loadCandidatesOnce = async (pool: MysteryPool, familyId: string) => {
-    const key = `${pool.id}|${familyId}`;
+  /**
+   * 0075: THE ROUTE IS PART OF THE QUESTION, SO IT IS PART OF THE CACHE KEY.
+   *
+   * A pre-order candidate's counter is the chosen route's own quota when it
+   * has one and the cell's shared pool otherwise, so two lines of the same
+   * pool on different routes are two different answers. Dropping the route
+   * here — which is what this did — made `loadCandidates` resolve every
+   * pre-order pool against the shared pool, and a route with its own quota was
+   * then judged on a counter it does not spend. The key keeps one query per
+   * (pool, family, route) rather than per line (§14).
+   */
+  const loadCandidatesOnce = async (pool: MysteryPool, familyId: string, transportMethod: string) => {
+    const route = pool.kind === 'preorder' ? transportMethod : '';
+    const key = `${pool.id}|${familyId}|${route}`;
     if (!candidateCache.has(key)) {
-      const set = await loadCandidates(db, pool, { familyId });
+      const set = await loadCandidates(db, pool, { familyId, transportMethod: route });
       candidateCache.set(key, set.candidates);
     }
     return candidateCache.get(key) ?? [];
@@ -195,18 +207,22 @@ export async function resolveMysteryLines(
     // only from the ids the pool itself carries. An unrecognised family is
     // IGNORED rather than refused: it is a filter, not a purchase term, and
     // refusing it would tell a caller which families exist.
-    const all = await loadCandidatesOnce(pool, '');
+    // The SAME route `mysteryAvailability` is told about below and the same one
+    // the line will be sold on, so the wheel, the availability and the
+    // reservation read one counter.
+    const route = req.transportMethod || 'air';
+    const all = await loadCandidatesOnce(pool, '', route);
     const families = [...new Set(all.map((c) => c.family_id).filter(Boolean))].sort();
     const wanted = offer.customer_picks_family ? String(req.familyId ?? '').trim() : '';
     const familyId = wanted && families.includes(wanted) ? wanted : '';
-    const candidates = familyId ? await loadCandidatesOnce(pool, familyId) : all;
+    const candidates = familyId ? await loadCandidatesOnce(pool, familyId, route) : all;
 
     const availability = mysteryAvailability({
       offerProductId: productId,
       spoolQty: offer.spool_qty,
       mode,
       candidates,
-      transportMethod: req.transportMethod || 'air',
+      transportMethod: route,
       window: {
         starts_at: b.window?.starts_at ?? null,
         ends_at: b.window?.ends_at ?? null,

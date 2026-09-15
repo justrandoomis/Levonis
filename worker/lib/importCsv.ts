@@ -661,7 +661,19 @@ export interface ParsedFulfillment {
    * `__CLEAR__`). A number is tracked, and 0 is a real tracked zero.
    */
   capacity?: number | null;
-  enabled: boolean;
+  /**
+   * undefined = the `active` cell was blank, so this row says nothing about
+   * the flag either and the stored one stands.
+   *
+   * It is the SAME rule as `capacity` above, and it has to be: a hand-written
+   * row that sets only a quota («links, value, capacity») leaves `active`
+   * empty, and `boolCell`'s fallback for every other row type is `true`. Once
+   * the sheet door actually writes cells, that fallback would switch a
+   * pre-order the owner had deliberately turned OFF back on, invisibly, from a
+   * cell the admin never filled in. A cell the file CREATES is enabled, which
+   * is `parseFulfillmentPayload`'s own default for an absent flag.
+   */
+  enabled?: boolean;
 }
 
 export interface ParsedOption {
@@ -1593,6 +1605,9 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         });
         continue;
       }
+      // Blank `active` = say nothing, exactly as a blank `capacity` does.
+      // See `ParsedFulfillment.enabled`.
+      const statedEnabled = cell(r, 'active').trim() === '' ? undefined : active;
       parent.fulfillments ??= [];
       parent.fulfillments.push({
         line,
@@ -1601,7 +1616,7 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         fulfillment_type: ftype,
         method: method as '' | 'air' | 'sea' | 'land',
         ...(capacityValue === undefined ? {} : { capacity: capacityValue }),
-        enabled: active,
+        ...(statedEnabled === undefined ? {} : { enabled: statedEnabled }),
       });
       continue;
     }
@@ -2193,7 +2208,9 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
             : fl.capacity === undefined || fl.capacity === null
               ? CAPACITY_NULL
               : String(fl.capacity),
-        active: bool(fl.enabled),
+        // An export always states the flag: `undefined` here is only ever the
+        // hand-written "say nothing", and this file is the store's own answer.
+        active: bool(fl.enabled !== false),
       });
     }
     for (const sp of p.specs) {

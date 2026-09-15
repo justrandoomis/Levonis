@@ -30,7 +30,7 @@ import type { ProductRelationsView } from '../lib/productOverlay';
 import { validateSelection } from '../lib/productRelations';
 import { validateCoupon } from '../lib/membershipOps';
 import { rateLimit } from '../lib/ratelimit';
-import { saleAvailability, unusableOrderType } from './products';
+import { saleAvailability, statedOrderType, unusableOrderType } from './products';
 import type { SaleAvailability } from './products';
 
 /**
@@ -829,7 +829,8 @@ async function loadCart(c: Context<AppContext>) {
         capacity: view ? capacityFrom(view, sel.optionValueIds ?? []) : null,
         transportMethod: sel.transportMethod,
       }),
-      sel.fulfillmentType
+      sel.fulfillmentType,
+      sel.transportMethod
     );
     items.push({
       id: row.cart_item_id,
@@ -1309,17 +1310,33 @@ async function addCompositionLine(
  * is summed, and neither is zeroed to mean "sold out" — `max_qty` is the one
  * number that says how many of THIS line may still be bought, and it is 0.
  *
- * A legacy line with no stored type (`stated` empty) is returned untouched:
- * `unusableOrderType` answers null there, and the old behaviour is kept.
+ * AND IT TYPES THE LINE THE WAY THE DOOR DOES, NOT ONLY BY `fulfillment_type`.
+ * `unusableOrderType` answers null for any stated value that is not exactly
+ * `direct_sale` or `pre_order`, so a LEGACY line — `fulfillment_type = ''` with
+ * a stored `transport_method`, exactly the shape migration 0073 leaves behind —
+ * came back untouched while `POST /api/orders` typed that same line `pre_order`
+ * from its transport. The cart described a direct sale off the shelf and the
+ * door refused a pre-order against a full import quota: two answers about two
+ * different counters for one line. `statedOrderType` is the checkout's own
+ * chain, so there is one rule and it lives in one place.
+ *
+ * A line whose own row states NOTHING — no stored type and no transport — is
+ * still returned untouched: `statedOrderType` answers '' there, and the old
+ * behaviour is kept.
  */
-export function statedAvailability(a: SaleAvailability, stated: string): SaleAvailability {
-  const refusal = unusableOrderType(a, stated);
+export function statedAvailability(
+  a: SaleAvailability,
+  stated: string,
+  transportMethod: string
+): SaleAvailability {
+  const effective = statedOrderType(stated, transportMethod);
+  const refusal = unusableOrderType(a, effective);
   if (!refusal) return a;
   return {
     ...a,
     // NOT `unavailable`: the mode is how every client learns which counter
     // this line spends, and erasing it is the same defect one step along.
-    mode: stated === 'pre_order' ? 'preorder' : 'direct_sale',
+    mode: effective === 'pre_order' ? 'preorder' : 'direct_sale',
     reason: refusal.code,
     stock: { ...a.stock, max_qty: 0 },
     preorder: { ...a.preorder, capacity: { ...a.preorder.capacity, max_qty: 0 } },

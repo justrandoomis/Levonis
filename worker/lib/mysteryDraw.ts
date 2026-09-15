@@ -28,11 +28,15 @@
  *    idempotency key. (§7.3 states this explicitly and §7.5's prose says
  *    "orderItemId"; §7.3's rule wins, because it is the one with the reason.)
  *
- * 3. CANDIDATES ARE REAL INVENTORY, JUDGED BY `resolveStock`. There is no pool
- *    stock column and never will be: an entry names a product, an option-value
- *    set and a colour, and its availability is the same number the product page
- *    shows. Zero stock, weight 0, an inactive entry, an inactive product,
- *    option or colour, an untracked row in a DIRECT pool, a pool-kind
+ * 3. CANDIDATES ARE REAL INVENTORY, JUDGED BY `resolveForOrderType` — THE POOL'S
+ *    OWN KIND PICKS THE COUNTER (0075, DECISION 4). There is no pool stock
+ *    column and never will be: an entry names a product, an option-value set
+ *    and a colour, and its availability is the same number the product page
+ *    shows for that order type — the member's SHELF in a `direct` pool, its
+ *    (model x pre-order) capacity or the chosen route's quota in a `preorder`
+ *    one, and NEVER the shelf for a pre-order. Zero stock, weight 0, an
+ *    inactive entry, an inactive product, option or colour, an untracked row
+ *    in a DIRECT pool, an ambiguous pre-order configuration, a pool-kind
  *    disagreement and a failed catalog/facet requirement each drop the entry —
  *    and the reason is kept, for the admin preview only.
  *
@@ -60,10 +64,11 @@
 
 import { seedFrom, sequence, weightedIndex, randomSeedHex } from './farm/rng';
 import { sha256Hex } from './crypto';
-import { resolveStock, type StockResolution, type StockTarget } from './inventory';
+import { resolveForOrderType, type OrderType, type StockResolution, type StockTarget } from './inventory';
 import { effectiveAvailability } from '@levonis/pricing/availability';
 import { typeForTransport, type ShippingType } from '@levonis/pricing/shippingType';
 import {
+  capacityFrom,
   EMPTY_RELATIONS,
   loadRelationsViews,
   snapshotFrom,
@@ -123,12 +128,13 @@ export interface MysteryConfig {
  * server will honour, so the disclosure and the wheel share one predicate
  * rather than two functions that happen to agree today.
  *
- * NOTE the asymmetry it makes visible: `loadCandidates` deliberately admits a
- * pre-order candidate at zero free stock (a pre-order is not shipped from the
- * shelf), while the wheel drops it. Making the odds match the WHEEL is the
- * conservative reading — nothing a customer is told can exceed what they can
- * actually receive — and it changes no draw. Whether the wheel should instead
- * treat a pre-order candidate as unbounded is a separate owner decision.
+ * `available` is the counter THIS POOL's order type spends, so the predicate
+ * reads the same fact in both kinds: an empty shelf drops a direct candidate
+ * and a FULL IMPORT QUOTA drops a pre-order one, while an untracked counter
+ * (`null`) bounds nothing and stays on the wheel. A pre-order candidate is no
+ * longer judged on the shelf it was never going to ship from, so the asymmetry
+ * this note used to record — the loader admitting a candidate the wheel then
+ * dropped — is gone.
  */
 export function isDrawable(c: { weight: number; available: number | null }): boolean {
   return c.weight > 0 && (c.available === null || c.available > 0);
@@ -141,9 +147,16 @@ export interface MysteryCandidate {
   color_id: string;
   family_id: string;
   weight: number;
-  /** Sellable units right now; `null` = untracked (a pre-order pool only). */
+  /**
+   * Sellable units right now for the counter THIS POOL's order type spends —
+   * the member's shelf in a direct pool, its (model x pre-order) capacity or
+   * the chosen route's quota in a pre-order one. `null` = untracked, which
+   * bounds nothing.
+   */
   available: number | null;
-  /** The REAL stock rows a reservation for this pick would consume. */
+  /** The REAL rows a reservation for this pick would consume — the same rows
+   *  `available` was read from, so the wheel, the availability and
+   *  `planInventory` can never aim at different counters. */
   targets: StockTarget[];
   /** Frozen at draw time so a later rename cannot rewrite history (§1.9). */
   name_snapshot: string;
@@ -159,6 +172,9 @@ export type ExclusionReason =
   | 'SELECTION_INACTIVE'
   | 'SELECTION_INCOMPLETE'
   | 'VARIANT_NOT_MODELLED'
+  /** 0075: the entry's selection names two tracked pre-order cells, so no one
+   *  counter answers for it. `capacityFrom` refuses rather than picking. */
+  | 'PREORDER_CAPACITY_AMBIGUOUS'
   | 'UNTRACKED_DIRECT'
   | 'BELOW_MIN_AVAILABLE'
   | 'MODE_MISMATCH'
@@ -397,10 +413,17 @@ function entryMode(view: ProductRelationsView, valueIds: string[], saleTypes: st
 export async function loadCandidates(
   db: D1Database,
   pool: MysteryPool,
-  opts: { familyId?: string; preview?: boolean } = {}
+  opts: { familyId?: string; preview?: boolean; transportMethod?: string } = {}
 ): Promise<CandidateSet> {
   const preview = opts.preview === true;
   const family = (opts.familyId ?? '').trim();
+  /**
+   * WHICH ROUTE A PRE-ORDER POOL IS JUDGED ON. Empty means "no route chosen
+   * yet", which `resolveCapacity` answers from the cell's SHARED pool — the
+   * honest before-you-pick figure, and what every route without a quota of
+   * its own will spend. It is never read on a direct pool.
+   */
+  const transportMethod = (opts.transportMethod ?? '').trim();
   const { results } = await db
     .prepare(CANDIDATE_SQL(preview))
     .bind(pool.id, family)
@@ -490,12 +513,48 @@ export async function loadCandidates(
       reserved: Number(r.stock_reserved ?? 0),
       low_stock_threshold: r.low_stock_threshold,
     });
-    const resolution: StockResolution = resolveStock(snap, {
-      option_value_ids: valueIds,
-      color_id: r.color_id || null,
-    });
+    /**
+     * 0075 AT THE MYSTERY DOOR — ONE COUNTER PER SPOOL, PICKED BY THE ORDER
+     * TYPE, exactly as a bare line and a bundle component already are.
+     *
+     * This used to be `resolveStock` for every candidate of every pool, so a
+     * PRE-ORDER offer judged and then RESERVED the drawn member's DIRECT SHELF
+     * (`stock_targets: cand.targets` in worker/routes/orders.ts): a pre-order
+     * took a unit from under the direct buyer racing it, while the import
+     * quota that sale was actually spending was never consulted and could be
+     * oversold without bound — a pre-order-only member with nine on the shelf
+     * and a cell capacity of 1 sold every one of those nine.
+     *
+     * The pool's OWN `kind` is the order type here and nothing else is: the
+     * two pools are separate rows (§7.6), so a direct purchase can never
+     * become a pre-order and the payment method never enters. It is
+     * `resolveForOrderType` + `capacityFrom` — the identical pair — so the
+     * wheel, the admin preview, the card, the cart and the reservation cannot
+     * aim at different rows.
+     *
+     * The ROUTE is the caller's own: `resolveCapacity` spends a route's own
+     * quota when it has one and the cell's shared pool otherwise, so air, sea
+     * and land must not be answered with one another's counter.
+     */
+    const orderType: OrderType = wantsDirect ? 'direct_sale' : 'pre_order';
+    const resolution: StockResolution = resolveForOrderType(
+      orderType,
+      snap,
+      { option_value_ids: valueIds, color_id: r.color_id || null },
+      orderType === 'pre_order' ? capacityFrom(view, valueIds) : null,
+      transportMethod
+    );
     if (resolution.error) {
-      drop(resolution.error === 'VARIANT_NOT_MODELLED' ? 'VARIANT_NOT_MODELLED' : 'SELECTION_INCOMPLETE');
+      drop(
+        resolution.error === 'VARIANT_NOT_MODELLED'
+          ? 'VARIANT_NOT_MODELLED'
+          : resolution.error === 'PREORDER_CAPACITY_AMBIGUOUS'
+            ? // The selection names two tracked pre-order cells, so there is no
+              // ONE counter to draw against. Refused, never silently resolved
+              // to one of them — see `capacityFrom`.
+              'PREORDER_CAPACITY_AMBIGUOUS'
+            : 'SELECTION_INCOMPLETE'
+      );
       continue;
     }
     if (wantsDirect) {
@@ -732,7 +791,17 @@ export function resolveMysteryMode(offer: MysteryOffer, requested: string | null
 export function poolSupply(candidates: MysteryCandidate[]): number | null {
   let total: number | null = null;
   for (const c of candidates) {
-    if (c.available === null) continue;
+    /**
+     * ONE UNTRACKED CANDIDATE MAKES THE WHOLE POOL UNBOUNDED, and skipping it
+     * instead would UNDERSTATE the supply — the read model would refuse a
+     * spool the door is willing to sell. The wheel is why: `drawSpools` drops
+     * a slot only when its own `remaining` hits zero, so while one slot claims
+     * no limit the wheel can never empty. (Unreachable on a `direct` pool,
+     * where an untracked candidate is dropped as `UNTRACKED_DIRECT` before it
+     * gets here; it is a real shape on a pre-order pool, where a model with no
+     * capacity cell is untracked beside one that has one.)
+     */
+    if (c.available === null) return null;
     total = (total ?? 0) + c.available;
   }
   return total;
@@ -746,7 +815,9 @@ export function poolSupply(candidates: MysteryCandidate[]): number | null {
  *
  * The synthetic component below is an AVAILABILITY input only: it is never a
  * stock move and never reaches `planInventory` — the real reservation is built
- * from each drawn candidate's own `targets`. `bundleAvailability` reads only
+ * from each drawn candidate's own `targets`, which since 0075 are that
+ * candidate's pre-order capacity rows in a pre-order pool and its shelf rows
+ * in a direct one. `bundleAvailability` reads only
  * `included`, `resolution`, `qty_per_bundle`, `sale_types` and `shipping_type`
  * from a component, which is why the cast below is safe and why `unit` (a
  * price this function never looks at) is absent.
@@ -761,7 +832,18 @@ export function mysteryAvailability(input: {
   active: boolean;
   offer: OfferCheck;
 }): CompositionAvailability {
-  const supply = input.mode === 'direct' ? poolSupply(input.candidates) : null;
+  /**
+   * 0075: THE SUPPLY IS READ FROM WHICHEVER COUNTER THE POOL'S KIND SPENDS.
+   *
+   * This used to be `mode === 'direct' ? poolSupply(...) : null` — "a
+   * pre-order bounds nothing" — which was true only while a pre-order had no
+   * counter at all. It now does, so a pre-order pool whose candidates carry
+   * tracked capacity is bounded, and hard-coding `null` here would publish an
+   * unbounded stepper for an offer the checkout refuses at the second spool.
+   * `poolSupply` still answers `null` when any candidate is untracked, which
+   * is every pre-order pool that predates 0075.
+   */
+  const supply = poolSupply(input.candidates);
   const shipping: ShippingType = input.mode === 'direct' ? 'direct' : typeForTransport(input.transportMethod ?? 'air');
   const resolution: StockResolution =
     supply === null
@@ -769,7 +851,13 @@ export function mysteryAvailability(input: {
       : {
           targets: [
             {
-              scope: 'base',
+              // The SCOPE is what `bundleAvailability` reads to decide whether
+              // a blocked line is an empty shelf or a full import quota, and
+              // the two are different facts and different waits. It is a label
+              // on an aggregate here, never a row: this resolution is an
+              // availability input only and no reservation is ever built from
+              // it.
+              scope: input.mode === 'direct' ? 'base' : 'preorder',
               scope_id: '',
               stock: supply,
               reserved: 0,

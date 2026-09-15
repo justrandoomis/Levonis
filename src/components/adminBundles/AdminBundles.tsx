@@ -270,6 +270,40 @@ function toLocalInput(iso: string | null): string {
   return new Date(ms + 3 * 3600_000).toISOString().slice(0, 16);
 }
 
+/**
+ * WHY A BLOCKING COMPONENT IS BLOCKING, IN THE ADMIN'S OWN LANGUAGE.
+ *
+ * `availability.blocking[].reason` is a machine code — `OUT_OF_STOCK`,
+ * `PREORDER_CAPACITY_EXHAUSTED` — and the preview used to render it verbatim,
+ * so an Arabic-first admin read «<product> — المطلوب 1, المتاح 0
+ * (PREORDER_CAPACITY_EXHAUSTED)». The ONE fact that distinguishes a full import
+ * quota from an empty shelf — a different problem, a different fix, a different
+ * screen to go and fix it on — arrived untranslated, on the screen the admin
+ * opens to diagnose it. Every other refusal on this panel is a server sentence
+ * in three languages (`BundleIssue.ar/en/ckb`); these codes are computed inside
+ * `bundleAvailability`, carry no sentence, and this table is where they get one.
+ *
+ * The raw code is still shown beside the sentence, dimmed: an admin reporting a
+ * problem to support quotes the code, and translating it away would take that
+ * with it. A code with no entry here falls back to itself rather than to an
+ * empty string, so a reason added on the server is never silently swallowed.
+ *
+ * ckb: THE ARABIC IS DELIBERATELY REPEATED. Kurdish Sorani here is the owner's
+ * to write by hand; a generated translation on an admin's diagnostic screen is
+ * worse than an honest fallback to a language they read.
+ */
+const BLOCKING_REASONS: Record<string, { ar: string; en: string }> = {
+  OUT_OF_STOCK: { ar: 'نفد المخزون', en: 'out of stock' },
+  PREORDER_CAPACITY_EXHAUSTED: { ar: 'حصة الطلب المسبق ممتلئة', en: 'pre-order quota is full' },
+  PREORDER_CAPACITY_AMBIGUOUS: {
+    ar: 'اختيار واحد يسمّي حصتَي طلب مسبق — اترك الحصة على موديل واحد فقط',
+    en: 'one selection names two pre-order quotas — leave the quota on one model only',
+  },
+  SELECTION_INCOMPLETE: { ar: 'الاختيار غير مكتمل', en: 'selection incomplete' },
+  VARIANT_NOT_MODELLED: { ar: 'هذه التوليفة غير معرّفة للبيع', en: 'this combination is not set up for sale' },
+  COMPONENT_UNAVAILABLE: { ar: 'هذا المكوّن لم يعد معروضًا للبيع', en: 'this component is no longer on sale' },
+};
+
 export default function AdminBundles() {
   const { lang, dir } = useLanguage();
   const loc = useCallback(
@@ -277,6 +311,16 @@ export default function AdminBundles() {
     [lang]
   );
   const say = useCallback((i: BundleIssue) => (lang === 'en' ? i.en : lang === 'ckb' ? i.ckb : i.ar), [lang]);
+  /** One blocking code, as a sentence. `ckb` falls back to the Arabic on
+   *  purpose — see BLOCKING_REASONS. */
+  const whyBlocked = useCallback(
+    (code: string) => {
+      const found = BLOCKING_REASONS[code];
+      if (!found) return code;
+      return lang === 'en' ? found.en : found.ar;
+    },
+    [lang]
+  );
 
   const [rows, setRows] = useState<BundleCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1201,7 +1245,10 @@ export default function AdminBundles() {
                   {preview.availability.blocking.map((b, k) => (
                     <li key={k}>
                       {b.product_id} — {loc('المطلوب', 'needed', 'پێویست')} {b.needed}, {loc('المتاح', 'available', 'بەردەست')}{' '}
-                      {b.available} ({b.reason})
+                      {b.available} — {whyBlocked(b.reason)}{' '}
+                      <span className="text-[10px] text-[var(--ap-text-3)]" dir="ltr">
+                        ({b.reason})
+                      </span>
                     </li>
                   ))}
                 </ul>

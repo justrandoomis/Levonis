@@ -522,10 +522,14 @@ options.2.low_stock_threshold=__NULL__
 # تكتبان في نفس العمود تمامًا (options.2.stock)، والتصدير يكتب الأولى فقط:
 #   options.2.direct.stock=__NULL__
 #   options.2.direct.low_stock_threshold=__NULL__
-# وسطر مثل options.2.direct.capacity=<العدد> مرفوض بالاسم مع جملة تقول أين يُكتب.
+# وسطر مثل options.2.direct.capacity=<العدد> مرفوض بالاسم مع جملة تقول أين يُكتب،
+# وكذلك options.2.capacity أو مفتاح capacity وحده في أعلى الملف: للسعة مفتاحان
+# اثنان لا ثالث لهما، وهما المذكوران أدناه.
 # A direct sale has NO capacity — its number is the model stock above.
 # options.2.direct.stock is an ALIAS onto options.2.stock: same column, and
-# only options.2.stock is exported. options.2.direct.capacity is refused by name.
+# only options.2.stock is exported. options.2.direct.capacity is refused by name,
+# and so is a capacity key written anywhere else (options.2.capacity, or a bare
+# capacity line at the top): the only two that carry one are named below.
 #
 # الطلب المسبق وحده يملك سعة اختيارية. فارغ أو __NULL__ = غير متتبَّعة = بلا حد
 # (سلوك المتجر اليوم)، و0 = متتبَّعة ولا توجد وحدات.

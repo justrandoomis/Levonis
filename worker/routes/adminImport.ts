@@ -64,7 +64,9 @@ import {
   type TemplateShape,
 } from '../lib/importCsv';
 import {
+  fulfillmentPayloadFrom,
   normKey,
+  relationValues,
   resolveProduct,
   splitComboKey,
   type CatalogRef,
@@ -73,6 +75,13 @@ import {
   type ExistingShape,
   type ImportMaps,
 } from '../lib/importApply';
+import {
+  existingCellsFrom,
+  fulfillmentStatements,
+  parseFulfillmentPayload,
+  refuseStrandedCapacity,
+  type ExistingCells,
+} from '../lib/optionFulfillment';
 import {
   deleteBenefitRule,
   saveBenefitRule,
@@ -1024,6 +1033,63 @@ async function loadExisting(db: D1Database, keys: string[]): Promise<Map<string,
   return out;
 }
 
+/**
+ * 0075 — WHAT THIS PRODUCT'S CELLS ARE HOLDING RIGHT NOW, from the shape the
+ * preview already loaded.
+ *
+ * `loadExisting` reads the cell and route rows with `SELECT *`, so `id` and
+ * `capacity_reserved` — the two columns a replace must carry across, and the
+ * two `refuseStrandedCapacity` judges against — are already in hand. Built
+ * with the SAME builder every other door uses (`existingCellsFrom`), because a
+ * second idea of "what is held" is a second place to be wrong about a live
+ * pre-order.
+ */
+function heldCellsOf(shape: ExistingShape | null): ExistingCells {
+  const cells = shape?.fulfillments ?? [];
+  return existingCellsFrom(
+    cells.map((f) => ({
+      id: String(f.id ?? ''),
+      option_id: f.option_id,
+      fulfillment_type: f.fulfillment_type,
+      capacity_reserved: Number(f.capacity_reserved ?? 0),
+    })),
+    cells.flatMap((f) =>
+      (f.transports ?? []).map((t) => ({
+        id: String(t.id ?? ''),
+        fulfillment_id: String(f.id ?? ''),
+        method: t.method,
+        capacity_reserved: Number(t.capacity_reserved ?? 0),
+      }))
+    )
+  );
+}
+
+/**
+ * 0075 — THE PREVIEW ASKS ABOUT THE COUNTER THE CONFIRM WILL MOVE.
+ *
+ * The confirm writes the cells through `parseFulfillmentPayload` +
+ * `refuseStrandedCapacity` (below). Both can refuse — a route the file drops
+ * while it is holding units, a pool cut under what is already held, a quota
+ * cleared to untracked with a live hold against it — and a preview that says
+ * nothing about any of them promises an import the confirm then reports as
+ * `failed`. So the preview runs the same two functions on the same resolved
+ * cells and shows the refusal as this product's error, before anything is
+ * written. The confirm still re-checks against the live rows, because the
+ * preview's answer can be minutes old and the write is the write.
+ */
+function cellRefusal(relations: Record<string, unknown>, shape: ExistingShape | null): string | null {
+  const values = relationValues(relations);
+  const payload = fulfillmentPayloadFrom(values);
+  if (!payload) return null;
+  try {
+    const cells = parseFulfillmentPayload(payload, new Set(values.map((v) => v.id)));
+    refuseStrandedCapacity(heldCellsOf(shape), cells);
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
 interface PreviewRow {
   key: string;
   line: number;
@@ -1079,7 +1145,8 @@ adminImportRoutes.post('/preview', async (c) => {
   const byKey = new Map<string, PreviewRow>();
 
   for (const p of parsed.products) {
-    const r = resolveProduct(p, existing.get(p.key) ?? null, maps, {
+    const stored = existing.get(p.key) ?? null;
+    const r = resolveProduct(p, stored, maps, {
       newId,
       money,
       specFieldIds: shape.specFields.map((f) => f.id),
@@ -1099,6 +1166,10 @@ adminImportRoutes.post('/preview', async (c) => {
       errors: r.issues.filter((i) => i.severity === 'error').map((i) => `سطر ${i.line}: ${i.message}`),
       warnings: r.issues.filter((i) => i.severity === 'warning').map((i) => `سطر ${i.line}: ${i.message}`),
     };
+    // 0075 — the order-type cells this sheet would write, judged here so the
+    // preview and the confirm answer about the same counter. See `cellRefusal`.
+    const refusedCells = cellRefusal(r.relations, stored);
+    if (refusedCells) row.errors.push(refusedCells);
     rows.push(row);
     byKey.set(p.key, row);
     resolved.push({
@@ -1422,6 +1493,57 @@ adminImportRoutes.post('/confirm', async (c) => {
             )
             .bind(productId, cid, cid)
         );
+      }
+      /**
+       * 0075 — THE ORDER-TYPE CELLS, IN THE SAME BATCH AS THE MODELS THEY HANG
+       * OFF, AND THE DEFECT THAT MADE THIS NECESSARY.
+       *
+       * This door applies a sheet through `planRelationsWrite`, which writes
+       * MODELS and emits no cell statement at all — `fulfillmentStatements` is
+       * reached only from `planProductSave`, which the TXT door uses and this
+       * one does not. So every `fulfillment` row's capacity was parsed,
+       * validated, refused by name when it was typed on the wrong row, shown
+       * in a clean preview — and then DROPPED, on create and on update alike.
+       * A sheet that said "one unit may be pre-ordered" wrote no row at all,
+       * the resolver read no capacity, and the cell stayed UNTRACKED: every
+       * buyer after the first was sold a unit nobody had.
+       *
+       * Written from `plan.requested.values`, which is the model list this
+       * very batch is about to write, so a cell can only name a model that
+       * will exist. LAST in the batch for the reason `planProductSave` states:
+       * `product_option_fulfillment.option_id` REFERENCES
+       * `product_option_values(id)` (0073), and on a create those value rows
+       * are inserted by the statements above.
+       *
+       * `refuseStrandedCapacity` runs against the LIVE rows rather than the
+       * preview's copy: a file is the likeliest way to cut a quota below the
+       * units already held or to drop a cell that is holding some, and either
+       * one leaves a release aiming at a row that no longer exists. It throws,
+       * the outer catch reports this product as `failed` with the sentence,
+       * and — because it throws BEFORE the batch runs — nothing of this
+       * product's structure is written.
+       */
+      const requestedValues = plan.requested.values;
+      const cellPayload = fulfillmentPayloadFrom(requestedValues);
+      if (cellPayload) {
+        const [liveCells, liveRoutes] = await Promise.all([
+          c.env.DB
+            .prepare(
+              'SELECT id, option_id, fulfillment_type, capacity_reserved FROM product_option_fulfillment WHERE product_id = ?'
+            )
+            .bind(productId)
+            .all<{ id: string; option_id: string; fulfillment_type: string; capacity_reserved: number | null }>(),
+          c.env.DB
+            .prepare(
+              'SELECT id, fulfillment_id, method, capacity_reserved FROM product_option_transports WHERE product_id = ?'
+            )
+            .bind(productId)
+            .all<{ id: string; fulfillment_id: string; method: string; capacity_reserved: number | null }>(),
+        ]);
+        const held = existingCellsFrom(liveCells.results ?? [], liveRoutes.results ?? []);
+        const cells = parseFulfillmentPayload(cellPayload, new Set(requestedValues.map((v) => v.id)));
+        refuseStrandedCapacity(held, cells);
+        relStmts.push(...fulfillmentStatements(c.env.DB, productId, cells, undefined, held));
       }
       await c.env.DB.batch(relStmts);
 

@@ -13,6 +13,7 @@ import {
   parseFulfillmentPayload,
   saleTypesFromCells,
   type ExistingCells,
+  type FulfillmentCell,
 } from '../lib/optionFulfillment';
 import {
   loadRelationsSnapshot,
@@ -294,6 +295,70 @@ function existingCells(rel: Awaited<ReturnType<typeof loadProductRelations>>): E
   return existingCellsFrom(rel.fulfillments, rel.transports);
 }
 
+/**
+ * TWO TRACKED PRE-ORDER QUOTAS THE CUSTOMER MUST SELECT TOGETHER IS NOT A
+ * CONFIGURATION THIS SHOP CAN SELL, SO IT IS REFUSED WHERE IT IS WRITTEN.
+ *
+ * A capacity is configured per (MODEL x pre-order). A customer's selection
+ * names ONE value per option group, so two values from DIFFERENT groups are
+ * chosen TOGETHER — and if both carry a tracked pre-order counter there is no
+ * one counter for the sale. `capacityFrom` (worker/lib/productOverlay.ts) will
+ * not pick between them: charging one leaves the other unenforced and charging
+ * both is two counters for one sale, so it answers `conflict` and every read
+ * door turns that into `PREORDER_CAPACITY_AMBIGUOUS`.
+ *
+ * The write door used to accept it happily — `{"success": true}`, `warnings:
+ * []` — and the product then became PERMANENTLY UNSELLABLE as a pre-order
+ * while the product page went on publishing a live quota: every legal
+ * selection resolved to the refusal, the shop quietly stopped selling, and the
+ * admin had been told the save worked. A read-side refusal an admin never sees
+ * is not a refusal. This one lands on the screen where the number was typed,
+ * names both models, and changes nothing until the admin fixes it.
+ *
+ * TWO VALUES IN THE SAME GROUP ARE NOT AMBIGUOUS and are deliberately allowed:
+ * a group is a choice BETWEEN its values, so a selection names at most one of
+ * them and each quota governs its own model — which is the whole point of a
+ * per-model capacity.
+ *
+ * WHAT THIS REFUSES TODAY: nothing that exists. Migration 0075 adds `capacity`
+ * NULL to every row and copies nothing into it, so no saved cell is tracked
+ * and no save that used to succeed starts failing.
+ */
+export function refuseAmbiguousPreorderCapacity(
+  values: readonly { id: string; group_id: string; name_en: string }[],
+  cells: FulfillmentCell[]
+): void {
+  const groupOf = new Map(values.map((v) => [v.id, v.group_id] as const));
+  const nameOf = new Map(values.map((v) => [v.id, v.name_en || v.id] as const));
+  /** Tracked = this cell claims a limit somewhere — its own pool, or a route's
+   *  own quota. `!== null` and NEVER `?? 0`: a blank capacity is untracked, not
+   *  sold out, and reading it as zero here would refuse every ordinary save. */
+  const tracked = cells.filter(
+    (cell) =>
+      cell.fulfillment_type === 'pre_order' &&
+      (cell.capacity !== null || cell.transports.some((t) => t.capacity !== null))
+  );
+  if (tracked.length < 2) return;
+
+  // Grouped by the MODEL'S GROUP, and sorted, so the refusal does not depend
+  // on the order the form happened to send its cells in.
+  const byGroup = new Map<string, FulfillmentCell>();
+  for (const cell of [...tracked].sort((a, b) => (a.option_id < b.option_id ? -1 : a.option_id > b.option_id ? 1 : 0))) {
+    const group = groupOf.get(cell.option_id) ?? '';
+    if (!byGroup.has(group)) byGroup.set(group, cell);
+  }
+  if (byGroup.size < 2) return;
+
+  const [a, b] = [...byGroup.values()];
+  throw badRequest(
+    `"${nameOf.get(a.option_id) ?? a.option_id}" and "${nameOf.get(b.option_id) ?? b.option_id}" are in different ` +
+      `option groups, so a customer chooses both at once — and both now hold a pre-order quota. ` +
+      `One sale can only spend one counter, so every pre-order of this product would be refused. ` +
+      `Leave the quota on just one of the two models (clear the other to blank for unlimited).`,
+    'PREORDER_CAPACITY_AMBIGUOUS'
+  );
+}
+
 adminProductRelationsRoutes.get('/:id/fulfillment', async (c) => {
   const productId = c.req.param('id');
   const product = await c.env.DB.prepare('SELECT id FROM products WHERE id = ?').bind(productId).first();
@@ -344,6 +409,10 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
   // each surviving row's id and its held units. See `refuseStrandedCapacity`.
   const current = existingCells(rel);
   refuseStrandedCapacity(current, cells);
+  // 0075 FOLLOW-UP. A save the READ doors would have to treat as unmodelled is
+  // refused HERE, while the admin is still looking at the form — never accepted
+  // with `success: true` and discovered later as a shop that stopped selling.
+  refuseAmbiguousPreorderCapacity(live, cells);
 
   // The product's sale types are DERIVED from what its models offer, never
   // asked for — the direction 0043 set, so the two cannot drift apart.

@@ -903,10 +903,12 @@ export function resolveProduct(
           route = { method: fl.method };
           routes.push(route);
         }
-        route.enabled = fl.enabled;
+        // Both cells are "absent means preserve": a row that states only a
+        // quota must not also flip a route the owner switched off back on.
+        if (fl.enabled !== undefined) route.enabled = fl.enabled;
         if (fl.capacity !== undefined) route.capacity = fl.capacity;
       } else {
-        cell.enabled = fl.enabled;
+        if (fl.enabled !== undefined) cell.enabled = fl.enabled;
         // `undefined` is "the cell was blank": keep the stored number. Only a
         // stated value — a number, or __NULL__/__CLEAR__ for untracked —
         // moves it. Nothing here touches `capacity_reserved`, which the
@@ -945,4 +947,55 @@ export function resolveProduct(
     membership: p.membership_rules,
     issues,
   };
+}
+
+/**
+ * 0075 — THE MODELS A RELATIONS BODY CARRIES, flattened to (id, cells).
+ *
+ * `resolveProduct` hangs a value's order-type cells off the value itself, and
+ * `planRelationsWriteFrom` carries the same key through to
+ * `RelationsPlan.requested.values`. Both shapes are read here so the PREVIEW
+ * (which has the resolved body) and the CONFIRM (which has the planned rows)
+ * ask about exactly the same cells — a preview answering about a different set
+ * from the one the write moves is worse than either answer alone.
+ */
+export function relationValues(
+  relations: Record<string, unknown>
+): Array<{ id: string; fulfillments?: unknown }> {
+  const groups = Array.isArray(relations.groups) ? (relations.groups as Array<Record<string, unknown>>) : [];
+  const out: Array<{ id: string; fulfillments?: unknown }> = [];
+  for (const g of groups) {
+    const values = Array.isArray(g?.values) ? (g.values as Array<Record<string, unknown>>) : [];
+    for (const v of values) out.push({ id: String(v?.id ?? ''), fulfillments: v?.fulfillments });
+  }
+  return out;
+}
+
+/**
+ * 0075 — THE ONE PAYLOAD `parseFulfillmentPayload` READS, built from those
+ * models, or `null` when the sheet said nothing about order types.
+ *
+ * `null` is not an empty payload and the difference is the whole
+ * back-compatibility story: a sheet with no `fulfillment` row must leave every
+ * stored cell exactly as it is, while a sheet that HAS one replaces the
+ * product's whole set (`resolveProduct` merges the stored cells in first, so
+ * "replace" loses nothing the file did not speak about). An empty
+ * `{ fulfillments: [] }` would delete them all.
+ *
+ * The option id is stamped on from the model that carries the cell rather than
+ * trusted from the row, exactly as `planProductSave` does it — a cell can only
+ * ever name the model it hangs off.
+ */
+export function fulfillmentPayloadFrom(
+  values: readonly { id: string; fulfillments?: unknown }[]
+): { fulfillments: unknown[] } | null {
+  if (!values.some((v) => Array.isArray(v.fulfillments))) return null;
+  const fulfillments: unknown[] = [];
+  for (const v of values) {
+    if (!Array.isArray(v.fulfillments)) continue;
+    for (const raw of v.fulfillments) {
+      fulfillments.push({ ...(raw as Record<string, unknown>), option_id: v.id });
+    }
+  }
+  return { fulfillments };
 }
