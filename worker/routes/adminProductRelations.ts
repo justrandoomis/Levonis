@@ -7,9 +7,11 @@ import { parseProductRow } from '../lib/productModel';
 import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import { liveValues, loadProductRelations } from '../lib/productRelations';
 import {
+  cellKey,
   existingCellsFrom,
   fulfillmentStatements,
   refuseStrandedCapacity,
+  transportKey,
   parseFulfillmentPayload,
   saleTypesFromCells,
   type ExistingCells,
@@ -409,6 +411,44 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
   // each surviving row's id and its held units. See `refuseStrandedCapacity`.
   const current = existingCells(rel);
   refuseStrandedCapacity(current, cells);
+
+  /**
+   * AN ACCOUNT THAT MAY NOT SEE A COST MAY NOT ERASE ONE (§11).
+   *
+   * The GET above hands an assistant admin the cells with `cost_iqd` and
+   * `cost_adjust_iqd` REMOVED by `projectForAdmin` — which is exactly right,
+   * and exactly why this PUT cannot take that same shape back at face value.
+   * The account is handed a payload with the cost missing, edits a quantity,
+   * saves, and the whole-set replace writes the missing cost as NULL: the one
+   * account forbidden from reading a cost is the one that can destroy it, and
+   * silently. Every other write door in this codebase carries costs forward
+   * for an actor without financial scope rather than trusting the payload; so
+   * does this one now.
+   */
+  if (!canViewFinancials(c.env, admin)) {
+    const storedCell = new Map(
+      (rel.fulfillments ?? []).map((f) => [cellKey(f.option_id, String(f.fulfillment_type)), f] as const)
+    );
+    const storedRoute = new Map(
+      (rel.transports ?? []).map((t) => {
+        const owner = (rel.fulfillments ?? []).find((f) => f.id === t.fulfillment_id);
+        return [
+          owner ? transportKey(owner.option_id, String(owner.fulfillment_type), String(t.method)) : `?${t.id}`,
+          t,
+        ] as const;
+      })
+    );
+    for (const cell of cells) {
+      const was = storedCell.get(cellKey(cell.option_id, cell.fulfillment_type));
+      cell.cost_iqd = was?.cost_iqd ?? null;
+      cell.cost_adjust_iqd = was?.cost_adjust_iqd ?? null;
+      for (const t of cell.transports) {
+        const wasRoute = storedRoute.get(transportKey(cell.option_id, cell.fulfillment_type, t.method));
+        t.cost_iqd = wasRoute?.cost_iqd ?? null;
+        t.cost_adjust_iqd = wasRoute?.cost_adjust_iqd ?? null;
+      }
+    }
+  }
   // 0075 FOLLOW-UP. A save the READ doors would have to treat as unmodelled is
   // refused HERE, while the admin is still looking at the form — never accepted
   // with `success: true` and discovered later as a shop that stopped selling.

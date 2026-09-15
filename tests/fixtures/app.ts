@@ -164,5 +164,7 @@ export const post = (a: App, path: string, body: unknown = {}, headers: Record<s
   send(a, 'POST', path, body, headers);
 export const patch = (a: App, path: string, body: unknown = {}, headers: Record<string, string> = {}) =>
   send(a, 'PATCH', path, body, headers);
+export const put = (a: App, path: string, body: unknown = {}, headers: Record<string, string> = {}) =>
+  send(a, 'PUT', path, body, headers);
 export const get = (a: App, path: string, headers: Record<string, string> = {}) =>
   a.request(path, { headers: { 'CF-Connecting-IP': '1.2.3.4', ...headers } }, undefined, ctx);

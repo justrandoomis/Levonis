@@ -63,6 +63,14 @@ export interface TransportCell extends CellPrices, LeadTime {
    * if the admin wrote it.
    */
   capacity: number | null;
+  /**
+   * Did the payload MENTION a price? See MONEY_KEYS. `false` leaves the stored
+   * money exactly as it is. OPTIONAL, and absent means TRUE: a caller that
+   * builds a cell in code has set its money fields deliberately, so the
+   * conservative default is to write them. Only the PARSER, which can tell an
+   * absent key from an explicit null, ever sets this false.
+   */
+  priced?: boolean;
 }
 
 export interface FulfillmentCell extends CellPrices, LeadTime {
@@ -83,6 +91,8 @@ export interface FulfillmentCell extends CellPrices, LeadTime {
    * per actual selection. See `parseFulfillmentPayload`.
    */
   capacity: number | null;
+  /** Did the payload MENTION a price? See MONEY_KEYS. Absent means true. */
+  priced?: boolean;
   transports: TransportCell[];
 }
 
@@ -128,6 +138,39 @@ function days(raw: unknown, field: string): number | null {
   if (!Number.isInteger(n) || n < 0 || n > 3650) throw badRequest(`${field} must be a whole number of days`);
   return n;
 }
+
+/**
+ * THE EIGHT MONEY KEYS, and whether the payload MENTIONED any of them.
+ *
+ * `money()`/`adjust()` turn an absent key and an explicit null into the same
+ * `null`, which is right for validation and catastrophic for a whole-set
+ * replace: a client that simply does not manage prices — the admin fulfilment
+ * panel, whose TransportCell has no price fields at all — would have every
+ * stored route price written to NULL the moment an admin saved an order type.
+ * That is destroying a price to change a quantity, which the owner's rules
+ * forbid outright.
+ *
+ * So the parser records what the payload TALKED ABOUT. A payload that mentions
+ * no money key at all leaves the stored money alone; one that mentions any is
+ * managing prices and is taken at its word, nulls included, because that is
+ * how a price is deliberately cleared. It is a coarse rule on purpose: it
+ * needs no per-field bookkeeping and it cannot silently half-apply a payload.
+ * The TXT and CSV doors always send a full set (`buildCells` merges the stored
+ * values in for every key the file omits), so they are unaffected.
+ */
+const MONEY_KEYS = [
+  'regular_price_iqd',
+  'prime_price_iqd',
+  'pro_price_iqd',
+  'cost_iqd',
+  'regular_adjust_iqd',
+  'prime_adjust_iqd',
+  'pro_adjust_iqd',
+  'cost_adjust_iqd',
+] as const;
+
+const mentionsMoney = (row: Record<string, unknown>): boolean =>
+  MONEY_KEYS.some((k) => row[k] !== undefined);
 
 function prices(row: Record<string, unknown>, where: string): CellPrices {
   return {
@@ -233,6 +276,7 @@ export function parseFulfillmentPayload(
         // on the shared pool — and nothing here copies the cell's number, or
         // another route's, onto it.
         capacity: capacity(tr.capacity, `${tWhere}.capacity`),
+        priced: mentionsMoney(tr),
         ...prices(tr, tWhere),
         ...leadTime(tr, tWhere),
       };
@@ -241,6 +285,7 @@ export function parseFulfillmentPayload(
     cells.push({
       option_id: optionId,
       fulfillment_type: type,
+      priced: mentionsMoney(row),
       enabled: row.enabled !== false,
       sort: Number.isInteger(row.sort) ? (row.sort as number) : i,
       capacity: cellCapacity,
@@ -480,6 +525,33 @@ export function refuseStrandedCapacity(existing: ExistingCells, cells: Fulfillme
  * nothing is kept, so the delete is unrestricted and every row is written
  * fresh.
  */
+/**
+ * THE MONEY HALF OF THE UPSERT, APPLIED ONLY TO A PAYLOAD THAT MENTIONED MONEY.
+ *
+ * Omitting these lines does not write a null — it leaves the stored column
+ * exactly as it was, which is what a client that does not manage prices means
+ * by not sending one. See MONEY_KEYS for why the distinction cannot come from
+ * the parsed value.
+ */
+const CELL_MONEY_SET = `             regular_price_iqd = excluded.regular_price_iqd,
+             prime_price_iqd = excluded.prime_price_iqd,
+             pro_price_iqd = excluded.pro_price_iqd,
+             cost_iqd = excluded.cost_iqd,
+             regular_adjust_iqd = excluded.regular_adjust_iqd,
+             prime_adjust_iqd = excluded.prime_adjust_iqd,
+             pro_adjust_iqd = excluded.pro_adjust_iqd,
+             cost_adjust_iqd = excluded.cost_adjust_iqd,
+`;
+const ROUTE_MONEY_SET = `               regular_price_iqd = excluded.regular_price_iqd,
+               prime_price_iqd = excluded.prime_price_iqd,
+               pro_price_iqd = excluded.pro_price_iqd,
+               cost_iqd = excluded.cost_iqd,
+               regular_adjust_iqd = excluded.regular_adjust_iqd,
+               prime_adjust_iqd = excluded.prime_adjust_iqd,
+               pro_adjust_iqd = excluded.pro_adjust_iqd,
+               cost_adjust_iqd = excluded.cost_adjust_iqd,
+`;
+
 export function fulfillmentStatements(
   db: { prepare(sql: string): D1PreparedStatement },
   productId: string,
@@ -566,15 +638,7 @@ export function fulfillmentStatements(
              option_id = excluded.option_id,
              fulfillment_type = excluded.fulfillment_type,
              enabled = excluded.enabled,
-             regular_price_iqd = excluded.regular_price_iqd,
-             prime_price_iqd = excluded.prime_price_iqd,
-             pro_price_iqd = excluded.pro_price_iqd,
-             cost_iqd = excluded.cost_iqd,
-             regular_adjust_iqd = excluded.regular_adjust_iqd,
-             prime_adjust_iqd = excluded.prime_adjust_iqd,
-             pro_adjust_iqd = excluded.pro_adjust_iqd,
-             cost_adjust_iqd = excluded.cost_adjust_iqd,
-             lead_time_text = excluded.lead_time_text,
+${cell.priced === false ? '' : CELL_MONEY_SET}             lead_time_text = excluded.lead_time_text,
              lead_time_min_days = excluded.lead_time_min_days,
              lead_time_max_days = excluded.lead_time_max_days,
              sort = excluded.sort,
@@ -623,15 +687,7 @@ export function fulfillmentStatements(
                method = excluded.method,
                enabled = excluded.enabled,
                surcharge_iqd = excluded.surcharge_iqd,
-               regular_price_iqd = excluded.regular_price_iqd,
-               prime_price_iqd = excluded.prime_price_iqd,
-               pro_price_iqd = excluded.pro_price_iqd,
-               cost_iqd = excluded.cost_iqd,
-               regular_adjust_iqd = excluded.regular_adjust_iqd,
-               prime_adjust_iqd = excluded.prime_adjust_iqd,
-               pro_adjust_iqd = excluded.pro_adjust_iqd,
-               cost_adjust_iqd = excluded.cost_adjust_iqd,
-               lead_time_text = excluded.lead_time_text,
+${t.priced === false ? '' : ROUTE_MONEY_SET}               lead_time_text = excluded.lead_time_text,
                lead_time_min_days = excluded.lead_time_min_days,
                lead_time_max_days = excluded.lead_time_max_days,
                sort = excluded.sort,
