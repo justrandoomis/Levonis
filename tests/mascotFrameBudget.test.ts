@@ -84,7 +84,7 @@ test('every event that can change the viewport refreshes it', () => {
    * the old size until it comes back, which is what the visibility branch is
    * for. Lose any one of these and the gaze aims at a screen that is not there.
    */
-  const onResize = /const onResize = \(\) => \{([\s\S]*?)\n    \};/.exec(code)?.[1] ?? '';
+  const onResize = /const onResize = \(\) => \{([\s\S]*?)\n {4}\};/.exec(code)?.[1] ?? '';
   assert.ok(onResize, 'onResize should be findable');
   assert.match(onResize, /refreshViewport\(\)/, 'resize/orientation/visualViewport/scroll all arrive here');
 
@@ -94,7 +94,7 @@ test('every event that can change the viewport refreshes it', () => {
     'the observer watching documentElement must refresh the cache'
   );
 
-  const visibility = /const onVisibility = \(\)[\s\S]*?\n    \};/.exec(code)?.[0] ?? '';
+  const visibility = /const onVisibility = \(\)[\s\S]*?\n {4}\};/.exec(code)?.[0] ?? '';
   assert.ok(visibility, 'onVisibility should be findable');
   assert.match(visibility, /refreshViewport\(\)/, 'a tab resized while hidden reports the old size');
 
@@ -125,7 +125,7 @@ test('the gaze still divides by the layout viewport, not the visual one', () => 
 
 test('the loop still stops when the tab goes away', () => {
   // The one thing that did pause it correctly, and the cheapest win there is.
-  const visibility = /const onVisibility = \(\)[\s\S]*?\n    \};/.exec(code)?.[0] ?? '';
+  const visibility = /const onVisibility = \(\)[\s\S]*?\n {4}\};/.exec(code)?.[0] ?? '';
   assert.match(visibility, /if \(document\.hidden\) \{[\s\S]*?stop\(\);/);
   assert.match(code, /return \(\) => \{[\s\S]*?stop\(\);/, 'and on unmount');
 });
