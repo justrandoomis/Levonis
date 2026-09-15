@@ -68,6 +68,8 @@ interface HistoryRow {
   tier_at_award: string;
   streak_day: number | null;
   awarded_at: string | null;
+  direction: 'earn' | 'spend';
+  note: string;
 }
 interface RewardsData {
   today: string;
@@ -281,6 +283,22 @@ export default function Rewards() {
     push: loc('تفعيل الإشعارات', 'Notifications enabled'),
     video: loc('مشاهدة إعلان', 'Watched an ad'),
     browse: loc('تصفّح المنتجات', 'Browsed products'),
+  };
+
+  /**
+   * When a history line happened. A dated mission shows its Baghdad day, which
+   * is the period it was earned for; everything else shows the instant the
+   * server recorded. `day` is never rendered on its own, because for the
+   * one-time push mission it is the word 'once'.
+   */
+  const historyWhen = (h: HistoryRow): string => {
+    const dated = /^\d{4}-\d{2}-\d{2}$/.test(h.day);
+    if (dated) return h.day;
+    if (!h.awarded_at) return '';
+    const d = new Date(h.awarded_at);
+    return Number.isNaN(d.getTime())
+      ? ''
+      : d.toLocaleDateString(loc('ar-IQ', 'en-GB'), { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   /** Says plainly that the store cannot verify a task, instead of implying it can. */
@@ -683,30 +701,43 @@ export default function Rewards() {
                 {data && data.history.length === 0 && (
                   <div className="text-zinc-400 text-center py-4 text-sm">{loc('لا يوجد نشاط بعد', 'No recent activity')}</div>
                 )}
-                {data?.history.map((h, i) => (
-                  <div key={`${h.mission}-${h.day}-${i}`} className="bg-[#18181b] rounded-[20px] p-4 flex items-center justify-between shadow-sm">
+                {data?.history.map((h, i) => {
+                  const spend = h.direction === 'spend';
+                  return (
+                  <div key={`${h.mission}-${h.day}-${h.awarded_at ?? ''}-${i}`} className="bg-[#18181b] rounded-[20px] p-4 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
-                        <Star aria-hidden="true" className="w-5 h-5 text-gold" fill="currentColor" />
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${spend ? 'bg-rose-400/10' : 'bg-gold/10'}`}>
+                        {spend ? (
+                          <ShoppingBag aria-hidden="true" className="w-5 h-5 text-rose-300" />
+                        ) : (
+                          <Star aria-hidden="true" className="w-5 h-5 text-gold" fill="currentColor" />
+                        )}
                       </div>
                       <div>
                         <h4 className="text-white font-bold text-[14px]">
-                          {missionLabel[h.mission] ?? h.mission}
+                          {/* A ledger movement has no mission; it carries its own wording. */}
+                          {missionLabel[h.mission] ?? (h.note || h.mission)}
                           {h.streak_day ? ` · ${loc(`يوم ${h.streak_day}`, `day ${h.streak_day}`)}` : ''}
                         </h4>
                         <span className="text-zinc-400 font-medium text-[12px]">
-                          {h.day}
+                          {/* THE INSTANT, NOT THE PERIOD. `day` is the mission's
+                              accounting period and for the one-time push mission
+                              it is the literal string 'once', which is not a date
+                              anyone can read. The server already sends the real
+                              instant; a mission keeps its Baghdad day beside it. */}
+                          {historyWhen(h)}
                           {h.multiplier_x100 > 100 && h.base_points !== null
                             ? ` · ${h.base_points} × ${(h.multiplier_x100 / 100).toString()} ${h.tier_at_award.toUpperCase()}`
                             : ''}
                         </span>
                       </div>
                     </div>
-                    <div className="font-bold text-[16px] text-gold shrink-0">
-                      +{h.points} {loc('نقطة', 'pts')}
+                    <div className={`font-bold text-[16px] shrink-0 ${spend ? 'text-rose-300' : 'text-gold'}`}>
+                      {spend ? '−' : '+'}{h.points} {loc('نقطة', 'pts')}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </>

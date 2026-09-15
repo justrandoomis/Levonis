@@ -208,7 +208,8 @@ export default function Games() {
               <div
                 key={l.id}
                 data-hub-link={l.id}
-                data-hub-link-shelved="1"
+                data-hub-link-shelved={shelved ? '1' : undefined}
+                data-hub-link-unknown={shelved ? undefined : '1'}
                 className={`${PANEL} flex items-center gap-3 px-4 py-3 min-h-[56px] opacity-60`}
               >
                 <span className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 shrink-0">
@@ -216,7 +217,18 @@ export default function Games() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-zinc-300 font-bold text-[14px] truncate">{l.title}</span>
-                  <span className="block text-[11.5px] text-zinc-500 truncate">{s.shelved.linkNote}</span>
+                  {/* THE SAME THREE-WAY SPLIT THE CARD ABOVE MAKES.
+                      «يفتح مع اللعبة» asserts the game is shut. That is only
+                      true when the server SAID so. While the status is
+                      unread — in flight, or permanently after a failed
+                      request — the row said it anyway, so a customer with a
+                      LIVE game and one dropped request was told three times
+                      that it had not opened, directly beneath a card offering
+                      to retry the question. It also reads as a broken promise
+                      to an admin who knows the game is open. */}
+                  <span className="block text-[11.5px] text-zinc-500 truncate">
+                    {shelved ? s.shelved.linkNote : s.shelved.linkUnknown}
+                  </span>
                 </span>
               </div>
             )

@@ -67,7 +67,7 @@ import { effectiveAvailability } from '@levonis/pricing/availability';
 import { typeForTransport, type ShippingType } from '@levonis/pricing/shippingType';
 import { parseProductRow, primaryMedia, type ProductDoc } from './productModel';
 import { capacityFrom, snapshotFrom } from './productOverlay';
-import { isSchemaMissing } from './membershipBenefits';
+import { isMissingTable } from './membershipBenefits';
 
 // ---------------------------------------------------------------- the rows
 
@@ -168,7 +168,13 @@ export async function compositionSelect(
       .all<Record<string, unknown>>();
     return r.results ?? [];
   } catch (e) {
-    if (!isSchemaMissing(e)) throw e;
+    // A MISSING TABLE ONLY. `offer_windows` with one column missing is a
+    // table that EXISTS and may hold a live, advertised discount; dropping to
+    // the no-offer projection there would charge the ordinary price for an
+    // item the shop is advertising at 25% off, at HTTP 200, while logging
+    // that 0060 "is not installed" — which would be false. See
+    // `isMissingTable`.
+    if (!isMissingTable(e)) throw e;
     console.warn('offers (migration 0060) not installed — bundles priced with no offer');
     const r = await db
       .prepare(build(COMPOSITION_COLUMNS_NO_OFFERS, COMPOSITION_FROM_NO_OFFERS))

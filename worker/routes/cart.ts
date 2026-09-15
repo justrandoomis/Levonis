@@ -10,6 +10,7 @@ import {
   type SellerLine,
 } from '../lib/cartSeller';
 import type { Context } from 'hono';
+import { cartLineSelect } from '../lib/cartLineProjection';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, int, str, oneOf, HttpError } from '../lib/http';
@@ -64,7 +65,6 @@ import {
   catalogAncestry,
   degradeIfSchemaMissing,
   fallbackFor,
-  isSchemaMissing,
   resolveMembershipBenefits,
   resolveOrderBenefits,
 } from '../lib/membershipBenefits';
@@ -674,46 +674,15 @@ function compositionCartItem(
  * existed, so a cart read this way is priced by the same code, down the same
  * branch, as a legacy line: nothing is approximated and no price moves.
  */
-const CART_LINE_COLUMNS: ReadonlyArray<{ name: string; sqlDefault: string }> = [
-  { name: 'option_id', sqlDefault: "''" },
-  { name: 'option_value_ids', sqlDefault: "'[]'" }, // 0023
-  { name: 'color_id', sqlDefault: "''" },
-  { name: 'shipping_method_id', sqlDefault: "''" },
-  { name: 'transport_method', sqlDefault: "''" }, // 0002
-  { name: 'fulfillment_type', sqlDefault: "''" }, // 0073
-  { name: 'warranty_plan_id', sqlDefault: "''" }, // 0002
-];
-
 const cartLineSql = (projection: string) =>
   `SELECT ci.id AS cart_item_id, ci.qty, ${projection}, p.*
      FROM cart_items ci JOIN products p ON p.id = ci.product_id
     WHERE ci.user_id = ? ORDER BY ci.created_at DESC`;
 
-/**
- * The cart's lines, read with the columns this database actually has.
- *
- * The fast path is the statement the code has always run, unchanged and at no
- * extra cost. The introspection below is paid for ONLY after that statement
- * has already refused for a missing column, which on a correctly migrated
- * database never happens. `cart_items` itself being absent is NOT recovered
- * from — the rebuilt statement still selects from it and still throws, because
- * a cart with no cart table is not a cart that should quietly render empty.
- */
-async function cartLineRows(db: D1Database, userId: string): Promise<Record<string, unknown>[]> {
-  const named = CART_LINE_COLUMNS.map((col) => `ci.${col.name}`).join(', ');
-  try {
-    return (await db.prepare(cartLineSql(named)).bind(userId).all<Record<string, unknown>>()).results ?? [];
-  } catch (e) {
-    if (!isSchemaMissing(e)) throw e;
-    console.error(`cart line columns behind the deployment: ${e instanceof Error ? e.message : String(e)}`);
-    const { results } = await db.prepare('PRAGMA table_info(cart_items)').all<{ name: string }>();
-    const present = new Set((results ?? []).map((r) => String(r.name)));
-    const projection = CART_LINE_COLUMNS.map((col) =>
-      present.has(col.name) ? `ci.${col.name}` : `${col.sqlDefault} AS ${col.name}`
-    ).join(', ');
-    return (await db.prepare(cartLineSql(projection)).bind(userId).all<Record<string, unknown>>()).results ?? [];
-  }
-}
+/** The cart's lines, read with the columns this database actually has. The
+ *  registry, the retry and the reasoning all live in
+ *  worker/lib/cartLineProjection.ts, which the checkout reads through too. */
+const cartLineRows = (db: D1Database, userId: string) => cartLineSelect(db, cartLineSql, [userId]);
 
 // ------------------------------------------------------------------- routes
 

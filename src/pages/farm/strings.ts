@@ -303,6 +303,9 @@ export interface FarmStrings {
     body: string;
     /** Under a hub row that leads into the shelved game. */
     linkNote: string;
+    /** Under a hub row when the game's status COULD NOT BE READ. Not the same
+     *  fact as «قريبا» and must never be written as if it were. */
+    linkUnknown: string;
     /** An admin's card says who it is closed to, and where the switch lives. */
     adminBadge: string;
     adminBody: string;
@@ -816,6 +819,7 @@ const ar: FarmStrings = {
     title: 'المزرعة تحت التطوير',
     body: 'اللعبة قيد التطوير الآن ولم تُفتح للاعبين بعد. لم يضع أحد شيئًا: كل ما جمعته المزارع محفوظ كما هو، وتعود اللعبة من حيث توقفت عند فتحها.',
     linkNote: 'يفتح مع اللعبة',
+    linkUnknown: 'تعذّر معرفة حالة اللعبة',
     adminBadge: 'مغلقة على اللاعبين',
     adminBody: 'أنت تدخلها كمشرف — اللاعبون يرون إشعار «قريبا» فقط. الفتح من لوحة الإدارة ← مزرعة الطابعات.',
   },
@@ -1123,6 +1127,7 @@ const en: FarmStrings = {
     title: 'The farm is under development',
     body: 'The game is still being built and is not open to players yet. Nothing was lost: every farm is stored exactly as its owner left it, and play resumes where it stopped.',
     linkNote: 'Opens with the game',
+    linkUnknown: 'Could not check whether the game is open',
     adminBadge: 'Closed to players',
     adminBody: 'You are entering as an admin — players only see the notice. The switch is in Admin → Printer Farm.',
   },
@@ -1434,6 +1439,7 @@ const ckb: FarmStrings = {
     title: 'المزرعة تحت التطوير',
     body: 'اللعبة قيد التطوير الآن ولم تُفتح للاعبين بعد. لم يضع أحد شيئًا: كل ما جمعته المزارع محفوظ كما هو، وتعود اللعبة من حيث توقفت عند فتحها.',
     linkNote: 'يفتح مع اللعبة',
+    linkUnknown: 'تعذّر معرفة حالة اللعبة',
     adminBadge: 'مغلقة على اللاعبين',
     adminBody: 'أنت تدخلها كمشرف — اللاعبون يرون إشعار «قريبا» فقط. الفتح من لوحة الإدارة ← مزرعة الطابعات.',
   },

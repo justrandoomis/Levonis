@@ -257,10 +257,26 @@ export default function Orders() {
   useEffect(() => {
     let alive = true;
     api
-      .get<{ reviews: Array<{ product_id: string | null }> }>('/api/reviews/mine')
+      .get<{ reviews: Array<{ product_id: string | null; system_generated?: boolean }> }>('/api/reviews/mine')
       .then((r) => {
         if (!alive) return;
-        setReviewed(new Set((r.reviews || []).map((x) => x.product_id).filter((x): x is string => !!x)));
+        // A SYSTEM MARKER IS NOT A REVIEW THE CUSTOMER WROTE.
+        //
+        // worker/lib/reviewAutoSweep.ts writes a clearly-marked `source =
+        // 'system'` row against every line of a delivered order once it is
+        // seven days old, so that a rating exists at all. Counting those as
+        // "already rated" hid «تقييم المنتجات» on every delivered order older
+        // than a week — which is precisely the set of orders the review sheet
+        // was built for — and told the customer «قيّمت كل منتجات هذا الطلب»,
+        // which was not true. The server disagrees with that on both of its
+        // own endpoints: GET /api/reviews/order/:id calls those lines
+        // `reviewable` with `can_replace_system_review`, and POST
+        // /api/reviews accepts them and replaces the marker in place.
+        //
+        // src/components/reviews/ReviewSection.tsx on the product page has
+        // always checked this flag; this is the same check, on the list.
+        const mine = (r.reviews || []).filter((x) => !x.system_generated);
+        setReviewed(new Set(mine.map((x) => x.product_id).filter((x): x is string => !!x)));
       })
       .catch(() => alive && setReviewed(null));
     return () => {

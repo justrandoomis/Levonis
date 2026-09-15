@@ -88,7 +88,66 @@ export function isSchemaMissing(e: unknown): boolean {
     const message =
       cursor instanceof Error ? cursor.message : typeof cursor === 'string' ? cursor : '';
     // D1 wraps SQLite's own wording: `D1_ERROR: no such table: x: SQLITE_ERROR`.
+    //
+    // SQLite USES TWO DIFFERENT SENTENCES FOR A MISSING COLUMN, and only one
+    // of them says "no such column". A SELECT naming an absent column gives
+    // `no such column: ci.fulfillment_type`; an INSERT naming one gives
+    // `table points_accruals has no column named base_points`. Matching only
+    // the first left every write path unrecognised — so the checkout answered
+    // a missing migration with "please try again" instead of SERVICE_SETUP,
+    // which is the one place the distinction mattered most.
     if (/no such (?:table|column)\b/i.test(message)) return true;
+    if (/has no column named\b/i.test(message)) return true;
+    cursor = cursor instanceof Error ? (cursor as { cause?: unknown }).cause : null;
+  }
+  return false;
+}
+
+/**
+ * A MISSING TABLE, AND NOT A MISSING COLUMN. The narrower question, and the
+ * only one that may be answered by degrading.
+ *
+ * The two are not the same fact and the difference decides a price:
+ *
+ *   `no such table`   — the feature is not installed. It HOLDS NO ROWS, so
+ *                       "no benefit rule", "no offer", "no pool" is the
+ *                       literal truth and answering it withholds nothing.
+ *
+ *   `no such column`  — THE TABLE IS THERE AND MAY BE FULL. Only the
+ *                       projection is out of date, which is exactly what a
+ *                       deploy that lands before its migration produces (0076
+ *                       alone does ADD COLUMN thirteen times). Every row in it
+ *                       is unread, not absent. Degrading here tells a PRO
+ *                       member with three live discount rules that they have
+ *                       none, and charges them the regular price at HTTP 200
+ *                       with no error anywhere — the silent wrong price this
+ *                       whole module exists to prevent, arriving through the
+ *                       door built to prevent it.
+ *
+ * So a missing column is NOT degradable. It fails loudly and reaches the
+ * customer as SERVICE_SETUP — «جزء من المتجر قيد التجهيز» — which is both
+ * true and actionable, and gets the migration run instead of quietly
+ * overcharging members until someone notices.
+ *
+ * `isSchemaMissing` keeps its wider meaning for the two callers that need it:
+ * `safeErrorCode`, where both shapes genuinely mean "deployment ahead of its
+ * database", and `cartLineRows`, which does not degrade at all — it reads
+ * PRAGMA table_info and substitutes each absent column's own
+ * migration-declared DEFAULT, which is the value the row would have carried.
+ */
+export function isMissingTable(e: unknown): boolean {
+  const seen = new Set<unknown>();
+  let cursor: unknown = e;
+  while (cursor && !seen.has(cursor)) {
+    seen.add(cursor);
+    const message =
+      cursor instanceof Error ? cursor.message : typeof cursor === 'string' ? cursor : '';
+    if (/no such table\b/i.test(message)) return true;
+    // Both of SQLite's ways of saying "that column is not here" (see
+    // `isSchemaMissing`) mean the TABLE exists — so its rows are unread, not
+    // absent, and nothing may be degraded away.
+    if (/no such column\b/i.test(message)) return false;
+    if (/has no column named\b/i.test(message)) return false;
     cursor = cursor instanceof Error ? (cursor as { cause?: unknown }).cause : null;
   }
   return false;
@@ -108,7 +167,7 @@ export async function degradeIfSchemaMissing<T>(
   try {
     return await run();
   } catch (e) {
-    if (!isSchemaMissing(e)) throw e;
+    if (!isMissingTable(e)) throw e;
     console.error(`optional feature not installed (${label}): ${e instanceof Error ? e.message : String(e)}`);
     return fallback;
   }

@@ -21,6 +21,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { api } from '../../lib/api';
+import { ErrorState } from '../../components/ui/AsyncStates';
 import FarmSkeleton from './FarmSkeleton';
 
 export interface FarmAccess {
@@ -92,8 +93,18 @@ export function useFarmAccess(): { access: FarmAccess | null; error: unknown; re
  * the failure honestly instead of inventing an answer here.
  */
 export function FarmGate({ children, fallback }: { children: React.ReactNode; fallback?: React.ReactNode }) {
-  const { access, error } = useFarmAccess();
-  if (error !== null) return <Navigate to="/games" replace />;
+  const { access, error, reload } = useFarmAccess();
+  // A STATUS THAT COULD NOT BE READ IS NOT A REFUSAL, AND IS NOT A GAME OVER.
+  //
+  // Bouncing to /games on a failed request threw a player out of a game that
+  // may well be open, over one dropped call, and landed them on a hub they
+  // would then have to interpret — the same conflation the hub itself used to
+  // make. The game still is not shown, because we still do not know it is
+  // open; but the question is asked again here, where the player is, instead
+  // of discarding where they were. A real refusal (`may_play === false`) is
+  // unchanged and still replaces onto the hub, where the «قريبا» card
+  // explains itself.
+  if (error !== null) return <ErrorState error={error} onRetry={reload} next="/games" />;
   if (!access) return <>{fallback ?? <FarmSkeleton />}</>;
   if (!access.may_play) return <Navigate to="/games" replace />;
   return <>{children}</>;

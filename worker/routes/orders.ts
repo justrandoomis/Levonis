@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, conflict, notFound, str, int, HttpError } from '../lib/http';
+import { requireAuth, badRequest, conflict, notFound, str, int, unavailable, HttpError } from '../lib/http';
+import { cartLineSelect } from '../lib/cartLineProjection';
 import { newId, newOrderId } from '../lib/crypto';
 import { primaryMedia, readProductDeliveryOptions } from '../lib/productModel';
 import { productImageForSelection } from '../lib/productSelectionImage';
@@ -96,6 +97,7 @@ import {
   catalogAncestry,
   currentBenefitVersionId,
   degradeIfSchemaMissing,
+  isSchemaMissing,
   resolveOrderBenefits,
   resolveProductBenefits,
 } from '../lib/membershipBenefits';
@@ -1495,16 +1497,25 @@ async function computeCheckout(
     nowIso: benefitNowIso,
   });
   // Load and price the cart lines server-side.
-  let sql = `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.option_value_ids, ci.color_id,
-                    ci.shipping_method_id, ci.transport_method, ci.fulfillment_type, ci.warranty_plan_id, ci.draw_salt, p.*
-               FROM cart_items ci JOIN products p ON p.id = ci.product_id
-              WHERE ci.user_id = ?`;
+  //
+  // THROUGH THE SAME DOOR THE CART READS. This statement names the same
+  // `cart_items` columns, so it fails in the same window — and it used to
+  // fail ALONE, leaving a customer with a cart that rendered correctly and a
+  // checkout that 500'd the moment they opened it. See
+  // worker/lib/cartLineProjection.ts for why an absent column is filled with
+  // its own migration's DEFAULT rather than degraded away.
   const params: unknown[] = [user.id];
-  if (input.itemIds.length > 0) {
-    sql += ` AND ci.id IN (${input.itemIds.map(() => '?').join(',')})`;
-    params.push(...input.itemIds);
-  }
-  const { results: rows } = await c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>();
+  const filter =
+    input.itemIds.length > 0 ? ` AND ci.id IN (${input.itemIds.map(() => '?').join(',')})` : '';
+  if (input.itemIds.length > 0) params.push(...input.itemIds);
+  const rows = await cartLineSelect(
+    c.env.DB,
+    (projection) =>
+      `SELECT ci.id AS cart_item_id, ci.qty, ${projection}, p.*
+         FROM cart_items ci JOIN products p ON p.id = ci.product_id
+        WHERE ci.user_id = ?${filter}`,
+    params
+  );
   if (rows.length === 0) throw badRequest('Your cart is empty');
 
   // §1: the cart rule guarantees one shipping type across the lines, so the
@@ -3453,6 +3464,29 @@ orderRoutes.post('/', async (c) => {
       throw badRequest('Order could not be placed: a balance or stock level changed. Please review your cart and try again.', 'CONFLICT_RETRY');
     }
     console.error('Order batch failed', msg);
+    /**
+     * A DEPLOYMENT AHEAD OF ITS DATABASE IS NOT THE CUSTOMER'S MISTAKE.
+     *
+     * Everything above this line is a 4xx because the customer can act on it:
+     * review the cart, top up, choose another address. A missing table or
+     * column is not in that class — no amount of retrying will add a column —
+     * and answering "please try again" for it sends the one person who can
+     * see the problem away, while the storefront around the checkout still
+     * looks perfectly healthy. Migration 0076 produces exactly this state:
+     * home, catalogue, cart and quote all answer 200, and not one order can
+     * be placed.
+     *
+     * SERVICE_SETUP says so honestly, and src/components/ui/AsyncStates.tsx
+     * renders it as «جزء من المتجر قيد التجهيز — إعادة المحاولة لن تفيد قبل
+     * اكتماله». The 503 is deliberate: it is the shop's fault, not the
+     * shopper's, and it is temporary.
+     */
+    if (isSchemaMissing(e)) {
+      throw unavailable(
+        'Checkout is unavailable while the shop finishes setting up. This is not a problem with your cart.',
+        'SERVICE_SETUP'
+      );
+    }
     throw badRequest('Order could not be placed. Please try again.');
   }
 

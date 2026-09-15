@@ -395,8 +395,37 @@ test('the farm page is not rendered at all: App.tsx gates every game route but t
 
   const gate = read('src/pages/farm/shelved.tsx');
   assert.match(gate, /<Navigate to="\/games" replace \/>/, 'a shelved page redirects to the hub');
-  assert.equal((gate.match(/<Navigate to="\/games" replace \/>/g) || []).length, 2, 'both the refusal and the unanswerable question redirect');
   assert.match(gate, /if \(!access\.may_play\) return <Navigate/, 'the server decides, not the page');
+
+  // A REFUSAL AND AN UNANSWERED QUESTION ARE NOT THE SAME EVENT.
+  //
+  // This file used to require BOTH to redirect. They are different facts and
+  // the difference costs a player their session: `may_play === false` is the
+  // server saying the game is shut, and the hub's «قريبا» card explains it —
+  // but a failed status request says nothing at all, and bouncing on it threw
+  // a player out of a game that may well be OPEN, over one dropped call, out
+  // of /games/printer-farm, /games/profile, /games/redeem and /leaderboards
+  // alike, onto a hub that then told them the game had not opened yet.
+  //
+  // So exactly ONE redirect remains — the refusal. The unanswered question
+  // asks again where the player is. The safety property is untouched: the
+  // game is still never rendered without a `may_play` the server gave.
+  assert.equal(
+    (gate.match(/<Navigate to="\/games" replace \/>/g) || []).length,
+    1,
+    'only a real refusal redirects'
+  );
+  assert.match(
+    gate,
+    /if \(error !== null\) return <ErrorState[\s\S]{0,120}onRetry=\{reload\}/,
+    'an unreadable status offers the retry instead of discarding where the player was'
+  );
+  // …and still does not render the game.
+  const gateBody = gate.slice(gate.indexOf('export function FarmGate'));
+  assert.ok(
+    gateBody.indexOf('if (error !== null)') < gateBody.indexOf('return <>{children}</>'),
+    'the error branch is decided before the children are ever returned'
+  );
   // `replace` is what keeps the back button out of the shelved page.
   assert.equal(/<Navigate to="[^"]*"(?![^>]*replace)/.test(gate), false, 'every redirect replaces the history entry');
   // Eager import: it must not drag the game's 65 KB string table into the

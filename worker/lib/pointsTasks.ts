@@ -442,26 +442,62 @@ export interface RewardHistoryRow {
   tier_at_award: string;
   streak_day: number | null;
   awarded_at: string | null;
+  /** 'earn' adds to the balance, 'spend' takes from it. */
+  direction: 'earn' | 'spend';
+  /** The ledger's own wording, for a movement that is not a mission. */
+  note: string;
 }
 
 /**
- * The points history, read from the AWARDS THEMSELVES rather than from the
- * ledger's free-text note — which is why it can show the Baghdad day the award
- * belongs to next to the UTC instant it happened, instead of the ledger's UTC
- * date standing in for both. (Those two disagree for every award made between
+ * THE WHOLE POINT BALANCE, ACCOUNTED FOR.
+ *
+ * A mission award is read from the AWARD ITSELF rather than from the ledger's
+ * free-text note — which is why it can show the Baghdad day the award belongs
+ * to next to the UTC instant it happened, instead of the ledger's UTC date
+ * standing in for both. (Those two disagree for every award made between
  * 21:00 and 24:00 UTC, which is why a check-in could appear on the "wrong"
- * calendar date in the history.)
+ * calendar date.)
+ *
+ * BUT MISSIONS ARE NOT THE ONLY THING THAT MOVES POINTS, and reading only
+ * `reward_claims` made purchase releases, review awards, the points a
+ * customer SPENDS at checkout and return clawbacks vanish from the only
+ * screen in the app that lists POINT movements at all (the wallet page is
+ * scoped to USD). A member could watch 900 points leave their balance with no
+ * line anywhere saying where they went — the single worst thing a points
+ * ledger can do, because it looks exactly like theft.
+ *
+ * So the ledger is UNIONed in, minus the rows a reward_claim already
+ * describes — `wallet_tx_id` is the join, so a check-in appears once, as the
+ * richer of the two. A withdrawal is marked `spend` and the page renders it
+ * as a subtraction; nothing here invents a mission name for it, the ledger's
+ * own note is carried through instead.
  */
 export async function readRewardHistory(db: D1Database, userId: string, limit = 20): Promise<RewardHistoryRow[]> {
+  const n = Math.max(1, Math.min(100, Math.trunc(limit)));
   const { results } = await db
     .prepare(
-      `SELECT mission, day, points, base_points, multiplier_x100, tier_at_award, streak_day, awarded_at
-         FROM reward_claims
-        WHERE user_id = ? AND state = 'awarded'
-        ORDER BY COALESCE(awarded_at, created_at) DESC, rowid DESC
-        LIMIT ?`
+      `SELECT * FROM (
+         SELECT mission, day, points, base_points, multiplier_x100, tier_at_award, streak_day,
+                COALESCE(awarded_at, created_at) AS awarded_at, 'earn' AS direction, '' AS note
+           FROM reward_claims
+          WHERE user_id = ?1 AND state = 'awarded'
+         UNION ALL
+         SELECT 'ledger' AS mission, '' AS day, amount AS points, NULL AS base_points,
+                100 AS multiplier_x100, '' AS tier_at_award, NULL AS streak_day,
+                COALESCE(decided_at, created_at) AS awarded_at,
+                CASE WHEN type = 'withdrawal' THEN 'spend' ELSE 'earn' END AS direction,
+                note
+           FROM wallet_transactions
+          WHERE user_id = ?1 AND currency = 'POINT' AND status = 'approved'
+            AND id NOT IN (
+              SELECT wallet_tx_id FROM reward_claims
+               WHERE user_id = ?1 AND wallet_tx_id IS NOT NULL AND wallet_tx_id != ''
+            )
+       )
+       ORDER BY awarded_at DESC
+       LIMIT ?2`
     )
-    .bind(userId, Math.max(1, Math.min(100, Math.trunc(limit))))
+    .bind(userId, n)
     .all<RewardHistoryRow>();
   return results;
 }
