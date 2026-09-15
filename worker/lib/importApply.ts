@@ -67,6 +67,24 @@ export interface ExistingVariant {
   cost_iqd: number | null;
 }
 
+/**
+ * 0075 — ONE STORED (MODEL x ORDER TYPE) CELL, verbatim, with its routes.
+ *
+ * Carried as the row's own columns rather than a re-typed subset: a
+ * `fulfillment` sheet row states a capacity and an enabled flag and nothing
+ * else, so every other column of that cell — its eight prices, its lead time
+ * — has to survive the merge untouched. `parseFulfillmentPayload` reads these
+ * by name, which is why the row is passed on as it was read.
+ */
+export interface ExistingRouteRow extends Record<string, unknown> {
+  method: string;
+}
+export interface ExistingCellRow extends Record<string, unknown> {
+  option_id: string;
+  fulfillment_type: string;
+  transports: ExistingRouteRow[];
+}
+
 /** The shape of a product that already exists, as far as matching cares. */
 export interface ExistingShape {
   id: string;
@@ -79,6 +97,13 @@ export interface ExistingShape {
   colors: Array<{ id: string; name_en: string }>;
   images: Array<{ id: string; url: string }>;
   variants: ExistingVariant[];
+  /**
+   * 0075 — the stored order-type cells. Optional, so a caller that does not
+   * load them behaves exactly as it did before: a sheet with no `fulfillment`
+   * row never reads this, and a sheet with one merges onto an empty set,
+   * which is the honest answer for a product that has no cells.
+   */
+  fulfillments?: ExistingCellRow[];
 }
 
 export interface ImportMaps {
@@ -818,6 +843,85 @@ export function resolveProduct(
       primary: im.is_primary,
     })),
   };
+
+  /**
+   * 0075 — THE ORDER-TYPE CELLS, ONLY WHEN THE SHEET SPEAKS ABOUT THEM.
+   *
+   * `p.fulfillments === null` means the file carries no `fulfillment` row, so
+   * nothing is attached and the writer leaves every stored cell exactly as it
+   * is — which is every sheet written before 0075 and every narrowed-down
+   * price sheet. That silence is the whole back-compat story.
+   *
+   * When the file DOES speak, the payload must be COMPLETE: the writer
+   * replaces the product's whole set, so the merge starts from the stored
+   * cells (all their prices and lead times intact) and the sheet only moves
+   * `capacity` and `enabled`. Every value then carries a `fulfillments` array
+   * — an empty one included — because a value that carries none would have
+   * its cells dropped instead of kept.
+   */
+  if (p.fulfillments !== null) {
+    type Cell = ExistingCellRow;
+    const cellsByOption = new Map<string, Map<string, Cell>>();
+    const liveValueIds = new Set(groups.flatMap((g) => g.values.map((v) => String(v.id))));
+    for (const stored of existing?.fulfillments ?? []) {
+      // A cell whose model is not in this file is dropped rather than sent:
+      // the structure write is about to remove that option row, and naming it
+      // here would be refused as UNKNOWN_OPTION.
+      if (!liveValueIds.has(stored.option_id)) continue;
+      const byType = cellsByOption.get(stored.option_id) ?? new Map<string, Cell>();
+      byType.set(stored.fulfillment_type, {
+        ...stored,
+        transports: (stored.transports ?? []).map((t) => ({ ...t })),
+      });
+      cellsByOption.set(stored.option_id, byType);
+    }
+
+    for (const fl of p.fulfillments) {
+      const optionId = valueIdByPair.get(pairKey(fl.group, fl.value));
+      if (!optionId) {
+        // parseImport already refused a row naming a model the file does not
+        // declare; this is the case where the model is stored but the file
+        // renamed or dropped it, and there is nothing to hang the cell on.
+        issues.push(err(fl.line, `fulfillment: لا يوجد موديل باسم "${fl.group}:${fl.value}"`));
+        continue;
+      }
+      const byType = cellsByOption.get(optionId) ?? new Map<string, Cell>();
+      cellsByOption.set(optionId, byType);
+      const cell: Cell = byType.get(fl.fulfillment_type) ?? {
+        option_id: optionId,
+        fulfillment_type: fl.fulfillment_type,
+        transports: [],
+      };
+      cell.option_id = optionId;
+      if (fl.method) {
+        // A ROUTE ROW. Its `enabled` and `capacity` belong to the route, never
+        // to the cell — and an absent capacity leaves the route drawing on the
+        // cell's shared pool, which is what `null` already means.
+        const routes = cell.transports;
+        let route = routes.find((t) => t.method === fl.method);
+        if (!route) {
+          route = { method: fl.method };
+          routes.push(route);
+        }
+        route.enabled = fl.enabled;
+        if (fl.capacity !== undefined) route.capacity = fl.capacity;
+      } else {
+        cell.enabled = fl.enabled;
+        // `undefined` is "the cell was blank": keep the stored number. Only a
+        // stated value — a number, or __NULL__/__CLEAR__ for untracked —
+        // moves it. Nothing here touches `capacity_reserved`, which the
+        // writer carries across the replace on its own.
+        if (fl.capacity !== undefined) cell.capacity = fl.capacity;
+      }
+      byType.set(fl.fulfillment_type, cell);
+    }
+
+    for (const g of groups) {
+      for (const v of g.values) {
+        v.fulfillments = [...(cellsByOption.get(String(v.id))?.values() ?? [])];
+      }
+    }
+  }
 
   const relations: Record<string, unknown> = {
     inventory_mode: mode,

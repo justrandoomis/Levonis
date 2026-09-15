@@ -513,6 +513,39 @@ options.2.active=true
 # +20000 = زيادة عشرين ألفًا فوق السعر الأساسي (تُخزَّن في regular_adjust_iqd)
 options.2.regular_price_iqd=+20000
 options.2.availability_type=
+# مخزون الموديل — البيع المباشر يقرأ هذا الرقم نفسه.
+# __NULL__ = لا يُتتبع (وهو حال كل منتج قبل هذه الإضافة)، 0 = لا توجد وحدات.
+options.2.stock=__NULL__
+options.2.low_stock_threshold=__NULL__
+# ---- 0075: المخزون والسعة / stock and capacity ---------------------------
+# البيع المباشر لا سعة له: رقمه هو مخزون الموديل أعلاه. والتهجئتان التاليتان
+# تكتبان في نفس العمود تمامًا (options.2.stock)، والتصدير يكتب الأولى فقط:
+#   options.2.direct.stock=__NULL__
+#   options.2.direct.low_stock_threshold=__NULL__
+# وسطر مثل options.2.direct.capacity=<العدد> مرفوض بالاسم مع جملة تقول أين يُكتب.
+# A direct sale has NO capacity — its number is the model stock above.
+# options.2.direct.stock is an ALIAS onto options.2.stock: same column, and
+# only options.2.stock is exported. options.2.direct.capacity is refused by name.
+#
+# الطلب المسبق وحده يملك سعة اختيارية. فارغ أو __NULL__ = غير متتبَّعة = بلا حد
+# (سلوك المتجر اليوم)، و0 = متتبَّعة ولا توجد وحدات.
+#   options.2.preorder.enabled=true
+#   options.2.preorder.capacity=__NULL__
+#
+# (أ) سعة مشتركة — اترك سعة الطرق فارغة، فتسحب الثلاث من حوض واحد:
+#   options.2.preorder.capacity=<العدد الكلي>
+#   options.2.preorder.transports.1.method=air
+#   options.2.preorder.transports.1.capacity=__NULL__
+#   options.2.preorder.transports.2.method=sea
+#   options.2.preorder.transports.2.capacity=__NULL__
+#   بيع وحدة جوًا ينقص وحدة من نصيب البحر.
+#   (a) SHARED: leave every route capacity empty; air/sea/land draw on one pool.
+#
+# (ب) حصص مستقلة — أعطِ الطريقة رقمها الخاص، فلا تسحب من الحوض المشترك:
+#   options.2.preorder.transports.1.method=air
+#   options.2.preorder.transports.1.capacity=<حصة الجو>
+#   (b) INDEPENDENT: a route with its own number does NOT also spend the pool —
+#   one counter per sale. Never copy one quantity onto air, sea and land.
 
 # ------------------------------ الألوان / colors
 # اللون زيادة فوق سعر الخيار المختار (لون ← خيار ← أساسي)
@@ -831,6 +864,39 @@ interface Analysis {
   membership: ParsedMembershipRule[];
 }
 
+/**
+ * 0073/0075 — THE ORDER-TYPE CELLS SURVIVE `validateProductDoc`.
+ *
+ * `upgradeOptions` (worker/lib/productModel.ts) rebuilds every option from a
+ * fixed field list, and `fulfillments` is not on it: the parsed cells are in
+ * `toDocBody`'s body, and the validated document that goes to the relations
+ * bridge has none. So `options.N.direct.*` and `options.N.preorder.*` parsed,
+ * exported and documented — and were dropped on the way to the writer. The
+ * capacity keys would have been dropped with them.
+ *
+ * Re-attached HERE rather than in `upgradeOptions`, because the JSON options
+ * mirror is read by that function on every product page: teaching it to carry
+ * cells would change what `deriveSaleTypes` sees for every product in the
+ * catalogue, which is a far larger change than the one this needs. Matching is
+ * by option id — the merge key the whole template path already uses — so a
+ * row the validator renumbered or a colour it re-expressed is unaffected.
+ */
+function reattachCells(doc: ProductDoc, body: Record<string, unknown>): void {
+  const parsedOptions = Array.isArray(body.options) ? (body.options as Array<Record<string, unknown>>) : [];
+  if (!parsedOptions.length) return;
+  const cellsById = new Map<string, unknown>();
+  for (const o of parsedOptions) {
+    if (Array.isArray(o.fulfillments)) cellsById.set(String(o.id ?? ''), o.fulfillments);
+  }
+  if (!cellsById.size) return;
+  for (const o of doc.options) {
+    const cells = cellsById.get(String(o.id));
+    // A model the FILE said nothing about keeps no cells here; the bridge then
+    // omits the key and the writer leaves whatever the product already has.
+    if (cells !== undefined) (o as unknown as Record<string, unknown>).fulfillments = cells;
+  }
+}
+
 /** Shared dry-run pipeline: parse → resolve refs → merge → validate.
  *  Never writes. `target` retargets the merge: undefined = follow the
  *  template's product_id header; null = force a create merge (ignore the
@@ -886,6 +952,7 @@ async function analyzeTemplate(
       a.refs.catalog_ids !== undefined ? a.refs.catalog_ids : a.existing ? undefined : []
     );
     a.doc = validated;
+    reattachCells(a.doc, body);
     /**
      * THE OWNER'S FORM IS WHAT GETS STORED: cheapest sellable price as the
      * base, every option and colour an increase over it (cheapestBase.ts). A
@@ -918,6 +985,7 @@ async function analyzeTemplate(
             serialized: validated.serialized,
             warranty_base_months: validated.warranty_base_months,
           });
+          reattachCells(a.doc, body);
           merge.warnings.push(...norm.warnings);
         } catch (e) {
           if (!(e instanceof HttpError)) throw e;

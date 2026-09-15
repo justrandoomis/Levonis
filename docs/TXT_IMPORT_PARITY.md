@@ -177,6 +177,11 @@ Persistence for the group: identical gate to images. Form reads `REL groups[]/va
 | `options.N.variant_key` / `variant_label` | string | `options[].variant_key/label` | `product_option_values.variant_key/label` | `FormValue.variant_key/label` | REL | OK — rows | Fallback derived from `name_ar` in model (`productModel.ts:408`) but `name_en` in writer. |
 | `options.N.sku_part` | string | `options[].sku_part` | `product_option_values.sku_part` | `FormValue.sku_part` | REL | OK — rows | |
 | `options.N.low_stock_threshold` | int nullable (`:267`) | `options[].low_stock_threshold` | `product_option_values.low_stock_threshold` | `FormValue.low_stock_threshold` | REL | OK — rows | |
+| `options.N.direct.stock` | int nullable — **alias** (`onModel`, `aliasOf: 'stock'`) | `options[].stock` — the SAME field as `options.N.stock` | `product_option_values.stock` | `FormValue.stock` | REL | OK — rows, import-only spelling | 0075 / DECISION 1. One stock source per actual selection: this is not a second column. Applied to the MODEL, after the scalar loop, so the more specific spelling wins and a warning names both keys. **Never exported** — `options.N.stock` is. |
+| `options.N.direct.low_stock_threshold` | int nullable — **alias** | `options[].low_stock_threshold` | `product_option_values.low_stock_threshold` | `FormValue.low_stock_threshold` | REL | OK — rows, import-only spelling | Same alias rule; never exported. |
+| `options.N.direct.capacity` | — | — | — | — | — | **refused by name** | `CellSpec.refused` (`worker/lib/template.ts`): a parse ERROR at preview, with the sentence naming `options.N.stock` as the field to use. A dropped unknown key would let an admin believe they had limited a direct sale. |
+| `options.N.preorder.capacity` | int nullable 0..1,000,000 | `options[].fulfillments[pre_order].capacity` | `product_option_fulfillment.capacity` (0075) | `FulfillmentPanel` cell capacity | REL `fulfillments[].capacity` | OK — rows | `__NULL__`/absent = UNTRACKED (unlimited, reserves nothing); `0` = tracked and empty. Exported as `__NULL__`, never as `0`. |
+| `options.N.preorder.transports.M.capacity` | int nullable 0..1,000,000 | `options[].fulfillments[pre_order].transports[].capacity` | `product_option_transports.capacity` (0075) | `FulfillmentPanel` route capacity | REL `transports[].capacity` | OK — rows | `__NULL__`/absent = this route draws on the cell's SHARED pool. A number = its own quota, which does NOT also spend the pool. Nothing copies one quantity onto the three routes. |
 | `options=__CLEAR__` | groupClears | `options=[]` | rows deleted only on relational path | — | REL | OK | Refused when reserved units exist (`adminProductRelations.ts:567-583`, repro D4). |
 | — (group `active`, `sort`) | — | — | `product_option_groups.active/sort` | `FormGroup.active` | REL | not in template | Groups rebuilt with `active:true`, sort = first appearance (`templateRelations.ts:107`). Round trip of a form-built product flips group order (repro C2; cause `productRelations.ts:242` flat `ORDER BY sort, name_en`). |
 
@@ -746,3 +751,65 @@ latin model token (`A1`, `0.4mm`). The equality test is gone.
   the cost-gate ordering, price history, hashtags). Only its localiser
   divergence — the actual data loss — was fixed; the two-batch commit stays
   recorded in §7.2.
+
+
+---
+
+## 9. سعة الطلب المسبق في القالبين (0075)
+
+هذا القسم يُبقي القالب النصّي وجدول البيانات مثبَّتين ببعضهما. المرجع النافذ
+للسلوك هو `migrations/0075_preorder_capacity.sql` و`worker/lib/inventory.ts`؛
+ما يلي هو كيف يقولها الملفّان، وأين يختلفان عمدًا.
+
+### 9.1 المفاتيح الأربعة وبيوتها
+
+| TXT | CSV | العمود | يُصدَّر؟ |
+|---|---|---|---|
+| `options.N.stock` | `option` ← `stock` | `product_option_values.stock` | نعم (هذه هي التهجئة المصدَّرة) |
+| `options.N.direct.stock` | *(نفس العمود أعلاه — لا عمود ثانٍ)* | `product_option_values.stock` | **لا** — مرادف استيراد فقط |
+| `options.N.low_stock_threshold` | `option` ← `low_stock_threshold` | `product_option_values.low_stock_threshold` | نعم |
+| `options.N.direct.low_stock_threshold` | *(نفس العمود أعلاه)* | `product_option_values.low_stock_threshold` | **لا** |
+| `options.N.preorder.capacity` | `fulfillment` بلا `kind` ← `capacity` | `product_option_fulfillment.capacity` | نعم، كـ `__NULL__` حين تكون غير متتبَّعة |
+| `options.N.preorder.transports.M.capacity` | `fulfillment` بـ `kind=air/sea/land` ← `capacity` | `product_option_transports.capacity` | نعم، كـ `__NULL__` حين تسحب من الحوض |
+
+`options.N.direct.capacity` وسطر `fulfillment` بـ `value=direct_sale` وفيه
+`capacity` **مرفوضان بالاسم** عند المعاينة، قبل أي كتابة. البيع المباشر لا
+سعة له: رقمه هو مخزون الموديل.
+
+### 9.2 الرموز الأربعة — نفس المعنى في القالبين
+
+| | TXT | CSV | المعنى |
+|---|---|---|---|
+| غائب | المفتاح أو الكتلة غير مذكورة | الخلية فارغة، أو لا سطر `fulfillment` إطلاقًا | يبقى المحفوظ. الصمت ليس قرارًا. |
+| صفر | `…capacity=0` | `capacity` = `0` | متتبَّع ولا وحدات: `PREORDER_CAPACITY_EXHAUSTED`. |
+| `__NULL__` | `…capacity=__NULL__` | `capacity` = `__NULL__` | غير متتبَّع: بلا حد، لا يحجز شيئًا، قابل للبيع. **لا يُقرأ عند التصدير على أنه `0`.** |
+| `__CLEAR__` | `…capacity=__CLEAR__` | `capacity` = `__CLEAR__` | يعيد الرقم المضبوط إلى «غير متتبَّع». **لا يمس `capacity_reserved`**: الحجز يُطلقه الإلغاء أو انتهاء المهلة وحدهما (`worker/lib/orderExpirySweep.ts`). |
+
+### 9.3 لماذا لا يحمل CSV كتلة `direct` أو `preorder`
+
+جدول البيانات لا يعرف «خلايا» 0073 أصلًا: 0073 لم يصل إليه. وبدل حشو سلسلة
+مُرمَّزة داخل خلية واحدة — وهو بالضبط ما يرفضه تصميم هذا الملف («packing …
+into encoded strings inside a single row — is unreadable in Excel») — أُضيف
+نوع سطر واحد `fulfillment`، سطر لكل (موديل × نوع طلب) وسطر لكل طريقة. فيصير
+الخطأ قابلًا للإشارة: «سطر 14: البيع المباشر لا سعة له».
+
+سطر `fulfillment` يحمل `capacity` و`active` فقط. لا يعيد ذكر الأعمدة الثمانية
+للأسعار ولا مدد الانتظار، و`resolveProduct` يدمجه فوق الخلايا المحفوظة كما هي
+— فملفٌ يضبط حصة لا يستطيع أن يمحو سعرًا لم يذكره.
+
+### 9.4 التوافق مع الملفات القديمة
+
+ملفٌ كُتب قبل اليوم — TXT بمفتاح `options.N.stock` وحده، أو CSV بلا أي سطر
+`fulfillment` — يُستورَد كما هو ويعني ما كان يعنيه. لا تُخترع سعة: كل السعات
+تبقى `NULL` = غير متتبَّعة = طلب مسبق بلا حد، وهو سلوك المتجر قبل 0075. ولا
+يُنسخ مخزون الموديل إلى السعة إطلاقًا؛ نسخُه كان سيجعل وحدة واحدة على الرف
+قابلة للبيع مرتين.
+
+### 9.5 الحفظ لا يُضيّع حجزًا
+
+`fulfillmentStatements` حذفٌ ثم إدراج. لولا الوسيط الخامس (`existing`) لصار كل
+حفظ يولّد معرّف صف جديدًا، بينما `inventory_ledger.scope_id` يسمّي الصف القديم
+لكل وحدة محجوزة — فيضيع الإطلاق إلى الأبد. مسار القالب/الجدول
+(`worker/lib/productPersistence.ts`) يقرأ الصفوف الحيّة ويمرّرها، فيبقى معرّف
+الصف و`capacity_reserved` كما هما عبر الحفظ. و`__CLEAR__` يغيّر الرقم المضبوط
+وحده.

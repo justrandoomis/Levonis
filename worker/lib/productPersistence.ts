@@ -1967,6 +1967,7 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
    * the API would refuse (a direct sale with a transport, a duplicate route, a
    * cell naming a model that is not on this product).
    */
+  const cellStatements: D1PreparedStatement[] = [];
   if (relations?.requested) {
     const cells: unknown[] = [];
     for (const v of relations.requested.values) {
@@ -2003,7 +2004,19 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
           .bind(productId)
           .all<{ id: string; fulfillment_id: string; method: string; capacity_reserved: number | null }>(),
       ]);
-      statements.push(
+      /**
+       * AFTER the structure, never before it.
+       *
+       * `product_option_fulfillment.option_id` REFERENCES
+       * `product_option_values(id)` (migration 0073). On a CREATE the option
+       * rows are in `relationStatements`, which are appended below — so a cell
+       * queued here would be inserted against a model that does not exist yet
+       * and D1 would fail the whole batch with a bare FOREIGN KEY error. The
+       * cells are the last thing written for the same reason the transports go
+       * before the cells inside `fulfillmentStatements`: a row is written after
+       * the row it names.
+       */
+      cellStatements.push(
         ...fulfillmentStatements(
           db,
           productId,
@@ -2016,6 +2029,7 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
   }
 
   statements.push(...relationStatements);
+  statements.push(...cellStatements);
 
   // `inventory_mode` is not in PRODUCT_COLUMNS (the relations planner owns it),
   // so a composition row pins it here: 'BASE' is what makes `snapshotFrom`

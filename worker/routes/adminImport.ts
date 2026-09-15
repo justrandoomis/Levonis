@@ -68,6 +68,8 @@ import {
   resolveProduct,
   splitComboKey,
   type CatalogRef,
+  type ExistingCellRow,
+  type ExistingRouteRow,
   type ExistingShape,
   type ImportMaps,
 } from '../lib/importApply';
@@ -338,6 +340,16 @@ async function exportProducts(
     .prepare(`SELECT * FROM product_colors WHERE product_id IN (${ph}) ORDER BY sort`)
     .bind(...productIds)
     .all<Record<string, unknown>>();
+  // 0075 — the order-type cells and their routes, so the exported sheet
+  // carries the pre-order capacity it is the only file able to edit.
+  const { results: cells } = await db
+    .prepare(`SELECT * FROM product_option_fulfillment WHERE product_id IN (${ph}) ORDER BY sort, id`)
+    .bind(...productIds)
+    .all<Record<string, unknown>>();
+  const { results: routes } = await db
+    .prepare(`SELECT * FROM product_option_transports WHERE product_id IN (${ph}) ORDER BY sort, id`)
+    .bind(...productIds)
+    .all<Record<string, unknown>>();
   const { results: links } = await db
     .prepare(
       `SELECT l.color_id, l.option_value_id FROM product_color_option_links l
@@ -584,6 +596,46 @@ async function exportProducts(
                 ? `option:${boundGroup.name_en}:${boundValue.name_en as string}`
                 : '',
           };
+        }),
+      /**
+       * 0075. One row for the cell, then one row per route it has.
+       *
+       * A route with NO capacity is exported all the same, with an empty
+       * number — that row is what tells the admin the route exists and is
+       * drawing on the shared pool, and an export is the bulk-EDIT path, so a
+       * row it omits is one the admin cannot change by editing this file.
+       * Nothing here copies the pool's number onto a route.
+       */
+      fulfillments: cells
+        .filter((f) => String(f.product_id) === pid)
+        .flatMap((f) => {
+          const v = valueById.get(String(f.option_id));
+          const g = v ? groupById.get(v.group_id as string) : undefined;
+          if (!v || !g) return [];
+          const model = { group: g.name_en, value: v.name_en as string };
+          const type = f.fulfillment_type === 'pre_order' ? ('pre_order' as const) : ('direct_sale' as const);
+          const head = {
+            ...model,
+            fulfillment_type: type,
+            method: '' as const,
+            // A direct sale has no capacity: `serializeProducts` writes an
+            // empty cell for it, never a number and never `__NULL__`.
+            capacity: type === 'pre_order' ? n(f.capacity) : null,
+            enabled: f.enabled !== 0,
+          };
+          if (type === 'direct_sale') return [head];
+          return [
+            head,
+            ...routes
+              .filter((t) => String(t.fulfillment_id) === String(f.id))
+              .map((t) => ({
+                ...model,
+                fulfillment_type: type,
+                method: (t.method === 'air' || t.method === 'sea' ? t.method : 'land') as 'air' | 'sea' | 'land',
+                capacity: n(t.capacity),
+                enabled: t.enabled !== 0,
+              })),
+          ];
         }),
     } satisfies ExportProduct;
   });
@@ -885,6 +937,32 @@ async function loadExisting(db: D1Database, keys: string[]): Promise<Map<string,
     .prepare(`SELECT * FROM product_variants WHERE product_id IN (${idPh})`)
     .bind(...ids)
     .all<Record<string, unknown>>();
+  /**
+   * 0075 — the stored order-type cells, read whole.
+   *
+   * A `fulfillment` sheet row states a capacity and an enabled flag and
+   * nothing else, but the writer replaces the product's whole cell set — so
+   * the merge has to start from the rows as they stand, prices and lead times
+   * included. `SELECT *` is deliberate for the same reason the fulfilment
+   * endpoint uses it: a column added later rides along instead of being
+   * silently dropped on the next spreadsheet save.
+   */
+  const { results: cellRows } = await db
+    .prepare(`SELECT * FROM product_option_fulfillment WHERE product_id IN (${idPh}) ORDER BY sort, id`)
+    .bind(...ids)
+    .all<Record<string, unknown>>();
+  const { results: routeRows } = await db
+    .prepare(`SELECT * FROM product_option_transports WHERE product_id IN (${idPh}) ORDER BY sort, id`)
+    .bind(...ids)
+    .all<Record<string, unknown>>();
+  const routesByCell = new Map<string, ExistingRouteRow[]>();
+  for (const t of routeRows) {
+    const owner = String(t.fulfillment_id ?? '');
+    const arr = routesByCell.get(owner);
+    const route: ExistingRouteRow = { ...t, method: String(t.method ?? '') };
+    if (arr) arr.push(route);
+    else routesByCell.set(owner, [route]);
+  }
 
   for (const row of results) {
     const doc = parseProductRow(row);
@@ -914,6 +992,30 @@ async function loadExisting(db: D1Database, keys: string[]): Promise<Map<string,
           pro_price_iqd: (v.pro_price_iqd as number) ?? null,
           cost_iqd: (v.cost_iqd as number) ?? null,
         })),
+      fulfillments: cellRows
+        .filter((f) => String(f.product_id) === id)
+        .map((f) => {
+          const type = String(f.fulfillment_type ?? '');
+          return {
+            ...f,
+            option_id: String(f.option_id ?? ''),
+            fulfillment_type: type,
+            // SQLite stores the flag as 0/1. `parseFulfillmentPayload` reads
+            // `enabled !== false`, so a stored 0 handed straight back would
+            // read as TRUE and a spreadsheet that only set a capacity would
+            // silently switch a disabled order type back on.
+            enabled: f.enabled !== 0,
+            // A direct-sale cell has no capacity of its own; a stray stored
+            // value (an older Worker during a rolling deploy) is inert to the
+            // resolver but would be REFUSED by the payload parser, so it is
+            // dropped here rather than turned into a failed import.
+            ...(type === 'direct_sale' ? { capacity: null } : {}),
+            transports:
+              type === 'pre_order'
+                ? (routesByCell.get(String(f.id)) ?? []).map((t) => ({ ...t, enabled: t.enabled !== 0 }))
+                : [],
+          } satisfies ExistingCellRow;
+        }),
     };
     // SKU wins over slug when both match different products.
     if (doc.sku) out.set(doc.sku, shape);

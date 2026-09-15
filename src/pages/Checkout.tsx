@@ -1,7 +1,9 @@
 import { MotionCharacterHome, useCharacterBusy } from '../components/bloub/MotionCharacterAnchor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useLanguage } from '../LanguageContext';
+// The standalone `loc` — this helper runs outside the component, and the
+// module-level translator is exactly what LanguageContext documents it for.
+import { loc, useLanguage } from '../LanguageContext';
 import {
   ArrowLeft, ArrowRight, Truck, Store,
   CreditCard, Wallet, Banknote,
@@ -343,6 +345,39 @@ const STRINGS = {
 /** What the server offers when no quote has answered yet (worker/lib/paymentPolicy.ts). */
 const DEFAULT_OFFERED_PAYMENT_IDS = ['wallet', 'cash'];
 
+/**
+ * 0075 — WHICH COUNTER MOVED, AT THE LAST SCREEN BEFORE PAYMENT.
+ *
+ * Two counters sit behind one order: the shelf a direct sale comes off, and
+ * the import quota a pre-order consumes. `apiRefusal` already gives the
+ * customer the server's own sentence in their language; this adds the one fact
+ * that sentence cannot carry — WHICH of the two ran out — because "sold out"
+ * and "this month's pre-order quota is full" have different answers.
+ *
+ * `loc` is the app's translator and falls back to Arabic for Kurdish: the
+ * Sorani here is the owner's to write by hand and is deliberately not invented.
+ */
+function counterNamed(code: string): string {
+  if (code === 'PREORDER_CAPACITY_EXHAUSTED') {
+    return loc(
+      'العدّاد: حصة الطلب المسبق لهذا الاختيار — وليس مخزون البيع المباشر.',
+      'The counter: this selection’s pre-order quota — not direct-sale stock.'
+    );
+  }
+  if (code === 'OUT_OF_STOCK' || code === 'QTY_UNAVAILABLE') {
+    return loc('العدّاد: مخزون البيع المباشر لهذا الاختيار.', 'The counter: direct-sale stock for this selection.');
+  }
+  return '';
+}
+
+/** The refusal as the server said it, followed by the counter it names. */
+function refusalWithCounter(err: unknown, lang: string, fallback: string): string {
+  const said = apiRefusal(err, lang as 'ar' | 'en' | 'ckb', fallback);
+  const code = err instanceof ApiError ? err.code ?? '' : '';
+  const counter = counterNamed(code);
+  return counter ? `${said} ${counter}` : said;
+}
+
 export default function Checkout() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -602,7 +637,7 @@ export default function Checkout() {
           return;
         }
         setQuote(null);
-        setQuoteError(apiRefusal(err, lang as 'ar' | 'en' | 'ckb', 'quote failed'));
+        setQuoteError(refusalWithCounter(err, lang, 'quote failed'));
       })
       .finally(() => {
         if (seq === quoteSeqRef.current) setQuoteLoading(false);
@@ -926,7 +961,7 @@ export default function Checkout() {
        * app. `apiRefusal` decodes the CODE from the trilingual table and falls
        * back to the server's sentence only for codes that already had one.
        */
-      const msg = apiRefusal(err, lang as 'ar' | 'en' | 'ckb', 'Order could not be placed. Please try again.');
+      const msg = refusalWithCounter(err, lang, 'Order could not be placed. Please try again.');
       if (err instanceof ApiError && err.code === 'INSUFFICIENT_BALANCE') {
         setSubmitError(dir === 'rtl' ? `الرصيد غير كافٍ للدفع المقدم المطلوب — ${msg}` : msg);
       } else if (err instanceof ApiError && err.code === 'POLICY_ACCEPTANCE_REQUIRED') {

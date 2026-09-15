@@ -54,7 +54,7 @@ GET /api/admin/import/export?category=<section id>          ← تصدير من�
 
 ---
 
-## ٢. أحد عشر نوع سطر — وكل حقل من النموذج له بيت
+## ٢. اثنا عشر نوع سطر — وكل حقل من النموذج له بيت
 
 العمود الأول `row_type` يحدد نوع السطر، والعمود `key` يربطه بمنتجه (SKU أو
 slug، مكرر في كل أسطر المنتج).
@@ -67,6 +67,7 @@ slug، مكرر في كل أسطر المنتج).
 | `variant` | توليفة مخزون | `links (Group:Value\|Group:Value\|color:Name), sku_part, active, stock, …الأسعار` |
 | `image` | صورة معرض | `image, alt, primary, links` |
 | `transport` | شحن الطلب المسبق | `value (air/sea/land), price_iqd (فارغ = العمولة الافتراضية), active` |
+| `fulfillment` | خلية (موديل × نوع الطلب) أو أحد طرقها — وسعة الطلب المسبق (0075) | `links (Group:Value — موديل واحد), value (direct_sale/pre_order), kind (فارغ = الخلية نفسها، أو air/sea/land), capacity, active` |
 | `spec` | سطر مواصفة | `group (عنوان المجموعة), label, value, unit` |
 | `label` | شارة | `kind (المفتاح المضبوط أو فارغ), value (النص), image (الأيقونة), active` |
 | `warranty` | خطة ضمان ممدد — **للطابعات فقط** | `value (العنوان), body (الشروط), duration_months (12 أو 24: +12 → 24 إجمالًا، +24 → 36), kind (extension؛ total للبيانات القديمة), percent (النسبة من سعر الطابعة الاعتيادي، مثال 7.5 أو 10), price_iqd (رسم ثابت حين لا توجد نسبة، 0 = مجاني), active` |
@@ -81,6 +82,7 @@ slug، مكرر في كل أسطر المنتج).
 | ٢ المعلومات الأساسية | `name, description, status, sku, display_order, is_featured` |
 | ٣ الأسعار والعضويات | `price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd` + أعمدة `membership.*` (خصم العضوية الخاص بالمنتج — §١١) |
 | ٤ البيع والمخزون | `sale_types, inventory_mode, stock, low_stock_threshold, payment_options` + أسطر `transport` + للطابعات `warranty_base_months, serialized` |
+| ٤أ نوع الطلب لكل موديل وسعته (0075) | أسطر `fulfillment` + عمود `capacity` — §١٢. مخزون البيع المباشر يبقى `stock` على سطر `option`: لا عمود مخزون ثانٍ. |
 | ٥ الخيارات والألوان | أسطر `option` و`color` و`variant` |
 | ٦ الوسائط | أسطر `image` |
 | ٧ المواصفات والاستخدام | أعمدة `spec.*` + أسطر `spec` + `how_to_use` + `usage_url` + أسطر `guide` |
@@ -145,7 +147,7 @@ form is expressible in the sheet»، وهو يقرأ `blankDoc()` — حالة �
 * خطتا ضمان بنفس العنوان، أو مواصفتان بنفس الاسم داخل مجموعة واحدة، تُرفضان.
 * سلّم الأسعار: `PRO ≤ PRIME ≤ الاعتيادي`، ولا يساوي سعر البيع التكلفة، وتخفيضٌ على
   خيار أو لون يبتلع سعر PRIME/PRO الموروث يُرفض ما لم يحدّد الصف سعر عضويته.
-* `row_type` غير معروف يُرفض بقائمة الأنواع الأحد عشر.
+* `row_type` غير معروف يُرفض بقائمة الأنواع الاثني عشر.
 * عمود لا يعرفه القالب يُبلَّغ عنه ولا يُخمَّن.
 * أعمدة `membership.*`: سقف بلا `cap_scope` يُرفض، و`cap_scope` بلا سقف يُرفض،
   و`percent` يحتاج نسبة بين ١ و١٠٠، و`fixed` يحتاج مبلغًا أكبر من صفر، والمبالغ
@@ -451,3 +453,128 @@ colors.1.regular_adjust_iqd=10000
 جدول يُسجَّل بنسخة (`membership_benefit_versions`) وبسطر تدقيق، تمامًا كتغيير
 من اللوحة. والقالب النصّي (TXT) يحمل القيم الستّ نفسها بالمفاتيح نفسها
 (`docs/TXT_IMPORT_PARITY.md` §2.14).
+
+
+---
+
+## ١٢. سعة الطلب المسبق — `fulfillment` و`capacity` (0075)
+
+> المرجع النافذ: `migrations/0075_preorder_capacity.sql` وتعليقات
+> `worker/lib/optionFulfillment.ts`. هذا القسم يصف كيف يقولها الملفّان.
+
+### القاعدة في سطر واحد
+
+**نوع الطلب وحده يقرر أي عدّاد تستهلكه العملية.** البيع المباشر يستهلك مخزون
+الموديل — الصف الذي يختاره `products.inventory_mode` — والطلب المسبق يستهلك
+سعته: حصة الطريقة المختارة إن كانت لها حصة، وإلا الحوض المشترك للخلية. ولا
+يستهلك الطلب المسبق مخزون البيع المباشر أبدًا.
+
+*Order type alone decides the counter. A direct sale spends the model stock; a
+pre-order spends its capacity — the chosen route's own quota if it has one,
+otherwise the cell's shared pool. Never the model stock.*
+
+### لا عمود مخزون ثانٍ
+
+«استخدم مصدر مخزون واحد لكل اختيار فعلي». مخزون البيع المباشر **هو** مخزون
+الموديل، ولا يوجد عمود ثانٍ له في أي مكان:
+
+| القالب النصّي (TXT) | جدول البيانات (CSV) | العمود الفعلي |
+|---|---|---|
+| `options.N.stock` *(هي التي تُصدَّر)* | سطر `option` ← `stock` | `product_option_values.stock` |
+| `options.N.direct.stock` *(مرادف، استيراد فقط)* | — نفس العمود أعلاه | `product_option_values.stock` |
+| `options.N.low_stock_threshold` *(هي التي تُصدَّر)* | سطر `option` ← `low_stock_threshold` | `product_option_values.low_stock_threshold` |
+| `options.N.direct.low_stock_threshold` *(مرادف، استيراد فقط)* | — نفس العمود أعلاه | `product_option_values.low_stock_threshold` |
+| `options.N.preorder.capacity` | سطر `fulfillment` بلا `kind` ← `capacity` | `product_option_fulfillment.capacity` |
+| `options.N.preorder.transports.M.capacity` | سطر `fulfillment` بـ `kind=air/sea/land` ← `capacity` | `product_option_transports.capacity` |
+
+التهجئتان الأوليان تكتبان في **نفس العمود**. لذلك:
+
+* **التصدير يكتب `options.N.stock` فقط**، ولا يكتب `options.N.direct.stock`
+  إطلاقًا — وإلا لَذكر ملفٌ رقمًا واحدًا مرتين وكتبته دورةُ الذهاب والإياب
+  مرتين.
+* لو حمل ملفٌ التهجئتين معًا، التهجئة الأدق (`direct.stock`) هي التي تُطبَّق،
+  ويُرفع تحذير يسمّي المفتاحين معًا.
+* `options.N.direct.capacity` **مرفوض بالاسم** عند المعاينة، بجملة تقول أين
+  يُكتب الرقم بدلًا منه. وكذلك سطر `fulfillment` بـ `value=direct_sale` وفيه
+  `capacity`. الرفض قبل أي كتابة، لأن من كتب الرقم يظن أنه حدّ شيئًا.
+
+### الرموز الأربعة، بالمعنى نفسه في القالبين
+
+| ما يُكتب | المعنى |
+|---|---|
+| **المفتاح غائب / الكتلة غائبة / الخلية فارغة** (تحديث) | الملف لا يقول شيئًا — يبقى المحفوظ. الصمت ليس قرارًا. |
+| `0` | متتبَّع، ولا توجد وحدات الآن. الطلب يُرفض بـ `PREORDER_CAPACITY_EXHAUSTED`. |
+| `__NULL__` | **غير متتبَّع**: بلا حد، ولا يحجز شيئًا، وقابل للبيع. ليس صفرًا، وملفٌ كتب `__NULL__` لا يُقرأ عند التصدير على أنه `0`. |
+| `__CLEAR__` | يُعيد الرقم **المضبوط** إلى «غير متتبَّع» (مثل `__NULL__` لحقل رقمي قابل للإفراغ). **لا يُطلق أي وحدة محجوزة**: الحجز ليس إعدادًا، ويبقى `capacity_reserved` كما هو ويُطلقه الإلغاء أو انتهاء المهلة وحدهما. |
+
+**التوافق مع الملفات القديمة:** ملفٌ كُتب قبل اليوم يحمل `options.N.stock` ولا
+يحمل كتلة `capacity` إطلاقًا (أو لا يحمل أي سطر `fulfillment`). يُستورَد كما
+هو، ويعني ما كان يعنيه، ولا يخترع سعة: كل السعات تبقى `NULL` = غير متتبَّعة =
+طلب مسبق بلا حد، وهو سلوك المتجر قبل 0075 بالضبط.
+
+### سعة مشتركة أم حصص مستقلة؟
+
+* **مشتركة** — اترك سعة كل طريقة فارغة. عندها تسحب `air` و`sea` و`land` كلها
+  من `options.N.preorder.capacity`، وبيع وحدة جوًا ينقص وحدة من نصيب البحر
+  والبر.
+* **مستقلة** — أعطِ الطريقة رقمها الخاص. تلك الطريقة تملك حصتها وحدها، ولا
+  تسحب من الحوض المشترك ولا من حصص الطرق الأخرى.
+* طريقة لها حصتها الخاصة **لا تستهلك الحوض المشترك أيضًا**: عدّاد واحد لكل
+  عملية بيع، لا عدّادان.
+* **«لا تكرر نفس الكمية تلقائيًا على الطرق الثلاث»** — لا شيء في القالبين ينسخ
+  رقمًا نيابة عنك، لا عند الاستيراد ولا عند التصدير ولا في القالب الفارغ.
+
+*Leave every route capacity empty → air/sea/land all draw on the cell's pool.
+Give a route a number → it holds its own quota and does NOT also spend the
+pool. One counter per sale. Never copy one quantity onto all three routes.*
+
+### المثال نفسه بالصيغتين
+
+استبدل `<الحوض>` و`<حصة الجو>` برقمك أنت.
+
+**TXT**
+
+```
+# حوض مشترك: الجو والبحر يقتسمان <الحوض>
+options.1.id=opt_a1_mini
+options.1.preorder.enabled=true
+options.1.preorder.capacity=<الحوض>
+options.1.preorder.transports.1.method=air
+options.1.preorder.transports.1.capacity=__NULL__
+options.1.preorder.transports.2.method=sea
+options.1.preorder.transports.2.capacity=__NULL__
+
+# حصة مستقلة للجو: لا تمس الحوض، والبحر وحده يبقى عليه
+options.1.preorder.transports.1.capacity=<حصة الجو>
+
+# البيع المباشر: لا سعة، بل مخزون الموديل
+options.1.stock=<وحدات الرف>
+# (ونفس العمود بالتهجئة الأخرى: options.1.direct.stock=<وحدات الرف>)
+```
+
+**CSV** (الأعمدة المعنية فقط؛ الترتيب الحقيقي هو ترتيب ترويسة `data.csv`)
+
+| `row_type` | `key` | `links` | `value` | `kind` | `capacity` | `active` | `stock` |
+|---|---|---|---|---|---|---|---|
+| `option` | `A1-MINI` | | | | | `yes` | `<وحدات الرف>` |
+| `fulfillment` | `A1-MINI` | `Model:A1 mini` | `pre_order` | | `<الحوض>` | `yes` | |
+| `fulfillment` | `A1-MINI` | `Model:A1 mini` | `pre_order` | `air` | *(فارغة = على الحوض)* | `yes` | |
+| `fulfillment` | `A1-MINI` | `Model:A1 mini` | `pre_order` | `sea` | *(فارغة = على الحوض)* | `yes` | |
+
+ولجعل الجو مستقلًا، اكتب `<حصة الجو>` في خانة `capacity` لسطر `kind=air` وحده.
+
+سطر `fulfillment` يحمل `capacity` و`active` فقط، ولا يعيد ذكر الأعمدة الثمانية
+للأسعار: فملفٌ يضبط حصة لا يستطيع أن يعيد كتابة سعرٍ لم يذكره. والدمج يبدأ من
+الخلايا المحفوظة كما هي.
+
+### ما يرفضه المستورد هنا
+
+| الرفض | متى |
+|---|---|
+| `capacity` على بيع مباشر | `options.N.direct.capacity`، أو سطر `fulfillment` بـ `value=direct_sale` وفيه `capacity`. |
+| `fulfillment` بلا موديل | `links` لا يسمّي زوجًا واحدًا `Group:Value`، أو يسمّي موديلًا لا سطر `option` له في الملف. |
+| `kind` على بيع مباشر | البيع المباشر بلا رحلة: `air/sea/land` تخص الطلب المسبق. |
+| سطر مكرر | نفس (الموديل، نوع الطلب، الطريقة) مرتين. |
+| رقم غير صالح | ليس عددًا صحيحًا ≥ 0، أو أكبر من 1,000,000. |
+
+جميعها تُرفع **عند المعاينة**، قبل أن يُكتب أي شيء.

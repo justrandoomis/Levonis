@@ -449,6 +449,49 @@ export interface CartItem {
     reason?: string | null;
     qty_ok?: boolean;
     selection?: { complete: boolean; errors: string[] };
+    /**
+     * THE SHELF, at the level `products.inventory_mode` selects — never the
+     * legacy `CartItem.stock` base row, which is a different number whenever
+     * the product tracks stock per option, colour or combination.
+     * `available: null` = untracked. `max_qty` is the per-line ceiling the
+     * server will actually honour, already clamped by the pre-order counter on
+     * a pre-order line (0075), so no screen has to clamp anything itself.
+     */
+    stock?: {
+      tracked: boolean;
+      scope: string;
+      on_hand: number | null;
+      reserved: number;
+      available: number | null;
+      max_qty: number;
+      low: boolean;
+    };
+    /**
+     * 0075 — THE PRE-ORDER COUNTER THIS LINE WOULD CONSUME, which is never the
+     * shelf above: the selected route's own quota when it has one, else the
+     * model's shared pool. `available: null` = untracked = unlimited, exactly
+     * as a null stock means untracked; `0` is tracked and refuses.
+     */
+    preorder?: {
+      enabled?: boolean;
+      usable?: boolean;
+      reason?: string | null;
+      capacity?: {
+        tracked: boolean;
+        scope: 'preorder' | 'preorder_transport' | null;
+        scope_id: string;
+        available: number | null;
+        max_qty: number;
+      };
+      routes?: Array<{
+        method: string;
+        available: number | null;
+        scope: 'preorder' | 'preorder_transport' | null;
+        scope_id: string;
+        usable: boolean;
+        reason: string | null;
+      }>;
+    };
   };
   options: ApiProduct['options'];
   colors: ApiProduct['colors'];

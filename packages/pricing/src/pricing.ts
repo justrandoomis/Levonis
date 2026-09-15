@@ -160,14 +160,29 @@ export interface OptionFulfillment extends PriceFields {
   fulfillment_type: 'direct_sale' | 'pre_order';
   enabled?: boolean;
   /**
-   * NO STOCK FIELD, DELIBERATELY. A pre-order has no stock by definition, so
-   * there is one number — the MODEL's, on `OptionV2.stock`, counted by the
-   * inventory ledger. The direct-sale cell reads it; the pre-order cell does
-   * not. See migration 0073 for why a second counter would fork that ledger.
+   * NO DIRECT-STOCK FIELD, DELIBERATELY. Direct-sale availability is the
+   * MODEL's number — `OptionV2.stock`, the row `products.inventory_mode`
+   * selects — and a second direct counter here would fork the ledger.
+   *
+   * 0075 OVERRODE THE OTHER HALF OF THAT RULE, in the owner's words: a
+   * pre-order may carry an OPTIONAL independent capacity. `capacity` below is
+   * that pool; it is never the model's stock and the two are never mixed.
    */
   lead_time_text?: string;
   lead_time_min_days?: number | null;
   lead_time_max_days?: number | null;
+  /**
+   * 0075 — THE MODEL'S SHARED PRE-ORDER POOL, or null/absent for UNTRACKED.
+   *
+   * null (and absent) = no limit is claimed: pre-orders are unlimited, which
+   * is what every cell written before 0075 carries. `0` = tracked and empty.
+   * The two are different answers and nothing here may conflate them, so
+   * never `capacity ?? 0`.
+   *
+   * MEANINGLESS ON A direct_sale CELL — the direct number is `OptionV2.stock`
+   * — and refused there by the writers.
+   */
+  capacity?: number | null;
   /** Pre-order only: how the unit reaches Iraq. Never local delivery. */
   transports?: OptionTransport[];
 }
@@ -186,6 +201,15 @@ export interface OptionTransport extends PriceFields {
   enabled?: boolean;
   /** Overrides the product's commission for this method. Never adds to it. */
   surcharge_iqd?: number | null;
+  /**
+   * 0075 — THIS ROUTE'S OWN PRE-ORDER QUOTA, or null/absent.
+   *
+   * null = this route draws on the fulfilment cell's SHARED pool, so selling
+   * one by air leaves one fewer for sea and for land. A number = this route
+   * holds its own quota and does NOT also spend the pool: one counter per
+   * sale. Nothing ever copies one quantity onto all three routes.
+   */
+  capacity?: number | null;
   lead_time_text?: string;
   lead_time_min_days?: number | null;
   lead_time_max_days?: number | null;

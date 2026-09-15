@@ -115,6 +115,15 @@ const STRINGS = {
     serverChecks: 'يُعاد التحقق من السعر والتوفر على الخادم عند السلة وعند تأكيد الطلب.',
     // machine reasons → honest text
     OUT_OF_STOCK: 'نفد المخزون حاليًا.',
+    /**
+     * 0075 — THE PRE-ORDER COUNTER, WHICH IS NOT THE SHELF. A pre-order is
+     * bought from a supplier, so «نفد المخزون» would be the wrong sentence:
+     * the shelf may be full and the import quota still closed.
+     */
+    PREORDER_CAPACITY_EXHAUSTED: 'اكتملت حصة الطلب المسبق لهذا الاختيار.',
+    routeQuotaFull: 'اكتملت حصة هذه الطريقة',
+    preorderLeft: 'بقي {n} من حصة الطلب المسبق',
+    directSoldOutPreorderOpen: 'نفد مخزون البيع المباشر — الطلب المسبق ما زال متاحًا.',
     PREORDER_NOT_ENABLED: 'الطلب المسبق غير مفعّل لهذا المنتج.',
     NO_TRANSPORT_OFFERED: 'الطلب المسبق مفعّل لكن لا توجد وسيلة نقل معروضة.',
     TRANSPORT_COMMISSION_UNCONFIGURED: 'الطلب المسبق مفعّل لكن عمولة النقل غير مُعدّة بعد.',
@@ -172,6 +181,10 @@ const STRINGS = {
     officialGuide: 'Official guide', watchVideo: 'Watch the video', stepDoc: 'Official doc for this step',
     serverChecks: 'Price and availability are re-checked on the server at cart and at checkout.',
     OUT_OF_STOCK: 'Out of stock right now.',
+    PREORDER_CAPACITY_EXHAUSTED: 'The pre-order quota for this selection is full.',
+    routeQuotaFull: 'This route’s quota is full',
+    preorderLeft: '{n} left in the pre-order quota',
+    directSoldOutPreorderOpen: 'Direct sale is sold out — pre-order is still open.',
     PREORDER_NOT_ENABLED: 'Pre-order is not enabled for this product.',
     NO_TRANSPORT_OFFERED: 'Pre-order is enabled but no transport option is offered.',
     TRANSPORT_COMMISSION_UNCONFIGURED: 'Pre-order is enabled but the transport commission is not configured yet.',
@@ -237,6 +250,18 @@ const STRINGS = {
     officialGuide: 'ڕێبەری فەرمی', watchVideo: 'ڤیدیۆکە ببینە', stepDoc: 'بەڵگەنامەی فەرمی ئەم هەنگاوە',
     serverChecks: 'نرخ و بەردەستی لەسەر ڕاژەکار دووبارە پشکنین دەکرێن لە سەبەتە و لە کاتی داواکاری.',
     OUT_OF_STOCK: 'ئێستا لە کۆگا نییە.',
+    /*
+     * NO SORANI IS INVENTED HERE. These four sentences arrived with 0075 and
+     * the Kurdish for them is the owner's to write by hand — the same rule the
+     * rest of this block follows («nothing here was translated»). Until they
+     * do, a Kurdish reader gets the ARABIC sentence, which is the documented
+     * fallback elsewhere in this app (components/adminBenefits/shared.ts),
+     * rather than a machine translation of a refusal.
+     */
+    PREORDER_CAPACITY_EXHAUSTED: 'اكتملت حصة الطلب المسبق لهذا الاختيار.',
+    routeQuotaFull: 'اكتملت حصة هذه الطريقة',
+    preorderLeft: 'بقي {n} من حصة الطلب المسبق',
+    directSoldOutPreorderOpen: 'نفد مخزون البيع المباشر — الطلب المسبق ما زال متاحًا.',
     PREORDER_NOT_ENABLED: 'پێشداواکاری بۆ ئەم بەرهەمە چالاک نەکراوە.',
     NO_TRANSPORT_OFFERED: 'پێشداواکاری چالاکە بەڵام هیچ شێوازی گواستنەوە پێشکەش نەکراوە.',
     TRANSPORT_COMMISSION_UNCONFIGURED: 'پێشداواکاری چالاکە بەڵام کۆمیشنی گواستنەوە هێشتا ڕێکنەخراوە.',
@@ -353,6 +378,27 @@ interface RelationsPayload {
 
 interface TransportView { method: string; commission_iqd: number | null; configured: boolean }
 
+/**
+ * 0075 — THE PRE-ORDER COUNTER FOR ONE ROUTE, AS THE SERVER RESOLVED IT.
+ *
+ * `available: null` is UNTRACKED — no limit was claimed, which is how every
+ * pre-order in this catalogue behaved before 0075 — and `0` is a tracked
+ * counter with nothing left. `scope` says WHOSE number it is: 'preorder' means
+ * the route is spending the model's SHARED pool (so the other routes show the
+ * same figure and move with it), 'preorder_transport' means it holds its own.
+ *
+ * The page never adds these together and never compares them with `stock`:
+ * two counters, and only the server decides which one a line consumes.
+ */
+interface PreorderRouteView {
+  method: string;
+  available: number | null;
+  scope: 'preorder' | 'preorder_transport' | null;
+  scope_id: string;
+  usable: boolean;
+  reason: string | null;
+}
+
 interface Availability {
   mode: 'direct_sale' | 'preorder' | 'unavailable';
   reason: string | null;
@@ -368,7 +414,22 @@ interface Availability {
   };
   /** §6: every sale type the product offers, with whether it can be used. */
   modes?: Array<{ type: 'direct_sale' | 'pre_order'; usable: boolean; reason: string | null }>;
-  preorder: { enabled: boolean; usable: boolean; reason: string | null; transports: TransportView[] };
+  preorder: {
+    enabled: boolean;
+    usable: boolean;
+    reason: string | null;
+    transports: TransportView[];
+    /** 0075. Optional: a Worker from before this change sends neither, and the
+     *  page then behaves exactly as it did — untracked, unlimited. */
+    routes?: PreorderRouteView[];
+    capacity?: {
+      tracked: boolean;
+      scope: 'preorder' | 'preorder_transport' | null;
+      scope_id: string;
+      available: number | null;
+      max_qty: number;
+    };
+  };
   qty_ok: boolean;
 }
 
@@ -1088,13 +1149,30 @@ export default function Product() {
           setActionError(s.CART_WARRANTY_CONFLICT);
           return;
         }
-        setActionError(err instanceof Error ? err.message : 'Failed to add to cart');
+        /**
+         * THE DOOR SPEAKS THE CUSTOMER'S LANGUAGE WHEN IT CAN.
+         *
+         * `HttpError` carries one untranslated sentence, and this branch
+         * echoed it verbatim — so the counter that refused was explained in
+         * English on an Arabic page. This page already owns a sentence for
+         * every code it can be refused with, including 0075's
+         * PREORDER_CAPACITY_EXHAUSTED, which is the one refusal a customer
+         * must not mistake for "sold out": the shelf may be full and the
+         * import quota closed. `reasonText` returns the CODE when it has no
+         * sentence, so only a decoded one is used and everything else still
+         * falls back to what the server said.
+         */
+        const code = err instanceof ApiError ? err.code ?? '' : '';
+        const said = code ? reasonText(s, code) : '';
+        setActionError(
+          said && said !== code ? said : err instanceof Error ? err.message : 'Failed to add to cart'
+        );
       } finally {
         addInFlight.current = false;
         setAddingToCart(false);
       }
     },
-    [product, qty, optionId, colorId, orderType, transportMethod, warrantyPlanId, availability, isAuthenticated, navigate, s.added, s.CART_WARRANTY_CONFLICT]
+    [product, qty, optionId, colorId, orderType, transportMethod, warrantyPlanId, availability, isAuthenticated, navigate, s]
   );
 
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
@@ -1452,6 +1530,35 @@ export default function Product() {
   const modesArr = availability?.modes ?? [];
   const directUsable = modesArr.some((m) => m.type === 'direct_sale' && m.usable);
   const preUsable = modesArr.some((m) => m.type === 'pre_order' && m.usable);
+
+  /**
+   * 0075 — THE SERVER'S ANSWER PER ROUTE, LOOKED UP AND NEVER RECOMPUTED.
+   *
+   * A route with its own quota answers from that quota; a route without one
+   * answers from the model's shared pool. The browser is told which, and does
+   * not work it out: `routes[]` already carries `usable`, the `reason` and the
+   * number, resolved by the same function the cart and the checkout run.
+   */
+  const routeCapacity = (method: string): PreorderRouteView | null =>
+    availability?.preorder.routes?.find((r) => r.method === method) ?? null;
+  const routeUsable = (t: TransportView): boolean => {
+    const cap = routeCapacity(t.method);
+    return t.configured && (cap === null || cap.usable);
+  };
+  /** The counter the CHOSEN order type and route would consume, as resolved
+   *  server-side. Untracked (or absent) means no number is published. */
+  const preorderCapacity = availability?.preorder.capacity ?? null;
+  const capacityNote =
+    mode === 'preorder' && preorderCapacity?.tracked && preorderCapacity.available !== null
+      ? s.preorderLeft.replace('{n}', String(preorderCapacity.available))
+      : '';
+  /**
+   * SOLD OUT ON THE SHELF IS NOT "UNAVAILABLE" WHEN IT CAN STILL BE ORDERED.
+   * `modes` is the server's own per-type verdict, so this sentence appears
+   * exactly when direct sale is offered-but-empty and pre-order is open.
+   */
+  const directSoldOutPreorderOpen =
+    preUsable && modesArr.some((m) => m.type === 'direct_sale' && !m.usable && m.reason === 'OUT_OF_STOCK');
   const bothUsable = directUsable && preUsable;
   const showTransports = (bothUsable ? wantPreorder : mode === 'preorder') && (availability?.preorder.transports.length ?? 0) > 0;
   const pricingModes = quotedModes ?? detailModes;
@@ -1893,22 +2000,51 @@ export default function Product() {
             {availability!.preorder.transports.map((t) => {
               const selected = transportMethod === t.method;
               const final = transportFinal(t);
+              /**
+               * 0075 — A FULL ROUTE IS NOT OFFERED, AND THE OTHERS STILL ARE.
+               * The route that ran out is the one that closes: a sea quota of
+               * zero must not take air and land down with it, and the customer
+               * is told which fact stopped them — "nobody priced this route"
+               * and "this route's quota is full" are different problems with
+               * different answers.
+               */
+              const cap = routeCapacity(t.method);
+              const usable = routeUsable(t);
+              const left = cap && cap.available !== null ? s.preorderLeft.replace('{n}', String(cap.available)) : '';
               return (
                 <button
                   key={t.method}
                   type="button"
-                  disabled={!t.configured}
+                  disabled={!usable}
                   aria-pressed={selected}
+                  data-route-usable={usable ? 'true' : 'false'}
+                  data-route-reason={cap?.reason ?? (t.configured ? '' : 'TRANSPORT_COMMISSION_UNCONFIGURED')}
                   onClick={() => setTransportMethod(selected ? '' : t.method)}
                   className="lv-choice flex min-h-[48px] items-center justify-between gap-3 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
-                    <span>{transportLabel(s, t.method)}</span>
+                    <span className="min-w-0 text-start">
+                      <span className="block">{transportLabel(s, t.method)}</span>
+                      {/* The SERVER's remaining figure for this route, shown
+                          only when it published one. Untracked publishes
+                          nothing, exactly as an untracked shelf does. */}
+                      {left ? (
+                        <span className="block text-[11px] font-medium text-zinc-400 leading-tight" data-route-left={t.method}>
+                          {left}
+                        </span>
+                      ) : null}
+                    </span>
                   </span>
                   {/* The FINAL unit price for this journey — never "+X". */}
                   <span className="tabular-nums text-[13px] font-bold">
-                    {final !== null ? formatIqd(final) : s.transportUnset}
+                    {!t.configured
+                      ? s.transportUnset
+                      : !usable
+                        ? s.routeQuotaFull
+                        : final !== null
+                          ? formatIqd(final)
+                          : s.transportUnset}
                   </span>
                 </button>
               );
@@ -2125,6 +2261,15 @@ export default function Product() {
           {s.COMMUNITY_LISTING_NOT_SELLABLE}
         </p>
       ) : null}
+      {/* SOLD OUT FOR "BUY NOW", STILL OPEN AS A PRE-ORDER — said in those
+          words. The page used to show only the pre-order badge, leaving a
+          customer who came for the shelf to guess why the direct choice had
+          gone. Both halves are the server's per-type verdict. */}
+      {directSoldOutPreorderOpen ? (
+        <p className="lv-alert lv-alert-warning text-amber-100 text-[13px]" data-direct-sold-out-preorder-open>
+          {s.directSoldOutPreorderOpen}
+        </p>
+      ) : null}
       {mode !== 'unavailable' && blockingCodes.length > 0
         ? blockingCodes.map((code) => (
             <p key={code} className="lv-alert lv-alert-warning text-amber-100 text-[13px]">
@@ -2325,6 +2470,14 @@ export default function Product() {
                   <span className="border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] text-zinc-300">{product.brand}</span>
                 ) : null}
                 {stockNote ? <span className="text-zinc-400 text-[12px]">{stockNote}</span> : null}
+                {/* 0075 — THE PRE-ORDER COUNTER, NEVER THE SHELF AND NEVER
+                    THE TWO ADDED UP. It is the number the server resolved for
+                    the chosen model and route. */}
+                {capacityNote ? (
+                  <span className="text-zinc-400 text-[12px]" data-preorder-capacity-left>
+                    {capacityNote}
+                  </span>
+                ) : null}
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-white leading-snug">{name}</h1>
               <p className="mt-2 text-[12px] text-zinc-500 flex items-center gap-1.5">

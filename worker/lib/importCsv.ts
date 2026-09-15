@@ -14,6 +14,8 @@
  *   variant    one stock combination of option values (and optionally a colour)
  *   image      one gallery image, with its primary flag and binding
  *   transport  one pre-order shipping method and its commission
+ *   fulfillment one (model x order type) cell, or one of its routes — and the
+ *              OPTIONAL pre-order capacity that cell or route holds (0075)
  *   spec       one specification row, inside a named specification group
  *   label      one badge shown on the product card
  *   warranty   one warranty plan, its duration and its fee
@@ -22,7 +24,7 @@
  *
  * EVERY FIELD OF THE PRODUCT FORM HAS A HOME HERE (the owner's «ويشمل كل شي
  * كل الحقول في اضافه المنتج»). Sections 1–8 of the form map onto the product
- * row and the ten child row types above; docs/IMPORT_TEMPLATE.md holds the
+ * row and the eleven child row types above; docs/IMPORT_TEMPLATE.md holds the
  * table, and tests/importCsv.test.ts asserts that no form field is missing.
  *
  * Rows are attached to their product by `key` — the product's SKU, or its
@@ -77,6 +79,7 @@ export type RowType =
   | 'variant'
   | 'image'
   | 'transport'
+  | 'fulfillment'
   | 'spec'
   | 'label'
   | 'warranty'
@@ -213,6 +216,20 @@ export const BASE_COLUMNS = [
   'membership.premium.max_quantity',
   'stock',
   'low_stock_threshold',
+  /**
+   * 0075 — THE PRE-ORDER CAPACITY OF ONE `fulfillment` ROW, and nothing else.
+   *
+   * It is deliberately NOT a second stock column. Direct-sale availability is
+   * `stock` above, on the row `inventory_mode` selects — «استخدم مصدر مخزون
+   * واحد لكل اختيار فعلي» — and a `fulfillment` row for a direct sale is
+   * refused if it carries this cell at all.
+   *
+   * Empty  = this file says nothing, keep what is stored.
+   * 0      = tracked and empty: no units available right now.
+   * __NULL__ / __CLEAR__ = UNTRACKED: unlimited pre-orders, reserves nothing.
+   *          Neither ever touches units already held for live orders.
+   */
+  'capacity',
   // Product-owned last-mile delivery rules. Empty across all six columns is
   // the backward-compatible legacy/global tariff state.
   'standard_delivery_enabled',
@@ -290,6 +307,8 @@ export const SALE_TYPES = ['direct_sale', 'pre_order', 'bundle'] as const;
 export const STATUSES = ['draft', 'active', 'hidden'] as const;
 export const INVENTORY_MODES = ['BASE', 'OPTION', 'COLOR', 'VARIANT_COMBINATION'] as const;
 export const TRANSPORT_METHODS = ['air', 'sea', 'land'] as const;
+/** 0075 — the two order types a `fulfillment` row may name. */
+export const FULFILLMENT_TYPES = ['direct_sale', 'pre_order'] as const;
 export const WARRANTY_KINDS = ['total', 'extension'] as const;
 export const CONTENT_KINDS = ['text', 'image', 'video_embed'] as const;
 export const GUIDE_KINDS = ['setup', 'usage'] as const;
@@ -379,6 +398,18 @@ export const MEMBERSHIP_MAX_PERCENT = 100;
  */
 export const MEMBERSHIP_NULL = '__NULL__';
 
+/**
+ * 0075 — the two words a `capacity` cell may carry instead of a number.
+ *
+ * Borrowed verbatim from the TXT template (`worker/lib/template.ts`) so one
+ * admin's habit transfers between the two files. Both mean UNTRACKED here:
+ * `__NULL__` states it, `__CLEAR__` resets a number that was set. Neither is
+ * zero, and neither releases a unit already held — a clear resets the
+ * CONFIGURED number, not the holds customers already have.
+ */
+export const CAPACITY_NULL = '__NULL__';
+export const CAPACITY_CLEAR = '__CLEAR__';
+
 /** `membership.<tier key>.<field>` for every tier and field, in column order. */
 export const MEMBERSHIP_COLUMNS: string[] = MEMBERSHIP_TIERS.flatMap((t) =>
   MEMBERSHIP_FIELDS.map((f) => `${MEMBERSHIP_PREFIX}${t.key}.${f}`)
@@ -467,6 +498,7 @@ export function labelRow(shape: TemplateShape): string[] {
     direct_surcharge_iqd: 'زيادة التوفر الفوري (للبيع المباشر)',
     stock: 'المخزون',
     low_stock_threshold: 'حد التنبيه',
+    capacity: 'سعة الطلب المسبق',
     standard_delivery_enabled: 'التوصيل العادي مفعّل (yes/no)',
     standard_delivery_quantity_step: 'عدد القطع لكل رسم توصيل عادي',
     standard_delivery_fee_iqd: 'رسم شريحة التوصيل العادي (د.ع)',
@@ -582,11 +614,54 @@ export interface ParsedProduct {
    * this product always carries its rows, so the round-trip is exact.
    */
   transports: ParsedTransport[] | null;
+  /**
+   * 0075 — the (model x order type) cells and routes this sheet STATES.
+   *
+   * null = the file carries no `fulfillment` row for this product, so every
+   * stored cell survives untouched; that is every sheet written before 0075
+   * and every sheet an admin narrows down to prices. An array is the file
+   * speaking, and then the cells it lists are merged onto the stored ones —
+   * never a blind replacement, because this row type carries capacity and
+   * enablement only and knows nothing about the eight price columns a cell
+   * already holds.
+   */
+  fulfillments: ParsedFulfillment[] | null;
   specs: ParsedSpec[] | null;
   labels: ParsedLabel[] | null;
   warranty_plans: ParsedWarranty[] | null;
   content_blocks: ParsedContent[] | null;
   guide_steps: ParsedGuideStep[] | null;
+}
+
+/**
+ * 0075 — ONE `fulfillment` ROW.
+ *
+ * A row names the MODEL in `links` the way every other child row names its
+ * relations (`Group:Value`, exactly one pair), the ORDER TYPE in `value`, and
+ * — optionally — one ROUTE in `kind`. With no `kind` the row is the order-type
+ * cell itself and its `capacity` is the model's SHARED pre-order pool; with a
+ * `kind` the row is that route and its `capacity` is the route's OWN quota.
+ *
+ * A row per line rather than an encoded string in one cell, because that is
+ * this format's whole premise: "row 14: a direct sale has no capacity" points
+ * at a line the admin can see in Excel.
+ */
+export interface ParsedFulfillment {
+  line: number;
+  /** The option GROUP naming the model, from `links`. */
+  group: string;
+  /** The option VALUE naming the model, from `links`. */
+  value: string;
+  fulfillment_type: 'direct_sale' | 'pre_order';
+  /** '' = the order-type cell itself; otherwise the route this row is. */
+  method: '' | 'air' | 'sea' | 'land';
+  /**
+   * undefined = the `capacity` cell was blank: this row says nothing about
+   * the number and whatever is stored stays. null = UNTRACKED (`__NULL__` or
+   * `__CLEAR__`). A number is tracked, and 0 is a real tracked zero.
+   */
+  capacity?: number | null;
+  enabled: boolean;
 }
 
 export interface ParsedOption {
@@ -758,6 +833,43 @@ function intCell(v: string, line: number, col: string, issues: RowIssue[]): numb
   return Number(s);
 }
 
+/**
+ * 0075 — A CAPACITY CELL, in units.
+ *
+ * Four answers, and they are four different things:
+ *   ''                    -> undefined: the file says nothing; keep what is stored.
+ *   '__NULL__'/'__CLEAR__'-> null: UNTRACKED — unlimited, reserves nothing.
+ *   '0'                   -> 0: tracked, and none available right now.
+ *   'N'                   -> N.
+ *
+ * `0` and `__NULL__` must never collapse into each other: one refuses a
+ * pre-order and the other allows an unlimited number of them, so the test is
+ * on emptiness and never on falsiness.
+ */
+function capacityCell(v: string, line: number, col: string, issues: RowIssue[]): number | null | undefined {
+  const t = v.trim();
+  if (t === '') return undefined;
+  if (t === CAPACITY_NULL || t === CAPACITY_CLEAR) return null;
+  if (!/^\d+$/.test(t)) {
+    issues.push({
+      line,
+      severity: 'error',
+      message: `${col}: "${t}" ليس عددًا صحيحًا من الوحدات — اكتب رقمًا ≥ 0، أو ${CAPACITY_NULL} لغير المتتبَّعة (بلا حد) / not a whole number of units — write an integer >= 0, or ${CAPACITY_NULL} for untracked (unlimited)`,
+    });
+    return undefined;
+  }
+  const n = Number(t);
+  if (n > 1_000_000) {
+    issues.push({
+      line,
+      severity: 'error',
+      message: `${col}: "${t}" أكبر مما يستطيع المتجر تخطيطه / larger than this shop can plan for`,
+    });
+    return undefined;
+  }
+  return n;
+}
+
 /** A share of the price: 0.01..100 with at most two decimals ("7.5", "10"). */
 function percentCell(v: string, line: number, col: string, issues: RowIssue[]): number | null {
   const s = v.trim();
@@ -773,6 +885,10 @@ function percentCell(v: string, line: number, col: string, issues: RowIssue[]): 
   }
   return n;
 }
+
+/** The same name-matching `importApply.normKey` uses, so a `fulfillment` row
+ *  and an `option` row agree on what "the same model" means. */
+const normCell = (v: string) => v.trim().toLowerCase().replace(/\s+/g, ' ');
 
 const splitList = (v: string) =>
   v
@@ -1213,6 +1329,7 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         variants: [],
         images: [],
         transports: null,
+        fulfillments: null,
         specs: null,
         labels: null,
         warranty_plans: null,
@@ -1388,6 +1505,72 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
       continue;
     }
 
+    /**
+     * 0075 — ONE (MODEL x ORDER TYPE) CELL, OR ONE OF ITS ROUTES.
+     *
+     * The row carries the OPTIONAL pre-order capacity and the enabled flag,
+     * and nothing else: the eight price columns of a cell are not repeated
+     * here, so a sheet that sets a quota cannot silently rewrite a price it
+     * never mentioned. `importApply` merges these onto the stored cells.
+     */
+    if (type === 'fulfillment') {
+      const { pairs } = parseLinks();
+      if (pairs.length !== 1) {
+        issues.push({
+          line,
+          severity: 'error',
+          message:
+            'سطر fulfillment يحتاج links يسمّي موديلًا واحدًا بصيغة Group:Value / a fulfillment row needs links naming exactly one model as Group:Value',
+        });
+        continue;
+      }
+      const ftype = enumCell(cell(r, 'value'), FULFILLMENT_TYPES, line, 'value', issues, null);
+      if (!ftype) continue;
+      const kindRaw = cell(r, 'kind').trim();
+      const method = kindRaw ? enumCell(kindRaw, TRANSPORT_METHODS, line, 'kind', issues, null) : '';
+      if (method === null) continue;
+      // A DIRECT SALE HAS NO JOURNEY — the same rule the fulfilment API
+      // enforces, refused here by name at preview time.
+      if (ftype === 'direct_sale' && method) {
+        issues.push({
+          line,
+          severity: 'error',
+          message:
+            'البيع المباشر بلا طريق — air/sea/land تخص الطلب المسبق وحده / a direct sale has no transport: air/sea/land belongs to a pre-order',
+        });
+        continue;
+      }
+      const capacityValue = capacityCell(cell(r, 'capacity'), line, 'capacity', issues);
+      /**
+       * A DIRECT SALE HAS NO CAPACITY OF ITS OWN (0075 / DECISION 1).
+       *
+       * Its number is the MODEL's stock — the `stock` cell of the `option`
+       * row — and a second one here would give the shop two places to be
+       * wrong about one physical shelf. Refused rather than dropped, because
+       * an admin who typed it believes they limited something.
+       */
+      if (ftype === 'direct_sale' && capacityValue !== undefined) {
+        issues.push({
+          line,
+          severity: 'error',
+          message:
+            'capacity: البيع المباشر لا سعة له — رقمه هو مخزون الموديل، فاكتبه في عمود stock على سطر option / a direct sale has no capacity: its number is the model stock, set it in the option row stock column',
+        });
+        continue;
+      }
+      parent.fulfillments ??= [];
+      parent.fulfillments.push({
+        line,
+        group: pairs[0].group,
+        value: pairs[0].value,
+        fulfillment_type: ftype,
+        method: method as '' | 'air' | 'sea' | 'land',
+        ...(capacityValue === undefined ? {} : { capacity: capacityValue }),
+        enabled: active,
+      });
+      continue;
+    }
+
     if (type === 'spec') {
       const label = cell(r, 'label');
       if (!label) {
@@ -1501,7 +1684,7 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
     issues.push({
       line,
       severity: 'error',
-      message: `row_type غير معروف: "${type}" — الأنواع المتاحة: product / option / color / variant / image / transport / spec / label / warranty / content / guide`,
+      message: `row_type غير معروف: "${type}" — الأنواع المتاحة: product / option / color / variant / image / transport / fulfillment / spec / label / warranty / content / guide`,
     });
   }
 
@@ -1710,6 +1893,38 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
       }
       seenMethods.add(tr.method);
     }
+
+    /**
+     * 0075 — THE `fulfillment` ROWS ARE CHECKED AGAINST THE MODELS IN THE FILE.
+     *
+     * A row naming a model no `option` row declares would create a quota on
+     * something unreachable, and `resolveProduct` would have no id to hang it
+     * on; refused here, at preview, with the name it wrote. A model this file
+     * does not mention but the PRODUCT already has is a different case and is
+     * allowed — `resolveProduct` matches it against the stored rows.
+     */
+    const declaredModels = new Set(p.options.map((o) => `${normCell(o.group)}\u0000${normCell(o.value)}`));
+    const seenCells = new Set<string>();
+    for (const fl of p.fulfillments ?? []) {
+      const modelKey = `${normCell(fl.group)}\u0000${normCell(fl.value)}`;
+      if (p.options.length > 0 && !declaredModels.has(modelKey)) {
+        issues.push({
+          line: fl.line,
+          severity: 'error',
+          message: `fulfillment: لا يوجد سطر option باسم "${fl.group}:${fl.value}" في هذا الملف / no option row in this file is named "${fl.group}:${fl.value}"`,
+        });
+        continue;
+      }
+      const cellId = `${modelKey}\u0000${fl.fulfillment_type}\u0000${fl.method}`;
+      if (seenCells.has(cellId)) {
+        issues.push({
+          line: fl.line,
+          severity: 'error',
+          message: `fulfillment: "${fl.group}:${fl.value}" ${fl.fulfillment_type}${fl.method ? ` ${fl.method}` : ''} مكرر / listed twice`,
+        });
+      }
+      seenCells.add(cellId);
+    }
   }
 
   return { products: [...products.values()], issues, unknownColumns };
@@ -1759,6 +1974,15 @@ export interface ExportProduct {
   variants: Array<Omit<ParsedVariant, 'line'>>;
   images: Array<Omit<ParsedImage, 'line'>>;
   transports: Array<Omit<ParsedTransport, 'line'>>;
+  /**
+   * 0075 — the product's (model x order type) cells and their routes.
+   *
+   * OPTIONAL so a caller that does not read them exports exactly the file it
+   * did before, and an absent list means the sheet carries no `fulfillment`
+   * row — which the importer reads as "this file says nothing", preserving
+   * every stored cell.
+   */
+  fulfillments?: Array<Omit<ParsedFulfillment, 'line'>>;
   specs: Array<Omit<ParsedSpec, 'line'>>;
   labels: Array<Omit<ParsedLabel, 'line'>>;
   warranty_plans: Array<Omit<ParsedWarranty, 'line'>>;
@@ -1909,6 +2133,32 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
         value: tr.method,
         price_iqd: num(tr.commission_iqd),
         active: bool(tr.active),
+      });
+    }
+    /**
+     * 0075. An UNTRACKED capacity exports as `__NULL__`, never as an empty
+     * cell and never as `0`.
+     *
+     * Empty would mean "say nothing", so the row would stop being editable in
+     * the file the store itself produced; `0` would turn every unlimited
+     * pre-order in the catalogue into a sold-out one on the next re-import.
+     * The word survives the round trip because it is the same word the file
+     * uses to mean it.
+     */
+    for (const fl of p.fulfillments ?? []) {
+      put({
+        row_type: 'fulfillment',
+        key: p.key,
+        links: `${fl.group}:${fl.value}`,
+        value: fl.fulfillment_type,
+        kind: fl.method,
+        capacity:
+          fl.fulfillment_type === 'direct_sale'
+            ? '' // a direct sale has no capacity: its number is the option row's `stock`
+            : fl.capacity === undefined || fl.capacity === null
+              ? CAPACITY_NULL
+              : String(fl.capacity),
+        active: bool(fl.enabled),
       });
     }
     for (const sp of p.specs) {
@@ -2098,6 +2348,41 @@ export function exampleRows(shape: TemplateShape): Array<Record<string, string>>
   out.push({ row_type: 'image', key, image: 'images/example-1.jpg', alt: 'front', primary: 'yes' });
   out.push({ row_type: 'transport', key, value: 'air', price_iqd: '', active: 'yes' });
   out.push({ row_type: 'transport', key, value: 'sea', price_iqd: '15000', active: 'yes' });
+  /**
+   * 0075 — THE PRE-ORDER CAPACITY, TAUGHT AS A SHAPE AND NOT AS A QUANTITY.
+   *
+   * Every capacity here is `__NULL__` — UNTRACKED, which is exactly what the
+   * shop did before 0075 and what every existing product carries. The example
+   * must not ship a number nobody typed: a 50 in this file would be copied
+   * into a real catalogue by the first admin who edits the example in place.
+   *
+   * The two shapes are both shown, one row each:
+   *   • the cell row (no `kind`)   — the model's SHARED pool, which every
+   *     route with an empty capacity draws on;
+   *   • a route row (`kind=air`)   — that route's OWN quota, which does NOT
+   *     also spend the pool.
+   * Leaving a route row out entirely is how a route stays on the pool.
+   */
+  if (ex.options.length) {
+    const model = `${ex.options[0][0]}:${ex.options[0][1]}`;
+    out.push({
+      row_type: 'fulfillment',
+      key,
+      links: model,
+      value: 'pre_order',
+      capacity: CAPACITY_NULL,
+      active: 'yes',
+    });
+    out.push({
+      row_type: 'fulfillment',
+      key,
+      links: model,
+      value: 'pre_order',
+      kind: 'air',
+      capacity: CAPACITY_NULL,
+      active: 'yes',
+    });
+  }
   const firstSpec = shape.specFields[0];
   out.push({
     row_type: 'spec',
@@ -2323,6 +2608,61 @@ export function lookupsReadme(lookups: Lookups): string {
 }
 
 /**
+ * 0075 — THE README BLOCK FOR PRE-ORDER CAPACITY.
+ *
+ * Two things an admin cannot guess from a column name, so both are spelled
+ * out with a worked example: that a direct sale's number is the model's stock
+ * and never a capacity, and how leaving a route's capacity empty puts it on
+ * the SHARED pool while giving it a number makes the quota INDEPENDENT.
+ *
+ * No quantity in the worked example is a number the owner typed — the shapes
+ * are shown with `<العدد>` placeholders and `__NULL__`.
+ */
+export function capacityReadme(): string {
+  return `سعة الطلب المسبق (سطر fulfillment وعمود capacity)
+------------------------------------------------
+سطر fulfillment يصف خلية واحدة: موديل واحد (links = Group:Value) ونوع طلب
+واحد (value = direct_sale أو pre_order). واترك kind فارغًا ليصف الخلية نفسها،
+أو اكتب ${TRANSPORT_METHODS.join(' / ')} ليصف طريقة بعينها من طرق الطلب المسبق.
+
+البيع المباشر لا سعة له. رقمه هو مخزون الموديل نفسه — عمود stock على سطر
+option — لأن لكل اختيار فعلي مصدر مخزون واحد فقط. سطر fulfillment ببيع مباشر
+وفيه capacity يُرفض عند المعاينة قبل أن يُكتب أي شيء.
+A direct sale has NO capacity: its number is the model stock (the option row's
+stock column). One stock source per actual selection.
+
+ما تعنيه خانة capacity
+  فارغة        هذا الملف لا يقول شيئًا عن الرقم — يبقى المحفوظ كما هو.
+  0            متتبَّعة ولا توجد وحدات الآن: الطلب المسبق يُرفض.
+  ${CAPACITY_NULL}     غير متتبَّعة: الطلب المسبق بلا حد ولا يحجز شيئًا (وهو حال كل
+               منتج قبل هذه الإضافة).
+  ${CAPACITY_CLEAR}    مثل ${CAPACITY_NULL}: يُعيد الرقم المضبوط إلى «غير متتبَّعة».
+               ولا يُطلق أي وحدة محجوزة لطلب قائم — الحجز ليس إعدادًا.
+  empty = say nothing · 0 = tracked and empty · ${CAPACITY_NULL} / ${CAPACITY_CLEAR} = UNTRACKED
+  (unlimited, reserves nothing). A clear resets the configured number, never a hold.
+
+سعة مشتركة أم حصص مستقلة؟  SHARED pool vs INDEPENDENT quotas
+  • مشتركة: اكتب سطر الخلية وحده، واترك سطور الطرق بلا capacity (أو لا تكتبها
+    إطلاقًا). عندها تسحب ${TRANSPORT_METHODS.join(' و')} كلها من حوض واحد، وبيع وحدة
+    جوًا ينقص وحدة من نصيب البحر والبر.
+  • مستقلة: أعطِ الطريقة رقمها الخاص. تلك الطريقة تملك حصتها وحدها ولا تسحب
+    من الحوض المشترك — عدّاد واحد لكل عملية بيع، لا عدّادان.
+  • لا تكرر نفس الكمية تلقائيًا على الطرق الثلاث: لا شيء في هذا الملف ينسخ
+    رقمًا عنك، وكل طريقة تُكتب وحدها.
+
+مثال (استبدل <العدد> برقمك)
+  # حوض مشترك: الجو والبحر والبر يقتسمون <العدد>
+  fulfillment,KEY,,,,,,Model:A1 mini,pre_order,,<العدد>,yes
+  # نفس الحوض، مع إظهار أن الجو يسحب منه (capacity فارغة على سطر الطريقة)
+  fulfillment,KEY,,,,,,Model:A1 mini,pre_order,air,,yes
+  # حصة مستقلة للجو: لا تمس الحوض المشترك
+  fulfillment,KEY,,,,,,Model:A1 mini,pre_order,air,<حصة الجو>,yes
+  (ترتيب الأعمدة الحقيقي هو ترتيب الترويسة في data.csv — املأ الخانات
+   links و value و kind و capacity و active أيًّا كان موضعها.)
+`;
+}
+
+/**
  * The README that ships inside the ZIP — the only documentation most admins
  * will ever read, so it names every row type, every column that row type
  * uses, and the exact values each enum accepts. Nothing here is generic: the
@@ -2375,6 +2715,11 @@ ${[
     rowType('variant', 'توليفة مخزون واحدة (خيارات + لون)', 'links (Group:Value|Group:Value|color:Name), sku_part, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
     rowType('image', 'صورة واحدة في المعرض', 'image, alt, primary, links (color:Name أو option:Group:Value)'),
     rowType('transport', 'طريقة شحن للطلب المسبق وعمولتها', `value (${TRANSPORT_METHODS.join(' / ')}), price_iqd (فارغ = العمولة الافتراضية), active`),
+    rowType(
+      'fulfillment',
+      'خلية (موديل × نوع الطلب) أو أحد طرقها — والسعة الاختيارية للطلب المسبق',
+      `links (Group:Value — موديل واحد), value (${FULFILLMENT_TYPES.join(' / ')}), kind (فارغ = الخلية نفسها، أو ${TRANSPORT_METHODS.join(' / ')} لطريقة بعينها), capacity, active`
+    ),
     rowType('spec', 'سطر مواصفة داخل مجموعة مواصفات', 'group (عنوان المجموعة), label (اسم المواصفة), value, unit'),
     rowType('label', 'شارة تظهر على بطاقة المنتج', `kind (${LABEL_KEYS.join(' / ')} أو فارغ), value (النص), image (اسم الأيقونة), active`),
     rowType('warranty', 'خطة ضمان ممدد — للطابعات فقط', `value (العنوان), body (الشروط), duration_months (12 أو 24: +12 → 24 إجمالًا، +24 → 36), kind (${WARRANTY_KINDS.join(' / ')}), percent (النسبة من سعر الطابعة، مثال 7.5), price_iqd (رسم ثابت عندما لا توجد نسبة، 0 = مجاني), active`),
@@ -2412,6 +2757,8 @@ ${[
   وإعادة التأكيد بنفس import_id لا تكرر شيئًا.
 * الأسطر التي تبدأ بـ # (مثل #labels و #lookup:) يتجاهلها المستورد.
 * احذف أسطر المثال (المفتاح EXAMPLE-…) قبل الاستيراد، وإلا أُنشئ منتج بهذا الاسم.
+
+${capacityReadme()}
 
 ${membershipReadme()}
 

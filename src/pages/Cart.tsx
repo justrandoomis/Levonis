@@ -510,17 +510,53 @@ export default function Cart() {
   );
 
   /**
+   * WHICH COUNTER MOVED.
+   *
+   * 0075 put two counters behind one basket: the shelf a direct sale comes off
+   * and the import quota a pre-order consumes. A refusal that says only "that
+   * is not available" leaves the customer unable to tell whether the thing is
+   * gone or merely this month's quota is full — and those have different
+   * answers (come back tomorrow versus buy it now instead). The decoded
+   * sentence is never rewritten; the counter is named after it.
+   *
+   * The Kurdish is deliberately absent rather than invented: `loc` falls back
+   * to the Arabic sentence, which is the documented behaviour of this app's
+   * translator, and the owner writes the Sorani by hand.
+   */
+  const counterNamed = useCallback(
+    (code: string): string =>
+      code === 'PREORDER_CAPACITY_EXHAUSTED'
+        ? loc(
+            'العدّاد: حصة الطلب المسبق لهذا الاختيار — وليس مخزون البيع المباشر.',
+            'The counter: this selection’s pre-order quota — not direct-sale stock.'
+          )
+        : code === 'OUT_OF_STOCK' || code === 'QTY_UNAVAILABLE'
+          ? loc(
+              'العدّاد: مخزون البيع المباشر لهذا الاختيار.',
+              'The counter: direct-sale stock for this selection.'
+            )
+          : '',
+    [loc]
+  );
+
+  /**
    * A refusal the customer can read, in their own language.
    *
    * `HttpError` carries one untranslated sentence, and this screen used to
    * render it verbatim — so a new server code arrived as English prose, or as
    * the bare identifier itself. `refusalText` answers from the trilingual table
    * (`src/lib/refusalStrings.ts`) for the codes it owns and falls back to the
-   * server's own sentence for every code that already had one.
+   * server's own sentence for every code that already had one. Since 0075 the
+   * counter that refused is named after it.
    */
   const cartRefusal = useCallback(
-    (err: unknown, fallback: string): string => apiRefusal(err, lang as 'ar' | 'en' | 'ckb', fallback),
-    [lang]
+    (err: unknown, fallback: string): string => {
+      const said = apiRefusal(err, lang as 'ar' | 'en' | 'ckb', fallback);
+      const code = err instanceof ApiError ? err.code ?? '' : '';
+      const counter = counterNamed(code);
+      return counter ? `${said} ${counter}` : said;
+    },
+    [counterNamed, lang]
   );
 
   const loadCart = useCallback(async (opts?: { silent?: boolean }) => {
@@ -649,11 +685,46 @@ export default function Cart() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supportKey, supportRetry]);
 
-  /** The per-line ceiling the SERVER published: a composition row's `max_qty`
-   *  (the scarcest component and the offer's per-order cap, §2.4), or an
-   *  ordinary row's `stock`. `null` = unbounded. */
+  /**
+   * The per-line ceiling the SERVER published: a composition row's `max_qty`
+   * (the scarcest component and the offer's per-order cap, §2.4), or an
+   * ordinary row's resolved `availability.stock.max_qty`. `null` = unbounded.
+   *
+   * 0075 — `availability` AND NOT THE LEGACY `stock` COLUMN. `CartItem.stock`
+   * is the product's BASE row, which is the wrong number whenever the product
+   * tracks stock per option, colour or combination, and it is not a counter at
+   * all for a pre-order line: a pre-order is limited by its capacity, which the
+   * server has already folded into `max_qty` for exactly this reason. The old
+   * expression let the stepper offer a quantity the door would refuse, and on a
+   * pre-order line it offered the shelf's. The legacy column stays as the
+   * fallback for a response from a Worker that predates the field.
+   */
   const lineCap = (item: CartItem): number | null =>
-    item.composition ? item.composition.max_qty : (item.stock ?? null);
+    item.composition
+      ? item.composition.max_qty
+      : typeof item.availability?.stock?.max_qty === 'number'
+        ? item.availability.stock.max_qty
+        : (item.stock ?? null);
+
+  /**
+   * WHAT IS LEFT, ON THE COUNTER THIS LINE ACTUALLY CONSUMES.
+   *
+   * The order type decides which counter answers — `preorder` for a pre-order
+   * line, the shelf for a direct sale — and the browser adds nothing together
+   * and works nothing out: both figures are the server's own resolution for
+   * this exact selection and route. `null` means no number is published
+   * (untracked), which is not zero and must never be rendered as "0 left".
+   */
+  const lineRemaining = (item: CartItem): { left: number; preorder: boolean } | null => {
+    const a = item.availability;
+    if (!a || item.composition) return null;
+    if (a.mode === 'preorder') {
+      const cap = a.preorder?.capacity;
+      return cap && cap.tracked && cap.available !== null ? { left: cap.available, preorder: true } : null;
+    }
+    const st = a.stock;
+    return st && st.tracked && st.available !== null ? { left: st.available, preorder: false } : null;
+  };
 
   /** A composition line the server will refuse at the door — `sold_out`,
    *  `ended`, `upcoming` or `locked`. It used to sit in the cart looking
@@ -666,8 +737,10 @@ export default function Cart() {
   const clampQty = (item: CartItem, q: number) =>
     // A composition line is bounded by the server's own `max_qty` — the
     // scarcest component and the offer's per-order cap — not by a `stock`
-    // column a bundle deliberately does not have (§2.4).
-    Math.max(1, Math.min(99, Math.min(q, item.composition ? item.composition.max_qty : (item.stock ?? 99))));
+    // column a bundle deliberately does not have (§2.4). An ordinary line is
+    // bounded by the ceiling the server published for the counter it consumes
+    // (0075), which is the same number the + button disables on.
+    Math.max(1, Math.min(99, Math.min(q, lineCap(item) ?? 99)));
 
   const updateQuantity = async (item: CartItem, delta: number) => {
     if (item.qty + delta < 1) {
@@ -1550,12 +1623,26 @@ export default function Cart() {
                           </span>
                         )
                       ) : (
-                        item.stock !== null &&
-                        item.stock < 10 && (
-                          <span className="text-amber-300/90 text-[12px]">
-                            {loc(`متبقي ${item.stock} فقط`, `Only ${item.stock} left`, `تەنها ${item.stock} ماوە`)}
-                          </span>
-                        )
+                        (() => {
+                          /* 0075 — THE COUNTER THIS LINE CONSUMES, NAMED.
+                             This read the legacy base `stock` column, so a
+                             pre-order line advertised a shelf it does not
+                             come off, and an option-tracked product showed
+                             the wrong level entirely. Both numbers now come
+                             from the server's resolution for this line. */
+                          const rem = lineRemaining(item);
+                          if (!rem || rem.left >= 10) return null;
+                          return (
+                            <span className="text-amber-300/90 text-[12px]" data-line-remaining={item.id}>
+                              {rem.preorder
+                                ? loc(
+                                    `بقي ${rem.left} من حصة الطلب المسبق`,
+                                    `${rem.left} left in the pre-order quota`
+                                  )
+                                : loc(`متبقي ${rem.left} فقط`, `Only ${rem.left} left`, `تەنها ${rem.left} ماوە`)}
+                            </span>
+                          );
+                        })()
                       )}
                     </div>
                     <button

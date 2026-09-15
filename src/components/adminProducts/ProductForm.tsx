@@ -1473,7 +1473,10 @@ export default function ProductForm({
           {...section(12)}
         >
           <Suspense fallback={<div className="py-6 text-center text-[13px] text-[var(--ap-text-2)]">…</div>}>
-            <FulfillmentPanel productId={productId} />
+            {/* `rel`/`setRel` because the DIRECT-sale number inside that
+                panel is this section's model stock, not a field of its own —
+                one column, one piece of state, one save. */}
+            <FulfillmentPanel productId={productId} rel={rel} setRel={setRel} />
           </Suspense>
         </SectionCard>
       ) : null}

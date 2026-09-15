@@ -21,6 +21,31 @@
  * AIR / SEA / LAND IS NOT LOCAL DELIVERY. This panel is about how a unit
  * reaches Iraq. How it reaches the customer's door — standard or personal
  * delivery — is a separate, later choice and lives in its own section.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * 0075 — TWO COUNTERS, AND THE SCREEN SAYS WHICH IS WHICH.
+ *
+ * DIRECT SALE HAS NO COUNTER OF ITS OWN. Its availability IS the model's
+ * stock — the row `products.inventory_mode` already selects — so the direct
+ * card here edits `rel` (section 5's own state) and NOT a field of its own.
+ * Typing a number here moves the very same number in «الخيارات»: that is the
+ * owner's «استخدم مصدر مخزون واحد لكل اختيار فعلي», made literal by sharing
+ * one piece of React state rather than by asking the admin to trust a label.
+ * It therefore saves with the PRODUCT (مسودة / نشر), not with this panel's own
+ * button, and the field says so.
+ *
+ * PRE-ORDER HAS AN OPTIONAL ONE. `capacity` is NULL = UNTRACKED = unlimited,
+ * and `0` is a tracked counter with nothing left. Those are different facts,
+ * so they are DIFFERENT CONTROLS: a select states the choice out loud and the
+ * number box only exists once "a set quota" has been chosen. An empty box that
+ * silently means unlimited is exactly the defect this panel is fixing.
+ *
+ * A ROUTE EITHER SHARES OR OWNS. `transports[].capacity` NULL means air, sea
+ * and land all spend from the cell's pool; a number means that route holds its
+ * own and does not touch the pool. The consequence is written under the
+ * control in one line, so nobody has to read a migration to know which they
+ * picked — and no quantity is ever copied onto the three routes for them
+ * («لا تكرر نفس الكمية تلقائيًا على الطرق الثلاث»).
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Check, Loader2, Plane, Ship, Truck, X } from 'lucide-react';
@@ -28,6 +53,7 @@ import { ApiError, api } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import * as T from './theme';
 import { ErrorBanner, L, NullableIqd, SignedIqd, inputCls } from './ui';
+import { deriveInventoryMode, type FormValue, type RelationsState } from './form/model';
 
 type FulfillmentType = 'direct_sale' | 'pre_order';
 type Method = 'air' | 'sea' | 'land';
@@ -51,6 +77,12 @@ interface TransportCell {
   method: Method;
   enabled: boolean;
   surcharge_iqd: number | null;
+  /** 0075 — null = THIS ROUTE DRAWS ON THE CELL'S SHARED POOL. A number = it
+   *  holds its own quota and does not spend the pool. */
+  capacity: number | null;
+  /** Read-only, from the server: units this route already holds for live
+   *  pre-orders. The save is refused below it (CAPACITY_BELOW_RESERVED). */
+  capacity_reserved: number;
   lead_time_text: string;
   lead_time_min_days: number | null;
   lead_time_max_days: number | null;
@@ -60,6 +92,12 @@ interface Cell {
   option_id: string;
   fulfillment_type: FulfillmentType;
   enabled: boolean;
+  /** 0075 — PRE-ORDER ONLY. null = UNTRACKED (unlimited, nothing is held);
+   *  0 = tracked and empty. A direct-sale cell never carries one: its number
+   *  is the MODEL's stock, and sending one is refused (CAPACITY_ON_DIRECT). */
+  capacity: number | null;
+  /** Read-only, from the server. */
+  capacity_reserved: number;
   regular_price_iqd: number | null;
   prime_price_iqd: number | null;
   pro_price_iqd: number | null;
@@ -80,6 +118,11 @@ const emptyCell = (optionId: string, type: FulfillmentType): Cell => ({
   option_id: optionId,
   fulfillment_type: type,
   enabled: true,
+  // A NEW CELL CLAIMS NO LIMIT. Untracked is what every pre-order in this
+  // catalogue was before 0075, so switching an order type on changes nothing
+  // about what can be sold until the admin decides otherwise.
+  capacity: null,
+  capacity_reserved: 0,
   regular_price_iqd: null,
   prime_price_iqd: null,
   pro_price_iqd: null,
@@ -99,6 +142,10 @@ function cellFrom(raw: Record<string, unknown>): Cell {
     option_id: String(raw.option_id ?? ''),
     fulfillment_type: raw.fulfillment_type === 'pre_order' ? 'pre_order' : 'direct_sale',
     enabled: raw.enabled !== 0 && raw.enabled !== false,
+    // `num` keeps 0 and turns anything non-numeric into null, which is the
+    // whole null-versus-zero distinction this panel exists to preserve.
+    capacity: num(raw.capacity),
+    capacity_reserved: num(raw.capacity_reserved) ?? 0,
     regular_price_iqd: num(raw.regular_price_iqd),
     prime_price_iqd: num(raw.prime_price_iqd),
     pro_price_iqd: num(raw.pro_price_iqd),
@@ -111,6 +158,8 @@ function cellFrom(raw: Record<string, unknown>): Cell {
       method: (t.method === 'air' || t.method === 'sea' ? t.method : 'land') as Method,
       enabled: t.enabled !== 0 && t.enabled !== false,
       surcharge_iqd: num(t.surcharge_iqd),
+      capacity: num(t.capacity),
+      capacity_reserved: num(t.capacity_reserved) ?? 0,
       lead_time_text: String(t.lead_time_text ?? ''),
       lead_time_min_days: num(t.lead_time_min_days),
       lead_time_max_days: num(t.lead_time_max_days),
@@ -120,7 +169,22 @@ function cellFrom(raw: Record<string, unknown>): Cell {
 
 const key = (optionId: string, type: FulfillmentType) => `${optionId}|${type}`;
 
-export default function FulfillmentPanel({ productId }: { productId: string }) {
+export default function FulfillmentPanel({
+  productId,
+  rel,
+  setRel,
+}: {
+  productId: string;
+  /**
+   * SECTION 5'S OWN STATE, NOT A COPY OF IT. The direct-sale number this panel
+   * edits is `product_option_values.stock` — the one column the storefront
+   * resolves for a direct sale — so it is edited THROUGH the same state the
+   * options section edits and saved by the same PUT /relations. There is no
+   * second direct-stock field anywhere in this form, and none on the server.
+   */
+  rel: RelationsState;
+  setRel: (fn: (r: RelationsState) => RelationsState) => void;
+}) {
   const { lang } = useLanguage();
   const ar = lang === 'ar';
   const tr = (a: string, e: string) => (ar ? a : e);
@@ -158,6 +222,34 @@ export default function FulfillmentPanel({ productId }: { productId: string }) {
     void load();
   }, [load]);
 
+  /** The MODEL row as section 5 holds it — the single owner of direct stock. */
+  const modelValue = (optionId: string): FormValue | null => {
+    for (const g of rel.groups) {
+      const v = g.values.find((x) => x.id === optionId);
+      if (v) return v;
+    }
+    return null;
+  };
+
+  /**
+   * Writes the model's own stock / low-stock threshold, and re-derives the
+   * inventory source exactly as section 5 does — a stock number appearing on a
+   * model IS what moves the product from BASE to OPTION, and a panel that
+   * wrote the number without re-deriving would leave the form claiming one
+   * level while the rows said another.
+   */
+  const patchModel = (optionId: string, patch: Partial<FormValue>) =>
+    setRel((r) => {
+      const next: RelationsState = {
+        ...r,
+        groups: r.groups.map((g) => ({
+          ...g,
+          values: g.values.map((v) => (v.id === optionId ? { ...v, ...patch } : v)),
+        })),
+      };
+      return { ...next, inventory_mode: deriveInventoryMode(next) };
+    });
+
   const update = (optionId: string, type: FulfillmentType, patch: Partial<Cell>) => {
     setCells((prev) => {
       const next = new Map(prev);
@@ -188,7 +280,18 @@ export default function FulfillmentPanel({ productId }: { productId: string }) {
         ? cell.transports.filter((t) => t.method !== method)
         : [
             ...cell.transports,
-            { method, enabled: true, surcharge_iqd: null, lead_time_text: '', lead_time_min_days: null, lead_time_max_days: null },
+            {
+              method,
+              enabled: true,
+              surcharge_iqd: null,
+              // SHARED BY DEFAULT, AND NEVER A COPY OF THE POOL'S NUMBER. A new
+              // route spends the model's pool until the admin gives it a quota.
+              capacity: null,
+              capacity_reserved: 0,
+              lead_time_text: '',
+              lead_time_min_days: null,
+              lead_time_max_days: null,
+            },
           ],
     });
   };
@@ -211,6 +314,12 @@ export default function FulfillmentPanel({ productId }: { productId: string }) {
         // A direct sale has no journey, so its transports are never sent — the
         // server refuses them, and sending them would be asking to be refused.
         transports: cell.fulfillment_type === 'pre_order' ? cell.transports : undefined,
+        // 0075 — AND IT HAS NO CAPACITY EITHER. The direct number is the
+        // model's stock, which travels with the product's own save; a capacity
+        // on a direct cell is CAPACITY_ON_DIRECT. The panel never offers the
+        // control, and this line makes the payload say so even if a cell was
+        // switched from pre-order to direct while it held one.
+        capacity: cell.fulfillment_type === 'pre_order' ? cell.capacity : null,
       }));
       const res = await api.put<{ sale_types: string[] }>(`/api/admin/products/${productId}/fulfillment`, {
         fulfillments: payload,
@@ -268,14 +377,19 @@ export default function FulfillmentPanel({ productId }: { productId: string }) {
       {models.map((m) => {
         const direct = cells.get(key(m.id, 'direct_sale'));
         const pre = cells.get(key(m.id, 'pre_order'));
+        // THE LIVE number, not the loaded one: the admin may have just typed it
+        // in the direct card below, or in section 5, and the header must agree
+        // with both — there is only one number to agree about.
+        const mv = modelValue(m.id);
+        const shownStock = mv ? mv.stock : m.stock;
         return (
           <div key={m.id} className="rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] bg-[var(--ap-surface-1)] p-3">
             <div className="flex items-center justify-between gap-2 mb-2.5">
               <span className={`font-bold text-[14px] ${T.text1}`}>{ar ? m.name_ar || m.name_en : m.name_en}</span>
-              <span className={`text-[11px] ${T.text3}`}>
-                {m.stock === null
+              <span className={`text-[11px] ${T.text3}`} data-model-stock={m.id}>
+                {shownStock === null
                   ? tr('المخزون: غير مُتتبع', 'Stock: not tracked')
-                  : tr(`المخزون: ${m.stock}`, `Stock: ${m.stock}`)}
+                  : tr(`المخزون: ${shownStock}`, `Stock: ${shownStock}`)}
               </span>
             </div>
 
@@ -298,6 +412,67 @@ export default function FulfillmentPanel({ productId }: { productId: string }) {
                       checked={direct.enabled}
                       onChange={(v) => update(m.id, 'direct_sale', { enabled: v })}
                     />
+
+                    {/* ───────────────────────────────── THE MODEL'S OWN STOCK.
+                        NOT A FIELD OF THIS PANEL. `mv` is the row section 5
+                        holds, and `patchModel` writes it there — so this box
+                        and the one under «الخيارات» are the same number, and
+                        the panel's own Save never sends a direct quantity. */}
+                    {mv ? (
+                      <div
+                        className="rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-2)] p-2 space-y-2"
+                        data-direct-stock={m.id}
+                      >
+                        <L
+                          ar="مخزون البيع المباشر"
+                          en="Direct-sale stock"
+                          hint={tr(
+                            'هو مخزون الموديل نفسه — رقم واحد، لا رفّ ثانٍ. تعديله هنا يعدّله في «الخيارات»، ويُحفظ مع المنتج (مسودة/نشر).',
+                            'This IS the model’s own stock — one number, never a second shelf. Editing it here edits it under Options, and it saves with the product.'
+                          )}
+                        />
+                        <select
+                          className={`${T.select} w-full`}
+                          data-direct-stock-mode={m.id}
+                          aria-label={tr('تتبّع مخزون البيع المباشر', 'Direct-sale stock tracking')}
+                          value={mv.stock === null ? 'untracked' : 'tracked'}
+                          onChange={(e) =>
+                            patchModel(m.id, { stock: e.target.value === 'tracked' ? mv.stock ?? 0 : null })
+                          }
+                        >
+                          <option value="untracked">{tr('غير مُتتبع — يُباع دائمًا', 'Untracked — always sellable')}</option>
+                          <option value="tracked">{tr('عدد محدّد', 'A counted number')}</option>
+                        </select>
+                        {mv.stock !== null ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <L ar="القطع المتوفرة" en="Units on hand" />
+                              <Units
+                                value={mv.stock}
+                                onChange={(n) => patchModel(m.id, { stock: n })}
+                                label={tr('القطع المتوفرة', 'Units on hand')}
+                              />
+                            </div>
+                            <div>
+                              <L ar="حد التنبيه" en="Low-stock warning" />
+                              <NullableIqd
+                                value={mv.low_stock_threshold}
+                                onChange={(v) => patchModel(m.id, { low_stock_threshold: v })}
+                                placeholder={tr('بلا تنبيه', 'no warning')}
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className={`text-[11px] leading-relaxed ${T.text3}`}>
+                        {tr(
+                          'هذا الموديل غير ظاهر في «الخيارات» بعد — مخزون البيع المباشر يُضبط هناك.',
+                          'This model is not in the Options section yet — its direct-sale stock is set there.'
+                        )}
+                      </p>
+                    )}
+
                     <div>
                       <L ar="سعر البيع المباشر" en="Direct price" hint={tr('فارغ = نفس سعر الموديل', 'Empty = the model’s own price')} />
                       <NullableIqd
@@ -356,6 +531,66 @@ export default function FulfillmentPanel({ productId }: { productId: string }) {
                         onChange={(e) => update(m.id, 'pre_order', { lead_time_text: e.target.value })}
                         placeholder={tr('مثال: ٢١ إلى ٣٠ يوم', 'e.g. 21 to 30 days')}
                       />
+                    </div>
+
+                    {/* ─────────────────────── PRE-ORDER CAPACITY (0075).
+                        UNTRACKED IS A CHOICE, NOT AN EMPTY BOX. The select
+                        states it in words; the number box only exists once a
+                        quota has been asked for, so `0` (tracked and empty)
+                        can never be confused with «no limit». */}
+                    <div
+                      className="rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-2)] p-2 space-y-2"
+                      data-preorder-capacity={m.id}
+                    >
+                      <L
+                        ar="سعة الطلب المسبق"
+                        en="Pre-order capacity"
+                        hint={tr(
+                          'عدّاد مستقل تمامًا عن مخزون البيع المباشر — لا يُخصم منه ولا يمسّه.',
+                          'A counter entirely separate from direct-sale stock — a pre-order never comes off the shelf.'
+                        )}
+                      />
+                      <select
+                        className={`${T.select} w-full`}
+                        data-capacity-mode={m.id}
+                        aria-label={tr('تتبّع سعة الطلب المسبق', 'Pre-order capacity tracking')}
+                        value={pre.capacity === null ? 'untracked' : 'tracked'}
+                        onChange={(e) =>
+                          update(m.id, 'pre_order', {
+                            capacity: e.target.value === 'tracked' ? pre.capacity ?? 0 : null,
+                          })
+                        }
+                      >
+                        <option value="untracked">{tr('غير محدودة (غير مُتتبعة)', 'Unlimited (untracked)')}</option>
+                        <option value="tracked">{tr('كمية محدّدة', 'A set quota')}</option>
+                      </select>
+                      {pre.capacity === null ? (
+                        <p className={`text-[11px] leading-relaxed ${T.text3}`}>
+                          {tr(
+                            'لا حدّ لعدد الطلبات المسبقة، ولا يُحجز شيء.',
+                            'No limit is claimed, nothing is held, and the pre-order stays sellable.'
+                          )}
+                        </p>
+                      ) : (
+                        <>
+                          <Units
+                            value={pre.capacity}
+                            onChange={(n) => update(m.id, 'pre_order', { capacity: n })}
+                            label={tr('سعة الطلب المسبق', 'Pre-order capacity')}
+                          />
+                          <p className={`text-[11px] leading-relaxed ${T.text3}`}>
+                            {tr('٠ يعني: لا يوجد متاح الآن، ويُرفض الطلب المسبق.', '0 means none available right now — a pre-order is refused.')}
+                          </p>
+                        </>
+                      )}
+                      {pre.capacity_reserved > 0 ? (
+                        <p className={`text-[11px] leading-relaxed ${T.text2}`} data-capacity-held={m.id}>
+                          {tr(
+                            `محجوز الآن لطلبات قائمة: ${pre.capacity_reserved}`,
+                            `Held now for live orders: ${pre.capacity_reserved}`
+                          )}
+                        </p>
+                      ) : null}
                     </div>
 
                     {/* ------------------------------- ONE SUB-CARD PER ROUTE */}
@@ -425,6 +660,55 @@ export default function FulfillmentPanel({ productId }: { productId: string }) {
                                     placeholder={tr('زيادة المنتج', 'the product’s')}
                                   />
                                 </div>
+                                {/* ───────── SHARED POOL, OR THIS ROUTE'S OWN.
+                                    The consequence is written under the choice
+                                    because it is the whole rule: one counter
+                                    per sale, never two. */}
+                                <div className="mt-1.5">
+                                  <L ar="كمية هذه الطريقة" en="This route’s quota" />
+                                  <select
+                                    className={`${T.select} w-full`}
+                                    data-route-capacity-mode={`${m.id}|${t.method}`}
+                                    aria-label={tr('كمية هذه الطريقة', 'This route’s quota')}
+                                    value={t.capacity === null ? 'shared' : 'own'}
+                                    onChange={(e) =>
+                                      updateTransport(m.id, t.method, {
+                                        capacity: e.target.value === 'own' ? t.capacity ?? 0 : null,
+                                      })
+                                    }
+                                  >
+                                    <option value="shared">{tr('تسحب من السعة المشتركة', 'Draws on the shared capacity')}</option>
+                                    <option value="own">{tr('كمية خاصة بهذه الطريقة', 'Its own quota')}</option>
+                                  </select>
+                                  <p className={`mt-1 text-[11px] leading-relaxed ${T.text3}`}>
+                                    {t.capacity === null
+                                      ? tr(
+                                          'بيع وحدة جوًا يُنقص المتاح بحرًا وبرًا — عدّاد واحد مشترك.',
+                                          'Selling one by air leaves one fewer by sea and by land — one shared counter.'
+                                        )
+                                      : tr(
+                                          'هذه الطريقة تملك كميتها ولا تمسّ السعة المشتركة.',
+                                          'This route holds its own quota and never spends the shared capacity.'
+                                        )}
+                                  </p>
+                                  {t.capacity !== null ? (
+                                    <div className="mt-1.5">
+                                      <Units
+                                        value={t.capacity}
+                                        onChange={(n) => updateTransport(m.id, t.method, { capacity: n })}
+                                        label={tr('كمية هذه الطريقة', 'This route’s quota')}
+                                      />
+                                    </div>
+                                  ) : null}
+                                  {t.capacity_reserved > 0 ? (
+                                    <p className={`mt-1 text-[11px] leading-relaxed ${T.text2}`}>
+                                      {tr(
+                                        `محجوز على هذه الطريقة: ${t.capacity_reserved}`,
+                                        `Held on this route: ${t.capacity_reserved}`
+                                      )}
+                                    </p>
+                                  ) : null}
+                                </div>
                                 <div className="mt-1.5">
                                   <L ar="مدة هذه الطريقة" en="This route’s lead time" />
                                   <input
@@ -438,6 +722,14 @@ export default function FulfillmentPanel({ productId }: { productId: string }) {
                             );
                           })}
                       </div>
+                      {pre.transports.length > 1 ? (
+                        <p className={`mt-1.5 text-[11px] leading-relaxed ${T.text3}`} data-no-auto-copy>
+                          {tr(
+                            'الكمية لا تُنسخ تلقائيًا على الطرق الثلاث — كل طريقة تُضبط وحدها.',
+                            'A quantity is never copied onto the three routes — each one is set on its own.'
+                          )}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
@@ -454,6 +746,42 @@ export default function FulfillmentPanel({ productId }: { productId: string }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * A COUNT THAT CANNOT MEAN "UNLIMITED".
+ *
+ * `Money`/`Qty` emit `null` for an empty box, which is right for a price that
+ * inherits and wrong for a counter: here an empty box is ZERO — tracked, and
+ * nothing left — because the untracked state is reached from the select beside
+ * it and nowhere else. The text is kept locally while typing so a half-typed
+ * number is not snapped under the admin's finger.
+ */
+function Units({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) {
+  const [text, setText] = useState(String(value));
+  const [touched, setTouched] = useState(false);
+  useEffect(() => {
+    if (!touched) setText(String(value));
+  }, [value, touched]);
+  return (
+    <input
+      dir="ltr"
+      inputMode="numeric"
+      aria-label={label}
+      className={inputCls}
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/[^\d]/g, '');
+        setTouched(true);
+        setText(raw);
+        onChange(raw === '' ? 0 : Number(raw));
+      }}
+      onBlur={() => {
+        setTouched(false);
+        setText(String(value));
+      }}
+    />
   );
 }
 
