@@ -74,7 +74,7 @@ import {
 import type { PreorderPricing } from '../lib/pricing';
 import { printerProductIds } from '../lib/printerIdentity';
 import { refuseNonPrinterWarranty } from '../lib/warrantyPlans';
-import { saleAvailability, statedOrderType } from './products';
+import { lineOrderType, saleAvailability } from './products';
 import { capacityFrom, EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/productOverlay';
 import {
   isCapacityScope,
@@ -1830,34 +1830,41 @@ async function computeCheckout(
        * leave the shelf alone exactly as a prepaid one does. `priceLines` runs
        * twice, once per basis, and both passes resolve the same targets.
        */
-      // `statedOrderType` IS this chain's first two steps, and it is the same
-      // function `GET /api/cart` types the line with — one rule, one place, so
-      // the read model and this door cannot answer about different counters for
-      // one row. The `|| 'direct_sale'` is the third step, unchanged: a line
-      // whose own row states nothing is a direct sale here.
-      const orderType: OrderType = statedOrderType(sel.fulfillmentType, sel.transportMethod) || 'direct_sale';
+      // `lineOrderType` IS this whole chain, and it is the same function
+      // `GET /api/cart` types the line with — one rule, one place, so the read
+      // model and this door cannot answer about different counters for one row.
+      //
+      // ITS THIRD STEP — the DEFAULT for a row that states neither a type nor a
+      // transport — is the description this door has already computed, which is
+      // the one the cart shows. A bare `|| 'direct_sale'` here was the second
+      // half of the defect: on a dual-mode model with an empty shelf and an
+      // open import quota the cart described a live pre-order counter and this
+      // door refused about the shelf. `|| 'direct_sale'` survives only for a
+      // row nothing can type (`mode: "unavailable"`), where it is byte for byte
+      // what it did before and the line is refused on its counter below anyway.
       const capacity = view ? capacityFrom(view, sel.optionValueIds ?? []) : null;
+      // The DESCRIPTION of this exact row, asked with the line's own declared
+      // preference — the same inputs `GET /api/cart` asks with.
+      const described = saleAvailability(doc, {
+        optionValueIds: sel.optionValueIds ?? [],
+        colorId: sel.colorId || null,
+        qty,
+        // §8.2 row 18: the checkout is a customer payload too.
+        coarseStock: poolMemberIds.has(String(row.id)),
+        transportDefaults: pricingCtx.transportDefaults,
+        inventory: snapshot,
+        links: view?.links,
+        preferredType: sel.fulfillmentType || (sel.transportMethod ? 'pre_order' : null),
+        capacity,
+        transportMethod: sel.transportMethod,
+      });
+      const orderType: OrderType = lineOrderType(described, sel.fulfillmentType, sel.transportMethod) || 'direct_sale';
       // The checkout must not trust a cart row written before the cart refused
       // incomplete selections (or one a product acquired options after): a
       // legacy JSON-column line with no option is refused here with the same
       // rule the cart applies, instead of being priced at the base and stored
       // with an empty option_id.
-      refuseIncompleteSelection(
-        saleAvailability(doc, {
-          optionValueIds: sel.optionValueIds ?? [],
-          colorId: sel.colorId || null,
-          qty,
-          // §8.2 row 18: the checkout is a customer payload too.
-          coarseStock: poolMemberIds.has(String(row.id)),
-          transportDefaults: pricingCtx.transportDefaults,
-          inventory: snapshot,
-          links: view?.links,
-          preferredType: orderType,
-          capacity,
-          transportMethod: sel.transportMethod,
-        }),
-        displayName
-      );
+      refuseIncompleteSelection(described, displayName);
       // An extended warranty is a PRINTER's option (owner mandate). The cart
       // already refuses it elsewhere; the checkout re-checks the stored row so
       // a line written before the rule, or a product that left the printer

@@ -30,7 +30,7 @@ import type { ProductRelationsView } from '../lib/productOverlay';
 import { validateSelection } from '../lib/productRelations';
 import { validateCoupon } from '../lib/membershipOps';
 import { rateLimit } from '../lib/ratelimit';
-import { saleAvailability, statedOrderType, unusableOrderType } from './products';
+import { lineOrderType, saleAvailability, unusableOrderType } from './products';
 import type { SaleAvailability } from './products';
 
 /**
@@ -1328,19 +1328,23 @@ async function addCompositionLine(
  * came back untouched while `POST /api/orders` typed that same line `pre_order`
  * from its transport. The cart described a direct sale off the shelf and the
  * door refused a pre-order against a full import quota: two answers about two
- * different counters for one line. `statedOrderType` is the checkout's own
+ * different counters for one line. `lineOrderType` is the checkout's own
  * chain, so there is one rule and it lives in one place.
  *
  * A line whose own row states NOTHING — no stored type and no transport — is
- * still returned untouched: `statedOrderType` answers '' there, and the old
- * behaviour is kept.
+ * typed by `lineOrderType` from this very description, which is the same
+ * default `POST /api/orders` now applies to that row. The two used to differ:
+ * the cart left the fallback standing (an open import quota) and the door
+ * defaulted to `direct_sale` and judged the shelf. The counters are still not
+ * rewritten and no refusal is invented — a row the description cannot type at
+ * all comes back exactly as `saleAvailability` described it.
  */
 export function statedAvailability(
   a: SaleAvailability,
   stated: string,
   transportMethod: string
 ): SaleAvailability {
-  const effective = statedOrderType(stated, transportMethod);
+  const effective = lineOrderType(a, stated, transportMethod);
   const refusal = unusableOrderType(a, effective);
   if (!refusal) return a;
   return {
@@ -1493,12 +1497,22 @@ cartRoutes.post('/items', async (c) => {
   // (it is what disables the storefront button), so the cart listens to it.
   // Checked before stock so "choose an option" wins over "out of stock".
   refuseIncompleteSelection(availability);
-  // THE STATED ORDER TYPE IS HONOURED OR REFUSED, NEVER QUIETLY SWAPPED. Without
+  // THE ORDER TYPE IS HONOURED OR REFUSED, NEVER QUIETLY SWAPPED. Without
   // this, "buy now" on a model whose last unit had gone fell through to the
   // pre-order branch and the line landed in the cart as a pre-order — a
   // different price, a different wait and a different counter than the one the
   // customer pressed.
-  const statedAdd = unusableOrderType(availability, fulfillmentType);
+  //
+  // AND IT IS THE TYPE THIS ROW WILL BE, not the raw field. The door used to
+  // hand `unusableOrderType` the body's `fulfillmentType` verbatim, which
+  // answers null for anything that is not exactly one of the two types — so a
+  // body carrying a TRANSPORT and no stated type (exactly what
+  // src/components/orders/ReorderButton.tsx builds) was validated against the
+  // descriptive fallback, admitted against the SHELF, and stored as a row that
+  // both `GET /api/cart` and `POST /api/orders` then type `pre_order`: admitted
+  // against one counter and described by another in the same response.
+  // `lineOrderType` is the read model's own rule and the checkout's own rule.
+  const statedAdd = unusableOrderType(availability, lineOrderType(availability, fulfillmentType, transportMethod));
   if (statedAdd) throw badRequest(statedAdd.message, statedAdd.code);
   if (availability.mode === 'unavailable') {
     throw badRequest(
@@ -1862,9 +1876,11 @@ cartRoutes.patch('/items/:id', async (c) => {
   // An update may also CLEAR a chosen option (an explicit empty list is the
   // new selection) — the same rule as an add.
   refuseIncompleteSelection(availability);
-  // The same rule on the edit door: changing the quantity of a stated
-  // pre-order must not silently re-type the line when its quota filled up.
-  const statedPatch = unusableOrderType(availability, fulfillmentType);
+  // The same rule on the edit door, typed the same way: changing the quantity
+  // of a pre-order must not silently re-type the line when its quota filled up,
+  // and a PATCH that carries a transport with no stated type is the same row
+  // the add door writes.
+  const statedPatch = unusableOrderType(availability, lineOrderType(availability, fulfillmentType, transportMethod));
   if (statedPatch) throw badRequest(statedPatch.message, statedPatch.code);
   if (availability.mode === 'unavailable') {
     throw badRequest(

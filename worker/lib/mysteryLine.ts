@@ -203,14 +203,30 @@ export async function resolveMysteryLines(
       continue;
     }
 
-    // A family the buyer may narrow to — only when the admin allowed it, and
-    // only from the ids the pool itself carries. An unrecognised family is
-    // IGNORED rather than refused: it is a filter, not a purchase term, and
-    // refusing it would tell a caller which families exist.
-    // The SAME route `mysteryAvailability` is told about below and the same one
-    // the line will be sold on, so the wheel, the availability and the
-    // reservation read one counter.
-    const route = req.transportMethod || 'air';
+    /**
+     * THE ROUTE THE LINE IS ACTUALLY ON, AND NOTHING STOOD IN FOR IT.
+     *
+     * This was `req.transportMethod || 'air'`, so a caller that chose no route
+     * had AIR chosen for it — and `loadCandidates`' own documentation says an
+     * empty method is the "no route chosen" case, answered from the cell's
+     * SHARED pool. The listing and the detail page send no method at all, so
+     * every pre-order pool was judged against air's OWN quota: a member whose
+     * air quota was full dropped off the wheel and the whole offer read
+     * `sold_out` on the card while sea and land were still selling it, and an
+     * add on sea returned 200 for the offer the card had just refused.
+     *
+     * '' is now passed through untouched. It is the honest before-you-pick
+     * figure — the pool every route without a quota of its own will spend —
+     * and it is the SAME route `mysteryAvailability` is told about below and
+     * the same one the line will be sold on, so the wheel, the availability
+     * and the reservation read one counter.
+     *
+     * A family the buyer may narrow to — only when the admin allowed it, and
+     * only from the ids the pool itself carries. An unrecognised family is
+     * IGNORED rather than refused: it is a filter, not a purchase term, and
+     * refusing it would tell a caller which families exist.
+     */
+    const route = String(req.transportMethod ?? '').trim();
     const all = await loadCandidatesOnce(pool, '', route);
     const families = [...new Set(all.map((c) => c.family_id).filter(Boolean))].sort();
     const wanted = offer.customer_picks_family ? String(req.familyId ?? '').trim() : '';

@@ -683,17 +683,45 @@ export function saleAvailability(
  * counters for one line.
  *
  * `''` IS RETURNED WHEN THE LINE ITSELF SAYS NOTHING — no stored type and no
- * transport — and it is deliberately not the checkout's third step. That step
- * is a DEFAULT, not a fact about the line, and `saleAvailability`'s own
- * descriptive fallback is the right answer for a line whose own row states
- * nothing: turning the absence of a fact into a stated direct sale would make
- * the cart refuse `DIRECT_SALE_NOT_ENABLED` on a pre-order-only product the
- * checkout is perfectly willing to take. The checkout applies that third step
- * itself, as `|| 'direct_sale'`, which is byte for byte what it did before.
+ * transport — because this function answers about the ROW's own two columns
+ * and nothing else. That absence is a DEFAULT to apply, not a fact to invent
+ * here, and applying it is `lineOrderType` below: one function, so the cart
+ * and the checkout cannot default the same row two different ways.
  */
 export function statedOrderType(stated: string, transportMethod: string): '' | OrderType {
   if (stated === 'pre_order' || stated === 'direct_sale') return stated;
   return transportMethod ? 'pre_order' : '';
+}
+
+/**
+ * THE ORDER TYPE ONE ROW IS, WITH THE DEFAULT APPLIED — the ONE answer the
+ * read model, the cart doors and the checkout all judge a line by (DECISION 4).
+ *
+ * `statedOrderType` above answers only about the row's own two columns, and
+ * returns '' for a row that states NEITHER a type NOR a transport. That '' was
+ * then resolved twice, in two places, into two different answers: `GET
+ * /api/cart` left `saleAvailability`'s DESCRIPTIVE fallback standing (direct
+ * sale when the shelf has units, else pre-order), while `POST /api/orders`
+ * applied `|| 'direct_sale'` and judged the SHELF. On a dual-mode model with
+ * an empty shelf and an open import quota that is a live pre-order counter in
+ * the cart and an out-of-stock shelf at the door — one row, two counters.
+ *
+ * So the DEFAULT is taken from the same description both sides already hold:
+ * `saleAvailability`'s own fallback, which is the answer a page gets and the
+ * answer the cart shows. The caller passes the availability it computed for
+ * that row — same selection, same inventory, same capacity — so both sides ask
+ * one question of one function instead of two that happen to agree.
+ *
+ * '' IS STILL RETURNED for a row the description cannot type at all (`mode:
+ * "unavailable"`): there is no usable counter to default to, the line is
+ * refused either way, and inventing a type there would only change which
+ * refusal is named. The checkout keeps its `|| 'direct_sale'` for that case,
+ * byte for byte what it did before.
+ */
+export function lineOrderType(a: SaleAvailability, stated: string, transportMethod: string): '' | OrderType {
+  const declared = statedOrderType(stated, transportMethod);
+  if (declared) return declared;
+  return a.mode === 'preorder' ? 'pre_order' : a.mode === 'direct_sale' ? 'direct_sale' : '';
 }
 
 /**

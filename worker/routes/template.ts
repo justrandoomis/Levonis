@@ -1412,6 +1412,68 @@ templateRoutes.get('/export/:productId', async (c) => {
   );
 });
 
+/**
+ * THE PREVIEW PLANS THE SAVE IT IS PREVIEWING (0075).
+ *
+ * `analyzeTemplate` parses, merges and validates the DOCUMENT. It never
+ * planned, so every refusal that lives in the PLAN was invisible to the check
+ * step — and the plan is where the counter rules live. The one that matters
+ * most is `refuseStrandedCapacity`: a file that lowers a (model × pre-order)
+ * capacity below the units that cell is already holding, or clears it to
+ * untracked while it holds some, strands a live pre-order whose release would
+ * then match no row at all. `POST /apply` refuses it; `POST /parse` answered
+ * `errors: []`, `warnings: []` and a tidy diff, so the owner was told "this is
+ * fine" about a file the apply was always going to reject. The CSV door gained
+ * this pre-flight last round (`cellRefusal` in worker/routes/adminImport.ts);
+ * the TXT door — the one an owner uses most — did not.
+ *
+ * IT IS THE SAME QUESTION, NOT A SECOND ONE THAT AGREES. The refusal is not
+ * re-implemented here: this runs `planProductSave` with the arguments
+ * `POST /apply` builds a few lines further down — the same document, the same
+ * `prev`, the same relations body, the same catalogs, the same actor — so the
+ * preview cannot drift from the apply as either changes. Nothing is written:
+ * the planner only reads and returns statements, and this throws its plan away.
+ *
+ * ON A COPY OF THE DOCUMENT. The planner legitimately EDITS what it is handed
+ * (it carries costs forward for an actor without financial scope, and restores
+ * a product's stored options/colours/media when no relations body is sent), and
+ * the preview's `preview`/`diff` must keep describing the FILE, not the
+ * planner's working state.
+ *
+ * The identity the apply would assign is applied to that copy first, because
+ * the planner needs one: the existing product's id on an update, a fresh id on
+ * a create. Neither is written anywhere.
+ */
+async function plannedRefusal(
+  db: D1Database,
+  a: Analysis,
+  actor: { adminId: string; money: boolean }
+): Promise<{ message: string; code: string } | null> {
+  if (!a.doc || !a.merge || a.validation_error) return null;
+  const isUpdate = !!a.existing;
+  const doc = JSON.parse(JSON.stringify(a.doc)) as ProductDoc;
+  doc.id = isUpdate ? a.existing!.id : doc.id || newId('prd');
+  if (isUpdate && !doc.slug) doc.slug = a.existing!.slug;
+  const relationsWanted = !isUpdate || touchesStructure(a.parsed) || a.merge.inventory_mode !== undefined;
+  try {
+    await planProductSave(db, {
+      mode: isUpdate ? 'update' : 'create',
+      doc,
+      prev: isUpdate ? a.existing : null,
+      relations: relationsWanted
+        ? relationsBodyFromDoc(doc, a.existingView ?? EMPTY_RELATIONS, { inventoryMode: a.merge.inventory_mode })
+        : null,
+      catalogIds: a.refs.catalog_ids,
+      actor,
+      translations: translationInputsOf(doc),
+    });
+    return null;
+  } catch (e) {
+    if (!(e instanceof HttpError)) throw e;
+    return { message: e.message, code: e.code ?? 'VALIDATION' };
+  }
+}
+
 // ---------------------------------------------------------------- POST /parse
 
 templateRoutes.post('/parse', async (c) => {
@@ -1419,8 +1481,12 @@ templateRoutes.post('/parse', async (c) => {
   const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
   const text = str(body.text, 'text', { min: 1, max: MAX_TEMPLATE_CHARS });
 
-  const a = await analyzeTemplate(c.env.DB, text, undefined, { money: canViewFinancials(c.env, c.get('user')) });
+  const money = canViewFinancials(c.env, c.get('user'));
+  const a = await analyzeTemplate(c.env.DB, text, undefined, { money });
   const needsReview = [...(a.merge?.needs_review ?? a.refs.needs_review ?? [])];
+  // The refusals that live in the PLAN — stranded pre-order capacity above all
+  // — said before the owner presses apply, never after.
+  const planned = await plannedRefusal(c.env.DB, a, { adminId: c.get('user')!.id, money });
   // Every error / warning / needs-review entry is returned in full — the UI
   // must be able to show ALL rejected rows with their reason (§6.1), never a
   // truncated "first five".
@@ -1442,7 +1508,11 @@ templateRoutes.post('/parse', async (c) => {
     warnings: [...(a.merge?.warnings ?? a.parsed.warnings), ...(a.doc ? priceWarnings(a.doc) : [])],
     unknown_keys: a.parsed.unknown_keys,
     needs_review: needsReview,
-    validation_error: a.validation_error,
+    // A plan the apply will refuse is a validation error of this file, in the
+    // field the check step already shows. `a.validation_error` wins when both
+    // exist: the document is judged before the save it would make (and
+    // `plannedRefusal` does not plan an invalid document at all).
+    validation_error: a.validation_error ?? planned,
     applied_fields: a.merge?.applied_fields ?? [],
     cleared_fields: a.merge?.cleared_fields ?? [],
     preserved_fields: a.merge?.preserved_fields ?? [],
@@ -1950,13 +2020,20 @@ templateRoutes.post('/parse-zip', async (c) => {
 
   const decoder = new TextDecoder('utf-8');
   const files: Array<Record<string, unknown>> = [];
+  const money = canViewFinancials(c.env, c.get('user'));
+  const actor = { adminId: c.get('user')!.id, money };
   // Each entry is parsed independently — one bad file never fails the rest.
   for (const name of names) {
     try {
       const text = decoder.decode(entries[name]);
-      const a = await analyzeTemplate(c.env.DB, text, undefined, { money: canViewFinancials(c.env, c.get('user')) });
+      const a = await analyzeTemplate(c.env.DB, text, undefined, { money });
+      // The same pre-flight the single-file /parse makes: a file whose PLAN the
+      // apply will refuse — a quota cut below the units a cell is holding, most
+      // of all — is not `ready_to_apply`. An archive is where that goes unread
+      // file by file, so it is the last place a clean preview may be a guess.
+      const refusal = a.validation_error ?? (await plannedRefusal(c.env.DB, a, actor));
       const needsReview = a.merge?.needs_review ?? a.refs.needs_review ?? [];
-      const ok = a.parsed.errors.length === 0 && !a.validation_error;
+      const ok = a.parsed.errors.length === 0 && !refusal;
       files.push({
         name,
         ok,
@@ -1967,7 +2044,7 @@ templateRoutes.post('/parse-zip', async (c) => {
         warnings: [...(a.merge?.warnings ?? a.parsed.warnings), ...(a.doc ? priceWarnings(a.doc) : [])],
         unknown_keys: a.parsed.unknown_keys,
         needs_review: needsReview,
-        validation_error: a.validation_error,
+        validation_error: refusal,
         applied_fields: a.merge?.applied_fields ?? [],
         // §7.3 — the same pre-flight statement the single-file /parse makes.
         spec_fields: a.spec,

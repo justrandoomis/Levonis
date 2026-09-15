@@ -158,6 +158,16 @@ export interface MysteryCandidate {
    *  `available` was read from, so the wheel, the availability and
    *  `planInventory` can never aim at different counters. */
   targets: StockTarget[];
+  /**
+   * THOSE ROWS AS ONE COMPARABLE STRING — the identity of the COUNTER this
+   * candidate spends. The de-duplication, the supply sum and the wheel's
+   * remaining budget all key on it, so the three ask ONE question instead of
+   * three that happen to agree. '' means the candidate spends nothing (an
+   * untracked pre-order model), and then it is its own budget.
+   *
+   * Optional only so a fixture may omit it; `loadCandidates` always sets it.
+   */
+  counter_key?: string;
   /** Frozen at draw time so a later rename cannot rewrite history (§1.9). */
   name_snapshot: string;
   image_snapshot: string;
@@ -407,6 +417,27 @@ function entryMode(view: ProductRelationsView, valueIds: string[], saleTypes: st
 }
 
 /**
+ * THE ROWS A CANDIDATE ACTUALLY SPENDS, AS ONE COMPARABLE STRING.
+ *
+ * `${scope}:${scope_id || product_id}` is the IDENTICAL key
+ * `bundleAvailability` sums its demand on and the identical pair
+ * `planInventory` resolves a move to — BASE stock lives on the product row
+ * itself, so its `scope_id` is '' and the product id is what names it, and
+ * keying on the scope alone would merge every BASE candidate in the pool into
+ * one imaginary shared row. Sorted, so two candidates that spend the same rows
+ * in a different order are one counter and not two.
+ *
+ * '' means the candidate spends NOTHING — an untracked pre-order model, which
+ * claims no limit and bounds nobody.
+ */
+function counterKeyOf(productId: string, targets: StockTarget[]): string {
+  return targets
+    .map((t) => `${t.scope}:${t.scope_id || productId}`)
+    .sort()
+    .join('+');
+}
+
+/**
  * THE CANDIDATE QUERY (§7.2), built server-side, per pool, per checkout —
  * never per spool, never cached, never shipped to the browser.
  */
@@ -570,11 +601,33 @@ export async function loadCandidates(
       }
     }
 
-    // Two identical entries would be two wheel slots for ONE stock row — double
-    // weight for the same filament, and a supply figure that counts its units
-    // twice. The primary key cannot forbid it (the ids differ), so the loader
-    // does, and the admin preview says which entry was dropped and why.
-    const key = `${r.product_id}|${valueIds.join(',')}|${r.color_id}`;
+    /**
+     * TWO SEPARATE QUESTIONS, AND CONFLATING THEM BREAKS THE WHEEL EITHER WAY.
+     *
+     * 1. "IS THIS THE SAME PRIZE?" — what DUPLICATE_ENTRY is for. Two wheel
+     *    slots for one prize are double weight for the same filament, and the
+     *    primary key cannot forbid it because the entry ids differ, so the
+     *    loader does and the admin preview is told which entry was dropped.
+     *    A prize is what the CUSTOMER RECEIVES, so colour is half of it: blue
+     *    and red are two different things to win, whatever they are counted
+     *    against. This key stays descriptive for BOTH pool kinds.
+     *
+     * 2. "DO THESE SPEND THE SAME COUNTER?" — what `counter_key` is for, and
+     *    it is NOT the same question. A pre-order candidate spends the
+     *    (option_id, pre_order) cell or one of that cell's routes, and COLOUR
+     *    IS A COLUMN OF NEITHER. So one model offered in three colours is
+     *    three prizes drawn from ONE capacity row: `poolSupply` must count its
+     *    units once, and `drawSpools` must draw all three from one pile.
+     *
+     * Keying the DE-DUPLICATION on the counter collapsed those three prizes
+     * into one wheel slot — and with `duplicate_policy: 'forbid'` it made the
+     * offer unsellable while its quota sat full. Keying the SUPPLY on the
+     * prize published three places against a capacity of one. Each question
+     * gets its own key, and `counter_key` (built below, grouped on by
+     * `poolSupply` and `drawSpools`) answers the second one alone.
+     */
+    const counter = counterKeyOf(r.product_id, resolution.targets);
+    const key = `prize|${r.product_id}|${valueIds.join(',')}|${r.color_id}`;
     if (seen.has(key)) {
       drop('DUPLICATE_ENTRY', resolution.available);
       continue;
@@ -592,6 +645,7 @@ export async function loadCandidates(
       weight: Number(r.weight ?? 1),
       available: resolution.available,
       targets: resolution.targets,
+      counter_key: counter,
       name_snapshot: r.name,
       image_snapshot: namedColor?.image || namedValues.find((v) => v?.image)?.image || firstImage(r.images),
       variant_snapshot: [...valueLabels, colorLabel].filter(Boolean).join(' · '),
@@ -608,6 +662,13 @@ export interface CanonicalCandidate {
   product_id: string;
   weight: number;
   available: number | null;
+  /**
+   * The counter the entry spent, so `replayDraw` groups the wheel's budgets
+   * exactly as the draw did. ABSENT on an audit written before the wheel
+   * shared a budget per counter — and then every entry was its own budget,
+   * which is precisely how those draws ran, so the fallback reproduces them.
+   */
+  counter_key?: string;
 }
 
 /** The canonical form whose sha256 rides on every allocation this line
@@ -615,7 +676,13 @@ export interface CanonicalCandidate {
  *  reproduces the winner years later. */
 export function canonicalCandidates(candidates: MysteryCandidate[]): string {
   const rows: CanonicalCandidate[] = candidates
-    .map((c) => ({ entry_id: c.entry_id, product_id: c.product_id, weight: c.weight, available: c.available }))
+    .map((c) => ({
+      entry_id: c.entry_id,
+      product_id: c.product_id,
+      weight: c.weight,
+      available: c.available,
+      counter_key: c.counter_key ?? '',
+    }))
     .sort((a, b) => (a.entry_id < b.entry_id ? -1 : a.entry_id > b.entry_id ? 1 : 0));
   return JSON.stringify(rows);
 }
@@ -645,11 +712,15 @@ export type DrawResult =
  * so `priceLines` stays synchronous and all three of its passes see the same
  * filament.
  *
- * After each draw the chosen candidate's remaining `available` is decremented
- * IN MEMORY and a candidate at zero leaves the wheel, so two spools cannot both
- * claim the last unit of one colour. That is a courtesy, not the guarantee: the
- * real enforcement is `planInventory`'s guard plus the reservation fence, with
- * every spool's reservation in one batch.
+ * After each draw the chosen candidate's remaining budget is decremented IN
+ * MEMORY and a candidate at zero leaves the wheel, so two spools cannot both
+ * claim the last unit of one colour. That budget belongs to the COUNTER, not
+ * to the slot: candidates that spend the same row share one, or a pool with
+ * five colours on one BASE shelf of three would hand out five threes. It is
+ * the identical `counter_key` `poolSupply` sums over, so the wheel and the
+ * published supply ask one question. That is a courtesy, not the guarantee:
+ * the real enforcement is `planInventory`'s guard plus the reservation fence,
+ * with every spool's reservation in one batch.
  *
  * The duplicate policy is never silently downgraded. `forbid` that runs out of
  * distinct choices REFUSES — with no count, ever, in the customer's refusal.
@@ -664,22 +735,34 @@ export function drawSpools(input: {
   const { seed, cartItemId, spools, duplicatePolicy } = input;
   if (input.candidates.length === 0) return { ok: false, code: 'MYSTERY_NO_ELIGIBLE_STOCK' };
 
+  /** One counter's units, SHARED by every slot that spends that counter. */
+  interface Budget {
+    /** Infinity for an untracked candidate: it bounds nothing. */
+    remaining: number;
+  }
   interface Slot {
     candidate: MysteryCandidate;
     weight: number;
-    /** Infinity for an untracked pre-order candidate: it bounds nothing. */
-    remaining: number;
+    budget: Budget;
   }
+  const budgets = new Map<string, Budget>();
+  // A candidate that spends nothing has no counter to share, so it is its own
+  // budget — which is also what an audit written before `counter_key` existed
+  // replays as, and how those draws actually ran.
+  const budgetFor = (c: MysteryCandidate): Budget => {
+    const key = c.counter_key || `entry:${c.entry_id}`;
+    const found = budgets.get(key);
+    if (found) return found;
+    const made: Budget = { remaining: c.available === null ? Infinity : c.available };
+    budgets.set(key, made);
+    return made;
+  };
   // Weight 0 is EXCLUDED, kept for history (§1.9). The candidate query already
   // drops it; the wheel drops it again, so no caller can hand a zero-weight
   // entry a silent weight of one.
   let wheel: Slot[] = input.candidates
     .filter(isDrawable)
-    .map((c) => ({
-      candidate: c,
-      weight: c.weight,
-      remaining: c.available === null ? Infinity : c.available,
-    }));
+    .map((c) => ({ candidate: c, weight: c.weight, budget: budgetFor(c) }));
   if (wheel.length === 0) return { ok: false, code: 'MYSTERY_NO_ELIGIBLE_STOCK' };
   /** True once `forbid` removed a candidate that still had stock — the wheel
    *  then emptied for lack of VARIETY, not for lack of stock. */
@@ -687,7 +770,7 @@ export function drawSpools(input: {
 
   const out: DrawnSpool[] = [];
   for (let i = 0; i < spools; i++) {
-    wheel = wheel.filter((s) => s.remaining > 0);
+    wheel = wheel.filter((s) => s.budget.remaining > 0);
     if (wheel.length === 0) {
       return {
         ok: false,
@@ -701,10 +784,10 @@ export function drawSpools(input: {
     );
     const slot = wheel[Math.min(idx, wheel.length - 1)];
     out.push({ spool_index: i, candidate: slot.candidate });
-    slot.remaining -= 1;
+    slot.budget.remaining -= 1;
 
     if (duplicatePolicy === 'forbid') {
-      if (slot.remaining > 0) removedWithStock = true;
+      if (slot.budget.remaining > 0) removedWithStock = true;
       wheel = wheel.filter((s) => s !== slot);
     } else if (duplicatePolicy === 'discourage') {
       // Halved, integer division, minimum 1 — a concrete, testable rule.
@@ -785,25 +868,43 @@ export function resolveMysteryMode(offer: MysteryOffer, requested: string | null
 
 // -------------------------------------------------------- the availability
 
-/** How many one-spool offers the eligible pool can back, before the spool
- *  quantity is applied. `null` = every candidate is untracked (a pre-order
- *  pool), which bounds nothing. */
+/**
+ * How many one-spool offers the eligible pool can back, before the spool
+ * quantity is applied. `null` = at least one candidate is untracked (a
+ * pre-order pool), which bounds nothing.
+ *
+ * ONE COUNTER CONTRIBUTES ITS UNITS ONCE. Two candidates that spend the SAME
+ * row are two prizes drawn from one pile, so adding both `available` figures
+ * published that pile twice — a pre-order cell of one advertised as two, a
+ * BASE shelf of three offered five times over in a five-colour pool. The sum
+ * is taken over `counter_key`, the identical identity `drawSpools` budgets on
+ * and `bundleAvailability` sums its demand on, so the wheel, the card and the
+ * door cannot answer different questions. A candidate with no counter is its
+ * own entry, exactly as the wheel treats it.
+ */
 export function poolSupply(candidates: MysteryCandidate[]): number | null {
-  let total: number | null = null;
+  const byCounter = new Map<string, number>();
   for (const c of candidates) {
     /**
      * ONE UNTRACKED CANDIDATE MAKES THE WHOLE POOL UNBOUNDED, and skipping it
      * instead would UNDERSTATE the supply — the read model would refuse a
      * spool the door is willing to sell. The wheel is why: `drawSpools` drops
-     * a slot only when its own `remaining` hits zero, so while one slot claims
-     * no limit the wheel can never empty. (Unreachable on a `direct` pool,
-     * where an untracked candidate is dropped as `UNTRACKED_DIRECT` before it
-     * gets here; it is a real shape on a pre-order pool, where a model with no
+     * a slot only when its budget hits zero, so while one slot claims no limit
+     * the wheel can never empty. (Unreachable on a `direct` pool, where an
+     * untracked candidate is dropped as `UNTRACKED_DIRECT` before it gets
+     * here; it is a real shape on a pre-order pool, where a model with no
      * capacity cell is untracked beside one that has one.)
      */
     if (c.available === null) return null;
-    total = (total ?? 0) + c.available;
+    const key = c.counter_key || `entry:${c.entry_id}`;
+    const seen = byCounter.get(key);
+    // The lower figure wins if two readings of one row ever disagree: this
+    // number is what a stepper is published from, and it must never overstate.
+    byCounter.set(key, seen === undefined ? c.available : Math.min(seen, c.available));
   }
+  if (byCounter.size === 0) return null;
+  let total = 0;
+  for (const units of byCounter.values()) total += units;
   return total;
 }
 
@@ -844,7 +945,16 @@ export function mysteryAvailability(input: {
    * is every pre-order pool that predates 0075.
    */
   const supply = poolSupply(input.candidates);
-  const shipping: ShippingType = input.mode === 'direct' ? 'direct' : typeForTransport(input.transportMethod ?? 'air');
+  /**
+   * A LABEL, NEVER A COUNTER. The counter is `supply`, read off candidates the
+   * caller already resolved against the line's REAL route ('' = no route
+   * chosen, which spends the cell's shared pool). This only decides which
+   * pre-order journey the card is captioned with, and an empty method would
+   * caption a pre-order offer «direct shipping» — so a pre-order pool with no
+   * route chosen yet keeps the first route's caption and nothing else.
+   */
+  const shipping: ShippingType =
+    input.mode === 'direct' ? 'direct' : typeForTransport(input.transportMethod || 'air');
   const resolution: StockResolution =
     supply === null
       ? { targets: [], tracked: false, available: null, error: null }
@@ -985,6 +1095,7 @@ export function replayDraw(input: {
     weight: r.weight,
     available: r.available,
     targets: [],
+    counter_key: r.counter_key ?? '',
     name_snapshot: '',
     image_snapshot: '',
     variant_snapshot: '',
