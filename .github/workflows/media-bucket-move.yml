@@ -302,6 +302,10 @@ jobs:
             domain: string;
             destination: string;
             bytes: number;
+            /** The verdict itself. `outcome` is a label for humans; reading the
+             *  verdict back out of that label would be a second rule to keep
+             *  in sync with the first, so the row carries it directly. */
+            verified: boolean;
             outcome: string;
             method: string;
             detail: string;
@@ -321,7 +325,7 @@ jobs:
               if (!isSafeMediaKey(object.key)) {
                 blocked.push({
                   key: object.key, visibility: '-', domain: '-', destination: '-', bytes: object.size,
-                  outcome: 'BLOCKED', method: 'unsafe-key',
+                  verified: false, outcome: 'BLOCKED', method: 'unsafe-key',
                   detail: 'the Worker will not serve this key from any bucket; rename or move it by hand',
                 });
                 continue;
@@ -346,7 +350,7 @@ jobs:
               const proof = verify(destination, object);
               rows.push({
                 key: object.key, visibility: plan.visibility, domain: plan.domain, destination, bytes: object.size,
-                outcome: proof.ok ? 'VERIFIED (' + action + ')' : 'FAILED',
+                verified: proof.ok, outcome: proof.ok ? 'VERIFIED (' + action + ')' : 'FAILED',
                 method: proof.method, detail: proof.detail,
               });
               console.log((proof.ok ? 'ok   ' : 'FAIL ') + plan.visibility.padEnd(7) + ' ' +
@@ -367,16 +371,16 @@ jobs:
               const source = sources.get(row.key);
               if (!source) {
                 // Already pruned by an earlier run. Re-running is a no-op, not an error.
-                rows.push({ ...row, outcome: 'ALREADY-GONE', method: 're-list', detail: 'not in the legacy bucket' });
+                rows.push({ ...row, verified: true, outcome: 'ALREADY-GONE', method: 're-list', detail: 'not in the legacy bucket' });
                 continue;
               }
               const proof = verify(row.destination, source);
               if (!proof.ok) {
-                blocked.push({ ...row, outcome: 'KEPT', method: proof.method, detail: proof.detail });
+                blocked.push({ ...row, verified: false, outcome: 'KEPT', method: proof.method, detail: proof.detail });
                 continue;
               }
               aws(['delete-object', '--bucket', SOURCE, '--key', row.key], false);
-              rows.push({ ...row, outcome: 'SOURCE-DELETED', method: proof.method, detail: proof.detail });
+              rows.push({ ...row, verified: true, outcome: 'SOURCE-DELETED', method: proof.method, detail: proof.detail });
               console.log('pruned ' + row.key + ' (re-verified in ' + row.destination + ' by ' + proof.method + ')');
             }
           }
@@ -417,7 +421,7 @@ jobs:
           for (const r of all) {
             console.log(
               [
-                r.outcome.startsWith('VERIFIED') ? 'OK     ' : r.outcome === 'BLOCKED' ? 'BLOCKED' : r.outcome,
+                r.verified ? 'OK     ' : r.outcome === 'BLOCKED' ? 'BLOCKED' : r.outcome,
                 'src=' + r.key,
                 'domain=' + r.domain,
                 'class=' + r.visibility,
@@ -428,8 +432,8 @@ jobs:
               ].join('  ')
             );
           }
-          const pub = rows.filter((r) => r.visibility === 'public' && r.outcome.startsWith('VERIFIED'));
-          const priv = rows.filter((r) => r.visibility === 'private' && r.outcome.startsWith('VERIFIED'));
+          const pub = rows.filter((r) => r.visibility === 'public' && r.verified);
+          const priv = rows.filter((r) => r.visibility === 'private' && r.verified);
           console.log('\n===== SUMMARY =====');
           console.log('TOTAL LEGACY OBJECTS: ' + all.length);
           console.log('PUBLIC VERIFIED: ' + pub.length);
