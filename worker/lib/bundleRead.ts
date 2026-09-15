@@ -44,6 +44,7 @@
 
 import {
   bundleAvailability,
+  componentOrderType,
   COMPOSITION_LOW_BUNDLES,
   loadBundleComponents,
   loadCompositionMembers,
@@ -58,7 +59,7 @@ import {
   type SaleModeName,
 } from './bundleComposition';
 import { offerEligible, windowFromRow, type OfferCheck, type OfferWindow } from './offers';
-import { resolveStock } from './inventory';
+import { resolveForOrderType, resolveStock } from './inventory';
 import type { InventorySnapshot, StockResolution } from './inventory';
 import { resolveUnitPrice, clampMemberLadder } from './pricing';
 import type { MemberFallback, PreorderPricing, ProPricingPolicy, ResolvedPrice, Tier } from './pricing';
@@ -66,7 +67,7 @@ import { tierInherits, type TierStatus } from './entitlements';
 import { effectiveAvailability } from '@levonis/pricing/availability';
 import { typeForTransport, type ShippingType } from '@levonis/pricing/shippingType';
 import { parseProductRow, primaryMedia, type ProductDoc } from './productModel';
-import { snapshotFrom } from './productOverlay';
+import { capacityFrom, snapshotFrom } from './productOverlay';
 
 // ---------------------------------------------------------------- the rows
 
@@ -455,6 +456,9 @@ function resolveComponent(
   const member = members.get(c.member_product_id) ?? null;
   const doc = member ? member.doc : parseProductRow({ id: c.member_product_id });
   const unavailable = !member || doc.status !== 'active';
+  // Needed before the stock resolution below, because WHICH counter a component
+  // reads is decided by what the member sells, not by what is on its shelf.
+  const saleTypes0 = doc.sale_types.length ? doc.sale_types : [doc.selling_type];
 
   const snapshot: InventorySnapshot =
     member && member.view.has_relations
@@ -509,9 +513,41 @@ function resolveComponent(
     }
   }
   const selection = best?.sel ?? { option_value_ids: [], color_id: null };
-  const resolution: StockResolution = best
+  let resolution: StockResolution = best
     ? best.res
     : { targets: [], tracked: false, available: null, error: null };
+
+  /**
+   * A PRE-ORDER COMPONENT IS READ AGAINST ITS IMPORT QUOTA, NOT THE SHELF.
+   *
+   * Everything above answers `resolveStock`, which only ever knows about a
+   * shelf. For a member that sells as a pre-order that is the WRONG COUNTER in
+   * both directions: a model with an empty shelf and four import places read as
+   * sold out, so `POST /api/cart/items` refused the bundle OUT_OF_STOCK while
+   * the identical standalone pre-order line was accepted; and a model with a
+   * full quota and stock on the shelf read as freely available.
+   *
+   * THE ROUTE IS DELIBERATELY NOT PASSED HERE, and this is the one place in the
+   * change where that is the right answer rather than a shortcut. Which route a
+   * component travels on is decided by `shippingPlan(partial)` — AFTER every
+   * component has been resolved, because the plan is a property of the whole
+   * bundle — so no route exists at this point in the read. Asking for the
+   * shared pool is the honest answer to "can this bundle be bought at all":
+   * it is the counter every route without its own quota spends, and a route
+   * that holds one has at most its own smaller number, never a larger one.
+   * The CHECKOUT re-asks with the buyer's real `cart_items.transport_method`
+   * (worker/routes/orders.ts), and that answer — not this one — is what moves
+   * a counter. This function describes; the door decides.
+   */
+  if (!unavailable && member && componentOrderType({ sale_types: saleTypes0, shipping_type: 'preorder_air' }) === 'pre_order') {
+    resolution = resolveForOrderType(
+      'pre_order',
+      snapshot,
+      selection,
+      capacityFrom(member.view, selection.option_value_ids),
+      ''
+    );
+  }
   if (unavailable) {
     resolution.targets = [];
     resolution.tracked = true;
@@ -519,7 +555,7 @@ function resolveComponent(
     resolution.error = 'COMPONENT_UNAVAILABLE';
   }
 
-  const saleTypes = doc.sale_types.length ? doc.sale_types : [doc.selling_type];
+  const saleTypes = saleTypes0;
   const eff = effectiveAvailability({ availability_type: '' }, saleTypes);
   const transports = doc.preorder_transports.filter((t) => t.active !== false).map((t) => t.method);
 

@@ -2,7 +2,8 @@
  * THE COMPOSITION READ MODEL — docs/BUNDLES_MYSTERY.md §2 and §4.
  *
  * Pure functions only. No SQL, no state, no stock arithmetic of its own: this
- * module COMPOSES `resolveStock` (worker/lib/inventory.ts) and
+ * module COMPOSES `resolveForOrderType` (worker/lib/inventory.ts, the shelf or
+ * the pre-order capacity depending on the component's ORDER TYPE) and
  * `resolveUnitPrice` (packages/pricing) rather than reimplementing either, and
  * that is the whole point — a bundle has no stock and no price of its own, it
  * has an answer computed from real products every time anyone asks.
@@ -37,7 +38,14 @@
  *    stored rows and a server clock; the client classifies nothing.
  */
 
-import { isLowStock, resolveStock, type StockResolution, type StockTarget } from './inventory';
+import {
+  isCapacityScope,
+  isLowStock,
+  resolveForOrderType,
+  type InventorySnapshot,
+  type StockResolution,
+  type StockTarget,
+} from './inventory';
 import { clampMemberLadder, resolveUnitPrice, type ProPricingPolicy, type ResolvedPrice, type Tier } from './pricing';
 import { effectiveAvailability } from '@levonis/pricing/availability';
 import { typeForTransport, type ShippingType } from '@levonis/pricing/shippingType';
@@ -48,6 +56,7 @@ import { HttpError } from './http';
 import { parseProductRow, type ProductDoc } from './productModel';
 import {
   applyRelations,
+  capacityFrom,
   loadRelationsViews,
   snapshotFrom,
   EMPTY_RELATIONS,
@@ -144,14 +153,95 @@ export interface CompositionAvailability {
 const availableOf = (t: StockTarget): number | null =>
   t.stock === null ? null : Math.max(0, t.stock - Math.max(0, t.reserved));
 
-const modeOf = (c: ResolvedComponent): SaleModeName => {
+/**
+ * THE ORDER TYPE OF ONE BUNDLE COMPONENT — and therefore WHICH COUNTER that
+ * component line consumes (0075, DECISION 4).
+ *
+ * THE RULE, AND WHY IT IS THIS ONE. A standalone line answers the question from
+ * `cart_items.fulfillment_type`, the customer's own stored answer, and falls
+ * back to the transport frozen on the row. A COMPONENT has no per-component
+ * answer to fall back on: the buyer chose a BUNDLE, and the bundle carries ONE
+ * transport method for the whole line (§2.2, §17.12) precisely because a cart
+ * holds one shipping type. So the same two-step rule is applied with the
+ * member's own catalogue answer standing in for the customer's:
+ *
+ *   the member sells ONLY one way   that way, whatever the line carries
+ *   the member sells BOTH ways      the journey this component is actually on
+ *                                   — `shipping_type`, which the shared-method
+ *                                   rule already derived from the one method
+ *                                   every pre-order component offers
+ *
+ * THREE THINGS THAT ARE DELIBERATELY NOT CONSULTED. The PARENT ORDER's
+ * `pricing_basis`, because that is prepaid-versus-cash-on-delivery and a
+ * payment method is not an order type — a COD pre-order component must consume
+ * the capacity and leave the shelf alone, byte for byte, as a prepaid one does.
+ * The BUNDLE ROW's own `sale_types`, which is always `['bundle']` and says
+ * nothing about any member. And the bundle's transport method on its own,
+ * which would turn a direct-sale member packed into a pre-order box into a
+ * pre-order of a model that may have no capacity cell at all.
+ */
+export function componentOrderType(c: Pick<ResolvedComponent, 'sale_types' | 'shipping_type'>): SaleModeName {
   const eff = effectiveAvailability({ availability_type: '' }, c.sale_types);
   if (eff === 'pre_order') return 'pre_order';
   if (eff === 'direct_sale') return 'direct_sale';
   // The member sells both ways and no option narrowed it: the transport method
   // frozen onto the component is what the line is actually on.
   return c.shipping_type === 'direct' ? 'direct_sale' : 'pre_order';
-};
+}
+
+const modeOf = componentOrderType;
+
+/**
+ * THE ONE COUNTER A COMPONENT LINE CONSUMES — the standalone rule, REUSED.
+ *
+ * `resolveForOrderType` is the identical function `POST /api/orders` calls for
+ * a bare product line and `capacityFrom` is the identical projection, so a
+ * bundle component and the same product bought on its own can never resolve to
+ * different rows. Before this existed the composition path called `resolveStock`
+ * unconditionally: a pre-order component reserved the member's SHELF, taking a
+ * unit from under the direct buyer racing it, while the import quota it should
+ * have spent was never looked at and could be oversold without bound.
+ *
+ * A direct component reads the member's shelf. A pre-order component reads the
+ * (model x pre-order) cell, or the chosen route's own quota when it holds one —
+ * never both, never their sum, and never the shelf.
+ *
+ * UNTRACKED STAYS UNTRACKED. A member with no relational overlay, or whose
+ * selected model has no pre-order cell, yields `capacity: null`, which
+ * `resolveCapacity` reads as "no limit is claimed": no target, nothing
+ * reserved, the sale goes through. That is DECISION 6, and it is how every
+ * pre-order in the catalogue behaved before 0075 — never `COALESCE(capacity, 0)`,
+ * which would have closed all of them on the day it shipped.
+ */
+export function resolveComponentCounter(
+  c: Pick<ResolvedComponent, 'sale_types' | 'shipping_type' | 'selection'>,
+  snapshot: InventorySnapshot,
+  view: ProductRelationsView | null,
+  /**
+   * THE ROUTE THE LINE IS ACTUALLY ON — `cart_items.transport_method`, '' for a
+   * direct line. Passed in rather than read off `c.shipping_type`, because the
+   * read model freezes every pre-order component onto the FIRST method the
+   * components share (air before sea before land) while the buyer's own choice
+   * lives on the bundle's cart row. A route quota belongs to ONE route, so a
+   * bundle the customer put on land must spend land's quota and not the pool
+   * air happens to draw on.
+   */
+  transportMethod: string
+): StockResolution {
+  const orderType = componentOrderType(c);
+  // Capacity is configured per (MODEL x pre-order), and the model is one of the
+  // selected option values — the same argument `POST /api/orders` passes for a
+  // bare line. A direct component never looks at a capacity cell at all.
+  const capacity =
+    orderType === 'pre_order' && view ? capacityFrom(view, c.selection.option_value_ids) : null;
+  return resolveForOrderType(
+    orderType,
+    snapshot,
+    { option_value_ids: c.selection.option_value_ids, color_id: c.selection.color_id },
+    capacity,
+    orderType === 'pre_order' ? transportMethod : ''
+  );
+}
 
 /**
  * THE SCARCEST COMPONENT, and nothing more.
@@ -196,7 +286,10 @@ export function bundleAvailability(
   if (shippingSet.size > 1) errors.push('BUNDLE_SHIPPING_MIXED');
 
   // ---- demand, SUMMED per (scope, scope_id) -------------------------------
-  const demand = new Map<string, { needed: number; available: number | null; component_id: string; product_id: string }>();
+  const demand = new Map<
+    string,
+    { needed: number; available: number | null; component_id: string; product_id: string; capacity: boolean }
+  >();
   let hardZero = false;
   for (const c of counted) {
     if (c.resolution.error) {
@@ -229,6 +322,12 @@ export function bundleAvailability(
           available: availableOf(t),
           component_id: c.component_id,
           product_id: c.member_product_id,
+          // A PRE-ORDER IS NOT "OUT OF STOCK". The counter this component would
+          // spend decides which refusal is true: a full import quota is a
+          // different fact from an empty shelf, and a different wait. Carried
+          // here because `blocking[].reason` is what the cart door and the
+          // customer's screen both read.
+          capacity: isCapacityScope(t.scope),
         });
     }
   }
@@ -243,7 +342,7 @@ export function bundleAvailability(
         product_id: d.product_id,
         available: d.available,
         needed: d.needed,
-        reason: 'OUT_OF_STOCK',
+        reason: d.capacity ? 'PREORDER_CAPACITY_EXHAUSTED' : 'OUT_OF_STOCK',
       });
     }
     maxBundles = maxBundles === null ? candidate : Math.min(maxBundles, candidate);
@@ -918,6 +1017,30 @@ export async function loadCompositionMembers(db: D1Database, ids: string[]): Pro
   return out;
 }
 
+/**
+ * The member's STOCK snapshot, in the shape the resolver needs — one place, so
+ * the admin pass and the checkout door cannot build it differently. A member
+ * with no relational overlay (a pre-0073 row) falls back to its BASE counters,
+ * which is what it has always had.
+ */
+export function memberSnapshot(m: MemberRow): InventorySnapshot {
+  const base = {
+    stock: m.doc.stock,
+    reserved: Number(m.row.stock_reserved ?? 0),
+    low_stock_threshold: m.doc.low_stock_threshold,
+  };
+  return m.view.has_relations
+    ? snapshotFrom(m.view, base)
+    : {
+        inventory_mode: 'BASE',
+        base,
+        option_values: [],
+        colors: [],
+        variants: [],
+        group_ids: [],
+      };
+}
+
 /** The fulfilment mode a member product offers, before any transport is
  *  chosen. '' means it genuinely offers both and the transport decides. */
 function memberMode(doc: ProductDoc): '' | 'direct_sale' | 'pre_order' {
@@ -976,8 +1099,9 @@ export interface ResolveCompositionResult {
 /**
  * THE ONE PASS the admin preview, the save and the storefront all take.
  *
- * It resolves every component against the REAL catalogue — `resolveStock` for
- * the stock answer, `resolveUnitPrice` for the standalone value — and then
+ * It resolves every component against the REAL catalogue — `resolveComponentCounter`
+ * for the ONE counter that component's order type selects, `resolveUnitPrice`
+ * for the standalone value — and then
  * hands the result to `bundleAvailability` and `resolveBundlePrice`, the same
  * two functions the card, the cart and the door use. Admin and shop therefore
  * cannot disagree, which is the whole point of computing nothing in the panel.
@@ -1068,28 +1192,32 @@ export async function resolveComposition(
     }
 
     const sel = { option_value_ids: [...c.option_value_ids].sort(), color_id: c.color_id || null };
-    const snapshot = view.has_relations
-      ? snapshotFrom(view, {
-          stock: m.doc.stock,
-          reserved: Number(m.row.stock_reserved ?? 0),
-          low_stock_threshold: m.doc.low_stock_threshold,
-        })
-      : {
-          inventory_mode: 'BASE' as const,
-          base: {
-            stock: m.doc.stock,
-            reserved: Number(m.row.stock_reserved ?? 0),
-            low_stock_threshold: m.doc.low_stock_threshold,
-          },
-          option_values: [],
-          colors: [],
-          variants: [],
-          group_ids: [],
-        };
-    const resolution = resolveStock(snapshot, sel);
+    const snapshot = memberSnapshot(m);
+    // The journey FIRST, because it is an input to which counter this component
+    // spends — not only to what it costs.
+    const mode = memberMode(m.doc);
+    const method = mode === 'pre_order' ? (transport.method ?? '') : '';
+    const shipping: ShippingType = mode === 'pre_order' ? typeForTransport(method) : 'direct';
+    /**
+     * 0075: the counter this component would consume, by its ORDER TYPE and
+     * nothing else — the shelf for a direct component, the (model x pre-order)
+     * capacity for a pre-order one. `resolveComponentCounter` is the same
+     * `resolveForOrderType` + `capacityFrom` pair the standalone checkout line
+     * uses, so the panel's preview, the storefront card and the door can only
+     * ever be judging the same row.
+     */
+    const resolution = resolveComponentCounter(
+      { sale_types: m.doc.sale_types, shipping_type: shipping, selection: sel },
+      snapshot,
+      view,
+      method
+    );
     // A fully pinned VARIANT_COMBINATION member whose combination has no row
     // can never be sold; the customer-selectable case is decided at the door,
-    // when the choice actually exists.
+    // when the choice actually exists. A PRE-ORDER component never reaches this
+    // branch, exactly as a standalone pre-order line does not: its counter is
+    // the import quota, and `resolveCapacity` has no verdict about a shelf row
+    // that the pre-order was never going to touch.
     if (
       resolution.error === 'VARIANT_NOT_MODELLED' &&
       !c.customer_picks_option &&
@@ -1099,8 +1227,6 @@ export async function resolveComposition(
       return;
     }
 
-    const mode = memberMode(m.doc);
-    const method = mode === 'pre_order' ? (transport.method ?? '') : '';
     const unit = resolveUnitPrice({
       product: m.doc,
       optionId: sel.option_value_ids[0] || null,
@@ -1112,7 +1238,6 @@ export async function resolveComposition(
       transportDefaults: input.ctx.transportDefaults,
       preorderPricing: 'prepaid',
     });
-    const shipping: ShippingType = mode === 'pre_order' ? typeForTransport(method) : 'direct';
 
     resolved.push({
       component_id: c.id ?? `bc_new_${i}`,

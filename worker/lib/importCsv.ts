@@ -1238,6 +1238,41 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
       continue;
     }
 
+    /**
+     * 0075 — `capacity` IS A `fulfillment` ROW'S CELL AND NOBODY ELSE'S.
+     *
+     * It was added to BASE_COLUMNS, which makes it a legal cell on EVERY row,
+     * and it is read in exactly one branch. So a quota typed on the `option`
+     * row — the row where `stock` lives, which is precisely where an admin
+     * reaching for "how many may I pre-order" will type it — was dropped
+     * without a word: not an issue, not even an unknown column, and the
+     * preview showed a clean import of a limit that was never stored.
+     *
+     * The TXT side refuses the analogous mistake BY NAME
+     * (`options.N.direct.capacity`, `GroupSpec.cellFields.direct.refused`) on
+     * the stated reasoning that "an admin who typed it believes they limited
+     * something". The sheet owes the same protection, so this is that refusal
+     * in the sheet's own terms, naming the row type that carries the number.
+     *
+     * An error rather than a warning: `adminImport` marks any row with an
+     * error `failed` and keeps it out of the confirmed payload, which is the
+     * point — an import that silently ignores a limit is how a shop
+     * over-sells. The row is NOT dropped here, so the rest of its cells are
+     * still parsed and reported; the product simply does not apply until the
+     * number is moved to the row that owns it.
+     */
+    if (type !== 'fulfillment' && cell(r, 'capacity') !== '') {
+      issues.push({
+        line,
+        severity: 'error',
+        message:
+          `capacity: لا مكان لها على سطر ${type} — سعة الطلب المسبق تُكتب على سطر fulfillment (value=pre_order)، ` +
+          `ومخزون البيع المباشر يُكتب في عمود stock على سطر option / ` +
+          `capacity does not belong on a ${type} row: a pre-order capacity goes on a fulfillment row (value=pre_order), ` +
+          `and direct-sale stock goes in the stock column of an option row`,
+      });
+    }
+
     if (type === 'product') {
       if (products.has(key)) {
         issues.push({ line, severity: 'error', message: `المفتاح "${key}" مكرر في الملف` });

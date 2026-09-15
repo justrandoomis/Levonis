@@ -32,6 +32,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
+import { REFUSAL_STRINGS, apiRefusal } from '../src/lib/refusalStrings';
 
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
 
@@ -222,10 +223,38 @@ test('the cart counts from the line’s own counter, not from the legacy base co
 });
 
 test('the cart and the checkout refuse with the server’s sentence and name the counter', () => {
+  /**
+   * WHAT THIS USED TO ASSERT, AND WHY THAT WAS WORTHLESS.
+   *
+   * `assert.match(src, /PREORDER_CAPACITY_EXHAUSTED/)` is satisfied by the
+   * bare identifier inside each file's own `counterNamed` helper — which is
+   * the very code that adds a sentence AFTER the decoded refusal. So it passed
+   * while the refusal itself had no translated sentence anywhere and
+   * `apiRefusal` was handing an Arabic customer the server's English prose on
+   * both of these screens. A test that is green while the thing it is named
+   * after is broken is worse than no test.
+   *
+   * The name claims these doors "refuse with the server's sentence" — i.e.
+   * with a sentence the customer can read — so the check is made through the
+   * exact call both files make, against the table both files read.
+   */
+  const SERVER = 'The pre-order quota for this selection is full.';
+  const entry = REFUSAL_STRINGS.PREORDER_CAPACITY_EXHAUSTED;
+  assert.ok(entry, 'PREORDER_CAPACITY_EXHAUSTED has no entry in REFUSAL_STRINGS, so both doors print English');
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.ok(entry[lang]?.trim(), `PREORDER_CAPACITY_EXHAUSTED has no ${lang} sentence`);
+  }
+  assert.match(entry.ar, /[\u0600-\u06FF]/, 'the Arabic sentence carries no Arabic');
+  assert.equal(
+    apiRefusal({ code: 'PREORDER_CAPACITY_EXHAUSTED', message: SERVER }, 'ar'),
+    entry.ar,
+    'the cart and the checkout would still print the server\u2019s untranslated sentence'
+  );
+  assert.notEqual(apiRefusal({ code: 'PREORDER_CAPACITY_EXHAUSTED', message: SERVER }, 'ar'), SERVER);
+
   for (const file of [CART, CHECKOUT]) {
     const src = read(file);
     assert.match(src, /apiRefusal\(/, `${file} no longer decodes the server's own sentence`);
-    assert.match(src, /PREORDER_CAPACITY_EXHAUSTED/, `${file} says nothing about the pre-order counter`);
     assert.ok(
       src.includes('The counter: this selection’s pre-order quota — not direct-sale stock.'),
       `${file} does not say WHICH counter refused`

@@ -355,6 +355,27 @@ export function existingCellsFrom(
  *    order that never consumed its unit. An admin who really wants to cut the
  *    quota must cancel the orders first, which is a decision, not a side
  *    effect of a form save.
+ *
+ *  3. GOING UNTRACKED — capacity back to NULL — WHILE UNITS ARE HELD. This was
+ *    permitted, because the check above reads `capacity !== null && capacity <
+ *    held` and a NULL capacity is neither. It is STRICTLY WORSE than lowering
+ *    the number to 0, and this is the whole reason it has its own refusal:
+ *
+ *      the deduct guard in worker/lib/inventory.ts is
+ *      `<on_hand> IS NOT NULL AND <on_hand> >= ? AND <reserved> >= ?`,
+ *
+ *    so once the column is NULL that WHERE clause can never match again. The
+ *    held units can never be deducted and never released:
+ *    `capacity_reserved` stays non-zero for ever, `planOrderDeduction` answers
+ *    `rejected: [{ reason: 'NOT_TRACKED' }]`, and the operator note at
+ *    worker/lib/orderStageOps.ts tells staff to "check the product stock
+ *    before shipping" — naming a counter that was never involved. Re-tracking
+ *    it afterwards is then blocked for ever by CAPACITY_BELOW_RESERVED,
+ *    because any number is below a hold that can no longer be released.
+ *
+ *    "Untracked" is a claim that NOTHING is outstanding, so it is only true
+ *    when nothing is held. The refusal says what to do instead: clear the
+ *    orders, or keep a number.
  */
 export function refuseStrandedCapacity(existing: ExistingCells, cells: FulfillmentCell[]): void {
   const keptCells = new Set(cells.map((c) => cellKey(c.option_id, c.fulfillment_type)));
@@ -381,6 +402,15 @@ export function refuseStrandedCapacity(existing: ExistingCells, cells: Fulfillme
 
   for (const cell of cells) {
     const held = existing.cells.get(cellKey(cell.option_id, cell.fulfillment_type))?.capacity_reserved ?? 0;
+    // Case 3, BEFORE the comparison — a NULL capacity is not "below" anything,
+    // which is exactly how it used to slip past.
+    if (cell.capacity === null && held > 0) {
+      throw badRequest(
+        `This order type is holding ${held} pre-ordered unit(s), so its capacity cannot be cleared to untracked — ` +
+          `leave a number of at least ${held}, or cancel or fulfil those orders first.`,
+        'CAPACITY_UNTRACKED_WHILE_HELD'
+      );
+    }
     if (cell.capacity !== null && cell.capacity < held) {
       throw badRequest(
         `Capacity cannot be set below the ${held} unit(s) already held for live pre-orders.`,
@@ -390,6 +420,13 @@ export function refuseStrandedCapacity(existing: ExistingCells, cells: Fulfillme
     for (const t of cell.transports) {
       const routeHeld =
         existing.transports.get(transportKey(cell.option_id, cell.fulfillment_type, t.method))?.capacity_reserved ?? 0;
+      if (t.capacity === null && routeHeld > 0) {
+        throw badRequest(
+          `${t.method}: this route is holding ${routeHeld} pre-ordered unit(s), so its quota cannot be cleared to ` +
+            `untracked — leave a number of at least ${routeHeld}, or cancel or fulfil those orders first.`,
+          'CAPACITY_UNTRACKED_WHILE_HELD'
+        );
+      }
       if (t.capacity !== null && t.capacity < routeHeld) {
         throw badRequest(
           `${t.method}: capacity cannot be set below the ${routeHeld} unit(s) already held for live pre-orders.`,

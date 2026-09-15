@@ -270,7 +270,16 @@ test('a route left out of the file keeps its own quota; nothing copies one numbe
     STORED
   );
   const routes = (cell('pre_order')!.transports ?? []) as Array<Record<string, unknown>>;
-  assert.deepEqual(routes.map((r) => r.capacity), [null], 'only the route the file listed survives');
+  // THE ASSERTION THIS TEST'S NAME ALWAYS PROMISED. It used to read
+  // `[null]` — "only the route the file listed survives" — which is the
+  // OPPOSITE of the title and was pinning the wholesale-replace defect in
+  // `buildCells`: sea, stored and unmentioned, was deleted along with whatever
+  // quota it held. Omission preserves, here as everywhere else in this format.
+  assert.deepEqual(
+    routes.map((r) => [r.method, r.capacity]),
+    [['air', null], ['sea', null]],
+    'a route the file left out was deleted instead of kept'
+  );
   assert.ok(
     routes.every((r) => r.capacity !== 40),
     'the pool is never copied onto a route'
@@ -504,30 +513,114 @@ const fulfil = (over: Record<string, string>) => ({
   ...over,
 });
 
+/**
+ * WHERE EACH TXT CELL KEY LIVES IN THE SHEET — the pin itself.
+ *
+ * This test used to be a hand-written list of assertions about the four keys
+ * that existed the day it was written. It was named "stay pinned to each
+ * other" and pinned NOTHING to anything: a fifth key added tomorrow with no
+ * CSV home left it green, which is precisely the drift the name promises to
+ * catch. The table below is walked against the registry in both directions, so
+ * a new key fails here until whoever adds it says where it lives in the sheet
+ * — or states here, with a reason, that it deliberately has no cell.
+ *
+ * `null` is a DECISION and not an absence.
+ */
+const CSV_HOME: Record<string, string | null> = {
+  // ONE STOCK SOURCE PER ACTUAL SELECTION. Both direct spellings ARE the
+  // model's own columns on the `option` row, which the sheet has always
+  // carried — two spellings, one column, in both files.
+  'direct.stock': 'stock',
+  'direct.low_stock_threshold': 'low_stock_threshold',
+
+  // THE TWO PRE-ORDER COUNTERS SHARE ONE COLUMN, and the ROW says which one it
+  // is: a `fulfillment` row with an empty `kind` is the model's shared pool,
+  // one naming air/sea/land is that route's independent quota. Never both,
+  // never a sum.
+  'preorder.capacity': 'capacity',
+  'preorder.transports.capacity': 'capacity',
+  'preorder.transports.method': 'kind',
+
+  // A cell, and a route, is switched on or off by the `active` column of the
+  // `fulfillment` row that names it.
+  'direct.enabled': 'active',
+  'preorder.enabled': 'active',
+  'preorder.transports.enabled': 'active',
+
+  // NO SHEET CELL, ON PURPOSE. A `fulfillment` row carries the optional
+  // capacity and the enabled flag and NOTHING ELSE (worker/lib/importCsv.ts):
+  // repeating a cell's price ladder and its lead time there would let a sheet
+  // that sets a quota silently rewrite a price it never mentioned. These are
+  // edited in the TXT file or in the admin form.
+  'direct.price_iqd': null,
+  'direct.prime_price_iqd': null,
+  'direct.pro_price_iqd': null,
+  'direct.cost_iqd': null,
+  'preorder.price_iqd': null,
+  'preorder.prime_price_iqd': null,
+  'preorder.pro_price_iqd': null,
+  'preorder.cost_iqd': null,
+  'preorder.lead_time_text': null,
+  'preorder.lead_time_min_days': null,
+  'preorder.lead_time_max_days': null,
+  'preorder.transports.surcharge_iqd': null,
+  'preorder.transports.price_iqd': null,
+  'preorder.transports.prime_price_iqd': null,
+  'preorder.transports.pro_price_iqd': null,
+  'preorder.transports.lead_time_text': null,
+  'preorder.transports.lead_time_min_days': null,
+  'preorder.transports.lead_time_max_days': null,
+};
+
+/** Every `options.N.<cell>[.<list>].<field>` key the TXT registry declares. */
+function txtCellKeys(): string[] {
+  const options = FIELD_REGISTRY.groups.find((g) => g.name === 'options')!;
+  const keys: string[] = [];
+  for (const [cellName, cell] of Object.entries(options.cellFields!)) {
+    for (const f of cell.fields) keys.push(`${cellName}.${f.key}`);
+    if (cell.list) for (const f of cell.list.fields) keys.push(`${cellName}.${cell.list.name}.${f.key}`);
+  }
+  return keys;
+}
+
 test('the CSV column list and the TXT key list stay pinned to each other', () => {
+  const keys = txtCellKeys();
+  const columns = BASE_COLUMNS as readonly string[];
+
+  // 1. NO TXT CELL KEY MAY EXIST WITHOUT A DECLARED SHEET HOME. This is the
+  //    assertion the old body was missing entirely.
+  assert.deepEqual(
+    keys.filter((k) => !(k in CSV_HOME)),
+    [],
+    'a TXT cell key has no declared CSV home — add it to CSV_HOME with its column, or with null and the reason it has none'
+  );
+  // 2. AND THE TABLE MAY NOT OUTLIVE THE KEYS, or it stops describing the
+  //    format and starts describing a memory of it.
+  assert.deepEqual(
+    Object.keys(CSV_HOME).filter((k) => !keys.includes(k)),
+    [],
+    'CSV_HOME names a TXT cell key the registry no longer declares'
+  );
+  // 3. EVERY NAMED COLUMN IS A REAL COLUMN OF THE SHEET.
+  for (const [key, column] of Object.entries(CSV_HOME)) {
+    if (column === null) continue;
+    assert.ok(columns.includes(column), `${key} is mapped to "${column}", which is not a column of the sheet`);
+  }
+
+  // The direct aliases really are aliases onto the model's own column — the
+  // reason they need no column of their own.
   const options = FIELD_REGISTRY.groups.find((g) => g.name === 'options')!;
   const direct = options.cellFields!.direct!;
-  const preorder = options.cellFields!.preorder!;
-
-  // The direct aliases have no column of their own ON PURPOSE: they are the
-  // option row's `stock` / `low_stock_threshold`, which the sheet has always
-  // carried. Two spellings, one column, in both files.
   assert.ok(direct.fields.some((f) => f.key === 'stock' && f.onModel));
-  assert.ok((BASE_COLUMNS as readonly string[]).includes('stock'));
-  assert.ok((BASE_COLUMNS as readonly string[]).includes('low_stock_threshold'));
   assert.equal(
-    (BASE_COLUMNS as readonly string[]).some((c) => c === 'direct_stock' || c === 'preorder_stock'),
+    columns.some((c) => c === 'direct_stock' || c === 'preorder_stock'),
     false,
     'no second direct-stock column may appear in the sheet either'
   );
-
-  // The two capacity keys DO have a home, and exactly one: the `capacity`
-  // column of a `fulfillment` row.
-  assert.ok(preorder.fields.some((f) => f.key === 'capacity'));
-  assert.ok(preorder.list!.fields.some((f) => f.key === 'capacity'));
-  assert.ok((BASE_COLUMNS as readonly string[]).includes('capacity'));
+  // And there is exactly ONE capacity column, which both capacity keys map to
+  // above: the row type is what tells the two counters apart.
   assert.equal(
-    (BASE_COLUMNS as readonly string[]).filter((c) => c.includes('capacity')).length,
+    columns.filter((c) => c.includes('capacity')).length,
     1,
     'one capacity column: the row type says which counter it is'
   );
@@ -919,13 +1012,12 @@ test('re-applying the SAME file keeps the row ids and the units already held', a
   raw.prepare('UPDATE product_option_fulfillment SET capacity_reserved = 4 WHERE id = ?').run(before.id);
   raw.prepare("UPDATE product_option_transports SET capacity_reserved = 1 WHERE method = 'air'").run();
 
+  // The SAME file, applied again as an update. The replace is delete-then-
+  // insert, so this is the case that would mint a new row id and zero the hold.
   const updated = await applyText(
     app,
     FILE.replace('template_version=2', `template_version=2
-product_id=${productId}`).replace(
-      'options.1.preorder.capacity=30',
-      'options.1.preorder.capacity=__CLEAR__'
-    ),
+product_id=${productId}`),
     'update'
   );
   assert.equal(updated.success, true, JSON.stringify(updated));
@@ -936,12 +1028,81 @@ product_id=${productId}`).replace(
     'pre_order'
   ) as { id: string; capacity: number | null; capacity_reserved: number };
   assert.equal(after.id, before.id, 'the row id is inventory_ledger.scope_id — minting a new one strands the hold');
-  assert.equal(after.capacity, null, '__CLEAR__ reset the configured number');
-  assert.equal(after.capacity_reserved, 4, 'and released nothing a customer is holding');
+  assert.equal(after.capacity, 30, 'the file said 30 and still says 30');
+  assert.equal(after.capacity_reserved, 4, 'and it released nothing a customer is holding');
   const air = row(raw, "SELECT capacity_reserved FROM product_option_transports WHERE method = 'air'") as {
     capacity_reserved: number;
   };
   assert.equal(air.capacity_reserved, 1);
+});
+
+test('__CLEAR__ on a capacity that is HOLDING units is refused, not silently obeyed', async () => {
+  // This case used to assert the opposite — that __CLEAR__ went through and
+  // simply kept the hold — and that was wrong, so the assertion is inverted
+  // here rather than deleted. Untracked is STRICTLY WORSE than zero: the
+  // deduct guard is `<onHand> IS NOT NULL AND ...`, so once the column is NULL
+  // the held units can be neither deducted at confirmation nor released on a
+  // cancel. They would sit in capacity_reserved for ever, and re-tracking the
+  // quota would then be blocked below them for ever by CAPACITY_BELOW_RESERVED.
+  // __CLEAR__ is how an owner stops LIMITING a pre-order; it is not how they
+  // lose the orders they have already taken.
+  const raw = freshDb();
+  const app = stubApp(asD1(raw), OWNER, mount);
+  const created = await applyText(app, FILE);
+  const productId = String(created.product_id ?? created.id ?? '');
+  const before = row(raw, 'SELECT id FROM product_option_fulfillment WHERE fulfillment_type = ?', 'pre_order') as {
+    id: string;
+  };
+  raw.prepare('UPDATE product_option_fulfillment SET capacity_reserved = 4 WHERE id = ?').run(before.id);
+
+  const cleared = await applyText(
+    app,
+    FILE.replace('template_version=2', `template_version=2
+product_id=${productId}`).replace(
+      'options.1.preorder.capacity=30',
+      'options.1.preorder.capacity=__CLEAR__'
+    ),
+    'update'
+  );
+  assert.equal(cleared.success, false, JSON.stringify(cleared));
+  assert.equal(cleared.code, 'CAPACITY_UNTRACKED_WHILE_HELD', JSON.stringify(cleared));
+  assert.match(String(cleared.error), /4/, 'the refusal names the count, so the owner knows what to cancel');
+
+  const after = row(
+    raw,
+    'SELECT capacity, capacity_reserved FROM product_option_fulfillment WHERE fulfillment_type = ?',
+    'pre_order'
+  ) as { capacity: number | null; capacity_reserved: number };
+  assert.equal(after.capacity, 30, 'and the refusal changed nothing');
+  assert.equal(after.capacity_reserved, 4);
+});
+
+test('__CLEAR__ IS obeyed once nothing is held, and keeps the row id', async () => {
+  const raw = freshDb();
+  const app = stubApp(asD1(raw), OWNER, mount);
+  const created = await applyText(app, FILE);
+  const productId = String(created.product_id ?? created.id ?? '');
+  const before = row(raw, 'SELECT id FROM product_option_fulfillment WHERE fulfillment_type = ?', 'pre_order') as {
+    id: string;
+  };
+
+  const cleared = await applyText(
+    app,
+    FILE.replace('template_version=2', `template_version=2
+product_id=${productId}`).replace(
+      'options.1.preorder.capacity=30',
+      'options.1.preorder.capacity=__CLEAR__'
+    ),
+    'update'
+  );
+  assert.equal(cleared.success, true, JSON.stringify(cleared));
+  const after = row(
+    raw,
+    'SELECT id, capacity FROM product_option_fulfillment WHERE fulfillment_type = ?',
+    'pre_order'
+  ) as { id: string; capacity: number | null };
+  assert.equal(after.capacity, null, 'untracked = unlimited pre-orders again');
+  assert.equal(after.id, before.id, 'and the row identity still survives the replace');
 });
 
 test('a file that mentions no cell block leaves the stored cells exactly as they are', async () => {

@@ -53,11 +53,15 @@ import { ProductAddedV1 } from '@levonis/contracts/events/v1/ProductAdded';
 import { sha256Hex } from '@levonis/contracts/canonical';
 import { availabilityFromName, deriveSaleTypes, normalizeAvailability, variantKeyFrom, variantLabelFallback } from './availability';
 import {
+  cellKey,
   existingCellsFrom,
   fulfillmentStatements,
   legacyShapeErrors,
   parseFulfillmentPayload,
   refuseStrandedCapacity,
+  transportKey,
+  type ExistingCells,
+  type FulfillmentCell,
 } from './optionFulfillment';
 import {
   normalizeSaleTypes,
@@ -812,6 +816,59 @@ export async function planRelationsWriteFrom(
     warnings.push(
       `Colour "${col.name_en}" is named by a live order and was deactivated instead of deleted / اللون مرتبط بطلب حيّ فعُطِّل بدل حذفه`
     );
+  }
+
+  // ---- a model that is HOLDING PRE-ORDERED UNITS is not deletable --------
+  //
+  // 0075's hold does not live on the option value. `product_option_values
+  // .reserved` counts units on a SHELF, and the guard above reads exactly
+  // that; a pre-ordered unit is held on the (model x pre-order) cell's
+  // `capacity_reserved` or on one route's, so a model can be holding ten
+  // pre-orders with `reserved = 0` and look perfectly deletable.
+  //
+  // Delete it and SQLite's ON DELETE CASCADE (migration 0073:
+  // `option_id ... REFERENCES product_option_values(id) ON DELETE CASCADE`)
+  // takes the cell and its routes with it. `inventory_ledger.scope_id` then
+  // names a row that no longer exists: the release for that order matches
+  // nothing, the units are never given back, and no screen can show where
+  // they went.
+  //
+  // WHY HERE AND NOT BESIDE THE CELL WRITER. `refuseStrandedCapacity` runs
+  // only for a payload that MENTIONS cells, and a file that DELETES a model
+  // carries no `fulfillments` key at all — the guard was reachable only by
+  // the payloads that did not need it. Every writer (the form, the TXT
+  // template, the CSV sheet, `options=__CLEAR__`) reaches the deletion
+  // through this function, so the refusal belongs with the other deletion
+  // guards, where all of them inherit it.
+  //
+  // A value RETAINED for a live order is DEACTIVATED rather than deleted, so
+  // its cells and their holds survive and it is exempt.
+  //
+  // The addition below is a COUNT OF OUTSTANDING HOLDS for the sentence, not
+  // a stock figure: every held unit sits on exactly one counter, and nothing
+  // here resolves, sums or spends a counter.
+  const retainedForOrders = new Set(retainedValues.map((v) => v.id));
+  const cellOwner = new Map<string, string>();
+  const heldByOption = new Map<string, number>();
+  const addHeld = (optionId: string, held: number) => {
+    if (held > 0) heldByOption.set(optionId, (heldByOption.get(optionId) ?? 0) + held);
+  };
+  for (const f of existing.fulfillments ?? []) {
+    cellOwner.set(f.id, f.option_id);
+    addHeld(f.option_id, Number(f.capacity_reserved ?? 0));
+  }
+  for (const t of existing.transports ?? []) {
+    const owner = cellOwner.get(t.fulfillment_id);
+    if (owner) addHeld(owner, Number(t.capacity_reserved ?? 0));
+  }
+  for (const v of existing.values) {
+    if (keptValues.has(v.id) || retainedForOrders.has(v.id)) continue;
+    const held = heldByOption.get(v.id) ?? 0;
+    if (held > 0) {
+      errors.push(
+        `Option "${v.name_en}" is holding ${held} pre-ordered unit(s) and cannot be removed — cancel or fulfil those pre-orders first / الخيار يحجز وحدات مطلوبة مسبقًا ولا يمكن حذفه`
+      );
+    }
   }
   // A live-order query that failed for any reason other than "this database
   // predates 0023" leaves the protection UNEVALUATED. Deleting on that basis
@@ -1708,6 +1765,14 @@ export interface ProductSavePlan {
   /** The document as it will be stored (after the cost gate). */
   doc: ProductDoc | null;
   relations: { mode: InventoryMode; summary: RelationsSummary; requested: RequestedRelations } | null;
+  /**
+   * 0075. THE (MODEL x ORDER TYPE) CELLS THIS SAVE IS WRITING, PARSED, plus
+   * what the rows were holding when the plan was built — so `verifyApplied`
+   * can read the capacity back and prove it landed. `null` when the payload
+   * said nothing about cells, which means "preserve", and there is nothing to
+   * compare.
+   */
+  cells: { requested: FulfillmentCell[]; held: ExistingCells } | null;
   catalogIds: string[] | null;
   priceHistory: PriceDelta[];
   hashtagsRegistered: number;
@@ -1974,6 +2039,7 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
    * cell naming a model that is not on this product).
    */
   const cellStatements: D1PreparedStatement[] = [];
+  let plannedCells: ProductSavePlan['cells'] = null;
   if (relations?.requested) {
     const cells: unknown[] = [];
     for (const v of relations.requested.values) {
@@ -2030,6 +2096,10 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
       // pre-order whose release would then match no row at all.
       refuseStrandedCapacity(existing, parsed);
       cellStatements.push(...fulfillmentStatements(db, productId, parsed, undefined, existing));
+      // Carried to `verifyApplied`: the capacity is a NUMBER THIS SAVE WROTE,
+      // and until now the read-back net compared every other written number
+      // and not this one.
+      plannedCells = { requested: parsed, held: existing };
     }
   }
 
@@ -2115,6 +2185,7 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
     statements,
     doc,
     relations,
+    cells: plannedCells,
     catalogIds,
     priceHistory,
     hashtagsRegistered,
@@ -2463,6 +2534,93 @@ export function verifyApplied(
     }
   } else if (opts.inventoryMode && stored.relations.product.inventory_mode !== opts.inventoryMode) {
     out.push({ section: 'inventory', key: 'inventory_mode', requested: opts.inventoryMode, stored: stored.relations.product.inventory_mode });
+  }
+
+  /**
+   * ---- THE PRE-ORDER COUNTER, READ BACK (0075) -----------------------------
+   *
+   * The net above compared every number this save wrote EXCEPT the two that
+   * 0075 added. `options.N.*` keys are skipped in the document half as
+   * "structural — verified through the relation tables below", and the
+   * relation tables it then verified were groups, values, colours, variants
+   * and images; `product_option_fulfillment` and `product_option_transports`
+   * were verified nowhere. A capacity write that silently failed to land —
+   * the batch reordered, a column absent on an edge that ran ahead of its
+   * migration, a cell matched to the wrong row — was reported as a clean
+   * apply, and the first sign of it would have been an oversold pre-order.
+   *
+   * SECTION `inventory`, not a new one. A capacity IS an inventory figure, and
+   * the section union is mirrored by the admin client
+   * (src/components/adminProducts/types.ts `ApplyMismatchSection`) which this
+   * change may not edit; a section the client cannot name would be worse than
+   * the honest label that already exists.
+   *
+   * `capacity` IS COMPARED EXACTLY. It is a setting this save wrote, exactly
+   * like `stock` on a value.
+   *
+   * `capacity_reserved` IS COMPARED ONE-SIDED — a mismatch only when units
+   * were LOST (stored below what the rows held when the plan was built).
+   * Nothing in a save may lower a hold: the replace carries it verbatim, and a
+   * drop to 0 is the stranding failure this whole feature exists to prevent.
+   * It may legitimately RISE between the plan and the read-back, because a
+   * checkout on another request reserves against the same row, and failing an
+   * admin's apply for someone else's purchase would be a false alarm. (The
+   * narrow converse — a `deduct` committing in that same window — would report
+   * a mismatch the operator can simply retry, which is the safe side of a
+   * safety net.)
+   */
+  if (plan.cells) {
+    const storedCells = stored.view.fulfillments ?? [];
+    const storedRoutes = stored.view.transports ?? [];
+    const cellOf = new Map(storedCells.map((f) => [`${f.option_id}|${f.fulfillment_type}`, f] as const));
+    const routeOf = new Map(storedRoutes.map((t) => [`${t.fulfillment_id}|${t.method}`, t] as const));
+    const capMiss = (key: string, requested: unknown, storedValue: unknown) =>
+      out.push({ section: 'inventory', key, requested, stored: storedValue });
+    /** A hold that came back SMALLER than the row was holding is units lost. */
+    const heldMiss = (key: string, held: number, storedValue: number) => {
+      if (storedValue < held) capMiss(key, held, storedValue);
+    };
+    for (const cell of plan.cells.requested) {
+      const where = `fulfillment.${cell.option_id}.${cell.fulfillment_type}`;
+      const s = cellOf.get(`${cell.option_id}|${cell.fulfillment_type}`);
+      if (!s) {
+        capMiss(`${where}.cell`, cell.capacity, null);
+        continue;
+      }
+      // `?? null` and NEVER `?? 0` on either side: an absent column is
+      // UNTRACKED, and reading it as zero here would report a clean apply as
+      // a mismatch and a sold-out pre-order as correct.
+      if ((s.capacity ?? null) !== cell.capacity) capMiss(`${where}.capacity`, cell.capacity, s.capacity ?? null);
+      heldMiss(
+        `${where}.capacity_reserved`,
+        plan.cells.held.cells.get(cellKey(cell.option_id, cell.fulfillment_type))?.capacity_reserved ?? 0,
+        Number(s.capacity_reserved ?? 0)
+      );
+      for (const t of cell.transports) {
+        const rWhere = `${where}.${t.method}`;
+        const sr = routeOf.get(`${s.id}|${t.method}`);
+        if (!sr) {
+          capMiss(`${rWhere}.route`, t.capacity, null);
+          continue;
+        }
+        if ((sr.capacity ?? null) !== t.capacity) capMiss(`${rWhere}.capacity`, t.capacity, sr.capacity ?? null);
+        heldMiss(
+          `${rWhere}.capacity_reserved`,
+          plan.cells.held.transports.get(transportKey(cell.option_id, cell.fulfillment_type, t.method))
+            ?.capacity_reserved ?? 0,
+          Number(sr.capacity_reserved ?? 0)
+        );
+      }
+    }
+    // A replace leaves EXACTLY the payload's set. A row the file did not
+    // describe but that survived the delete is a counter nobody is looking at.
+    if (storedCells.length !== plan.cells.requested.length) {
+      capMiss('fulfillment.cells', plan.cells.requested.length, storedCells.length);
+    }
+    const wantedRoutes = plan.cells.requested.reduce((sum, c) => sum + c.transports.length, 0);
+    if (storedRoutes.length !== wantedRoutes) {
+      capMiss('fulfillment.routes', wantedRoutes, storedRoutes.length);
+    }
   }
 
   return out;

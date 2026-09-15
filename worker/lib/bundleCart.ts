@@ -475,9 +475,20 @@ export function refuseComposition(
   if (state === 'upcoming') throw badRequest(`"${label}" has not started yet`, 'OFFER_WINDOW_NOT_STARTED');
   if (state === 'unconfigured') throw badRequest(`"${label}" is not available right now`, 'OFFER_INACTIVE');
   if (state === 'sold_out' || b.availability.max_bundles === 0) {
-    throw badRequest(`"${label}" is out of stock`, 'OUT_OF_STOCK', {
-      blocking: b.availability.blocking.map((x) => ({ product_id: x.product_id, reason: x.reason })),
-    });
+    // A FULL IMPORT QUOTA IS NOT AN EMPTY SHELF, and the bundle door must not
+    // say it is. When every counter that blocked this bundle is a pre-order
+    // capacity, the customer is told the quota is full — a different fact, a
+    // different wait, and the one sentence they must not read as "sold out".
+    // A mixed bundle (one component off the shelf, one off a quota) keeps
+    // OUT_OF_STOCK, because the shelf really is empty and that is the blunter
+    // truth of the two.
+    const blocking = b.availability.blocking.map((x) => ({ product_id: x.product_id, reason: x.reason }));
+    const quotaOnly = blocking.length > 0 && blocking.every((x) => x.reason === 'PREORDER_CAPACITY_EXHAUSTED');
+    throw badRequest(
+      quotaOnly ? `The pre-order quota for "${label}" is full` : `"${label}" is out of stock`,
+      quotaOnly ? 'PREORDER_CAPACITY_EXHAUSTED' : 'OUT_OF_STOCK',
+      { blocking }
+    );
   }
   // The per-order cap is REFUSED with its number, never silently clamped —
   // `worker/routes/cart.ts` already refuses a quantity rather than rewriting

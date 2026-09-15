@@ -799,29 +799,38 @@ async function loadCart(c: Context<AppContext>) {
       : false;
     // What this exact line can actually be sold as, from the authoritative
     // stock level — not from products.stock when the product tracks elsewhere.
-    const availability = saleAvailability(doc, {
-      optionValueIds: sel.optionValueIds ?? [],
-      colorId: sel.colorId || null,
-      qty: Number(row.qty) || 1,
-      coarseStock,
-      transportDefaults: ctx.transportDefaults,
-      inventory: view
-        ? snapshotFrom(view, {
-            stock: doc.stock,
-            reserved: Number(row.stock_reserved ?? 0),
-            low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
-          })
-        : undefined,
-      links: view?.links,
-      // 0073. What the customer CHOSE, falling back to the old inference for a
-      // line written before the order type was a field of its own.
-      preferredType: sel.fulfillmentType || (sel.transportMethod ? 'pre_order' : null),
-      // 0075. The pre-order counter for THIS line's model and route, so a cart
-      // line whose quota filled up while it sat there says so before the
-      // customer reaches the door.
-      capacity: view ? capacityFrom(view, sel.optionValueIds ?? []) : null,
-      transportMethod: sel.transportMethod,
-    });
+    //
+    // 0075 — AND AS THE ORDER TYPE IT WAS STORED WITH. `statedAvailability`
+    // applies the same guard the add and patch doors apply, so a pre-order
+    // line whose quota filled up is reported against ITS counter instead of
+    // being quietly re-described as a direct sale off a shelf the customer
+    // never asked about.
+    const availability = statedAvailability(
+      saleAvailability(doc, {
+        optionValueIds: sel.optionValueIds ?? [],
+        colorId: sel.colorId || null,
+        qty: Number(row.qty) || 1,
+        coarseStock,
+        transportDefaults: ctx.transportDefaults,
+        inventory: view
+          ? snapshotFrom(view, {
+              stock: doc.stock,
+              reserved: Number(row.stock_reserved ?? 0),
+              low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+            })
+          : undefined,
+        links: view?.links,
+        // 0073. What the customer CHOSE, falling back to the old inference for a
+        // line written before the order type was a field of its own.
+        preferredType: sel.fulfillmentType || (sel.transportMethod ? 'pre_order' : null),
+        // 0075. The pre-order counter for THIS line's model and route, so a cart
+        // line whose quota filled up while it sat there says so before the
+        // customer reaches the door.
+        capacity: view ? capacityFrom(view, sel.optionValueIds ?? []) : null,
+        transportMethod: sel.transportMethod,
+      }),
+      sel.fulfillmentType
+    );
     items.push({
       id: row.cart_item_id,
       productId: row.id,
@@ -1272,6 +1281,50 @@ async function addCompositionLine(
 
   const { items, tier: t, tierActive: ta } = await loadCart(c);
   return c.json({ success: true, items, tier: t, tierActive: ta });
+}
+
+/**
+ * THE STORED ORDER TYPE SURVIVES THE READ PATH TOO (0075).
+ *
+ * `saleAvailability` DESCRIBES a product. Its descriptive fallback — no direct
+ * sale? then pre-order; no pre-order? then direct sale — is right for a page
+ * that has not been told what the buyer wants, and it is what lets a product
+ * card still show a buy button. It is wrong for a LINE THAT IS ALREADY IN A
+ * BASKET, because that line has an order type already: a stored fact, priced
+ * on that basis, that decides which counter it will consume at the door.
+ *
+ * The add door and the patch door both refuse the fallback through
+ * `unusableOrderType`. `GET /api/cart` did not. So when a pre-order line's
+ * quota filled up while it sat in the basket, the fallback silently re-typed
+ * it: the response came back `mode: "direct_sale"`, `reason: null` and the
+ * SHELF's count, the cart screen showed no warning at all, and the `+` button
+ * offered to raise the quantity to a number of units that line will never be
+ * sold from. The customer found out at the checkout, which re-checks properly.
+ *
+ * This keeps the line's own order type, names the refusal, and publishes a
+ * ceiling of zero — so the counter a client reads (`preorder.capacity` for a
+ * pre-order line, `stock` for a direct one) is the counter that actually
+ * limits it. The counters themselves are NOT rewritten: the shelf still says
+ * what is on the shelf and the quota still says what is in the quota. Nothing
+ * is summed, and neither is zeroed to mean "sold out" — `max_qty` is the one
+ * number that says how many of THIS line may still be bought, and it is 0.
+ *
+ * A legacy line with no stored type (`stated` empty) is returned untouched:
+ * `unusableOrderType` answers null there, and the old behaviour is kept.
+ */
+export function statedAvailability(a: SaleAvailability, stated: string): SaleAvailability {
+  const refusal = unusableOrderType(a, stated);
+  if (!refusal) return a;
+  return {
+    ...a,
+    // NOT `unavailable`: the mode is how every client learns which counter
+    // this line spends, and erasing it is the same defect one step along.
+    mode: stated === 'pre_order' ? 'preorder' : 'direct_sale',
+    reason: refusal.code,
+    stock: { ...a.stock, max_qty: 0 },
+    preorder: { ...a.preorder, capacity: { ...a.preorder.capacity, max_qty: 0 } },
+    qty_ok: false,
+  };
 }
 
 /**

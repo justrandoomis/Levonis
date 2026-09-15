@@ -422,6 +422,10 @@ const GROUP_SPECS: GroupSpec[] = [
             '  Leave every route capacity empty → air/sea/land all draw on the cell pool.',
             '  Give a route a number → that route holds its own quota and does NOT also spend the pool.',
             '  Never copy one quantity onto all three routes.',
+            'الطريق الذي لا يذكره الملف يُحفظ كما هو بحصته وسعره — لحذف كل الطرق اكتب options.N.preorder.transports=__CLEAR__',
+            'ثم اذكر الطرق التي تريد بقاءها في نفس الملف.',
+            '  A route the file does not name is PRESERVED with its quota and its price.',
+            '  options.N.preorder.transports=__CLEAR__ removes every route; name the ones you want after it.',
           ],
           fields: [
             f('method', 'enum', 'options', 'air | sea | land — كيف يصل الجهاز إلى العراق. ليست طريقة التوصيل داخل العراق.', { required: true, enumValues: ['air', 'sea', 'land'] as const }),
@@ -636,6 +640,16 @@ export interface ParsedCell {
   list?: ParsedGroupItem[];
   /** `options.1.preorder=__CLEAR__` — this model no longer sells that way. */
   cleared?: boolean;
+  /**
+   * `options.1.preorder.transports=__CLEAR__` — every stored route of this
+   * cell goes, and only the routes this same file names are written back.
+   *
+   * It exists because omission PRESERVES a route (see `buildCells`): without
+   * an explicit statement there would be no way left to take one away, and
+   * "the file did not mention it" and "the owner deleted it" have to stay two
+   * different things.
+   */
+  listCleared?: boolean;
 }
 const HEREDOC_TOKEN_RE = /^[A-Za-z0-9_]{1,40}$/;
 
@@ -958,6 +972,22 @@ export function parseTemplate(text: string): ParsedTemplate {
         item.cells ??= {};
         const cell = (item.cells[cm[1]] ??= { line: lineNo, fields: {} });
         const rest = cm[2];
+
+        // `options.N.preorder.transports=__CLEAR__`: the list itself, cleared.
+        // A bare `…transports=<anything else>` is a mistake worth naming, the
+        // same way a bare `options.N.preorder=<value>` is — it is a list, not
+        // a field, and silently dropping it would be the loss this idiom was
+        // added to prevent.
+        if (cellSpec.list && rest === cellSpec.list.name) {
+          if (value !== CLEAR_TOKEN) {
+            err(lineNo, key, `"${key}" is a list — use ${key}.1.<field>=…, or ${key}=${CLEAR_TOKEN} to remove every route`);
+            continue;
+          }
+          if (seenGroupField.has(key)) { err(lineNo, key, 'duplicate key'); continue; }
+          seenGroupField.add(key);
+          cell.listCleared = true;
+          continue;
+        }
 
         const lm = cellSpec.list ? CELL_LIST_RE.exec(rest) : null;
         if (lm && cellSpec.list && lm[1] === cellSpec.list.name) {
@@ -2000,18 +2030,61 @@ function buildCells(
     if ('price_iqd' in cell) { cell.regular_price_iqd = cell.price_iqd; delete cell.price_iqd; }
     if (cell.enabled === undefined) cell.enabled = true;
 
-    if (cellSpec.list && parsed.list) {
-      const prevList = Array.isArray(cell[cellSpec.list.name]) ? (cell[cellSpec.list.name] as LooseItem[]) : [];
+    /**
+     * THE ROUTES MERGE BY METHOD, AND A ROUTE THE FILE DOES NOT NAME SURVIVES.
+     *
+     * This used to assign `out` over the whole list, so naming air alone
+     * DELETED sea and land. That contradicts the one rule this format states
+     * about omission — "a field the file omits is one the importer PRESERVES"
+     * — and it contradicts every other repeatable list in this same file:
+     * `buildGroupItems` merges by id and keeps unmentioned items, `buildRows`
+     * merges by id and keeps unmentioned rows. The transports list was the
+     * only one that replaced wholesale, and nothing was pushed to
+     * `result.warnings` or `cleared_fields`, so the preview showed no loss at
+     * all: `{ success: true, warnings: [] }` over a destroyed route.
+     *
+     * Before 0075 that lost a surcharge and a lead time. Since 0075 it also
+     * destroys `product_option_transports.capacity` — an INDEPENDENT quota
+     * that is the only thing standing between that route and unlimited
+     * pre-orders. Preserving is the safer half of the choice as well as the
+     * consistent one: an owner who edits the air price in a two-line file gets
+     * the air price edited, and a route is only ever removed when they say so.
+     *
+     * `method` is `required: true` on every entry and an entry without one is
+     * skipped below, so the merge key is always present — the "not every item
+     * carries a key, so replace them all" branch the other two lists need has
+     * nothing to fall back from here.
+     *
+     * REMOVING A ROUTE therefore needs a statement of its own, and it is the
+     * idiom this format already uses one level up:
+     * `options.N.preorder.transports=__CLEAR__` empties the list, and any
+     * route the same file then names is written fresh. That keeps "the file
+     * did not mention it" and "the owner deleted it" two different things,
+     * which is the whole reason `options.N.preorder=__CLEAR__` exists.
+     */
+    if (cellSpec.list && (parsed.list || parsed.listCleared)) {
+      const prevList =
+        parsed.listCleared || !Array.isArray(cell[cellSpec.list.name])
+          ? []
+          : (cell[cellSpec.list.name] as LooseItem[]);
       const byMethod = new Map(prevList.map((x) => [String(x.method ?? ''), x]));
+      const named = new Set<string>();
       const out: LooseItem[] = [];
-      for (const entry of parsed.list) {
+      for (const entry of parsed.list ?? []) {
         const method = String(entry.fields.method?.value ?? '').trim();
         if (!method) continue;
+        named.add(method);
         const row: LooseItem = { ...(byMethod.get(method) ?? {}), method };
         applyItemFields(row, cellSpec.list.fields, entry.fields);
         if ('price_iqd' in row) { row.regular_price_iqd = row.price_iqd; delete row.price_iqd; }
         if (row.enabled === undefined) row.enabled = true;
         out.push(row);
+      }
+      // The unnamed routes, in the order they were stored, after the ones the
+      // file spoke about — the same tail `buildRows` and `buildGroupItems`
+      // give an item the template never mentioned.
+      for (const prev of prevList) {
+        if (!named.has(String(prev.method ?? ''))) out.push({ ...prev });
       }
       cell[cellSpec.list.name] = out;
     }

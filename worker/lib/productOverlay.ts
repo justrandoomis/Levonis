@@ -609,7 +609,55 @@ export function snapshotFrom(
  * them would be the double count §7 forbids, while taking the largest would
  * promise units of a model the customer did not choose.
  *
- * Returns null when nothing is selected, or when the selected model has no
+ * WHICH SELECTED VALUE IS THE MODEL, AND WHY IT IS NOT "THE FIRST ONE".
+ *
+ * This used to answer `ids.find(id => a pre_order cell exists for id)`. Two
+ * things were wrong with that, and both were reproduced against the real
+ * routes:
+ *
+ *  (a) A selection naming TWO values that each carry a pre-order cell charged
+ *      ONE of them and left the other unenforced — four units sold against a
+ *      cell whose capacity was 1, which stayed at `capacity_reserved` 0 while
+ *      a different cell absorbed all four. Charging only one counter when the
+ *      configuration implies two is the same defect as summing them, inverted.
+ *  (b) The answer depended on ARRAY ORDER, and the two doors do not agree on
+ *      the order: the cart add keeps the client's order, the checkout reads
+ *      the canonically sorted list `cart_items.option_value_ids` stores. So
+ *      the counter the door validated was not always the counter the sale
+ *      consumed.
+ *
+ * `resolveStock` has no such ambiguity because `products.inventory_mode` names
+ * the ONE authoritative row. There is no equivalent column here, so the rule
+ * is this, and it is order-independent by construction:
+ *
+ *   A cell is TRACKED when its own capacity is set, or when any of its routes
+ *   holds a quota. Exactly one tracked cell among the selected values is THE
+ *   counter. More than one is an UNMODELLED CONFIGURATION and is REFUSED
+ *   (`conflict`), at the door, with a code — never silently resolved. None
+ *   tracked means every candidate answers UNTRACKED, so they are interchange-
+ *   able and the lowest `option_id` is taken purely to keep `scope_id` stable
+ *   between the two doors.
+ *
+ * WHY REFUSE RATHER THAN CHARGE THEM ALL. Charging every tracked cell the
+ * selection names is two counters for one sale: `planOrderDeduction` and the
+ * release path are built on ONE target per line with one `idempotency_key`,
+ * so "exactly once" would have to be re-derived for a partial failure (one
+ * cell full, one not) with no way to express a half-sold line. And it is not
+ * what the data means: two pools of units for one physical unit is a
+ * catalogue mistake, not a sale.
+ *
+ * WHY NOT TIE IT TO THE GROUP `inventory_mode` DESIGNATES. `inventory_mode` is
+ * `OPTION` for the whole product, not for a group — it names a LEVEL, not
+ * which of several groups owns the shelf — so there is no group to inherit,
+ * and inventing one would make the pre-order counter depend on a column whose
+ * documented meaning is about direct-sale stock.
+ *
+ * WHAT THIS REFUSES TODAY: NOTHING. `capacity` is NULL on every row in every
+ * existing catalogue (migration 0075 adds it NULL and copies nothing into it),
+ * so every existing cell is untracked, no selection has two tracked cells, and
+ * the answer is byte for byte what it was before.
+ *
+ * Returns null when nothing is selected, or when no selected model has a
  * pre-order cell — a product from before 0073, or one whose pre-order lives
  * only on the product row. The resolver reads that as UNTRACKED and sells,
  * which is exactly how the shop behaved before this column existed
@@ -623,17 +671,42 @@ export function capacityFrom(
   view: ProductRelationsView,
   selected: string | readonly string[]
 ): CapacitySnapshot | null {
-  const ids = (typeof selected === 'string' ? [selected] : [...selected]).filter(Boolean);
-  if (ids.length === 0) return null;
+  const ids = new Set((typeof selected === 'string' ? [selected] : [...selected]).filter(Boolean));
+  if (ids.size === 0) return null;
   const cells = view.fulfillments ?? [];
-  // The first SELECTED value that has a pre-order cell is the model. Scanning
-  // the selection rather than the cell list keeps the answer deterministic for
-  // a caller that passes its ids in a canonical order.
-  const optionId = ids.find((id) => cells.some((f) => f.option_id === id && f.fulfillment_type === 'pre_order'));
-  if (!optionId) return null;
-  const cellRow = cells.find((f) => f.option_id === optionId && f.fulfillment_type === 'pre_order');
-  if (!cellRow) return null;
-  const label = (view.values ?? []).find((v) => v.id === optionId)?.name_en || optionId;
+  const allRoutes = view.transports ?? [];
+  // Scanning the CELLS and sorting by option id — never scanning the caller's
+  // array — is what makes the answer independent of the order the doors pass
+  // their selection in. `(option_id, fulfillment_type)` is unique (0073), so
+  // this is at most one row per selected value.
+  const named = cells
+    .filter((f) => f.fulfillment_type === 'pre_order' && ids.has(f.option_id))
+    .sort((a, b) => (a.option_id < b.option_id ? -1 : a.option_id > b.option_id ? 1 : 0));
+  if (named.length === 0) return null;
+
+  const routesOf = (cellId: string) => allRoutes.filter((t) => t.fulfillment_id === cellId);
+  /** Tracked = this cell claims a limit somewhere. `?? null` and NEVER `?? 0`:
+   *  an absent column is untracked, not sold out. */
+  const isTracked = (f: OptionFulfillmentRow) =>
+    (f.capacity ?? null) !== null || routesOf(f.id).some((t) => (t.capacity ?? null) !== null);
+  const tracked = named.filter(isTracked);
+  const labelOf = (optionId: string) =>
+    (view.values ?? []).find((v) => v.id === optionId)?.name_en || optionId;
+
+  if (tracked.length > 1) {
+    return {
+      cell: null,
+      transports: [],
+      conflict: {
+        option_ids: tracked.map((f) => f.option_id),
+        cell_ids: tracked.map((f) => f.id),
+        labels: tracked.map((f) => labelOf(f.option_id)),
+      },
+    };
+  }
+
+  const cellRow = tracked[0] ?? named[0];
+  const label = labelOf(cellRow.option_id);
   return {
     cell: {
       id: cellRow.id,
@@ -644,16 +717,15 @@ export function capacityFrom(
       reserved: cellRow.capacity_reserved ?? 0,
       label,
     },
-    transports: (view.transports ?? [])
-      .filter((t) => t.fulfillment_id === cellRow.id)
-      .map((t) => ({
-        id: t.id,
-        method: t.method,
-        enabled: truthy(t.enabled),
-        capacity: t.capacity ?? null,
-        reserved: t.capacity_reserved ?? 0,
-        label: `${label} — ${t.method}`,
-      })),
+    conflict: null,
+    transports: routesOf(cellRow.id).map((t) => ({
+      id: t.id,
+      method: t.method,
+      enabled: truthy(t.enabled),
+      capacity: t.capacity ?? null,
+      reserved: t.capacity_reserved ?? 0,
+      label: `${label} — ${t.method}`,
+    })),
   };
 }
 

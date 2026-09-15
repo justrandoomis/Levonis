@@ -17,7 +17,12 @@ import {
   refuseIncompleteSelection,
 } from './cart';
 import type { ResolvedBundle } from '../lib/bundleRead';
-import { allocateComponentValue } from '../lib/bundleComposition';
+import {
+  allocateComponentValue,
+  loadCompositionMembers,
+  memberSnapshot,
+  resolveComponentCounter,
+} from '../lib/bundleComposition';
 import { applyMysteryToBundles, resolveCartMystery } from '../lib/bundleCart';
 import {
   drawMysteryLine,
@@ -83,7 +88,7 @@ import { CheckoutStartedV1 } from '@levonis/contracts/events/v1/CheckoutStarted'
 import { OrderCreatedV1 } from '@levonis/contracts/events/v1/OrderCreated';
 import { planOrderReturn } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
-import type { StockMove, StockTarget } from '../lib/inventory';
+import type { StockMove, StockResolution, StockTarget } from '../lib/inventory';
 import { benefits, pricingTierContext, preorderGiftFor, shippingEntitlementContext } from '../lib/entitlements';
 import {
   activeBenefitRules,
@@ -700,6 +705,15 @@ function priceCompositionLine(
   b: ResolvedBundle | undefined,
   printerIds: Set<string>,
   displayName: string,
+  /**
+   * 0075 — THE COUNTER EACH COMPONENT LINE CONSUMES, resolved by ORDER TYPE in
+   * the async pre-pass (`componentCounters`) because this function is pure and
+   * runs up to three times. Keyed `<cart_item_id>:<component_id>`, so two lines
+   * of the same bundle with different choices are two independent answers and
+   * the prepaid and cash-on-delivery passes read the SAME one — a payment
+   * method is not an order type and may not re-target a counter.
+   */
+  counters: ReadonlyMap<string, StockResolution>,
   mystery?: MysteryLineResolution
 ): { lines: ComputedLine[]; subtotal: number; merchandise: number; shippingItems: ShippingItem[]; physicalLines: number } {
   const qty = Number(row.qty) || 1;
@@ -887,6 +901,22 @@ function priceCompositionLine(
   });
   included.forEach((k, i) => {
     const componentQty = k.qty_per_bundle * qty;
+    /**
+     * A COMPONENT LINE RESOLVES ITS COUNTER BY THE SAME RULE A STANDALONE LINE
+     * DOES (0075, DECISION 4).
+     *
+     * `k.resolution` is the composition READ MODEL's answer and it is
+     * `resolveStock` — the member's SHELF — whatever the line's order type is.
+     * Used as the reservation target it made a pre-order bundle decrement
+     * `products.stock`, taking a unit from under the direct buyer racing it,
+     * while the import quota it should have spent was never consulted and could
+     * be oversold without bound through the bundle door. The pre-pass re-asked
+     * the question through `resolveForOrderType` + `capacityFrom`; the read
+     * model's answer stays only as the fallback for a member row that vanished
+     * between the resolve and here, which `refuseComposition` has already
+     * refused as COMPONENT_UNAVAILABLE.
+     */
+    const counter = counters.get(`${String(row.cart_item_id)}:${k.component_id}`) ?? k.resolution;
     const { cost_iqd, ...snapshot } = k.unit;
     void cost_iqd;
     // The component's own resolver output, with `applied_iqd` set to 0 AFTER
@@ -898,7 +928,7 @@ function priceCompositionLine(
       id: newId('oi'),
       product_id: k.member_product_id,
       option_value_ids: k.selection.option_value_ids,
-      stock_targets: k.resolution.targets,
+      stock_targets: counter.targets,
       name: k.doc.name_en || k.doc.name_ar || k.member_product_id,
       name_ar: k.doc.name_ar,
       image: primaryMedia(k.doc.media)?.url ?? '',
@@ -910,7 +940,7 @@ function priceCompositionLine(
       unit: 0,
       line: 0,
       applied_iqd: 0,
-      tracked: k.resolution.tracked,
+      tracked: counter.tracked,
       pricing_snapshot: JSON.stringify(componentSnapshot),
       warranty_snapshot: null,
       transport_snapshot: k.unit.transport ? JSON.stringify(k.unit.transport) : null,
@@ -1576,7 +1606,7 @@ async function computeCheckout(
   // them the checkout's printer delivery note would go silent the moment a
   // printer was sold inside a bundle.
   const memberIds = [...bundles.values()].flatMap((b) => b.components.map((k) => k.member_product_id));
-  const [views, printerIds, poolMemberIds] = await Promise.all([
+  const [views, printerIds, poolMemberIds, members] = await Promise.all([
     loadRelationsViews(
       c.env.DB,
       rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
@@ -1598,7 +1628,61 @@ async function computeCheckout(
      * never leaving their wallet.
      */
     activePoolProductIds(c.env.DB, [...rows.map((r) => String(r.id)), ...memberIds, ...drawnIds]),
+    /**
+     * THE MEMBER PRODUCTS WITH THEIR RELATIONAL OVERLAY — the pre-order cells
+     * and route quotas included. The composition read model loads them to
+     * PRICE and DESCRIBE the components; the door needs them to answer a
+     * different question the read model never asks, so it is asked here where
+     * awaiting is still allowed (`priceLines` is synchronous and runs up to
+     * three times).
+     */
+    loadCompositionMembers(c.env.DB, memberIds),
   ]);
+
+  /**
+   * 0075 AT THE BUNDLE DOOR — ONE COUNTER PER COMPONENT, PICKED BY ORDER TYPE.
+   *
+   * `resolveComponentCounter` is `resolveForOrderType` + `capacityFrom`, the
+   * same pair a bare product line goes through a few hundred lines below, so
+   * the bundle door and the ordinary door cannot aim at different rows for the
+   * same product. A direct component keeps its shelf; a pre-order component
+   * spends its (model x pre-order) cell, or the chosen route's own quota, and
+   * NEVER `products.stock`.
+   *
+   * Resolved ONCE, from `bundlesByBasis.prepaid`, and shared by both pricing
+   * passes: the components, their selections and the line's transport are
+   * identical under either basis, and re-resolving per basis would be an
+   * invitation to let the payment method change the counter — which it must
+   * never do. A member row that failed to load keeps no entry: the read model
+   * has already marked that component COMPONENT_UNAVAILABLE and
+   * `refuseComposition` refuses the line before any of this is read.
+   *
+   * These targets then flow into `refuseAggregateDemand` with every other
+   * line's, so a bundle and a bare pre-order of the same model SUM against one
+   * quota before either is judged, and into `planInventory`, which reserves
+   * capacity rows through the same guards and the same UNIQUE idempotency key
+   * as a shelf — so the release stays exactly-once with no new lifecycle.
+   */
+  const componentCounters = new Map<string, StockResolution>();
+  for (const cartRow of compositionRows) {
+    const cartItemId = String(cartRow.cart_item_id);
+    const resolvedBundle = bundles.get(cartItemId);
+    if (!resolvedBundle) continue;
+    // The ROUTE is the buyer's own, off the bundle's cart row — the column
+    // `resolveLineTransport` already proved every pre-order component offers.
+    // The read model's per-component `shipping_type` is the FIRST method they
+    // share, so reading the route off it would spend air's pool for a bundle
+    // the customer put on land.
+    const lineTransport = String(cartRow.transport_method ?? '');
+    for (const k of includedComponents(resolvedBundle)) {
+      const member = members.get(k.member_product_id);
+      if (!member) continue;
+      componentCounters.set(
+        `${cartItemId}:${k.component_id}`,
+        resolveComponentCounter(k, memberSnapshot(member), member.view, lineTransport)
+      );
+    }
+  }
 
   interface PricedLines {
     lines: ComputedLine[];
@@ -1644,6 +1728,7 @@ async function computeCheckout(
           resolvedForBasis.get(String(row.cart_item_id)),
           printerIds,
           displayName,
+          componentCounters,
           mysteryLines.get(String(row.cart_item_id))
         );
         lines.push(...priced.lines);

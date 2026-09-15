@@ -209,6 +209,35 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ckb: 'داواکارییەک کە ناوەڕۆکی ئاشکرا بووە هەڵناوەشێتەوە — پەیوەندی بە پشتگیری بکە.',
   },
 
+  // ---- the two counters behind one basket (migration 0075) ----------------
+  /**
+   * THE ONE REFUSAL A CUSTOMER MUST NOT READ AS "SOLD OUT".
+   *
+   * 0075 put a second counter behind a model: the shelf a direct sale comes
+   * off, and the import quota a pre-order consumes. `PREORDER_CAPACITY_EXHAUSTED`
+   * says the QUOTA is full while the shelf may be untouched — a different wait,
+   * not a different shop — so the sentence has to say so, and has to point at
+   * the thing the customer can still do (another route, or later).
+   *
+   * It was the only customer-facing code this work added and the only one that
+   * never reached this table: `Product.tsx` carries its own Arabic, so the same
+   * refusal printed in Arabic on the product page and in the server's raw
+   * English on the cart and the checkout, which both decode through
+   * `apiRefusal`. In an Arabic-first shop that is the worst sentence to leave
+   * in English.
+   */
+  PREORDER_CAPACITY_EXHAUSTED: {
+    ar: 'اكتملت حصة الطلب المسبق لهذا الاختيار — وهذا ليس نفادًا للمخزون. جرّب طريقة شحن أخرى أو عُد لاحقًا.',
+    en: 'The pre-order quota for this selection is full — this is not a sold-out shelf. Try another shipping route, or come back later.',
+    // NO SORANI IS INVENTED HERE. The Kurdish for this sentence is the owner's
+    // to write by hand; until they do, the ARABIC above is what a Kurdish
+    // reader gets, which is this app's own documented fallback (`loc`) and the
+    // same choice `Product.tsx`, `Cart.tsx` and `Checkout.tsx` make for the
+    // rest of the 0075 copy. A machine translation of a refusal is not an
+    // option in this repo.
+    ckb: 'اكتملت حصة الطلب المسبق لهذا الاختيار — وهذا ليس نفادًا للمخزون. جرّب طريقة شحن أخرى أو عُد لاحقًا.',
+  },
+
   // ---- delivery address ---------------------------------------------------
   // Both are raised by `worker/routes/addresses.ts` and reach the customer
   // inside a form they are filling in, so each says what to change.

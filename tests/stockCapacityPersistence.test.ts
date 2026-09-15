@@ -240,14 +240,38 @@ test('a FILE may lower a capacity down TO the units held, but not past them', as
   assert.equal(cells(raw)[0].capacity_reserved, 2);
 });
 
-test('__CLEAR__/untracked from a file keeps the row and its hold', async () => {
+test('a FILE may not make a counter UNTRACKED while it is holding units', async () => {
   const raw = seed();
-  // null = untracked. It is not a way to zero a counter, and it must not be a
-  // way to lose the units the counter is holding.
+  // This test used to assert the opposite — that untracking simply kept the
+  // hold — and that was wrong. Going untracked is STRICTLY WORSE than going to
+  // zero, because the deduct guard in inventory.ts is
+  // `<onHand> IS NOT NULL AND <onHand> >= ? AND <reserved> >= ?`: once the
+  // column is NULL that statement can never match again, so the held units can
+  // be neither deducted at confirmation nor released on a cancel. They sit in
+  // capacity_reserved for ever, and re-tracking the quota is then permanently
+  // blocked below them by CAPACITY_BELOW_RESERVED. `__CLEAR__` is a way to stop
+  // limiting a pre-order, never a way to lose the orders already taken.
+  await assert.rejects(
+    () => save(raw, relationsBody({ capacity: null, routeCapacity: null })),
+    (e: Error & { code?: string }) => e.code === 'CAPACITY_UNTRACKED_WHILE_HELD',
+    'untracking a held counter makes its units unreachable by every verb that could return them'
+  );
+  assert.equal(cells(raw)[0].capacity, 5, 'and nothing moved');
+  assert.equal(cells(raw)[0].capacity_reserved, 2);
+});
+
+test('__CLEAR__/untracked IS allowed once nothing is held, and keeps the row id', async () => {
+  const raw = seed();
+  raw.exec("UPDATE product_option_fulfillment SET capacity_reserved = 0 WHERE id = 'f_pre'");
+  raw.exec("UPDATE product_option_transports SET capacity_reserved = 0 WHERE id = 't_land'");
+  const before = { cell: cells(raw)[0].id, route: routes(raw)[0].id };
+
   await save(raw, relationsBody({ capacity: null, routeCapacity: null }));
-  assert.equal(cells(raw)[0].capacity, null);
-  assert.equal(cells(raw)[0].capacity_reserved, 2, 'the hold survives going untracked');
-  assert.equal(routes(raw)[0].capacity_reserved, 1);
+
+  assert.equal(cells(raw)[0].capacity, null, 'untracked = unlimited again');
+  assert.equal(routes(raw)[0].capacity, null, 'and the route goes back to the shared pool');
+  assert.equal(cells(raw)[0].id, before.cell, 'the row identity still survives the replace');
+  assert.equal(routes(raw)[0].id, before.route);
 });
 
 test('existingCellsFrom skips a transport whose cell is gone rather than keying it wrongly', () => {

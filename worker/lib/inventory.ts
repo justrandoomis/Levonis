@@ -130,7 +130,12 @@ export interface StockResolution {
    *  composition read model's verdict for a bundle component whose member
    *  product went draft or archived. A stock row can still hold units for a
    *  product nobody may buy, and nothing else in this union can say so. */
-  error: 'VARIANT_NOT_MODELLED' | 'SELECTION_INCOMPLETE' | 'COMPONENT_UNAVAILABLE' | null;
+  error:
+    | 'VARIANT_NOT_MODELLED'
+    | 'SELECTION_INCOMPLETE'
+    | 'COMPONENT_UNAVAILABLE'
+    | 'PREORDER_CAPACITY_AMBIGUOUS'
+    | null;
 }
 
 /** The minimal shape the resolver needs — it never reads the database itself,
@@ -301,6 +306,25 @@ export interface CapacityTransportRow extends CapacityRow {
 export interface CapacitySnapshot {
   cell: CapacityRow | null;
   transports: CapacityTransportRow[];
+  /**
+   * 0075 FOLLOW-UP — THE SELECTION NAMED MORE THAN ONE TRACKED PRE-ORDER
+   * COUNTER, so there is no ONE counter to answer from. Non-null is a REFUSAL,
+   * never a pick: see `capacityFrom` in worker/lib/productOverlay.ts for why
+   * choosing one of them silently is the defect this replaces.
+   */
+  conflict?: CapacityConflict | null;
+}
+
+/** The tracked cells one selection resolved to, when it resolved to more than
+ *  one. Carried so a refusal can name them instead of guessing. */
+export interface CapacityConflict {
+  /** The option values whose pre-order cell is tracked. Sorted, so the answer
+   *  does not depend on the order the caller listed its selection in. */
+  option_ids: string[];
+  /** Those cells' row ids, in the same order. */
+  cell_ids: string[];
+  /** Their human labels, for a message an admin can act on. */
+  labels: string[];
 }
 
 /**
@@ -323,6 +347,26 @@ export interface CapacitySnapshot {
  */
 export function resolveCapacity(snap: CapacitySnapshot | null, transportMethod: string): StockResolution {
   const untracked: StockResolution = { targets: [], tracked: false, available: null, error: null };
+  /**
+   * AN AMBIGUOUS SELECTION IS NOT SELLABLE AS A PRE-ORDER, AND IS NOT A PICK.
+   *
+   * `capacityFrom` sets this when the customer's selection names two or more
+   * models that each track a pre-order counter. There is no honest answer:
+   * charging one of them leaves the other unenforced (the reviewer sold four
+   * units against a cell whose capacity was 1), and charging both is two
+   * counters for one sale — the double count §7 forbids, with no exactly-once
+   * release to match. So the whole selection is refused.
+   *
+   * TRACKED WITH ZERO AVAILABLE, never `untracked`: untracked is the sellable
+   * answer, and this must refuse. Every door already stops on that pair —
+   * `saleAvailability` marks every route unusable, `unusableOrderType` raises
+   * the refusal at the cart, and the checkout's `available < qty` throws — so
+   * the add door and the checkout agree without either of them learning a new
+   * shape. The `error` names the real reason for a caller that wants it.
+   */
+  if (snap?.conflict) {
+    return { targets: [], tracked: true, available: 0, error: 'PREORDER_CAPACITY_AMBIGUOUS' };
+  }
   if (!snap || !snap.cell) return untracked;
 
   const route = transportMethod
