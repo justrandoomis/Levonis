@@ -252,7 +252,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     let settleTimer = 0;
     /** When measure() first REFUSED to dock, so every refusal has a deadline. */
     let waitingSince = 0;
-    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => schedule(false));
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => { refreshViewport(); schedule(false); });
 
     /**
      * Come back on our own, once, after `ms`.
@@ -266,6 +266,34 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       window.clearTimeout(settleTimer);
       settleTimer = window.setTimeout(() => { settleTimer = 0; schedule(false); }, ms);
     };
+
+    /**
+     * THE LAYOUT VIEWPORT, READ WHEN IT CHANGES AND NOT SIXTY TIMES A SECOND.
+     *
+     * `aimAt` needs the viewport as the denominator for the gaze's falloff, and
+     * it was calling `layoutViewport()` — which reads
+     * `documentElement.clientWidth/clientHeight` — inside the loop. Reading
+     * layout is only cheap when the browser has nothing to recompute, and this
+     * loop had already written `style.transform` onto the character earlier in
+     * the SAME frame while travelling. A write followed by a read is a FORCED
+     * SYNCHRONOUS REFLOW: the browser must stop and lay the whole document out
+     * again before it can answer, every frame, on a phone, on every route.
+     *
+     * The owner's report of it was «التعليك lagging والتشنج في الموقع يحدث بين
+     * فترات متقاربه ومستمره» — sticking and freezing that recurs at short,
+     * continuous intervals, with nobody touching anything.
+     *
+     * The value cannot change without one of the listeners registered at the
+     * bottom of this effect firing. A rotation, a URL-bar collapse and a
+     * pinch-zoom all reach `onResize`; anything that changes the root element's
+     * own box reaches the ResizeObserver already watching
+     * `document.documentElement`; and a scrollbar appearing does both. So a
+     * cache refreshed from those is not an approximation of the live value, it
+     * IS the live value — measured at the moments it can move, instead of at
+     * sixty moments a second when it cannot.
+     */
+    let viewportSize = layoutViewport();
+    const refreshViewport = () => { viewportSize = layoutViewport(); };
 
     const occupy = (element: HTMLElement | null) => {
       if (occupied === element) return;
@@ -315,7 +343,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       // fraction: a pinch-zoom or a raised keyboard shrinks the visual
       // viewport while leaving every client coordinate exactly where it was,
       // so the character's reach changed without anything it measures moving.
-      const viewport = layoutViewport();
+      const viewport = viewportSize;
 
       if (pointer.present && pointer.movedAt > lastActivity.current) {
         // New activity: re-roll how long this engagement will be held, so the
@@ -580,6 +608,10 @@ export default function AppIntro({ ready }: { ready: boolean }) {
 
     const unsubscribe = characterLayout.subscribe(() => schedule(true));
     const onResize = () => {
+      // Before the measurement, not after: `measure()` and the loop both read
+      // the cached size, and a stale denominator for one frame is a gaze that
+      // aims at where the screen used to be.
+      refreshViewport();
       schedule(false);
       // ...and once more when it stops. See SETTLE_MS: the geometry this event
       // announces is not the geometry the page ends up with.
@@ -596,6 +628,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
         setPhase(completedRef.current ? 'docked' : 'loading');
         mascot.activity('anchor-travel', null);
       } else {
+        refreshViewport();
         start();
         schedule(false);
       }
