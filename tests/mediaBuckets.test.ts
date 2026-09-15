@@ -632,3 +632,68 @@ test('a throw mid-prune still writes the record of what was already deleted', ()
   assert.match(runner, /if \(fatal\) console\.error\('The run stopped early: ' \+ fatal\);/);
   assert.match(runner, /process\.exit\(1\)/, 'and it must still fail the job');
 });
+
+// ------------------------------------------- 8. the stray-private-logo workflow
+//
+// This one's risk is the mirror of workflow 39's. There the danger was deleting
+// a folder's contents; here it is deleting the ONLY copy of the shop's logo
+// because someone pointed the job at the wrong bucket. So the survivor has to be
+// proven — from outside, over the internet — before the duplicate is touched.
+
+const STRAY_WORKFLOW = '.github/workflows/media-stray-private-logo-remove.yml';
+
+function strayRunner(): string {
+  const text = repoFile(STRAY_WORKFLOW);
+  const lines = text.split('\n').map((line) => line.replace(/^ {10}/, ''));
+  const start = lines.findIndex((l) => l.startsWith("cat > ./scripts/media-stray-logo.gen.ts <<'TSEOF'"));
+  const end = lines.findIndex((l, i) => i > start && l === 'TSEOF');
+  assert.ok(start >= 0 && end > start, 'the stray workflow no longer embeds a runner the way this test reads it');
+  return lines.slice(start + 1, end).join('\n');
+}
+
+test('the stray-logo workflow can delete exactly one key, and only from the private bucket', () => {
+  const text = repoFile(STRAY_WORKFLOW);
+  const runner = strayRunner();
+
+  assert.match(text, /\[ "\$\{\{ inputs\.confirm \}\}" = "REMOVE-STRAY-PRIVATE-LOGO" \]/, 'it must be gated on its own typed phrase');
+  assert.match(runner, /const KEY = 'UiUx\/Logo\/Logo\.webp';/, 'the key is a constant, not an input');
+  assert.ok(!/inputs\.(key|keys|prefix)/.test(text), 'the key must never come from an input');
+
+  for (const bulk of ['delete-objects', '--recursive', 's3 rm', 'delete-bucket', 'bucket delete']) {
+    assert.ok(!text.includes(bulk), `the workflow must never use ${bulk}`);
+  }
+  assert.equal(runner.split("'delete-object'").length - 1, 1, 'exactly one delete in the whole runner');
+  // The delete names the PRIVATE bucket. Naming the public one would destroy
+  // the copy every check above exists to protect.
+  assert.match(runner, /aws\(\['delete-object', '--bucket', PRIVATE_BUCKET, '--key', KEY\], false\)/);
+  assert.ok(!/delete-object'[^;]*PUBLIC_BUCKET/.test(runner), 'nothing may delete from the public bucket');
+});
+
+test('the surviving public copy is proven three ways before the duplicate goes', () => {
+  const text = repoFile(STRAY_WORKFLOW);
+  const runner = strayRunner();
+  const deleteAt = runner.indexOf("'delete-object'");
+
+  // Existence and size, from R2.
+  const existsAt = runner.indexOf("check('public copy exists'");
+  const sizeAt = runner.indexOf('public copy size is exactly');
+  assert.ok(existsAt > 0 && existsAt < deleteAt);
+  assert.ok(sizeAt > 0 && sizeAt < deleteAt);
+  assert.match(runner, /const EXPECTED_BYTES = 107218;/);
+
+  // Byte-identity, because two different 107218-byte files would pass a size
+  // check and only one of them is the duplicate.
+  const shaAt = runner.indexOf('the private object is byte-identical to the public one');
+  assert.ok(shaAt > 0 && shaAt < deleteAt, 'identity must be proven before the delete');
+  assert.match(runner, /const privateDigest = sha256\(PRIVATE_BUCKET, 'private'\);/);
+
+  // And from outside: a step that fails the job before the runner ever starts
+  // if a stranger cannot fetch the logo right now.
+  assert.match(text, /\n {6}- name: The live site must already serve the logo anonymously\n/);
+  const liveAt = text.indexOf('The live site must already serve the logo anonymously');
+  const runAt = text.indexOf('Prove the survivor, then remove the duplicate');
+  assert.ok(liveAt > 0 && liveAt < runAt, 'the live check must come before the delete step');
+
+  // Refusing is not optional: any failed check aborts before the delete.
+  assert.match(runner, /if \(refusals\.length > 0\) \{[\s\S]{0,200}process\.exit\(1\);/);
+});

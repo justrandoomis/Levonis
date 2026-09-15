@@ -1,0 +1,334 @@
+# ---------------------------------------------------------------------------
+#   REMOVE THE STRAY PRIVATE DUPLICATE OF THE PUBLIC LOGO
+# ---------------------------------------------------------------------------
+# WHERE THIS OBJECT CAME FROM
+# ---------------------------------
+# `isAnonymousPublicMediaKey` used to match the brand folder as `ui/` and
+# `UIUx/`, exactly. The real object is spelled `UiUx/Logo/Logo.webp` — lowercase
+# i — so the match failed, the key was classified PRIVATE, and the first media
+# migration filed the shop's own logo in levonis-media-private-staging. It
+# copied and verified perfectly; it was simply put somewhere no anonymous
+# visitor can reach.
+#
+# The rule is case-insensitive now, the logo is verified in the PUBLIC bucket,
+# and the live site serves it to a stranger. What is left in the private bucket
+# is a duplicate that nothing reads: for this key `mediaBucket()` resolves to
+# R2_PUBLIC, so no code path in the Worker will ever open the private copy.
+#
+# WHY THIS IS NOT WORKFLOW 39
+# ---------------------------
+# Workflow 39 deletes four zero-byte markers from the LEGACY bucket, and a test
+# asserts it cannot even name a destination bucket — that is the property that
+# makes it safe, and widening it to reach into levonis-media-private-staging
+# would destroy exactly the guarantee it exists to provide. So this is its own
+# workflow, with its own phrase, its own single hardcoded key, and its own
+# proofs.
+#
+# WHAT IS PROVEN BEFORE THE DELETE
+# --------------------------------
+# The danger here is the mirror image of workflow 39's. There the risk was
+# deleting a folder's contents; here it is deleting the ONLY copy of the logo
+# because someone pointed the job at the wrong bucket. So the survivor is
+# proven first, and proven three ways:
+#
+#   1. the public copy EXISTS in the public bucket at this exact key;
+#   2. its size is exactly the expected 107218 bytes;
+#   3. the live site serves it to an anonymous request: HTTP 200, 107218 bytes
+#      — not "the object is in a bucket" but "a stranger can fetch it";
+#   4. the private object about to go is byte-identical to the public one,
+#      by SHA-256 over both. If they differ it is NOT a stray duplicate, it is
+#      something else, and the job refuses rather than guess;
+#   5. the private and public buckets are different buckets.
+#
+# Only then, one `delete-object` naming the private bucket and the exact key.
+# Afterwards the public copy is re-checked and the live fetch is repeated,
+# because the only thing that matters is that the logo still loads.
+#
+# This workflow deletes exactly one object and can delete no other. It never
+# writes to any bucket, and it never deletes a bucket.
+name: 41 - Remove the stray private duplicate of the public logo (gated, one exact key)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type REMOVE-STRAY-PRIVATE-LOGO to delete the duplicate. No other object is deletable by this workflow.'
+        required: true
+        default: ''
+      private_bucket:
+        description: 'The bucket holding the stray duplicate'
+        required: true
+        default: 'levonis-media-private-staging'
+      public_bucket:
+        description: 'The bucket holding the copy that must survive'
+        required: true
+        default: 'levonis-media-public-staging'
+      dry_run:
+        description: 'true = prove everything and delete nothing (recommended first run)'
+        required: false
+        default: 'false'
+
+concurrency: media-bucket-move
+
+jobs:
+  stray:
+    name: Prove the public logo survives, then remove the private duplicate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID || secrets.R2_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY || secrets.R2_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+    steps:
+      - name: Confirmation gate
+        run: |
+          [ "${{ inputs.confirm }}" = "REMOVE-STRAY-PRIVATE-LOGO" ] \
+            || { echo "::error::type REMOVE-STRAY-PRIVATE-LOGO in the confirm input — aborting, nothing was touched"; exit 1; }
+
+      - name: The two buckets must be two different buckets
+        run: |
+          set -e
+          PRI='${{ inputs.private_bucket }}'
+          PUB='${{ inputs.public_bucket }}'
+          for name in "$PRI" "$PUB"; do
+            case "$name" in
+              ''|*[!a-z0-9-]*) echo "::error::\"$name\" is not a plain R2 bucket name"; exit 1 ;;
+            esac
+          done
+          # The delete targets the private bucket by name. If the two were the
+          # same, this job would delete the copy it just finished proving.
+          [ "$PRI" != "$PUB" ] \
+            || { echo "::error::the private and public buckets are the same — refusing"; exit 1; }
+
+      # THE SURVIVOR IS PROVEN BEFORE THE DUPLICATE IS TOUCHED, and proven from
+      # outside: not "R2 says the object is there" but "an anonymous stranger
+      # can fetch it over the internet, and gets the right number of bytes".
+      # If the live site cannot serve the logo right now, then whatever is in
+      # the private bucket is not safe to remove yet, whatever the buckets say.
+      - name: The live site must already serve the logo anonymously
+        run: |
+          set -e
+          KEY="UiUx/Logo/Logo.webp"
+          EXPECT=107218
+          code=$(curl -s -o /tmp/logo.bin -w '%{http_code}' --max-time 25 "https://levonis-iq.com/files/$KEY")
+          bytes=$(stat -c%s /tmp/logo.bin 2>/dev/null || echo 0)
+          echo "anonymous GET /files/$KEY -> $code, ${bytes} B (expected 200, ${EXPECT} B)"
+          [ "$code" = "200" ] || { echo "::error::the live site does not serve the logo (HTTP $code) — refusing to delete any copy"; exit 1; }
+          [ "$bytes" = "$EXPECT" ] || { echo "::error::the live logo is ${bytes} B, expected ${EXPECT} — refusing"; exit 1; }
+          echo "LIVE DELIVERY BEFORE: 200, ${bytes} B"
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: Preflight — credentials, tooling, and that both buckets exist
+        run: |
+          set -e
+          command -v aws >/dev/null \
+            || { echo "::error::the AWS CLI is not on this runner, and R2's object API is S3-only"; exit 1; }
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] \
+            || { echo "::error::secret CLOUDFLARE_ACCOUNT_ID is not set"; exit 1; }
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "::error::No R2 S3 credential is configured. This job reads, in order:"
+            echo "::error::  CLOUDFLARE_R2_ACCESS_KEY_ID / CLOUDFLARE_R2_SECRET_ACCESS_KEY"
+            echo "::error::  R2_S3_ACCESS_KEY_ID / R2_S3_SECRET_ACCESS_KEY"
+            exit 1
+          fi
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          echo "R2_ENDPOINT=$ENDPOINT" >> "$GITHUB_ENV"
+          for b in '${{ inputs.private_bucket }}' '${{ inputs.public_bucket }}'; do
+            aws s3api head-bucket --endpoint-url "$ENDPOINT" --bucket "$b" >/dev/null 2>&1 \
+              || { echo "::error::bucket \"$b\" does not exist on this account, or this token cannot see it."; exit 1; }
+            echo "bucket ok: $b"
+          done
+
+      - name: Generate the stray-logo runner
+        run: |
+          cat > ./scripts/media-stray-logo.gen.ts <<'TSEOF'
+          /**
+           * Remove ONE object — the private duplicate of the public logo — and
+           * nothing else, ever, and only once the public copy is proven.
+           * Generated by .github/workflows/media-stray-private-logo-remove.yml.
+           */
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { readFileSync, mkdtempSync } from 'node:fs';
+          import { tmpdir } from 'node:os';
+          import { join } from 'node:path';
+          import { isAnonymousPublicMediaKey } from '../worker/lib/mediaStorage';
+
+          function required(name: string): string {
+            const value = process.env[name];
+            if (!value) throw new Error(`${name} is not set`);
+            return value;
+          }
+
+          const PRIVATE_BUCKET = required('PRIVATE_BUCKET');
+          const PUBLIC_BUCKET = required('PUBLIC_BUCKET');
+          const ENDPOINT = required('R2_ENDPOINT');
+          const DRY_RUN = process.env.DRY_RUN === 'true';
+
+          /**
+           * THE ONLY KEY THIS SCRIPT MAY DELETE, and the size its surviving
+           * twin must have. Literals, not inputs: an operator chooses the
+           * buckets and whether to run, never the key.
+           */
+          const KEY = 'UiUx/Logo/Logo.webp';
+          const EXPECTED_BYTES = 107218;
+
+          function aws(args: string[], expectJson = true): any {
+            const out = execFileSync(
+              'aws',
+              ['s3api', args[0], '--endpoint-url', ENDPOINT, '--output', 'json', ...args.slice(1)],
+              { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
+            );
+            if (!expectJson) return null;
+            const text = out.trim();
+            return text ? JSON.parse(text) : null;
+          }
+
+          function awsOrNull(args: string[]): any {
+            try { return aws(args); } catch { return null; }
+          }
+
+          const scratch = mkdtempSync(join(tmpdir(), 'straylogo-'));
+          function sha256(bucket: string, tag: string): string {
+            const file = join(scratch, tag);
+            aws(['get-object', '--bucket', bucket, '--key', KEY, file]);
+            return createHash('sha256').update(readFileSync(file)).digest('hex');
+          }
+
+          const refusals: string[] = [];
+          function check(name: string, held: boolean, value: string): void {
+            console.log('  ' + (held ? 'ok  ' : 'FAIL') + '  ' + name + ' : ' + value);
+            if (!held) refusals.push(name);
+          }
+
+          console.log('key            : ' + JSON.stringify(KEY));
+          console.log('delete from    : ' + PRIVATE_BUCKET);
+          console.log('must survive in: ' + PUBLIC_BUCKET);
+          console.log('mode           : ' + (DRY_RUN ? 'DRY RUN — proves everything, deletes nothing' : 'DELETE'));
+          console.log('');
+
+          // The buckets are distinct, and the delete does not name the public one.
+          check('private and public are different buckets', PRIVATE_BUCKET !== PUBLIC_BUCKET, PRIVATE_BUCKET + ' vs ' + PUBLIC_BUCKET);
+
+          // This key is PUBLIC by the Worker's own rule, which is why the
+          // private copy is dead weight: for a public key `mediaBucket()`
+          // resolves to R2_PUBLIC and no request ever opens the private one.
+          check('the Worker classifies this key as public', isAnonymousPublicMediaKey(KEY) === true, String(isAnonymousPublicMediaKey(KEY)));
+
+          // PROOF 1 + 2 — the survivor exists, at this exact key, at this size.
+          const publicHead = awsOrNull(['head-object', '--bucket', PUBLIC_BUCKET, '--key', KEY]);
+          check('public copy exists', publicHead !== null, publicHead ? 'present' : 'ABSENT');
+          const publicBytes = publicHead ? Number(publicHead.ContentLength) : -1;
+          check('public copy size is exactly ' + EXPECTED_BYTES, publicBytes === EXPECTED_BYTES, String(publicBytes));
+
+          // The private object itself. Absent is not a failure: re-running must
+          // be a no-op, because the object this job removes stays removed.
+          const privateHead = awsOrNull(['head-object', '--bucket', PRIVATE_BUCKET, '--key', KEY]);
+          if (!privateHead) {
+            console.log('');
+            console.log('STRAY PRIVATE LOGO BEFORE  : absent');
+            console.log('STRAY PRIVATE LOGO DELETED : 0 (an earlier run already removed it)');
+            console.log('PUBLIC LOGO INTACT         : ' + (publicBytes === EXPECTED_BYTES ? 'yes' : 'NO'));
+            if (refusals.length > 0) { console.error('::error::' + refusals.join('; ')); process.exit(1); }
+            process.exit(0);
+          }
+          console.log('  --  private copy present   : ' + Number(privateHead.ContentLength) + ' B');
+
+          // PROOF 4 — it is a DUPLICATE, byte for byte. Same size is not
+          // enough: two different 107218-byte files would pass that. If the
+          // bytes differ this is not the stray copy, it is something unique,
+          // and deleting it would destroy the only instance of whatever it is.
+          const publicDigest = publicHead ? sha256(PUBLIC_BUCKET, 'public') : '';
+          const privateDigest = sha256(PRIVATE_BUCKET, 'private');
+          console.log('  --  public  sha256         : ' + publicDigest);
+          console.log('  --  private sha256         : ' + privateDigest);
+          check('the private object is byte-identical to the public one',
+            publicDigest !== '' && publicDigest === privateDigest,
+            publicDigest === privateDigest ? 'identical' : 'DIFFERENT — this is not a duplicate');
+
+          if (refusals.length > 0) {
+            console.error('');
+            console.error('::error::refusing to delete anything: ' + refusals.join('; '));
+            process.exit(1);
+          }
+
+          if (DRY_RUN) {
+            console.log('');
+            console.log('DRY RUN — every check passed and no delete-object call was made');
+            process.exit(0);
+          }
+
+          // THE DELETE. One object, in the private bucket, by its exact key.
+          aws(['delete-object', '--bucket', PRIVATE_BUCKET, '--key', KEY], false);
+          console.log('');
+          console.log('DeleteObject: single object, --bucket ' + PRIVATE_BUCKET + ' --key ' + JSON.stringify(KEY));
+
+          // AFTERWARDS: the duplicate is gone and the survivor is untouched.
+          const goneHead = awsOrNull(['head-object', '--bucket', PRIVATE_BUCKET, '--key', KEY]);
+          const survivorHead = awsOrNull(['head-object', '--bucket', PUBLIC_BUCKET, '--key', KEY]);
+          const survivorBytes = survivorHead ? Number(survivorHead.ContentLength) : -1;
+          console.log('');
+          console.log('STRAY PRIVATE LOGO BEFORE  : present (' + Number(privateHead.ContentLength) + ' B)');
+          console.log('STRAY PRIVATE LOGO DELETED : 1');
+          console.log('STRAY PRIVATE LOGO EXISTS  : ' + (goneHead ? 'YES — IT DID NOT GO' : 'no'));
+          console.log('PUBLIC LOGO EXISTS         : ' + (survivorHead ? 'yes' : 'NO'));
+          console.log('PUBLIC LOGO BYTES          : ' + survivorBytes);
+          console.log('OTHER OBJECTS DELETED      : 0');
+
+          if (goneHead) { console.error('::error::the private duplicate is still present'); process.exit(1); }
+          if (survivorBytes !== EXPECTED_BYTES) {
+            console.error('::error::the PUBLIC logo is not intact after the delete — this is the failure this job exists to prevent');
+            process.exit(1);
+          }
+          TSEOF
+          test -s ./scripts/media-stray-logo.gen.ts || { echo "::error::runner was not written"; exit 1; }
+          wc -l ./scripts/media-stray-logo.gen.ts
+
+      - name: Typecheck the runner against the repository it imports from
+        run: npx tsc --noEmit -p tests/tsconfig.json
+
+      - name: Prove the survivor, then remove the duplicate
+        env:
+          PRIVATE_BUCKET: ${{ inputs.private_bucket }}
+          PUBLIC_BUCKET: ${{ inputs.public_bucket }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: npx tsx ./scripts/media-stray-logo.gen.ts
+
+      # The bucket said the logo is still there. This asks the internet.
+      - name: The live site must still serve the logo, and private media must stay refused
+        if: always()
+        run: |
+          set +e
+          BASE="https://levonis-iq.com"
+          LEAKS=0
+          code=$(curl -s -o /tmp/logo2.bin -w '%{http_code}' --max-time 25 "$BASE/files/UiUx/Logo/Logo.webp")
+          bytes=$(stat -c%s /tmp/logo2.bin 2>/dev/null || echo 0)
+          echo "PUBLIC LOGO DELIVERY AFTER : $code, ${bytes} B"
+          probe() {
+            c=$(curl -s -o /tmp/p.bin -w '%{http_code}' --max-time 25 "$BASE/files/$1")
+            b=$(stat -c%s /tmp/p.bin 2>/dev/null || echo 0)
+            if [ "$c" = "200" ] && [ "$b" -gt 0 ]; then
+              echo "  ::error::LEAK   $c  ${b} B  $1"; LEAKS=$((LEAKS + 1))
+            else
+              echo "  private OK      $c  ${b} B  $1  (correctly refused)"
+            fi
+          }
+          probe "receipts/usr_04834acf6e1e4bf1bd6f/3994c9ee34f64aa9a2c4.png"
+          probe "chat/usr_7eeadbc88ab04da7856d/a4af69669be943e0ada9.jpg"
+          probe "reviews/usr_934b7beb1ff24ce2b6b6/4aa60f3409074d8f8fb2.png"
+          probe "reviews-evidence/usr_934b7beb1ff24ce2b6b6/6f68671f892c4c4d94f2.png"
+          for page in / /products; do
+            echo "  $page -> $(curl -s -o /dev/null -w '%{http_code}' --max-time 25 "$BASE$page")"
+          done
+          echo "ANONYMOUS LEAKS: $LEAKS"
+          [ "$code" = "200" ] && [ "$bytes" = "107218" ] && [ "$LEAKS" = "0" ] \
+            || { echo "::error::post-delete verification failed"; exit 1; }
