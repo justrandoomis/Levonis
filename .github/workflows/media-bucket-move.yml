@@ -406,6 +406,16 @@ jobs:
 
           if (!verifiedAll) {
             console.error('\n' + failures + ' object(s) failed verification, ' + blocked.length + ' blocked.');
+            // NAME THEM, IN THE LOG. These rows lived only in the step summary,
+            // so a run that refused to delete could not tell anyone WHICH four
+            // objects to fix without opening a web page and scrolling a table.
+            // A refusal you cannot act on is only half a safety feature.
+            for (const r of rows.filter((x) => x.outcome === 'FAILED')) {
+              console.error('  FAILED  ' + r.key + '  (' + r.method + ': ' + r.detail + ')');
+            }
+            for (const r of blocked) {
+              console.error('  BLOCKED ' + r.key + '  (' + r.method + ': ' + r.detail + ')');
+            }
             console.error('Nothing has been deleted. Fix or hand-move those objects, then re-run —');
             console.error('objects already verified are skipped, so a re-run is cheap and safe.');
             process.exit(1);

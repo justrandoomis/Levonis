@@ -366,8 +366,22 @@ export function isAnonymousPublicMediaKey(key: string): boolean {
     key.startsWith('community/') ||
     /^users\/[^/]+\/(?:avatar|public-avatars)\//.test(key) ||
     /^merchants\/[^/]+\/(?:public|logos|covers)\//.test(key) ||
-    key.startsWith('ui/') ||
-    key.startsWith('UIUx/') ||
+    /**
+     * THE BRAND FOLDER, WHATEVER CASE IT WAS UPLOADED IN.
+     *
+     * This directory has been spelled `ui/`, `UIUx/` and `UiUx/` across code,
+     * imports and hand uploads, and an exact match on two of those three sent
+     * the real object — `UiUx/Logo/Logo.webp` — to the PRIVATE bucket, where an
+     * anonymous visitor cannot fetch the site's own logo. A brand asset that
+     * only signed-in users can load is not a private asset, it is a broken one.
+     *
+     * Case-insensitive HERE and nowhere else: this folder holds fixed brand
+     * files an admin controls and never user content, so widening it exposes
+     * nothing. The user-scoped prefixes above stay exact on purpose — matching
+     * `Users/` as loosely as `users/` would be a way to reach someone's data
+     * by changing a letter.
+     */
+    /^ui(?:ux)?\//i.test(key) ||
     key.startsWith('brands/') ||
     key.startsWith('services/')
   );
