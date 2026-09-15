@@ -344,3 +344,78 @@ test('the columns this rests on exist, so a dropped migration fails here and not
     row<{ n: number }>(raw, "SELECT COUNT(*) AS n FROM pragma_table_info('inventory_ledger') WHERE name = 'scope'")!.n === 1
   );
 });
+
+// ==================== the CASCADE is a writer too, and it asks no questions
+//
+// `product_option_fulfillment.option_id` is ON DELETE CASCADE (0073). Deleting
+// a model therefore deletes its cell, that cell's routes, and every unit they
+// are holding — without going through any of the guards that protect those
+// rows. The plan-time count refuses the delete when it can SEE a hold; a
+// checkout that commits between that read and the batch is invisible to it.
+
+test('the model delete asks the row, so a hold taken after the plan is not cascaded away', async () => {
+  const raw = seed();
+  // Nothing is held YET. That is the whole point: at plan time this model is
+  // genuinely free to delete, so every plan-time guard rightly passes.
+  raw.exec("UPDATE product_option_fulfillment SET capacity_reserved = 0 WHERE id = 'f_pre'");
+  raw.exec("UPDATE product_option_transports SET capacity_reserved = 0 WHERE id = 't_land'");
+  const db = asD1(raw);
+  const stored = row<Record<string, unknown>>(raw, 'SELECT * FROM products WHERE id = ?', 'p_a1')!;
+
+  const body = relationsBody() as Record<string, unknown>;
+  (body.groups as Array<{ values: unknown[] }>)[0].values = [];
+  const plan = await planProductSave(db, {
+    mode: 'update',
+    doc: null,
+    prev: parseProductRow(stored),
+    relations: body,
+    actor: { adminId: 'boss', money: true },
+  });
+
+  // ...and a real pre-order commits in the window before the batch runs.
+  raw.prepare('UPDATE product_option_fulfillment SET capacity_reserved = 3 WHERE id = ?').run('f_pre');
+  raw.exec(`
+    INSERT INTO inventory_ledger (id,product_id,scope,scope_id,kind,qty,order_id,idempotency_key,reason)
+    VALUES ('l_race','p_a1','preorder','f_pre','reserve',3,'o_race','reserve:o_race:f_pre','checkout');
+  `);
+
+  await saveProductAtomic(db, plan);
+
+  assert.equal(cells(raw).length, 1, 'the cell that is holding units is still here');
+  assert.equal(cells(raw)[0].capacity_reserved, 3, 'and it still knows what it is holding');
+  const orphans = all<{ scope_id: string }>(
+    raw,
+    `SELECT l.scope_id FROM inventory_ledger l
+      WHERE l.scope = 'preorder'
+        AND NOT EXISTS (SELECT 1 FROM product_option_fulfillment f WHERE f.id = l.scope_id)`
+  );
+  assert.deepEqual(orphans, [], 'the release for that order can still find the counter it must give back to');
+});
+
+test('a model with no hold still deletes, and its lost quota is named in the warnings', async () => {
+  const raw = seed();
+  raw.exec("UPDATE product_option_fulfillment SET capacity_reserved = 0 WHERE id = 'f_pre'");
+  raw.exec("UPDATE product_option_transports SET capacity_reserved = 0 WHERE id = 't_land'");
+  const db = asD1(raw);
+  const stored = row<Record<string, unknown>>(raw, 'SELECT * FROM products WHERE id = ?', 'p_a1')!;
+
+  const body = relationsBody() as Record<string, unknown>;
+  (body.groups as Array<{ values: unknown[] }>)[0].values = [];
+  const plan = await planProductSave(db, {
+    mode: 'update',
+    doc: null,
+    prev: parseProductRow(stored),
+    relations: body,
+    actor: { adminId: 'boss', money: true },
+  });
+  await saveProductAtomic(db, plan);
+
+  assert.equal(cells(raw).length, 0, 'nothing was held, so the delete goes through as it always did');
+  // A sheet has no option-id column, so a RENAME is a delete plus a create —
+  // and a sheet with no fulfilment rows re-creates no quota. Silently turning
+  // a limited pre-order into an unlimited one is the loss this names.
+  assert.ok(
+    plan.warnings.some((w) => /capacity limit/i.test(w)),
+    `the lost quota must be named: ${JSON.stringify(plan.warnings)}`
+  );
+});

@@ -861,12 +861,40 @@ export async function planRelationsWriteFrom(
     const owner = cellOwner.get(t.fulfillment_id);
     if (owner) addHeld(owner, Number(t.capacity_reserved ?? 0));
   }
+  // A CONFIGURED quota that is holding nothing is not worth refusing a delete
+  // over — but it must not vanish without a word either. A spreadsheet has no
+  // option-id column, so RENAMING a model is modelled as delete-plus-create;
+  // the cascade takes the quota with the old row and a sheet carrying no
+  // fulfilment rows re-creates nothing, so the limit is simply gone and the
+  // pre-order becomes unlimited. That is a silent loss, which is the one thing
+  // this format promises never to do.
+  const trackedByOption = new Map<string, number>();
+  const noteTracked = (optionId: string, capacity: unknown) => {
+    if (capacity !== null && capacity !== undefined) {
+      trackedByOption.set(optionId, (trackedByOption.get(optionId) ?? 0) + 1);
+    }
+  };
+  for (const f of existing.fulfillments ?? []) {
+    if (String(f.fulfillment_type) === 'pre_order') noteTracked(f.option_id, f.capacity ?? null);
+  }
+  for (const t of existing.transports ?? []) {
+    const owner = cellOwner.get(t.fulfillment_id);
+    if (owner) noteTracked(owner, t.capacity ?? null);
+  }
+
   for (const v of existing.values) {
     if (keptValues.has(v.id) || retainedForOrders.has(v.id)) continue;
     const held = heldByOption.get(v.id) ?? 0;
     if (held > 0) {
       errors.push(
         `Option "${v.name_en}" is holding ${held} pre-ordered unit(s) and cannot be removed — cancel or fulfil those pre-orders first / الخيار يحجز وحدات مطلوبة مسبقًا ولا يمكن حذفه`
+      );
+      continue;
+    }
+    const tracked = trackedByOption.get(v.id) ?? 0;
+    if (tracked > 0) {
+      warnings.push(
+        `Option "${v.name_en}" was removed, and the ${tracked} pre-order capacity limit(s) it carried went with it — a model removed here is not renamed, and nothing re-creates its quota / حُذف الخيار ومعه حدود السعة المسبقة التي كان يحملها`
       );
     }
   }
@@ -1121,7 +1149,36 @@ export async function planRelationsWriteFrom(
     if (retainedValueIds.has(v.id)) {
       stmts.push(db.prepare('UPDATE product_option_values SET active = 0 WHERE id = ?').bind(v.id));
     } else {
-      stmts.push(db.prepare('DELETE FROM product_option_values WHERE id = ?').bind(v.id));
+      /**
+       * 0075. THE DELETE ASKS THE ROW, because the CASCADE does not.
+       *
+       * `product_option_fulfillment.option_id` is ON DELETE CASCADE (0073), so
+       * deleting a model silently takes its (model x pre-order) cell, that
+       * cell's routes, and every unit they are HOLDING. The guard above is a
+       * plan-time count — read before the batch — and a checkout that commits
+       * in that window is invisible to it; `inventory_ledger.scope_id` would
+       * then name a row that no longer exists and the release could never
+       * match. `fulfillmentStatements` was taught the same lesson for its own
+       * delete; this is the cascade one level up.
+       *
+       * Losing the admin's deletion is recoverable — they try again, and the
+       * count guard names the hold. Losing a customer's units is not.
+       */
+      stmts.push(
+        db
+          .prepare(
+            `DELETE FROM product_option_values
+              WHERE id = ?
+                AND NOT EXISTS (
+                  SELECT 1 FROM product_option_fulfillment f
+                   WHERE f.option_id = product_option_values.id AND f.capacity_reserved > 0)
+                AND NOT EXISTS (
+                  SELECT 1 FROM product_option_transports t
+                    JOIN product_option_fulfillment f2 ON f2.id = t.fulfillment_id
+                   WHERE f2.option_id = product_option_values.id AND t.capacity_reserved > 0)`
+          )
+          .bind(v.id)
+      );
     }
   }
   const retainedColorIds = new Set(retainedColors.map((c) => c.id));
