@@ -297,6 +297,9 @@ jobs:
           interface Row {
             key: string;
             visibility: string;
+            /** The media DOMAIN the key's prefix resolves to — products, chat,
+             *  receipts, reviews… The report is unreadable without it. */
+            domain: string;
             destination: string;
             bytes: number;
             outcome: string;
@@ -317,7 +320,7 @@ jobs:
               // unreachable copy and let the run call that progress.
               if (!isSafeMediaKey(object.key)) {
                 blocked.push({
-                  key: object.key, visibility: '-', destination: '-', bytes: object.size,
+                  key: object.key, visibility: '-', domain: '-', destination: '-', bytes: object.size,
                   outcome: 'BLOCKED', method: 'unsafe-key',
                   detail: 'the Worker will not serve this key from any bucket; rename or move it by hand',
                 });
@@ -342,7 +345,7 @@ jobs:
               }
               const proof = verify(destination, object);
               rows.push({
-                key: object.key, visibility: plan.visibility, destination, bytes: object.size,
+                key: object.key, visibility: plan.visibility, domain: plan.domain, destination, bytes: object.size,
                 outcome: proof.ok ? 'VERIFIED (' + action + ')' : 'FAILED',
                 method: proof.method, detail: proof.detail,
               });
@@ -404,6 +407,44 @@ jobs:
             writeFileSync(summaryPath, lines.join('\n') + '\n', { flag: 'a' });
           }
 
+          // ------------------------------------------------- THE FULL REPORT
+          //
+          // Printed to the CONSOLE, every run, pass or fail. The step summary
+          // is a web page; a migration's per-object result has to be readable
+          // where the run is read, or "18 of 22" is the only fact that travels.
+          const all = [...rows, ...blocked];
+          console.log('\n===== PER-OBJECT RESULT =====');
+          for (const r of all) {
+            console.log(
+              [
+                r.outcome.startsWith('VERIFIED') ? 'OK     ' : r.outcome === 'BLOCKED' ? 'BLOCKED' : r.outcome,
+                'src=' + r.key,
+                'domain=' + r.domain,
+                'class=' + r.visibility,
+                'dest=' + r.destination,
+                'destKey=' + (r.destination === '-' ? '-' : r.key),
+                'bytes=' + r.bytes,
+                'proof=' + r.method + (r.detail ? ':' + r.detail : ''),
+              ].join('  ')
+            );
+          }
+          const pub = rows.filter((r) => r.visibility === 'public' && r.outcome.startsWith('VERIFIED'));
+          const priv = rows.filter((r) => r.visibility === 'private' && r.outcome.startsWith('VERIFIED'));
+          console.log('\n===== SUMMARY =====');
+          console.log('TOTAL LEGACY OBJECTS: ' + all.length);
+          console.log('PUBLIC VERIFIED: ' + pub.length);
+          console.log('PRIVATE VERIFIED: ' + priv.length);
+          console.log('BLOCKED: ' + blocked.length);
+          console.log('FAILED: ' + failures);
+          console.log('LEGACY DELETED: 0');
+          console.log('\nPUBLIC OBJECT LIST:');
+          for (const r of pub) console.log('  ' + r.key + '  (' + r.bytes + ' B, ' + r.method + ')');
+          console.log('PRIVATE OBJECT LIST:');
+          for (const r of priv) console.log('  ' + r.key + '  (' + r.bytes + ' B, ' + r.method + ')');
+          console.log('BLOCKED OBJECT LIST + EXACT REASON:');
+          for (const r of blocked) console.log('  ' + r.key + '  -> ' + r.method + ': ' + r.detail);
+          if (blocked.length === 0) console.log('  (none)');
+
           if (!verifiedAll) {
             console.error('\n' + failures + ' object(s) failed verification, ' + blocked.length + ' blocked.');
             // NAME THEM, IN THE LOG. These rows lived only in the step summary,
@@ -438,6 +479,47 @@ jobs:
           PRIVATE_BUCKET: ${{ inputs.private_bucket }}
           MANIFEST: ${{ runner.temp }}/media-move-manifest.json
         run: npx tsx ./scripts/media-bucket-move.gen.ts
+
+      # DOES THE SHOP ACTUALLY SERVE WHAT WE JUST FILED?
+      #
+      # A migration that verifies bytes in a bucket has proved storage, not
+      # delivery. The Worker decides public-vs-private from the KEY, by the same
+      # isAnonymousPublicMediaKey this job used to choose a bucket — so the two
+      # can disagree, and the way you find out is by asking the live site as an
+      # anonymous stranger would.
+      #
+      # Both directions matter, and the second one more:
+      #   a PUBLIC key must answer 200 with no credentials;
+      #   a PRIVATE key must NOT — a customer's receipt or chat photo answering
+      #   200 to a stranger is a data leak, and this step would catch it.
+      #
+      # Read-only, unauthenticated, and never fatal: the live Worker may be
+      # older than the classification this run used, and that is a deploy fact
+      # to report, not a reason to fail a storage migration.
+      - name: Ask the live site whether these keys are served as classified
+        continue-on-error: true
+        run: |
+          set +e
+          BASE="https://levonis-iq.com"
+          echo "=== anonymous delivery, via the Worker's own /files route ==="
+          probe() {
+            local key="$1" expect="$2"
+            local code
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE/files/$key")
+            if [ "$expect" = "public" ]; then
+              [ "$code" = "200" ]                 && echo "  PUBLIC OK      $code  $key"                 || echo "  PUBLIC NOT YET $code  $key   (expected 200)"
+            else
+              [ "$code" = "200" ]                 && echo "  ::error::LEAK  $code  $key   (a private object answered an anonymous request)"                 || echo "  private OK     $code  $key   (correctly refused)"
+            fi
+          }
+          probe "UiUx/Logo/Logo.webp" public
+          # A representative private key from each customer-data domain. If any
+          # of these answers 200 anonymously, the split is wrong, not merely late.
+          probe "receipts/usr_04834acf6e1e4bf1bd6f/3994c9ee34f64aa9a2c4.png" private
+          probe "chat/usr_7eeadbc88ab04da7856d/a4af69669be943e0ada9.jpg" private
+          probe "reviews/usr_934b7beb1ff24ce2b6b6/4aa60f3409074d8f8fb2.png" private
+          probe "reviews-evidence/usr_934b7beb1ff24ce2b6b6/6f68671f892c4c4d94f2.png" private
+          echo "(a PUBLIC NOT YET only means the live Worker predates the classification fix)"
 
       # ONE directory, so the artifact's internal layout is flat and known.
       # (upload-artifact@v4 roots a multi-path upload at the paths' common
