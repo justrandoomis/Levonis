@@ -1,8 +1,11 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { AppContext, Env } from './lib/types';
 import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
 import { loadSessionUser } from './lib/session';
 import { isAnonymousPublicMediaKey } from './lib/mediaStorage';
+import { injectSocialPreview, productSlugFromPath, resolveProductPreview } from './lib/socialPreview';
+import { trustedOrigin } from './lib/appOrigin';
 import { runDurableJobs } from './lib/jobs';
 import { authRoutes } from './routes/auth';
 import { productRoutes, homeRoutes } from './routes/products';
@@ -121,6 +124,26 @@ app.use('*', async (c, next) => {
    */
   const path = c.req.path;
   if (path.startsWith('/files/') && isAnonymousPublicMediaKey(path.slice('/files/'.length))) {
+    await next();
+    return;
+  }
+  /**
+   * NEITHER DOES A PRODUCT PAGE'S HTML — and it now reaches the Worker.
+   *
+   * Putting the product paths in `run_worker_first` (wrangler.jsonc) so a
+   * shared link can carry the product's own card means the Worker is invoked
+   * for the DOCUMENT too, not just for the API calls the page makes after it
+   * boots. Without this, a signed-in shopper opening a product page paid a
+   * `sessions` x `users` JOIN for the shell itself, before the page had asked
+   * for anything.
+   *
+   * Nothing on these paths reads `user`: they match no route, so the only
+   * handler is the SPA fallback below, and the card it injects is the same
+   * public product every visitor sees. The predicate is the same one that
+   * decides whether to inject, so the skip cannot cover a path the fallback
+   * treats differently.
+   */
+  if (productSlugFromPath(path)) {
     await next();
     return;
   }
@@ -254,12 +277,72 @@ app.all('/api/d1/init', (c) => c.json({ success: false, error: 'This endpoint ha
 app.all('/api/make-all-investors', (c) => c.json({ success: false, error: 'This endpoint has been removed.' }, 410));
 app.all('/api/upload', (c) => c.json({ success: false, error: 'Use POST /api/uploads.' }, 410));
 
+// THE SPA FALLBACK, AND THE ONE THING IT REWRITES ON THE WAY OUT.
+//
+// Every non-API path is served the same built `index.html`; React reads the
+// URL and renders the right screen. That is invisible to a human and fatal to
+// a crawler, which reads the bytes it is handed and leaves. Before this, every
+// product link pasted into Instagram, Telegram, WhatsApp or Messenger unfurled
+// with the SHOP's card, because the shop's card is what the shell ships.
+//
+// So for the handful of paths that name a product — and ONLY those, see
+// `productSlugFromPath` — the shell's four identifying tags are replaced with
+// the product's own before the response leaves. Every other route pays nothing:
+// no extra read, no buffering, the same `ASSETS.fetch` as before.
+//
+// NOTHING HERE MAY BREAK A PAGE LOAD. A slug that resolves to no published
+// product, a database that is slow or unavailable, an asset response that is
+// not HTML — each one falls through to the untouched response. A share card is
+// worth a rewrite; it is not worth a white screen, so the whole rewrite sits
+// inside a catch and the customer gets the app either way.
+//
+// LINE COMMENTS, NOT A BLOCK — the same reason as the note at the bottom of
+// this file. The comment stripper in tests/storefrontIsolation.test.ts reads
+// the slash-star inside the '/api/admin/*' mount string above as a comment
+// opener, so the first block terminator below it deletes every route mount in
+// between, and the admin host guard that test asserts on vanishes with them.
+async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
+  const asset = await c.env.ASSETS.fetch(c.req.raw);
+  const slug = productSlugFromPath(c.req.path);
+  if (!slug || !asset.ok) return asset;
+  if (!/^text\/html\b/i.test(asset.headers.get('Content-Type') || '')) return asset;
+
+  try {
+    const origin = trustedOrigin(c);
+    const product = await resolveProductPreview(c.env.DB, slug, origin);
+    if (!product) return asset;
+
+    const url = new URL(c.req.url);
+    const html = injectSocialPreview(await asset.text(), {
+      ...product,
+      // The URL the crawler was given, not the canonical one — query string
+      // included. A shared link carries the supporter's handle as `?ref=`
+      // (`productSupportPath`), and a crawler that is told the canonical
+      // address will show and follow THAT, dropping the referral the sharer is
+      // owed. Rebuilt from the trusted origin rather than echoed, so a spoofed
+      // Host header cannot write its own domain into the card.
+      url: `${origin}${url.pathname}${url.search}`,
+    });
+
+    const headers = new Headers(asset.headers);
+    // The body is no longer the asset that was hashed. A stale validator would
+    // let a browser or an intermediary answer a later request with the cached
+    // ORIGINAL — the shop's card again, on a product page.
+    headers.delete('ETag');
+    headers.delete('Content-Length');
+    return new Response(html, { status: asset.status, headers });
+  } catch {
+    // A card is an enhancement. The app is not.
+    return asset;
+  }
+}
+
 app.notFound((c) => {
   if (c.req.path.startsWith('/api/') || c.req.path.startsWith('/files/')) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   // Anything else falls through to the static assets (SPA).
-  return c.env.ASSETS.fetch(c.req.raw);
+  return assetWithPreview(c);
 });
 
 // THE ONE THING A 500 MAY TELL THE CUSTOMER.

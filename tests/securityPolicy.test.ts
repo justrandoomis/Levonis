@@ -251,9 +251,50 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
     steps.indexOf('vite build') < steps.indexOf('node scripts/write-asset-headers.mjs'),
     'the headers file must be written after vite empties dist/'
   );
+  /**
+   * THE WORKER NOW RUNS FIRST FOR SOME PAGES, AND `_headers` IS STILL THE
+   * RIGHT LAYER. THIS IS THAT REVISIT.
+   *
+   * The assertion here used to pin `run_worker_first` to exactly
+   * `["/api/*", "/files/*"]`, with the note "if the Worker starts running
+   * first for pages, revisit whether _headers is still the right layer". It
+   * since does, for the four product paths, so a shared product link can carry
+   * the product's own share card (worker/lib/socialPreview.ts).
+   *
+   * The answer is that nothing moves. Those four are a HANDFUL of routes; `/`,
+   * `/products`, `/cart`, `/checkout`, `/orders`, `/auth`, every admin screen
+   * and every built asset are still answered by the asset layer with the
+   * Worker nowhere in the request, and this file is the only thing that gives
+   * them a policy. What changes is that the product documents are covered
+   * TWICE — once by the file, once by `securityHeaders` — and by construction
+   * they agree: the middleware sets a policy only when the response does not
+   * already carry one, and the one it would set is `spaCsp()` from this very
+   * module.
+   *
+   * So what is pinned now is the property that actually matters: the two
+   * surfaces the Worker owns are still first, and the SPA is not wholesale
+   * moved behind the Worker without someone reading this comment. A blanket
+   * `/*` would put every page and every asset through the Worker, and THAT is
+   * the change that would make the file redundant and the CPU bill real.
+   */
   const wrangler = readFileSync('wrangler.jsonc', 'utf8');
-  assert.match(wrangler, /"run_worker_first":\s*\["\/api\/\*",\s*"\/files\/\*"\]/,
-    'if the Worker starts running first for pages, revisit whether _headers is still the right layer');
+  const blocks = wrangler.match(/"run_worker_first"\s*:\s*\[[^\]]*\]/g) ?? [];
+  assert.equal(blocks.length, 3, 'top-level, staging and production each declare it');
+  for (const block of blocks) {
+    assert.ok(block.includes('"/api/*"') && block.includes('"/files/*"'), block);
+    const routes = [...block.matchAll(/"([^"]+)"/g)].map((m) => m[1]).filter((r) => r.startsWith('/'));
+    assert.ok(
+      !routes.includes('/*') && !routes.includes('/'),
+      'the whole SPA behind the Worker would make dist/_headers redundant — read the note above before doing it'
+    );
+    // Named prefixes only. Every one of them is a deliberate decision.
+    for (const route of routes) {
+      assert.ok(
+        ['/api/*', '/files/*', '/product/*', '/bundles/*', '/p/*', '/community/store/*'].includes(route),
+        `${route} was added to run_worker_first without revisiting this test`
+      );
+    }
+  }
 });
 
 /**

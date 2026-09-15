@@ -43,7 +43,10 @@ export function securityHeaders() {
     c.header('Strict-Transport-Security', STRICT_TRANSPORT_SECURITY);
     // The SPA policy, unless the route already chose one: the print documents
     // (asDocument) and the R2 file sandbox set their own. See securityPolicy.ts
-    // — and note the asset layer serves the page itself from dist/_headers.
+    // — and note the asset layer serves most of the pages themselves, from
+    // dist/_headers. The product paths are the exception (run_worker_first, so
+    // a shared link carries the product's own card); they arrive here already
+    // carrying that file's policy, which is why this must not overwrite one.
     if (!c.res.headers.has('Content-Security-Policy')) {
       c.header('Content-Security-Policy', spaCsp());
     }

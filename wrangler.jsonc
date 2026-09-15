@@ -12,12 +12,35 @@
   "compatibility_flags": ["nodejs_compat"],
 
   // Built Vite frontend served as static assets with SPA fallback.
-  // /api/* and /files/* always hit the Worker first.
+  //
+  // `run_worker_first` is the whole routing decision. Anything NOT listed here
+  // is answered by the asset layer before the Worker exists for that request —
+  // which is why the SPA document's security headers come from a generated
+  // `dist/_headers` file and not from the Worker's own middleware
+  // (packages/platform-kit/src/edge/securityPolicy.ts says so at length).
+  //
+  // /api/* and /files/* are the Worker's own surface.
+  //
+  // THE FOUR PRODUCT PATHS ARE HERE FOR ONE REASON: A SHARED LINK. They are
+  // ordinary SPA routes and the asset layer could serve them, but then a
+  // crawler — Telegram, WhatsApp, Instagram, Messenger — would read the shell
+  // and unfurl the SHOP's card for every product in the catalogue, because a
+  // crawler does not boot React. Running the Worker first lets it put the
+  // product's own name, picture and description into the document before it
+  // leaves (worker/lib/socialPreview.ts). The Worker passes every other
+  // request on these prefixes straight through to the same assets.
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/files/*"]
+    "run_worker_first": [
+      "/api/*",
+      "/files/*",
+      "/product/*",
+      "/bundles/*",
+      "/p/*",
+      "/community/store/*"
+    ]
   },
 
   // Top-level names double as the LOCAL dev identifiers (wrangler dev /
@@ -86,11 +109,19 @@
     // never to the production domain.
     "staging": {
       "name": "levonis-staging",
+      // See the top-level `assets` block for why the product paths are here.
       "assets": {
         "directory": "./dist",
         "binding": "ASSETS",
         "not_found_handling": "single-page-application",
-        "run_worker_first": ["/api/*", "/files/*"]
+        "run_worker_first": [
+          "/api/*",
+          "/files/*",
+          "/product/*",
+          "/bundles/*",
+          "/p/*",
+          "/community/store/*"
+        ]
       },
       "d1_databases": [
         {
@@ -150,11 +181,19 @@
     // of the whole product should not also answer on a second, unrouted door.
     "dark": {
       "name": "levonis-core-dark",
+      // See the top-level `assets` block for why the product paths are here.
       "assets": {
         "directory": "./dist",
         "binding": "ASSETS",
         "not_found_handling": "single-page-application",
-        "run_worker_first": ["/api/*", "/files/*"]
+        "run_worker_first": [
+          "/api/*",
+          "/files/*",
+          "/product/*",
+          "/bundles/*",
+          "/p/*",
+          "/community/store/*"
+        ]
       },
       "workers_dev": false,
       "preview_urls": false,

@@ -130,13 +130,23 @@ export function spaCsp(): string {
  * The `_headers` file for Workers Static Assets, written into dist/ by
  * scripts/write-asset-headers.mjs after every build.
  *
- * WHY A FILE. wrangler.jsonc runs the Worker only for /api/* and /files/*
- * (run_worker_first); index.html, every SPA route and every asset are served
- * by the asset layer BEFORE the Worker exists for that request. So the
- * middleware above never touched the page itself — the audit's live probe
- * found the SPA document without X-Frame-Options, nosniff or any policy,
- * while the API next to it had them all. The asset layer honours a
- * `_headers` file; generating it from this module keeps one policy text.
+ * WHY A FILE. `run_worker_first` in wrangler.jsonc names the only paths the
+ * Worker is invoked for; index.html and every asset are served by the asset
+ * layer BEFORE the Worker exists for that request. So the middleware above
+ * never touched the page itself — the audit's live probe found the SPA
+ * document without X-Frame-Options, nosniff or any policy, while the API next
+ * to it had them all. The asset layer honours a `_headers` file; generating it
+ * from this module keeps one policy text.
+ *
+ * THE PRODUCT PATHS ARE THE EXCEPTION, AND THEY DO NOT CHANGE THE ANSWER.
+ * `/product/*` and its three siblings were later added to `run_worker_first`
+ * so a shared link can carry the product's own share card
+ * (worker/lib/socialPreview.ts). Those documents therefore pass through the
+ * middleware as well — and get the SAME text, because `securityHeaders` sets
+ * a policy only when the response does not already carry one, and the one it
+ * would set comes from this very module. Every other SPA route is still served
+ * by the asset layer alone, so this file stays the only thing standing between
+ * the page and a missing policy.
  */
 export function assetHeadersFile(): string {
   const lines = [
