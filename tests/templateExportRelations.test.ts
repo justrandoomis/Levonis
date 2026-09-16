@@ -114,7 +114,12 @@ test('the 0043 fields survive, so a re-import cannot reset the variant', () => {
   const at = (k: string) => entries.find((e) => e.key === k)?.value;
   assert.equal(at('options.1.availability_type'), 'direct_sale');
   assert.equal(at('options.2.availability_type'), 'pre_order');
-  assert.equal(at('options.2.lead_time_text'), '25-40 يوم');
+  // 0079 — the source moved to the `_en` line; the two translation lines sit
+  // beside it, empty until a human or the local engine fills them.
+  assert.equal(at('options.2.lead_time_text_en'), '25-40 يوم');
+  assert.equal(at('options.2.lead_time_text_ar'), '');
+  assert.equal(at('options.2.lead_time_text_ckb'), '');
+  assert.equal(at('options.2.lead_time_text'), undefined, 'the bare spelling is import-only');
   assert.equal(at('options.1.variant_key'), 'a1');
   assert.equal(at('options.2.variant_label'), 'A1');
 });

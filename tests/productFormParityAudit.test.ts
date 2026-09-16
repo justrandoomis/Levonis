@@ -134,7 +134,9 @@ status=draft
 description_ar=وصف عربي كتبه المالك
 description_en=Owner-written English description
 description_ckb=وەسفی کوردی نووسراو
-how_to_use=Level the bed, load filament, print.
+how_to_use_ar=سوِّ المنصة، حمّل الفلامنت، اطبع.
+how_to_use_en=Level the bed, load filament, print.
+how_to_use_ckb=تەختەکە ڕێک بخە، فیلامێنت بار بکە، چاپ بکە.
 price_iqd=500000
 pro_price_iqd=450000
 prime_price_iqd=480000
@@ -366,6 +368,10 @@ test('§5 AUDIT — the form state itself carries all fifteen, not just the expo
   assert.equal(doc.sku, 'AUDIT-FULL-01');
   assert.equal(doc.description_en, 'Owner-written English description');
   assert.equal(doc.how_to_use, 'Level the bed, load filament, print.');
+  // 0079 — the Arabic and Kurdish the FILE states are what is stored, and the
+  // form save below must not regenerate over them.
+  assert.equal(doc.how_to_use_ar, 'سوِّ المنصة، حمّل الفلامنت، اطبع.');
+  assert.equal(doc.how_to_use_ckb, 'تەختەکە ڕێک بخە، فیلامێنت بار بکە، چاپ بکە.');
   assert.equal(doc.price_iqd, 500_000);
   assert.equal(doc.prime_price_iqd, 480_000);
   assert.equal(doc.pro_price_iqd, 450_000);

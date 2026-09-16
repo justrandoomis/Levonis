@@ -295,6 +295,9 @@ interface OptionItem {
   variant_key?: string;
   variant_label?: string;
   lead_time_text?: string;
+  /** 0079. «مدة التجهيز» in the two other languages; '' = read the source. */
+  lead_time_text_ar?: string;
+  lead_time_text_ckb?: string;
   lead_time_min_days?: number | null;
   lead_time_max_days?: number | null;
 }
@@ -333,12 +336,15 @@ interface ProductDetail {
   warranty_base_months?: number | null;
   spec_groups?: SpecGroup[]; specifications?: Array<{ key: string; value: string }>;
   description_images?: string[]; description_videos?: string[];
-  how_to_use?: string; brand?: string; stock?: number | null;
+  how_to_use?: string; how_to_use_ar?: string; how_to_use_ckb?: string;
+  brand?: string; stock?: number | null;
   spec_fields?: Record<string, string>;
   usage_guide?: {
     official_url: string;
     steps: Array<{
       id: string; kind: 'setup' | 'usage'; title: string; body: string;
+      /** 0079. '' = nothing authored in this language; read the source. */
+      title_ar?: string; title_ckb?: string; body_ar?: string; body_ckb?: string;
       images: string[]; video_url: string; link_url: string; order: number;
     }>;
   };
@@ -1329,6 +1335,15 @@ export default function Product() {
     .split(/\r?\n/)
     .map((t) => t.trim().replace(/^[-•·*]\s*/, ''))
     .filter(Boolean);
+  /**
+   * 0079. «طريقة الاستخدام» IN THE LANGUAGE ON SCREEN.
+   *
+   * The translation was generated on every save and discarded, so this
+   * paragraph showed the admin's English to an Arabic reader for as long as
+   * the field existed. `pick` falls back to the source when a language has no
+   * authored copy — an honest fallback, never an invented sentence.
+   */
+  const howToUse = pick(lang as Lang, product.how_to_use_ar, product.how_to_use, product.how_to_use_ckb);
   const guideSteps = product.usage_guide?.steps ?? [];
   const setupSteps = guideSteps.filter((st) => st.kind === 'setup');
   const usageSteps = guideSteps.filter((st) => st.kind !== 'setup');
@@ -1786,7 +1801,7 @@ export default function Product() {
                   const selected = optionId === opt.id;
                   const isPre = opt.availability_type === 'pre_order';
                   const chip = invMode === 'OPTION' ? levelChip(availByValue.get(opt.id)) : null;
-                  const wait = (opt.lead_time_text ?? '').trim();
+                  const wait = pick(lang as Lang, opt.lead_time_text_ar, opt.lead_time_text, opt.lead_time_text_ckb);
                   return (
                     <button
                       key={opt.id}
@@ -2537,7 +2552,7 @@ export default function Product() {
                 </Section>
               ) : null}
 
-              {guideSteps.length > 0 || product.how_to_use ? (
+              {guideSteps.length > 0 || howToUse ? (
                 <Section title={s.howToUse} icon={<Settings2 aria-hidden="true" className="w-5 h-5 text-zinc-400" />}>
                   {officialUrl ? (
                     <a
@@ -2577,12 +2592,14 @@ export default function Product() {
                                       {i + 1}
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                      {st.title ? (
-                                        <h5 dir="auto" className="text-[13px] font-bold text-white leading-snug">{st.title}</h5>
+                                      {pick(lang as Lang, st.title_ar, st.title, st.title_ckb) ? (
+                                        <h5 dir="auto" className="text-[13px] font-bold text-white leading-snug">
+                                          {pick(lang as Lang, st.title_ar, st.title, st.title_ckb)}
+                                        </h5>
                                       ) : null}
-                                      {st.body ? (
+                                      {pick(lang as Lang, st.body_ar, st.body, st.body_ckb) ? (
                                         <p dir="auto" className="mt-1 text-[13px] text-zinc-300 leading-relaxed whitespace-pre-line">
-                                          {st.body}
+                                          {pick(lang as Lang, st.body_ar, st.body, st.body_ckb)}
                                         </p>
                                       ) : null}
                                     </div>
@@ -2593,7 +2610,7 @@ export default function Product() {
                                         <SafeImage
                                           key={k}
                                           src={img}
-                                          alt={st.title || ''}
+                                          alt={pick(lang as Lang, st.title_ar, st.title, st.title_ckb)}
                                           aspect="square"
                                           fit="cover"
                                           className="rounded-lg border border-zinc-800"
@@ -2640,7 +2657,7 @@ export default function Product() {
                         ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">{product.how_to_use}</p>
+                    <p dir="auto" className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">{howToUse}</p>
                   )}
                 </Section>
               ) : null}

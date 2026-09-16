@@ -442,7 +442,9 @@ description_ar=<<<END
 END
 description_en=A multi-line English description written with a heredoc block.
 description_ckb=
-how_to_use=مثال مختصر على طريقة الاستخدام.
+how_to_use_ar=مثال مختصر على طريقة الاستخدام.
+how_to_use_en=A short example of how to use it.
+how_to_use_ckb=
 
 # ------------------------------ التسعير / pricing (أعداد صحيحة بالدينار)
 price_iqd=100000
@@ -623,8 +625,12 @@ content_blocks.1.caption_ar=مثال
 usage_official_url=
 usage_steps.1.id=ustep_example_unbox
 usage_steps.1.kind=setup
-usage_steps.1.title=فك التغليف
-usage_steps.1.body=أخرج الجهاز وأزل أشرطة التثبيت قبل التشغيل.
+usage_steps.1.title_ar=فك التغليف
+usage_steps.1.title_en=Unboxing
+usage_steps.1.title_ckb=
+usage_steps.1.body_ar=أخرج الجهاز وأزل أشرطة التثبيت قبل التشغيل.
+usage_steps.1.body_en=Take the machine out and remove the shipping clips before powering it on.
+usage_steps.1.body_ckb=
 usage_steps.1.images=
 usage_steps.1.video_url=
 usage_steps.1.link_url=

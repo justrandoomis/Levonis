@@ -38,6 +38,12 @@ export function UsageGuideSection({
           kind,
           title: '',
           body: '',
+          // 0079. The localiser fills these on save; a new step starts with
+          // nothing authored, which every reader treats as "show the source".
+          title_ar: '',
+          title_ckb: '',
+          body_ar: '',
+          body_ckb: '',
           images: [],
           video_url: '',
           link_url: '',

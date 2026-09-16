@@ -82,6 +82,22 @@ function labelFor(key: string, doc: EditorDoc): string {
     return `${g?.title_en || parts[1]} › ${r?.label_en || parts[2]} — ${what}`;
   }
   if (parts[0] === 'label') return `شارة: ${doc.labels?.find((x) => x.id === parts[1])?.text_en || parts[1]}`;
+  // 0079 — the three families that gained per-language slots.
+  if (parts[0] === 'usage_step') {
+    const st = doc.usage_guide?.steps?.find((x) => x.id === parts[1]);
+    const where = st?.kind === 'setup' ? 'التركيب' : 'الاستخدام';
+    const what = parts[2] === 'title' ? 'العنوان' : 'الشرح';
+    return `خطوة ${where}: ${st?.title || parts[1]} — ${what}`;
+  }
+  if (parts[0] === 'lead_time') {
+    const o = doc.options?.find((x) => x.id === parts[1]);
+    const model = o?.variant_label || o?.name_en || parts[1];
+    if (parts.length === 2) return `مدة التجهيز: ${model}`;
+    const type = parts[2] === 'pre_order' ? 'طلب مسبق' : 'بيع مباشر';
+    if (parts.length === 3) return `مدة التجهيز: ${model} — ${type}`;
+    const route = parts[3] === 'air' ? 'جوي' : parts[3] === 'sea' ? 'بحري' : 'بري';
+    return `مدة التجهيز: ${model} — ${type} · ${route}`;
+  }
   if (parts[0] === 'block') {
     const b = doc.content_blocks?.find((x) => x.id === parts[1]);
     const what = parts[2] === 'body' ? 'النص' : parts[2] === 'caption' ? 'التعليق' : 'الوصف البديل';
@@ -106,9 +122,11 @@ export interface TranslationRow {
 
 /**
  * Joins the flagged field list to the document's own slots. A flagged field
- * with no slot — `how_to_use`, whose Arabic and Kurdish live only in
- * `product_translations` — is DROPPED rather than shown with boxes that would
- * save into nothing.
+ * with no slot is DROPPED rather than shown with boxes that would save into
+ * nothing — the guard, not the design. Until 0079 `how_to_use` was the field
+ * it dropped, which is why «طريقة الاستخدام» could be FLAGGED for review and
+ * still had no row here to fix it in. It has slots now, as do the usage steps
+ * and all three rungs of «مدة التجهيز».
  */
 export function translationRows(doc: EditorDoc, review: ReviewItem[]): TranslationRow[] {
   const slots = new Map(

@@ -280,7 +280,9 @@ never as 0.
 | الحقل | القيم | ماذا يعني الفراغ |
 |---|---|---|
 | `availability_type` | `direct_sale` / `pre_order` | **يرث أنواع بيع المنتج** — وهو ما تفعله كل الخيارات القديمة |
-| `lead_time_text` | نص حر: `3-4 weeks` | لا تُعرض مدة |
+| `lead_time_text_en` | نص حر بالإنجليزية (المصدر): `3-4 weeks` | لا تُعرض مدة |
+| `lead_time_text_ar` | النص بالعربية: `٣-٤ أسابيع` | تُقرأ النسخة الإنجليزية |
+| `lead_time_text_ckb` | النص بالكردية | تُقرأ النسخة الإنجليزية |
 | `lead_time_min_days` | عدد | — |
 | `lead_time_max_days` | عدد | — |
 | `variant_key` | `a1` / `a1-combo` | يُشتق من `variant_label` |
@@ -288,6 +290,26 @@ never as 0.
 
 **النص يسبق الأرقام دائمًا** في عرض المدة: من كتب «بعد العيد» يقصدها، ولا يجوز
 للبرنامج أن يستبدلها بحساب.
+
+### 0079 — ثلاث لغات لكل سطر نصّي
+
+كل خانة تحمل نصًّا يقرؤه الزبون صارت تُصدَّر بثلاثة أسطر: `_ar` و`_en` و`_ckb`.
+`_en` هو **المصدر** (هو نفسه العمود القديم)، و`_ar`/`_ckb` ترجمتاه. الفراغ في أي
+منهما يعني «لا نص مكتوب بهذه اللغة» فيُقرأ المصدر — لا تُختلق ترجمة أبدًا.
+
+```
+how_to_use_ar=            how_to_use_en=            how_to_use_ckb=
+usage_steps.1.title_ar=   usage_steps.1.title_en=   usage_steps.1.title_ckb=
+usage_steps.1.body_ar=    usage_steps.1.body_en=    usage_steps.1.body_ckb=
+options.1.lead_time_text_ar=                        options.1.lead_time_text_en=
+options.1.preorder.lead_time_text_ar=               options.1.preorder.lead_time_text_en=
+options.1.preorder.transports.1.lead_time_text_ar=  …
+```
+
+التهجئة القديمة بلا لاحقة (`how_to_use=`، `usage_steps.1.title=`،
+`options.1.lead_time_text=`) **ما زالت تُقرأ** وتُكتب في نفس عمود المصدر، لكنها
+لا تُصدَّر: تصدير التهجئتين يعني ذكر عمود واحد مرتين، والدورة الكاملة ستكتبه
+مرتين. إن ذُكرت التهجئتان في ملف واحد فالفوز للاحقة `_en`.
 
 **`variant_key` بيانات لا تحليل نصوص.** بدونه ما يربط «A1 طلب مسبق» بـ«A1 بيع
 مباشر» هو تشابه اسميهما فقط، وتحليل «A1 - » من التسمية يكسر عند أول منتج اسمه

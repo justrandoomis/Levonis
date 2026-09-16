@@ -126,8 +126,18 @@ export interface ContentBlockV2 {
 export interface UsageStepV2 {
   id: string;
   kind: 'setup' | 'usage';
-  title: string; // <=200
-  body: string; // <=2000
+  title: string; // <=200 — the AUTHORED source (English in the form)
+  body: string; // <=2000 — the AUTHORED source
+  /**
+   * The Arabic and Sorani of the two above. '' means "nothing authored in this
+   * language", and every reader falls back to the source — an honest fallback,
+   * never a stored fabrication. They ride inside the `usage_guide` JSON column,
+   * so no migration adds a column for them.
+   */
+  title_ar: string;
+  title_ckb: string;
+  body_ar: string;
+  body_ckb: string;
   images: string[]; // <=6, sanitized URLs
   video_url: string; // '' or a sanitized URL (direct file or YouTube/Vimeo page)
   link_url: string; // '' or a sanitized URL to the official doc for this step
@@ -264,6 +274,14 @@ export interface ProductDoc {
   payment_options: string[];
   hashtags: string[];
   how_to_use: string;
+  /**
+   * 0079. The Arabic and Sorani of `how_to_use`, which until then had nowhere
+   * to live: the localiser translated it on every save and threw the result
+   * away, so «طريقة الاستخدام» was English-only on the storefront. '' = not
+   * authored in this language, and readers fall back to `how_to_use`.
+   */
+  how_to_use_ar: string;
+  how_to_use_ckb: string;
   /** Structured setup/usage steps; how_to_use stays the plain-text fallback. */
   usage_guide: UsageGuideV2;
   // Legacy read-only passthrough (v1 data preserved, not edited in v2 UI):
@@ -462,6 +480,8 @@ export function upgradeOptions(raw: unknown): OptionV2[] {
       availability_type: normalizeAvailability(o.availability_type),
       stock: num(o.stock),
       lead_time_text: s(o.lead_time_text, 200),
+      lead_time_text_ar: s(o.lead_time_text_ar, 200),
+      lead_time_text_ckb: s(o.lead_time_text_ckb, 200),
       lead_time_min_days: num(o.lead_time_min_days),
       lead_time_max_days: num(o.lead_time_max_days),
       variant_key: s(o.variant_key, 80) || variantKeyFrom(label),
@@ -696,6 +716,10 @@ export function upgradeUsageGuide(raw: unknown): UsageGuideV2 {
         kind: (st.kind === 'setup' ? 'setup' : 'usage') as UsageStepV2['kind'],
         title: s(st.title, 200).trim(),
         body: s(st.body, 2000),
+        title_ar: s(st.title_ar, 200).trim(),
+        title_ckb: s(st.title_ckb, 200).trim(),
+        body_ar: s(st.body_ar, 2000),
+        body_ckb: s(st.body_ckb, 2000),
         images,
         video_url: safeLink(st.video_url),
         link_url: safeLink(st.link_url),
@@ -791,6 +815,8 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     payment_options: safeParse<string[]>(row.payment_options, []),
     hashtags: safeParse<string[]>(row.hashtags, []),
     how_to_use: s(row.how_to_use, 20000),
+    how_to_use_ar: s(row.how_to_use_ar, 20000),
+    how_to_use_ckb: s(row.how_to_use_ckb, 20000),
     usage_guide: upgradeUsageGuide(row.usage_guide),
     legacy: {
       brand_text: s(row.brand, 200),
@@ -1213,6 +1239,8 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
       ? dedupeHashtags((body.hashtags as string[]).slice(0, 30).map((x) => normalizeHashtag(s(x, 60))))
       : [],
     how_to_use: s(body.how_to_use, 20000),
+    how_to_use_ar: s(body.how_to_use_ar, 20000),
+    how_to_use_ckb: s(body.how_to_use_ckb, 20000),
     usage_guide: upgradeUsageGuide(body.usage_guide),
     legacy: {
       brand_text: s((body.legacy as Record<string, unknown>)?.brand_text ?? body.brand, 200),
@@ -1283,6 +1311,8 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     payment_options: JSON.stringify(doc.payment_options),
     hashtags: JSON.stringify(doc.hashtags),
     how_to_use: doc.how_to_use,
+    how_to_use_ar: doc.how_to_use_ar,
+    how_to_use_ckb: doc.how_to_use_ckb,
     usage_guide:
       doc.usage_guide.official_url || doc.usage_guide.steps.length ? JSON.stringify(doc.usage_guide) : null,
   };
@@ -1428,6 +1458,8 @@ export function projectPublic(doc: ProductDoc, coarse = false) {
     payment_options: doc.payment_options,
     hashtags: doc.hashtags,
     how_to_use: doc.how_to_use,
+    how_to_use_ar: doc.how_to_use_ar,
+    how_to_use_ckb: doc.how_to_use_ckb,
     usage_guide: doc.usage_guide,
     created_at: doc.created_at,
   };
@@ -1440,5 +1472,5 @@ export const PRODUCT_COLUMNS = [
   'direct_surcharge_iqd','stock','low_stock_threshold','brand_id','category_id','sub_category_id',
   'template_family','sku','spec_fields','images','options','colors','specifications','labels',
   'warranty_plans','ops_policy','content_blocks','translation_meta','is_featured',
-  'display_order','payment_options','hashtags','how_to_use','usage_guide',
+  'display_order','payment_options','hashtags','how_to_use','how_to_use_ar','how_to_use_ckb','usage_guide',
 ] as const;

@@ -169,6 +169,14 @@ export interface OptionFulfillment extends PriceFields {
    * that pool; it is never the model's stock and the two are never mixed.
    */
   lead_time_text?: string;
+  /**
+   * 0079 — the Arabic and Sorani of `lead_time_text`. «مدة التجهيز» is a
+   * SENTENCE, the one thing on this shape a formatter cannot derive from the
+   * day numbers, so each language needs its own slot. '' = not authored here;
+   * readers fall back to `lead_time_text`.
+   */
+  lead_time_text_ar?: string;
+  lead_time_text_ckb?: string;
   lead_time_min_days?: number | null;
   lead_time_max_days?: number | null;
   /**
@@ -211,6 +219,14 @@ export interface OptionTransport extends PriceFields {
    */
   capacity?: number | null;
   lead_time_text?: string;
+  /**
+   * 0079 — the Arabic and Sorani of `lead_time_text`. «مدة التجهيز» is a
+   * SENTENCE, the one thing on this shape a formatter cannot derive from the
+   * day numbers, so each language needs its own slot. '' = not authored here;
+   * readers fall back to `lead_time_text`.
+   */
+  lead_time_text_ar?: string;
+  lead_time_text_ckb?: string;
   lead_time_min_days?: number | null;
   lead_time_max_days?: number | null;
 }
@@ -232,6 +248,14 @@ export interface OptionV2 extends PriceFields {
   availability_type?: '' | 'direct_sale' | 'pre_order';
   /** Shown when this option is a pre-order. Prose wins over the day numbers. */
   lead_time_text?: string;
+  /**
+   * 0079 — the Arabic and Sorani of `lead_time_text`. «مدة التجهيز» is a
+   * SENTENCE, the one thing on this shape a formatter cannot derive from the
+   * day numbers, so each language needs its own slot. '' = not authored here;
+   * readers fall back to `lead_time_text`.
+   */
+  lead_time_text_ar?: string;
+  lead_time_text_ckb?: string;
   lead_time_min_days?: number | null;
   lead_time_max_days?: number | null;
   /** The MODEL this option is a fulfilment of — 'a1' vs 'a1-combo'. */

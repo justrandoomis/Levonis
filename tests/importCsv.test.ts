@@ -1129,7 +1129,11 @@ test('every field of the product form is expressible in the sheet', () => {
     product_cost_iqd: 'cost_iqd', direct_surcharge_iqd: 'direct_surcharge_iqd',
     stock: 'stock', low_stock_threshold: 'low_stock_threshold', payment_options: 'payment_options',
     delivery_options: 'standard_delivery_enabled',
-    how_to_use: 'how_to_use', spec_fields: 'spec.*',
+    // One column, three doc fields — exactly as `description` works: the sheet
+    // carries the ENGLISH source and the local engine writes the other two on
+    // apply (worker/lib/importApply.ts hands the doc to localizeRespectingAuthored).
+    how_to_use: 'how_to_use', how_to_use_ar: 'how_to_use', how_to_use_ckb: 'how_to_use',
+    spec_fields: 'spec.*',
     // device coverage (products.ops_policy) — the base the extended warranty adds to
     warranty_base_months: 'warranty_base_months', serialized: 'serialized',
     // child row types

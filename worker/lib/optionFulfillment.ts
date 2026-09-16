@@ -41,6 +41,19 @@ export interface CellPrices {
 
 export interface LeadTime {
   lead_time_text: string;
+  /**
+   * 0079 — the Arabic and Sorani of the sentence above. A lead time is the one
+   * field on this shape a formatter cannot build from the day numbers, so each
+   * language gets its own column. '' = nothing authored here, and every reader
+   * falls back to `lead_time_text` rather than inventing a translation.
+   *
+   * UNDEFINED IS NOT ''. Absent means the payload never mentioned the field, so
+   * the stored text is PRESERVED — the contract 0055 gave the option and colour
+   * names, and the reason the order-types panel (which sends English only) does
+   * not wipe a translation every time an admin edits a price.
+   */
+  lead_time_text_ar?: string;
+  lead_time_text_ckb?: string;
   lead_time_min_days: number | null;
   lead_time_max_days: number | null;
 }
@@ -185,6 +198,11 @@ function prices(row: Record<string, unknown>, where: string): CellPrices {
   };
 }
 
+/** Absent (or null) = the payload said nothing → PRESERVE. A string — '' very
+ *  much included — is a statement and gets written. */
+const optionalLead = (v: unknown): string | undefined =>
+  v === undefined || v === null ? undefined : String(v).trim().slice(0, 200);
+
 function leadTime(row: Record<string, unknown>, where: string): LeadTime {
   const min = days(row.lead_time_min_days, `${where}.lead_time_min_days`);
   const max = days(row.lead_time_max_days, `${where}.lead_time_max_days`);
@@ -193,6 +211,8 @@ function leadTime(row: Record<string, unknown>, where: string): LeadTime {
   }
   return {
     lead_time_text: String(row.lead_time_text ?? '').trim().slice(0, 200),
+    lead_time_text_ar: optionalLead(row.lead_time_text_ar),
+    lead_time_text_ckb: optionalLead(row.lead_time_text_ckb),
     lead_time_min_days: min,
     lead_time_max_days: max,
   };
@@ -630,15 +650,18 @@ export function fulfillmentStatements(
              (id, product_id, option_id, fulfillment_type, enabled,
               regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd,
               regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd,
-              lead_time_text, lead_time_min_days, lead_time_max_days, sort,
+              lead_time_text, lead_time_text_ar, lead_time_text_ckb,
+              lead_time_min_days, lead_time_max_days, sort,
               capacity)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
            ON CONFLICT (id) DO UPDATE SET
              product_id = excluded.product_id,
              option_id = excluded.option_id,
              fulfillment_type = excluded.fulfillment_type,
              enabled = excluded.enabled,
 ${cell.priced === false ? '' : CELL_MONEY_SET}             lead_time_text = excluded.lead_time_text,
+             lead_time_text_ar = CASE WHEN ? THEN excluded.lead_time_text_ar ELSE product_option_fulfillment.lead_time_text_ar END,
+             lead_time_text_ckb = CASE WHEN ? THEN excluded.lead_time_text_ckb ELSE product_option_fulfillment.lead_time_text_ckb END,
              lead_time_min_days = excluded.lead_time_min_days,
              lead_time_max_days = excluded.lead_time_max_days,
              sort = excluded.sort,
@@ -659,6 +682,8 @@ ${cell.priced === false ? '' : CELL_MONEY_SET}             lead_time_text = excl
           cell.pro_adjust_iqd,
           cell.cost_adjust_iqd,
           cell.lead_time_text,
+          cell.lead_time_text_ar ?? '',
+          cell.lead_time_text_ckb ?? '',
           cell.lead_time_min_days,
           cell.lead_time_max_days,
           cell.sort,
@@ -667,7 +692,10 @@ ${cell.priced === false ? '' : CELL_MONEY_SET}             lead_time_text = excl
           // pool or nothing. `capacity_reserved` is ABSENT from both halves of
           // this statement: a new row takes the column's DEFAULT 0, and an
           // existing row keeps whatever it is holding right now.
-          cell.capacity
+          cell.capacity,
+          // 0079. The two flags of the CASE WHENs above, in statement order.
+          cell.lead_time_text_ar === undefined ? 0 : 1,
+          cell.lead_time_text_ckb === undefined ? 0 : 1
         )
     );
     for (const { t, id: routeId } of transports) {
@@ -678,9 +706,10 @@ ${cell.priced === false ? '' : CELL_MONEY_SET}             lead_time_text = excl
                (id, product_id, fulfillment_id, method, enabled, surcharge_iqd,
                 regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd,
                 regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd,
-                lead_time_text, lead_time_min_days, lead_time_max_days, sort,
+                lead_time_text, lead_time_text_ar, lead_time_text_ckb,
+                lead_time_min_days, lead_time_max_days, sort,
                 capacity)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
              ON CONFLICT (id) DO UPDATE SET
                product_id = excluded.product_id,
                fulfillment_id = excluded.fulfillment_id,
@@ -688,6 +717,8 @@ ${cell.priced === false ? '' : CELL_MONEY_SET}             lead_time_text = excl
                enabled = excluded.enabled,
                surcharge_iqd = excluded.surcharge_iqd,
 ${t.priced === false ? '' : ROUTE_MONEY_SET}               lead_time_text = excluded.lead_time_text,
+               lead_time_text_ar = CASE WHEN ? THEN excluded.lead_time_text_ar ELSE product_option_transports.lead_time_text_ar END,
+               lead_time_text_ckb = CASE WHEN ? THEN excluded.lead_time_text_ckb ELSE product_option_transports.lead_time_text_ckb END,
                lead_time_min_days = excluded.lead_time_min_days,
                lead_time_max_days = excluded.lead_time_max_days,
                sort = excluded.sort,
@@ -709,11 +740,16 @@ ${t.priced === false ? '' : ROUTE_MONEY_SET}               lead_time_text = excl
             t.pro_adjust_iqd,
             t.cost_adjust_iqd,
             t.lead_time_text,
+            t.lead_time_text_ar ?? '',
+            t.lead_time_text_ckb ?? '',
             t.lead_time_min_days,
             t.lead_time_max_days,
             t.sort,
             // As above: this route's own quota, never its hold.
-            t.capacity
+            t.capacity,
+            // 0079. The two flags of the CASE WHENs above, in statement order.
+            t.lead_time_text_ar === undefined ? 0 : 1,
+            t.lead_time_text_ckb === undefined ? 0 : 1
           )
       );
     }

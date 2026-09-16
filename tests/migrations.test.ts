@@ -23,11 +23,25 @@ const run = (args: string[]) =>
 test('migrations apply to a fresh database and survive a second pass', () => {
   const out = run(['--twice']);
   assert.match(out, /second full pass applied 0 files/);
-  assert.match(out, /idempotent statement\(s\) re-ran — no row added, no value changed/);
-  // Not just 'the line printed': the harness must have had something to
-  // re-run. A migration it cannot re-run is untested, not proven.
-  const n = Number(/(\d+) idempotent statement\(s\)/.exec(out)?.[1] ?? 0);
-  assert.ok(n > 0, `the newest migration had no re-runnable statement (${n})`);
+  /**
+   * THE NEWEST MIGRATION MUST BE PROVEN, AND THERE ARE TWO KINDS OF PROOF.
+   *
+   * Most files carry re-runnable statements (`CREATE … IF NOT EXISTS`,
+   * `INSERT OR IGNORE`), and the harness re-executes them and asserts no row
+   * moved. A file made only of `ALTER TABLE … ADD COLUMN` — 0079 is the first
+   * — cannot be re-run at all, because SQLite has no `ADD COLUMN IF NOT
+   * EXISTS`; its proof is that every column it names is PRESENT after one
+   * pass, with the bookkeeping pass above showing it ran exactly once.
+   *
+   * Either line satisfies this, and NEITHER does not: a migration the harness
+   * cannot speak for is untested, not proven.
+   */
+  const reran = Number(/(\d+) idempotent statement\(s\) re-ran/.exec(out)?.[1] ?? 0);
+  const added = Number(/is (\d+) ADD COLUMN\(s\), every one present/.exec(out)?.[1] ?? 0);
+  assert.ok(
+    reran > 0 || added > 0,
+    `the newest migration proved nothing: ${reran} re-run statements, ${added} verified columns`
+  );
   assert.match(out, /foreign_key_check violations: 0/);
   assert.match(out, /orphan catalogs: 0/);
 });

@@ -101,6 +101,14 @@ export const UNITS: Record<string, TermEntry> = {
   years: { ar: 'سنة', ckb: 'ساڵ' },
   day: { ar: 'يوم', ckb: 'ڕۆژ' },
   days: { ar: 'يوم', ckb: 'ڕۆژ' },
+  // 0079. «مدة التجهيز» is written in weeks as often as in days, and without
+  // these a lead time as ordinary as "3-4 weeks" came back untranslated.
+  week: { ar: 'أسبوع', ckb: 'هەفتە' },
+  weeks: { ar: 'أسبوع', ckb: 'هەفتە' },
+  'business day': { ar: 'يوم عمل', ckb: 'ڕۆژی کار' },
+  'business days': { ar: 'يوم عمل', ckb: 'ڕۆژی کار' },
+  'working day': { ar: 'يوم عمل', ckb: 'ڕۆژی کار' },
+  'working days': { ar: 'يوم عمل', ckb: 'ڕۆژی کار' },
 };
 
 /**
@@ -211,6 +219,22 @@ export const PHRASES: Record<string, TermEntry> = {
   'made in': { ar: 'صنع في', ckb: 'دروستکراوە لە' },
   'sku': { ar: 'رمز المنتج', ckb: 'کۆدی بەرهەم' },
   'availability': { ar: 'التوفر', ckb: 'بەردەستی' },
+  // ---- 0079: how long the customer waits, and who is waiting for what ----
+  // The one field on a pre-order that a formatter cannot derive from the day
+  // numbers, so these are the LABELS an admin actually types beside it.
+  'lead time': { ar: 'مدة التجهيز', ckb: 'ماوەی ئامادەکردن' },
+  'preparation time': { ar: 'مدة التجهيز', ckb: 'ماوەی ئامادەکردن' },
+  'processing time': { ar: 'مدة المعالجة', ckb: 'ماوەی پرۆسێسکردن' },
+  'delivery time': { ar: 'مدة التوصيل', ckb: 'ماوەی گەیاندن' },
+  'shipping time': { ar: 'مدة الشحن', ckb: 'ماوەی گواستنەوە' },
+  'estimated delivery': { ar: 'التوصيل المتوقع', ckb: 'گەیاندنی چاوەڕوانکراو' },
+  'estimated arrival': { ar: 'الوصول المتوقع', ckb: 'گەیشتنی چاوەڕوانکراو' },
+  'ready to ship': { ar: 'جاهز للشحن', ckb: 'ئامادەیە بۆ ناردن' },
+  'made to order': { ar: 'يُصنع عند الطلب', ckb: 'بە داواکاری دروست دەکرێت' },
+  'ships worldwide': { ar: 'يُشحن إلى جميع الدول', ckb: 'بۆ هەموو جیهان دەنێردرێت' },
+  'air freight': { ar: 'شحن جوي', ckb: 'گواستنەوەی ئاسمانی' },
+  'sea freight': { ar: 'شحن بحري', ckb: 'گواستنەوەی دەریایی' },
+  'land freight': { ar: 'شحن بري', ckb: 'گواستنەوەی وشکانی' },
   'in stock': { ar: 'متوفر', ckb: 'بەردەستە' },
   'out of stock': { ar: 'غير متوفر', ckb: 'نەماوە' },
   'pre-order': { ar: 'طلب مسبق', ckb: 'داواکاری پێشوەخت' },

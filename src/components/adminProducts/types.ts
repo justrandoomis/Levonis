@@ -69,6 +69,8 @@ export function blankDoc(): EditorDoc {
     payment_options: [],
     hashtags: [],
     how_to_use: '',
+    how_to_use_ar: '',
+    how_to_use_ckb: '',
     usage_guide: { official_url: '', steps: [] },
     catalog_ids: [],
   };
@@ -103,6 +105,8 @@ export function toEditorDoc(p: Partial<ProductDocV2> & { catalog_ids?: string[] 
     description_en: str(p.description_en),
     description_ckb: str(p.description_ckb),
     how_to_use: str(p.how_to_use),
+    how_to_use_ar: str(p.how_to_use_ar),
+    how_to_use_ckb: str(p.how_to_use_ckb),
     selling_type: sellingType,
     sale_types: saleTypes.length > 0 ? saleTypes : [sellingType],
     preorder_transports: list(p.preorder_transports),

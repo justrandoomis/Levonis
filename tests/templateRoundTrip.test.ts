@@ -658,7 +658,13 @@ test('the setup & usage guide round-trips: official link, steps, photos, video, 
   // unambiguous; the reader still accepts a comma before a new address, which
   // is what keeps every file written before the change readable.
   assert.match(text, /^usage_steps\.1\.images=https:\/\/img\.example\/1\.jpg https:\/\/img\.example\/2\.jpg$/m);
-  assert.match(text, /^usage_steps\.2\.title=First print$/m);
+  // 0079 — the step's text is exported as a triple. The English is the source
+  // (`title`/`body` in the document), and the two translations are their own
+  // lines, empty here because nothing has authored them.
+  assert.match(text, /^usage_steps\.2\.title_en=First print$/m);
+  assert.match(text, /^usage_steps\.2\.title_ar=$/m);
+  assert.match(text, /^usage_steps\.2\.title_ckb=$/m);
+  assert.ok(!/^usage_steps\.2\.title=/m.test(text), 'the bare spelling is import-only');
   const parsed = parseTemplate(text);
   assert.deepEqual(parsed.errors, []);
   assert.deepEqual(parsed.unknown_keys, []);
@@ -671,9 +677,18 @@ test('the setup & usage guide round-trips: official link, steps, photos, video, 
   assert.equal(built.usage_guide.steps[1].kind, 'usage');
 
   // Editing ONE step's title merges by id; a file that omits the guide keeps it.
-  const renamed = text.replace(/^usage_steps\.2\.title=First print$/m, 'usage_steps.2.title=أول طباعة');
+  const renamed = text.replace(/^usage_steps\.2\.title_en=First print$/m, 'usage_steps.2.title_en=First layer');
   const edited = validateProductDoc(toDocBody(parseTemplate(renamed), built, { needs_review: [] }).body);
-  assert.deepEqual(edited.usage_guide.steps.map((s) => s.title), ['Mount the spool holder', 'أول طباعة']);
+  assert.deepEqual(edited.usage_guide.steps.map((s) => s.title), ['Mount the spool holder', 'First layer']);
+  // …and the Arabic line edits the Arabic slot, leaving the English source be.
+  const arabic = text.replace(/^usage_steps\.2\.title_ar=$/m, 'usage_steps.2.title_ar=أول طباعة');
+  const withAr = validateProductDoc(toDocBody(parseTemplate(arabic), built, { needs_review: [] }).body);
+  assert.deepEqual(withAr.usage_guide.steps.map((s) => s.title_ar), ['', 'أول طباعة']);
+  assert.deepEqual(withAr.usage_guide.steps.map((s) => s.title), ['Mount the spool holder', 'First print']);
+  // The spelling every file written before 0079 uses still lands on the source.
+  const legacy = text.replace(/^usage_steps\.2\.title_en=First print$/m, 'usage_steps.2.title=First print v2');
+  const old = validateProductDoc(toDocBody(parseTemplate(legacy), built, { needs_review: [] }).body);
+  assert.deepEqual(old.usage_guide.steps.map((s) => s.title), ['Mount the spool holder', 'First print v2']);
   const without = text.split('\n').filter((l) => !l.startsWith('usage_')).join('\n');
   const kept = validateProductDoc(toDocBody(parseTemplate(without), built, { needs_review: [] }).body);
   assert.equal(kept.usage_guide.steps.length, 2, 'an omitted group preserves');

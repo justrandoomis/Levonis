@@ -219,7 +219,16 @@ const SCALAR_FIELDS: FieldSpec[] = [
   f('description_ar', 'text', 'description', 'الوصف العربي (المصدر) — multiline allowed via heredoc', { lang: 'ar' }),
   f('description_en', 'text', 'description', 'English description', { lang: 'en' }),
   f('description_ckb', 'text', 'description', 'وەسفی کوردی — Kurdish description', { lang: 'ckb' }),
-  f('how_to_use', 'text', 'description', 'طريقة الاستخدام — usage instructions (multiline allowed)'),
+  // The spelling every file written before 0079 uses. Import-only: exporting
+  // both would state one column twice and a round trip would write it twice.
+  // Routed to `how_to_use` by name in toDocBody — `aliasOf` is honoured for
+  // repeated-group items only, never for scalars. FIRST in the list so that a
+  // file carrying both spellings lands on the newer one: the scalar loop
+  // follows registry order and the last writer wins.
+  f('how_to_use', 'text', 'description', 'التهجئة القديمة لـ how_to_use_en — import-only synonym, never exported', { exported: false }),
+  f('how_to_use_ar', 'text', 'description', 'طريقة الاستخدام بالعربية — Arabic usage instructions (multiline allowed via heredoc). فارغ = لا نص عربي، وتُقرأ الإنجليزية.', { lang: 'ar' }),
+  f('how_to_use_en', 'text', 'description', 'طريقة الاستخدام بالإنجليزية (المصدر) — English usage instructions; this is the column `how_to_use`', { lang: 'en' }),
+  f('how_to_use_ckb', 'text', 'description', 'چۆنیەتی بەکارهێنان بە کوردی — Kurdish usage instructions. فارغ = لا نص كردي، وتُقرأ الإنجليزية.', { lang: 'ckb' }),
   // pricing — IQD integers; null = inherit/none, 0 = explicit zero
   f('price_iqd', 'iqd', 'pricing', 'السعر الأساسي بالدينار = أرخص صنف قابل للبيع؛ كل خيار أو لون أو طريقة توفر زيادة فوقه — base price = the CHEAPEST sellable item, REQUIRED integer', { required: true, min: 0, max: IQD_MAX }),
   f('pro_price_iqd', 'iqd', 'pricing', 'سعر PRO الصريح — explicit PRO price; __NULL__ = no explicit price (store policy applies, default: no discount)', { nullable: true, min: 0, max: IQD_MAX }),
@@ -346,7 +355,10 @@ const GROUP_SPECS: GroupSpec[] = [
       // ---- 0043: this option's own availability, stock and lead time ------
       f('availability_type', 'enum', 'options', 'نوع التوفر لهذا الخيار — فارغ = حسب المنتج (الموصى به): يُباع كما يُباع المنتج، وفرق البيع المباشر/الطلب المسبق يأتي من direct_surcharge_iqd وزيادات النقل لا من خيارات منفصلة. direct_sale | pre_order فقط عندما يختلف هذا الخيار فعلًا عن المنتج.', { enumValues: ['', 'direct_sale', 'pre_order'] as const }),
       f('stock', 'int', 'options', 'مخزون هذا الخيار — __NULL__ = لا يُتتبع (الطلب المسبق عادةً). البيع المباشر يضع رقمًا.', { nullable: true, min: 0, max: 1_000_000 }),
-      f('lead_time_text', 'string', 'options', 'مدة الطلب المسبق كما تُعرض للزبون — مثال: 3-4 weeks. النص يسبق الأرقام دائمًا.'),
+      f('lead_time_text', 'string', 'options', 'التهجئة القديمة لـ lead_time_text_en — import-only synonym, never exported', { exported: false }),
+      f('lead_time_text_ar', 'string', 'options', 'مدة الطلب المسبق بالعربية كما تُعرض للزبون — مثال: ٣-٤ أسابيع. فارغ = تُقرأ النسخة الإنجليزية.', { lang: 'ar' }),
+      f('lead_time_text_en', 'string', 'options', 'مدة الطلب المسبق بالإنجليزية (المصدر) — 3-4 weeks. النص يسبق الأرقام دائمًا.', { lang: 'en', aliasOf: 'lead_time_text' }),
+      f('lead_time_text_ckb', 'string', 'options', 'ماوەی پێشوەخت بە کوردی — فارغ = تُقرأ النسخة الإنجليزية.', { lang: 'ckb' }),
       f('lead_time_min_days', 'int', 'options', 'أقل عدد أيام للطلب المسبق — للترتيب والتقدير، لا للعرض', { nullable: true, min: 0, max: 3650 }),
       f('lead_time_max_days', 'int', 'options', 'أكثر عدد أيام للطلب المسبق', { nullable: true, min: 0, max: 3650 }),
       f('variant_key', 'string', 'options', 'مفتاح النسخة — a1 / a1-combo. هو ما يجمع «A1 طلب مسبق» و«A1 بيع مباشر» تحت نسخة واحدة؛ اتركه فارغًا ليُشتق من variant_label.'),
@@ -421,7 +433,10 @@ const GROUP_SPECS: GroupSpec[] = [
           f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME للطلب المسبق — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
           f('pro_price_iqd', 'iqd', 'options', 'سعر PRO للطلب المسبق — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'pro_adjust_iqd' }),
           f('cost_iqd', 'iqd', 'options', 'كلفة الطلب المسبق (داخلي) — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'cost_adjust_iqd' }),
-          f('lead_time_text', 'string', 'options', 'المدة كما تُعرض للزبون — النص يسبق الأرقام دائمًا'),
+          f('lead_time_text', 'string', 'options', 'التهجئة القديمة لـ lead_time_text_en — import-only synonym, never exported', { exported: false }),
+          f('lead_time_text_ar', 'string', 'options', 'مدة هذا الموديل بالعربية كما تُعرض للزبون — فارغ = تُقرأ النسخة الإنجليزية', { lang: 'ar' }),
+          f('lead_time_text_en', 'string', 'options', 'المدة بالإنجليزية (المصدر) — النص يسبق الأرقام دائمًا', { lang: 'en', aliasOf: 'lead_time_text' }),
+          f('lead_time_text_ckb', 'string', 'options', 'ماوە بە کوردی — فارغ = تُقرأ النسخة الإنجليزية', { lang: 'ckb' }),
           f('lead_time_min_days', 'int', 'options', 'أقل عدد أيام — للترتيب والتقدير', { nullable: true, min: 0, max: 3650 }),
           f('lead_time_max_days', 'int', 'options', 'أكثر عدد أيام', { nullable: true, min: 0, max: 3650 }),
         ],
@@ -456,7 +471,10 @@ const GROUP_SPECS: GroupSpec[] = [
             f('price_iqd', 'iqd', 'options', 'سعر ثابت لهذا الموديل بهذه الطريقة — نادر؛ __NULL__ = احسب من المستويات الأعلى', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'regular_adjust_iqd' }),
             f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME بهذه الطريقة — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
             f('pro_price_iqd', 'iqd', 'options', 'سعر PRO بهذه الطريقة — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'pro_adjust_iqd' }),
-            f('lead_time_text', 'string', 'options', 'مدة هذه الطريقة — فارغ = مدة الطلب المسبق أعلاه'),
+            f('lead_time_text', 'string', 'options', 'التهجئة القديمة لـ lead_time_text_en — import-only synonym, never exported', { exported: false }),
+            f('lead_time_text_ar', 'string', 'options', 'مدة هذه الطريقة بالعربية — فارغ = تُقرأ النسخة الإنجليزية، وإن كانت فارغة أيضًا فمدة الطلب المسبق أعلاه', { lang: 'ar' }),
+            f('lead_time_text_en', 'string', 'options', 'مدة هذه الطريقة بالإنجليزية (المصدر) — فارغ = مدة الطلب المسبق أعلاه', { lang: 'en', aliasOf: 'lead_time_text' }),
+            f('lead_time_text_ckb', 'string', 'options', 'ماوەی ئەم ڕێگایە بە کوردی — فارغ = تُقرأ النسخة الإنجليزية', { lang: 'ckb' }),
             f('lead_time_min_days', 'int', 'options', 'أقل عدد أيام لهذه الطريقة', { nullable: true, min: 0, max: 3650 }),
             f('lead_time_max_days', 'int', 'options', 'أكثر عدد أيام لهذه الطريقة', { nullable: true, min: 0, max: 3650 }),
           ],
@@ -574,8 +592,17 @@ const GROUP_SPECS: GroupSpec[] = [
     fields: [
       f('id', 'string', 'usage', 'معرف ثابت — stable id for merge-by-id'),
       f('kind', 'enum', 'usage', 'setup (تركيب) | usage (استخدام)', { required: true, enumValues: ['setup', 'usage'] as const }),
-      f('title', 'string', 'usage', 'عنوان الخطوة (حتى 200 حرف) — step title'),
-      f('body', 'text', 'usage', 'شرح الخطوة (حتى 2000 حرف؛ heredoc للأسطر المتعددة) — step body'),
+      // 0079 — three languages per line. The bare spellings are what every
+      // file written before it carries, so they stay as import-only synonyms
+      // of the `_en` source; only the triple is exported.
+      f('title', 'string', 'usage', 'التهجئة القديمة لـ title_en — import-only synonym, never exported', { exported: false }),
+      f('title_ar', 'string', 'usage', 'عنوان الخطوة بالعربية (حتى 200 حرف) — فارغ = يُقرأ العنوان الإنجليزي', { lang: 'ar' }),
+      f('title_en', 'string', 'usage', 'عنوان الخطوة بالإنجليزية (المصدر) — step title', { lang: 'en', aliasOf: 'title' }),
+      f('title_ckb', 'string', 'usage', 'ناونیشانی هەنگاو بە کوردی — فارغ = يُقرأ العنوان الإنجليزي', { lang: 'ckb' }),
+      f('body', 'text', 'usage', 'التهجئة القديمة لـ body_en — import-only synonym, never exported', { exported: false }),
+      f('body_ar', 'text', 'usage', 'شرح الخطوة بالعربية (حتى 2000 حرف؛ heredoc للأسطر المتعددة) — فارغ = يُقرأ الشرح الإنجليزي', { lang: 'ar' }),
+      f('body_en', 'text', 'usage', 'شرح الخطوة بالإنجليزية (المصدر) — step body', { lang: 'en', aliasOf: 'body' }),
+      f('body_ckb', 'text', 'usage', 'ڕوونکردنەوەی هەنگاو بە کوردی — فارغ = يُقرأ الشرح الإنجليزي', { lang: 'ckb' }),
       f('images', 'urls', 'usage', 'حتى 6 روابط صور — افصل بينها بمسافة (الفاصلة مقبولة أيضًا قبل رابط جديد). الفاصلة داخل الرابط نفسه لا تكسره. — up to six image URLs, space-separated'),
       f('video_url', 'string', 'usage', 'رابط فيديو (ملف مباشر أو صفحة YouTube/Vimeo) أو فارغ'),
       f('link_url', 'string', 'usage', 'رابط الوثيقة الرسمية لهذه الخطوة أو فارغ'),
@@ -1229,7 +1256,9 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   push('description_ar', doc.description_ar);
   push('description_en', doc.description_en);
   push('description_ckb', doc.description_ckb);
-  push('how_to_use', doc.how_to_use);
+  push('how_to_use_ar', doc.how_to_use_ar);
+  push('how_to_use_en', doc.how_to_use);
+  push('how_to_use_ckb', doc.how_to_use_ckb);
   // pricing
   push('price_iqd', String(doc.price_iqd));
   push('pro_price_iqd', numStr(doc.pro_price_iqd));
@@ -1366,7 +1395,9 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     // editing the file the store itself produced.
     push(`${p}.availability_type`, o.availability_type ?? '');
     push(`${p}.stock`, numStr(o.stock ?? null));
-    push(`${p}.lead_time_text`, o.lead_time_text ?? '');
+    push(`${p}.lead_time_text_ar`, o.lead_time_text_ar ?? '');
+    push(`${p}.lead_time_text_en`, o.lead_time_text ?? '');
+    push(`${p}.lead_time_text_ckb`, o.lead_time_text_ckb ?? '');
     push(`${p}.lead_time_min_days`, numStr(o.lead_time_min_days ?? null));
     push(`${p}.lead_time_max_days`, numStr(o.lead_time_max_days ?? null));
     push(`${p}.variant_key`, o.variant_key ?? '');
@@ -1403,7 +1434,9 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
          * would state one column twice and a round trip would write it twice.
          */
         push(`${cp}.capacity`, numStr(cell.capacity ?? null));
-        push(`${cp}.lead_time_text`, cell.lead_time_text ?? '');
+        push(`${cp}.lead_time_text_ar`, cell.lead_time_text_ar ?? '');
+        push(`${cp}.lead_time_text_en`, cell.lead_time_text ?? '');
+        push(`${cp}.lead_time_text_ckb`, cell.lead_time_text_ckb ?? '');
         push(`${cp}.lead_time_min_days`, numStr(cell.lead_time_min_days ?? null));
         push(`${cp}.lead_time_max_days`, numStr(cell.lead_time_max_days ?? null));
         (cell.transports ?? []).forEach((t, ti) => {
@@ -1418,7 +1451,9 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
           push(`${tp}.price_iqd`, numStr(t.regular_price_iqd ?? null));
           push(`${tp}.prime_price_iqd`, numStr(t.prime_price_iqd ?? null));
           push(`${tp}.pro_price_iqd`, numStr(t.pro_price_iqd ?? null));
-          push(`${tp}.lead_time_text`, t.lead_time_text ?? '');
+          push(`${tp}.lead_time_text_ar`, t.lead_time_text_ar ?? '');
+          push(`${tp}.lead_time_text_en`, t.lead_time_text ?? '');
+          push(`${tp}.lead_time_text_ckb`, t.lead_time_text_ckb ?? '');
           push(`${tp}.lead_time_min_days`, numStr(t.lead_time_min_days ?? null));
           push(`${tp}.lead_time_max_days`, numStr(t.lead_time_max_days ?? null));
         });
@@ -1540,8 +1575,12 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     const p = `usage_steps.${i + 1}`;
     push(`${p}.id`, st.id);
     push(`${p}.kind`, st.kind);
-    push(`${p}.title`, st.title);
-    push(`${p}.body`, st.body);
+    push(`${p}.title_ar`, st.title_ar);
+    push(`${p}.title_en`, st.title);
+    push(`${p}.title_ckb`, st.title_ckb);
+    push(`${p}.body_ar`, st.body_ar);
+    push(`${p}.body_en`, st.body);
+    push(`${p}.body_ckb`, st.body_ckb);
     // A SPACE, not a comma: a bare space cannot appear inside a valid URL, so
     // this join is unambiguous no matter what the address contains.
     push(`${p}.images`, st.images.join(' '));
@@ -2363,6 +2402,11 @@ export function toDocBody(
         name_ar: existing.name_ar, name_en: existing.name_en, name_ckb: existing.name_ckb,
         description_ar: existing.description_ar, description_en: existing.description_en, description_ckb: existing.description_ckb,
         how_to_use: existing.how_to_use,
+        // 0079. CARRIED, like every other column the file may not mention.
+        // Leaving them out would make an UPDATE that says nothing about the
+        // usage text erase its Arabic and Kurdish while reporting it preserved.
+        how_to_use_ar: existing.how_to_use_ar,
+        how_to_use_ckb: existing.how_to_use_ckb,
         price_iqd: existing.price_iqd,
         pro_price_iqd: existing.pro_price_iqd,
         prime_price_iqd: existing.prime_price_iqd,
@@ -2435,7 +2479,10 @@ export function toDocBody(
   for (const spec of SCALAR_FIELDS) {
     const pf = parsed.fields[spec.key];
     if (!pf) {
-      if (existing && !REF_KEYS.has(spec.key)) result.preserved_fields.push(spec.key);
+      // An import-only synonym (`how_to_use` for `how_to_use_en`) is a
+      // SPELLING, not a value: reporting it as preserved would list the same
+      // column twice in the apply report.
+      if (existing && !REF_KEYS.has(spec.key) && spec.exported !== false) result.preserved_fields.push(spec.key);
       continue;
     }
     if (REF_KEYS.has(spec.key)) continue; // handled below via resolved refs
@@ -2445,6 +2492,14 @@ export function toDocBody(
       result.applied_fields.push(spec.key);
     }
     switch (spec.key) {
+      case 'how_to_use':
+      case 'how_to_use_en':
+        // Two spellings of ONE column. `aliasOf` is honoured only for the
+        // fields of a repeated group (applyItemField), so the scalar synonym
+        // is routed here by name instead. Registry order puts the legacy
+        // spelling first, so a file carrying both lands on `how_to_use_en`.
+        body.how_to_use = pf.value;
+        break;
       case 'payment_options':
       case 'hashtags':
         body[spec.key] = pf.value ?? [];

@@ -154,6 +154,12 @@ export interface UsageStepV2 {
   kind: 'setup' | 'usage';
   title: string;
   body: string;
+  /** 0079. '' = nothing authored in this language; readers fall back to the
+   *  source above rather than showing a fabricated translation. */
+  title_ar: string;
+  title_ckb: string;
+  body_ar: string;
+  body_ckb: string;
   images: string[];
   video_url: string;
   link_url: string;
@@ -249,6 +255,9 @@ export interface ProductDocV2 {
   payment_options: string[];
   hashtags: string[];
   how_to_use: string;
+  /** 0079. The Arabic and Sorani of `how_to_use`; '' = read the English. */
+  how_to_use_ar: string;
+  how_to_use_ckb: string;
   /** Structured setup/usage steps; how_to_use stays the plain-text fallback. */
   usage_guide: UsageGuideV2;
   catalog_ids?: string[];

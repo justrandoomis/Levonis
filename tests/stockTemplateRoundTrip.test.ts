@@ -561,6 +561,11 @@ const CSV_HOME: Record<string, string | null> = {
   'preorder.pro_price_iqd': null,
   'preorder.cost_iqd': null,
   'preorder.lead_time_text': null,
+  // 0079. The three languages of that same sentence, and the same reason: a
+  // `fulfillment` row carries a capacity and an active flag, nothing else.
+  'preorder.lead_time_text_ar': null,
+  'preorder.lead_time_text_en': null,
+  'preorder.lead_time_text_ckb': null,
   'preorder.lead_time_min_days': null,
   'preorder.lead_time_max_days': null,
   'preorder.transports.surcharge_iqd': null,
@@ -568,6 +573,9 @@ const CSV_HOME: Record<string, string | null> = {
   'preorder.transports.prime_price_iqd': null,
   'preorder.transports.pro_price_iqd': null,
   'preorder.transports.lead_time_text': null,
+  'preorder.transports.lead_time_text_ar': null,
+  'preorder.transports.lead_time_text_en': null,
+  'preorder.transports.lead_time_text_ckb': null,
   'preorder.transports.lead_time_min_days': null,
   'preorder.transports.lead_time_max_days': null,
 };

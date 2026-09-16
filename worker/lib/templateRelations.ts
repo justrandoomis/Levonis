@@ -206,6 +206,11 @@ export function relationsBodyFromDoc(
       low_stock_threshold: o.low_stock_threshold ?? null,
       availability_type: o.availability_type ?? '',
       lead_time_text: o.lead_time_text ?? '',
+      // 0079. Carried explicitly, because the writer treats an ABSENT key as
+      // "preserve": a file that states an Arabic lead time must be able to
+      // state it, and one that clears it must be able to clear it.
+      lead_time_text_ar: o.lead_time_text_ar ?? '',
+      lead_time_text_ckb: o.lead_time_text_ckb ?? '',
       lead_time_min_days: o.lead_time_min_days ?? null,
       lead_time_max_days: o.lead_time_max_days ?? null,
       variant_key: o.variant_key ?? '',

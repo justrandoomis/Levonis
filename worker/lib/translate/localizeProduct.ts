@@ -85,11 +85,28 @@ export function localizeProductDoc(doc: ProductDoc): LocalizeResult {
     doc.description_ckb = ckb;
   });
 
-  // `how_to_use` is a single string in the doc; there is no ar/ckb slot for it
-  // on the product row, so its translation lives only in product_translations
-  // and is read from there by the storefront.
-  if (doc.how_to_use && doc.how_to_use.trim()) {
-    put('how_to_use', doc.how_to_use, () => {});
+  // 0079. `how_to_use` HAS slots now. Until then this call ended in `() => {}`
+  // — the translation was computed on every save and thrown away, with a
+  // comment claiming the storefront read it from `product_translations`.
+  // Nothing read it from there (`loadProductTranslations` had no caller), so
+  // «طريقة الاستخدام» was English-only for as long as the column existed.
+  put('how_to_use', doc.how_to_use, (ar, ckb) => {
+    doc.how_to_use_ar = ar;
+    doc.how_to_use_ckb = ckb;
+  });
+
+  // 2b. The structured setup/usage guide beside it — one slot per step per
+  //     field, so a guide written in the form reaches the Arabic page as
+  //     Arabic instead of as the English the admin typed.
+  for (const st of doc.usage_guide?.steps ?? []) {
+    put(`usage_step:${st.id}:title`, st.title, (ar, ckb) => {
+      st.title_ar = ar;
+      st.title_ckb = ckb;
+    });
+    put(`usage_step:${st.id}:body`, st.body, (ar, ckb) => {
+      st.body_ar = ar;
+      st.body_ckb = ckb;
+    });
   }
 
   // 3. Specifications.
@@ -160,6 +177,31 @@ export function localizeProductDoc(doc: ProductDoc): LocalizeResult {
       col.name_ar = ar;
       col.name_ckb = ckb;
     });
+  }
+
+  // 8. «مدة التجهيز» — the ONE piece of prose on an option. Its three rungs
+  //    (the model's own sentence, its pre-order cell's, and one per route) are
+  //    translated, unlike the names above: a name is a token the SKU uses and
+  //    §7 keeps it English, while "ships in 2-3 weeks" is something a customer
+  //    reads. Keyed `lead_time:` rather than `option:` for exactly that reason.
+  for (const o of doc.options ?? []) {
+    put(`lead_time:${o.id}`, o.lead_time_text ?? '', (ar, ckb) => {
+      o.lead_time_text_ar = ar;
+      o.lead_time_text_ckb = ckb;
+    });
+    for (const cell of o.fulfillments ?? []) {
+      const type = cell.fulfillment_type || 'direct_sale';
+      put(`lead_time:${o.id}:${type}`, cell.lead_time_text ?? '', (ar, ckb) => {
+        cell.lead_time_text_ar = ar;
+        cell.lead_time_text_ckb = ckb;
+      });
+      for (const t of cell.transports ?? []) {
+        put(`lead_time:${o.id}:${type}:${t.method}`, t.lead_time_text ?? '', (ar, ckb) => {
+          t.lead_time_text_ar = ar;
+          t.lead_time_text_ckb = ckb;
+        });
+      }
+    }
   }
 
   return { review_needed: review, review_details: details, fields };

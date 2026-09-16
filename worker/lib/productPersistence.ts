@@ -386,6 +386,10 @@ export interface RequestedRelations {
     prices: PriceInput;
     availability_type: string;
     lead_time_text: string;
+    /** 0079. Absent = PRESERVE (the form never sends them); a string writes it,
+     *  '' included — the same contract `name_ar` has carried since 0055. */
+    lead_time_text_ar?: string;
+    lead_time_text_ckb?: string;
     lead_time_min_days: number | null;
     lead_time_max_days: number | null;
     variant_key: string;
@@ -538,6 +542,8 @@ export async function planRelationsWriteFrom(
         prices,
         availability_type: availability,
         lead_time_text: leadText,
+        lead_time_text_ar: optionalText(v.lead_time_text_ar, `${where}.lead_time_text_ar`, 200),
+        lead_time_text_ckb: optionalText(v.lead_time_text_ckb, `${where}.lead_time_text_ckb`, 200),
         lead_time_min_days: availability === 'direct_sale' ? null : leadMin,
         lead_time_max_days: availability === 'direct_sale' ? null : leadMax,
         variant_key: key.trim() || variantKeyFrom(effectiveLabel),
@@ -1104,8 +1110,9 @@ export async function planRelationsWriteFrom(
               regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd,
               regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd,
               availability_type, lead_time_text, lead_time_min_days, lead_time_max_days,
-              variant_key, variant_label, name_ar, name_ckb)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              variant_key, variant_label, name_ar, name_ckb,
+              lead_time_text_ar, lead_time_text_ckb)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (id) DO UPDATE SET
              group_id = excluded.group_id, name_en = excluded.name_en, sku_part = excluded.sku_part,
              image = excluded.image, sort = excluded.sort, active = excluded.active,
@@ -1123,7 +1130,10 @@ export async function planRelationsWriteFrom(
              variant_label = excluded.variant_label,
              -- 0055: preserved when the client did not send them.
              name_ar = CASE WHEN ? THEN excluded.name_ar ELSE product_option_values.name_ar END,
-             name_ckb = CASE WHEN ? THEN excluded.name_ckb ELSE product_option_values.name_ckb END${money ? ', cost_iqd = excluded.cost_iqd, cost_adjust_iqd = excluded.cost_adjust_iqd' : ''}`
+             name_ckb = CASE WHEN ? THEN excluded.name_ckb ELSE product_option_values.name_ckb END,
+             -- 0079: same contract — a client that never heard of them keeps them.
+             lead_time_text_ar = CASE WHEN ? THEN excluded.lead_time_text_ar ELSE product_option_values.lead_time_text_ar END,
+             lead_time_text_ckb = CASE WHEN ? THEN excluded.lead_time_text_ckb ELSE product_option_values.lead_time_text_ckb END${money ? ', cost_iqd = excluded.cost_iqd, cost_adjust_iqd = excluded.cost_adjust_iqd' : ''}`
         )
         .bind(
           v.id, productId, v.group_id, v.name_en, v.sku_part, v.image, v.sort, v.active,
@@ -1135,7 +1145,9 @@ export async function planRelationsWriteFrom(
           v.availability_type, v.lead_time_text, v.lead_time_min_days, v.lead_time_max_days,
           v.variant_key, v.variant_label,
           v.name_ar ?? '', v.name_ckb ?? '',
-          v.name_ar === undefined ? 0 : 1, v.name_ckb === undefined ? 0 : 1
+          v.lead_time_text_ar ?? '', v.lead_time_text_ckb ?? '',
+          v.name_ar === undefined ? 0 : 1, v.name_ckb === undefined ? 0 : 1,
+          v.lead_time_text_ar === undefined ? 0 : 1, v.lead_time_text_ckb === undefined ? 0 : 1
         )
     );
   }
@@ -1473,6 +1485,8 @@ function plannedRelationsView(
         cost_adjust_iqd: cost(v.prices.cost_adjust_iqd, stored?.cost_adjust_iqd),
         availability_type: v.availability_type,
         lead_time_text: v.lead_time_text,
+        lead_time_text_ar: keep(v.lead_time_text_ar, stored?.lead_time_text_ar),
+        lead_time_text_ckb: keep(v.lead_time_text_ckb, stored?.lead_time_text_ckb),
         lead_time_min_days: v.lead_time_min_days,
         lead_time_max_days: v.lead_time_max_days,
         variant_key: v.variant_key,
@@ -1866,7 +1880,6 @@ export function translationInputsOf(doc: ProductDoc): TranslationInput[] {
     if (slot.key === 'name' || slot.key.startsWith('option:') || slot.key.startsWith('color:')) continue;
     if (slot.en.trim()) out.push({ field: slot.key, source_en: slot.en });
   }
-  if (doc.how_to_use && doc.how_to_use.trim()) out.push({ field: 'how_to_use', source_en: doc.how_to_use });
   return out;
 }
 
@@ -1980,6 +1993,76 @@ function carryCostsForward(doc: ProductDoc, prev: ProductDoc | null): void {
  * refusal that names a field (validation, an unknown catalog, a relation the
  * writer rejects — `RELATIONS_VALIDATION` with every reason listed).
  */
+/**
+ * 0079 — THE LOCALISER WRITES THE DOCUMENT; THE RELATION TABLES ARE WRITTEN
+ * FROM THE WIRE BODY.
+ *
+ * «مدة التجهيز» lives on `product_option_values` (and, since 0073, on the
+ * order-type cell and each of its routes), not in the products JSON — so the
+ * Arabic and Kurdish `localizeProductDoc` just generated onto `doc.options[]`
+ * would reach the database on the TEMPLATE path (whose relations body is BUILT
+ * from the doc) and nowhere else. The form PUTs its own relations body, typed
+ * in English by an admin who by §3 never sees an ar/ckb box, so without this
+ * the generated text would be computed and dropped on every form save — the
+ * exact failure `how_to_use` shipped with.
+ *
+ * Matched by id, and only onto rows that did NOT state the field themselves: a
+ * file that says `lead_time_text_ar=` is a human statement and outranks the
+ * machine's. Absent on both sides stays absent, which the writer reads as
+ * "preserve what is stored".
+ */
+export function bridgeLeadTimeTranslations(
+  doc: ProductDoc | null,
+  relations: Record<string, unknown> | null
+): void {
+  if (!doc || !relations) return;
+  const groups = relations.groups;
+  if (!Array.isArray(groups)) return;
+  const fromDoc = new Map(doc.options.map((o) => [o.id, o]));
+  for (const g of groups) {
+    const values = (g as Record<string, unknown>)?.values;
+    if (!Array.isArray(values)) continue;
+    for (const raw of values) {
+      const v = raw as Record<string, unknown>;
+      const src = fromDoc.get(String(v?.id ?? ''));
+      if (!src) continue;
+      if (v.lead_time_text_ar === undefined && src.lead_time_text_ar !== undefined) {
+        v.lead_time_text_ar = src.lead_time_text_ar;
+      }
+      if (v.lead_time_text_ckb === undefined && src.lead_time_text_ckb !== undefined) {
+        v.lead_time_text_ckb = src.lead_time_text_ckb;
+      }
+      // The order-type cells beneath the model, when this save carries them.
+      const cells = v.fulfillments;
+      if (!Array.isArray(cells)) continue;
+      for (const rawCell of cells) {
+        const cell = rawCell as Record<string, unknown>;
+        const srcCell = (src.fulfillments ?? []).find((f) => f.fulfillment_type === cell?.fulfillment_type);
+        if (!srcCell) continue;
+        if (cell.lead_time_text_ar === undefined && srcCell.lead_time_text_ar !== undefined) {
+          cell.lead_time_text_ar = srcCell.lead_time_text_ar;
+        }
+        if (cell.lead_time_text_ckb === undefined && srcCell.lead_time_text_ckb !== undefined) {
+          cell.lead_time_text_ckb = srcCell.lead_time_text_ckb;
+        }
+        const routes = cell.transports;
+        if (!Array.isArray(routes)) continue;
+        for (const rawRoute of routes) {
+          const route = rawRoute as Record<string, unknown>;
+          const srcRoute = (srcCell.transports ?? []).find((t) => t.method === route?.method);
+          if (!srcRoute) continue;
+          if (route.lead_time_text_ar === undefined && srcRoute.lead_time_text_ar !== undefined) {
+            route.lead_time_text_ar = srcRoute.lead_time_text_ar;
+          }
+          if (route.lead_time_text_ckb === undefined && srcRoute.lead_time_text_ckb !== undefined) {
+            route.lead_time_text_ckb = srcRoute.lead_time_text_ckb;
+          }
+        }
+      }
+    }
+  }
+}
+
 export async function planProductSave(db: D1Database, intent: ProductWriteIntent): Promise<ProductSavePlan> {
   const { doc, prev, actor } = intent;
   const productId = doc?.id ?? prev?.id;
@@ -1987,6 +2070,10 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
   if (intent.mode === 'create' && !doc) throw badRequest('a create needs a document');
   const warnings: string[] = [];
   const statements: D1PreparedStatement[] = [];
+
+  // The one seam where the localised document and the relations wire body are
+  // both in hand. See the function's own note.
+  bridgeLeadTimeTranslations(doc, intent.relations);
 
   // ---- 0058: composition is a door, not a field --------------------------
   //
@@ -2608,6 +2695,8 @@ export function verifyApplied(
       }
       check('options', v.id, 'availability_type', v.availability_type, s.availability_type ?? '');
       check('options', v.id, 'lead_time_text', v.lead_time_text, s.lead_time_text ?? '');
+      if (v.lead_time_text_ar !== undefined) check('options', v.id, 'lead_time_text_ar', v.lead_time_text_ar, s.lead_time_text_ar ?? '');
+      if (v.lead_time_text_ckb !== undefined) check('options', v.id, 'lead_time_text_ckb', v.lead_time_text_ckb, s.lead_time_text_ckb ?? '');
       check('options', v.id, 'lead_time_min_days', v.lead_time_min_days, n(s.lead_time_min_days));
       check('options', v.id, 'lead_time_max_days', v.lead_time_max_days, n(s.lead_time_max_days));
       check('options', v.id, 'variant_key', v.variant_key, s.variant_key ?? '');

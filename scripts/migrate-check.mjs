@@ -117,47 +117,91 @@ if (twice) {
   // A migration made only of statements this harness cannot re-run is not
   // "proven idempotent", it is UNTESTED — and printing a green line for it is
   // exactly the fake success the mandate forbids. Say so and fail.
+  let addColumnsOnly = false;
   if (stmts.length === 0) {
-    console.error(
-      `✘ ${newest}: no statement in it is re-runnable by this harness, so the ` +
-        'second-pass check proves nothing. Either the migration is not idempotent, ' +
-        'or isIdempotent() needs to learn its shape.'
-    );
-    process.exit(1);
-  }
-
-  // §12 asks for "دون تكرار أو تلف" — no DUPLICATION and no CORRUPTION. Row
-  // counts only answer the first. So the whole contents of each table are
-  // snapshotted and compared, which also catches an UPDATE that rewrites a
-  // value on the second pass without changing how many rows there are.
-  const countable = ['catalogs', 'facets', 'membership_plans', 'product_option_groups', 'product_images'];
-  const snapshot = () =>
-    Object.fromEntries(
-      countable.map((t) => [t, JSON.stringify(db.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all())])
-    );
-  const counts = () =>
-    Object.fromEntries(countable.map((t) => [t, db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n]));
-
-  const before = snapshot();
-  const beforeCounts = counts();
-  db.exec('BEGIN');
-  for (const s of stmts) db.exec(s);
-  db.exec('COMMIT');
-  const after = snapshot();
-  const afterCounts = counts();
-  for (const t of countable) {
-    if (afterCounts[t] !== beforeCounts[t]) {
-      console.error(`✘ re-running ${newest} DUPLICATED rows in ${t}: ${beforeCounts[t]} → ${afterCounts[t]}`);
+    /**
+     * ONE SHAPE GENUINELY CANNOT BE RE-RUN, AND PRETENDING OTHERWISE WOULD BE
+     * THE LIE THIS CHECK EXISTS TO PREVENT.
+     *
+     * SQLite has no `ALTER TABLE … ADD COLUMN IF NOT EXISTS`, so an additive
+     * migration made only of ADD COLUMNs errors on a second application by
+     * construction. That is not a defect: D1 applies each file exactly once,
+     * and the second-pass bookkeeping check above is what proves it. Demanding
+     * a re-runnable statement from such a file pushes the author to bolt on an
+     * index nobody needs just to make the harness happy.
+     *
+     * So the right property is asserted instead of a different one being
+     * faked: every column the file claims to add must actually be there after
+     * the first pass. A typo, a table that does not exist, or a statement the
+     * splitter mangled all fail here — which is what this check was ever
+     * really about for an additive file.
+     */
+    const adds = [...readFileSync(join('migrations', newest), 'utf8').matchAll(
+      /ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)/gi
+    )].map((m) => [m[1], m[2]]);
+    const allStatements = splitStatements(readFileSync(join('migrations', newest), 'utf8'));
+    const onlyAdds = allStatements.length > 0 && allStatements.every((x) => /^ALTER\s+TABLE\s/i.test(x));
+    if (!onlyAdds || adds.length === 0) {
+      console.error(
+        `✘ ${newest}: no statement in it is re-runnable by this harness, so the ` +
+          'second-pass check proves nothing. Either the migration is not idempotent, ' +
+          'or isIdempotent() needs to learn its shape.'
+      );
       process.exit(1);
     }
-    if (after[t] !== before[t]) {
-      console.error(`✘ re-running ${newest} CHANGED the contents of ${t} without changing its row count`);
+    const missing = adds.filter(
+      ([table, col]) => !db.prepare(`PRAGMA table_info(${table})`).all().some((r) => r.name === col)
+    );
+    if (missing.length > 0) {
+      console.error(`✘ ${newest}: these columns were not added: ${missing.map((m) => m.join('.')).join(', ')}`);
       process.exit(1);
     }
+    console.log(
+      `✔ ${newest} is ${adds.length} ADD COLUMN(s), every one present; ` +
+        'not re-runnable by design (SQLite has no ADD COLUMN IF NOT EXISTS), ' +
+        'and the bookkeeping pass above is what proves it runs once'
+    );
+    // NOT `process.exit(0)`. The integrity checks at the end of this file —
+    // foreign_key_check and the orphan-catalog scan — are about the SCHEMA the
+    // whole set produced, not about this one file's idempotency, and exiting
+    // here would silently switch them off for every future additive migration.
+    addColumnsOnly = true;
   }
-  console.log(
-    `✔ ${newest}: ${stmts.length} idempotent statement(s) re-ran — no row added, no value changed`
-  );
+
+  if (!addColumnsOnly) {
+    // §12 asks for "دون تكرار أو تلف" — no DUPLICATION and no CORRUPTION. Row
+    // counts only answer the first. So the whole contents of each table are
+    // snapshotted and compared, which also catches an UPDATE that rewrites a
+    // value on the second pass without changing how many rows there are.
+    const countable = ['catalogs', 'facets', 'membership_plans', 'product_option_groups', 'product_images'];
+    const snapshot = () =>
+      Object.fromEntries(
+        countable.map((t) => [t, JSON.stringify(db.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all())])
+      );
+    const counts = () =>
+      Object.fromEntries(countable.map((t) => [t, db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n]));
+
+    const before = snapshot();
+    const beforeCounts = counts();
+    db.exec('BEGIN');
+    for (const s of stmts) db.exec(s);
+    db.exec('COMMIT');
+    const after = snapshot();
+    const afterCounts = counts();
+    for (const t of countable) {
+      if (afterCounts[t] !== beforeCounts[t]) {
+        console.error(`✘ re-running ${newest} DUPLICATED rows in ${t}: ${beforeCounts[t]} → ${afterCounts[t]}`);
+        process.exit(1);
+      }
+      if (after[t] !== before[t]) {
+        console.error(`✘ re-running ${newest} CHANGED the contents of ${t} without changing its row count`);
+        process.exit(1);
+      }
+    }
+    console.log(
+      `✔ ${newest}: ${stmts.length} idempotent statement(s) re-ran — no row added, no value changed`
+    );
+  }
 }
 
 const tables = db.prepare(

@@ -66,6 +66,10 @@ export interface OptionValueRow {
    *  crash a storefront over a column that is only ever an enrichment. */
   availability_type?: string;
   lead_time_text?: string;
+  /** 0079. The Arabic and Sorani of the sentence above; '' = not authored and
+   *  the reader falls back to it. Optional for the same rolling-deploy reason. */
+  lead_time_text_ar?: string;
+  lead_time_text_ckb?: string;
   lead_time_min_days?: number | null;
   lead_time_max_days?: number | null;
   variant_key?: string;
@@ -96,6 +100,10 @@ export interface OptionFulfillmentRow {
   pro_adjust_iqd?: number | null;
   cost_adjust_iqd?: number | null;
   lead_time_text?: string;
+  /** 0079. The Arabic and Sorani of the sentence above; '' = not authored and
+   *  the reader falls back to it. Optional for the same rolling-deploy reason. */
+  lead_time_text_ar?: string;
+  lead_time_text_ckb?: string;
   lead_time_min_days?: number | null;
   lead_time_max_days?: number | null;
   sort?: number;
@@ -128,6 +136,10 @@ export interface OptionTransportRow {
   pro_adjust_iqd?: number | null;
   cost_adjust_iqd?: number | null;
   lead_time_text?: string;
+  /** 0079. The Arabic and Sorani of the sentence above; '' = not authored and
+   *  the reader falls back to it. Optional for the same rolling-deploy reason. */
+  lead_time_text_ar?: string;
+  lead_time_text_ckb?: string;
   lead_time_min_days?: number | null;
   lead_time_max_days?: number | null;
   sort?: number;

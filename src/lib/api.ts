@@ -392,6 +392,8 @@ export interface ApiProduct {
   stores: Array<{ name: string; url: string; price_iqd?: number }>;
   warranty_plans: Array<{ name: string; price_iqd?: number }>;
   how_to_use: string;
+  how_to_use_ar?: string;
+  how_to_use_ckb?: string;
   stock: number | null;
   created_at: string;
   merchant?: { id: string; name: string; verified: boolean };

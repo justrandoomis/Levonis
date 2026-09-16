@@ -401,6 +401,8 @@ export function applyRelations(
       pro_adjust_iqd: f.pro_adjust_iqd ?? null,
       cost_adjust_iqd: f.cost_adjust_iqd ?? null,
       lead_time_text: f.lead_time_text ?? '',
+      lead_time_text_ar: f.lead_time_text_ar ?? '',
+      lead_time_text_ckb: f.lead_time_text_ckb ?? '',
       lead_time_min_days: f.lead_time_min_days ?? null,
       lead_time_max_days: f.lead_time_max_days ?? null,
       // 0075. The pre-order pool, carried so the admin surfaces and the TXT
@@ -428,6 +430,8 @@ export function applyRelations(
               pro_adjust_iqd: t.pro_adjust_iqd ?? null,
               cost_adjust_iqd: t.cost_adjust_iqd ?? null,
               lead_time_text: t.lead_time_text ?? '',
+              lead_time_text_ar: t.lead_time_text_ar ?? '',
+              lead_time_text_ckb: t.lead_time_text_ckb ?? '',
               lead_time_min_days: t.lead_time_min_days ?? null,
               lead_time_max_days: t.lead_time_max_days ?? null,
             }))
@@ -467,6 +471,8 @@ export function applyRelations(
       // stable even for a legacy row.
       availability_type: normalizeAvailability(v.availability_type) || availabilityFromName(v.name_en),
       lead_time_text: v.lead_time_text ?? '',
+      lead_time_text_ar: v.lead_time_text_ar ?? '',
+      lead_time_text_ckb: v.lead_time_text_ckb ?? '',
       lead_time_min_days: v.lead_time_min_days ?? null,
       lead_time_max_days: v.lead_time_max_days ?? null,
       variant_label: (v.variant_label ?? '').trim() || variantLabelFallback(v.name_en),
