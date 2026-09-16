@@ -495,18 +495,37 @@ export function saleAvailability(
    * that has no stock at all.
    */
   const compositionModes = input.compositionModes ?? [];
-  const directEnabled = isComposition
-    ? compositionModes.includes('direct_sale')
-    : saleTypes.includes('direct_sale') || saleTypes.includes('bundle');
   /**
    * `sale_types` is derived by TWO different doors — `saleTypesFromCells` in
    * adminProductRelations.ts and `deriveSaleTypes` in productPersistence.ts —
-   * so it can lag behind a model whose own pre-order cell is enabled. The
-   * cell is the more specific statement, so it counts as well.
+   * so it can lag behind a model whose own cell says otherwise. The cell is
+   * the more specific statement, so it counts as well.
+   *
+   * BEFORE A MODEL IS PICKED, THE ANSWER IS THE PRODUCT'S — WHICH IS THE UNION.
+   *
+   * The pre-order half of this filtered on `selectedValueIds` alone, so on the
+   * FIRST PAINT — no option chosen, which is every visitor's first second on
+   * the page — the set was empty and no cell was ever consulted. A product
+   * whose every model offers pre-order with a priced route came back
+   * `PREORDER_NOT_ENABLED`, `modes: [direct_sale]`, `transports: []`: the page
+   * was told the product has no pre-order at all, so it drew no order-type
+   * chooser, and the buyer had to guess that picking a model would reveal one.
+   *
+   * With nothing selected the honest answer is what the product OFFERS —
+   * anywhere in its models. The moment a model is chosen the set narrows to
+   * that model and every later answer is about it alone, exactly as before.
    */
-  const modelPreorderCell = doc.options
-    .filter((o) => o.active !== false && selectedValueIds.includes(o.id))
-    .some((o) => o.fulfillments?.some((f) => f.fulfillment_type === 'pre_order' && f.enabled !== false));
+  const cellScope = doc.options.filter(
+    (o) => o.active !== false && (selectedValueIds.length === 0 || selectedValueIds.includes(o.id))
+  );
+  const cellSays = (type: 'direct_sale' | 'pre_order') =>
+    cellScope.some((o) => o.fulfillments?.some((f) => f.fulfillment_type === type && f.enabled !== false));
+  const modelPreorderCell = cellSays('pre_order');
+  const modelDirectCell = cellSays('direct_sale');
+
+  const directEnabled = isComposition
+    ? compositionModes.includes('direct_sale')
+    : saleTypes.includes('direct_sale') || saleTypes.includes('bundle') || modelDirectCell;
   const preorderEnabled = isComposition
     ? compositionModes.includes('pre_order')
     : saleTypes.includes('pre_order') || modelPreorderCell;
@@ -542,7 +561,21 @@ export function saleAvailability(
    *   2. the PRODUCT's commission for the method
    *   3. the admin default for the method
    */
-  const preorderCells = chosenOptions
+  /**
+   * THE ROUTES ARE READ OVER THE SAME SCOPE AS THE ORDER TYPES.
+   *
+   * `chosenOptions` is empty before a model is picked, so this produced no
+   * cells, hence no `modelRoutes`, hence `offeredMethods` fell back to a
+   * product column the per-model door never writes — `transports: []` and
+   * `NO_TRANSPORT_OFFERED`. Answering "this product has no pre-order route"
+   * while every one of its models has a priced LAND route is the same untruth
+   * as the one above, one step further down.
+   *
+   * `cellScope` IS `chosenOptions` once anything is selected, so the priced
+   * answer for a real selection is byte for byte what it was; only the
+   * unselected first paint changes, from a false negative to the union.
+   */
+  const preorderCells = cellScope
     .map((o) => o.fulfillments?.find((f) => f.fulfillment_type === 'pre_order' && f.enabled !== false) ?? null)
     .filter((f): f is NonNullable<typeof f> => f !== null);
   const modelRoutes = preorderCells

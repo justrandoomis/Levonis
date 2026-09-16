@@ -29,8 +29,24 @@ test('the dark system is semantic and selection uses a small cue rather than a g
 test('product variants and availability modes share the restrained accessible choice primitive', () => {
   const product = read('src/pages/Product.tsx');
   assert.match(product, /className="lv-choice[^\n]+"/);
-  assert.match(product, /aria-pressed=\{!wantPreorder\}/);
-  assert.match(product, /aria-pressed=\{wantPreorder\}/);
+  /**
+   * The two order-type buttons are pinned by their ROLE, not by the exact
+   * boolean that drives them. This used to assert `aria-pressed={wantPreorder}`
+   * verbatim, which made the accessible state un-improvable: teaching the
+   * pressed state to account for a CLOSED mode (a sold-out direct sale is
+   * disabled, and must not also read as pressed) failed a test about design
+   * primitives. What matters, and what is asserted, is that each one is a
+   * `lv-choice` carrying `aria-pressed` and `disabled`.
+   */
+  for (const type of ['direct_sale', 'pre_order']) {
+    const button = new RegExp(
+      `data-order-type="${type}"[\\s\\S]{0,400}?className="lv-choice`,
+      ''
+    );
+    assert.match(product, button, `the ${type} button is a lv-choice`);
+  }
+  assert.match(product, /disabled=\{!directUsable\}[\s\S]{0,200}aria-pressed=\{/);
+  assert.match(product, /disabled=\{!preUsable\}[\s\S]{0,200}aria-pressed=\{/);
   assert.match(product, /<SafeImage[\s\S]{0,500}lv-choice-mark/);
   assert.doesNotMatch(product, /border-gold\s+bg-gold\/15\s+text-gold/);
 });

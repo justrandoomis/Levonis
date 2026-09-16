@@ -1574,8 +1574,32 @@ export default function Product() {
    */
   const directSoldOutPreorderOpen =
     preUsable && modesArr.some((m) => m.type === 'direct_sale' && !m.usable && m.reason === 'OUT_OF_STOCK');
-  const bothUsable = directUsable && preUsable;
-  const showTransports = (bothUsable ? wantPreorder : mode === 'preorder') && (availability?.preorder.transports.length ?? 0) > 0;
+  /**
+   * THE CHOICE IS SHOWN WHENEVER THE PRODUCT OFFERS ONE — not only when both
+   * halves happen to be buyable today.
+   *
+   * This was gated on `directUsable && preUsable`, so the whole «طريقة التوفر» block vanished
+   * the moment either side was closed: a model sold out on the shelf with its
+   * pre-order wide open rendered NO chooser at all, and a buyer looking at
+   * «نفد» had no way to learn that the thing could still be ordered. Silence
+   * is the one answer a shop must never give about how to buy something.
+   *
+   * `modes` is the SERVER's list of the types this product declares, each with
+   * its own `usable` and `reason`. Two entries means two ways to buy exist, so
+   * both are drawn; the one that is closed is disabled and SAYS WHY, in the
+   * shop's own words, rather than disappearing.
+   */
+  const offersBoth = modesArr.length >= 2;
+  const modeOf = (type: 'direct_sale' | 'pre_order') => modesArr.find((m) => m.type === type) ?? null;
+
+  /**
+   * The order type in force: what the buyer picked, or — before they pick —
+   * the server's own default. The transports below follow THIS and not the
+   * button state, so a product whose only open route is pre-order still shows
+   * its journeys on the first paint.
+   */
+  const effectivePreorder = orderType ? wantPreorder : mode === 'preorder';
+  const showTransports = effectivePreorder && (availability?.preorder.transports.length ?? 0) > 0;
   const pricingModes = quotedModes ?? detailModes;
   const directFinal: number | null = pricingModes?.direct?.unit_subtotal_iqd ?? null;
   const transportFinal = (t: TransportView): number | null =>
@@ -1945,8 +1969,8 @@ export default function Product() {
         </fieldset>
       ) : null}
 
-      {bothUsable ? (
-        <fieldset className="lv-section">
+      {offersBoth ? (
+        <fieldset className="lv-section" data-fulfilment-chooser>
           <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
             <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
             {s.fulfilment}
@@ -1954,39 +1978,56 @@ export default function Product() {
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
               type="button"
-              aria-pressed={!wantPreorder}
+              disabled={!directUsable}
+              aria-pressed={directUsable && !effectivePreorder}
+              data-order-type="direct_sale"
+              data-usable={directUsable ? 'yes' : 'no'}
               onClick={() => {
                 setOrderType('direct_sale');
                 setTransportMethod('');
               }}
-              className="lv-choice flex min-h-[52px] items-start gap-3 px-3 py-2.5 text-sm text-start"
+              className="lv-choice flex min-h-[52px] items-start gap-3 px-3 py-2.5 text-sm text-start disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="min-w-0 flex-1">
                 <span className="block">{s.directSale}</span>
                 <span className="block text-[11px] text-zinc-400 font-medium leading-snug">{s.fulfilDirectSub}</span>
-                {directFinal !== null ? (
+                {directUsable && directFinal !== null ? (
                   <span className="block tabular-nums text-[14px] font-bold mt-1" data-direct-final>{formatIqd(directFinal)}</span>
+                ) : null}
+                {/* CLOSED, AND IT SAYS WHY. Never a dead chip with no sentence. */}
+                {!directUsable ? (
+                  <span className="block text-[11px] font-medium text-warning leading-snug mt-1" data-mode-closed>
+                    {reasonText(s, modeOf('direct_sale')?.reason)}
+                  </span>
                 ) : null}
               </span>
               <span className="lv-choice-mark mt-0.5"><Check aria-hidden="true" className="h-3 w-3" /></span>
             </button>
             <button
               type="button"
-              aria-pressed={wantPreorder}
+              disabled={!preUsable}
+              aria-pressed={preUsable && effectivePreorder}
+              data-order-type="pre_order"
+              data-usable={preUsable ? 'yes' : 'no'}
               onClick={() => {
                 setOrderType('pre_order');
                 const usable = (availability?.preorder.transports ?? []).filter((t) => t.configured);
                 if (usable.length === 1) setTransportMethod(usable[0].method);
               }}
-              className="lv-choice flex min-h-[52px] items-start gap-3 px-3 py-2.5 text-sm text-start"
+              className="lv-choice flex min-h-[52px] items-start gap-3 px-3 py-2.5 text-sm text-start disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="min-w-0 flex-1">
                 <span className="block">{s.preorderMode}</span>
                 <span className="block text-[11px] text-zinc-400 font-medium leading-snug">{s.fulfilPreorderSub}</span>
-                {preorderFromFinal !== null ? (
+                {preUsable && preorderFromFinal !== null ? (
                   <span className="block tabular-nums text-[14px] font-bold mt-1">
                     <span className="text-[10px] font-medium text-zinc-400 me-1">{s.from}</span>
                     {formatIqd(preorderFromFinal)}
+                  </span>
+                ) : null}
+                {!preUsable ? (
+                  <span className="block text-[11px] font-medium text-warning leading-snug mt-1" data-mode-closed>
+                    {reasonText(s, modeOf('pre_order')?.reason)}
                   </span>
                 ) : null}
               </span>
@@ -2069,7 +2110,7 @@ export default function Product() {
               hint, so it sits under the journeys instead — once, not twice,
               and only when cash on delivery would change the price (a
               product with no direct premium keeps its commission either way). */}
-          {!bothUsable && codReprices ? (
+          {!offersBoth && codReprices ? (
             <p className="mt-2 text-[11px] text-zinc-500 leading-relaxed" data-preorder-cod-hint>
               {s.preorderCodHint}
             </p>
