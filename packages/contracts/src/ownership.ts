@@ -71,6 +71,19 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'merchant_payout_ledger', 'community_merchants', 'merchant_stores', 'merchant_store_slugs', 'reserved_slugs',
     'merchant_notification_preferences', 'community_products', 'merchant_store_sections', 'merchant_services', 'merchant_showcase',
     'merchant_coupons', 'merchant_reviews', 'merchant_reputation_events',
+    // The print quote engine (migration 0078, `docs/PRINT_QUOTE_ENGINE.md`).
+    // It sits here rather than in Catalog because every one of these rows is
+    // read to answer «كم تكلف طباعتي» for a `community_requests` job on a
+    // `merchant_printers` machine — and `print_quotes.request_id` is a foreign
+    // key into this service's own aggregate. `printer_models` and
+    // `print_materials` are platform reference data, but a reference table read
+    // only by one service is that service's to own.
+    'printer_models', 'print_materials', 'merchant_spools',
+    'print_analyses', 'print_analysis_materials',
+    'print_quotes', 'print_quote_cost_components',
+    // What actually happened, which is what turns the estimate into a
+    // calibration rather than a permanent guess (§15).
+    'print_actuals', 'print_failures', 'printer_calibration_stats',
   ]),
   ...owned('reviews', ['reviews', 'review_rewards', 'gift_entitlements', 'gift_pool_items', 'gift_redemptions', 'gift_pools', 'review_media']),
   ...owned('devices', ['order_item_units', 'device_serials', 'device_registrations', 'warranty_claims', 'claim_messages', 'warranty_receipts']),

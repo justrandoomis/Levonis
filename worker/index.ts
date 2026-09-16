@@ -34,6 +34,7 @@ import { adminPriceGridRoutes } from './routes/adminPriceGrid';
 import { printRequestRoutes } from './routes/printRequests';
 import { notificationRoutes } from './routes/notifications';
 import { merchantPrinterRoutes } from './routes/merchantPrinters';
+import { printQuoteRoutes } from './routes/printQuote';
 import { membershipsRoutes } from './routes/memberships';
 import { telegramRoutes } from './routes/telegram';
 import { invoiceRoutes } from './routes/invoices';
@@ -203,6 +204,10 @@ app.route('/api/uploads', uploadRoutes);
 // so nothing there can shadow it; its one public route (the leaderboard) is
 // registered inside the module ahead of its own requireAuth.
 app.route('/api/farm', farmRoutes);
+// The print cost/quote engine. Mounted before the '/api' misc catch-all for the
+// same reason the farm is, and it carries no requireAuth of its own: a guest
+// may upload and be quoted, and each route states its own guard.
+app.route('/api/print-quote', printQuoteRoutes);
 app.route('/api', miscRoutes);
 app.route('/api/admin', adminRoutes);
 // The farm's balancing console. Under /api/admin/* on purpose: the apex-only

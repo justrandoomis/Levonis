@@ -178,6 +178,17 @@ export interface ModelAnalysis {
   overhang_area_mm2: number;
   /** Overhang as a share of total area, 0..1 — what drives the support cost. */
   overhang_ratio: number;
+  /**
+   * The part of that overhang that is lying ON THE BED — every downward face
+   * at the model's lowest z.
+   *
+   * It is reported separately because it is the one overhang nothing supports:
+   * the build plate is already under it. Without this figure a flat-bottomed
+   * part is charged for supporting its own base, which is both wrong and
+   * expensive — a 20 mm cube picks up a tenth of its own weight in support it
+   * will never print.
+   */
+  bed_contact_area_mm2: number;
   /** 0..1. Surface detail per unit of enclosing volume, clamped. */
   complexity: number;
   warnings: ModelWarning[];
@@ -229,6 +240,7 @@ function emptyAnalysis(format: ModelFormat, reason: string): ModelAnalysis {
     watertight: null,
     overhang_area_mm2: 0,
     overhang_ratio: 0,
+    bed_contact_area_mm2: 0,
     complexity: 0,
     warnings: [],
   };
@@ -328,6 +340,10 @@ function measure(mesh: Mesh, format: ModelFormat, capability: FormatCapability):
 
   const volume = Math.abs(signedVolume);
   const dims: Vec3 = { x: maxX - minX, y: maxY - minY, z: maxZ - minZ };
+  // The bed-contact pass has to wait for minZ, which is only known now. One
+  // more sweep over the same buffer, no extra memory — the same budget the
+  // topology pass below already spends.
+  const bedContact = bedContactArea(p, n, s, minZ, dims.z);
   const topology = n <= TOPOLOGY_TRIANGLE_CAP ? analyseTopology(p, n, s) : null;
 
   const warnings: ModelWarning[] = [];
@@ -399,6 +415,7 @@ function measure(mesh: Mesh, format: ModelFormat, capability: FormatCapability):
     watertight: topology ? topology.watertight : null,
     overhang_area_mm2: round(overhang, 2),
     overhang_ratio: round(overhangRatio, 4),
+    bed_contact_area_mm2: round(Math.min(bedContact, overhang), 2),
     complexity: complexityOf(dims, volume, area, n),
     warnings,
     ...(mesh.title ? { title: mesh.title } : {}),
@@ -446,6 +463,37 @@ interface Topology {
  * micron grid is finer than any printer and coarse enough to make the two
  * corners agree.
  */
+/**
+ * Area of every downward-facing triangle lying flat at the model's lowest z —
+ * the part that rests on the build plate.
+ *
+ * The tolerance scales with the model so a 500 mm print and a 5 mm one are
+ * judged the same way, with a floor that keeps float noise in an exported STL
+ * from splitting one flat face into "on the bed" and "just above it".
+ */
+function bedContactArea(p: Float32Array, n: number, s: number, minZ: number, heightMm: number): number {
+  const tolerance = Math.max(0.05, heightMm * 1e-3);
+  const ceiling = minZ + tolerance;
+  let contact = 0;
+  for (let t = 0; t < n; t++) {
+    const o = t * 9;
+    const az = p[o + 2] * s, bz = p[o + 5] * s, cz = p[o + 8] * s;
+    if (az > ceiling || bz > ceiling || cz > ceiling) continue;
+    const ax = p[o] * s, ay = p[o + 1] * s;
+    const bx = p[o + 3] * s, by = p[o + 4] * s;
+    const cx = p[o + 6] * s, cy = p[o + 7] * s;
+    const ux = bx - ax, uy = by - ay, uz = bz - az;
+    const vx = cx - ax, vy = cy - ay, vz = cz - az;
+    const nx = uy * vz - uz * vy;
+    const ny = uz * vx - ux * vz;
+    const nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz);
+    if (len <= 1e-12) continue;
+    if (-nz / len > OVERHANG_COS) contact += len / 2;
+  }
+  return contact;
+}
+
 function analyseTopology(p: Float32Array, n: number, scale: number): Topology {
   const vertexId = new Map<string, number>();
   const ids = new Int32Array(n * 3);

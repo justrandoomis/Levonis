@@ -164,6 +164,11 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/store-orders', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'auth', rateClass: 'money' },
   { prefix: '/api/marketplace', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'write', note: '/api/marketplace/print extends the same requests' },
   { prefix: '/api/admin/community', hosts: 'main', owner: 'MARKETPLACE', flipPhase: 6, requires: 'admin', rateClass: 'admin-write' },
+  // The print quote engine (migration 0078). It answers «احسب سعر طباعتك» for a
+  // GUEST — the calculator is how somebody finds out the shop exists, so
+  // `requires: 'none'` is the point of it, and the route's own per-bucket rate
+  // limits do the work an auth gate would otherwise do.
+  { prefix: '/api/print-quote', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'upload', note: 'guest uploads a model and is quoted for it' },
 
   // ------------------------------------------------------- leaves (phase 4)
   { prefix: '/api/chats', hosts: 'root', owner: 'CHAT', flipPhase: 4, requires: 'auth', rateClass: 'write' },

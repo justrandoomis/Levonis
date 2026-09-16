@@ -132,6 +132,16 @@ export const HISTORY_TABLES: HistoryTable[] = [
   { table: 'order_item_units', columns: ['product_id'] },
   { table: 'warranty_receipts', columns: ['product_id'] },
   { table: 'community_complaints', columns: ['product_id'] },
+  /**
+   * The print-quote material catalogue (0078). `product_id` records that the
+   * shop SELLS this filament, which is a commercial fact that can end; the
+   * material itself is a physical one that cannot. PLA is still 1.24 g/cm³
+   * after the last PLA product is delisted, and every stored analysis that
+   * weighed grams against that density has to keep resolving. So the pointer
+   * is cleared and the row stays — which is also what the schema says
+   * (`ON DELETE SET NULL`).
+   */
+  { table: 'print_materials', columns: ['product_id'] },
 ];
 
 /**

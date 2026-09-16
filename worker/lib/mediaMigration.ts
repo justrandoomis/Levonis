@@ -67,6 +67,10 @@ function domainForKey(key: string): MediaDomain {
     kyc: 'kyc',
     requests: 'requests',
     'request-previews': 'print-requests',
+    // The quote engine's own namespace. Absent from this map a key classifies
+    // as domain 'support' and action 'manual_review' — which is the exact
+    // silent misfiling the ui/uiux note at the top of this file describes.
+    'print-requests': 'print-requests',
   };
   return map[prefix] ?? 'support'; // unknown is private/manual-review below
 }

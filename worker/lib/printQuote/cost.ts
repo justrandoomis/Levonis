@@ -277,12 +277,24 @@ export function priceJob(input: PricingInputs): QuoteResult {
 
   const materialFactor = input.materialFactor?.value ?? 1;
   const timeFactor = input.timeFactor?.value ?? 1;
-  if (input.materialFactor) provenances.push(input.materialFactor.from);
-  if (input.timeFactor) provenances.push(input.timeFactor.from);
+  // A factor of exactly 1 is what `resolveFactor` returns when a shop has too
+  // little history to calibrate with — it changes no number, so it must not
+  // drag the quote's provenance down to 'platform' either. Only a correction
+  // that actually moves a figure gets to speak for where that figure came from.
+  const materialFactorFrom = materialFactor !== 1 ? input.materialFactor?.from : undefined;
+  const timeFactorFrom = timeFactor !== 1 ? input.timeFactor?.from : undefined;
+  if (materialFactorFrom) provenances.push(materialFactorFrom);
+  if (timeFactorFrom) provenances.push(timeFactorFrom);
 
   // ---- 1. material, split by where every gram goes ------------------------
   const bucketIqd = new Map<CostComponent, number>();
   const bucketDetail = new Map<CostComponent, string[]>();
+  // Per COMPONENT, not per quote: a line that came from the merchant's own
+  // spool says 'merchant' even when some unrelated input to the same quote is
+  // weaker. Rolling the running weakest into every material line is how a real
+  // measurement gets mislabelled as a platform default — and the merchant panel
+  // reads these to decide whether a number is theirs or ours.
+  const bucketFrom = new Map<CostComponent, Provenance[]>();
   let wasteGrams = 0;
   let totalGrams = 0;
   let unpriced: string | null = null;
@@ -304,13 +316,24 @@ export function priceJob(input: PricingInputs): QuoteResult {
       const list = bucketDetail.get(component);
       if (list) list.push(label);
       else bucketDetail.set(component, [label]);
+      const froms = bucketFrom.get(component);
+      if (froms) froms.push(price.from);
+      else bucketFrom.set(component, [price.from]);
     }
   }
 
   for (const [component] of GRAM_BUCKETS) {
     const value = bucketIqd.get(component);
     if (value === undefined) continue;
-    push(lines, component, value * quantity, weakestProvenance(provenances), bucketDetail.get(component)?.join(' · '));
+    // The grams are the analysis's, the rate is the price's, and the factor (if
+    // it moved anything) is the shop's history. The weakest of exactly those
+    // three is what this line is worth believing.
+    const from = weakestProvenance([
+      analysis.provenance,
+      ...(bucketFrom.get(component) ?? []),
+      ...(materialFactorFrom ? [materialFactorFrom] : []),
+    ]);
+    push(lines, component, value * quantity, from, bucketDetail.get(component)?.join(' · '));
   }
 
   // ---- 2. machine time ----------------------------------------------------
@@ -323,17 +346,22 @@ export function priceJob(input: PricingInputs): QuoteResult {
     energyKwh(analysis, printer.power, analysis.toolChanges > 0 ? idleTools : 0, mm.standbyWattsPerIdleTool) *
     timeFactor *
     quantity;
-  push(lines, 'ELECTRICITY', kwh * input.electricity.value, input.electricity.from, `${kwh.toFixed(2)} kWh`);
+  // Every time-driven line inherits the analysis's provenance too: an estimated
+  // print time priced at a measured electricity rate is still an estimate.
+  const timed = (rateFrom: Provenance): Provenance =>
+    weakestProvenance([analysis.provenance, rateFrom, ...(timeFactorFrom ? [timeFactorFrom] : [])]);
+
+  push(lines, 'ELECTRICITY', kwh * input.electricity.value, timed(input.electricity.from), `${kwh.toFixed(2)} kWh`);
   provenances.push(input.electricity.from);
 
   const depPerHour = input.machineIqdPerHourOverride?.value ?? machineIqdPerHour(printer);
   const depFrom: Provenance = input.machineIqdPerHourOverride?.from ?? 'profile';
-  push(lines, 'DEPRECIATION', hours * depPerHour, depFrom, `${hours.toFixed(2)} h @ ${Math.round(depPerHour).toLocaleString('en-US')}/h`);
+  push(lines, 'DEPRECIATION', hours * depPerHour, timed(depFrom), `${hours.toFixed(2)} h @ ${Math.round(depPerHour).toLocaleString('en-US')}/h`);
   provenances.push(depFrom);
 
   const maintPerHour = input.maintenanceIqdPerHourOverride?.value ?? printer.maintenanceIqdPerHour;
   const maintFrom: Provenance = input.maintenanceIqdPerHourOverride?.from ?? 'profile';
-  push(lines, 'MAINTENANCE', hours * maintPerHour, maintFrom, `${hours.toFixed(2)} h`);
+  push(lines, 'MAINTENANCE', hours * maintPerHour, timed(maintFrom), `${hours.toFixed(2)} h`);
   provenances.push(maintFrom);
 
   // ---- 3. people ----------------------------------------------------------

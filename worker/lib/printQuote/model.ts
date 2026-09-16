@@ -144,6 +144,17 @@ export interface PrintAnalysis {
   /** Pieces that fit on one plate, for batch maths (§12). */
   piecesPerPlate: number;
 
+  /**
+   * THE WHOLE JOB'S MATERIAL, every plate and every copy included — not one
+   * plate's worth and not one piece's.
+   *
+   * Said explicitly because the alternative reading costs money twice: if these
+   * were per-piece, a caller would multiply them by a quantity, and a quantity
+   * applied AFTER the measurement cannot know that nine copies need three
+   * plates and therefore three warm-ups. Quantity is an input to measuring, not
+   * a multiplier on the result — which is why `priceJob`'s own `quantity` means
+   * "this many copies of this whole job" and the routes leave it at one.
+   */
   materials: AnalysisMaterial[];
   /** How many times the machine swapped material. Drives purge and time. */
   toolChanges: number;

@@ -51,6 +51,17 @@ export interface RequestOptions {
   mascot?: MascotFeedback;
   /** Deadline in ms. Defaults to DEFAULT_TIMEOUT_MS; 0 disables it. */
   timeoutMs?: number;
+  /**
+   * Extra request headers.
+   *
+   * Exists for ONE case: the print-quote flow lets a signed-out visitor upload
+   * a model and be quoted for it, and the capability that proves the upload is
+   * theirs travels in `X-Guest-Token`. It is not a cookie because it must NOT
+   * be sent to anything else — a header the caller opts into per request is the
+   * narrowest way to carry it. `Content-Type` is set after this, so a caller
+   * cannot use it to change how a body is encoded.
+   */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -62,9 +73,11 @@ export interface RequestOptions {
 const DEFAULT_TIMEOUT_MS = 20000;
 
 async function requestRaw<T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
-  const init: RequestInit = { method, credentials: 'same-origin', headers: {} };
+  const init: RequestInit = { method, credentials: 'same-origin', headers: { ...opts?.headers } };
   if (body !== undefined && !(body instanceof FormData)) {
-    init.headers = { 'Content-Type': 'application/json' };
+    // After the caller's headers, never before: the body encoding is this
+    // function's to decide.
+    init.headers = { ...opts?.headers, 'Content-Type': 'application/json' };
     init.body = JSON.stringify(body);
   } else if (body instanceof FormData) {
     init.body = body;

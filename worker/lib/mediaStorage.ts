@@ -32,7 +32,21 @@ export interface MediaKeyInput {
 }
 
 const SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/;
-const EXTENSION = /^(?:avif|csv|gif|jpg|jpeg|json|mp4|pdf|png|stl|3mf|webp)$/i;
+/**
+ * WHAT MAY BE STORED, BY EXTENSION.
+ *
+ * The 3D formats beyond STL and 3MF were missing, and the gap was inert only
+ * because no print-request path calls `buildMediaKey` — marketplace.ts and
+ * printRequests.ts hand-build their keys, so `putMediaObject` (which validates
+ * only `isSafeMediaKey`) accepted a .step quietly. `worker/lib/attachments.ts`
+ * has always ACCEPTED these formats by magic bytes; the moment anything routes
+ * a model through the canonical key builder, an allowlist that stops at 3MF
+ * turns a working upload into `Invalid media extension`.
+ *
+ * `lvm` is the derived preview mesh the 3D viewer serves, and it is on the same
+ * footing: a real object with a real key that the taxonomy has to admit exists.
+ */
+const EXTENSION = /^(?:3mf|amf|avif|csv|gif|glb|gltf|jpg|jpeg|json|lvm|mp4|obj|pdf|png|step|stl|stp|webp)$/i;
 
 function safeSegment(value: string, field: string): string {
   const v = value.trim();

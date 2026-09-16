@@ -171,6 +171,24 @@ export interface PrinterModel {
    * merchant has enough of their own history to replace it (§14).
    */
   baselineSuccessRate: number;
+
+  // ---- what the machine can lay down, for the geometry path --------------
+  //
+  // These four are what `geometryAdapter.ts` needs to turn a measured solid
+  // into an estimated print TIME without a slicer. They are machine facts, not
+  // pricing choices: a hotend melts so many mm³ a second, a layer costs some
+  // fixed travel, a bed takes some minutes to reach temperature. Each is stored
+  // on the model row so a faster machine legitimately quotes a shorter job.
+
+  /** Peak volumetric flow the hotend sustains, mm³/s. The real speed ceiling. */
+  maxVolumetricFlowMm3PerS: number;
+  /** The share of that ceiling a real print holds, once perimeters, corners and
+   *  the first layer are counted. Never 1 — no print runs at peak throughout. */
+  sustainedFlowFraction: number;
+  /** Travel, retraction and acceleration per layer, in seconds. */
+  layerOverheadSeconds: number;
+  /** Minutes from cold to first layer. Charged once per PLATE (§12). */
+  warmupMinutes: number;
 }
 
 /** Depreciation per printing hour: (what it cost − what it will be worth) over

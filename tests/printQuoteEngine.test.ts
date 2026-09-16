@@ -105,6 +105,12 @@ const SMALL: PrinterModel = {
   usefulPrintHours: 6_000,
   maintenanceIqdPerHour: 18,
   baselineSuccessRate: 0.9,
+  // The geometry path's time model. Unused by these tests — they price a
+  // SLICED analysis — but a PrinterModel without them is not a printer.
+  maxVolumetricFlowMm3PerS: 28,
+  sustainedFlowFraction: 0.55,
+  layerOverheadSeconds: 2,
+  warmupMinutes: 4,
 };
 
 /** A larger, dearer machine with two independent toolheads. */
@@ -126,6 +132,10 @@ const BIG: PrinterModel = {
   usefulPrintHours: 8_000,
   maintenanceIqdPerHour: 42,
   baselineSuccessRate: 0.93,
+  maxVolumetricFlowMm3PerS: 32,
+  sustainedFlowFraction: 0.55,
+  layerOverheadSeconds: 1.5,
+  warmupMinutes: 6,
 };
 
 const inputs = (over: Partial<PricingInputs> = {}): PricingInputs => ({
@@ -385,6 +395,58 @@ test('the weakest input decides what the quote may claim to be', () => {
   );
   assert.equal(fromPhoto.confidence, 'estimated');
   assert.ok(fromPhoto.rangeIqd.high > fromPhoto.rangeIqd.low);
+});
+
+test('a line says where ITS OWN number came from, not where the weakest one did', () => {
+  // The bug this pins: every material line used to be stamped with the WEAKEST
+  // provenance in the whole quote. A shop pricing from a spool they actually
+  // bought would see «من المنصة» on their own material, because some unrelated
+  // input — a platform electricity rate, or a no-op calibration factor — had
+  // already entered the running minimum. The merchant panel reads these labels
+  // to decide whether a figure is theirs, so a mislabelled line is a lie about
+  // the source of a real measurement.
+  const r = priceJob(
+    inputs({
+      analysis: analysis({ provenance: 'measured' }),
+      materialPrices: { spool: { 'pla-black': { iqdPerKg: 14_000, spoolId: 'sp_7' } } },
+      electricity: sourced(120, 'platform'),
+      risk: { successRate: sourced(0.9, 'platform') },
+      // What `resolveFactor` hands back when a shop has no history: a factor of
+      // exactly 1, labelled 'platform'. It multiplies nothing, so it must not
+      // relabel anything either.
+      materialFactor: sourced(1, 'platform'),
+      timeFactor: sourced(1, 'platform'),
+    })
+  );
+
+  assert.equal(lineOf(r, 'MODEL_MATERIAL')!.from, 'merchant', 'their spool is their spool');
+  assert.equal(lineOf(r, 'ELECTRICITY')!.from, 'platform', 'and a platform tariff still says platform');
+  assert.equal(lineOf(r, 'LABOR')!.from, 'merchant');
+  // The quote as a whole is still only as good as its weakest input.
+  assert.equal(r.confidence, 'estimated');
+
+  // A factor that DOES move a number speaks for it: the grams are no longer
+  // purely the slicer's once the shop's own history has scaled them.
+  const calibrated = priceJob(
+    inputs({
+      analysis: analysis({ provenance: 'measured' }),
+      materialPrices: { spool: { 'pla-black': { iqdPerKg: 14_000, spoolId: 'sp_7' } } },
+      materialFactor: sourced(1.06, 'merchant', 'samples:12'),
+    })
+  );
+  assert.equal(lineOf(calibrated, 'MODEL_MATERIAL')!.from, 'merchant');
+  assert.ok(iqdOf(calibrated, 'MODEL_MATERIAL') > iqdOf(r, 'MODEL_MATERIAL'), '6% more material costs 6% more');
+
+  // And a geometry that was never measured cannot be laundered into a
+  // measurement by a merchant price: the grams are still a guess (§3).
+  const guessed = priceJob(
+    inputs({
+      analysis: analysis({ provenance: 'inferred' }),
+      materialPrices: { spool: { 'pla-black': { iqdPerKg: 14_000, spoolId: 'sp_7' } } },
+    })
+  );
+  assert.equal(lineOf(guessed, 'MODEL_MATERIAL')!.from, 'inferred');
+  assert.equal(lineOf(guessed, 'DEPRECIATION')!.from, 'inferred', 'estimated hours are estimated hours');
 });
 
 // -------------------------------------------------------------- calibration

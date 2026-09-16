@@ -53,6 +53,7 @@ export const UPLOAD_CLASSES: readonly BodyClass[] = [
   { prefix: '/api/devices/claims/upload', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/routes/devices.ts#CLAIM_VIDEO_MAX', routeFile: 'devices.ts' },
   { prefix: '/api/admin/import', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/routes/adminImport.ts#MAX_ZIP_BYTES', routeFile: 'adminImport.ts' },
   { prefix: '/api/admin/template/parse-zip', methods: ['POST'], kind: 'multipart', maxBytes: 15 * MB, source: 'worker/routes/template.ts#MAX_ZIP_BYTES', routeFile: 'template.ts' },
+  { prefix: '/api/print-quote/uploads', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/routes/printQuote.ts#MODEL_MAX_BYTES', routeFile: 'printQuote.ts' },
 ];
 
 export const JSON_CLASSES: readonly BodyClass[] = [
