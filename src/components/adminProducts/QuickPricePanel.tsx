@@ -153,6 +153,11 @@ const STRINGS = {
     adjust: 'فرق',
     fixed: 'ثابت',
     inheritHint: 'يتبع الأعلى',
+    // The in-field «= / +» prefix explains itself on hover and to a screen
+    // reader; the glyph alone is the visual, per the one-cue rule.
+    required: 'مطلوب',
+    fixedHint: 'رقم ثابت — اضغط ليصبح فرقًا عن الأعلى',
+    adjustHint: 'فرق عن الأعلى — اضغط ليصبح رقمًا ثابتًا',
     save: 'حفظ',
     saving: 'جارٍ الحفظ…',
     cancel: 'تراجع عن التعديلات',
@@ -236,6 +241,9 @@ const STRINGS = {
     adjust: 'Adjust',
     fixed: 'Fixed',
     inheritHint: 'follows the level above',
+    required: 'required',
+    fixedHint: 'A fixed number — tap to make it a difference',
+    adjustHint: 'A difference from the level above — tap to make it fixed',
     save: 'Save',
     saving: 'Saving…',
     cancel: 'Discard changes',
@@ -756,7 +764,7 @@ function GridTab({
           <thead>
             <tr className={T.tableHead}>
               <th className="text-start font-semibold px-3 py-2 w-8"> </th>
-              <th className="text-start font-semibold px-3 py-2">{t.where}</th>
+              <th className="text-start font-semibold px-3 py-2 min-w-[14rem]">{t.where}</th>
               {fields.map((f) => (
                 <th key={f} className="text-start font-semibold px-2 py-2 w-[8.5rem]">
                   {t[f]}
@@ -863,7 +871,11 @@ function RowLabel({
 
   return (
     <div className="min-w-0">
-      <p className="text-[13px] font-semibold text-[var(--ap-text-1)] truncate" dir="auto">
+      {/* IDENTITY AND STATE ON ONE LINE. Whether a row is live is a fact ABOUT
+          the row, so it reads beside the name — not at the end of a list of
+          settings, where it was competing with the controls for attention. */}
+      <div className="flex items-center gap-1.5 min-w-0">
+        <p className="text-[13px] font-semibold text-[var(--ap-text-1)] truncate min-w-0 flex-1" dir="auto">
         {row.level === 'color' && row.hex && (
           <span
             className="inline-block w-2.5 h-2.5 rounded-full align-middle me-1.5 border border-[var(--ap-hairline)]"
@@ -871,8 +883,22 @@ function RowLabel({
           />
         )}
         {row.level === 'product' ? t.base : row.label_ar || row.label_en}
-        {!editable && !row.active && <span className={`${T.kbdTiny} ms-1.5`}>{t.inactive}</span>}
-      </p>
+          {!editable && !row.active && <span className={`${T.kbdTiny} ms-1.5`}>{t.inactive}</span>}
+        </p>
+        {row.variant_label && <span className={`${T.kbdTiny} shrink-0`}>{row.variant_label}</span>}
+        {editable && (
+          <button
+            type="button"
+            className={`${T.chip} h-6 px-2 text-[11px] shrink-0`}
+            aria-pressed={row.active}
+            disabled={busy}
+            data-qp-active={rowKey(row)}
+            onClick={() => send('active', !row.active)}
+          >
+            {row.active ? t.activeOn : t.activeOff}
+          </button>
+        )}
+      </div>
 
       {!editable && (row.variant_label || availability || row.stock !== null) && (
         <p className="text-[11px] text-[var(--ap-text-3)] mt-0.5 truncate">
@@ -882,39 +908,38 @@ function RowLabel({
         </p>
       )}
 
+      {/*
+        FOUR CONTROLS IN A WRAPPING PILE BECAME TWO TIDY LINES.
+        `flex-wrap` in a column squeezed by four fixed price columns turned the
+        route select, the stock box and the active chip into a three-storey
+        tower, and every row was a different height — which is most of why the
+        grid read as مربك. A GRID here instead: the route and the stock sit in
+        the same two tracks on every row, so the eye can run down a column of
+        routes and a column of quantities the way it runs down the prices.
+      */}
       {editable && (
-        <div className="mt-1 flex flex-wrap items-center gap-1.5" data-qp-traits={rowKey(row)}>
-          {row.variant_label && <span className={T.kbdTiny}>{row.variant_label}</span>}
-
-          {/* Only an option carries a fulfilment route; a colour inherits the
-              option it hangs from, so it is not offered one. */}
-          {row.level === 'option' && (
-            <select
-              className={`${T.selectSm} h-7 px-1.5`}
-              value={row.availability_type}
-              disabled={busy}
-              data-qp-availability={row.id}
-              aria-label={t.route}
-              onChange={(e) => send('availability_type', e.target.value)}
-            >
-              <option value="">{t.followProduct}</option>
-              <option value="direct_sale">{t.directSale}</option>
-              <option value="pre_order">{t.preOrder}</option>
-            </select>
-          )}
-
-          <StockTrait t={t} row={row} busy={busy} onCommit={(v) => send('stock', v)} />
-
-          <button
-            type="button"
-            className={`${T.chip} h-7 px-2 text-[11px]`}
-            aria-pressed={row.active}
-            disabled={busy}
-            data-qp-active={rowKey(row)}
-            onClick={() => send('active', !row.active)}
-          >
-            {row.active ? t.activeOn : t.activeOff}
-          </button>
+        <div className="mt-1.5 min-w-0" data-qp-traits={rowKey(row)}>
+          <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-1.5">
+            {/* Only an option carries a fulfilment route; a colour inherits the
+                option it hangs from, so it is not offered one. */}
+            {row.level === 'option' ? (
+              <select
+                className={`${T.selectSm} h-7 px-1.5 min-w-0`}
+                value={row.availability_type}
+                disabled={busy}
+                data-qp-availability={row.id}
+                aria-label={t.route}
+                onChange={(e) => send('availability_type', e.target.value)}
+              >
+                <option value="">{t.followProduct}</option>
+                <option value="direct_sale">{t.directSale}</option>
+                <option value="pre_order">{t.preOrder}</option>
+              </select>
+            ) : (
+              <span className="text-[11px] text-[var(--ap-text-3)] truncate">{availability || '—'}</span>
+            )}
+            <StockTrait t={t} row={row} busy={busy} onCommit={(v) => send('stock', v)} />
+          </div>
         </div>
       )}
     </div>
@@ -956,26 +981,28 @@ function StockTrait({
     if (n !== row.stock) onCommit(n);
   };
 
+  /* The word «المخزون» beside every box was a label repeated on every row of a
+     column that already has one. The box keeps its accessible name and drops
+     the visible duplicate, which is what lets the route select beside it have
+     the width it needs. */
   return (
-    <label className="inline-flex items-center gap-1 text-[11px] text-[var(--ap-text-3)]">
-      <span>{t.stock}</span>
-      <input
-        type="text"
-        inputMode="numeric"
-        className={`${T.input} h-7 w-16 px-1.5 text-[11px] text-center`}
-        value={text}
-        disabled={busy}
-        placeholder={t.stockUntracked}
-        data-qp-stock={rowKey(row)}
-        aria-label={`${t.stock} — ${row.label_ar || row.label_en}`}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-          if (e.key === 'Escape') setText(stored);
-        }}
-      />
-    </label>
+    <input
+      type="text"
+      inputMode="numeric"
+      className={`${T.input} h-7 w-full px-1.5 text-[11px] text-center`}
+      value={text}
+      disabled={busy}
+      placeholder={t.stockUntracked}
+      data-qp-stock={rowKey(row)}
+      title={t.stock}
+      aria-label={`${t.stock} — ${row.label_ar || row.label_en}`}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'Escape') setText(stored);
+      }}
+    />
   );
 }
 
@@ -1033,21 +1060,33 @@ function CellEditor({
     if (next !== 'inherit') setTimeout(() => ref.current?.focus(), 0);
   };
 
+  /**
+   * THE BOX IS THE MODE CONTROL. Clearing it means "follow the level above";
+   * typing a number means "this row's own price". That was already true and is
+   * now the only way those two are set — which is why the chips could go.
+   *
+   * `canInherit` is honoured HERE, not merely by hiding a button. The product's
+   * base regular price has nothing above it to follow, so emptying that one box
+   * must leave it an empty required field rather than silently marking it
+   * inherited from a level that does not exist.
+   */
   const setText = (value: string) => {
     setDraft((d) => {
       const copy = { ...d };
       const nextMode: Mode = mode === 'inherit' && value !== '' ? 'fixed' : mode;
+      const cleared: Mode = canInherit ? 'inherit' : 'fixed';
       const unchanged = nextMode === cell.mode && value === (stored === null ? '' : String(stored));
       if (unchanged) delete copy[key];
-      else copy[key] = { mode: value === '' ? 'inherit' : nextMode, text: value };
+      else copy[key] = { mode: value === '' ? cleared : nextMode, text: value };
       return copy;
     });
   };
 
   const charge = row.charges?.[field] ?? { charged: cell.effective, viaRegular: false };
 
-  const placeholder =
-    mode === 'inherit'
+  const placeholder = !canInherit
+    ? t.required
+    : mode === 'inherit'
       ? cell.inherited === null
         ? t.inheritHint
         : formatIqd(cell.inherited)
@@ -1055,80 +1094,92 @@ function CellEditor({
         ? '+0'
         : '';
 
-  return (
-    <div className="min-w-0" data-qp-cell={key} data-qp-mode={mode} data-qp-dirty-cell={pending ? '1' : '0'}>
-      <input
-        ref={ref}
-        type="text"
-        inputMode="numeric"
-        dir="ltr"
-        className={`${T.input} h-8 w-full text-[12.5px] ${bad ? 'border-[var(--ap-danger)]' : pending ? 'border-[var(--ap-accent-border,var(--ap-border))]' : ''}`}
-        value={text}
-        placeholder={placeholder}
-        onChange={(e) => setText(e.target.value)}
-        aria-invalid={bad}
-        aria-label={`${row.label_ar || row.label_en} ${t[field]}`}
-        data-qp-input={key}
-      />
-      <div className="flex items-center gap-1 mt-1">
-        {canInherit && (
-          <ModeChip label={t.inherit} active={mode === 'inherit'} onClick={() => setMode('inherit')} cellKey={key} mode="inherit" />
-        )}
-        {canAdjust && (
-          <ModeChip label={t.adjust} active={mode === 'adjust'} onClick={() => setMode('adjust')} cellKey={key} mode="adjust" />
-        )}
-        <ModeChip label={t.fixed} active={mode === 'fixed'} onClick={() => setMode('fixed')} cellKey={key} mode="fixed" />
-        {/*
-          WHAT THE CUSTOMER IS CHARGED, not the raw ladder value. `row.charges`
-          walks the same rungs the resolver walks, in the same order — including
-          the colour rung it walks even with no colour chosen, which erases a
-          member price of zero or less and sends that tier back to the regular
-          price. Reading `cell.effective` here showed «= 0» on a row the till
-          charges the full price for.
-        */}
-        {mode !== 'fixed' && charge.charged !== null && (
-          <span
-            className="text-[10.5px] text-[var(--ap-text-3)] ms-auto"
-            dir="ltr"
-            data-qp-effective={key}
-            data-qp-via-regular={charge.viaRegular ? '1' : '0'}
-            title={charge.viaRegular ? 'لا سعر لهذه الفئة — تُحاسب بسعر البيع' : undefined}
-          >
-            = {formatIqd(charge.charged)}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
+  /**
+   * THREE CHIPS PER CELL WERE TWO CHIPS TOO MANY.
+   *
+   * The cell used to carry an input, then a row of «موروث / فرق / ثابت»
+   * buttons, then the resolved «= 675,000». Four pieces of chrome, in every
+   * cell, of four columns, of every row — which is what the owner was looking
+   * at when they called the screen مربك.
+   *
+   * Two of those three chips never had to exist, because the field ALREADY
+   * expresses what they set: `setText` above turns an empty box back into
+   * `inherit` and a typed number into `fixed`, all by itself. So «موروث» is
+   * "clear the box" and «ثابت» is "type a number" — both already reachable,
+   * both shown by the box's own contents.
+   *
+   * What genuinely needs a control is the one thing typing cannot say: whether
+   * `60000` means "this row costs 60,000" or "this row costs 60,000 MORE than
+   * the one above it". That is a single binary, so it is a single affordance —
+   * a prefix INSIDE the field, where the sign of a number belongs, reading
+   * `=` or `+`. It is the only glyph left in the cell, which is what makes it
+   * readable at a glance across twenty rows.
+   */
+  const toggleAdjust = () => setMode(mode === 'adjust' ? 'fixed' : 'adjust');
+  const dirty = !!pending;
+  const showsResolved = mode !== 'fixed' && charge.charged !== null;
 
-function ModeChip({
-  label,
-  active,
-  onClick,
-  cellKey: key,
-  mode,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  cellKey: string;
-  mode: Mode;
-}) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      data-qp-mode-btn={`${key}:${mode}`}
-      className={`text-[10px] leading-none px-1.5 h-5 rounded-[5px] border transition-colors duration-150 ${
-        active
-          ? 'border-[var(--ap-border)] bg-[var(--ap-surface-4)] text-[var(--ap-text-1)]'
-          : 'border-transparent text-[var(--ap-text-3)] hover:text-[var(--ap-text-2)]'
-      }`}
-    >
-      {label}
-    </button>
+    <div className="min-w-0" data-qp-cell={key} data-qp-mode={mode} data-qp-dirty-cell={dirty ? '1' : '0'}>
+      <div
+        className={`flex items-center h-8 rounded-[var(--ap-radius-md)] border bg-[var(--ap-surface-2)] transition-colors duration-150 focus-within:border-[var(--ap-accent)] focus-within:shadow-[0_0_0_3px_var(--ap-accent-soft)] ${
+          bad
+            ? 'border-[var(--ap-danger)]'
+            : dirty
+              ? 'border-[var(--ap-accent-border,var(--ap-border-hover))]'
+              : 'border-[var(--ap-border)]'
+        }`}
+      >
+        {canAdjust && (
+          <button
+            type="button"
+            onClick={toggleAdjust}
+            aria-pressed={mode === 'adjust'}
+            data-qp-mode-btn={`${key}:adjust`}
+            title={mode === 'adjust' ? t.adjustHint : t.fixedHint}
+            className="shrink-0 w-7 h-full grid place-items-center text-[13px] font-bold leading-none rounded-s-[var(--ap-radius-md)] text-[var(--ap-text-3)] aria-pressed:text-[var(--ap-accent-text)] hover:text-[var(--ap-text-1)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ap-ring)]"
+          >
+            <span aria-hidden="true">{mode === 'adjust' ? '+' : '='}</span>
+            <span className="sr-only">{mode === 'adjust' ? t.adjust : t.fixed}</span>
+          </button>
+        )}
+        <input
+          ref={ref}
+          type="text"
+          inputMode="numeric"
+          dir="ltr"
+          className={`min-w-0 flex-1 h-full bg-transparent border-0 outline-none text-[12.5px] text-[var(--ap-text-1)] placeholder:text-[var(--ap-text-3)] ${canAdjust ? 'pe-2.5' : 'px-2.5'}`}
+          value={text}
+          placeholder={placeholder}
+          onChange={(e) => setText(e.target.value)}
+          aria-invalid={bad}
+          aria-label={`${row.label_ar || row.label_en} ${t[field]}`}
+          data-qp-input={key}
+        />
+      </div>
+      {/*
+        WHAT THE CUSTOMER IS CHARGED, not the raw ladder value. `row.charges`
+        walks the same rungs the resolver walks, in the same order — including
+        the colour rung it walks even with no colour chosen, which erases a
+        member price of zero or less and sends that tier back to the regular
+        price. Reading `cell.effective` here showed «= 0» on a row the till
+        charges the full price for.
+
+        One quiet line under the field instead of a chip competing with it: it
+        is an ANSWER to what was typed, so it reads below, in the calm colour.
+      */}
+      {showsResolved && (
+        <p
+          className="mt-1 text-[10.5px] leading-none text-[var(--ap-text-3)] truncate"
+          dir="ltr"
+          data-qp-effective={key}
+          data-qp-via-regular={charge.viaRegular ? '1' : '0'}
+          title={charge.viaRegular ? 'لا سعر لهذه الفئة — تُحاسب بسعر البيع' : undefined}
+        >
+          = {formatIqd(charge.charged as number)}
+        </p>
+      )}
+    </div>
   );
 }
 

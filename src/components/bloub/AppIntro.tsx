@@ -11,6 +11,7 @@ import {
 } from './character/attention';
 import { readPointer, watchPointer } from './pointer';
 import { watchInterest, centreOf, type InterestTarget } from './interest';
+import { isMascotHiddenRoute } from './MotionCharacterAnchor';
 import { POSES, type Pose } from './character/expressions';
 import { isTravelWorthAnimating, planTravel, sampleTravel, type TravelFrame, type TravelPlan, type TravelSample } from './character/travel';
 import {
@@ -771,6 +772,13 @@ export default function AppIntro({ ready }: { ready: boolean }) {
 
   return (
     <div className="lv-app-intro" data-phase={failed ? 'hidden' : phase}
+      /* THE ADMIN PANEL HAS NO CHARACTER. It is a workbench — dense tables and
+         forms — and there the mascot is a green ball parked in the top bar,
+         taking the vertical space those tables need. Hidden by ROUTE rather
+         than unmounted: the journey state machine, its anchors and the veil it
+         releases all stay intact, so entering and leaving /admin costs nothing
+         and cannot strand the layer mid-travel. */
+      data-route-hidden={isMascotHiddenRoute(location.pathname) ? 'true' : 'false'}
       data-reduced-motion={reduced ? 'true' : 'false'} data-page-visible={pageVisible ? 'true' : 'false'}
       data-bloub-rendered={failed ? 'false' : 'true'} data-mascot-state={expression.state} aria-live="polite" aria-busy={!failed && phase === 'loading'}>
       <div className="lv-app-intro__veil" aria-hidden="true" />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useLanguage } from '../../LanguageContext';
 import { beginCharacterRouteLoad, characterLayout, registerCharacterAnchor, type AnchorKind } from './anchors';
 import { signalBloub } from './events';
@@ -63,8 +63,28 @@ export function MotionCharacterHome({ busy = false, kind = 'top-header' }: { bus
  * AppIntro holds the character's current position through a short handoff
  * rather than docking it here and again on the page's own header.
  */
+/**
+ * THE ADMIN PANEL IS A WORKBENCH, NOT A STOREFRONT.
+ *
+ * The character is a piece of shopfront warmth: it reacts to browsing, to a
+ * cart, to a request finishing. None of that is happening on a screen where
+ * someone is repricing forty rows, and there it is simply a green ball sitting
+ * in the middle of the top bar, occupying the vertical space a dense table
+ * needs most — which is exactly what the owner reported.
+ *
+ * Route-level, not a prop threaded through four shells: every admin screen is
+ * under this one prefix, so one predicate keeps the rule in a single place and
+ * a future admin route inherits it automatically.
+ */
+export function isMascotHiddenRoute(pathname: string): boolean {
+  const path = pathname.toLowerCase();
+  return path === '/admin' || path.startsWith('/admin/');
+}
+
 export function MotionCharacterFallbackHeader() {
+  const { pathname } = useLocation();
   React.useSyncExternalStore(characterLayout.subscribe, characterLayout.snapshot, characterLayout.serverSnapshot);
+  if (isMascotHiddenRoute(pathname)) return null;
   if (characterLayout.hasPageAnchor()) return null;
   return (
     <div data-bloub-fallback-header className="lv-character-fallback-header">

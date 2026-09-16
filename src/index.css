@@ -766,6 +766,17 @@ html[data-overlay-open='true'] .lv-app-intro__character {
   opacity: 0;
 }
 
+/* THE ADMIN PANEL HAS NO CHARACTER.
+   `display: none` and not `opacity: 0`: the character is a fixed layer that
+   runs a per-frame transform, and an invisible element still costs a composite
+   on every one of those frames. Taking the whole layer out of the box tree is
+   what actually gives the admin's tables back the top of the screen AND the
+   frame budget — the route keeps the component mounted, so nothing about the
+   journey it is in the middle of is lost. */
+.lv-app-intro[data-route-hidden='true'] {
+  display: none;
+}
+
 /* The character's drawing carries NO CSS animation at all.
    Its outline, both eyes and its mouth are written as attributes once per
    frame by the engine, which is the only way the face can stay in step with a

@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronUp, Trash2, X, AlertTriangle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info, Trash2, X, AlertTriangle } from 'lucide-react';
 import { failureText, uploadFile } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import type { TransStatus } from './types';
@@ -29,13 +29,46 @@ export const btnGhostDanger =
   'p-2 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors';
 
 /** Arabic-first field label with a small English secondary. */
-export function L({ ar, en, hint }: { ar: string; en: string; hint?: string }) {
+/**
+ * ONE FIELD LABEL FOR THE WHOLE ADMIN — and it now speaks the same language as
+ * the product form's `Field`, because the owner's rule for these screens is
+ * that they follow that form.
+ *
+ * Two things changed and both were making the panels read as noise:
+ *
+ *  - it painted `zinc-300`/`zinc-500` literals while everything around it uses
+ *    the `.ap` tokens, so labels sat at a slightly different temperature from
+ *    the controls they name;
+ *  - `hint` is permanent text under every label, and these panels carry
+ *    sentences — "عدّاد مستقل تمامًا عن مخزون البيع المباشر…" — that are true,
+ *    necessary once, and then read as a wall for ever after. `tip` puts that
+ *    explanation behind an info glyph exactly the way the product form does,
+ *    and keeps it reachable to a screen reader. `hint` stays for the short
+ *    line that genuinely belongs under the control.
+ */
+export function L({ ar, en, hint, tip }: { ar: string; en: string; hint?: string; tip?: string }) {
   return (
     <div className="mb-1.5">
-      <span className="block text-[12px] font-bold text-zinc-300">
-        {ar} <span className="text-[10px] font-medium text-zinc-500 mx-1">{en}</span>
+      <span className="flex items-center gap-1.5 min-w-0">
+        <span className="text-[12px] font-bold text-[var(--ap-text-1)] truncate">
+          {ar} <span className="text-[10px] font-medium text-[var(--ap-text-3)] mx-1">{en}</span>
+        </span>
+        {tip && (
+          <span className="group relative shrink-0">
+            <Info className="w-3.5 h-3.5 text-[var(--ap-text-3)]" aria-hidden="true" />
+            <span className="sr-only">{tip}</span>
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute z-30 start-0 top-5 hidden group-hover:block group-focus-within:block
+                         w-56 max-w-[70vw] rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-4)] border border-[var(--ap-border-strong)]
+                         p-2 text-[11px] leading-snug text-[var(--ap-text-2)] shadow-[var(--ap-shadow-1)]"
+            >
+              {tip}
+            </span>
+          </span>
+        )}
       </span>
-      {hint && <span className="block text-[10px] text-zinc-500 mt-0.5">{hint}</span>}
+      {hint && <span className="block text-[10px] text-[var(--ap-text-3)] mt-0.5">{hint}</span>}
     </div>
   );
 }

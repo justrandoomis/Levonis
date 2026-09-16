@@ -395,27 +395,32 @@ export default function FulfillmentPanel({
         const mv = modelValue(m.id);
         const shownStock = mv ? mv.stock : m.stock;
         return (
-          <div key={m.id} className="rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] bg-[var(--ap-surface-1)] p-3">
-            <div className="flex items-center justify-between gap-2 mb-2.5">
-              <span className={`font-bold text-[14px] ${T.text1}`}>{ar ? m.name_ar || m.name_en : m.name_en}</span>
-              <span className={`text-[11px] ${T.text3}`} data-model-stock={m.id}>
+          <div key={m.id} className="rounded-[var(--ap-radius-lg)] border border-[var(--ap-border)] bg-[var(--ap-surface-1)] overflow-hidden">
+            {/* ONE HEADER BAND PER MODEL, and a hairline instead of a second
+                border. Three nested boxes — card, sub-card, tinted inner box —
+                gave every field its own frame and left nothing for the eye to
+                rank; a band plus spacing says the same hierarchy with one line
+                instead of three rectangles. */}
+            <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-[var(--ap-surface-2)] border-b border-[var(--ap-hairline)]">
+              <span className={`font-bold text-[14px] truncate min-w-0 ${T.text1}`}>{ar ? m.name_ar || m.name_en : m.name_en}</span>
+              <span className={`text-[11px] shrink-0 tabular-nums ${T.text3}`} data-model-stock={m.id}>
                 {shownStock === null
                   ? tr('المخزون: غير مُتتبع', 'Stock: not tracked')
                   : tr(`المخزون: ${shownStock}`, `Stock: ${shownStock}`)}
               </span>
             </div>
 
-            <div className="grid gap-2.5 md:grid-cols-2">
+            <div className="grid md:grid-cols-2 md:divide-x md:divide-[var(--ap-hairline)] divide-y md:divide-y-0 divide-[var(--ap-hairline)]">
               {/* ---------------------------------------------- DIRECT SALE */}
-              <div className="rounded-[var(--ap-radius-sm)] border border-[var(--ap-border)] p-2.5">
-                <label className="flex items-center gap-2 cursor-pointer select-none mb-2">
+              <div className="p-3 min-w-0">
+                <label className="flex items-center gap-2 cursor-pointer select-none mb-2.5 min-w-0">
                   <input
                     type="checkbox"
                     checked={!!direct}
                     onChange={() => toggleCell(m.id, 'direct_sale')}
-                    className="h-4 w-4 accent-[var(--ap-accent)]"
+                    className="h-4 w-4 accent-[var(--ap-accent)] shrink-0"
                   />
-                  <span className={`font-bold text-[13px] ${T.text1}`}>{tr('بيع مباشر', 'Direct sale')}</span>
+                  <span className={`font-bold text-[13px] ${direct ? T.text1 : T.text3}`}>{tr('بيع مباشر', 'Direct sale')}</span>
                 </label>
                 {direct ? (
                   <div className="space-y-2">
@@ -431,10 +436,7 @@ export default function FulfillmentPanel({
                         and the one under «الخيارات» are the same number, and
                         the panel's own Save never sends a direct quantity. */}
                     {mv ? (
-                      <div
-                        className="rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-2)] p-2 space-y-2"
-                        data-direct-stock={m.id}
-                      >
+                      <div className="pt-2 border-t border-[var(--ap-hairline)] space-y-2" data-direct-stock={m.id}>
                         <L
                           ar="مخزون البيع المباشر"
                           en="Direct-sale stock"
@@ -511,15 +513,15 @@ export default function FulfillmentPanel({
               </div>
 
               {/* ------------------------------------------------ PRE-ORDER */}
-              <div className="rounded-[var(--ap-radius-sm)] border border-[var(--ap-border)] p-2.5">
-                <label className="flex items-center gap-2 cursor-pointer select-none mb-2">
+              <div className="p-3 min-w-0">
+                <label className="flex items-center gap-2 cursor-pointer select-none mb-2.5 min-w-0">
                   <input
                     type="checkbox"
                     checked={!!pre}
                     onChange={() => toggleCell(m.id, 'pre_order')}
-                    className="h-4 w-4 accent-[var(--ap-accent)]"
+                    className="h-4 w-4 accent-[var(--ap-accent)] shrink-0"
                   />
-                  <span className={`font-bold text-[13px] ${T.text1}`}>{tr('طلب مسبق', 'Pre-order')}</span>
+                  <span className={`font-bold text-[13px] ${pre ? T.text1 : T.text3}`}>{tr('طلب مسبق', 'Pre-order')}</span>
                 </label>
                 {pre ? (
                   <div className="space-y-2">
@@ -551,14 +553,11 @@ export default function FulfillmentPanel({
                         states it in words; the number box only exists once a
                         quota has been asked for, so `0` (tracked and empty)
                         can never be confused with «no limit». */}
-                    <div
-                      className="rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-2)] p-2 space-y-2"
-                      data-preorder-capacity={m.id}
-                    >
+                    <div className="pt-2 border-t border-[var(--ap-hairline)] space-y-2" data-preorder-capacity={m.id}>
                       <L
                         ar="سعة الطلب المسبق"
                         en="Pre-order capacity"
-                        hint={tr(
+                        tip={tr(
                           'عدّاد مستقل تمامًا عن مخزون البيع المباشر — لا يُخصم منه ولا يمسّه.',
                           'A counter entirely separate from direct-sale stock — a pre-order never comes off the shelf.'
                         )}
@@ -634,14 +633,19 @@ export default function FulfillmentPanel({
                           );
                         })}
                       </div>
-                      <div className="space-y-2 mt-2">
+                      <div className="mt-2">
                         {pre.transports
                           .slice()
                           .sort((a, b) => METHODS.findIndex((x) => x.id === a.method) - METHODS.findIndex((x) => x.id === b.method))
                           .map((t) => {
                             const meta = METHODS.find((x) => x.id === t.method)!;
                             return (
-                              <div key={t.method} className="rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-2)] p-2">
+                              /* A ROW, NOT A CARD. Three routes stacked as
+                                 three tinted rectangles inside a section
+                                 inside a card was the third frame in a row;
+                                 a divided list says "these are siblings"
+                                 with one hairline. */
+                              <div key={t.method} className="py-2 first:pt-0 border-t first:border-t-0 border-[var(--ap-hairline)]">
                                 <div className="flex items-center justify-between gap-2 mb-1.5">
                                   <span className={`text-[12px] font-bold ${T.text1}`}>{ar ? meta.ar : meta.en}</span>
                                   <button
