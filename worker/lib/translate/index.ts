@@ -55,9 +55,20 @@ import { translateSentence, type GrammarContext } from './grammar';
 
 export type TargetLang = 'ar' | 'ckb';
 
-/** Bumped whenever the rules or the catalog change meaning, so stored rows can
- *  be re-generated deliberately instead of silently drifting. */
-export const TRANSLATION_VERSION = 1;
+/**
+ * Bumped whenever the rules or the catalog change meaning, so stored rows can
+ * be re-generated deliberately instead of silently drifting.
+ *
+ * 2 — the R7 sentence layer (`./grammar.ts`), the × dimension separator, the
+ *     ASCII unit spellings, and the enumeration guard that stopped a thousands
+ *     separator being read as a list. Every one of those changes what an
+ *     existing stored translation WOULD be, and one of them (the guard)
+ *     corrected output that was fabricated and stored as `machine`. A row
+ *     written under version 1 is therefore not equivalent to the same source
+ *     translated today, and leaving the number alone would have let the two
+ *     coexist with nothing to tell them apart.
+ */
+export const TRANSLATION_VERSION = 2;
 
 /** The ONLY fields that are ever machine-translated. `name` is absent on
  *  purpose (§3). */
@@ -172,8 +183,21 @@ function translateMeasurement(seg: string, lang: TargetLang): string | null {
   return out.join(' ');
 }
 
-/** R6 — "PLA, PETG, TPU" / "Black / White". Every member must translate. */
+/** R6 — "PLA, PETG, TPU" / "Black / White". Every member must translate.
+ *
+ * A THOUSANDS SEPARATOR IS NOT A LIST SEPARATOR, and treating it as one was
+ * not a cosmetic bug — it FABRICATED TEXT AND MARKED IT COMPLETE.
+ * "Acceleration: 10,000 mm/s2" came back as «التسارع: 10، 000 مم، s2» with
+ * `status: 'machine'` and `coverage: 1`, so it shipped to the storefront with
+ * no review flag at all. The chain: `mm/s2` was not a `UNITS` key (only the
+ * superscript `mm/s²` was), so R3 declined, and R6 then "succeeded" by
+ * splitting the NUMBER into `10` and `000 mm` and translating the debris.
+ * §3's one absolute rule is that this engine never invents; this is the shape
+ * that broke it, so the guard lives here and the missing unit spellings are
+ * recorded in `dictionary.ts`.
+ */
 function translateEnumeration(seg: string, lang: TargetLang): string | null {
+  if (/\d,\d/.test(seg)) return null;
   if (!/[,/،]/.test(seg)) return null;
   const sep = /[,،]/.test(seg) ? '، ' : ' / ';
   const parts = seg.split(/[,/،]/).map((p) => p.trim()).filter(Boolean);

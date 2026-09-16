@@ -8,6 +8,7 @@
  * for real.
  */
 import { test } from 'node:test';
+import { TRANSLATION_VERSION } from '../worker/lib/translate/index';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { SqliteD1, createTableIfNotExistsSql, newSqlite } from './fixtures/d1';
@@ -35,7 +36,10 @@ test('a covered field stores machine status and both languages', async () => {
   assert.equal(row.source_en, 'Nozzle diameter: 0.4 mm');
   assert.equal(row.text_ar, 'قطر الفوهة: 0.4 مم');
   assert.equal(row.status, 'machine');
-  assert.equal(row.translation_version, 1);
+  // Against the CONSTANT, not a literal: the version is meant to move when the
+  // rules change, and a hardcoded number turns every deliberate bump into a
+  // failing test that says nothing about the stored row.
+  assert.equal(row.translation_version, TRANSLATION_VERSION);
   assert.ok(String(row.source_hash).length > 0);
 });
 

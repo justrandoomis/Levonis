@@ -1312,6 +1312,38 @@ const COST_KEYS = ['cost_iqd', 'cost_adjust_iqd'] as const;
 const stripCostFields = <T extends PriceFields>(x: T) => {
   const rest = { ...x } as Record<string, unknown>;
   for (const k of COST_KEYS) delete rest[k];
+
+  /**
+   * COST HIDES THREE LEVELS DEEP NOW, AND THE STRIP HAS TO GO WITH IT.
+   *
+   * This used to delete the cost keys from the option object and stop. 0073
+   * then hung `fulfillments` off every option and `transports` off every
+   * fulfilment, and BOTH carry `PriceFields` — so an option's per-model and
+   * per-route landed cost rode out to anonymous callers on
+   * `GET /api/products/:slug` untouched. §11 and §22 both forbid publishing
+   * what a shop paid, and a cost that reaches the storefront is a cost the
+   * competition reads.
+   *
+   * The recursion is written against the SAME `COST_KEYS` list, so a new cost
+   * column added anywhere in that tree is stripped by the one edit that names
+   * it rather than by remembering to add a third loop here.
+   */
+  const fulfillments = rest.fulfillments;
+  if (Array.isArray(fulfillments)) {
+    rest.fulfillments = fulfillments.map((f) => {
+      const cell = { ...(f as Record<string, unknown>) };
+      for (const k of COST_KEYS) delete cell[k];
+      const transports = cell.transports;
+      if (Array.isArray(transports)) {
+        cell.transports = transports.map((t) => {
+          const route = { ...(t as Record<string, unknown>) };
+          for (const k of COST_KEYS) delete route[k];
+          return route;
+        });
+      }
+      return cell;
+    });
+  }
   return rest as Omit<T, (typeof COST_KEYS)[number]>;
 };
 

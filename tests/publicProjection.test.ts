@@ -33,7 +33,7 @@ function docWithCosts(): ProductDoc {
     pro_adjust_iqd: null,
     cost_adjust_iqd: 3_000,
   };
-  return parseProductRow({
+  const doc = parseProductRow({
     id: 'prd_test',
     slug: 'test',
     status: 'active',
@@ -50,6 +50,28 @@ function docWithCosts(): ProductDoc {
       { id: 'c1', name_ar: 'أسود', name_en: 'Black', hex: '#000000', active: true, ...prices },
     ]),
   });
+
+  /**
+   * 0073 HUNG TWO MORE LEVELS OFF AN OPTION, AND BOTH CARRY `PriceFields`.
+   *
+   * They are attached HERE, after the parser, because that is where they come
+   * from in production: `parseProductRow` whitelists the option keys and drops
+   * `fulfillments`, and `applyRelations` hangs the per-model cells and their
+   * per-route transports on afterwards. A fixture that only went through the
+   * parser had nothing nested for the recursive assertion below to catch —
+   * which is how the shop's cost for a model and for a shipping route came to
+   * be served to anonymous callers on `GET /api/products/:slug` with this file
+   * already green.
+   */
+  (doc.options[0] as unknown as Record<string, unknown>).fulfillments = [
+    {
+      fulfillment_type: 'pre_order',
+      enabled: true,
+      ...prices,
+      transports: [{ method: 'land', enabled: true, surcharge_iqd: 60_000, ...prices }],
+    },
+  ];
+  return doc;
 }
 
 /** Every key on every object, at any depth. */

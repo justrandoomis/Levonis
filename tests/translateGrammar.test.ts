@@ -181,3 +181,51 @@ test('Sorani degrades on its own without dragging Arabic down', () => {
   assert.equal(translateText(src, 'ckb').status, 'review_needed');
   assert.equal(translateText(src, 'ckb').text, src);
 });
+
+// --------------------------------------------- the one that invented text
+
+/**
+ * THE WORST CLASS OF BUG THIS ENGINE CAN HAVE: output it made up, marked
+ * complete, and shipped with no review flag.
+ *
+ * `translateText('Acceleration: 10,000 mm/s2', 'ar')` returned
+ * «التسارع: 10، 000 مم، s2» with `status: 'machine'` and `coverage: 1`.
+ * `mm/s2` was not a unit this catalogue knew — only the superscript `mm/s²`
+ * was — so the measurement rule declined, and the ENUMERATION rule then
+ * "succeeded" by splitting the number at its thousands separator and
+ * translating the debris `10` / `000 mm` / `s2`.
+ *
+ * §3's one absolute rule is that the engine never invents. A refusal is
+ * always acceptable; a fabrication presented as a finished translation is not.
+ */
+test('a thousands separator is never read as a list separator', () => {
+  const r = ar('Acceleration: 10,000 mm/s2');
+  assert.equal(r.text, 'التسارع: 10,000 مم/ث²');
+  assert.equal(r.status, 'machine');
+  // The specific corruption, named so a regression is unmistakable.
+  assert.doesNotMatch(r.text, /10، 000/, 'the number was split at its comma');
+  assert.doesNotMatch(r.text, /s2/, 'the unit was left in English debris');
+});
+
+test('the ASCII unit spellings a vendor page actually uses are recognised', () => {
+  // Recording these is what keeps R3 from declining and handing the segment to
+  // the enumeration rule in the first place.
+  for (const [src, expected] of [
+    ['10,000 mm/s2', '10,000 مم/ث²'],
+    ['10000 mm/s^2', '10000 مم/ث²'],
+    ['24 mm3/s', '24 مم³/ث'],
+    ['24 mm^3/s', '24 مم³/ث'],
+  ] as Array<[string, string]>) {
+    const r = ar(src);
+    assert.equal(r.status, 'machine', `${src} was refused`);
+    assert.equal(r.text, expected, src);
+  }
+});
+
+test('a genuine list still translates, and a broken one still refuses', () => {
+  assert.equal(ar('PLA, PETG, TPU').text, 'PLA، PETG، TPU');
+  // No member resolves → the whole segment comes back in English.
+  const junk = ar('Widget, Doohickey, Thingamabob');
+  assert.equal(junk.status, 'review_needed');
+  assert.equal(junk.text, 'Widget, Doohickey, Thingamabob');
+});

@@ -68,8 +68,19 @@ export const UNITS: Record<string, TermEntry> = {
   '°c': { ar: '°م', ckb: '°س' },
   c: { ar: '°م', ckb: '°س' },
   'mm/s': { ar: 'مم/ث', ckb: 'مم/چ' },
+  // THE SPELLINGS PEOPLE ACTUALLY TYPE. A spec sheet pasted from a vendor page
+  // carries `mm/s2` or `mm/s^2` far more often than the superscript, and a unit
+  // this table does not recognise makes R3 decline — which used to hand the
+  // segment to R6 and let it split a thousands separator. Recording the ASCII
+  // forms is what stops that path from being reachable at all.
+  'mm/s2': { ar: 'مم/ث²', ckb: 'مم/چ²' },
+  'mm/s^2': { ar: 'مم/ث²', ckb: 'مم/چ²' },
   'mm/s²': { ar: 'مم/ث²', ckb: 'مم/چ²' },
+  'mm3/s': { ar: 'مم³/ث', ckb: 'مم³/چ' },
+  'mm^3/s': { ar: 'مم³/ث', ckb: 'مم³/چ' },
   'mm³/s': { ar: 'مم³/ث', ckb: 'مم³/چ' },
+  'm/s2': { ar: 'م/ث²' },
+  'm/s²': { ar: 'م/ث²' },
   gb: { ar: 'غيغابايت', ckb: 'گیگابایت' },
   mb: { ar: 'ميغابايت', ckb: 'مێگابایت' },
   mah: { ar: 'ملي أمبير/ساعة', ckb: 'ملی ئەمپێر/کاتژمێر' },

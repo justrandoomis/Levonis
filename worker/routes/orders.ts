@@ -2093,6 +2093,24 @@ async function computeCheckout(
     ? (delivery.price_iqd as number)
     : shippingConfig.ordinary_iqd;
   const configForOrder: ShippingConfig = { ...shippingConfig, ordinary_iqd: methodOrdinary };
+  /**
+   * The same substitution for ANY method, so pricing a method other than the
+   * selected one uses ITS tariff.
+   *
+   * `configForOrder` above bakes in the CHOSEN method's `price_iqd`. The
+   * per-method preview below must not reuse it: on a cart with no per-product
+   * delivery rule the ordinary tariff is the whole fee, so reusing one
+   * method's config made every card print the selected method's number and the
+   * figures still moved on every click — the very defect the preview exists to
+   * remove.
+   */
+  const configForMethod = (m: DeliveryMethod): ShippingConfig => {
+    const ordinary =
+      Number.isInteger(m.price_iqd) && (m.price_iqd as number) >= 0
+        ? (m.price_iqd as number)
+        : shippingConfig.ordinary_iqd;
+    return { ...shippingConfig, ordinary_iqd: ordinary };
+  };
 
   const shippingEntitlements = shippingEntitlementContext(tierStatus);
 
@@ -2224,7 +2242,12 @@ async function computeCheckout(
         // Store pickup has no last mile, so nothing to protect; the flag is
         // dropped rather than charged for a delivery that does not happen.
         protectedDelivery: input.protectedDelivery && methodId !== 'pickup',
-        config: configForOrder,
+        config:
+          methodId === delivery.id
+            ? configForOrder
+            : configForMethod(
+                (settings.checkoutDeliveryMethods as DeliveryMethod[]).find((m) => m.id === methodId) ?? delivery
+              ),
       });
 
     const emptyQuote: ShippingQuote = {
