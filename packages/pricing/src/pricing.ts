@@ -1012,8 +1012,26 @@ export function resolveUnitPrice(input: {
     if (!method) {
       errors.push('TRANSPORT_REQUIRED');
     } else {
-      const offer = product.preorder_transports.find((t) => t.method === method && t.active !== false);
-      if (!offer) {
+      /**
+       * A ROUTE THE MODEL ITSELF DECLARES IS OFFERED, even when the product
+       * carries no list of its own.
+       *
+       * 0073 moved pre-order transports onto the MODEL — the admin's «نوع
+       * الطلب لكل موديل» door writes `product_option_transports` and never
+       * touches `products.preorder_transports`. This line only ever consulted
+       * the product column, so a shop that enabled LAND on the A1 Combo and
+       * nothing at product level got `TRANSPORT_NOT_OFFERED` on a route it
+       * had just configured. `saleAvailability` gated the same way, which is
+       * why the option never appeared on the product page either.
+       *
+       * The product row stays as the FALLBACK it was always documented to be:
+       * when the model declares the route, `offer` may be absent and the
+       * commission ladder below falls through to the product's figure and then
+       * to the admin default exactly as before.
+       */
+      const offer = product.preorder_transports.find((t) => t.method === method && t.active !== false) ?? null;
+      const modelOffersIt = !!transportRow && transportRow.enabled !== false;
+      if (!offer && !modelOffersIt) {
         errors.push('TRANSPORT_NOT_OFFERED');
       } else {
         /**
@@ -1036,7 +1054,7 @@ export function resolveUnitPrice(input: {
           if (own !== null && own !== undefined && Number.isInteger(own) && own >= 0) commission = own;
           else if (statesPrice(transportRow)) commission = 0;
         }
-        if (commission === null) commission = offer.commission_iqd ?? null;
+        if (commission === null) commission = offer?.commission_iqd ?? null;
         if (commission === null || commission === undefined) {
           const def = (input.transportDefaults ?? []).find((d) => d.method === method);
           commission = def ? def.commission_iqd : null;

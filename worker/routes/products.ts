@@ -498,7 +498,18 @@ export function saleAvailability(
   const directEnabled = isComposition
     ? compositionModes.includes('direct_sale')
     : saleTypes.includes('direct_sale') || saleTypes.includes('bundle');
-  const preorderEnabled = isComposition ? compositionModes.includes('pre_order') : saleTypes.includes('pre_order');
+  /**
+   * `sale_types` is derived by TWO different doors — `saleTypesFromCells` in
+   * adminProductRelations.ts and `deriveSaleTypes` in productPersistence.ts —
+   * so it can lag behind a model whose own pre-order cell is enabled. The
+   * cell is the more specific statement, so it counts as well.
+   */
+  const modelPreorderCell = doc.options
+    .filter((o) => o.active !== false && selectedValueIds.includes(o.id))
+    .some((o) => o.fulfillments?.some((f) => f.fulfillment_type === 'pre_order' && f.enabled !== false));
+  const preorderEnabled = isComposition
+    ? compositionModes.includes('pre_order')
+    : saleTypes.includes('pre_order') || modelPreorderCell;
 
   /**
    * 0075 — WHAT ONE ROUTE'S COUNTER SAYS. `resolveCapacity` holds the whole
@@ -508,14 +519,56 @@ export function saleAvailability(
    */
   const capacityFor = (method: string) => resolveCapacity(input.capacity ?? null, method);
 
-  const transports: TransportOptionView[] = doc.preorder_transports
-    .filter((t) => t.active !== false)
-    .map((t) => {
-      const own = Number.isInteger(t.commission_iqd) ? (t.commission_iqd as number) : null;
-      const fallback = defaults.find((d) => d.method === t.method);
-      const commission = own !== null ? own : fallback ? fallback.commission_iqd : null;
-      return { method: t.method, commission_iqd: commission, configured: commission !== null };
-    });
+  /**
+   * THE ROUTES THIS MODEL ACTUALLY OFFERS — the model's own first, the
+   * product's list as the fallback it was always meant to be.
+   *
+   * THE BUG THIS FIXES. 0073 moved pre-order transports onto the MODEL, and
+   * the admin's «نوع الطلب لكل موديل» door writes `product_option_fulfillment`
+   * / `product_option_transports` and mirrors only `sale_types` back to the
+   * product row — it never writes `products.preorder_transports`. This reader
+   * consulted the product column alone, so a shop that enabled pre-order on a
+   * model and gave it a LAND route got `transports.length === 0`, hence
+   * `NO_TRANSPORT_OFFERED`, hence `preorderUsable === false`, hence no
+   * order-type selector on the product page at all. Direct sale was the only
+   * thing left standing and pre-order was unreachable — with the route sitting
+   * configured in the admin the whole time.
+   *
+   * Reader and writer now agree. The ladder is FIRST-MATCH, never a sum, and
+   * it is the same one `packages/pricing` applies when the line is quoted, so
+   * the pill the page paints is the price the cart will charge:
+   *
+   *   1. this MODEL's row for this route (`surcharge_iqd`)
+   *   2. the PRODUCT's commission for the method
+   *   3. the admin default for the method
+   */
+  const preorderCells = chosenOptions
+    .map((o) => o.fulfillments?.find((f) => f.fulfillment_type === 'pre_order' && f.enabled !== false) ?? null)
+    .filter((f): f is NonNullable<typeof f> => f !== null);
+  const modelRoutes = preorderCells
+    .flatMap((f) => f.transports ?? [])
+    .filter((t) => t.enabled !== false);
+
+  const productRoutes = doc.preorder_transports.filter((t) => t.active !== false);
+  const commissionFor = (method: string): number | null => {
+    const own = modelRoutes.find((t) => t.method === method)?.surcharge_iqd;
+    if (own !== null && own !== undefined && Number.isInteger(own) && own >= 0) return own;
+    const fromProduct = productRoutes.find((t) => t.method === method)?.commission_iqd;
+    if (Number.isInteger(fromProduct)) return fromProduct as number;
+    const fallback = defaults.find((d) => d.method === method);
+    return fallback ? fallback.commission_iqd : null;
+  };
+
+  // A model that declares its own routes REPLACES the product list for this
+  // selection; with none declared the product's list is what is on offer.
+  const offeredMethods = modelRoutes.length
+    ? [...new Set(modelRoutes.map((t) => t.method))]
+    : productRoutes.map((t) => t.method);
+
+  const transports: TransportOptionView[] = offeredMethods.map((method) => {
+    const commission = commissionFor(method);
+    return { method, commission_iqd: commission, configured: commission !== null };
+  });
   const routes: PreorderRouteCapacity[] = transports.map((t) => {
     const cap = capacityFor(t.method);
     const target = cap.targets[0] ?? null;
@@ -990,8 +1043,21 @@ export function pricingModes(
   const direct = d.errors.includes('TRANSPORT_REQUIRED') ? null : { unit_subtotal_iqd: d.unit_subtotal_iqd, direct: d.direct };
   const unusable = new Set(['TRANSPORT_NOT_APPLICABLE', 'TRANSPORT_NOT_OFFERED', 'TRANSPORT_COMMISSION_UNCONFIGURED']);
   const preorder: PricingModes['preorder'] = [];
-  for (const t of doc.preorder_transports) {
-    if (t.active === false) continue;
+  /**
+   * The SAME merged route list `saleAvailability` offers — the selected
+   * model's own routes first, the product's as fallback. Iterating only
+   * `doc.preorder_transports` here priced nothing for a model that declares
+   * its routes itself, so the page had a pill with no price behind it.
+   */
+  const selected = doc.options.find((o) => o.id === sel.optionId && o.active !== false) ?? null;
+  const modelPreRoutes = (
+    selected?.fulfillments?.find((f) => f.fulfillment_type === 'pre_order' && f.enabled !== false)?.transports ?? []
+  ).filter((t) => t.enabled !== false);
+  const methods = modelPreRoutes.length
+    ? [...new Set(modelPreRoutes.map((t) => t.method))]
+    : doc.preorder_transports.filter((t) => t.active !== false).map((t) => t.method);
+  for (const method of methods) {
+    const t = { method };
     const prepaid = resolve(t.method, 'prepaid');
     if (prepaid.errors.some((e) => unusable.has(e))) {
       preorder.push({ method: t.method, prepaid: null, cod: null, cod_reprices: false });
