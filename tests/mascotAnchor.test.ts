@@ -201,9 +201,18 @@ test('the geometry that actually moves an anchor is observed', () => {
   assert.match(src, /offsetParent[\s\S]{0,400}resizeObserver\?\.observe\(observedContainer\)/);
   assert.match(src, /addEventListener\('orientationchange', onResize\)/);
   assert.match(src, /removeEventListener\('orientationchange', onResize\)/, 'and it has to come off again');
-  // A rotation is not finished when the event announcing it fires.
+  // A rotation is not finished when the event announcing it fires, so the
+  // measurement is taken again once it settles.
+  //
+  // `onResize` reaches that through `onScroll`, which is where the re-measure
+  // now lives: the two were split so that a SCROLL — which fires for the whole
+  // length of every swipe, on every scroller in the app — re-measures the
+  // anchor without also re-measuring the viewport, whose cached size is what
+  // keeps a forced layout read out of the animation frame. A rotation is a
+  // size change and a scroll is not; both still move the anchor.
   assert.match(src, /const SETTLE_MS = \d+/);
-  assert.match(src, /onResize = \(\) => \{[\s\S]{0,200}remeasureAfter\(SETTLE_MS\)/);
+  assert.match(src, /onScroll = \(\) => \{[\s\S]{0,200}remeasureAfter\(SETTLE_MS\)/);
+  assert.match(src, /onResize = \(\) => \{[\s\S]{0,200}onScroll\(\)/, 'a resize must still settle');
 });
 
 test('the draw loop still reads no layout, and positions come from a measured rect', () => {

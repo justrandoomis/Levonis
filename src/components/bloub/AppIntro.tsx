@@ -607,15 +607,39 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     scheduleRef.current = schedule;
 
     const unsubscribe = characterLayout.subscribe(() => schedule(true));
+    /**
+     * The anchor may have MOVED — re-measure, and re-measure again when the
+     * movement stops.
+     *
+     * This is the handler for scrolling as well as for resizing, and scrolling
+     * is the common case: the capture-phase listener below fires for every
+     * scroller in the app. `schedule` collapses the burst onto one rAF, so the
+     * cost is one measurement per frame while a finger is moving, not one per
+     * event.
+     */
+    const onScroll = () => {
+      schedule(false);
+      // ...and once more when it stops. See SETTLE_MS: the geometry this event
+      // announces is not the geometry the page ends up with.
+      remeasureAfter(SETTLE_MS);
+    };
+
+    /**
+     * The VIEWPORT ITSELF changed size — a rotation, a window resize, a
+     * keyboard, a URL bar collapsing.
+     *
+     * Only these refresh the cached size, and that distinction is the point.
+     * Refreshing it on scroll too would put `clientWidth`/`clientHeight` — a
+     * forced layout read — back on the hottest path in the app, which is the
+     * thing this cache exists to get off it. A scroll moves the page past the
+     * viewport; it does not resize the viewport.
+     */
     const onResize = () => {
       // Before the measurement, not after: `measure()` and the loop both read
       // the cached size, and a stale denominator for one frame is a gaze that
       // aims at where the screen used to be.
       refreshViewport();
-      schedule(false);
-      // ...and once more when it stops. See SETTLE_MS: the geometry this event
-      // announces is not the geometry the page ends up with.
-      remeasureAfter(SETTLE_MS);
+      onScroll();
     };
     const onVisibility = () => {
       setPageVisible(!document.hidden);
@@ -674,11 +698,11 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     window.addEventListener('resize', onResize);
     window.addEventListener('orientationchange', onResize);
     window.visualViewport?.addEventListener('resize', onResize);
-    window.visualViewport?.addEventListener('scroll', onResize);
+    window.visualViewport?.addEventListener('scroll', onScroll);
     // The capture-phase listener is the app's every scroller at once, and it is
     // still the only thing that catches an in-page layout shift moving a sticky
     // header. It stays until something cheaper covers that case.
-    document.addEventListener('scroll', onResize, true);
+    document.addEventListener('scroll', onScroll, true);
     // The layout viewport itself. Unlike the anchor slots — whose boxes are
     // clamp()-pinned to a constant at every tablet width — this changes on
     // every rotation and every URL-bar collapse, which is precisely when the
@@ -709,8 +733,8 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       window.removeEventListener('resize', onResize);
       window.removeEventListener('orientationchange', onResize);
       window.visualViewport?.removeEventListener('resize', onResize);
-      window.visualViewport?.removeEventListener('scroll', onResize);
-      document.removeEventListener('scroll', onResize, true);
+      window.visualViewport?.removeEventListener('scroll', onScroll);
+      document.removeEventListener('scroll', onScroll, true);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener(BLOUB_EVENT, onState);
     };

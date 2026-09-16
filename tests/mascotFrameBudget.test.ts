@@ -78,15 +78,16 @@ test('the viewport is measured once, then refreshed only when it can have change
 
 test('every event that can change the viewport refreshes it', () => {
   /**
-   * The cache is only as correct as this list. A rotation, a URL-bar collapse
-   * and a pinch-zoom reach `onResize`; a change to the root element's own box
-   * reaches the ResizeObserver; and a tab resized while it was HIDDEN reports
-   * the old size until it comes back, which is what the visibility branch is
-   * for. Lose any one of these and the gaze aims at a screen that is not there.
+   * The cache is only as correct as this list. A rotation, a window resize, a
+   * keyboard and a URL bar all reach `onResize`; a change to the root
+   * element's own box reaches the ResizeObserver; and a tab resized while it
+   * was HIDDEN reports the old size until it comes back, which is what the
+   * visibility branch is for. Lose any one and the gaze aims at a screen that
+   * is not there.
    */
   const onResize = /const onResize = \(\) => \{([\s\S]*?)\n {4}\};/.exec(code)?.[1] ?? '';
   assert.ok(onResize, 'onResize should be findable');
-  assert.match(onResize, /refreshViewport\(\)/, 'resize/orientation/visualViewport/scroll all arrive here');
+  assert.match(onResize, /refreshViewport\(\)/);
 
   assert.match(
     code,
@@ -98,15 +99,47 @@ test('every event that can change the viewport refreshes it', () => {
   assert.ok(visibility, 'onVisibility should be findable');
   assert.match(visibility, /refreshViewport\(\)/, 'a tab resized while hidden reports the old size');
 
-  // And the listeners that feed onResize are still attached.
   for (const wiring of [
     "window.addEventListener('resize', onResize)",
     "window.addEventListener('orientationchange', onResize)",
     "window.visualViewport?.addEventListener('resize', onResize)",
-    "window.visualViewport?.addEventListener('scroll', onResize)",
-    "resizeObserver?.observe(document.documentElement)",
+    'resizeObserver?.observe(document.documentElement)',
   ]) {
     assert.ok(code.includes(wiring), `missing: ${wiring}`);
+  }
+});
+
+test('a scroll re-measures the anchor but never re-measures the viewport', () => {
+  /**
+   * The capture-phase listener on `document` is the app's every scroller at
+   * once — the window, the inner `#main-scroll-container`, every horizontal
+   * rail — and it fires for the whole length of a swipe. Putting the cached
+   * viewport's refresh on that path would return `clientWidth`/`clientHeight`,
+   * a forced layout read, to the hottest path in the app, which is exactly
+   * what the cache exists to remove.
+   *
+   * A scroll moves the page PAST the viewport; it does not resize it. The two
+   * handlers say so.
+   */
+  const onScroll = /const onScroll = \(\) => \{([\s\S]*?)\n {4}\};/.exec(code)?.[1] ?? '';
+  assert.ok(onScroll, 'onScroll should be findable');
+  assert.ok(!onScroll.includes('refreshViewport'), 'a scroll must not re-measure the viewport');
+  assert.match(onScroll, /schedule\(false\)/, 'it must still re-measure the ANCHOR — that is its job');
+
+  for (const wiring of [
+    "document.addEventListener('scroll', onScroll, true)",
+    "window.visualViewport?.addEventListener('scroll', onScroll)",
+  ]) {
+    assert.ok(code.includes(wiring), `missing: ${wiring}`);
+  }
+  // Every listener is removed with the same handler it was added with — a
+  // mismatch here leaks a listener for the life of the page.
+  for (const [add, remove] of [
+    ["addEventListener('scroll', onScroll, true)", "removeEventListener('scroll', onScroll, true)"],
+    ["visualViewport?.addEventListener('scroll', onScroll)", "visualViewport?.removeEventListener('scroll', onScroll)"],
+    ["visualViewport?.addEventListener('resize', onResize)", "visualViewport?.removeEventListener('resize', onResize)"],
+  ]) {
+    assert.ok(code.includes(add) && code.includes(remove), `add/remove mismatch around ${add}`);
   }
 });
 
