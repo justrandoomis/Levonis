@@ -15,6 +15,7 @@
  *  - real canvas capture (DOM-only; only the uniform-image detector runs).
  */
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { registerHooks } from "node:module";
 
@@ -1062,4 +1063,58 @@ test("no signature at all means the old always-save behaviour, unchanged", async
   }
   assert.equal(callbacks.captures, 3);
   controller.dispose();
+});
+
+/**
+ * WHAT AN AUTOSAVE COSTS A GUEST.
+ *
+ * `sha256HexOf` reads the whole snapshot into one contiguous ArrayBuffer to
+ * digest it — for a real project, the entire 3MF, in one allocation, on the
+ * main thread, on a phone whose JS heap shares a per-tab budget with the slice
+ * worker. Every 9 seconds for as long as the tab is open.
+ *
+ * It buys exactly one thing: the incremental-upload skip, which compares it
+ * with `lastSyncedHash`. A guest never uploads. Neither does an unlinked
+ * project or one held by a conflict — the same three conditions the upload
+ * step already returns on. The hash was being computed and thrown away.
+ *
+ * These are source guards because the defect is an allocation, not an output:
+ * every assertion about the RESULT passes either way, which is why it survived
+ * this long.
+ */
+test("the autosave hash is only computed when there is an upload to key", async () => {
+  const source = await readFile(new URL("../app/project-sync.ts", import.meta.url), "utf8");
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  // One resolved target, gating both the hash and the upload.
+  assert.match(
+    code,
+    /const uploadTarget\s*=\s*\n?\s*this\.opts\.userId !== null && !this\.state\.conflict \? this\.state\.remoteProjectId : null;/,
+    "the upload target must be resolved once"
+  );
+  assert.match(code, /if \(uploadTarget\) \{[\s\S]*?await hash\(/, "the hash must sit inside that gate");
+  assert.match(code, /if \(!uploadTarget\) return;/, "and the upload step must read the same value");
+
+  // The request uses the resolved value rather than re-reading the state it
+  // was derived from — two reads across an await are two chances to differ.
+  assert.match(code, /projectId: uploadTarget,/);
+  const afterGate = code.slice(code.indexOf("if (!uploadTarget) return;"));
+  assert.ok(
+    !afterGate.includes("this.state.remoteProjectId"),
+    "nothing after the gate may re-read remoteProjectId"
+  );
+});
+
+test("a null content hash stays an ordinary value, not a new state", async () => {
+  // Skipping the hash is only safe because null was always allowed: the local
+  // draft stores it and NOTHING reads it back, and every downstream type
+  // already says `string | null`. If a reader ever appears, this fails.
+  const store = await readFile(new URL("../app/project-store.ts", import.meta.url), "utf8");
+  const persistence = await readFile(new URL("../app/hooks/use-project-persistence.ts", import.meta.url), "utf8");
+  assert.match(store, /contentHash\?: string \| null;/);
+  // `project-store` writes it and never compares it.
+  assert.ok(!/contentHash\s*===|===\s*\w*\.?contentHash/.test(store), "the draft hash must stay write-only");
+  // The one place a hash IS compared reads the REMOTE revision's, from the
+  // server — not the local draft's.
+  assert.match(persistence, /opened\.revision\.content_hash/);
 });

@@ -1139,16 +1139,41 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         captureEngineThumbnail(adapter, { width: 512, height: 512 }),
         captureEngineThumbnail(adapter, { width: 128, height: 128 }),
       ]);
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const result = toBambuProject(bytes, {
-        projectName: projectName.trim() || "LEVO Project",
-        application: LEVO_APPLICATION,
-        version: LEVO_VERSION,
-        createdAt: new Date().toISOString().slice(0, 10),
-        thumbnailPng: big ? new Uint8Array(await big.arrayBuffer()) : null,
-        thumbnailSmallPng: small ? new Uint8Array(await small.arrayBuffer()) : null,
-        printerModelId: profile.shortName,
-        nozzleDiameters: profile.nozzle ? String(profile.nozzle) : undefined,
+      // Read the two captured thumbnails out BEFORE the canvas is stood down:
+      // they are already Blobs by this point, but keeping the order explicit
+      // means a future change cannot accidentally ask a suspended renderer for
+      // a frame and get a blank one.
+      const thumbnailPng = big ? new Uint8Array(await big.arrayBuffer()) : null;
+      const thumbnailSmallPng = small ? new Uint8Array(await small.arrayBuffer()) : null;
+      /**
+       * THE CANVAS STOPS WHILE THE PROJECT IS REPACKAGED.
+       *
+       * `toBambuProject` inflates the engine's 3MF and deflates a new one, in
+       * one synchronous pass, on the main thread, holding both in memory —
+       * and on a constrained device the slice worker's WASM heap is still
+       * resident beside it. Leaving the 3D view rendering through that means
+       * the renderer competes for the same thread and the same budget for the
+       * whole conversion, on the devices least able to afford either.
+       *
+       * `captureEngineSnapshot` already does exactly this for the autosave
+       * export; this path is the one the owner reaches by hand, from "save
+       * project" and "prepare for Bambu Handy", and it did not.
+       *
+       * The helper restores rendering on every path, including a throw, so a
+       * failed conversion cannot leave a dead viewport behind.
+       */
+      const result = await adapter.withRenderingSuspended(async () => {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        return toBambuProject(bytes, {
+          projectName: projectName.trim() || "LEVO Project",
+          application: LEVO_APPLICATION,
+          version: LEVO_VERSION,
+          createdAt: new Date().toISOString().slice(0, 10),
+          thumbnailPng,
+          thumbnailSmallPng,
+          printerModelId: profile.shortName,
+          nozzleDiameters: profile.nozzle ? String(profile.nozzle) : undefined,
+        });
       });
       downloadBlob(new Blob([result.bytes as BlobPart], { type: "model/3mf" }), filename);
       if (onDone) onDone();

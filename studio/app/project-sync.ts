@@ -1049,16 +1049,51 @@ export class ProjectSyncController {
     }
     if (this.disposed) return;
 
-    // 2. Hash (incremental-upload key) + local draft persist.
+    /**
+     * 2. Hash (incremental-upload key) + local draft persist.
+     *
+     * THE HASH IS AN UPLOAD KEY, SO IT IS ONLY WORTH PAYING FOR WHEN THERE IS
+     * AN UPLOAD.
+     *
+     * `sha256HexOf` reads the whole snapshot into one contiguous ArrayBuffer
+     * before it can digest it. For a real project that is the entire 3MF —
+     * tens of megabytes — allocated in one piece on the main thread, on a
+     * phone, where the JS heap and the slice worker share a single per-tab
+     * budget. Every 9 seconds, for as long as the tab is open.
+     *
+     * It buys exactly one thing: the incremental-upload skip at step 3, which
+     * compares it with `lastSyncedHash`. A guest has no upload. Neither does a
+     * project that was never linked to a remote, nor one held by an unresolved
+     * conflict — those are the same three conditions step 3 returns on, three
+     * lines below, before the hash is looked at.
+     *
+     * It is also stored on the local draft, and nothing reads it back:
+     * `project-store.ts` writes `contentHash` and never compares it, and the
+     * one place that does compare a hash (`use-project-persistence.ts`) reads
+     * the REMOTE revision's `content_hash` from the server, not the draft's.
+     * `contentHash` is `string | null` everywhere downstream, so null is the
+     * ordinary "not computed" case, not a new state.
+     *
+     * `uploadTarget` is resolved ONCE and is what both this decision and the
+     * return at step 3 read, so the two can never disagree about whether this
+     * run has an upload in it — which is the only way the skip could be lost.
+     * It also removes a re-read across the awaits between them: the previous
+     * code tested `this.state.remoteProjectId` at the guard and read it again
+     * at the request, which is two chances to see two different values.
+     */
+    const uploadTarget =
+      this.opts.userId !== null && !this.state.conflict ? this.state.remoteProjectId : null;
     const hash = this.opts.hash ?? sha256HexOf;
     let contentHash: string | null = null;
-    try {
-      contentHash =
-        kind === "full" ? await hash(files[0]) : await combinedContentHash(await Promise.all(files.map(hash)));
-    } catch {
-      contentHash = null;
+    if (uploadTarget) {
+      try {
+        contentHash =
+          kind === "full" ? await hash(files[0]) : await combinedContentHash(await Promise.all(files.map(hash)));
+      } catch {
+        contentHash = null;
+      }
+      if (this.disposed) return;
     }
-    if (this.disposed) return;
 
     let localSaved = false;
     try {
@@ -1086,8 +1121,9 @@ export class ProjectSyncController {
     }
 
     // 3. Upload — signed-in and linked only; IndexedDB alone is NEVER "synced".
-    if (this.opts.userId === null || !this.state.remoteProjectId) return;
-    if (this.state.conflict) return; // an unresolved conflict blocks uploads
+    // The same three conditions the hash above is skipped for, as one value:
+    // a guest, an unlinked project, or an unresolved conflict blocking uploads.
+    if (!uploadTarget) return;
 
     if (contentHash && contentHash === this.lastSyncedHash && kind === this.state.lastSyncedKind) {
       // Unchanged content — nothing to re-upload (incremental save).
@@ -1114,7 +1150,7 @@ export class ProjectSyncController {
 
     const result = await this.uploader(
       {
-        projectId: this.state.remoteProjectId,
+        projectId: uploadTarget,
         baseRevision: this.baseRevision,
         snapshotKind: kind,
         manifest: callbacks.buildManifest(kind),
