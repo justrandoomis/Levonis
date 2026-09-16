@@ -299,3 +299,31 @@ test("the handle's touch target is the row, not the 4px bar", async () => {
   assert.match(stylesheet, /\.sheet-handle::before \{[^}]*width: 40px;[^}]*height: 4px;/, "the bar keeps its familiar size");
   assert.match(stylesheet, /\.sheet-handle:focus-visible \{[^}]*outline:/, "and it shows focus (skill §12)");
 });
+
+test("every token the projects panel reads is actually defined here", async () => {
+  /**
+   * THE SILENT ONE.
+   *
+   * `components/projects-panel.tsx` ships its own <style> block built on a
+   * `--levo-*` family it inherited from a different product, each with a
+   * hard-coded fallback: `var(--levo-ok, #3fbf6f)`, `var(--levo-warn,
+   * #e2a93b)`. Six of the eight were mapped onto the black ladder in :root.
+   * Two were missed, so the fallback fired and the panel's "synced" and
+   * "degraded" badges were painted in that other product's green and amber.
+   *
+   * A missing custom property is silent BY DESIGN — the fallback is the
+   * feature, and it is precisely why the gap survived a full theme pass and a
+   * screenshot review. This test is the thing that is not silent.
+   */
+  const panel = await readFile(new URL("../app/components/projects-panel.tsx", import.meta.url), "utf8");
+  const referenced = [...new Set([...panel.matchAll(/var\((--levo-[a-z-]+)/g)].map((m) => m[1]))];
+  assert.ok(referenced.length >= 6, `expected the panel's token family, saw ${referenced.length}`);
+  const missing = referenced.filter((token) => !new RegExp(`^\\s*${token}:`, "m").test(root));
+  assert.deepEqual(missing, [], `unmapped — the panel will silently use its own palette: ${missing.join(", ")}`);
+
+  // And each one resolves to a token from OUR ladder, not to another literal.
+  for (const token of referenced) {
+    const value = new RegExp(`${token}:\\s*([^;]+);`).exec(root)?.[1]?.trim();
+    assert.match(value ?? "", /^var\(--[\w-]+\)$/, `${token} must map onto the ladder, not restate a colour`);
+  }
+});

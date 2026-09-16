@@ -169,6 +169,23 @@
   --levo-panel-border: var(--line);
   --levo-accent: var(--accent);
   --levo-danger: var(--danger);
+  /*
+   * TWO OF THE EIGHT WERE NEVER MAPPED, AND NOBODY COULD SEE IT.
+   *
+   * The panel writes `var(--levo-ok, #3fbf6f)` and `var(--levo-warn, #e2a93b)`
+   * on its sync badges. Six of its eight tokens were mapped onto the ladder
+   * above; these two were missed — so the fallback fired, and the "synced" and
+   * "degraded" badges were painted in the OTHER product's green and amber,
+   * inside an app whose semantic colours are Apple's dark-mode system ones.
+   *
+   * A missing custom property is silent by design: the fallback is a feature,
+   * and it is exactly why the gap survived. Mapping them is the fix; the
+   * stylesheet test that refuses a spelled-out colour in a rule is what stops
+   * the next one, because a NEW unmapped token would have to arrive with a hex
+   * fallback beside it.
+   */
+  --levo-ok: var(--success);
+  --levo-warn: var(--warning);
 }
 
 * { box-sizing: border-box; }
