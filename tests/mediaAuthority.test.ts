@@ -224,3 +224,43 @@ test('private review evidence is never made public by this route', () => {
   assert.ok(!/json_each|published/.test(evidence), 'evidence must never be resolved by publication');
   assert.match(evidence, /if \(!user\) throw notFound\(\)/, 'and is refused outright when signed out');
 });
+
+// ------------------------------------------- the cache and a revoked permission
+
+test('a revocable permission is never cached as if it were permanent', () => {
+  /**
+   * `isPublic` on the review-media route is not a property of the object. It
+   * is the answer to a question asked of the database on that request — "is
+   * this key an item of a PUBLISHED review's media?" — and the answer changes:
+   * a review gets moderated, an author retracts it, an admin unpublishes a
+   * product's reviews. The object does not move; the permission does.
+   *
+   * The response said `public, max-age=3600`, which tells every shared cache
+   * and every browser to serve the photo for an hour WITHOUT asking again. For
+   * that hour an unpublished review's media stayed readable by anyone holding
+   * the URL, and nothing in the unpublish path could reach into those caches.
+   *
+   * `no-cache` is the right instruction and is NOT `no-store`: caches may keep
+   * the bytes, they may not serve them without revalidating. The ETag makes
+   * that revalidation a 304, so almost all of the bandwidth saving survives.
+   */
+  const handler = slice('worker/routes/reviews.ts', "reviewRoutes.get('/media", 'reviewRoutes.');
+  assert.ok(handler.length > 500, 'the media handler should be findable');
+  assert.ok(!/max-age=\d+/.test(handler), 'a fixed lifetime outlives the permission it was granted under');
+  assert.match(handler, /isPublic \? 'public, no-cache' : 'private, no-cache'/);
+  // Dispute evidence is not cached at all, revalidated or otherwise.
+  assert.match(handler, /key\.startsWith\('reviews-evidence\/'\) \? 'no-store'/);
+
+  // …and the revalidation it asks for is answered, or `no-cache` would turn
+  // every hit into a full re-download.
+  assert.match(handler, /headers\.set\('etag', obj\.httpEtag\)/);
+  assert.match(handler, /c\.req\.header\('If-None-Match'\) === obj\.httpEtag/);
+  assert.match(handler, /new Response\(null, \{ status: 304, headers \}\)/);
+
+  // The 304 must come AFTER the authorisation, or it becomes a way to learn
+  // that an object exists without being allowed to see it.
+  assert.ok(
+    handler.indexOf('if (!allowed) throw notFound();') < handler.indexOf('If-None-Match'),
+    'the conditional check must not precede the permission check'
+  );
+});

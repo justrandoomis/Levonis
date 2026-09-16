@@ -964,12 +964,47 @@ reviewRoutes.get('/media/*', async (c) => {
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
   headers.set('etag', obj.httpEtag);
+  /**
+   * PUBLIC HERE IS A REVOCABLE DECISION, SO THE CACHE MUST ASK EVERY TIME.
+   *
+   * `isPublic` is not a property of the object. It is the answer to a question
+   * asked of the database a few lines above — "is this key an item of a
+   * PUBLISHED review's media?" — and that answer changes. A review gets
+   * moderated, an author retracts it, an admin unpublishes a whole product's
+   * reviews. The object does not move; the permission does.
+   *
+   * `public, max-age=3600` told every shared cache and every browser to serve
+   * the photo for an hour WITHOUT asking again, so for that hour an
+   * unpublished review's media stayed readable by anyone holding the URL, and
+   * nothing in the unpublish path could reach into those caches to stop it.
+   *
+   * `no-cache` is the correct instruction and it is not the same as
+   * `no-store`: caches may keep the bytes, they simply may not serve them
+   * without revalidating. With the ETag above that revalidation is a 304 with
+   * no body — so the bandwidth saving survives almost intact, and the
+   * permission is re-checked on every single request, which is the point.
+   *
+   * `reviews-evidence/` keeps `no-store`: seller-dispute material should not
+   * be sitting in a cache at all, revalidated or otherwise.
+   */
   headers.set(
     'Cache-Control',
-    key.startsWith('reviews-evidence/') ? 'no-store' : isPublic ? 'public, max-age=3600' : 'private, max-age=300'
+    key.startsWith('reviews-evidence/') ? 'no-store' : isPublic ? 'public, no-cache' : 'private, no-cache'
   );
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
+  /**
+   * …and the revalidation it asks for is answered properly.
+   *
+   * `no-cache` is only cheap if a conditional request can come back 304. This
+   * handler always streamed the body, so telling caches to revalidate would
+   * have turned every hit into a full re-download. The check happens AFTER the
+   * authorisation above, so a 304 is never a way to learn that an object
+   * exists without being allowed to see it.
+   */
+  if (c.req.header('If-None-Match') === obj.httpEtag) {
+    return new Response(null, { status: 304, headers });
+  }
   return new Response(obj.body, { headers });
 });
 
