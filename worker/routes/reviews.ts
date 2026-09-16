@@ -904,8 +904,19 @@ reviewRoutes.get('/media/*', async (c) => {
   const marker = '/media/';
   const idx = c.req.path.indexOf(marker);
   const key = decodeURIComponent(c.req.path.slice(idx + marker.length));
-  // Strict charset: our keys are hex ids under fixed prefixes. This also
-  // keeps LIKE below literal (no %/_ wildcards can widen the match).
+  // Strict charset: our keys are hex ids under fixed prefixes.
+  //
+  // THE CHARSET IS NOT WHAT KEEPS THE LOOKUP HONEST, AND IT ONCE CLAIMED TO BE.
+  // This comment used to add "no %/_ wildcards can widen the match" — while
+  // `_` sat inside the character class one line below, and `_` is a LIKE
+  // wildcard matching any single character. The guard did not do the thing it
+  // said it did. Nothing was reachable through it, because `newId` emits hex
+  // and no stored key contains `_`, so a widened match could only ever agree
+  // with a key that does not exist in R2 — but a rule that is wrong for an
+  // incidental reason is a rule waiting for the key format to change.
+  //
+  // So the query below no longer uses LIKE at all, and this is back to being
+  // exactly what it looks like: a path sanity check.
   if (!key || key.includes('..') || !/^[A-Za-z0-9/._-]+$/.test(key)) throw notFound();
   const user = c.get('user');
 
@@ -918,10 +929,29 @@ reviewRoutes.get('/media/*', async (c) => {
     if (user && (key.startsWith(`reviews/${user.id}/`) || user.role === 'admin')) {
       allowed = true;
     } else {
+      /**
+       * IS THIS EXACT KEY AN ITEM OF A PUBLISHED REVIEW'S MEDIA?
+       *
+       * `json_each` walks the stored array and `json_extract` reads the `key`
+       * field of each entry (worker/lib/reviewQuality.ts ReviewQualityMedia),
+       * so the comparison is `=` on the field that means what we are asking
+       * about — not a substring search over the serialised JSON.
+       *
+       * The previous `media LIKE '%"key"%'` had two problems beyond the
+       * wildcard above: it matched the key ANYWHERE in the row, including in a
+       * `mime` or a future field that happened to contain it, and it could
+       * never use an index. This asks the real question.
+       */
       const hit = await c.env.DB.prepare(
-        `SELECT 1 AS x FROM reviews WHERE status = 'published' AND media LIKE ? LIMIT 1`
+        `SELECT 1 AS x FROM reviews
+          WHERE status = 'published'
+            AND EXISTS (
+              SELECT 1 FROM json_each(reviews.media) AS m
+               WHERE json_extract(m.value, '$.key') = ?
+            )
+          LIMIT 1`
       )
-        .bind(`%"${key}"%`)
+        .bind(key)
         .first();
       allowed = !!hit;
       isPublic = allowed;

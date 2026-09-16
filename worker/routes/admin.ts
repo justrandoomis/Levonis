@@ -378,6 +378,45 @@ adminRoutes.post('/products', async (c) => {
   // and a printer's plans must be the +12 / +24 extensions. The document is
   // built over the stored row so the stored ops_policy (serialized, base)
   // is what the rules judge.
+  /**
+   * THIS ROUTE MUST NOT OVERWRITE A PRODUCT THAT HAS RELATION ROWS.
+   *
+   * `product_images` (migration 0018) is the authoritative store for a
+   * product's media, and `products.images` is a DERIVED MIRROR of it —
+   * productPersistence.ts says so in as many words, and productOverlay.ts
+   * makes the rows win on read whenever the product has any
+   * (`view.images.length > 0 ? view.images : doc.media`).
+   *
+   * This legacy route writes the mirror column directly and has no statement
+   * touching `product_images` anywhere. So on a product that HAS rows, a save
+   * here rewrites the copy that nothing reads and leaves the rows that
+   * everything reads untouched. The admin sees their change accepted, the
+   * storefront keeps the old pictures, and the two stores stay apart for good
+   * — with no error at any point.
+   *
+   * The v2 route (`/api/admin/products-v2`) is what the admin UI actually
+   * uses, and it restates the mirror and the rows in one batch. This route is
+   * reached by nothing in src/ — only by tests, none of which send structure.
+   * So the fix is to refuse the case that would diverge rather than to teach a
+   * second writer how to keep two stores in step: a save that carries
+   * structure for a product that already has rows is answered 409, naming the
+   * route that can do it.
+   */
+  const STRUCTURE_FIELDS = ['images', 'options', 'colors'] as const;
+  const carriesStructure = STRUCTURE_FIELDS.some((field) => body[field] !== undefined);
+  if (carriesStructure) {
+    const rows = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM product_images WHERE product_id = ?')
+      .bind(id)
+      .first<{ n: number }>();
+    if (Number(rows?.n ?? 0) > 0) {
+      throw new HttpError(
+        409,
+        'This product stores its media as relation rows. Save it through /api/admin/products-v2, which writes both.',
+        'STRUCTURE_HAS_RELATIONS'
+      );
+    }
+  }
+
   const stored = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
   await applyPrinterWarrantyRules(
     c.env.DB,
