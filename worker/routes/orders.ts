@@ -1375,6 +1375,10 @@ interface CheckoutComputation {
   subtotal: number; // Σ unit_subtotal × qty (incl. commissions/warranty fees)
   merchandise: number; // Σ applied price × qty (product prices only)
   shipping: ShippingQuote;
+  /** What each configured delivery method would cost for THIS cart, priced by
+   *  the same function that prices the order. `fee_iqd: null` with
+   *  `available: false` means the cart cannot use that method at all. */
+  deliveryMethodFees: Array<{ id: string; fee_iqd: number | null; available: boolean }>;
   isPickup: boolean;
   independentFreeDelivery: boolean;
   couponId: string | null;
@@ -2183,18 +2187,26 @@ async function computeCheckout(
      * actually chose, so a PREMIUM rule listing standard only refuses a
      * personal delivery here rather than in the UI.
      */
-    const orderBenefitsAt = (basisIqd: number) =>
+    const orderBenefitsAt = (basisIqd: number, methodId: string = delivery.id) =>
       resolveOrderBenefits({
         rules: pricingCtx.benefitRules,
         status: tierStatus,
         shippingBasisIqd: basisIqd,
-        deliveryMethod: delivery.id === 'standard' || delivery.id === 'personal' ? delivery.id : null,
+        deliveryMethod: methodId === 'standard' || methodId === 'personal' ? methodId : null,
         nowIso: benefitNowIso,
       });
-    const runQuote = (basisIqd: number, primeBasisIqd?: number): ShippingQuote =>
+    /**
+     * `methodId` defaults to the method the customer chose, which is every
+     * caller but one: `deliveryMethodFees` below re-runs this for EVERY
+     * configured method so the checkout screen can print a real fee on each
+     * card instead of a base rate that ignores the cart. It is a pure
+     * function over figures already in hand, so N methods cost no queries.
+     */
+    const runQuote = (basisIqd: number, primeBasisIqd?: number, methodId: string = delivery.id): ShippingQuote =>
       quoteShipping({
         items: shippingItems,
-        deliveryMethod: productDeliveryMethod ?? undefined,
+        deliveryMethod:
+          methodId === 'standard' || methodId === 'personal' ? (methodId as ProductDeliveryMethod) : undefined,
         merchandiseIqd: basisIqd,
         primeMerchandiseIqd: primeBasisIqd,
         tier: tierStatus.tier,
@@ -2206,11 +2218,12 @@ async function computeCheckout(
         // figure the caller passes as `primeMerchandiseIqd` (§5), so the rule
         // is tested against whichever number this member's tier is judged on.
         membershipShipping: orderBenefitsAt(
-          tierStatus.tier === 'prime' ? (primeBasisIqd ?? basisIqd) : basisIqd
+          tierStatus.tier === 'prime' ? (primeBasisIqd ?? basisIqd) : basisIqd,
+          methodId
         ).shipping,
         // Store pickup has no last mile, so nothing to protect; the flag is
         // dropped rather than charged for a delivery that does not happen.
-        protectedDelivery: input.protectedDelivery && !isPickup,
+        protectedDelivery: input.protectedDelivery && methodId !== 'pickup',
         config: configForOrder,
       });
 
@@ -2340,8 +2353,35 @@ async function computeCheckout(
     const financedIqd = isBnpl(input.paymentMethodId) ? payableBeforeCodTax : 0;
     const dueOnDelivery = isBnpl(input.paymentMethodId) ? 0 : payableBeforeCodTax + codTaxIqd;
 
+    /**
+     * Priced for EVERY configured method, not just the chosen one. A method
+     * the cart cannot use is reported as unavailable rather than priced, so
+     * the screen can grey it out instead of quoting a delivery that would be
+     * refused at the door.
+     */
+    const deliveryMethodFees: Array<{ id: string; fee_iqd: number | null; available: boolean }> = (
+      settings.checkoutDeliveryMethods as DeliveryMethod[]
+    ).map((m) => {
+      if (m.id === 'pickup') return { id: m.id, fee_iqd: 0, available: true };
+      const asProduct: ProductDeliveryMethod | null =
+        m.id === 'standard' || m.id === 'personal' ? m.id : null;
+      // The same two doors the chosen method goes through above — asked here
+      // as a question instead of thrown as a refusal.
+      if (priced.shippingItems.some((item) => item.delivery !== undefined)) {
+        if (!asProduct) return { id: m.id, fee_iqd: null, available: false };
+        if (!productDeliveryMethodAvailable(priced.shippingItems, asProduct).available) {
+          return { id: m.id, fee_iqd: null, available: false };
+        }
+      }
+      // The SAME basis the chosen method's own final quote uses, so the
+      // card's figure and the summary's figure cannot disagree.
+      const q = runQuote(memberMerchandise, undefined, m.id);
+      return { id: m.id, fee_iqd: q.total_iqd, available: true };
+    });
+
     return {
       shipping,
+      deliveryMethodFees,
       couponId,
       couponDiscount,
       couponSnapshot,
@@ -2441,6 +2481,22 @@ async function computeCheckout(
     subtotal: priced.subtotal,
     merchandise: priced.merchandise,
     shipping: settled.shipping,
+    /**
+     * WHAT EVERY OTHER DELIVERY METHOD WOULD COST, for the same cart.
+     *
+     * The checkout screen used to print `method.price_iqd` — the flat rate
+     * configured in settings — on every card except the selected one, and the
+     * SERVER's figure only on the selected one. For a cart whose fee is
+     * per-product and per-quantity («محسوب حسب القطع والكمية») those are
+     * different numbers, so selecting a method made its price jump and made
+     * the previously-selected one drop back to its base rate. It read as two
+     * options swapping prices; it was one real figure and one placeholder.
+     *
+     * `runQuote` is pure over figures already computed, so pricing all of them
+     * costs no extra queries — and it is the SAME function that prices the
+     * order, which is what stops the preview and the charge from drifting.
+     */
+    deliveryMethodFees: settled.deliveryMethodFees,
     isPickup,
     independentFreeDelivery,
     couponId: settled.couponId,
@@ -2734,6 +2790,9 @@ orderRoutes.post('/quote', async (c) => {
           !comp.isPickup && comp.lines.some((l) => l.is_printer) ? comp.printerNoteIqd : null,
       },
       shipping: comp.shipping,
+      /** Every method's real fee for this cart — so the screen prints a true
+       *  figure on every card before the customer has chosen anything. */
+      delivery_method_fees: comp.deliveryMethodFees,
       is_pickup: comp.isPickup,
       /**
        * Whether the protected-delivery add-on can be offered at all, and what

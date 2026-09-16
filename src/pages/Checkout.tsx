@@ -194,6 +194,10 @@ interface CheckoutQuoteDto {
   prepaid_by_wallet?: boolean;
   /** Informational notes — never part of any total. */
   notes?: { printer_home_delivery_iqd: number | null };
+  /** Every configured delivery method priced for THIS cart by the server —
+   *  so a card can print a true fee before anything is selected.
+   *  `fee_iqd: null` + `available: false` = the cart cannot use that method. */
+  delivery_method_fees?: Array<{ id: string; fee_iqd: number | null; available: boolean }>;
   shipping: ShippingQuoteDto;
   is_pickup: boolean;
   /** The protected-delivery add-on: offered only when the owner priced it. */
@@ -1258,7 +1262,23 @@ export default function Checkout() {
               {availableDeliveryMethods.map(method => {
                 const selected = deliveryMethod === method.id;
                 const selectedQuote = selected ? quote?.shipping : null;
-                const displayedPrice = selectedQuote?.total_iqd ?? method.price_iqd;
+                /**
+                 * THE SERVER'S FIGURE FOR *THIS* METHOD, not for the selected
+                 * one and not a flat rate from settings.
+                 *
+                 * This line used to read `selectedQuote?.total_iqd ??
+                 * method.price_iqd`: the selected card showed the real quote
+                 * and every other card showed the configured base rate. On a
+                 * cart whose delivery is priced per product and per quantity
+                 * those differ, so choosing a method made its price jump and
+                 * dropped the previous one back to its placeholder — two
+                 * options appearing to swap prices. The server now prices
+                 * every method in the same pass, with the same function that
+                 * prices the order.
+                 */
+                const serverFee = quote?.delivery_method_fees?.find((f) => f.id === method.id);
+                const unavailable = serverFee ? !serverFee.available : false;
+                const displayedPrice = serverFee?.fee_iqd ?? selectedQuote?.total_iqd ?? null;
                 const memberWaiver = selectedQuote?.waiver_source === 'pro' || selectedQuote?.waiver_source === 'prime';
                 return (
                 <label key={method.id} data-selected={selected} className="lv-choice relative flex cursor-pointer items-center gap-3 p-4 sm:gap-4">
@@ -1282,8 +1302,22 @@ export default function Checkout() {
                         )}
                       </div>
                     </div>
-                    <span className={`font-medium text-sm shrink-0 ${displayedPrice === 0 ? 'text-emerald-400' : 'text-white'}`}>
-                      {displayedPrice === 0 ? loc('مجاناً', 'Free', 'بەخۆڕایی') : formatIqd(displayedPrice)}
+                    {/* A fee we do not have yet is shown as a placeholder, never
+                        as a number. Printing a stale or base figure here is the
+                        defect this card is fixing. */}
+                    <span
+                      className={`font-medium text-sm shrink-0 tabular-nums ${
+                        unavailable ? 'text-zinc-600' : displayedPrice === 0 ? 'text-emerald-400' : 'text-white'
+                      }`}
+                      data-delivery-fee={method.id}
+                    >
+                      {unavailable
+                        ? loc('غير متاح', 'Unavailable', 'بەردەست نییە')
+                        : displayedPrice === null
+                          ? '—'
+                          : displayedPrice === 0
+                            ? loc('مجاناً', 'Free', 'بەخۆڕایی')
+                            : formatIqd(displayedPrice)}
                     </span>
                   </div>
                   <span className="lv-choice-mark ms-1"><Check className="h-3 w-3" aria-hidden="true" /></span>
@@ -1341,14 +1375,42 @@ export default function Checkout() {
       {/* Right Summary Area. The phone's fixed action bar overlaps THIS column
           (it is last in the flow below `lg`), so the clearance belongs here. */}
       <div className="relative z-20 flex w-full shrink-0 flex-col bg-surface pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-0 lg:h-full lg:min-h-0 lg:w-[460px] lg:border-s lg:border-border-subtle">
-        <div className="flex min-h-0 flex-col p-4 sm:p-6 lg:h-full lg:p-10">
+        {/*
+          THE SUMMARY COLUMN SCROLLS AS A WHOLE.
+
+          It used to scroll only its ITEM LIST: the list carried
+          `lg:flex-1 lg:overflow-y-auto` inside a `lg:h-full` column, and
+          everything after it — the totals, the promo field, the points and
+          wallet switches, the delivery breakdown, the consent checkbox and the
+          place-order button — sat in the same fixed-height column with no
+          overflow of its own. Whenever that tail was taller than the space the
+          list left over, it ran past the bottom of the column and the root's
+          `lg:overflow-hidden` clipped it. On an iPad the customer saw the
+          policy checkbox at the very edge of the screen and the confirm button
+          below the fold, with nothing to scroll.
+
+          The fix is to put the scroll on THIS container and let the list take
+          its natural height, so every row in the summary is reachable. The
+          root stays `lg:overflow-hidden` on purpose — the two columns are
+          independent panes, which is what keeps the form from scrolling the
+          summary away.
+
+          The button is NOT made sticky: the refusal messages under it
+          (insufficient balance, a price that moved, the implicit-policy note)
+          have to be readable, and the comment on `orderButton` records why
+          they were moved out from under a fixed bar in the first place.
+        */}
+        <div className="flex min-h-0 flex-col p-4 sm:p-6 lg:h-full lg:overflow-y-auto lg:p-10 custom-scrollbar">
 
           <h2 className="text-xl font-normal text-white flex items-center gap-3 mb-6">
             <Receipt className="w-5 h-5 text-zinc-400" strokeWidth={1.5} />
             {dir === 'rtl' ? 'ملخص الطلب' : 'Order Summary'}
           </h2>
 
-          <div className="mb-6 space-y-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pe-2 custom-scrollbar">
+          {/* Natural height now — the column above owns the scrolling. A nested
+              scroll area here would trap the wheel inside the item list and
+              leave the totals below it unreachable all over again. */}
+          <div className="mb-6 space-y-2">
             {summaryLines.map((line) => (
                 <div key={line.key} data-checkout-line={line.key} className="group relative flex gap-3 overflow-hidden py-3 border-b border-border-subtle last:border-0">
                   <div className="w-16 h-16 rounded-lg bg-black overflow-hidden relative shrink-0">
