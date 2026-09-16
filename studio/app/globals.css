@@ -442,13 +442,43 @@ button:disabled { cursor: not-allowed; }
 /* The cut sheet: a height, what to keep, and whether to close the face. */
 .cut-body { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px 16px; }
 .cut-help { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
-.cut-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
-.cut-row > span:first-child { flex: 0 0 auto; font-weight: 700; color: var(--text); }
-.cut-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
-.cut-number { width: 84px; min-height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); font-size: 12px; direction: ltr; }
-.cut-extent { margin: -6px 0 0; font-size: 11px; color: var(--muted); }
-.cut-keep button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); font-size: 12px; font-weight: 700; cursor: pointer; }
+/*
+ * THE HEIGHT ROW DID NOT FIT ON A PHONE, AND THE CONTROL THAT SUFFERED WAS
+ * THE ONE THE SHEET EXISTS FOR.
+ *
+ * It was one no-wrap flex row holding a label, a flex:1 slider, an 84px number
+ * and a unit, with three 10px gaps. On a 320px screen the sheet body is 292px
+ * wide, so the SLIDER got whatever was left — roughly 60 to 80 pixels of
+ * travel to express the whole height of a model, at a 0.1mm step. That is not
+ * a slider; it is a decoration next to the number box, and the number box then
+ * summons a keypad over the sheet.
+ *
+ * So the row wraps, deliberately and always: the label, the number and the
+ * unit take the first line, where they fit at any width, and the slider gets a
+ * line of its own at FULL width. `order` does it without touching the markup,
+ * which carries the data-levo-cut hooks the browser tests drive.
+ *
+ * The controls also come up to the 44px touch floor the rest of the app keeps.
+ * A 36px slider is hard to catch with a thumb, and this one is dragged.
+ */
+.cut-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: var(--text-label); }
+.cut-row > span:first-child { flex: 1 0 auto; order: 1; font-weight: 700; color: var(--text); }
+.cut-number { order: 2; width: 96px; min-height: var(--tap-min); padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); font-size: var(--text-label); direction: ltr; text-align: center; }
+.cut-row > b { order: 3; color: var(--muted); }
+/* flex-basis 100% is what puts it on its own line — at every width, because a
+   height slider that shares a line is a height slider nobody can aim. */
+.cut-row input[type="range"] { order: 4; flex: 1 1 100%; min-width: 0; min-height: var(--tap-min); accent-color: var(--accent); }
+.cut-extent { margin: -6px 0 0; font-size: var(--text-caption); color: var(--muted); }
+/* The three choices are a segmented control: the label owns the first line and
+   they share the second equally, so none of them is clipped at 320px. */
+.cut-keep > span:first-child { flex: 1 1 100%; }
+.cut-keep button { flex: 1 1 0; min-width: 0; min-height: var(--tap-min); padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; background: var(--panel); color: var(--text); font-size: var(--text-label); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+/* ONE state cue (skill §3): the surface is taken, not outlined AND filled AND
+   recoloured. Gold here is the selection, and it is the only gold in the row. */
 .cut-keep button.active { border-color: var(--accent-strong); background: var(--accent); color: var(--accent-ink); }
+/* A checkbox at 18px is below the floor too, and this one turns a cut face
+   into a closed one — a decision worth being able to hit. */
+.cut-cap input { width: 22px; height: 22px; }
 .cut-cap { align-items: flex-start; gap: 8px; }
 .cut-cap input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); flex: 0 0 auto; }
 .cut-cap span { display: flex; flex-direction: column; gap: 3px; }
@@ -575,9 +605,31 @@ button:disabled { cursor: not-allowed; }
 .setup-body { display: flex; flex-direction: column; gap: 17px; }
 .setup-body fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .setup-body legend { margin-bottom: 9px; color: var(--muted); font-size: 11px; font-weight: 750; }
-.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; direction: ltr; }
-.profile-grid button { min-height: 96px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; background: var(--panel); text-align: left; cursor: pointer; }
-.profile-grid button.active { border-color: var(--accent-strong); background: var(--accent-tint); box-shadow: inset 0 0 0 1px var(--accent-strong); }
+/*
+ * FOURTEEN PRINTERS, IN A SHEET BODY ABOUT 440px TALL.
+ *
+ * At two columns with 96px cards that is seven rows — a screen and a half.
+ * The mobile block used to drop it to ONE column, which made it fourteen rows
+ * and about three screens, for a list where nine of the entries share the same
+ * bed string and are told apart by a name on the first line.
+ *
+ * So: two columns at every width, and shorter cards. The card still carries
+ * all three lines, because the setting id and the nozzle are what distinguish
+ * the ones with identical beds.
+ */
+.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; direction: ltr; }
+.profile-grid button { position: relative; min-height: 78px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; background: var(--panel); text-align: left; cursor: pointer; }
+/*
+ * ONE STATE CUE, PLUS ONE SUPPORTING IT (skill §3).
+ *
+ * It used to be three at once: an accent border, a gold-tinted background AND
+ * an inset gold ring. The card ended up looking like a warning. The surface
+ * lifts one step, and a small checkmark says which one it is — the cue that
+ * survives for someone who cannot separate the two surfaces by colour.
+ */
+.profile-grid button.active { border-color: var(--accent-strong); background: var(--surface-strong); }
+.profile-check { position: absolute; top: 8px; inset-inline-end: 8px; display: grid; place-items: center; color: var(--accent); }
+.profile-check svg { width: 16px; height: 16px; }
 .profile-grid strong { font-size: 13px; }
 .profile-grid span, .profile-grid small { color: var(--muted); font-size: var(--text-caption); }
 .profile-status { margin: 10px 0 0; display: flex; align-items: flex-start; gap: 7px; color: var(--muted); font-size: var(--text-caption); line-height: 1.5; }
@@ -961,7 +1013,6 @@ button:disabled { cursor: not-allowed; }
 
 @media (max-width: 540px) {
   .studio-actions .about-button { display: none; }
-  .profile-grid { grid-template-columns: 1fr; }
   .print-action-grid { grid-template-columns: 1fr; }
   .print-action-grid button { min-height: 64px; }
   .connection-method-tabs span { font-size: var(--text-caption); }

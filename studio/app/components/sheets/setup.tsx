@@ -37,12 +37,36 @@ export default function SetupSheet(props: SetupSheetProps) {
     <div className="sheet-body setup-body">
       <fieldset>
         <legend>{t.printer}</legend>
+        {/*
+          THE CURRENT PRINTER IS FIRST, ALWAYS.
+
+          Fourteen machines in a sheet whose body is about 440px tall on a
+          phone is roughly three screens of scrolling, and the one that matters
+          — the one already selected — was wherever the declaration order
+          happened to put it. So a user opening this sheet to check which
+          printer is set had to hunt for the highlighted card.
+
+          Sorting the selected one to the front costs nothing, needs no new
+          string (which matters: Sorani here is hand-written and is never
+          generated), and answers the question the sheet is usually opened to
+          ask before any scrolling happens at all.
+
+          The order is otherwise the declaration order, so the list does not
+          reshuffle under the finger as the selection changes — only the
+          chosen card moves, and it moves to a place the eye is already on.
+        */}
         <div className="profile-grid">
-          {PROFILE_IDS.map((id) => (
-            <button key={id} className={props.profileId === id ? "active" : ""} onClick={() => props.onProfile(id)}>
+          {[...PROFILE_IDS].sort((a, b) => Number(b === props.profileId) - Number(a === props.profileId)).map((id) => (
+            <button
+              key={id}
+              className={props.profileId === id ? "active" : ""}
+              aria-pressed={props.profileId === id}
+              onClick={() => props.onProfile(id)}
+            >
               <strong>{PROFILES[id].model}</strong>
               <span>{PROFILES[id].bed}</span>
               <small>{PROFILES[id].settingId} · {PROFILES[id].nozzle.toFixed(1)} mm</small>
+              {props.profileId === id && <i className="profile-check" aria-hidden="true"><Icon name="check" /></i>}
             </button>
           ))}
         </div>
