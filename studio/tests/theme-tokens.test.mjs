@@ -226,3 +226,76 @@ test("the engine chrome is parked above the shell's bar, from the same number", 
   }
   assert.match(theme, /env\(safe-area-inset-bottom\)/, "the inset must be part of the offset");
 });
+
+/**
+ * WHAT A SHEET PROMISES, IT HAS TO DO.
+ *
+ * The bar across the top of a bottom sheet is a learned affordance — on a
+ * phone it means "drag me down". It was a decorative `<div className=
+ * "sheet-handle" />` with no handlers at all, so the gesture every user tries
+ * first did nothing. The dialog also declared `aria-modal` while leaving focus
+ * on the page behind it and ignoring Escape, so a keyboard or a screen reader
+ * never entered it.
+ *
+ * These are source guards because the defect is an absence: every screenshot
+ * of the sheet looked correct, and the handle looked exactly like a handle.
+ */
+test("the sheet handle is a control, not a decoration", async () => {
+  const shell = await readFile(new URL("../app/slicer-client.tsx", import.meta.url), "utf8");
+  const handle = /<div\s+className="sheet-handle"[\s\S]*?\/>/.exec(shell)?.[0] ?? "";
+  assert.ok(handle, "the handle should be findable");
+  assert.match(handle, /onPointerDown=\{beginSheetDrag\}/, "it must start a drag");
+  assert.match(handle, /role="button"/, "and announce itself as one");
+  assert.match(handle, /tabIndex=\{0\}/, "reachable by keyboard…");
+  assert.match(handle, /onKeyDown=/, "…and operable by it");
+  assert.match(handle, /aria-label=\{t\.close\}/, "with a name that says what it does");
+});
+
+test("the drag clamps, decides, and never leaves the sheet mid-air", async () => {
+  const shell = await readFile(new URL("../app/slicer-client.tsx", import.meta.url), "utf8");
+  const drag = /const beginSheetDrag = useCallback\([\s\S]*?\n  \}, \[\]\);/.exec(shell)?.[0] ?? "";
+  assert.ok(drag, "beginSheetDrag should be findable");
+  // Pointer events, so a mouse and a stylus behave like a finger.
+  assert.match(drag, /setPointerCapture/, "the gesture must stay attached when the finger leaves the bar");
+  assert.match(drag, /Math\.max\(0,/, "upward travel is clamped — a bottom sheet has a defined top edge");
+  // Both ways a real person performs this: a long pull, and a fast flick.
+  assert.match(drag, /height \/ 3/, "a pull past a third closes");
+  assert.match(drag, /travelled \/ elapsed/, "and so does a flick");
+  // Every listener comes off, on every ending — including a cancelled pointer.
+  for (const ending of ["pointerup", "pointercancel"]) {
+    assert.ok(drag.includes(`addEventListener("${ending}"`), `missing ${ending}`);
+  }
+  assert.match(drag, /removeEventListener\("pointermove", move\)/);
+  assert.match(drag, /setSheetDrag\(0\)/, "and the sheet returns to the CSS transition's control");
+});
+
+test("a modal dialog behaves like one", async () => {
+  const shell = await readFile(new URL("../app/slicer-client.tsx", import.meta.url), "utf8");
+  // Escape, and focus that starts inside — the two things `aria-modal` implies
+  // and neither of which was there.
+  const effect = /if \(!sheet\) return;\n\s*sheetRef\.current\?\.focus\(\);[\s\S]*?\}, \[sheet\]\);/.exec(shell)?.[0] ?? "";
+  assert.ok(effect, "the sheet focus/escape effect should be findable");
+  assert.match(effect, /event\.key === "Escape"/);
+  assert.match(effect, /removeEventListener\("keydown", onKey\)/, "and the listener comes off with the sheet");
+  assert.match(shell, /aria-modal="true"/);
+  assert.match(shell, /ref=\{sheetRef\}/);
+  assert.match(shell, /tabIndex=\{-1\}/, "the dialog itself has to be focusable to receive focus");
+});
+
+test("the handle's touch target is the row, not the 4px bar", async () => {
+  // 4px is a line, not a target. The padded row around it is what a thumb
+  // hits; ::before is what the eye sees.
+  const stylesheet = await readFile(cssUrl, "utf8");
+  // There are two `.sheet-handle` rules: the desktop one, which hides it, and
+  // the mobile one inside @media (max-width: 899px), which is the sheet people
+  // actually drag. Anchor on the multi-line one so the single-line desktop
+  // `display: none` cannot satisfy the assertions below.
+  const rule = /\.sheet-handle \{\n[\s\S]*?\n {2}\}/.exec(stylesheet)?.[0] ?? "";
+  assert.ok(rule, "the mobile handle rule should be findable");
+  assert.ok(!/display: none/.test(rule), "this must be the mobile rule, not the desktop one");
+  assert.match(rule, /width: 100%/);
+  assert.match(rule, /height: 22px/);
+  assert.match(rule, /touch-action: none/, "or the browser scrolls instead of dragging");
+  assert.match(stylesheet, /\.sheet-handle::before \{[^}]*width: 40px;[^}]*height: 4px;/, "the bar keeps its familiar size");
+  assert.match(stylesheet, /\.sheet-handle:focus-visible \{[^}]*outline:/, "and it shows focus (skill §12)");
+});

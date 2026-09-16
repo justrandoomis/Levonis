@@ -910,7 +910,32 @@ button:disabled { cursor: not-allowed; }
 
   .sheet-backdrop { padding: 0; align-items: flex-end; }
   .studio-sheet { width: 100%; max-height: 91dvh; border-right: 0; border-bottom: 0; border-left: 0; border-radius: var(--radius-sheet) var(--radius-sheet) 0 0; padding-bottom: env(safe-area-inset-bottom); }
-  .sheet-handle { width: 40px; height: 4px; margin: 8px auto 1px; display: block; border-radius: 99px; background: var(--track); }
+  /*
+   * A REAL HANDLE NEEDS A REAL TARGET.
+   *
+   * The bar itself stays 40x4 — that is the visual language people recognise —
+   * but the thing a thumb has to hit is the padded row around it, not the
+   * 4px line. The padding is the touch target; ::before is the bar.
+   */
+  .sheet-handle {
+    width: 100%;
+    height: 22px;
+    margin: 0;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    cursor: grab;
+    touch-action: none;
+  }
+  .sheet-handle::before { content: ""; width: 40px; height: 4px; border-radius: 99px; background: var(--track); }
+  .sheet-handle:active { cursor: grabbing; }
+  .sheet-handle:active::before { background: var(--muted); }
+  .sheet-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: var(--radius-sm); }
+  /* The spring back after a drag that did not go far enough. The inline style
+     sets `transition: none` while a finger is down, so this owns every other
+     movement — including the release. */
+  .studio-sheet { transition: transform .22s cubic-bezier(.32, .72, 0, 1); }
   .studio-sheet > header { min-height: 61px; padding-top: 8px; }
   .studio-sheet > header strong { font-size: 16px; }
   .sheet-body { max-height: calc(91dvh - 66px - env(safe-area-inset-bottom)); padding: 14px; }

@@ -247,6 +247,14 @@ const LOCALE_OPTIONS = LOCALES.map((id) => ({ id, label: LOCALE_NAMES[id] }));
 export default function SlicerClient({ user = null }: { user?: { id?: string; displayName: string } | null }) {
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
   const [sheet, setSheet] = useState<Sheet>(null);
+  /**
+   * How far the open sheet has been dragged down, in pixels, while a finger is
+   * on the handle. 0 means "not being dragged", which is also the resting
+   * state — so the inline transform is only applied while it is non-zero and
+   * the CSS transition owns every other movement.
+   */
+  const [sheetDrag, setSheetDrag] = useState(0);
+  const sheetRef = useRef<HTMLElement | null>(null);
   const [profileId, setProfileId] = useState<ProfileId>(DEFAULT_PROFILE_ID);
   const [quality, setQuality] = useState<QualityId>("standard");
   const [strength, setStrength] = useState<StrengthId>("standard");
@@ -1314,6 +1322,66 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     }
   }, []);
 
+  /**
+   * DRAG THE HANDLE DOWN TO DISMISS.
+   *
+   * Pointer events, not touch events, so a mouse and a stylus behave the same
+   * as a finger; `setPointerCapture` keeps the gesture attached to the handle
+   * even when the finger leaves it, which on a sheet being pulled toward the
+   * bottom of the screen is most of the gesture.
+   *
+   * Upward movement is clamped to zero rather than allowed to lift the sheet:
+   * a bottom sheet that can be dragged up past its own top is a sheet with no
+   * defined edge. Past a third of its height — or on a fast flick, which is
+   * how this gesture is actually performed — it closes; otherwise it springs
+   * back, and the spring is the CSS transition, which resumes the moment the
+   * inline `transition: none` is removed with the drag state.
+   */
+  const beginSheetDrag = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const startY = event.clientY;
+    const startedAt = event.timeStamp;
+    const node = event.currentTarget;
+    const height = sheetRef.current?.getBoundingClientRect().height ?? 0;
+    node.setPointerCapture(event.pointerId);
+
+    let travelled = 0;
+    const move = (moveEvent: PointerEvent) => {
+      travelled = Math.max(0, moveEvent.clientY - startY);
+      setSheetDrag(travelled);
+    };
+    const end = (endEvent: PointerEvent) => {
+      node.releasePointerCapture?.(endEvent.pointerId);
+      node.removeEventListener("pointermove", move);
+      node.removeEventListener("pointerup", end);
+      node.removeEventListener("pointercancel", end);
+      setSheetDrag(0);
+      const elapsed = Math.max(1, endEvent.timeStamp - startedAt);
+      const flicked = travelled > 48 && travelled / elapsed > 0.5;
+      if (flicked || (height > 0 && travelled > height / 3)) setSheet(null);
+    };
+    node.addEventListener("pointermove", move);
+    node.addEventListener("pointerup", end);
+    node.addEventListener("pointercancel", end);
+  }, []);
+
+  /**
+   * Escape closes the sheet, and opening one moves focus into it.
+   *
+   * A dialog that declares `aria-modal` and then leaves focus on the page
+   * behind is a dialog a keyboard or a screen reader never enters — the
+   * skill's §10 (correct focus handling) and §12 (keyboard navigation). The
+   * listener is on the document because the sheet's own contents are the
+   * likeliest focus target, and a key pressed inside a field in the sheet
+   * still has to reach it.
+   */
+  useEffect(() => {
+    if (!sheet) return;
+    sheetRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setSheet(null); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [sheet]);
+
   /** The one place that decides whether letting the worker go is safe. */
   const releaseSlicerWorkerIfSafe = useCallback(() => {
     // Painting only exists inside the worker's WASM heap, and the engine's
@@ -1855,9 +1923,39 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         </div>
       </section>
 
+      {/*
+        THE SHEET'S DISMISS PATHS, ALL THREE OF THEM REAL.
+
+        The bar across the top of a bottom sheet is a learned affordance: on a
+        phone it means "drag me down". This one was a decorative div with no
+        pointer handlers at all, so the gesture every user tries first did
+        nothing — the apple-design skill's §2 (agency: the user must understand
+        what will happen) and §10 (an obvious dismiss path) both fail on a
+        control that lies about what it does.
+
+        It drags now, and the two dismissals that were missing are here too:
+        Escape, and focus that starts inside the dialog rather than wherever it
+        happened to be on the page behind. `aria-modal` was already claimed;
+        this is the behaviour that claim implies.
+      */}
       {sheet && <div className="sheet-backdrop" onPointerDown={(event) => { if (event.target === event.currentTarget) setSheet(null); }}>
-        <section className="studio-sheet" role="dialog" aria-modal="true" aria-label={sheetTitle}>
-          <div className="sheet-handle" />
+        <section
+          ref={sheetRef}
+          className="studio-sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-label={sheetTitle}
+          tabIndex={-1}
+          style={sheetDrag > 0 ? { transform: `translateY(${sheetDrag}px)`, transition: "none" } : undefined}
+        >
+          <div
+            className="sheet-handle"
+            role="button"
+            tabIndex={0}
+            aria-label={t.close}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSheet(null); } }}
+            onPointerDown={beginSheetDrag}
+          />
           <header>
             <div><strong>{sheetTitle}</strong><span>{profile.shortName} · {profile.nozzle.toFixed(1)} mm · PLA</span></div>
             <button onClick={() => setSheet(null)} aria-label={t.close}><Icon name="close" /></button>
