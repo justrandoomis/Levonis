@@ -25,7 +25,7 @@ import { motion } from 'motion/react';
 import {
   Store, Package, ShoppingBag, Star, Users, BarChart3, Settings as SettingsIcon,
   Bell, Wallet, Loader2, Plus, ExternalLink,
-  ArrowRight, LayoutGrid, Hammer, Images, Tag, ClipboardList, MessageCircle, Printer,
+  ArrowRight, LayoutGrid, Hammer, Images, Tag, ClipboardList, MessageCircle, Printer, Calculator,
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { ApiError } from '../lib/api';
@@ -38,11 +38,12 @@ import { ProductsManager } from '../components/merchant/dashboard/ProductsManage
 import { OrdersTab, CustomOrdersTab, CouponsTab } from '../components/merchant/dashboard/SalesTabs';
 import { StoreSettingsTab } from '../components/merchant/dashboard/StoreSettingsTab';
 import { PrintersTab } from '../components/merchant/dashboard/PrintersTab';
+import { CostingTab } from '../components/merchant/dashboard/CostingTab';
 
 type Tab =
   | 'overview' | 'products' | 'sections' | 'services' | 'showcase'
   | 'orders' | 'custom' | 'coupons'
-  | 'reviews' | 'customers' | 'money' | 'settings' | 'notifications' | 'printers';
+  | 'reviews' | 'customers' | 'money' | 'settings' | 'notifications' | 'printers' | 'costing';
 
 export default function MerchantDashboardPage() {
   const { loc } = useLanguage();
@@ -124,6 +125,10 @@ export default function MerchantDashboardPage() {
        belong beside the store setup rather than in the catalogue: a shop with
        no printer here is a shop the matcher can never notify. */
     { id: 'printers', label: loc('الطابعات', 'Printers', 'چاپکەرەکان'), icon: <Printer className="w-3.5 h-3.5" /> },
+    /* Beside the printers, because the answer it gives is WHICH printer: it
+       prices one model on every machine the shop owns, with the breakdown a
+       customer must never see (§22). */
+    { id: 'costing', label: loc('تسعير الطباعة', 'Print costing', 'نرخی چاپ'), icon: <Calculator className="w-3.5 h-3.5" /> },
     { id: 'notifications', label: loc('الإشعارات', 'Notifications', 'ئاگادارکردنەوە'), icon: <Bell className="w-3.5 h-3.5" /> },
   ];
 
@@ -222,6 +227,7 @@ export default function MerchantDashboardPage() {
           {tab === 'settings' && <StoreSettingsTab me={me} onSaved={reload} />}
           {tab === 'notifications' && <NotificationsTab />}
           {tab === 'printers' && <PrintersTab canSell={canSell} />}
+          {tab === 'costing' && <CostingTab />}
         </motion.div>
       </div>
     </div>
