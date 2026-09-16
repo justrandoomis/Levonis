@@ -384,29 +384,57 @@ jobs:
       # Worker — which is exactly how EMAIL_API_KEY spent months set in GitHub
       # and absent from the site.
       #
-      # All three are SECRETS, never vars: a var is readable from the Worker's
-      # settings, and two of these are credentials while the third is an
-      # authorization list. Unset means the admin bot stays honestly off — the
-      # webhook answers 503 and admin notifications keep going to the legacy
-      # chat on the customer bot.
-      - name: Upload the admin bot secrets
+      # All of them are SECRETS, never vars: a var is readable from the Worker's
+      # settings, and these are credentials and an authorization list.
+      #
+      # THE CUSTOMER BOT'S TWO WERE NEVER HERE AT ALL, and that is the whole
+      # reason Telegram linking has never worked on the live site. Workflow 16
+      # proved it from two independent directions on 2026-09-16: a wrong-secret
+      # probe of `POST /api/telegram/webhook` answered 503 — which the handler
+      # returns only when TELEGRAM_WEBHOOK_SECRET is unset — and Telegram's own
+      # `getWebhookInfo` reported `last error: Wrong response from the webhook:
+      # 503 Service Unavailable` against a correctly registered URL, minutes
+      # after the owner tried to link an account. Both secrets have existed as
+      # repository secrets the whole time. Nothing carried them across.
+      #
+      # That is the same failure this file was written to prevent, one bot over:
+      # `wrangler deploy` carries plain-text VARS forward but NOT secrets, so a
+      # secret that nothing uploads never reaches the running Worker — exactly
+      # how EMAIL_API_KEY spent months set in GitHub and absent from the site.
+      # The lesson was learned for the email key and for the admin bot, and the
+      # customer bot was simply missed.
+      #
+      # Unset stays honest either way: no customer bot means Telegram sign-in
+      # and linking are unavailable rather than broken, and no admin bot means
+      # @alilevobot stays off with notifications on the legacy chat.
+      - name: Upload the Telegram bot secrets (customer and admin)
         env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
           TELEGRAM_ADMIN_BOT_TOKEN: ${{ secrets.TELEGRAM_ADMIN_BOT_TOKEN }}
           TELEGRAM_ADMIN_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_ADMIN_WEBHOOK_SECRET }}
           TELEGRAM_ADMIN_USER_IDS: ${{ secrets.TELEGRAM_ADMIN_USER_IDS }}
         run: |
-          UPLOADED=0
-          for NAME in TELEGRAM_ADMIN_BOT_TOKEN TELEGRAM_ADMIN_WEBHOOK_SECRET TELEGRAM_ADMIN_USER_IDS; do
+          CUSTOMER=0
+          ADMIN=0
+          for NAME in TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET \
+                      TELEGRAM_ADMIN_BOT_TOKEN TELEGRAM_ADMIN_WEBHOOK_SECRET TELEGRAM_ADMIN_USER_IDS; do
             VALUE="${!NAME}"
             if [ -n "$VALUE" ]; then
               printf '%s' "$VALUE" | npx wrangler secret put "$NAME" --env staging
               echo "$NAME uploaded"
-              UPLOADED=$((UPLOADED + 1))
+              case "$NAME" in
+                TELEGRAM_ADMIN_*) ADMIN=$((ADMIN + 1)) ;;
+                *)                CUSTOMER=$((CUSTOMER + 1)) ;;
+              esac
             else
               echo "$NAME not set — leaving the Worker's current value untouched"
             fi
           done
-          if [ "$UPLOADED" -eq 0 ]; then
+          if [ "$CUSTOMER" -eq 0 ]; then
+            echo "::warning::no CUSTOMER bot secret was uploaded — Telegram sign-in and account linking stay unavailable"
+          fi
+          if [ "$ADMIN" -eq 0 ]; then
             echo "::notice::no admin-bot secret was uploaded; @alilevobot stays off and admin notifications keep using the legacy chat"
           fi
 
