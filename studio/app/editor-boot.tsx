@@ -1,6 +1,49 @@
 "use client";
 
 import { useEffect, useState, type ComponentType } from "react";
+import { LEVONIS_TOKENS, STUDIO_SURFACES } from "./editor-theme";
+
+/**
+ * THE FIRST FRAME IS PART OF THE APP, AND IT WAS NOT DRESSED LIKE IT.
+ *
+ * These two screens — the bundle still loading, and the bundle refusing to
+ * load — are the only thing on screen for the whole engine download on a cold
+ * cache. They were written with Tailwind's zinc scale spelled out inline
+ * (#0a0a0a, #e4e4e7, #a1a1aa, #3f3f46, #18181b) and `fontFamily: system-ui`.
+ *
+ * So the first thing a visitor saw was a DIFFERENT near-black than the app
+ * that follows, with Arabic set in whatever face the operating system picks
+ * rather than Cairo — and then the page changed underneath them when the real
+ * shell mounted. The values come from the same tokens as everything else now,
+ * imported rather than copied, so they cannot drift again.
+ *
+ * `globals.css` is not loaded yet at this point, which is why these are inline
+ * styles and not classes, and why the tokens are read from TypeScript.
+ */
+const BOOT_SCREEN = {
+  minHeight: "100dvh",
+  display: "grid",
+  placeItems: "center",
+  background: STUDIO_SURFACES.shell,
+  color: STUDIO_SURFACES.text,
+  fontFamily: LEVONIS_TOKENS.fontSans,
+} as const;
+
+const BOOT_MUTED = STUDIO_SURFACES.muted;
+
+const BOOT_RETRY = {
+  // 44px is the touch floor the rest of the app keeps; the recovery control on
+  // a failure screen is the last place to go below it.
+  minHeight: "44px",
+  padding: "0.6rem 1.4rem",
+  borderRadius: "12px",
+  border: `1px solid ${STUDIO_SURFACES.line}`,
+  background: STUDIO_SURFACES.surface,
+  color: STUDIO_SURFACES.text,
+  fontFamily: "inherit",
+  fontSize: "13px",
+  cursor: "pointer",
+} as const;
 
 type EditorUser = { id?: string; displayName: string } | null;
 type EditorComponent = ComponentType<{ user?: EditorUser }>;
@@ -85,10 +128,10 @@ export default function EditorBoot({ user = null }: { user?: EditorUser }) {
   if (failed) {
     // Honest failure — no fake progress. Reload is the real recovery action.
     return (
-      <div dir="rtl" style={{ minHeight: "100dvh", display: "grid", placeItems: "center", background: "#0a0a0a", color: "#e4e4e7", fontFamily: "system-ui" }}>
-        <div style={{ textAlign: "center", padding: "1rem" }}>
-          <p style={{ marginBottom: "0.75rem" }}>تعذر تحميل المحرر — تحقق من الاتصال ثم أعد المحاولة / Failed to load the editor.</p>
-          <button onClick={() => window.location.reload()} style={{ padding: "0.6rem 1.4rem", borderRadius: "0.75rem", border: "1px solid #3f3f46", background: "#18181b", color: "#fff" }}>
+      <div dir="rtl" style={BOOT_SCREEN}>
+        <div style={{ textAlign: "center", padding: "1rem", maxWidth: "34ch" }}>
+          <p style={{ marginBottom: "0.75rem", lineHeight: 1.7 }}>تعذر تحميل المحرر — تحقق من الاتصال ثم أعد المحاولة / Failed to load the editor.</p>
+          <button onClick={() => window.location.reload()} style={BOOT_RETRY}>
             إعادة المحاولة / Retry
           </button>
         </div>
@@ -100,8 +143,8 @@ export default function EditorBoot({ user = null }: { user?: EditorUser }) {
     // Minimal shell while the editor bundle loads — mirrors the editor's own
     // dark ground so there is no white flash; no fake progress numbers.
     return (
-      <div aria-busy="true" style={{ minHeight: "100dvh", display: "grid", placeItems: "center", background: "#0a0a0a", color: "#a1a1aa", fontFamily: "system-ui" }}>
-        <p>جارٍ تحميل LEVO Studio…</p>
+      <div aria-busy="true" style={{ ...BOOT_SCREEN, color: BOOT_MUTED }}>
+        <p style={{ lineHeight: 1.7 }}>جارٍ تحميل LEVO Studio…</p>
       </div>
     );
   }

@@ -77,6 +77,32 @@ export const STUDIO_SURFACES = {
 const T = STUDIO_SURFACES;
 
 /**
+ * HOW FAR UP THE ENGINE'S OWN CONTROLS MUST SIT ON A PHONE.
+ *
+ * The shell's bottom bar is `--mobile-bar-height` (68px) PLUS the safe-area
+ * inset, and it is `position: absolute; bottom: 0` over the canvas. The engine
+ * parks its plate bar and its status line inside the same canvas, and they
+ * were pinned at 76px and 72px — numbers chosen when the bar was shorter and
+ * before anyone had a home indicator.
+ *
+ * On a phone with a 34px inset the bar is ~102px tall, so the plate tabs, the
+ * add/remove-plate buttons and the whole status readout were BEHIND it, with
+ * no way to reach them: the tray does not re-provide plate switching, only
+ * plate-add.
+ *
+ * So the offsets are computed from the bar rather than guessed next to it.
+ * `env(safe-area-inset-bottom)` resolves inside a shadow root exactly as it
+ * does on the page — it is a viewport-level value, not an inherited property —
+ * which is what lets this stay in sync without the shell passing anything in.
+ * tests/theme-tokens.test.mjs pins the 68px against globals.css so the two
+ * cannot drift apart again.
+ */
+const MOBILE_BAR_HEIGHT_PX = 68;
+/** Clear of the bar, plus a thumb's worth of margin so the edges do not touch. */
+const ABOVE_BAR = `calc(${MOBILE_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + 10px)`;
+const ABOVE_BAR_TIGHT = `calc(${MOBILE_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + 6px)`;
+
+/**
  * Injected into the engine's shadow roots by the S4 adapter. Includes the
  * responsive sidebar rules driven by the `data-levo-sidebar` host attribute
  * (set through `EngineAdapter#setHostAttribute`).
@@ -146,12 +172,12 @@ export const EDITOR_SHADOW_CSS = `
   @media (max-width: 899px) {
     .app-shell { font-size: 12px; }
     .topbar, .left-rail, .vp-top-toolbar { display: none !important; }
-    .plate-bar { right: 8px; bottom: 76px; padding: 4px; }
+    .plate-bar { right: 8px; bottom: ${ABOVE_BAR}; padding: 4px; }
     .plate-bar button { min-width: 44px; height: 44px; }
-    .vp-status { bottom: 72px; left: 9px; right: 58px; font-size: 10px; }
-    .bed-warn, .stats-card { left: 8px; bottom: 116px; max-width: calc(100% - 68px); }
+    .vp-status { bottom: ${ABOVE_BAR_TIGHT}; left: 9px; right: 58px; font-size: 11px; }
+    .bed-warn, .stats-card { left: 8px; bottom: calc(${ABOVE_BAR} + 44px); max-width: calc(100% - 68px); }
     .brush-panel { top: 8px; left: 8px; width: min(280px, calc(100vw - 16px)); }
-    .sidebar { position: absolute; z-index: 14; top: 0; right: 0; bottom: 62px; width: min(94vw, 420px); flex-basis: auto; box-shadow: -16px 0 34px ${T.shadowCast}; }
+    .sidebar { position: absolute; z-index: 14; top: 0; right: 0; bottom: ${ABOVE_BAR_TIGHT}; width: min(94vw, 420px); flex-basis: auto; box-shadow: -16px 0 34px ${T.shadowCast}; }
     :host([data-levo-sidebar="closed"]) .sidebar { display: none; }
     :host([data-levo-sidebar="open"]) .sidebar { display: flex; }
     .sidebar-scroll { padding: 8px 8px 82px; }

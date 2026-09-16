@@ -183,3 +183,46 @@ test("the file header describes the design that is actually in the file", () => 
   assert.ok(!/olive family/i.test(header) || /no longer/i.test(header), "the header still advertises the olive palette");
   assert.match(css, /THE BLACK SYSTEM/, "the rationale for the ladder must stay with it");
 });
+
+test("the engine chrome is parked above the shell's bar, from the same number", () => {
+  /**
+   * The shell's bottom bar is `--mobile-bar-height` plus the safe-area inset,
+   * absolutely positioned over the canvas. The engine parks its plate bar and
+   * its status line inside that same canvas, and those offsets were hard-coded
+   * at 76px and 72px — chosen when the bar was shorter and before anyone had a
+   * home indicator. On a phone with a 34px inset the bar is ~102px tall, so
+   * the plate tabs and the whole status readout sat BEHIND it, unreachable:
+   * the tool tray re-provides plate-ADD but never plate switching.
+   *
+   * Both sides now derive from one number. This is the test that keeps them
+   * derived from the SAME one.
+   */
+  // `:root` carries a desktop default and the mobile block OVERRIDES it, so
+  // the number to compare against is the one in force below 900px — which is
+  // the only width the engine's mobile rules apply at.
+  assert.ok(/--mobile-bar-height:\s*\d+px/.test(root), "--mobile-bar-height must be a token");
+  const shadow = /const MOBILE_BAR_HEIGHT_PX = (\d+);/.exec(theme)?.[1];
+  assert.ok(shadow, "editor-theme.ts must name the bar height it is clearing");
+  const mobile = /@media \(max-width: 899px\) \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? "";
+  const inForce = /--mobile-bar-height:\s*(\d+)px/.exec(mobile)?.[1];
+  assert.equal(
+    inForce,
+    shadow,
+    "editor-theme.ts and the mobile --mobile-bar-height disagree — the engine would be parked at the wrong height"
+  );
+
+  // And every engine element that lives at the bottom of the canvas clears it,
+  // safe area included. A bare `bottom: NNpx` here is the bug coming back.
+  const shadowCss = /EDITOR_SHADOW_CSS = `([\s\S]*?)\n`;/.exec(theme)?.[1] ?? "";
+  const mobileShadow = /@media \(max-width: 899px\) \{([\s\S]*?)\n {2}\}/.exec(shadowCss)?.[1] ?? "";
+  assert.ok(mobileShadow.length > 200, "the engine's mobile block should be findable");
+  for (const selector of [".plate-bar", ".vp-status", ".sidebar"]) {
+    const rule = new RegExp(`\\${selector}[^{]*\\{[^}]*\\}`).exec(mobileShadow)?.[0] ?? "";
+    assert.ok(rule, `${selector} should have a mobile rule`);
+    assert.ok(
+      /bottom:\s*(calc\()?\$\{ABOVE_BAR/.test(rule),
+      `${selector} must clear the shell bar — found: ${/bottom:[^;]*/.exec(rule)?.[0]}`
+    );
+  }
+  assert.match(theme, /env\(safe-area-inset-bottom\)/, "the inset must be part of the offset");
+});

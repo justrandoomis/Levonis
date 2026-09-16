@@ -821,7 +821,59 @@ button:disabled { cursor: not-allowed; }
   .mobile-tooltray > header small { color: var(--muted); font-size: var(--text-caption); }
   .mobile-tooltray > header button { width: 44px; height: 44px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: var(--radius-sm); display: grid; place-items: center; background: var(--surface); cursor: pointer; }
   .mobile-tooltray > header svg { width: 18px; height: 18px; }
-  .mobile-toolgrid { padding: 8px 8px 12px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; direction: ltr; }
+  /*
+   * GROUPS, NOT A GRID OF TWENTY.
+   *
+   * The tray was one flat grid: a mode beside a destructive action beside a
+   * history step beside an output, all the same size and weight. Proximity and
+   * a quiet label do the work a box would otherwise be asked to do (skill §4),
+   * so the groups carry a hairline between them and nothing else — no cards,
+   * no nesting, no second border.
+   *
+   * The label is quiet by COLOUR and letter-spacing, not by being shrunk below
+   * reading (skill §5): it sits at the caption size the whole app now floors
+   * at, in --muted, upper-case-tracked so it reads as a heading rather than as
+   * another control.
+   */
+  .toolgroup + .toolgroup { border-top: 1px solid var(--line-soft); }
+  .toolgroup-label {
+    margin: 0;
+    padding: 10px 10px 2px;
+    color: var(--muted);
+    font-size: var(--text-caption);
+    font-weight: 750;
+    letter-spacing: .06em;
+  }
+  .mobile-toolgrid { padding: 6px 8px 10px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; direction: ltr; }
+
+  /*
+   * THE LANGUAGE, AS THREE CHOICES RATHER THAN A PICKER.
+   *
+   * This is the copy a 320px phone can reach — the header's <select> is
+   * removed at that width. Three fixed options are a segmented control's exact
+   * job, and the autonyms are their own labels, so the control needs no
+   * translation of itself.
+   */
+  .locale-segments { padding: 2px 8px 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .locale-segments button {
+    min-width: 0;
+    min-height: var(--tap-min);
+    padding: 6px 4px;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--panel);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: var(--text-caption);
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  /* ONE state cue (skill §3): the surface lifts and the text stops being
+     quiet. No gold fill — the accent belongs to the primary action. */
+  .locale-segments button.active { border-color: var(--line); background: var(--surface); color: var(--text); }
   .mobile-toolgrid :is(button, .file-select-control) { min-width: 0; min-height: 62px; padding: 6px 3px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; background: var(--panel); color: var(--text); cursor: pointer; }
   .mobile-toolgrid :is(button, .file-select-control):active { background: var(--surface-strong); }
   .mobile-toolgrid :is(button, .file-select-control).danger { background: var(--danger-surface); color: var(--on-danger); }

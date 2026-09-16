@@ -94,6 +94,8 @@ import type {
 import {
   DEFAULT_LOCALE,
   DICTIONARIES,
+  LOCALES,
+  LOCALE_NAMES,
   applyLocaleToDocument,
   dateLocaleFor,
   readStoredLocale,
@@ -231,6 +233,16 @@ function downloadBlob(blob: Blob, name: string) {
 }
 
 const MB = 1024 * 1024;
+
+/**
+ * The three locales, as a segmented control rather than a native <select>.
+ *
+ * Three fixed choices are exactly what a segmented control is for, and on a
+ * phone it needs no picker sheet — which matters because this is the copy a
+ * 320px screen can reach. The autonyms are the same ones the header's select
+ * shows, imported rather than restated.
+ */
+const LOCALE_OPTIONS = LOCALES.map((id) => ({ id, label: LOCALE_NAMES[id] }));
 
 export default function SlicerClient({ user = null }: { user?: { id?: string; displayName: string } | null }) {
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
@@ -761,6 +773,26 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   }, [importSelectedFiles]);
 
   // -- general arrange (all current objects, undoable — S4) ------------------
+  /**
+   * ONE UNDO IN THE BAR, FOR THE THING THAT WAS JUST DONE.
+   *
+   * Arrange, orient and cut each raised their own undo flag and cleared none
+   * of the others — only the undo HANDLERS cleared siblings. So arrange, then
+   * orient, then cut left three pills in the notice bar, beside the message
+   * text and the close button, inside 306px of width on a phone. Nothing in
+   * that row could be read, and two of the three pills would have undone a
+   * step that was no longer the last one anyway.
+   *
+   * These three operations are alternatives, not a stack: each one re-arranges
+   * the same plate, and the engine keeps no history across them. So raising
+   * one lowers the rest, here, at the single point that sets any of them.
+   */
+  const raiseUndo = useCallback((which: "arrange" | "orient" | "cut", available: boolean) => {
+    setArrangeUndoAvailable(which === "arrange" && available);
+    setOrientUndoAvailable(which === "orient" && available);
+    setCutUndoAvailable(which === "cut" && available);
+  }, []);
+
   const arrangeAll = useCallback(async () => {
     setToolTrayOpen(false);
     if (!objects.length) { setNotice(t.arrangeUnavailable); return; }
@@ -771,12 +803,12 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     });
     if (!result.ok) { setNotice(t.arrangeUnavailable); return; }
     arrangeUndoRef.current = result.undo;
-    setArrangeUndoAvailable(Boolean(result.undo));
+    raiseUndo("arrange", Boolean(result.undo));
     const messages = [templateText(t.arrangeDone, { models: result.arrangedCount, plates: Math.max(1, result.platesUsed) })];
     if (result.oversizedCount) messages.push(templateText(t.zipOversized, { count: result.oversizedCount }));
     if (result.overflowCount) messages.push(templateText(t.zipOverflow, { count: result.overflowCount }));
     setNotice(messages.join(" "));
-  }, [adapter, objects.length, profile.bedDepth, profile.bedWidth, selectedPlate, t.arrangeDone, t.arrangeUnavailable, t.zipOverflow, t.zipOversized]);
+  }, [adapter, objects.length, profile.bedDepth, profile.bedWidth, raiseUndo, selectedPlate, t.arrangeDone, t.arrangeUnavailable, t.zipOverflow, t.zipOversized]);
 
   // -- auto-orient (BambuStudio's scoring, undoable) -------------------------
   /**
@@ -806,7 +838,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     }
     if (!result.ok) { setNotice(t.orientUnavailable); return; }
     orientUndoRef.current = result.undo;
-    setOrientUndoAvailable(Boolean(result.undo));
+    raiseUndo("orient", Boolean(result.undo));
     const total = result.orientedCount + result.alreadyBestCount + result.skippedCount;
     const messages = result.orientedCount
       ? [templateText(t.orientDone, { oriented: result.orientedCount, total })]
@@ -814,7 +846,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     if (result.skippedCount) messages.push(templateText(t.orientSkipped, { skipped: result.skippedCount }));
     if (result.lockedCount) messages.push(templateText(t.orientLocked, { locked: result.lockedCount }));
     setNotice(messages.join(" "));
-  }, [adapter, objects.length, selectedPlate, t.orientBusy, t.orientDone, t.orientLocked,
+  }, [adapter, objects.length, raiseUndo, selectedPlate, t.orientBusy, t.orientDone, t.orientLocked,
       t.orientNoChange, t.orientSkipped, t.orientUnavailable]);
 
   /**
@@ -868,14 +900,14 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     }
     setSheet(null);
     cutUndoRef.current = result.undo;
-    setCutUndoAvailable(Boolean(result.undo));
+    raiseUndo("cut", Boolean(result.undo));
     const messages = [templateText(t.cutDone, { pieces: result.pieceIds.length })];
     // A cut face that could not be closed leaves a hole in a piece that will
     // then slice badly. Saying so is the difference between a tool and a toy.
     if (result.openChains) messages.push(templateText(t.cutOpen, { open: result.openChains }));
     if (result.skippedLoops) messages.push(templateText(t.cutSkipped, { skipped: result.skippedLoops }));
     setNotice(messages.join(" "));
-  }, [adapter, cutCap, cutKeep, cutOffset, selectedPlate, t.cutDone, t.cutMissed, t.cutOpen,
+  }, [adapter, cutCap, cutKeep, cutOffset, raiseUndo, selectedPlate, t.cutDone, t.cutMissed, t.cutOpen,
       t.cutSkipped, t.cutUnavailable]);
 
   const undoCut = useCallback(() => {
@@ -1703,29 +1735,112 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           </button>
         </div>
 
+        {/*
+          THE TOOL TRAY, GROUPED.
+
+          It was twenty identical tiles in one flat grid: a mode (move) sat
+          beside a destructive action (delete) sat beside a history step (undo)
+          sat beside an output (save), all the same size, the same weight and
+          the same colour. Nothing said which of them changes the selected
+          object, which changes the whole plate, and which cannot be taken
+          back. The apple-design skill asks for hierarchy from proximity before
+          boxes (§4) and for competing emphasis to be removed (§15); a flat
+          grid of twenty serves neither.
+
+          Five groups now, each with a quiet label, in the order a print is
+          actually made: put something on the bed, shape it, lay the plate out,
+          look at it, then keep it. Destructive actions are the only ones that
+          carry colour, and they sit at the end of their own group rather than
+          in the middle of the grid where a thumb lands by accident.
+
+          NOTHING WAS DROPPED. Every control that was in the flat grid is still
+          here, and two that were reachable on a desktop and NOWHERE on a phone
+          have been added: "new project" (the header button that carries it is
+          display:none below 900px) and the language switch (removed outright
+          below 350px, which locked a small phone to whatever locale happened
+          to be stored).
+        */}
         {toolTrayOpen && <section className="mobile-tooltray" aria-label={t.editTools}>
           <header><span><strong>{t.editTools}</strong><small>{t.editToolsHelp}</small></span><button onClick={() => setToolTrayOpen(false)} aria-label={t.close}><Icon name="close" /></button></header>
-          <div className="mobile-toolgrid">
-            <FileSelectControl className="tool-upload-action" label={t.add} disabled={!Viewport || Boolean(importProgress)} onFiles={handlePickedFiles}><Icon name="file" /><span>{t.add}</span></FileSelectControl>
-            <button onClick={() => runTool("gizmo-move")}><Icon name="move" /><span>{t.move}</span></button>
-            <button onClick={() => runTool("gizmo-rotate")}><Icon name="rotate" /><span>{t.rotate}</span></button>
-            <button onClick={() => runTool("gizmo-scale")}><Icon name="scale" /><span>{t.scale}</span></button>
-            <button onClick={() => runTool("tool-duplicate")}><Icon name="copy" /><span>{t.duplicate}</span></button>
-            <button className="danger" onClick={() => runTool("tool-delete")}><Icon name="trash" /><span>{t.remove}</span></button>
-            <button onClick={() => runTool("tool-split")}><Icon name="split" /><span>{t.split}</span></button>
-            <button onClick={() => runTool("tool-onbed")}><Icon name="bed" /><span>{t.onBed}</span></button>
-            <button onClick={() => runTool("gizmo-paint")}><Icon name="paint" /><span>{t.paint}</span></button>
-            <button onClick={() => void arrangeAll()}><Icon name="arrange" /><span>{t.arrange}</span></button>
-            <button data-levo-action="auto-orient-tray" disabled={orienting} onClick={() => void orientAll()}><Icon name="orient" /><span>{t.orient}</span></button>
-            <button data-levo-action="cut-tray" onClick={openCut}><Icon name="cut" /><span>{t.cut}</span></button>
-            <button onClick={() => { shortcut("z"); setToolTrayOpen(false); }}><Icon name="fit" /><span>{t.fit}</span></button>
-            <button onClick={() => { shortcut("b"); setToolTrayOpen(false); }}><Icon name="bed" /><span>{t.bed}</span></button>
-            <button onClick={() => { clickControl("undo"); setToolTrayOpen(false); }}><Icon name="undo" /><span>{t.undo}</span></button>
-            <button onClick={() => { clickControl("redo"); setToolTrayOpen(false); }}><Icon name="redo" /><span>{t.redo}</span></button>
-            <button onClick={() => { clickControl("plate-add"); setToolTrayOpen(false); }}><Icon name="layers" /><span>{t.addPlate}</span></button>
-            <button onClick={() => { saveBambuProject(); setToolTrayOpen(false); }}><Icon name="save" /><span>{t.save}</span></button>
-            {plateCount > 1 && <button onClick={() => { triggerSlice(true); setToolTrayOpen(false); }}><Icon name="slice" /><span>{t.sliceAll}</span></button>}
-            <button className="danger" onClick={deleteAll}><Icon name="trash" /><span>{t.deleteAll}</span></button>
+
+          <div className="toolgroup" role="group" aria-label={t.files}>
+            <p className="toolgroup-label">{t.files}</p>
+            <div className="mobile-toolgrid">
+              <FileSelectControl className="tool-upload-action" label={t.add} disabled={!Viewport || Boolean(importProgress)} onFiles={handlePickedFiles}><Icon name="file" /><span>{t.add}</span></FileSelectControl>
+              <button onClick={() => { void openProjects(); setToolTrayOpen(false); }}><Icon name="layers" /><span>{t.projects}</span></button>
+              <button onClick={() => { newProject(); setToolTrayOpen(false); }}><Icon name="plus" /><span>{t.newProject}</span></button>
+            </div>
+          </div>
+
+          <div className="toolgroup" role="group" aria-label={t.editTools}>
+            <p className="toolgroup-label">{t.tools}</p>
+            <div className="mobile-toolgrid">
+              <button onClick={() => runTool("gizmo-move")}><Icon name="move" /><span>{t.move}</span></button>
+              <button onClick={() => runTool("gizmo-rotate")}><Icon name="rotate" /><span>{t.rotate}</span></button>
+              <button onClick={() => runTool("gizmo-scale")}><Icon name="scale" /><span>{t.scale}</span></button>
+              <button onClick={() => runTool("gizmo-paint")}><Icon name="paint" /><span>{t.paint}</span></button>
+              <button onClick={() => runTool("tool-duplicate")}><Icon name="copy" /><span>{t.duplicate}</span></button>
+              <button onClick={() => runTool("tool-split")}><Icon name="split" /><span>{t.split}</span></button>
+              <button onClick={() => runTool("tool-onbed")}><Icon name="bed" /><span>{t.onBed}</span></button>
+              <button className="danger" onClick={() => runTool("tool-delete")}><Icon name="trash" /><span>{t.remove}</span></button>
+            </div>
+          </div>
+
+          <div className="toolgroup" role="group" aria-label={t.arrange}>
+            <p className="toolgroup-label">{t.plate}</p>
+            <div className="mobile-toolgrid">
+              <button onClick={() => void arrangeAll()}><Icon name="arrange" /><span>{t.arrange}</span></button>
+              <button data-levo-action="auto-orient-tray" disabled={orienting} onClick={() => void orientAll()}><Icon name="orient" /><span>{t.orient}</span></button>
+              <button data-levo-action="cut-tray" onClick={openCut}><Icon name="cut" /><span>{t.cut}</span></button>
+              <button onClick={() => { clickControl("plate-add"); setToolTrayOpen(false); }}><Icon name="layers" /><span>{t.addPlate}</span></button>
+              <button className="danger" onClick={deleteAll}><Icon name="trash" /><span>{t.deleteAll}</span></button>
+            </div>
+          </div>
+
+          <div className="toolgroup" role="group" aria-label={t.preview}>
+            <p className="toolgroup-label">{t.preview}</p>
+            <div className="mobile-toolgrid">
+              <button onClick={() => { shortcut("z"); setToolTrayOpen(false); }}><Icon name="fit" /><span>{t.fit}</span></button>
+              <button onClick={() => { shortcut("b"); setToolTrayOpen(false); }}><Icon name="bed" /><span>{t.bed}</span></button>
+              <button onClick={() => { clickControl("undo"); setToolTrayOpen(false); }}><Icon name="undo" /><span>{t.undo}</span></button>
+              <button onClick={() => { clickControl("redo"); setToolTrayOpen(false); }}><Icon name="redo" /><span>{t.redo}</span></button>
+            </div>
+          </div>
+
+          <div className="toolgroup" role="group" aria-label={t.save}>
+            <p className="toolgroup-label">{t.printExport}</p>
+            <div className="mobile-toolgrid">
+              <button onClick={() => { saveBambuProject(); setToolTrayOpen(false); }}><Icon name="save" /><span>{t.save}</span></button>
+              {plateCount > 1 && <button onClick={() => { triggerSlice(true); setToolTrayOpen(false); }}><Icon name="slice" /><span>{t.sliceAll}</span></button>}
+              <button onClick={() => { openPrintCenter(); setToolTrayOpen(false); }}><Icon name="print" /><span>{t.printExport}</span></button>
+            </div>
+          </div>
+
+          {/*
+            THE LANGUAGE, WHERE A SMALL PHONE CAN REACH IT.
+
+            The header's <select> is the only locale switcher in the app and it
+            is removed outright below 350px, so a 320px phone was locked to
+            whatever locale was persisted — in an app whose whole point is that
+            it speaks Arabic, English and Kurdish. Here it is a segmented
+            control rather than a select: three fixed choices are a segmented
+            control's exact job, and it needs no native picker on a phone.
+          */}
+          <div className="toolgroup" role="group" aria-label={t.language}>
+            <p className="toolgroup-label">{t.language}</p>
+            <div className="locale-segments" role="radiogroup" aria-label={t.language}>
+              {LOCALE_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  role="radio"
+                  aria-checked={locale === option.id}
+                  className={locale === option.id ? "active" : ""}
+                  onClick={() => changeLocale(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
         </section>}
 

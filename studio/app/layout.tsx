@@ -31,7 +31,16 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0A1410",
+  /**
+   * The colour the BROWSER paints its own chrome — the Android address bar,
+   * the iOS status area, the task switcher.
+   *
+   * It was #0A1410 long after the app became black: the old olive, sitting in
+   * a strip directly above a pure-black application, which is the one place a
+   * tint is impossible to miss. The surfaces moved and the frame around them
+   * did not.
+   */
+  themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
