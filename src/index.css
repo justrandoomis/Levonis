@@ -830,7 +830,22 @@ html[data-overlay-open='true'] .lv-app-intro__character {
 :root {
   --lv-home-visual: clamp(82px, 21.5vw, 102px);
   --lv-home-hit: clamp(88px, 23vw, 108px);
-  --lv-header-visual: clamp(66px, 17vw, 84px);
+  /*
+    THE HEADER BAR IS AS TALL AS THE BLOUB, so the bloub is what makes it tall.
+    At 17vw on a 412px phone the visual was 70px and the hit box 78px; with
+    12px of padding above and below, the bar stood at ~102px — a tenth of the
+    screen spent on chrome before the product was reached, which is what the
+    owner saw.
+
+    The proportions are untouched: the same clamp shape, the same +8px hit box
+    around the same circle, so the character is recognisably itself and its
+    landing geometry still resolves from `getBoundingClientRect`. It is simply
+    smaller, and the padding below is tighter. ~102px becomes ~72px.
+
+    The HOME bloub is deliberately NOT changed. It is the page's own character
+    moment and has room to be one; a product page header is chrome.
+  */
+  --lv-header-visual: clamp(52px, 13.5vw, 64px);
   --lv-header-hit: calc(var(--lv-header-visual) + 8px);
 }
 .lv-character-anchor { display: grid; place-items: center; width: var(--lv-header-visual); height: var(--lv-header-visual); flex: none; }
@@ -838,7 +853,7 @@ html[data-overlay-open='true'] .lv-app-intro__character {
 .lv-character-bottom-home { display: grid; place-items: center; width: var(--lv-home-hit); height: var(--lv-home-hit); }
 .lv-character-fallback { color: var(--color-text-secondary); font-size: 24px; font-weight: 800; }
 .lv-character-home { display: grid; place-items: center; width: var(--lv-header-hit); height: var(--lv-header-hit); border-radius: 8px; }
-.lv-character-header { display: grid; grid-template-columns: minmax(0, 1fr) var(--lv-header-hit) minmax(0, 1fr); gap: 8px; padding-top: max(0.75rem, env(safe-area-inset-top)); }
+.lv-character-header { display: grid; grid-template-columns: minmax(0, 1fr) var(--lv-header-hit) minmax(0, 1fr); gap: 8px; padding-top: max(0.375rem, env(safe-area-inset-top)); }
 .lv-character-header > :first-child { justify-self: start; }
 .lv-character-header > .lv-character-home { grid-column: 2; }
 .lv-character-header > :last-child { justify-self: end; min-width: 0; max-width: 100%; }

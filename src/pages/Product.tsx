@@ -48,6 +48,7 @@ import {
   AlertTriangle, Store, ZoomIn, Image as ImageIcon, Box, ExternalLink, PlayCircle, Wrench,
 } from 'lucide-react';
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
+import { useGoBack } from '../lib/useGoBack';
 import { setCartCount, countCartItems } from '../lib/cartCount';
 import ReviewSection from '../components/reviews/ReviewSection';
 import SafeImage from '../components/ui/SafeImage';
@@ -686,6 +687,9 @@ export default function Product() {
   // caught up.
   const shownSlug = urlSlug || slug;
   const navigate = useNavigate();
+  /** The catalogue is this page's parent: a visitor who arrived from WhatsApp
+   *  has no history to pop, and «رجوع» must take them INTO the shop. */
+  const goBack = useGoBack('/products');
   const { lang, dir } = useLanguage();
   const { isAuthenticated } = useAuth();
   const { settings: publicSettings } = useWallet();
@@ -1040,54 +1044,102 @@ export default function Product() {
     captureSupportRefFromSearch(location.search, { product: location.pathname });
   }, [location.search, location.pathname]);
 
-  const handleShare = async () => {
-    const name = product ? pickName(product.name_en, product.name, product.name_ar) : '';
-    // §3.3 — a signed-in sharer's link carries THEIR support handle. The path
-    // is built by the SERVER from the account's own username (GET
-    // /api/referrals/support/link): the browser never invents a handle, and a
-    // signed-out visitor (or an account with no username yet) simply shares
-    // the plain product URL instead of a broken code.
-    let url = window.location.href;
-    if (isAuthenticated && slug) {
+  /**
+   * THE SUPPORT LINK IS FETCHED BEFORE THE TAP, NOT DURING IT.
+   *
+   * §3.3 — a signed-in sharer's link carries THEIR support handle, built by the
+   * SERVER from the account's own username: the browser never invents a handle.
+   * That part is unchanged. What changed is WHEN it is asked for.
+   *
+   * It used to be awaited inside the click, so every share paid a full network
+   * round trip before the sheet appeared — the delay the owner reported. Worse
+   * than slow, it was BROKEN on iOS: Safari requires `navigator.share()` to be
+   * called synchronously inside the user gesture, and an `await` before it
+   * detaches the call from that gesture, so the share throws NotAllowedError
+   * and nothing opens at all.
+   *
+   * So the handle is resolved once, quietly, when the page settles. By the time
+   * a thumb reaches the button the answer is already in a ref, the sheet opens
+   * in the same tick as the tap, and a share that happens before the fetch
+   * lands simply carries the plain product URL — which is a correct link, just
+   * without the referral. Never a delay, never a failure, at worst a missed
+   * extra.
+   */
+  const supportUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    supportUrlRef.current = null;
+    if (!isAuthenticated || !slug) return;
+    let cancelled = false;
+    void (async () => {
       try {
         const res = await api.get<{ path: string; ref: string | null; supported: boolean }>(
           `/api/referrals/support/link?path=${encodeURIComponent(`/product/${slug}`)}`
         );
-        if (res.supported && res.path) url = new URL(res.path, window.location.origin).toString();
+        if (!cancelled && res.supported && res.path) {
+          supportUrlRef.current = new URL(res.path, window.location.origin).toString();
+        }
       } catch {
-        /* keep the plain product URL — sharing must not fail over an extra */
+        /* the plain product URL is the fallback, and it is a good one */
       }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, slug]);
+
+  const handleShare = () => {
+    const name = product ? pickName(product.name_en, product.name, product.name_ar) : '';
+    const url = supportUrlRef.current ?? window.location.href;
+    // NOT awaited before the call: `navigator.share` must be reached in the
+    // same tick as the gesture. The promise is handled after the sheet opens.
+    if (navigator.share) {
+      navigator.share({ title: name, url }).catch(() => {
+        /* the customer dismissed the sheet — not an error */
+      });
+      return;
     }
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: name, url });
-      } else {
-        await navigator.clipboard.writeText(url);
+    void navigator.clipboard
+      .writeText(url)
+      .then(() => {
         setNotice(s.linkCopied);
         setTimeout(() => setNotice(''), 2000);
-      }
-    } catch {
-      /* user cancelled the share sheet */
-    }
+      })
+      .catch(() => {
+        /* a browser that refuses the clipboard: the URL bar still has the link */
+      });
   };
 
+  /**
+   * THE HEART MOVES ON THE TAP, NOT ON THE ROUND TRIP.
+   *
+   * It used to wait for the server before changing, so on a phone the button
+   * sat inert for as long as the network took — the slowness the owner
+   * reported. A favourite is a preference, not a payment: the honest interface
+   * shows the new state at once and puts it back if the server disagrees.
+   *
+   * The button is no longer DISABLED while in flight either. Disabling it was
+   * how a double-tap was prevented, and it is also what made the control feel
+   * dead; `favBusy` still guards re-entry, so a second tap during the request
+   * is ignored rather than queued, and the control keeps its normal appearance
+   * throughout.
+   *
+   * On failure the heart returns to where it was and the error is said out
+   * loud. Silently keeping a filled heart that the server never recorded would
+   * be a lie the customer only discovers on their favourites page.
+   */
   const toggleFavorite = async () => {
     if (!product || favBusy || source !== 'catalog') return;
     if (!isAuthenticated) {
       navigate(`/auth?next=${encodeURIComponent(`/product/${product.slug}`)}`);
       return;
     }
+    const was = favorite;
+    setFavorite(!was);
     setFavBusy(true);
     setActionError('');
     try {
-      if (favorite) {
-        await api.delete(`/api/profile/favorites/${product.id}`);
-        setFavorite(false);
-      } else {
-        await api.put(`/api/profile/favorites/${product.id}`);
-        setFavorite(true);
-      }
+      if (was) await api.delete(`/api/profile/favorites/${product.id}`);
+      else await api.put(`/api/profile/favorites/${product.id}`);
     } catch (err) {
+      setFavorite(was);
       if (err instanceof ApiError && err.status === 401) {
         navigate(`/auth?next=${encodeURIComponent(`/product/${product.slug}`)}`);
         return;
@@ -1237,7 +1289,7 @@ export default function Product() {
   if (loading || !product) {
     return (
       <div className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
-        <div className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center">
+        <div className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 pb-1.5 flex items-center">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -2267,14 +2319,17 @@ export default function Product() {
   );
 
   /**
-   * THE SAME STEPPER, SIZED FOR THE BAR.
+   * THE PHONE'S ONLY STEPPER, SIZED FOR THE BAR.
    *
-   * `qtyControl` above is a full-width labelled row; it lives in the stacked
-   * panel, which on a phone sits above the description — so a customer reading
-   * the reviews and reaching for the fixed bar had no way to change quantity
-   * without scrolling back. This is the bar's own copy: 44px targets (the
-   * floor for a reliable tap), no label, and it never appears when there is
-   * only one unit to be had.
+   * `qtyControl` above is a full-width labelled row, and at `lg` it is the
+   * desktop panel's — there is no bottom bar at that width. Below `lg` this is
+   * the only quantity control on the page: 44px targets (the floor for a
+   * reliable tap), no label because the bar has no room for one, and it never
+   * appears when there is only one unit to be had.
+   *
+   * It sits beside the price and «أضف إلى السلة», which is where a quantity
+   * decision is actually made, and it is reachable from anywhere on the page
+   * without scrolling back up.
    */
   const barStepper =
     maxQty > 1 ? (
@@ -2398,10 +2453,10 @@ export default function Product() {
     <div ref={pageRef} className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
       {/* Sticky page chrome inside the app scroll container — never a fixed
           overlay that could land in the middle of the content. */}
-      <div ref={pageHeaderRef} className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 py-3 flex items-center justify-between gap-2">
+      <div ref={pageHeaderRef} className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 pb-1.5 flex items-center justify-between gap-2">
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={goBack}
           aria-label={s.back}
           className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-zinc-900/60 rounded-full hover:bg-zinc-800 transition-colors"
         >
@@ -2420,7 +2475,7 @@ export default function Product() {
           <button
             type="button"
             onClick={toggleFavorite}
-            disabled={favBusy || source !== 'catalog'}
+            disabled={source !== 'catalog'}
             aria-label={favorite ? s.unfavorite : s.favorite}
             aria-pressed={favorite}
             className={`w-11 h-11 rounded-full bg-zinc-900/60 flex items-center justify-center transition-colors ${
@@ -2559,12 +2614,25 @@ export default function Product() {
               ) : null}
             </div>
 
-            {/* Purchase panel on PHONES: the same controls, stacked, with the
-                CTA delegated to the single bottom bar (no doubled button). */}
+            {/*
+              Purchase panel on PHONES: the same controls, stacked, with the CTA
+              AND THE STEPPER delegated to the single bottom bar.
+
+              The quantity row used to live here as well. On a phone the bottom
+              bar is always on screen, so the customer saw two steppers a
+              thumb-length apart, driving the same number — the duplication the
+              owner reported. Two controls for one value is not redundancy, it
+              is a question about which one is real.
+
+              The bar's own stepper is the survivor because it is the one beside
+              the price and the «أضف إلى السلة» button, which is where a
+              quantity decision is actually made. The DESKTOP panel below keeps
+              its copy: there is no bottom bar at `lg`, so removing it there
+              would leave no way to change quantity at all.
+            */}
             <div className="mt-5 space-y-3 lg:hidden">
               {priceBlock}
               {selectionBlocks}
-              {qtyControl}
               {statusMessages}
             </div>
 
