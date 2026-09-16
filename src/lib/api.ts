@@ -206,6 +206,28 @@ export function isAborted(e: unknown): boolean {
   return e instanceof ApiError && e.code === 'ABORTED';
 }
 
+/**
+ * THE REASON, NOT THE CATEGORY.
+ *
+ * `e instanceof ApiError ? e.message : 'فشل الرفع'` was written across the admin
+ * to avoid printing an internal exception at a customer. It has the opposite
+ * effect where it is actually used: `requestRaw` already converts EVERY network
+ * and server failure into an `ApiError`, so the only errors that reach the
+ * `else` branch are the ones thrown BEFORE the request — the image decoder, the
+ * WebP encoder, the size guards. Those are exactly the failures whose reason the
+ * admin needs, and they were the only ones being thrown away. An upload that
+ * failed because the file is 74 MB, and one that failed because the phone has no
+ * WebP encoder, both read as "فشل الرفع / upload failed" with nothing to act on.
+ *
+ * `ApiError extends Error`, so one branch covers both. A non-Error throw (which
+ * nothing in this codebase does) still falls back to the caller's wording.
+ */
+export function failureText(e: unknown, fallback: string): string {
+  if (isAborted(e)) return fallback;
+  const message = e instanceof Error ? e.message.trim() : '';
+  return message || fallback;
+}
+
 // ---------------------------------------------------------------- types
 
 export interface ApiUser {
@@ -1132,5 +1154,29 @@ export async function uploadFile(
   form.append('originalName', originalName);
   if (width) form.append('width', String(width));
   if (height) form.append('height', String(height));
-  return api.post<{ key: string; url: string; mime?: string; bytes?: number; width?: number | null; height?: number | null; visibility?: 'public' | 'private' }>('/api/uploads', form);
+  return api.post<{ key: string; url: string; mime?: string; bytes?: number; width?: number | null; height?: number | null; visibility?: 'public' | 'private' }>(
+    '/api/uploads',
+    form,
+    { timeoutMs: uploadTimeoutMs(prepared.size) }
+  );
+}
+
+/**
+ * A DEADLINE SIZED FOR THE BODY, NOT FOR A JSON GET.
+ *
+ * `DEFAULT_TIMEOUT_MS` is 20 seconds, which is generous for a request whose
+ * body is a few hundred bytes and far too short for one that is megabytes of
+ * image over a phone. The route accepts video up to 40 MB; 20 seconds cannot
+ * carry that on any connection the owner's customers actually have, and the
+ * abort surfaced as "Network error — check your connection", blaming a
+ * connection that was working.
+ *
+ * 32 KB/s is a deliberately pessimistic uplink — bad mobile data, not Wi-Fi —
+ * so a request that exceeds this really has stalled rather than merely been
+ * slow. The ceiling keeps a genuinely dead socket from hanging the button
+ * forever.
+ */
+export function uploadTimeoutMs(bytes: number): number {
+  const allowance = 30_000 + Math.ceil(Math.max(0, bytes) / 1024) * 31;
+  return Math.min(300_000, allowance);
 }

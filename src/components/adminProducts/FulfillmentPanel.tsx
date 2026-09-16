@@ -53,6 +53,7 @@ import { ApiError, api } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import * as T from './theme';
 import { ErrorBanner, L, NullableIqd, SignedIqd, inputCls } from './ui';
+import { MirrorNote } from './form/formUi';
 import { deriveInventoryMode, type FormValue, type RelationsState } from './form/model';
 
 type FulfillmentType = 'direct_sale' | 'pre_order';
@@ -173,6 +174,7 @@ export default function FulfillmentPanel({
   productId,
   rel,
   setRel,
+  onProductTouched,
 }: {
   productId: string;
   /**
@@ -184,6 +186,14 @@ export default function FulfillmentPanel({
    */
   rel: RelationsState;
   setRel: (fn: (r: RelationsState) => RelationsState) => void;
+  /**
+   * This panel's own save writes `products.updated_at`, and the form around it
+   * echoes the `updated_at` it loaded back as `expected_updated_at`. Without
+   * this the form's token goes stale the moment this button is used, and the
+   * next مسودة / نشر is refused as "modified by someone else" — by the same
+   * admin, through the same screen.
+   */
+  onProductTouched?: (updatedAt: string) => void;
 }) {
   const { lang } = useLanguage();
   const ar = lang === 'ar';
@@ -321,9 +331,11 @@ export default function FulfillmentPanel({
         // switched from pre-order to direct while it held one.
         capacity: cell.fulfillment_type === 'pre_order' ? cell.capacity : null,
       }));
-      const res = await api.put<{ sale_types: string[] }>(`/api/admin/products/${productId}/fulfillment`, {
-        fulfillments: payload,
-      });
+      const res = await api.put<{ sale_types: string[]; updated_at?: string }>(
+        `/api/admin/products/${productId}/fulfillment`,
+        { fulfillments: payload }
+      );
+      if (res.updated_at) onProductTouched?.(res.updated_at);
       setNotice(
         tr(
           `حُفظ. المنتج يُباع الآن: ${res.sale_types.map((t) => (t === 'pre_order' ? 'طلب مسبق' : 'بيع مباشر')).join(' + ') || '—'}`,
@@ -426,11 +438,12 @@ export default function FulfillmentPanel({
                         <L
                           ar="مخزون البيع المباشر"
                           en="Direct-sale stock"
-                          hint={tr(
-                            'هو مخزون الموديل نفسه — رقم واحد، لا رفّ ثانٍ. تعديله هنا يعدّله في «الخيارات»، ويُحفظ مع المنتج (مسودة/نشر).',
-                            'This IS the model’s own stock — one number, never a second shelf. Editing it here edits it under Options, and it saves with the product.'
-                          )}
+                          hint={tr('رقم واحد لهذا الموديل، لا رفّ ثانٍ.', 'One number for this model, never a second shelf.')}
                         />
+                        {/* The owner read the two boxes as two settings that
+                            mysteriously moved together. Same marker, same
+                            wording, wherever a value is shown twice. */}
+                        <MirrorNote kind="same" where="٥ الخيارات والألوان" detail="يُحفظ مع المنتج (مسودة/نشر)، لا بزر هذه اللوحة" />
                         <select
                           className={`${T.select} w-full`}
                           data-direct-stock-mode={m.id}
@@ -649,16 +662,14 @@ export default function FulfillmentPanel({
                                   <L
                                     ar="زيادة هذه الطريقة"
                                     en="This route’s surcharge"
-                                    hint={tr(
-                                      'تحلّ محل زيادة المنتج لهذه الطريقة ولا تُضاف إليها. فارغ = زيادة المنتج.',
-                                      'REPLACES the product’s surcharge for this route — never adds to it. Empty = use the product’s.'
-                                    )}
+                                    hint={tr('فارغ = زيادة المنتج.', 'Empty = use the product’s.')}
                                   />
                                   <NullableIqd
                                     value={t.surcharge_iqd}
                                     onChange={(v) => updateTransport(m.id, t.method, { surcharge_iqd: v })}
                                     placeholder={tr('زيادة المنتج', 'the product’s')}
                                   />
+                                  <MirrorNote kind="replaces" where="٤ البيع والتوفر والمخزون" detail="لهذه الطريقة وحدها" />
                                 </div>
                                 {/* ───────── SHARED POOL, OR THIS ROUTE'S OWN.
                                     The consequence is written under the choice

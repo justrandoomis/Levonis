@@ -19,8 +19,8 @@
  */
 
 import React, { useId, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, ImagePlus, Info, RefreshCw, X } from 'lucide-react';
-import { uploadFile } from '../../../lib/api';
+import { ChevronDown, ImagePlus, Info, Link2, RefreshCw, X } from 'lucide-react';
+import { uploadFile, failureText } from '../../../lib/api';
 import SafeImage from '../../ui/SafeImage';
 
 /** 40px control (the §12 floor), 13px text, never wider than its track. */
@@ -123,6 +123,65 @@ export function Field({
       {hint && !error && <p className="mt-1 text-[11px] text-zinc-500 truncate">{hint}</p>}
       {error && <p className="mt-1 text-[11px] text-red-400">{error}</p>}
     </div>
+  );
+}
+
+/**
+ * ONE VALUE, SHOWN TWICE — AND THE FORM SAYS SO.
+ *
+ * The owner's report, in their words: «نفس الحقل مكرر بأكثر من قسم مما يسبب
+ * بإرباك الأدمن … ليس خيارا إضافيا لكن هو نفس الخيار وعند تغييره يتغير الباقي».
+ * They are right, and the links they hit are real and deliberate: the
+ * direct-sale stock in «نوع الطلب لكل موديل» IS the model's stock in
+ * «الخيارات» (one row, one column, edited through one piece of state); an
+ * option's own price REPLACES the product price rather than adding to it; a
+ * route's surcharge REPLACES the product's direct premium.
+ *
+ * None of that was wrong — it was just unsaid. A second box that moves when
+ * you type in the first, with nothing on screen admitting they are the same
+ * box, reads as a bug every single time. So each mirrored control now carries
+ * ONE quiet line naming what it really is and which section owns it.
+ *
+ * Three relationships, because they behave differently and the admin must not
+ * have to guess which one they are looking at:
+ *
+ *   same       literally one value. Typing here types there.
+ *   replaces   setting this one makes the other stop applying HERE. It is not
+ *              added on top, which is the misreading that costs money.
+ *   derived    computed from elsewhere; this is a read-out, not an input.
+ *
+ * Deliberately not a tooltip: the admin panel is used on a tablet, where a
+ * hover tooltip does not exist. It is quiet (11px, muted) so it never competes
+ * with the control it explains — §4 of the design rules — but it is on screen.
+ */
+export function MirrorNote({
+  kind,
+  where,
+  detail,
+}: {
+  kind: 'same' | 'replaces' | 'derived';
+  /** The section that OWNS this value, in the admin's own words, e.g. «٥ الخيارات والألوان». */
+  where: string;
+  /** One extra clause when the consequence is not obvious from the kind. */
+  detail?: string;
+}) {
+  const lead =
+    kind === 'same'
+      ? `نفس الحقل في «${where}» — تعديله هنا يعدّله هناك`
+      : kind === 'replaces'
+        ? `يستبدل قيمة «${where}» ولا يُضاف إليها`
+        : `محسوب من «${where}» — للقراءة فقط هنا`;
+  return (
+    <p
+      className="mt-1 flex items-start gap-1 text-[11px] leading-snug text-zinc-500"
+      data-mirror={kind}
+    >
+      <Link2 className="w-3 h-3 mt-[3px] shrink-0 text-zinc-600" aria-hidden="true" />
+      <span className="min-w-0">
+        {lead}
+        {detail ? <span className="text-zinc-600">{` · ${detail}`}</span> : null}
+      </span>
+    </p>
   );
 }
 
@@ -481,17 +540,19 @@ export function ImgSlot({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(false);
+  /** The REASON this slot is empty, not merely that it is. `catch {}` with a
+   *  boolean left the admin with a red outline and nothing to act on. */
+  const [err, setErr] = useState<string | null>(null);
 
   const pick = async (file: File | undefined) => {
     if (!file) return;
-    setErr(false);
+    setErr(null);
     setBusy(true);
     try {
       const res = await uploadFile(file, 'product');
       onChange(res.url);
-    } catch {
-      setErr(true);
+    } catch (e) {
+      setErr(failureText(e, 'فشل الرفع / upload failed'));
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -499,12 +560,12 @@ export function ImgSlot({
   };
 
   return (
-    <span className="relative shrink-0">
+    <span className="relative inline-flex items-center gap-1.5 shrink-0 min-w-0">
       <input
         ref={fileRef}
         type="file"
         dir="ltr"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
         className="hidden"
         aria-hidden="true"
         tabIndex={-1}
@@ -537,10 +598,10 @@ export function ImgSlot({
         <button
           type="button"
           aria-label={label}
-          title={label}
           disabled={busy}
           onClick={() => fileRef.current?.click()}
-          className={`w-10 h-10 rounded-lg border grid place-items-center transition-colors disabled:opacity-60 ${
+          title={err ?? label}
+          className={`w-10 h-10 shrink-0 rounded-lg border grid place-items-center transition-colors disabled:opacity-60 ${
             err
               ? 'border-red-500/50 text-red-400'
               : 'border-dashed border-zinc-600 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500'
@@ -548,6 +609,14 @@ export function ImgSlot({
         >
           {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
         </button>
+      )}
+      {/* A `title` tooltip does not exist on the tablet this form is used on,
+          so the reason is TEXT. Truncated and width-capped so a long message
+          cannot push the row it sits in. */}
+      {err && (
+        <span role="alert" className="text-[10px] leading-tight text-red-400 truncate max-w-[9rem]" title={err}>
+          {err}
+        </span>
       )}
     </span>
   );

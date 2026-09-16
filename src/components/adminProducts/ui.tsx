@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronUp, Trash2, X, AlertTriangle } from 'lucide-react';
-import { ApiError, uploadFile } from '../../lib/api';
+import { failureText, uploadFile } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import type { TransStatus } from './types';
 
@@ -581,7 +581,9 @@ export async function uploadProductImage(file: File): Promise<{ key: string; url
   try {
     return await uploadFile(file, 'product');
   } catch (err) {
-    throw new Error(err instanceof ApiError ? err.message : 'فشل الرفع / upload failed');
+    // Decode/encode/size failures are plain Errors and carry the only wording
+    // that tells the admin what to change — see `failureText`.
+    throw new Error(failureText(err, 'فشل الرفع / upload failed'));
   }
 }
 

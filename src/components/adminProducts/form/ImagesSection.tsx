@@ -18,15 +18,28 @@
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Star, Trash2, Upload, ArrowUp, ArrowDown, Link2, RefreshCw, AlertTriangle } from 'lucide-react';
-import { uploadFile, api, ApiError } from '../../../lib/api';
+import { uploadFile, api, failureText } from '../../../lib/api';
 import { Banner, Field, Select, TextInput, btnGhost, btnPrimary, iconBtn } from './formUi';
 import { localId, type FormImage, type RelationsState } from './model';
 import SafeImage from '../../ui/SafeImage';
 import { classifyImageUrl, primaryRepair } from '../../../lib/imageUrl';
 import { splitUrlList } from '../../../../worker/lib/urlList';
+import { PRODUCT_IMAGE_MAX_BYTES, PRODUCT_IMAGE_MAX_SOURCE_BYTES } from '../../../lib/imagePreprocess';
 
-const MAX_BYTES = 8 * 1024 * 1024;
-const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
+/**
+ * WHAT THE PICKER MAY HAND OVER.
+ *
+ * AVIF was named in the hint under the button and in the server's own sniffer,
+ * but not here — so the one format modern vendor CDNs serve by default was
+ * refused by the file dialog as «نوع غير مدعوم».
+ *
+ * The size gate is split for the same reason `prepareProductImage` splits it: a
+ * PNG or a JPEG is re-encoded to WebP before anything is sent, so measuring the
+ * picked file against the upload ceiling refuses files that would have arrived
+ * at a fraction of their size. Formats that travel untouched keep the real one.
+ */
+const CONVERTED_TYPES = ['image/jpeg', 'image/png'];
+const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/avif';
 
 interface Upload {
   key: string;
@@ -116,13 +129,11 @@ export function ImagesSection({
         addImage(res.url, { width: res.width, height: res.height, r2_key: res.key });
         setUploads((u) => u.filter((x) => x.key !== key));
       } catch (e) {
-        setUploads((u) =>
-          u.map((x) =>
-            x.key === key
-              ? { ...x, state: 'error', error: e instanceof ApiError ? e.message : 'فشل الرفع / upload failed' }
-              : x
-          )
-        );
+        // The REASON, never the category — see `failureText`. Everything that
+        // can fail before the request (decode, WebP encode, the size guards)
+        // throws a plain Error, and that was the branch being discarded.
+        const error = failureText(e, 'فشل الرفع / upload failed');
+        setUploads((u) => u.map((x) => (x.key === key ? { ...x, state: 'error', error } : x)));
       }
     },
     [addImage]
@@ -136,8 +147,17 @@ export function ImagesSection({
         next.push({ key: localId('up'), name: file.name, state: 'error', error: 'نوع غير مدعوم', file });
         continue;
       }
-      if (file.size > MAX_BYTES) {
-        next.push({ key: localId('up'), name: file.name, state: 'error', error: 'أكبر من 8 ميغابايت', file });
+      const ceiling = CONVERTED_TYPES.includes(file.type)
+        ? PRODUCT_IMAGE_MAX_SOURCE_BYTES
+        : PRODUCT_IMAGE_MAX_BYTES;
+      if (file.size > ceiling) {
+        next.push({
+          key: localId('up'),
+          name: file.name,
+          state: 'error',
+          error: `${(file.size / 1024 / 1024).toFixed(1)}MB — الحد ${Math.round(ceiling / 1024 / 1024)}MB`,
+          file,
+        });
         continue;
       }
       const key = localId('up');
@@ -220,7 +240,7 @@ export function ImagesSection({
           : `أضيفت ${ok}${pageNote}، وفشلت ${refused.length}: ${refused.slice(0, 2).join(' | ')}`
       );
     } catch (e) {
-      setUrlNote(e instanceof ApiError ? e.message : 'تعذّر جلب الصور');
+      setUrlNote(failureText(e, 'تعذّر جلب الصور'));
     } finally {
       setUrlBusy(false);
     }
@@ -333,7 +353,7 @@ export function ImagesSection({
           className="hidden"
           onChange={(e) => pick(e.target.files)}
         />
-        <span className="text-[11px] text-zinc-500">JPEG / PNG / WebP / GIF / AVIF · حتى 8MB للصورة</span>
+        <span className="text-[11px] text-zinc-500">JPEG / PNG / WebP / GIF / AVIF · تُحوَّل تلقائيًا إلى WebP</span>
       </div>
 
       <div className="flex flex-wrap items-end gap-2 mb-3 min-w-0">

@@ -51,6 +51,7 @@ import {
 } from '../lib/productDeletion';
 import {
   localizeRespectingAuthored,
+  readTranslationOverrides,
   planProductSave,
   priceHistoryDeltas as sharedPriceHistoryDeltas,
   recordPriceHistory,
@@ -886,7 +887,13 @@ adminProductsRoutes.post('/', async (c) => {
   // survive as long as their English source is unchanged. Mutates the doc in
   // place BEFORE serialization, so the row that gets written already carries
   // the generated text and the storefront needs no runtime translation.
-  const localized = localizeRespectingAuthored(doc, prev);
+  //
+  // TRANSLATIONS THE ADMIN TYPED. §3 forbids inventing prose, so a description
+  // written as sentences — or an English box filled in Arabic — can only be
+  // made correct by a human writing the Arabic and Kurdish copies. This is the
+  // channel that carries them; everything else is still generated locally.
+  const overrides = readTranslationOverrides(body.translation_overrides);
+  const localized = localizeRespectingAuthored(doc, prev, overrides);
   applyTranslationTracking(doc, prev, localized.review_needed);
 
   // ONE CONTRACT, ONE BATCH. The row, the catalog placement, the price-history
@@ -975,6 +982,10 @@ adminProductsRoutes.post('/', async (c) => {
     // their English text because the local engine could not translate them
     // safely (§3). The product is saved and live either way.
     translation_review_needed: localized.review_needed,
+    // The same fields WITH the reason each one could not be translated, so the
+    // form can say "this is Arabic in the English box" instead of listing 66
+    // opaque keys under a sentence that was not even true.
+    translation_review: localized.review_details,
     ...(priceHistoryWarning ? { price_history_warning: priceHistoryWarning } : {}),
     ...(translationWarning ? { translation_warning: translationWarning } : {}),
   });

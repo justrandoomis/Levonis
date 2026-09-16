@@ -39,7 +39,7 @@
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus } from 'lucide-react';
-import { api, ApiError, formatIqd } from '../../lib/api';
+import { api, ApiError, failureText, formatIqd } from '../../lib/api';
 import { refusalIssues } from './applyResult';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
@@ -60,12 +60,16 @@ import PinnedPriceNotice from './PinnedPriceNotice';
 // carries its own load/save cycle. Keeping it out of the form's first chunk
 // costs a saved product one small fetch and saves every new product the code.
 const FulfillmentPanel = React.lazy(() => import('./FulfillmentPanel'));
+const TranslationsSheet = React.lazy(() => import('./form/TranslationsSheet'));
+// Types only — no runtime import, so the sheet stays in its own lazy chunk.
+import type { ReviewItem, TranslationOverrides } from './form/TranslationsSheet';
 import { repriceRow, pinnedRows, type RepriceMode } from '../../../worker/lib/pinnedPrices';
 import {
   Banner,
   CheckCard,
   Field,
   Grid,
+  MirrorNote,
   Money,
   Qty,
   SectionCard,
@@ -236,6 +240,26 @@ export default function ProductForm({
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saveNote, setSaveNote] = useState<string | null>(null);
   const [reviewNeeded, setReviewNeeded] = useState<string[]>([]);
+  /**
+   * The same fields WITH the reason each one could not be translated, and the
+   * Arabic/Kurdish the admin writes by hand for them. §3 forbids inventing
+   * prose, so a flagged field can only become correct if a human supplies the
+   * copy — `translation_overrides` is how this save carries it, and the server
+   * stores it as `approved` so the next save does not regenerate over it.
+   */
+  const [reviewDetail, setReviewDetail] = useState<ReviewItem[]>([]);
+  const [overrides, setOverrides] = useState<TranslationOverrides>({});
+  const [transOpen, setTransOpen] = useState(false);
+  /**
+   * A REFUSED SAVE NEEDS A WAY OUT, NOT JUST A SENTENCE.
+   *
+   * `STALE_EDIT` said "Review the current version below" and there was nothing
+   * below — no current version, no reload, no overwrite. The admin's only
+   * option was to leave the screen and lose everything they had typed. This
+   * holds the refusal so the banner can offer the two answers that actually
+   * exist: take the stored version, or keep mine and write over it.
+   */
+  const [staleSave, setStaleSave] = useState<'draft' | 'active' | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -531,8 +555,9 @@ export default function ProductForm({
 
   // -------------------------------------------------------------- saving
 
-  const save = async (status: 'draft' | 'active') => {
+  const save = async (status: 'draft' | 'active', { overwrite = false }: { overwrite?: boolean } = {}) => {
     setShowErrors(true);
+    setStaleSave(null);
     const next = { ...doc, status } as EditorDoc;
     const check = validateForm({
       name_en: next.name_en,
@@ -566,14 +591,27 @@ export default function ProductForm({
       const body: Record<string, unknown> = {
         ...docFields,
         relations: relationsToWire(rel),
-        expected_updated_at: loadedUpdatedAt || undefined,
+        ...(Object.keys(overrides).length ? { translation_overrides: overrides } : {}),
+        // Omitted deliberately when the admin has chosen to overwrite: the
+        // server skips the stale check when no expectation is stated, which is
+        // exactly what "keep my version" means.
+        expected_updated_at: overwrite ? undefined : loadedUpdatedAt || undefined,
       };
-      const res = await api.post<SaveResponse & { translation_review_needed?: string[]; warnings?: string[] }>(
+      const res = await api.post<SaveResponse & {
+        translation_review_needed?: string[];
+        translation_review?: ReviewItem[];
+        warnings?: string[];
+      }>(
         '/api/admin/products-v2',
         body
       );
       const savedId = res.product?.id ?? next.id;
       setReviewNeeded(res.translation_review_needed ?? []);
+      setReviewDetail(res.translation_review ?? []);
+      // What was just written is stored and `approved`; re-sending it on every
+      // later save would only be noise, and the read-back below already carries
+      // the text into the document.
+      setOverrides({});
 
       // WHAT THE FORM SHOWS AFTER A SAVE IS A READ-BACK, NOT THE ECHO.
       // The save answers with the product document; the structure is read from
@@ -606,8 +644,13 @@ export default function ProductForm({
       // error (400)». Reading the body's own lines — the same helper the
       // import window uses — is the difference between "something failed" and
       // "this row was rejected, for this reason".
+      if (e instanceof ApiError && e.code === 'STALE_EDIT') {
+        setStaleSave(status);
+        setSaveErr(null);
+        return;
+      }
       const lines = e instanceof ApiError ? refusalIssues((e.body ?? e.details ?? {}) as Parameters<typeof refusalIssues>[0]) : [];
-      const base = e instanceof ApiError ? e.message : 'فشل الحفظ / save failed';
+      const base = failureText(e, 'فشل الحفظ / save failed');
       setSaveErr(lines.length ? `${base}: ${lines.join(' · ')}` : base);
     } finally {
       setSaving(false);
@@ -635,6 +678,38 @@ export default function ProductForm({
 
   // --------------------------------------------------------------- render
 
+  /**
+   * HOW MANY ROWS IGNORE THE BASE PRICE. `pinnedRows` is the same reader the
+   * price-change notice uses, so the count under the price field and the
+   * warning that appears when it moves can never disagree.
+   */
+  const pricedRowCount = useMemo(
+    () =>
+      pinnedRows({
+        options: [
+          ...rel.groups.flatMap((g) => g.values as unknown as Array<Record<string, unknown>>),
+          ...((doc.options ?? []) as unknown as Array<Record<string, unknown>>),
+        ],
+        colors: [
+          ...(rel.colors as unknown as Array<Record<string, unknown>>),
+          ...((doc.colors ?? []) as unknown as Array<Record<string, unknown>>),
+        ],
+        variants: rel.variants as unknown as Array<Record<string, unknown>>,
+      } as never).length,
+    [rel.groups, rel.colors, rel.variants, doc.options, doc.colors]
+  );
+
+  /** One line per REASON rather than 66 keys — the counts an owner can act on. */
+  const reviewSummary = useMemo(() => {
+    const text: Record<ReviewItem['reason'], string> = {
+      not_english: 'مكتوبة بالعربية داخل حقل الإنجليزية — صفحة الإنجليزية تعرضها كما هي',
+      prose: 'جُمل حرّة — تحتاج مترجمًا بشريًا دائمًا',
+      terms: 'مصطلحات غير موجودة في القاموس المحلي',
+    };
+    const counts = new Map<ReviewItem['reason'], number>();
+    for (const item of reviewDetail) counts.set(item.reason, (counts.get(item.reason) ?? 0) + 1);
+    return [...counts].map(([reason, count]) => ({ reason, count, text: text[reason] }));
+  }, [reviewDetail]);
   if (loading) {
     return (
       <div className="p-6 text-center text-zinc-400 text-sm">
@@ -704,6 +779,35 @@ export default function ProductForm({
       </div>
 
       {saveErr && <Banner kind="error">{saveErr}</Banner>}
+      {staleSave && (
+        <div data-form="stale-edit">
+          <Banner kind="warn">
+            <p className="mb-2 leading-relaxed">
+              النسخة المحفوظة تغيّرت بعد فتح هذه الصفحة — غالبًا لأن لوحة «البيع والتوفر» حُفظت من هنا، أو لأن
+              المنتج مفتوح في تبويب آخر. تغييراتك ما زالت أمامك ولم يُحذف شيء.
+              <span className="block text-zinc-400 text-[11px] mt-1">
+                The stored copy moved since this page was opened. Nothing you typed was lost.
+              </span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={btnPrimary} disabled={saving} onClick={() => void save(staleSave, { overwrite: true })}>
+                احفظ تغييراتي فوقها
+              </button>
+              <button
+                type="button"
+                className={btnGhost}
+                disabled={saving || !productId}
+                onClick={() => {
+                  setStaleSave(null);
+                  if (productId) void loadProduct(productId);
+                }}
+              >
+                اعرض النسخة المحفوظة (تُلغى تغييراتي)
+              </button>
+            </div>
+          </Banner>
+        </div>
+      )}
       {saveNote && <Banner kind="warn">{saveNote}</Banner>}
       {(rel.hydration_issues?.length ?? 0) > 0 && (
         <div data-form="hydration-issues">
@@ -715,10 +819,46 @@ export default function ProductForm({
         </div>
       )}
       {reviewNeeded.length > 0 && (
-        <Banner kind="warn">
-          حُفظ المنتج. لم يستطع المترجم المحلي ترجمة {reviewNeeded.length} حقلًا بأمان، فبقيت بالإنجليزية وعُلّمت
-          للمراجعة: <span className="font-mono text-[11px]">{reviewNeeded.slice(0, 6).join(', ')}</span>
-        </Banner>
+        <div data-form="translation-review">
+          <Banner kind="warn">
+            {/*
+              WHAT THIS USED TO SAY: that the fields had "stayed in English",
+              printed under a list of 66 opaque field keys. For a form filled in
+              Arabic that sentence was not even true, and it hid the one fact
+              that mattered: the local engine runs English → ar/ckb and never
+              invents prose (§3), so these fields need a person, not a retry.
+              The counts below say which situation each field is in, and the
+              button is the door that was missing.
+            */}
+            <p className="mb-2 leading-relaxed">
+              حُفظ المنتج. {reviewNeeded.length} حقلًا تحتاج ترجمة بشرية — المترجم المحلي يعمل من الإنجليزية إلى
+              العربية والكردية ولا يؤلّف جملًا.
+            </p>
+            {reviewSummary.length > 0 && (
+              <ul className="mb-2 space-y-0.5 text-[11px] text-amber-200/90">
+                {reviewSummary.map((r) => (
+                  <li key={r.reason}>
+                    • {r.count} — {r.text}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button type="button" className={btnPrimary} onClick={() => setTransOpen(true)}>
+              اكتب الترجمة يدويًا
+            </button>
+          </Banner>
+        </div>
+      )}
+      {transOpen && (
+        <React.Suspense fallback={null}>
+          <TranslationsSheet
+            doc={doc}
+            review={reviewDetail}
+            overrides={overrides}
+            onApply={setOverrides}
+            onClose={() => setTransOpen(false)}
+          />
+        </React.Suspense>
       )}
 
       {/* 1 ──────────────── classification: section → sub-section → brand →
@@ -1066,6 +1206,13 @@ export default function ProductForm({
               value={doc.price_iqd}
               onChange={(v) => setDoc((d) => ({ ...d, price_iqd: v ?? 0 }))}
             />
+            {pricedRowCount > 0 && (
+              <MirrorNote
+                kind="replaces"
+                where="٥ الخيارات والألوان"
+                detail={`${pricedRowCount} صفًّا له سعر خاص يتجاهل هذا الرقم`}
+              />
+            )}
           </Field>
           <Field
             ar="سعر LEVO PRIME"
@@ -1074,9 +1221,11 @@ export default function ProductForm({
             tip="خصم PRIME أقل من PRO. الترتيب المطلوب: PRO ≤ PRIME ≤ الاعتيادي."
           >
             <Money value={doc.prime_price_iqd} onChange={(v) => setDoc((d) => ({ ...d, prime_price_iqd: v }))} />
+            <MirrorNote kind="replaces" where="خصم العضوية أسفل هذا القسم" detail="السعر المكتوب يفوز على أي قاعدة خصم" />
           </Field>
           <Field ar="سعر LEVO PRO" en="PRO" hint="فارغ = سياسة المتجر">
             <Money value={doc.pro_price_iqd} onChange={(v) => setDoc((d) => ({ ...d, pro_price_iqd: v }))} />
+            <MirrorNote kind="replaces" where="خصم العضوية أسفل هذا القسم" detail="السعر المكتوب يفوز على أي قاعدة خصم" />
           </Field>
           {canSeeCost && (
             <Field ar="التكلفة" en="Cost" tip="إداري فقط — لا تظهر للعميل ولا لمساعد الأدمن، ولا في أي تصدير.">
@@ -1206,6 +1355,11 @@ export default function ProductForm({
                   value={doc.direct_surcharge_iqd}
                   onChange={(v) => setDoc((d) => ({ ...d, direct_surcharge_iqd: v }))}
                   placeholder="بلا زيادة"
+                />
+                <MirrorNote
+                  kind="replaces"
+                  where="١٢ نوع الطلب لكل موديل"
+                  detail="زيادة مكتوبة على طريق معيّن تحل محل هذه الزيادة لذلك الطريق"
                 />
               </Field>
             </Grid>
@@ -1410,6 +1564,13 @@ export default function ProductForm({
             }
           >
             <Qty value={doc.stock} onChange={(v) => setDoc((d) => ({ ...d, stock: v }))} />
+            {rel.inventory_mode !== 'BASE' && (
+              <MirrorNote
+                kind="derived"
+                where="٥ الخيارات والألوان"
+                detail={`التوفر يُحسب من ${rel.inventory_mode === 'VARIANT_COMBINATION' ? 'مخزون التركيبات' : 'مخزون الخيارات والألوان'}، وهذا الرقم مرجع فقط`}
+              />
+            )}
           </Field>
           <Field ar="حد التنبيه" en="Low-stock">
             <Qty
@@ -1476,7 +1637,7 @@ export default function ProductForm({
             {/* `rel`/`setRel` because the DIRECT-sale number inside that
                 panel is this section's model stock, not a field of its own —
                 one column, one piece of state, one save. */}
-            <FulfillmentPanel productId={productId} rel={rel} setRel={setRel} />
+            <FulfillmentPanel productId={productId} rel={rel} setRel={setRel} onProductTouched={setLoadedUpdatedAt} />
           </Suspense>
         </SectionCard>
       ) : null}

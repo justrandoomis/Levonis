@@ -26,6 +26,7 @@ import {
   Field,
   ImgSlot,
   Grid,
+  MirrorNote,
   Money,
   Qty,
   Repeater,
@@ -335,6 +336,11 @@ export function OptionsSection({
                         }
                       >
                         <Qty value={v.stock} onChange={(n) => patchValue(g.id, v.id, { stock: n })} />
+                        {/* The owner's «نفس الحقل مكرر بأكثر من قسم»: this box
+                            and the direct-sale box in §12 are ONE column on
+                            ONE row. Saying so is the whole fix — the sharing
+                            itself is the design («مصدر مخزون واحد»). */}
+                        <MirrorNote kind="same" where="١٢ نوع الطلب لكل موديل" detail="مخزون البيع المباشر لهذا الموديل" />
                       </Field>
                       <Field ar="حد التنبيه" en="Low-stock">
                         <Qty
@@ -425,6 +431,7 @@ export function OptionsSection({
               <Grid cols={3}>
                 <Field ar="المخزون" en="Stock" hint="فارغ = لا يُحسب من هذا اللون">
                   <Qty value={c.stock} onChange={(n) => patchColor(c.id, { stock: n })} />
+                  <MirrorNote kind="replaces" where="٤ مخزون المنتج" detail="عند ملئه يصير هو مصدر التوفر بدل مخزون المنتج" />
                 </Field>
                 <Field ar="حد التنبيه" en="Low-stock">
                   <Qty

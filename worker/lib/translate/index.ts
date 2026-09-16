@@ -271,6 +271,73 @@ export function translateText(source: string, lang: TargetLang): TranslationResu
   };
 }
 
+/**
+ * WHY A SEGMENT WAS NOT TRANSLATED — because "review needed" on its own sent
+ * the owner looking for a bug that is not there.
+ *
+ * The banner used to say the fields «بقيت بالإنجليزية» (stayed in English).
+ * For a form filled in ARABIC that sentence is simply false, and it hid the
+ * one fact that mattered: this engine runs English → ar/ckb, so text typed
+ * into the English box in Arabic has nothing to translate FROM. Saying which
+ * of the two situations happened is the difference between "the translator is
+ * broken" and "this field is in the wrong box".
+ *
+ *   not_english  the source is written in Arabic script — the form's English
+ *                field is holding Arabic, so no engine in this direction can
+ *                produce English or Kurdish from it;
+ *   prose        ordinary English sentences. §3 forbids inventing a
+ *                translation and a rule engine cannot write correct Arabic or
+ *                Sorani prose, so this ALWAYS needs a human. Expected, not a
+ *                failure;
+ *   terms        spec-shaped English whose vocabulary the dictionary does not
+ *                carry yet. This one is fixable by adding the term.
+ */
+export type ReviewReason = 'not_english' | 'prose' | 'terms';
+
+const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+const LATIN_RE = /[A-Za-z]/;
+
+/**
+ * True when the text is written in Arabic/Kurdish script rather than Latin.
+ *
+ * Not "contains an Arabic letter" and not "mostly Arabic letters". Both fail on
+ * the sentences this actually sees. An Arabic line about a printer carries the
+ * model name in Latin — «طابعة Bambu Lab A1» is 6 Arabic letters against 9
+ * Latin ones and is unmistakably Arabic — while an English line can quote one
+ * Arabic place name and is still English.
+ *
+ * A SHARE, therefore, and a low one: past a third of the letters, the Arabic is
+ * the sentence rather than a quotation inside it. The cost of each mistake is
+ * only the wording of an advisory line, never a refused save.
+ */
+const ARABIC_SHARE_FLOOR = 0.3;
+
+export function isArabicScript(source: string): boolean {
+  if (!ARABIC_RE.test(source)) return false;
+  let arabic = 0;
+  let latin = 0;
+  for (const ch of source) {
+    if (ARABIC_RE.test(ch)) arabic += 1;
+    else if (LATIN_RE.test(ch)) latin += 1;
+  }
+  const letters = arabic + latin;
+  return letters > 0 && arabic / letters >= ARABIC_SHARE_FLOOR;
+}
+
+/**
+ * Classifies ONE field's English source. Only ever called for a field the
+ * engine could not fully translate, so it explains a known failure rather than
+ * predicting one.
+ */
+export function reviewReason(sourceEn: string): ReviewReason {
+  if (isArabicScript(sourceEn)) return 'not_english';
+  // Prose, not a spec line: a segment with several words and no colon, unit or
+  // separator is a sentence, and a sentence is a human's job by §3.
+  const words = sourceEn.trim().split(/\s+/).filter(Boolean);
+  if (words.length > 8 && !/[:：]/.test(sourceEn)) return 'prose';
+  return 'terms';
+}
+
 export interface FieldTranslation {
   field: string;
   source_en: string;

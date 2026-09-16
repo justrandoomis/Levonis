@@ -1738,19 +1738,98 @@ const authoredEmpty = (key: string, status: string): boolean => status === 'miss
  * Mutates `doc` (text and `translation_meta`) and returns the localiser's
  * report plus the slots it kept.
  */
-export function localizeRespectingAuthored(doc: ProductDoc, prev: ProductDoc | null): LocalizeResult & { kept: string[] } {
+/**
+ * A TRANSLATION THE ADMIN TYPED, KEYED BY SLOT.
+ *
+ * `{ 'description': { ar: '…', ckb: '…' } }`. The engine runs English → ar/ckb
+ * and by §3 must never invent prose, so a description written as sentences —
+ * or an English box that was filled in Arabic — can ONLY become correct if a
+ * human writes the other two copies. The `approved` machinery below already
+ * protected such text once it existed; until now nothing could create it from
+ * the form, so the review flag pointed at a door with no handle.
+ *
+ * A narrow, explicitly-named channel rather than trusting every `*_ar` key in
+ * the body: those are written by the localiser on every save and carried
+ * verbatim by the TXT importer, and widening their meaning would change what a
+ * save means for every other client.
+ */
+export type TranslationOverrides = Record<string, { ar?: string; ckb?: string }>;
+
+/** Slot keys are built by `localizableSlots` from ids this code generates, so
+ *  the shape is known and anything else is refused rather than trusted. */
+const SLOT_KEY_RE = /^[A-Za-z0-9][A-Za-z0-9_:.-]{0,199}$/;
+const OVERRIDE_MAX_FIELDS = 400;
+const OVERRIDE_MAX_CHARS = 50_000;
+
+/**
+ * Parses and BOUNDS the `translation_overrides` body field. Unknown keys, a
+ * prototype-polluting key, a non-string value and anything past the bounds are
+ * dropped silently rather than throwing: a malformed override must never cost
+ * the admin the rest of a save they spent ten minutes on.
+ */
+export function readTranslationOverrides(raw: unknown): TranslationOverrides | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const out: TranslationOverrides = {};
+  let count = 0;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (count >= OVERRIDE_MAX_FIELDS) break;
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+    if (!SLOT_KEY_RE.test(key)) continue;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const entry: { ar?: string; ckb?: string } = {};
+    for (const lang of ['ar', 'ckb'] as const) {
+      const text = (value as Record<string, unknown>)[lang];
+      if (typeof text !== 'string') continue;
+      entry[lang] = text.slice(0, OVERRIDE_MAX_CHARS);
+    }
+    if (entry.ar === undefined && entry.ckb === undefined) continue;
+    out[key] = entry;
+    count += 1;
+  }
+  return count > 0 ? out : undefined;
+}
+
+export function localizeRespectingAuthored(
+  doc: ProductDoc,
+  prev: ProductDoc | null,
+  overrides?: TranslationOverrides
+): LocalizeResult & { kept: string[]; authored: string[] } {
   const prevSlots = new Map(prev ? localizableSlots(prev as unknown as Record<string, unknown>).map((s) => [s.key, s]) : []);
   const meta: TranslationMeta = {};
   for (const [k, v] of Object.entries(prev?.translation_meta ?? {})) meta[k] = { ...v };
 
   const result = localizeProductDoc(doc);
   const kept: string[] = [];
+  const authored: string[] = [];
+  const srcRev = Math.max(0, Number(doc.content_rev) || 0);
   for (const slot of localizableSlots(doc as unknown as Record<string, unknown>)) {
+    // 1. What this save AUTHORS wins over both the machine and the stored copy:
+    //    it is the newest human statement about this slot.
+    const typed = overrides?.[slot.key];
+    if (typed) {
+      const entry = (meta[slot.key] ??= {});
+      let touched = false;
+      for (const lang of ['ar', 'ckb'] as const) {
+        const text = typed[lang];
+        if (typeof text !== 'string') continue;
+        slot.set(lang, text);
+        entry[lang] = { status: 'approved', src_rev: srcRev };
+        authored.push(`${slot.key}.${lang}`);
+        touched = true;
+      }
+      // A slot whose BOTH languages were just written needs nothing from the
+      // stored copy; one that had only Arabic typed still consults it for ckb.
+      if (touched && typeof typed.ar === 'string' && typeof typed.ckb === 'string') continue;
+    }
+
+    // 2. Otherwise a copy a human (or a TXT file) wrote earlier survives, as
+    //    long as the English it was written against has not moved.
     const before = prevSlots.get(slot.key);
     const entry = meta[slot.key];
     if (!before || !entry) continue;
     const sourceChanged = slot.en !== before.en;
     for (const lang of ['ar', 'ckb'] as const) {
+      if (typeof typed?.[lang] === 'string') continue; // just authored above
       const status = entry[lang]?.status;
       if (!status || !(AUTHORED.has(status) || authoredEmpty(slot.key, status))) continue;
       if (sourceChanged) {
@@ -1762,7 +1841,20 @@ export function localizeRespectingAuthored(doc: ProductDoc, prev: ProductDoc | n
     }
   }
   doc.translation_meta = meta;
-  return { ...result, kept };
+
+  // A slot the admin just wrote by hand is no longer waiting for a human.
+  const settled = new Set(
+    Object.entries(overrides ?? {})
+      .filter(([, v]) => typeof v.ar === 'string' && typeof v.ckb === 'string')
+      .map(([k]) => k)
+  );
+  return {
+    ...result,
+    review_needed: result.review_needed.filter((f) => !settled.has(f)),
+    review_details: result.review_details.filter((d) => !settled.has(d.field)),
+    kept,
+    authored,
+  };
 }
 
 /** The translation inputs of a document WITHOUT localising it — the TXT path,

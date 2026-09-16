@@ -487,10 +487,28 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
     if (arr) arr.push(t);
     else byFulfillment.set(t.fulfillment_id, [t]);
   }
+  /**
+   * THE NEW CONCURRENCY TOKEN, BECAUSE THIS DOOR JUST MOVED IT.
+   *
+   * The statement above writes `products.updated_at`. The product form holds
+   * the `updated_at` it loaded and echoes it back as `expected_updated_at` on
+   * مسودة / نشر — so an admin who saved this panel and then saved the product
+   * was told "This product was modified by someone else since you opened it"
+   * about a change THEY had just made, through a button inside the very same
+   * form. Nobody else was editing anything.
+   *
+   * A second door that moves the token has to hand the new one back. Anything
+   * else makes optimistic concurrency fire on a single editor, which teaches
+   * the admin to distrust a warning that exists to protect them.
+   */
+  const token = await c.env.DB.prepare('SELECT updated_at FROM products WHERE id = ?')
+    .bind(productId)
+    .first<{ updated_at: string | null }>();
   return c.json(
     projectForAdmin(c.env, admin, {
       success: true,
       sale_types: saleTypes,
+      updated_at: token?.updated_at ? String(token.updated_at) : undefined,
       fulfillments: after.fulfillments.map((f) => ({ ...f, transports: byFulfillment.get(f.id) ?? [] })),
     })
   );

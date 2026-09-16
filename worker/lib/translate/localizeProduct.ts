@@ -20,12 +20,21 @@
  */
 
 import type { ProductDoc } from '../productModel';
-import { translateText } from './index';
+import { reviewReason, translateText, type ReviewReason } from './index';
 import type { TranslationInput } from './store';
+
+/** One flagged field and WHY — see `reviewReason`. A bare list of 66 field
+ *  keys told the owner nothing about what to do with them. */
+export interface ReviewItem {
+  field: string;
+  reason: ReviewReason;
+}
 
 export interface LocalizeResult {
   /** Field keys still needing a human, e.g. ['description', 'spec:g1:r2']. */
   review_needed: string[];
+  /** The same fields, each with the reason it could not be translated. */
+  review_details: ReviewItem[];
   /** Rows to persist in product_translations. */
   fields: TranslationInput[];
 }
@@ -33,6 +42,7 @@ export interface LocalizeResult {
 /** Mutates `doc` in place: fills every ar/ckb slot from its English source. */
 export function localizeProductDoc(doc: ProductDoc): LocalizeResult {
   const review: string[] = [];
+  const details: ReviewItem[] = [];
   const fields: TranslationInput[] = [];
 
   /** Translates one English source into both languages and reports honestly. */
@@ -51,7 +61,10 @@ export function localizeProductDoc(doc: ProductDoc): LocalizeResult {
     const ckb = translateText(src, 'ckb');
     set(ar.text, ckb.text);
     if (track) fields.push({ field: key, source_en: src });
-    if (ar.status !== 'machine' || ckb.status !== 'machine') review.push(key);
+    if (ar.status !== 'machine' || ckb.status !== 'machine') {
+      review.push(key);
+      details.push({ field: key, reason: reviewReason(src) });
+    }
   };
 
   /** Copies English verbatim into both slots — for names and codes that must
@@ -149,5 +162,5 @@ export function localizeProductDoc(doc: ProductDoc): LocalizeResult {
     });
   }
 
-  return { review_needed: review, fields };
+  return { review_needed: review, review_details: details, fields };
 }

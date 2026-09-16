@@ -115,9 +115,15 @@ test('the direct number is the model’s own stock, edited through the options s
   assert.match(panel, /deriveInventoryMode\(next\)/);
   // There is NO second direct-stock field in the payload this panel sends.
   assert.doesNotMatch(panel, /direct_stock|directStock|direct\.stock/);
-  // And the call site really hands it that state.
+  // And the call site really hands it that state. Asserted prop by prop rather
+  // than as one exact line: the claim here is that the panel edits the FORM's
+  // relations state, and an unrelated prop added later (the concurrency token
+  // its own save moves) is not a reason for this to fail.
   const form = read('src/components/adminProducts/ProductForm.tsx');
-  assert.match(form, /<FulfillmentPanel productId=\{productId\} rel=\{rel\} setRel=\{setRel\} \/>/);
+  const mount = form.match(/<FulfillmentPanel\b[^>]*\/>/)?.[0] ?? '';
+  assert.match(mount, /productId=\{productId\}/);
+  assert.match(mount, /rel=\{rel\}/);
+  assert.match(mount, /setRel=\{setRel\}/);
 });
 
 // ------------------------------------ untracked is not zero, and says so
