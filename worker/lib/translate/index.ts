@@ -29,16 +29,29 @@
  *                    dictionary hit AND the value must itself satisfy R2-R5
  *   R6 enumeration   "PLA, PETG, TPU" or "Black / White" — every member must
  *                    satisfy R2-R4
+ *   R7 sentence      a SPEC SENTENCE whose whole shape is a recorded frame and
+ *                    whose every noun phrase resolves — see ./grammar.ts
  *   otherwise        kept in English and flagged review_needed
  *
- * Free prose is therefore NEVER machine-translated. That is deliberate: a
- * rule-based engine cannot produce correct Arabic or Sorani sentences, and
- * §3 forbids inventing one. Descriptions written as prose stay English and
- * surface for human review; descriptions written as spec lines translate
- * cleanly.
+ * R7 IS WHAT MAKES THIS MORE THAN A GLOSSARY, and it is still not a guess.
+ * `grammar.ts` holds hand-written Arabic sentence skeletons with typed holes;
+ * a sentence is translated only when its shape matches a skeleton AND every
+ * hole resolves through the tables. One unknown noun abandons the whole
+ * sentence. So "Bambu Lab A1 is an open-frame FDM 3D printer with a
+ * 256 x 256 x 256 mm build volume, full-auto calibration and a quick-swap
+ * nozzle system" becomes real Arabic with the modifiers behind the head noun
+ * where Arabic puts them — while "This printer is perfect for hobbyists who
+ * want reliable results every day" matches no skeleton and stays English.
+ *
+ * MARKETING PROSE IS THEREFORE STILL NEVER MACHINE-TRANSLATED, which is the
+ * §3 rule this engine exists to keep. What changed is that SPEC prose — the
+ * overwhelming majority of what a product description actually contains — is
+ * no longer thrown away just because it came as a sentence rather than a
+ * "Label: value" line.
  */
 
 import { IDENTITY_TERMS, PHRASES, UNITS } from './dictionary';
+import { translateSentence, type GrammarContext } from './grammar';
 
 export type TargetLang = 'ar' | 'ckb';
 
@@ -57,6 +70,7 @@ export type SegmentRule =
   | 'phrase'
   | 'label'
   | 'enumeration'
+  | 'sentence'
   | 'untranslated';
 
 export interface Segment {
@@ -126,7 +140,13 @@ function translateMeasurement(seg: string, lang: TargetLang): string | null {
       out.push(tok + trailing);
       continue;
     }
-    if (DIM_SEP_RE.test(tok) || RANGE_SEP_RE.test(tok) || tok === '/' || tok === '±') {
+    if (DIM_SEP_RE.test(tok)) {
+      // Arabic and Kurdish spec sheets write a dimension with the multiplication
+      // sign, not a Latin "x" — which in RTL text reads as a stray letter.
+      out.push('\u00d7' + trailing);
+      continue;
+    }
+    if (RANGE_SEP_RE.test(tok) || tok === '/' || tok === '±') {
       out.push(tok + trailing);
       continue;
     }
@@ -194,6 +214,19 @@ function translateLabelled(seg: string, lang: TargetLang): string | null {
   return `${labelOut}: ${valueOut}`;
 }
 
+/**
+ * The grammar layer never re-implements R2-R4 — it borrows them, so a
+ * measurement or an identity term means exactly the same thing inside a
+ * sentence as it does on a spec line, for ever.
+ */
+function grammarContext(lang: TargetLang): GrammarContext {
+  return {
+    lang,
+    atom: (value, l) => translateAtom(value, l),
+    phrase: (term, l) => lookup(term, l),
+  };
+}
+
 function translateSegment(
   seg: string,
   lang: TargetLang
@@ -217,6 +250,9 @@ function translateSegment(
     ['measurement', translateMeasurement(body, lang)],
     ['identity', isIdentity(body) ? body : null],
     ['enumeration', translateEnumeration(body, lang)],
+    // LAST on purpose: a whole-segment dictionary hit is a human's finished
+    // text and must always beat a composed one.
+    ['sentence', translateSentence(body, grammarContext(lang))],
   ];
   for (const [rule, out] of attempts) {
     if (out !== null) return { out: `${bullet}${out}${trailing}`, translated: true, rule };

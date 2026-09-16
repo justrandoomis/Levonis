@@ -89,7 +89,11 @@ test('R2: material codes and model numbers stay as they are, and that counts as 
 
 test('R3: measurements keep their numbers and localize only the unit', () => {
   assert.equal(translateText('0.4 mm', 'ar').text, '0.4 مم');
-  assert.equal(translateText('256 x 256 x 256 mm', 'ar').text, '256 x 256 x 256 مم');
+  // The dimension separator becomes the MULTIPLICATION SIGN, not a Latin "x".
+  // In an RTL paragraph a bare Latin x is a stray letter that flips the run
+  // direction around it; × is what an Arabic or Kurdish spec sheet writes.
+  assert.equal(translateText('256 x 256 x 256 mm', 'ar').text, '256 × 256 × 256 مم');
+  assert.equal(translateText('256 × 256 × 256 mm', 'ckb').text, '256 × 256 × 256 مم');
   assert.equal(translateText('500 mm/s', 'ar').text, '500 مم/ث');
   assert.equal(translateText('220V', 'ar').text, '220 فولت');
   assert.equal(translateText('1.75 mm', 'ckb').text, '1.75 مم');
