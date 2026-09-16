@@ -35,20 +35,76 @@ test("the patch file matches the installed engine version", async () => {
   const pkg = JSON.parse(await readFile(packageUrl, "utf8"));
   const patch = await readFile(patchUrl, "utf8");
   assert.equal(pkg.dependencies["three-slicer"], "0.2.2", "the patch file name pins this version");
-  assert.match(patch, /viewer\/dist\/Viewport\.js/);
-  // One line changed, purely additive. A patch that starts REMOVING engine
-  // behaviour needs a different review than this test can stand in for.
+  // Two hunks, in two files, for two different problems. Both are named here
+  // so that a third arriving without its own review is visible.
+  assert.match(patch, /viewer\/dist\/Viewport\.js/, "the idle-worker release hook");
+  assert.match(patch, /engine\/src\/slicer\.worker\.js/, "the pthread pool cap");
+  assert.equal((patch.match(/^diff --git /gm) ?? []).length, 2, "an unreviewed third hunk");
+
+  /**
+   * EXACTLY ONE LINE OF ENGINE BEHAVIOUR IS REPLACED IN THE WHOLE PATCH, and
+   * the replacement keeps everything the original did. Every other line is an
+   * addition. A patch that starts REMOVING engine behaviour needs a different
+   * review than this test can stand in for, and it should fail here first.
+   */
   const removed = patch.split("\n").filter((line) => line.startsWith("-") && !line.startsWith("---"));
+  assert.equal(removed.length, 1, "the patch must replace exactly one engine line");
   const added = patch.split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++"));
-  assert.equal(removed.length, 1, "the patch must touch exactly one line");
-  assert.equal(added.length, 1);
-  // Everything the original line did is still there — the change only appends
-  // a second assignment inside the same `typeof window` guard.
   const originalPrefix = removed[0].slice(1, removed[0].lastIndexOf("(window.__vpWorker = k"));
   assert.ok(originalPrefix.length > 100, "unexpected patch shape");
-  assert.ok(added[0].includes(originalPrefix), "the replacement dropped part of the original line");
-  assert.ok(added[0].includes("window.__vpWorker = k"), "the engine's own worker handle must survive");
-  assert.ok(added[0].includes("window.__vpReleaseWorker"), "the patch must add the release hook");
+  const replacement = added.find((line) => line.includes("window.__vpReleaseWorker"));
+  assert.ok(replacement, "the patch must add the release hook");
+  assert.ok(replacement.includes(originalPrefix), "the replacement dropped part of the original line");
+  assert.ok(replacement.includes("window.__vpWorker = k"), "the engine's own worker handle must survive");
+});
+
+test("the pool cap keeps threads — it does not fall back to the single-threaded core", async () => {
+  /**
+   * THE FIX THAT WOULD HAVE COST MORE THAN IT SAVED.
+   *
+   * The obvious answer to "an Android phone dies when it slices" is to stop
+   * telling Android it is cross-origin isolated, because the engine picks its
+   * core on that one signal and would then take the single-threaded build.
+   *
+   * It is the wrong answer. `slicer.worker.js` sends the support-progress and
+   * CANCEL pointers to the main thread only when the buffer behind them is a
+   * SharedArrayBuffer — which exists only on the threaded core. Dropping
+   * isolation would therefore take slice cancellation and live support
+   * progress away from every Android phone, on top of a measured 2.2x.
+   *
+   * So the cap keeps the threaded core and takes the pool size instead. These
+   * assertions are what stops someone "simplifying" it back.
+   */
+  const worker = await readFile(new URL("../node_modules/three-slicer/engine/src/slicer.worker.js", import.meta.url), "utf8");
+  // The engine's own core selection is untouched: isolated still means mt.
+  assert.match(worker, /const isolated = typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated/);
+  assert.match(worker, /import\('\.\/slicer_core\.mt\.js'\)/);
+  // …and the cap runs inside that branch, before the core is imported.
+  const branch = /if \(isolated\) \{[\s\S]*?slicer_core\.mt\.js/.exec(worker)?.[0] ?? "";
+  assert.ok(branch, "the isolated branch should be findable");
+  assert.ok(
+    branch.indexOf("capPthreadPool()") > 0 && branch.indexOf("capPthreadPool()") < branch.indexOf("slicer_core.mt.js"),
+    "the cap must be applied BEFORE the threaded core reads hardwareConcurrency"
+  );
+  // The cap shadows the value the core reads, and leaves desktops alone.
+  assert.match(worker, /Object\.defineProperty\(navigator, 'hardwareConcurrency', \{ value: cap, configurable: true \}\)/);
+  assert.match(worker, /if \(cap >= cores\) return/, "a machine with few cores must not be capped upward");
+  // And the thing the whole trade-off is for is still reachable.
+  assert.match(worker, /v\.buffer instanceof SharedArrayBuffer/, "cancel + support progress ride on the SAB");
+});
+
+test("the server still grants isolation to Android, and says why", async () => {
+  /**
+   * The counterpart to the test above, on the other side of the wire. If
+   * someone adds an Android branch to `isMemoryConstrainedApple`, the headers
+   * stop being sent, `crossOriginIsolated` goes false, the engine silently
+   * takes the single-threaded core, and cancellation disappears on the exact
+   * devices this whole exercise was about — with no error anywhere.
+   */
+  const platform = await readFile(new URL("../worker/platform.ts", import.meta.url), "utf8");
+  const rules = platform.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/Android/i.test(rules), "Android must keep isolation — the pool cap is what protects it instead");
+  assert.match(platform, /pthread pool/i, "the reasoning must live next to the rule, not only in a test");
 });
 
 test("the installed build carries the worker-release hook", async () => {

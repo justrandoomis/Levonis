@@ -68,3 +68,81 @@ kernel stays warm.
 
 `tests/engine-patch.test.mjs` asserts the patch is present in the installed
 build and that the shell only reaches it through the adapter.
+
+## `three-slicer+0.2.2.patch` — cap the pthread pool
+
+**Purely additive**: it adds `capPthreadPool()` to `engine/src/slicer.worker.js`
+and calls it inside the branch that loads the threaded core, before the import.
+
+### The crash
+
+The owner photographed, on an Android phone in Chrome:
+
+```
+Worker terminated (likely out of memory): worker error
+```
+
+`slicer_core.mt.js` does, verbatim:
+
+```js
+initMainThread(){var pthreadPoolSize=typeof navigator!=="undefined"&&navigator.hardwareConcurrency||4;
+  while(pthreadPoolSize--){PThread.allocateUnusedWorker()}
+  addOnPreRun(async()=>{var r=PThread.loadWasmModuleToAllWorkers();addRunDependency("loading-workers");await r;removeRunDependency("loading-workers")})}
+allocateUnusedWorker(){worker=new Worker(new URL("slicer_core.mt.js",import.meta.url),{type:"module",...})}
+```
+
+One module Worker per logical core, each fetching and parsing the same 5.28 MB
+script, and all of it an `addRunDependency` — so it blocks *before* the kernel
+reports ready. A Pixel 8 reports eight cores. The compiled module and the heap
+are shared rather than re-instantiated, so the cost per pool worker is a V8
+isolate plus that parse, which on a phone with a browser full of tabs is
+enough.
+
+### Why not simply stop telling Android it is isolated
+
+That is the cheaper-looking fix and it is the wrong one. The engine picks its
+core on one signal — `crossOriginIsolated` — so withholding COOP/COEP makes it
+take the single-threaded build, which is what `worker/platform.ts` already does
+for iOS and iPadOS.
+
+But `slicer.worker.js` sends the support-progress and **cancel** pointers to
+the main thread only when the buffer behind them is a `SharedArrayBuffer`:
+
+```js
+if (v && v.buffer instanceof SharedArrayBuffer)
+  self.postMessage({ type: 'supsab', buf: v.buffer, ptr: v.byteOffset, cancelPtr: c ? c.byteOffset : 0 })
+```
+
+There is no equivalent on the single-threaded core. Dropping isolation on
+Android would therefore take **slice cancellation and live support progress
+away from every Android phone** — a feature loss rather than a slowdown — on
+top of the threaded core's measured 2.2×.
+
+iOS and iPadOS are a different case: WebKit's per-tab budget cannot carry the
+threaded core at any pool size, so for them the core itself has to go. Android
+can carry it; it just cannot carry eight of everything.
+
+### Why the shell cannot do this without a patch
+
+`initMainThread()` runs inside the slice worker's own global scope, reading
+that worker's `navigator`. The shell is on the main thread and shares no scope
+with it, and the worker is constructed by the viewer from a package URL, so
+there is nowhere to pass an option in. Shadowing the property on the worker's
+own `navigator` — from inside the worker, before the core is imported — is the
+only seam. The pool workers the core then spawns do not re-run that branch, so
+capping it once is enough.
+
+### Why it is safe
+
+`Object.defineProperty` on the instance shadows the prototype getter and
+nothing else reads the value. The cap never raises a machine's count (`if (cap
+>= cores) return`), so a two-core device is untouched, and a desktop keeps a
+thread per core. `navigator.deviceMemory` is Chromium-only and is treated as a
+signal only when present; the user-agent test covers the rest. Any failure —
+a navigator that refuses to be shadowed — is caught and leaves the engine's own
+default in place.
+
+`tests/engine-patch.test.mjs` pins both halves: that the cap runs before the
+threaded core is imported, and that `worker/platform.ts` still has **no**
+Android branch. The second is the one that matters — without it, a later
+"simplification" would remove cancellation from Android phones silently.

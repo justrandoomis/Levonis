@@ -1,3 +1,45 @@
+diff --git a/node_modules/three-slicer/engine/src/slicer.worker.js b/node_modules/three-slicer/engine/src/slicer.worker.js
+index 0aaf626..994863b 100644
+--- a/node_modules/three-slicer/engine/src/slicer.worker.js
++++ b/node_modules/three-slicer/engine/src/slicer.worker.js
+@@ -20,10 +20,37 @@ import { assertLegacySlaFallback, parseSlaJob } from './sla_request.js'
+ let quiet = false
+ const say = (level, ...args) => { if (!quiet) console[level](...args) }
+ 
++// LEVONIS PATCH — cap the pthread pool before the threaded core sizes it.
++// See patches/README.md. The core does, verbatim:
++//   pthreadPoolSize = navigator.hardwareConcurrency || 4
++//   while (pthreadPoolSize--) PThread.allocateUnusedWorker()
++// and each of those is a module Worker that parses this package's 5.28 MB
++// core, as a blocking addOnPreRun dependency. On an 8-core phone that is 8
++// extra isolates and 8 parses before the kernel reports ready, which is what
++// kills it. Shadowing the value on the worker's OWN navigator is enough:
++// initMainThread() reads it from here, in this scope, and the pool workers it
++// then spawns do not re-run that branch.
++const capPthreadPool = () => {
++  try {
++    const cores = navigator.hardwareConcurrency || 4
++    // deviceMemory is Chromium-only and is the reliable signal where it exists;
++    // the user-agent test covers the rest. A phone gets threads, just not one
++    // per core — that keeps SharedArrayBuffer, and with it slice cancellation
++    // and live support progress, which the single-threaded core cannot do.
++    const small = navigator.deviceMemory > 0 && navigator.deviceMemory <= 4
++    const handheld = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')
++    const cap = small || handheld ? 2 : cores
++    if (cap >= cores) return
++    Object.defineProperty(navigator, 'hardwareConcurrency', { value: cap, configurable: true })
++    say('info', '[slicer.worker] pthread pool capped at ' + cap + ' (device reports ' + cores + ')')
++  } catch { /* a navigator we cannot shadow keeps the engine's own default */ }
++}
++
+ const loadCore = async () => {
+   const isolated = typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated
+   if (isolated) {
+     try {
++      capPthreadPool()
+       const M = await (await import('./slicer_core.mt.js')).default()
+       say('info', '[slicer.worker] core: mt (threads)')
+       return M
 diff --git a/node_modules/three-slicer/viewer/dist/Viewport.js b/node_modules/three-slicer/viewer/dist/Viewport.js
 index 679c796..4fa3617 100644
 --- a/node_modules/three-slicer/viewer/dist/Viewport.js

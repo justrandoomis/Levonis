@@ -22,6 +22,36 @@
  */
 
 /**
+ * WHY ANDROID IS NOT IN THIS LIST, WHICH IS THE OPPOSITE OF WHAT IT LOOKS LIKE.
+ *
+ * An Android phone dies with "Worker terminated (likely out of memory)" the
+ * moment it slices, and it dies for the same reason an iPad did: the threaded
+ * core spawns one module Worker per logical core, each parsing the package's
+ * 5.28 MB core, as a blocking dependency before the kernel reports ready. On
+ * an eight-core phone that is eight extra isolates and eight parses.
+ *
+ * So the obvious fix is to add Android here and let the engine take its
+ * single-threaded core, exactly as this function already does for iPadOS.
+ *
+ * DO NOT. The two platforms are not in the same position. `slicer.worker.js`
+ * hands the main thread its support-progress and CANCEL pointers only when the
+ * buffer behind them is a SharedArrayBuffer, and that exists only on the
+ * threaded core. Withholding isolation from Android would therefore remove
+ * slice cancellation and live support progress from every Android phone — a
+ * feature loss, not a slowdown — on top of a measured 2.2x.
+ *
+ * Android keeps threads. What it does not keep is a thread per core: the
+ * pthread pool is capped to two inside the worker, by the LEVONIS hunk in
+ * patches/three-slicer+0.2.2.patch. That removes the memory the pool costs
+ * while leaving the SharedArrayBuffer, and therefore cancel, intact.
+ * tests/engine-patch.test.mjs asserts both halves of that trade, including
+ * that this function still has no Android branch.
+ *
+ * iOS and iPadOS are different because WebKit's per-tab budget cannot carry
+ * the threaded core at ANY pool size, so for them the core itself has to go.
+ */
+
+/**
  * iOS and iPadOS, including iPadOS Safari's desktop-class user agent — which
  * claims Macintosh and is only told apart from a real Mac by touch points,
  * which a server cannot see.
