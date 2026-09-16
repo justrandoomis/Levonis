@@ -88,6 +88,11 @@ export const ROUTES: readonly RouteRule[] = [
 
   // -------------------------------------------------------------- telegram
   { prefix: '/api/telegram/webhook', hosts: 'main', owner: 'NOTIFICATIONS', flipPhase: 4, requires: 'none', rateClass: 'webhook', note: 'secret-header check moves with it' },
+  // 0080 — the ADMIN bot's webhook. Machine ingress authenticated by
+  // X-Telegram-Bot-Api-Secret-Token, exactly like the customer webhook above,
+  // so it carries no session and cannot be admin-gated. It is deliberately
+  // NOT under /api/telegram/admin: that prefix declares a session capability.
+  { prefix: '/api/telegram/ops/webhook', hosts: 'main', owner: 'NOTIFICATIONS', flipPhase: 4, requires: 'none', rateClass: 'webhook', note: 'secret-header check moves with it' },
   { prefix: '/api/telegram/admin', hosts: 'main', owner: 'NOTIFICATIONS', flipPhase: 4, requires: 'admin:full', rateClass: 'admin-write' },
   { prefix: '/api/telegram', hosts: 'root', owner: 'IDENTITY', flipPhase: 9, requires: 'none', rateClass: 'auth', note: 'link/OTP status poll — 240/min per ip, see limiter.ts' },
 

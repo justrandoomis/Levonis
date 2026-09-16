@@ -25,7 +25,7 @@ import { parseProductRow } from '../lib/productModel';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
 import { mysteryViewFor, orderPublic, shippingConfigFrom, ORDER_ITEMS_SELECT } from './orders';
 import { getOrderPointsSnapshots } from '../lib/pointsOps';
-import { notifyAdmins, telegramConfigured, telegramGetMe } from '../lib/telegram';
+import { telegramConfigured, telegramGetMe } from '../lib/telegram';
 import {
   STAGE_SOURCE,
   canMoveStage,
@@ -50,6 +50,7 @@ import { syncOrderDelivery, sweepDeliveryStatuses } from '../lib/delivery/sync';
 import type { DeliveryDriver } from '../lib/delivery/types';
 import { typeForTransport } from '../lib/shippingType';
 import type { ShippingType } from '../lib/shippingType';
+import { notifyAdminTopic } from '../lib/telegramAdmin';
 
 export const adminRoutes = new Hono<AppContext>();
 adminRoutes.use('*', requireAdmin);
@@ -208,7 +209,12 @@ adminRoutes.post('/telegram/test', async (c) => {
   const configured = telegramConfigured(c.env);
   let sent = false;
   if (configured && me.ok) {
-    sent = await notifyAdmins(c.env, '✅ Levonis: Telegram notifications are working (test message from the admin console).');
+    const routed = await notifyAdminTopic(
+      c.env,
+      'general',
+      '✅ Levonis: Telegram notifications are working (test message from the admin console).'
+    );
+    sent = routed.ok;
   }
   return c.json({
     success: true,

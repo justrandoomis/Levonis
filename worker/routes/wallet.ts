@@ -4,7 +4,6 @@ import { requireAuth, requireAdmin, badRequest, conflict, forbidden, notFound, i
 import { newId } from '../lib/crypto';
 import { walletTxPublic } from '../lib/wallet';
 import { rateLimit } from '../lib/ratelimit';
-import { notifyAdmins } from '../lib/telegram';
 import {
   closeDepositNotification,
   enqueueUserDepositStatusNotification,
@@ -34,6 +33,7 @@ import {
   type WithdrawalOpResult,
   type WithdrawalRow,
 } from '../lib/walletOps';
+import { notifyAdminTopic } from '../lib/telegramAdmin';
 
 /**
  * Wallet API (integrated mandate §11.1–§11.4).
@@ -300,8 +300,9 @@ walletRoutes.post('/deposits', async (c) => {
     notifyAdminsOfDeposit(c.env, id)
       .then(async (res) => {
         if (res.enqueued || res.reason === 'already_enqueued') return;
-        await notifyAdmins(
+        await notifyAdminTopic(
           c.env,
+          'wallet',
           `💰 New deposit request (pending review)\nOperation: ${operationNumber(id)}\nUser: ${user.username || user.email}\nAmount: $${(amount / 100).toFixed(2)}${provider ? `\nMethod: ${provider}` : ''}${reference ? `\nReference: ${reference}` : ''}${reviewState !== 'awaiting_review' ? `\nSignal: ${reviewState}` : ''}`
         );
       })
@@ -353,8 +354,9 @@ walletRoutes.post('/withdrawals', async (c) => {
   });
   if (!res.replayed) {
     c.executionCtx.waitUntil(
-      notifyAdmins(
+      notifyAdminTopic(
         c.env,
+        'wallet',
         `🏧 New withdrawal request (pending review — no transfer made)\nOperation: ${operationNumber(res.id, 'WD')}\nUser: ${user.username || user.email}\nAmount: $${(amount / 100).toFixed(2)}\nDestination: ${kind}`
       )
     );

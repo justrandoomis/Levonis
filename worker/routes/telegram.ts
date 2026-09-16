@@ -18,12 +18,29 @@ import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import {
   getBotUsername,
+  scrubTokens,
   sendToChat,
   verifyOtp,
   maybeSendAuthChallengeOtp,
+  botToken,
   OTP_PURPOSES,
   type OtpPurpose,
 } from '../lib/telegram';
+import {
+  TOPIC_KEYS,
+  adminBotConfigured,
+  adminTelegramIds,
+  auditAdminBot,
+  isBotAdmin,
+  readAdminGroup,
+  readTopics,
+  topicLabel,
+} from '../lib/telegramAdmin';
+import {
+  handleAdminCommand,
+  refuseUnauthorized,
+  type AdminMessage,
+} from '../lib/telegramAdminCommands';
 import {
   handleAdminActionCallback,
   processWalletNotifications,
@@ -649,9 +666,13 @@ telegramRoutes.get('/admin/webhook-info', requireAdmin, async (c) => {
   });
 });
 
+/**
+ * Masks EVERY bot token, not just the customer one (0080). A second bot's
+ * token would otherwise appear in clear the first time `getWebhookInfo`
+ * echoed a URL or an error containing it.
+ */
 function maskBotToken(env: Env, s: string): string {
-  if (!env.TELEGRAM_BOT_TOKEN) return s;
-  return s.split(env.TELEGRAM_BOT_TOKEN).join('***');
+  return scrubTokens(env, s);
 }
 
 // ------------------------------------------- wallet approval authority (§12.2)
@@ -837,3 +858,318 @@ telegramRoutes.post('/admin/wallet-notifications/:id/retry', requireAdmin, async
   c.executionCtx.waitUntil(processWalletNotifications(c.env, 5).then(() => undefined));
   return c.json({ success: true, state: 'pending' });
 });
+
+// =========================================================================
+//  THE ADMIN BOT — @alilevobot (migration 0080)
+// =========================================================================
+//
+// WHY THE PATH IS `/api/telegram/ops/webhook` AND NOT `/api/telegram/admin/webhook`.
+//
+// `/admin` in a route path is a CAPABILITY declaration in this codebase, not a
+// naming convention: `services/gateway/test/capabilities.test.ts` discovers
+// every core route whose path contains "admin" and fails the build unless it
+// is apex-only AND gated behind an admin SESSION. A Telegram webhook has no
+// session — it is a machine ingress authenticated by a shared secret header,
+// exactly like `/api/telegram/webhook` — so putting it under `/admin` would
+// either 401 every update Telegram sends or force a hole in that gate.
+//
+// The bot's MANAGEMENT endpoints below DO live under `/admin`, because they
+// are genuine admin surfaces and do require a session. The webhook path is
+// never typed by a human: our own tooling registers it with Telegram.
+
+/** The admin bot's update-dedup table is its own — see migration 0080 for why
+ *  sharing `telegram_updates` would silently swallow this bot's first updates. */
+async function claimAdminUpdate(env: Env, updateId: number): Promise<boolean> {
+  try {
+    await env.DB.prepare('INSERT INTO telegram_admin_updates (update_id) VALUES (?)').bind(updateId).run();
+    return true;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('UNIQUE') || msg.includes('PRIMARY')) return false;
+    throw e;
+  }
+}
+
+telegramRoutes.post('/ops/webhook', async (c) => {
+  const secret = c.env.TELEGRAM_ADMIN_WEBHOOK_SECRET;
+  if (!secret) {
+    throw unavailable('Admin Telegram webhook is not configured (TELEGRAM_ADMIN_WEBHOOK_SECRET is unset)');
+  }
+  const header = c.req.header('X-Telegram-Bot-Api-Secret-Token') || '';
+  const enc = new TextEncoder();
+  if (!timingSafeEqual(enc.encode(header), enc.encode(secret))) {
+    throw forbidden('Invalid webhook secret');
+  }
+
+  const update = (await c.req.json().catch(() => null)) as AdminUpdate | null;
+  if (!update || typeof update !== 'object') throw badRequest('Invalid update payload');
+  if (!Number.isInteger(update.update_id)) return c.json({ ok: true });
+
+  // §16 — a redelivered update is acknowledged 200 and NOT re-processed. The
+  // business operations behind the buttons are independently idempotent
+  // (single-use action tokens + the conditional flip inside decideDeposit),
+  // so this is defence in depth rather than the only guard.
+  if (!(await claimAdminUpdate(c.env, update.update_id))) return c.json({ ok: true });
+
+  try {
+    await handleAdminUpdate(c.env, update);
+  } catch (e) {
+    // Same contract as the customer webhook: the update is already recorded,
+    // so a non-200 would only earn a retry that gets deduped away. The error
+    // is logged with both tokens scrubbed.
+    console.error('telegram admin webhook: update handling failed', scrubTokens(c.env, e instanceof Error ? e.message : String(e)));
+  }
+  return c.json({ ok: true });
+});
+
+interface AdminUpdate {
+  update_id: number;
+  message?: AdminMessage;
+  callback_query?: {
+    id?: string;
+    from?: { id?: number };
+    data?: string;
+    message?: { message_id?: number; chat?: { id?: number } };
+  };
+}
+
+async function handleAdminUpdate(env: Env, update: AdminUpdate): Promise<void> {
+  // ---- button presses -----------------------------------------------------
+  const cb = update.callback_query;
+  if (cb) {
+    if (typeof cb.id !== 'string' || !cb.id) return;
+    const from = cb.from?.id;
+    // DOOR 1 (§3): the bot allow-list, numeric ids only. DOOR 2 — the site
+    // role that actually authorises money — is enforced inside
+    // handleAdminActionCallback by resolveAdminActor, and this does not
+    // replace it. Someone on the allow-list with no admin_tg_identities row
+    // still cannot approve a dinar.
+    if (!isBotAdmin(env, from)) {
+      await answerAdminCallback(env, cb.id, 'غير مصرح لك بهذا الإجراء.');
+      await auditAdminBot(env.DB, null, 'telegram_admin.callback.denied', `tg:${from ?? 'unknown'}`, typeof from === 'number' ? from : null, {
+        reason: 'not_in_allow_list',
+      });
+      return;
+    }
+    await handleAdminActionCallback(env, cb as CallbackQueryInput, 'admin');
+    return;
+  }
+
+  // ---- commands -----------------------------------------------------------
+  const msg = update.message;
+  if (!msg?.chat || typeof msg.chat.id !== 'number') return;
+  const from = msg.from?.id;
+  if (!isBotAdmin(env, from)) {
+    // §20: an unauthorized sender learns nothing about the platform.
+    await refuseUnauthorized(env, msg);
+    return;
+  }
+  await handleAdminCommand({ env, msg, telegramUserId: from as number });
+}
+
+/** The admin bot's own fast callback answer for refusals it makes before the
+ *  wallet machinery is reached (§14 — the spinner never stays stuck). */
+async function answerAdminCallback(env: Env, callbackQueryId: string, text: string): Promise<void> {
+  const token = botToken(env, 'admin');
+  if (!token) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackQueryId, text: text.slice(0, 200), show_alert: true }),
+    });
+  } catch (e) {
+    console.error('admin answerCallbackQuery failed', scrubTokens(env, e instanceof Error ? e.message : String(e)));
+  }
+}
+
+// ------------------------------------------- admin-bot management (session)
+//
+// These DO live under `/admin` and DO require a site admin session: they are
+// operator surfaces, not machine ingress. `requireAdmin` also enforces the
+// apex-host rule, which is what the gateway's capability table declares for
+// this prefix.
+
+/** Everything an operator needs to see whether the admin bot is wired up,
+ *  with no secret value in the response — only whether each one is SET. */
+telegramRoutes.get('/admin/bot-status', requireAdmin, async (c) => {
+  await rateLimit(c, 'tg-admin-bot-status', 60, 3600);
+  const group = await readAdminGroup(c.env.DB);
+  const topics = await readTopics(c.env.DB);
+  const bound = new Map(topics.filter((t) => t.enabled).map((t) => [t.topicKey, t]));
+  return c.json({
+    success: true,
+    configured: {
+      bot_token: !!c.env.TELEGRAM_ADMIN_BOT_TOKEN,
+      webhook_secret: !!c.env.TELEGRAM_ADMIN_WEBHOOK_SECRET,
+      // The COUNT of allowed ids, never the ids themselves.
+      admin_user_ids: adminTelegramIds(c.env).size,
+      legacy_chat_fallback: !!(c.env.TELEGRAM_ADMIN_CHAT_ID || '').trim(),
+    },
+    group: group
+      ? { chat_id: group.groupChatId, title: group.groupTitle, updated_at: group.updatedAt }
+      : null,
+    topics: TOPIC_KEYS.map((key) => {
+      const t = bound.get(key);
+      return {
+        key,
+        label: topicLabel(key),
+        bound: !!t,
+        // null = the forum's General topic, which Telegram addresses with no
+        // thread id at all. Not a missing value.
+        message_thread_id: t ? t.messageThreadId : null,
+      };
+    }),
+  });
+});
+
+/**
+ * Registers @alilevobot's webhook for THIS deployment. Same deliberate
+ * friction as the customer bot: a bot has exactly ONE webhook, and pointing
+ * this one at the wrong environment silently disconnects the other.
+ */
+telegramRoutes.post('/admin/set-admin-webhook', requireAdmin, async (c) => {
+  await rateLimit(c, 'tg-set-admin-webhook', 5, 3600);
+  const user = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  if (body.confirm !== 'SET-ADMIN-WEBHOOK') {
+    throw badRequest('Confirmation required: send { "confirm": "SET-ADMIN-WEBHOOK" }', 'CONFIRM_REQUIRED');
+  }
+  const missing: string[] = [];
+  if (!c.env.TELEGRAM_ADMIN_BOT_TOKEN) missing.push('TELEGRAM_ADMIN_BOT_TOKEN');
+  if (!c.env.TELEGRAM_ADMIN_WEBHOOK_SECRET) missing.push('TELEGRAM_ADMIN_WEBHOOK_SECRET');
+  if (!c.env.APP_ORIGIN) missing.push('APP_ORIGIN');
+  if (missing.length) {
+    throw unavailable(`Admin bot webhook setup is not configured — missing: ${missing.join(', ')}`);
+  }
+  const origin = c.env.APP_ORIGIN!.replace(/\/+$/, '');
+  if (!origin.startsWith('https://')) throw badRequest('APP_ORIGIN must be an https:// origin', 'BAD_ORIGIN');
+  const url = `${origin}/api/telegram/ops/webhook`;
+
+  let ok = false;
+  let description = '';
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${c.env.TELEGRAM_ADMIN_BOT_TOKEN}/setWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        secret_token: c.env.TELEGRAM_ADMIN_WEBHOOK_SECRET,
+        // Telegram delivers ONLY what is listed. `message` carries /topic_here
+        // and friends; `callback_query` carries the wallet buttons.
+        allowed_updates: ['message', 'callback_query'],
+        drop_pending_updates: false,
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; description?: string };
+    ok = res.ok && data.ok === true;
+    description = maskBotToken(c.env, String(data.description ?? `HTTP ${res.status}`));
+  } catch (e) {
+    description = 'Telegram API unreachable';
+    console.error('admin setWebhook failed', scrubTokens(c.env, e instanceof Error ? e.message : String(e)));
+  }
+
+  // Best effort, and only after the webhook is live: the command menu is
+  // cosmetic and its failure must not fail the registration.
+  let commandsOk = false;
+  if (ok) commandsOk = await setAdminBotCommands(c.env);
+
+  await audit(c.env.DB, user.id, 'telegram_admin.set_webhook', url, { ok, description, commands: commandsOk });
+  return c.json(
+    {
+      success: ok,
+      ok,
+      url,
+      description,
+      commands_registered: commandsOk,
+      note: 'A Telegram bot has exactly ONE webhook. This registers @alilevobot only; the customer bot is untouched.',
+    },
+    ok ? 200 : 502
+  );
+});
+
+/** getWebhookInfo for the ADMIN bot, minimized and masked like the customer one. */
+telegramRoutes.get('/admin/admin-webhook-info', requireAdmin, async (c) => {
+  await rateLimit(c, 'tg-admin-webhook-info', 30, 3600);
+  if (!adminBotConfigured(c.env)) {
+    throw unavailable('Admin bot is not configured (TELEGRAM_ADMIN_BOT_TOKEN is unset)');
+  }
+  let info: Record<string, unknown> | null = null;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${c.env.TELEGRAM_ADMIN_BOT_TOKEN}/getWebhookInfo`);
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; result?: Record<string, unknown> };
+    if (res.ok && data.ok && data.result) info = data.result;
+  } catch (e) {
+    console.error('admin getWebhookInfo failed', scrubTokens(c.env, e instanceof Error ? e.message : String(e)));
+  }
+  if (!info) throw unavailable('Telegram API unreachable — try again later', 'TELEGRAM_UNAVAILABLE');
+  const masked = (v: unknown) => (typeof v === 'string' ? maskBotToken(c.env, v) : v);
+  return c.json({
+    success: true,
+    webhook: {
+      url: masked(info.url),
+      pending_update_count: info.pending_update_count ?? 0,
+      ip_address: info.ip_address ?? null,
+      last_error_date: info.last_error_date ?? null,
+      last_error_message: masked(info.last_error_message) ?? null,
+      max_connections: info.max_connections ?? null,
+      allowed_updates: info.allowed_updates ?? null,
+    },
+  });
+});
+
+/**
+ * Unbinds the admin group so a DIFFERENT group can be adopted by the next
+ * `/topic_here`. Deliberately a site-admin action behind a confirm string:
+ * `/topic_here` alone must never be able to move the platform's notifications
+ * to whatever group the sender happens to be standing in (§5).
+ *
+ * The TOPIC bindings go with it — a thread id is meaningless in another group.
+ */
+telegramRoutes.post('/admin/group/reset', requireAdmin, async (c) => {
+  await rateLimit(c, 'tg-admin-group-reset', 5, 3600);
+  const user = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  if (body.confirm !== 'RESET-ADMIN-GROUP') {
+    throw badRequest('Confirmation required: send { "confirm": "RESET-ADMIN-GROUP" }', 'CONFIRM_REQUIRED');
+  }
+  const before = await readAdminGroup(c.env.DB);
+  if (!before) throw notFound('No admin group is bound');
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM telegram_admin_topics'),
+    c.env.DB.prepare("DELETE FROM telegram_admin_config WHERE id = 'singleton'"),
+  ]);
+  await auditAdminBot(c.env.DB, user.id, 'telegram_admin.group.reset', before.groupChatId, null, {
+    previous_title: before.groupTitle,
+  });
+  return c.json({
+    success: true,
+    note: 'The next /topic_here from an authorized admin adopts the group it is sent in.',
+  });
+});
+
+/** The command menu Telegram shows in the bot's UI (§25). Only the five
+ *  commands an operator needs — no internal surface is advertised. */
+async function setAdminBotCommands(env: Env): Promise<boolean> {
+  const token = botToken(env, 'admin');
+  if (!token) return false;
+  const commands = [
+    { command: 'start', description: 'بدء استخدام بوت الإدارة' },
+    { command: 'help', description: 'قائمة الأوامر' },
+    { command: 'status', description: 'حالة البوت والمجموعة' },
+    { command: 'topics', description: 'حالة ربط المواضيع' },
+    { command: 'topic_here', description: 'ربط الموضوع الحالي — مثال: /topic_here wallet' },
+  ];
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commands }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
+    return res.ok && data.ok === true;
+  } catch (e) {
+    console.error('setMyCommands failed', scrubTokens(env, e instanceof Error ? e.message : String(e)));
+    return false;
+  }
+}

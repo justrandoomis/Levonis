@@ -120,7 +120,7 @@ Intermediate rename artefacts inside rebuild migrations belong to the owner of t
 | Reviews | `reviews`, `review_rewards`, `gift_entitlements`, `gift_pool_items`, `gift_redemptions`, `gift_pools`, `review_media` (new) |
 | Devices & Warranty | `order_item_units`, `device_serials`, `device_registrations`, `warranty_claims`, `claim_messages`, `warranty_receipts` |
 | Chat | `chats`, `chat_participants, chat_typing_presence`, `chat_messages` |
-| Notifications | `outbox`, `user_notifications`, `telegram_updates`, `tg_admin_notifications`, `tg_admin_actions` (Telegram transport state), `notification_preferences` (new), `notify_deliveries` (new) |
+| Notifications | `outbox`, `user_notifications`, `telegram_updates`, `tg_admin_notifications`, `tg_admin_actions` (Telegram transport state), `telegram_admin_config`, `telegram_admin_topics`, `telegram_admin_updates` (0080 — the ADMIN bot @alilevobot: the group and forum topics discovered from `/topic_here`, and its OWN update-dedup table, because a second bot's `update_id` sequence collides with the first bot's), `notification_preferences` (new), `notify_deliveries` (new) |
 | Invoices | `invoices` |
 | Policies | `policy_documents`, `policy_acceptances` |
 | Support | `support_tickets`, `support_ticket_messages` |

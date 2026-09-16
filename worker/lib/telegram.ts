@@ -4,10 +4,12 @@ import { newId, sha256Hex, timingSafeEqual } from './crypto';
 /**
  * Telegram transport + OTP helpers (final-phase §2).
  *
- * - Admin notifications (notifyAdmins) require TELEGRAM_BOT_TOKEN and
- *   TELEGRAM_ADMIN_CHAT_ID. When either is missing the feature is simply
- *   off — callers treat the result honestly and nothing pretends to have
- *   been sent.
+ * - Admin notifications are routed by TOPIC through
+ *   worker/lib/telegramAdmin.ts `notifyAdminTopic` (0080), which picks the
+ *   admin bot and the bound forum topic, and falls back to GENERAL and then
+ *   to the legacy TELEGRAM_ADMIN_CHAT_ID chat. When nothing is configured the
+ *   feature is simply off — callers treat the result honestly and nothing
+ *   pretends to have been sent.
  * - Customer messages (sendToChat) go ONLY to a specific private chat id —
  *   OTPs and account messages are NEVER routed to the admin chat or any
  *   group.
@@ -20,31 +22,45 @@ import { newId, sha256Hex, timingSafeEqual } from './crypto';
 
 const API = 'https://api.telegram.org';
 
+/**
+ * WHICH OF THE TWO BOTS (0080).
+ *
+ * `customer` is the bot every existing caller means — linking, OTP, account
+ * messages, and (until an admin group is bound) the admin notifications too.
+ * `admin` is @alilevobot: the admin group, admin private chats, and nothing
+ * else. It never DMs a customer.
+ *
+ * Every helper below takes this as a TRAILING parameter defaulting to
+ * `'customer'`, so all ~40 existing call sites keep their exact behaviour and
+ * the second bot is opt-in at each call.
+ */
+export type BotId = 'customer' | 'admin';
+
+/** The token for one bot, or undefined when that bot is not configured. */
+export function botToken(env: Env, bot: BotId = 'customer'): string | undefined {
+  return bot === 'admin' ? env.TELEGRAM_ADMIN_BOT_TOKEN : env.TELEGRAM_BOT_TOKEN;
+}
+
+/** Is this bot usable at all? Callers degrade honestly rather than throwing. */
+export function botConfigured(env: Env, bot: BotId = 'customer'): boolean {
+  return !!botToken(env, bot);
+}
+
 export function telegramConfigured(env: Env): boolean {
   return !!(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_ADMIN_CHAT_ID);
 }
 
-export async function notifyAdmins(env: Env, text: string): Promise<boolean> {
-  if (!telegramConfigured(env)) return false;
-  try {
-    const res = await fetch(`${API}/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: env.TELEGRAM_ADMIN_CHAT_ID,
-        text: text.slice(0, 4000),
-        disable_web_page_preview: true,
-      }),
-    });
-    if (!res.ok) {
-      console.error('Telegram sendMessage failed', res.status, await res.text().catch(() => ''));
-    }
-    return res.ok;
-  } catch (e) {
-    console.error('Telegram sendMessage error', e);
-    return false;
-  }
-}
+/**
+ * REPLACED BY THE TOPIC ROUTER (0080). What used to be `notifyAdmins(env, text)`
+ * — one hard-coded chat, one bot, no topic — is now
+ * `notifyAdminTopic(env, topic, text)` in worker/lib/telegramAdmin.ts, which
+ * resolves the admin group and the forum topic and falls back, in order, to
+ * GENERAL and then to this same `TELEGRAM_ADMIN_CHAT_ID` chat.
+ *
+ * Deleted rather than kept as a wrapper: two admin-notification paths is
+ * exactly the duplicate the routing is meant to remove, and a wrapper here
+ * would import the router and close an import cycle.
+ */
 
 /**
  * Send a plain-text message to one specific chat (used for PRIVATE customer
@@ -610,11 +626,23 @@ interface TgApiEnvelope {
   result?: { message_id?: number; chat?: { id?: number } };
 }
 
-/** Redacts the bot token from anything about to be logged or persisted. */
-function scrub(env: Env, s: string): string {
-  const token = env.TELEGRAM_BOT_TOKEN;
-  return (token ? s.split(token).join('***') : s).slice(0, 300);
+/**
+ * Redacts EVERY bot token from anything about to be logged or persisted.
+ *
+ * Both of them, unconditionally, whichever bot the call was for: a message the
+ * admin bot failed to send is logged by code that has no idea which token it
+ * used, and one scrubber that only knew about `TELEGRAM_BOT_TOKEN` would print
+ * the admin token in clear the first time the second bot hit an error.
+ */
+export function scrubTokens(env: Env, s: string): string {
+  let out = s;
+  for (const token of [env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_ADMIN_BOT_TOKEN]) {
+    if (token) out = out.split(token).join('***');
+  }
+  return out.slice(0, 300);
 }
+
+const scrub = scrubTokens;
 
 async function readEnvelope(env: Env, res: Response): Promise<TgSendResult> {
   let data: TgApiEnvelope = {};
@@ -641,12 +669,19 @@ async function readEnvelope(env: Env, res: Response): Promise<TgSendResult> {
   return result;
 }
 
-async function callApi(env: Env, method: string, body: BodyInit, headers?: Record<string, string>): Promise<TgSendResult> {
-  if (!env.TELEGRAM_BOT_TOKEN) {
+async function callApi(
+  env: Env,
+  method: string,
+  body: BodyInit,
+  headers?: Record<string, string>,
+  bot: BotId = 'customer'
+): Promise<TgSendResult> {
+  const token = botToken(env, bot);
+  if (!token) {
     return { ok: false, error: 'TELEGRAM_NOT_CONFIGURED', retryable: false };
   }
   try {
-    const res = await fetch(`${API}/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, { method: 'POST', body, headers });
+    const res = await fetch(`${API}/bot${token}/${method}`, { method: 'POST', body, headers });
     return await readEnvelope(env, res);
   } catch (e) {
     // Network failure: the send may or may not have reached Telegram. The
@@ -671,7 +706,8 @@ export async function sendPhotoToChat(
   chatId: number | string,
   bytes: ArrayBuffer | Uint8Array,
   caption: string,
-  extra: Record<string, unknown> = {}
+  extra: Record<string, unknown> = {},
+  bot: BotId = 'customer'
 ): Promise<TgSendResult> {
   const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   const form = new FormData();
@@ -685,7 +721,7 @@ export async function sendPhotoToChat(
   const copy = new Uint8Array(view.byteLength);
   copy.set(view);
   form.append('photo', new Blob([copy]), 'proof.jpg');
-  return callApi(env, 'sendPhoto', form);
+  return callApi(env, 'sendPhoto', form, undefined, bot);
 }
 
 /** Plain-text send that returns the message reference (the boolean-returning
@@ -694,13 +730,15 @@ export async function sendMessageToChat(
   env: Env,
   chatId: number | string,
   text: string,
-  extra: Record<string, unknown> = {}
+  extra: Record<string, unknown> = {},
+  bot: BotId = 'customer'
 ): Promise<TgSendResult> {
   return callApi(
     env,
     'sendMessage',
     JSON.stringify({ chat_id: chatId, text: text.slice(0, 4000), disable_web_page_preview: true, ...extra }),
-    { 'Content-Type': 'application/json' }
+    { 'Content-Type': 'application/json' },
+    bot
   );
 }
 
@@ -713,18 +751,20 @@ export async function answerCallbackQuery(
   env: Env,
   callbackQueryId: string,
   text: string,
-  showAlert = false
+  showAlert = false,
+  bot: BotId = 'customer'
 ): Promise<boolean> {
-  if (!env.TELEGRAM_BOT_TOKEN) return false;
+  const token = botToken(env, bot);
+  if (!token) return false;
   try {
-    const res = await fetch(`${API}/bot${env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+    const res = await fetch(`${API}/bot${token}/answerCallbackQuery`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ callback_query_id: callbackQueryId, text: text.slice(0, 200), show_alert: showAlert }),
     });
     return res.ok;
   } catch (e) {
-    console.error('answerCallbackQuery failed', e instanceof Error ? e.message : e);
+    console.error('answerCallbackQuery failed', scrubTokens(env, e instanceof Error ? e.message : String(e)));
     return false;
   }
 }
@@ -736,13 +776,15 @@ export async function editMessageCaption(
   chatId: number | string,
   messageId: number,
   caption: string,
-  replyMarkup?: Record<string, unknown>
+  replyMarkup?: Record<string, unknown>,
+  bot: BotId = 'customer'
 ): Promise<TgSendResult> {
   return callApi(
     env,
     'editMessageCaption',
     JSON.stringify({ chat_id: chatId, message_id: messageId, caption: caption.slice(0, 1024), reply_markup: replyMarkup ?? { inline_keyboard: [] } }),
-    { 'Content-Type': 'application/json' }
+    { 'Content-Type': 'application/json' },
+    bot
   );
 }
 
@@ -752,7 +794,8 @@ export async function editMessageText(
   chatId: number | string,
   messageId: number,
   text: string,
-  replyMarkup?: Record<string, unknown>
+  replyMarkup?: Record<string, unknown>,
+  bot: BotId = 'customer'
 ): Promise<TgSendResult> {
   return callApi(
     env,
@@ -764,7 +807,8 @@ export async function editMessageText(
       disable_web_page_preview: true,
       reply_markup: replyMarkup ?? { inline_keyboard: [] },
     }),
-    { 'Content-Type': 'application/json' }
+    { 'Content-Type': 'application/json' },
+    bot
   );
 }
 
@@ -774,12 +818,14 @@ export async function editMessageReplyMarkup(
   env: Env,
   chatId: number | string,
   messageId: number,
-  replyMarkup: Record<string, unknown>
+  replyMarkup: Record<string, unknown>,
+  bot: BotId = 'customer'
 ): Promise<TgSendResult> {
   return callApi(
     env,
     'editMessageReplyMarkup',
     JSON.stringify({ chat_id: chatId, message_id: messageId, reply_markup: replyMarkup }),
-    { 'Content-Type': 'application/json' }
+    { 'Content-Type': 'application/json' },
+    bot
   );
 }

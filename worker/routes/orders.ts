@@ -136,7 +136,6 @@ import {
 import type { PointsRule, OrderPointsSnapshot } from '../lib/pointsOps';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
-import { notifyAdmins } from '../lib/telegram';
 import { quoteShipping } from '../lib/shipping';
 import { productDeliveryMethodAvailable } from '../lib/shipping';
 import type { ProductDeliveryMethod, ShippingConfig, ShippingItem, ShippingQuote } from '../lib/shipping';
@@ -150,6 +149,7 @@ import { coverageState, maskSerial } from '../lib/deviceOps';
 import type { ShippingType } from '../lib/shippingType';
 import type { PolicyRef } from '../lib/policyOps';
 import { createInvoiceForOrder } from '../lib/invoices';
+import { notifyAdminTopic } from '../lib/telegramAdmin';
 
 export const orderRoutes = new Hono<AppContext>();
 orderRoutes.use('*', requireAuth);
@@ -3625,8 +3625,9 @@ orderRoutes.post('/', async (c) => {
     c.executionCtx.waitUntil(grantPrinterGiftIfEligible(c.env, orderId));
   }
   c.executionCtx.waitUntil(
-    notifyAdmins(
+    notifyAdminTopic(
       c.env,
+      'orders',
       `🛒 New order ${orderId}\nCustomer: ${user.username || user.email}\nItems: ${comp.lines.filter((l) => !l.bundle_parent_item_id).length}\nTotal: ${comp.totalIqd.toLocaleString()} IQD (${input.paymentMethodId})\n${comp.bnplAmount > 0 ? `BNPL due: ${comp.bnplAmount.toLocaleString()} IQD · ${comp.bnplDueAt}` : `Due on delivery: ${comp.dueOnDelivery.toLocaleString()} IQD`}\nFulfilment: ${fulfillmentService}`
     )
   );

@@ -90,6 +90,11 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ...owned('chat', ['chats', 'chat_participants', 'chat_messages', 'chat_typing_presence']),
   ...owned('notifications', [
     'outbox', 'user_notifications', 'telegram_updates', 'tg_admin_notifications', 'tg_admin_actions', 'notification_preferences',
+    // 0080 — the ADMIN bot (@alilevobot): the group it learned from a
+    // `/topic_here`, the topic it routes each notification into, and its OWN
+    // update-dedup table (a second bot's update_id sequence collides with the
+    // first bot's, so they cannot share one).
+    'telegram_admin_config', 'telegram_admin_topics', 'telegram_admin_updates',
     'notify_deliveries',
     // `notify_outbox` is the service's own copy of the legacy `outbox` SHAPE
     // (`02-MIGRATION-PLAN.md` 1.7), column for column, so the monolith's rows

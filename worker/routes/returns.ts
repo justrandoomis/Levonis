@@ -38,7 +38,6 @@ import { audit } from '../lib/audit';
 import { emitFromRequest, eventsEnabled } from '../lib/eventBus';
 import { RefundCompletedV1 } from '@levonis/contracts/events/v1/RefundCompleted';
 import { rateLimit } from '../lib/ratelimit';
-import { notifyAdmins } from '../lib/telegram';
 import { getSettings } from '../lib/settings';
 import { parseProductRow } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
@@ -50,6 +49,7 @@ import { isRevealed, loadAllocations, paidOrderIds } from '../lib/mysteryReveal'
 import { mysteryRefusal } from '../lib/mystery/issues';
 import { typeForTransport } from '../lib/shippingType';
 import { pumpAfter, waitUntilFrom } from '../lib/eventBus';
+import { notifyAdminTopic } from '../lib/telegramAdmin';
 
 const WINDOW_MS = 7 * 86_400_000;
 
@@ -422,7 +422,7 @@ returnRoutes.post('/', async (c) => {
 
   await audit(c.env.DB, user.id, 'return.request', id, { order_id: item.order_id, order_item_id: orderItemId, qty, reason });
   c.executionCtx.waitUntil(
-    notifyAdmins(c.env, `↩️ Return request ${id}\nOrder: ${item.order_id}\nItem: ${item.name_snapshot} × ${qty}\nReason: ${reason}`)
+    notifyAdminTopic(c.env, 'orders', `↩️ Return request ${id}\nOrder: ${item.order_id}\nItem: ${item.name_snapshot} × ${qty}\nReason: ${reason}`)
   );
 
   const row = await c.env.DB.prepare('SELECT * FROM return_cases WHERE id = ?').bind(id).first<ReturnCaseRow>();
@@ -1027,7 +1027,7 @@ priceProtectionRoutes.post('/claims', async (c) => {
     order_item_id: orderItemId, original: originalUnit, observed: observedUnit, computed_iqd: computed,
   });
   c.executionCtx.waitUntil(
-    notifyAdmins(c.env, `🛡️ Price-protection claim ${id}\nItem: ${String(item.name_snapshot)}\nDrop: ${perUnitDrop.toLocaleString()} IQD × ${qty}`)
+    notifyAdminTopic(c.env, 'orders', `🛡️ Price-protection claim ${id}\nItem: ${String(item.name_snapshot)}\nDrop: ${perUnitDrop.toLocaleString()} IQD × ${qty}`)
   );
 
   const row = await c.env.DB.prepare('SELECT * FROM price_protection_claims WHERE id = ?').bind(id).first<ClaimRow>();

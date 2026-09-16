@@ -7,13 +7,16 @@ import { getSetting } from './settings';
 import { escapeHtml, emailLang, type EmailLang } from './emailTemplates';
 import {
   answerCallbackQuery,
+  botConfigured,
   editMessageCaption,
   editMessageReplyMarkup,
   editMessageText,
   sendMessageToChat,
   sendPhotoToChat,
+  type BotId,
   type TgSendResult,
 } from './telegram';
+import { resolveAdminDestination, threadExtra } from './telegramAdmin';
 import { operationNumber } from './walletOps';
 import { getMediaObject, headMediaObject } from './mediaStorage';
 
@@ -494,8 +497,30 @@ export async function enqueueDepositAdminNotification(env: Env, requestId: strin
     .first<DepositFacts>();
   if (!facts) return { enqueued: false, id: null, reason: 'request_not_found' };
 
-  const targetChat = (env.TELEGRAM_ADMIN_CHAT_ID || '').trim();
-  if (!targetChat) return { enqueued: false, id: null, reason: 'not_configured' };
+  /**
+   * 0080 — WHERE THIS GOES IS DECIDED ONCE, HERE, AND STORED.
+   *
+   * The destination is resolved at enqueue time rather than at each delivery
+   * attempt so that a retry three hours later cannot land in a different
+   * topic than the buttons were minted for, and so the row itself records
+   * where the message was meant to go. The ladder is §9's: the wallet topic,
+   * else GENERAL, else the pre-0080 chat on the customer bot.
+   */
+  const routed = await resolveAdminDestination(env, 'wallet');
+  if (!routed.ok) {
+    console.error(
+      JSON.stringify({
+        event: 'telegram_admin_routing_error',
+        topic: 'wallet',
+        reason: routed.miss,
+        request_id: facts.id,
+        detail: 'wallet top-up has no admin destination; it stays pending in the admin panel',
+      })
+    );
+    return { enqueued: false, id: null, reason: 'not_configured' };
+  }
+  const dest = routed.destination;
+  const targetChat = dest.chatId;
 
   const rate = Number(await getSetting(env.DB, 'exchangeRate')) || 1400;
   const email = verifiedEmail(facts.email, facts.email_verified_at);
@@ -523,10 +548,21 @@ export async function enqueueDepositAdminNotification(env: Env, requestId: strin
   try {
     await env.DB.prepare(
       `INSERT INTO tg_admin_notifications
-         (id, event_key, request_kind, request_id, target_chat, photo_key, caption, state)
-       VALUES (?1, ?2, 'deposit', ?3, ?4, ?5, ?6, 'pending')`
+         (id, event_key, request_kind, request_id, target_chat, photo_key, caption, state,
+          bot, message_thread_id, topic_key)
+       VALUES (?1, ?2, 'deposit', ?3, ?4, ?5, ?6, 'pending', ?7, ?8, ?9)`
     )
-      .bind(notificationId, eventKey, facts.id, targetChat, facts.receipt_key ?? '', caption)
+      .bind(
+        notificationId,
+        eventKey,
+        facts.id,
+        targetChat,
+        facts.receipt_key ?? '',
+        caption,
+        dest.bot,
+        dest.messageThreadId,
+        dest.topicKey
+      )
       .run();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -641,6 +677,9 @@ async function mintReasonTokens(env: Env, ctx: MintContext): Promise<ReasonToken
 // ---------------------------------------------------------- delivery (§12.3)
 
 interface NotificationRow {
+  /** 0080. 'customer' on every row written before the admin bot existed. */
+  bot?: string;
+  message_thread_id?: number | null;
   id: string;
   request_kind: WalletRequestKind;
   request_id: string;
@@ -671,7 +710,8 @@ export interface ProcessReport {
 export async function processWalletNotifications(env: Env, limit = 10): Promise<ProcessReport> {
   const report: ProcessReport = { sent: 0, failed: 0, dead: 0 };
   const { results } = await env.DB.prepare(
-    `SELECT id, request_kind, request_id, target_chat, photo_key, caption, attempts, created_at
+    `SELECT id, request_kind, request_id, target_chat, photo_key, caption, attempts, created_at,
+            bot, message_thread_id
        FROM tg_admin_notifications
       WHERE state IN ('pending','failed') AND attempts < ?
       ORDER BY created_at LIMIT ?`
@@ -689,11 +729,16 @@ export async function processWalletNotifications(env: Env, limit = 10): Promise<
       .catch(() => null);
     if (!claim || (claim.meta.changes ?? 0) === 0) continue;
 
-    if (!env.TELEGRAM_BOT_TOKEN) {
+    // 0080 — the bot this ROW was addressed to, not whichever token happens to
+    // be set. A chat id is only reachable by the bot that shares it, so sending
+    // an admin-bot message with the customer token would fail every time.
+    const rowBot: BotId = row.bot === 'admin' ? 'admin' : 'customer';
+    if (!botConfigured(env, rowBot)) {
       await markDead(env, row.id, 'TELEGRAM_NOT_CONFIGURED');
       report.dead++;
       continue;
     }
+    const thread = threadExtra(row.message_thread_id ?? null);
 
     // Fresh buttons for this attempt; the previous attempt's tokens (which
     // were never bound to a delivered message) are superseded here.
@@ -723,7 +768,14 @@ export async function processWalletNotifications(env: Env, limit = 10): Promise<
     if (row.photo_key) {
       const bytes = await readProofBytes(env, row.photo_key);
       if (bytes.ok) {
-        result = await sendPhotoToChat(env, row.target_chat, bytes.bytes, row.caption, { reply_markup: keyboard });
+        result = await sendPhotoToChat(
+          env,
+          row.target_chat,
+          bytes.bytes,
+          row.caption,
+          { reply_markup: keyboard, ...thread },
+          rowBot
+        );
         // A transient transport problem is RETRIED as a photo; it is never
         // silently downgraded to a message claiming the proof is missing.
         if (!result.ok && result.retryable) {
@@ -740,9 +792,13 @@ export async function processWalletNotifications(env: Env, limit = 10): Promise<
 
     if (!result || !result.ok) {
       sentAs = 'text';
-      result = await sendMessageToChat(env, row.target_chat, withProofFailureNote(row.caption, photoProblem), {
-        reply_markup: keyboard,
-      });
+      result = await sendMessageToChat(
+        env,
+        row.target_chat,
+        withProofFailureNote(row.caption, photoProblem),
+        { reply_markup: keyboard, ...thread },
+        rowBot
+      );
     }
 
     if (!result.ok) {
@@ -1048,12 +1104,23 @@ export type CallbackOutcome =
  * service → fast callback answer → message rewrite. Nothing is announced
  * before it is committed, and nothing is committed by this file.
  */
-export async function handleAdminActionCallback(env: Env, cb: CallbackQueryInput): Promise<CallbackOutcome> {
+export async function handleAdminActionCallback(
+  env: Env,
+  cb: CallbackQueryInput,
+  /**
+   * WHICH BOT DELIVERED THE BUTTON (0080). A callback can only be answered,
+   * and its message only edited, by the bot that owns that conversation — so
+   * the webhook that received it passes its own identity in. It defaults to
+   * `'customer'`, which is what every button minted before the admin bot
+   * existed was delivered by.
+   */
+  bot: BotId = 'customer'
+): Promise<CallbackOutcome> {
   const rawToken = parseCallbackData(cb.data);
   const chatId = cb.message?.chat?.id;
   const messageId = cb.message?.message_id;
   if (!rawToken || typeof chatId !== 'number' || typeof messageId !== 'number') {
-    if (cb.id) await answerCallbackQuery(env, cb.id, 'زر غير صالح.', true);
+    if (cb.id) await answerCallbackQuery(env, cb.id, 'زر غير صالح.', true, bot);
     return 'ignored';
   }
   const origin: CallbackOrigin = { chatId, messageId };
@@ -1061,7 +1128,7 @@ export async function handleAdminActionCallback(env: Env, cb: CallbackQueryInput
   // 1. WHO. Group membership grants nothing (§12.2).
   const actor = await resolveAdminActor(env, cb.from?.id);
   if (!actor) {
-    await answerCallbackQuery(env, cb.id, 'لا تملك صلاحية اعتماد مالي في الموقع. اطلب من الإدارة ربط حسابك.', true);
+    await answerCallbackQuery(env, cb.id, 'لا تملك صلاحية اعتماد مالي في الموقع. اطلب من الإدارة ربط حسابك.', true, bot);
     await audit(env.DB, null, 'telegram.callback.denied', `tg:${cb.from?.id ?? 'unknown'}`, {
       chat_id: chatId,
       message_id: messageId,
@@ -1079,7 +1146,7 @@ export async function handleAdminActionCallback(env: Env, cb: CallbackQueryInput
         : lookup.failure === 'already_used'
           ? await staleButtonText(env, lookup.row)
           : 'هذا الزر غير صالح لهذه الرسالة.';
-    await answerCallbackQuery(env, cb.id, text, true);
+    await answerCallbackQuery(env, cb.id, text, true, bot);
     await audit(env.DB, actor.userId, 'telegram.callback.rejected', `wallet:${lookup.row?.request_id ?? 'unknown'}`, {
       failure: lookup.failure,
       chat_id: chatId,
@@ -1108,8 +1175,8 @@ export async function handleAdminActionCallback(env: Env, cb: CallbackQueryInput
       row.action === 'reject_menu'
         ? reasonKeyboard(await mintReasonTokens(env, ctx), adminUrl)
         : decisionKeyboard(await mintDecisionTokens(env, ctx), adminUrl);
-    await answerCallbackQuery(env, cb.id, row.action === 'reject_menu' ? 'اختر سبب الرفض.' : 'رجوع.');
-    await editMessageReplyMarkup(env, chatId, messageId, markup);
+    await answerCallbackQuery(env, cb.id, row.action === 'reject_menu' ? 'اختر سبب الرفض.' : 'رجوع.', false, bot);
+    await editMessageReplyMarkup(env, chatId, messageId, markup, bot);
     return 'menu';
   }
 
@@ -1118,14 +1185,14 @@ export async function handleAdminActionCallback(env: Env, cb: CallbackQueryInput
   // to walletOps.advanceWithdrawal belongs to the wallet slice's contract, and
   // until that exists this answers honestly instead of guessing.
   if (row.request_kind !== 'deposit') {
-    await answerCallbackQuery(env, cb.id, 'قرارات السحب تُتخذ من لوحة الإدارة — الموافقة هنا لا تنفّذ تحويلًا.', true);
+    await answerCallbackQuery(env, cb.id, 'قرارات السحب تُتخذ من لوحة الإدارة — الموافقة هنا لا تنفّذ تحويلًا.', true, bot);
     return 'unsupported_kind';
   }
 
   // 4. Single-use claim.
   const claimed = await claimDecisionToken(env, row.token_hash, actor, origin);
   if (!claimed) {
-    await answerCallbackQuery(env, cb.id, await staleButtonText(env, row), true);
+    await answerCallbackQuery(env, cb.id, await staleButtonText(env, row), true, bot);
     return 'already_processed';
   }
 
@@ -1141,7 +1208,7 @@ export async function handleAdminActionCallback(env: Env, cb: CallbackQueryInput
     // The transition did not happen — release the claim so the reviewer can
     // retry, and say so plainly. No "done" is ever shown for a non-commit.
     await releaseDecisionToken(env, row.token_hash);
-    await answerCallbackQuery(env, cb.id, 'تعذّر تنفيذ القرار الآن — أعد المحاولة أو أكمل من لوحة الإدارة.', true);
+    await answerCallbackQuery(env, cb.id, 'تعذّر تنفيذ القرار الآن — أعد المحاولة أو أكمل من لوحة الإدارة.', true, bot);
     await audit(env.DB, actor.userId, 'telegram.deposit.decision_failed', row.request_id, {
       action,
       called: call.called,
@@ -1167,7 +1234,8 @@ export async function handleAdminActionCallback(env: Env, cb: CallbackQueryInput
         ? 'تمت الموافقة وأُضيف الرصيد.'
         : 'تم تسجيل الرفض. لم يتغيّر الرصيد.'
       : `عولج الطلب مسبقًا (${state.status === 'approved' ? 'موافقة' : 'رفض'}) بواسطة ${deciderLabel}.`,
-    !won
+    !won,
+    bot
   );
 
   await audit(env.DB, actor.userId, won ? `telegram.deposit.${expected}` : 'telegram.deposit.lost_race', row.request_id, {
@@ -1213,7 +1281,7 @@ export async function closeNotificationMessage(
   p: { status: 'approved' | 'rejected'; actorLabel: string; at: string; reason?: string; via: string }
 ): Promise<boolean> {
   const row = await env.DB.prepare(
-    `SELECT id, request_kind, request_id, chat_id, message_id, caption, sent_as, delivery_note
+    `SELECT id, request_kind, request_id, chat_id, message_id, caption, sent_as, delivery_note, bot
        FROM tg_admin_notifications WHERE id = ?`
   )
     .bind(notificationId)
@@ -1226,6 +1294,7 @@ export async function closeNotificationMessage(
       caption: string;
       sent_as: string;
       delivery_note: string;
+      bot: string | null;
     }>();
   if (!row || row.chat_id === null || row.message_id === null) return false;
 
@@ -1236,9 +1305,12 @@ export async function closeNotificationMessage(
   // than reverting to the stored photo caption.
   const body = isPhoto ? row.caption : withProofFailureNote(row.caption, row.delivery_note);
   const finalText = buildClosingCaption(body, p, isPhoto ? CAPTION_MAX : TEXT_MAX);
+  // 0080 — edited by the bot that SENT it. A decision taken on the site has no
+  // callback to name the bot, so the row is the only thing that knows.
+  const rowBot: BotId = row.bot === 'admin' ? 'admin' : 'customer';
   const res = isPhoto
-    ? await editMessageCaption(env, row.chat_id, row.message_id, finalText, closedKeyboard(adminUrl))
-    : await editMessageText(env, row.chat_id, row.message_id, finalText, closedKeyboard(adminUrl));
+    ? await editMessageCaption(env, row.chat_id, row.message_id, finalText, closedKeyboard(adminUrl), rowBot)
+    : await editMessageText(env, row.chat_id, row.message_id, finalText, closedKeyboard(adminUrl), rowBot);
 
   if (res.ok) {
     await env.DB.prepare(

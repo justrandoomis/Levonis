@@ -110,6 +110,15 @@ function freshDb(): { env: Env; raw: DatabaseSync } {
   raw.exec(readFileSync(join(ROOT, 'migrations', '0015_wallet_holds.sql'), 'utf8'));
   raw.exec(createTableSql('0016_support_code.sql', 'support_gift_entitlements'));
   raw.exec(createTableSql('0017_tg_actions.sql', 'tg_admin_notifications'));
+  // 0080 added three columns to that table: WHICH BOT carries the message, the
+  // forum topic it goes in, and which topic the router chose. This fixture
+  // hand-picks CREATE TABLE statements, so the later ALTERs have to be replayed
+  // here or the table is not the one production has.
+  raw.exec(`
+    ALTER TABLE tg_admin_notifications ADD COLUMN bot TEXT NOT NULL DEFAULT 'customer';
+    ALTER TABLE tg_admin_notifications ADD COLUMN message_thread_id INTEGER;
+    ALTER TABLE tg_admin_notifications ADD COLUMN topic_key TEXT NOT NULL DEFAULT '';
+  `);
   const env = { DB: new SqliteD1(raw) as unknown as D1Database } as unknown as Env;
   return { env, raw };
 }

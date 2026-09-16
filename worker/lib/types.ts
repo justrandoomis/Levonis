@@ -18,8 +18,34 @@ export interface Env {
   GEMINI_API_KEY?: string;
   EMAIL_API_KEY?: string; // e.g. a Resend API key, enables password-reset email
   EMAIL_FROM?: string;
-  TELEGRAM_BOT_TOKEN?: string; // admin notifications bot
-  TELEGRAM_ADMIN_CHAT_ID?: string; // chat/channel the bot posts into
+  TELEGRAM_BOT_TOKEN?: string; // the CUSTOMER bot: linking, OTP, account messages
+  /**
+   * LEGACY FALLBACK (0080). The single chat the customer bot posted admin
+   * notifications into before the admin bot existed. It is still honoured when
+   * no admin group has been bound, so nothing goes dark mid-migration — but the
+   * group discovered by `/topic_here` (`telegram_admin_config`) OUTRANKS it the
+   * moment it exists. Nobody has to edit this secret again.
+   */
+  TELEGRAM_ADMIN_CHAT_ID?: string;
+  /**
+   * THE SECOND BOT — @alilevobot (0080). Completely separate from the customer
+   * bot: its own token, its own webhook secret, its own webhook path, its own
+   * update-dedup table. It talks ONLY to the admin group and to admins in a
+   * private chat, and never DMs a customer.
+   */
+  TELEGRAM_ADMIN_BOT_TOKEN?: string;
+  /** Compared against X-Telegram-Bot-Api-Secret-Token on the ADMIN webhook.
+   *  Unset = the admin webhook is honestly 503, exactly like the customer one. */
+  TELEGRAM_ADMIN_WEBHOOK_SECRET?: string;
+  /**
+   * Comma-separated NUMERIC Telegram user ids allowed to command the admin bot,
+   * e.g. "6404042791,123456789". Numeric ids only — a @username is not an
+   * identity (it is re-assignable and spoofable in display), so it grants
+   * nothing. This is the BOT-level door; money still needs the site role, which
+   * `resolveAdminActor` reads from `admin_tg_identities` + `users.role` at
+   * click time.
+   */
+  TELEGRAM_ADMIN_USER_IDS?: string;
   /** Trusted absolute origin for links in emails (per environment). Never
    *  derive email links from the request Host header. */
   APP_ORIGIN?: string;
