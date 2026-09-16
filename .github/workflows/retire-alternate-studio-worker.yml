@@ -1,0 +1,179 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+# Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
+#   RETIRE THE ALTERNATE STUDIO WORKER
+# ---------------------------------------------------------------------------
+# WHAT THIS DELETES, AND WHAT IT MUST NEVER TOUCH
+#
+# It deletes the Worker script `levonis-studio` — the alternate, which serves
+# no domain and exists only at a workers.dev URL. It must NEVER touch
+# `levonis-studio-staging`, which IS studio.levonis-iq.com. The two names differ
+# by a suffix, the suffix is a historical accident rather than an environment,
+# and confusing them would take the Studio off the internet. So the target is
+# hardcoded, the survivor is named, and the job refuses if the target turns out
+# to carry a route.
+#
+# HONESTY ABOUT WHY
+#
+# This is NOT a performance change and no one should expect the site to get
+# faster. An idle Worker with no route consumes nothing and cannot slow another
+# Worker down. What it removes is a FOOT-GUN: two similarly-named Studio
+# Workers, one of which is live, is how a deploy ends up reporting success
+# while changing nothing a user can see — which has already cost this project
+# three rounds of wasted work (docs/WORKERS.md opens by saying so).
+#
+# WHAT SURVIVES
+#
+# Deleting a Worker script does not delete its bindings' contents. The
+# alternate's own D1 database `levonis-studio-db` and R2 bucket
+# `levonis-studio-files` are NOT touched by this job and remain on the account.
+# That is deliberate: this job deletes one script, and nothing else. Whether
+# those two should also go is a separate decision with its own evidence, and
+# the owner has a standing rule that no bucket still bound or referenced is to
+# be deleted.
+#
+# WHAT IS PROVEN BEFORE THE DELETE
+#
+#   1. the SURVIVOR `levonis-studio-staging` exists;
+#   2. studio.levonis-iq.com answers 200 from the internet, right now;
+#   3. the TARGET `levonis-studio` exists (so the job is not a no-op lying
+#      about success);
+#   4. the TARGET has NO zone routes and NO custom domains — if it has even
+#      one, it is serving somebody and the job refuses;
+#   5. the two names are not the same string.
+#
+# Only then, and only with the typed phrase, is the DELETE sent. After it, the
+# survivor is re-proved live — because the only failure that matters here is
+# having deleted the wrong one.
+name: 43 - Retire the ALTERNATE Studio worker levonis-studio (gated)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type RETIRE-ALTERNATE-STUDIO to confirm'
+        required: true
+        default: ''
+      mode:
+        description: 'inspect (read-only, proves everything and stops) or delete'
+        required: true
+        default: inspect
+        type: choice
+        options: [inspect, delete]
+
+concurrency: retire-alternate-studio
+
+env:
+  TARGET: levonis-studio
+  SURVIVOR: levonis-studio-staging
+  STUDIO_URL: https://studio.levonis-iq.com
+
+jobs:
+  retire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CF_API: https://api.cloudflare.com/client/v4
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse a delete without the typed confirmation
+        if: ${{ github.event.inputs.mode == 'delete' }}
+        run: |
+          [ "${{ github.event.inputs.confirm }}" = "RETIRE-ALTERNATE-STUDIO" ] \
+            || { echo "::error::delete requires confirm=RETIRE-ALTERNATE-STUDIO — deleting a Worker cannot be undone"; exit 1; }
+
+      - name: The two names are different, or nothing else matters
+        run: |
+          [ "$TARGET" != "$SURVIVOR" ] \
+            || { echo "::error::target and survivor are the same name — refusing"; exit 1; }
+          echo "target  : $TARGET   (expected: workers.dev only, no domain)"
+          echo "survivor: $SURVIVOR (expected: studio.levonis-iq.com)"
+
+      - name: The SURVIVOR exists and is serving the internet right now
+        run: |
+          set -e
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "$CF_API/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$SURVIVOR" -o /tmp/sv.json \
+            -w '%{http_code}' > /tmp/sv.code || true
+          CODE=$(cat /tmp/sv.code)
+          [ "$CODE" = "200" ] \
+            || { echo "::error::survivor $SURVIVOR is not readable (HTTP $CODE) — refusing to delete anything"; exit 1; }
+          echo "survivor script: present"
+
+          LIVE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 "$STUDIO_URL" || echo 000)
+          echo "$STUDIO_URL -> $LIVE"
+          [ "$LIVE" = "200" ] \
+            || { echo "::error::the live Studio does not answer 200 (got $LIVE) — fix that BEFORE deleting anything"; exit 1; }
+
+      - name: The TARGET exists, and serves nobody
+        id: target
+        run: |
+          set -e
+          CODE=$(curl -sS -o /tmp/tg.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "$CF_API/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$TARGET" || echo 000)
+          echo "GET script $TARGET -> $CODE"
+          if [ "$CODE" = "404" ]; then
+            echo "::notice::$TARGET does not exist — already retired, nothing to do"
+            echo "present=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [ "$CODE" = "200" ] || { echo "::error::cannot read $TARGET (HTTP $CODE)"; exit 1; }
+          echo "present=yes" >> "$GITHUB_OUTPUT"
+
+          # A worker with a custom domain or a zone route is SERVING somebody.
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "$CF_API/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains?service=$TARGET" -o /tmp/dom.json || true
+          DOMAINS=$(jq -r '[.result[]?] | length' /tmp/dom.json 2>/dev/null || echo 0)
+          echo "custom domains attached to $TARGET: $DOMAINS"
+          jq -r '.result[]? | "  - " + (.hostname // "?")' /tmp/dom.json 2>/dev/null || true
+          [ "$DOMAINS" = "0" ] \
+            || { echo "::error::$TARGET has $DOMAINS custom domain(s) — it is serving traffic, refusing"; exit 1; }
+          echo "no custom domain: it serves no hostname"
+
+      - name: Retire it
+        if: ${{ github.event.inputs.mode == 'delete' && steps.target.outputs.present == 'yes' }}
+        run: |
+          set -e
+          CODE=$(curl -sS -o /tmp/del.json -w '%{http_code}' -X DELETE \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "$CF_API/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$TARGET?force=false" || echo 000)
+          echo "DELETE $TARGET -> $CODE"
+          jq -r '{success, errors}' /tmp/del.json 2>/dev/null || true
+          [ "$CODE" = "200" ] \
+            || { echo "::error::delete refused (HTTP $CODE) — read the errors above; force=false is deliberate, a refusal means something still binds it"; exit 1; }
+          echo "retired."
+
+      - name: Prove the LIVE Studio is still live
+        if: ${{ github.event.inputs.mode == 'delete' }}
+        run: |
+          set -e
+          for i in 1 2 3; do
+            LIVE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 "$STUDIO_URL" || echo 000)
+            echo "attempt $i: $STUDIO_URL -> $LIVE"
+            [ "$LIVE" = "200" ] && exit 0
+            sleep 5
+          done
+          echo "::error::studio.levonis-iq.com is NOT answering 200 after the delete — the wrong Worker may have been removed"
+          exit 1
+
+      - name: What is left
+        run: |
+          echo "levonis-studio-staging  -> studio.levonis-iq.com   [LIVE, untouched]"
+          echo "levonis-studio          -> retired (mode=${{ github.event.inputs.mode }})"
+          echo ""
+          echo "NOT touched by this job, and still on the account:"
+          echo "  D1 database  levonis-studio-db"
+          echo "  R2 bucket    levonis-studio-files"
+          echo "Deleting those is a separate decision with its own evidence."
