@@ -87,24 +87,44 @@ jobs:
       - name: Admin-bot bindings on the LIVE main Worker (names only, never values)
         run: |
           set -e
+          # TWO ENDPOINTS, because one of them is not authoritative about
+          # secrets. /settings returns the script's bindings, and a secret's
+          # NAME does not always appear there; /secrets is the endpoint whose
+          # whole job is the name list. Reading only /settings reported the
+          # CUSTOMER bot's long-working token as missing, which would have had
+          # an operator re-uploading a secret that was never gone.
+          NAMES=/tmp/binding-names.txt
+          : > "$NAMES"
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-staging/secrets" \
+            -o /tmp/secrets.json || true
+          if jq -e '.success == true' /tmp/secrets.json > /dev/null 2>&1; then
+            jq -r '.result[]? | select(.type=="secret_text") | .name' /tmp/secrets.json >> "$NAMES"
+          else
+            echo "::warning::/secrets was not readable with this token; falling back to /settings bindings"
+          fi
           curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/levonis-staging/settings" \
-            -o /tmp/main.json
-          jq -e '.success == true' /tmp/main.json > /dev/null \
-            || { echo "::error::cannot read levonis-staging settings"; exit 1; }
+            -o /tmp/main.json || true
+          if jq -e '.success == true' /tmp/main.json > /dev/null 2>&1; then
+            jq -r '.result.bindings[]? | select(.type=="secret_text") | .name' /tmp/main.json >> "$NAMES"
+          fi
+          sort -u "$NAMES" -o "$NAMES"
+          [ -s "$NAMES" ] || { echo "::error::neither endpoint returned a single secret name — cannot judge anything"; exit 1; }
+
           MISSING=0
           for NAME in TELEGRAM_ADMIN_BOT_TOKEN TELEGRAM_ADMIN_WEBHOOK_SECRET TELEGRAM_ADMIN_USER_IDS; do
-            if jq -e --arg n "$NAME" '[.result.bindings[]? | select(.name==$n and .type=="secret_text")] | length > 0' /tmp/main.json > /dev/null; then
+            if grep -qx "$NAME" "$NAMES"; then
               echo "$NAME: present as a Worker SECRET"
             else
-              echo "::error::$NAME is not a secret_text binding on levonis-staging — set the repository secret and re-run workflow 7"
+              echo "::error::$NAME is not a Worker secret on levonis-staging — set the repository secret and re-run workflow 7"
               MISSING=1
             fi
           done
           echo "missing=$MISSING" >> "$GITHUB_OUTPUT"
           # The customer bot must be untouched by all of this — assert it.
           for NAME in TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET; do
-            jq -e --arg n "$NAME" '[.result.bindings[]? | select(.name==$n and .type=="secret_text")] | length > 0' /tmp/main.json > /dev/null \
+            grep -qx "$NAME" "$NAMES" \
               && echo "$NAME: still present (customer bot untouched)" \
               || echo "::warning::$NAME is missing — the CUSTOMER bot would be affected, which this change must never do"
           done
@@ -134,7 +154,10 @@ jobs:
           jq -e '.ok == true' /tmp/me.json > /dev/null || { echo "::error::Telegram refused getMe — the admin bot token is not valid"; exit 1; }
           USERNAME=$(jq -r '.result.username // ""' /tmp/me.json)
           echo "bot username   : @${USERNAME:-<unknown>}"
-          if [ "$USERNAME" != "alilevobot" ]; then
+          # Telegram usernames are case-insensitive and getMe answers with the
+          # capitalisation the owner typed at registration (@Alilevobot). An
+          # exact-string comparison called the RIGHT bot the wrong one.
+          if [ "$(printf '%s' "$USERNAME" | tr '[:upper:]' '[:lower:]')" != "alilevobot" ]; then
             echo "::warning::this token is for @$USERNAME, not @alilevobot — confirm it is the intended admin bot before repairing"
           fi
 
