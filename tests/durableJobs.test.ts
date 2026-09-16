@@ -220,15 +220,33 @@ test('a pending admin notification is claimed, and stays reviewable when deliver
     )
     .run();
 
-  const report = await runDurableJobs(env);
-  // No bot token in this process, so nothing can be SENT — the honest
-  // outcome is a failed/retryable row, never a silent drop and never a
-  // "sent" claim.
+  const errors: string[] = [];
+  const realError = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(' ')); };
+  let report;
+  try {
+    report = await runDurableJobs(env);
+  } finally {
+    console.error = realError;
+  }
+  // No bot token and no admin group in this process, so there is nowhere to
+  // send — the honest outcome is a row that stays reviewable, never a silent
+  // drop and never a "sent" claim.
   assert.equal(report.wallet_notifications.sent, 0);
-  const row = raw.prepare('SELECT state, attempts FROM tg_admin_notifications WHERE id = ?').get('tgn1') as {
-    state: string;
-    attempts: number;
-  };
-  assert.ok(['failed', 'pending', 'dead'].includes(row.state), `unexpected state ${row.state}`);
-  assert.ok(row.attempts >= 1, 'the delivery attempt must be recorded so retries are bounded');
+  assert.equal(report.wallet_notifications.failed, 1, 'the miss is counted, not swallowed');
+  const row = raw
+    .prepare('SELECT state, attempts, last_error FROM tg_admin_notifications WHERE id = ?')
+    .get('tgn1') as { state: string; attempts: number; last_error: string };
+  assert.equal(row.state, 'pending', 'it waits for a destination rather than dead-lettering');
+  // 0080: a CONFIGURATION gap must not spend the retry budget. Five sweeps with
+  // no group bound used to burn all five attempts and dead-letter a deposit
+  // that nothing was ever wrong with; the destination is re-resolved on every
+  // attempt now, so the message delivers itself the moment a group exists.
+  assert.equal(row.attempts, 0, 'a missing destination is not a failed delivery attempt');
+  assert.equal(row.last_error, 'NO_ADMIN_DESTINATION');
+  const logged = errors.map((e) => { try { return JSON.parse(e) as Record<string, unknown>; } catch { return null; } });
+  assert.ok(
+    logged.some((l) => l?.event === 'telegram_admin_routing_error' && l?.topic === 'wallet'),
+    'and §9 requires the routing miss to be REPORTED'
+  );
 });

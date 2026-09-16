@@ -76,7 +76,13 @@ export type CommandOutcome =
   | 'refused_other_group'
   | 'refused_unknown_topic';
 
-const GROUP_TYPES = new Set(['group', 'supergroup']);
+/**
+ * A Telegram forum is ALWAYS a supergroup carrying `is_forum: true`. A basic
+ * `group` can never hold a topic at all, so it is not in this set: adopting one
+ * as the admin group would bind every topic to the same thread-less chat while
+ * the reply claimed a topic had been bound.
+ */
+const FORUM_TYPE = 'supergroup';
 
 // ------------------------------------------------------------------- copy
 
@@ -167,16 +173,8 @@ async function bindHere(ctx: CommandContext, rawKey: string | undefined): Promis
   const chatId = chat.id;
   if (typeof chatId !== 'number') return 'ignored';
 
-  // A private chat is not the admin group and must never become it (§19).
-  if (chat.type === 'private') {
-    await reply(ctx, 'اربط المواضيع من داخل مجموعة الإدارة (Forum) وليس من المحادثة الخاصة.');
-    return 'refused_private';
-  }
-  if (!GROUP_TYPES.has(String(chat.type ?? ''))) {
-    await reply(ctx, 'هذا الأمر يعمل داخل مجموعة إدارة من نوع Forum فقط.');
-    return 'refused_not_forum';
-  }
-
+  // A typo is answered first: it is not a permission problem, and refusing it
+  // here keeps the later refusals from doubling as an oracle.
   const key = (rawKey ?? '').trim().toLowerCase();
   if (!isTopicKey(key)) {
     await reply(
@@ -191,10 +189,61 @@ async function bindHere(ctx: CommandContext, rawKey: string | undefined): Promis
     return 'refused_unknown_topic';
   }
 
+  // A private chat is not the admin group and must never become it (§19).
+  if (chat.type === 'private') {
+    await reply(ctx, 'اربط المواضيع من داخل مجموعة الإدارة (Forum) وليس من المحادثة الخاصة.');
+    return 'refused_private';
+  }
+  // A FORUM, PROVEN — not merely "some group". Telegram sets `is_forum` on
+  // every message from a forum supergroup, so its absence is a real negative
+  // and not a missing field. Without this the outcome name `refused_not_forum`
+  // was a claim the code never checked: a plain group was silently adopted as
+  // THE admin group and every `/topic_here` in it bound a thread-less
+  // destination.
+  if (String(chat.type ?? '') !== FORUM_TYPE || chat.is_forum !== true) {
+    await reply(
+      ctx,
+      [
+        'هذا الأمر يعمل داخل مجموعة إدارة من نوع Forum فقط.',
+        'فعّل «Topics» في إعدادات المجموعة ثم أعد المحاولة من داخل الموضوع المطلوب.',
+      ].join('\n')
+    );
+    return 'refused_not_forum';
+  }
+
+  /**
+   * DOOR 2, AND IT BELONGS HERE.
+   *
+   * Being on `TELEGRAM_ADMIN_USER_IDS` opens the bot. It does NOT get to decide
+   * WHERE the platform delivers its admin notifications — and that includes the
+   * wallet messages, which carry the customer's payment-proof photo. Re-pointing
+   * that is at least as sensitive as pressing the approve button, so it is
+   * behind the same site-role check the button uses: a live `admin_tg_identities`
+   * row joined to `users.role = 'admin'`, read now.
+   *
+   * There is no `tg:<id>` fallback any more. A binding whose author cannot be
+   * named in the audit trail is a binding nobody can answer for.
+   */
+  const actor = await resolveAdminActor(env, ctx.telegramUserId);
+  if (!actor) {
+    await reply(
+      ctx,
+      [
+        '⚠️ حسابك غير مربوط بصلاحية إدارة على الموقع.',
+        'ربط المواضيع يحدّد أين تصل رسائل المحفظة وإثباتات الدفع، فيتطلب نفس صلاحية أزرار الاعتماد.',
+        'اطلب من الإدارة ربط حسابك من: لوحة الإدارة ← تيليغرام ← هويات المسؤولين.',
+      ].join('\n')
+    );
+    await auditAdminBot(env.DB, null, 'telegram_admin.topic.denied', String(chatId), ctx.telegramUserId, {
+      reason: 'no_site_admin_identity',
+      attempted_topic: (rawKey ?? '').slice(0, 40),
+    });
+    return 'unauthorized';
+  }
+
   // The first authorized /topic_here ESTABLISHES the group; every later one
   // must come from that same group (§5).
-  const actor = await resolveAdminActor(env, ctx.telegramUserId);
-  const siteUserId = actor?.userId ?? `tg:${ctx.telegramUserId}`;
+  const siteUserId = actor.userId;
   const bound = await bindAdminGroup(env.DB, {
     chatId: String(chatId),
     title: String(chat.title ?? '').slice(0, 200),
@@ -210,7 +259,7 @@ async function bindHere(ctx: CommandContext, rawKey: string | undefined): Promis
         'إن أردت نقل الإدارة إلى هنا، أعد التعيين من لوحة الإدارة أولًا.',
       ].join('\n')
     );
-    await auditAdminBot(env.DB, actor?.userId ?? null, 'telegram_admin.group.refused', String(chatId), ctx.telegramUserId, {
+    await auditAdminBot(env.DB, actor.userId, 'telegram_admin.group.refused', String(chatId), ctx.telegramUserId, {
       bound_group: bound.existing.groupChatId,
       attempted_topic: key,
     });
@@ -220,13 +269,25 @@ async function bindHere(ctx: CommandContext, rawKey: string | undefined): Promis
   // Telegram sends NO message_thread_id in a forum's General topic. That
   // absence IS the answer — stored as NULL, never invented (§21).
   const threadId = typeof msg.message_thread_id === 'number' ? msg.message_thread_id : null;
-  await bindTopic(env.DB, {
+  // Conditional on THIS group still being the bound one. `group/reset` can land
+  // between the check above and this write; without the guard the topic row
+  // would outlive the config row and the next group to be adopted would inherit
+  // a thread id from the group that was abandoned.
+  const wrote = await bindTopic(env.DB, {
     topicKey: key as TopicKey,
     messageThreadId: threadId,
     userId: siteUserId,
     telegramUserId: ctx.telegramUserId,
+    groupChatId: String(chatId),
   });
-  await auditAdminBot(env.DB, actor?.userId ?? null, 'telegram_admin.topic.bound', key, ctx.telegramUserId, {
+  if (!wrote) {
+    await reply(ctx, '⚠️ تغيّر ربط المجموعة أثناء التنفيذ. أعد إرسال الأمر من داخل الموضوع.');
+    await auditAdminBot(env.DB, actor.userId, 'telegram_admin.topic.raced', key, ctx.telegramUserId, {
+      group_chat_id: String(chatId),
+    });
+    return 'refused_other_group';
+  }
+  await auditAdminBot(env.DB, actor.userId, 'telegram_admin.topic.bound', key, ctx.telegramUserId, {
     group_chat_id: String(chatId),
     message_thread_id: threadId,
     group_created: bound.created,

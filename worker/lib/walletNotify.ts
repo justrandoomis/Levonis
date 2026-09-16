@@ -508,19 +508,24 @@ export async function enqueueDepositAdminNotification(env: Env, requestId: strin
    */
   const routed = await resolveAdminDestination(env, 'wallet');
   if (!routed.ok) {
+    // NOT a silent return any more. The row IS the durable record §12.3 exists
+    // for, so it is written even with nowhere to send: the delivery pass
+    // re-resolves the destination on every attempt, so binding the group ten
+    // minutes later delivers this message instead of losing it. Returning
+    // early here left a deposit with no retryable record at all, and
+    // `/admin/group/reset` made that a routine window.
     console.error(
       JSON.stringify({
         event: 'telegram_admin_routing_error',
         topic: 'wallet',
         reason: routed.miss,
         request_id: facts.id,
-        detail: 'wallet top-up has no admin destination; it stays pending in the admin panel',
+        detail: 'no admin destination yet; the notification is queued and will be delivered once one exists',
       })
     );
-    return { enqueued: false, id: null, reason: 'not_configured' };
   }
-  const dest = routed.destination;
-  const targetChat = dest.chatId;
+  const dest = routed.ok ? routed.destination : null;
+  const targetChat = dest?.chatId ?? '';
 
   const rate = Number(await getSetting(env.DB, 'exchangeRate')) || 1400;
   const email = verifiedEmail(facts.email, facts.email_verified_at);
@@ -559,9 +564,9 @@ export async function enqueueDepositAdminNotification(env: Env, requestId: strin
         targetChat,
         facts.receipt_key ?? '',
         caption,
-        dest.bot,
-        dest.messageThreadId,
-        dest.topicKey
+        dest?.bot ?? 'customer',
+        dest?.messageThreadId ?? null,
+        dest?.topicKey ?? ''
       )
       .run();
   } catch (e) {
@@ -729,16 +734,60 @@ export async function processWalletNotifications(env: Env, limit = 10): Promise<
       .catch(() => null);
     if (!claim || (claim.meta.changes ?? 0) === 0) continue;
 
-    // 0080 — the bot this ROW was addressed to, not whichever token happens to
-    // be set. A chat id is only reachable by the bot that shares it, so sending
-    // an admin-bot message with the customer token would fail every time.
-    const rowBot: BotId = row.bot === 'admin' ? 'admin' : 'customer';
+    /**
+     * 0080 — THE DESTINATION IS RESOLVED AGAIN, ON EVERY ATTEMPT.
+     *
+     * The columns on the row are the recorded ROUTING INTENT (what the ladder
+     * chose when the deposit was filed, kept for the audit); they are not the
+     * address. Freezing the address is what stranded a message when the group
+     * was later re-bound or reset: the admin's "retry" wrote `state='pending'`
+     * and the next pass re-sent to the same dead chat, for ever.
+     *
+     * Re-resolving also means a notification queued while NOTHING was bound
+     * delivers itself the moment a group exists.
+     */
+    const routed = await resolveAdminDestination(env, 'wallet');
+    if (!routed.ok) {
+      // No destination anywhere. Leave it PENDING and do not spend the attempt
+      // budget on a wall: this is a configuration gap, not a delivery failure,
+      // and burning five attempts would dead-letter a perfectly good message.
+      // §9: the miss is REPORTED, with the reason that names the repair.
+      console.error(
+        JSON.stringify({
+          event: 'telegram_admin_routing_error',
+          topic: 'wallet',
+          reason: routed.miss,
+          detail: 'wallet top-up has no admin destination; it stays pending and reviewable in the admin panel',
+        })
+      );
+      await env.DB.prepare(
+        `UPDATE tg_admin_notifications
+            SET attempts = ?2, last_error = 'NO_ADMIN_DESTINATION', updated_at = ${NOW_SQL}
+          WHERE id = ?1`
+      )
+        .bind(row.id, row.attempts)
+        .run();
+      report.failed++;
+      continue;
+    }
+    const dest = routed.destination;
+    const rowBot: BotId = dest.bot;
     if (!botConfigured(env, rowBot)) {
       await markDead(env, row.id, 'TELEGRAM_NOT_CONFIGURED');
       report.dead++;
       continue;
     }
-    const thread = threadExtra(row.message_thread_id ?? null);
+    const targetChat = dest.chatId;
+    const thread = threadExtra(dest.messageThreadId);
+    // Record where this attempt is ACTUALLY going, so the row never describes
+    // a destination the send did not use.
+    await env.DB.prepare(
+      `UPDATE tg_admin_notifications
+          SET target_chat = ?2, bot = ?3, message_thread_id = ?4, topic_key = ?5, updated_at = ${NOW_SQL}
+        WHERE id = ?1`
+    )
+      .bind(row.id, targetChat, dest.bot, dest.messageThreadId, dest.topicKey)
+      .run();
 
     // Fresh buttons for this attempt; the previous attempt's tokens (which
     // were never bound to a delivered message) are superseded here.
@@ -770,7 +819,7 @@ export async function processWalletNotifications(env: Env, limit = 10): Promise<
       if (bytes.ok) {
         result = await sendPhotoToChat(
           env,
-          row.target_chat,
+          targetChat,
           bytes.bytes,
           row.caption,
           { reply_markup: keyboard, ...thread },
@@ -794,7 +843,7 @@ export async function processWalletNotifications(env: Env, limit = 10): Promise<
       sentAs = 'text';
       result = await sendMessageToChat(
         env,
-        row.target_chat,
+        targetChat,
         withProofFailureNote(row.caption, photoProblem),
         { reply_markup: keyboard, ...thread },
         rowBot

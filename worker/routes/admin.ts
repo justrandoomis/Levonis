@@ -203,25 +203,39 @@ adminRoutes.get('/overview', async (c) => {
 
 // ---------------------------------------------------------------- telegram
 
-/** Verifies the Telegram integration end-to-end and reports honestly. */
+/**
+ * Verifies the Telegram integration end-to-end and reports honestly.
+ *
+ * 0080 — THE GATE IS THE ROUTER, NOT THE LEGACY PAIR. Before the admin bot
+ * existed, "configured" meant `TELEGRAM_BOT_TOKEN && TELEGRAM_ADMIN_CHAT_ID`,
+ * and the send was the customer bot posting into that one chat. Now the
+ * destination comes from the ladder — the bound topic, then GENERAL, then that
+ * legacy chat — so gating on the legacy pair would report the integration DEAD
+ * the day the owner stops using the legacy chat, while it is in fact working
+ * perfectly through @alilevobot.
+ *
+ * The response says WHICH rung carried it, because "it sent" and "it sent from
+ * the fallback you thought you had retired" are different answers.
+ */
 adminRoutes.post('/telegram/test', async (c) => {
   const me = await telegramGetMe(c.env);
-  const configured = telegramConfigured(c.env);
-  let sent = false;
-  if (configured && me.ok) {
-    const routed = await notifyAdminTopic(
-      c.env,
-      'general',
-      '✅ Levonis: Telegram notifications are working (test message from the admin console).'
-    );
-    sent = routed.ok;
-  }
+  const routed = await notifyAdminTopic(
+    c.env,
+    'general',
+    '✅ Levonis: Telegram notifications are working (test message from the admin console).'
+  );
   return c.json({
     success: true,
+    // The CUSTOMER bot's own health — unchanged fields, unchanged meaning.
     tokenValid: me.ok,
     botUsername: me.username ?? null,
     chatConfigured: !!c.env.TELEGRAM_ADMIN_CHAT_ID,
-    sent,
+    sent: routed.ok,
+    // Which rung of the §9 ladder actually carried it, and which bot.
+    delivered_via: routed.ok ? routed.destination.via : null,
+    delivered_by: routed.ok ? routed.destination.bot : null,
+    topic: routed.ok ? routed.destination.topicKey : null,
+    reason: routed.ok ? null : routed.reason,
   });
 });
 

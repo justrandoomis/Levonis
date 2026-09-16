@@ -990,6 +990,21 @@ async function answerAdminCallback(env: Env, callbackQueryId: string, text: stri
 // apex-host rule, which is what the gateway's capability table declares for
 // this prefix.
 
+/** Seeded Telegram approvers who are NOT on the bot allow-list, so the gap is
+ *  visible on the screen rather than discovered when a button refuses. The
+ *  mapping itself is already admin-visible at /admin/tg-identities. */
+async function identitiesOutsideAllowList(
+  env: Env
+): Promise<Array<{ telegram_user_id: number; user_id: string; name: string }>> {
+  const allowed = adminTelegramIds(env);
+  const { results } = await env.DB.prepare(
+    `SELECT i.telegram_user_id, i.user_id, u.name
+       FROM admin_tg_identities i JOIN users u ON u.id = i.user_id
+      WHERE i.revoked_at IS NULL AND u.role = 'admin'`
+  ).all<{ telegram_user_id: number; user_id: string; name: string }>();
+  return (results ?? []).filter((r) => !allowed.has(Number(r.telegram_user_id)));
+}
+
 /** Everything an operator needs to see whether the admin bot is wired up,
  *  with no secret value in the response — only whether each one is SET. */
 telegramRoutes.get('/admin/bot-status', requireAdmin, async (c) => {
@@ -1009,6 +1024,16 @@ telegramRoutes.get('/admin/bot-status', requireAdmin, async (c) => {
     group: group
       ? { chat_id: group.groupChatId, title: group.groupTitle, updated_at: group.updatedAt }
       : null,
+    /**
+     * THE TWO DOORS, SIDE BY SIDE.
+     *
+     * A site admin can hold a live `admin_tg_identities` row (door 2 — the one
+     * that authorises money) and still not be on `TELEGRAM_ADMIN_USER_IDS`
+     * (door 1 — the one that opens the bot). The buttons then refuse them, and
+     * the refusal is correct but bewildering: nothing on any screen said the
+     * two lists had drifted. This names the gap instead.
+     */
+    identities_missing_from_allow_list: await identitiesOutsideAllowList(c.env),
     topics: TOPIC_KEYS.map((key) => {
       const t = bound.get(key);
       return {
@@ -1135,6 +1160,14 @@ telegramRoutes.post('/admin/group/reset', requireAdmin, async (c) => {
   }
   const before = await readAdminGroup(c.env.DB);
   if (!before) throw notFound('No admin group is bound');
+  // Unbinding while messages are still queued used to strand them: the row
+  // carried a frozen destination and every retry re-sent to the dead chat.
+  // The delivery pass now RE-RESOLVES on each attempt, so a queued message
+  // simply waits and then lands in the new group — but say so, because an
+  // operator who resets mid-queue should know the queue is still there.
+  const queued = await c.env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM tg_admin_notifications WHERE state IN ('pending','failed')"
+  ).first<{ n: number }>();
   await c.env.DB.batch([
     c.env.DB.prepare('DELETE FROM telegram_admin_topics'),
     c.env.DB.prepare("DELETE FROM telegram_admin_config WHERE id = 'singleton'"),
@@ -1144,15 +1177,28 @@ telegramRoutes.post('/admin/group/reset', requireAdmin, async (c) => {
   });
   return c.json({
     success: true,
-    note: 'The next /topic_here from an authorized admin adopts the group it is sent in.',
+    queued_notifications: queued?.n ?? 0,
+    note:
+      'The next /topic_here from an authorized admin adopts the group it is sent in. '
+      + 'Queued notifications are not lost: each delivery attempt resolves the destination again.',
   });
 });
 
-/** The command menu Telegram shows in the bot's UI (§25). Only the five
- *  commands an operator needs — no internal surface is advertised. */
+/**
+ * The command menu Telegram shows in the bot's UI (§25).
+ *
+ * SCOPED TO THE ADMIN GROUP, never registered globally. An unscoped
+ * `setMyCommands` writes `BotCommandScopeDefault`, which Telegram shows to
+ * EVERY user who opens the bot — so the whole admin command surface, including
+ * `/topic_here`, would be advertised to any stranger who found @alilevobot.
+ * Before a group is bound there is no chat to scope to, so nothing is
+ * registered: the commands still work, only the menu waits.
+ */
 async function setAdminBotCommands(env: Env): Promise<boolean> {
   const token = botToken(env, 'admin');
   if (!token) return false;
+  const group = await readAdminGroup(env.DB);
+  if (!group) return false;
   const commands = [
     { command: 'start', description: 'بدء استخدام بوت الإدارة' },
     { command: 'help', description: 'قائمة الأوامر' },
@@ -1164,7 +1210,7 @@ async function setAdminBotCommands(env: Env): Promise<boolean> {
     const res = await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ commands }),
+      body: JSON.stringify({ commands, scope: { type: 'chat', chat_id: group.groupChatId } }),
     });
     const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
     return res.ok && data.ok === true;

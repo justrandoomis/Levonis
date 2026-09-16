@@ -21,8 +21,10 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { APEX, asD1, freshDb, post, row, stubApp, type StubUser } from './fixtures/app';
 import { telegramRoutes } from '../worker/routes/telegram';
+import { adminRoutes } from '../worker/routes/admin';
 import {
   adminTelegramIds,
+  bindTopic,
   isBotAdmin,
   notifyAdminTopic,
   resolveAdminDestination,
@@ -111,6 +113,16 @@ const message = (
 const hook = (a: ReturnType<typeof app>, update: unknown, secret: string | null = SECRET) =>
   post(a, '/api/telegram/ops/webhook', update, secret === null ? {} : { 'X-Telegram-Bot-Api-Secret-Token': secret });
 
+/** Seeds the site-admin identity that door 2 requires. */
+function seedSiteAdmin(raw: DatabaseSync, tg = ADMIN_TG) {
+  raw.exec(`
+    INSERT OR IGNORE INTO users (id,name,email,password_hash,role)
+      VALUES ('boss','Ali','boss@x.co','h','admin');
+    INSERT OR IGNORE INTO admin_tg_identities (telegram_user_id,user_id,created_by)
+      VALUES (${tg},'boss','boss');
+  `);
+}
+
 // =========================================================================
 // WEBHOOK
 // =========================================================================
@@ -197,6 +209,7 @@ test('AUTH — an unauthorized sender is told nothing about the platform, and ne
 
 test('GROUP SETUP — the first authorized /topic_here adopts the group and stores the thread id', async () => {
   const raw = freshDb();
+  seedSiteAdmin(raw);
   const tg = stubTelegram();
   try {
     const a = app(raw);
@@ -225,6 +238,7 @@ test('GROUP SETUP — the first authorized /topic_here adopts the group and stor
 
 test('GROUP SETUP — the General topic has NO thread id, and none is invented', async () => {
   const raw = freshDb();
+  seedSiteAdmin(raw);
   const tg = stubTelegram();
   try {
     // Telegram sends no message_thread_id at all for a forum's General topic.
@@ -238,6 +252,7 @@ test('GROUP SETUP — the General topic has NO thread id, and none is invented',
 
 test('GROUP SETUP — a SECOND group is refused, and its refusal is audited', async () => {
   const raw = freshDb();
+  seedSiteAdmin(raw);
   const tg = stubTelegram();
   try {
     const a = app(raw);
@@ -276,6 +291,7 @@ test('GROUP SETUP — a private chat can never become the admin group', async ()
 
 test('TOPIC BINDING — re-running /topic_here in another topic MOVES it, it does not duplicate', async () => {
   const raw = freshDb();
+  seedSiteAdmin(raw);
   const tg = stubTelegram();
   try {
     const a = app(raw);
@@ -303,6 +319,7 @@ test('TOPIC BINDING — an unknown topic name is refused WITH the list, and bind
 
 test('/topics reports each topic and whether THIS chat is the configured group', async () => {
   const raw = freshDb();
+  seedSiteAdmin(raw);
   const tg = stubTelegram();
   try {
     const a = app(raw);
@@ -351,6 +368,7 @@ test('parseCommand strips the @botname Telegram appends in groups', () => {
 // =========================================================================
 
 async function bind(raw: DatabaseSync, pairs: Array<[string, number | null]>) {
+  seedSiteAdmin(raw);
   const tg = stubTelegram();
   try {
     const a = app(raw);
@@ -416,16 +434,18 @@ test('ROUTING — with no group bound at all the legacy chat carries it on the C
 
 test('ROUTING — no destination at all is REPORTED, never silently dropped', async () => {
   const raw = freshDb();
+  // No admin bot token and no legacy chat. The reason names the SECRET, which
+  // is the thing an operator would have to fix — see the miss-naming test below.
   const e = env(raw, { TELEGRAM_ADMIN_BOT_TOKEN: undefined, TELEGRAM_ADMIN_CHAT_ID: undefined }) as unknown as Env;
   const res = await resolveAdminDestination(e, 'wallet');
-  assert.deepEqual(res, { ok: false, miss: 'no_group_bound' });
+  assert.deepEqual(res, { ok: false, miss: 'admin_bot_not_configured' });
 
   const errors: string[] = [];
   const realError = console.error;
   console.error = (...args: unknown[]) => { errors.push(args.map(String).join(' ')); };
   try {
     const out = await notifyAdminTopic(e, 'wallet', 'x');
-    assert.deepEqual(out, { ok: false, reason: 'no_group_bound' });
+    assert.deepEqual(out, { ok: false, reason: 'admin_bot_not_configured' });
   } finally {
     console.error = realError;
   }
@@ -433,7 +453,7 @@ test('ROUTING — no destination at all is REPORTED, never silently dropped', as
   const logged = JSON.parse(errors[0]) as Record<string, unknown>;
   assert.equal(logged.event, 'telegram_admin_routing_error');
   assert.equal(logged.topic, 'wallet');
-  assert.equal(logged.reason, 'no_group_bound');
+  assert.equal(logged.reason, 'admin_bot_not_configured');
 });
 
 test('ROUTING — the message really is sent by the ADMIN bot into the bound thread', async () => {
@@ -580,4 +600,241 @@ test('REGRESSION — the two bots keep separate dedup ledgers', async () => {
   } finally {
     tg.restore();
   }
+});
+
+// =========================================================================
+// THE ADVERSARIAL PASS — every finding it confirmed, pinned so it cannot
+// come back. Each of these FAILS against the first implementation.
+// =========================================================================
+
+/** A forum message: a supergroup that actually carries `is_forum: true`. */
+const forumMsg = (p: Parameters<typeof message>[0], id?: number) => message({ ...p, type: 'supergroup' }, id);
+
+/** The same message from a chat Telegram did NOT mark as a forum. */
+const plainGroupMsg = (p: Parameters<typeof message>[0], id?: number) => {
+  const u = message({ ...p, type: p.type ?? 'supergroup' }, id) as { message: { chat: Record<string, unknown> } };
+  delete u.message.chat.is_forum;
+  return u;
+};
+
+test('CRITICAL — /topic_here needs the SITE admin identity, not just the bot allow-list', async () => {
+  const raw = freshDb();
+  const tg = stubTelegram();
+  try {
+    // ADMIN_TG is on TELEGRAM_ADMIN_USER_IDS but has NO admin_tg_identities
+    // row — exactly the person who may command the bot and may NOT approve a
+    // dinar. Letting them bind would let them re-point the wallet topic, and
+    // with it the customer's payment-proof photo, to a chat they control.
+    await hook(app(raw), forumMsg({ text: '/topic_here wallet', thread: 42 }));
+    assert.equal(await readAdminGroup(asD1(raw)), null, 'no group was adopted');
+    assert.deepEqual(await readTopics(asD1(raw)), [], 'and no topic was bound');
+    const sent = tg.calls.find((c) => c.method === 'sendMessage');
+    assert.match(String(sent?.body.text ?? ''), /غير مربوط بصلاحية إدارة/);
+    assert.ok(row(raw, "SELECT 1 AS x FROM audit_log WHERE action = 'telegram_admin.topic.denied'"));
+
+    // With the identity seeded, the same command works.
+    tg.calls.length = 0;
+    seedSiteAdmin(raw);
+    await hook(app(raw), forumMsg({ text: '/topic_here wallet', thread: 42 }));
+    assert.equal((await readAdminGroup(asD1(raw)))?.groupChatId, String(GROUP));
+    // …and the audit names the SITE user, never a `tg:` placeholder.
+    const bound = row<{ actor_id: string }>(
+      raw,
+      "SELECT actor_id FROM audit_log WHERE action = 'telegram_admin.topic.bound'"
+    );
+    assert.equal(bound?.actor_id, 'boss');
+    const cfg = row<{ configured_by: string }>(raw, 'SELECT configured_by FROM telegram_admin_config');
+    assert.equal(cfg?.configured_by, 'boss', 'no tg:<id> placeholder reaches the table');
+  } finally {
+    tg.restore();
+  }
+});
+
+test('CRITICAL — a chat Telegram did not mark as a forum is refused, not silently adopted', async () => {
+  const raw = freshDb();
+  seedSiteAdmin(raw);
+  const tg = stubTelegram();
+  try {
+    // `is_forum` absent: a plain supergroup, or a basic group. Either way it
+    // has no topics, so binding one would bind a thread-less destination while
+    // the reply claimed a topic was bound.
+    await hook(app(raw), plainGroupMsg({ text: '/topic_here wallet', thread: 42 }));
+    assert.equal(await readAdminGroup(asD1(raw)), null);
+    assert.deepEqual(await readTopics(asD1(raw)), []);
+    assert.match(String(tg.calls.find((c) => c.method === 'sendMessage')?.body.text ?? ''), /Forum/);
+
+    // A basic `group` is refused too, is_forum or not.
+    tg.calls.length = 0;
+    await hook(app(raw), message({ text: '/topic_here wallet', type: 'group', thread: 42 }));
+    assert.equal(await readAdminGroup(asD1(raw)), null);
+  } finally {
+    tg.restore();
+  }
+});
+
+test('an unknown topic name is answered before any permission check, so refusals are not an oracle', async () => {
+  const raw = freshDb();
+  const tg = stubTelegram();
+  try {
+    // No site-admin identity, a non-forum chat — and still the answer is about
+    // the typo, which tells the sender nothing about the other two gates.
+    await hook(app(raw), plainGroupMsg({ text: '/topic_here refunds' }));
+    const text = String(tg.calls.find((c) => c.method === 'sendMessage')?.body.text ?? '');
+    assert.match(text, /الأسماء المتاحة/);
+    assert.ok(!/صلاحية إدارة/.test(text) && !/Forum/.test(text));
+  } finally {
+    tg.restore();
+  }
+});
+
+test('bot-status names the seeded approvers who are NOT on the allow-list', async () => {
+  const raw = freshDb();
+  seedSiteAdmin(raw);
+  // A second seeded approver who was never added to TELEGRAM_ADMIN_USER_IDS:
+  // the buttons will refuse them, and until now nothing said why.
+  raw.exec(`
+    INSERT INTO users (id,name,email,password_hash,role) VALUES ('boss2','Sara','s@x.co','h','admin');
+    INSERT INTO admin_tg_identities (telegram_user_id,user_id,created_by) VALUES (99887766,'boss2','boss');
+  `);
+  const a = app(raw, {}, ADMIN_USER);
+  const res = await a.request('/api/telegram/admin/bot-status', { headers: { 'CF-Connecting-IP': '1.2.3.4' } });
+  const body = (await res.json()) as { identities_missing_from_allow_list: Array<Record<string, unknown>> };
+  assert.deepEqual(
+    body.identities_missing_from_allow_list.map((r) => [r.telegram_user_id, r.name]),
+    [[99887766, 'Sara']],
+    'the drift between the two doors is on the screen, not a surprise at the button'
+  );
+});
+
+test('the command menu is scoped to the admin group, never registered globally', async () => {
+  const raw = freshDb();
+  seedSiteAdmin(raw);
+  const tg = stubTelegram();
+  try {
+    // With no group bound there is nothing to scope to, so nothing is written.
+    let a = app(raw, { APP_ORIGIN: 'https://levonis-iq.com' }, ADMIN_USER);
+    await post(a, '/api/telegram/admin/set-admin-webhook', { confirm: 'SET-ADMIN-WEBHOOK' });
+    assert.equal(tg.calls.filter((c) => c.method === 'setMyCommands').length, 0);
+
+    // Once bound, the menu is written WITH a chat scope.
+    await hook(app(raw), forumMsg({ text: '/topic_here general', thread: null }));
+    tg.calls.length = 0;
+    a = app(raw, { APP_ORIGIN: 'https://levonis-iq.com' }, ADMIN_USER);
+    await post(a, '/api/telegram/admin/set-admin-webhook', { confirm: 'SET-ADMIN-WEBHOOK' });
+    const menu = tg.calls.find((c) => c.method === 'setMyCommands')!;
+    assert.deepEqual(menu.body.scope, { type: 'chat', chat_id: String(GROUP) });
+  } finally {
+    tg.restore();
+  }
+});
+
+test('the admin console Telegram test reports the ROUTER, not the retired legacy chat', async () => {
+  const raw = freshDb();
+  seedSiteAdmin(raw);
+  const tg = stubTelegram();
+  try {
+    await hook(app(raw), forumMsg({ text: '/topic_here general', thread: 11 }));
+    tg.calls.length = 0;
+    // No TELEGRAM_ADMIN_CHAT_ID at all — the legacy chat is retired, and the
+    // integration is nonetheless working perfectly through @alilevobot.
+    const a = stubApp(asD1(raw), ADMIN_USER, (x) => x.route('/api/admin', adminRoutes), {
+      host: APEX,
+      env: { ...env(raw), TELEGRAM_ADMIN_CHAT_ID: undefined },
+    });
+    const res = await post(a, '/api/admin/telegram/test', {});
+    const body = (await res.json()) as Record<string, unknown>;
+    assert.equal(body.sent, true, 'it really sent');
+    assert.equal(body.delivered_by, 'admin');
+    assert.equal(body.delivered_via, 'topic');
+    assert.equal(body.chatConfigured, false, 'and is honest that the legacy chat is gone');
+  } finally {
+    tg.restore();
+  }
+});
+
+test('a topic cannot be bound to a group that stopped being THE group mid-command', async () => {
+  const raw = freshDb();
+  seedSiteAdmin(raw);
+  const tg = stubTelegram();
+  try {
+    const a = app(raw);
+    await hook(a, forumMsg({ text: '/topic_here wallet', thread: 42 }));
+
+    // The admin resets the binding. `bindAdminGroup` has already answered "yes,
+    // this is your group" for the command still in flight below, so the write
+    // that follows must be refused by the database, not by the check that is
+    // now stale. Simulated here by resetting between the two writes.
+    await post(
+      stubApp(asD1(raw), ADMIN_USER, (x) => x.route('/api/telegram', telegramRoutes), { host: APEX, env: env(raw) }),
+      '/api/telegram/admin/group/reset',
+      { confirm: 'RESET-ADMIN-GROUP' }
+    );
+    assert.equal(await readAdminGroup(asD1(raw)), null, 'the reset really cleared the group');
+    assert.deepEqual(await readTopics(asD1(raw)), [], 'and its topics with it');
+
+    // The guarded write, run directly against a group that is no longer bound.
+    const wrote = await bindTopic(asD1(raw), {
+      topicKey: 'wallet',
+      messageThreadId: 42,
+      userId: 'boss',
+      telegramUserId: ADMIN_TG,
+      groupChatId: String(GROUP),
+    });
+    assert.equal(wrote, false, 'the write is rejected, not silently orphaned');
+    assert.deepEqual(await readTopics(asD1(raw)), [], 'no orphan row survives to poison the NEXT group');
+
+    // …and a topic row from the old group can never be inherited by a new one.
+    await hook(a, forumMsg({ text: '/topic_here wallet', chat: OTHER_GROUP, thread: 7 }));
+    const topics = await readTopics(asD1(raw));
+    assert.deepEqual(topics.map((t) => [t.topicKey, t.messageThreadId]), [['wallet', 7]]);
+  } finally {
+    tg.restore();
+  }
+});
+
+test('a routing miss names the thing an operator has to FIX', async () => {
+  const raw = freshDb();
+  const base = env(raw) as unknown as Env;
+
+  // No admin bot token, no legacy chat: the repair is the SECRET, and saying
+  // "no group bound" would send someone into Telegram for nothing.
+  assert.deepEqual(
+    await resolveAdminDestination(
+      { ...base, TELEGRAM_ADMIN_BOT_TOKEN: undefined, TELEGRAM_ADMIN_CHAT_ID: undefined } as Env,
+      'wallet'
+    ),
+    { ok: false, miss: 'admin_bot_not_configured' }
+  );
+
+  // Admin bot configured, nobody has run /topic_here: the repair is the COMMAND.
+  assert.deepEqual(
+    await resolveAdminDestination({ ...base, TELEGRAM_ADMIN_CHAT_ID: undefined } as Env, 'wallet'),
+    { ok: false, miss: 'no_group_bound' }
+  );
+
+  // A legacy chat with no customer-bot token to carry it is its own diagnosis.
+  assert.deepEqual(
+    await resolveAdminDestination(
+      {
+        ...base,
+        TELEGRAM_ADMIN_BOT_TOKEN: undefined,
+        TELEGRAM_BOT_TOKEN: undefined,
+        TELEGRAM_ADMIN_CHAT_ID: '-100999',
+      } as Env,
+      'wallet'
+    ),
+    { ok: false, miss: 'not_configured' }
+  );
+
+  // A bound group with NO topics is never a miss: the send lands in General.
+  const tg = stubTelegram();
+  try {
+    seedSiteAdmin(raw);
+    await hook(app(raw), forumMsg({ text: '/topic_here general', thread: null }));
+  } finally {
+    tg.restore();
+  }
+  const hit = await resolveAdminDestination(base, 'support');
+  assert.equal(hit.ok, true);
+  assert.equal(hit.ok && hit.destination.via, 'general');
 });

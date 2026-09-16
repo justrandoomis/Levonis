@@ -228,16 +228,34 @@ export async function readTopics(db: D1Database): Promise<TopicBinding[]> {
  * no thread id at all. We store that NULL rather than inventing a number: a
  * fabricated thread id addresses a topic that does not exist and every send
  * into it fails.
+ *
+ * The write is CONDITIONAL on `groupChatId` still being the bound group. The
+ * group check and this insert are two statements, and `group/reset` can land
+ * between them: without the guard the config row would be gone while the topic
+ * row survived, and the NEXT group to be adopted would inherit a thread id
+ * belonging to the group that was just abandoned — every wallet notification
+ * addressed to a topic that does not exist there. Returns false when the guard
+ * rejected the write, so the caller can say so instead of claiming success.
  */
 export async function bindTopic(
   db: D1Database,
-  p: { topicKey: TopicKey; messageThreadId: number | null; userId: string; telegramUserId: number }
-): Promise<void> {
-  await db
+  p: {
+    topicKey: TopicKey;
+    messageThreadId: number | null;
+    userId: string;
+    telegramUserId: number;
+    groupChatId: string;
+  }
+): Promise<boolean> {
+  const res = await db
     .prepare(
       `INSERT INTO telegram_admin_topics
          (topic_key, message_thread_id, enabled, configured_by, configured_by_tg)
-       VALUES (?1, ?2, 1, ?3, ?4)
+       SELECT ?1, ?2, 1, ?3, ?4
+        WHERE EXISTS (
+          SELECT 1 FROM telegram_admin_config
+           WHERE id = 'singleton' AND group_chat_id = ?5
+        )
        ON CONFLICT (topic_key) DO UPDATE SET
          message_thread_id = excluded.message_thread_id,
          enabled = 1,
@@ -245,8 +263,9 @@ export async function bindTopic(
          configured_by_tg = excluded.configured_by_tg,
          updated_at = ${NOW_SQL}`
     )
-    .bind(p.topicKey, p.messageThreadId, p.userId, p.telegramUserId)
+    .bind(p.topicKey, p.messageThreadId, p.userId, p.telegramUserId, p.groupChatId)
     .run();
+  return Number(res.meta?.changes ?? 0) > 0;
 }
 
 // ------------------------------------------------------------ destinations
@@ -272,11 +291,20 @@ export interface AdminDestination {
   via: 'topic' | 'general' | 'legacy';
 }
 
-/** Why there is nowhere to send — never a silent drop (§9). */
+/**
+ * Why there is nowhere to send — never a silent drop (§9).
+ *
+ * Each value names a DIFFERENT repair, so they must not be interchangeable:
+ *   'admin_bot_not_configured'  the admin bot has no token — upload the secret.
+ *   'no_group_bound'            the bot works; nobody has run `/topic_here` yet.
+ *   'not_configured'            the legacy chat is set but the CUSTOMER bot,
+ *                               which carries it, has no token.
+ * There is deliberately no `no_topic_and_no_general`: a bound group with no
+ * topics still delivers, into its General topic, so that is never a miss.
+ */
 export type DestinationMiss =
   | 'admin_bot_not_configured'
   | 'no_group_bound'
-  | 'no_topic_and_no_general'
   | 'not_configured';
 
 export type DestinationResult =
@@ -290,12 +318,24 @@ export type DestinationResult =
  */
 export async function resolveAdminDestination(env: Env, topicKey: TopicKey): Promise<DestinationResult> {
   const legacyChat = (env.TELEGRAM_ADMIN_CHAT_ID || '').trim();
-  const legacy = (): DestinationResult =>
-    legacyChat && botConfigured(env, 'customer')
-      ? { ok: true, destination: { bot: 'customer', chatId: legacyChat, messageThreadId: null, topicKey: '', via: 'legacy' } }
-      : { ok: false, miss: legacyChat ? 'not_configured' : 'no_group_bound' };
+  const adminBot = adminBotConfigured(env);
+  // The miss is reported as the thing an operator would have to FIX. A missing
+  // admin-bot token and an unbound group are one line apart in the code and a
+  // different afternoon's work in the operator's hands, so they never share a
+  // name: reporting the first as `no_group_bound` sends someone into Telegram
+  // to run `/topic_here` in a group the bot cannot even read.
+  const legacy = (): DestinationResult => {
+    if (legacyChat && botConfigured(env, 'customer')) {
+      return {
+        ok: true,
+        destination: { bot: 'customer', chatId: legacyChat, messageThreadId: null, topicKey: '', via: 'legacy' },
+      };
+    }
+    if (legacyChat) return { ok: false, miss: 'not_configured' };
+    return { ok: false, miss: adminBot ? 'no_group_bound' : 'admin_bot_not_configured' };
+  };
 
-  if (!adminBotConfigured(env)) return legacy();
+  if (!adminBot) return legacy();
   const group = await readAdminGroup(env.DB);
   if (!group) return legacy();
 
