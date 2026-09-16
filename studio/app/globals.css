@@ -398,7 +398,6 @@ button:disabled { cursor: not-allowed; }
   grid-template-columns: 32px minmax(0, 1fr);
   align-items: center;
   gap: 8px 10px;
-  direction: ltr;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--header);
@@ -425,7 +424,6 @@ button:disabled { cursor: not-allowed; }
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  direction: ltr;
   border: 1px solid var(--accent-tint-border);
   border-radius: var(--radius-sm);
   box-shadow: 0 10px 28px var(--shadow-cast);
@@ -561,7 +559,6 @@ button:disabled { cursor: not-allowed; }
   display: flex;
   align-items: center;
   gap: 9px;
-  direction: ltr;
   border: 1px solid var(--warning-border);
   border-radius: var(--radius-sm);
   background: var(--warning-surface);
@@ -618,7 +615,7 @@ button:disabled { cursor: not-allowed; }
  * the ones with identical beds.
  */
 .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; direction: ltr; }
-.profile-grid button { position: relative; min-height: 78px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; background: var(--panel); text-align: left; cursor: pointer; }
+.profile-grid button { position: relative; min-height: 78px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; background: var(--panel); text-align: start; cursor: pointer; }
 /*
  * ONE STATE CUE, PLUS ONE SUPPORTING IT (skill §3).
  *
@@ -682,7 +679,7 @@ button:disabled { cursor: not-allowed; }
 }
 
 .print-body { display: flex; flex-direction: column; gap: 14px; }
-.print-ready-card { min-height: 78px; padding: 14px; display: flex; align-items: center; gap: 12px; direction: ltr; border: 1px solid var(--accent-tint-border); border-radius: var(--radius-sm); background: var(--accent-tint); }
+.print-ready-card { min-height: 78px; padding: 14px; display: flex; align-items: center; gap: 12px; border: 1px solid var(--accent-tint-border); border-radius: var(--radius-sm); background: var(--accent-tint); }
 .print-ready-card > span { width: 40px; height: 40px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: var(--accent-ink); }
 .print-ready-card svg { width: 22px; height: 22px; }
 .print-ready-card > div { display: flex; flex-direction: column; gap: 4px; }
@@ -695,7 +692,7 @@ button:disabled { cursor: not-allowed; }
 .secondary-output-section h3 { margin: 0 0 4px; font-size: 12px; color: var(--muted); font-weight: 800; }
 .secondary-output-help { margin: 0 0 10px; color: var(--muted); font-size: var(--text-caption); line-height: 1.5; }
 .print-action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; direction: ltr; }
-.print-action-grid button { min-height: 72px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); display: flex; align-items: center; gap: 11px; background: var(--surface); text-align: left; cursor: pointer; }
+.print-action-grid button { min-height: 72px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); display: flex; align-items: center; gap: 11px; background: var(--surface); text-align: start; cursor: pointer; }
 .print-action-grid button:hover:not(:disabled) { background: var(--surface-strong); }
 .print-action-grid button:disabled { opacity: .42; }
 .print-action-grid > button > svg { width: 24px; height: 24px; flex: 0 0 auto; }
@@ -725,7 +722,7 @@ button:disabled { cursor: not-allowed; }
 .phone-print-confirmation { margin: 0; padding: 10px; display: flex; align-items: flex-start; gap: 8px; border-radius: var(--radius-sm); background: var(--accent-tint); color: var(--muted-on-tint); font-size: var(--text-caption); line-height: 1.45; }
 .phone-print-confirmation svg { width: 16px; height: 16px; flex: 0 0 auto; color: var(--accent); }
 .phone-print-rights { color: var(--muted-on-tint); font-size: var(--text-caption); line-height: 1.4; }
-.print-handoff { padding: 15px; display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 11px; direction: ltr; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); }
+.print-handoff { padding: 15px; display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); }
 .handoff-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--surface); color: var(--accent); }
 .handoff-icon svg { width: 23px; height: 23px; }
 .print-handoff > div { min-width: 0; }
@@ -733,11 +730,11 @@ button:disabled { cursor: not-allowed; }
 .print-handoff p { margin: 5px 0 0; color: var(--muted); font-size: var(--text-caption); line-height: 1.5; }
 .print-handoff a { grid-column: 1 / -1; min-height: 44px; padding: 0 13px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); text-decoration: none; font-size: var(--text-caption); font-weight: 760; }
 .print-handoff a svg { width: 17px; height: 17px; }
-.print-safety { margin: 0; padding: 11px 12px; display: flex; align-items: flex-start; gap: 8px; direction: ltr; border-radius: var(--radius-sm); background: var(--warning-surface); color: var(--on-warning); font-size: var(--text-caption); line-height: 1.45; }
+.print-safety { margin: 0; padding: 11px 12px; display: flex; align-items: flex-start; gap: 8px; border-radius: var(--radius-sm); background: var(--warning-surface); color: var(--on-warning); font-size: var(--text-caption); line-height: 1.45; }
 .print-safety svg { width: 17px; height: 17px; flex: 0 0 auto; }
 
 .about-body { display: flex; flex-direction: column; gap: 10px; }
-.capability { min-height: 76px; padding: 13px; display: flex; align-items: flex-start; gap: 11px; direction: ltr; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); }
+.capability { min-height: 76px; padding: 13px; display: flex; align-items: flex-start; gap: 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); }
 .capability > i { width: 10px; height: 10px; margin-top: 4px; flex: 0 0 auto; border-radius: 50%; }
 .capability.verified > i { background: var(--accent); }
 .capability.partial > i { background: var(--warning); }
@@ -751,7 +748,6 @@ button:disabled { cursor: not-allowed; }
   display: flex;
   align-items: flex-start;
   gap: 11px;
-  direction: ltr;
   border: 1px dashed var(--line);
   border-radius: var(--radius-sm);
   background: var(--panel);
@@ -784,7 +780,7 @@ button:disabled { cursor: not-allowed; }
 .connection-method-tabs svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .connection-method-tabs span { overflow: hidden; font-size: var(--text-caption); font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
 .connection-method-panel { padding: 15px; display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); }
-.connection-method-panel > header { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; gap: 10px; direction: ltr; }
+.connection-method-panel > header { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; gap: 10px; }
 .connection-method-panel > header > span { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--header); }
 .connection-method-panel > header > span i { width: 10px; height: 10px; border-radius: 50%; background: var(--idle); }
 .connection-method-panel > header > span.available i { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-tint); }
@@ -793,7 +789,7 @@ button:disabled { cursor: not-allowed; }
 .connection-method-panel > header strong { font-size: 13px; }
 .connection-method-panel > header small { overflow: hidden; color: var(--muted); font-size: var(--text-caption); text-overflow: ellipsis; white-space: nowrap; }
 .connection-method-panel > p { margin: 0; color: var(--muted); font-size: var(--text-caption); line-height: 1.55; }
-.native-bridge-state { padding: 11px; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 9px; direction: ltr; border: 1px solid var(--warning-border); border-radius: var(--radius-sm); background: var(--warning-surface); color: var(--on-warning); }
+.native-bridge-state { padding: 11px; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 9px; border: 1px solid var(--warning-border); border-radius: var(--radius-sm); background: var(--warning-surface); color: var(--on-warning); }
 .native-bridge-state.ready { border-color: var(--accent-tint-border); background: var(--accent-tint); color: var(--on-accent-tint); }
 .native-bridge-state > svg { width: 20px; height: 20px; }
 .native-bridge-state > span { display: flex; flex-direction: column; gap: 4px; }
@@ -803,7 +799,9 @@ button:disabled { cursor: not-allowed; }
 .discover-printers-button:disabled, .connect-lan-button:disabled { opacity: .42; }
 .discover-printers-button svg, .connect-lan-button svg { width: 18px; height: 18px; }
 .discovered-printers { display: grid; gap: 6px; }
-.discovered-printers button { min-height: 54px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; gap: 10px; direction: ltr; background: var(--header); color: var(--text); text-align: left; cursor: pointer; }
+.discovered-printers button { min-height: 54px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--header); color: var(--text); text-align: start; cursor: pointer; }
+.discovered-printers button small { direction: ltr; unicode-bidi: isolate; }
+.connected-printer-card strong, .connected-printer-card small { direction: ltr; unicode-bidi: isolate; }
 .discovered-printers button span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .discovered-printers b { font-size: var(--text-caption); }
 .discovered-printers small { color: var(--muted); font-size: var(--text-caption); }
@@ -814,7 +812,7 @@ button:disabled { cursor: not-allowed; }
 .lan-connection-form input { width: 100%; height: 44px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); outline: 0; background: var(--shell); color: var(--text); font-size: 11px; }
 .lan-connection-form input:focus { border-color: var(--accent-strong); box-shadow: 0 0 0 2px var(--accent-tint); }
 .connect-lan-button { grid-column: 1 / -1; border-color: var(--accent-strong); background: var(--accent); color: var(--accent-ink); }
-.connected-printer-card { min-height: 68px; padding: 10px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 10px; direction: ltr; border: 1px solid var(--accent-tint-border); border-radius: var(--radius-sm); background: var(--accent-tint); }
+.connected-printer-card { min-height: 68px; padding: 10px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 10px; border: 1px solid var(--accent-tint-border); border-radius: var(--radius-sm); background: var(--accent-tint); }
 .connected-printer-card > span { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: var(--accent-ink); }
 .connected-printer-card svg { width: 20px; height: 20px; }
 .connected-printer-card > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -822,7 +820,7 @@ button:disabled { cursor: not-allowed; }
 .connected-printer-card strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .connected-printer-card small { color: var(--muted-on-tint); font-size: var(--text-caption); }
 .connected-printer-card button { min-height: 34px; padding: 0 10px; border: 1px solid var(--accent-tint-border); border-radius: var(--radius-sm); background: var(--panel); color: var(--on-accent-tint); font-size: var(--text-caption); cursor: pointer; }
-.lan-print-button, .usb-download-button { min-height: 54px; padding: 9px 12px; border: 1px solid var(--accent-strong); border-radius: var(--radius-sm); display: flex; align-items: center; gap: 10px; direction: ltr; background: var(--accent); color: var(--accent-ink); text-align: left; cursor: pointer; }
+.lan-print-button, .usb-download-button { min-height: 54px; padding: 9px 12px; border: 1px solid var(--accent-strong); border-radius: var(--radius-sm); display: flex; align-items: center; gap: 10px; background: var(--accent); color: var(--accent-ink); text-align: start; cursor: pointer; }
 .lan-print-button:disabled, .usb-download-button:disabled { border-color: var(--line); background: var(--surface); color: var(--idle); cursor: not-allowed; }
 .lan-print-button > svg, .usb-download-button > svg { width: 21px; height: 21px; flex: 0 0 auto; }
 .lan-print-button > span, .usb-download-button > span { display: flex; flex-direction: column; gap: 3px; }
@@ -830,11 +828,11 @@ button:disabled { cursor: not-allowed; }
 .lan-print-button small, .usb-download-button small { color: inherit; opacity: .72; font-size: var(--text-caption); }
 .lan-transfer-progress { width: 100%; height: 5px; border: 0; accent-color: var(--accent); }
 .lan-message { padding: 9px 10px; border-radius: var(--radius-sm); background: var(--shell); color: var(--text) !important; }
-.lan-security, .usb-compatibility { padding: 10px; display: flex; align-items: flex-start; gap: 8px; direction: ltr; border-radius: var(--radius-sm); background: var(--header); }
+.lan-security, .usb-compatibility { padding: 10px; display: flex; align-items: flex-start; gap: 8px; border-radius: var(--radius-sm); background: var(--header); }
 .lan-security svg, .usb-compatibility svg { width: 17px; height: 17px; flex: 0 0 auto; color: var(--warning); }
 .method-doc-link { min-height: 44px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); text-decoration: none; font-size: var(--text-caption); font-weight: 780; }
 .method-doc-link svg { width: 16px; height: 16px; }
-.connection-policy { padding: 14px; display: flex; align-items: flex-start; gap: 11px; direction: ltr; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); }
+.connection-policy { padding: 14px; display: flex; align-items: flex-start; gap: 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); }
 .connection-policy > svg { width: 22px; height: 22px; flex: 0 0 auto; color: var(--warning); }
 .connection-policy strong { font-size: 12px; }
 .connection-policy p { margin: 6px 0 0; color: var(--muted); font-size: var(--text-caption); line-height: 1.55; }

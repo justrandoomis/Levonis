@@ -327,3 +327,96 @@ test("every token the projects panel reads is actually defined here", async () =
     assert.match(value ?? "", /^var\(--[\w-]+\)$/, `${token} must map onto the ladder, not restate a colour`);
   }
 });
+
+test("LTR is pinned to readouts, not to sentences", () => {
+  /**
+   * MANDATE §5 SAYS THE 3D VIEWPORT AND TECHNICAL READOUTS STAY LTR WHILE THE
+   * CHROME FOLLOWS THE LOCALE. The rule was right and it had been applied at
+   * the wrong level: `direction: ltr` sat on fourteen CONTAINERS whose content
+   * is localised prose — the notice bar, the stale banner, the import toast,
+   * every capability paragraph in the about sheet, the safety note, and most
+   * of the connect sheet.
+   *
+   * A container's direction is the BASE DIRECTION the bidi algorithm resolves
+   * an Arabic sentence against. Get it wrong and trailing punctuation lands at
+   * the wrong end and any embedded Latin — a filename, a preset id — is
+   * ordered against the rest of the line. It is not a cosmetic setting.
+   *
+   * These are the containers that may keep it, and why. Anything else that
+   * acquires it should have to justify itself here first.
+   */
+  const ALLOWED = [
+    ".viewport-mount",       // the 3D canvas — coordinates and axes
+    ".studio-status",        // a technical state readout
+    ".studio-actions",       // an icon row whose order is physical, not textual
+    ".shell-actions",        // likewise: a strip pinned to a screen edge, past
+                             // the engine's own rail, whose buttons carry one
+                             // word each — no sentence for a base direction to
+                             // reorder, and a physical order to preserve
+    ".editor-loader small",  // the profile/bed string
+    ".empty-upload-card > p",// the accepted-format list
+    ".cut-number",           // a millimetre value
+    ".cut-extent",           // a millimetre range
+    ".profile-grid",         // Latin model names and bed dimensions
+    ".segmented-control",    // layer heights and wall counts
+    ".switch",               // a physical control
+    ".studio-sheet > header span", // the technical subtitle
+    ".print-action-grid",    // file formats
+    ".connection-method-tabs",
+    ".lan-connection-form",  // an IP, a serial, an access code
+    ".mobile-toolgrid",
+    ".mobile-primarybar",
+    ".discovered-printers button small",
+    ".connected-printer-card strong, .connected-printer-card small",
+  ];
+
+  /**
+   * Rules are found by SPLITTING the stylesheet, not by a regex that has to
+   * span one.
+   *
+   * The first version used `(?:[^}]*\n)*?` to reach across a multi-line rule
+   * body — the classic catastrophic-backtracking shape, which on a thousand-
+   * line stylesheet simply did not finish. Cutting at every `}` gives one
+   * selector and one body per piece, in linear time, and says the same thing
+   * more plainly.
+   */
+  const all = [...new Set(
+    rules
+      .split("}")
+      .filter((piece) => piece.includes("direction: ltr"))
+      .map((piece) => {
+        const brace = piece.lastIndexOf("{", piece.indexOf("direction: ltr"));
+        const selector = brace === -1 ? "" : piece.slice(0, brace);
+        // A rule inside a media query carries the @media line ahead of it in
+        // the same piece; the selector is the last non-empty line before `{`.
+        return selector.split("\n").map((l) => l.trim()).filter(Boolean).pop() ?? "";
+      })
+      .filter(Boolean)
+  )];
+
+  const unexplained = all.filter((selector) => !ALLOWED.includes(selector));
+  assert.deepEqual(
+    unexplained,
+    [],
+    `direction: ltr on a container that holds localised prose — add it to ALLOWED with a reason, or remove it: ${unexplained.join(" | ")}`
+  );
+});
+
+test("nothing aligns text by a physical edge", () => {
+  /**
+   * `text-align: left` is a PHYSICAL direction: in an RTL locale it pins text
+   * to the wrong edge of its own box. `start` is the same thing in LTR and the
+   * correct thing in RTL, and the repo already used it elsewhere — four rules
+   * had drifted, and they were inside containers that have just stopped being
+   * force-LTR, so the mismatch was about to become visible.
+   */
+  for (const physical of ["text-align: left", "text-align: right"]) {
+    assert.ok(!rules.includes(physical), `${physical} — use start/end`);
+  }
+  // The same argument for box edges. `left:`/`right:` are legitimate for
+  // something pinned to the viewport (a floating bar, the engine's own rail),
+  // so this only guards the text-flow properties.
+  for (const physical of ["margin-left:", "margin-right:", "padding-left:", "padding-right:"]) {
+    assert.ok(!rules.includes(physical), `${physical} — use the -inline- logical property`);
+  }
+});
