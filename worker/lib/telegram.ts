@@ -410,6 +410,22 @@ export type AuthLinkability =
  * - signup: neither the phone nor the Telegram account may already be
  *   linked — an existing owner is guided to login instead of a duplicate
  *   account or a silent merge.
+ *
+ * `users.phone_e164` COUNTS AS TAKEN, not only a live telegram_links row.
+ * Those two are usually the same fact — the column is stamped from a proven
+ * link — but they come apart when a link is REVOKED: the account keeps the
+ * number, the link is gone. This function used to look only at the links, so
+ * that state answered "linkable" for a signup, and the account-creating batch
+ * in routes/auth.ts then refused it on its own
+ * `NOT EXISTS (SELECT 1 FROM users WHERE phone_e164 = ?)` guard — leaving the
+ * customer with a generic failure instead of the sentence that would have
+ * helped them. The two now agree on what "taken" means.
+ *
+ * For LOGIN the same state is 'support' rather than 'use_signup': an account
+ * does hold this number, but nothing links it to the Telegram account in
+ * front of us. Re-linking on the strength of the number alone is exactly the
+ * takeover this design refuses, and sending them to signup would only bounce
+ * them back here.
  */
 export async function resolveAuthLinkability(
   env: Env,
@@ -425,7 +441,14 @@ export async function resolveAuthLinkability(
     )
       .bind(phoneE164)
       .first<{ user_id: string; telegram_user_id: number }>();
-    if (!link) return { linkable: false, hint: 'use_signup' };
+    if (!link) {
+      // No live link. If an ACCOUNT nonetheless holds this number, a human
+      // decides — see the note above.
+      const held = await env.DB.prepare('SELECT id FROM users WHERE phone_e164 = ? LIMIT 1')
+        .bind(phoneE164)
+        .first();
+      return { linkable: false, hint: held ? 'support' : 'use_signup' };
+    }
     if (telegramUserId === null || link.telegram_user_id !== telegramUserId) {
       return { linkable: false, hint: 'support' };
     }
@@ -433,7 +456,10 @@ export async function resolveAuthLinkability(
   }
   // signup
   const phoneTaken = await env.DB.prepare(
-    'SELECT user_id FROM telegram_links WHERE phone_e164 = ? AND revoked_at IS NULL LIMIT 1'
+    `SELECT 1 AS n FROM telegram_links WHERE phone_e164 = ?1 AND revoked_at IS NULL
+      UNION ALL
+     SELECT 1 AS n FROM users WHERE phone_e164 = ?1
+     LIMIT 1`
   )
     .bind(phoneE164)
     .first();

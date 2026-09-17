@@ -25,7 +25,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { APEX, asD1, freshDb, json, post, row, stubApp } from './fixtures/app';
+import { APEX, MERCHANT_HOST, asD1, freshDb, json, post, row, stubApp } from './fixtures/app';
 import { authRoutes } from '../worker/routes/auth';
 import {
   AUTH_OTP_RESEND_COOLDOWN_SECONDS,
@@ -558,4 +558,34 @@ test('capabilities reports each code channel, and reports it OFF when unconfigur
   const bOff = (await off.json()) as Record<string, unknown>;
   assert.equal(bOff.emailOtp, false);
   assert.equal(bOff.whatsappOtp, false);
+});
+
+test('the code sign-in works from a MERCHANT host, exactly like every other sign-in', async () => {
+  // requireMainHost is for global administration and for changing a signed-in
+  // account's credentials. /login, /register, /google and /telegram/* are all
+  // reachable from a merchant storefront; a code sign-in that 404s only there
+  // would be an inconsistency the page could not explain, because
+  // /capabilities — served by the same Worker — would still offer the button.
+  const raw = freshDb();
+  seedUser(raw);
+  const p = stubProviders();
+  try {
+    const merchant = stubApp(asD1(raw), null, (a) => a.route('/api/auth', authRoutes), {
+      host: MERCHANT_HOST,
+      env: env(raw),
+    });
+    const r1 = await post(merchant, '/api/auth/otp/start', { channel: 'email', identifier: ADDRESS }, {
+      'CF-Connecting-IP': '10.9.9.9',
+    });
+    assert.equal(r1.status, 200);
+    const r2 = await post(
+      merchant,
+      '/api/auth/otp/verify',
+      { channel: 'email', identifier: ADDRESS, code: p.sent[0].code },
+      { 'CF-Connecting-IP': '10.9.9.8' }
+    );
+    assert.equal(r2.status, 200);
+  } finally {
+    p.restore();
+  }
 });

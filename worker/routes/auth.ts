@@ -1974,7 +1974,15 @@ async function accountForOtpDestination(
     .first<{ id: string; email: string; email_verified_at: string | null }>();
 }
 
-authRoutes.post('/otp/start', requireMainHost, async (c) => {
+// NO requireMainHost ON EITHER OF THESE, deliberately. That guard is for
+// global administration and for CHANGING a signed-in account's credentials
+// (/change-password, /change-email, /google/link) — things a page on a
+// merchant subdomain has no business doing with the session cookie it
+// happens to carry. Signing IN is not one of them: /login, /register,
+// /google and /telegram/* are all reachable from a merchant storefront, and
+// a code sign-in that 404s only there would be an inconsistency the sign-in
+// page could not explain, since /capabilities would still offer the button.
+authRoutes.post('/otp/start', async (c) => {
   // Per IP first, then per DESTINATION — one mailbox or one phone must not be
   // floodable from many addresses, and on WhatsApp a flood is also the shop's
   // own send quota (as little as one message per five seconds) being spent by
@@ -2055,7 +2063,7 @@ authRoutes.post('/otp/start', requireMainHost, async (c) => {
   });
 });
 
-authRoutes.post('/otp/verify', requireMainHost, async (c) => {
+authRoutes.post('/otp/verify', async (c) => {
   await rateLimit(c, 'otp-verify', 20, 900);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const { channel, destination } = readOtpTarget(body);

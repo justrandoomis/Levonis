@@ -17,6 +17,8 @@ curl -s https://levonis-iq.com/api/auth/capabilities | jq
   "telegramBot": "",
   "phoneSignIn": true,
   "phoneOtp": false,
+  "emailOtp": false,
+  "whatsappOtp": false,
   "defaultCountry": "IQ"
 }
 ```
@@ -162,6 +164,66 @@ completes the flow.
 
 ---
 
+## 4b. Sign-in codes — email and WhatsApp
+
+**Two endpoints, and they SIGN IN only.**
+
+```
+POST /api/auth/otp/start    { channel: "email" | "whatsapp", identifier, lang }
+POST /api/auth/otp/verify   { channel, identifier, code }
+```
+
+A code proves control of an address or a number. It does not answer the
+questions a NEW account needs answered — a username, a referral, whether a
+password is wanted — so creating one here would make a half-account nobody
+asked for. Sign-up stays where those questions are asked.
+
+| Channel | Where the code goes | Why that is enough |
+| --- | --- | --- |
+| `email` | `users.email` | Receiving it IS the mailbox proof — the same proof `/verify-email/confirm` accepts, so a successful sign-in also stamps `email_verified_at`. |
+| `whatsapp` | `users.phone_e164` | Migration 0013 is explicit that this column is only ever written after Telegram contact verification: *"a phone typed into a form is never stored here"*. The number is already proven; WhatsApp on it is a second factor of the same ownership. |
+
+**`/start` cannot be used to find out who has an account.** An address with no
+account writes a *decoy* challenge — `user_id NULL`, nothing sent — so the
+response, its shape and the 60-second resend cooldown are identical either
+way. The cooldown is keyed on the DESTINATION rather than a user id, because a
+per-user cooldown is itself an oracle. `/verify` has one uniform failure for
+every cause, exactly like `/login`.
+
+**The one thing `/start` does not hide** is that the channel is switched off:
+a shop with no mail provider, or no WhatsApp key, answers 503 with a reason.
+Pretending to send a code that can never arrive leaves the customer waiting on
+nothing.
+
+The rules are the Telegram OTP's, deliberately — unbiased WebCrypto digits,
+only a salted SHA-256 digest stored, 10-minute TTL, 5 attempts claimed BEFORE
+the comparison, timing-safe compare, supersede-on-resend, conditional consume
+(`worker/lib/authOtp.ts`, table `auth_otp`, migration 0087). A six-digit code
+that behaves differently depending on which channel carried it is a code
+nobody can reason about.
+
+### WhatsApp: WasenderAPI
+
+`WASENDER_API_KEY` (a Worker *secret*). The provider drives a **real WhatsApp
+account** — the shop's own number, linked by QR or passkey — and three
+consequences run through everything:
+
+1. **A key present is not a working channel.** The session can be logged out
+   while the token stays valid, so `capabilities.whatsappOtp` means *a key is
+   set*, and only **Admin → Customer channels** asks the provider for the
+   session's real state.
+2. **The send ceiling is tiny and per-session:** 256/minute on a paid plan,
+   but **one message per five seconds** with Account Protection on, and
+   1/minute and 50/day on a trial. Notifications therefore go through the
+   durable outbox; only the sign-in code sends directly, and a 429 is reported
+   with the provider's own retry hint rather than swallowed.
+3. **`to` also accepts group and channel JIDs.** A stored "phone" of
+   `120363…@g.us` would broadcast a customer's code to a group, so E.164
+   validation happens before the network and is a security boundary, not
+   tidiness.
+
+---
+
 ## 5. Phone
 
 | | State | Why |
@@ -169,6 +231,7 @@ completes the flow.
 | Sign IN with a phone number | **works** | The identifier field takes an email, a username or a phone; the server matches it against the account's verified `phone_e164`. |
 | Sign UP with a phone number alone | **refused** | A typed number proves nothing. Account creation on a number goes through Telegram. |
 | SMS / OTP provider | **none** | `capabilities.phoneOtp` is `false`, so no SMS flow is advertised. |
+| A CODE on a phone | **works, over WhatsApp** | §4b. Not SMS: nothing here talks to a carrier. It goes to the number the account already proved it owns. |
 
 There is no separate "Phone" tab any more. Signing up there always failed —
 the panel's only possible outcome was an error telling you to use Telegram —
