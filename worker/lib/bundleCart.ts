@@ -41,6 +41,7 @@
 
 import { badRequest, HttpError } from './http';
 import { safeParse } from './types';
+import { optionValueIdsJson } from './cartSelectionIdentity';
 import {
   compositionSelect,
   compositionMaxQty,
@@ -256,18 +257,21 @@ export async function loadCartChoices(
  * two apart without a race. Earlier statements in a D1 batch are visible to
  * later ones, so `SELECT id FROM cart_items WHERE …` inside these statements
  * sees the row this same batch just wrote — with no window in which a line
- * exists without its composition.
+ * exists without its composition. The complete option_value_ids identity is
+ * included too, matching migration 0082's widened partial index.
  */
 export function cartChoiceStatements(
   db: D1Database,
   userId: string,
   productId: string,
   compositionKeyValue: string,
+  lineOptionValueIds: readonly string[],
   choices: Map<string, ComponentChoice>
 ): D1PreparedStatement[] {
+  const lineOptionValueIdsJson = optionValueIdsJson(lineOptionValueIds);
   const lineSelect = `SELECT id FROM cart_items
                        WHERE user_id = ? AND product_id = ? AND option_id = ?
-                         AND color_id = '' AND shipping_method_id = ''`;
+                         AND option_value_ids = ? AND color_id = '' AND shipping_method_id = ''`;
   const ids = [...choices.keys()];
   const stmts: D1PreparedStatement[] = [
     // A component the admin removed since this line was written must not stay
@@ -287,7 +291,7 @@ export function cartChoiceStatements(
           WHERE cart_item_id IN (${lineSelect})
             AND component_id NOT IN (SELECT value FROM json_each(?))`
       )
-      .bind(userId, productId, compositionKeyValue, JSON.stringify(ids)),
+      .bind(userId, productId, compositionKeyValue, lineOptionValueIdsJson, JSON.stringify(ids)),
   ];
   for (const [componentId, ch] of choices) {
     stmts.push(
@@ -295,7 +299,8 @@ export function cartChoiceStatements(
         .prepare(
           `INSERT INTO cart_bundle_choices (cart_item_id, component_id, option_value_ids, color_id, included)
            SELECT id, ?, ?, ?, ? FROM cart_items
-            WHERE user_id = ? AND product_id = ? AND option_id = ? AND color_id = '' AND shipping_method_id = ''
+            WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ?
+              AND color_id = '' AND shipping_method_id = ''
            ON CONFLICT(cart_item_id, component_id) DO UPDATE SET
              option_value_ids = excluded.option_value_ids,
              color_id = excluded.color_id,
@@ -308,7 +313,8 @@ export function cartChoiceStatements(
           ch.included ? 1 : 0,
           userId,
           productId,
-          compositionKeyValue
+          compositionKeyValue,
+          lineOptionValueIdsJson
         )
     );
   }
@@ -660,11 +666,10 @@ export function cartCompositionBlock(b: ResolvedBundle, mystery?: MysteryContext
  * composition row for the same reason `option_id` carries the composition key
  * (§5.1): `selectionFromCartRow` returns an EMPTY selection for a composition
  * row, so nothing downstream — not `resolveUnitPrice`, not `saleAvailability`,
- * not price protection — ever reads it. It is outside the
- * `UNIQUE (user_id, product_id, community_product_id, option_id, color_id,
- * shipping_method_id)` tuple, so `idx_cart_levonis_line` is untouched, and the
- * family is ALSO folded into the composition key, so two lines narrowed to two
- * families are two rows rather than one merged one.
+ * not price protection — ever reads it. It participates in
+ * `idx_cart_levonis_line` as canonical JSON (0082), and the family is ALSO
+ * folded into the composition key, so two lines narrowed to two families are
+ * two rows rather than one merged one.
  */
 export const mysteryFamilyOf = (row: Record<string, unknown>): string =>
   safeParse<string[]>(String(row.option_value_ids ?? '[]'), []).filter((x) => typeof x === 'string')[0] ?? '';

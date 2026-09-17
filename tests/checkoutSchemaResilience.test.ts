@@ -51,7 +51,12 @@ function setup(dropColumn?: string) {
     INSERT INTO cart_items (id,user_id,product_id,option_id,option_value_ids,color_id,shipping_method_id,transport_method,warranty_plan_id,qty)
       VALUES ('ci','buyer','p_pla','','[]','','','','',2);
   `);
-  if (dropColumn) raw.exec(`ALTER TABLE cart_items DROP COLUMN ${dropColumn};`);
+  if (dropColumn) {
+    if (dropColumn === 'option_value_ids') {
+      raw.exec('DROP INDEX IF EXISTS idx_cart_levonis_line_v2; DROP INDEX IF EXISTS idx_cart_levonis_line;');
+    }
+    raw.exec(`ALTER TABLE cart_items DROP COLUMN ${dropColumn};`);
+  }
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
 

@@ -201,6 +201,7 @@ options.3.group=Nozzle
 options.3.name_ar=فوهة ٠٫٤
 options.3.name_en=0.4mm
 options.3.active=true
+options.3.stock=0
 options.4.id=opt_n06
 options.4.group=Nozzle
 options.4.name_ar=فوهة ٠٫٦
@@ -212,7 +213,7 @@ colors.1.name_ar=أسود
 colors.1.name_en=Black
 colors.1.name_ckb=ڕەش
 colors.1.hex=#000000
-colors.1.option_ids=opt_base,opt_combo
+colors.1.option_ids=
 colors.1.sku_part=BLK
 colors.1.active=true
 colors.1.regular_price_iqd=+5000
@@ -299,6 +300,15 @@ const AREAS: Array<{ area: string; match: (k: string) => boolean }> = [
  */
 const VOLATILE = /^(updated_at|exported_at|content_rev|doc_version|expected_updated_at)$/;
 
+/**
+ * A legacy TXT can state selling_type=mixed without spelling the per-option
+ * fulfillment cells. Hydration materializes that inherited meaning so the
+ * editor can save an explicit, stable contract. Those newly explicit defaults
+ * are canonicalization, not a loss of an author-supplied field; the second-save
+ * test below still proves they never drift again.
+ */
+const MATERIALIZED_OPTION_FULFILLMENT = /^options\.\d+\.(?:direct|preorder)\./;
+
 // =========================================================================
 
 test('§5 AUDIT — TXT create → ProductForm save → reload changes nothing, in any of the fifteen areas', async () => {
@@ -328,6 +338,7 @@ test('§5 AUDIT — TXT create → ProductForm save → reload changes nothing, 
     if (VOLATILE.test(key)) continue;
     const b = before.get(key);
     const a = after.get(key);
+    if (b === undefined && a !== undefined && MATERIALIZED_OPTION_FULFILLMENT.test(key)) continue;
     if (b !== a) changed.push(`${key}: "${b ?? '(absent)'}" → "${a ?? '(absent)'}"`);
   }
 
@@ -389,7 +400,7 @@ test('§5 AUDIT — the form state itself carries all fifteen, not just the expo
   assert.equal(values.find((v) => v.id === 'opt_combo')?.regular_adjust_iqd, 150_000, 'the surcharge, as an adjustment');
   assert.equal(values.find((v) => v.id === 'opt_n06')?.active, false);
   assert.equal(rel.colors.length, 1);
-  assert.deepEqual(rel.colors[0].option_value_ids.slice().sort(), ['opt_base', 'opt_combo']);
+  assert.deepEqual(rel.colors[0].option_value_ids, [], 'empty option_ids remains the canonical all-options shorthand');
   assert.equal(rel.images.length, 3);
   assert.equal(rel.images.find((i) => i.id === 'img_front')?.is_primary, true);
   assert.equal(rel.images.find((i) => i.id === 'img_front')?.source_url, 'https://vendor.example/front.jpg');

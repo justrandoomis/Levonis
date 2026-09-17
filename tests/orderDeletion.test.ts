@@ -56,10 +56,10 @@ test('permanent order deletion is limited to cancelled orders and removes owned 
 
   const result = await deleteCancelledOrder(adapter(db), 'order-delete');
   assert.equal(result.deleted, true);
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM orders WHERE id = 'order-delete'").get().n, 0);
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM order_items WHERE order_id = 'order-delete'").get().n, 0);
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM order_status_history WHERE order_id = 'order-delete'").get().n, 0);
-  assert.equal(db.prepare("SELECT order_id FROM inventory_ledger WHERE id = 'led-delete'").get().order_id, null);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM orders WHERE id = 'order-delete'").get()!.n, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM order_items WHERE order_id = 'order-delete'").get()!.n, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM order_status_history WHERE order_id = 'order-delete'").get()!.n, 0);
+  assert.equal(db.prepare("SELECT order_id FROM inventory_ledger WHERE id = 'led-delete'").get()!.order_id, null);
 });
 
 test('a delivered or serialized cancelled order is never purged', async () => {
@@ -70,7 +70,7 @@ test('a delivered or serialized cancelled order is never purged', async () => {
     () => deleteCancelledOrder(adapter(db), 'order-device'),
     (error: unknown) => error instanceof OrderDeletionRefusal && error.code === 'ORDER_HAS_FULFILMENT_HISTORY'
   );
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM orders WHERE id = 'order-device'").get().n, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM orders WHERE id = 'order-device'").get()!.n, 1);
 });
 
 test('the retention sweep deletes only cancelled orders older than 30 days', async () => {
@@ -83,16 +83,16 @@ test('the retention sweep deletes only cancelled orders older than 30 days', asy
 
   const report = await sweepCancelledOrders(adapter(db), '2026-03-01T00:00:00.000Z', 30, 20);
   assert.equal(report.deleted, 1);
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM orders WHERE id = 'old-cancelled'").get().n, 0);
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM orders WHERE id = 'recent-cancelled'").get().n, 1);
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM orders WHERE id = 'old-pending'").get().n, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM orders WHERE id = 'old-cancelled'").get()!.n, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM orders WHERE id = 'recent-cancelled'").get()!.n, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM orders WHERE id = 'old-pending'").get()!.n, 1);
 });
 
 test('the cancelled timestamp follows cancellation and reopening in every route', () => {
   const db = database();
   addOrder(db, 'order-clock');
   db.prepare("UPDATE orders SET status = 'cancelled' WHERE id = 'order-clock'").run();
-  assert.ok(db.prepare("SELECT cancelled_at FROM orders WHERE id = 'order-clock'").get().cancelled_at);
+  assert.ok(db.prepare("SELECT cancelled_at FROM orders WHERE id = 'order-clock'").get()!.cancelled_at);
   db.prepare("UPDATE orders SET status = 'pending' WHERE id = 'order-clock'").run();
-  assert.equal(db.prepare("SELECT cancelled_at FROM orders WHERE id = 'order-clock'").get().cancelled_at, null);
+  assert.equal(db.prepare("SELECT cancelled_at FROM orders WHERE id = 'order-clock'").get()!.cancelled_at, null);
 });

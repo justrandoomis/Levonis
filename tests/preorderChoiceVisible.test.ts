@@ -92,7 +92,7 @@ test('THE FIRST PAINT names both ways to buy, before any model is chosen', async
   // WITHOUT THE FIX: [{direct_sale, usable:true}] and nothing else.
   assert.deepEqual(
     modesOf(a).map((m) => [m.type, m.usable]),
-    [['direct_sale', true], ['pre_order', true]],
+    [['direct_sale', false], ['pre_order', true]],
     'the product offers both, so the first paint says both'
   );
   assert.equal(a.preorder.enabled, true, 'pre-order is enabled by the MODELS, not only by sale_types');

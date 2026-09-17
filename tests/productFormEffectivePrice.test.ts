@@ -678,10 +678,11 @@ test('the colour spread is the set of prices the colour really takes', () => {
   assert.notEqual(under(optionA), under(optionB), 'the two differ, which is what the warning is for');
 });
 
-test('a combination price clears its twin adjustment, like every other cell', () => {
-  const src = readFileSync(new URL('../src/components/adminProducts/form/OptionsSection.tsx', import.meta.url), 'utf8');
-  assert.match(src, /\[key\]: value, \[ADJUST_OF\[key\]\]: null/, 'the variants table pins the pair too');
-  assert.match(src, /onChange=\{\(n\) => setVariantPrice\(v\.id, k, n\)\}/);
-  // The raw spread that created the contradiction must not come back.
-  assert.ok(!/variants: r\.variants\.map\(\(x\) => \(x\.id === v\.id \? \{ \.\.\.x, \[k\]: n \} : x\)\)/.test(src));
+test('a direct option adjustment clears its twin absolute price in quick edit', () => {
+  const src = readFileSync(new URL('../src/components/adminProducts/QuickPricePanel.tsx', import.meta.url), 'utf8');
+  assert.match(
+    src,
+    /setCell\(value, \{ \.\.\.direct, regular_price_iqd: null, regular_adjust_iqd \}\)/,
+    'the synchronized quick editor must not persist an absolute price and an adjustment together'
+  );
 });

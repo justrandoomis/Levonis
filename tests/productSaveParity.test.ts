@@ -722,7 +722,7 @@ test('a legacy JSON-only product keeps an Arabic name equal to its English one t
     .prepare('UPDATE products SET options = ?, images = ? WHERE id = ?')
     .run(
       JSON.stringify([
-        { id: 'ov_l', name_en: 'Alpha', name_ar: 'Alpha', name_ckb: 'Alpha', group_en: 'Model', order: 0, active: true },
+        { id: 'ov_l', name_en: 'Alpha', name_ar: 'Alpha', name_ckb: 'Alpha', group_en: 'Model', order: 0, active: true, stock: 0 },
       ]),
       JSON.stringify([{ id: 'md_l', url: 'https://cdn.example/a.jpg', alt_en: 'Pic', alt_ar: 'Pic', order: 0, primary: true }]),
       id

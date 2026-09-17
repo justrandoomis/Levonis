@@ -96,16 +96,23 @@ test('an admin WebP product upload lands only in the public bucket with verified
   assert.equal(legacyBucket.objects.size, 0);
 });
 
-test('the server refuses a product PNG even when a client bypasses preprocessing', async () => {
+test('the server accepts a valid product PNG when browser-side WebP conversion is unavailable', async () => {
   const { hono, publicBucket } = app(true);
-  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, ...new Array(28).fill(0)]);
+  const png = new Uint8Array(32);
+  png.set([0x89, 0x50, 0x4e, 0x47], 0);
+  png.set([0, 0, 2, 128], 16); // 640 px
+  png.set([0, 0, 1, 224], 20); // 480 px
   const form = new FormData();
   form.set('purpose', 'product');
-  form.set('file', new File([png], 'renamed.webp', { type: 'image/webp' }));
+  form.set('file', new File([png], 'catalog.png', { type: 'image/png' }));
   const response = await hono.request('/api/uploads', { method: 'POST', body: form });
-  assert.equal(response.status, 400);
-  assert.equal((await response.json() as { code: string }).code, 'PRODUCT_IMAGE_REQUIRES_WEBP');
-  assert.equal(publicBucket.objects.size, 0);
+  assert.equal(response.status, 200);
+  const body = await response.json() as { mime: string; width: number; height: number; key: string };
+  assert.equal(body.mime, 'image/png');
+  assert.equal(body.width, 640);
+  assert.equal(body.height, 480);
+  assert.match(body.key, /^products\/catalog\/gallery\/[a-f0-9]+\.png$/);
+  assert.equal(publicBucket.objects.size, 1);
 });
 
 test('public media resolves anonymously while a private namespace never does', async () => {

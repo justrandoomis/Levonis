@@ -442,6 +442,9 @@ export interface CartItem {
   image: string;
   qty: number;
   option_id: string;
+  /** Complete canonical relational selection; option_id remains its stable
+   * lexical legacy identity while server pricing uses authored group order. */
+  option_value_ids?: string[];
   color_id: string;
   /** Legacy column; the line's journey is `transport_method`. */
   shipping_method_id: string;

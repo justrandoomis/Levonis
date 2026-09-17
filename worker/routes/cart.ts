@@ -13,6 +13,12 @@ import type { Context } from 'hono';
 import { cartLineSelect } from '../lib/cartLineProjection';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
+import {
+  canonicalOptionValueIds,
+  optionValueIdsJson,
+  optionValueIdsInRelationOrder,
+  sameOptionValueIds,
+} from '../lib/cartSelectionIdentity';
 import { requireAuth, badRequest, conflict, notFound, int, str, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
@@ -320,8 +326,8 @@ export interface CartSelection {
    */
   fulfillmentType: string;
   warrantyPlanId: string;
-  /** §7 multi-group selection. `optionId` stays as the first entry so every
-   *  pre-0018 reader keeps working. */
+  /** §7 multi-group selection. `optionId` stays as the authored first-group
+   *  value so every pre-0018 reader keeps seeing the price-bearing model. */
   optionValueIds?: string[];
 }
 
@@ -361,12 +367,12 @@ export function resolveCartLine(
   // them (migration 0022 gave every existing product its rows), so the cart
   // prices exactly what the storefront showed.
   const doc = view ? applyRelations(parseProductRow(row), view) : parseProductRow(row);
-  const valueIds = (sel.optionValueIds && sel.optionValueIds.length
-    ? sel.optionValueIds
-    : sel.optionId
-      ? [sel.optionId]
-      : []
-  ).filter(Boolean);
+  // One deterministic order for pricing, labels, persistence and identity.
+  // A request may list option groups in any order; it must never change which
+  // value supplies the inherited price or create a second cart line.
+  const storedIds = canonicalOptionValueIds(sel.optionValueIds ?? []);
+  const identityIds = storedIds.length ? storedIds : canonicalOptionValueIds([], sel.optionId);
+  const valueIds = optionValueIdsInRelationOrder(identityIds, view);
 
   // The resolver prices ONE option; with several groups the first selected
   // value carries the price override, and per-field inheritance fills the
@@ -494,11 +500,12 @@ export function selectionFromCartRow(row: Record<string, unknown>): CartSelectio
     return { optionId: '', optionValueIds: [], colorId: '', transportMethod, fulfillmentType: '', warrantyPlanId: '' };
   }
   const storedIds = safeParse<unknown[]>(String(row.option_value_ids ?? '[]'), []);
-  const ids = storedIds.filter((x): x is string => typeof x === 'string' && !!x);
   const legacy = String(row.option_id ?? '');
+  const fullIds = canonicalOptionValueIds(storedIds);
+  const ids = fullIds.length ? fullIds : canonicalOptionValueIds([], legacy);
   return {
-    optionId: legacy,
-    optionValueIds: ids.length ? ids : legacy ? [legacy] : [],
+    optionId: ids[0] ?? '',
+    optionValueIds: ids,
     colorId: String(row.color_id ?? ''),
     transportMethod,
     fulfillmentType,
@@ -1196,9 +1203,9 @@ export function parseFulfillmentType(v: unknown): string {
  * is read here, and the server owns every one of them.
  *
  * The line is an ORDINARY `cart_items` row whose `option_id` carries the
- * server-computed `compositionKey`, so the partial unique index
- * `idx_cart_levonis_line` and the `ON CONFLICT(...)` upsert are untouched — the
- * exact operation migrations/0032_cart_line_identity.sql exists because of.
+ * server-computed `compositionKey`. The partial `idx_cart_levonis_line` also
+ * includes canonical option_value_ids JSON (0082), so ordinary products
+ * distinguish every group while composition keys still distinguish choices.
  * Two bundles with different colours are two lines; two with identical choices
  * merge into one line at qty 2.
  *
@@ -1313,6 +1320,8 @@ async function addCompositionLine(
   await enforceCartScope(c, typeForTransport(method), body.replaceCart === true);
 
   const key = compositionKey(isMystery ? mysteryKeyInput(familyId) : keyInput(choices));
+  const identityIds = canonicalOptionValueIds(familyId ? [familyId] : []);
+  const identityJson = optionValueIdsJson(identityIds);
 
   // A MERGE IS AN ADD, AND THE CAP APPLIES TO WHAT THE LINE WILL HOLD. Two
   // adds of the same bundle land on one line (identical choices ⇒ identical
@@ -1322,9 +1331,10 @@ async function addCompositionLine(
   const merged = await c.env.DB
     .prepare(
       `SELECT id, qty FROM cart_items
-        WHERE user_id = ? AND product_id = ? AND option_id = ? AND color_id = '' AND shipping_method_id = ''`
+        WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ?
+          AND color_id = '' AND shipping_method_id = ''`
     )
-    .bind(user.id, productId, key)
+    .bind(user.id, productId, key, identityJson)
     .first<{ id: string; qty: number }>();
   if (merged) refuseComposition(b, (Number(merged.qty) || 0) + qty, label);
 
@@ -1336,17 +1346,19 @@ async function addCompositionLine(
   const salt = isMystery ? randomSeedHex() : '';
   const addMetric = metricStatement(c.env.DB, productId, 'adds');
 
+  // Intentionally no conflict target. Release A must run against 0032's
+  // five-column index before 0082, both v1+v2 during the rolling deploy, and
+  // 0083's six-column index afterwards. Naming either shape would strand the
+  // Worker on one side of that expand/contract boundary.
   await c.env.DB.batch([
     c.env.DB.prepare(
       `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
                                shipping_method_id, transport_method, warranty_plan_id, qty, draw_salt)
        VALUES (?, ?, ?, ?, ?, '', '', ?, '', ?, ?)
-       ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
-         WHERE product_id IS NOT NULL
-       DO UPDATE SET qty = MIN(99, qty + excluded.qty),
+       ON CONFLICT DO UPDATE SET qty = MIN(99, qty + excluded.qty),
                      transport_method = excluded.transport_method`
-    ).bind(lineId, user.id, productId, key, JSON.stringify(familyId ? [familyId] : []), method, qty, salt),
-    ...cartChoiceStatements(c.env.DB, user.id, productId, key, choices),
+    ).bind(lineId, user.id, productId, key, identityJson, method, qty, salt),
+    ...cartChoiceStatements(c.env.DB, user.id, productId, key, identityIds, choices),
     // §12's `adds`, in the SAME batch as the line it counts — so a counted add
     // is an add that happened, and a tap costs no extra round trip.
     ...(addMetric ? [addMetric] : []),
@@ -1444,16 +1456,12 @@ cartRoutes.post('/items', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const productId = str(body.productId, 'productId', { min: 1, max: 60 });
   const qty = int(body.qty, 'qty', { min: 1, max: 99, def: 1 });
-  const optionId = str(body.optionId, 'optionId', { max: 60, required: false });
+  const legacyOptionId = str(body.optionId, 'optionId', { max: 60, required: false });
   // §7: one value per option group. The legacy single `optionId` is folded in
   // so an older client keeps working unchanged.
   const rawValueIds: unknown[] = Array.isArray(body.optionValueIds) ? body.optionValueIds : [];
-  const optionValueIds: string[] = [
-    ...new Set<string>([
-      ...rawValueIds.filter((x): x is string => typeof x === 'string' && x.length > 0),
-      ...(optionId ? [optionId] : []),
-    ]),
-  ].slice(0, 12);
+  const optionValueIds = canonicalOptionValueIds(rawValueIds, legacyOptionId).slice(0, 12);
+  const optionId = optionValueIds[0] ?? '';
   const colorId = str(body.colorId, 'colorId', { max: 60, required: false });
   const transportMethod = parseTransportMethod(body.transportMethod);
   const fulfillmentType = parseFulfillmentType(body.fulfillmentType);
@@ -1612,9 +1620,14 @@ cartRoutes.post('/items', async (c) => {
   // shipping_method_id stays '' — legacy column kept for the UNIQUE key only,
   // pricing is entirely resolver-driven now.
   // The full selection is stored canonically sorted so two requests that name
-  // the same values in a different order are the same line. option_id keeps
-  // the first value for the pre-0018 UNIQUE key and every legacy reader.
-  const canonical = [...optionValueIds].sort();
+  // the same values in a different order are the same line. option_id is the
+  // lexically first canonical value as well: it participates in the unique
+  // key, so tying it to mutable admin group order would let reordering groups
+  // create a duplicate of the exact same option_value_ids selection. Pricing
+  // already used authored group order in resolveCartLine above and stays
+  // deliberately separate from this persisted identity.
+  const canonical = canonicalOptionValueIds(optionValueIds);
+  const canonicalJson = optionValueIdsJson(canonical);
   const primaryOption = canonical[0] ?? '';
 
   // ONE PLAN PER LINE, AND THE LINE'S PLAN IS THE CUSTOMER'S TO CHANGE. The
@@ -1628,9 +1641,10 @@ cartRoutes.post('/items', async (c) => {
   const existingLine = await c.env.DB
     .prepare(
       `SELECT id, warranty_plan_id FROM cart_items
-        WHERE user_id = ? AND product_id = ? AND option_id = ? AND color_id = ? AND shipping_method_id = ''`
+        WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ?
+          AND color_id = ? AND shipping_method_id = ''`
     )
-    .bind(user.id, productId, primaryOption, colorId)
+    .bind(user.id, productId, primaryOption, canonicalJson, colorId)
     .first<{ id: string; warranty_plan_id: string | null }>();
   if (existingLine && warrantyPlanId && warrantyPlanId !== String(existingLine.warranty_plan_id ?? '')) {
     throw conflict(
@@ -1639,13 +1653,14 @@ cartRoutes.post('/items', async (c) => {
     );
   }
 
+  // Intentionally targetless for the same three-schema rollout as the bundle
+  // upsert above: old-only, v1+v2, then v2-only. Stage C enables the multi-
+  // group UI only after the separate 0083 contract deployment completes.
   await c.env.DB.prepare(
     `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
                              shipping_method_id, transport_method, fulfillment_type, warranty_plan_id, qty)
      VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
-     ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
-       WHERE product_id IS NOT NULL
-     DO UPDATE SET qty = MIN(99, qty + excluded.qty),
+     ON CONFLICT DO UPDATE SET qty = MIN(99, qty + excluded.qty),
                    option_value_ids = excluded.option_value_ids,
                    transport_method = excluded.transport_method,
                    fulfillment_type = excluded.fulfillment_type,
@@ -1654,7 +1669,7 @@ cartRoutes.post('/items', async (c) => {
                                            ELSE excluded.warranty_plan_id END`
   )
     .bind(
-      newId('ci'), user.id, productId, primaryOption, JSON.stringify(canonical), colorId,
+      newId('ci'), user.id, productId, primaryOption, canonicalJson, colorId,
       transportMethod, fulfillmentType, warrantyPlanId, qty
     )
     .run();
@@ -1668,7 +1683,10 @@ cartRoutes.post('/items', async (c) => {
   // just resolved, not a second lookup.
   if (eventsEnabled(c.env)) {
     const line = items.find(
-      (it) => String(it.productId) === productId && String(it.option_id ?? '') === primaryOption && String(it.color_id ?? '') === colorId
+      (it) =>
+        String(it.productId) === productId &&
+        sameOptionValueIds(Array.isArray(it.option_value_ids) ? it.option_value_ids : [], canonical) &&
+        String(it.color_id ?? '') === colorId
     );
     await emitBestEffort(
       c.env.DB,
@@ -1676,7 +1694,7 @@ cartRoutes.post('/items', async (c) => {
       {
         user_hash: await dailyUserHash(user.id),
         product_id: productId,
-        line_key: `${productId}:${primaryOption}:${colorId}`,
+        line_key: `${productId}:${canonicalJson}:${colorId}`,
         qty,
         seller_type: 'platform',
         price_iqd_snapshot: Math.max(0, Math.round(Number(line?.unit_price_iqd ?? 0))),
@@ -1765,15 +1783,18 @@ async function patchCompositionLine(
   const key = isMystery
     ? compositionKey(mysteryKeyInput(mysteryFamilyOf(existing)))
     : compositionKey(keyInput(choices));
+  const identityIds = canonicalOptionValueIds(isMystery ? [mysteryFamilyOf(existing)] : []);
+  const identityJson = optionValueIdsJson(identityIds);
   const currentKey = String(existing.option_id ?? '');
   let mergedInto: string | null = null;
   if (key !== currentKey) {
     const twin = await c.env.DB
       .prepare(
         `SELECT id, qty FROM cart_items
-          WHERE user_id = ? AND product_id = ? AND option_id = ? AND color_id = '' AND shipping_method_id = '' AND id <> ?`
+          WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ?
+            AND color_id = '' AND shipping_method_id = '' AND id <> ?`
       )
-      .bind(user.id, productId, key, id)
+      .bind(user.id, productId, key, identityJson, id)
       .first<{ id: string; qty: number }>();
     if (twin) {
       // The same bundle with the same choices is the same line. The two are
@@ -1785,7 +1806,7 @@ async function patchCompositionLine(
       await c.env.DB.batch([
         c.env.DB.prepare('UPDATE cart_items SET qty = ? WHERE id = ? AND user_id = ?').bind(total, twin.id, user.id),
         c.env.DB.prepare('DELETE FROM cart_items WHERE id = ? AND user_id = ?').bind(id, user.id),
-        ...cartChoiceStatements(c.env.DB, user.id, productId, key, choices),
+        ...cartChoiceStatements(c.env.DB, user.id, productId, key, identityIds, choices),
       ]);
       const cart = await loadCart(c);
       return c.json({ success: true, items: cart.items, tier: cart.tier, tierActive: cart.tierActive, merged_into: mergedInto });
@@ -1793,8 +1814,10 @@ async function patchCompositionLine(
   }
 
   await c.env.DB.batch([
-    c.env.DB.prepare('UPDATE cart_items SET qty = ?, option_id = ? WHERE id = ? AND user_id = ?').bind(qty, key, id, user.id),
-    ...cartChoiceStatements(c.env.DB, user.id, productId, key, choices),
+    c.env.DB
+      .prepare('UPDATE cart_items SET qty = ?, option_id = ?, option_value_ids = ? WHERE id = ? AND user_id = ?')
+      .bind(qty, key, identityJson, id, user.id),
+    ...cartChoiceStatements(c.env.DB, user.id, productId, key, identityIds, choices),
   ]);
 
   const { items, tier: t, tierActive: ta } = await loadCart(c);
@@ -1840,18 +1863,16 @@ cartRoutes.patch('/items/:id', async (c) => {
   }
 
   const qty = body.qty !== undefined ? int(body.qty, 'qty', { min: 1, max: 99 }) : (existing.qty as number);
-  const optionId =
-    body.optionId !== undefined ? str(body.optionId, 'optionId', { max: 60, required: false }) : String(existing.option_id);
+  const submittedOptionId =
+    body.optionId !== undefined ? str(body.optionId, 'optionId', { max: 60, required: false }) : null;
   const patchRawIds: unknown[] = Array.isArray(body.optionValueIds) ? body.optionValueIds : [];
-  const optionValueIds: string[] =
-    body.optionValueIds !== undefined || body.optionId !== undefined
-      ? [
-          ...new Set<string>([
-            ...patchRawIds.filter((x): x is string => typeof x === 'string' && x.length > 0),
-            ...(optionId ? [optionId] : []),
-          ]),
-        ].slice(0, 12)
-      : (selectionFromCartRow(existing).optionValueIds ?? []);
+  const optionValueIds =
+    body.optionValueIds !== undefined
+      ? canonicalOptionValueIds(patchRawIds, submittedOptionId ?? '').slice(0, 12)
+      : submittedOptionId !== null
+        ? canonicalOptionValueIds([], submittedOptionId)
+        : canonicalOptionValueIds(selectionFromCartRow(existing).optionValueIds ?? []);
+  const optionId = optionValueIds[0] ?? '';
   const colorId =
     body.colorId !== undefined ? str(body.colorId, 'colorId', { max: 60, required: false }) : String(existing.color_id);
   const transportMethod =
@@ -1974,14 +1995,37 @@ cartRoutes.patch('/items/:id', async (c) => {
   }
   if (!availability.qty_ok) throw refuseQty(availability);
 
-  const canonical = [...optionValueIds].sort();
+  const canonical = canonicalOptionValueIds(optionValueIds);
+  const canonicalJson = optionValueIdsJson(canonical);
+  // Stable line identity, never the mutable authored group order. The price
+  // was resolved above through resolveCartLine, which orders this same set by
+  // active relation groups without changing what is stored or indexed.
+  const primaryOption = canonical[0] ?? '';
+  const shippingMethodId = String(existing.shipping_method_id ?? '');
+
+  // Editing a line into an already-existing complete selection must be a
+  // named conflict, not a UNIQUE-index exception and generic 500.
+  const identityTwin = await c.env.DB
+    .prepare(
+      `SELECT id FROM cart_items
+        WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ?
+          AND color_id = ? AND shipping_method_id = ? AND id <> ?`
+    )
+    .bind(user.id, existing.product_id, primaryOption, canonicalJson, colorId, shippingMethodId, id)
+    .first<{ id: string }>();
+  if (identityTwin) {
+    throw conflict(
+      'This exact option and colour combination is already in your cart.',
+      'CART_LINE_ALREADY_EXISTS'
+    );
+  }
   await c.env.DB.prepare(
     `UPDATE cart_items SET qty = ?, option_id = ?, option_value_ids = ?, color_id = ?,
             transport_method = ?, fulfillment_type = ?, warranty_plan_id = ?
       WHERE id = ? AND user_id = ?`
   )
     .bind(
-      qty, canonical[0] ?? '', JSON.stringify(canonical), colorId,
+      qty, primaryOption, canonicalJson, colorId,
       transportMethod, fulfillmentType, warrantyPlanId, id, user.id
     )
     .run();

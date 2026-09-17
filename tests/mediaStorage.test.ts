@@ -102,11 +102,12 @@ test('header dimensions are bounded before product media is accepted', () => {
   assert.equal(validRasterDimensions({ width: 10_000, height: 10_000 }), false);
 });
 
-test('upload route re-sniffs bytes and refuses unconverted product PNG/JPEG', () => {
+test('upload route re-sniffs bytes and accepts product PNG/JPEG without browser conversion', () => {
   const route = readFileSync(new URL('../worker/routes/uploads.ts', import.meta.url), 'utf8');
   const browser = readFileSync(new URL('../src/lib/imagePreprocess.ts', import.meta.url), 'utf8');
-  assert.match(route, /PRODUCT_IMAGE_REQUIRES_WEBP/);
+  assert.doesNotMatch(route, /PRODUCT_IMAGE_REQUIRES_WEBP/);
   assert.match(route, /rasterDimensions\(buf, kind\.mime\)/);
+  assert.match(route, /kind\.mime === 'image\/png'/);
   assert.match(browser, /getContext\('2d', \{ alpha: true \}\)/);
   assert.doesNotMatch(browser, /fillRect\(/);
 });
