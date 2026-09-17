@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, uploadFile } from '../lib/api';
 import type { SiteMediaEntry } from '../lib/api';
-import { GripVertical, Plus, Settings, Eye, EyeOff, Save, Trash2, LayoutTemplate, Megaphone, Image as ImageIcon, Ticket, Tag, Star, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Upload, Check, AlertTriangle, Package, RotateCcw } from 'lucide-react';
+import { GripVertical, Plus, Settings, Eye, EyeOff, Save, Trash2, LayoutTemplate, Megaphone, Image as ImageIcon, Ticket, Tag, Star, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Upload, Check, AlertTriangle, Package, PackageOpen, RotateCcw } from 'lucide-react';
 import AdminAds from './AdminAds';
 
 interface HomeSection {
@@ -90,6 +90,7 @@ const SECTION_ICONS: Record<string, React.ElementType> = {
   categories: LayoutTemplate,
   discounts_offers: Tag,
   top_brands: Star,
+  open_box: PackageOpen,
   bundles: Package,
 };
 
@@ -101,6 +102,11 @@ const INITIAL_SECTIONS: HomeSection[] = [
   { id: 'categories', titleEn: 'Main & Sub Categories', titleAr: 'الأقسام الرئيسية والفرعية', isVisible: true },
   { id: 'discounts_offers', titleEn: 'Discounts & Offers under categories', titleAr: 'القسم لخصومات المنتجات والعروض تحت الأقسام', isVisible: true },
   { id: 'top_brands', titleEn: 'Top Brands Section', titleAr: 'قسم top brands', isVisible: true },
+  // Open box / used / refurbished. Registered HERE and not only in Home.tsx:
+  // `orderOf` and `sectionVisible` read settings.homeSections, which
+  // mergeSections builds from this list, so a section missing from it is
+  // pinned to the bottom of the page for ever and can never be hidden.
+  { id: 'open_box', titleEn: 'Open Box & Used', titleAr: 'قسم المستعمل و Open Box', isVisible: true },
   // Registering the shelf in src/pages/Home.tsx is NOT enough: `orderOf` and
   // `sectionVisible` read settings.homeSections, which mergeSections builds
   // from this list. A section id missing here is pinned to the bottom of the

@@ -6,6 +6,7 @@ import { PackageSearch } from 'lucide-react';
 import { api, ApiProduct, PublicSettings, HomeTaxon, SiteMediaEntry } from '../lib/api';
 import Hero from '../components/home/Hero';
 import ServicesGrid from '../components/home/ServicesGrid';
+import OpenBoxShelf from '../components/home/OpenBoxShelf';
 import ProductCard from '../components/home/ProductCard';
 import SectionHeader from '../components/home/SectionHeader';
 import Marquee from '../components/home/Marquee';
@@ -41,6 +42,8 @@ export default function Home() {
    * than to holes.
    */
   const [siteMedia, setSiteMedia] = useState<SiteMediaEntry[]>([]);
+  /** Open box / used / refurbished, newest first — the server's own shelf. */
+  const [openBox, setOpenBox] = useState<ApiProduct[]>([]);
 
   const [discountedProducts, setDiscountedProducts] = useState<ApiProduct[]>([]);
   const [newProducts, setNewProducts] = useState<ApiProduct[]>([]);
@@ -67,6 +70,7 @@ export default function Home() {
         categories?: HomeTaxon[];
         brands?: HomeTaxon[];
         siteMedia?: SiteMediaEntry[];
+        open_box?: ApiProduct[];
       }>('/api/home');
       if (homeReqRef.current !== reqId) return;
       setSettings(data.settings);
@@ -75,6 +79,7 @@ export default function Home() {
       setCategories(data.categories || []);
       setBrands(data.brands || []);
       setSiteMedia(data.siteMedia || []);
+      setOpenBox(data.open_box || []);
       setHasMore((data.latest || []).length >= 20);
     } catch (err) {
       console.error('Failed to fetch home products', err);
@@ -237,6 +242,13 @@ export default function Home() {
                 <CategoryChips key="categories" categories={categories} />
               )
             ) : null,
+          },
+          {
+            id: 'open_box',
+            order: orderOf('open_box'),
+            // Renders nothing when the shop has no graded stock, so an empty
+            // shelf costs no vertical space on the first screen.
+            node: sectionVisible('open_box') ? <OpenBoxShelf key="open_box" products={openBox} /> : null,
           },
           {
             id: 'top_brands',

@@ -216,6 +216,8 @@ export const translations = {
     // ---- Home sections
     browseCategories: "Browse by category",
     topBrands: "Top brands",
+    openBoxTitle: "Open Box & Used",
+    openBoxNote: "Inspected units at a lower price — sold with a LEVONIS warranty and not returnable after delivery.",
     couponsOffers: "Coupons & offers",
     productCount: "products",
     seeAll: "See all",
@@ -432,6 +434,8 @@ export const translations = {
 
     browseCategories: "تصفّح حسب القسم",
     topBrands: "أبرز العلامات",
+    openBoxTitle: "Open Box والمستعمل",
+    openBoxNote: "أجهزة مفحوصة بسعر أقل — بضمان ليفو، وغير قابلة للإرجاع بعد الاستلام.",
     couponsOffers: "كوبونات وعروض",
     productCount: "منتج",
     seeAll: "عرض الكل",
@@ -647,6 +651,8 @@ export const translations = {
 
     browseCategories: "بەپێی بەش بگەڕێ",
     topBrands: "باشترین براندەکان",
+    openBoxTitle: "Open Box و بەکارهاتوو",
+    openBoxNote: "ئامێری پشکنراو بە نرخێکی کەمتر — بە زەمانەتی لیڤۆنیس، و دوای وەرگرتن ناگەڕێندرێتەوە.",
     couponsOffers: "کۆپۆن و ئۆفەر",
     productCount: "بەرهەم",
     seeAll: "هەمووی ببینە",

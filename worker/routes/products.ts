@@ -72,6 +72,7 @@ import { activePoolProductIds } from '../lib/mysteryDraw';
 import { applyOfferToResolved, loadOffers, offerEligible, offerKey, scheduleState, subjectOf, type OfferView } from '../lib/offers';
 import { isPrinterProduct } from '../lib/printerIdentity';
 import { resolveSiteMedia } from '../lib/siteMedia';
+import { conditionSaving, parseConditionDoc } from '../lib/condition';
 import { salesBadgeFor } from '../lib/salesBadge';
 import { pricedPlans, WARRANTY_NOT_PRINTER } from '../lib/warrantyPlans';
 import {
@@ -2427,6 +2428,10 @@ export async function compositionDetail(
 const CARD_FIELDS = [
   'id',
   'slug',
+  // Open box / used / refurbished. A card that does not say so is a card that
+  // sells a used printer as a new one, so the grade travels with the shelf
+  // entry rather than waiting for the product page.
+  'condition',
   // A composition links to /bundles/<product_slug>; an ordinary row has none.
   'product_slug',
   'name',
@@ -3140,7 +3145,7 @@ productRoutes.post('/:slug/quote', async (c) => {
 export const homeRoutes = new Hono<AppContext>();
 
 homeRoutes.get('/', async (c) => {
-  const [settings, discounted, latest, categories, brands, ctx] = await Promise.all([
+  const [settings, discounted, latest, openBox, categories, brands, ctx] = await Promise.all([
     getSettings(c.env.DB, PUBLIC_SETTING_KEYS),
     c.env.DB.prepare(
       "SELECT * FROM products WHERE status = 'active' AND original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd ORDER BY created_at DESC LIMIT 10"
@@ -3148,6 +3153,15 @@ homeRoutes.get('/', async (c) => {
     c.env.DB.prepare("SELECT * FROM products WHERE status = 'active' ORDER BY created_at DESC LIMIT 20").all<
       Record<string, unknown>
     >(),
+    // OPEN BOX / USED / REFURBISHED, newest first.
+    //
+    // `condition_doc <> '{}'` is the same predicate migration 0085's PARTIAL
+    // index is built on, so this reads the index rather than scanning the
+    // catalogue on the shop's first screen. The shelf shows a fixed handful;
+    // the full list lives behind its own listing.
+    c.env.DB.prepare(
+      "SELECT * FROM products WHERE status = 'active' AND condition_doc <> '{}' ORDER BY created_at DESC LIMIT 12"
+    ).all<Record<string, unknown>>(),
     // The REAL taxonomy, so the categories strip works without the owner
     // retyping their own catalog into the home settings. Only catalogs that
     // actually have something to show are returned — an empty category on the
@@ -3220,7 +3234,7 @@ homeRoutes.get('/', async (c) => {
   // A product can be in BOTH strips, and the same id twice would bind a
   // duplicate placeholder for nothing.
   const homeRows = new Map<string, { id: string; inventory_mode: unknown }>();
-  for (const r of [...discounted.results, ...latest.results]) {
+  for (const r of [...discounted.results, ...latest.results, ...openBox.results]) {
     homeRows.set(String(r.id), { id: String(r.id), inventory_mode: r.inventory_mode });
   }
   const [homeViews, homePooled] = await Promise.all([
@@ -3228,6 +3242,39 @@ homeRoutes.get('/', async (c) => {
     // §8.2 row 18 on the home rails too: the same card, the same `stock` field.
     degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, [...homeRows.keys()].map(String)), new Set<string>()),
   ]);
+
+  /**
+   * The new-product prices the graded shelf compares against, in ONE read.
+   *
+   * Only ACTIVE rows: a used listing that points at a product the owner has
+   * since hidden must not keep advertising a saving against a price the shop
+   * no longer offers.
+   */
+  const referenceIds = [
+    ...new Set(
+      openBox.results
+        .map((r) => parseConditionDoc(r.condition_doc)?.new_product_id)
+        .filter((id): id is string => typeof id === 'string' && id !== '')
+    ),
+  ];
+  const referencePrices = new Map<string, number>();
+  if (referenceIds.length > 0) {
+    const { results: refRows } = await c.env.DB.prepare(
+      `SELECT id, price_iqd FROM products WHERE status = 'active' AND id IN (${referenceIds.map(() => '?').join(',')})`
+    )
+      .bind(...referenceIds)
+      .all<{ id: string; price_iqd: number }>();
+    for (const r of refRows ?? []) referencePrices.set(String(r.id), Number(r.price_iqd) || 0);
+  }
+  const openBoxCards = openBox.results.map((p) => {
+    const card = cardShape(
+      publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, null, homePooled.has(String(p.id)))
+    );
+    const condition = parseConditionDoc(p.condition_doc);
+    const reference = condition?.new_product_id ? referencePrices.get(condition.new_product_id) : undefined;
+    const saving = conditionSaving(Number(card.display_price_iqd ?? card.price_iqd ?? 0), reference);
+    return saving ? { ...card, condition_reference: saving } : card;
+  });
 
   return c.json({
     success: true,
@@ -3246,5 +3293,16 @@ homeRoutes.get('/', async (c) => {
     // never has to know what `UiUx/MainPage/` is. `mainPageMedia` is already in
     // PUBLIC_SETTING_KEYS, so this costs no extra read.
     siteMedia: resolveSiteMedia((safeSettings as Record<string, unknown>).mainPageMedia),
+    /**
+     * The graded shelf, each card carrying the CURRENT price of the new
+     * product it is a copy of.
+     *
+     * Resolved here rather than on the card, because one batched read answers
+     * the whole shelf: twelve cards would otherwise be twelve lookups on the
+     * first screen. A link to a product that is gone, hidden, or not actually
+     * dearer simply yields no comparison — conditionSaving() refuses to print
+     * a zero or negative saving beside a struck-through number.
+     */
+    open_box: openBoxCards,
   });
 });
