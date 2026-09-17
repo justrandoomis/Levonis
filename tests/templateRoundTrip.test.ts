@@ -309,14 +309,13 @@ test('clearing the options group drops the combination that depended on it', () 
 
 // ------------------------------------------- what the file could not say
 
-test('the section pair, SKU, template family, low-stock and direct premium round-trip', () => {
+test('the section pair, SKU, template family and low-stock round-trip without a product-wide direct increase', () => {
   const doc = applyRelations(
     parseProductRow({
       ...baseRow(),
       sku: 'BL-A1-001',
       template_family: 'devices',
       low_stock_threshold: 3,
-      direct_surcharge_iqd: 50_000,
       category_id: 'cat_printers',
       sub_category_id: 'cat_fdm',
     }),
@@ -336,7 +335,6 @@ test('the section pair, SKU, template family, low-stock and direct premium round
     'template_family=devices',
     'sku=BL-A1-001',
     'low_stock_threshold=3',
-    'direct_surcharge_iqd=50000',
   ]) {
     assert.ok(text.includes(`${line}\n`), `the export must carry ${line}`);
   }
@@ -352,7 +350,7 @@ test('the section pair, SKU, template family, low-stock and direct premium round
   assert.equal(built.sku, 'BL-A1-001');
   assert.equal(built.template_family, 'devices');
   assert.equal(built.low_stock_threshold, 3);
-  assert.equal(built.direct_surcharge_iqd, 50_000);
+  assert.equal(text.includes('direct_surcharge_iqd='), false);
   assert.equal(built.category_id, 'cat_printers');
   assert.equal(built.sub_category_id, 'cat_fdm');
 });

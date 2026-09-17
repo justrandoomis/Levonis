@@ -428,6 +428,6 @@ test('an ORDINARY product is byte-identical with and without the new inputs', ()
     maxQtyPerOrder: undefined,
   });
   assert.equal(JSON.stringify(after), JSON.stringify(before));
-  assert.equal(before.stock.max_qty, 99, 'an untracked ORDINARY product still sells 99');
+  assert.equal(before.stock.max_qty, 0, 'a direct-sale product without an explicit counter fails closed');
   assert.equal(before.stock.scope, 'product');
 });

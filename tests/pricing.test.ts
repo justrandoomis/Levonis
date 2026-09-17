@@ -436,7 +436,8 @@ test('transport commission inherits admin default when null', () => {
     preorder_transports: [{ method: 'land', commission_iqd: null, active: true }],
   });
   const noDefault = resolveUnitPrice({ product: p, transportMethod: 'land', ...free });
-  assert.ok(noDefault.errors.includes('TRANSPORT_COMMISSION_UNCONFIGURED'));
+  assert.deepEqual(noDefault.errors, []);
+  assert.equal(noDefault.unit_subtotal_iqd, 100_000);
   const withDefault = resolveUnitPrice({
     product: p, transportMethod: 'land', ...free,
     transportDefaults: [{ method: 'land', commission_iqd: 10_000 }],
