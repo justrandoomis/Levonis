@@ -86,7 +86,7 @@ DELETE FROM cart_items
             AND k.shipping_method_id = cart_items.shipping_method_id
        );
 
-CREATE UNIQUE INDEX idx_cart_levonis_line
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cart_levonis_line
   ON cart_items(
     user_id,
     product_id,
