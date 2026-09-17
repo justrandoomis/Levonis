@@ -6,6 +6,7 @@ import CardPrice from '../CardPrice';
 import OfferBadge from '../ui/OfferBadge';
 import Countdown from '../ui/Countdown';
 import { productPrimaryImage } from '../../lib/productImage';
+import DirectStockEdge from '../DirectStockEdge';
 
 /**
  * The home product card — presentation only; every price shown here is the
@@ -31,7 +32,7 @@ export default function ProductCard({ p, widthClass = 'w-[160px]' }: { p: ApiPro
   return (
     <Link
       to={`/product/${p.slug || p.id}`}
-      className={`${widthClass} shrink-0 overflow-hidden flex flex-col group bg-surface rounded-xl border border-border-subtle hover:bg-surface-raised transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
+      className={`${widthClass} relative shrink-0 overflow-hidden flex flex-col group bg-surface rounded-xl border border-border-subtle hover:bg-surface-raised transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
     >
       <div className="relative aspect-square overflow-hidden bg-black">
         <SafeImage
@@ -66,6 +67,7 @@ export default function ProductCard({ p, widthClass = 'w-[160px]' }: { p: ApiPro
           <CardPrice p={p} />
         </div>
       </div>
+      <DirectStockEdge product={p} />
     </Link>
   );
 }

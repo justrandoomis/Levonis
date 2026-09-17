@@ -523,12 +523,41 @@ export function saleAvailability(
   const modelPreorderCell = cellSays('pre_order');
   const modelDirectCell = cellSays('direct_sale');
 
+  /**
+   * Once a model is selected, its own fulfilment cells are authoritative.
+   * `sale_types` is the PRODUCT-WIDE union used before a selection exists; OR-ing
+   * it back into a selected model made a pre-order-only model appear to offer
+   * direct sale merely because a different model did. A legacy model with no
+   * cells keeps its explicit `availability_type`, then falls back to the
+   * product union exactly as it did before migration 0073.
+   */
+  const selectedHasCells =
+    selectedValueIds.length > 0 && cellScope.some((o) => (o.fulfillments?.length ?? 0) > 0);
+  const selectedLegacyTypes = new Set(
+    selectedValueIds.length > 0
+      ? cellScope
+          .filter((o) => (o.fulfillments?.length ?? 0) === 0)
+          .map((o) => o.availability_type)
+          .filter((x): x is 'direct_sale' | 'pre_order' => x === 'direct_sale' || x === 'pre_order')
+      : []
+  );
+  const productDirect = saleTypes.includes('direct_sale') || saleTypes.includes('bundle');
+  const productPreorder = saleTypes.includes('pre_order');
+
   const directEnabled = isComposition
     ? compositionModes.includes('direct_sale')
-    : saleTypes.includes('direct_sale') || saleTypes.includes('bundle') || modelDirectCell;
+    : selectedHasCells
+      ? modelDirectCell
+      : selectedLegacyTypes.size > 0
+        ? selectedLegacyTypes.has('direct_sale')
+        : productDirect || modelDirectCell;
   const preorderEnabled = isComposition
     ? compositionModes.includes('pre_order')
-    : saleTypes.includes('pre_order') || modelPreorderCell;
+    : selectedHasCells
+      ? modelPreorderCell
+      : selectedLegacyTypes.size > 0
+        ? selectedLegacyTypes.has('pre_order')
+        : productPreorder || modelPreorderCell;
 
   /**
    * 0075 — WHAT ONE ROUTE'S COUNTER SAYS. `resolveCapacity` holds the whole
@@ -773,6 +802,138 @@ export function saleAvailability(
     },
     qty_ok: input.qty === undefined ? true : input.qty >= 1 && input.qty <= maxQty,
   };
+}
+
+export interface InitialDirectSaleSelection {
+  option_id: string | null;
+  color_id: string | null;
+  fulfillment_type: 'direct_sale';
+  availability: SaleAvailability;
+}
+
+/**
+ * The first complete selection that the SAME availability engine proves can
+ * be sold from the shelf. This is the product page's opening selection; it is
+ * intentionally server-derived so OPTION, COLOR, VARIANT_COMBINATION,
+ * reservations, colour links and disabled fulfilment cells cannot drift from
+ * what cart/checkout will enforce.
+ */
+export function firstUsableDirectSelection(
+  doc: AvailabilityDoc,
+  input: {
+    inventory: InventorySnapshot;
+    links?: ColorLinkRow[];
+    transportDefaults?: Array<{ method: string; commission_iqd: number }>;
+    coarseStock?: boolean;
+  }
+): InitialDirectSaleSelection | null {
+  const options = doc.options.filter((o) => o.active !== false);
+  const colors = doc.colors.filter((c) => c.active !== false);
+  const optionIds: Array<string | null> = options.length ? options.map((o) => o.id) : [null];
+
+  for (const optionId of optionIds) {
+    // Try real colours first. If this option owns no selectable colour, the
+    // final null candidate is the complete and correct selection.
+    const colorIds: Array<string | null> = colors.length
+      ? [...colors.map((c) => c.id), null]
+      : [null];
+    for (const colorId of colorIds) {
+      const availability = saleAvailability(doc, {
+        optionId,
+        colorId,
+        inventory: input.inventory,
+        links: input.links,
+        transportDefaults: input.transportDefaults,
+        coarseStock: input.coarseStock,
+        preferredType: 'direct_sale',
+      });
+      const direct = availability.modes.find((m) => m.type === 'direct_sale');
+      if (availability.selection.complete && availability.mode === 'direct_sale' && direct?.usable) {
+        return { option_id: optionId, color_id: colorId, fulfillment_type: 'direct_sale', availability };
+      }
+    }
+  }
+  return null;
+}
+
+const sellableRemainder = (stock: number | null | undefined, reserved: number | null | undefined): number =>
+  stock === null || stock === undefined
+    ? 0
+    : Math.max(0, Math.trunc(stock) - Math.max(0, Math.trunc(reserved ?? 0)));
+
+/**
+ * Exact direct-sale units for a PRODUCT CARD.
+ *
+ * Only the level selected by `inventory_mode` is summed. In particular we
+ * never add option stock to colour or variant stock. Rows with NULL stock are
+ * not unlimited, reservations are removed row-by-row, and a combination is
+ * counted once even when it contains several option tokens.
+ *
+ * `null` means either “direct sale is not offered” or “the exact count is
+ * intentionally hidden for a mystery-pool member”; `0` means direct sale is
+ * configured but every authoritative shelf is empty/untracked.
+ */
+export function directStockAvailable(
+  doc: ProductDoc,
+  view: ProductRelationsView,
+  base: { stock: number | null; reserved: number },
+  coarseStock = false
+): number | null {
+  if (coarseStock || (doc.composition ?? '') !== '') return null;
+
+  const saleTypes = doc.sale_types?.length ? doc.sale_types : [doc.selling_type || 'direct_sale'];
+  const productDirect = saleTypes.includes('direct_sale') || saleTypes.includes('bundle');
+  const activeOptions = doc.options.filter((o) => o.active !== false);
+  const optionById = new Map(activeOptions.map((o) => [o.id, o] as const));
+  const optionAllowsDirect = (id: string): boolean => {
+    const option = optionById.get(id);
+    if (!option) return false;
+    const cells = option.fulfillments ?? [];
+    if (cells.length > 0) {
+      return cells.some((f) => f.fulfillment_type === 'direct_sale' && f.enabled !== false);
+    }
+    if (option.availability_type === 'direct_sale') return true;
+    if (option.availability_type === 'pre_order') return false;
+    return productDirect;
+  };
+  const directOptionIds = new Set(activeOptions.filter((o) => optionAllowsDirect(o.id)).map((o) => o.id));
+  const anyDirect = activeOptions.length > 0 ? directOptionIds.size > 0 : productDirect;
+  if (!anyDirect) return null;
+
+  switch (view.inventory_mode) {
+    case 'OPTION':
+      return view.values
+        .filter((v) => v.active !== 0 && v.active !== false && directOptionIds.has(v.id))
+        .reduce((sum, v) => sum + sellableRemainder(v.stock, v.reserved), 0);
+
+    case 'COLOR':
+      return view.colors
+        .filter((c) => c.active !== 0 && c.active !== false)
+        .filter((c) => {
+          const linked = view.links.filter((l) => l.color_id === c.id);
+          return linked.length === 0 ? anyDirect : linked.some((l) => directOptionIds.has(l.option_value_id));
+        })
+        .reduce((sum, c) => sum + sellableRemainder(c.stock, c.reserved), 0);
+
+    case 'VARIANT_COMBINATION':
+      return view.variants
+        .filter((v) => v.active !== 0)
+        .filter((v) => {
+          const tokens = new Set(v.combo_key.split('|'));
+          const optionIds = [...tokens]
+            .filter((token) => token.startsWith('o:'))
+            .map((token) => token.slice(2));
+          return optionIds.length === 0 ? productDirect : optionIds.some((id) => directOptionIds.has(id));
+        })
+        .reduce((sum, v) => sum + sellableRemainder(v.stock, v.reserved), 0);
+
+    case 'BASE':
+    default:
+      // Legacy flat products only. New direct-sale products are written with
+      // OPTION/COLOR/VARIANT_COMBINATION, but a numeric legacy shelf remains
+      // a truthful finite count and must not be relabelled “unlimited”.
+      return sellableRemainder(base.stock, base.reserved);
+  }
 }
 
 /**
@@ -1396,6 +1557,13 @@ export function publicWithDisplayPrice(
   // themselves) stay admin-side numbers.
   const heldBase = Number(row.stock_reserved ?? 0);
   if (!coarseStock && doc.stock !== null && heldBase > 0) out.stock = Math.max(0, doc.stock - heldBase);
+  const directStock = directStockAvailable(
+    doc,
+    view ?? EMPTY_RELATIONS,
+    { stock: doc.stock, reserved: heldBase },
+    coarseStock
+  );
+  if (directStock !== null) out.direct_stock_available = directStock;
   const levels: Array<{ optionId?: string; colorId?: string }> = [{}];
   for (const o of doc.options) if (o.active !== false) levels.push({ optionId: o.id });
   for (const col of doc.colors) if (col.active !== false) levels.push({ colorId: col.id });
@@ -1660,6 +1828,10 @@ const CARD_FIELDS = [
   'display_pro_iqd',
   'display_applied_tier',
   'display_from',
+  // Exact sellable direct-sale units from the ONE authoritative inventory
+  // level. Cards render it only when positive; zero remains a truthful API
+  // answer for a configured but exhausted shelf.
+  'direct_stock_available',
   // Set alongside `offer` when a live window has a PLUS rung.
   'display_plus_iqd',
   // The countdown and the members-only lock chip.
@@ -1916,16 +2088,6 @@ productRoutes.get('/:slug', async (c) => {
       isPrinterProduct(c.env.DB, String(row.id)),
     ]);
     const doc = applyRelations(parsed, relations);
-
-    const resolved = resolveUnitPrice({
-      product: doc,
-      tier: ctx.tier,
-      tierActive: ctx.tierActive,
-      proPolicy: ctx.proPolicy,
-      transportDefaults: ctx.transportDefaults,
-      memberFallback: benefitFallbackFor(ctx, doc),
-      isPrinter,
-    });
     // ONE FIELD, ONE MEANING. `display_price_iqd` is the CARD price — the
     // cheapest way to buy the product — everywhere else it appears, and this
     // endpoint used to set it to the base selection instead. A customer who
@@ -1943,6 +2105,32 @@ productRoutes.get('/:slug', async (c) => {
     // block and the per-selection levels, or the page would paint an offer
     // price on the card and a ladder price the moment a variant was tapped.
     const offer = (await degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(c.env.DB, [subjectOf(String(row.id))]), EMPTY_OFFERS())).get(offerKey(subjectOf(String(row.id))));
+
+    const inventory = snapshotFrom(relations, {
+      stock: doc.stock,
+      reserved: Number(row.stock_reserved ?? 0),
+      low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+    });
+    const initialSelection = firstUsableDirectSelection(doc, {
+      inventory,
+      links: relations.links,
+      transportDefaults: ctx.transportDefaults,
+      coarseStock: poolMember,
+    });
+    const initialOptionId = initialSelection?.option_id ?? null;
+    const initialColorId = initialSelection?.color_id ?? null;
+    const resolved = resolveUnitPrice({
+      product: doc,
+      optionId: initialOptionId,
+      colorId: initialColorId,
+      fulfillmentType: initialSelection ? 'direct_sale' : undefined,
+      tier: ctx.tier,
+      tierActive: ctx.tierActive,
+      proPolicy: ctx.proPolicy,
+      transportDefaults: ctx.transportDefaults,
+      memberFallback: benefitFallbackFor(ctx, doc),
+      isPrinter,
+    });
     const out = publicWithDisplayPrice(row, ctx, relations, undefined, offer, poolMember);
     // A fact about the product, not a price: the storefront renders the
     // home-delivery note beside a printer's price block from this flag.
@@ -1986,19 +2174,39 @@ productRoutes.get('/:slug', async (c) => {
       // real many-to-many colour links, modelled combinations and bound
       // images. Null when the product has no relational rows at all.
       relations: publicRelations(relations, poolMember),
-      pricing: publicQuote(resolved), // base-selection resolver result, cost-free
-      // §8/§9: the base selection's member prices, from the live rules, so the
+      // When a shelf-backed direct selection exists, every first-paint block
+      // below answers that SAME selection. Otherwise they retain the legacy
+      // base/null answer until the customer chooses.
+      initial_selection: initialSelection
+        ? {
+            option_id: initialOptionId,
+            color_id: initialColorId,
+            fulfillment_type: 'direct_sale' as const,
+          }
+        : null,
+      pricing: publicQuote(resolved), // opening-selection resolver result, cost-free
+      // §8/§9: the opening selection's member prices, from the live rules, so the
       // page can state the benefit on first paint rather than waiting for the
       // debounced quote to say what a membership is worth here.
-      membership_preview: membershipPreview(ctx, doc, { optionId: null, colorId: null }, isPrinter),
+      membership_preview: membershipPreview(
+        ctx,
+        doc,
+        { optionId: initialOptionId, colorId: initialColorId },
+        isPrinter
+      ),
       // EVERY SELECTION THE CHOOSERS CAN REACH, PRICED HERE (see `priceLevels`).
       // The page paints the exact figure on the same frame as the tap, and the
       // debounced quote becomes a confirmation rather than a prerequisite.
       price_levels: priceLevels(doc, ctx, offer, Date.now()),
-      // The final price of every way to get the BASE selection (the quote
+      // The final price of every way to get the opening selection (the quote
       // re-computes them per selection) — the page's fulfilment pills and
       // transport rows read these, and compute nothing.
-      pricing_modes: pricingModes(doc, ctx, { optionId: null, colorId: null }, isPrinter),
+      pricing_modes: pricingModes(
+        doc,
+        ctx,
+        { optionId: initialOptionId, colorId: initialColorId },
+        isPrinter
+      ),
       // §7.2 — the sale mode the page may DEFAULT to, derived from the real
       // stock model and the admin pre-order policy (never from the browser).
       //
@@ -2010,15 +2218,14 @@ productRoutes.get('/:slug', async (c) => {
       // quote below answers with the real counter the moment a model is
       // tapped, and the cart and the checkout re-derive it server-side
       // regardless of what this block said.
-      availability: saleAvailability(doc, {
-        coarseStock: poolMember,
-        transportDefaults: ctx.transportDefaults,
-        inventory: snapshotFrom(relations, {
-          stock: doc.stock,
-          reserved: Number(row.stock_reserved ?? 0),
-          low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+      availability:
+        initialSelection?.availability ??
+        saleAvailability(doc, {
+          coarseStock: poolMember,
+          transportDefaults: ctx.transportDefaults,
+          inventory,
+          links: relations.links,
         }),
-      }),
       viewer_tier: viewerTier(ctx),
     });
   }

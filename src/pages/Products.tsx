@@ -11,6 +11,7 @@ import CardPrice from '../components/CardPrice';
 import OfferBadge from '../components/ui/OfferBadge';
 import Countdown from '../components/ui/Countdown';
 import { productPrimaryImage } from '../lib/productImage';
+import DirectStockEdge from '../components/DirectStockEdge';
 
 export default function Products() {
   const { t, dir, loc } = useLanguage();
@@ -118,7 +119,7 @@ export default function Products() {
                 <Link
                   to={p.product_slug ? `/bundles/${p.product_slug}` : `/product/${p.slug || p.id}`}
                   key={p.id}
-                  className="bg-surface border border-border-subtle rounded-xl overflow-hidden flex flex-col group hover:bg-surface-raised transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  className="relative bg-surface border border-border-subtle rounded-xl overflow-hidden flex flex-col group hover:bg-surface-raised transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   <div className="relative aspect-square overflow-hidden bg-black">
                     <SafeImage
@@ -153,6 +154,7 @@ export default function Products() {
                       <CardPrice p={p} />
                     </div>
                   </div>
+                  <DirectStockEdge product={p} />
                 </Link>
               );
             })}

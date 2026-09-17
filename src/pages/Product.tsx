@@ -372,7 +372,10 @@ interface RelationsPayload {
     id: string; name_en: string; sort: number;
     values: Array<{ id: string; name_en: string; image: string; sort: number; available: number | null }>;
   }>;
-  colors: Array<{ id: string; name_en: string; hex: string; image: string; sort: number; available: number | null }>;
+  colors: Array<{
+    id: string; name_en: string; hex: string; image: string; sort: number; available: number | null;
+    links?: Array<{ group_id: string; option_value_id: string }>;
+  }>;
   variants?: Array<{ id: string; combo_key: string; available: number | null }>;
   images: Array<{
     id: string; url: string; alt_en: string; sort_order: number; is_primary: boolean;
@@ -532,9 +535,14 @@ interface MembershipPreview {
 
 interface DetailResponse {
   product: ProductDetail;
-  /** The BASE selection's quote, already resolved by the server on this very
-   *  request. The page used to discard it and re-ask for it over the network. */
+  /** The opening selection's quote, already resolved by the server on this
+   *  request. It is the first shelf-backed direct selection when one exists. */
   pricing?: Omit<Quote, 'qty' | 'line_total_iqd'>;
+  initial_selection?: {
+    option_id: string | null;
+    color_id: string | null;
+    fulfillment_type: 'direct_sale';
+  } | null;
   price_levels?: PriceLevels;
   /** The BASE selection's membership preview, so §8/§9 can be stated on the
    *  FIRST PAINT instead of waiting for the debounced quote. */
@@ -871,13 +879,20 @@ export default function Product() {
         setQuoteError(null);
         setPriceLevels(data.price_levels ?? null);
         // THE PRICE IS ALREADY HERE. `pricing` is the server's own resolver
-        // result for the base selection, computed on this request; seeding the
+        // result for the opening selection, computed on this request; seeding the
         // quote with it means the page opens with a real, final figure instead
-        // of «يبدأ من» plus a round trip. `quotedFor` is set to the base key so
+        // of «يبدأ من» plus a round trip. `quotedFor` is set to that exact key so
         // the moment a variant IS chosen the page knows this quote no longer
         // answers the question.
+        const initial = data.initial_selection?.fulfillment_type === 'direct_sale'
+          ? data.initial_selection
+          : null;
         setQuote(data.pricing ? { ...data.pricing, qty: 1, line_total_iqd: data.pricing.unit_subtotal_iqd } : null);
-        setQuotedFor(data.pricing ? '|||' : null);
+        setQuotedFor(
+          data.pricing
+            ? `${initial?.option_id ?? ''}|${initial?.color_id ?? ''}|${initial ? 'direct_sale' : ''}||`
+            : null
+        );
         // A quote left in flight by the PREVIOUS product must not leave this
         // one looking like it is still resolving.
         setQuoteLoading(false);
@@ -888,19 +903,28 @@ export default function Product() {
         setActionError('');
         setNotice('');
 
-        // Deterministic pre-selection ONLY where a single possibility exists.
+        // Prefer the server-proven first direct-sale shelf. This happens once
+        // per product load, never in a reactive effect that could overwrite a
+        // later customer choice. Legacy/sold-out products keep the previous
+        // single-possibility fallback.
         const opts = data.product.options ?? [];
-        setOptionId(opts.length === 1 ? opts[0].id : '');
+        const openingOptionId = initial
+          ? (initial.option_id ?? '')
+          : (opts.length === 1 ? opts[0].id : '');
+        setOptionId(openingOptionId);
         const cols = (data.product.colors ?? []).filter(
-          (c) => !c.option_id || (opts.length === 1 && c.option_id === opts[0].id)
+          (c) => !c.option_id || (openingOptionId && c.option_id === openingOptionId)
         );
-        setColorId(cols.length === 1 && (data.product.colors ?? []).length === 1 ? cols[0].id : '');
+        setColorId(
+          initial
+            ? (initial.color_id ?? '')
+            : (cols.length === 1 && (data.product.colors ?? []).length === 1 ? cols[0].id : '')
+        );
         const usable = (data.availability?.preorder.transports ?? []).filter((t) => t.configured);
         setTransportMethod(
-          data.availability?.mode === 'preorder' && usable.length === 1 ? usable[0].method : ''
+          !initial && data.availability?.mode === 'preorder' && usable.length === 1 ? usable[0].method : ''
         );
-        // A fresh product is an unanswered question, not a direct sale.
-        setOrderType('');
+        setOrderType(initial ? 'direct_sale' : '');
       } catch (err) {
         console.error(err);
         if (!cancelled) {
@@ -1010,8 +1034,14 @@ export default function Product() {
   const colorsForOption = useMemo(() => {
     const all = product?.colors ?? [];
     if (!optionId) return all;
-    return all.filter((c) => !c.option_id || c.option_id === optionId);
-  }, [product, optionId]);
+    const relational = new Map((relations?.colors ?? []).map((c) => [c.id, c] as const));
+    return all.filter((c) => {
+      const links = relational.get(c.id)?.links ?? [];
+      return links.length > 0
+        ? links.some((link) => link.option_value_id === optionId)
+        : !c.option_id || c.option_id === optionId;
+    });
+  }, [product, optionId, relations]);
 
   useEffect(() => {
     if (colorId && !colorsForOption.some((c) => c.id === colorId)) setColorId('');
@@ -1828,6 +1858,11 @@ export default function Product() {
                     // option immediately. Multiple rows are legacy data and
                     // still need the compatibility chooser below.
                     setOptionId(selected ? '' : m.options.length === 1 ? m.options[0].id : '');
+                    // A new model is a new fulfilment question. Let the server
+                    // default it to direct only when that model/colour really
+                    // has stock; do not carry the previous model's answer.
+                    setOrderType('');
+                    setTransportMethod('');
                   }}
                   className="lv-choice flex min-h-[50px] max-w-full items-center gap-2 px-2.5 py-1.5 text-sm font-bold"
                 >
@@ -1936,7 +1971,11 @@ export default function Product() {
                   key={opt.id}
                   type="button"
                   aria-pressed={selected}
-                  onClick={() => setOptionId(selected ? '' : opt.id)}
+                  onClick={() => {
+                    setOptionId(selected ? '' : opt.id);
+                    setOrderType('');
+                    setTransportMethod('');
+                  }}
                   className="lv-choice flex items-center gap-2 px-3 py-1.5 text-sm font-bold"
                 >
                   {opt.image ? (
@@ -1984,7 +2023,11 @@ export default function Product() {
                   key={col.id}
                   type="button"
                   aria-pressed={selected}
-                  onClick={() => setColorId(selected ? '' : col.id)}
+                  onClick={() => {
+                    setColorId(selected ? '' : col.id);
+                    setOrderType('');
+                    setTransportMethod('');
+                  }}
                   className="lv-choice flex items-center gap-2 px-3 py-1.5 text-sm font-bold"
                 >
                   {col.image ? (

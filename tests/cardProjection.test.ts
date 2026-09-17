@@ -46,6 +46,7 @@ const READ_BY_CARDS = [
   'display_pro_iqd',
   'display_applied_tier',
   'display_from',
+  'direct_stock_available',
   'offer',
 ];
 
