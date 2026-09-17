@@ -69,6 +69,7 @@ test('opening selection skips an empty direct model and chooses the first stocke
 
   const initial = firstUsableDirectSelection(product as never, { inventory });
   assert.equal(initial?.option_id, 'stocked');
+  assert.deepEqual(initial?.option_value_ids, ['stocked']);
   assert.equal(initial?.color_id, null);
   assert.equal(initial?.availability.mode, 'direct_sale');
   assert.equal(initial?.availability.stock.available, 3);
@@ -103,8 +104,29 @@ test('opening selection resolves the first stocked option-colour combination', (
 
   const initial = firstUsableDirectSelection(product as never, { inventory, links });
   assert.equal(initial?.option_id, 'spool');
+  assert.deepEqual(initial?.option_value_ids, ['spool']);
   assert.equal(initial?.color_id, 'white');
   assert.equal(initial?.availability.stock.available, 3);
+});
+
+test('opening selection fails closed when more than one active option group is required', () => {
+  const product = doc({
+    options: [
+      { id: 'model-a', active: true, availability_type: '', fulfillments: [cell('direct_sale')] },
+      { id: 'size-small', active: true, availability_type: '', fulfillments: [] },
+    ],
+  });
+  const inventory = snapshot({
+    group_ids: ['model', 'size'],
+    option_values: [
+      { id: 'model-a', group_id: 'model', name_en: 'Model A', stock: 5, reserved: 0, low_stock_threshold: null },
+      { id: 'size-small', group_id: 'size', name_en: 'Small', stock: 5, reserved: 0, low_stock_threshold: null },
+    ],
+  });
+
+  // The current detail/cart identity can preserve only one option id, so it
+  // must not silently auto-select a second hidden group value.
+  assert.equal(firstUsableDirectSelection(product as never, { inventory }), null);
 });
 
 test('a selected model with an explicit disabled direct cell does not inherit the product union', () => {
@@ -122,6 +144,29 @@ test('a selected model with an explicit disabled direct cell does not inherit th
       inventory: snapshot({
         option_values: [
           { id: 'preonly', group_id: 'model', name_en: 'Pre-order', stock: 8, reserved: 0, low_stock_threshold: null },
+        ],
+      }),
+    }
+  );
+
+  assert.equal(availability.modes.some((m) => m.type === 'direct_sale'), false);
+});
+
+test('all selected explicit fulfilment cells must allow direct sale', () => {
+  const availability = saleAvailability(
+    doc({
+      options: [
+        { id: 'direct', active: true, availability_type: '', fulfillments: [cell('direct_sale')] },
+        { id: 'preonly', active: true, availability_type: '', fulfillments: [cell('pre_order')] },
+      ],
+    }) as never,
+    {
+      optionValueIds: ['direct', 'preonly'],
+      inventory: snapshot({
+        group_ids: ['model', 'size'],
+        option_values: [
+          { id: 'direct', group_id: 'model', name_en: 'Direct', stock: 8, reserved: 0, low_stock_threshold: null },
+          { id: 'preonly', group_id: 'size', name_en: 'Pre-order', stock: 8, reserved: 0, low_stock_threshold: null },
         ],
       }),
     }
@@ -149,22 +194,99 @@ test('card OPTION total subtracts reservations and excludes pre-order-only model
   assert.equal(directStockAvailable(product as never, relations, { stock: null, reserved: 0 }), 8);
 });
 
-test('card VARIANT total counts every eligible combination once with exact option tokens', () => {
+test('card OPTION total sums within tracked groups and takes the cross-group minimum', () => {
   const product = doc({
     options: [
-      { id: 'o1', active: true, availability_type: '', fulfillments: [cell('direct_sale')] },
-      { id: 'o2', active: true, availability_type: '', fulfillments: [cell('direct_sale')] },
+      { id: 'm1', active: true, availability_type: '', fulfillments: [cell('direct_sale')] },
+      { id: 'm2', active: true, availability_type: '', fulfillments: [cell('direct_sale')] },
+      { id: 's1', active: true, availability_type: '', fulfillments: [] },
+      { id: 's2', active: true, availability_type: '', fulfillments: [] },
+    ],
+  });
+  const relations = view({
+    inventory_mode: 'OPTION',
+    groups: [
+      { id: 'model', active: 1 },
+      { id: 'size', active: 1 },
+    ] as never,
+    values: [
+      { id: 'm1', group_id: 'model', active: 1, stock: 10, reserved: 2 },
+      { id: 'm2', group_id: 'model', active: 1, stock: 5, reserved: 0 },
+      { id: 's1', group_id: 'size', active: 1, stock: 6, reserved: 1 },
+      { id: 's2', group_id: 'size', active: 1, stock: 4, reserved: 0 },
+    ] as never,
+  });
+
+  // model = 13, size = 9; every sale consumes one from both, so 9 not 22.
+  assert.equal(directStockAvailable(product as never, relations, { stock: null, reserved: 0 }), 9);
+});
+
+test('card OPTION total is zero when a tracked required group has no direct-sale value', () => {
+  const product = doc({
+    options: [
+      { id: 'model-direct', active: true, availability_type: '', fulfillments: [cell('direct_sale')] },
+      { id: 'size-preonly', active: true, availability_type: 'pre_order', fulfillments: [] },
+    ],
+  });
+  const relations = view({
+    inventory_mode: 'OPTION',
+    groups: [
+      { id: 'model', active: 1 },
+      { id: 'size', active: 1 },
+    ] as never,
+    values: [
+      { id: 'model-direct', group_id: 'model', active: 1, stock: 5, reserved: 0 },
+      { id: 'size-preonly', group_id: 'size', active: 1, stock: 20, reserved: 0 },
+    ] as never,
+  });
+
+  assert.equal(directStockAvailable(product as never, relations, { stock: null, reserved: 0 }), 0);
+});
+
+test('card VARIANT total counts only complete active selectable direct combinations', () => {
+  const product = doc({
+    options: [
+      { id: 'model-direct', active: true, availability_type: '', fulfillments: [cell('direct_sale')] },
+      { id: 'model-pre', active: true, availability_type: '', fulfillments: [cell('pre_order')] },
+      { id: 'size-small', active: true, availability_type: '', fulfillments: [] },
+      { id: 'size-large', active: true, availability_type: '', fulfillments: [] },
+      { id: 'size-prelegacy', active: true, availability_type: 'pre_order', fulfillments: [] },
+    ],
+    colors: [
+      { id: 'c1', active: true, option_id: null },
+      { id: 'c2', active: false, option_id: null },
     ],
   });
   const relations = view({
     inventory_mode: 'VARIANT_COMBINATION',
+    groups: [
+      { id: 'model', active: 1 },
+      { id: 'size', active: 1 },
+    ] as never,
+    values: [
+      { id: 'model-direct', group_id: 'model', name_en: 'Direct', active: 1, stock: null, reserved: 0 },
+      { id: 'model-pre', group_id: 'model', name_en: 'Pre', active: 1, stock: null, reserved: 0 },
+      { id: 'size-small', group_id: 'size', name_en: 'Small', active: 1, stock: null, reserved: 0 },
+      { id: 'size-large', group_id: 'size', name_en: 'Large', active: 1, stock: null, reserved: 0 },
+      { id: 'size-prelegacy', group_id: 'size', name_en: 'Legacy pre-order', active: 1, stock: null, reserved: 0 },
+    ] as never,
+    colors: [
+      { id: 'c1', name_en: 'Active', active: 1, stock: null, reserved: 0 },
+      { id: 'c2', name_en: 'Inactive', active: 0, stock: null, reserved: 0 },
+    ] as never,
     variants: [
-      { id: 'v1', active: 1, combo_key: 'o:o1|c:c1', stock: 5, reserved: 1 },
-      // Contains two direct ids but is one shelf row: count it once.
-      { id: 'v2', active: 1, combo_key: 'o:o1|o:o2|c:c2', stock: 4, reserved: 1 },
-      // `o:o10` must not match `o:o1` by substring.
-      { id: 'v3', active: 1, combo_key: 'o:o10|c:c3', stock: 99, reserved: 0 },
-      { id: 'v4', active: 0, combo_key: 'o:o1|c:c4', stock: 99, reserved: 0 },
+      { id: 'v1', active: 1, combo_key: 'o:model-direct|o:size-small|c:c1', stock: 5, reserved: 1 },
+      { id: 'v2', active: 1, combo_key: 'o:model-direct|o:size-large|c:c1', stock: 4, reserved: 1 },
+      // Missing the size group.
+      { id: 'v3', active: 1, combo_key: 'o:model-direct|c:c1', stock: 99, reserved: 0 },
+      // Colour is inactive.
+      { id: 'v4', active: 1, combo_key: 'o:model-direct|o:size-small|c:c2', stock: 99, reserved: 0 },
+      // An explicitly pre-order-only selected cell blocks direct sale.
+      { id: 'v5', active: 1, combo_key: 'o:model-pre|o:size-small|c:c1', stock: 99, reserved: 0 },
+      // A legacy pre-order-only value also blocks direct sale when another
+      // selected group uses modern fulfilment cells.
+      { id: 'v7', active: 1, combo_key: 'o:model-direct|o:size-prelegacy|c:c1', stock: 99, reserved: 0 },
+      { id: 'v6', active: 0, combo_key: 'o:model-direct|o:size-small|c:c1', stock: 99, reserved: 0 },
     ] as never,
   });
 
