@@ -40,6 +40,7 @@ import type { AvailabilityType } from './availability';
 import { normalizeHashtag } from './hashtags';
 import type { ParsedMembershipRule, ParsedProduct, RowIssue } from './importCsv';
 import { printerWarrantyRules, readOpsWarranty } from './warrantyPlans';
+import { parseConditionDoc, type ConditionDoc } from './condition';
 
 export interface CatalogRef {
   id: string;
@@ -117,6 +118,14 @@ export interface ImportMaps {
   familyOf: Map<string, 'devices' | 'materials' | null>;
   /** image cell (ZIP filename or URL) -> the stored delivery URL */
   images: Map<string, string>;
+  /**
+   * lowercased product slug -> product id, for `condition_new_product_slug`.
+   *
+   * A slug rather than an id, because an id is not something a person filling
+   * a sheet can be expected to know or to copy correctly — and the slug is
+   * already the thing they see in the product URL.
+   */
+  productSlugs: Map<string, string>;
   /**
    * Normalized display names claimed by MORE than one row. Such a name is in
    * the maps too (pointing at one of them), so a resolver that ignores this
@@ -653,12 +662,54 @@ export function resolveProduct(
   // printer defaults (serialized, 12-month base) are applied here so the
   // PREVIEW refuses a warranty row on a non-printer with its line number; the
   // confirm re-checks against the catalog table.
+  /**
+   * OPEN BOX / USED / REFURBISHED, from the sheet or from what is stored.
+   *
+   * `undefined` is a sheet with no condition columns — every sheet written
+   * before the feature — and keeps the stored document. `null` is an explicit
+   * empty `condition_kind`, which DOES clear a grade, so a listing can be
+   * returned to new from a sheet on purpose.
+   *
+   * The block is re-parsed through the same `parseConditionDoc` the admin form
+   * and the database go through, so a sheet cannot introduce a kind, a grade or
+   * an unbounded hour count the rest of the system would refuse. An unknown
+   * `condition_kind` parses to null (= new) and is reported rather than stored.
+   */
+  // `existing.doc` is a Record<string, unknown>, so the stored value is
+  // re-parsed rather than cast — the same validation a fresh sheet goes
+  // through, applied to what is already in the column.
+  let condition: ConditionDoc | null = parseConditionDoc(existing?.doc.condition);
+  if (p.condition !== undefined) {
+    if (p.condition === null) {
+      condition = null;
+    } else {
+      const resolvedNewId = p.condition.new_product_slug
+        ? (maps.productSlugs.get(p.condition.new_product_slug.toLowerCase()) ?? null)
+        : null;
+      if (p.condition.new_product_slug && !resolvedNewId) {
+        issues.push(
+          err(p.line, `condition_new_product_slug: no product with slug "${p.condition.new_product_slug}" — the new-price comparison would be blank`)
+        );
+      }
+      condition = parseConditionDoc({ ...p.condition, new_product_id: resolvedNewId });
+      if (!condition) {
+        issues.push(
+          err(p.line, `condition_kind: "${p.condition.kind}" is not one of open_box, used, refurbished`)
+        );
+      }
+    }
+  }
+
   const guard = {
     warranty_plans: (Array.isArray(warrantyPlans) ? warrantyPlans : []) as Array<{
       id: string; duration_months: number; duration_kind: 'total' | 'extension'; fee_iqd: number; fee_percent?: number | null; active: boolean;
     }>,
     serialized: coverage.serialized,
     warranty_base_months: coverage.warranty_base_months,
+    // So the PREVIEW refuses an extension on a used unit with its line number,
+    // and so a graded listing gets the owner's 1-or-12 base rather than the
+    // printer default.
+    condition,
   };
   for (const message of printerWarrantyRules(guard, isPrinter)) {
     issues.push(err(p.warranty_plans?.[0]?.line ?? p.line, message));

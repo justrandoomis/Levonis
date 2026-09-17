@@ -201,6 +201,7 @@ export const TEMPLATE_GROUPS: Array<{ id: string; titleAr: string; titleEn: stri
   { id: 'specs',           titleAr: 'المواصفات',             titleEn: 'Specifications' },
   { id: 'labels',          titleAr: 'الشارات',               titleEn: 'Labels' },
   { id: 'warranty',        titleAr: 'خطط الضمان',            titleEn: 'Warranty plans' },
+  { id: 'condition',       titleAr: 'الحالة (Open Box/مستعمل)', titleEn: 'Condition (Open Box/Used)' },
   { id: 'content',         titleAr: 'كتل المحتوى',           titleEn: 'Content blocks' },
   // The last form section the file could not say: the setup & usage guide
   // (official link + ordered steps with photos, a video and a doc link).
@@ -280,6 +281,23 @@ const SCALAR_FIELDS: FieldSpec[] = [
   // warranty adds to, and whether a unit is recorded per physical device
   f('warranty_base_months', 'int', 'warranty', 'مدة الضمان الأساسي بالأشهر من التسليم — للطابعات 12 افتراضيًا (التمديد +12 → 24 إجمالًا، +24 → 36)؛ __NULL__ = غير مُعدّة', { nullable: true, min: 1, max: 240 }),
   f('serialized', 'bool', 'warranty', 'جهاز مُرقَّم — تُنشأ وحدة لكل جهاز عند التسليم ويُربط بها الضمان (الطابعات true تلقائيًا)'),
+  // OPEN BOX / USED / REFURBISHED (products.condition_doc). An empty
+  // `condition_kind` leaves the product NEW and every other key here is then
+  // ignored, so a sheet written before the feature cannot un-grade a listing.
+  f('condition_kind', 'string', 'condition', 'حالة المنتج: open_box أو used أو refurbished — فارغ = منتج جديد وتُتجاهل بقية أسطر القسم'),
+  f('condition_grade', 'string', 'condition', 'درجة الحالة: like_new أو excellent أو good أو fair'),
+  f('condition_usage_hours', 'int', 'condition', 'عدد ساعات التشغيل الفعلية — integer >= 0؛ فارغ = غير معروف', { nullable: true, min: 0, max: 200_000 }),
+  f('condition_warranty_months', 'int', 'condition', 'ضمان ليفو بالأشهر — 1 أو 12 فقط (فارغ = 12). لا تُباع خطط تمديد على المنتج المستعمل', { nullable: true, min: 1, max: 12 }),
+  f('condition_new_product_slug', 'string', 'condition', 'سلَك المنتج الجديد الذي هذه نسخة مستعملة منه — يُعرض سعره مشطوباً بجانب السعر'),
+  f('condition_fault_ar', 'string', 'condition', 'العطل الذي كان في الجهاز (عربي)'),
+  f('condition_fault_en', 'string', 'condition', 'The fault this unit had (English)'),
+  f('condition_fault_ckb', 'string', 'condition', 'کێشەکەی ئەم ئامێرە (کوردی)'),
+  f('condition_repair_ar', 'string', 'condition', 'الإصلاح الذي جرى (عربي)'),
+  f('condition_repair_en', 'string', 'condition', 'The repair that was carried out (English)'),
+  f('condition_repair_ckb', 'string', 'condition', 'ئەو چاککردنەوەیەی کرا (کوردی)'),
+  f('condition_notes_ar', 'string', 'condition', 'ملاحظات أخرى للمشتري (عربي)'),
+  f('condition_notes_en', 'string', 'condition', 'Other notes for the buyer (English)'),
+  f('condition_notes_ckb', 'string', 'condition', 'تێبینی تر بۆ کڕیار (کوردی)'),
   // usage guide — the steps are the `usage_steps` group below
   f('usage_official_url', 'string', 'usage', 'رابط الدليل الرسمي للمنتج (صفحة الشركة المصنّعة) — official documentation URL; فارغ = لا يوجد'),
 ];

@@ -490,6 +490,29 @@ display_order=0
 selling_type=mixed
 payment_options=
 
+# ------------------------------ الحالة (Open Box / مستعمل / مجدّد)
+# اترك condition_kind فارغاً للمنتج الجديد — عندها تُتجاهل كل أسطر هذا القسم.
+# عند تعبئته: المنتج غير قابل للإرجاع لتغيير الرأي، ولا تُباع عليه خطط ضمان
+# ممدّد، والضمان هو ما تكتبه هنا (شهر واحد أو اثنا عشر).
+condition_kind=
+# open_box | used | refurbished
+condition_grade=
+# like_new | excellent | good | fair
+# الأرقام تقبل __NULL__ لا الفراغ (سطر رقمي فارغ خطأ في هذا القالب)
+condition_usage_hours=__NULL__
+condition_warranty_months=__NULL__
+# سلَك المنتج الجديد الذي هذه نسخة مستعملة منه، لعرض سعره مشطوباً
+condition_new_product_slug=
+condition_fault_ar=
+condition_fault_en=
+condition_fault_ckb=
+condition_repair_ar=
+condition_repair_en=
+condition_repair_ckb=
+condition_notes_ar=
+condition_notes_en=
+condition_notes_ckb=
+
 # ------------------------------ الوسائط / media
 # معطّلة عمداً: ضع رابطاً حقيقياً (/files/<key> أو https://…) قبل التفعيل،
 # فالمثال يجب ألا يُنشئ منتجاً بصورة مكسورة.

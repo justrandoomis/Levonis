@@ -873,6 +873,8 @@ export interface OrderUnit {
   unit_index: number;
   serial: string | null;
   warranty_base_months: number | null;
+  /** Open box / used / refurbished; null for a new product. */
+  condition?: import('./condition').ConditionEntry | null;
   warranty_ext_months: number;
   warranty_start_at: string | null;
   warranty_end_at: string | null;

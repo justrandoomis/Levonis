@@ -242,6 +242,32 @@ export const BASE_COLUMNS = [
   // adds to (printers default to 12) and whether a unit is recorded per device
   'warranty_base_months',
   'serialized',
+  // ---- OPEN BOX / USED / REFURBISHED (products.condition_doc).
+  //
+  // One block, on EVERY product type. A used filament spool and a used printer
+  // are graded the same way, so the columns do not vary with the template
+  // family the way the spec fields do — what varies is which specs sit beside
+  // them, and that is already handled.
+  //
+  // `condition_kind` is the switch: empty leaves the product NEW and every
+  // other column in the block is then ignored, so an older sheet with none of
+  // these columns cannot un-grade a listing.
+  'condition_kind',
+  'condition_grade',
+  'condition_usage_hours',
+  'condition_warranty_months',
+  // The NEW product this is a used copy of, BY SLUG — an id is not something
+  // a person filling a sheet can be expected to know or to copy correctly.
+  'condition_new_product_slug',
+  'condition_fault_ar',
+  'condition_fault_en',
+  'condition_fault_ckb',
+  'condition_repair_ar',
+  'condition_repair_en',
+  'condition_repair_ckb',
+  'condition_notes_ar',
+  'condition_notes_en',
+  'condition_notes_ckb',
   // ---- 0044: an ADJUSTMENT instead of a pin — "+60,000 above the base",
   // which keeps following the base instead of freezing away from it.
   'regular_adjust_iqd',
@@ -506,6 +532,20 @@ export function labelRow(shape: TemplateShape): string[] {
     personal_delivery_quantity_step: 'عدد القطع لكل رسم توصيل شخصي',
     personal_delivery_fee_iqd: 'رسم شريحة التوصيل الشخصي (د.ع)',
     warranty_base_months: 'مدة الضمان الأساسي بالأشهر (الطابعات 12؛ فارغ = كما هو محفوظ)',
+    condition_kind: 'حالة المنتج: open_box أو used أو refurbished — اتركه فارغاً للمنتج الجديد',
+    condition_grade: 'درجة الحالة: like_new أو excellent أو good أو fair',
+    condition_usage_hours: 'عدد ساعات التشغيل الفعلية (رقم صحيح؛ فارغ = غير معروف)',
+    condition_warranty_months: 'ضمان ليفو بالأشهر: 1 أو 12 فقط (فارغ = 12)',
+    condition_new_product_slug: 'سلَك المنتج الجديد الذي هذه نسخة مستعملة منه — لعرض سعر الجديد مشطوباً',
+    condition_fault_ar: 'العطل الذي كان في الجهاز (عربي)',
+    condition_fault_en: 'The fault this unit had (English)',
+    condition_fault_ckb: 'کێشەکەی ئەم ئامێرە (کوردی)',
+    condition_repair_ar: 'الإصلاح الذي جرى (عربي)',
+    condition_repair_en: 'The repair that was carried out (English)',
+    condition_repair_ckb: 'ئەو چاککردنەوەیەی کرا (کوردی)',
+    condition_notes_ar: 'ملاحظات أخرى للمشتري (عربي)',
+    condition_notes_en: 'Other notes for the buyer (English)',
+    condition_notes_ckb: 'تێبینی تر بۆ کڕیار (کوردی)',
     serialized: 'جهاز مُرقَّم — وحدة لكل جهاز عند التسليم (yes/no؛ فارغ = كما هو محفوظ)',
     payment_options: 'طرق الدفع المسموحة (id|id)',
     how_to_use: 'طريقة الاستخدام (نص)',
@@ -554,6 +594,18 @@ export function labelRow(shape: TemplateShape): string[] {
 
 // ------------------------------------------------------------------- parsing
 
+/** The condition block as a sheet states it; slug is resolved to an id later. */
+export interface ParsedCondition {
+  kind: string;
+  grade: string;
+  usage_hours: number | null;
+  warranty_months: number;
+  new_product_slug: string;
+  fault_ar: string; fault_en: string; fault_ckb: string;
+  repair_ar: string; repair_en: string; repair_ckb: string;
+  notes_ar: string; notes_en: string; notes_ckb: string;
+}
+
 export interface ParsedProduct {
   key: string;
   line: number;
@@ -586,6 +638,15 @@ export interface ParsedProduct {
    */
   warranty_base_months: number | null;
   serialized: boolean | null;
+  /**
+   * Open box / used / refurbished, as this SHEET states it.
+   *
+   * `undefined` means the sheet carried no condition columns at all, which is
+   * every sheet written before this feature — importApply then keeps whatever
+   * is stored. An explicit empty `condition_kind` means NEW and DOES clear a
+   * stored grade, so a listing can be un-graded from a sheet on purpose.
+   */
+  condition: ParsedCondition | null | undefined;
   /** null when the column is absent, so an older sheet keeps stored values. */
   payment_options: string[] | null;
   how_to_use: string | null;
@@ -1362,6 +1423,30 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
             },
           };
         })(),
+        condition: (() => {
+          // Absent columns = "this sheet has nothing to say about condition".
+          if (!index.has('condition_kind')) return undefined;
+          const kind = cell(r, 'condition_kind').trim().toLowerCase();
+          // An explicitly EMPTY kind is a decision: this listing is new.
+          if (!kind) return null;
+          const months = intCell(cell(r, 'condition_warranty_months'), line, 'condition_warranty_months', issues);
+          return {
+            kind,
+            grade: cell(r, 'condition_grade').trim().toLowerCase(),
+            usage_hours: intCell(cell(r, 'condition_usage_hours'), line, 'condition_usage_hours', issues),
+            warranty_months: months === 1 ? 1 : 12,
+            new_product_slug: cell(r, 'condition_new_product_slug').trim(),
+            fault_ar: cell(r, 'condition_fault_ar'),
+            fault_en: cell(r, 'condition_fault_en'),
+            fault_ckb: cell(r, 'condition_fault_ckb'),
+            repair_ar: cell(r, 'condition_repair_ar'),
+            repair_en: cell(r, 'condition_repair_en'),
+            repair_ckb: cell(r, 'condition_repair_ckb'),
+            notes_ar: cell(r, 'condition_notes_ar'),
+            notes_en: cell(r, 'condition_notes_en'),
+            notes_ckb: cell(r, 'condition_notes_ckb'),
+          };
+        })(),
         warranty_base_months: intCell(cell(r, 'warranty_base_months'), line, 'warranty_base_months', issues),
         serialized:
           cell(r, 'serialized') === '' ? null : boolCell(cell(r, 'serialized'), line, 'serialized', issues, false),
@@ -2007,6 +2092,14 @@ export interface ExportProduct {
   /** Device coverage; null exports an empty cell ("keep what is stored"). */
   warranty_base_months: number | null;
   serialized: boolean | null;
+  /** Open box / used / refurbished; null for a new product. */
+  condition?: {
+    kind: string; grade: string; usage_hours: number | null; warranty_months: number;
+    new_product_slug?: string;
+    fault_ar: string; fault_en: string; fault_ckb: string;
+    repair_ar: string; repair_en: string; repair_ckb: string;
+    notes_ar: string; notes_en: string; notes_ckb: string;
+  } | null;
   payment_options: string[];
   how_to_use: string;
   usage_url: string;
@@ -2084,6 +2177,22 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
       personal_delivery_fee_iqd: p.delivery_options ? num(p.delivery_options.personal.fee_iqd) : '',
       warranty_base_months: num(p.warranty_base_months),
       serialized: p.serialized === null ? '' : bool(p.serialized),
+      // An empty `condition_kind` on export means NEW, which is exactly what
+      // re-importing the file should preserve.
+      condition_kind: p.condition?.kind ?? '',
+      condition_grade: p.condition?.grade ?? '',
+      condition_usage_hours: p.condition ? num(p.condition.usage_hours) : '',
+      condition_warranty_months: p.condition ? String(p.condition.warranty_months) : '',
+      condition_new_product_slug: p.condition?.new_product_slug ?? '',
+      condition_fault_ar: p.condition?.fault_ar ?? '',
+      condition_fault_en: p.condition?.fault_en ?? '',
+      condition_fault_ckb: p.condition?.fault_ckb ?? '',
+      condition_repair_ar: p.condition?.repair_ar ?? '',
+      condition_repair_en: p.condition?.repair_en ?? '',
+      condition_repair_ckb: p.condition?.repair_ckb ?? '',
+      condition_notes_ar: p.condition?.notes_ar ?? '',
+      condition_notes_en: p.condition?.notes_en ?? '',
+      condition_notes_ckb: p.condition?.notes_ckb ?? '',
       payment_options: p.payment_options.join('|'),
       how_to_use: p.how_to_use,
       usage_url: p.usage_url,

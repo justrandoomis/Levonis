@@ -1136,6 +1136,10 @@ test('every field of the product form is expressible in the sheet', () => {
     spec_fields: 'spec.*',
     // device coverage (products.ops_policy) — the base the extended warranty adds to
     warranty_base_months: 'warranty_base_months', serialized: 'serialized',
+    // Open box / used / refurbished. One doc field, a BLOCK of columns — the
+    // kind is the switch and the rest describe the unit; `condition_kind` is
+    // the one the sheet is keyed on.
+    condition: 'condition_kind',
     // child row types
     options: 'row:option', colors: 'row:color', media: 'row:image',
     preorder_transports: 'row:transport', spec_groups: 'row:spec', labels: 'row:label',

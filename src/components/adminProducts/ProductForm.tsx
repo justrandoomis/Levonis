@@ -90,6 +90,7 @@ import {
 import { OptionsSection } from './form/OptionsSection';
 import { UsageGuideSection } from './form/UsageGuideSection';
 import { WarrantySection } from './form/WarrantySection';
+import { ConditionSection } from './form/ConditionSection';
 import PricePreview from './PricePreview';
 import MembershipDiscountSection from './form/MembershipDiscountSection';
 import { ImagesSection } from './form/ImagesSection';
@@ -1376,6 +1377,17 @@ export default function ProductForm({
           onSerializedChange={(v) => setDoc((d) => ({ ...d, serialized: v }))}
           onBaseMonthsChange={(v) => setDoc((d) => ({ ...d, warranty_base_months: v }))}
         />
+
+        {/* Open box / used / refurbished. Beside the warranty because a graded
+            listing's coverage IS one of its condition facts — the server
+            refuses to sell extensions on top of it. Collapsed to a single
+            select for a new product, which is nearly every product. */}
+        <div className="mt-5 pt-5 border-t border-zinc-800">
+          <ConditionSection
+            condition={doc.condition ?? null}
+            onChange={(next) => setDoc((d) => ({ ...d, condition: next }))}
+          />
+        </div>
 
       </SectionCard>
 

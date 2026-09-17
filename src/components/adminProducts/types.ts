@@ -61,6 +61,9 @@ export function blankDoc(): EditorDoc {
     warranty_plans: [],
     warranty_base_months: null,
     serialized: null,
+    // null = NEW. Sent explicitly so the admin route can tell "this form
+    // un-graded the listing" from "this client never had the field".
+    condition: null,
     delivery_options: defaultProductDeliveryOptions(),
     content_blocks: [],
     translation_meta: {},
@@ -122,6 +125,7 @@ export function toEditorDoc(p: Partial<ProductDocV2> & { catalog_ids?: string[] 
     warranty_plans: list<EditorDoc['warranty_plans'][number]>(p.warranty_plans).map((w) => ({ ...w, fee_percent: w.fee_percent ?? null })),
     warranty_base_months: p.warranty_base_months ?? null,
     serialized: p.serialized ?? null,
+    condition: p.condition ?? null,
     delivery_options: p.delivery_options ?? null,
     content_blocks: list(p.content_blocks),
     translation_meta: p.translation_meta ?? {},

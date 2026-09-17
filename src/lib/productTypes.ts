@@ -201,6 +201,14 @@ export interface TranslationMetaV2 {
 }
 
 export interface ProductDocV2 {
+  /**
+   * Open box / used / refurbished; null for a NEW product, which is the
+   * default for every listing the owner does not mark. Mirrors the server's
+   * ConditionDoc (worker/lib/condition.ts) — the rules live there, this is
+   * only the shape the editor carries.
+   */
+  condition?: import('./condition').ConditionEntry | null;
+
   id: string;
   slug: string;
   status: 'draft' | 'active' | 'hidden';

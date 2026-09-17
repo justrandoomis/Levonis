@@ -910,7 +910,16 @@ async function buildMaps(db: D1Database, images: Map<string, string>): Promise<I
   const facets = new Map<string, string>();
   registerAliases(facetRows, (f) => f.id, facets, ambiguous.facets);
 
-  return { brands, catalogs, facets, familyOf: familyMap(rows), images, ambiguous };
+  // Every product's slug, for the used-listing link. One read: the catalogue
+  // is small enough that a map beats a lookup per graded row, and the import
+  // already loads the catalogs and brands the same way.
+  const { results: slugRows } = await db
+    .prepare('SELECT id, slug FROM products')
+    .all<{ id: string; slug: string }>();
+  const productSlugs = new Map<string, string>(
+    (slugRows ?? []).map((r) => [String(r.slug).toLowerCase(), String(r.id)])
+  );
+  return { brands, catalogs, facets, familyOf: familyMap(rows), images, productSlugs, ambiguous };
 }
 
 /** The existing product a `key` refers to: SKU first, then slug. */
