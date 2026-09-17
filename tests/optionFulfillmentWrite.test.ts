@@ -298,9 +298,9 @@ test('the panel calls the prefix the fulfilment router is actually mounted on', 
   assert.ok(mount, 'adminProductRelationsRoutes must be mounted somewhere findable');
   const prefix = mount![1];
 
-  const panel = readFileSync(join(ROOT, 'src/components/adminProducts/FulfillmentPanel.tsx'), 'utf8');
+  const panel = readFileSync(join(ROOT, 'src/components/adminProducts/QuickPricePanel.tsx'), 'utf8');
   const calls = [...panel.matchAll(/`(\/api\/admin\/[^`$]*)\$\{productId\}\/fulfillment`/g)].map((m) => m[1]);
-  assert.ok(calls.length >= 2, 'the panel should both read and write');
+  assert.ok(calls.length >= 1, 'the synchronized quick editor must write fulfilment changes');
   for (const call of calls) {
     assert.equal(call, `${prefix}/`, `the panel calls ${call}\${productId}/fulfillment, but the router is mounted at ${prefix}`);
   }

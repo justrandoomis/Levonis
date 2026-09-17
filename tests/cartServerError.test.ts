@@ -92,7 +92,12 @@ function seed(): DatabaseSync {
 function without(raw: DatabaseSync, opts: { tables?: string[]; columns?: Array<[string, string]> }): DatabaseSync {
   raw.exec('PRAGMA foreign_keys = OFF;');
   for (const t of opts.tables ?? []) raw.exec(`DROP TABLE IF EXISTS ${t};`);
-  for (const [t, c] of opts.columns ?? []) raw.exec(`ALTER TABLE ${t} DROP COLUMN ${c};`);
+  for (const [t, c] of opts.columns ?? []) {
+    if (t === 'cart_items' && c === 'option_value_ids') {
+      raw.exec('DROP INDEX IF EXISTS idx_cart_levonis_line_v2; DROP INDEX IF EXISTS idx_cart_levonis_line;');
+    }
+    raw.exec(`ALTER TABLE ${t} DROP COLUMN ${c};`);
+  }
   raw.exec('PRAGMA foreign_keys = ON;');
   return raw;
 }

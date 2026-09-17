@@ -55,13 +55,14 @@ test('stock > 0 defaults to direct sale and caps qty at the sellable amount', ()
   assert.equal(a.stock.scope, 'product');
 });
 
-test('untracked stock (NULL) is a distinct state from zero, not "unlimited zero"', () => {
+test('untracked direct stock (NULL) fails closed instead of becoming unlimited', () => {
   const untracked = saleAvailability(doc({ stock: null }));
-  assert.equal(untracked.mode, 'direct_sale');
+  assert.equal(untracked.mode, 'unavailable');
+  assert.equal(untracked.reason, 'OUT_OF_STOCK');
   assert.equal(untracked.stock.tracked, false);
   assert.equal(untracked.stock.on_hand, null);
   assert.equal(untracked.stock.available, null);
-  assert.equal(untracked.stock.max_qty, 99);
+  assert.equal(untracked.stock.max_qty, 0);
 
   const zero = saleAvailability(doc({ stock: 0 }));
   assert.equal(zero.mode, 'unavailable');
@@ -113,16 +114,16 @@ test('pre-order inherits an unconfigured commission from the admin defaults', ()
   assert.deepEqual(a.preorder.transports, [{ method: 'sea', commission_iqd: 3000, configured: true }]);
 });
 
-test('pre-order with NO resolvable commission is unavailable with the real reason (no invented fee)', () => {
+test('pre-order with no configured increase remains available at zero increase', () => {
   const a = saleAvailability(
     doc({ selling_type: 'pre_order', stock: 0, preorder_transports: [transport({ commission_iqd: null })] })
   );
-  assert.equal(a.mode, 'unavailable');
-  assert.equal(a.reason, 'TRANSPORT_COMMISSION_UNCONFIGURED');
+  assert.equal(a.mode, 'preorder');
+  assert.equal(a.reason, null);
   assert.equal(a.preorder.enabled, true);
-  assert.equal(a.preorder.usable, false);
-  assert.equal(a.preorder.transports[0].commission_iqd, null);
-  assert.equal(a.stock.max_qty, 0);
+  assert.equal(a.preorder.usable, true);
+  assert.equal(a.preorder.transports[0].commission_iqd, 0);
+  assert.equal(a.stock.max_qty, 99);
 });
 
 test('pre-order with no transport offer at all reports NO_TRANSPORT_OFFERED', () => {
