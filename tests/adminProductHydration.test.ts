@@ -770,8 +770,13 @@ test('ProductForm: loads through hydrateRelations, keeps a stored section/family
   assert.match(src, /data-form="spec-outside-template"/);
   assert.match(src, /data-form="preserved-groups"/);
   assert.match(src, /data-form="imported-texts"/);
-  assert.match(src, /data-form="surcharge-preserved"/);
-  assert.match(src, /data-form="transports-preserved"/);
+  // Product-level fulfilment controls were retired: direct/pre-order pricing
+  // and availability now live on each option, so hidden legacy values must not
+  // recreate the removed surcharge/transport UI.
+  assert.doesNotMatch(src, /data-form="surcharge-preserved"/);
+  assert.doesNotMatch(src, /data-form="transports-preserved"/);
+  const options = read('src/components/adminProducts/form/OptionsSection.tsx');
+  assert.match(options, /value\.fulfillments\.find\(\(f\) => f\.fulfillment_type === type\)/);
   assert.match(src, /data-form="warranty-preserved"/);
   assert.match(src, /data-form="payment-options-preserved"/);
   // The stored specs render even when the section has no template.
