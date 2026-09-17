@@ -107,9 +107,21 @@ function waitUntil(c: Context<AppContext>, work: Promise<unknown>): void {
   }
 }
 
+/**
+ * CODED, so the screen can say it in the reader's language.
+ *
+ * These two threw a bare English sentence with no code, and the client's
+ * CODE_MESSAGES table can only translate what it can name — so an Arabic or
+ * Kurdish customer met «Password must be at least 8 characters» at the one
+ * moment they are least able to guess what is wanted. The wording stays as the
+ * fallback for anything that does not know the code; the code is what makes a
+ * translation possible at all.
+ */
 function checkPassword(pw: string): void {
-  if (pw.length < PASSWORD_MIN) throw badRequest(`Password must be at least ${PASSWORD_MIN} characters`);
-  if (pw.length > PASSWORD_MAX) throw badRequest('Password is too long');
+  if (pw.length < PASSWORD_MIN) {
+    throw badRequest(`Password must be at least ${PASSWORD_MIN} characters`, 'PASSWORD_TOO_SHORT');
+  }
+  if (pw.length > PASSWORD_MAX) throw badRequest('Password is too long', 'PASSWORD_TOO_LONG');
 }
 
 async function getFullUser(db: D1Database, id: string): Promise<SessionUser | null> {

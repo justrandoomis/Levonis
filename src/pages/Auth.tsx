@@ -27,6 +27,7 @@ import { useCapabilities } from '../hooks/useCapabilities';
 import { COUNTRIES, COMMON_ISO, countryNames, flagOf, toAsciiDigitsClient } from '../components/auth/PhoneField';
 import ReferralBar from '../components/auth/ReferralBar';
 import { useUsernameAvailability } from '../components/auth/useUsernameAvailability';
+import { usernameRejection } from '../lib/usernameRules';
 import { useShortViewport } from '../components/auth/useShortViewport';
 import { onboardingStrings, usernameReasonLabel } from '../components/onboarding/strings';
 
@@ -117,6 +118,7 @@ const STRINGS = {
     hintName: 'أدخل الاسم',
     hintEmail: 'أدخل بريدًا إلكترونيًا صحيحًا',
     hintPassword: 'كلمة المرور: 8 محارف على الأقل',
+    errPasswordLong: 'كلمة المرور طويلة جدًا — 128 محرفًا كحد أقصى.',
     hintConfirm: 'أعد كتابة كلمة المرور نفسها للتأكيد',
     backToSignIn: 'العودة لتسجيل الدخول',
     noAccount: 'ليس لديك حساب؟',
@@ -227,6 +229,7 @@ const STRINGS = {
     hintName: 'Enter your name',
     hintEmail: 'Enter a valid email address',
     hintPassword: 'Password: at least 8 characters',
+    errPasswordLong: 'That password is too long — 128 characters at most.',
     hintConfirm: 'Repeat the same password to confirm',
     backToSignIn: 'Back to sign in',
     noAccount: "Don't have an account?",
@@ -336,6 +339,7 @@ const STRINGS = {
     hintName: 'ناوەکەت بنووسە',
     hintEmail: 'ئیمەیلێکی دروست بنووسە',
     hintPassword: 'وشەی نهێنی: لانیکەم ٨ پیت',
+    errPasswordLong: 'وشەی نهێنییەکە زۆر درێژە — زۆرترین ١٢٨ پیت.',
     hintConfirm: 'هەمان وشەی نهێنی دووبارە بنووسە بۆ دووپاتکردنەوە',
     backToSignIn: 'گەڕانەوە بۆ چوونەژوورەوە',
     noAccount: 'هەژمارت نییە؟',
@@ -411,8 +415,6 @@ type AuthPanel = 'form' | 'telegram';
 type SignupStep = 1 | 2 | 3;
 
 /** Client mirror of the server's username shape (worker/lib/usernames.ts; the server lowercases). */
-const USERNAME_SHAPE_RE = /^[a-zA-Z0-9._-]{3,30}$/;
-
 /** Drafting-sheet labels above each screen's title. Technical, LTR, never translated. */
 const SHEET = {
   signin: 'SIGN-IN',
@@ -608,6 +610,10 @@ export default function Auth() {
     USERNAME_BAD_EDGES: usernameReasonLabel(ob, 'bad_edges'),
     USERNAME_REPEATED_PUNCTUATION: usernameReasonLabel(ob, 'repeated_punctuation'),
     USERNAME_ALL_DIGITS: usernameReasonLabel(ob, 'all_digits'),
+    // The server now names these, so they can be read in Arabic and Kurdish
+    // instead of arriving as an English sentence.
+    PASSWORD_TOO_SHORT: s.hintPassword,
+    PASSWORD_TOO_LONG: s.errPasswordLong,
     EMAIL_NOT_CONFIGURED: s.errMailOff,
     GOOGLE_NOT_CONFIGURED: s.googleServerNotConfigured,
     EMAIL_NOT_VERIFIED: s.errGoogleNeedsVerify,
@@ -741,7 +747,18 @@ export default function Auth() {
   // The handle: shape first (client mirror of the server rule), then the
   // server's own availability answer while typing — informational, except
   // that a name the server has ALREADY refused cannot be "ready".
-  const usernameShapeValid = USERNAME_SHAPE_RE.test(trimmedUsername);
+  /**
+   * The SERVER's rule, checked here — see src/lib/usernameRules.ts.
+   *
+   * This was `/^[a-zA-Z0-9._-]{3,30}$/`, which accepts `_ali`, `ali.`,
+   * `ali__b` and `12345` — all refused by the server. Because the loose check
+   * also GATED the live availability lookup below, someone typing one of those
+   * got no feedback at all while typing and a flat refusal on submit. The
+   * precise reasons were already written in all three languages; nothing was
+   * reaching them.
+   */
+  const usernameProblem = trimmedUsername ? usernameRejection(trimmedUsername) : null;
+  const usernameShapeValid = trimmedUsername.length > 0 && usernameProblem === null;
   const availability = useUsernameAvailability(trimmedUsername, view === 'signup' && usernameShapeValid);
   const usernameValid = usernameShapeValid && availability.state !== 'unavailable';
   const usernamePart = {
@@ -787,11 +804,14 @@ export default function Auth() {
           : '';
   const step2Hint = !trimmedName
     ? s.hintName
-    : !usernameShapeValid
-      ? s.hintUsername
-      : availability.state === 'unavailable'
-        ? s.hintUsernameTaken
-        : '';
+    : usernameProblem
+      // Say WHICH rule it broke, not "handle is invalid".
+      ? usernameReasonLabel(ob, usernameProblem)
+      : !usernameShapeValid
+        ? s.hintUsername
+        : availability.state === 'unavailable'
+          ? s.hintUsernameTaken
+          : '';
   const signupEmailHint = step1Hint || step2Hint;
 
   // Inline errors only where they genuinely help while typing.
@@ -800,15 +820,23 @@ export default function Auth() {
       ? s.errPasswordMismatch
       : undefined;
   const usernameHelp =
-    availability.state === 'checking'
-      ? ob.usernameChecking
-      : availability.state === 'free'
-        ? ob.usernameFree
-        : availability.state === 'unavailable'
-          ? usernameReasonLabel(ob, availability.reason)
-          : s.hintUsername;
+    // The local verdict comes FIRST: it is instant and it is the same rule the
+    // server applies, so there is no reason to wait 350ms for a round trip to
+    // say that `ali__b` has a doubled separator.
+    usernameProblem
+      ? usernameReasonLabel(ob, usernameProblem)
+      : availability.state === 'checking'
+        ? ob.usernameChecking
+        : availability.state === 'free'
+          ? ob.usernameFree
+          : availability.state === 'unavailable'
+            ? usernameReasonLabel(ob, availability.reason)
+            : s.hintUsername;
   const usernameTone: 'neutral' | 'ok' | 'bad' =
-    availability.state === 'free' ? 'ok' : availability.state === 'unavailable' ? 'bad' : 'neutral';
+    // A handle that breaks a rule is WRONG, whatever the availability lookup
+    // thinks — and the lookup is not even running for it, because it is gated
+    // on the shape being valid.
+    usernameProblem ? 'bad' : availability.state === 'free' ? 'ok' : availability.state === 'unavailable' ? 'bad' : 'neutral';
 
   // ---------------------------------------------------------------- submits
 
@@ -1122,6 +1150,28 @@ export default function Auth() {
       revealLabels={{ show: s.showPassword, hide: s.hidePassword }}
       disabled={submitting}
       labelEnd={autoComplete === 'current-password' ? forgotLink : undefined}
+      {...(autoComplete === 'new-password'
+        ? {
+            /**
+             * THE RULE, BEFORE IT IS BROKEN.
+             *
+             * `checkPassword` on the server throws «Password must be at least
+             * 8 characters» — in English, with no error code, so the client's
+             * code table cannot translate it. An Arabic or Kurdish customer
+             * therefore met an English sentence at the one moment they are
+             * least able to guess what it wants.
+             *
+             * The requirement was already written in all three languages and
+             * was only being used as a hint under the STEP. Showing it on the
+             * field turns a refusal into an instruction, and it stops being a
+             * refusal at all: it goes green as soon as it is satisfied, so
+             * nobody reaches the server's message.
+             */
+            help: s.hintPassword,
+            helpTone: (password.length === 0 ? 'neutral' : newPwValid ? 'ok' : 'bad') as 'neutral' | 'ok' | 'bad',
+            ok: newPwValid,
+          }
+        : {})}
     />
   );
 

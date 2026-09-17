@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { X } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
@@ -84,6 +86,45 @@ interface VerifyStatus {
   emailConfigured: boolean;
 }
 
+/**
+ * DISMISSING IT HAS TO MEAN SOMETHING.
+ *
+ * `hidden` was component state, and this component is mounted by the app
+ * shell — so it remounts on every navigation and the banner came straight
+ * back. Pressing × did nothing that lasted longer than a tap, which is the
+ * whole of the "مزعجة" complaint: not that the notice exists, but that it
+ * cannot be acknowledged.
+ *
+ * Snoozed rather than dismissed for good, and keyed by ADDRESS: verification
+ * still matters, and a different account on the same device has not dismissed
+ * anything. A day is long enough to stop nagging and short enough that an
+ * unverified inbox is not forgotten.
+ *
+ * Every read and write is guarded: storage throws in a private window and
+ * returns nothing with site data cleared, and a banner must not be what breaks
+ * the page it sits on.
+ */
+const SNOOZE_MS = 24 * 60 * 60 * 1000;
+const snoozeKey = (email: string) => `lv.verify-email.snooze.${email.toLowerCase()}`;
+
+function snoozedUntil(email: string): number {
+  try {
+    const raw = window.localStorage.getItem(snoozeKey(email));
+    const until = raw ? Number(raw) : 0;
+    return Number.isFinite(until) ? until : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function snooze(email: string, now: number): void {
+  try {
+    window.localStorage.setItem(snoozeKey(email), String(now + SNOOZE_MS));
+  } catch {
+    /* a banner must never be the thing that breaks the page */
+  }
+}
+
 function tokenFromUrl(): string {
   try {
     return new URLSearchParams(window.location.search).get('verify_email') || '';
@@ -109,6 +150,10 @@ export default function EmailVerifyBanner() {
 
   const [status, setStatus] = useState<VerifyStatus | null>(null);
   const [hidden, setHidden] = useState(false);
+  const dismiss = useCallback(() => {
+    setHidden(true);
+    if (status?.email) snooze(status.email, Date.now());
+  }, [status?.email]);
 
   // Resend state
   const [sendState, setSendState] = useState<'idle' | 'sending' | 'sent' | 'not_configured' | 'too_many' | 'error'>('idle');
@@ -117,6 +162,25 @@ export default function EmailVerifyBanner() {
 
   // Confirm-token state (?verify_email=…)
   const [token] = useState<string>(() => tokenFromUrl());
+  /**
+   * THE HEADER IS `position: fixed`, SO THE TOP OF THE PAGE IS UNDER IT.
+   *
+   * This component is the first child of the scroll container, and on '/' the
+   * store header floats over that container at z-100 — so the banner was drawn
+   * beneath it and the owner saw the notice "behind the search bar". Header now
+   * measures itself into `--app-header-height` (index.css declares it,
+   * Product.tsx already maintains it the same way), and this reads that one
+   * live value instead of copying Hero's hand-tuned `pt-[132px]` to a second
+   * place. The header renders on '/' and nowhere else, so nowhere else pays for
+   * the offset.
+   */
+  const onHomeRoute = useLocation().pathname === '/';
+  // A MARGIN, not padding: padding would grow the notice itself by the height
+  // of the header and leave its text stranded at the bottom of a 170px box.
+  // The clearance belongs between the header and the card, not inside it.
+  const headerClearance = onHomeRoute
+    ? 'mt-[calc(var(--app-header-height,132px)+0.75rem)]'
+    : 'mt-3';
   const [confirmState, setConfirmState] = useState<'idle' | 'confirming' | 'done' | 'failed'>('idle');
 
   const loadStatus = useCallback(() => {
@@ -187,7 +251,7 @@ export default function EmailVerifyBanner() {
   // Confirm card takes precedence: the user followed the email link.
   if (token && confirmState !== 'done') {
     return (
-      <div className="mx-3 mt-3 rounded-2xl border border-yellow-700/50 bg-[#171304] p-4 text-sm">
+      <div className={`${headerClearance} mx-3 rounded-2xl border border-warning/30 bg-warning/[0.08] p-4 text-sm`}>
         <p className="font-bold text-yellow-500 mb-1">{t.confirmTitle}</p>
         {confirmState === 'failed' ? (
           <>
@@ -213,10 +277,15 @@ export default function EmailVerifyBanner() {
 
   if (token && confirmState === 'done') {
     return (
-      <div className="mx-3 mt-3 rounded-2xl border border-green-700/50 bg-[#06170a] p-4 text-sm flex items-start justify-between gap-3">
+      <div className={`${headerClearance} mx-3 rounded-2xl border border-success/30 bg-success/[0.08] p-4 text-sm flex items-start justify-between gap-3`}>
         <p className="text-green-400">{t.confirmed}</p>
-        <button type="button" onClick={() => setHidden(true)} aria-label={t.dismiss} className="text-gray-400 px-1">
-          ×
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label={t.dismiss}
+          className="shrink-0 w-11 h-11 -m-2 grid place-items-center rounded-lg text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          <X aria-hidden="true" className="w-4 h-4" />
         </button>
       </div>
     );
@@ -224,6 +293,8 @@ export default function EmailVerifyBanner() {
 
   // Ordinary banner: only for a signed-in, confirmed-unverified account.
   if (hidden || !isLoaded || !isAuthenticated || !status || status.verified) return null;
+  // Acknowledged on this device, for this address, within the last day.
+  if (Date.now() < snoozedUntil(status.email)) return null;
 
   // Telegram-signup accounts carry a non-routable placeholder address
   // (tg-<id>@telegram.local) until the user adds a real email. "Verify your
@@ -233,11 +304,16 @@ export default function EmailVerifyBanner() {
   if (status.email.toLowerCase().endsWith('@telegram.local')) return null;
 
   return (
-    <div className="mx-3 mt-3 rounded-2xl border border-yellow-700/40 bg-[#171304] p-4 text-sm">
+    <div className={`${headerClearance} mx-3 rounded-2xl border border-warning/25 bg-warning/[0.07] p-3.5 text-sm`}>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-gray-200">{t.unverified}</p>
-        <button type="button" onClick={() => setHidden(true)} aria-label={t.dismiss} className="text-gray-400 px-1">
-          ×
+        <p className="text-text-secondary leading-snug">{t.unverified}</p>
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label={t.dismiss}
+          className="shrink-0 w-11 h-11 -m-2 grid place-items-center rounded-lg text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          <X aria-hidden="true" className="w-4 h-4" />
         </button>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3">

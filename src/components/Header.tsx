@@ -38,6 +38,7 @@ export default function Header() {
   // on it: it reads the trigger's box once, on open, to point the panel's
   // transform-origin at the control the person actually pressed.
   const langButtonRef = useRef<HTMLButtonElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -60,12 +61,45 @@ export default function Header() {
     }
   }, [location.pathname]);
 
+  /**
+   * THE HEADER PUBLISHES ITS OWN HEIGHT.
+   *
+   * It is `position: fixed`, so it is out of flow and the scroll container
+   * begins underneath it — anything rendered at the top of that container is
+   * COVERED. Hero already clears it, with a hand-tuned `pt-[132px]`; the email
+   * verification banner did not, which is exactly why it was reported as
+   * appearing "behind the search bar".
+   *
+   * Rather than copy that magic number to a second place, the header measures
+   * itself into `--app-header-height` — the token index.css already declares
+   * and Product.tsx already maintains the same way — so anything that needs to
+   * clear it reads one live value. The observer follows the collapse on scroll
+   * too, so the offset shrinks with the bar instead of stranding a gap.
+   */
+  React.useLayoutEffect(() => {
+    const element = headerRef.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const write = () => {
+      document.documentElement.style.setProperty(
+        '--app-header-height',
+        `${Math.ceil(element.getBoundingClientRect().height)}px`
+      );
+    };
+    write();
+    const observer = new ResizeObserver(write);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty('--app-header-height');
+    };
+  }, [location.pathname]);
+
   if (location.pathname !== '/') {
     return null;
   }
 
   return (
-    <header className={`fixed top-0 inset-x-0 z-[100] flex flex-col pointer-events-none transition-all duration-500 px-4 ${
+    <header ref={headerRef} className={`fixed top-0 inset-x-0 z-[100] flex flex-col pointer-events-none transition-all duration-500 px-4 ${
       isScrolled ? 'material material-thin pt-2.5 pb-2.5 shadow-lg' : 'bg-gradient-to-b from-black/88 via-black/48 to-transparent pt-4 pb-2'
     }`}>
       <div className={`flex items-center justify-between pointer-events-auto transition-all duration-500 ease-in-out origin-top ${
