@@ -101,7 +101,7 @@ const STRINGS = {
   lone third verb take the full width — a predictable shape whatever the
   language, and shared edges to align to.
 */
-const ACTION = 'lv-button lv-button-sm flex-1 basis-[calc(50%-0.25rem)]';
+const ACTION = 'lv-button lv-button-sm flex-1 basis-[calc(50%-0.25rem)] min-w-0';
 
 /**
  * What is still owed at the door. `due_on_delivery_iqd` is the checkout-time

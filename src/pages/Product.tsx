@@ -45,7 +45,7 @@ import { useWallet } from '../WalletContext';
 import {
   ArrowRight, ArrowLeft, ShoppingCart, Star, Check, Share2, Heart, Clock, Package,
   ChevronDown, Minus, Plus, X, FileText, Settings2, ShieldCheck, Truck,
-  AlertTriangle, Store, ZoomIn, Image as ImageIcon, Box, ExternalLink, PlayCircle, Wrench,
+  AlertTriangle, Store, ZoomIn, Image as ImageIcon, Box, ExternalLink, PlayCircle, Wrench, TrendingUp,
 } from 'lucide-react';
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
 import { useGoBack } from '../lib/useGoBack';
@@ -98,6 +98,10 @@ const STRINGS = {
     addToCart: 'أضف إلى السلة', adding: 'جارٍ الإضافة…', added: 'تمت الإضافة إلى السلة',
     viewCart: 'عرض السلة', signInToBuy: 'سجّل الدخول للشراء',
     directSale: 'بيع مباشر', preorderMode: 'طلب مسبق', unavailable: 'غير متوفر',
+    salesSold: 'مبيعات',
+    reviewsCount: (n: number): string => (n === 1 ? 'تقييم' : n === 2 ? 'تقييمان' : n <= 10 ? 'تقييمات' : 'تقييماً'),
+    ratingAria: (avg: string, n: number): string => `التقييم ${avg} من 5، من ${n} تقييم`,
+    salesAria: (tier: string): string => `أكثر من ${tier} عملية بيع`,
     fulfilment: 'طريقة التوفر', fulfilDirectSub: 'يصلك فورًا من المخزون', fulfilPreorderSub: 'يُطلب لك ثم يُشحن',
     levelOut: 'نفد', levelLeft: 'بقي {n}', levelAvail: 'متوفر {n}',
     inStock: 'متوفر', lowStock: 'بقي {n} فقط', stockProductScope: 'الكمية مسجّلة على مستوى المنتج وليست لكل خيار',
@@ -164,6 +168,10 @@ const STRINGS = {
     addToCart: 'Add to cart', adding: 'Adding…', added: 'Added to your cart',
     viewCart: 'View cart', signInToBuy: 'Sign in to buy',
     directSale: 'Direct sale', preorderMode: 'Pre-order', unavailable: 'Unavailable',
+    salesSold: 'sold',
+    reviewsCount: (n: number): string => (n === 1 ? 'review' : 'reviews'),
+    ratingAria: (avg: string, n: number): string => `Rated ${avg} out of 5, from ${n} reviews`,
+    salesAria: (tier: string): string => `More than ${tier} sold`,
     fulfilment: 'Availability', fulfilDirectSub: 'Ships now from stock', fulfilPreorderSub: 'Ordered for you, then shipped',
     levelOut: 'Out', levelLeft: '{n} left', levelAvail: '{n} available',
     inStock: 'In stock', lowStock: 'Only {n} left', stockProductScope: 'Stock is tracked per product, not per option',
@@ -232,6 +240,10 @@ const STRINGS = {
     addToCart: 'زیادکردن بۆ سەبەتە', adding: 'زیاد دەکرێت…', added: 'زیادکرا بۆ سەبەتەکەت',
     viewCart: 'بینینی سەبەتە', signInToBuy: 'بچۆ ژوورەوە بۆ کڕین',
     directSale: 'فرۆشتنی ڕاستەوخۆ', preorderMode: 'پێشداواکاری', unavailable: 'بەردەست نییە',
+    salesSold: 'فرۆشراو',
+    reviewsCount: (n: number): string => (n === 1 ? 'هەڵسەنگاندن' : 'هەڵسەنگاندن'),
+    ratingAria: (avg: string, n: number): string => `${avg} لە 5، لە ${n} هەڵسەنگاندن`,
+    salesAria: (tier: string): string => `زیاتر لە ${tier} فرۆشراوە`,
     fulfilment: 'شێوازی بەردەستبوون', fulfilDirectSub: 'یەکسەر لە کۆگاوە دەگات', fulfilPreorderSub: 'بۆت داوا دەکرێت پاشان دەنێردرێت',
     levelOut: 'نەماوە', levelLeft: '{n} ماوە', levelAvail: '{n} بەردەستە',
     inStock: 'بەردەستە', lowStock: 'تەنها {n} ماوە', stockProductScope: 'بڕ لەسەر ئاستی بەرهەم تۆمار کراوە، نەک بۆ هەر هەڵبژاردەیەک',
@@ -562,6 +574,16 @@ interface DetailResponse {
   /** §10: a composition slug answers with the canonical location beside its
    *  payload, so an old `/product/<bundle>` link still works. */
   redirect?: string;
+  /**
+   * The header's two extra signals.
+   *
+   * `sales_badge` is a TIER the product has genuinely passed, never the exact
+   * count — the raw figure is bucketed in the Worker and never sent, so the
+   * shop's per-product sales volume is not published to anyone who opens
+   * devtools (worker/lib/salesBadge.ts). Null below the first tier.
+   */
+  sales_badge?: number | null;
+  rating?: { average: number; count: number } | null;
 }
 
 interface QuoteResponse {
@@ -714,6 +736,9 @@ export default function Product() {
   })();
 
   const [product, setProduct] = useState<ProductDetail | null>(null);
+  /** Header signals: the sales TIER (never the exact count) and the score. */
+  const [salesBadge, setSalesBadge] = useState<number | null>(null);
+  const [rating, setRating] = useState<{ average: number; count: number } | null>(null);
   const [source, setSource] = useState<ProductSource>('catalog');
   const [relations, setRelations] = useState<RelationsPayload | null>(null);
   const [baseAvailability, setBaseAvailability] = useState<Availability | null>(null);
@@ -848,6 +873,8 @@ export default function Product() {
   // makes React re-render immediately (skeleton) before anything is painted.
   if (product && shownSlug && product.slug !== shownSlug) {
     setProduct(null);
+    setSalesBadge(null);
+    setRating(null);
     setLoading(true);
   }
 
@@ -886,6 +913,8 @@ export default function Product() {
         setQuotedPlans(null);
         setQuoteError(null);
         setPriceLevels(data.price_levels ?? null);
+        setSalesBadge(data.sales_badge ?? null);
+        setRating(data.rating ?? null);
         // THE PRICE IS ALREADY HERE. `pricing` is the server's own resolver
         // result for the opening selection, computed on this request; seeding the
         // quote with it means the page opens with a real, final figure instead
@@ -2721,11 +2750,58 @@ export default function Product() {
 
             {/* Title + store, shown once (the panel repeats no heading). */}
             <div className="mt-5">
-              <div className="flex items-center gap-2 flex-wrap mb-2">
+              {/*
+                THE THREE SIGNALS A SHOPPER WEIGHS BEFORE THE PRICE.
+
+                Availability, score and how many have sold. Only the first
+                carries a semantic tint: it is the one that changes what
+                happens when you tap Buy, and tinting all three would make a
+                row of competing badges out of what should read as one quiet
+                line of facts (§7 — accent where it communicates importance).
+                The star keeps the gold because a rating without one is not a
+                rating; the sales chip is neutral.
+
+                Each chip renders only when it has something true to say — no
+                "0 reviews" and no "0+ sold". A new product shows one chip,
+                which is correct: nothing has happened to it yet.
+              */}
+              <div className="flex items-center gap-x-2 gap-y-1.5 flex-wrap mb-2">
                 <span className={`inline-flex items-center gap-1.5 border rounded-full px-2.5 py-1 text-[11px] font-bold ${modeBadge.cls}`}>
                   {modeBadge.icon}
                   {modeBadge.label}
                 </span>
+
+                {rating && rating.count > 0 ? (
+                  <span
+                    data-product-rating
+                    aria-label={s.ratingAria(rating.average.toFixed(1), rating.count)}
+                    className="inline-flex items-center gap-1.5 border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] text-zinc-300"
+                  >
+                    <Star aria-hidden="true" className="w-3.5 h-3.5 text-[#BAA369]" fill="currentColor" strokeWidth={0} />
+                    {/* Tabular figures so a 4.0 and a 4.8 occupy the same
+                        width and the row does not shift as products change. */}
+                    <span className="font-bold tabular-nums" dir="ltr">{rating.average.toFixed(1)}</span>
+                    <span className="text-zinc-500 tabular-nums">
+                      ({rating.count.toLocaleString('en-US')} {s.reviewsCount(rating.count)})
+                    </span>
+                  </span>
+                ) : null}
+
+                {salesBadge !== null ? (
+                  <span
+                    data-product-sales={salesBadge}
+                    aria-label={s.salesAria(salesBadge.toLocaleString('en-US'))}
+                    className="inline-flex items-center gap-1.5 border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] text-zinc-300"
+                  >
+                    <TrendingUp aria-hidden="true" className="w-3.5 h-3.5 text-zinc-400" />
+                    {/* `dir="ltr"` on the figure alone: «+200 مبيعات» has an
+                        LTR number inside an RTL sentence, and without the
+                        isolate the plus sign jumps to the wrong side of it. */}
+                    <span className="font-bold tabular-nums" dir="ltr">+{salesBadge.toLocaleString('en-US')}</span>
+                    <span className="text-zinc-500">{s.salesSold}</span>
+                  </span>
+                ) : null}
+
                 {product.brand ? (
                   <span className="border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] text-zinc-300">{product.brand}</span>
                 ) : null}

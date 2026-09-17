@@ -587,7 +587,7 @@ export default function Profile() {
                 aria-disabled={game.soon || undefined}
                 title={game.soon ? `${game.label} — ${t('comingSoon')}` : undefined}
                 className={`group flex w-[74px] shrink-0 flex-col items-center gap-2 rounded-lg py-1 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] ${
-                  game.soon ? 'cursor-default' : 'hover:scale-105 active:scale-95'
+                  game.soon ? 'cursor-default' : 'press-scale sm:hover:scale-105'
                 }`}
               >
                 <span className="relative" aria-hidden="true">

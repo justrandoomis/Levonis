@@ -72,6 +72,7 @@ import { activePoolProductIds } from '../lib/mysteryDraw';
 import { applyOfferToResolved, loadOffers, offerEligible, offerKey, scheduleState, subjectOf, type OfferView } from '../lib/offers';
 import { isPrinterProduct } from '../lib/printerIdentity';
 import { resolveSiteMedia } from '../lib/siteMedia';
+import { salesBadgeFor } from '../lib/salesBadge';
 import { pricedPlans, WARRANTY_NOT_PRINTER } from '../lib/warrantyPlans';
 import {
   canonicalOptionValueIds as canonicalSelectionOptionValueIds,
@@ -2680,7 +2681,7 @@ productRoutes.get('/:slug', async (c) => {
       });
     }
 
-    const [ctx, favRow, brandRow, relations, isPrinter] = await Promise.all([
+    const [ctx, favRow, brandRow, relations, isPrinter, salesBadge, ratingRow] = await Promise.all([
       pricingCtx(c),
       user
         ? c.env.DB.prepare('SELECT 1 AS x FROM favorites WHERE user_id = ? AND product_id = ?')
@@ -2699,7 +2700,21 @@ productRoutes.get('/:slug', async (c) => {
       // The owner's catalog flag: the page shows the printer home-delivery
       // note off it (worker/lib/printerIdentity.ts) — never off ops_policy.
       isPrinterProduct(c.env.DB, String(row.id)),
+      // The header's "how many have sold" tier. Joins this batch rather than
+      // running after it, so the badge costs the page no extra round trip.
+      salesBadgeFor(c.env.DB, String(row.id)),
+      // The header's score. Same aggregate the reviews tab computes, on the
+      // same `status = 'published'` filter, so the two can never disagree.
+      c.env.DB.prepare(
+        "SELECT COUNT(*) AS n, AVG(stars) AS avg_stars FROM reviews WHERE product_id = ? AND status = 'published'"
+      )
+        .bind(String(row.id))
+        .first<{ n: number; avg_stars: number | null }>(),
     ]);
+    const ratingCount = Number(ratingRow?.n) || 0;
+    const ratingSummary = ratingCount > 0
+      ? { average: Math.round(Number(ratingRow?.avg_stars ?? 0) * 10) / 10, count: ratingCount }
+      : null;
     const doc = applyRelations(parsed, relations);
     // ONE FIELD, ONE MEANING. `display_price_iqd` is the CARD price — the
     // cheapest way to buy the product — everywhere else it appears, and this
@@ -2789,6 +2804,21 @@ productRoutes.get('/:slug', async (c) => {
       source: 'catalog',
       favorite: !!favRow,
       brand: brandRow ?? null,
+      /**
+       * The two header signals the page could not previously show.
+       *
+       * `sales_badge` is the TIER, not the count — worker/lib/salesBadge.ts
+       * explains why the exact figure must not leave the Worker. Null below
+       * the first tier, so a new product shows nothing rather than "0+".
+       *
+       * `rating` was reachable only through GET /api/reviews/product/:slug,
+       * which the reviews TAB fetches — so the header could not show a score
+       * until the shopper scrolled to and opened that tab. One extra aggregate
+       * here is cheaper than the page being unable to answer "is this any
+       * good?" above the fold.
+       */
+      sales_badge: salesBadge,
+      rating: ratingSummary,
       // The structure the JSON model could not express: option GROUPS, the
       // real many-to-many colour links, modelled combinations and bound
       // images. Null when the product has no relational rows at all.

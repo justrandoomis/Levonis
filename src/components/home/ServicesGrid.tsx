@@ -66,7 +66,7 @@ function CardBody({
         }`}
       >
         {image ? (
-          <img src={image} alt="" aria-hidden="true" loading="lazy" decoding="async" className="w-full h-full object-contain p-1.5" />
+          <img src={image} alt="" aria-hidden="true" width={44} height={44} loading="lazy" decoding="async" className="w-full h-full object-contain p-1.5" />
         ) : (
           <Icon aria-hidden="true" className={`w-5 h-5 ${featured ? 'text-olive-light' : 'text-zinc-300'}`} />
         )}

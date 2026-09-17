@@ -191,7 +191,7 @@ function MarqueeMark({ entry, first }: { entry: MarqueeEntry; first: boolean }) 
         }`}
       >
         {entry.image ? (
-          <img src={entry.image} alt="" loading="lazy" className="w-full h-full object-contain p-2" />
+          <img src={entry.image} alt="" width={56} height={56} loading="lazy" decoding="async" className="w-full h-full object-contain p-2" />
         ) : (
           monogramOf(entry.name)
         )}

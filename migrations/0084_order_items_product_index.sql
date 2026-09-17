@@ -1,0 +1,14 @@
+-- The product page's "how many have sold" badge counts delivered units per
+-- product:
+--
+--   SELECT SUM(oi.qty) FROM order_items oi
+--     JOIN orders o ON o.id = oi.order_id
+--    WHERE oi.product_id IN (...) AND o.status = 'delivered'
+--
+-- order_items carried only idx_order_items_order (order_id), so that filter
+-- was a full scan of every line ever sold, on the busiest read in the shop.
+-- This index makes it a lookup.
+--
+-- Rerunnable: IF NOT EXISTS, so applying the migration set twice is a no-op
+-- rather than a failure (the rule migration 0083 was corrected for).
+CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id);

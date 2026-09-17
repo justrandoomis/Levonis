@@ -594,8 +594,8 @@ function SiteMediaSettings({ dir }: { dir: string }) {
       </div>
 
       {loadError && (
-        <div className="mb-4 text-sm text-red-400 flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4" /> {loadError}
+        <div role="alert" className="mb-4 text-sm text-red-400 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4" aria-hidden="true" /> {loadError}
           <button onClick={() => void load()} className="underline font-bold">{rtl ? 'إعادة المحاولة' : 'Retry'}</button>
         </div>
       )}
@@ -612,7 +612,7 @@ function SiteMediaSettings({ dir }: { dir: string }) {
                 <div key={m.slot} className="flex items-center gap-3 bg-zinc-950/60 border border-zinc-800 rounded-2xl p-3">
                   <span className="w-12 h-12 shrink-0 rounded-xl bg-zinc-100 border border-zinc-300/30 grid place-items-center overflow-hidden">
                     {m.url
-                      ? <img src={m.url} alt="" className="w-full h-full object-contain p-1" />
+                      ? <img src={m.url} alt="" width={48} height={48} loading="lazy" decoding="async" className="w-full h-full object-contain p-1" />
                       : <ImageIcon className="w-5 h-5 text-zinc-500" aria-hidden="true" />}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -624,16 +624,31 @@ function SiteMediaSettings({ dir }: { dir: string }) {
                           ? (rtl ? 'الصورة الافتراضية' : 'Default image')
                           : (rtl ? 'لا توجد صورة' : 'No image')}
                     </span>
-                    {slotError[m.slot] && <span className="block text-[11px] text-red-400 mt-0.5">{slotError[m.slot]}</span>}
+                    {slotError[m.slot] && (
+                      <span role="alert" className="block text-[11px] text-red-400 mt-0.5">{slotError[m.slot]}</span>
+                    )}
                   </span>
                   <span className="flex items-center gap-1.5 shrink-0">
-                    <label className={`flex items-center gap-1.5 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg cursor-pointer transition-colors border border-zinc-700 text-xs font-bold ${busySlot === m.slot ? 'opacity-50 pointer-events-none' : ''}`}>
-                      <Upload className="w-3.5 h-3.5" />
-                      {busySlot === m.slot ? (rtl ? '…' : '…') : (rtl ? 'رفع' : 'Upload')}
+                    {/* `sr-only`, NOT `hidden`. A file input inside a label is
+                        the standard way to style an upload control, but
+                        `display: none` also removes it from the focus order —
+                        and since a <label> is not focusable either, the whole
+                        control becomes unreachable by keyboard. Visually hidden
+                        keeps it focusable, and `has-[:focus-visible]` paints
+                        the ring on the part the eye can actually see. (`peer-*`
+                        would be wrong here: the input is a DESCENDANT of the
+                        label, not a preceding sibling.) */}
+                    <label
+                      className={`has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus flex items-center gap-1.5 px-3 py-2 min-h-[44px] bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg cursor-pointer transition-colors border border-zinc-700 text-xs font-bold ${busySlot === m.slot ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      <Upload className="w-3.5 h-3.5" aria-hidden="true" />
+                      {busySlot === m.slot ? (rtl ? 'جارٍ الرفع…' : 'Uploading…') : (rtl ? 'رفع' : 'Upload')}
+                      <span className="sr-only">{` — ${m.label}`}</span>
                       <input
                         type="file"
-                        className="hidden"
+                        className="sr-only"
                         accept="image/webp,.webp"
+                        disabled={busySlot === m.slot}
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           e.target.value = '';
@@ -646,10 +661,11 @@ function SiteMediaSettings({ dir }: { dir: string }) {
                         type="button"
                         onClick={() => void reset(m.slot)}
                         disabled={busySlot === m.slot}
+                        aria-label={`${rtl ? 'العودة للصورة الافتراضية' : 'Back to the default image'} — ${m.label}`}
                         title={rtl ? 'العودة للصورة الافتراضية' : 'Back to the default image'}
-                        className="px-2.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-lg border border-zinc-700 text-xs font-bold disabled:opacity-50"
+                        className="px-2.5 py-2 min-h-[44px] bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-lg border border-zinc-700 text-xs font-bold disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                       >
-                        <RotateCcw className="w-3.5 h-3.5" />
+                        <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
                     )}
                   </span>
