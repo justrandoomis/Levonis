@@ -84,16 +84,25 @@ const usable = (a: { modes?: Mode[] }, type: Mode['type']) =>
 /** The page's own gate, quoted: `modesArr.length >= 2`. */
 const chooserRenders = (a: { modes?: Mode[] }) => modesOf(a).length >= 2;
 
-test('THE FIRST PAINT names both ways to buy, before any model is chosen', async () => {
+test('THE FIRST PAINT names both ways and defaults to the stocked direct-sale model', async () => {
   const app = shopApp(asD1(seedA1()));
   const detail = await json(await get(app, '/api/products/a1'));
   const a = detail.availability;
 
-  // WITHOUT THE FIX: [{direct_sale, usable:true}] and nothing else.
+  assert.deepEqual(
+    detail.initial_selection,
+    {
+      option_id: 'v_combo',
+      option_value_ids: ['v_combo'],
+      color_id: null,
+      fulfillment_type: 'direct_sale',
+    },
+    'the first stocked complete selection is chosen server-side'
+  );
   assert.deepEqual(
     modesOf(a).map((m) => [m.type, m.usable]),
-    [['direct_sale', false], ['pre_order', true]],
-    'the product offers both, so the first paint says both'
+    [['direct_sale', true], ['pre_order', true]],
+    'the stocked opening selection keeps both offered ways visible'
   );
   assert.equal(a.preorder.enabled, true, 'pre-order is enabled by the MODELS, not only by sale_types');
   assert.equal(a.preorder.usable, true);
