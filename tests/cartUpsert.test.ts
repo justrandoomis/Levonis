@@ -29,7 +29,10 @@ function db() {
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON;');
   const dir = join(ROOT, 'migrations');
-  for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) {
+  // Release A schema: 0082 expand is present and 0083 contract is deliberately
+  // a separate deployment. Most route SQL must remain valid in this dual-index
+  // state; contract-only behaviour is tested in cartIdentityContract.test.ts.
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql') && !x.startsWith('0083')).sort()) {
     raw.exec(readFileSync(join(dir, f), 'utf8'));
   }
   raw.exec(`
@@ -50,14 +53,22 @@ const LEVONIS_ADD = `
   INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
                           shipping_method_id, transport_method, warranty_plan_id, qty)
   VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?)
-  ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
-    WHERE product_id IS NOT NULL
-  DO UPDATE SET qty = MIN(99, qty + excluded.qty),
+  ON CONFLICT DO UPDATE SET qty = MIN(99, qty + excluded.qty),
                 option_value_ids = excluded.option_value_ids,
                 transport_method = excluded.transport_method,
                 warranty_plan_id = CASE WHEN excluded.warranty_plan_id = ''
                                         THEN cart_items.warranty_plan_id
                                         ELSE excluded.warranty_plan_id END`;
+
+/** Release -1 statement: kept here to prove 0082 never strands a Worker that
+ * still names the five-column 0032 conflict target. */
+const LEGACY_LEVONIS_ADD = `
+  INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
+                          shipping_method_id, transport_method, warranty_plan_id, qty)
+  VALUES (?, ?, ?, ?, ?, ?, '', '', '', ?)
+  ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
+    WHERE product_id IS NOT NULL
+  DO UPDATE SET qty = MIN(99, qty + excluded.qty)`;
 
 const MERCHANT_ADD = `
   INSERT INTO cart_items
@@ -67,8 +78,28 @@ const MERCHANT_ADD = `
     WHERE community_product_id IS NOT NULL
   DO UPDATE SET qty = MIN(99, cart_items.qty + excluded.qty)`;
 
-const addLevonis = (raw: DatabaseSync, id: string, qty = 1, opt = '', color = '', plan = '') =>
-  raw.prepare(LEVONIS_ADD).run(id, 'u1', 'p1', opt, '[]', color, '', plan, qty);
+const addLevonis = (
+  raw: DatabaseSync,
+  id: string,
+  qty = 1,
+  opt = '',
+  color = '',
+  plan = '',
+  selected: string[] = opt ? [opt] : []
+) => {
+  const canonical = [...new Set(selected.filter(Boolean))].sort();
+  raw.prepare(LEVONIS_ADD).run(
+    id,
+    'u1',
+    'p1',
+    canonical[0] || opt || '',
+    JSON.stringify(canonical),
+    color,
+    '',
+    plan,
+    qty
+  );
+};
 
 const addMerchant = (raw: DatabaseSync, id: string, qty = 1, opt = '', color = '') =>
   raw.prepare(MERCHANT_ADD).run(id, 'u1', 'm1', 's1', 'cp1', opt, color, qty);
@@ -138,6 +169,121 @@ test('a different option, colour or shipping method is a DIFFERENT line', () => 
   assert.equal(rows(raw).length, 3);
 });
 
+test('0082 canonicalizes and dedupes without dropping the five-column v1 index', () => {
+  const raw = new DatabaseSync(':memory:');
+  raw.exec('PRAGMA foreign_keys = ON;');
+  const dir = join(ROOT, 'migrations');
+  const files = readdirSync(dir).filter((x) => x.endsWith('.sql')).sort();
+  for (const f of files) {
+    if (f.startsWith('0082')) break;
+    raw.exec(readFileSync(join(dir, f), 'utf8'));
+  }
+  raw.exec(`
+    INSERT INTO users (id,name,email,password_hash) VALUES ('u1','Sara','s@x.co','h');
+    INSERT INTO products (id, slug, name, price_iqd, status)
+      VALUES ('p1','widget','Widget',5000,'active');
+    INSERT INTO products (id, slug, name, price_iqd, status, composition)
+      VALUES ('bundle1','mystery-box','Mystery box',5000,'active','mystery');
+    INSERT INTO product_option_groups (id,product_id,name_en,sort,active) VALUES
+      ('g-size','p1','Size',20,1),
+      ('g-model','p1','Model',10,1);
+    INSERT INTO product_option_values (id,product_id,group_id,name_en,sort,active) VALUES
+      ('a-size','p1','g-size','Small',0,1),
+      ('z-model','p1','g-model','Model Z',0,1);
+    INSERT INTO cart_items
+      (id,user_id,seller_type,product_id,option_id,option_value_ids,warranty_plan_id,qty)
+    VALUES
+      ('legacy','u1','levonis','p1','z-model','["z-model","a-size","a-size"]','wp_ext12',1),
+      ('legacy-second','u1','levonis','p1','a-size','["a-size","z-model"]','',2),
+      ('bundle','u1','levonis','bundle1','bx_keep_me','["family-a"]','',1);
+  `);
+
+  raw.exec(readFileSync(join(dir, files.find((f) => f.startsWith('0082'))!), 'utf8'));
+  const migrated = raw.prepare("SELECT option_id, option_value_ids FROM cart_items WHERE id = 'legacy'")
+    .get() as { option_id: string; option_value_ids: string };
+  assert.equal(migrated.option_id, 'z-model', 'expand must not rewrite the old index key');
+  assert.equal(migrated.option_value_ids, '["a-size","z-model"]');
+  assert.equal(
+    (raw.prepare("SELECT COUNT(*) AS n FROM cart_items WHERE product_id = 'p1'").get() as { n: number }).n,
+    1
+  );
+  assert.equal(
+    (raw.prepare("SELECT qty FROM cart_items WHERE product_id = 'p1'").get() as { qty: number }).qty,
+    3
+  );
+  assert.equal(
+    (raw.prepare("SELECT warranty_plan_id FROM cart_items WHERE product_id = 'p1'").get() as { warranty_plan_id: string }).warranty_plan_id,
+    '',
+    'mixed warranty choices must be cleared rather than applied to unagreed units'
+  );
+  const bundle = raw.prepare("SELECT option_id, option_value_ids FROM cart_items WHERE id = 'bundle'")
+    .get() as { option_id: string; option_value_ids: string };
+  assert.equal(bundle.option_id, 'bx_keep_me');
+  assert.equal(bundle.option_value_ids, '["family-a"]');
+
+  const expandedIndexes = (raw.prepare(
+    "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='cart_items'"
+  ).all() as Array<{ name: string }>).map((row) => row.name);
+  assert.ok(expandedIndexes.includes('idx_cart_levonis_line'));
+  assert.ok(expandedIndexes.includes('idx_cart_levonis_line_v2'));
+
+});
+
+test('Release A UPSERT and the old Worker both work on old-only and dual-index schemas', () => {
+  const raw = new DatabaseSync(':memory:');
+  raw.exec('PRAGMA foreign_keys = ON;');
+  const dir = join(ROOT, 'migrations');
+  const files = readdirSync(dir).filter((x) => x.endsWith('.sql')).sort();
+  for (const f of files) {
+    if (f.startsWith('0082')) break;
+    raw.exec(readFileSync(join(dir, f), 'utf8'));
+  }
+  raw.exec(`
+    INSERT INTO users (id,name,email,password_hash) VALUES ('u1','Sara','s@x.co','h');
+    INSERT INTO products (id,slug,name,price_iqd,status) VALUES ('p1','widget','Widget',5000,'active');
+    INSERT INTO product_option_groups (id,product_id,name_en,sort,active) VALUES ('g1','p1','Model',0,1);
+    INSERT INTO product_option_values (id,product_id,group_id,name_en,sort,active)
+      VALUES ('opt-a','p1','g1','A',0,1);
+  `);
+  const oldAdd = (id: string) => raw.prepare(LEGACY_LEVONIS_ADD)
+    .run(id, 'u1', 'p1', 'opt-a', '["opt-a"]', '', 1);
+  const releaseAAdd = (id: string) => raw.prepare(LEVONIS_ADD)
+    .run(id, 'u1', 'p1', 'opt-a', '["opt-a"]', '', '', '', 1);
+  const qty = () => (raw.prepare("SELECT qty FROM cart_items WHERE product_id = 'p1'").get() as { qty: number }).qty;
+
+  oldAdd('old-only-old-worker');
+  releaseAAdd('old-only-release-a');
+  assert.equal(qty(), 2, 'targetless Release A failed against the old-only index');
+
+  raw.exec(readFileSync(join(dir, files.find((f) => f.startsWith('0082'))!), 'utf8'));
+  oldAdd('dual-old-worker');
+  releaseAAdd('dual-release-a');
+  assert.equal(qty(), 4, 'old or new Worker failed against the dual-index schema');
+
+});
+
+test('reordering option groups cannot create a second line for the same complete selection', () => {
+  const raw = db();
+  raw.exec(`
+    INSERT INTO product_option_groups (id,product_id,name_en,sort,active) VALUES
+      ('g-model','p1','Model',10,1),
+      ('g-size','p1','Size',20,1);
+    INSERT INTO product_option_values (id,product_id,group_id,name_en,sort,active) VALUES
+      ('z-model','p1','g-model','Model Z',0,1),
+      ('a-size','p1','g-size','Small',0,1);
+  `);
+
+  addLevonis(raw, 'ci-before', 1, 'z-model', '', '', ['z-model', 'a-size']);
+  raw.exec("UPDATE product_option_groups SET sort = CASE id WHEN 'g-model' THEN 20 ELSE 10 END WHERE product_id = 'p1'");
+  addLevonis(raw, 'ci-after', 1, 'a-size', '', '', ['a-size', 'z-model']);
+
+  const r = rows(raw);
+  assert.equal(r.length, 1, 'group reorder changed the cart identity');
+  assert.equal(r[0].qty, 2);
+  assert.equal(r[0].option_id, 'a-size');
+  assert.equal(r[0].option_value_ids, '["a-size","z-model"]');
+});
+
 test('a merchant line and a Levonis line for the same shape do not collide', () => {
   // They are different sellers and different products; nothing about one
   // should be able to absorb the other.
@@ -175,6 +321,7 @@ test('the partial indexes exist and are the ones the routes name', () => {
     "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='cart_items'"
   ).all() as Array<{ name: string }>).map((r) => r.name);
   assert.ok(idx.includes('idx_cart_levonis_line'), idx.join(', '));
+  assert.ok(idx.includes('idx_cart_levonis_line_v2'), idx.join(', '));
   assert.ok(idx.includes('idx_cart_merchant_line'), idx.join(', '));
 });
 
@@ -228,12 +375,11 @@ test('the conflict target 0030 left behind really does fail against this schema'
  * of §5.1: it satisfies the same table CHECK, the same
  * `UNIQUE (user_id, product_id, community_product_id, option_id, color_id,
  * shipping_method_id)`, the same partial index `idx_cart_levonis_line` and the
- * same `ON CONFLICT(...)` upsert — with NO index change and NO table rebuild.
+ * same `ON CONFLICT(...)` upsert. Migration 0082 widens the partial index with
+ * canonical option_value_ids while retaining option_id for this key.
  *
- * That is why the composition key rides in `option_id` rather than in a column
- * of its own: a new column inside that unique tuple would have rebuilt the
- * partial index, which is the exact operation migration 0032 exists because of
- * and which took add-to-cart to a 500 the last time it happened.
+ * The composition key remains in `option_id`; option_value_ids adds ordinary
+ * multi-group identity without replacing the bundle key.
  *
  * `draw_salt` is the one column 0058 adds, and it is deliberately OUTSIDE the
  * tuple, so `ALTER TABLE … ADD COLUMN` does not touch the index at all.
@@ -242,9 +388,7 @@ const BUNDLE_ADD = `
   INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
                           shipping_method_id, transport_method, warranty_plan_id, qty, draw_salt)
   VALUES (?, ?, ?, ?, '[]', '', '', ?, '', ?, ?)
-  ON CONFLICT(user_id, product_id, option_id, color_id, shipping_method_id)
-    WHERE product_id IS NOT NULL
-  DO UPDATE SET qty = MIN(99, qty + excluded.qty),
+  ON CONFLICT DO UPDATE SET qty = MIN(99, qty + excluded.qty),
                 transport_method = excluded.transport_method`;
 
 const addBundleLine = (raw: DatabaseSync, id: string, key: string, qty = 1, salt = '') =>
@@ -286,17 +430,17 @@ test('a bundle line and an ordinary line of the same customer never collide', ()
   assert.deepEqual(r.map((x) => String(x.product_id)).sort(), ['p1', 'pb1']);
 });
 
-test('0058 added ONLY draw_salt to cart_items, and it is outside the unique tuple', () => {
+test('draw_salt stays outside the unique tuple and full option identity stays inside it', () => {
   const raw = db();
   const cols = (raw.prepare('PRAGMA table_info(cart_items)').all() as Array<{ name: string }>).map((c) => c.name);
   assert.ok(cols.includes('draw_salt'), 'draw_salt is missing');
-  // The tuple the partial unique index is built on — unchanged.
-  const idx = (raw.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_cart_levonis_line'").get() as {
+  // 0082 adds the complete option selection; draw_salt remains unrelated.
+  const idx = (raw.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_cart_levonis_line_v2'").get() as {
     sql: string;
   }).sql;
   assert.ok(!idx.includes('draw_salt'), 'draw_salt must not be inside idx_cart_levonis_line');
   assert.ok(!idx.includes('composition_key'), 'the composition key rides in option_id, not a new column');
-  for (const part of ['user_id', 'product_id', 'option_id', 'color_id', 'shipping_method_id']) {
+  for (const part of ['user_id', 'product_id', 'option_id', 'option_value_ids', 'color_id', 'shipping_method_id']) {
     assert.ok(idx.includes(part), `${part} left the line-identity index`);
   }
 });
