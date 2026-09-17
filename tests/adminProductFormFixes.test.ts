@@ -231,19 +231,12 @@ test('the form offers the hand-translation door the review flag used to point at
 
 // ---------------------------------------------------------- 3. save conflict
 
-test('the second write door inside the form hands back the concurrency token', () => {
-  const route = src('worker/routes/adminProductRelations.ts');
-  // The door that moves `products.updated_at`...
-  assert.match(route, /UPDATE products SET sale_types = \?, updated_at = strftime/);
-  // ...must return the value it moved it to.
-  assert.match(route, /SELECT updated_at FROM products WHERE id = \?/);
-  assert.match(route, /updated_at: token\?\.updated_at/);
-
-  const panel = src('src/components/adminProducts/FulfillmentPanel.tsx');
-  assert.match(panel, /if \(res\.updated_at\) onProductTouched\?\.\(res\.updated_at\)/);
-
+test('option fulfilment saves through the product form and refreshes its concurrency baseline', () => {
   const form = src('src/components/adminProducts/ProductForm.tsx');
-  assert.match(form, /onProductTouched=\{setLoadedUpdatedAt\}/);
+  assert.match(form, /relations: relationsToWire\(rel\)/);
+  assert.match(form, /setLoadedUpdatedAt\(res\.product\?\.updated_at \?\? loadedUpdatedAt\)/);
+  assert.match(form, /setBaseline\(JSON\.stringify\(\{ d: freshDoc, rs: savedRel \}\)\)/);
+  assert.doesNotMatch(form, /FulfillmentPanel/);
 });
 
 test('a refused save offers a way out instead of a sentence with nothing below it', () => {
@@ -257,7 +250,7 @@ test('a refused save offers a way out instead of a sentence with nothing below i
 
 // ------------------------------------------------------- 4. mirrored fields
 
-test('every control that shows a value owned elsewhere says so, in one shared marker', () => {
+test('the obsolete mirrored stock controls are gone; each value has one editor', () => {
   const formUi = src('src/components/adminProducts/form/formUi.tsx');
   assert.match(formUi, /export function MirrorNote/);
   // Three relationships, because they behave differently for the admin.
@@ -265,16 +258,15 @@ test('every control that shows a value owned elsewhere says so, in one shared ma
     assert.match(formUi, new RegExp(`'${kind}'`));
   }
 
-  // The direct-sale stock the owner named: one column, two screens.
+  // Direct-sale stock now has one home: the option/colour editor.
   const options = src('src/components/adminProducts/form/OptionsSection.tsx');
-  const panel = src('src/components/adminProducts/FulfillmentPanel.tsx');
-  assert.match(options, /MirrorNote kind="same" where="١٢ نوع الطلب لكل موديل"/);
-  assert.match(panel, /MirrorNote kind="same" where="٥ الخيارات والألوان"/);
+  assert.doesNotMatch(options, /MirrorNote/);
+  assert.match(options, /data-option-stock-total=\{v\.id\}/);
+  assert.match(options, /data-color-direct-stock=\{c\.id\}/);
 
-  // The prices and the direct premium they also named.
+  // Product-level direct surcharge/order-type mirrors were removed too.
   const form = src('src/components/adminProducts/ProductForm.tsx');
-  assert.match(form, /kind="replaces"\s*\n?\s*where="٥ الخيارات والألوان"/);
-  assert.match(form, /where="خصم العضوية أسفل هذا القسم"/);
-  assert.match(form, /where="١٢ نوع الطلب لكل موديل"/);
-  assert.match(form, /kind="derived"/);
+  assert.doesNotMatch(form, /نوع الطلب لكل موديل/);
+  assert.doesNotMatch(form, /where="١٢ نوع الطلب لكل موديل"/);
+  assert.doesNotMatch(form, /ar="زيادة البيع المباشر"/);
 });

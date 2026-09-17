@@ -37,7 +37,7 @@
  * /api/admin/products/:id/relations — the rows, never an echo.
  */
 
-import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus } from 'lucide-react';
 import { api, ApiError, failureText, formatIqd } from '../../lib/api';
 import { refusalIssues } from './applyResult';
@@ -56,17 +56,12 @@ import {
   type SaveResponse,
 } from './types';
 import PinnedPriceNotice from './PinnedPriceNotice';
-// Lazy: the order-type editor is only reachable on a SAVED product, and it
-// carries its own load/save cycle. Keeping it out of the form's first chunk
-// costs a saved product one small fetch and saves every new product the code.
-const FulfillmentPanel = React.lazy(() => import('./FulfillmentPanel'));
 const TranslationsSheet = React.lazy(() => import('./form/TranslationsSheet'));
 // Types only — no runtime import, so the sheet stays in its own lazy chunk.
 import type { ReviewItem, TranslationOverrides } from './form/TranslationsSheet';
 import { repriceRow, pinnedRows, type RepriceMode } from '../../../worker/lib/pinnedPrices';
 import {
   Banner,
-  CheckCard,
   Field,
   Grid,
   MirrorNote,
@@ -120,21 +115,6 @@ interface CatalogNode extends CatalogV2 {
   parent_id: string | null;
   effective_template_family: 'devices' | 'materials' | null;
 }
-
-// «باقة» is gone from this list on the owner's order: bundles are now their
-// own admin-composed entity (the الباقات tab), not a per-product checkbox.
-// The backend still accepts the legacy 'bundle' value so old rows load.
-const SALE_TYPES: Array<{ id: SaleType; ar: string; en: string; sub: string }> = [
-  { id: 'direct_sale', ar: 'بيع مباشر', en: 'Direct sale', sub: 'يُشحن من المخزون' },
-  { id: 'pre_order', ar: 'طلب مسبق', en: 'Pre-order', sub: 'يُطلب ثم يُشحن' },
-];
-
-/** The three pre-order journeys, with the owner's wording. */
-const TRANSPORTS: Array<{ method: 'air' | 'sea' | 'land'; ar: string; en: string }> = [
-  { method: 'land', ar: 'بري', en: 'Land' },
-  { method: 'air', ar: 'جوي', en: 'Air' },
-  { method: 'sea', ar: 'بحري', en: 'Sea' },
-];
 
 export default function ProductForm({
   productId,
@@ -486,34 +466,14 @@ export default function ProductForm({
   const errorList = Object.values(errors);
   const err = (k: string) => (showErrors ? (errors[k] ?? null) : null);
 
-  /**
-   * 0043 — THE SALE TYPES ARE READ OFF THE OPTIONS, HERE TOO.
-   *
-   * `worker/lib/availability.ts` already derives the product's sale types from
-   * its options and lets the options WIN whenever any of them declares one.
-   * This form, though, still asked the admin to tick the same answer by hand,
-   * which meant the screen could show "direct sale" while the saved product
-   * was a pre-order — the checkbox was a lie the moment an option disagreed
-   * with it, and it made the admin choose "both" for a mix the options had
-   * already described.
-   *
-   * So the checkboxes stand down as soon as any ACTIVE option has an opinion,
-   * and what is shown is what the server will conclude. The rule and its order
-   * are the server's, copied deliberately rather than invented: an option that
-   * is switched off is not consulted, and `bundle` is a catalogue label that no
-   * option ever claims, so it survives whatever the options say.
-   *
-   * A product with no options at all keeps the manual choice, because that is
-   * the only place its route can come from — and that is every product written
-   * before options carried an availability type.
-   */
+  /** Product sale types are the union of the enabled per-model checkboxes. */
   const optionSaleTypes = (() => {
     const declared = new Set<SaleType>();
     for (const g of rel.groups) {
       for (const v of g.values) {
         if (v.active === false) continue;
-        if (v.availability_type === 'direct_sale' || v.availability_type === 'pre_order') {
-          declared.add(v.availability_type);
+        for (const fulfillment of v.fulfillments) {
+          if (fulfillment.enabled) declared.add(fulfillment.fulfillment_type);
         }
       }
     }
@@ -521,7 +481,7 @@ export default function ProductForm({
   })();
   const saleTypesAreDerived = optionSaleTypes.size > 0;
   const derivedSaleTypes: SaleType[] = saleTypesAreDerived
-    ? (SALE_TYPES.map((t) => t.id).filter((id) => optionSaleTypes.has(id)) as SaleType[])
+    ? (['direct_sale', 'pre_order'].filter((id) => optionSaleTypes.has(id as SaleType)) as SaleType[])
     : [];
 
   /**
@@ -546,12 +506,6 @@ export default function ProductForm({
     // keeps this to the transitions that actually change the answer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saleTypesAreDerived, derivedSaleTypes.join(',')]);
-
-  const setSale = (t: SaleType, on: boolean) =>
-    setDoc((d) => {
-      const next = on ? [...new Set([...d.sale_types, t])] : d.sale_types.filter((x) => x !== t);
-      return { ...d, sale_types: next as EditorDoc['sale_types'], selling_type: (next[0] ?? 'direct_sale') as EditorDoc['selling_type'] };
-    });
 
   // -------------------------------------------------------------- saving
 
@@ -747,8 +701,6 @@ export default function ProductForm({
   const extraCatalogs = doc.catalog_ids
     .filter((id) => id !== doc.category_id && id !== doc.sub_category_id)
     .map((id) => catalogs.find((c) => c.id === id)?.name_ar || catalogs.find((c) => c.id === id)?.name_en || id);
-  const activeTransportsHidden = !doc.sale_types.includes('pre_order') && doc.preorder_transports.some((o) => o.active);
-  const surchargeHidden = !doc.sale_types.includes('direct_sale') && doc.direct_surcharge_iqd !== null;
   const warrantyHiddenValues =
     !isPrinterCatalog && doc.warranty_plans.length === 0 && (doc.warranty_base_months !== null || doc.serialized !== null);
 
@@ -783,7 +735,7 @@ export default function ProductForm({
         <div data-form="stale-edit">
           <Banner kind="warn">
             <p className="mb-2 leading-relaxed">
-              النسخة المحفوظة تغيّرت بعد فتح هذه الصفحة — غالبًا لأن لوحة «البيع والتوفر» حُفظت من هنا، أو لأن
+              النسخة المحفوظة تغيّرت بعد فتح هذه الصفحة — غالبًا لأن تعديلًا سريعًا حُفظ، أو لأن
               المنتج مفتوح في تبويب آخر. تغييراتك ما زالت أمامك ولم يُحذف شيء.
               <span className="block text-zinc-400 text-[11px] mt-1">
                 The stored copy moved since this page was opened. Nothing you typed was lost.
@@ -1289,151 +1241,23 @@ export default function ProductForm({
         />
       </SectionCard>
 
-      {/* 4 ─────────────────────────────────────── sale types, availability */}
+      {/* 4 ───────────────────────────────────── delivery and warranty only */}
       <SectionCard
         n={4}
-        ar="البيع والتوفر والمخزون"
-        en="Selling & stock"
+        ar="خيارات التوصيل والضمان"
+        en="Delivery & warranty"
         summary={summarize([
-          doc.sale_types.map((t) => SALE_TYPES.find((s) => s.id === t)?.ar ?? t).join(' + '),
-          rel.inventory_mode,
-          doc.stock === null ? 'غير محدود' : `${doc.stock} قطعة`,
+          doc.delivery_options ? 'توصيل مخصص' : 'تعرفة التوصيل العامة',
           isPrinterCatalog && doc.warranty_plans.some((p) => p.active)
             ? `ضمان ممدد ${doc.warranty_plans.filter((p) => p.active).map((p) => `+${p.duration_months}`).join(' / ')}`
             : undefined,
         ])}
         error={
           showErrors &&
-          (!!errors.sale_types ||
-            Object.keys(errors).some((k) => k.startsWith('warranty') || k === 'serialized'))
+          Object.keys(errors).some((k) => k.startsWith('warranty') || k === 'serialized')
         }
         {...section(4)}
       >
-        {showErrors && errors.sale_types && <Banner kind="error">{errors.sale_types}</Banner>}
-        <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(160px,1fr))] mb-2">
-          {SALE_TYPES.map((t) => (
-            <CheckCard
-              key={t.id}
-              checked={doc.sale_types.includes(t.id)}
-              onChange={(on) => setSale(t.id, on)}
-              title={t.ar}
-              sub={saleTypesAreDerived ? 'من الخيارات' : t.sub}
-              disabled={saleTypesAreDerived}
-            />
-          ))}
-        </div>
-        {saleTypesAreDerived ? (
-          <p className="text-[11px] text-zinc-400 mb-3" data-form="sale-types-derived">
-            نوع البيع مأخوذ من خياراتك تلقائيًا:{' '}
-            <b className="text-zinc-200">
-              {derivedSaleTypes.map((t) => SALE_TYPES.find((s) => s.id === t)?.ar ?? t).join(' + ')}
-            </b>
-            {derivedSaleTypes.length > 1 ? ' (مختلط)' : ''} — لتغييره، غيّر «نوع التوفر» داخل الخيارات
-            في قسم ٥. لا حاجة لاختيار «مختلط» يدويًا.
-          </p>
-        ) : (
-          <p className="text-[11px] text-zinc-500 mb-3">
-            يمكن تفعيل النوعين معًا. الافتراضي للعميل: بيع مباشر عند توفر المخزون، وإلا الطلب المسبق.
-            وإذا حدّدت «نوع التوفر» داخل الخيارات، فسيُشتق النوع منها تلقائيًا.
-          </p>
-        )}
-
-        {/* Availability pricing — the owner's model: immediacy has a price
-            the way each journey has one. Direct +X, and each pre-order
-            transport its own commission. The CUSTOMER only ever sees final
-            numbers; these inputs are the admin's side of that promise. */}
-        {doc.sale_types.includes('direct_sale') && (
-          <div className="mb-3 min-w-0">
-            <Grid cols={3}>
-              <Field
-                ar="زيادة البيع المباشر"
-                en="Direct premium"
-                hint="تُضاف على السعر عند الشراء الفوري من المخزون. فارغ = بلا زيادة"
-                tip="مثال: السعر ١٠٠ ألف والزيادة ٥٠ ألفًا — يرى الزبون ١٥٠ ألفًا كسعر نهائي للبيع المباشر، ولا تُعرض له الزيادة كبند منفصل."
-              >
-                <Money
-                  value={doc.direct_surcharge_iqd}
-                  onChange={(v) => setDoc((d) => ({ ...d, direct_surcharge_iqd: v }))}
-                  placeholder="بلا زيادة"
-                />
-                <MirrorNote
-                  kind="replaces"
-                  where="١٢ نوع الطلب لكل موديل"
-                  detail="زيادة مكتوبة على طريق معيّن تحل محل هذه الزيادة لذلك الطريق"
-                />
-              </Field>
-            </Grid>
-          </div>
-        )}
-        {surchargeHidden && (
-          <p className="text-[11px] text-amber-300 mb-3" data-form="surcharge-preserved">
-            زيادة البيع المباشر المحفوظة {formatIqd(doc.direct_surcharge_iqd as number)} — تظهر للتعديل عند تفعيل «بيع مباشر»، وتبقى محفوظة كما هي.
-          </p>
-        )}
-        {activeTransportsHidden && (
-          <p className="text-[11px] text-amber-300 mb-3" data-form="transports-preserved">
-            طرق طلب مسبق مفعّلة محفوظة ({doc.preorder_transports.filter((o) => o.active).map((o) => TRANSPORTS.find((t) => t.method === o.method)?.ar ?? o.method).join('، ')}) — تظهر للتعديل عند تفعيل «طلب مسبق».
-          </p>
-        )}
-        {doc.sale_types.includes('pre_order') && (
-          <div className="mb-3 min-w-0">
-            <div className="text-[12px] font-bold text-zinc-300 mb-1.5">
-              طرق الطلب المسبق وزياداتها{' '}
-              <span className="text-[10px] font-medium text-zinc-500">Pre-order transports</span>
-            </div>
-            <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(190px,1fr))]">
-              {TRANSPORTS.map((t) => {
-                const offer = doc.preorder_transports.find((o) => o.method === t.method);
-                const active = offer?.active === true;
-                return (
-                  <div
-                    key={t.method}
-                    className={`rounded-lg border p-2.5 min-w-0 ${
-                      active ? 'bg-[#6B46FF]/5 border-[#6B46FF]/40' : 'bg-zinc-800/30 border-zinc-700'
-                    }`}
-                  >
-                    <Toggle
-                      checked={active}
-                      onChange={(on) =>
-                        setDoc((d) => {
-                          const rest = d.preorder_transports.filter((o) => o.method !== t.method);
-                          const current = d.preorder_transports.find((o) => o.method === t.method);
-                          return {
-                            ...d,
-                            preorder_transports: [
-                              ...rest,
-                              { method: t.method, commission_iqd: current?.commission_iqd ?? null, active: on },
-                            ],
-                          };
-                        })
-                      }
-                      label={t.ar}
-                      sub={t.en}
-                    />
-                    {active && (
-                      <div className="mt-1.5">
-                        <Money
-                          value={offer?.commission_iqd ?? null}
-                          onChange={(v) =>
-                            setDoc((d) => ({
-                              ...d,
-                              preorder_transports: d.preorder_transports.map((o) =>
-                                o.method === t.method ? { ...o, commission_iqd: v } : o
-                              ),
-                            }))
-                          }
-                          placeholder="الافتراضي العام"
-                        />
-                        <p className="text-[10px] text-zinc-500 mt-1">الزيادة بالدينار. فارغ = القيمة الافتراضية من الإعدادات</p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Product-owned delivery tariffs. Existing products remain on the
             global legacy tariff until an admin explicitly opts them in; this
             prevents an unrelated edit from changing live checkout totals. */}
@@ -1553,33 +1377,6 @@ export default function ProductForm({
           onBaseMonthsChange={(v) => setDoc((d) => ({ ...d, warranty_base_months: v }))}
         />
 
-        <Grid cols={3}>
-          <Field
-            ar="مخزون المنتج"
-            en="Base stock"
-            hint={
-              rel.inventory_mode === 'BASE'
-                ? 'المصدر المعتمد حاليًا'
-                : 'مرجع عام — التوفر يُحسب من مخزون الخيارات/الألوان تلقائيًا'
-            }
-          >
-            <Qty value={doc.stock} onChange={(v) => setDoc((d) => ({ ...d, stock: v }))} />
-            {rel.inventory_mode !== 'BASE' && (
-              <MirrorNote
-                kind="derived"
-                where="٥ الخيارات والألوان"
-                detail={`التوفر يُحسب من ${rel.inventory_mode === 'VARIANT_COMBINATION' ? 'مخزون التركيبات' : 'مخزون الخيارات والألوان'}، وهذا الرقم مرجع فقط`}
-              />
-            )}
-          </Field>
-          <Field ar="حد التنبيه" en="Low-stock">
-            <Qty
-              value={doc.low_stock_threshold}
-              onChange={(v) => setDoc((d) => ({ ...d, low_stock_threshold: v }))}
-              placeholder="بدون / none"
-            />
-          </Field>
-        </Grid>
       </SectionCard>
 
       {/* 5 ────────────────────────────────────────── options and colours */}
@@ -1594,14 +1391,15 @@ export default function ProductForm({
           `${rel.colors.length} لون`,
           rel.inventory_mode,
         ])}
-        error={showErrors && Object.keys(errors).some((k) => k.startsWith('group') || k.startsWith('value') || k.startsWith('color') || k.startsWith('variant') || k === 'inventory_mode')}
+        error={showErrors && Object.keys(errors).some((k) => k.startsWith('group') || k.startsWith('value') || k.startsWith('option_stock') || k.startsWith('color') || k.startsWith('variant') || k === 'inventory_mode' || k === 'sale_types')}
         {...section(5)}
       >
+        {showErrors && errors.sale_types && <Banner kind="error">{errors.sale_types}</Banner>}
         <OptionsSection
           rel={rel}
           setRel={setRel}
           // LIVE, not the loaded document: an admin who raises the base price in
-          // section 4 must see every inheriting option's price move with it
+          // price section must see every inheriting option's price move with it
           // before they save, not after a reload.
           base={{
             regular: doc.price_iqd,
@@ -1613,34 +1411,6 @@ export default function ProductForm({
           errors={showErrors ? errors : {}}
         />
       </SectionCard>
-
-      {/* 5b ── WHAT EACH MODEL DOES. Its own card, and its own save, because
-             the SERVER has two doors for the same reason: section 5 writes
-             MODELS, this writes their order types and routes. Neither payload
-             has a field that could create the other, which is what keeps
-             «لا تنشئ Pre-order / Direct / Air / Sea / Land كـProduct Options»
-             true by construction rather than by discipline.
-
-             Only on a SAVED product: a cell names a model by its id, and a
-             model that has never been written has no id to name. */}
-      {productId ? (
-        <SectionCard
-          n={12}
-          ar="نوع الطلب لكل موديل"
-          en="Order type per model"
-          summary={summarize([
-            doc.sale_types.map((t) => (t === 'pre_order' ? 'طلب مسبق' : t === 'direct_sale' ? 'بيع مباشر' : t)).join(' + '),
-          ])}
-          {...section(12)}
-        >
-          <Suspense fallback={<div className="py-6 text-center text-[13px] text-[var(--ap-text-2)]">…</div>}>
-            {/* `rel`/`setRel` because the DIRECT-sale number inside that
-                panel is this section's model stock, not a field of its own —
-                one column, one piece of state, one save. */}
-            <FulfillmentPanel productId={productId} rel={rel} setRel={setRel} onProductTouched={setLoadedUpdatedAt} />
-          </Suspense>
-        </SectionCard>
-      ) : null}
 
       {/* 6 ───────────────────────────────────────────────────────── images */}
       <SectionCard

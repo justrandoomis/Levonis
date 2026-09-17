@@ -131,6 +131,12 @@ adminProductRelationsRoutes.get('/:id/relations', async (c) => {
   if (!product) throw notFound('Product not found');
 
   const rel = await loadProductRelations(c.env.DB, productId);
+  const transportsByFulfillment = new Map<string, unknown[]>();
+  for (const transport of rel.transports) {
+    const arr = transportsByFulfillment.get(transport.fulfillment_id);
+    if (arr) arr.push(transport);
+    else transportsByFulfillment.set(transport.fulfillment_id, [transport]);
+  }
   const [variants, images, facets] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM product_variants WHERE product_id = ? ORDER BY combo_key').bind(productId).all(),
     c.env.DB
@@ -154,6 +160,13 @@ adminProductRelationsRoutes.get('/:id/relations', async (c) => {
       values: rel.values,
       colors: rel.colors,
       links: rel.links,
+      // The full editor now owns the model's order types too. Returning them
+      // here keeps the first paint and the eventual whole-product save on one
+      // canonical snapshot instead of loading the removed duplicate panel.
+      fulfillments: rel.fulfillments.map((f) => ({
+        ...f,
+        transports: transportsByFulfillment.get(f.id) ?? [],
+      })),
       variants: variants.results,
       images: images.results,
       facet_ids: facets.results.map((f) => f.facet_id),
@@ -407,6 +420,70 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const cells = parseFulfillmentPayload(body, new Set(live.map((v) => v.id)));
 
+  /**
+   * Optional direct-sale stock edits from Quick Price. They share this write
+   * so a checkbox cannot commit while its corresponding shelf fails. Only the
+   * two supported sources are accepted: an option with no linked colours, or
+   * an exact option×colour variant. Pre-order has deliberately no stock row.
+   */
+  const directStockRaw = Array.isArray(body.direct_stock)
+    ? (body.direct_stock as Array<Record<string, unknown>>)
+    : [];
+  const variants = directStockRaw.some((r) => r.scope === 'variant')
+    ? await c.env.DB
+        .prepare('SELECT id, reserved FROM product_variants WHERE product_id = ?')
+        .bind(productId)
+        .all<{ id: string; reserved: number }>()
+    : { results: [] as Array<{ id: string; reserved: number }> };
+  const optionById = new Map(live.map((v) => [v.id, v] as const));
+  const variantById = new Map((variants.results ?? []).map((v) => [v.id, v] as const));
+  const stockStatements: D1PreparedStatement[] = [];
+  for (const [i, raw] of directStockRaw.entries()) {
+    const where = `direct_stock[${i}]`;
+    const scope = String(raw.scope ?? '');
+    if (scope !== 'option' && scope !== 'variant') {
+      throw badRequest(`${where}.scope must be option or variant`, 'DIRECT_STOCK_SCOPE');
+    }
+    const id = String(raw.id ?? '').trim();
+    const stored = scope === 'option' ? optionById.get(id) : variantById.get(id);
+    if (!stored) throw badRequest(`${where}.id is not on this product`, 'DIRECT_STOCK_ROW');
+    const readQty = (value: unknown, field: string): number | null => {
+      if (value === null || value === undefined || value === '') return null;
+      const n = Number(value);
+      if (!Number.isInteger(n) || n < 0 || n > 10_000_000) {
+        throw badRequest(`${field} must be a whole number from 0 to 10000000`, 'BAD_STOCK');
+      }
+      return n;
+    };
+    const stock = readQty(raw.stock, `${where}.stock`);
+    const low = readQty(raw.low_stock_threshold, `${where}.low_stock_threshold`);
+    if (stock === null) {
+      throw badRequest(`${where}.stock is required for an enabled direct sale`, 'DIRECT_STOCK_REQUIRED');
+    }
+    const reserved = Number(stored.reserved ?? 0);
+    if (reserved > 0 && stock < reserved) {
+      throw badRequest(
+        `${where}.stock cannot be below ${reserved}; those units are reserved by live direct-sale orders`,
+        'STOCK_BELOW_RESERVED'
+      );
+    }
+    const table = scope === 'option' ? 'product_option_values' : 'product_variants';
+    stockStatements.push(
+      c.env.DB
+        .prepare(`UPDATE ${table} SET stock = ?, low_stock_threshold = ? WHERE id = ? AND product_id = ?`)
+        .bind(stock, low, id, productId)
+    );
+  }
+  if (directStockRaw.length > 0) {
+    const requestedMode = String(body.inventory_mode ?? '');
+    if (requestedMode !== 'OPTION' && requestedMode !== 'VARIANT_COMBINATION') {
+      throw badRequest('inventory_mode must be OPTION or VARIANT_COMBINATION for direct stock', 'DIRECT_STOCK_MODE');
+    }
+    stockStatements.push(
+      c.env.DB.prepare('UPDATE products SET inventory_mode = ? WHERE id = ?').bind(requestedMode, productId)
+    );
+  }
+
   // 0075. What this product's cells ARE right now, so the replace below keeps
   // each surviving row's id and its held units. See `refuseStrandedCapacity`.
   const current = existingCells(rel);
@@ -467,6 +544,7 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
   const saleTypes = saleTypesFromCells(rel.values, cells, fallback);
 
   const statements = fulfillmentStatements(c.env.DB, productId, cells, undefined, current);
+  statements.push(...stockStatements);
   statements.push(
     c.env.DB
       .prepare("UPDATE products SET sale_types = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
@@ -477,6 +555,7 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
   await audit(c.env.DB, admin.id, 'product_v2.fulfillment', productId, {
     cells: cells.length,
     transports: cells.reduce((n, cell) => n + cell.transports.length, 0),
+    direct_stock_rows: directStockRaw.length,
     sale_types: saleTypes,
   });
 

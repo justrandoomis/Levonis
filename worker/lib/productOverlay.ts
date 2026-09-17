@@ -823,6 +823,11 @@ export function publicRelations(view: ProductRelationsView, coarse = false) {
       .map((v) => ({
         id: v.id,
         combo_key: v.combo_key,
+        // Exact option×colour stock is what a direct-sale colour chip needs.
+        // As at the other levels, public readers receive only the sellable
+        // remainder (or a coarse state for mystery products), never counters.
+        available: availableOf(v.stock, v.reserved),
+        ...(coarse ? { stock_state: stateOf(v.stock, v.reserved, v.low_stock_threshold) } : {}),
         regular_price_iqd: v.regular_price_iqd,
         prime_price_iqd: v.prime_price_iqd,
         pro_price_iqd: v.pro_price_iqd,

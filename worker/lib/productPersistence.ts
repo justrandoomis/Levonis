@@ -2266,13 +2266,11 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
     }
   }
   /**
-   * 0073. THE ORDER-TYPE CELLS, IN THE SAME BATCH as the models they hang off.
+   * THE ORDER-TYPE CELLS, IN THE SAME BATCH as the models they hang off.
    *
-   * Only when the payload carried them — the form never does, so a form save
-   * leaves a product's order types exactly as they were. Validation is the
-   * SAME function the dedicated endpoint uses, so a file cannot express a cell
-   * the API would refuse (a direct sale with a transport, a duplicate route, a
-   * cell naming a model that is not on this product).
+   * The full form and the TXT document both carry them now. Validation is the
+   * SAME function the dedicated Quick Price endpoint uses, so neither door can
+   * express a cell the other would refuse.
    */
   const cellStatements: D1PreparedStatement[] = [];
   let plannedCells: ProductSavePlan['cells'] = null;
@@ -2292,6 +2290,59 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
         { fulfillments: cells },
         new Set(relations.requested.values.map((v) => v.id))
       );
+      /**
+       * DIRECT SALE ALWAYS NAMES A REAL SHELF. With no linked colours that is
+       * the option row. Once colours are linked it is one exact option×colour
+       * variant per link; the option's displayed number is their sum and is
+       * never a second counter. Pre-order cells deliberately take no part.
+       */
+      const directIds = new Set(
+        parsed
+          .filter((cell) => cell.fulfillment_type === 'direct_sale' && cell.enabled)
+          .map((cell) => cell.option_id)
+      );
+      const activeColors = relations.requested.colors.filter((color) => color.active !== 0);
+      const activeVariants = relations.requested.variants.filter((variant) => variant.active !== 0);
+      const stockErrors: string[] = [];
+      for (const value of relations.requested.values.filter((row) => row.active !== 0 && directIds.has(row.id))) {
+        const linked = activeColors.filter((color) => color.linked.includes(value.id));
+        if (linked.length === 0) {
+          if (relations.mode === 'VARIANT_COMBINATION') {
+            const shelf = activeVariants.find(
+              (variant) =>
+                variant.combo_key.split('|').includes(`o:${value.id}`) &&
+                !variant.combo_key.split('|').some((part) => part.startsWith('c:'))
+            );
+            if (!shelf || shelf.stock === null) {
+              stockErrors.push(`Option "${value.name_en}" needs direct-sale stock on its colour-less combination`);
+            }
+          } else if (value.stock === null) {
+            stockErrors.push(`Option "${value.name_en}" needs direct-sale stock`);
+          }
+          continue;
+        }
+        if (relations.mode !== 'VARIANT_COMBINATION') {
+          stockErrors.push(`Option "${value.name_en}" has linked colours, so direct stock must use exact combinations`);
+          continue;
+        }
+        for (const color of linked) {
+          const shelf = activeVariants.find((variant) => {
+            const parts = variant.combo_key.split('|');
+            return parts.includes(`o:${value.id}`) && parts.includes(`c:${color.id}`);
+          });
+          if (!shelf || shelf.stock === null) {
+            stockErrors.push(`Colour "${color.name_en}" needs direct-sale stock for option "${value.name_en}"`);
+          }
+        }
+      }
+      if (stockErrors.length > 0) {
+        throw new HttpError(
+          400,
+          `تعذّر حفظ مخزون البيع المباشر: ${stockErrors.join(' — ')}`,
+          'RELATIONS_VALIDATION',
+          { errors: stockErrors }
+        );
+      }
       // 0075. THE SAME HOLD-PRESERVING REPLACE THE ADMIN DOOR USES. Without
       // this, a whole-product save (a TXT import, most of all) would delete a
       // cell and re-insert it under a NEW id with `capacity_reserved` back at

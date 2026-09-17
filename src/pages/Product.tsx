@@ -103,9 +103,7 @@ const STRINGS = {
     inStock: 'متوفر', lowStock: 'بقي {n} فقط', stockProductScope: 'الكمية مسجّلة على مستوى المنتج وليست لكل خيار',
     untracked: 'التوفر غير مرتبط بعدّاد مخزون',
     qtyCapped: 'المتاح الآن {n} فقط — لم نضف الباقي كطلب مسبق',
-    unitBreakdown: 'تفصيل سعر الوحدة', itemPrice: 'سعر المنتج', transportFee: 'عمولة النقل',
-    directFee: 'زيادة البيع المباشر',
-    warrantyFee: 'رسوم الضمان', waivedProOf: (tier: string) => `معفاة لعضوية ${tier}`, lineTotal: 'إجمالي البنود',
+    lineTotal: 'إجمالي البنود',
     preorderCodHint: 'الدفع مقدمًا من المحفظة يُبقي هذا السعر؛ الدفع عند الاستلام يُسعَّر كبيع مباشر ويبقى الطلب طلبًا مسبقًا.',
     CART_WARRANTY_CONFLICT: 'هذه الطابعة في سلتك بخيار ضمان ممدد مختلف — غيّره من السلة.',
     printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} مقدماً من المحفظة.`,
@@ -170,9 +168,7 @@ const STRINGS = {
     inStock: 'In stock', lowStock: 'Only {n} left', stockProductScope: 'Stock is tracked per product, not per option',
     untracked: 'Availability is not tied to a stock counter',
     qtyCapped: 'Only {n} available now — the rest was not turned into a pre-order',
-    unitBreakdown: 'Unit price breakdown', itemPrice: 'Item price', transportFee: 'Transport commission',
-    directFee: 'Direct-sale surcharge',
-    warrantyFee: 'Warranty fee', waivedProOf: (tier: string) => `Waived for ${tier}`, lineTotal: 'Line total',
+    lineTotal: 'Line total',
     preorderCodHint: 'Paying in advance from the wallet keeps this price; cash on delivery is priced as a direct sale while the order stays a pre-order.',
     CART_WARRANTY_CONFLICT: 'This printer is already in your cart with a different extended-warranty choice — change it from the cart.',
     printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid in advance from your wallet.`,
@@ -239,9 +235,7 @@ const STRINGS = {
     inStock: 'بەردەستە', lowStock: 'تەنها {n} ماوە', stockProductScope: 'بڕ لەسەر ئاستی بەرهەم تۆمار کراوە، نەک بۆ هەر هەڵبژاردەیەک',
     untracked: 'بەردەستی بە ژمێرەری کۆگا نەبەستراوە',
     qtyCapped: 'تەنها {n} بەردەستە ئێستا — ئەوەی ماوە نەکرا بە پێشداواکاری',
-    unitBreakdown: 'وردەکاری نرخی یەکە', itemPrice: 'نرخی بەرهەم', transportFee: 'کۆمیشنی گواستنەوە',
-    directFee: 'زیادەی فرۆشتنی ڕاستەوخۆ',
-    warrantyFee: 'کرێی گەرەنتی', waivedProOf: (tier: string) => `بۆ ${tier} بەخشراوە`, lineTotal: 'کۆی گشتی',
+    lineTotal: 'کۆی گشتی',
     preorderCodHint: 'پارەدانی پێشوەخت لە جزدانەوە ئەم نرخە دەهێڵێتەوە؛ پارەدان لە کاتی گەیاندن وەک فرۆشتنی ڕاستەوخۆ نرخ دەکرێت و داواکارییەکە وەک پێش-داواکاری دەمێنێتەوە.',
     CART_WARRANTY_CONFLICT: 'ئەم پرینتەرە پێشتر لە سەبەتەکەتدایە بە هەڵبژاردەیەکی جیاوازی گەرەنتی درێژکراوە — لە سەبەتەوە بیگۆڕە.',
     printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
@@ -293,6 +287,8 @@ interface OptionItem {
   /** 0043. Absent on every product written before per-option availability,
    *  which is exactly why the two-step chooser below is opt-in. */
   availability_type?: '' | 'direct_sale' | 'pre_order';
+  /** Modern models carry independent direct/pre-order cells on one option. */
+  fulfillments?: Array<{ fulfillment_type: 'direct_sale' | 'pre_order'; enabled?: boolean }>;
   variant_key?: string;
   variant_label?: string;
   lead_time_text?: string;
@@ -377,6 +373,7 @@ interface RelationsPayload {
     values: Array<{ id: string; name_en: string; image: string; sort: number; available: number | null }>;
   }>;
   colors: Array<{ id: string; name_en: string; hex: string; image: string; sort: number; available: number | null }>;
+  variants?: Array<{ id: string; combo_key: string; available: number | null }>;
   images: Array<{
     id: string; url: string; alt_en: string; sort_order: number; is_primary: boolean;
     option_value_id: string | null; color_id: string | null; variant_id: string | null;
@@ -1258,7 +1255,12 @@ export default function Product() {
 
   const models = useMemo(() => {
     const options = product?.options ?? [];
-    const declared = options.some((o) => o.availability_type === 'pre_order' || o.availability_type === 'direct_sale');
+    const declared = options.some(
+      (o) =>
+        o.availability_type === 'pre_order' ||
+        o.availability_type === 'direct_sale' ||
+        (o.fulfillments?.length ?? 0) > 0
+    );
     if (!declared) return null;
     const byKey = new Map<string, { key: string; label: string; options: OptionItem[] }>();
     for (const o of options) {
@@ -1352,6 +1354,14 @@ export default function Product() {
   const availByColor = new Map<string, number | null>(
     (relations?.colors ?? []).map((c) => [c.id, c.available] as const)
   );
+  const variantAvailable = new Map<string, number | null>(
+    (relations?.variants ?? []).map((v) => [v.combo_key, v.available] as const)
+  );
+  const variantTotalForOption = (id: string): number | null => {
+    const rows = (relations?.variants ?? []).filter((v) => v.combo_key.split('|').includes(`o:${id}`));
+    if (rows.length === 0 || rows.some((v) => v.available === null)) return null;
+    return rows.reduce((sum, v) => sum + (v.available ?? 0), 0);
+  };
   const levelChip = (n: number | null | undefined): { text: string; cls: string } | null => {
     if (n === null || n === undefined) return null;
     if (n <= 0) return { text: s.levelOut, cls: 'text-red-300' };
@@ -1612,13 +1622,6 @@ export default function Product() {
     const cap = routeCapacity(t.method);
     return t.configured && (cap === null || cap.usable);
   };
-  /** The counter the CHOSEN order type and route would consume, as resolved
-   *  server-side. Untracked (or absent) means no number is published. */
-  const preorderCapacity = availability?.preorder.capacity ?? null;
-  const capacityNote =
-    mode === 'preorder' && preorderCapacity?.tracked && preorderCapacity.available !== null
-      ? s.preorderLeft.replace('{n}', String(preorderCapacity.available))
-      : '';
   /**
    * SOLD OUT ON THE SHELF IS NOT "UNAVAILABLE" WHEN IT CAN STILL BE ORDERED.
    * `modes` is the server's own per-type verdict, so this sentence appears
@@ -1771,44 +1774,20 @@ export default function Product() {
         </button>
       ) : null}
 
-      {/* Unit breakdown — every added fee is named, never folded silently. */}
-      {priceIsAuthoritative && (quote!.transport || quote!.direct || quote!.warranty) ? (
+      {/* The customer sees the final product price. Only an optional warranty
+          remains itemised; item price and fulfilment increases are deliberately
+          not repeated as notes beneath that final figure. */}
+      {priceIsAuthoritative && quote!.warranty ? (
         <dl className="mt-3 pt-3 border-t border-zinc-800/70 space-y-1.5 text-[13px]">
-          <div className="flex justify-between gap-3">
-            <dt className="text-zinc-400">{s.itemPrice}</dt>
-            <dd className="text-zinc-200 tabular-nums">{formatIqd(quote!.applied_iqd)}</dd>
+          <div className="flex justify-between gap-3" data-warranty-fee-row>
+            <dt className="text-zinc-400">
+              {s.warranty}
+              {quote!.warranty.duration_kind === 'extension'
+                ? ` · ${s.extendedPlan(monthsLabel(quote!.warranty.duration_months, lang))}`
+                : ''}
+            </dt>
+            <dd className="text-zinc-200 tabular-nums">{formatIqd(quote!.warranty.fee_iqd)}</dd>
           </div>
-          {quote!.transport ? (
-            <div className="flex justify-between gap-3">
-              <dt className="text-zinc-400">
-                {s.transportFee} · {transportLabel(s, quote!.transport.method)}
-              </dt>
-              <dd className="text-zinc-200 tabular-nums">
-                {quote!.transport.waived ? s.waivedProOf(PRO_LABEL) : formatIqd(quote!.transport.commission_iqd)}
-              </dd>
-            </div>
-          ) : null}
-          {/* The direct-sale surcharge, with the same PRO exemption as the
-              commission — shown as the server resolved it, never inferred. */}
-          {quote!.direct ? (
-            <div className="flex justify-between gap-3" data-direct-surcharge={quote!.direct.waived ? 'waived' : 'charged'}>
-              <dt className="text-zinc-400">{s.directFee}</dt>
-              <dd className="text-zinc-200 tabular-nums">
-                {quote!.direct.waived ? s.waivedProOf(PRO_LABEL) : formatIqd(quote!.direct.surcharge_iqd)}
-              </dd>
-            </div>
-          ) : null}
-          {quote!.warranty ? (
-            <div className="flex justify-between gap-3" data-warranty-fee-row>
-              <dt className="text-zinc-400">
-                {s.warranty}
-                {quote!.warranty.duration_kind === 'extension'
-                  ? ` · ${s.extendedPlan(monthsLabel(quote!.warranty.duration_months, lang))}`
-                  : ''}
-              </dt>
-              <dd className="text-zinc-200 tabular-nums">{formatIqd(quote!.warranty.fee_iqd)}</dd>
-            </div>
-          ) : null}
         </dl>
       ) : null}
 
@@ -1844,9 +1823,11 @@ export default function Product() {
                   aria-pressed={selected}
                   onClick={() => {
                     setModelKey(selected ? '' : m.key);
-                    // Changing the model invalidates the availability chosen
-                    // under the previous one.
-                    setOptionId('');
+                    // A modern model is one option with two independent
+                    // fulfillment cells, so selecting the model selects that
+                    // option immediately. Multiple rows are legacy data and
+                    // still need the compatibility chooser below.
+                    setOptionId(selected ? '' : m.options.length === 1 ? m.options[0].id : '');
                   }}
                   className="lv-choice flex min-h-[50px] max-w-full items-center gap-2 px-2.5 py-1.5 text-sm font-bold"
                 >
@@ -1867,7 +1848,7 @@ export default function Product() {
             })}
           </div>
 
-          {activeModel ? (
+          {activeModel && activeModel.options.length > 1 ? (
             <div className="mt-4 border-t border-border-subtle pt-3" data-availability-chooser>
               <p className="text-white font-bold text-[13px] mb-2">
                 {tr('طريقة التوفر', 'How to get it', 'چۆنیەتی بەردەستبوون')}
@@ -1876,7 +1857,11 @@ export default function Product() {
                 {activeModel.options.map((opt) => {
                   const selected = optionId === opt.id;
                   const isPre = opt.availability_type === 'pre_order';
-                  const chip = invMode === 'OPTION' ? levelChip(availByValue.get(opt.id)) : null;
+                  const chip = invMode === 'OPTION'
+                    ? levelChip(availByValue.get(opt.id))
+                    : invMode === 'VARIANT_COMBINATION'
+                      ? levelChip(variantTotalForOption(opt.id))
+                      : null;
                   const wait = pick(lang as Lang, opt.lead_time_text_ar, opt.lead_time_text, opt.lead_time_text_ckb);
                   return (
                     <button
@@ -1941,7 +1926,11 @@ export default function Product() {
             {options.map((opt) => {
               const selected = optionId === opt.id;
               const label = pickName(opt.name_en, opt.name, opt.name_ar) || opt.id;
-              const chip = invMode === 'OPTION' ? levelChip(availByValue.get(opt.id)) : null;
+              const chip = invMode === 'OPTION'
+                ? levelChip(availByValue.get(opt.id))
+                : invMode === 'VARIANT_COMBINATION'
+                  ? levelChip(variantTotalForOption(opt.id))
+                  : null;
               return (
                 <button
                   key={opt.id}
@@ -1984,7 +1973,12 @@ export default function Product() {
             {colorsForOption.map((col) => {
               const selected = colorId === col.id;
               const label = pickName(col.name_en, col.name, col.name_ar) || col.id;
-              const chip = invMode === 'COLOR' ? levelChip(availByColor.get(col.id)) : null;
+              const comboKey = optionId ? `o:${optionId}|c:${col.id}` : '';
+              const chip = invMode === 'COLOR'
+                ? levelChip(availByColor.get(col.id))
+                : invMode === 'VARIANT_COMBINATION' && comboKey
+                  ? levelChip(variantAvailable.get(comboKey))
+                  : null;
               return (
                 <button
                   key={col.id}
@@ -2118,7 +2112,6 @@ export default function Product() {
                */
               const cap = routeCapacity(t.method);
               const usable = routeUsable(t);
-              const left = cap && cap.available !== null ? s.preorderLeft.replace('{n}', String(cap.available)) : '';
               return (
                 <button
                   key={t.method}
@@ -2132,17 +2125,7 @@ export default function Product() {
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
-                    <span className="min-w-0 text-start">
-                      <span className="block">{transportLabel(s, t.method)}</span>
-                      {/* The SERVER's remaining figure for this route, shown
-                          only when it published one. Untracked publishes
-                          nothing, exactly as an untracked shelf does. */}
-                      {left ? (
-                        <span className="block text-[11px] font-medium text-zinc-400 leading-tight" data-route-left={t.method}>
-                          {left}
-                        </span>
-                      ) : null}
-                    </span>
+                    <span className="min-w-0 text-start">{transportLabel(s, t.method)}</span>
                   </span>
                   {/* The FINAL unit price for this journey — never "+X". */}
                   <span className="tabular-nums text-[13px] font-bold">
@@ -2581,14 +2564,6 @@ export default function Product() {
                   <span className="border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] text-zinc-300">{product.brand}</span>
                 ) : null}
                 {stockNote ? <span className="text-zinc-400 text-[12px]">{stockNote}</span> : null}
-                {/* 0075 — THE PRE-ORDER COUNTER, NEVER THE SHELF AND NEVER
-                    THE TWO ADDED UP. It is the number the server resolved for
-                    the chosen model and route. */}
-                {capacityNote ? (
-                  <span className="text-zinc-400 text-[12px]" data-preorder-capacity-left>
-                    {capacityNote}
-                  </span>
-                ) : null}
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-white leading-snug">{name}</h1>
               <p className="mt-2 text-[12px] text-zinc-500 flex items-center gap-1.5">
