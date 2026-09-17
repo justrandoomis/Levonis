@@ -701,6 +701,7 @@ const maps: ImportMaps = {
     ['/files/products/import/c.jpg', '/files/products/import/c.jpg'],
     ['/files/products/import/black.jpg', '/files/products/import/black.jpg'],
   ]),
+  productSlugs: new Map(),
 };
 
 let seq = 0;

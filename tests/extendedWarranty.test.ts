@@ -888,6 +888,7 @@ test('CSV resolver: a warranty row on a non-printer section is refused in the PR
     facets: new Map(),
     familyOf: new Map([['cat_fil', 'materials'], ['cat_printers', 'devices']]),
     images: new Map(),
+    productSlugs: new Map(),
   };
   const newId = () => {
     let n = 0;
