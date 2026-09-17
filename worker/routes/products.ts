@@ -1025,7 +1025,7 @@ function parseVariantSelection(combo: string): ParsedVariantSelection | null {
  * what cart/checkout will enforce.
  */
 export function firstUsableDirectSelection(
-  doc: AvailabilityDoc,
+  sourceDoc: AvailabilityDoc,
   input: {
     inventory: InventorySnapshot;
     links?: ColorLinkRow[];
@@ -1035,17 +1035,17 @@ export function firstUsableDirectSelection(
     coarseStock?: boolean;
   }
 ): InitialDirectSaleSelection | null {
-  const declaredOptions = doc.options.filter((o) => o.active !== false);
-  const colors = doc.colors.filter((c) => c.active !== false);
-  const layout = activeOptionLayout(doc, input.inventory, input.activeGroupIds);
+  const declaredOptions = sourceDoc.options.filter((o) => o.active !== false);
+  const colors = sourceDoc.colors.filter((c) => c.active !== false);
+  const layout = activeOptionLayout(sourceDoc, input.inventory, input.activeGroupIds);
   const relationalGroupsKnown =
     input.activeGroupIds !== undefined || input.inventory.has_group_rows === true;
   const options = relationalGroupsKnown
     ? declaredOptions.filter((option) => layout.activeOptionIds.has(option.id))
     : declaredOptions;
-  const availabilityDoc = relationalGroupsKnown
-    ? { ...doc, options: doc.options.filter((option) => layout.activeOptionIds.has(option.id)) }
-    : doc;
+  const doc = relationalGroupsKnown
+    ? { ...sourceDoc, options: sourceDoc.options.filter((option) => layout.activeOptionIds.has(option.id)) }
+    : sourceDoc;
   const activeColorIds = new Set(colors.map((c) => c.id));
   const optionById = new Map(options.map((option) => [option.id, option] as const));
   const inventoryOptionById = new Map(
@@ -1069,7 +1069,7 @@ export function firstUsableDirectSelection(
   ): InitialDirectSaleSelection | null => {
     if (evaluatedSelections >= MAX_OPENING_SELECTIONS) return null;
     evaluatedSelections += 1;
-    const availability = saleAvailability(availabilityDoc, {
+    const availability = saleAvailability(doc, {
       optionValueIds,
       colorId,
       inventory,
