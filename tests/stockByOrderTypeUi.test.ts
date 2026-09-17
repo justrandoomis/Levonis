@@ -17,6 +17,10 @@ const MODEL = 'src/components/adminProducts/form/model.ts';
 const FORM = 'src/components/adminProducts/ProductForm.tsx';
 const QUICK = 'src/components/adminProducts/QuickPricePanel.tsx';
 const PRODUCT = 'src/pages/Product.tsx';
+const CARD_EDGE = 'src/components/DirectStockEdge.tsx';
+const HOME_CARD = 'src/components/home/ProductCard.tsx';
+const PRODUCTS = 'src/pages/Products.tsx';
+const PROFILE = 'src/pages/Profile.tsx';
 
 test('the duplicate model-order panel is gone and fulfilment lives on each option', () => {
   assert.equal(
@@ -111,4 +115,48 @@ test('the desktop product layout uses the viewport and stacks availability choic
   assert.match(page, /<div className="mt-2 flex flex-col gap-2">/);
   assert.doesNotMatch(page, /عمولة الطلب المسبق غير معدة/);
   assert.doesNotMatch(page, /Pre-order commission is not configured/);
+});
+
+test('product details apply the server-proven stocked direct selection once on load', () => {
+  const page = read(PRODUCT);
+  assert.match(page, /data\.initial_selection\?\.fulfillment_type === 'direct_sale'/);
+  assert.match(page, /setOptionValueIds\(openingOptionValueIds\)/);
+  assert.match(page, /optionValueIds: optionValueIds\.length \? optionValueIds : undefined/);
+  assert.match(page, /body\.optionValueIds = optionValueIds/);
+  assert.match(page, /data-option-groups/);
+  assert.match(page, /relationOptionGroups\.flatMap/);
+  assert.match(page, /setColorId\(/);
+  assert.match(page, /setOrderType\(initial \? 'direct_sale' : ''\)/);
+  assert.doesNotMatch(page, /useEffect\(\(\) => \{[\s\S]{0,300}setOrderType\('direct_sale'\)/);
+});
+
+test('inactive relational groups never fall back to legacy product options', () => {
+  const page = read(PRODUCT);
+  assert.match(page, /const opts = data\.relations\s*\?[\s\S]{0,180}publicRelationOptionIds\.has\(option\.id\)/);
+  assert.doesNotMatch(page, /publicRelationOptionIds\.size > 0/);
+  assert.match(page, /const storefrontOptions = useMemo\(\(\) => \{[\s\S]{0,180}if \(!relations\) return all;/);
+  assert.match(page, /const options = storefrontOptions;/);
+  assert.doesNotMatch(page, /relationIds\.size > 0|visibleOptionIds\.size > 0/);
+});
+
+test('linked colours stay hidden until their option-group constraints are selected', () => {
+  const page = read(PRODUCT);
+  assert.doesNotMatch(page, /if \(optionValueIds\.length === 0\) return all;/);
+  assert.match(page, /if \(links\.length === 0\) return !c\.option_id \|\| chosen\.has\(c\.option_id\);/);
+  assert.match(page, /\[\.\.\.byGroup\.values\(\)\]\.every\(\(ids\) => ids\.some\(\(id\) => chosen\.has\(id\)\)\)/);
+});
+
+test('the direct-stock card edge overlays every product-card surface without changing layout', () => {
+  const edge = read(CARD_EDGE);
+  assert.match(edge, /pointer-events-none absolute inset-x-0 bottom-0/);
+  assert.match(edge, /h-3/);
+  assert.match(edge, /data-direct-stock-edge/);
+  assert.doesNotMatch(edge, /rounded-/);
+
+  for (const path of [HOME_CARD, PRODUCTS, PROFILE]) {
+    const card = read(path);
+    assert.match(card, /DirectStockEdge/);
+    assert.match(card, /\brelative\b/);
+    assert.match(card, /overflow-hidden/);
+  }
 });

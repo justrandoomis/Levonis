@@ -268,6 +268,8 @@ export function validateSelection(input: {
 }): string[] {
   const errors: string[] = [];
   const activeGroups = input.groups.filter((g) => g.active !== 0 && g.active !== false);
+  const hasGroupRows = input.groups.length > 0;
+  const activeGroupIds = new Set(activeGroups.map((group) => group.id));
   const valueById = new Map(input.values.map((v) => [v.id, v]));
 
   const selection: GroupSelection = {};
@@ -277,7 +279,14 @@ export function validateSelection(input: {
       errors.push('OPTION_VALUE_NOT_FOUND');
       continue;
     }
-    if (v.active === 0 || v.active === false) errors.push('OPTION_VALUE_INACTIVE');
+    if (
+      v.active === 0 ||
+      v.active === false ||
+      (hasGroupRows && !activeGroupIds.has(v.group_id))
+    ) {
+      errors.push('OPTION_VALUE_INACTIVE');
+      continue;
+    }
     if (selection[v.group_id]) {
       // Two values from one group is not "OR" — OR describes what a COLOUR may
       // be linked to, not what a buyer may pick.
@@ -303,8 +312,11 @@ export function validateSelection(input: {
       const vis = colorVisibility(color.id, input.links, selection);
       if (!vis.visible) errors.push('COLOR_OPTION_MISMATCH');
     }
-  } else if (input.colors.some((c) => c.active !== 0 && c.active !== false)) {
-    errors.push('COLOR_REQUIRED');
+  } else {
+    const hasVisibleColor = input.colors
+      .filter((c) => c.active !== 0 && c.active !== false)
+      .some((c) => colorVisibility(c.id, input.links, selection).visible);
+    if (hasVisibleColor) errors.push('COLOR_REQUIRED');
   }
 
   return [...new Set(errors)];

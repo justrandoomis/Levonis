@@ -127,7 +127,8 @@ const STRINGS = {
     NO_TRANSPORT_OFFERED: 'الطلب المسبق مفعّل لكن لا توجد وسيلة نقل معروضة.',
     TRANSPORT_COMMISSION_UNCONFIGURED: 'طريقة الشحن هذه غير متاحة حاليًا.',
     COMMUNITY_LISTING_NOT_SELLABLE: 'هذا عرض من متجر مجتمعي ولا يُشترى عبر سلة المتجر.',
-    OPTION_REQUIRED: 'اختر خيارًا أولًا.', COLOR_REQUIRED: 'اختر لونًا أولًا.',
+    OPTION_REQUIRED: 'اختر خيارًا أولًا.', OPTION_GROUP_REQUIRED: 'اختر قيمة من كل مجموعة خيارات.',
+    OPTION_GROUP_DUPLICATE_SELECTION: 'اختر قيمة واحدة فقط من كل مجموعة.', COLOR_REQUIRED: 'اختر لونًا أولًا.',
     OPTION_NOT_FOUND: 'الخيار المحدد غير موجود.', OPTION_INACTIVE: 'الخيار المحدد لم يعد متاحًا.',
     COLOR_NOT_FOUND: 'اللون المحدد غير موجود.', COLOR_INACTIVE: 'اللون المحدد لم يعد متاحًا.',
     COLOR_OPTION_MISMATCH: 'هذا اللون لا يناسب الخيار المحدد.',
@@ -186,7 +187,8 @@ const STRINGS = {
     NO_TRANSPORT_OFFERED: 'Pre-order is enabled but no transport option is offered.',
     TRANSPORT_COMMISSION_UNCONFIGURED: 'This shipping route is not available right now.',
     COMMUNITY_LISTING_NOT_SELLABLE: 'This is a community listing and is not sold through the store cart.',
-    OPTION_REQUIRED: 'Choose an option first.', COLOR_REQUIRED: 'Choose a colour first.',
+    OPTION_REQUIRED: 'Choose an option first.', OPTION_GROUP_REQUIRED: 'Choose one value from every option group.',
+    OPTION_GROUP_DUPLICATE_SELECTION: 'Choose only one value from each group.', COLOR_REQUIRED: 'Choose a colour first.',
     OPTION_NOT_FOUND: 'The selected option does not exist.', OPTION_INACTIVE: 'The selected option is no longer available.',
     COLOR_NOT_FOUND: 'The selected colour does not exist.', COLOR_INACTIVE: 'The selected colour is no longer available.',
     COLOR_OPTION_MISMATCH: 'That colour does not belong to the selected option.',
@@ -261,7 +263,8 @@ const STRINGS = {
     NO_TRANSPORT_OFFERED: 'پێشداواکاری چالاکە بەڵام هیچ شێوازی گواستنەوە پێشکەش نەکراوە.',
     TRANSPORT_COMMISSION_UNCONFIGURED: 'ئەم ڕێگای ناردنە لە ئێستادا بەردەست نییە.',
     COMMUNITY_LISTING_NOT_SELLABLE: 'ئەمە ڕیکلامی فرۆشگای کۆمەڵگایە و بە سەبەتەی فرۆشگا نافرۆشرێت.',
-    OPTION_REQUIRED: 'سەرەتا هەڵبژاردەیەک هەڵبژێرە.', COLOR_REQUIRED: 'سەرەتا ڕەنگێک هەڵبژێرە.',
+    OPTION_REQUIRED: 'سەرەتا هەڵبژاردەیەک هەڵبژێرە.', OPTION_GROUP_REQUIRED: 'لە هەر گرووپێکدا یەک بەها هەڵبژێرە.',
+    OPTION_GROUP_DUPLICATE_SELECTION: 'لە هەر گرووپێکدا تەنها یەک بەها هەڵبژێرە.', COLOR_REQUIRED: 'سەرەتا ڕەنگێک هەڵبژێرە.',
     OPTION_NOT_FOUND: 'هەڵبژاردەی دیاریکراو نییە.', OPTION_INACTIVE: 'هەڵبژاردەی دیاریکراو چیتر بەردەست نییە.',
     COLOR_NOT_FOUND: 'ڕەنگی دیاریکراو نییە.', COLOR_INACTIVE: 'ڕەنگی دیاریکراو چیتر بەردەست نییە.',
     COLOR_OPTION_MISMATCH: 'ئەم ڕەنگە بۆ ئەم هەڵبژاردەیە نییە.',
@@ -372,7 +375,10 @@ interface RelationsPayload {
     id: string; name_en: string; sort: number;
     values: Array<{ id: string; name_en: string; image: string; sort: number; available: number | null }>;
   }>;
-  colors: Array<{ id: string; name_en: string; hex: string; image: string; sort: number; available: number | null }>;
+  colors: Array<{
+    id: string; name_en: string; hex: string; image: string; sort: number; available: number | null;
+    links?: Array<{ group_id: string; option_value_id: string }>;
+  }>;
   variants?: Array<{ id: string; combo_key: string; available: number | null }>;
   images: Array<{
     id: string; url: string; alt_en: string; sort_order: number; is_primary: boolean;
@@ -414,6 +420,7 @@ interface Availability {
   selection: {
     option_required: boolean; color_required: boolean;
     option_id: string | null; color_id: string | null;
+    option_value_ids?: string[];
     complete: boolean; errors: string[];
   };
   /** §6: every sale type the product offers, with whether it can be used. */
@@ -532,9 +539,15 @@ interface MembershipPreview {
 
 interface DetailResponse {
   product: ProductDetail;
-  /** The BASE selection's quote, already resolved by the server on this very
-   *  request. The page used to discard it and re-ask for it over the network. */
+  /** The opening selection's quote, already resolved by the server on this
+   *  request. It is the first shelf-backed direct selection when one exists. */
   pricing?: Omit<Quote, 'qty' | 'line_total_iqd'>;
+  initial_selection?: {
+    option_id: string | null;
+    option_value_ids: string[];
+    color_id: string | null;
+    fulfillment_type: 'direct_sale';
+  } | null;
   price_levels?: PriceLevels;
   /** The BASE selection's membership preview, so §8/§9 can be stated on the
    *  FIRST PAINT instead of waiting for the debounced quote. */
@@ -742,7 +755,10 @@ export default function Product() {
 
   // Selection — nothing is guessed: a value is set only when the catalogue
   // leaves exactly one possibility (no randomness) or the user picks it.
-  const [optionId, setOptionId] = useState('');
+  /** One selected value per active relational group, kept in group order. */
+  const [optionValueIds, setOptionValueIds] = useState<string[]>([]);
+  /** Legacy and pricing compatibility: the first group remains `optionId`. */
+  const optionId = optionValueIds[0] ?? '';
   const [colorId, setColorId] = useState('');
   const [transportMethod, setTransportMethod] = useState('');
   const [warrantyPlanId, setWarrantyPlanId] = useState('');
@@ -871,13 +887,20 @@ export default function Product() {
         setQuoteError(null);
         setPriceLevels(data.price_levels ?? null);
         // THE PRICE IS ALREADY HERE. `pricing` is the server's own resolver
-        // result for the base selection, computed on this request; seeding the
+        // result for the opening selection, computed on this request; seeding the
         // quote with it means the page opens with a real, final figure instead
-        // of «يبدأ من» plus a round trip. `quotedFor` is set to the base key so
+        // of «يبدأ من» plus a round trip. `quotedFor` is set to that exact key so
         // the moment a variant IS chosen the page knows this quote no longer
         // answers the question.
+        const initial = data.initial_selection?.fulfillment_type === 'direct_sale'
+          ? data.initial_selection
+          : null;
         setQuote(data.pricing ? { ...data.pricing, qty: 1, line_total_iqd: data.pricing.unit_subtotal_iqd } : null);
-        setQuotedFor(data.pricing ? '|||' : null);
+        setQuotedFor(
+          data.pricing
+            ? `${initial?.option_value_ids?.length ? initial.option_value_ids.join(',') : initial?.option_id ?? ''}|${initial?.color_id ?? ''}|${initial ? 'direct_sale' : ''}||`
+            : null
+        );
         // A quote left in flight by the PREVIOUS product must not leave this
         // one looking like it is still resolving.
         setQuoteLoading(false);
@@ -888,19 +911,42 @@ export default function Product() {
         setActionError('');
         setNotice('');
 
-        // Deterministic pre-selection ONLY where a single possibility exists.
-        const opts = data.product.options ?? [];
-        setOptionId(opts.length === 1 ? opts[0].id : '');
-        const cols = (data.product.colors ?? []).filter(
-          (c) => !c.option_id || (opts.length === 1 && c.option_id === opts[0].id)
+        // Prefer the server-proven first direct-sale shelf. This happens once
+        // per product load, never in a reactive effect that could overwrite a
+        // later customer choice. Legacy/sold-out products keep the previous
+        // single-possibility fallback.
+        const publicRelationOptionIds = new Set(
+          (data.relations?.option_groups ?? []).flatMap((group) => group.values.map((value) => value.id))
         );
-        setColorId(cols.length === 1 && (data.product.colors ?? []).length === 1 ? cols[0].id : '');
+        // The PRESENCE of relational data is the boundary, not whether its
+        // public option set happens to be non-empty. An empty set can mean all
+        // relation groups are inactive; falling back to the JSON options in
+        // that case would resurrect admin-hidden values on the storefront.
+        const opts = data.relations
+          ? (data.product.options ?? []).filter((option) => publicRelationOptionIds.has(option.id))
+          : (data.product.options ?? []);
+        const openingOptionValueIds = initial
+          ? (initial.option_value_ids?.length
+              ? initial.option_value_ids
+              : initial.option_id
+                ? [initial.option_id]
+                : [])
+          : (opts.length === 1 ? [opts[0].id] : []);
+        const openingOptionId = openingOptionValueIds[0] ?? '';
+        setOptionValueIds(openingOptionValueIds);
+        const cols = (data.product.colors ?? []).filter(
+          (c) => !c.option_id || (openingOptionId && c.option_id === openingOptionId)
+        );
+        setColorId(
+          initial
+            ? (initial.color_id ?? '')
+            : (cols.length === 1 && (data.product.colors ?? []).length === 1 ? cols[0].id : '')
+        );
         const usable = (data.availability?.preorder.transports ?? []).filter((t) => t.configured);
         setTransportMethod(
-          data.availability?.mode === 'preorder' && usable.length === 1 ? usable[0].method : ''
+          !initial && data.availability?.mode === 'preorder' && usable.length === 1 ? usable[0].method : ''
         );
-        // A fresh product is an unanswered question, not a direct sale.
-        setOrderType('');
+        setOrderType(initial ? 'direct_sale' : '');
       } catch (err) {
         console.error(err);
         if (!cancelled) {
@@ -932,7 +978,7 @@ export default function Product() {
    * the old gate hid the price for the whole of that window, the figure the
    * customer was reading vanished each time they asked for one more.
    */
-  const priceKey = `${optionId}|${colorId}|${orderType}|${transportMethod}|${warrantyPlanId}`;
+  const priceKey = `${optionValueIds.join(',')}|${colorId}|${orderType}|${transportMethod}|${warrantyPlanId}`;
   const productSlug = product?.slug ?? '';
   useEffect(() => {
     if (!productSlug || source !== 'catalog') return;
@@ -949,6 +995,7 @@ export default function Product() {
           {
             qty: 1,
             optionId: optionId || undefined,
+            optionValueIds: optionValueIds.length ? optionValueIds : undefined,
             colorId: colorId || undefined,
             transportMethod: transportMethod || undefined,
             fulfillmentType: orderType || undefined,
@@ -988,7 +1035,7 @@ export default function Product() {
       clearTimeout(timer);
       ac.abort();
     };
-  }, [productSlug, source, priceKey, optionId, colorId, orderType, transportMethod, warrantyPlanId, quoteToken]);
+  }, [productSlug, source, priceKey, optionId, optionValueIds, colorId, orderType, transportMethod, warrantyPlanId, quoteToken]);
 
   /**
    * A CONFIRMATION IS A MOMENT, NOT A STATE. The "added to cart" notice used
@@ -1009,9 +1056,23 @@ export default function Product() {
   // choice survives as long as it is valid).
   const colorsForOption = useMemo(() => {
     const all = product?.colors ?? [];
-    if (!optionId) return all;
-    return all.filter((c) => !c.option_id || c.option_id === optionId);
-  }, [product, optionId]);
+    const chosen = new Set(optionValueIds);
+    const relational = new Map((relations?.colors ?? []).map((c) => [c.id, c] as const));
+    return all.filter((c) => {
+      const links = relational.get(c.id)?.links ?? [];
+      if (links.length === 0) return !c.option_id || chosen.has(c.option_id);
+      // A colour linked to several groups is visible only when every linked
+      // group accepts the selected value; several links inside one group are
+      // alternatives (OR), exactly like the server's colorVisibility helper.
+      const byGroup = new Map<string, string[]>();
+      for (const link of links) {
+        const ids = byGroup.get(link.group_id) ?? [];
+        ids.push(link.option_value_id);
+        byGroup.set(link.group_id, ids);
+      }
+      return [...byGroup.values()].every((ids) => ids.some((id) => chosen.has(id)));
+    });
+  }, [product, optionValueIds, relations]);
 
   useEffect(() => {
     if (colorId && !colorsForOption.some((c) => c.id === colorId)) setColorId('');
@@ -1021,7 +1082,7 @@ export default function Product() {
   // selection-aware gallery puts them first).
   useEffect(() => {
     setGalleryIndex(0);
-  }, [optionId, colorId]);
+  }, [optionValueIds, colorId]);
 
   // ONE default, used by both. These disagreed (1 here, 99 in the clamp), so
   // before availability arrived the + button was dead while the effect would
@@ -1167,6 +1228,7 @@ export default function Product() {
       try {
         const body: Record<string, unknown> = { productId: product.id, qty };
         if (optionId) body.optionId = optionId;
+        if (optionValueIds.length) body.optionValueIds = optionValueIds;
         if (colorId) body.colorId = colorId;
         if (availability?.mode === 'preorder' && transportMethod) body.transportMethod = transportMethod;
         // The ORDER TYPE travels on its own, so the cart line records what the
@@ -1227,7 +1289,7 @@ export default function Product() {
         setAddingToCart(false);
       }
     },
-    [product, qty, optionId, colorId, orderType, transportMethod, warrantyPlanId, availability, isAuthenticated, navigate, s]
+    [product, qty, optionId, optionValueIds, colorId, orderType, transportMethod, warrantyPlanId, availability, isAuthenticated, navigate, s]
   );
 
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
@@ -1253,9 +1315,29 @@ export default function Product() {
    */
   const tr = (ar: string, en: string, ckb: string) => (lang === 'en' ? en : lang === 'ckb' ? ckb : ar);
 
+  const relationOptionGroups = useMemo(
+    () => (relations?.option_groups ?? []).filter((group) => group.values.length > 0),
+    [relations]
+  );
+  const hasMultipleOptionGroups = relationOptionGroups.length > 1;
+  const storefrontOptions = useMemo(() => {
+    const all = product?.options ?? [];
+    if (!relations) return all;
+    const publicIds = new Set(
+      relationOptionGroups.flatMap((group) => group.values.map((value) => value.id))
+    );
+    // Relations with zero public groups are meaningful: every relational
+    // group is inactive. Return no options instead of reviving values from
+    // inactive groups through the legacy JSON fallback.
+    return all.filter((option) => publicIds.has(option.id));
+  }, [product, relations, relationOptionGroups]);
+
   const models = useMemo(() => {
-    const options = product?.options ?? [];
-    const declared = options.some(
+    // A relational multi-group product gets one visible chooser per group
+    // below. Folding those values into the legacy "model" abstraction would
+    // hide the secondary groups and lose part of the selection at checkout.
+    if (hasMultipleOptionGroups) return null;
+    const declared = storefrontOptions.some(
       (o) =>
         o.availability_type === 'pre_order' ||
         o.availability_type === 'direct_sale' ||
@@ -1263,14 +1345,14 @@ export default function Product() {
     );
     if (!declared) return null;
     const byKey = new Map<string, { key: string; label: string; options: OptionItem[] }>();
-    for (const o of options) {
+    for (const o of storefrontOptions) {
       const key = o.variant_key || o.id;
       const entry = byKey.get(key);
       if (entry) entry.options.push(o);
       else byKey.set(key, { key, label: o.variant_label || pickName(o.name_en, o.name, o.name_ar) || key, options: [o] });
     }
     return [...byKey.values()];
-  }, [product]);
+  }, [hasMultipleOptionGroups, storefrontOptions]);
 
   const selectedOption = useMemo(
     () => (optionId ? (product?.options ?? []).find((o) => o.id === optionId) ?? null : null),
@@ -1342,7 +1424,7 @@ export default function Product() {
     });
   })();
   const activeMedia = gallery[Math.min(galleryIndex, Math.max(0, gallery.length - 1))];
-  const options = product.options ?? [];
+  const options = storefrontOptions;
 
   // Per-level sellable counts (server-derived, never raw counters) — shown
   // on the pills ONLY when that level is the authoritative inventory source,
@@ -1438,6 +1520,10 @@ export default function Product() {
   const levelPrice: PriceLevel | null = (() => {
     const L = priceLevels;
     if (!L) return null;
+    // The compact level grid predates relational multi-group combinations.
+    // Only the live quote can authoritatively price those; showing the first
+    // group's figure as final would be a false price while the request runs.
+    if (optionValueIds.length > 1) return null;
     if (optionId && colorId) return L.complete ? (L.combo[`${optionId}|${colorId}`] ?? null) : null;
     if (optionId) return L.option[optionId] ?? null;
     if (colorId) return L.color[colorId] ?? null;
@@ -1806,7 +1892,72 @@ export default function Product() {
 
   const selectionBlocks = (
     <>
-      {models ? (
+      {hasMultipleOptionGroups ? (
+        <div className="space-y-3" data-option-groups>
+          {relationOptionGroups.map((group) => {
+            const groupSelected = group.values.find((value) => optionValueIds.includes(value.id))?.id ?? '';
+            return (
+              <fieldset key={group.id} className="lv-section" data-option-group={group.id}>
+                <legend className="px-1 text-white font-bold text-[14px]">
+                  {group.name_en}
+                  {!groupSelected ? (
+                    <span className="ms-2 text-amber-300 font-medium text-[12px]">{s.chooseOption}</span>
+                  ) : null}
+                </legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {group.values.map((value) => {
+                    const selected = groupSelected === value.id;
+                    const option = options.find((item) => item.id === value.id);
+                    const label = option ? pickName(option.name_en, option.name, option.name_ar) : value.name_en || value.id;
+                    const chip = invMode === 'OPTION'
+                      ? levelChip(availByValue.get(value.id))
+                      : invMode === 'VARIANT_COMBINATION'
+                        ? levelChip(variantTotalForOption(value.id))
+                        : null;
+                    return (
+                      <button
+                        key={value.id}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => {
+                          setOptionValueIds((current) =>
+                            relationOptionGroups.flatMap((candidateGroup) => {
+                              if (candidateGroup.id === group.id) return selected ? [] : [value.id];
+                              const kept = candidateGroup.values.find((item) => current.includes(item.id));
+                              return kept ? [kept.id] : [];
+                            })
+                          );
+                          // Any changed dimension asks the server afresh which
+                          // fulfilment modes this complete combination offers.
+                          setOrderType('');
+                          setTransportMethod('');
+                        }}
+                        className="lv-choice flex min-h-[48px] items-center gap-2 px-3 py-1.5 text-sm font-bold"
+                      >
+                        {value.image ? (
+                          <SafeImage
+                            src={value.image}
+                            alt={label}
+                            aspect="square"
+                            fit="cover"
+                            className="h-10 w-10 shrink-0 rounded-md"
+                            bgClassName="bg-black"
+                          />
+                        ) : null}
+                        <span className="min-w-0 text-start">
+                          <span className="block truncate max-w-[10rem]">{label}</span>
+                          {chip ? <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span> : null}
+                        </span>
+                        <span className="lv-choice-mark ms-auto"><Check aria-hidden="true" className="h-3 w-3" /></span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            );
+          })}
+        </div>
+      ) : models ? (
         <fieldset className="lv-section" data-variant-chooser>
           <legend className="px-1 text-white font-bold text-[14px]">
             {tr('اختر النسخة', 'Choose the version', 'وەشان هەڵبژێرە')}
@@ -1827,7 +1978,12 @@ export default function Product() {
                     // fulfillment cells, so selecting the model selects that
                     // option immediately. Multiple rows are legacy data and
                     // still need the compatibility chooser below.
-                    setOptionId(selected ? '' : m.options.length === 1 ? m.options[0].id : '');
+                    setOptionValueIds(selected ? [] : m.options.length === 1 ? [m.options[0].id] : []);
+                    // A new model is a new fulfilment question. Let the server
+                    // default it to direct only when that model/colour really
+                    // has stock; do not carry the previous model's answer.
+                    setOrderType('');
+                    setTransportMethod('');
                   }}
                   className="lv-choice flex min-h-[50px] max-w-full items-center gap-2 px-2.5 py-1.5 text-sm font-bold"
                 >
@@ -1872,7 +2028,7 @@ export default function Product() {
                       aria-pressed={selected}
                       onClick={() => {
                         const next = selected ? '' : opt.id;
-                        setOptionId(next);
+                        setOptionValueIds(next ? [next] : []);
                         // The option now decides the route, so the page stops
                         // asking the fulfilment question separately: a direct
                         // option clears any transport, a pre-order one keeps
@@ -1936,7 +2092,11 @@ export default function Product() {
                   key={opt.id}
                   type="button"
                   aria-pressed={selected}
-                  onClick={() => setOptionId(selected ? '' : opt.id)}
+                  onClick={() => {
+                    setOptionValueIds(selected ? [] : [opt.id]);
+                    setOrderType('');
+                    setTransportMethod('');
+                  }}
                   className="lv-choice flex items-center gap-2 px-3 py-1.5 text-sm font-bold"
                 >
                   {opt.image ? (
@@ -1973,7 +2133,9 @@ export default function Product() {
             {colorsForOption.map((col) => {
               const selected = colorId === col.id;
               const label = pickName(col.name_en, col.name, col.name_ar) || col.id;
-              const comboKey = optionId ? `o:${optionId}|c:${col.id}` : '';
+              const comboKey = optionValueIds.length
+                ? [...optionValueIds].sort().map((id) => `o:${id}`).concat(`c:${col.id}`).join('|')
+                : '';
               const chip = invMode === 'COLOR'
                 ? levelChip(availByColor.get(col.id))
                 : invMode === 'VARIANT_COMBINATION' && comboKey
@@ -1984,7 +2146,11 @@ export default function Product() {
                   key={col.id}
                   type="button"
                   aria-pressed={selected}
-                  onClick={() => setColorId(selected ? '' : col.id)}
+                  onClick={() => {
+                    setColorId(selected ? '' : col.id);
+                    setOrderType('');
+                    setTransportMethod('');
+                  }}
                   className="lv-choice flex items-center gap-2 px-3 py-1.5 text-sm font-bold"
                 >
                   {col.image ? (

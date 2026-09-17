@@ -143,6 +143,14 @@ export interface StockResolution {
  *  alike. */
 export interface InventorySnapshot {
   inventory_mode: InventoryMode;
+  /**
+   * True when the relational model contains option-group rows, even when all
+   * of those rows are inactive. `group_ids: []` alone cannot carry that
+   * distinction: it also describes a genuinely legacy flat option chooser.
+   * Readers use this marker to avoid resurrecting values from inactive
+   * relational groups as legacy options.
+   */
+  has_group_rows?: boolean;
   base: { stock: number | null; reserved: number; low_stock_threshold: number | null };
   option_values: Array<{
     id: string;
@@ -412,8 +420,8 @@ export function resolveForOrderType(
   orderType: OrderType,
   snap: InventorySnapshot,
   sel: Selection,
-  _capacity: CapacitySnapshot | null,
-  _transportMethod: string
+  capacity: CapacitySnapshot | null,
+  transportMethod: string
 ): StockResolution {
   // Pre-order is enabled/disabled and route-priced only; it has no inventory
   // counter. Capacity rows remain as a compatibility shell while historic

@@ -363,6 +363,10 @@ export function applyRelations(
   const nameIn = (stored: string | null | undefined, english: string): string =>
     opts.authoredNames ? (typeof stored === 'string' ? stored : '') : authoredName(stored, english);
   const groupNameById = new Map(view.groups.map((g) => [g.id, g.name_en]));
+  const hasGroupRows = view.groups.length > 0;
+  const activeGroupIds = new Set(
+    view.groups.filter((group) => truthy(group.active)).map((group) => group.id)
+  );
 
   /**
    * 0073. THE MODEL'S OWN CELLS, indexed by the option they belong to.
@@ -443,7 +447,11 @@ export function applyRelations(
   }
 
   const options: OptionV2[] = view.values
-    .filter((v) => showAll || truthy(v.active))
+    .filter(
+      (v) =>
+        showAll ||
+        (truthy(v.active) && (!hasGroupRows || activeGroupIds.has(v.group_id)))
+    )
     .map((v) => ({
       id: v.id,
       name_ar: nameIn(v.name_ar, v.name_en),
@@ -573,8 +581,14 @@ export function snapshotFrom(
   view: ProductRelationsView,
   base: { stock: number | null; reserved: number; low_stock_threshold: number | null }
 ): InventorySnapshot {
+  const activeGroupIds = new Set(
+    view.groups.filter((group) => truthy(group.active)).map((group) => group.id)
+  );
   return {
     inventory_mode: view.inventory_mode,
+    // Keep this separate from `group_ids`: an empty active-group list can
+    // mean either true legacy data or relational groups that are all hidden.
+    has_group_rows: view.groups.length > 0,
     base,
     option_values: view.values.map((v) => ({
       id: v.id,
@@ -599,7 +613,10 @@ export function snapshotFrom(
       low_stock_threshold: v.low_stock_threshold,
       active: truthy(v.active),
     })),
-    group_ids: view.groups.map((g) => g.id),
+    // An inactive group is not a customer dimension. Keeping it here made
+    // availability demand a hidden choice even though publicRelations and
+    // validateSelection correctly omit it.
+    group_ids: view.groups.filter((g) => activeGroupIds.has(g.id)).map((g) => g.id),
   };
 }
 

@@ -367,6 +367,10 @@ export interface ApiProduct {
   display_pro_iqd?: number | null;
   /** True when variants differ in price — the card may say «يبدأ من». */
   display_from?: boolean;
+  /** Exact sellable units across the product's authoritative direct-sale
+   *  option/colour combinations. Omitted when the count is intentionally
+   *  hidden; cards render the edge only when this is greater than zero. */
+  direct_stock_available?: number;
   /** Availability premium charged on direct-priced lines (a direct sale, or a
    *  pre-order paid cash on delivery); waived for an active PRO. Folded into
    *  the quote's final price server-side, shown only as the final number. */
@@ -438,6 +442,9 @@ export interface CartItem {
   image: string;
   qty: number;
   option_id: string;
+  /** Complete canonical relational selection; option_id remains its stable
+   * lexical legacy identity while server pricing uses authored group order. */
+  option_value_ids?: string[];
   color_id: string;
   /** Legacy column; the line's journey is `transport_method`. */
   shipping_method_id: string;

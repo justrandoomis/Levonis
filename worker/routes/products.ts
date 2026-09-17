@@ -72,10 +72,33 @@ import { activePoolProductIds } from '../lib/mysteryDraw';
 import { applyOfferToResolved, loadOffers, offerEligible, offerKey, scheduleState, subjectOf, type OfferView } from '../lib/offers';
 import { isPrinterProduct } from '../lib/printerIdentity';
 import { pricedPlans, WARRANTY_NOT_PRINTER } from '../lib/warrantyPlans';
+import {
+  canonicalOptionValueIds as canonicalSelectionOptionValueIds,
+  optionValueIdsInRelationOrder,
+} from '../lib/cartSelectionIdentity';
 
 export const productRoutes = new Hono<AppContext>();
 
 // ---------------------------------------------------------------- helpers
+
+/**
+ * Normalize a quote request's complete option selection in the same two
+ * phases as the cart: first give the set one order-independent identity, then
+ * restore the catalogue's authored group order for pricing. The latter is
+ * important because the first authored group is the price-bearing model;
+ * client array order must never be allowed to choose a different override.
+ */
+export function quoteOptionValueIds(
+  submitted: unknown,
+  legacyOptionId: unknown,
+  relations: Pick<ProductRelationsView, 'groups' | 'values'>
+): string[] {
+  const canonical = canonicalSelectionOptionValueIds(
+    Array.isArray(submitted) ? submitted : [],
+    legacyOptionId
+  ).slice(0, 12);
+  return optionValueIdsInRelationOrder(canonical, relations);
+}
 
 /** Sanitizes the preorderTransportDefaults setting for the resolver:
  *  only methods with an explicitly configured integer commission survive. */
@@ -377,7 +400,19 @@ export function saleAvailability(
   ].filter(Boolean);
 
   // ---- selection (a hidden option/color is not selectable)
-  const activeOptions = doc.options.filter((o) => o.active !== false);
+  const declaredActiveOptions = doc.options.filter((o) => o.active !== false);
+  const inventoryGroupOf = new Map(
+    (input.inventory?.option_values ?? []).map((value) => [value.id, value.group_id] as const)
+  );
+  const activeInventoryGroups = new Set(input.inventory?.group_ids ?? []);
+  const hasRelationalGroupRows = input.inventory?.has_group_rows === true;
+  const activeOptions =
+    input.inventory && (hasRelationalGroupRows || input.inventory.group_ids.length > 0)
+      ? declaredActiveOptions.filter((option) => {
+          const groupId = inventoryGroupOf.get(option.id);
+          return !!groupId && activeInventoryGroups.has(groupId);
+        })
+      : declaredActiveOptions;
   const activeColors = doc.colors.filter((c) => c.active !== false);
   const errors: string[] = [];
 
@@ -403,9 +438,9 @@ export function saleAvailability(
   const groupSelection: GroupSelection = {};
   if (links.length && input.inventory) {
     const groupOf = new Map(input.inventory.option_values.map((v) => [v.id, v.group_id] as const));
-    for (const id of selectedValueIds) {
-      const g = groupOf.get(id);
-      if (g) groupSelection[g] = id;
+    for (const chosen of chosenOptions) {
+      const groupId = groupOf.get(chosen.id);
+      if (groupId) groupSelection[groupId] = chosen.id;
     }
   }
   const colorSelectable = (c: { id: string; option_id: string | null }): boolean =>
@@ -417,8 +452,34 @@ export function saleAvailability(
   const selectableColors = activeColors.filter(colorSelectable);
 
   const optionRequired = activeOptions.length > 0;
-  const colorRequired = selectableColors.length > 0 || (activeColors.length > 0 && selectedValueIds.length === 0);
+  // Colour is a per-selection dimension. A mixed product may have colours for
+  // model A while model B is intentionally colourless; only colours visible
+  // for the current complete tuple make a colour mandatory.
+  const colorRequired = selectableColors.length > 0;
   if (optionRequired && chosenOptions.length === 0) errors.push('OPTION_REQUIRED');
+  if (input.inventory && input.inventory.group_ids.length > 0) {
+    const groupOf = inventoryGroupOf;
+    const requiredGroups = new Set(
+      activeOptions
+        .map((o) => groupOf.get(o.id))
+        .filter((id): id is string => !!id && activeInventoryGroups.has(id))
+    );
+    const selectedPerGroup = new Map<string, number>();
+    for (const id of selectedValueIds) {
+      const groupId = groupOf.get(id);
+      // A stale value under an inactive group is already rejected as
+      // OPTION_INACTIVE above. Hidden groups do not also participate in the
+      // public one-value-per-group completeness rule.
+      if (!groupId || !activeInventoryGroups.has(groupId)) continue;
+      selectedPerGroup.set(groupId, (selectedPerGroup.get(groupId) ?? 0) + 1);
+    }
+    if ([...selectedPerGroup.values()].some((count) => count > 1)) {
+      errors.push('OPTION_GROUP_DUPLICATE_SELECTION');
+    }
+    if ([...requiredGroups].some((groupId) => (selectedPerGroup.get(groupId) ?? 0) === 0)) {
+      errors.push('OPTION_GROUP_REQUIRED');
+    }
+  }
   if (colorRequired && !color) errors.push('COLOR_REQUIRED');
 
   // ---- stock: the ONE authoritative level for this selection
@@ -446,7 +507,11 @@ export function saleAvailability(
         ? answered
         : input.inventory.inventory_mode === 'BASE'
           ? 'base'
-          : 'variant';
+          : input.inventory.inventory_mode === 'OPTION'
+            ? 'option'
+            : input.inventory.inventory_mode === 'COLOR'
+              ? 'color'
+              : 'variant';
     onHand = res.targets.length
       ? res.targets.reduce<number>((m, t) => Math.min(m, t.stock ?? Infinity), Infinity)
       : null;
@@ -515,20 +580,55 @@ export function saleAvailability(
    * anywhere in its models. The moment a model is chosen the set narrows to
    * that model and every later answer is about it alone, exactly as before.
    */
-  const cellScope = doc.options.filter(
-    (o) => o.active !== false && (selectedValueIds.length === 0 || selectedValueIds.includes(o.id))
+  const cellScope = activeOptions.filter(
+    (o) => selectedValueIds.length === 0 || selectedValueIds.includes(o.id)
   );
-  const cellSays = (type: 'direct_sale' | 'pre_order') =>
+  const anyCellSays = (type: 'direct_sale' | 'pre_order') =>
     cellScope.some((o) => o.fulfillments?.some((f) => f.fulfillment_type === type && f.enabled !== false));
-  const modelPreorderCell = cellSays('pre_order');
-  const modelDirectCell = cellSays('direct_sale');
+  /**
+   * Every selected value that explicitly declares fulfilment participates in
+   * the verdict. Modern cells win for their own value; a legacy
+   * `availability_type` is still an explicit declaration; a value with
+   * neither is neutral and inherits the selection/product answer.
+   *
+   * This matters for multi-group selections: [modern direct model + legacy
+   * pre-order-only size] is NOT direct, while [modern direct model + neutral
+   * size] is. Looking only at `selectedHasCells` used to erase the legacy
+   * declaration as soon as any sibling group had a modern cell.
+   */
+  const selectedDeclarations = selectedValueIds.length > 0
+    ? cellScope.filter(
+        (o) =>
+          (o.fulfillments?.length ?? 0) > 0 ||
+          o.availability_type === 'direct_sale' ||
+          o.availability_type === 'pre_order'
+      )
+    : [];
+  const declarationAllows = (
+    option: (typeof cellScope)[number],
+    type: 'direct_sale' | 'pre_order'
+  ): boolean => {
+    const cells = option.fulfillments ?? [];
+    if (cells.length > 0) {
+      return cells.some((f) => f.fulfillment_type === type && f.enabled !== false);
+    }
+    return option.availability_type === type;
+  };
+  const selectedDeclarationsAllow = (type: 'direct_sale' | 'pre_order') =>
+    selectedDeclarations.length > 0 && selectedDeclarations.every((o) => declarationAllows(o, type));
+  const productDirect = saleTypes.includes('direct_sale') || saleTypes.includes('bundle');
+  const productPreorder = saleTypes.includes('pre_order');
 
   const directEnabled = isComposition
     ? compositionModes.includes('direct_sale')
-    : saleTypes.includes('direct_sale') || saleTypes.includes('bundle') || modelDirectCell;
+    : selectedDeclarations.length > 0
+      ? selectedDeclarationsAllow('direct_sale')
+      : productDirect || anyCellSays('direct_sale');
   const preorderEnabled = isComposition
     ? compositionModes.includes('pre_order')
-    : saleTypes.includes('pre_order') || modelPreorderCell;
+    : selectedDeclarations.length > 0
+      ? selectedDeclarationsAllow('pre_order')
+      : productPreorder || anyCellSays('pre_order');
 
   /**
    * 0075 — WHAT ONE ROUTE'S COUNTER SAYS. `resolveCapacity` holds the whole
@@ -773,6 +873,679 @@ export function saleAvailability(
     },
     qty_ok: input.qty === undefined ? true : input.qty >= 1 && input.qty <= maxQty,
   };
+}
+
+export interface InitialDirectSaleSelection {
+  option_id: string | null;
+  /** Complete relational choice; `option_id` remains for legacy clients. */
+  option_value_ids: string[];
+  color_id: string | null;
+  fulfillment_type: 'direct_sale';
+  availability: SaleAvailability;
+}
+
+interface ActiveOptionLayout {
+  /** Active value ids, one array per represented group, in catalogue order. */
+  groups: string[][];
+  groupByOptionId: Map<string, string>;
+  activeOptionIds: Set<string>;
+}
+
+/** Joins the public active option list to the inventory snapshot's group ids. */
+function activeOptionLayout(
+  doc: AvailabilityDoc,
+  inventory: InventorySnapshot,
+  allowedGroupIds?: ReadonlySet<string>
+): ActiveOptionLayout {
+  const declaredActiveOptionIds = new Set(doc.options.filter((o) => o.active !== false).map((o) => o.id));
+  // `group_ids: []` is ambiguous by itself: it is both the old flat-option
+  // shape and the result when every relational group is inactive. The
+  // snapshot marker (or an explicit group set from the route) makes the
+  // latter strict, so values from hidden groups cannot be rediscovered by the
+  // rolling-deploy fallback below.
+  const constrainedGroupIds = allowedGroupIds ?? (
+    inventory.has_group_rows === true || inventory.group_ids.length > 0
+      ? new Set(inventory.group_ids)
+      : undefined
+  );
+  const activeOptionIds = constrainedGroupIds
+    ? new Set(
+        inventory.option_values
+          .filter((row) => constrainedGroupIds.has(row.group_id) && declaredActiveOptionIds.has(row.id))
+          .map((row) => row.id)
+      )
+    : declaredActiveOptionIds;
+  const groupByOptionId = new Map<string, string>();
+  const idsByGroup = new Map<string, string[]>();
+
+  for (const row of inventory.option_values) {
+    if (
+      !activeOptionIds.has(row.id) ||
+      !row.group_id ||
+      (constrainedGroupIds && !constrainedGroupIds.has(row.group_id))
+    ) continue;
+    groupByOptionId.set(row.id, row.group_id);
+    const ids = idsByGroup.get(row.group_id) ?? [];
+    if (!ids.includes(row.id)) ids.push(row.id);
+    idsByGroup.set(row.group_id, ids);
+  }
+
+  // `group_ids` is already in the admin's display order. Include a defensive
+  // discovered tail for rolling-deploy fixtures/snapshots that predate it.
+  const orderedGroupIds = [
+    ...new Set([
+      ...inventory.group_ids.filter((id) => idsByGroup.has(id)),
+      ...idsByGroup.keys(),
+    ]),
+  ];
+  return {
+    groups: orderedGroupIds.map((id) => idsByGroup.get(id) ?? []).filter((ids) => ids.length > 0),
+    groupByOptionId,
+    activeOptionIds,
+  };
+}
+
+function completeActiveOptionSelection(ids: string[], layout: ActiveOptionLayout): boolean {
+  if (layout.groups.length === 0) {
+    // Legacy flat options are one chooser even though no group row exists.
+    return layout.activeOptionIds.size === 0
+      ? ids.length === 0
+      : ids.length === 1 && layout.activeOptionIds.has(ids[0]);
+  }
+  const counts = new Map<string, number>();
+  for (const id of ids) {
+    if (!layout.activeOptionIds.has(id)) return false;
+    const groupId = layout.groupByOptionId.get(id);
+    if (!groupId) return false;
+    counts.set(groupId, (counts.get(groupId) ?? 0) + 1);
+  }
+  return layout.groups.every((group) => {
+    const groupId = layout.groupByOptionId.get(group[0]);
+    return !!groupId && counts.get(groupId) === 1;
+  });
+}
+
+interface ParsedVariantSelection {
+  optionValueIds: string[];
+  colorId: string | null;
+  normalizedKey: string;
+}
+
+type DirectDeclaration = 'allow' | 'block' | 'neutral';
+
+/** The same per-value declaration rule used by canonical availability. */
+function directDeclarationForOption(
+  option: AvailabilityDoc['options'][number] | undefined
+): DirectDeclaration {
+  if (!option) return 'block';
+  const cells = option.fulfillments ?? [];
+  if (cells.length > 0) {
+    return cells.some(
+      (cell) => cell.fulfillment_type === 'direct_sale' && cell.enabled !== false
+    )
+      ? 'allow'
+      : 'block';
+  }
+  if (option.availability_type === 'direct_sale') return 'allow';
+  if (option.availability_type === 'pre_order') return 'block';
+  return 'neutral';
+}
+
+/** Strict parser: stale/ambiguous variant rows are not public inventory. */
+function parseVariantSelection(combo: string): ParsedVariantSelection | null {
+  const optionValueIds: string[] = [];
+  let colorId: string | null = null;
+  for (const token of combo.split('|').filter(Boolean)) {
+    if (token.startsWith('o:')) {
+      const id = token.slice(2);
+      if (!id || optionValueIds.includes(id)) return null;
+      optionValueIds.push(id);
+      continue;
+    }
+    if (token.startsWith('c:')) {
+      const id = token.slice(2);
+      if (!id || colorId !== null) return null;
+      colorId = id;
+      continue;
+    }
+    return null;
+  }
+  const normalizedKey = [
+    ...[...optionValueIds].sort().map((id) => `o:${id}`),
+    ...(colorId ? [`c:${colorId}`] : []),
+  ].join('|');
+  return { optionValueIds, colorId, normalizedKey };
+}
+
+/**
+ * The first complete selection that the SAME availability engine proves can
+ * be sold from the shelf. This is the product page's opening selection; it is
+ * intentionally server-derived so OPTION, COLOR, VARIANT_COMBINATION,
+ * reservations, colour links and disabled fulfilment cells cannot drift from
+ * what cart/checkout will enforce.
+ */
+export function firstUsableDirectSelection(
+  doc: AvailabilityDoc,
+  input: {
+    inventory: InventorySnapshot;
+    links?: ColorLinkRow[];
+    /** Active relation groups; inactive groups never demand a storefront choice. */
+    activeGroupIds?: ReadonlySet<string>;
+    transportDefaults?: Array<{ method: string; commission_iqd: number }>;
+    coarseStock?: boolean;
+  }
+): InitialDirectSaleSelection | null {
+  const declaredOptions = doc.options.filter((o) => o.active !== false);
+  const colors = doc.colors.filter((c) => c.active !== false);
+  const layout = activeOptionLayout(doc, input.inventory, input.activeGroupIds);
+  const relationalGroupsKnown =
+    input.activeGroupIds !== undefined || input.inventory.has_group_rows === true;
+  const options = relationalGroupsKnown
+    ? declaredOptions.filter((option) => layout.activeOptionIds.has(option.id))
+    : declaredOptions;
+  const availabilityDoc = relationalGroupsKnown
+    ? { ...doc, options: doc.options.filter((option) => layout.activeOptionIds.has(option.id)) }
+    : doc;
+  const activeColorIds = new Set(colors.map((c) => c.id));
+  const optionById = new Map(options.map((option) => [option.id, option] as const));
+  const inventoryOptionById = new Map(
+    input.inventory.option_values.map((row) => [row.id, row] as const)
+  );
+
+  // A relational chooser whose groups/values are all hidden is not a legacy
+  // no-option product. There is no customer selection to default to.
+  if (
+    relationalGroupsKnown &&
+    input.inventory.option_values.length > 0 &&
+    layout.groups.length === 0
+  ) return null;
+
+  const MAX_OPENING_SELECTIONS = 4096;
+  let evaluatedSelections = 0;
+  const evaluate = (
+    optionValueIds: string[],
+    colorId: string | null,
+    inventory = input.inventory
+  ): InitialDirectSaleSelection | null => {
+    if (evaluatedSelections >= MAX_OPENING_SELECTIONS) return null;
+    evaluatedSelections += 1;
+    const availability = saleAvailability(availabilityDoc, {
+      optionValueIds,
+      colorId,
+      inventory,
+      links: input.links,
+      transportDefaults: input.transportDefaults,
+      coarseStock: input.coarseStock,
+      preferredType: 'direct_sale',
+    });
+    const direct = availability.modes.find((m) => m.type === 'direct_sale');
+    if (!availability.selection.complete || availability.mode !== 'direct_sale' || !direct?.usable) return null;
+    return {
+      option_id: optionValueIds[0] ?? null,
+      option_value_ids: optionValueIds,
+      color_id: colorId,
+      fulfillment_type: 'direct_sale',
+      availability,
+    };
+  };
+
+  if (input.inventory.inventory_mode === 'VARIANT_COMBINATION') {
+    // Iterate actual modelled rows rather than an exponential Cartesian
+    // product. A stale row is rejected unless all options/colour are active,
+    // the selection covers every active group, and the canonical availability
+    // engine proves direct sale is usable.
+    const seen = new Set<string>();
+    for (const variant of input.inventory.variants) {
+      if (!variant.active) continue;
+      const parsed = parseVariantSelection(variant.combo_key);
+      if (!parsed || seen.has(parsed.normalizedKey)) continue;
+      seen.add(parsed.normalizedKey);
+      if (!completeActiveOptionSelection(parsed.optionValueIds, layout)) continue;
+      if (parsed.colorId && !activeColorIds.has(parsed.colorId)) {
+        continue;
+      }
+      // A direct opening choice needs a finite shelf with at least one unit.
+      // Empty/untracked rows can never pass `evaluate`, so they must not burn
+      // the bounded search budget ahead of a later stocked combination.
+      if (sellableRemainder(variant.stock, variant.reserved) <= 0) continue;
+      // Variant keys are canonicalised lexically for identity, while pricing
+      // deliberately uses the first OPTION GROUP. Restore the catalogue's
+      // group order before the selection reaches either the legacy option_id
+      // field or the price resolver.
+      const orderedIds = layout.groups.length
+        ? layout.groups
+            .map((group) => group.find((id) => parsed.optionValueIds.includes(id)) ?? '')
+            .filter(Boolean)
+        : parsed.optionValueIds;
+      // Avoid resolveStock's linear variant lookup for every candidate. The
+      // candidate has already been strictly parsed and de-duplicated, so a
+      // one-row canonical snapshot is the same stock question in O(1).
+      const candidateInventory: InventorySnapshot = {
+        ...input.inventory,
+        variants: [{ ...variant, combo_key: parsed.normalizedKey }],
+      };
+      const result = evaluate(orderedIds, parsed.colorId, candidateInventory);
+      if (result) return result;
+      if (evaluatedSelections >= MAX_OPENING_SELECTIONS) return null;
+    }
+    return null;
+  }
+
+  // Try real colours first. When a complete option selection owns no
+  // selectable colour, the final null candidate is valid and intentional.
+  const openingColors = input.inventory.inventory_mode === 'COLOR'
+    ? colors.filter((color) => {
+        const row = input.inventory.colors.find((candidate) => candidate.id === color.id);
+        return !!row && sellableRemainder(row.stock, row.reserved) > 0;
+      })
+    : colors;
+  const evaluateOptions = (optionValueIds: string[]): InitialDirectSaleSelection | null => {
+    const selectedByGroup: GroupSelection = {};
+    for (const id of optionValueIds) {
+      const groupId = layout.groupByOptionId.get(id);
+      if (groupId) selectedByGroup[groupId] = id;
+    }
+    const visible = colors.filter((color) =>
+      (input.links?.length ?? 0) > 0
+        ? colorVisibility(color.id, input.links ?? [], selectedByGroup).visible
+        : !color.option_id || optionValueIds.includes(color.option_id)
+    );
+    const visibleIds = new Set(visible.map((color) => color.id));
+    const colorIds: Array<string | null> = visible.length > 0
+      ? openingColors.filter((color) => visibleIds.has(color.id)).map((color) => color.id)
+      : [null];
+    for (const colorId of colorIds) {
+      if (evaluatedSelections >= MAX_OPENING_SELECTIONS) return null;
+      const result = evaluate(optionValueIds, colorId);
+      if (result) return result;
+    }
+    return null;
+  };
+
+  if (layout.groups.length > 0) {
+    // Explicit pre-order-only values can never participate in a direct-sale
+    // witness. In OPTION mode, a tracked empty row can never participate
+    // either because the resolver takes the minimum across selected rows.
+    // Pruning these before the Cartesian walk both preserves semantics and
+    // prevents a valid last-in-order 10×10×10×10 witness from sitting beyond
+    // the safety cap.
+    const candidateGroups = layout.groups.map((group) =>
+      group
+        .filter((id) => directDeclarationForOption(optionById.get(id)) !== 'block')
+        .filter((id) => {
+          if (input.inventory.inventory_mode !== 'OPTION') return true;
+          const row = inventoryOptionById.get(id);
+          return !!row && (row.stock === null || sellableRemainder(row.stock, row.reserved) > 0);
+        })
+        .sort((left, right) => {
+          const rank = (id: string) => directDeclarationForOption(optionById.get(id)) === 'allow' ? 0 : 1;
+          return rank(left) - rank(right);
+        })
+    );
+    if (candidateGroups.some((group) => group.length === 0)) return null;
+    if (
+      input.inventory.inventory_mode === 'OPTION' &&
+      !candidateGroups.some((group) =>
+        group.some((id) => {
+          const row = inventoryOptionById.get(id);
+          return !!row && row.stock !== null && sellableRemainder(row.stock, row.reserved) > 0;
+        })
+      )
+    ) return null;
+
+    const chosen: string[] = [];
+    // Product data is admin-authored, but an accidental 12×12×12×12 matrix
+    // must not turn a detail GET into an unbounded search. Failing closed here
+    // leaves the ordinary chooser available; it never invents a default.
+    const visit = (depth: number): InitialDirectSaleSelection | null => {
+      if (evaluatedSelections >= MAX_OPENING_SELECTIONS) return null;
+      if (depth === candidateGroups.length) {
+        return evaluateOptions([...chosen]);
+      }
+      for (const id of candidateGroups[depth]) {
+        chosen.push(id);
+        const result = visit(depth + 1);
+        chosen.pop();
+        if (result) return result;
+      }
+      return null;
+    };
+    return visit(0);
+  }
+
+  if (options.length === 0) return evaluateOptions([]);
+  for (const option of options) {
+    const result = evaluateOptions([option.id]);
+    if (result) return result;
+  }
+  return null;
+}
+
+const sellableRemainder = (stock: number | null | undefined, reserved: number | null | undefined): number =>
+  stock === null || stock === undefined
+    ? 0
+    : Math.max(0, Math.trunc(stock) - Math.max(0, Math.trunc(reserved ?? 0)));
+
+/**
+ * Product cards are computed for a whole catalogue page inside one Worker
+ * request. A malformed 10×10×10×10 option graph must not turn one card into
+ * ten thousand availability resolutions (then repeat that per value/colour).
+ * The proof below is memoized and shares this strict per-product budget; if a
+ * catalogue exceeds it we fail closed and publish no exact direct-stock count.
+ */
+export const DIRECT_STOCK_SELECTION_EVALUATION_CAP = 512;
+
+/**
+ * Exact direct-sale units for a PRODUCT CARD.
+ *
+ * Only the level selected by `inventory_mode` is summed. In particular we
+ * never add option stock to colour or variant stock. Rows with NULL stock are
+ * not unlimited, reservations are removed row-by-row, and a combination is
+ * counted once even when it contains several option tokens.
+ *
+ * `null` means either “direct sale is not offered” or “the exact count is
+ * intentionally hidden for a mystery-pool member”; `0` means direct sale is
+ * configured but every authoritative shelf is empty/untracked.
+ */
+export function directStockAvailable(
+  doc: ProductDoc,
+  view: ProductRelationsView,
+  base: { stock: number | null; reserved: number },
+  coarseStock = false
+): number | null {
+  if (coarseStock || (doc.composition ?? '') !== '') return null;
+
+  const saleTypes = doc.sale_types?.length ? doc.sale_types : [doc.selling_type || 'direct_sale'];
+  const productDirect = saleTypes.includes('direct_sale') || saleTypes.includes('bundle');
+  const activeOptions = doc.options.filter((o) => o.active !== false);
+  const optionById = new Map(activeOptions.map((o) => [o.id, o] as const));
+  const directDeclaration = (id: string): DirectDeclaration => {
+    return directDeclarationForOption(optionById.get(id));
+  };
+  const anyDirect = productDirect || activeOptions.some((option) => directDeclaration(option.id) === 'allow');
+  if (!anyDirect) return null;
+
+  const activeGroupIds = new Set(
+    view.groups
+      .filter((group) => group.active !== 0 && group.active !== false)
+      .map((group) => group.id)
+  );
+  const hasGroupRows = view.groups.length > 0;
+  const activeValueRows = view.values.filter(
+    (value) =>
+      value.active !== 0 &&
+      value.active !== false &&
+      optionById.has(value.id) &&
+      (!hasGroupRows || activeGroupIds.has(value.group_id))
+  );
+  const valueById = new Map(activeValueRows.map((value) => [value.id, value] as const));
+  const idsByGroup = new Map<string, string[]>();
+  for (const value of activeValueRows) {
+    const groupId = value.group_id || '__legacy_option_group__';
+    const ids = idsByGroup.get(groupId) ?? [];
+    ids.push(value.id);
+    idsByGroup.set(groupId, ids);
+  }
+  let groupIds = hasGroupRows
+    ? view.groups
+        .filter((group) => group.active !== 0 && group.active !== false && idsByGroup.has(group.id))
+        .map((group) => group.id)
+    : [...idsByGroup.keys()];
+  // BASE products and legacy fixtures may still carry flat JSON options with
+  // no relation rows. They are one chooser, not N required groups.
+  if (groupIds.length === 0 && activeOptions.length > 0 && !hasGroupRows) {
+    const legacyGroupId = '__legacy_option_group__';
+    idsByGroup.set(legacyGroupId, activeOptions.map((option) => option.id));
+    groupIds = [legacyGroupId];
+  }
+  // Relational groups that are all inactive (or have no public active value)
+  // are not a legacy flat chooser. No hidden row may make the card claim
+  // direct stock, regardless of which inventory level owns its counter.
+  if (hasGroupRows && groupIds.length === 0) return 0;
+
+  const inventory = snapshotFrom(view, {
+    stock: base.stock,
+    reserved: base.reserved,
+    low_stock_threshold: null,
+  });
+  const activeColors = doc.colors.filter((color) => color.active !== false);
+  const colorById = new Map(activeColors.map((color) => [color.id, color] as const));
+  const directSelectionMemo = new Map<string, boolean>();
+  let directSelectionEvaluations = 0;
+  let directSelectionEvaluationCapped = false;
+
+  /**
+   * Proves a real, complete selection exists. It fixes one value per active
+   * group, applies the colour's AND-across/OR-within links, and then delegates
+   * the final mode/stock verdict to the canonical availability engine.
+   * `forcedOptionId` lets OPTION totals count only rows that can participate
+   * in at least one complete direct-sale selection.
+   */
+  const hasCompleteDirectSelection = (
+    colorId: string | null,
+    forcedOptionId: string | null = null
+  ): boolean => {
+    if (directSelectionEvaluationCapped) return false;
+    const memoKey = JSON.stringify([colorId, forcedOptionId]);
+    const memoized = directSelectionMemo.get(memoKey);
+    if (memoized !== undefined) return memoized;
+    const remember = (result: boolean): boolean => {
+      if (!directSelectionEvaluationCapped) directSelectionMemo.set(memoKey, result);
+      return result;
+    };
+
+    const color = colorId ? colorById.get(colorId) ?? null : null;
+    if (colorId && !color) return remember(false);
+
+    const linksForColor = colorId ? view.links.filter((link) => link.color_id === colorId) : [];
+    const groupIdSet = new Set(groupIds);
+    if (linksForColor.some((link) => !groupIdSet.has(link.group_id))) return remember(false);
+
+    let forcedGroupId: string | null = null;
+    if (forcedOptionId) {
+      for (const groupId of groupIds) {
+        if ((idsByGroup.get(groupId) ?? []).includes(forcedOptionId)) {
+          forcedGroupId = groupId;
+          break;
+        }
+      }
+      if (!forcedGroupId) return remember(false);
+    }
+
+    const candidatesByGroup: string[][] = [];
+    for (const groupId of groupIds) {
+      const linkedIds = new Set(
+        linksForColor
+          .filter((link) => link.group_id === groupId)
+          .map((link) => link.option_value_id)
+      );
+      let candidates = [...(idsByGroup.get(groupId) ?? [])];
+      if (forcedGroupId === groupId && forcedOptionId) {
+        candidates = candidates.filter((id) => id === forcedOptionId);
+      }
+      if (linkedIds.size > 0) candidates = candidates.filter((id) => linkedIds.has(id));
+
+      // The legacy single-link field predates relation rows. Keep it truthful
+      // for BASE products and rolling-deploy data that has no link table yet.
+      if (color && linksForColor.length === 0 && color.option_id) {
+        const legacyOptionGroup = groupIds.find((id) => (idsByGroup.get(id) ?? []).includes(color.option_id!));
+        if (!legacyOptionGroup) return remember(false);
+        if (legacyOptionGroup === groupId) candidates = candidates.filter((id) => id === color.option_id);
+      }
+
+      candidates = candidates.filter((id) => directDeclaration(id) !== 'block');
+      if (view.inventory_mode === 'OPTION') {
+        candidates = candidates.filter((id) => {
+          const row = valueById.get(id);
+          return !row || row.stock === null || sellableRemainder(row.stock, row.reserved) > 0;
+        });
+      }
+      // Try explicit direct declarations before neutral values. A neutral
+      // secondary value may inherit a direct model chosen in another group,
+      // but cannot create direct sale by itself when the product union is stale.
+      candidates.sort((a, b) => {
+        const rank = (id: string) => directDeclaration(id) === 'allow' ? 0 : 1;
+        return rank(a) - rank(b);
+      });
+      if (candidates.length === 0) return remember(false);
+      candidatesByGroup.push(candidates);
+    }
+
+    const selected: string[] = [];
+    const visit = (depth: number): boolean => {
+      if (directSelectionEvaluationCapped) return false;
+      if (depth === candidatesByGroup.length) {
+        if (directSelectionEvaluations >= DIRECT_STOCK_SELECTION_EVALUATION_CAP) {
+          directSelectionEvaluationCapped = true;
+          return false;
+        }
+        directSelectionEvaluations += 1;
+        const availability = saleAvailability(doc, {
+          optionValueIds: selected,
+          colorId,
+          inventory,
+          links: view.links,
+          preferredType: 'direct_sale',
+        });
+        const direct = availability.modes.find((mode) => mode.type === 'direct_sale');
+        return availability.selection.complete && availability.mode === 'direct_sale' && direct?.usable === true;
+      }
+      for (const id of candidatesByGroup[depth]) {
+        selected.push(id);
+        const usable = visit(depth + 1);
+        selected.pop();
+        if (usable) return true;
+        if (directSelectionEvaluationCapped) return false;
+      }
+      return false;
+    };
+    return remember(visit(0));
+  };
+
+  // Null is a real candidate for an option tuple to which no active colour is
+  // linked. saleAvailability rejects it when that tuple does expose colours.
+  const activeColorIds: Array<string | null> = [
+    ...activeColors.map((color) => color.id),
+    null,
+  ];
+  const hasCompleteDirectForAnyColor = (forcedOptionId: string | null = null): boolean =>
+    activeColorIds.some((colorId) => hasCompleteDirectSelection(colorId, forcedOptionId));
+
+  switch (view.inventory_mode) {
+    case 'OPTION': {
+      /**
+       * One order consumes one selected row from every tracked group and the
+       * inventory resolver answers with their minimum. The card's catalogue-
+       * wide capacity is therefore: sum the selectable rows *within* each
+       * tracked group, then take the minimum *across* groups. Adding every row
+       * across every group double-counted the same physical sales.
+       */
+      const totals = new Map<string, number>();
+      for (const value of activeValueRows) {
+        // NULL is an untracked row, not a finite quantity to include in an
+        // exact stock badge. A group becomes constraining once it has a real
+        // counter, exactly like resolveStock's tracked-target filter.
+        if (value.stock === null || value.stock === undefined) continue;
+        // A finite counter on an explicitly pre-order-only value is not a
+        // direct-sale counter. Do not let it make an otherwise-untracked
+        // direct group look tracked; the complete-selection proof below still
+        // makes a product with no direct value in a required group resolve 0.
+        if (directDeclaration(value.id) === 'block') continue;
+        const groupId = value.group_id || '__legacy_option_group__';
+        if (!totals.has(groupId)) totals.set(groupId, 0);
+        const remaining = sellableRemainder(value.stock, value.reserved);
+        if (remaining > 0 && hasCompleteDirectForAnyColor(value.id)) {
+          totals.set(groupId, (totals.get(groupId) ?? 0) + remaining);
+        }
+        if (directSelectionEvaluationCapped) return 0;
+      }
+      return totals.size > 0 ? Math.min(...totals.values()) : 0;
+    }
+
+    case 'COLOR': {
+      let total = 0;
+      for (const color of view.colors) {
+        if (color.active === 0 || color.active === false) continue;
+        const remaining = sellableRemainder(color.stock, color.reserved);
+        if (remaining > 0 && hasCompleteDirectSelection(color.id)) total += remaining;
+        if (directSelectionEvaluationCapped) return 0;
+      }
+      return total;
+    }
+
+    case 'VARIANT_COMBINATION': {
+      const variantActiveGroupIds = view.groups.length > 0
+        ? new Set(
+            view.groups
+              .filter((group) => group.active !== 0 && group.active !== false)
+              .map((group) => group.id)
+          )
+        : undefined;
+      const layout = activeOptionLayout(doc, inventory, variantActiveGroupIds);
+      const variantActiveColorIds = new Set(activeColors.map((color) => color.id));
+      const seen = new Set<string>();
+      let total = 0;
+      let checked = 0;
+
+      for (const variant of view.variants) {
+        if (!variant.active) continue;
+        const parsed = parseVariantSelection(variant.combo_key);
+        if (!parsed || seen.has(parsed.normalizedKey)) continue;
+        seen.add(parsed.normalizedKey);
+        if (!completeActiveOptionSelection(parsed.optionValueIds, layout)) continue;
+        if (parsed.colorId && !variantActiveColorIds.has(parsed.colorId)) {
+          continue;
+        }
+        const remaining = sellableRemainder(variant.stock, variant.reserved);
+        // Zero and NULL cannot contribute to an exact direct-stock total and
+        // cannot pass canonical direct availability. Skip them before the
+        // proof budget so a late stocked witness remains discoverable.
+        if (remaining <= 0) continue;
+        if (checked >= DIRECT_STOCK_SELECTION_EVALUATION_CAP) return 0;
+        checked += 1;
+        // Every explicit selected fulfilment cell must permit direct sale;
+        // saleAvailability also validates links and the exact active variant.
+        // Use the already-validated row as a one-entry canonical index so
+        // resolveStock does not linearly scan the whole variant table once
+        // per row (O(V²) on a large catalogue).
+        const candidateInventory: InventorySnapshot = {
+          ...inventory,
+          variants: [{
+            id: variant.id,
+            combo_key: parsed.normalizedKey,
+            stock: variant.stock,
+            reserved: variant.reserved ?? 0,
+            low_stock_threshold: variant.low_stock_threshold,
+            active: true,
+          }],
+        };
+        const availability = saleAvailability(doc, {
+          optionValueIds: parsed.optionValueIds,
+          colorId: parsed.colorId,
+          inventory: candidateInventory,
+          links: view.links,
+          preferredType: 'direct_sale',
+        });
+        const direct = availability.modes.find((m) => m.type === 'direct_sale');
+        if (!availability.selection.complete || availability.mode !== 'direct_sale' || !direct?.usable) continue;
+        total += remaining;
+      }
+      return total;
+    }
+
+    case 'BASE':
+    default: {
+      // Legacy flat products only. New direct-sale products are written with
+      // OPTION/COLOR/VARIANT_COMBINATION, but a numeric legacy shelf remains
+      // a truthful finite count and must not be relabelled “unlimited”.
+      const complete = hasCompleteDirectForAnyColor();
+      return directSelectionEvaluationCapped
+        ? 0
+        : complete
+          ? sellableRemainder(base.stock, base.reserved)
+          : 0;
+    }
+  }
 }
 
 /**
@@ -1396,6 +2169,13 @@ export function publicWithDisplayPrice(
   // themselves) stay admin-side numbers.
   const heldBase = Number(row.stock_reserved ?? 0);
   if (!coarseStock && doc.stock !== null && heldBase > 0) out.stock = Math.max(0, doc.stock - heldBase);
+  const directStock = directStockAvailable(
+    doc,
+    view ?? EMPTY_RELATIONS,
+    { stock: doc.stock, reserved: heldBase },
+    coarseStock
+  );
+  if (directStock !== null) out.direct_stock_available = directStock;
   const levels: Array<{ optionId?: string; colorId?: string }> = [{}];
   for (const o of doc.options) if (o.active !== false) levels.push({ optionId: o.id });
   for (const col of doc.colors) if (col.active !== false) levels.push({ colorId: col.id });
@@ -1660,6 +2440,10 @@ const CARD_FIELDS = [
   'display_pro_iqd',
   'display_applied_tier',
   'display_from',
+  // Exact sellable direct-sale units from the ONE authoritative inventory
+  // level. Cards render it only when positive; zero remains a truthful API
+  // answer for a configured but exhausted shelf.
+  'direct_stock_available',
   // Set alongside `offer` when a live window has a PLUS rung.
   'display_plus_iqd',
   // The countdown and the members-only lock chip.
@@ -1916,16 +2700,6 @@ productRoutes.get('/:slug', async (c) => {
       isPrinterProduct(c.env.DB, String(row.id)),
     ]);
     const doc = applyRelations(parsed, relations);
-
-    const resolved = resolveUnitPrice({
-      product: doc,
-      tier: ctx.tier,
-      tierActive: ctx.tierActive,
-      proPolicy: ctx.proPolicy,
-      transportDefaults: ctx.transportDefaults,
-      memberFallback: benefitFallbackFor(ctx, doc),
-      isPrinter,
-    });
     // ONE FIELD, ONE MEANING. `display_price_iqd` is the CARD price — the
     // cheapest way to buy the product — everywhere else it appears, and this
     // endpoint used to set it to the base selection instead. A customer who
@@ -1943,6 +2717,38 @@ productRoutes.get('/:slug', async (c) => {
     // block and the per-selection levels, or the page would paint an offer
     // price on the card and a ladder price the moment a variant was tapped.
     const offer = (await degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(c.env.DB, [subjectOf(String(row.id))]), EMPTY_OFFERS())).get(offerKey(subjectOf(String(row.id))));
+
+    const inventory = snapshotFrom(relations, {
+      stock: doc.stock,
+      reserved: Number(row.stock_reserved ?? 0),
+      low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+    });
+    const initialSelection = firstUsableDirectSelection(doc, {
+      inventory,
+      links: relations.links,
+      activeGroupIds: relations.has_relations
+        ? new Set(
+            relations.groups.filter((group) => group.active !== 0 && group.active !== false).map((group) => group.id)
+          )
+        : undefined,
+      transportDefaults: ctx.transportDefaults,
+      coarseStock: poolMember,
+    });
+    const initialOptionValueIds = initialSelection?.option_value_ids ?? [];
+    const initialOptionId = initialOptionValueIds[0] ?? null;
+    const initialColorId = initialSelection?.color_id ?? null;
+    const resolved = resolveUnitPrice({
+      product: doc,
+      optionId: initialOptionId,
+      colorId: initialColorId,
+      fulfillmentType: initialSelection ? 'direct_sale' : undefined,
+      tier: ctx.tier,
+      tierActive: ctx.tierActive,
+      proPolicy: ctx.proPolicy,
+      transportDefaults: ctx.transportDefaults,
+      memberFallback: benefitFallbackFor(ctx, doc),
+      isPrinter,
+    });
     const out = publicWithDisplayPrice(row, ctx, relations, undefined, offer, poolMember);
     // A fact about the product, not a price: the storefront renders the
     // home-delivery note beside a printer's price block from this flag.
@@ -1986,19 +2792,40 @@ productRoutes.get('/:slug', async (c) => {
       // real many-to-many colour links, modelled combinations and bound
       // images. Null when the product has no relational rows at all.
       relations: publicRelations(relations, poolMember),
-      pricing: publicQuote(resolved), // base-selection resolver result, cost-free
-      // §8/§9: the base selection's member prices, from the live rules, so the
+      // When a shelf-backed direct selection exists, every first-paint block
+      // below answers that SAME selection. Otherwise they retain the legacy
+      // base/null answer until the customer chooses.
+      initial_selection: initialSelection
+        ? {
+            option_id: initialOptionId,
+            option_value_ids: initialOptionValueIds,
+            color_id: initialColorId,
+            fulfillment_type: 'direct_sale' as const,
+          }
+        : null,
+      pricing: publicQuote(resolved), // opening-selection resolver result, cost-free
+      // §8/§9: the opening selection's member prices, from the live rules, so the
       // page can state the benefit on first paint rather than waiting for the
       // debounced quote to say what a membership is worth here.
-      membership_preview: membershipPreview(ctx, doc, { optionId: null, colorId: null }, isPrinter),
+      membership_preview: membershipPreview(
+        ctx,
+        doc,
+        { optionId: initialOptionId, colorId: initialColorId },
+        isPrinter
+      ),
       // EVERY SELECTION THE CHOOSERS CAN REACH, PRICED HERE (see `priceLevels`).
       // The page paints the exact figure on the same frame as the tap, and the
       // debounced quote becomes a confirmation rather than a prerequisite.
       price_levels: priceLevels(doc, ctx, offer, Date.now()),
-      // The final price of every way to get the BASE selection (the quote
+      // The final price of every way to get the opening selection (the quote
       // re-computes them per selection) — the page's fulfilment pills and
       // transport rows read these, and compute nothing.
-      pricing_modes: pricingModes(doc, ctx, { optionId: null, colorId: null }, isPrinter),
+      pricing_modes: pricingModes(
+        doc,
+        ctx,
+        { optionId: initialOptionId, colorId: initialColorId },
+        isPrinter
+      ),
       // §7.2 — the sale mode the page may DEFAULT to, derived from the real
       // stock model and the admin pre-order policy (never from the browser).
       //
@@ -2010,15 +2837,14 @@ productRoutes.get('/:slug', async (c) => {
       // quote below answers with the real counter the moment a model is
       // tapped, and the cart and the checkout re-derive it server-side
       // regardless of what this block said.
-      availability: saleAvailability(doc, {
-        coarseStock: poolMember,
-        transportDefaults: ctx.transportDefaults,
-        inventory: snapshotFrom(relations, {
-          stock: doc.stock,
-          reserved: Number(row.stock_reserved ?? 0),
-          low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+      availability:
+        initialSelection?.availability ??
+        saleAvailability(doc, {
+          coarseStock: poolMember,
+          transportDefaults: ctx.transportDefaults,
+          inventory,
+          links: relations.links,
         }),
-      }),
       viewer_tier: viewerTier(ctx),
     });
   }
@@ -2188,17 +3014,12 @@ productRoutes.post('/:slug/quote', async (c) => {
    * only thing sent), so a client that has not learned the field is byte-for-
    * byte unaffected.
    */
-  const rawValueIds: unknown[] = Array.isArray(body.optionValueIds) ? body.optionValueIds : [];
-  const optionValueIds: string[] = [
-    ...new Set<string>([
-      ...rawValueIds.filter((x): x is string => typeof x === 'string' && x.length > 0),
-      ...(rawOptionId ? [rawOptionId] : []),
-    ]),
-  ].slice(0, 12);
+  const optionValueIds = quoteOptionValueIds(body.optionValueIds, rawOptionId, relations);
   // The resolver prices ONE option and the first selected value carries the
-  // override — `resolveCartLine`'s rule, so the quote and the cart cannot
-  // price the same selection differently. With only `optionId` sent this IS
-  // `optionId`, which is what every existing caller sends.
+  // override — `resolveCartLine`'s authored-group rule, so neither reversing
+  // the request array nor adding a secondary group can select a different
+  // price-bearing model. With only `optionId` sent this remains that id, which
+  // is what every existing caller sends.
   const optionId = optionValueIds[0] ?? null;
   const colorId = typeof body.colorId === 'string' && body.colorId ? body.colorId : null;
   const transportMethod = typeof body.transportMethod === 'string' ? body.transportMethod : null;

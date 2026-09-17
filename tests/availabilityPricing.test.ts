@@ -151,8 +151,52 @@ test('an option direct-sale cell replaces the removed product-wide increase, inc
 
 // -------------------------------------- 2. card price = cheapest variant
 
-import { publicWithDisplayPrice, saleAvailability } from '../worker/routes/products';
+import { publicWithDisplayPrice, quoteOptionValueIds, saleAvailability } from '../worker/routes/products';
 import { DEFAULT_PRO_POLICY } from '../worker/lib/pricing';
+
+test('multi-group quote pricing is independent of client array order and uses the first authored group', () => {
+  const relations = {
+    groups: [
+      { id: 'model', sort: 10, name_en: 'Model', active: 1 },
+      { id: 'accessory', sort: 20, name_en: 'Accessory', active: 1 },
+    ],
+    values: [
+      // Lexically later on purpose: lexical identity order must not make the
+      // accessory the price-bearing option.
+      { id: 'z-model', group_id: 'model', sort: 0, name_en: 'Model Z', active: 1 },
+      { id: 'a-accessory', group_id: 'accessory', sort: 0, name_en: 'Accessory A', active: 1 },
+    ],
+  };
+  const forward = quoteOptionValueIds(['z-model', 'a-accessory'], null, relations as never);
+  const reversed = quoteOptionValueIds(['a-accessory', 'z-model'], null, relations as never);
+
+  assert.deepEqual(forward, ['z-model', 'a-accessory']);
+  assert.deepEqual(reversed, forward);
+  assert.equal(forward[0], 'z-model', 'the first authored group supplies the pricing option');
+
+  const priced = product({
+    options: [
+      {
+        id: 'z-model', name_ar: '', name_en: 'Model Z', name_ckb: '', image: '', order: 0, active: true,
+        regular_price_iqd: 125_000, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null,
+        fulfillments: [],
+      },
+      {
+        id: 'a-accessory', name_ar: '', name_en: 'Accessory A', name_ckb: '', image: '', order: 1, active: true,
+        regular_price_iqd: 900_000, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null,
+        fulfillments: [],
+      },
+    ],
+  });
+  const quote = (ids: string[]) => resolveUnitPrice({
+    product: priced,
+    optionId: ids[0],
+    ...free,
+  }).unit_subtotal_iqd;
+
+  assert.equal(quote(forward), 125_000);
+  assert.equal(quote(reversed), 125_000);
+});
 
 const row = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: 'p1', slug: 'p1', status: 'active', name: 'Printer', price_iqd: 100_000,

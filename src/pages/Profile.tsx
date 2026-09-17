@@ -15,6 +15,7 @@ import ProfileIconGrid, { ProfileIconAction } from '../components/profile/Profil
 import GuestCard from '../components/profile/GuestCard';
 import MyReviewsTab from '../components/profile/MyReviewsTab';
 import QrCodeModal from '../components/profile/QrCodeModal';
+import DirectStockEdge from '../components/DirectStockEdge';
 
 interface FavoriteItem {
   id: string;
@@ -645,7 +646,7 @@ export default function Profile() {
               const name = p.name;
 
               return (
-                <button type="button" onClick={() => navigate('/product/' + p.slug)} key={p.id} className="bg-white dark:bg-[#1a1a1a] rounded-[10px] overflow-hidden flex flex-col text-start border border-black/5 dark:border-white/5 shadow-sm pb-2 active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
+                <button type="button" onClick={() => navigate('/product/' + p.slug)} key={p.id} className="relative bg-white dark:bg-[#1a1a1a] rounded-[10px] overflow-hidden flex flex-col text-start border border-black/5 dark:border-white/5 shadow-sm pb-2 active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
                   <div className="relative aspect-square overflow-hidden bg-zinc-100 dark:bg-zinc-800 w-full">
                     {firstImage && <img referrerPolicy="no-referrer" src={firstImage} alt={name} className="w-full h-full object-cover" />}
                   </div>
@@ -661,6 +662,7 @@ export default function Profile() {
                        )}
                     </div>
                   </div>
+                  <DirectStockEdge product={p} />
                 </button>
               );
             })}
