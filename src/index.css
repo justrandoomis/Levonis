@@ -276,6 +276,47 @@ html {
     border: 1px solid color-mix(in oklab, var(--color-danger) 35%, transparent);
   }
 
+  /*
+    COMPACT IN LOOK, NEVER IN TOUCH TARGET.
+
+    A card that stacks several verbs needs them to read as secondary to the
+    card's own content, and the temptation is to shrink the control — which is
+    how the orders card ended up at min-h-[40px], under both the 44px every
+    other control in this app uses and the platform minimum. Only the INLINE
+    padding and the type scale come down here; `min-block-size` stays inherited
+    from `.lv-button`, so the thumb target is unchanged and only the visual
+    weight drops.
+  */
+  .lv-button-sm {
+    padding-inline: 0.75rem;
+    font-size: 0.8125rem;
+    gap: 0.375rem;
+  }
+
+  /*
+    The one accent verb. `--color-gold` is the same token the rest of the
+    system uses for premium and for a selected state, so this is not a fifth
+    accent — it is the existing one, applied at the low intensity §7 asks for:
+    a tinted surface and accent text, NOT border + fill + glow together.
+  */
+  .lv-button-accent {
+    color: var(--color-gold);
+    background-color: color-mix(in oklab, var(--color-gold) 12%, var(--color-surface));
+    border: 1px solid color-mix(in oklab, var(--color-gold) 32%, transparent);
+  }
+
+  .lv-button-accent:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--color-gold) 20%, var(--color-surface));
+  }
+
+  .lv-button-danger:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--color-danger) 22%, var(--color-surface));
+  }
+
+  .lv-button-secondary:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--color-text-primary) 8%, var(--color-surface-raised));
+  }
+
   .lv-button:disabled,
   .lv-button[aria-disabled='true'] {
     opacity: 0.45;
@@ -847,12 +888,32 @@ html[data-overlay-open='true'] .lv-app-intro__character {
   */
   --lv-header-visual: clamp(52px, 13.5vw, 64px);
   --lv-header-hit: calc(var(--lv-header-visual) + 8px);
+  --lv-header-visual-compact: clamp(36px, 10vw, 44px);
+  --lv-header-hit-compact: max(44px, calc(var(--lv-header-visual-compact) + 8px));
 }
 .lv-character-anchor { display: grid; place-items: center; width: var(--lv-header-visual); height: var(--lv-header-visual); flex: none; }
 .lv-character-anchor[data-bloub-anchor='bottom-home'] { width: var(--lv-home-visual); height: var(--lv-home-visual); }
 .lv-character-bottom-home { display: grid; place-items: center; width: var(--lv-home-hit); height: var(--lv-home-hit); }
 .lv-character-fallback { color: var(--color-text-secondary); font-size: 24px; font-weight: 800; }
 .lv-character-home { display: grid; place-items: center; width: var(--lv-header-hit); height: var(--lv-header-hit); border-radius: 8px; }
+/*
+  A HEADER THE CHARACTER JOINS INSTEAD OF ONE IT ADDS.
+
+  The full-size slot is clamp(52px, 13.5vw, 64px) of visual plus an 8px hit
+  margin — right for a bar the character OWNS (the bottom navigation, the
+  fallback landing strip), and too tall for a bar that already has a back
+  button, a title and an action in it. Stacked on top of a page's own 44px
+  header it is what produced the reported "second bar": ~60px reserved by the
+  shell, then the real header underneath it.
+
+  The compact slot keeps the hit area above the 44px floor while letting the
+  drawn character come down to roughly the size of the back button beside it,
+  so the page keeps ONE bar and the character sits inside it. Size follows the
+  anchor box automatically — frameFromRect() takes min(width, height) — so
+  there is no second place where this number has to be repeated.
+*/
+.lv-character-home--compact { width: var(--lv-header-hit-compact); height: var(--lv-header-hit-compact); }
+.lv-character-home--compact > .lv-character-anchor { width: var(--lv-header-visual-compact); height: var(--lv-header-visual-compact); }
 .lv-character-header { display: grid; grid-template-columns: minmax(0, 1fr) var(--lv-header-hit) minmax(0, 1fr); gap: 8px; padding-top: max(0.375rem, env(safe-area-inset-top)); }
 .lv-character-header > :first-child { justify-self: start; }
 .lv-character-header > .lv-character-home { grid-column: 2; }

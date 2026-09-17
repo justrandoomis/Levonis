@@ -55,6 +55,7 @@ import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
 import TelegramLink from '../components/security/TelegramLink';
+import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 
 const PASSWORD_MIN = 8; // mirrors worker/routes/auth.ts checkPassword
 const USERNAME_COOLDOWN_DAYS = 14; // mirrors worker/routes/profile.ts
@@ -559,6 +560,15 @@ export default function Settings() {
           {rtl ? <ChevronRight aria-hidden="true" className="w-5 h-5" /> : <ChevronLeft aria-hidden="true" className="w-5 h-5" />}
         </button>
         <h1 className="text-[18px] font-bold">{s.title}</h1>
+        {/* THE PAGE OWNS ITS BLOUB SLOT, SO THE SHELL STOPS RESERVING ONE.
+            MotionCharacterFallbackHeader returns null the moment any page
+            anchor is registered; without this the shell printed a second
+            60-72px strip ABOVE this bar on every full-screen route, and the
+            settings list started a whole header lower than it should. One bar,
+            with the character living at its trailing edge. */}
+        <div className="ms-auto shrink-0">
+          <MotionCharacterHome kind="top-header" compact />
+        </div>
       </div>
 
       <div className="px-3 sm:px-4 py-5 max-w-xl mx-auto pb-[max(4rem,env(safe-area-inset-bottom))]">

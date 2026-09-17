@@ -83,9 +83,25 @@ const STRINGS = {
   },
 } as const;
 
-const ACTION =
-  'inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border text-[12.5px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-50';
-const ACTION_QUIET = `${ACTION} border-zinc-800 text-zinc-200 hover:bg-zinc-800`;
+/*
+  THE VERBS ON AN ORDER CARD NOW COME FROM THE HOUSE PRIMITIVE.
+
+  They used to be two local class strings with hard-coded literals — zinc-800
+  borders, an #BAA369 focus ring, red-500/30, a 12.5px type size and a 40px
+  height — none of which appear anywhere else in the app. That is what made
+  them read as borrowed from another product: `.lv-button` (the primitive
+  Settings, Cart, Checkout, Support and Addresses all use) is 44px, uses
+  `--radius-md`, takes its colours from tokens and gets its focus ring from
+  `:focus-visible` with an offset. Every value below is now that system's.
+
+  `flex-1 basis-[calc(50%-0.25rem)]` is what fixes the ragged row: the four
+  verbs are different lengths in all three languages ('Track' vs «تقييم
+  المنتجات»), so a plain `flex-wrap` produced a different silhouette on every
+  card. Giving each a half-width basis tiles them two-up on a phone and lets a
+  lone third verb take the full width — a predictable shape whatever the
+  language, and shared edges to align to.
+*/
+const ACTION = 'lv-button lv-button-sm flex-1 basis-[calc(50%-0.25rem)]';
 
 /**
  * What is still owed at the door. `due_on_delivery_iqd` is the checkout-time
@@ -255,24 +271,32 @@ export default function OrderCard({
             data-track-order={order.id}
             aria-expanded={trackingOpen}
             onClick={onToggleTracking}
-            className={ACTION_QUIET}
+            className={`${ACTION} lv-button-secondary`}
           >
-            <Truck className="w-3.5 h-3.5" aria-hidden />
-            {trackingOpen ? s.hideTrack : s.track}
+            <Truck className="w-4 h-4 shrink-0" aria-hidden />
+            <span className="truncate">{trackingOpen ? s.hideTrack : s.track}</span>
           </button>
-          <Link to={`/orders/${encodeURIComponent(order.id)}`} aria-label={s.open(order.id)} className={ACTION_QUIET}>
-            {s.details}
-            <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" aria-hidden />
+          {/* Details is the card's primary path — it opens the whole order —
+              so it carries the one filled treatment in the group. Everything
+              else is a tinted or neutral surface, which keeps a LIST of order
+              cards visually quiet instead of a column of competing fills. */}
+          <Link
+            to={`/orders/${encodeURIComponent(order.id)}`}
+            aria-label={s.open(order.id)}
+            className={`${ACTION} lv-button-primary`}
+          >
+            <span className="truncate">{s.details}</span>
+            <ChevronRight className="w-4 h-4 shrink-0 rtl:rotate-180" aria-hidden />
           </Link>
           {order.status === 'pending' && (
             <button
               type="button"
               data-cancel-order={order.id}
               onClick={(e) => onCancel(order, e.currentTarget)}
-              className={`${ACTION} border-red-500/30 text-red-300 hover:bg-red-500/10 focus-visible:ring-red-400`}
+              className={`${ACTION} lv-button-danger`}
             >
-              <XCircle className="w-3.5 h-3.5" aria-hidden />
-              {s.cancel}
+              <XCircle className="w-4 h-4 shrink-0" aria-hidden />
+              <span className="truncate">{s.cancel}</span>
             </button>
           )}
           {canReview && (
@@ -280,16 +304,16 @@ export default function OrderCard({
               type="button"
               data-review-order={order.id}
               onClick={(e) => onReview(order, e.currentTarget)}
-              className={`${ACTION} border-[#BAA369]/40 text-[#BAA369] hover:bg-[#BAA369]/10`}
+              className={`${ACTION} lv-button-accent`}
             >
-              <Star className="w-3.5 h-3.5" aria-hidden />
-              {s.review}
+              <Star className="w-4 h-4 shrink-0" aria-hidden />
+              <span className="truncate">{s.review}</span>
             </button>
           )}
           {allReviewed && (
             <span
               data-review-all-done={order.id}
-              className="inline-flex items-center gap-1.5 min-h-[40px] px-3 text-[12.5px] font-bold text-emerald-300/80"
+              className="inline-flex items-center gap-1.5 min-h-[44px] px-3 text-[13px] font-bold text-emerald-300/80"
             >
               <Star className="w-3.5 h-3.5" fill="currentColor" aria-hidden />
               {s.reviewedAll}

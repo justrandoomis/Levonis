@@ -44,6 +44,7 @@ import { ChevronLeft, ChevronRight, Plus, MapPin, Edit2, Trash2, CheckCircle, Sh
 import { useAuth } from '../AuthContext';
 import { api, ApiAddress } from '../lib/api';
 import { apiRefusal } from '../lib/refusalStrings';
+import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { useLanguage } from '../LanguageContext';
 import { GOVERNORATES } from '../lib/governorates';
 import { Overlay } from '../components/ui/Overlay';
@@ -176,7 +177,10 @@ export default function Addresses() {
           <Back aria-hidden="true" className="w-6 h-6" />
         </button>
         <h1 className="text-[17px] font-bold">{loc('عناويني', 'My addresses', 'ناونیشانەکانم')}</h1>
-        <div className="w-11" />
+        {/* Takes the place of the old `w-11` spacer: it still balances the back
+            button so the title stays centred, and it registers the page anchor
+            that stops the shell reserving a second strip above this bar. */}
+        <MotionCharacterHome kind="top-header" compact />
       </div>
 
       <div className="flex-1 px-4 py-4 mx-auto w-full max-w-[560px]">

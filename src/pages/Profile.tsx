@@ -543,7 +543,25 @@ export default function Profile() {
             every tile leads to a real page). */}
         {isAuthenticated && (
         <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-4 mb-3 shadow-sm overflow-hidden relative">
-          <div className="flex overflow-x-auto gap-5 hide-scrollbar">
+          {/*
+            WHY THE LABELS USED TO COLLIDE.
+
+            Each tile was `min-w-[56px]` with no `shrink-0`, and its label was
+            `whitespace-nowrap`. `min-width` stops the BOX at 56px; it does not
+            stop the TEXT. So in a flex row whose contents are wider than the
+            screen, every tile was compressed to 56px while «تسجيل الدخول
+            اليومي» (~95px at 11px) kept its full width and simply painted
+            outside its own box — on top of «مزرعة الطباعة» to one side and
+            «الالعاب» to the other. The horizontal scroller never engaged,
+            because shrinking had already made the row "fit".
+
+            The fix is to let the tiles keep their real width (`shrink-0`) so
+            the row genuinely scrolls, and to give the label a fixed column it
+            wraps inside instead of a single unbreakable line. Two lines, hard
+            clamped, so a long Arabic label and a short Kurdish one produce the
+            same tile height and the icons stay on one baseline.
+          */}
+          <div className="flex overflow-x-auto gap-4 hide-scrollbar -mx-1 px-1 py-0.5">
             {[
               /* §3.1: the referrals page gets ONE of the five slots under
                  "My Orders" — it replaces a "coming soon" placeholder, so no
@@ -552,22 +570,42 @@ export default function Profile() {
               { icon: UserPlus, label: loc('الإحالات', 'Referrals', 'بانگهێشتکردن'), color: 'text-sky-500', bg: 'bg-sky-100 dark:bg-sky-900/30', to: '/referrals' },
               /* The Printer Farm is the real game behind the former "Collect
                  Coins" placeholder: Farm Coins are earned there, on the server. */
-              { icon: Coins, label: loc('مزرعة الطباعة', 'Printer Farm', 'کێڵگەی چاپکەر'), color: 'text-yellow-500', bg: 'bg-yellow-100 dark:bg-yellow-900/30', to: '/games/printer-farm' },
-              { icon: Zap, label: loc('تسجيل الدخول اليومي', 'Daily Sign-in', 'چوونەژوورەوەی ڕۆژانە'), color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/30', to: '/points' },
-              { icon: Gamepad2, label: loc('الالعاب', 'Games', 'یارییەکان'), color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-900/30', to: '/games' },
-              { icon: Star, label: loc('المكافآت', 'Rewards', 'خەڵاتەکان'), color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30', to: '/points' },
+              /* `soon` marks a destination the app will not actually serve
+                 yet: /games is behind a feature gate and /games/printer-farm
+                 is bounced by FarmGate, so tapping either used to look like a
+                 dead button. The tile says so up front instead. Points and
+                 missions stay live — they pay real balances today. */
+              { icon: Coins, label: loc('مزرعة الطباعة', 'Printer Farm', 'کێڵگەی چاپکەر'), color: 'text-yellow-500', bg: 'bg-yellow-100 dark:bg-yellow-900/30', to: '/games/printer-farm', soon: true },
+              { icon: Zap, label: loc('تسجيل الدخول اليومي', 'Daily Sign-in', 'چوونەژوورەوەی ڕۆژانە'), color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/30', to: '/points', soon: false },
+              { icon: Gamepad2, label: loc('الالعاب', 'Games', 'یارییەکان'), color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-900/30', to: '/games', soon: true },
+              { icon: Star, label: loc('المكافآت', 'Rewards', 'خەڵاتەکان'), color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30', to: '/points', soon: false },
             ].map((game, i) => (
               <button
                 key={i}
                 type="button"
-                onClick={() => navigate(game.to)}
-                className="flex flex-col items-center gap-2 min-w-[56px] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded-lg hover:scale-105 active:scale-95"
+                onClick={() => { if (!game.soon) navigate(game.to); }}
+                aria-disabled={game.soon || undefined}
+                title={game.soon ? `${game.label} — ${t('comingSoon')}` : undefined}
+                className={`group flex w-[74px] shrink-0 flex-col items-center gap-2 rounded-lg py-1 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] ${
+                  game.soon ? 'cursor-default' : 'hover:scale-105 active:scale-95'
+                }`}
               >
-                <span className={`w-[44px] h-[44px] rounded-full flex items-center justify-center ${game.bg}`} aria-hidden="true">
-                  <game.icon className={`w-[22px] h-[22px] ${game.color}`} strokeWidth={2} />
+                <span className="relative" aria-hidden="true">
+                  <span className={`w-[44px] h-[44px] rounded-full flex items-center justify-center ${game.bg} ${game.soon ? 'opacity-45' : ''}`}>
+                    <game.icon className={`w-[22px] h-[22px] ${game.color}`} strokeWidth={2} />
+                  </span>
                 </span>
-                <span className="text-[11px] text-black dark:text-white text-center whitespace-nowrap">
-                  {game.label}
+                <span className="flex flex-col items-center gap-1">
+                  <span className={`text-[11px] leading-[1.35] text-center line-clamp-2 ${
+                    game.soon ? 'text-zinc-500 dark:text-zinc-500' : 'text-black dark:text-white'
+                  }`}>
+                    {game.label}
+                  </span>
+                  {game.soon && (
+                    <span className="text-[9px] font-bold leading-none px-1.5 py-[3px] rounded-full bg-[#BAA369]/15 text-[#BAA369] whitespace-nowrap">
+                      {t('comingSoon')}
+                    </span>
+                  )}
                 </span>
               </button>
             ))}

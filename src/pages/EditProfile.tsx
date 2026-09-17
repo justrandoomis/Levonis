@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext';
 import MerchantDashboard from '../components/MerchantDashboard';
 import { api, uploadFile } from '../lib/api';
 import { COUNTRIES, countryNames, flagOf } from '../components/auth/PhoneField';
+import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 
 const XIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -180,14 +181,26 @@ export default function EditProfile() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between p-4 pt-4 bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-10 border-b border-zinc-800/50">
+      {/* ONE BAR, AND A TITLE THAT CANNOT LAND ON ANYTHING.
+          The title used to be `absolute left-1/2 -translate-x-1/2`, which is
+          centred on the VIEWPORT rather than on the space left between the
+          back button and Save — so at 360px it sat on top of both, and in RTL
+          it centred against the wrong edge entirely. A grid gives the title a
+          real column that the two buttons cannot enter, and `truncate` ends it
+          before the column does.
+          The character anchor is what stops the shell printing a SECOND strip
+          above this bar: MotionCharacterFallbackHeader suppresses itself as
+          soon as a page registers an anchor of its own. */}
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 p-4 pt-4 bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-10 border-b border-zinc-800/50">
         <button
           onClick={() => navigate(-1)}
+          aria-label="Back"
           className="w-11 h-11 bg-white/5 rounded-full flex items-center justify-center shadow-sm hover:bg-white/10 active:scale-95 transition-all border border-white/5"
         >
-          <ChevronLeft className="w-6 h-6 text-white" />
+          <ChevronLeft className="w-6 h-6 text-white rtl:rotate-180" />
         </button>
-        <h1 className="text-[18px] font-bold absolute left-1/2 -translate-x-1/2 text-gold">Edit profile</h1>
+        <h1 className="text-[18px] font-bold text-gold text-center truncate">Edit profile</h1>
+        <MotionCharacterHome kind="top-header" compact />
         <button
           onClick={handleSave}
           disabled={isSaving || !user}

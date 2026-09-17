@@ -31,11 +31,21 @@ export function MotionCharacterAnchor({ kind = 'top-header', busy = false, class
   );
 }
 
-export function MotionCharacterHome({ busy = false, kind = 'top-header' }: { busy?: boolean; kind?: AnchorKind }) {
+/**
+ * `compact` is for a bar the page already owns.
+ *
+ * A page with its own back-button/title header needs the character to JOIN
+ * that bar, not to size it: the full slot is taller than the 44px controls
+ * beside it and makes the header grow. Compact keeps the tap target at 44px
+ * and lets the drawn character match the controls it sits with.
+ */
+export function MotionCharacterHome({ busy = false, kind = 'top-header', compact = false }: {
+  busy?: boolean; kind?: AnchorKind; compact?: boolean;
+}) {
   const { t } = useLanguage();
   return (
     <Link to="/" aria-label={t('home')} onClick={() => signalBloub('tap', 210)}
-      className="lv-character-home focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+      className={`lv-character-home${compact ? ' lv-character-home--compact' : ''} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}>
       <MotionCharacterAnchor kind={kind} busy={busy} />
     </Link>
   );

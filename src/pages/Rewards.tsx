@@ -6,6 +6,7 @@ import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
 import { useSignInPrompt } from '../lib/guest';
 import { api } from '../lib/api';
+import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { Overlay } from '../components/ui/Overlay';
 
 /**
@@ -340,6 +341,9 @@ export default function Rewards() {
           <ChevronLeft aria-hidden="true" className="w-6 h-6 text-gold rtl:rotate-180" strokeWidth={2.5} />
         </button>
         <h1 className="text-[17px] font-bold text-center flex-1">{loc('النقاط والمهام', 'Points & Missions')}</h1>
+        {/* Registers this page's own character anchor, so the shell stops
+            reserving a separate landing strip above this header. */}
+        <MotionCharacterHome kind="top-header" compact />
         {/* The tier badge is the server's answer, never a local guess. */}
         {multiplier && multiplier.active ? (
           <span className="p-1 px-3 text-[12px] font-bold rounded-full bg-gold text-black uppercase">
