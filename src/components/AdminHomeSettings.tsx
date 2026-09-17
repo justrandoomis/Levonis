@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, uploadFile } from '../lib/api';
-import { GripVertical, Plus, Settings, Eye, EyeOff, Save, Trash2, LayoutTemplate, Megaphone, Image as ImageIcon, Ticket, Tag, Star, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Upload, Check, AlertTriangle, Package } from 'lucide-react';
+import type { SiteMediaEntry } from '../lib/api';
+import { GripVertical, Plus, Settings, Eye, EyeOff, Save, Trash2, LayoutTemplate, Megaphone, Image as ImageIcon, Ticket, Tag, Star, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Upload, Check, AlertTriangle, Package, RotateCcw } from 'lucide-react';
 import AdminAds from './AdminAds';
 
 interface HomeSection {
@@ -329,6 +330,16 @@ export default function AdminHomeSettings() {
             {dir === 'rtl' ? 'ترتيب وإظهار الأقسام' : 'Layout & Visibility'}
           </button>
 
+          <button
+            onClick={() => setActiveTab('site-media')}
+            className={`flex items-center gap-2 whitespace-nowrap px-4 py-2.5 rounded-xl font-bold transition-all shrink-0 ${
+              activeTab === 'site-media' ? 'bg-[#6B46FF] text-white shadow-lg' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" />
+            {dir === 'rtl' ? 'صور وأيقونات الصفحة الرئيسية' : 'Main page images'}
+          </button>
+
           {INITIAL_SECTIONS.map((section) => {
             const Icon = SECTION_ICONS[section.id] || LayoutTemplate;
             return (
@@ -464,7 +475,190 @@ export default function AdminHomeSettings() {
             saveError={itemsError}
           />
         )}
+
+        {activeTab === 'site-media' && <SiteMediaSettings dir={dir} />}
       </div>
+    </div>
+  );
+}
+
+/**
+ * THE BRAND MARKS AND SERVICE ICONS ON THE FIRST SCREEN.
+ *
+ * Unlike every other panel here, this one does NOT stage edits and save them
+ * in a batch. An upload is a write to R2 that either happened or did not, so
+ * there is nothing meaningful to hold in a draft and nothing to "discard" —
+ * the server returns the new resolved list and that IS the state. Each row is
+ * therefore independently live, and a failed upload leaves the other rows
+ * untouched instead of poisoning a whole-form save.
+ *
+ * WebP is refused CLIENT-side as well as on the server. The server's check is
+ * the one that counts (it sniffs magic bytes; a renamed .png will not pass),
+ * but telling someone their PNG is wrong before a 2 MB round trip is the
+ * difference between a rule and an obstacle.
+ */
+function SiteMediaSettings({ dir }: { dir: string }) {
+  const rtl = dir === 'rtl';
+  const [media, setMedia] = useState<SiteMediaEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [busySlot, setBusySlot] = useState<string | null>(null);
+  const [slotError, setSlotError] = useState<Record<string, string>>({});
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const data = await api.get<{ media: SiteMediaEntry[] }>('/api/admin/site-media');
+      setMedia(data.media || []);
+    } catch (err) {
+      setLoadError(err instanceof ApiError ? err.message : 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const upload = async (slot: string, file: File) => {
+    setSlotError((p) => ({ ...p, [slot]: '' }));
+    if (!/\.webp$/i.test(file.name) && file.type !== 'image/webp') {
+      setSlotError((p) => ({ ...p, [slot]: rtl ? 'الصيغة يجب أن تكون WebP فقط' : 'The file must be a WebP image' }));
+      return;
+    }
+    setBusySlot(slot);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('originalName', file.name);
+      const data = await api.post<{ media: SiteMediaEntry[] }>(`/api/admin/site-media/${encodeURIComponent(slot)}`, form);
+      setMedia(data.media || []);
+    } catch (err) {
+      setSlotError((p) => ({ ...p, [slot]: err instanceof ApiError ? err.message : 'Upload failed' }));
+    } finally {
+      setBusySlot(null);
+    }
+  };
+
+  const reset = async (slot: string) => {
+    setBusySlot(slot);
+    setSlotError((p) => ({ ...p, [slot]: '' }));
+    try {
+      const data = await api.delete<{ media: SiteMediaEntry[] }>(`/api/admin/site-media/${encodeURIComponent(slot)}`);
+      setMedia(data.media || []);
+    } catch (err) {
+      setSlotError((p) => ({ ...p, [slot]: err instanceof ApiError ? err.message : 'Reset failed' }));
+    } finally {
+      setBusySlot(null);
+    }
+  };
+
+  const GROUPS: Array<{ group: SiteMediaEntry['group']; titleAr: string; titleEn: string; noteAr: string; noteEn: string }> = [
+    {
+      group: 'brand',
+      titleAr: 'شعارات العلامات التجارية', titleEn: 'Brand logos',
+      noteAr: 'تظهر في قسم «أبرز العلامات» على الصفحة الرئيسية.',
+      noteEn: 'Shown in the “Top brands” section on the home page.',
+    },
+    {
+      group: 'service',
+      titleAr: 'أيقونات الخدمات', titleEn: 'Service icons',
+      noteAr: 'تستبدل الأيقونة المرسومة في شريط الخدمات. اتركها فارغة لإبقاء الأيقونة الحالية.',
+      noteEn: 'Replaces the drawn icon on the services rail. Leave empty to keep the current icon.',
+    },
+    {
+      group: 'banner',
+      titleAr: 'صور إضافية للصفحة الرئيسية', titleEn: 'Extra main page images',
+      noteAr: 'أماكن جاهزة لصور الصفحة الرئيسية غير شرائح العرض.',
+      noteEn: 'Ready slots for main page artwork other than the hero carousel.',
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 text-zinc-400 text-sm">
+        {rtl ? 'جارٍ التحميل…' : 'Loading…'}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
+      <div className="mb-5">
+        <h3 className="text-lg font-bold text-white">{rtl ? 'صور وأيقونات الصفحة الرئيسية' : 'Main page images & icons'}</h3>
+        <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+          {rtl
+            ? 'تُحفظ كلها في مجلد UiUx/MainPage داخل التخزين العام، وبصيغة WebP فقط. كل رفع ينشئ ملفًا جديدًا حتى لا تبقى النسخة القديمة محفوظة في ذاكرة المتصفحات.'
+            : 'All of these live in UiUx/MainPage in public storage, and must be WebP. Every upload writes a NEW file, so browsers and edge caches cannot keep serving the old one.'}
+        </p>
+      </div>
+
+      {loadError && (
+        <div className="mb-4 text-sm text-red-400 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4" /> {loadError}
+          <button onClick={() => void load()} className="underline font-bold">{rtl ? 'إعادة المحاولة' : 'Retry'}</button>
+        </div>
+      )}
+
+      {GROUPS.map((g) => {
+        const rows = media.filter((m) => m.group === g.group);
+        if (rows.length === 0) return null;
+        return (
+          <div key={g.group} className="mb-7 last:mb-0">
+            <h4 className="text-sm font-bold text-white mb-1">{rtl ? g.titleAr : g.titleEn}</h4>
+            <p className="text-xs text-zinc-500 mb-3">{rtl ? g.noteAr : g.noteEn}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {rows.map((m) => (
+                <div key={m.slot} className="flex items-center gap-3 bg-zinc-950/60 border border-zinc-800 rounded-2xl p-3">
+                  <span className="w-12 h-12 shrink-0 rounded-xl bg-zinc-100 border border-zinc-300/30 grid place-items-center overflow-hidden">
+                    {m.url
+                      ? <img src={m.url} alt="" className="w-full h-full object-contain p-1" />
+                      : <ImageIcon className="w-5 h-5 text-zinc-500" aria-hidden="true" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold text-white truncate">{m.label}</span>
+                    <span className="block text-[11px] text-zinc-500 truncate">
+                      {m.custom
+                        ? (rtl ? 'صورة مرفوعة' : 'Uploaded image')
+                        : m.url
+                          ? (rtl ? 'الصورة الافتراضية' : 'Default image')
+                          : (rtl ? 'لا توجد صورة' : 'No image')}
+                    </span>
+                    {slotError[m.slot] && <span className="block text-[11px] text-red-400 mt-0.5">{slotError[m.slot]}</span>}
+                  </span>
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    <label className={`flex items-center gap-1.5 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg cursor-pointer transition-colors border border-zinc-700 text-xs font-bold ${busySlot === m.slot ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <Upload className="w-3.5 h-3.5" />
+                      {busySlot === m.slot ? (rtl ? '…' : '…') : (rtl ? 'رفع' : 'Upload')}
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/webp,.webp"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = '';
+                          if (file) void upload(m.slot, file);
+                        }}
+                      />
+                    </label>
+                    {m.custom && (
+                      <button
+                        type="button"
+                        onClick={() => void reset(m.slot)}
+                        disabled={busySlot === m.slot}
+                        title={rtl ? 'العودة للصورة الافتراضية' : 'Back to the default image'}
+                        className="px-2.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-lg border border-zinc-700 text-xs font-bold disabled:opacity-50"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

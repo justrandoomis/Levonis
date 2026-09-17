@@ -1112,6 +1112,26 @@ export interface HomeTaxon {
   product_count: number;
 }
 
+/**
+ * One piece of main-page artwork, already resolved by the server.
+ *
+ * The client deliberately does NOT know the slot list, the `UiUx/MainPage/`
+ * prefix or which slots have seeded defaults — worker/lib/siteMedia.ts owns
+ * all three, and /api/home sends the decided answer. That is what keeps the
+ * two sides from drifting: there is no second copy of the list to update.
+ *
+ * `url` is '' for a slot the owner has not filled and that has no default; a
+ * consumer treats that as "keep drawing what you drew before".
+ */
+export interface SiteMediaEntry {
+  slot: string;
+  group: 'brand' | 'service' | 'banner';
+  label: string;
+  link: string;
+  url: string;
+  custom: boolean;
+}
+
 /** The string to show for `lang`, falling back to the first language the
  *  owner filled in. Mirrors pickText in worker/lib/homeContent.ts. */
 export function pickText(t: LocalizedText | undefined, lang: string): string {

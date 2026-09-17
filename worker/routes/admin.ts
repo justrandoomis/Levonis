@@ -11,6 +11,18 @@ import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { canViewFinancials, normalizeAdminScope, userPatchRefusal } from '../lib/adminScope';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
+import {
+  findSiteMediaSlot,
+  mintSiteMediaObject,
+  normalizeSiteMedia,
+  resolveSiteMedia,
+  siteMediaKey,
+  SITE_MEDIA_MAX_BYTES,
+  SITE_MEDIA_MIME,
+} from '../lib/siteMedia';
+import { putMediaObject } from '../lib/mediaStorage';
+import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
+import { sniff } from './uploads';
 import { deductOrderStock, planOrderReturn, stockReturnNote } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
 import { deleteCancelledOrder, OrderDeletionRefusal } from '../lib/orderDeletion';
@@ -1958,6 +1970,94 @@ adminRoutes.get('/settings', async (c) => {
   return c.json({ success: true, settings });
 });
 
+// ------------------------------------------------------- main page media
+//
+// Brand marks and service icons on the home page. The owner's rule is that
+// these are WebP, so this route ENFORCES it rather than converting: the sniff
+// below reads magic bytes, and anything that is not a RIFF/WEBP container is
+// refused by name. `/api/uploads` cannot serve this purpose — its key builder
+// produces owner-scoped four-segment keys and its purpose list is closed, and
+// widening either for six site-wide images would weaken a path that carries
+// customer uploads.
+
+adminRoutes.get('/site-media', async (c) => {
+  const stored = await getSetting(c.env.DB, 'mainPageMedia');
+  return c.json({ success: true, media: resolveSiteMedia(stored) });
+});
+
+adminRoutes.post('/site-media/:slot', async (c) => {
+  const adminUser = c.get('user')!;
+  const slot = findSiteMediaSlot(c.req.param('slot'));
+  if (!slot) throw notFound('Unknown main page media slot');
+
+  const form = await c.req.formData().catch(() => null);
+  if (!form) throw badRequest('Expected multipart form data');
+  const file = form.get('file');
+  if (!(file instanceof File)) throw badRequest('No file uploaded');
+  if (file.size > SITE_MEDIA_MAX_BYTES) {
+    throw badRequest(
+      `الصورة أكبر من الحد (${Math.round(SITE_MEDIA_MAX_BYTES / 1024 / 1024)} ميغابايت) / Image is larger than ${Math.round(SITE_MEDIA_MAX_BYTES / 1024 / 1024)} MB`,
+      'SITE_MEDIA_TOO_LARGE'
+    );
+  }
+
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const kind = sniff(buf);
+  if (!kind || kind.mime !== SITE_MEDIA_MIME) {
+    throw badRequest(
+      'صور الصفحة الرئيسية يجب أن تكون WebP فقط / Main page media must be a WebP image',
+      'SITE_MEDIA_NOT_WEBP'
+    );
+  }
+  const dimensions = rasterDimensions(buf, kind.mime);
+  if (!validRasterDimensions(dimensions)) {
+    throw badRequest('The image has invalid or unsupported dimensions', 'BAD_IMAGE_DIMENSIONS');
+  }
+
+  // A NEW object name every time, never an overwrite — /files/* stamps public
+  // keys `immutable` for a year, so replacing bytes under a live key would
+  // leave caches serving the old logo with nothing here able to purge them.
+  const object = mintSiteMediaObject(slot.slot, newId());
+  const key = siteMediaKey(object);
+  await putMediaObject(
+    c.env,
+    {
+      key,
+      visibility: 'public',
+      domain: 'ui',
+      mime: kind.mime,
+      bytes: buf.byteLength,
+      ownerId: adminUser.id,
+      entityId: slot.slot,
+      width: dimensions?.width ?? null,
+      height: dimensions?.height ?? null,
+      originalName: String(form.get('originalName') || file.name),
+    },
+    buf,
+    { httpMetadata: { contentType: kind.mime, cacheControl: 'public, max-age=31536000, immutable' } }
+  );
+
+  const stored = normalizeSiteMedia(await getSetting(c.env.DB, 'mainPageMedia'));
+  const previous = stored[slot.slot] ?? '';
+  await setSetting(c.env.DB, 'mainPageMedia', { ...stored, [slot.slot]: object });
+  await audit(c.env.DB, adminUser.id, 'admin.site_media_set', slot.slot, { object, previous, bytes: buf.byteLength });
+
+  return c.json({ success: true, media: resolveSiteMedia({ ...stored, [slot.slot]: object }) });
+});
+
+/** Reverts a slot to its seeded default. The uploaded object is left in R2. */
+adminRoutes.delete('/site-media/:slot', async (c) => {
+  const adminUser = c.get('user')!;
+  const slot = findSiteMediaSlot(c.req.param('slot'));
+  if (!slot) throw notFound('Unknown main page media slot');
+  const stored = normalizeSiteMedia(await getSetting(c.env.DB, 'mainPageMedia'));
+  const previous = stored[slot.slot] ?? '';
+  delete stored[slot.slot];
+  await setSetting(c.env.DB, 'mainPageMedia', stored);
+  await audit(c.env.DB, adminUser.id, 'admin.site_media_cleared', slot.slot, { previous });
+  return c.json({ success: true, media: resolveSiteMedia(stored) });
+});
+
 adminRoutes.put('/settings/:key', async (c) => {
   const adminUser = c.get('user')!;
   const key = c.req.param('key') as SettingKey;
@@ -1969,6 +2069,17 @@ adminRoutes.put('/settings/:key', async (c) => {
     throw badRequest(
       'إعدادات مزرعة الطابعات تُحرَّر من مسارها الخاص / Use PUT /api/admin/farm/config/:section for the printer farm configuration',
       'FARM_CONFIG_ROUTE'
+    );
+  }
+  // Same reasoning as the farm config: mainPageMedia is a pointer INTO R2, and
+  // the only writer that can guarantee the object it names actually exists —
+  // and is a WebP — is the upload route below. A raw JSON write here would
+  // happily store a filename for bytes nobody ever uploaded, and the storefront
+  // would render a broken image on its first screen.
+  if (key === 'mainPageMedia') {
+    throw badRequest(
+      'صور الصفحة الرئيسية تُرفع من مسارها الخاص / Use POST /api/admin/site-media/:slot to upload main page media',
+      'SITE_MEDIA_ROUTE'
     );
   }
   const body = await c.req.json().catch(() => ({}));

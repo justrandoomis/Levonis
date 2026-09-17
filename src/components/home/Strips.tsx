@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../LanguageContext';
-import type { HomeSectionItem, HomeTaxon } from '../../lib/api';
+import type { HomeSectionItem, HomeTaxon, SiteMediaEntry } from '../../lib/api';
 import SafeImage from '../ui/SafeImage';
 import SectionHeader from './SectionHeader';
 import Marquee from './Marquee';
@@ -226,8 +226,29 @@ function MarqueeMark({ entry, first }: { entry: MarqueeEntry; first: boolean }) 
   );
 }
 
-export function BrandMarquee({ items, brands }: { items: HomeSectionItem[]; brands: HomeTaxon[] }) {
+export function BrandMarquee({ items, brands, siteMedia = [] }: {
+  items: HomeSectionItem[];
+  brands: HomeTaxon[];
+  siteMedia?: SiteMediaEntry[];
+}) {
   const { t, loc } = useLanguage();
+
+  /**
+   * THREE SOURCES, IN DESCENDING ORDER OF HOW DELIBERATE THEY ARE.
+   *
+   * 1. Cards the owner authored for this section — an explicit editorial
+   *    choice, so nothing overrides them.
+   * 2. The main-page brand slots. These carry REAL LOGOS: the seven marks the
+   *    owner uploaded to `UiUx/MainPage/`, resolved into URLs by the server.
+   * 3. The `brands` taxonomy table. It has no logo column at all, so every
+   *    entry it produces renders as a gold monogram letter — correct as a last
+   *    resort, and not what a brand belt is for.
+   *
+   * The middle source is the one that was missing. Before it, a shop with
+   * seven logos sitting in R2 and no authored cards fell straight through to
+   * (3) and drew seven letters.
+   */
+  const brandSlots = siteMedia.filter((m) => m.group === 'brand' && m.url);
 
   const entries: MarqueeEntry[] =
     items.length > 0
@@ -238,6 +259,15 @@ export function BrandMarquee({ items, brands }: { items: HomeSectionItem[]; bran
           link: it.link,
           data: 'strip' as const,
           id: it.id,
+        }))
+      : brandSlots.length > 0
+      ? brandSlots.map((m) => ({
+          key: m.slot,
+          name: m.label,
+          image: m.url,
+          link: m.link,
+          data: 'brand' as const,
+          id: m.slot,
         }))
       : brands.map((b) => ({
           key: b.id,

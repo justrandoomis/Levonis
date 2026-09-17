@@ -74,6 +74,7 @@ import {
 } from '../lib/paymentPolicy';
 import type { PreorderPricing } from '../lib/pricing';
 import { printerProductIds } from '../lib/printerIdentity';
+import { printerHomeDeliveryAdvanceIqd } from '../lib/printerAdvance';
 import { refuseNonPrinterWarranty } from '../lib/warrantyPlans';
 import { lineOrderType, saleAvailability } from './products';
 import { capacityFrom, EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/productOverlay';
@@ -2334,14 +2335,62 @@ async function computeCheckout(
     // (§6.3) on top of the payment method's rule.
     let requiredAdvance = 0;
     if (isPrepaid(input.paymentMethodId)) requiredAdvance = afterPoints;
-    requiredAdvance = Math.min(Math.max(requiredAdvance, shipping.advance_due_iqd), afterPoints);
 
+    /**
+     * THE PRINTER HOME-DELIVERY ADVANCE IS NOW ENFORCED, NOT ANNOUNCED.
+     *
+     * `printerHomeDeliveryNoteIqd` was display-only: the product page, the cart
+     * and this checkout all told the customer that 50,000 IQD is paid from the
+     * wallet in advance, and no code path ever asked for it — a printer order
+     * was accepted with an empty wallet. It now joins `shipping.advance_due_iqd`
+     * in the same `max`, so the existing wallet machinery below debits it and
+     * refuses with INSUFFICIENT_BALANCE when the balance cannot cover it.
+     *
+     * Deliberately NOT routed through the shipping fee engine's printer
+     * components — see worker/lib/printerAdvance.ts for why that lever would
+     * break every printer checkout instead of guarding it.
+     */
+    const printerAdvance = printerHomeDeliveryAdvanceIqd({
+      hasPrinterLine: p.lines.some((l) => l.is_printer),
+      isPickup,
+      noteIqd: printerNoteIqdFrom(settings.printerHomeDeliveryNoteIqd),
+    });
+
+    requiredAdvance = Math.min(Math.max(requiredAdvance, shipping.advance_due_iqd, printerAdvance), afterPoints);
+
+    /**
+     * AN ADVANCE TAKES THE ADVANCE, NOT THE WHOLE WALLET.
+     *
+     * This used to read `if (requiredAdvance > 0 || input.useWallet)` and then
+     * apply `min(balance, afterPoints)` — the ENTIRE balance — in both cases.
+     * For a prepaid method the two are the same number, because `requiredAdvance`
+     * is `afterPoints` there, so the bug never showed: `shipping.advance_due_iqd`
+     * is the only other contributor and it is always 0 while the printer fee
+     * mapping stays unconfigured.
+     *
+     * The printer advance makes that path live, and the difference is the whole
+     * point of the rule. Someone who chose cash on delivery and owes a 50,000
+     * advance on a 904,000 order must lose 50,000 from the wallet and pay the
+     * rest at the door. Sweeping the balance would silently convert their COD
+     * order into a prepaid one and empty an account they never offered.
+     */
     let walletApplied = 0;
-    if (requiredAdvance > 0 || input.useWallet) {
+    if (input.useWallet) {
       walletApplied = Math.min(walletBalanceIqd, afterPoints);
+    } else if (requiredAdvance > 0) {
+      walletApplied = Math.min(walletBalanceIqd, requiredAdvance);
     }
     if (walletApplied < requiredAdvance) {
-      throw badRequest('Insufficient wallet balance for the required advance payment', 'INSUFFICIENT_BALANCE');
+      // Name the rule that is asking. "Insufficient balance" on a printer
+      // order reads as a bug when the customer was never told an advance was
+      // due; saying the amount and the reason turns it into an instruction.
+      throw badRequest(
+        printerAdvance > 0 && printerAdvance >= requiredAdvance
+          ? `توصيل الطابعة إلى المنزل يتطلب دفع ${printerAdvance.toLocaleString('en-US')} د.ع مقدماً من المحفظة قبل إتمام الطلب. / Home delivery of a printer requires ${printerAdvance.toLocaleString('en-US')} IQD paid in advance from your wallet before the order can be placed.`
+          : 'Insufficient wallet balance for the required advance payment',
+        'INSUFFICIENT_BALANCE',
+        { required_advance_iqd: requiredAdvance, printer_advance_iqd: printerAdvance, wallet_available_iqd: walletBalanceIqd }
+      );
     }
     const walletUsdCents = walletApplied > 0 ? iqdToUsdCents(walletApplied, exchangeRate) : 0;
     if (walletUsdCents > available.usd_cents_available) {
@@ -2415,6 +2464,13 @@ async function computeCheckout(
       walletApplied,
       walletUsdCents: finalWalletUsdCents,
       requiredAdvance,
+      /**
+       * Reported separately from `requiredAdvance` so the checkout screen can
+       * say WHY money must be in the wallet. `requiredAdvance` is a max over
+       * several rules, and "pay 50,000 in advance for the printer" is a very
+       * different sentence from "this payment method is prepaid".
+       */
+      printerAdvance,
       totalIqd: afterPoints + codTaxIqd,
       dueOnDelivery,
       codTaxIqd,

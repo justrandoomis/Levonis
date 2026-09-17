@@ -3,7 +3,7 @@ import { useRail } from '../lib/useRail';
 import React, { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { PackageSearch } from 'lucide-react';
-import { api, ApiProduct, PublicSettings, HomeTaxon } from '../lib/api';
+import { api, ApiProduct, PublicSettings, HomeTaxon, SiteMediaEntry } from '../lib/api';
 import Hero from '../components/home/Hero';
 import ServicesGrid from '../components/home/ServicesGrid';
 import ProductCard from '../components/home/ProductCard';
@@ -33,6 +33,14 @@ export default function Home() {
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [categories, setCategories] = useState<HomeTaxon[]>([]);
   const [brands, setBrands] = useState<HomeTaxon[]>([]);
+  /**
+   * The first screen's own artwork, already resolved by the server into
+   * `/files/...` URLs — brand marks and service icons. Empty until /api/home
+   * answers, and every consumer below treats empty as "draw what you drew
+   * before", so a slow or failed fetch degrades to the previous design rather
+   * than to holes.
+   */
+  const [siteMedia, setSiteMedia] = useState<SiteMediaEntry[]>([]);
 
   const [discountedProducts, setDiscountedProducts] = useState<ApiProduct[]>([]);
   const [newProducts, setNewProducts] = useState<ApiProduct[]>([]);
@@ -58,6 +66,7 @@ export default function Home() {
         latest: ApiProduct[];
         categories?: HomeTaxon[];
         brands?: HomeTaxon[];
+        siteMedia?: SiteMediaEntry[];
       }>('/api/home');
       if (homeReqRef.current !== reqId) return;
       setSettings(data.settings);
@@ -65,6 +74,7 @@ export default function Home() {
       setNewProducts(data.latest || []);
       setCategories(data.categories || []);
       setBrands(data.brands || []);
+      setSiteMedia(data.siteMedia || []);
       setHasMore((data.latest || []).length >= 20);
     } catch (err) {
       console.error('Failed to fetch home products', err);
@@ -187,7 +197,7 @@ export default function Home() {
           </div>
         )}
 
-        <ServicesGrid />
+        <ServicesGrid siteMedia={siteMedia} />
 
         {/* The owner-configurable sections, in the ORDER the admin panel
             shows them. Each renders nothing when it has no content, so an
@@ -236,7 +246,7 @@ export default function Home() {
             // fallback. The belt drifts, pauses under a finger or pointer,
             // and resumes when it leaves.
             node: sectionVisible('top_brands') ? (
-              <BrandMarquee key="top_brands" items={itemsFor('top_brands')} brands={brands} />
+              <BrandMarquee key="top_brands" items={itemsFor('top_brands')} brands={brands} siteMedia={siteMedia} />
             ) : null,
           },
           {

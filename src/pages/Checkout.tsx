@@ -281,6 +281,7 @@ const STRINGS = {
     prepaidPreorder: 'الدفع مقدمًا يُبقي تسعير الطلب المسبق كما هو مُعدّ.',
     prepaidByWallet: 'مدفوع بالكامل من محفظتك — يُطبَّق تسعير الطلب المسبق.',
     printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} مقدماً من المحفظة.`,
+    printerAdvanceShort: (need: string, have: string) => `رصيد محفظتك ${have} ولا يغطي الدفعة المقدمة ${need}. اشحن المحفظة أو اختر الاستلام من المتجر.`,
   },
   en: {
     quoteLoading: 'Calculating delivery...',
@@ -312,6 +313,7 @@ const STRINGS = {
     prepaidPreorder: 'Paying in advance keeps the configured pre-order pricing.',
     prepaidByWallet: 'Paid in full from your wallet — pre-order pricing applies.',
     printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid in advance from your wallet.`,
+    printerAdvanceShort: (need: string, have: string) => `Your wallet holds ${have}, which does not cover the ${need} advance. Top up your wallet, or choose store pickup.`,
   },
   ckb: {
     quoteLoading: 'حسابکردنی گەیاندن...',
@@ -343,6 +345,7 @@ const STRINGS = {
     prepaidPreorder: 'پارەدانی پێشوەخت نرخی پێش-داواکاری وەک ڕێکخراوە دەهێڵێتەوە.',
     prepaidByWallet: 'بە تەواوی لە جزدانەکەتەوە دراوە — نرخی پێش-داواکاری جێبەجێ دەبێت.',
     printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
+    printerAdvanceShort: (need: string, have: string) => `جزدانەکەت ${have} هەیە، کە ${need}ی پێشەکی ناگرێتەوە. جزدان پڕ بکەرەوە یان وەرگرتن لە فرۆشگا هەڵبژێرە.`,
   },
 };
 
@@ -769,6 +772,18 @@ export default function Checkout() {
   // The printer note — the server echoes the amount only when a line is a
   // printer, a home delivery is requested and the owner configured a number.
   const printerNoteIqd = quote?.notes?.printer_home_delivery_iqd ?? null;
+  /**
+   * The printer advance is now a REQUIREMENT, not only a printed term: the
+   * server folds it into `wallet.required_advance_iqd`, so an order it cannot
+   * cover is refused at the door. `isBalanceSufficient` below already disables
+   * the Complete button from the same field — this flag exists so the note can
+   * say WHICH requirement is unmet rather than leaving a dead button and no
+   * explanation.
+   */
+  const printerAdvanceUnmet =
+    printerNoteIqd !== null &&
+    quote !== null &&
+    quote.wallet.applied_iqd < quote.wallet.required_advance_iqd;
   const selectedDelivery = checkoutDeliveryMethods.find(m => m.id === deliveryMethod);
   const deliveryPrice = selectedDelivery?.price_iqd || 0;
   const shippingIqd = quote ? quote.shipping.total_iqd : deliveryPrice;
@@ -1661,8 +1676,21 @@ export default function Checkout() {
                 (settings), echoed on the quote only for a printer line going
                 to a home address; a store pickup gets no note. */}
             {printerNoteIqd !== null && summaryLines.some((l) => l.isPrinter) && (
-              <Note tone="zinc" icon={<Truck className="w-4 h-4" strokeWidth={1.5} />} testId="checkout-printer-note">
+              <Note
+                tone={printerAdvanceUnmet ? 'amber' : 'zinc'}
+                icon={<Truck className="w-4 h-4" strokeWidth={1.5} />}
+                testId="checkout-printer-note"
+              >
                 <span className="font-light">{S.printerNote(formatIqd(printerNoteIqd))}</span>
+                {/* Only once the quote says the balance cannot cover it. The
+                    sentence above is a term of sale and stays quiet; this one
+                    is the reason the Complete button is disabled, so it is
+                    worth the tone change. */}
+                {printerAdvanceUnmet && (
+                  <span className="mt-1 block font-medium">
+                    {S.printerAdvanceShort(formatIqd(printerNoteIqd), formatIqd(walletBalanceShown))}
+                  </span>
+                )}
               </Note>
             )}
             {shippingNeedsConfig && (

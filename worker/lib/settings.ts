@@ -103,6 +103,15 @@ export const SETTING_DEFAULTS = {
   homeBanners: {} as Record<string, Array<{ id: string; image: string; link: string }>>,
   homeSectionItems: {} as Record<string, Array<{ id: string; title: string; subtitle: string; image: string; link: string }>>,
   homeAds: [] as Array<{ id: string; text: string; animation: string }>,
+  /**
+   * Main-page artwork the owner replaces from the admin: slot id → the object
+   * name inside `UiUx/MainPage/`. Empty means every slot uses the seeded
+   * default, which is why the brand strip works before anyone touches this.
+   * Written only by POST/DELETE /api/admin/site-media/:slot — see
+   * worker/lib/siteMedia.ts for why an upload mints a new object name instead
+   * of overwriting one.
+   */
+  mainPageMedia: {} as Record<string, string>,
   // PRO pricing fallback when no explicit PRO price exists on a product/option/color.
   // 'explicit_only' = no fabricated discount (default until the owner approves a rule).
   proPricingPolicy: { mode: 'explicit_only', percent: null } as { mode: 'explicit_only' | 'global_percent'; percent: number | null },
@@ -340,6 +349,9 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   'homeBanners',
   'homeSectionItems',
   'homeAds',
+  // Brand marks and service icons on the first screen a signed-out visitor
+  // sees. Public by nature; the bytes themselves are already anonymous.
+  'mainPageMedia',
   // The calculator is a public tool; the rates on it are a published price
   // list, not internal policy.
   'printServicePricing',

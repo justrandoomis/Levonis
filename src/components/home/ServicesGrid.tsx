@@ -5,6 +5,7 @@ import { useLanguage } from '../../LanguageContext';
 import { STUDIO_URL } from '../../translations';
 import SectionHeader from './SectionHeader';
 import { useRail } from '../../lib/useRail';
+import type { SiteMediaEntry } from '../../lib/api';
 
 /**
  * What LEVONIS does besides sell boxes — six compact cards on one
@@ -37,31 +38,50 @@ const CARD_PLAIN = 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600';
 const CARD_FEATURED =
   'bg-gradient-to-br from-olive/20 to-zinc-900/60 border-olive/40 hover:border-olive/70';
 
+/**
+ * `image` is the owner's uploaded icon for this card, or '' for none.
+ *
+ * NONE IS THE NORMAL CASE, not a missing state. The lucide icon is a deliberate
+ * design, so a card without an upload keeps drawing it rather than showing a
+ * gap — the upload REPLACES a working icon, it does not fill a hole. That is
+ * also why the tile keeps its size, border and background either way: swapping
+ * the mark inside the tile leaves the rail's rhythm untouched.
+ */
 function CardBody({
   icon: Icon,
   title,
   featured,
+  image,
 }: {
   icon: React.ElementType;
   title: string;
   featured?: boolean;
+  image?: string;
 }) {
   return (
     <>
       <div
-        className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border ${
+        className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border ${
           featured ? 'bg-olive/25 border-olive/50' : 'bg-zinc-800/70 border-zinc-700/60'
         }`}
       >
-        <Icon aria-hidden="true" className={`w-5 h-5 ${featured ? 'text-olive-light' : 'text-zinc-300'}`} />
+        {image ? (
+          <img src={image} alt="" aria-hidden="true" loading="lazy" decoding="async" className="w-full h-full object-contain p-1.5" />
+        ) : (
+          <Icon aria-hidden="true" className={`w-5 h-5 ${featured ? 'text-olive-light' : 'text-zinc-300'}`} />
+        )}
       </div>
       <h3 className="w-full text-[12px] font-bold leading-snug text-white line-clamp-2">{title}</h3>
     </>
   );
 }
 
-export default function ServicesGrid() {
+export default function ServicesGrid({ siteMedia = [] }: { siteMedia?: SiteMediaEntry[] }) {
   const { t } = useLanguage();
+  // Keyed by the same id the card already carries in `data-service`, so there
+  // is no second naming scheme to keep in step with the server's slot list.
+  const iconFor = (id: string): string =>
+    siteMedia.find((m) => m.group === 'service' && m.slot === `service-${id}`)?.url || '';
   // Six short cards: a snappier decay suits a rail this narrow.
   const rail = useRail({ decelerationRate: 0.99 });
 
@@ -96,12 +116,12 @@ export default function ServicesGrid() {
           data-service="studio"
           className={`${CARD_BASE} ${CARD_FEATURED}`}
         >
-          <CardBody icon={Layers} title={t('studioCardTitle')} featured />
+          <CardBody icon={Layers} title={t('studioCardTitle')} featured image={iconFor('studio')} />
         </a>
 
         {inApp.map((s) => (
           <Link key={s.id} to={s.to} data-service={s.id} className={`${CARD_BASE} ${CARD_PLAIN}`}>
-            <CardBody icon={s.icon} title={s.title} />
+            <CardBody icon={s.icon} title={s.title} image={iconFor(s.id)} />
           </Link>
         ))}
       </div>

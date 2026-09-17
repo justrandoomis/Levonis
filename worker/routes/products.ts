@@ -71,6 +71,7 @@ import { publicMysteryBlock, resolveMysteryLines, type MysteryContext } from '..
 import { activePoolProductIds } from '../lib/mysteryDraw';
 import { applyOfferToResolved, loadOffers, offerEligible, offerKey, scheduleState, subjectOf, type OfferView } from '../lib/offers';
 import { isPrinterProduct } from '../lib/printerIdentity';
+import { resolveSiteMedia } from '../lib/siteMedia';
 import { pricedPlans, WARRANTY_NOT_PRINTER } from '../lib/warrantyPlans';
 import {
   canonicalOptionValueIds as canonicalSelectionOptionValueIds,
@@ -3209,5 +3210,11 @@ homeRoutes.get('/', async (c) => {
     ),
     categories: categories.results.filter((r) => Number(r.product_count) > 0),
     brands: brands.results.filter((r) => Number(r.product_count) > 0),
+    // The first screen's own artwork — brand marks and service icons. Resolved
+    // here rather than in the client so the seeded defaults and the owner's
+    // uploads arrive as one already-decided list of URLs, and the storefront
+    // never has to know what `UiUx/MainPage/` is. `mainPageMedia` is already in
+    // PUBLIC_SETTING_KEYS, so this costs no extra read.
+    siteMedia: resolveSiteMedia((safeSettings as Record<string, unknown>).mainPageMedia),
   });
 });
