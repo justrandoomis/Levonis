@@ -145,7 +145,7 @@ test('the blank template documents the grammar and declares nothing by printing 
   for (const key of [
     'options.1.direct.enabled',
     'options.1.direct.price_iqd',
-    'options.1.preorder.lead_time_text',
+    'options.1.preorder.lead_time_text_en',
     'options.1.preorder.transports.1.method',
     'options.1.preorder.transports.1.surcharge_iqd',
   ]) {

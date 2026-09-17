@@ -80,6 +80,7 @@ import {
   PRODUCT_TYPES,
   groupsForType,
   groupsForSection,
+  narrowGroups,
   type SectionRef,
   flatFields,
   isProductType,
@@ -87,6 +88,7 @@ import {
   productType,
   type ProductTypeId,
   type TemplateField,
+  type TemplateGroup,
 } from '../lib/templateFamilies';
 import {
   MEMBERSHIP_CAP_SCOPES,
@@ -485,8 +487,7 @@ is_featured=false
 display_order=0
 
 # ------------------------------ البيع والمخزون / selling & stock
-selling_type=direct_sale
-stock=5
+selling_type=mixed
 payment_options=
 
 # ------------------------------ الوسائط / media
@@ -498,9 +499,7 @@ payment_options=
 # images.1.alt_ar=صورة المنتج
 
 # ------------------------------ الخيارات / options
-# السعر الأساسي (100000) هو الأرخص؛ كل خيار زيادة فوقه. التوفر حسب المنتج:
-# اترك availability_type فارغًا، فالبيع المباشر/الطلب المسبق يُسعَّر بزيادات
-# المنتج (direct_surcharge_iqd وطرق الشحن) لا بخيارات منفصلة.
+# السعر الأساسي (100000) هو الأرخص؛ كل خيار وطريقة توفر زيادة فوقه.
 options.1.id=opt_example_small
 options.1.name_ar=المقاس الصغير
 options.1.name_en=Small
@@ -508,6 +507,13 @@ options.1.active=true
 # __NULL__ = نفس السعر الأساسي (لا يساوي صفراً)
 options.1.regular_price_iqd=__NULL__
 options.1.availability_type=
+options.1.direct.enabled=true
+options.1.direct.price_iqd=+2000
+options.1.stock=5
+options.1.preorder.enabled=true
+options.1.preorder.transports.1.method=sea
+options.1.preorder.transports.1.enabled=true
+options.1.preorder.transports.1.surcharge_iqd=+5000
 options.2.id=opt_example_large
 options.2.name_ar=المقاس الكبير
 options.2.name_en=Large
@@ -515,43 +521,16 @@ options.2.active=true
 # +20000 = زيادة عشرين ألفًا فوق السعر الأساسي (تُخزَّن في regular_adjust_iqd)
 options.2.regular_price_iqd=+20000
 options.2.availability_type=
-# مخزون الموديل — البيع المباشر يقرأ هذا الرقم نفسه.
-# __NULL__ = لا يُتتبع (وهو حال كل منتج قبل هذه الإضافة)، 0 = لا توجد وحدات.
-options.2.stock=__NULL__
+options.2.direct.enabled=true
+options.2.direct.price_iqd=+3000
+# البيع المباشر يوجب رقماً: 0 = منتهي، وأي رقم موجب = الكمية المتاحة.
+options.2.stock=0
 options.2.low_stock_threshold=__NULL__
-# ---- 0075: المخزون والسعة / stock and capacity ---------------------------
-# البيع المباشر لا سعة له: رقمه هو مخزون الموديل أعلاه. والتهجئتان التاليتان
-# تكتبان في نفس العمود تمامًا (options.2.stock)، والتصدير يكتب الأولى فقط:
-#   options.2.direct.stock=__NULL__
-#   options.2.direct.low_stock_threshold=__NULL__
-# وسطر مثل options.2.direct.capacity=<العدد> مرفوض بالاسم مع جملة تقول أين يُكتب،
-# وكذلك options.2.capacity أو مفتاح capacity وحده في أعلى الملف: للسعة مفتاحان
-# اثنان لا ثالث لهما، وهما المذكوران أدناه.
-# A direct sale has NO capacity — its number is the model stock above.
-# options.2.direct.stock is an ALIAS onto options.2.stock: same column, and
-# only options.2.stock is exported. options.2.direct.capacity is refused by name,
-# and so is a capacity key written anywhere else (options.2.capacity, or a bare
-# capacity line at the top): the only two that carry one are named below.
-#
-# الطلب المسبق وحده يملك سعة اختيارية. فارغ أو __NULL__ = غير متتبَّعة = بلا حد
-# (سلوك المتجر اليوم)، و0 = متتبَّعة ولا توجد وحدات.
-#   options.2.preorder.enabled=true
-#   options.2.preorder.capacity=__NULL__
-#
-# (أ) سعة مشتركة — اترك سعة الطرق فارغة، فتسحب الثلاث من حوض واحد:
-#   options.2.preorder.capacity=<العدد الكلي>
-#   options.2.preorder.transports.1.method=air
-#   options.2.preorder.transports.1.capacity=__NULL__
-#   options.2.preorder.transports.2.method=sea
-#   options.2.preorder.transports.2.capacity=__NULL__
-#   بيع وحدة جوًا ينقص وحدة من نصيب البحر.
-#   (a) SHARED: leave every route capacity empty; air/sea/land draw on one pool.
-#
-# (ب) حصص مستقلة — أعطِ الطريقة رقمها الخاص، فلا تسحب من الحوض المشترك:
-#   options.2.preorder.transports.1.method=air
-#   options.2.preorder.transports.1.capacity=<حصة الجو>
-#   (b) INDEPENDENT: a route with its own number does NOT also spend the pool —
-#   one counter per sale. Never copy one quantity onto air, sea and land.
+# الطلب المسبق لا يملك مخزونًا أو سعة؛ هو متوفر أو غير متوفر، ولكل طريق زيادة.
+options.2.preorder.enabled=true
+options.2.preorder.transports.1.method=air
+options.2.preorder.transports.1.enabled=true
+options.2.preorder.transports.1.surcharge_iqd=+15000
 
 # ------------------------------ الألوان / colors
 # اللون زيادة فوق سعر الخيار المختار (لون ← خيار ← أساسي)
@@ -576,11 +555,14 @@ colors.2.active=true
 spec_groups.1.id=sg_example_general
 spec_groups.1.title_ar=عام
 spec_groups.1.title_en=General
+spec_groups.1.title_ckb=گشتی
 spec_groups.1.rows.1.id=sr_example_weight
 spec_groups.1.rows.1.label_ar=الوزن
 spec_groups.1.rows.1.label_en=Weight
+spec_groups.1.rows.1.label_ckb=کێش
 spec_groups.1.rows.1.value_ar=1.2
 spec_groups.1.rows.1.value_en=1.2
+spec_groups.1.rows.1.value_ckb=1.2
 spec_groups.1.rows.1.unit=kg
 
 # ------------------------------ الشارات / labels
@@ -1321,7 +1303,7 @@ function priceWarnings(doc: ProductDoc): string[] {
 // ------------------------------------------------------- GET /blank, /example
 
 /**
- * THE SPEC SHEET THIS PRODUCT TYPE ACTUALLY HAS, as a commented scaffold.
+ * THE SPEC SHEET THIS PRODUCT TYPE ACTUALLY HAS.
  *
  * The TXT template's `spec_groups` are free-form label/value rows, which is
  * what makes it able to carry a detail-rich product — and also what makes a
@@ -1330,40 +1312,32 @@ function priceWarnings(doc: ProductDoc): string[] {
  * already knows, because the product form and the CSV columns are both built
  * from the same per-type registry; this hands the TXT lane the same list.
  *
- * EVERY LINE IS A COMMENT. The scaffold names the fields and suggests the
- * indices; it cannot add a value, cannot introduce a parse error, and cannot
- * change what /apply writes. The §6.1 round-trip contract (a served template
- * parses with zero errors) therefore holds by construction, and
- * tests/templateDownload.test.ts checks it for every type rather than trusting
- * that.
+ * The labels remain comments, while every specification value is an active,
+ * empty `spec.<id>=` row. An empty value preserves a stored value; `__CLEAR__`
+ * is the explicit delete token. This makes changing the selected type/section
+ * visibly change the downloaded TXT rows without an empty template erasing
+ * existing specifications when it is re-applied.
  */
-export function typeSpecScaffold(id: ProductTypeId): string[] {
+export function typeSpecScaffold(id: ProductTypeId, groups: TemplateGroup[] = groupsForType(id), sectionName = ''): string[] {
   const def = productType(id);
-  const groups = groupsForType(id);
   const out: string[] = [
     '',
     '# ============================================================',
     `# مواصفات «${def.label_ar}» — القائمة نفسها التي يعرضها نموذج المنتج`,
-    `# Specification sheet for "${def.label_en}" — the same list the product form shows`,
+    `# Specification sheet for "${def.label_en}"${sectionName ? ` · ${sectionName}` : ''} — the same list the product form shows`,
     '# ============================================================',
-    '# كل الأسطر أدناه تعليقات: احذف علامة # من السطر الذي تملؤه فعلاً.',
-    '# Every line below is a comment: uncomment only the rows you actually fill.',
-    '# لا حد ثابت لعدد المجموعات أو الأسطر — كرّر spec_groups.2 / rows.3 وهكذا.',
-    '# No fixed number of groups or rows — keep going with spec_groups.2, rows.3, …',
+    '# هذه الصفوف تختلف فعلياً حسب النوع والقسم المختارين. اكتب القيمة الإنجليزية بعد علامة =.',
+    '# These rows are generated for the selected type/section. Enter the English source value after =.',
+    '# الحقل الفارغ لا يمس قيمة محفوظة؛ للمسح الصريح اكتب __CLEAR__.',
+    '# Empty preserves an existing value; use __CLEAR__ to remove one explicitly.',
   ];
-  let g = 0;
   for (const group of groups) {
-    g += 1;
     out.push('', `# --- ${group.label_ar} / ${group.label_en}`);
-    out.push(`# spec_groups.${g}.title_ar=${group.label_ar}`);
-    out.push(`# spec_groups.${g}.title_en=${group.label_en}`);
-    let r = 0;
     for (const field of group.fields) {
-      r += 1;
       const unit = field.unit ? ` (${field.unit})` : '';
       const options = field.options?.length ? ` — ${field.options.join(' / ')}` : '';
-      out.push(`# spec_groups.${g}.rows.${r}.label_ar=${field.label_ar}${unit}${options}`);
-      out.push(`# spec_groups.${g}.rows.${r}.value_ar=`);
+      out.push(`# ${field.label_ar} / ${field.label_en}${unit}${options}`);
+      out.push(`spec.${field.id}=`);
     }
   }
   out.push('');
@@ -1375,7 +1349,7 @@ export function typeSpecScaffold(id: ProductTypeId): string[] {
  * scaffold. Without it the template is exactly what it has always been, so
  * every existing caller and saved link keeps its file.
  */
-templateRoutes.get('/blank', (c) => {
+templateRoutes.get('/blank', async (c) => {
   const raw = (c.req.query('type') ?? '').trim();
   if (!raw) return attachment(buildBlankTemplate().text, 'levonis-product-template.txt');
   if (!isProductType(raw)) {
@@ -1383,7 +1357,24 @@ templateRoutes.get('/blank', (c) => {
       `type: "${raw}" غير معروف — القيم المتاحة: ${PRODUCT_TYPES.map((t) => t.id).join(' / ')}`
     );
   }
-  const text = `${buildBlankTemplate().text}\n${typeSpecScaffold(raw).join('\n')}`;
+  const category = (c.req.query('category') ?? '').trim();
+  let groups = groupsForType(raw);
+  let sectionName = '';
+  if (category) {
+    const { results } = await c.env.DB.prepare('SELECT * FROM catalogs').all<CatalogRow>();
+    const selected = results.find((row) => row.id === category || row.slug === category);
+    if (!selected) throw badRequest(`category: "${category}" غير معروف / unknown section`);
+    const byId = new Map(results.map((row) => [row.id, row]));
+    const branch: SectionRef[] = [];
+    let cursor: CatalogRow | undefined = selected;
+    for (let i = 0; i < 20 && cursor; i++) {
+      branch.push({ id: cursor.id, slug: cursor.slug });
+      cursor = cursor.parent_id ? byId.get(cursor.parent_id) : undefined;
+    }
+    groups = narrowGroups(raw, branch);
+    sectionName = selected.name_ar || selected.name_en || selected.slug;
+  }
+  const text = `${buildBlankTemplate().text}\n${typeSpecScaffold(raw, groups, sectionName).join('\n')}`;
   return attachment(text, `levonis-product-template-${raw}.txt`);
 });
 

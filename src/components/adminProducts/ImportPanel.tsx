@@ -63,12 +63,12 @@ const STRINGS = {
 
     step2: '٢. النوع والقسم',
     step2HintTable: 'النوع يحدد أعمدة القالب، والقسم يحدد أين يُحفظ المنتج.',
-    step2HintTxt: 'ملف TXT يحمل تصنيفه بداخله. النوع هنا يُستخدم فقط ليأتي القالب الفارغ بورقة مواصفات هذا النوع.',
+    step2HintTxt: 'ملف TXT يحمل تصنيفه بداخله. اختر النوع والقسم هنا لتوليد صفوف مواصفات مطابقة للقسم في القالب الفارغ.',
     typeColumns: '{n} حقل مواصفات',
     anyType: 'كل الأنواع',
     pickTypeFirst: 'اختر نوع المنتج أولًا.',
     sectionPlaceholder: 'اختر قسمًا…',
-    sectionOptional: 'غير مطلوب لصيغة TXT',
+    sectionOptional: 'اختياري للاستيراد، لكنه يخصص صفوف قالب TXT حسب القسم.',
     noFamily: 'هذا القسم بلا عائلة قالب. حدّدها (أجهزة أو مواد) من إدارة الأقسام أولًا.',
 
     step3: '٣. نزّل القالب',
@@ -176,12 +176,12 @@ const STRINGS = {
 
     step2: '2. Type and section',
     step2HintTable: 'The type decides the template columns; the section decides where the product is filed.',
-    step2HintTxt: 'A TXT file carries its own classification. The type is used here only so the blank template arrives with that type’s specification sheet.',
+    step2HintTxt: 'A TXT file carries its own classification. Choose a type and section here to generate the matching specification rows in the blank template.',
     typeColumns: '{n} spec fields',
     anyType: 'All types',
     pickTypeFirst: 'Choose a product type first.',
     sectionPlaceholder: 'Choose a section…',
-    sectionOptional: 'Not needed for TXT',
+    sectionOptional: 'Optional for import; selecting it tailors the TXT template rows to that section.',
     noFamily: 'This section has no template family. Set it to Devices or Materials in the sections admin first.',
 
     step3: '3. Download the template',
@@ -707,24 +707,21 @@ export default function ImportPanel({
             />
           ))}
         </div>
-        {isTable ? (
-          <div className="mt-2">
-            <select
-              data-import="section"
-              value={sectionId}
-              onChange={(e) => { setSectionId(e.target.value); invalidate(); }}
-              className={inputCls + ' w-full sm:w-auto sm:min-w-[18rem] max-w-full'}
-            >
-              <option value="">{t.sectionPlaceholder}</option>
-              {options.map((c) => (
-                <option key={c.id} value={c.id}>{label(c)}</option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <p className="text-[11px] text-zinc-500 mt-2">{t.sectionOptional}</p>
-        )}
-        {isTable && catalogs.length > 0 && options.length === 0 && <p className="text-amber-300/90 text-[11px] mt-2">{t.noFamily}</p>}
+        <div className="mt-2">
+          <select
+            data-import="section"
+            value={sectionId}
+            onChange={(e) => { setSectionId(e.target.value); invalidate(); }}
+            className={inputCls + ' w-full sm:w-auto sm:min-w-[18rem] max-w-full'}
+          >
+            <option value="">{t.sectionPlaceholder}</option>
+            {options.map((c) => (
+              <option key={c.id} value={c.id}>{label(c)}</option>
+            ))}
+          </select>
+        </div>
+        {!isTable && <p className="text-[11px] text-zinc-500 mt-2">{t.sectionOptional}</p>}
+        {catalogs.length > 0 && options.length === 0 && <p className="text-amber-300/90 text-[11px] mt-2">{t.noFamily}</p>}
         {lookups && <LookupsBox lookups={lookups} section={section} lang={lang} t={t} />}
       </Step>
 
@@ -745,7 +742,13 @@ export default function ImportPanel({
           )}
           {format === 'txt' && (
             <>
-              {dlBtn('template-txt', `/api/admin/template/blank${effectiveType ? `?type=${encodeURIComponent(effectiveType)}` : ''}`, `levonis-product-template${effectiveType ? `-${effectiveType}` : ''}.txt`, t.tplTxt, { kind: 'txt', primary: true })}
+              {dlBtn(
+                'template-txt',
+                `/api/admin/template/blank${effectiveType ? `?${templateQuery}` : ''}`,
+                `levonis-product-template${effectiveType ? `-${stem}` : ''}.txt`,
+                t.tplTxt,
+                { kind: 'txt', primary: true }
+              )}
               {dlBtn('template-txt-example', '/api/admin/template/example', 'levonis-product-template-example.txt', t.tplTxtExample, { kind: 'txt' })}
             </>
           )}

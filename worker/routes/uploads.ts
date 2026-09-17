@@ -92,16 +92,13 @@ uploadRoutes.post('/', async (c) => {
     throw badRequest(`Image is too large (max ${Math.round(IMAGE_MAX / 1024 / 1024)} MB)`);
   }
 
-  // Admin browsers preprocess PNG/JPEG through one WebP encoder before this
-  // request. Refusing their raw signatures here prevents a modified/untrusted
-  // client from silently filling the new public product bucket with PNG/JPEG.
-  if (purpose === 'product' && (kind.mime === 'image/png' || kind.mime === 'image/jpeg')) {
-    throw badRequest('Product PNG/JPEG images must be converted to WebP before upload', 'PRODUCT_IMAGE_REQUIRES_WEBP');
-  }
-
   const dimensions = kind.mime.startsWith('image/') ? rasterDimensions(buf, kind.mime) : null;
-  if (purpose === 'product' && kind.mime === 'image/webp' && !validRasterDimensions(dimensions)) {
-    throw badRequest('The WebP image has invalid or unsupported dimensions', 'BAD_IMAGE_DIMENSIONS');
+  if (
+    purpose === 'product' &&
+    (kind.mime === 'image/webp' || kind.mime === 'image/png' || kind.mime === 'image/jpeg') &&
+    !validRasterDimensions(dimensions)
+  ) {
+    throw badRequest('The image has invalid or unsupported dimensions', 'BAD_IMAGE_DIMENSIONS');
   }
 
   const target: { visibility: MediaVisibility; domain: MediaDomain; entityId: string; keyKind: string } =

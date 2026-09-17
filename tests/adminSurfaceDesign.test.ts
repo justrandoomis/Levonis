@@ -18,8 +18,9 @@ import { readFileSync } from 'node:fs';
 const src = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
 const QUICK = 'src/components/adminProducts/QuickPricePanel.tsx';
-const PANEL = 'src/components/adminProducts/FulfillmentPanel.tsx';
 const UI = 'src/components/adminProducts/ui.tsx';
+const THEME = 'src/components/adminProducts/theme.css';
+const PRODUCTS = 'src/components/AdminProducts.tsx';
 const ANCHOR = 'src/components/bloub/MotionCharacterAnchor.tsx';
 
 // ------------------------------------------------- the mascot and the admin
@@ -74,51 +75,54 @@ test('clearing a box means inherit — except where there is nothing to inherit 
   assert.match(quick, /const placeholder = !canInherit\s*\n\s*\? t\.required/);
 });
 
-test('the row identity reads as identity, and its traits line up down the grid', () => {
+test('the row identity reads as identity while fulfilment stays in its dedicated workspace', () => {
   const quick = src(QUICK);
   // State belongs beside the name; settings belong under it.
   assert.match(quick, /data-qp-active=\{rowKey\(row\)\}/);
-  // The wrapping pile became two fixed tracks, so routes and quantities align
-  // across rows instead of every row being a different height.
+  // Exact option-colour counters use a stable label/value track in the
+  // fulfilment workspace rather than being repeated inside every price row.
   assert.match(quick, /grid-cols-\[minmax\(0,1fr\)_5\.5rem\]/);
   assert.doesNotMatch(quick, /mt-1 flex flex-wrap items-center gap-1\.5" data-qp-traits/);
-  // The stock box no longer repeats its column's label on every row.
-  assert.doesNotMatch(quick, /<span>\{t\.stock\}<\/span>/);
-  assert.match(quick, /aria-label=\{`\$\{t\.stock\} — \$\{row\.label_ar \|\| row\.label_en\}`\}/);
+  assert.match(quick, /function QuickFulfillmentPanel/);
+  assert.doesNotMatch(quick, /data-qp-availability=/);
 });
 
-// ------------------------------------------------------ order type per model
+// ----------------------------------------------------- Apple-style workspace
 
-test('a model is one card, not three nested frames', () => {
-  const panel = src(PANEL);
-  // The card keeps ONE border. Its two halves are separated by a rule, and the
-  // groups inside them by a hairline — not by a second and third rectangle.
-  assert.doesNotMatch(panel, /rounded-\[var\(--ap-radius-sm\)\] border border-\[var\(--ap-border\)\] p-2\.5/);
-  assert.match(panel, /md:divide-x md:divide-\[var\(--ap-hairline\)\]/);
-  assert.match(panel, /border-t border-\[var\(--ap-hairline\)\] space-y-2" data-preorder-capacity/);
-  assert.match(panel, /border-t border-\[var\(--ap-hairline\)\] space-y-2" data-direct-stock/);
-  // The three shipping routes are a divided list of siblings, not three cards.
-  assert.doesNotMatch(panel, /key=\{t\.method\} className="rounded-\[var\(--ap-radius-sm\)\] bg-\[var\(--ap-surface-2\)\]/);
-
-  // An unchecked half is legible as unchecked without reading its controls.
-  assert.match(panel, /\$\{direct \? T\.text1 : T\.text3\}/);
-  assert.match(panel, /\$\{pre \? T\.text1 : T\.text3\}/);
-});
-
-test('the shared admin label uses the panel tokens and can park its prose', () => {
+test('Quick Price opens as a calm, token-scoped workspace instead of an unstyled portal', () => {
   const ui = src(UI);
-  // It painted zinc literals while every control beside it used .ap tokens.
-  const label = ui.slice(ui.indexOf('export function L('), ui.indexOf('/** Collapsible editor section card'));
-  assert.doesNotMatch(label, /zinc-/);
-  assert.match(label, /var\(--ap-text-1\)/);
-  assert.match(label, /var\(--ap-text-3\)/);
-  // A `tip`, exactly like the product form's Field, so a paragraph of
-  // explanation stops being permanent furniture under every control.
-  assert.match(label, /tip\?: string/);
-  assert.match(label, /role="tooltip"/);
-  assert.match(label, /<span className="sr-only">\{tip\}<\/span>/);
+  const theme = src(THEME);
+  const products = src(PRODUCTS);
 
-  // And the longest sentence in the fulfilment panel now lives behind it.
-  const panel = src(PANEL);
-  assert.match(panel, /tip=\{tr\(\s*\n\s*'عدّاد مستقل تمامًا عن مخزون البيع المباشر/);
+  // The dialog is portalled to body, so the shell itself must carry `.ap` or
+  // every var(--ap-*) value inside the quick editor resolves to nothing.
+  assert.match(ui, /className="ap fixed inset-x-0/);
+  assert.match(ui, /workspace \? 'ap-quick-workspace sm:max-w-\[1180px\]'/);
+  assert.match(ui, /min-h-11 min-w-11/);
+  assert.match(products, /<Modal\s*\n\s*wide\s*\n\s*workspace/);
+
+  // Material is restrained to the shell, with opaque editing surfaces and a
+  // reduced-motion path for people who request it.
+  assert.match(theme, /\.ap \.ap-quick-workspace/);
+  assert.match(theme, /radial-gradient/);
+  assert.match(theme, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(theme, /animation-duration: 0\.01ms !important/);
+});
+
+test('Quick Price exposes one clear hierarchy, segmented tabs and a persistent action bar', () => {
+  const quick = src(QUICK);
+
+  assert.match(quick, /role="tablist"/);
+  assert.match(quick, /role="tab"/);
+  assert.match(quick, /aria-selected=\{tab === x\.id\}/);
+  assert.match(quick, /min-h-10/);
+  assert.match(quick, /sticky bottom-0/);
+  assert.match(quick, /backdrop-blur-xl/);
+
+  // Model, sale type and route are distinct surface levels, without the old
+  // standalone duplicate fulfilment panel.
+  assert.match(quick, /rounded-xl bg-\[var\(--ap-surface-1\)\]/);
+  assert.match(quick, /rounded-xl bg-\[var\(--ap-surface-2\)\]/);
+  assert.match(quick, /rounded-lg bg-\[var\(--ap-surface-1\)\]/);
+  assert.doesNotMatch(quick, /preorder\.capacity/);
 });

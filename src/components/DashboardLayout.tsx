@@ -36,6 +36,21 @@ interface SidebarItem {
   id: string;
   icon: React.ElementType;
   label: string;
+  /** Optional visual section. It organises long admin menus without changing
+   *  routes, permissions or the stable data-tab hooks. */
+  section?: string;
+  sectionLabel?: string;
+}
+
+function sidebarSections(items: SidebarItem[]): Array<{ id: string; label: string; items: SidebarItem[] }> {
+  const sections: Array<{ id: string; label: string; items: SidebarItem[] }> = [];
+  for (const item of items) {
+    const id = item.section ?? 'main';
+    const last = sections[sections.length - 1];
+    if (last?.id === id) last.items.push(item);
+    else sections.push({ id, label: item.sectionLabel ?? '', items: [item] });
+  }
+  return sections;
 }
 
 interface DashboardLayoutProps {
@@ -230,6 +245,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
   const CollapseIcon = collapsed
     ? (dir === 'rtl' ? ChevronsLeft : ChevronsRight)
     : (dir === 'rtl' ? ChevronsRight : ChevronsLeft);
+  const navSections = sidebarSections(sidebarItems);
 
   return (
     // h-dvh (not h-screen): on iPad Safari the browser chrome makes 100vh
@@ -274,27 +290,36 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
           </div>
         )}
 
-        <nav className="flex-1 min-h-0 px-2 py-2 space-y-1 overflow-y-auto">
-          {sidebarItems.map((item) => (
-            <button
-              key={item.id}
-              // Stable hook: the tab is local state, not a URL, so browser
-              // verification needs a way to reach a known panel.
-              data-tab={item.id}
-              onClick={() => onTabChange(item.id)}
-              title={collapsed ? item.label : undefined}
-              aria-current={activeTab === item.id ? 'page' : undefined}
-              className={`w-full flex items-center gap-3 min-h-11 rounded-xl transition-colors font-medium text-start ${
-                collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
-              } ${
-                activeTab === item.id
-                  ? 'bg-[#708238] text-white shadow-[0_4px_15px_rgba(112,130,56,0.3)]'
-                  : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
-              }`}
-            >
-              <item.icon className="w-5 h-5 shrink-0" />
-              {!collapsed && <span className="text-[13px] truncate min-w-0">{item.label}</span>}
-            </button>
+        <nav className="flex-1 min-h-0 px-2 py-2 space-y-3 overflow-y-auto">
+          {navSections.map((section, sectionIndex) => (
+            <div key={section.id} className={sectionIndex > 0 && collapsed ? 'border-t border-zinc-800/70 pt-3' : ''}>
+              {!collapsed && section.label && (
+                <p className="px-3 pb-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-600">
+                  {section.label}
+                </p>
+              )}
+              <div className="space-y-1">
+                {section.items.map((item) => (
+                  <button
+                    key={item.id}
+                    data-tab={item.id}
+                    onClick={() => onTabChange(item.id)}
+                    title={collapsed ? item.label : undefined}
+                    aria-current={activeTab === item.id ? 'page' : undefined}
+                    className={`w-full flex items-center gap-3 min-h-11 rounded-xl transition-colors font-medium text-start ${
+                      collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
+                    } ${
+                      activeTab === item.id
+                        ? 'bg-[#708238] text-white shadow-[0_4px_15px_rgba(112,130,56,0.3)]'
+                        : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
+                    }`}
+                  >
+                    <item.icon className="w-5 h-5 shrink-0" />
+                    {!collapsed && <span className="text-[13px] truncate min-w-0">{item.label}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
 
@@ -570,22 +595,31 @@ function MobileDrawer({
           </button>
         </div>
 
-        <nav className="flex-1 min-h-0 space-y-1 overflow-y-auto">
-          {items.map((item) => (
-            <button
-              key={item.id}
-              // Same hook as the desktop sidebar, so verification can reach a
-              // panel at any viewport width.
-              data-tab={item.id}
-              onClick={() => onSelect(item.id)}
-              aria-current={activeTab === item.id ? 'page' : undefined}
-              className={`w-full flex items-center gap-3 min-h-11 px-3 py-2.5 rounded-xl font-medium transition-colors text-start ${
-                activeTab === item.id ? 'bg-[#708238] text-white' : 'text-zinc-400 hover:bg-zinc-800'
-              }`}
-            >
-              <item.icon className="w-5 h-5 shrink-0" />
-              <span className="text-sm truncate min-w-0">{item.label}</span>
-            </button>
+        <nav className="flex-1 min-h-0 space-y-4 overflow-y-auto">
+          {sidebarSections(items).map((section) => (
+            <div key={section.id}>
+              {section.label && (
+                <p className="px-3 pb-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-600">
+                  {section.label}
+                </p>
+              )}
+              <div className="space-y-1">
+                {section.items.map((item) => (
+                  <button
+                    key={item.id}
+                    data-tab={item.id}
+                    onClick={() => onSelect(item.id)}
+                    aria-current={activeTab === item.id ? 'page' : undefined}
+                    className={`w-full flex items-center gap-3 min-h-11 px-3 py-2.5 rounded-xl font-medium transition-colors text-start ${
+                      activeTab === item.id ? 'bg-[#708238] text-white' : 'text-zinc-400 hover:bg-zinc-800'
+                    }`}
+                  >
+                    <item.icon className="w-5 h-5 shrink-0" />
+                    <span className="text-sm truncate min-w-0">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
       </motion.div>

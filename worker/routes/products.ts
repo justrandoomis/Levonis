@@ -536,7 +536,10 @@ export function saleAvailability(
    * ask it per method and it answers with the route's own quota if there is
    * one and the model's shared pool otherwise.
    */
-  const capacityFor = (method: string) => resolveCapacity(input.capacity ?? null, method);
+  // Pre-order is availability only. Legacy capacity columns may remain while
+  // old reservations drain, but they no longer limit a customer-facing route
+  // and are never presented as pre-order stock.
+  const capacityFor = (_method: string) => resolveCapacity(null, '');
 
   /**
    * THE ROUTES THIS MODEL ACTUALLY OFFERS — the model's own first, the
@@ -583,13 +586,16 @@ export function saleAvailability(
     .filter((t) => t.enabled !== false);
 
   const productRoutes = doc.preorder_transports.filter((t) => t.active !== false);
-  const commissionFor = (method: string): number | null => {
+  const commissionFor = (method: string): number => {
     const own = modelRoutes.find((t) => t.method === method)?.surcharge_iqd;
     if (own !== null && own !== undefined && Number.isInteger(own) && own >= 0) return own;
     const fromProduct = productRoutes.find((t) => t.method === method)?.commission_iqd;
     if (Number.isInteger(fromProduct)) return fromProduct as number;
     const fallback = defaults.find((d) => d.method === method);
-    return fallback ? fallback.commission_iqd : null;
+    // An enabled route with no surcharge is a zero-increase route, not a
+    // broken configuration. Availability is the checkbox; the amount is an
+    // optional addition.
+    return fallback ? fallback.commission_iqd : 0;
   };
 
   // A model that declares its own routes REPLACES the product list for this
@@ -600,7 +606,7 @@ export function saleAvailability(
 
   const transports: TransportOptionView[] = offeredMethods.map((method) => {
     const commission = commissionFor(method);
-    return { method, commission_iqd: commission, configured: commission !== null };
+    return { method, commission_iqd: commission, configured: true };
   });
   const routes: PreorderRouteCapacity[] = transports.map((t) => {
     const cap = capacityFor(t.method);
@@ -646,7 +652,10 @@ export function saleAvailability(
   const chosenCapacity = capacityFor(String(input.transportMethod ?? ''));
   const capacityTarget = chosenCapacity.targets[0] ?? null;
 
-  const directUsable = directEnabled && (available === null || available > 0);
+  // A direct sale must name a real shelf. NULL used to mean “unlimited” and
+  // let a misconfigured product sell without stock; it now fails closed. The
+  // admin writers require either 0 (sold out) or a positive integer.
+  const directUsable = directEnabled && tracked && available !== null && available > 0;
   const directReason = directEnabled ? (directUsable ? null : 'OUT_OF_STOCK') : 'DIRECT_SALE_NOT_ENABLED';
 
   const modes: SaleAvailability['modes'] = [];

@@ -368,8 +368,14 @@ export interface DeletionDb {
  * when the schema grows something this file does not know about.
  */
 async function columnsOf(db: DeletionDb, table: string): Promise<Set<string>> {
+  // D1 accepts PRAGMA table_info(table), but deployments have differed on
+  // whether the table-valued form accepts a bound parameter. Registry table
+  // names are compile-time constants; validate them and use the canonical
+  // PRAGMA syntax so deletion does not silently see an empty schema and then
+  // collide with a foreign-key reference at the final DELETE.
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(table)) return new Set();
   try {
-    const rows = await db.prepare(`SELECT name FROM pragma_table_info(?)`).bind(table).all<{ name: string }>();
+    const rows = await db.prepare(`PRAGMA table_info("${table}")`).all<{ name: string }>();
     return new Set((rows.results ?? []).map((r) => String(r.name)));
   } catch {
     return new Set();
@@ -593,8 +599,13 @@ export async function deleteProductPermanently(
 
   const statements: D1PreparedStatement[] = [];
   const ledger: Array<{ kind: 'job' | 'delete' | 'unlink'; table: string }> = [];
+  // A Worker can be deployed seconds before migration 0072 reaches D1. The
+  // product row must still be deletable in that window; the returned in-memory
+  // jobs let the route remove R2 objects immediately, while deployments with
+  // the table keep the durable retry guarantee.
+  const durableMediaJobs = await tableExists(db, 'media_cleanup_jobs');
 
-  for (const job of jobs) {
+  for (const job of durableMediaJobs ? jobs : []) {
     // OR IGNORE against the partial unique index on (object_key) WHERE pending:
     // deleting two products that shared a key in the same sweep, or retrying a
     // half-finished delete, must not queue the same object twice.
@@ -692,29 +703,38 @@ export async function runMediaCleanup(
   jobs: Array<{ id: string; key: string; visibility: 'public' | 'private' }>
 ): Promise<MediaCleanupOutcome> {
   const out: MediaCleanupOutcome = { deleted: [], failed: [] };
+  const mark = async (sql: string, values: unknown[]): Promise<void> => {
+    try {
+      await env.DB.prepare(sql).bind(...values).run();
+    } catch (error) {
+      // Compatibility for the deploy-before-migrate window described above.
+      // Do not turn a successful bucket delete into a failed product delete
+      // merely because the optional retry ledger has not landed yet.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/no such table|media_cleanup_jobs/i.test(message)) throw error;
+    }
+  };
   for (const job of jobs) {
     try {
       await deleteMediaObject(env, job.visibility, job.key);
       out.deleted.push(job.key);
-      await env.DB.prepare(
+      await mark(
         `UPDATE media_cleanup_jobs
             SET state = 'done', attempts = attempts + 1, last_error = '',
                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-          WHERE object_key = ? AND state = 'pending'`
-      )
-        .bind(job.key)
-        .run();
+          WHERE object_key = ? AND state = 'pending'`,
+        [job.key]
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown';
       out.failed.push({ key: job.key, error: message });
-      await env.DB.prepare(
+      await mark(
         `UPDATE media_cleanup_jobs
             SET attempts = attempts + 1, last_error = ?,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-          WHERE object_key = ? AND state = 'pending'`
-      )
-        .bind(message.slice(0, 400), job.key)
-        .run();
+          WHERE object_key = ? AND state = 'pending'`,
+        [message.slice(0, 400), job.key]
+      );
     }
   }
   return out;
@@ -725,6 +745,7 @@ export async function pendingMediaCleanup(
   db: DeletionDb,
   limit = 200
 ): Promise<Array<{ id: string; key: string; visibility: 'public' | 'private'; attempts: number }>> {
+  if (!(await tableExists(db, 'media_cleanup_jobs'))) return [];
   const rows = await db
     .prepare(
       `SELECT id, object_key, visibility, attempts FROM media_cleanup_jobs

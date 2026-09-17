@@ -50,10 +50,8 @@ export const CLEAR_TOKEN = '__CLEAR__';
  * the three they want. See `parseTemplate`'s `ignoreKey`.
  */
 export const MISPLACED_CAPACITY =
-  'السعة تخص الطلب المسبق وحده: اكتبها في options.N.preorder.capacity (الحوض المشترك للموديل) ' +
-  'أو options.N.preorder.transports.M.capacity (حصة طريقة واحدة)، ومخزون البيع المباشر هو options.N.stock. / ' +
-  'capacity belongs to a pre-order only: write options.N.preorder.capacity (the model shared pool) ' +
-  "or options.N.preorder.transports.M.capacity (one route's own quota); direct-sale stock is options.N.stock.";
+  'المخزون للبيع المباشر فقط ويكتب في options.N.stock أو في توليفة الخيار واللون؛ الطلب المسبق متوفر أو غير متوفر بلا مخزون. / ' +
+  'Stock belongs to direct sale only (options.N.stock or an option-colour combination); pre-order is enabled/disabled with no stock.';
 
 // ---------------------------------------------------------------- registry
 
@@ -253,8 +251,10 @@ const SCALAR_FIELDS: FieldSpec[] = [
   f('display_order', 'int', 'classification', 'ترتيب العرض — display order (integer, lower = earlier)', { min: -100_000, max: 100_000 }),
   // selling
   f('selling_type', 'enum', 'selling', 'direct_sale | pre_order | bundle | mixed — «mixed» كلمة إدخال تتوسّع إلى بيع مباشر + طلب مسبق معًا؛ لا تُخزَّن كما هي. والأدق أن تترك الخيارات تقرر: أنواع البيع تُشتق من availability_type لكل خيار.', { enumValues: ['direct_sale', 'pre_order', 'bundle', 'mixed'] as const }),
-  f('stock', 'int', 'selling', 'المخزون — stock count; __NULL__ = not tracked', { nullable: true, min: 0, max: 1_000_000 }),
-  f('low_stock_threshold', 'int', 'selling', 'حد التنبيه لمخزون المنتج — __NULL__ = بلا تنبيه', { nullable: true, min: 0, max: 1_000_000 }),
+  // Legacy import compatibility only. Inventory now belongs to an enabled
+  // direct-sale option (or its exact option×colour variant), never the product.
+  f('stock', 'int', 'selling', 'قديم للاستيراد فقط — مخزون المنتج لم يعد مستخدمًا؛ ضع المخزون في options.N.stock', { nullable: true, min: 0, max: 1_000_000, exported: false }),
+  f('low_stock_threshold', 'int', 'selling', 'قديم للاستيراد فقط — حد المنتج لم يعد مستخدمًا', { nullable: true, min: 0, max: 1_000_000, exported: false }),
   // WHICH LEVEL COUNTS THE STOCK. The form derives it from where the numbers
   // are (colour stock → COLOR, option stock → OPTION, else BASE) on every
   // save; the file may state it explicitly, and an empty value asks for the
@@ -265,7 +265,7 @@ const SCALAR_FIELDS: FieldSpec[] = [
   // Real money on a direct line, added on top of the price. Exporting a file
   // that showed a price the customer never pays was the quiet half of the
   // owner's complaint about the numbers in the export.
-  f('direct_surcharge_iqd', 'iqd', 'selling', 'زيادة البيع المباشر — تُضاف فوق سعر الخيار/اللون المختار عند الشراء الفوري من المخزون، وعند الدفع عند الاستلام لطلب مسبق (يُعفى منها عضو PRO الفعّال كعمولة النقل)؛ __NULL__ أو 0 = بلا زيادة', { nullable: true, min: 0, max: IQD_MAX, plusIsPlain: true }),
+  f('direct_surcharge_iqd', 'iqd', 'selling', 'قديم للاستيراد فقط — زيادة البيع المباشر تُكتب لكل خيار في options.N.direct.price_iqd', { nullable: true, min: 0, max: IQD_MAX, plusIsPlain: true, exported: false }),
   f('payment_options', 'csv', 'selling', 'معرفات طرق الدفع المسموحة — allowed checkout payment method ids, comma-separated'),
   // Product-owned last-mile delivery. All six values are folded into the
   // single canonical `delivery_options` document below; omitted lines keep a
@@ -387,18 +387,16 @@ const GROUP_SPECS: GroupSpec[] = [
         titleAr: 'البيع المباشر لهذا الموديل', titleEn: 'Direct sale for this model',
         notes: [
           'مخزون البيع المباشر هو مخزون الموديل نفسه — مصدر واحد لكل اختيار فعلي.',
-          'options.N.direct.stock و options.N.direct.low_stock_threshold مرادفان لـ options.N.stock و options.N.low_stock_threshold،',
-          'ويكتبان في نفس العمود. التصدير يكتب التهجئة الأولى فقط حتى لا يُكتب الرقم مرتين.',
-          'Direct-sale stock IS the model stock: options.N.direct.stock is an alias onto options.N.stock',
-          '(one stock source per actual selection); only options.N.stock is exported.',
-          'لا سعة (capacity) للبيع المباشر — السعة للطلب المسبق وحده. / A direct sale has no capacity.',
+          'ضع رقمًا صحيحًا في options.N.stock: الصفر = منتهي، ولا يُسمح بمخزون غير محدود.',
+          'إذا رُبط الخيار بألوان فمخزون كل توليفة خيار×لون هو المصدر، ومخزون الخيار هو مجموعها.',
+          'Direct-sale stock is required: 0 means sold out; linked colours use exact option×colour stock.',
         ],
         /**
          * «لا تنشئ نظامًا موازيًا» — a direct sale's number is the model's
          * stock, and this file must not offer a second box to type it into.
          */
         refused: {
-          capacity: 'السعة تخص الطلب المسبق وحده — للبيع المباشر اكتب options.N.stock (أو options.N.direct.stock، وهما نفس العمود). / capacity belongs to a pre-order only — for a direct sale write options.N.stock (or options.N.direct.stock, the same column).',
+          capacity: MISPLACED_CAPACITY,
         },
         fields: [
           f('enabled', 'bool', 'options', 'هل يُباع هذا الموديل مباشرةً من المخزون؟ حذف الكتلة كلها = لا يُباع مباشرة إطلاقًا'),
@@ -417,18 +415,16 @@ const GROUP_SPECS: GroupSpec[] = [
       preorder: {
         titleAr: 'الطلب المسبق لهذا الموديل', titleEn: 'Pre-order for this model',
         notes: [
-          'السعة (capacity) هنا هي الحوض المشترك للطلب المسبق لهذا الموديل، وهي اختيارية تمامًا.',
-          'اتركها فارغة أو __NULL__ = غير متتبَّعة: الطلب المسبق بلا حد، وهو سلوك المتجر قبل هذه الإضافة.',
-          '0 = متتبَّعة ولا توجد وحدات الآن. السعة لا تمس مخزون البيع المباشر أبدًا.',
-          'capacity here is the SHARED pre-order pool for this model. Empty / __NULL__ = untracked',
-          '(unlimited, reserves nothing); 0 = tracked and empty. It never touches direct stock.',
+          'الطلب المسبق متوفر أو غير متوفر فقط؛ لا يملك مخزونًا ولا سعة.',
+          'فعّل واحدة أو أكثر من طرق الوصول إلى العراق (جوي / بحري / بري) واكتب زيادة كل طريقة.',
+          'Pre-order has no stock or capacity: enable transport routes and their surcharges.',
         ],
         fields: [
           f('enabled', 'bool', 'options', 'هل يمكن طلب هذا الموديل مسبقًا؟ حذف الكتلة كلها = لا طلب مسبق'),
           // 0075 / DECISION 2. Optional, independent of the model's stock, and
           // NULL by default so every product written before this behaves as it
           // always did: an unlimited pre-order.
-          f('capacity', 'int', 'options', 'سعة الطلب المسبق المشتركة لهذا الموديل — __NULL__ أو فارغ = غير متتبَّعة (بلا حد)، 0 = لا توجد وحدات. الطرق التي تُترك سعتها فارغة تسحب من هذا الحوض. لا علاقة لها بمخزون البيع المباشر.', { nullable: true, min: 0, max: 1_000_000 }),
+          f('capacity', 'int', 'options', 'قديم للاستيراد فقط — الطلب المسبق متوفر أو غير متوفر ولا يملك مخزونًا أو سعة', { nullable: true, min: 0, max: 1_000_000, exported: false }),
           f('price_iqd', 'iqd', 'options', 'سعر الطلب المسبق لهذا الموديل — +N = فرق عن سعر الموديل، __NULL__ = نفس سعر الموديل', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'regular_adjust_iqd' }),
           f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME للطلب المسبق — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
           f('pro_price_iqd', 'iqd', 'options', 'سعر PRO للطلب المسبق — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'pro_adjust_iqd' }),
@@ -443,22 +439,11 @@ const GROUP_SPECS: GroupSpec[] = [
         list: {
           name: 'transports',
           notes: [
-            'السعة المشتركة مقابل الحصص المستقلة — SHARED pool vs INDEPENDENT quotas:',
-            '  • اترك سعة كل الطرق فارغة  → الجو والبحر والبر تسحب كلها من options.N.preorder.capacity.',
-            '    بيع وحدة جوًا ينقص وحدة من نصيب البحر والبر.',
-            '  • أعطِ طريقة رقمًا خاصًا بها → تلك الطريقة تملك حصتها المستقلة، ولا تسحب من الحوض المشترك.',
-            '    عدّاد واحد لكل عملية بيع، لا عدّادان.',
-            '  • لا تكرر نفس الكمية تلقائيًا على الطرق الثلاث — لا شيء هنا ينسخ رقمًا عنك.',
-            '  Leave every route capacity empty → air/sea/land all draw on the cell pool.',
-            '  Give a route a number → that route holds its own quota and does NOT also spend the pool.',
-            '  Never copy one quantity onto all three routes.',
-            'الطريق الذي لا يذكره الملف يُحفظ كما هو بحصته وسعره — لحذف كل الطرق اكتب options.N.preorder.transports=__CLEAR__',
-            'ثم اذكر الطرق التي تريد بقاءها في نفس الملف؛ الطريق الذي تعيد ذكره يحتفظ بحصته وسعره كما هما،',
-            'ولإلغاء تتبّع حصته اكتبها صراحةً: options.N.preorder.transports.M.capacity=__NULL__',
-            '  A route the file does not name is PRESERVED with its quota and its price.',
+            'الطريق الذي لا يذكره الملف يُحفظ كما هو بسعره — لحذف كل الطرق اكتب options.N.preorder.transports=__CLEAR__',
+            'ثم اذكر الطرق التي تريد بقاءها في نفس الملف.',
+            'A route the file does not name is preserved with its price.',
             '  options.N.preorder.transports=__CLEAR__ removes every route the same file does not name again;',
-            '  a route you do name again keeps its stored quota and price — untracking one is said out loud,',
-            '  options.N.preorder.transports.M.capacity=__NULL__.',
+            '  a route you name again keeps its stored price unless the file changes it.',
           ],
           fields: [
             f('method', 'enum', 'options', 'air | sea | land — كيف يصل الجهاز إلى العراق. ليست طريقة التوصيل داخل العراق.', { required: true, enumValues: ['air', 'sea', 'land'] as const }),
@@ -466,7 +451,7 @@ const GROUP_SPECS: GroupSpec[] = [
             // 0075 / DECISION 2. Blank is not zero and is not "copy the pool":
             // it is "this route shares the pool", which is the default every
             // route written before 0075 has.
-            f('capacity', 'int', 'options', 'حصة هذه الطريقة وحدها — فارغ أو __NULL__ = تسحب من السعة المشتركة أعلاه، ورقم = حصة مستقلة لا تمس الحوض المشترك. 0 = متتبَّعة ولا توجد وحدات على هذه الطريقة.', { nullable: true, min: 0, max: 1_000_000 }),
+            f('capacity', 'int', 'options', 'قديم للاستيراد فقط — طريقة الطلب المسبق لا تملك مخزونًا أو سعة', { nullable: true, min: 0, max: 1_000_000, exported: false }),
             f('surcharge_iqd', 'iqd', 'options', 'زيادة هذه الطريقة لهذا الموديل — تحلّ محل زيادة المنتج لهذه الطريقة ولا تُضاف إليها. __NULL__ = استخدم زيادة المنتج.', { nullable: true, min: 0, max: IQD_MAX, plusIsPlain: true }),
             f('price_iqd', 'iqd', 'options', 'سعر ثابت لهذا الموديل بهذه الطريقة — نادر؛ __NULL__ = احسب من المستويات الأعلى', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'regular_adjust_iqd' }),
             f('prime_price_iqd', 'iqd', 'options', 'سعر PRIME بهذه الطريقة — __NULL__ = وراثة', { nullable: true, min: 0, max: IQD_MAX, adjustKey: 'prime_adjust_iqd' }),
@@ -1303,10 +1288,7 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     'selling_type',
     doc.composition !== '' ? 'bundle' : isMixed(doc.sale_types) ? 'mixed' : doc.selling_type
   );
-  push('stock', numStr(doc.stock));
-  push('low_stock_threshold', numStr(doc.low_stock_threshold));
   if (opts.inventoryMode !== undefined) push('inventory_mode', opts.inventoryMode ?? '');
-  push('direct_surcharge_iqd', numStr(doc.direct_surcharge_iqd));
   push('payment_options', doc.payment_options.join(','));
   // A null delivery_options is an intentional legacy state. Do not emit six
   // invented values into an export: omitting them means a round-trip keeps
@@ -1433,7 +1415,6 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
          * already written above as `options.N.stock`; emitting the alias too
          * would state one column twice and a round trip would write it twice.
          */
-        push(`${cp}.capacity`, numStr(cell.capacity ?? null));
         push(`${cp}.lead_time_text_ar`, cell.lead_time_text_ar ?? '');
         push(`${cp}.lead_time_text_en`, cell.lead_time_text ?? '');
         push(`${cp}.lead_time_text_ckb`, cell.lead_time_text_ckb ?? '');
@@ -1447,7 +1428,6 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
           // null = THIS ROUTE SHARES THE POOL. Exported as `__NULL__`, never
           // as the pool's number: copying it here would be the automatic
           // duplication onto the three routes the owner forbade.
-          push(`${tp}.capacity`, numStr(t.capacity ?? null));
           push(`${tp}.price_iqd`, numStr(t.regular_price_iqd ?? null));
           push(`${tp}.prime_price_iqd`, numStr(t.prime_price_iqd ?? null));
           push(`${tp}.pro_price_iqd`, numStr(t.pro_price_iqd ?? null));
@@ -1866,7 +1846,7 @@ export function generateBlankTemplate(): string {
     '#  - المجموعات المتكررة مفهرسة: options.1.name_ar ثم options.2.name_ar وهكذا.',
     '#  - الأسعار أعداد صحيحة بالدينار العراقي فقط (بدون فواصل).',
     '#  - السعر الأساسي (price_iqd) هو الأرخص. الخيارات والألوان زيادات فوقه: regular_adjust_iqd=60000 أو regular_price_iqd=+60000.',
-    '#  - التوفر حسب المنتج: اترك options.N.availability_type فارغًا. البيع المباشر زيادة (direct_surcharge_iqd) وكل طريقة طلب مسبق زيادة (transports.N.commission_iqd).',
+    '#  - التوفر لكل خيار: فعّل options.N.direct و/أو options.N.preorder. زيادة المباشر في direct.price_iqd، وزيادة كل شحن مسبق في transports.N.surcharge_iqd.',
     '#  - سعر ثابت (regular_price_iqd=رقم بلا إشارة) ما زال مقبولًا ويُعاد التعبير عنه كزيادة فوق الأساسي عند الاستيراد دون تغيير ما يدفعه الزبون.',
     '#  - لا تختلق قيماً — إذا كانت المعلومة غير معروفة اترك الحقل فارغاً أو __NULL__.',
     '',
@@ -1886,6 +1866,7 @@ export function generateBlankTemplate(): string {
   const groupedSections = new Set(GROUP_SPECS.map((g) => g.group));
   let current = '';
   for (const spec of SCALAR_FIELDS) {
+    if (spec.exported === false) continue;
     if (groupedSections.has(spec.group)) continue;
     if (spec.group !== current) {
       current = spec.group;
@@ -1898,6 +1879,7 @@ export function generateBlankTemplate(): string {
   for (const g of GROUP_SPECS) {
     lines.push(...sectionHeader(g.group));
     for (const spec of SCALAR_FIELDS) {
+      if (spec.exported === false) continue;
       if (spec.group !== g.group) continue;
       lines.push(fieldComment(spec));
       lines.push(`${spec.key}=${blankValue(spec)}`);
@@ -1941,6 +1923,7 @@ export function generateBlankTemplate(): string {
         lines.push(`# (مرفوض / refused) ${g.name}.1.${cellName}.${key} — ${why}`);
       }
       for (const spec of cell.fields) {
+        if (spec.exported === false) continue;
         lines.push(fieldComment(spec));
         lines.push(`# ${g.name}.1.${cellName}.${spec.key}=${blankValue(spec)}`);
       }
@@ -1950,6 +1933,7 @@ export function generateBlankTemplate(): string {
         );
         for (const note of cell.list.notes ?? []) lines.push(`# ${note}`);
         for (const spec of cell.list.fields) {
+          if (spec.exported === false) continue;
           lines.push(fieldComment(spec));
           lines.push(`# ${g.name}.1.${cellName}.${cell.list.name}.1.${spec.key}=${blankValue(spec)}`);
         }
@@ -2566,9 +2550,14 @@ export function toDocBody(
     const merged: Record<string, string> = { ...(existing?.spec_fields ?? {}) };
     for (const id of specKeys) {
       const pf = parsed.specFields[id];
-      if (pf.clear || pf.value === null || pf.value === '') {
+      if (pf.clear || pf.value === null) {
         delete merged[id];
         result.cleared_fields.push(`spec.${id}`);
+      } else if (pf.value === '') {
+        // Typed blank templates list every section-specific spec as an active
+        // empty row. Empty therefore means "not supplied"; __CLEAR__ remains
+        // the explicit way to remove a stored value.
+        result.preserved_fields.push(`spec.${id}`);
       } else {
         merged[id] = String(pf.value);
         result.applied_fields.push(`spec.${id}`);

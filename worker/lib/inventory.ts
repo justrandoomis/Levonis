@@ -415,8 +415,11 @@ export function resolveForOrderType(
   capacity: CapacitySnapshot | null,
   transportMethod: string
 ): StockResolution {
+  // Pre-order is enabled/disabled and route-priced only; it has no inventory
+  // counter. Capacity rows remain as a compatibility shell while historic
+  // reservations drain, but new cart and checkout decisions ignore them.
   return orderType === 'pre_order'
-    ? resolveCapacity(capacity, transportMethod)
+    ? resolveCapacity(null, '')
     : resolveStock(snap, sel);
 }
 

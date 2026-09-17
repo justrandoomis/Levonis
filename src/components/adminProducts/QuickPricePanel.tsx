@@ -724,13 +724,14 @@ export default function QuickPricePanel({
 
   return (
     <div className="min-w-0" data-qp="panel" data-qp-store={data.product.store} onKeyDown={onKeyDown}>
-      <div className="flex items-center gap-1.5 flex-wrap mb-3">
+      <div className="mb-4 flex w-full items-center gap-1 rounded-xl border border-[var(--ap-border)] bg-[var(--ap-surface-2)] p-1 sm:w-fit" role="tablist" aria-label={t.title}>
         {TABS.map((x) => (
           <button
             key={x.id}
             type="button"
-            className={T.chip}
-            aria-pressed={tab === x.id}
+            role="tab"
+            className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold text-[var(--ap-text-2)] transition-[color,background-color,box-shadow] duration-150 hover:text-[var(--ap-text-1)] aria-selected:bg-[var(--ap-surface-4)] aria-selected:text-[var(--ap-text-1)] aria-selected:shadow-[0_1px_3px_rgb(0_0_0_/_0.35)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ap-ring)] sm:flex-none"
+            aria-selected={tab === x.id}
             data-qp-tab={x.id}
             onClick={() => setTab(x.id)}
           >
@@ -807,7 +808,7 @@ export default function QuickPricePanel({
       {/* --------------------------------------------------- the action bar */}
       {tab === 'grid' && (
         <div
-          className="sticky bottom-0 -mx-1 mt-3 px-1 pt-3 pb-1 bg-[var(--ap-surface-1)] border-t border-[var(--ap-hairline)] flex items-center gap-2 flex-wrap"
+          className="sticky bottom-0 z-10 -mx-3 mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--ap-hairline)] bg-[rgba(31,31,36,0.92)] px-3 pb-1 pt-3 backdrop-blur-xl sm:-mx-5 sm:px-5"
           data-qp="actions"
         >
           {guards.length > 0 && (
@@ -905,6 +906,35 @@ function QuickFulfillmentPanel({
         next,
       ].sort((a, b) => a.sort - b.sort),
     }));
+  const toggleDirect = (value: FormValue, direct: FormFulfillment, enabled: boolean) => {
+    const hasCombinations = combos.some((combo) => combo.option_value_ids.includes(value.id));
+    change((current) => ({
+      ...current,
+      groups: current.groups.map((g) => ({
+        ...g,
+        values: g.values.map((v) => {
+          if (v.id !== value.id) return v;
+          const next = { ...direct, enabled };
+          return {
+            ...v,
+            // Enabling direct sale always creates a real counter. Zero is an
+            // explicit sold-out shelf; null is never interpreted as unlimited.
+            stock: enabled && !hasCombinations && v.stock === null ? 0 : v.stock,
+            fulfillments: [
+              ...v.fulfillments.filter((f) => f.fulfillment_type !== 'direct_sale'),
+              next,
+            ].sort((a, b) => a.sort - b.sort),
+          };
+        }),
+      })),
+      variants: enabled && hasCombinations
+        ? current.variants.map((variant) => {
+            const parts = new Set(variant.combo_key.split('|'));
+            return parts.has(`o:${value.id}`) && variant.stock === null ? { ...variant, stock: 0 } : variant;
+          })
+        : current.variants,
+    }));
+  };
   const setVariantStock = (variant: FormVariant, stock: number | null) =>
     change((current) => ({
       ...current,
@@ -929,33 +959,33 @@ function QuickFulfillmentPanel({
 
   if (values.length === 0) return null;
   return (
-    <section className={`${T.surface} mb-3 p-3`} data-qp="fulfillment-stock">
-      <div className="flex items-start justify-between gap-3 mb-3">
+    <section className="mb-4 rounded-2xl bg-[var(--ap-surface-2)] p-3 shadow-[inset_0_0_0_1px_var(--ap-hairline)] sm:p-4" data-qp="fulfillment-stock">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h3 className="text-[13px] font-bold text-[var(--ap-text-1)]">التوفر والزيادة والمخزون حسب الخيار</h3>
-          <p className="mt-0.5 text-[11px] text-[var(--ap-text-3)]">
+          <h3 className="text-[14px] font-semibold tracking-[-0.01em] text-[var(--ap-text-1)]">التوفر والزيادة والمخزون حسب الخيار</h3>
+          <p className="mt-1 text-[11.5px] leading-relaxed text-[var(--ap-text-3)]">
             البيع المباشر يملك مخزونًا؛ الطلب المسبق متوفر أو غير متوفر فقط.
           </p>
         </div>
-        <button type="button" className={T.btnSecondary} disabled={!dirty || saving} onClick={onSave} data-qp-save-fulfillment>
+        <button type="button" className={`${T.btnSecondary} min-h-11 sm:min-h-9`} disabled={!dirty || saving} onClick={onSave} data-qp-save-fulfillment>
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
           حفظ التوفر
         </button>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {values.map((value) => {
           const direct = cellOf(value, 'direct_sale');
           const preorder = cellOf(value, 'pre_order');
           const mine = combos.filter((combo) => combo.option_value_ids.includes(value.id));
           const total = mine.reduce((sum, combo) => sum + (variants.get(combinationKey(combo))?.stock ?? 0), 0);
           return (
-            <div key={value.id} className="rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] bg-[var(--ap-surface-2)] p-2.5">
-              <p className="mb-2 text-[12.5px] font-semibold text-[var(--ap-text-1)]">{value.name_en || value.id}</p>
-              <div className="grid gap-2 lg:grid-cols-2">
-                <div className="rounded-md border border-[var(--ap-hairline)] p-2">
+            <div key={value.id} className="rounded-xl bg-[var(--ap-surface-1)] p-3 shadow-[inset_0_0_0_1px_var(--ap-border)] sm:p-3.5">
+              <p className="mb-3 text-[13px] font-semibold text-[var(--ap-text-1)]">{value.name_en || value.id}</p>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="rounded-xl bg-[var(--ap-surface-2)] p-3 shadow-[inset_0_0_0_1px_var(--ap-hairline)]">
                   <Toggle
                     checked={direct.enabled}
-                    onChange={(enabled) => setCell(value, { ...direct, enabled })}
+                    onChange={(enabled) => toggleDirect(value, direct, enabled)}
                     label="بيع مباشر"
                     sub="Direct sale"
                   />
@@ -975,6 +1005,7 @@ function QuickFulfillmentPanel({
                           <Qty
                             value={value.stock}
                             onChange={(stock) => patchValue(value.id, (v) => ({ ...v, stock }))}
+                            placeholder="مطلوب: 0 = نفد"
                           />
                         ) : (
                           <div className="space-y-1.5">
@@ -991,7 +1022,7 @@ function QuickFulfillmentPanel({
                                 <label key={combinationKey(combo)} className="grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-1.5">
                                   <span className="truncate text-[10.5px] text-[var(--ap-text-3)]">{color}{other ? ` · ${other}` : ''}</span>
                                   {variant ? (
-                                    <Qty value={variant.stock} onChange={(stock) => setVariantStock(variant, stock)} />
+                                    <Qty value={variant.stock} onChange={(stock) => setVariantStock(variant, stock)} placeholder="0 = نفد" />
                                   ) : (
                                     <span className="text-[10px] text-[var(--ap-warning)]">من التعديل الكامل</span>
                                   )}
@@ -1005,7 +1036,7 @@ function QuickFulfillmentPanel({
                   )}
                 </div>
 
-                <div className="rounded-md border border-[var(--ap-hairline)] p-2">
+                <div className="rounded-xl bg-[var(--ap-surface-2)] p-3 shadow-[inset_0_0_0_1px_var(--ap-hairline)]">
                   <Toggle
                     checked={preorder.enabled}
                     onChange={(enabled) => setCell(value, { ...preorder, enabled })}
@@ -1017,7 +1048,7 @@ function QuickFulfillmentPanel({
                       {routes.map(([method, ar, en]) => {
                         const current = routeOf(preorder, method);
                         return (
-                          <div key={method} className="rounded-md border border-[var(--ap-hairline)] p-1.5">
+                          <div key={method} className="rounded-lg bg-[var(--ap-surface-1)] p-2 shadow-[inset_0_0_0_1px_var(--ap-hairline)]">
                             <Toggle
                               checked={current.enabled}
                               onChange={(enabled) => setRoute(value, preorder, { ...current, enabled })}

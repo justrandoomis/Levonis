@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent } from 'lucide-react';
+import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, Trash2 } from 'lucide-react';
 import OrderDetailModal from '../components/adminOrders/OrderDetailModal';
 import { api, ApiError, ApiOrder, formatIqd } from '../lib/api';
 import DashboardLayout from '../components/DashboardLayout';
@@ -147,6 +147,7 @@ function AdminOrders() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | ApiOrder['status']>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -216,6 +217,31 @@ function AdminOrders() {
 
   const statusLabel = (st: ApiOrder['status']) => (dir === 'rtl' ? STATUS_AR[st] : st);
 
+  const deleteCancelled = async (order: ApiOrder) => {
+    if (order.status !== 'cancelled' || deletingId) return;
+    const ok = window.confirm(
+      loc(
+        `حذف الطلب ${order.id} نهائياً من قاعدة البيانات؟ لا يمكن التراجع عن هذا الإجراء.`,
+        `Permanently delete order ${order.id} from the database? This cannot be undone.`,
+        `داواکاری ${order.id} بۆ هەمیشە لە بنکەدراوە بسڕێتەوە؟ ئەمە ناگەڕێتەوە.`
+      )
+    );
+    if (!ok) return;
+    setDeletingId(order.id);
+    setRowError(null);
+    setNotice(null);
+    try {
+      await api.delete(`/api/admin/orders/${order.id}`);
+      setOrders((current) => current.filter((item) => item.id !== order.id));
+      setTotal((current) => Math.max(0, current - 1));
+      setNotice(loc('حُذف الطلب نهائياً من قاعدة البيانات.', 'Order permanently deleted.', 'داواکاری بۆ هەمیشە سڕایەوە.'));
+    } catch (error) {
+      setRowError({ id: order.id, message: error instanceof ApiError ? error.message : 'Failed to delete order' });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   /** The status control, shared by the card and the table row. */
   const StatusSelect = ({ o }: { o: ApiOrder }) => {
     const nextStates = ORDER_TRANSITIONS[o.status] ?? [];
@@ -259,6 +285,23 @@ function AdminOrders() {
       {loc('تجهيز', 'Prepare', 'ئامادەکردن')}
     </button>
   );
+
+  const DeleteOrderButton = ({ o, iconOnly = false }: { o: ApiOrder; iconOnly?: boolean }) =>
+    o.status === 'cancelled' ? (
+      <button
+        type="button"
+        data-action="delete-order-permanently"
+        data-order-id={o.id}
+        disabled={deletingId === o.id}
+        onClick={() => void deleteCancelled(o)}
+        className={`${iconOnly ? 'h-9 w-9 p-0' : 'min-h-9 px-3'} inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-500/25 bg-red-500/10 text-xs font-bold text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-45`}
+        title={loc('حذف نهائي من قاعدة البيانات', 'Delete permanently from database', 'سڕینەوەی هەمیشەیی')}
+        aria-label={loc('حذف الطلب نهائياً', 'Permanently delete order', 'سڕینەوەی هەمیشەیی')}
+      >
+        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+        {!iconOnly && loc('حذف نهائي', 'Delete', 'سڕینەوە')}
+      </button>
+    ) : null;
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -379,6 +422,7 @@ function AdminOrders() {
               <div className="flex-1 min-w-0">
                 <StatusSelect o={o} />
               </div>
+              <DeleteOrderButton o={o} iconOnly />
             </div>
             {rowError?.id === o.id && <div className="text-[11px] text-red-400 mt-2">{rowError.message}</div>}
           </div>
@@ -410,6 +454,7 @@ function AdminOrders() {
                   loc('الحالة', 'Status', 'دۆخ'),
                   loc('تغيير', 'Change', 'گۆڕین'),
                   loc('تجهيز', 'Prepare', 'ئامادەکردن'),
+                  loc('إجراءات', 'Actions', 'کردارەکان'),
                 ].map((h) => (
                   <th key={h} className="py-2.5 px-3 text-[11px] font-bold text-zinc-400 uppercase tracking-wider whitespace-nowrap">
                     {h}
@@ -446,18 +491,21 @@ function AdminOrders() {
                   <td className="py-2.5 px-3">
                     <PrepareButton o={o} />
                   </td>
+                  <td className="py-2.5 px-3">
+                    <DeleteOrderButton o={o} />
+                  </td>
                 </tr>
               ))}
               {!loading && orders.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-zinc-500 font-medium">
+                  <td colSpan={9} className="py-12 text-center text-zinc-500 font-medium">
                     {loc('لا توجد طلبات', 'No orders found', 'هیچ داواکارییەک نییە')}
                   </td>
                 </tr>
               )}
               {loading && orders.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-zinc-500 font-medium">
+                  <td colSpan={9} className="py-12 text-center text-zinc-500 font-medium">
                     {loc('جارٍ التحميل...', 'Loading...', 'بار دەبێت...')}
                   </td>
                 </tr>
@@ -513,31 +561,32 @@ export default function Admin() {
   const { t, dir, loc } = useLanguage();
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
 
+  const section = (id: string, ar: string, en: string, ckb?: string) => ({ section: id, sectionLabel: loc(ar, en, ckb) });
   const sidebarItems = [
-    { id: 'overview', icon: LayoutDashboard, label: dir === 'rtl' ? 'نظرة عامة' : 'Overview' },
-    { id: 'orders', icon: ClipboardList, label: dir === 'rtl' ? 'الطلبات' : 'Orders' },
-    { id: 'wallet_requests', icon: Bell, label: 'Wallet Requests' },
-    { id: 'products', icon: Package, label: t('adminProducts') },
-    { id: 'bundles', icon: Boxes, label: dir === 'rtl' ? 'الباقات' : 'Bundles' },
-    { id: 'mystery', icon: Dice5, label: loc('العروض العشوائية', 'Mystery offers', 'ئۆفەرە نهێنییەکان') },
-    { id: 'mystery_pools', icon: Layers, label: loc('مجموعات السحب', 'Mystery pools', 'کۆمەڵەکانی هەڵبژاردن') },
-    { id: 'taxonomy', icon: Tag, label: dir === 'rtl' ? 'التصنيفات' : 'Taxonomy' },
-    { id: 'warranties', icon: ShieldCheck, label: dir === 'rtl' ? 'الضمانات' : 'Warranties' },
-    { id: 'home_settings', icon: LayoutList, label: dir === 'rtl' ? 'اعدادات الرئيسية' : 'Home Settings' },
-    { id: 'users', icon: Users, label: t('adminUsers') },
-    { id: 'wallet_settings', icon: Wallet, label: 'Wallet Settings' },
-    { id: 'store_settings', icon: Settings, label: 'Store Settings' },
-    { id: 'ads', icon: Megaphone, label: 'Ads & Texts' },
-    { id: 'serials', icon: Barcode, label: dir === 'rtl' ? 'الأجهزة والتسلسلات' : 'Serials & Devices' },
-    { id: 'reviews', icon: Star, label: dir === 'rtl' ? 'المراجعات والهدايا' : 'Reviews & Gifts' },
-    { id: 'kyc', icon: ShieldCheck, label: dir === 'rtl' ? 'التحقق والعناوين' : 'KYC & Addresses' },
-    { id: 'memberships', icon: Crown, label: dir === 'rtl' ? 'الأعضاء والدعم' : 'Members & Support' },
-    { id: 'membership_benefits', icon: BadgePercent, label: loc('مزايا العضوية', 'Membership benefits') },
-    { id: 'coupons', icon: Ticket, label: dir === 'rtl' ? 'أكواد الخصم' : 'Promo codes' },
-    { id: 'offers', icon: PercentIcon, label: loc('العروض الخاصة', 'Special offers', 'ئۆفەرە تایبەتەکان') },
-    { id: 'delivery', icon: Truck, label: dir === 'rtl' ? 'التوصيل المحلي' : 'Local delivery' },
-    { id: 'community', icon: Store, label: dir === 'rtl' ? 'مجتمع ليفو' : 'Levo Community' },
-    { id: 'printer_farm', icon: Factory, label: loc('مزرعة الطابعات', 'Printer Farm', 'کێڵگەی چاپکەر') },
+    { id: 'overview', icon: LayoutDashboard, label: loc('نظرة عامة', 'Overview', 'پێداچوونەوە'), ...section('operations', 'التشغيل', 'Operations', 'بەڕێوەبردن') },
+    { id: 'orders', icon: ClipboardList, label: loc('الطلبات', 'Orders', 'داواکارییەکان'), ...section('operations', 'التشغيل', 'Operations') },
+    { id: 'wallet_requests', icon: Bell, label: loc('طلبات المحفظة', 'Wallet requests'), ...section('operations', 'التشغيل', 'Operations') },
+    { id: 'products', icon: Package, label: t('adminProducts'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') },
+    { id: 'bundles', icon: Boxes, label: loc('الباقات', 'Bundles'), ...section('catalog', 'الكتالوج', 'Catalog') },
+    { id: 'mystery', icon: Dice5, label: loc('العروض العشوائية', 'Mystery offers', 'ئۆفەرە نهێنییەکان'), ...section('catalog', 'الكتالوج', 'Catalog') },
+    { id: 'mystery_pools', icon: Layers, label: loc('مجموعات السحب', 'Mystery pools', 'کۆمەڵەکانی هەڵبژاردن'), ...section('catalog', 'الكتالوج', 'Catalog') },
+    { id: 'taxonomy', icon: Tag, label: loc('التصنيفات', 'Taxonomy'), ...section('catalog', 'الكتالوج', 'Catalog') },
+    { id: 'warranties', icon: ShieldCheck, label: loc('الضمانات', 'Warranties'), ...section('catalog', 'الكتالوج', 'Catalog') },
+    { id: 'memberships', icon: Crown, label: loc('الأعضاء والدعم', 'Members & support'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
+    { id: 'membership_benefits', icon: BadgePercent, label: loc('مزايا العضوية', 'Membership benefits'), ...section('growth', 'العضويات والتسويق', 'Growth') },
+    { id: 'coupons', icon: Ticket, label: loc('أكواد الخصم', 'Promo codes'), ...section('growth', 'العضويات والتسويق', 'Growth') },
+    { id: 'offers', icon: PercentIcon, label: loc('العروض الخاصة', 'Special offers', 'ئۆفەرە تایبەتەکان'), ...section('growth', 'العضويات والتسويق', 'Growth') },
+    { id: 'ads', icon: Megaphone, label: loc('الإعلانات والنصوص', 'Ads & texts'), ...section('growth', 'العضويات والتسويق', 'Growth') },
+    { id: 'users', icon: Users, label: t('adminUsers'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
+    { id: 'kyc', icon: ShieldCheck, label: loc('التحقق والعناوين', 'KYC & addresses'), ...section('administration', 'الإدارة', 'Administration') },
+    { id: 'serials', icon: Barcode, label: loc('الأجهزة والتسلسلات', 'Serials & devices'), ...section('administration', 'الإدارة', 'Administration') },
+    { id: 'reviews', icon: Star, label: loc('المراجعات والهدايا', 'Reviews & gifts'), ...section('administration', 'الإدارة', 'Administration') },
+    { id: 'delivery', icon: Truck, label: loc('التوصيل المحلي', 'Local delivery'), ...section('administration', 'الإدارة', 'Administration') },
+    { id: 'community', icon: Store, label: loc('مجتمع ليفو', 'Levo Community'), ...section('administration', 'الإدارة', 'Administration') },
+    { id: 'printer_farm', icon: Factory, label: loc('مزرعة الطابعات', 'Printer Farm', 'کێڵگەی چاپکەر'), ...section('administration', 'الإدارة', 'Administration') },
+    { id: 'home_settings', icon: LayoutList, label: loc('إعدادات الرئيسية', 'Home settings'), ...section('settings', 'الإعدادات', 'Settings', 'ڕێکخستنەکان') },
+    { id: 'wallet_settings', icon: Wallet, label: loc('إعدادات المحفظة', 'Wallet settings'), ...section('settings', 'الإعدادات', 'Settings') },
+    { id: 'store_settings', icon: Settings, label: loc('إعدادات المتجر', 'Store settings'), ...section('settings', 'الإعدادات', 'Settings') },
   ];
 
   return (

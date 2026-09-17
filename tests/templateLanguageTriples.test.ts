@@ -20,12 +20,55 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseProductRow, upgradeUsageGuide, validateProductDoc } from '../worker/lib/productModel';
 import type { ProductDoc } from '../worker/lib/productModel';
-import { exportProduct, parseTemplate, toDocBody } from '../worker/lib/template';
+import { exportProduct, parseTemplate, toDocBody, FIELD_REGISTRY } from '../worker/lib/template';
 import { localizeProductDoc } from '../worker/lib/translate/localizeProduct';
+import { translateText } from '../worker/lib/translate';
 import { localizableSlots } from '../worker/lib/translationSlots';
+import { PRODUCT_TYPES, groupsForType } from '../worker/lib/templateFamilies';
 import { relationsBodyFromDoc } from '../worker/lib/templateRelations';
 import { bridgeLeadTimeTranslations } from '../worker/lib/productPersistence';
 import { EMPTY_RELATIONS } from '../worker/lib/productOverlay';
+
+test('every exported repeatable text family exposes ar, en and ckb slots', () => {
+  const families = new Map<string, Set<string>>();
+  const add = (scope: string, spec: { key: string; exported?: boolean }) => {
+    if (spec.exported === false) return;
+    const match = /^(.*)_(ar|en|ckb)$/.exec(spec.key);
+    if (!match) return;
+    const key = `${scope}:${match[1]}`;
+    const langs = families.get(key) ?? new Set<string>();
+    langs.add(match[2]);
+    families.set(key, langs);
+  };
+  for (const spec of FIELD_REGISTRY.scalars) add('scalar', spec);
+  for (const group of FIELD_REGISTRY.groups) {
+    for (const spec of group.fields) add(group.name, spec);
+    for (const spec of group.rowFields ?? []) add(`${group.name}.rows`, spec);
+    for (const [name, cell] of Object.entries(group.cellFields ?? {})) {
+      for (const spec of cell.fields) add(`${group.name}.${name}`, spec);
+      for (const spec of cell.list?.fields ?? []) add(`${group.name}.${name}.${cell.list!.name}`, spec);
+    }
+  }
+  for (const [key, langs] of families) {
+    assert.deepEqual([...langs].sort(), ['ar', 'ckb', 'en'], `${key} is missing a language slot`);
+  }
+});
+
+test('the deterministic dictionary covers every built-in template label and choice', () => {
+  const vocabulary = new Set<string>();
+  for (const type of PRODUCT_TYPES) {
+    for (const group of groupsForType(type.id)) {
+      for (const field of group.fields) {
+        vocabulary.add(field.label_en);
+        for (const option of field.options ?? []) vocabulary.add(option);
+      }
+    }
+  }
+  for (const phrase of vocabulary) {
+    assert.equal(translateText(phrase, 'ar').status, 'machine', `Arabic dictionary gap: ${phrase}`);
+    assert.equal(translateText(phrase, 'ckb').status, 'machine', `Sorani dictionary gap: ${phrase}`);
+  }
+});
 
 /**
  * `upgradeOptions` rebuilds every option from a fixed field list and

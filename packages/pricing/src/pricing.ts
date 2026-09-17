@@ -1083,9 +1083,11 @@ export function resolveUnitPrice(input: {
           const def = (input.transportDefaults ?? []).find((d) => d.method === method);
           commission = def ? def.commission_iqd : null;
         }
-        if (commission === null || commission === undefined) {
-          errors.push('TRANSPORT_COMMISSION_UNCONFIGURED');
-        } else if (preorderPricing === 'cod' && hasDirectPremium) {
+        // An enabled route with no configured surcharge means zero increase.
+        // The route checkbox decides availability; leaving an optional amount
+        // blank must not close pre-order or show “commission not configured”.
+        if (commission === null || commission === undefined) commission = 0;
+        if (preorderPricing === 'cod' && hasDirectPremium) {
           // Cash on delivery: the owner's rule is that this line follows the
           // DIRECT-SALE pricing, so the commission is not the fee here — the
           // direct premium below is. The method stays: shipping_type, the
