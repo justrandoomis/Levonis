@@ -5,7 +5,7 @@ import { closeDepositNotification, enqueueUserDepositStatusNotification } from '
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAdmin, badRequest, notFound, forbidden, conflict, str, int, oneOf, jsonArray, HttpError } from '../lib/http';
+import { requireAdmin, badRequest, notFound, forbidden, conflict, str, int, oneOf, jsonArray, email, HttpError } from '../lib/http';
 import { newId, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
@@ -64,6 +64,11 @@ import type { DeliveryDriver } from '../lib/delivery/types';
 import { typeForTransport } from '../lib/shippingType';
 import type { ShippingType } from '../lib/shippingType';
 import { notifyAdminTopic } from '../lib/telegramAdmin';
+import { emailConfigured, sendEmailNow } from '../lib/emailSend';
+import { sendWhatsAppText, wasenderConfigured, wasenderStatus } from '../lib/wasender';
+import { normalizePhone, maskPhone } from '../lib/phone';
+import { escapeHtml } from '../lib/emailTemplates';
+import { notifyOrderStatus } from '../lib/orderNotify';
 
 export const adminRoutes = new Hono<AppContext>();
 adminRoutes.use('*', requireAdmin);
@@ -110,8 +115,8 @@ adminRoutes.get('/providers', async (c) => {
       note: 'Identity Services ID tokens, verified against Google JWKS. No client secret and no callback URL exist in this architecture.',
     },
     email: {
-      configured: !!(c.env.EMAIL_API_KEY && (c.env.EMAIL_FROM || '').trim()),
-      hasKey: !!c.env.EMAIL_API_KEY,
+      configured: emailConfigured(c.env),
+      hasKey: !!(c.env.EMAIL_API_KEY || '').trim(),
       hasFromAddress: !!(c.env.EMAIL_FROM || '').trim(),
       restrictedToAllowlist: allowList.length > 0,
       allowlistSize: allowList.length,
@@ -126,11 +131,32 @@ adminRoutes.get('/providers', async (c) => {
       botUsername: me.ok ? me.username : '',
       webhookSecretSet: !!c.env.TELEGRAM_WEBHOOK_SECRET,
     },
+    whatsapp: {
+      // WasenderAPI drives a REAL WhatsApp account, so a present key is not a
+      // working channel: the shop's phone can log out while the token stays
+      // valid. `configured` is the secret; `sessionStatus` is the truth, and
+      // it costs a live request — which is why it is here, behind admin auth,
+      // and not on the cached public /api/auth/capabilities.
+      configured: wasenderConfigured(c.env),
+      ...(await (async () => {
+        if (!wasenderConfigured(c.env)) {
+          return { sessionStatus: null, canSend: false, error: 'NOT_CONFIGURED' as const };
+        }
+        const st = await wasenderStatus(c.env).catch(() => null);
+        if (!st) return { sessionStatus: null, canSend: false, error: 'PROVIDER_DOWN' as const };
+        if (!st.ok) return { sessionStatus: null, canSend: false, error: st.error, detail: st.detail ?? null };
+        return { sessionStatus: st.status, canSend: st.can_send, error: null };
+      })()),
+      note: 'Sign-in codes send directly; notifications go through the outbox because the provider allows as few as one message every five seconds.',
+    },
     phone: {
       // A phone number signs you IN. Signing UP on one needs proof of
       // ownership, which is Telegram's job here — there is no SMS provider.
       signIn: true,
       smsProvider: false,
+      // A code over WhatsApp, to the number migration 0013 already proved the
+      // account owns. Not SMS: nothing here talks to a carrier.
+      whatsappOtp: wasenderConfigured(c.env),
     },
     origin: {
       appOrigin: (c.env.APP_ORIGIN || '').trim(),
@@ -251,6 +277,130 @@ adminRoutes.post('/telegram/test', async (c) => {
     reason: routed.ok ? null : routed.reason,
   });
 });
+
+
+// -------------------------------------------------- customer-channel tests
+
+/**
+ * SEND A REAL MESSAGE, AND SAY WHAT THE PROVIDER SAID.
+ *
+ * `/providers` reports whether the secrets are PRESENT. That is the question
+ * nobody actually has: the owner wants to know whether an order confirmation
+ * will arrive, and a key can be present and wrong, a Resend domain can be
+ * unverified, a WhatsApp session can be logged out, and a staging allowlist
+ * can be silently dropping every send. None of those show up as a missing
+ * secret. Only a real send does.
+ *
+ * So this endpoint sends one, to a destination the ADMIN NAMES, and returns
+ * the provider's own verdict instead of a green tick.
+ *
+ * WHY IT IS SAFE TO EXPOSE:
+ *   * admin-only, and refused outright for a restricted (`assistant`) scope —
+ *     a send costs money on email and costs WhatsApp quota, and on WhatsApp
+ *     a burst is what gets a shop's number banned;
+ *   * rate limited, per admin, hard;
+ *   * the body is a fixed test message — nothing an admin types is
+ *     transmitted, so this can never be turned into a relay for sending
+ *     arbitrary text to arbitrary people;
+ *   * every call is audited with a MASKED destination.
+ *
+ * The WhatsApp send goes DIRECT rather than through the outbox: a test whose
+ * answer arrives fifteen minutes later in a cron is not a test.
+ */
+adminRoutes.post('/providers/test', async (c) => {
+  const adminUser = c.get('user')!;
+  if (normalizeAdminScope(adminUser.admin_scope) === 'assistant') {
+    throw new HttpError(403, 'A restricted admin account cannot send provider tests', 'SCOPE_FORBIDDEN');
+  }
+  // Deliberately tight. Each call is a real message to a real person and, on
+  // WhatsApp, a slot out of a quota that can be as small as one per five
+  // seconds.
+  await rateLimit(c, 'provider-test', 6, 900);
+
+  const body = await c.req.json().catch(() => ({}));
+  const channel = oneOf(body.channel, 'channel', ['email', 'whatsapp', 'telegram'] as const);
+  const stamp = new Date().toISOString();
+  const text =
+    `LEVONIS\n` +
+    `رسالة اختبار من لوحة التحكم — القناة تعمل.\n` +
+    `Test message from the admin console — this channel is working.\n` +
+    `${stamp}`;
+
+  if (channel === 'telegram') {
+    // Telegram's destination is not a free-text field: it is the admin group
+    // the bot is already bound to. /telegram/test is the older, richer
+    // version of this and stays; this branch exists so one endpoint answers
+    // "does each channel work" in the same shape.
+    const routed = await notifyAdminTopic(c.env, 'general', text);
+    await audit(c.env.DB, adminUser.id, 'provider.test', 'channel:telegram', {
+      ok: routed.ok,
+      via: routed.ok ? routed.destination.via : null,
+    });
+    return c.json({
+      success: true,
+      channel,
+      sent: routed.ok,
+      detail: routed.ok ? `delivered via ${routed.destination.via}` : routed.reason,
+    });
+  }
+
+  if (channel === 'email') {
+    if (!emailConfigured(c.env)) {
+      return c.json({ success: true, channel, sent: false, detail: 'EMAIL_NOT_CONFIGURED' });
+    }
+    const to = email(body.to);
+    // A fresh key every time: the point of a test is that it actually leaves,
+    // and Resend would deduplicate a repeat of the same Idempotency-Key.
+    const sent = await sendEmailNow(
+      c.env,
+      to,
+      'LEVONIS — email channel test',
+      `<p style="font-family:Arial,sans-serif">${escapeHtml(text).replace(/\n/g, '<br>')}</p>`,
+      text
+    );
+    await audit(c.env.DB, adminUser.id, 'provider.test', 'channel:email', { ok: sent, to: maskEmailForAudit(to) });
+    return c.json({
+      success: true,
+      channel,
+      sent,
+      // The one failure an operator will hit and not understand on their own.
+      detail: sent
+        ? 'accepted by Resend — acceptance is not delivery; check the inbox'
+        : 'Resend refused it, or EMAIL_ALLOWED_RECIPIENTS excluded this address (see the Worker log)',
+    });
+  }
+
+  if (!wasenderConfigured(c.env)) {
+    return c.json({ success: true, channel, sent: false, detail: 'WHATSAPP_NOT_CONFIGURED' });
+  }
+  const raw = str(body.to, 'to', { min: 4, max: 32 });
+  const phone = normalizePhone(raw);
+  if (!phone) throw badRequest('This phone number is not valid', 'PHONE_INVALID');
+  const res = await sendWhatsAppText(c.env, phone, text);
+  await audit(c.env.DB, adminUser.id, 'provider.test', 'channel:whatsapp', {
+    ok: res.ok,
+    to: maskPhone(phone),
+    error: res.ok ? null : res.error,
+  });
+  return c.json({
+    success: true,
+    channel,
+    sent: res.ok,
+    // `in_progress` is the provider's own word for accepted-not-delivered.
+    detail: res.ok
+      ? `accepted by WasenderAPI (status: ${res.status ?? 'unknown'}) — acceptance is not delivery`
+      : `${res.error}${res.detail ? `: ${res.detail}` : ''}`,
+    ...(res.ok ? {} : { retry_after_seconds: res.retry_after_seconds ?? null }),
+  });
+});
+
+/** Masked for the audit row: staff read these, and an audit table should not
+ *  double as an address book. */
+function maskEmailForAudit(address: string): string {
+  const at = address.indexOf('@');
+  if (at <= 0) return '***';
+  return `${address.slice(0, 1)}${'*'.repeat(Math.max(2, at - 1))}${address.slice(at)}`;
+}
 
 // ---------------------------------------------------------------- users
 
@@ -1857,6 +2007,13 @@ adminRoutes.patch('/orders/:id', async (c) => {
     stock: stockNote,
     reversal: reversalNote,
   });
+
+  // AFTER the audit and after the flip has committed, never before: a
+  // notification for a transition that did not happen is worse than none.
+  // Queued, so the admin's request does not wait on three providers, and
+  // silent for `processing` — see NOTIFIED_ORDER_STATUSES.
+  c.executionCtx.waitUntil(notifyOrderStatus(c.env, id, next));
+
   return c.json({
     success: true,
     ...(stockNote ? { stock_note: stockNote } : {}),

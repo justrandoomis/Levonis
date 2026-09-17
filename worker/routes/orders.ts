@@ -151,6 +151,7 @@ import type { ShippingType } from '../lib/shippingType';
 import type { PolicyRef } from '../lib/policyOps';
 import { createInvoiceForOrder } from '../lib/invoices';
 import { notifyAdminTopic } from '../lib/telegramAdmin';
+import { notifyOrderPlaced } from '../lib/orderNotify';
 
 export const orderRoutes = new Hono<AppContext>();
 orderRoutes.use('*', requireAuth);
@@ -3680,6 +3681,10 @@ orderRoutes.post('/', async (c) => {
   if (printerGift?.enabled === true && printerGift.milestone === 'paid') {
     c.executionCtx.waitUntil(grantPrinterGiftIfEligible(c.env, orderId));
   }
+  // The CUSTOMER hears about their own order too — email, WhatsApp and
+  // Telegram, on whichever of the three can reach them. Until this line the
+  // only party told an order existed was the admin group below.
+  c.executionCtx.waitUntil(notifyOrderPlaced(c.env, orderId));
   c.executionCtx.waitUntil(
     notifyAdminTopic(
       c.env,

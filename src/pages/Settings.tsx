@@ -56,6 +56,7 @@ import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
 import TelegramLink from '../components/security/TelegramLink';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
+import { useCapabilities } from '../hooks/useCapabilities';
 
 const PASSWORD_MIN = 8; // mirrors worker/routes/auth.ts checkPassword
 const USERNAME_COOLDOWN_DAYS = 14; // mirrors worker/routes/profile.ts
@@ -80,7 +81,12 @@ const STRINGS = {
     notifEmailNeedsVerify: 'أكّد بريدك أولاً لتصلك الفواتير ورسائل الأمان.',
     notifGoTelegram: 'اذهب إلى الربط',
     notifWhatsapp: 'واتساب',
-    notifWhatsappWhy: 'غير متاح بعد: يحتاج حساب WhatsApp Business وقوالب رسائل معتمدة من المزوّد. لا نعرض زرًا لا يعمل.',
+    notifWhatsappWhy: 'غير متاح بعد: لم يهيّئ المسؤول مزوّد واتساب. لا نعرض زرًا لا يعمل.',
+    waReady: 'مُفعّل',
+    waNeedsPhone: 'يحتاج رقمًا',
+    waReadyNote: 'ستصلك تحديثات طلبك على واتساب على الرقم الموثّق في حسابك، ويمكنك تسجيل الدخول برمز يصل إليه.',
+    waNeedsPhoneNote: 'لا يوجد رقم موثّق على حسابك بعد. وثّق رقمك عبر تيليغرام ليعمل واتساب.',
+    waGoVerify: 'توثيق رقمي',
     changePassword: 'تغيير كلمة المرور', currentPassword: 'كلمة المرور الحالية',
     newPassword: 'كلمة المرور الجديدة', confirmPassword: 'تأكيد كلمة المرور',
     pwMin: `الحد الأدنى ${PASSWORD_MIN} أحرف.`, pwMismatch: 'كلمتا المرور غير متطابقتين.',
@@ -140,7 +146,12 @@ const STRINGS = {
     notifEmailNeedsVerify: 'Verify your email first so invoices and security messages can reach you.',
     notifGoTelegram: 'Go to linking',
     notifWhatsapp: 'WhatsApp',
-    notifWhatsappWhy: 'Not available yet: it needs a WhatsApp Business account and approved message templates from the provider. We do not show a button that cannot work.',
+    notifWhatsappWhy: 'Not available yet: the administrator has not configured a WhatsApp provider. We do not show a button that cannot work.',
+    waReady: 'On',
+    waNeedsPhone: 'Needs a number',
+    waReadyNote: 'Order updates reach you on WhatsApp at the verified number on your account, and you can sign in with a code sent there.',
+    waNeedsPhoneNote: 'Your account has no verified number yet. Verify one through Telegram and WhatsApp starts working.',
+    waGoVerify: 'Verify my number',
     changePassword: 'Change password', currentPassword: 'Current password',
     newPassword: 'New password', confirmPassword: 'Confirm password',
     pwMin: `Minimum ${PASSWORD_MIN} characters.`, pwMismatch: 'The passwords do not match.',
@@ -200,7 +211,12 @@ const STRINGS = {
     notifEmailNeedsVerify: 'سەرەتا ئیمەیڵەکەت پشتڕاست بکەرەوە.',
     notifGoTelegram: 'بڕۆ بەستنەوە',
     notifWhatsapp: 'واتسئاپ',
-    notifWhatsappWhy: 'هێشتا بەردەست نییە: پێویستی بە هەژماری WhatsApp Business هەیە.',
+    notifWhatsappWhy: 'هێشتا بەردەست نییە: بەڕێوەبەر دابینکەری واتساپی ڕێکنەخستووە.',
+    waReady: 'چالاکە',
+    waNeedsPhone: 'ژمارەی پێویستە',
+    waReadyNote: 'نوێکارییەکانی داواکارییەکەت بە واتساپ دەگەن بەو ژمارە پشتڕاستکراوەی هەژمارەکەت، و دەتوانیت بە کۆد بچیتە ژوورەوە.',
+    waNeedsPhoneNote: 'هێشتا ژمارەیەکی پشتڕاستکراو لەسەر هەژمارەکەت نییە. بە تێلێگرام ژمارەکەت پشتڕاست بکەرەوە.',
+    waGoVerify: 'پشتڕاستکردنەوەی ژمارەکەم',
     changePassword: 'گۆڕینی وشەی تێپەڕ', currentPassword: 'وشەی تێپەڕی ئێستا',
     newPassword: 'وشەی تێپەڕی نوێ', confirmPassword: 'دووبارەکردنەوەی وشەی تێپەڕ',
     pwMin: `لانیکەم ${PASSWORD_MIN} پیت.`, pwMismatch: 'وشە تێپەڕەکان وەک یەک نین.',
@@ -363,6 +379,12 @@ export default function Settings() {
   const { lang, setLang, dir } = useLanguage();
   const s = STRINGS[lang];
   const rtl = dir === 'rtl';
+
+  // Whether the DEPLOYMENT has a WhatsApp provider at all. Not whether the
+  // shop's WhatsApp session is currently linked — only a live provider call
+  // can answer that, and this cached public endpoint deliberately does not
+  // make one. The row below says what it can honestly say.
+  const whatsappConfigured = useCapabilities()?.whatsappOtp ?? false;
 
   const [signingOut, setSigningOut] = useState(false);
 
@@ -959,16 +981,55 @@ export default function Settings() {
                 </a>
               </div>
 
-              {/* WhatsApp is named rather than omitted. The owner asked for it
-                  and a reader who cannot find it deserves the reason instead
-                  of an absence they have to interpret. No control, because
-                  there is nothing behind one yet. */}
-              <DisabledRow
-                label={s.notifWhatsapp}
-                reason={s.notifWhatsappWhy}
-                note={s.notAvailable}
-                icon={<Bell aria-hidden="true" className="w-5 h-5" />}
-              />
+              {/*
+                WHATSAPP IS A REAL ROW NOW, and it has two honest states.
+
+                It used to be a DisabledRow saying the channel needed a
+                WhatsApp Business account and approved templates. That is no
+                longer what it needs: the shop sends through WasenderAPI, from
+                its own number. So the row reports the two things that
+                actually decide whether a message arrives — whether the
+                deployment has a provider at all, and whether THIS account has
+                a verified number for it to reach.
+
+                The number is the account's `phone_e164`, which migration 0013
+                only ever writes after Telegram contact verification. So the
+                fix for "needs a number" is the Telegram link in the section
+                above, and the row points there rather than describing it.
+              */}
+              {!whatsappConfigured ? (
+                <DisabledRow
+                  label={s.notifWhatsapp}
+                  reason={s.notifWhatsappWhy}
+                  note={s.notAvailable}
+                  icon={<Bell aria-hidden="true" className="w-5 h-5" />}
+                />
+              ) : (
+                <div className="px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-bold text-[15px]">{s.notifWhatsapp}</span>
+                    <span
+                      className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                        user?.has_phone ? 'text-success bg-success/10' : 'text-warning bg-warning/10'
+                      }`}
+                    >
+                      {user?.has_phone ? s.waReady : s.waNeedsPhone}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">
+                    {user?.has_phone ? s.waReadyNote : s.waNeedsPhoneNote}
+                  </p>
+                  {user?.has_phone ? (
+                    <p className="mt-1 text-[12px] text-zinc-500" dir="ltr">
+                      {user.phone}
+                    </p>
+                  ) : (
+                    <a href="#settings-linking" className="lv-button lv-button-secondary lv-button-sm mt-2">
+                      {s.waGoVerify}
+                    </a>
+                  )}
+                </div>
+              )}
             </SectionCard>
 
             {/* --------------------------------------- 7. Privacy and help */}

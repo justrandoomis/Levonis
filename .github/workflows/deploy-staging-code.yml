@@ -407,6 +407,28 @@ jobs:
       # Unset stays honest either way: no customer bot means Telegram sign-in
       # and linking are unavailable rather than broken, and no admin bot means
       # @alilevobot stays off with notifications on the legacy chat.
+      # THE WHATSAPP KEY, for the same reason as every block around it:
+      # `wrangler deploy` carries plain-text VARS forward but NOT secrets, so a
+      # secret that nothing uploads never reaches the running Worker. That is
+      # how EMAIL_API_KEY spent months set in GitHub and absent from the site,
+      # and it is the one failure this file exists to prevent.
+      #
+      # Unset stays honest: no key means WhatsApp sign-in codes and WhatsApp
+      # notifications are reported UNAVAILABLE by /api/auth/capabilities and by
+      # the admin providers panel, rather than queued for a channel that will
+      # never drain.
+      - name: Upload the WhatsApp (WasenderAPI) secret
+        env:
+          WASENDER_API_KEY: ${{ secrets.WASENDER_API_KEY }}
+        run: |
+          if [ -n "$WASENDER_API_KEY" ]; then
+            printf '%s' "$WASENDER_API_KEY" | npx wrangler secret put WASENDER_API_KEY --env staging
+            echo "WASENDER_API_KEY uploaded — WhatsApp sign-in codes and notifications can send"
+            echo "::notice::a key is not a linked session; check Admin → Providers for the WhatsApp session status"
+          else
+            echo "WASENDER_API_KEY not set — WhatsApp stays honestly unavailable"
+          fi
+
       - name: Upload the Telegram bot secrets (customer and admin)
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

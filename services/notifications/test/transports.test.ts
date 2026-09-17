@@ -18,14 +18,33 @@ import { TransportRegistry } from '../src/transports/registry';
 import { CONFIGURED_ENV, forbiddenFetch, recordingFetch, REPO_ROOT, SERVICE_ROOT, UNCONFIGURED_ENV } from './_harness';
 
 const coreOutbox = readFileSync(join(REPO_ROOT, 'worker', 'lib', 'outbox.ts'), 'utf8');
+/**
+ * The core's EMAIL wire format moved out of outbox.ts into lib/emailSend.ts,
+ * so that the immediate auth path (a reset link, a sign-in code) and the
+ * durable outbox stop maintaining two copies of the same request. The
+ * property this file defends is unchanged — the dark transport must send what
+ * the core sends — so it now reads whichever of the two files the core keeps
+ * each half in. Telegram is still built inline in outbox.ts.
+ */
+const coreEmail = readFileSync(join(REPO_ROOT, 'worker', 'lib', 'emailSend.ts'), 'utf8');
 
 const EMAIL = { kind: 'email', to: 'someone@example.com', subject: 'Hi', html: '<p>Hi</p>', text: 'Hi' } as const;
 const TELEGRAM = { kind: 'telegram', chat_id: '-100123', text: 'New order' } as const;
 
 test('the endpoints are the ones the core uses today, read from the core rather than restated', () => {
-  assert.ok(coreOutbox.includes(RESEND_ENDPOINT), `worker/lib/outbox.ts no longer posts to ${RESEND_ENDPOINT}`);
+  assert.ok(coreEmail.includes(RESEND_ENDPOINT), `the core no longer posts to ${RESEND_ENDPOINT}`);
   assert.ok(coreOutbox.includes(`${TELEGRAM_API}/bot`), 'worker/lib/outbox.ts no longer posts to the Telegram bot API');
-  assert.ok(coreOutbox.includes("headers['Idempotency-Key'] = eventKey.slice(0, 256)"), 'the core still keys Resend on the event key');
+  // Two halves of the same rule, in the two files that now hold them: the
+  // outbox supplies the EVENT KEY as the idempotency key, and the sender
+  // truncates it to the provider's documented maximum.
+  assert.ok(
+    coreOutbox.includes('idempotencyKey: eventKey'),
+    'the core still keys Resend on the event key, so a retry of one business event cannot double-send'
+  );
+  assert.ok(
+    coreEmail.includes("headers['Idempotency-Key'] = opts.idempotencyKey.slice(0, 256)"),
+    'the core still truncates the Idempotency-Key to 256'
+  );
   assert.equal(IDEMPOTENCY_KEY_MAX, 256);
   assert.ok(coreOutbox.includes('text.slice(0, 4000)'));
   assert.equal(TEXT_MAX, 4000);

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, AtSign, Check, CheckCircle2, Info, Lock, Mail, MailCheck, UserRound, X } from 'lucide-react';
+import { ArrowLeft, AtSign, Check, CheckCircle2, Info, Lock, Mail, MailCheck, MessageCircle, UserRound, X } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMotion } from '../lib/motion';
@@ -12,6 +12,7 @@ import AuthDivider from '../components/auth/AuthDivider';
 import AuthTextField from '../components/auth/AuthTextField';
 import GoogleAuthButton from '../components/auth/GoogleAuthButton';
 import SocialAuthButton, { TelegramIcon } from '../components/auth/SocialAuthButton';
+import CodeAuth from '../components/auth/CodeAuth';
 import TelegramAuth from '../components/auth/TelegramAuth';
 import { sanitizeNextPath } from '../components/auth/nextPath';
 import FillButton, {
@@ -100,6 +101,9 @@ const STRINGS = {
     orLabel: 'أو',
     backLabel: 'رجوع',
     continueWithTelegram: 'المتابعة باستخدام تيليغرام',
+    signInWithEmailCode: 'رمز إلى بريدي',
+    signInWithWhatsapp: 'رمز على واتساب',
+    codeSignInTitle: 'الدخول برمز',
     googleWorking: 'جارٍ المتابعة عبر Google…',
     errPasswordMismatch: 'كلمتا المرور غير متطابقتين',
     signInCta: 'تسجيل الدخول',
@@ -211,6 +215,9 @@ const STRINGS = {
     orLabel: 'or',
     backLabel: 'Back',
     continueWithTelegram: 'Continue with Telegram',
+    signInWithEmailCode: 'Email me a code',
+    signInWithWhatsapp: 'Code on WhatsApp',
+    codeSignInTitle: 'Sign in with a code',
     googleWorking: 'Continuing with Google…',
     errPasswordMismatch: 'Passwords do not match',
     signInCta: 'Sign in',
@@ -321,6 +328,9 @@ const STRINGS = {
     orLabel: 'یان',
     backLabel: 'گەڕانەوە',
     continueWithTelegram: 'بەردەوامبوون بە تێلێگرام',
+    signInWithEmailCode: 'کۆد بۆ ئیمەیڵەکەم',
+    signInWithWhatsapp: 'کۆد لە واتساپ',
+    codeSignInTitle: 'چوونەژوورەوە بە کۆد',
     googleWorking: 'بەردەوامبوون بە Google…',
     errPasswordMismatch: 'وشە نهێنیيەکان یەک ناگرنەوە',
     signInCta: 'چوونەژوورەوە',
@@ -411,7 +421,7 @@ const STRINGS = {
 
 type AuthView = 'signin' | 'signup' | 'forgot';
 /** What the card is currently showing inside a view. */
-type AuthPanel = 'form' | 'telegram';
+type AuthPanel = 'form' | 'telegram' | 'code-email' | 'code-whatsapp';
 /** The three signup screens (one request, on the last one). */
 type SignupStep = 1 | 2 | 3;
 
@@ -424,6 +434,7 @@ const SHEET = {
   reset: 'NEW PASSWORD',
   finish: 'CHOOSE PASSWORD',
   telegram: 'TELEGRAM',
+  code: 'SIGN-IN CODE',
 } as const;
 
 /** Server codes that belong to an earlier step's field: the review step hands the person back there. */
@@ -560,6 +571,8 @@ export default function Auth() {
   const googleClientId = caps?.googleClientId ?? '';
   const resetConfigured = caps?.passwordReset ?? false;
   const telegramConfigured = caps?.telegram ?? false;
+  const emailCodeConfigured = caps?.emailOtp ?? false;
+  const whatsappCodeConfigured = caps?.whatsappOtp ?? false;
   const emailVerificationConfigured = caps?.emailVerification ?? false;
   // With a mail service the sign-up collects NO password — it is chosen on
   // the finish screen. Until the answer arrives the password fields are
@@ -605,7 +618,10 @@ export default function Auth() {
    * back to the form instead of rendering an empty panel.
    */
   useEffect(() => {
-    if (panel === 'telegram' && caps && !caps.telegram) setPanel('form');
+    if (!caps) return;
+    if (panel === 'telegram' && !caps.telegram) setPanel('form');
+    if (panel === 'code-email' && !caps.emailOtp) setPanel('form');
+    if (panel === 'code-whatsapp' && !caps.whatsappOtp) setPanel('form');
   }, [caps, panel]);
 
   /**
@@ -692,6 +708,11 @@ export default function Auth() {
   const openTelegram = () => {
     clearMessages();
     setPanel('telegram');
+  };
+
+  const openCodePanel = (next: 'code-email' | 'code-whatsapp') => {
+    clearMessages();
+    setPanel(next);
   };
 
   const goToStep = (next: SignupStep) => {
@@ -1245,6 +1266,31 @@ export default function Auth() {
                 compact={shortViewport}
               />
             )}
+            {/*
+              SIGN-IN ONLY, and not by omission. A code proves control of an
+              address; it does not answer the questions a NEW account needs
+              answered — a username, a referral, whether a password is wanted
+              — so offering it on the sign-up screen would promise an account
+              this button cannot create. The server refuses the same way.
+            */}
+            {view === 'signin' && emailCodeConfigured && (
+              <SocialAuthButton
+                icon={<Mail aria-hidden="true" className="w-5 h-5" />}
+                label={s.signInWithEmailCode}
+                onClick={() => openCodePanel('code-email')}
+                disabled={submitting}
+                compact={shortViewport}
+              />
+            )}
+            {view === 'signin' && whatsappCodeConfigured && (
+              <SocialAuthButton
+                icon={<MessageCircle aria-hidden="true" className="w-5 h-5" />}
+                label={s.signInWithWhatsapp}
+                onClick={() => openCodePanel('code-whatsapp')}
+                disabled={submitting}
+                compact={shortViewport}
+              />
+            )}
           </div>
         </div>
         {googleConfigured && <p className="lv-note-google">{s.googleNote}</p>}
@@ -1689,7 +1735,20 @@ export default function Auth() {
     }
   } else {
     screenKey = `signin:${panel}`;
-    if (panel === 'telegram') {
+    if (panel === 'code-email' || panel === 'code-whatsapp') {
+      screen = (
+        <div>
+          {backLink(() => setPanel('form'))}
+          {heading(SHEET.code, s.codeSignInTitle)}
+          {errorSummary}
+          <CodeAuth
+            channel={panel === 'code-email' ? 'email' : 'whatsapp'}
+            onSuccess={() => finishAuth(false)}
+            onSwitchMode={switchView}
+          />
+        </div>
+      );
+    } else if (panel === 'telegram') {
       screen = (
         <div>
           {backLink(() => setPanel('form'))}

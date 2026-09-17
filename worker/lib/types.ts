@@ -20,6 +20,14 @@ export interface Env {
   EMAIL_FROM?: string;
   TELEGRAM_BOT_TOKEN?: string; // the CUSTOMER bot: linking, OTP, account messages
   /**
+   * WasenderAPI bearer token — the WhatsApp channel (OTP sign-in and customer
+   * notifications). It authenticates ONE linked WhatsApp session, so unlike
+   * every other secret here its presence does not mean the channel works: the
+   * shop's phone can be logged out while the token stays valid. Ask
+   * `wasenderStatus()` when it matters.
+   */
+  WASENDER_API_KEY?: string;
+  /**
    * LEGACY FALLBACK (0080). The single chat the customer bot posted admin
    * notifications into before the admin bot existed. It is still honoured when
    * no admin group has been bound, so nothing goes dark mid-migration — but the

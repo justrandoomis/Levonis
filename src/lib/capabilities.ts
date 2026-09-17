@@ -33,6 +33,19 @@ export interface AuthCapabilities {
   phoneSignIn: boolean;
   /** An SMS provider exists for phone sign-UP. It does not; see below. */
   phoneOtp: boolean;
+  /** A six-digit sign-in code can be MAILED. Same provider as password reset. */
+  emailOtp: boolean;
+  /**
+   * A six-digit sign-in code can be sent on WhatsApp.
+   *
+   * TRUE MEANS "A KEY IS SET", NOT "IT WILL ARRIVE". WasenderAPI drives a real
+   * WhatsApp account that can be logged out while its token stays valid, and
+   * only a live request to the provider can tell the difference — which this
+   * cached, unauthenticated endpoint deliberately does not make. So the
+   * sign-in screen must treat a failed send as an ordinary outcome rather
+   * than an impossible one.
+   */
+  whatsappOtp: boolean;
   defaultCountry: string;
 }
 
@@ -55,6 +68,8 @@ export const OFFLINE_CAPABILITIES: AuthCapabilities = {
   telegramBot: '',
   phoneSignIn: true,
   phoneOtp: false,
+  emailOtp: false,
+  whatsappOtp: false,
   defaultCountry: 'IQ',
 };
 
@@ -80,6 +95,8 @@ export function loadCapabilities(): Promise<AuthCapabilities> {
         telegramBot: r.telegramBot || '',
         phoneSignIn: r.phoneSignIn !== false,
         phoneOtp: !!r.phoneOtp,
+        emailOtp: !!r.emailOtp,
+        whatsappOtp: !!r.whatsappOtp,
         defaultCountry: r.defaultCountry || 'IQ',
       }))
       .catch(() => OFFLINE_CAPABILITIES);

@@ -143,6 +143,7 @@ jobs:
           TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
           TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
           EMAIL_API_KEY: ${{ secrets.EMAIL_API_KEY }}
+          WASENDER_API_KEY: ${{ secrets.WASENDER_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           KYC_ENC_KEY: ${{ secrets.KYC_ENC_KEY }}
           # The SAME secret the Studio worker gets. Both halves must hold it
@@ -164,6 +165,14 @@ jobs:
             printf '%s' "$EMAIL_API_KEY" | npx wrangler secret put EMAIL_API_KEY
           else
             echo "EMAIL_API_KEY not set — password-reset email stays honestly disabled in production"
+          fi
+          # A key is not a linked WhatsApp session: WasenderAPI drives a real
+          # account that can be logged out while its token stays valid. Admin →
+          # Providers asks the provider and reports the session state.
+          if [ -n "$WASENDER_API_KEY" ]; then
+            printf '%s' "$WASENDER_API_KEY" | npx wrangler secret put WASENDER_API_KEY
+          else
+            echo "WASENDER_API_KEY not set — WhatsApp sign-in codes and notifications stay honestly disabled in production"
           fi
           if [ -n "$GEMINI_API_KEY" ]; then
             printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY

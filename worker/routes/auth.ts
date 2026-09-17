@@ -43,6 +43,16 @@ import {
   type AuthChallengeRow,
 } from '../lib/telegram';
 import { resolveSupportRef, type SupportRef } from '../lib/supportCode';
+import { emailConfigured, sendEmailNow } from '../lib/emailSend';
+import { sendWhatsAppText, wasenderConfigured } from '../lib/wasender';
+import { isPlaceholderEmail } from '../lib/profileCompletion';
+import {
+  AUTH_OTP_CHANNELS,
+  authOtpMessage,
+  startAuthOtp,
+  verifyAuthOtp,
+  type AuthOtpChannel,
+} from '../lib/authOtp';
 import { enqueue, processOutbox } from '../lib/outbox';
 import {
   emailLang,
@@ -52,6 +62,7 @@ import {
   renderGoogleAccountNoticeEmail,
   renderFinishSignupEmail,
   renderAccountExistsEmail,
+  renderSignInCodeEmail,
   type EmailLang,
 } from '../lib/emailTemplates';
 
@@ -323,7 +334,7 @@ export function pickSignupReferralSource(
  */
 authRoutes.get('/capabilities', async (c) => {
   const clientId = (c.env.GOOGLE_CLIENT_ID || '').trim();
-  const mail = !!(c.env.EMAIL_API_KEY && (c.env.EMAIL_FROM || '').trim());
+  const mail = emailConfigured(c.env);
   // getBotUsername answers from an in-memory cache, then a persisted one, and
   // returns null rather than guessing — so `telegram: true` means a bot that
   // actually answered, not merely a token that is present.
@@ -360,6 +371,19 @@ authRoutes.get('/capabilities', async (c) => {
      */
     phoneSignIn: true,
     phoneOtp: false,
+    /**
+     * Passwordless sign-in by a six-digit code, per channel. Both are
+     * SIGN-IN only — neither creates an account (see /otp/start).
+     *
+     * `whatsappOtp` is true when a WasenderAPI key is present, which is NOT
+     * the same as the shop's WhatsApp being linked: that session can be
+     * logged out while the key stays valid, and only the provider can say so
+     * (admin diagnostics asks it; this cached, unauthenticated endpoint must
+     * not). The sign-in form should therefore treat a failed send as a real
+     * possibility rather than an impossible one.
+     */
+    emailOtp: mail,
+    whatsappOtp: wasenderConfigured(c.env),
     defaultCountry: DEFAULT_COUNTRY,
   });
 });
@@ -436,7 +460,7 @@ authRoutes.post('/register', async (c) => {
   // reading the inbox. Because no password is collected here, a stranger who
   // plants a sign-up for someone else's address gains nothing: the owner
   // ignores the mail or sets their own password.
-  const emailFirst = !!(c.env.EMAIL_API_KEY && c.env.EMAIL_FROM);
+  const emailFirst = emailConfigured(c.env);
   if (emailFirst) {
     // One address must not be floodable from many IPs — and since every
     // attempt for a free address mails a fresh link, the day is capped too, so
@@ -1078,7 +1102,7 @@ authRoutes.post('/forgot-password', async (c) => {
   await rateLimit(c, 'forgot-id', 3, 3600, await identifierKey(mail));
   const lang = emailLang(body.lang);
 
-  if (!c.env.EMAIL_API_KEY || !c.env.EMAIL_FROM) {
+  if (!emailConfigured(c.env)) {
     // Honest unavailability: no email service is configured, so no reset
     // email can be sent. We never generate or reveal passwords instead.
     throw unavailable(
@@ -1711,14 +1735,14 @@ authRoutes.get('/verify-email/status', requireAuth, async (c) => {
     success: true,
     email: row?.email ?? user.email,
     verified: !!row?.email_verified_at,
-    emailConfigured: !!(c.env.EMAIL_API_KEY && c.env.EMAIL_FROM),
+    emailConfigured: emailConfigured(c.env),
   });
 });
 
 authRoutes.post('/verify-email/send', requireAuth, async (c) => {
   await rateLimit(c, 'verify-email-send', 6, 3600);
   const user = c.get('user')!;
-  if (!c.env.EMAIL_API_KEY || !c.env.EMAIL_FROM) {
+  if (!emailConfigured(c.env)) {
     // Honest unavailability — no email service means no message can be sent.
     throw unavailable(
       'Email verification is not available yet because no email service is configured.',
@@ -1815,7 +1839,7 @@ authRoutes.post('/change-email', requireMainHost, requireAuth, async (c) => {
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
   const newMail = email(body.newEmail);
-  if (!c.env.EMAIL_API_KEY || !c.env.EMAIL_FROM) {
+  if (!emailConfigured(c.env)) {
     throw unavailable(
       'Changing the account email is not available yet because no email service is configured.',
       'EMAIL_NOT_CONFIGURED'
@@ -1864,54 +1888,246 @@ authRoutes.post('/change-email', requireMainHost, requireAuth, async (c) => {
   });
 });
 
+// ---------------------------------------------- passwordless sign-in codes
+//
+// SIGNING IN WITH A CODE, over email or WhatsApp. Two endpoints:
+//
+//   POST /api/auth/otp/start   { channel, identifier, lang }
+//   POST /api/auth/otp/verify  { channel, identifier, code }
+//
+// THIS SIGNS IN; IT DOES NOT SIGN UP. An account is created by /register, by
+// Google, or by the Telegram flow, all of which collect the things an account
+// needs (a username, a referral, a password choice). Creating one here from a
+// bare address would make a half-account nobody asked for — and on the
+// WhatsApp side it would mean a phone number entered a shop's user table
+// without anybody ever proving they own it.
+//
+// WHY EACH CHANNEL IS ALLOWED TO DO THIS AT ALL:
+//
+//   email    — the code goes to `users.email`. Receiving it IS proof of
+//              control of that mailbox, which is the same proof
+//              /verify-email/confirm accepts, so a successful sign-in also
+//              stamps `email_verified_at` when it was never stamped.
+//
+//   whatsapp — the code goes to `users.phone_e164`, and migration 0013 is
+//              explicit that this column is only ever written after Telegram
+//              contact verification: "a phone typed into a form is never
+//              stored here". So the number is already proven to belong to the
+//              account holder, and WhatsApp on it is a second factor of the
+//              same ownership rather than a new trust assumption.
+//
+// ANTI-ENUMERATION. /start answers identically whether or not an account
+// exists: the unknown case writes a decoy challenge (user_id NULL, nothing
+// sent) so the response, its shape and its timing carry no signal, and the
+// resend cooldown is keyed on the DESTINATION rather than a user id — a
+// per-user cooldown is itself an oracle. /verify has one uniform failure for
+// every cause, exactly like /login.
+//
+// THE ONE THING /start DOES NOT HIDE is that the channel is switched off. A
+// shop with no mail provider, or whose WhatsApp session has logged out,
+// answers 503 with a reason, because pretending to send a code that can never
+// arrive leaves the customer waiting on nothing.
+
+/** Uniform failure for /verify — unknown destination, wrong code, expired,
+ *  burnt attempts and a re-pointed account are one message from outside. */
+const OTP_FAIL_MSG =
+  'الرمز غير صحيح أو انتهت صلاحيته. اطلب رمزاً جديداً. / ' +
+  'That code is wrong or has expired. Request a new one.';
+
+/**
+ * Read `{channel, identifier}` into a normalized destination.
+ *
+ * Normalization is not cosmetic here: the resend cooldown, both rate limits
+ * and the challenge lookup are all keyed on this string, so `Ali@X.COM` and
+ * `ali@x.com` reaching the database as different destinations would be two
+ * free buckets for the same mailbox.
+ */
+function readOtpTarget(body: Record<string, unknown>): { channel: AuthOtpChannel; destination: string } {
+  const channel = oneOf(body.channel, 'channel', AUTH_OTP_CHANNELS as readonly string[]) as AuthOtpChannel;
+  if (channel === 'email') {
+    return { channel, destination: email(body.identifier ?? body.email) };
+  }
+  const raw = str(body.identifier ?? body.phone, 'phone', { min: 4, max: 32 });
+  const phone = normalizePhone(raw, countryCodeOrNull(body.country) ?? DEFAULT_COUNTRY);
+  if (!phone) throw badRequest('This phone number is not valid', 'PHONE_INVALID');
+  return { channel, destination: phone };
+}
+
+/** The account a code for this destination would sign in, or null. */
+async function accountForOtpDestination(
+  db: D1Database,
+  channel: AuthOtpChannel,
+  destination: string
+): Promise<{ id: string; email: string; email_verified_at: string | null } | null> {
+  if (channel === 'email') {
+    // A placeholder address is not a mailbox — nothing can be delivered to
+    // `@telegram.local`, and /verify-email/send already refuses it.
+    if (isPlaceholderEmail(destination)) return null;
+    return db
+      .prepare('SELECT id, email, email_verified_at FROM users WHERE email = ?')
+      .bind(destination)
+      .first<{ id: string; email: string; email_verified_at: string | null }>();
+  }
+  return db
+    .prepare('SELECT id, email, email_verified_at FROM users WHERE phone_e164 = ?')
+    .bind(destination)
+    .first<{ id: string; email: string; email_verified_at: string | null }>();
+}
+
+authRoutes.post('/otp/start', requireMainHost, async (c) => {
+  // Per IP first, then per DESTINATION — one mailbox or one phone must not be
+  // floodable from many addresses, and on WhatsApp a flood is also the shop's
+  // own send quota (as little as one message per five seconds) being spent by
+  // a stranger.
+  await rateLimit(c, 'otp-start', 8, 900);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const { channel, destination } = readOtpTarget(body);
+  await rateLimit(c, `otp-start-${channel}`, 4, 3600, await identifierKey(destination));
+
+  const lang = emailLang(body.lang);
+
+  if (channel === 'email' && !emailConfigured(c.env)) {
+    throw unavailable(
+      'تسجيل الدخول برمز عبر البريد غير متاح حالياً. / Sign-in codes by email are not available right now.',
+      'EMAIL_NOT_CONFIGURED'
+    );
+  }
+  if (channel === 'whatsapp' && !wasenderConfigured(c.env)) {
+    throw unavailable(
+      'تسجيل الدخول برمز عبر واتساب غير متاح حالياً. / Sign-in codes by WhatsApp are not available right now.',
+      'WHATSAPP_NOT_CONFIGURED'
+    );
+  }
+
+  const account = await accountForOtpDestination(c.env.DB, channel, destination);
+
+  const started = await startAuthOtp(c.env, {
+    channel,
+    destination,
+    userId: account?.id ?? null,
+    // The decoy path: no account, so nothing is sent, but the row is still
+    // written and this reports success — the caller cannot tell the two apart.
+    send: async (code) => {
+      // The decoy. 'skipped' — not `true` — so the row records honestly that
+      // nothing left, while the cooldown and the response stay identical to a
+      // real request.
+      if (!account) return 'skipped';
+      if (channel === 'email') {
+        const msg = renderSignInCodeEmail(lang, code);
+        return sendEmail(c.env, account.email, msg.subject, msg.html, msg.text);
+      }
+      const msg = authOtpMessage(code, lang);
+      const sent = await sendWhatsAppText(c.env, destination, msg.text);
+      if (!sent.ok) {
+        // Not customer-facing: the outward response stays uniform. It is here
+        // so an operator can tell a logged-out WhatsApp session from a wrong
+        // number, which have completely different fixes.
+        console.warn(`otp/start: WhatsApp send failed (${sent.error})`);
+      }
+      return sent.ok;
+    },
+  });
+
+  if (!started.ok) {
+    if (started.error === 'COOLDOWN') {
+      throw new HttpError(
+        429,
+        'انتظر قليلاً قبل طلب رمز جديد. / Wait a moment before requesting another code.',
+        'OTP_COOLDOWN',
+        { retry_after_seconds: started.retry_after_seconds }
+      );
+    }
+    // The send failed for a REAL destination. Saying so is honest and reveals
+    // nothing an attacker could not already learn by watching the channel: it
+    // is reported for the unknown-account case too, because the decoy path
+    // reports success and never reaches here.
+    throw unavailable(
+      'تعذّر إرسال الرمز الآن. حاول مرة أخرى بعد قليل. / The code could not be sent right now. Try again shortly.',
+      'OTP_SEND_FAILED'
+    );
+  }
+
+  return c.json({
+    success: true,
+    channel,
+    expires_in_seconds: started.expires_in_seconds,
+    resend_after_seconds: started.resend_after_seconds,
+  });
+});
+
+authRoutes.post('/otp/verify', requireMainHost, async (c) => {
+  await rateLimit(c, 'otp-verify', 20, 900);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const { channel, destination } = readOtpTarget(body);
+  await rateLimit(c, `otp-verify-${channel}`, 10, 900, await identifierKey(destination));
+  const code = str(body.code, 'code', { min: 4, max: 12 });
+
+  const fail = () => new HttpError(401, OTP_FAIL_MSG, 'OTP_FAILED');
+
+  const result = await verifyAuthOtp(c.env, channel, destination, code);
+  if (!result.ok) throw fail();
+
+  // RESOLVED AGAIN, from the destination, not taken from the row. The row's
+  // user_id is a record of what was true when the code was issued; ten
+  // minutes later the address may belong to a different account (a change of
+  // email) or to none. The proof this code carries is "somebody controls this
+  // destination" — who that is, is decided now.
+  const account = await accountForOtpDestination(c.env.DB, channel, destination);
+  if (!account) throw fail();
+  if (result.user_id && result.user_id !== account.id) {
+    // The destination moved between issue and use. Refusing is the only safe
+    // reading: neither account consented to the other's code.
+    console.warn('otp/verify: destination re-pointed between issue and use — refused');
+    throw fail();
+  }
+
+  // Receiving the code IS the mailbox proof, so an account that signed in this
+  // way has a verified address whether or not it ever clicked a link.
+  if (channel === 'email' && !account.email_verified_at) {
+    await c.env.DB.prepare(
+      "UPDATE users SET email_verified_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND email_verified_at IS NULL"
+    )
+      .bind(account.id)
+      .run();
+  }
+
+  await audit(c.env.DB, account.id, 'auth.otp_login', `user:${account.id}`, {
+    channel,
+    // Never the address or the number itself: an audit row is read by staff.
+    destination_masked: channel === 'email' ? maskEmail(destination) : maskPhone(destination),
+  });
+
+  await createSession(c, account.id);
+  const user = await getFullUser(c.env.DB, account.id);
+  if (!user) throw fail();
+  return c.json({ success: true, user: publicUser(user) });
+});
+
+/** `a***@example.com` — enough for staff to recognise an address in an audit
+ *  row, not enough for the row itself to be a mailing list. */
+function maskEmail(address: string): string {
+  const at = address.indexOf('@');
+  if (at <= 0) return '***';
+  const local = address.slice(0, at);
+  return `${local.slice(0, 1)}${'*'.repeat(Math.max(2, local.length - 1))}${address.slice(at)}`;
+}
+
+
 // Email helpers --------------------------------------------------------------
 
 
 /**
- * Sends one email through the Resend API (immediate path for time-critical
- * auth mail — reset links must not sit in a queue). Returns false (never
- * throws) on any failure. Staging safety: when EMAIL_ALLOWED_RECIPIENTS is
- * set (comma-separated), recipients outside the list are skipped — outward
- * API responses never change (no enumeration signal), only a console.warn is
- * logged for the operator. The API key is never logged. Templates come from
- * worker/lib/emailTemplates.ts and always include a plain-text alternative.
+ * Sends one email NOW, for auth mail a person is waiting on (a reset link, a
+ * sign-in code) — as opposed to the durable outbox, which cron drains.
+ *
+ * The implementation moved to lib/emailSend.ts so the configuration check,
+ * the staging allowlist and the provider timeout are decided once instead of
+ * at each call site; this wrapper stays because thirteen call sites in this
+ * file read better as `sendEmail(...)`. Returns false, never throws: the
+ * outward API response must not vary with whether a particular address exists.
  */
 async function sendEmail(env: Env, to: string, subject: string, html: string, text: string): Promise<boolean> {
-  if (!env.EMAIL_API_KEY || !env.EMAIL_FROM) return false;
-
-  const allowed = (env.EMAIL_ALLOWED_RECIPIENTS || '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  // An empty allowlist means "everyone", EXCEPT where the deployment declares
-  // that it must not reach a real address at all (`EMAIL_ALLOWLIST_REQUIRED`,
-  // the dark core), where it means "nobody".
-  if (allowed.length === 0 && (env.EMAIL_ALLOWLIST_REQUIRED || '').trim().toLowerCase() === 'on') {
-    console.warn('sendEmail: EMAIL_ALLOWED_RECIPIENTS is empty and EMAIL_ALLOWLIST_REQUIRED is on — send skipped');
-    return false;
-  }
-  if (allowed.length > 0 && !allowed.includes(to.toLowerCase())) {
-    console.warn('sendEmail: recipient is not in EMAIL_ALLOWED_RECIPIENTS — send skipped (staging guard)');
-    return false;
-  }
-
-  try {
-    // Resend-compatible API; swap the URL for another provider if needed.
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${env.EMAIL_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: env.EMAIL_FROM, to, subject, html, text }),
-    });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      console.error(`sendEmail: provider responded ${res.status}: ${detail.slice(0, 500)}`);
-      return false;
-    }
-    return true;
-  } catch (e) {
-    console.error('sendEmail: request failed:', e instanceof Error ? e.message : String(e));
-    return false;
-  }
+  return sendEmailNow(env, to, subject, html, text);
 }
 
 export { loadSessionUser };

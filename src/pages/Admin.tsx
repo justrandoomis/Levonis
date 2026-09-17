@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, Trash2 } from 'lucide-react';
+import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, RefreshCw, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, Trash2, MessageCircle } from 'lucide-react';
 import OrderDetailModal from '../components/adminOrders/OrderDetailModal';
 import { api, ApiError, ApiOrder, formatIqd } from '../lib/api';
 import DashboardLayout from '../components/DashboardLayout';
@@ -50,6 +50,7 @@ const AdminUsers = React.lazy(() => import('../components/AdminUsers'));
 const AdminWalletRequests = React.lazy(() => import('../components/AdminWalletRequests'));
 const AdminWalletSettings = React.lazy(() => import('../components/AdminWalletSettings'));
 const AdminStoreSettings = React.lazy(() => import('../components/AdminStoreSettings'));
+const AdminChannels = React.lazy(() => import('../components/AdminChannels'));
 const AdminSerials = React.lazy(() => import('../components/AdminSerials'));
 const AdminReviews = React.lazy(() => import('../components/AdminReviews'));
 const AdminKyc = React.lazy(() => import('../components/AdminKyc'));
@@ -91,6 +92,7 @@ type AdminTab =
   | 'wallet_requests'
   | 'wallet_settings'
   | 'store_settings'
+  | 'channels'
   | 'ads'
   | 'serials'
   | 'reviews'
@@ -587,6 +589,10 @@ export default function Admin() {
     { id: 'home_settings', icon: LayoutList, label: loc('إعدادات الرئيسية', 'Home settings'), ...section('settings', 'الإعدادات', 'Settings', 'ڕێکخستنەکان') },
     { id: 'wallet_settings', icon: Wallet, label: loc('إعدادات المحفظة', 'Wallet settings'), ...section('settings', 'الإعدادات', 'Settings') },
     { id: 'store_settings', icon: Settings, label: loc('إعدادات المتجر', 'Store settings'), ...section('settings', 'الإعدادات', 'Settings') },
+    // Not "notification settings" — there is nothing to set here. It answers
+    // one question the owner actually has: will an order confirmation reach
+    // the customer today, on each of the three channels.
+    { id: 'channels', icon: MessageCircle, label: loc('قنوات التواصل', 'Customer channels', 'کەناڵەکانی پەیوەندی'), ...section('settings', 'الإعدادات', 'Settings') },
   ];
 
   return (
@@ -640,6 +646,10 @@ export default function Admin() {
 
         {activeTab === 'store_settings' && (
            <AdminStoreSettings />
+        )}
+
+        {activeTab === 'channels' && (
+           <AdminChannels />
         )}
 
         {activeTab === 'serials' && (

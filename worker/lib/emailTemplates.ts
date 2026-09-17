@@ -78,6 +78,12 @@ interface Copy {
   finishCta: string;
   finishExpiry: string;
   finishIgnore: string;
+  codeSubject: (code: string) => string;
+  codeIntro: string;
+  codeLabel: string;
+  codeExpiry: string;
+  codeWarn: string;
+  codeIgnore: string;
   invoiceSubject: (invoiceNo: string) => string;
   invoiceTitle: string;
   invoiceGreeting: (name: string) => string;
@@ -142,6 +148,12 @@ const COPY_AR: Copy = {
   finishCta: 'اختيار كلمة المرور وفتح الحساب',
   finishExpiry: 'الرابط صالح لمدة 24 ساعة ولمرة واحدة.',
   finishIgnore: 'إذا لم تطلب ذلك، تجاهل هذه الرسالة — لن يُنشأ أي حساب ولن يُخزَّن شيء.',
+  codeSubject: (code: string) => `${code} رمز الدخول إلى LEVONIS`,
+  codeIntro: 'استعمل هذا الرمز لتسجيل الدخول إلى حسابك في ليفونيس.',
+  codeLabel: 'رمز الدخول',
+  codeExpiry: 'صالح لمدة ١٠ دقائق، ويُستعمل مرة واحدة فقط.',
+  codeWarn: 'لا تشارك هذا الرمز مع أحد. فريق ليفونيس لن يطلبه منك أبداً — لا عبر الهاتف ولا عبر الرسائل.',
+  codeIgnore: 'إذا لم تطلب هذا الرمز، تجاهل هذه الرسالة؛ لم يتغيّر شيء في حسابك.',
   invoiceSubject: (invoiceNo) => `فاتورة طلبك ${invoiceNo} — LEVONIS`,
   invoiceTitle: 'فاتورة',
   invoiceGreeting: (name) => (name ? `مرحبًا ${name}،` : 'مرحبًا،'),
@@ -214,6 +226,12 @@ const COPY_EN: Copy = {
   finishCta: 'Choose a password and open my account',
   finishExpiry: 'The link works once and expires in 24 hours.',
   finishIgnore: 'If you did not request this, ignore this email — no account will be created and nothing is stored.',
+  codeSubject: (code: string) => `${code} is your LEVONIS sign-in code`,
+  codeIntro: 'Use this code to sign in to your LEVONIS account.',
+  codeLabel: 'Sign-in code',
+  codeExpiry: 'Valid for 10 minutes, and can be used once.',
+  codeWarn: 'Never share this code. LEVONIS staff will never ask you for it — not by phone, not by message.',
+  codeIgnore: 'If you did not request it, ignore this message; nothing about your account has changed.',
   invoiceSubject: (invoiceNo) => `Your LEVONIS invoice ${invoiceNo}`,
   invoiceTitle: 'Invoice',
   invoiceGreeting: (name) => (name ? `Hello ${name},` : 'Hello,'),
@@ -288,6 +306,12 @@ const COPY_CKB: Copy = {
   finishCta: 'هەڵبژاردنی وشەی نهێنی و کردنەوەی هەژمار',
   finishExpiry: 'بەستەرەکە تەنها جارێک و بۆ ٢٤ کاتژمێر کاردەکات.',
   finishIgnore: 'ئەگەر ئەمەت داوا نەکردووە، ئەم پەیامە پشتگوێ بخە — هیچ هەژمارێک دروست ناکرێت و هیچ شتێک هەڵناگیرێت.',
+  codeSubject: (code: string) => `${code} کۆدی چوونەژوورەوەی LEVONIS`,
+  codeIntro: 'ئەم کۆدە بەکاربهێنە بۆ چوونەژوورەوە بۆ هەژمارەکەت لە لیڤۆنیس.',
+  codeLabel: 'کۆدی چوونەژوورەوە',
+  codeExpiry: 'بۆ ماوەی ١٠ خولەک کاردەکات و تەنها جارێک بەکاردێت.',
+  codeWarn: 'ئەم کۆدە لەگەڵ هیچ کەسێک بەشی مەکە. ستافی لیڤۆنیس هەرگیز داوای لێ ناکات — نە بە تەلەفۆن نە بە نامە.',
+  codeIgnore: 'ئەگەر تۆ داوات نەکردووە، پشتگوێی بخە؛ هیچ شتێک لە هەژمارەکەت نەگۆڕاوە.',
   invoiceSubject: (invoiceNo) => `پسوولەی داواکارییەکەت ${invoiceNo} — LEVONIS`,
   invoiceTitle: 'پسوولە',
   invoiceGreeting: (name) => (name ? `سڵاو ${name}،` : 'سڵاو،'),
@@ -445,6 +469,46 @@ export function renderAccountExistsEmail(lang: EmailLang, signInUrl: string): Re
     para(t.existsBody) + ctaButton(t.existsCta, signInUrl) + para(t.existsIgnore, { small: true }) + rawLink(signInUrl, t.linkFallback)
   );
   return { subject: t.existsSubject, html, text: [t.existsBody, '', `${t.existsCta}: ${signInUrl}`, '', t.existsIgnore].join('\n') };
+}
+
+/**
+ * THE SIGN-IN CODE EMAIL. The only template here whose whole job is one
+ * six-character string, and the only one with no link in it at all.
+ *
+ * THE CODE IS IN THE SUBJECT LINE, first. On a phone the notification preview
+ * is often the entire interaction — the customer reads six digits from the
+ * lock screen and never opens the message. Burying it behind "Your LEVONIS
+ * verification" costs an app switch for no gain.
+ *
+ * IT IS SET LTR AND TABULAR, inside an RTL document. Digits are read
+ * left-to-right in Arabic and Kurdish too, and a code that a customer has to
+ * mentally re-order is a code they will mistype. `unicode-bidi: isolate`
+ * stops the surrounding Arabic from reordering it — the same rule the printed
+ * documents follow (worker/lib/printDocument.ts).
+ *
+ * NO BUTTON, NO LINK, DELIBERATELY. A sign-in message that trains customers to
+ * click is a sign-in message that trains them to click the phisher's copy.
+ * There is nothing to click here, which is itself the lesson.
+ */
+export function renderSignInCodeEmail(lang: EmailLang, code: string): RenderedEmail {
+  const t = COPY[lang];
+  const digits =
+    `<p style="margin:22px 0;text-align:center;">` +
+    `<span dir="ltr" style="display:inline-block;background-color:#111111;color:#d4af37;` +
+    `padding:14px 26px;border-radius:12px;font-size:30px;font-weight:bold;` +
+    `letter-spacing:8px;font-family:'Courier New',Courier,monospace;unicode-bidi:isolate;">` +
+    `${escapeHtml(code)}</span></p>`;
+  const html = shell(
+    lang,
+    para(t.codeIntro) +
+      `<p style="margin:0;text-align:center;font-size:12px;color:#777777;">${escapeHtml(t.codeLabel)}</p>` +
+      digits +
+      para(t.codeExpiry, { small: true }) +
+      para(t.codeWarn, { small: true }) +
+      para(t.codeIgnore, { small: true })
+  );
+  const text = [t.codeIntro, '', `${t.codeLabel}: ${code}`, '', t.codeExpiry, t.codeWarn, t.codeIgnore].join('\n');
+  return { subject: t.codeSubject(code), html, text };
 }
 
 // ------------------------------------------------------ invoice template

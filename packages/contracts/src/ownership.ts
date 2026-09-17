@@ -18,7 +18,7 @@ const owned = (owner: Owner, tables: string[]): Array<[string, Owner]> => tables
 export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ...owned('identity', [
     'users', 'sessions', 'password_reset_tokens', 'email_verification_tokens', 'pending_signups', 'telegram_links',
-    'link_challenges', 'otp_challenges', 'studio_handoff_codes', 'addresses', 'favorites', 'community_product_favorites',
+    'link_challenges', 'otp_challenges', 'auth_otp', 'studio_handoff_codes', 'addresses', 'favorites', 'community_product_favorites',
     'follows', 'service_keys', 'rate_limits',
   ]),
   ...owned('kyc', ['kyc_cases', 'approved_addresses']),

@@ -9,6 +9,8 @@
 
 import type { Env } from './types';
 import { newId } from './crypto';
+import { emailConfigured, emailAllowsRecipient, sendEmailNow } from './emailSend';
+import { sendWhatsAppText, wasenderConfigured, whatsappErrorIsRetryable } from './wasender';
 
 export interface OutboxEmail {
   kind: 'email';
@@ -22,6 +24,20 @@ export interface OutboxTelegram {
   chat_id: number | string;
   text: string;
 }
+/**
+ * WhatsApp, through WasenderAPI (migration 0087). Queued rather than sent
+ * directly because the provider's send ceiling is as low as one message per
+ * five seconds: a burst of order notifications is a 429, and a 429 here is a
+ * retry instead of a lost message. `to` is E.164 and the transport refuses
+ * anything else — the provider's `to` field also accepts group JIDs.
+ */
+export interface OutboxWhatsApp {
+  kind: 'whatsapp';
+  to: string;
+  text: string;
+}
+
+export type OutboxMessage = OutboxEmail | OutboxTelegram | OutboxWhatsApp;
 
 const MAX_ATTEMPTS = 5;
 
@@ -33,11 +49,12 @@ const MAX_ATTEMPTS = 5;
 export async function enqueue(
   env: Env,
   eventKey: string,
-  message: OutboxEmail | OutboxTelegram,
+  message: OutboxMessage,
   opts: { state?: 'pending' | 'skipped'; note?: string } = {}
 ): Promise<string | null> {
   const id = newId('obx');
-  const recipient = message.kind === 'email' ? message.to : String(message.chat_id);
+  const recipient =
+    message.kind === 'email' || message.kind === 'whatsapp' ? message.to : String(message.chat_id);
   const state = opts.state ?? 'pending';
   try {
     await env.DB.prepare(
@@ -63,29 +80,30 @@ export async function enqueue(
  */
 function allowedRecipient(env: Env, kind: string, recipient: string): boolean {
   if (kind !== 'email') return true;
-  const allow = (env.EMAIL_ALLOWED_RECIPIENTS || '').trim();
-  if (!allow) return (env.EMAIL_ALLOWLIST_REQUIRED || '').trim().toLowerCase() !== 'on';
-  return allow.split(',').map((s) => s.trim().toLowerCase()).includes(recipient.toLowerCase());
+  return emailAllowsRecipient(env, recipient);
 }
 
-async function deliver(env: Env, payload: OutboxEmail | OutboxTelegram, eventKey: string): Promise<{ ok: boolean; error?: string }> {
+async function deliver(env: Env, payload: OutboxMessage, eventKey: string): Promise<{ ok: boolean; error?: string }> {
   if (payload.kind === 'email') {
-    if (!env.EMAIL_API_KEY || !env.EMAIL_FROM) return { ok: false, error: 'EMAIL_NOT_CONFIGURED' };
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${env.EMAIL_API_KEY}`,
-      'Content-Type': 'application/json',
-    };
+    if (!emailConfigured(env)) return { ok: false, error: 'EMAIL_NOT_CONFIGURED' };
     // Provider-side dedup: retries of the same business event reuse the same
     // Idempotency-Key (the unique event_key), so an ambiguous first attempt
-    // (timeout after the provider accepted) cannot double-send.
-    if (eventKey) headers['Idempotency-Key'] = eventKey.slice(0, 256);
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ from: env.EMAIL_FROM, to: payload.to, subject: payload.subject, html: payload.html, text: payload.text }),
+    // (timeout after the provider accepted) cannot double-send — which is
+    // also what makes retrying this path safe at all.
+    const ok = await sendEmailNow(env, payload.to, payload.subject, payload.html, payload.text, {
+      idempotencyKey: eventKey || undefined,
     });
-    if (!res.ok) return { ok: false, error: `resend ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}` };
-    return { ok: true };
+    return ok ? { ok: true } : { ok: false, error: 'resend send failed' };
+  }
+  if (payload.kind === 'whatsapp') {
+    if (!wasenderConfigured(env)) return { ok: false, error: 'WHATSAPP_NOT_CONFIGURED' };
+    const sent = await sendWhatsAppText(env, payload.to, payload.text);
+    if (sent.ok) return { ok: true };
+    // A terminal failure (a number that is not on WhatsApp, a malformed
+    // payload) must not burn four more attempts and four more rate-limit
+    // slots — the prefix is what processOutbox reads to kill the row.
+    const prefix = whatsappErrorIsRetryable(sent.error) ? '' : 'TERMINAL ';
+    return { ok: false, error: `${prefix}whatsapp ${sent.error}${sent.detail ? `: ${sent.detail}` : ''}` };
   }
   if (!env.TELEGRAM_BOT_TOKEN) return { ok: false, error: 'TELEGRAM_NOT_CONFIGURED' };
   const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -132,7 +150,7 @@ export async function processOutbox(env: Env, limit = 10): Promise<{ sent: numbe
       continue;
     }
 
-    let payload: OutboxEmail | OutboxTelegram;
+    let payload: OutboxMessage;
     try {
       payload = JSON.parse(row.payload);
     } catch {
@@ -149,7 +167,15 @@ export async function processOutbox(env: Env, limit = 10): Promise<{ sent: numbe
       sent++;
     } else {
       const attempts = row.attempts + 1;
-      const state = attempts >= MAX_ATTEMPTS || result.error === 'EMAIL_NOT_CONFIGURED' || result.error === 'TELEGRAM_NOT_CONFIGURED' ? 'dead' : 'failed';
+      const err = result.error ?? '';
+      // Dead, not failed, when retrying provably cannot help: the channel is
+      // unconfigured, or the provider rejected this exact payload.
+      const terminal =
+        err === 'EMAIL_NOT_CONFIGURED' ||
+        err === 'TELEGRAM_NOT_CONFIGURED' ||
+        err === 'WHATSAPP_NOT_CONFIGURED' ||
+        err.startsWith('TERMINAL ');
+      const state = attempts >= MAX_ATTEMPTS || terminal ? 'dead' : 'failed';
       await env.DB.prepare('UPDATE outbox SET state = ?, last_error = ? WHERE id = ?')
         .bind(state, (result.error ?? 'unknown').slice(0, 500), row.id)
         .run();
