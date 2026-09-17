@@ -1494,4 +1494,13 @@ export const PRODUCT_COLUMNS = [
   'template_family','sku','spec_fields','images','options','colors','specifications','labels',
   'warranty_plans','ops_policy','content_blocks','translation_meta','is_featured',
   'display_order','payment_options','hashtags','how_to_use','how_to_use_ar','how_to_use_ckb','usage_guide',
+  // OPEN BOX / USED / REFURBISHED (migration 0085). THIS LIST IS THE WRITE
+  // PATH: `serializeDoc` above has emitted `condition_doc` since the feature
+  // was added, but both writers bind only the columns named here
+  // (`PRODUCT_COLUMNS.map((k) => record[k] ?? null)` in productPersistence.ts),
+  // so until this line the grade was produced, carried to the statement, and
+  // dropped — an owner marking a printer «مستعمل» saved it at HTTP 200 as an
+  // ordinary new product, with no error anywhere. Never NULL: the column is
+  // NOT NULL and `serializeConditionDoc(null)` returns `'{}'`.
+  'condition_doc',
 ] as const;

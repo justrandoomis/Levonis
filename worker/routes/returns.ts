@@ -51,6 +51,7 @@ import { typeForTransport } from '../lib/shippingType';
 import { pumpAfter, waitUntilFrom } from '../lib/eventBus';
 import { notifyAdminTopic } from '../lib/telegramAdmin';
 import { parseConditionDoc, returnRefusal } from '../lib/condition';
+import { CONDITION_DOC_DEFAULT_SQL, isConditionColumnMissing } from '../lib/conditionProjection';
 
 const WINDOW_MS = 7 * 86_400_000;
 
@@ -174,15 +175,27 @@ returnRoutes.post('/', async (c) => {
     evidence.push(k);
   }
 
-  const item = await c.env.DB.prepare(
+  /**
+   * `condition_doc` is migration 0085's column, and a deploy that lands ahead
+   * of its database once turned this whole route into a 500 — a customer with
+   * a faulty printer could not open a return at all. The retry substitutes the
+   * column's own declared DEFAULT `'{}'`, which `parseConditionDoc` reads as
+   * "not graded", so the refusal below simply does not apply: exactly the
+   * behaviour this route had before open-box existed, which is the correct
+   * behaviour on a database where open-box cannot exist yet.
+   * (worker/lib/conditionProjection.ts explains why this is a substitution
+   * rather than a forbidden degrade.)
+   */
+  const itemSql = (conditionExpr: string) =>
     `SELECT oi.id, oi.order_id, oi.qty AS item_qty, oi.name_snapshot, oi.bundle_parent_item_id,
             o.user_id, o.status, o.delivered_at, o.stage, o.shipping_type,
-            p.condition_doc AS product_condition_doc
+            ${conditionExpr} AS product_condition_doc
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        LEFT JOIN products p ON p.id = oi.product_id
-      WHERE oi.id = ?`
-  )
+      WHERE oi.id = ?`;
+  const readItem = (conditionExpr: string) =>
+    c.env.DB.prepare(itemSql(conditionExpr))
     .bind(orderItemId)
     .first<{
       id: string;
@@ -197,6 +210,13 @@ returnRoutes.post('/', async (c) => {
       shipping_type: string | null;
       product_condition_doc: string | null;
     }>();
+  let item: Awaited<ReturnType<typeof readItem>>;
+  try {
+    item = await readItem('p.condition_doc');
+  } catch (e) {
+    if (!(await isConditionColumnMissing(c.env.DB, e))) throw e;
+    item = await readItem(CONDITION_DOC_DEFAULT_SQL);
+  }
   if (!item || item.user_id !== user.id) throw notFound('Order item not found');
 
   /**

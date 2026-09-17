@@ -180,8 +180,20 @@ jobs:
             echo "GEMINI_API_KEY not set — AI features stay honestly disabled in production"
           fi
 
+      # Liveness AND schema drift. This used to be `curl -fsS .../api/health`
+      # against a route that was the literal `c.json({ status: 'ok' })` — it
+      # could not fail, so the gate meant to catch a bad deploy would have
+      # passed on a completely dark shop. /api/health now reports whether the
+      # database has the migrations this code expects.
       - name: Health check
-        run: curl -fsS -m 15 "${{ steps.deploy.outputs.url }}/api/health"
+        run: |
+          body=$(curl -fsS -m 15 "${{ steps.deploy.outputs.url }}/api/health")
+          echo "$body"
+          state=$(echo "$body" | jq -r '.schema.state // "missing"')
+          if [ "$state" = "behind" ]; then
+            echo "::error::the database is behind the code that was just deployed — migrations did not run"
+            exit 1
+          fi
 
       - name: Summary
         if: always()

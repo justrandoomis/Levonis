@@ -14,13 +14,56 @@ and `33382596554`. None of it is inferred from what a URL returns.
 
 ## The mapping
 
-| Hostname | Worker | Status | Database | Bucket |
-| --- | --- | --- | --- | --- |
-| `levonis-iq.com` | **`levonis-staging`** | **LIVE** | `levonis-db-staging` | `levonis-files-staging` |
-| `*.levonis-iq.com` (merchant subdomains) | **`levonis-staging`** | **LIVE** | same | same |
-| `studio.levonis-iq.com` | **`levonis-studio-staging`** | **LIVE** | `levonis-studio-db-staging` | `levonis-studio-files-staging` |
-| — none — | `levonis-studio` | alternate, workers.dev only | `levonis-studio-db` | `levonis-studio-files` |
-| — none — | `levonis` | **does not exist on the account** | — | — |
+| Hostname | Worker | Status | Database | Bucket | Deployed by |
+| --- | --- | --- | --- | --- | --- |
+| `levonis-iq.com` | **`levonis-staging`** | **LIVE** | `levonis-db-staging` | `levonis-files-staging` | **workflow 7 AND the Cloudflare Git integration — see below** |
+| `*.levonis-iq.com` (merchant subdomains) | **`levonis-staging`** | **LIVE** | same | same | same |
+| `studio.levonis-iq.com` | **`levonis-studio-staging`** | **LIVE** | `levonis-studio-db-staging` | `levonis-studio-files-staging` | workflow 8 |
+| — none — | `levonis-studio` | alternate, workers.dev only | `levonis-studio-db` | `levonis-studio-files` | workflow 5 |
+| — none — | `levonis` | **does not exist on the account** | — | — | — |
+
+## THE LIVE WORKER HAS TWO DEPLOYERS, AND ONLY ONE OF THEM RUNS MIGRATIONS
+
+This table used to have no "Deployed by" column at all, and that omission has
+a date attached: **2026-09-17**. A push to the default branch put a Worker
+carrying migration 0085 onto a live database still at 0083. `/api/home`
+answered `SERVICE_SETUP` and the storefront's entire first screen became an
+error card — for hours, while `/api/health` reported `{"status":"ok"}`.
+
+No GitHub Actions run exists for that commit, and none could: **every**
+workflow in this repository that deploys a main Worker is `workflow_dispatch`
+only. The deployer was the other one.
+
+| | **Workflow 7** (`deploy-staging-code.yml`) | **Cloudflare Workers Builds** (Git integration) |
+| --- | --- | --- |
+| Triggered by | a human, `workflow_dispatch` | **every push to the default branch**, automatically |
+| Applies migrations | **yes**, before the code — `wrangler d1 migrations apply levonis-db-staging --remote --env staging` | **no** |
+| Runs the test suite | yes | no |
+| Probes the live site afterwards | yes — `/api/health`, `/api/home`, `/api/products`, `/api/memberships/plans` | no |
+| Configured in | this repository | **the Cloudflare dashboard** — invisible from here |
+
+The build command it runs (`npm run build`, via
+`scripts/prepare-deploy-config.mjs`) is repo-controlled; the **deploy command
+is dashboard-controlled**, which is why no change in this repository can make
+that path apply migrations. `docs/SUBDOMAIN_ARCHITECTURE.md` already weighed
+this up and its recommendation was to **disconnect the Git integration**, "and
+the reason is the migration row".
+
+Until it is disconnected, two things now make the failure visible rather than
+silent:
+
+* **`GET /api/health` reports schema drift** (`worker/lib/schemaVersion.ts`).
+  It still answers 200 — it is a liveness probe for the staging deploy's retry
+  loop and for `wildcard-subdomains.yml`'s routing check, and a probe that
+  refuses to answer serves neither — but it now carries
+  `schema: { expected, applied, state, behind, … }`. One request says whether
+  the database is as new as the code.
+* **Both deploy workflows fail on `state: behind`**, so the gate that is meant
+  to catch a bad deploy can no longer pass on a dark shop.
+
+Neither of those stops the Git integration from shipping code ahead of its
+database. Only disconnecting it, or pointing its deploy command at something
+that migrates first, does that.
 
 The exact-host route `studio.levonis-iq.com/* -> levonis-studio-staging` wins
 over the wildcard `*.levonis-iq.com/* -> levonis-staging`, and the Worker

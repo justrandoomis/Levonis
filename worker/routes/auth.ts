@@ -44,6 +44,7 @@ import {
 } from '../lib/telegram';
 import { resolveSupportRef, type SupportRef } from '../lib/supportCode';
 import { emailConfigured, sendEmailNow } from '../lib/emailSend';
+import { isMissingTable } from '../lib/membershipBenefits';
 import { sendWhatsAppText, wasenderConfigured } from '../lib/wasender';
 import { isPlaceholderEmail } from '../lib/profileCompletion';
 import {
@@ -1928,6 +1929,26 @@ authRoutes.post('/change-email', requireMainHost, requireAuth, async (c) => {
 // answers 503 with a reason, because pretending to send a code that can never
 // arrive leaves the customer waiting on nothing.
 
+/**
+ * `startAuthOtp`, answering "not installed yet" instead of "something went
+ * wrong" when migration 0087 has not been applied. See the note at the call
+ * site for why a missing TABLE may be answered this way and a missing column
+ * may not.
+ */
+async function startAuthOtpOrUnavailable(
+  env: Env,
+  unavailableError: () => HttpError,
+  input: Parameters<typeof startAuthOtp>[1]
+): Promise<Awaited<ReturnType<typeof startAuthOtp>>> {
+  try {
+    return await startAuthOtp(env, input);
+  } catch (e) {
+    if (!isMissingTable(e)) throw e;
+    console.error('sign-in codes: auth_otp is not installed (migration 0087 has not been applied)');
+    throw unavailableError();
+  }
+}
+
 /** Uniform failure for /verify — unknown destination, wrong code, expired,
  *  burnt attempts and a re-pointed account are one message from outside. */
 const OTP_FAIL_MSG =
@@ -2009,7 +2030,27 @@ authRoutes.post('/otp/start', async (c) => {
 
   const account = await accountForOtpDestination(c.env.DB, channel, destination);
 
-  const started = await startAuthOtp(c.env, {
+  /**
+   * A MISSING `auth_otp` TABLE IS "NOT INSTALLED", NOT "SOMETHING WENT WRONG".
+   *
+   * The table arrives with migration 0087, and a deploy that lands before its
+   * migration answered this route with a generic 500 for a feature that simply
+   * is not there yet. A missing TABLE is the DEGRADABLE half of the doctrine in
+   * lib/membershipBenefits.ts — it holds no rows, so "unavailable" is the
+   * literal truth — and this route already has the right vocabulary two checks
+   * above. The customer is told to use another sign-in method instead of being
+   * told the shop is broken.
+   *
+   * A missing COLUMN would still escape as SERVICE_SETUP, which is the correct
+   * side of the same doctrine.
+   */
+  const otpUnavailable = () =>
+    unavailable(
+      'تسجيل الدخول برمز غير متاح حالياً — استخدم طريقة أخرى. / Sign-in codes are not available right now — use another method.',
+      'OTP_NOT_AVAILABLE'
+    );
+
+  const started = await startAuthOtpOrUnavailable(c.env, otpUnavailable, {
     channel,
     destination,
     userId: account?.id ?? null,
@@ -2072,7 +2113,17 @@ authRoutes.post('/otp/verify', async (c) => {
 
   const fail = () => new HttpError(401, OTP_FAIL_MSG, 'OTP_FAILED');
 
-  const result = await verifyAuthOtp(c.env, channel, destination, code);
+  let result: Awaited<ReturnType<typeof verifyAuthOtp>>;
+  try {
+    result = await verifyAuthOtp(c.env, channel, destination, code);
+  } catch (e) {
+    if (!isMissingTable(e)) throw e;
+    // The table is not installed; there is no code to be wrong about.
+    throw unavailable(
+      'تسجيل الدخول برمز غير متاح حالياً — استخدم طريقة أخرى. / Sign-in codes are not available right now — use another method.',
+      'OTP_NOT_AVAILABLE'
+    );
+  }
   if (!result.ok) throw fail();
 
   // RESOLVED AGAIN, from the destination, not taken from the row. The row's

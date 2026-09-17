@@ -818,6 +818,20 @@ export function resolveProduct(
     warranty_plans: warrantyPlans,
     warranty_base_months: coverage.warranty_base_months,
     serialized: coverage.serialized,
+    /**
+     * OPEN BOX / USED / REFURBISHED. Resolved above (the slug of the new
+     * product it is a copy of is looked up, the kind is validated, and the
+     * warranty guard is already run against it) — and then, until this line,
+     * left out of the document, so the sheet's grade was parsed, validated,
+     * reported on, and thrown away. Worse than ignoring the columns: a row
+     * could be REFUSED for a bad `condition_kind` whose good value would have
+     * been discarded anyway.
+     *
+     * `null` clears a grade, which is why this is written unconditionally
+     * rather than only when truthy: the spread of `existing.doc` above would
+     * otherwise make a listing impossible to un-grade from a sheet.
+     */
+    condition,
     delivery_options:
       p.delivery_options === null
         ? (existing?.doc.delivery_options ?? undefined)

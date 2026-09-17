@@ -18,12 +18,38 @@ export const APEX = 'levonis-iq.com';
 export const MERCHANT_HOST = 'somestore.levonis-iq.com';
 
 export function freshDb(): DatabaseSync {
+  return dbThrough(null);
+}
+
+/**
+ * THE DATABASE A DEPLOY LANDS ON WHEN ITS MIGRATIONS HAVE NOT RUN.
+ *
+ * `through` is the highest migration NUMBER to apply, as the four digits that
+ * start a filename — `dbThrough('0083')` is the live database on the night the
+ * storefront's first screen went dark, because a Worker carrying migration
+ * 0085's `products.condition_doc` had been deployed over it.
+ *
+ * Numbers, not filenames, on purpose: a test that says "one migration behind"
+ * must keep meaning that when the file after it is renamed, and a test pinned
+ * to `0085_product_condition.sql` would silently start proving nothing the day
+ * somebody renumbered it.
+ *
+ * `null` means every migration, which is what `freshDb()` is.
+ */
+export function dbThrough(through: string | null): DatabaseSync {
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON;');
   const dir = join(ROOT, 'migrations');
-  for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) raw.exec(readFileSync(join(dir, f), 'utf8'));
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) {
+    if (through !== null && f.slice(0, 4) > through) break;
+    raw.exec(readFileSync(join(dir, f), 'utf8'));
+  }
   return raw;
 }
+
+/** Does this table carry this column? The question a deploy-ahead test asks. */
+export const hasColumn = (raw: DatabaseSync, table: string, column: string): boolean =>
+  (raw.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).some((r) => r.name === column);
 
 export const asD1 = (raw: DatabaseSync) => new SqliteD1(raw) as unknown as D1Database;
 

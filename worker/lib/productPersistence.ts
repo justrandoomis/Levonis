@@ -72,6 +72,7 @@ import {
   type ProductDoc,
   type TranslationMeta,
 } from './productModel';
+import { productsHaveConditionDoc } from './conditionProjection';
 import {
   isValidHex,
   normalizeHex,
@@ -2240,20 +2241,32 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
   // ---- the product row ----------------------------------------------------
   if (doc) {
     const record = serializeDoc(doc);
+    /**
+     * `condition_doc` (migration 0085) is dropped from the column list when the
+     * live table does not have it yet, so a database one migration behind the
+     * deployment can still have its prices and stock corrected. The row then
+     * takes the DEFAULT the migration declares — `'{}'`, ungraded — which is
+     * the only thing a product on a pre-0085 database can be.
+     * See worker/lib/conditionProjection.ts for why this one asks first rather
+     * than repairing on failure like the reads do.
+     */
+    const writable = (await productsHaveConditionDoc(db))
+      ? PRODUCT_COLUMNS
+      : PRODUCT_COLUMNS.filter((k) => k !== 'condition_doc');
     if (intent.mode === 'create') {
       statements.push(
         db
           .prepare(
-            `INSERT INTO products (${PRODUCT_COLUMNS.join(', ')})
-             VALUES (${PRODUCT_COLUMNS.map(() => '?').join(', ')})`
+            `INSERT INTO products (${writable.join(', ')})
+             VALUES (${writable.map(() => '?').join(', ')})`
           )
-          .bind(...PRODUCT_COLUMNS.map((k) => record[k] ?? null))
+          .bind(...writable.map((k) => record[k] ?? null))
       );
     } else {
       // Explicit-column UPDATE: legacy v1 columns (shipping_methods, features,
       // membership_prices, brand text, categories, …) are not in the column
       // map, so they are preserved verbatim.
-      const cols = PRODUCT_COLUMNS.filter((k) => k !== 'id');
+      const cols = writable.filter((k) => k !== 'id');
       statements.push(
         db
           .prepare(

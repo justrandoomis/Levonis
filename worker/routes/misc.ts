@@ -3,10 +3,36 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, unavailable, str, oneOf } from '../lib/http';
 import { getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
 import { rateLimit } from '../lib/ratelimit';
+import { readSchemaStatus } from '../lib/schemaVersion';
 
 export const miscRoutes = new Hono<AppContext>();
 
-miscRoutes.get('/health', (c) => c.json({ status: 'ok' }));
+/**
+ * LIVENESS, AND WHETHER THE DATABASE IS AS NEW AS THIS CODE.
+ *
+ * `status` keeps its old meaning and its old shape exactly: this route
+ * answering 200 means the Worker is up, which is what the staging deploy's
+ * retry loop and `wildcard-subdomains.yml`'s routing probe ask it. Neither is
+ * broken by what was added, and neither would be served by a health check that
+ * refuses to answer when something else is wrong.
+ *
+ * `schema` is the part that was missing on the night a Worker carrying
+ * migration 0085 was deployed over a database at 0083: the storefront's first
+ * screen was a SERVICE_SETUP error card, and this endpoint said `{"status":
+ * "ok"}` the whole time, because it was a literal that touched nothing. The
+ * deploy's own final gate curls this route — so the check meant to catch a bad
+ * deploy passed on a shop that was completely dark.
+ *
+ * It is DATA, not a verdict. The deploy workflows assert `schema.behind == 0`
+ * and fail there, where failing is useful; a person can read the same answer
+ * in one request.
+ */
+miscRoutes.get('/health', async (c) => {
+  const schema = await readSchemaStatus(c.env.DB);
+  // A probe is read while something is already wrong — never cache it.
+  c.header('Cache-Control', 'no-store');
+  return c.json({ status: 'ok', schema });
+});
 
 /** Public storefront settings (no secrets, no internal keys). */
 miscRoutes.get('/settings/public', async (c) => {

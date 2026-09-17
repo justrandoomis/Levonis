@@ -1,14 +1,35 @@
--- The product page's "how many have sold" badge counts delivered units per
--- product:
+-- Levonis migration 0084 — A NO-OP, AND THE FILE SAYS SO.
+--
+-- WHAT IT WAS WRITTEN TO DO. The product page's "how many have sold" badge
+-- counts delivered units per product:
 --
 --   SELECT SUM(oi.qty) FROM order_items oi
 --     JOIN orders o ON o.id = oi.order_id
 --    WHERE oi.product_id IN (...) AND o.status = 'delivered'
 --
--- order_items carried only idx_order_items_order (order_id), so that filter
--- was a full scan of every line ever sold, on the busiest read in the shop.
--- This index makes it a lookup.
+-- and this file was added on the belief that `order_items` carried only
+-- `idx_order_items_order (order_id)`, leaving that filter to scan every line
+-- the shop has ever sold.
 --
--- Rerunnable: IF NOT EXISTS, so applying the migration set twice is a no-op
--- rather than a failure (the rule migration 0083 was corrected for).
+-- WHY IT DOES NOTHING. That belief was wrong. Migration **0040** already
+-- created an index of THE SAME NAME, on more columns:
+--
+--   CREATE INDEX IF NOT EXISTS idx_order_items_product
+--     ON order_items(product_id, order_id, qty);
+--
+-- which is a COVERING index for exactly the query above — the join key and the
+-- summed column are both in it, so SQLite answers without touching the table
+-- at all. `IF NOT EXISTS` therefore makes the statement below do nothing on
+-- any database that has run 0040, which is every database this project has.
+--
+-- WHY IT IS STILL HERE. Migration numbers are a contract: `d1_migrations`
+-- records what ran by name, and removing a file that some environment has
+-- already applied would leave that database permanently "ahead" of the set.
+-- The statement is harmless, and a file that explains its own emptiness is
+-- worth more than a gap in the sequence.
+--
+-- THE LESSON, which cost a wrong claim in a commit message: check
+-- `grep -rn "ON <table>" migrations/` before adding an index. An index name is
+-- global, and `IF NOT EXISTS` will silently keep the older definition — so a
+-- redundant migration reports success and changes nothing.
 CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id);

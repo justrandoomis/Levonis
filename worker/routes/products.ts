@@ -25,6 +25,7 @@ import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY, type MemberFallbac
 import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
 import { pricingTierContext } from '../lib/entitlements';
 import { activeBenefitRules, ancestryFor, catalogAncestry, degradeIfSchemaMissing, fallbackFor } from '../lib/membershipBenefits';
+import { isConditionColumnMissing } from '../lib/conditionProjection';
 import type { BenefitRule } from '@levonis/pricing/membershipBenefits';
 import type { TierStatus } from '../lib/entitlements';
 import { rateLimit } from '../lib/ratelimit';
@@ -3164,10 +3165,33 @@ productRoutes.post('/:slug/quote', async (c) => {
 // ---------------------------------------------------------------- home
 
 /** Aggregated payload for the storefront home page. */
+/**
+ * The graded shelf's rows — empty rather than fatal when migration 0085 has
+ * not been applied yet.
+ *
+ * `'{}'` is `condition_doc`'s migration-declared DEFAULT and the value
+ * `parseConditionDoc` reads as "not graded", so on a database without the
+ * column EVERY row would fall outside `condition_doc <> '{}'`. An empty shelf
+ * is therefore not a degraded answer that might be hiding listings; it is the
+ * answer, one migration early. `isConditionColumnMissing` is what keeps that
+ * true — a missing products TABLE, or any OTHER absent column, still throws.
+ */
+async function openBoxShelf(db: D1Database): Promise<Record<string, unknown>[]> {
+  try {
+    const r = await db
+      .prepare("SELECT * FROM products WHERE status = 'active' AND condition_doc <> '{}' ORDER BY created_at DESC LIMIT 12")
+      .all<Record<string, unknown>>();
+    return r.results ?? [];
+  } catch (e) {
+    if (await isConditionColumnMissing(db, e)) return [];
+    throw e;
+  }
+}
+
 export const homeRoutes = new Hono<AppContext>();
 
 homeRoutes.get('/', async (c) => {
-  const [settings, discounted, latest, openBox, categories, brands, ctx] = await Promise.all([
+  const [settings, discounted, latest, openBoxRows, categories, brands, ctx] = await Promise.all([
     getSettings(c.env.DB, PUBLIC_SETTING_KEYS),
     c.env.DB.prepare(
       "SELECT * FROM products WHERE status = 'active' AND original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd ORDER BY created_at DESC LIMIT 10"
@@ -3181,9 +3205,12 @@ homeRoutes.get('/', async (c) => {
     // index is built on, so this reads the index rather than scanning the
     // catalogue on the shop's first screen. The shelf shows a fixed handful;
     // the full list lives behind its own listing.
-    c.env.DB.prepare(
-      "SELECT * FROM products WHERE status = 'active' AND condition_doc <> '{}' ORDER BY created_at DESC LIMIT 12"
-    ).all<Record<string, unknown>>(),
+    //
+    // Through openBoxShelf, because this ONE optional strip naming a column
+    // from the newest migration is what turned the whole first screen into an
+    // error card when a deploy landed ahead of its database — see
+    // worker/lib/conditionProjection.ts.
+    openBoxShelf(c.env.DB),
     // The REAL taxonomy, so the categories strip works without the owner
     // retyping their own catalog into the home settings. Only catalogs that
     // actually have something to show are returned — an empty category on the
@@ -3256,7 +3283,7 @@ homeRoutes.get('/', async (c) => {
   // A product can be in BOTH strips, and the same id twice would bind a
   // duplicate placeholder for nothing.
   const homeRows = new Map<string, { id: string; inventory_mode: unknown }>();
-  for (const r of [...discounted.results, ...latest.results, ...openBox.results]) {
+  for (const r of [...discounted.results, ...latest.results, ...openBoxRows]) {
     homeRows.set(String(r.id), { id: String(r.id), inventory_mode: r.inventory_mode });
   }
   const [homeViews, homePooled] = await Promise.all([
@@ -3274,7 +3301,7 @@ homeRoutes.get('/', async (c) => {
    */
   const referenceIds = [
     ...new Set(
-      openBox.results
+      openBoxRows
         .map((r) => parseConditionDoc(r.condition_doc)?.new_product_id)
         .filter((id): id is string => typeof id === 'string' && id !== '')
     ),
@@ -3288,7 +3315,7 @@ homeRoutes.get('/', async (c) => {
       .all<{ id: string; price_iqd: number }>();
     for (const r of refRows ?? []) referencePrices.set(String(r.id), Number(r.price_iqd) || 0);
   }
-  const openBoxCards = openBox.results.map((p) => {
+  const openBoxCards = openBoxRows.map((p) => {
     const card = cardShape(
       publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, null, homePooled.has(String(p.id)))
     );

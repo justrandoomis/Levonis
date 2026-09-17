@@ -65,6 +65,9 @@ CREATE TABLE IF NOT EXISTS auth_otp (
 -- channel". Ordering by created_at is part of the index so the lookup on a
 -- verify never scans a destination's history.
 CREATE INDEX IF NOT EXISTS idx_auth_otp_live ON auth_otp(channel, destination, purpose, created_at);
--- The sweeper's index (jobs.ts prunes expired rows), matching
--- idx_otp_challenges_expires on the Telegram table.
+-- The sweeper's index. worker/lib/jobs.ts prunes rows past expires_at on
+-- the */15 cron, matching what it already does for otp_challenges — which
+-- matters more here than there: the anti-enumeration path writes a DECOY row
+-- for every probe of an address with no account, so without the sweep this
+-- table would grow by one row per guess.
 CREATE INDEX IF NOT EXISTS idx_auth_otp_expires ON auth_otp(expires_at);

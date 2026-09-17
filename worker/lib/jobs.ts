@@ -48,6 +48,8 @@ export interface DurableJobsReport {
   outbox: { sent: number; failed: number };
   expired_link_challenges: number;
   pruned_otp_challenges: number;
+  /** Email/WhatsApp sign-in codes pruned (auth_otp, migration 0087). */
+  pruned_auth_otp: number;
   pruned_email_tokens: number;
   pruned_reset_tokens: number;
   pruned_sessions: number;
@@ -96,6 +98,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     outbox: { sent: 0, failed: 0 },
     expired_link_challenges: 0,
     pruned_otp_challenges: 0,
+    pruned_auth_otp: 0,
     pruned_email_tokens: 0,
     pruned_reset_tokens: 0,
     pruned_sessions: 0,
@@ -164,6 +167,18 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   await step('otp_challenges', async () => {
     const res = await env.DB.prepare('DELETE FROM otp_challenges WHERE expires_at < ?').bind(pruneBefore).run();
     report.pruned_otp_challenges = res.meta.changes ?? 0;
+  });
+
+  // 3b. The same, for the EMAIL and WHATSAPP sign-in codes (auth_otp,
+  //     migration 0087). Migration 0087's own header called
+  //     `idx_auth_otp_expires` "the sweeper's index" while no sweeper existed,
+  //     so the table accumulated every expired challenge — and every decoy row
+  //     the anti-enumeration path writes for an address with no account, which
+  //     is one per probe. A security table that only grows is a slow leak of
+  //     exactly the addresses and phone numbers somebody went looking for.
+  await step('auth_otp', async () => {
+    const res = await env.DB.prepare('DELETE FROM auth_otp WHERE expires_at < ?').bind(pruneBefore).run();
+    report.pruned_auth_otp = res.meta.changes ?? 0;
   });
 
   // 4. Prune consumed/long-expired email-verification tokens.

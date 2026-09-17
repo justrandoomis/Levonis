@@ -535,6 +535,35 @@ jobs:
             console.log(`the live store opens the Studio in its own tab (${seen} entry point(s), each with noopener and noreferrer)`);
           '
 
+      # THE DATABASE, BEFORE THE ENDPOINTS THAT DEPEND ON IT.
+      #
+      # On the night of 2026-09-17 a Worker carrying migration 0085 reached
+      # production over a database still at 0083 — not through this workflow,
+      # which applies migrations first, but through a push that something else
+      # built. `/api/home` answered SERVICE_SETUP and the storefront's first
+      # screen was an error card.
+      #
+      # The probe below WOULD have caught that (it requires /api/home to answer
+      # 200), but it would have reported "an endpoint did not answer 200",
+      # leaving whoever read it to work out why. /api/health now carries the
+      # answer, so the failure names its own cause in one line.
+      - name: The live database is as new as the code that just shipped
+        run: |
+          body=$(curl -s --max-time 25 "https://levonis-iq.com/api/health")
+          echo "$body" | jq -c '.schema' || { echo "::error::/api/health did not answer JSON"; exit 1; }
+          state=$(echo "$body" | jq -r '.schema.state // "missing"')
+          case "$state" in
+            current|ahead)
+              echo "schema $state — the database has what this code expects" ;;
+            unknown)
+              echo "::warning::the database records no migration history; drift cannot be checked" ;;
+            *)
+              echo "::error::the live database is $state by $(echo "$body" | jq -r '.schema.behind') migration(s):"
+              echo "::error::  code expects $(echo "$body" | jq -r '.schema.expected'), database has $(echo "$body" | jq -r '.schema.applied')"
+              echo "::error::run this workflow again — its 'Apply any pending migrations' step is what fixes this"
+              exit 1 ;;
+          esac
+
       - name: Verify the live site, read-only
         id: probe
         run: |
