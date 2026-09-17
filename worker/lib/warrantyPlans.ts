@@ -43,6 +43,7 @@
 
 import type { WarrantyPlanV2 } from './pricing';
 import { badRequest } from './http';
+import type { ConditionDoc } from './condition';
 import { isPrinterProduct } from './printerIdentity';
 
 // The pure plan math lives in the shared pricing package since Phase 1.1
@@ -106,10 +107,15 @@ export function mergeOpsPolicy(
 // ------------------------------------------------------------ the guard
 
 /** The document fields the printer rules read and (for defaults) write. */
+/** Refused: a used or refurbished unit does not sell extended coverage. */
+export const WARRANTY_NOT_EXTENDABLE = 'WARRANTY_NOT_EXTENDABLE';
+
 export interface WarrantyGuardDoc {
   warranty_plans: Array<PlanLike & { id: string; active: boolean }>;
   serialized: boolean | null;
   warranty_base_months: number | null;
+  /** Open box / used / refurbished, or null for a new product. */
+  condition?: ConditionDoc | null;
 }
 
 /**
@@ -122,6 +128,33 @@ export interface WarrantyGuardDoc {
 export function printerWarrantyRules(doc: WarrantyGuardDoc, isPrinter: boolean): string[] {
   const issues: string[] = [];
   const plans = doc.warranty_plans;
+
+  /**
+   * A USED OR REFURBISHED DEVICE CARRIES THE OWNER'S CHOICE, AND NOTHING MORE.
+   *
+   * The rules below give every printer a 12-month base and let it sell +12 or
+   * +24 on top. Neither is right for a repaired unit: the owner sets one month
+   * or twelve per listing, and selling two further years of coverage on a
+   * machine that has already failed once is a promise that is hard to keep —
+   * so extensions are refused rather than silently priced.
+   *
+   * This runs BEFORE the printer branch on purpose. A used printer is still a
+   * printer, so without it the 12-month default would overwrite the one month
+   * the owner chose, and the +12/+24 shapes would be accepted.
+   */
+  if (doc.condition) {
+    if (plans.some((w) => w.active)) {
+      issues.push(
+        `warranty_plans: extended warranty is not sold on a used or refurbished unit — it carries ${doc.condition.warranty_months} month(s) of LEVONIS warranty (${WARRANTY_NOT_EXTENDABLE})`
+      );
+    }
+    // The owner's choice IS the base, and a used device is still tracked per
+    // unit so its certificate can name the months it actually carries.
+    doc.warranty_base_months = doc.condition.warranty_months;
+    if (doc.serialized === null) doc.serialized = true;
+    return issues;
+  }
+
   if (!isPrinter) {
     if (plans.length > 0) {
       issues.push(
@@ -182,7 +215,11 @@ export async function applyPrinterWarrantyRules(
   if (!isPrinter && catalogIds === undefined && doc.id) isPrinter = await isPrinterProduct(db, doc.id);
   const issues = printerWarrantyRules(doc, isPrinter);
   if (issues.length) {
-    const code = issues[0].includes(WARRANTY_NOT_PRINTER) ? WARRANTY_NOT_PRINTER : WARRANTY_PLAN_INVALID;
+    const code = issues[0].includes(WARRANTY_NOT_EXTENDABLE)
+      ? WARRANTY_NOT_EXTENDABLE
+      : issues[0].includes(WARRANTY_NOT_PRINTER)
+        ? WARRANTY_NOT_PRINTER
+        : WARRANTY_PLAN_INVALID;
     throw badRequest(issues.join(' | '), code);
   }
   return { is_printer: isPrinter };

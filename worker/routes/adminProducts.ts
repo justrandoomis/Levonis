@@ -915,6 +915,16 @@ adminProductsRoutes.post('/', async (c) => {
   // edits, so a save from a client that never saw size_class cannot erase it.
   if (prev) doc.ops_policy = { ...prev.ops_policy, ...doc.ops_policy };
 
+  // THE SAME GUARD FOR THE CONDITION DOCUMENT.
+  //
+  // `validateProductDoc` reads `body.condition` and an absent key parses to
+  // null, which means NEW — so a panel that predates open-box listings, or any
+  // client that sends a partial document, would silently turn a graded unit
+  // back into a new one and take its warranty length and no-return rule with
+  // it. Omitting the key keeps what is stored; sending `condition: null`
+  // explicitly is how a listing is deliberately un-graded.
+  if (prev && !('condition' in body)) doc.condition = prev.condition;
+
   // EXTENDED WARRANTY IS FOR PRINTERS (owner mandate). The catalog placement
   // this save states — or, when it states none, the stored one — decides:
   // a non-printer carrying plans is refused, a printer's plans must be the

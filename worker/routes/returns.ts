@@ -50,6 +50,7 @@ import { mysteryRefusal } from '../lib/mystery/issues';
 import { typeForTransport } from '../lib/shippingType';
 import { pumpAfter, waitUntilFrom } from '../lib/eventBus';
 import { notifyAdminTopic } from '../lib/telegramAdmin';
+import { parseConditionDoc, returnRefusal } from '../lib/condition';
 
 const WINDOW_MS = 7 * 86_400_000;
 
@@ -175,8 +176,11 @@ returnRoutes.post('/', async (c) => {
 
   const item = await c.env.DB.prepare(
     `SELECT oi.id, oi.order_id, oi.qty AS item_qty, oi.name_snapshot, oi.bundle_parent_item_id,
-            o.user_id, o.status, o.delivered_at, o.stage, o.shipping_type
-       FROM order_items oi JOIN orders o ON o.id = oi.order_id
+            o.user_id, o.status, o.delivered_at, o.stage, o.shipping_type,
+            p.condition_doc AS product_condition_doc
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       LEFT JOIN products p ON p.id = oi.product_id
       WHERE oi.id = ?`
   )
     .bind(orderItemId)
@@ -191,8 +195,30 @@ returnRoutes.post('/', async (c) => {
       delivered_at: string | null;
       stage: string | null;
       shipping_type: string | null;
+      product_condition_doc: string | null;
     }>();
   if (!item || item.user_id !== user.id) throw notFound('Order item not found');
+
+  /**
+   * AN OPEN-BOX UNIT IS SOLD AS IMPERFECT, SO "not as described" IS NOT A CASE.
+   *
+   * Its grade, its running hours and its repair history are printed on the
+   * product page before anybody pays, which is exactly what makes the
+   * change-of-mind return unavailable — that is the owner's «غير قابل
+   * للإرجاع». It is ALSO why the block stops there: a unit that arrives dead,
+   * arrives damaged, or is the wrong box was never described at all, and
+   * refusing those would cost far more trust than the unit is worth.
+   *
+   * LEFT JOIN, so an order line whose product has since been deleted still
+   * returns normally rather than being refused by a NULL.
+   */
+  const conditionRefusal = returnRefusal(parseConditionDoc(item.product_condition_doc), reason);
+  if (conditionRefusal) {
+    throw badRequest(
+      'هذا المنتج مستعمل/مجدد ولا يقبل الإرجاع لتغيير الرأي — يبقى مشمولاً إذا وصل تالفاً أو كان الجهاز خاطئاً. / This is a used or refurbished unit and cannot be returned for change of mind. A claim is still accepted if it arrived faulty, damaged, or is the wrong item.',
+      conditionRefusal
+    );
+  }
 
   // WHOLE-BUNDLE RETURNS ONLY, v1 (§6.4, §17 decision 3). A case names ONE
   // `order_items` row, and for a bundle that row is a COMPONENT — the row that

@@ -33,6 +33,7 @@ import {
 import { specGroupsFromFields } from './templateFamilies';
 import { isValidFeePercent, mergeOpsPolicy, parseFeePercent, readOpsWarranty } from './warrantyPlans';
 import type { ProductDeliveryOptions, ProductDeliveryRule } from './shipping';
+import { parseConditionDoc, serializeConditionDoc, type ConditionDoc } from './condition';
 
 export const DOC_VERSION = 2;
 
@@ -239,6 +240,13 @@ export interface ProductDoc {
   sku: string | null;
   /** §10: values for the spec fields the section's template declares. */
   spec_fields: Record<string, string>;
+  /**
+   * Open box / used / refurbished. `null` is NEW, which is every row that
+   * predates the feature and every row the owner does not mark. See
+   * worker/lib/condition.ts for what the document decides — the warranty
+   * length, the blocked return reasons and the price comparison.
+   */
+  condition: ConditionDoc | null;
   media: MediaV2[];
   options: OptionV2[];
   colors: ColorV2[];
@@ -800,6 +808,7 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
       row.template_family === 'devices' || row.template_family === 'materials' ? row.template_family : null,
     sku: typeof row.sku === 'string' && row.sku ? row.sku : null,
     spec_fields: safeParse<Record<string, string>>(String(row.spec_fields ?? '{}'), {}),
+    condition: parseConditionDoc(row.condition_doc),
     media: upgradeMedia(row.images),
     options: upgradeOptions(row.options),
     colors: upgradeColors(row.colors),
@@ -1215,6 +1224,13 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
       body.template_family === 'devices' || body.template_family === 'materials' ? body.template_family : null,
     sku: s(body.sku, 60).trim() || null,
     spec_fields: readSpecFields(body.spec_fields),
+    // Open box / used / refurbished, as this REQUEST states it. An absent key
+    // parses to null (= NEW) here, which on its own would let a client that
+    // predates the feature un-grade a listing just by saving it; the admin
+    // route carries the stored document forward when the key is omitted, the
+    // same guard `ops_policy` already has. Sending `condition: null`
+    // explicitly is how a listing is deliberately returned to NEW.
+    condition: parseConditionDoc(body.condition),
     media,
     options,
     colors,
@@ -1295,6 +1311,7 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     template_family: doc.template_family,
     sku: doc.sku,
     spec_fields: JSON.stringify(doc.spec_fields),
+    condition_doc: serializeConditionDoc(doc.condition),
     images: JSON.stringify(doc.media),
     options: JSON.stringify(doc.options),
     colors: JSON.stringify(doc.colors),
@@ -1423,6 +1440,10 @@ export function projectPublic(doc: ProductDoc, coarse = false) {
     template_family: doc.template_family,
     sku: doc.sku,
     spec_fields: doc.spec_fields,
+    // Shown, not hidden: the whole point of a graded listing is that the buyer
+    // can see what they are accepting. Cost fields are stripped elsewhere in
+    // this projection; nothing in the condition document is internal.
+    condition: doc.condition,
     media,
     images: media.map((m) => m.url), // legacy string[] compatibility
     options: doc.options
