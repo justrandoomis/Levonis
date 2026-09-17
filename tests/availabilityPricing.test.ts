@@ -112,6 +112,43 @@ test('direct premium: WAIVED for an active PRO, on the same gate as the commissi
   assert.equal(asPrime.unit_subtotal_iqd, 150_000);
 });
 
+test('an option direct-sale cell replaces the removed product-wide increase, including with zero increase', () => {
+  const cell = (regular_adjust_iqd: number | null) => ({
+    fulfillment_type: 'direct_sale' as const,
+    enabled: true,
+    regular_price_iqd: null,
+    prime_price_iqd: null,
+    pro_price_iqd: null,
+    cost_iqd: null,
+    regular_adjust_iqd,
+    transports: [],
+  });
+  const option = (regular_adjust_iqd: number | null) => ({
+    id: 'spool', name_ar: '', name_en: 'Full spool', name_ckb: '', image: '', order: 0, active: true,
+    regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null,
+    fulfillments: [cell(regular_adjust_iqd)],
+  });
+  const legacy = product({ direct_surcharge_iqd: 50_000, options: [option(null)] });
+  const noIncrease = resolveUnitPrice({
+    product: legacy,
+    optionId: 'spool',
+    fulfillmentType: 'direct_sale',
+    ...free,
+  });
+  assert.equal(noIncrease.unit_subtotal_iqd, 100_000);
+  assert.equal(noIncrease.direct, null);
+
+  const perOption = resolveUnitPrice({
+    product: product({ direct_surcharge_iqd: 50_000, options: [option(3_000)] }),
+    optionId: 'spool',
+    fulfillmentType: 'direct_sale',
+    ...free,
+  });
+  assert.equal(perOption.applied_iqd, 103_000);
+  assert.equal(perOption.unit_subtotal_iqd, 103_000);
+  assert.equal(perOption.direct, null);
+});
+
 // -------------------------------------- 2. card price = cheapest variant
 
 import { publicWithDisplayPrice } from '../worker/routes/products';
@@ -183,18 +220,19 @@ const rel = (over: Partial<RelationsState> = {}): RelationsState => ({
 
 const valueWith = (stock: number | null) => ({
   id: 'v1', name_en: 'A1', sku_part: '', image: '', sort: 0, active: true,
-  stock, low_stock_threshold: null,
+  stock, reserved: 0, low_stock_threshold: null,
   regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null,
   // 0043: silent about its own availability, which is what these
   // inventory-mode tests are about — the derivation must not care.
   availability_type: '' as const, lead_time_text: '',
   lead_time_min_days: null, lead_time_max_days: null,
   variant_key: '', variant_label: '',
+  fulfillments: [],
 });
 
 const colorWith = (stock: number | null) => ({
   id: 'c1', name_en: 'Black', hex: '#000000', image: '', sku_part: '', sort: 0, active: true,
-  stock, low_stock_threshold: null, option_value_ids: [],
+  stock, reserved: 0, low_stock_threshold: null, option_value_ids: [],
   regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null,
 });
 
@@ -222,7 +260,7 @@ test('derived mode: option numbers → OPTION; a colour number (more specific) w
 test('derived mode: an existing combinations product keeps VARIANT_COMBINATION; an empty one derives away', () => {
   const variant = {
     id: 'pv1', option_value_ids: ['v1'], color_id: null, sku: '', active: true,
-    stock: 3, low_stock_threshold: null,
+    stock: 3, reserved: 0, low_stock_threshold: null,
     regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: null,
   };
   assert.equal(deriveInventoryMode(rel({ inventory_mode: 'VARIANT_COMBINATION', variants: [variant] })), 'VARIANT_COMBINATION');

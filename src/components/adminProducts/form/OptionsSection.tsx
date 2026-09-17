@@ -26,7 +26,6 @@ import {
   Field,
   ImgSlot,
   Grid,
-  MirrorNote,
   Money,
   Qty,
   Repeater,
@@ -38,11 +37,17 @@ import {
 } from './formUi';
 import {
   deriveInventoryMode,
+  combinationKey,
+  directStockCombinations,
+  emptyFulfillment,
   emptyPrices,
   localId,
   type FormColor,
   type FormGroup,
   type FormPrices,
+  type FormFulfillment,
+  type FormTransport,
+  type FormVariant,
   type FormValue,
   type RelationsState,
 } from './model';
@@ -57,7 +62,7 @@ import {
   type Cell,
   type Field as GridField,
 } from '../../../../worker/lib/priceGrid';
-import { ADJUST_OF, type PriceFields, type PriceKey } from '../../../../worker/lib/pricing';
+import { ADJUST_OF, type PriceFields } from '../../../../worker/lib/pricing';
 
 export function OptionsSection({
   rel,
@@ -109,39 +114,46 @@ export function OptionsSection({
     });
 
   const addValue = (groupId: string) =>
-    setRelAuto((r) => ({
-      ...r,
-      groups: r.groups.map((g) =>
-        g.id === groupId
-          ? {
-              ...g,
-              values: [
-                ...g.values,
-                {
-                  id: localId('ov'),
-                  name_en: '',
-                  sku_part: '',
-                  image: '',
-                  sort: g.values.length,
-                  active: true,
-                  stock: null,
-                  low_stock_threshold: null,
-                  ...emptyPrices(),
-                  // '' = inherit the product's sale types. A new option is not
-                  // assumed to be direct sale: that would silently make a
-                  // pre-order product's new option sellable from stock.
-                  availability_type: '',
-                  lead_time_text: '',
-                  lead_time_min_days: null,
-                  lead_time_max_days: null,
-                  variant_key: '',
-                  variant_label: '',
-                },
-              ],
-            }
-          : g
-      ),
-    }));
+    setRelAuto((r) => {
+      const current = r.groups.flatMap((g) => g.values).flatMap((v) => v.fulfillments).filter((f) => f.enabled);
+      const direct = current.length === 0 || current.some((f) => f.fulfillment_type === 'direct_sale');
+      const preorder = current.some((f) => f.fulfillment_type === 'pre_order');
+      return {
+        ...r,
+        groups: r.groups.map((g) =>
+          g.id === groupId
+            ? {
+                ...g,
+                values: [
+                  ...g.values,
+                  {
+                    id: localId('ov'),
+                    name_en: '',
+                    sku_part: '',
+                    image: '',
+                    sort: g.values.length,
+                    active: true,
+                    stock: null,
+                    reserved: 0,
+                    low_stock_threshold: null,
+                    ...emptyPrices(),
+                    availability_type: '',
+                    lead_time_text: '',
+                    lead_time_min_days: null,
+                    lead_time_max_days: null,
+                    variant_key: '',
+                    variant_label: '',
+                    fulfillments: [
+                      emptyFulfillment('direct_sale', direct),
+                      emptyFulfillment('pre_order', preorder),
+                    ],
+                  },
+                ],
+              }
+            : g
+        ),
+      };
+    });
 
   const patchValue = (groupId: string, id: string, patch: Partial<FormValue>) =>
     setRelAuto((r) => ({
@@ -149,6 +161,22 @@ export function OptionsSection({
       groups: r.groups.map((g) =>
         g.id === groupId ? { ...g, values: g.values.map((v) => (v.id === id ? { ...v, ...patch } : v)) } : g
       ),
+      // Once another model uses colour stock the product switches to exact
+      // combination inventory. Keep this option's colour-less shelf in sync
+      // with the option input so a mixed product never saves a stale number.
+      variants: 'stock' in patch || 'low_stock_threshold' in patch
+        ? r.variants.map((variant) =>
+            variant.color_id === null && variant.option_value_ids.length === 1 && variant.option_value_ids[0] === id
+              ? {
+                  ...variant,
+                  ...('stock' in patch ? { stock: patch.stock ?? null } : {}),
+                  ...('low_stock_threshold' in patch
+                    ? { low_stock_threshold: patch.low_stock_threshold ?? null }
+                    : {}),
+                }
+              : variant
+          )
+        : r.variants,
     }));
 
   const removeValue = (groupId: string, id: string) =>
@@ -173,6 +201,7 @@ export function OptionsSection({
           sort: r.colors.length,
           active: true,
           stock: null,
+          reserved: 0,
           low_stock_threshold: null,
           option_value_ids: [],
           ...emptyPrices(),
@@ -232,19 +261,84 @@ export function OptionsSection({
   };
 
   const toggleLink = (colorId: string, valueId: string) =>
-    setRelAuto((r) => ({
-      ...r,
-      colors: r.colors.map((c) =>
-        c.id === colorId
-          ? {
-              ...c,
-              option_value_ids: c.option_value_ids.includes(valueId)
-                ? c.option_value_ids.filter((x) => x !== valueId)
-                : [...c.option_value_ids, valueId],
-            }
-          : c
-      ),
-    }));
+    setRelAuto((r) => {
+      const next: RelationsState = {
+        ...r,
+        colors: r.colors.map((c) =>
+          c.id === colorId
+            ? {
+                ...c,
+                option_value_ids: c.option_value_ids.includes(valueId)
+                  ? c.option_value_ids.filter((x) => x !== valueId)
+                  : [...c.option_value_ids, valueId],
+              }
+            : c
+        ),
+      };
+      const wanted = directStockCombinations(next);
+      const existing = new Map(r.variants.map((v) => [combinationKey(v), v] as const));
+      const retained = r.variants.filter((v) => v.color_id !== colorId);
+      const retainedKeys = new Set(retained.map(combinationKey));
+      return {
+        ...next,
+        variants: [
+          ...retained,
+          ...wanted.filter((combo) => !retainedKeys.has(combinationKey(combo))).map((combo) => {
+            const optionStock = combo.color_id === null && combo.option_value_ids.length === 1
+              ? r.groups.flatMap((g) => g.values).find((v) => v.id === combo.option_value_ids[0])?.stock ?? null
+              : null;
+            return existing.get(combinationKey(combo)) ?? {
+              id: localId('pv'),
+              option_value_ids: combo.option_value_ids,
+              color_id: combo.color_id,
+              sku: '',
+              active: true,
+              stock: optionStock,
+              reserved: 0,
+              low_stock_threshold: null,
+              ...emptyPrices(),
+            };
+          }),
+        ],
+      };
+    });
+
+  const setCombinationStock = (
+    combo: { option_value_ids: string[]; color_id: string | null },
+    stock: number | null,
+    low_stock_threshold?: number | null
+  ) =>
+    setRelAuto((r) => {
+      const key = combinationKey(combo);
+      const found = r.variants.find((v) => combinationKey(v) === key);
+      const patch = low_stock_threshold === undefined ? { stock } : { stock, low_stock_threshold };
+      if (found) {
+        return { ...r, variants: r.variants.map((v) => (v.id === found.id ? { ...v, ...patch } : v)) };
+      }
+      const made: FormVariant = {
+        id: localId('pv'),
+        option_value_ids: combo.option_value_ids,
+        color_id: combo.color_id,
+        sku: '',
+        active: true,
+        stock,
+        reserved: 0,
+        low_stock_threshold: low_stock_threshold ?? null,
+        ...emptyPrices(),
+      };
+      return { ...r, variants: [...r.variants, made] };
+    });
+
+  const directCombos = directStockCombinations(rel);
+  const variantByKey = new Map(rel.variants.map((v) => [combinationKey(v), v] as const));
+  const combosForOption = (optionId: string) => directCombos.filter((x) => x.option_value_ids.includes(optionId));
+  const directEnabled = (value: FormValue) =>
+    value.fulfillments.some((f) => f.fulfillment_type === 'direct_sale' && f.enabled);
+  const optionStockTotal = (optionId: string) =>
+    combosForOption(optionId).reduce((sum, combo) => {
+      const row = variantByKey.get(combinationKey(combo));
+      return sum + (row?.stock ?? 0);
+    }, 0);
 
   return (
     <div className="min-w-0 space-y-4">
@@ -315,40 +409,50 @@ export function OptionsSection({
                       {errors[`value:${v.id}`] ?? errors[`value_price:${v.id}`]}
                     </p>
                   )}
-                  <AvailabilityRow
+                  <FulfillmentEditor
                     value={v}
-                    onChange={(patch) => patchValue(g.id, v.id, patch)}
+                    onChange={(fulfillments) => patchValue(g.id, v.id, { fulfillments })}
+                    onValueChange={(patch) => patchValue(g.id, v.id, patch)}
                     error={errors[`value_availability:${v.id}`]}
                   />
                   <div className="mt-2">
                     <Grid cols={3}>
-                      {/* Stock is the DIRECT-sale question; a pre-order option
-                          normally has none, and the hint says which case the
-                          admin is in rather than leaving an empty box to guess
-                          at. */}
-                      <Field
-                        ar="المخزون"
-                        en="Stock"
-                        hint={
-                          v.availability_type === 'pre_order'
-                            ? 'طلب مسبق — عادةً بلا مخزون. ضع رقمًا فقط إذا كان للدفعة حد.'
-                            : 'فارغ = لا يُحسب من هذا الخيار'
-                        }
-                      >
-                        <Qty value={v.stock} onChange={(n) => patchValue(g.id, v.id, { stock: n })} />
-                        {/* The owner's «نفس الحقل مكرر بأكثر من قسم»: this box
-                            and the direct-sale box in §12 are ONE column on
-                            ONE row. Saying so is the whole fix — the sharing
-                            itself is the design («مصدر مخزون واحد»). */}
-                        <MirrorNote kind="same" where="١٢ نوع الطلب لكل موديل" detail="مخزون البيع المباشر لهذا الموديل" />
-                      </Field>
-                      <Field ar="حد التنبيه" en="Low-stock">
-                        <Qty
-                          value={v.low_stock_threshold}
-                          onChange={(n) => patchValue(g.id, v.id, { low_stock_threshold: n })}
-                          placeholder="بدون / none"
-                        />
-                      </Field>
+                      {directEnabled(v) && (
+                        <>
+                          <Field
+                            ar="مخزون البيع المباشر"
+                            en="Direct stock"
+                            hint={
+                              combosForOption(v.id).length > 0
+                                ? 'محسوب تلقائيًا من مخزون الألوان المرتبطة بهذا الخيار'
+                                : 'أدخل كمية البيع المباشر لهذا الخيار. الطلب المسبق لا يستخدم هذا الرقم.'
+                            }
+                          >
+                            {combosForOption(v.id).length > 0 ? (
+                              <div className={`${fieldCls} flex items-center justify-between bg-zinc-900/70 text-zinc-300`} data-option-stock-total={v.id}>
+                                <span>{optionStockTotal(v.id).toLocaleString('en-US')}</span>
+                                <span className="text-[10px] text-zinc-500">مجموع الألوان</span>
+                              </div>
+                            ) : (
+                              <Qty value={v.stock} onChange={(n) => patchValue(g.id, v.id, { stock: n })} />
+                            )}
+                          </Field>
+                          {errors[`option_stock:${v.id}`] && (
+                            <p className="text-[11px] text-red-400 sm:col-span-2">
+                              {errors[`option_stock:${v.id}`]}
+                            </p>
+                          )}
+                          {combosForOption(v.id).length === 0 && (
+                            <Field ar="حد تنبيه الخيار" en="Option low-stock">
+                              <Qty
+                                value={v.low_stock_threshold}
+                                onChange={(n) => patchValue(g.id, v.id, { low_stock_threshold: n })}
+                                placeholder="بدون / none"
+                              />
+                            </Field>
+                          )}
+                        </>
+                      )}
                       <PriceCells
                         prices={v}
                         beneath={base}
@@ -429,17 +533,6 @@ export function OptionsSection({
 
             <div className="mt-2">
               <Grid cols={3}>
-                <Field ar="المخزون" en="Stock" hint="فارغ = لا يُحسب من هذا اللون">
-                  <Qty value={c.stock} onChange={(n) => patchColor(c.id, { stock: n })} />
-                  <MirrorNote kind="replaces" where="٤ مخزون المنتج" detail="عند ملئه يصير هو مصدر التوفر بدل مخزون المنتج" />
-                </Field>
-                <Field ar="حد التنبيه" en="Low-stock">
-                  <Qty
-                    value={c.low_stock_threshold}
-                    onChange={(n) => patchColor(c.id, { low_stock_threshold: n })}
-                    placeholder="بدون / none"
-                  />
-                </Field>
                 <PriceCells
                   prices={c}
                   beneath={beneathColor(c)}
@@ -504,13 +597,55 @@ export function OptionsSection({
                 </p>
               </div>
             )}
+
+            {directCombos.some((combo) => combo.color_id === c.id) && (
+              <div className="mt-2.5 rounded-lg border border-emerald-900/60 bg-emerald-950/15 p-2.5" data-color-direct-stock={c.id}>
+                <div className="mb-2">
+                  <p className="text-[12px] font-bold text-zinc-200">مخزون البيع المباشر حسب الخيار</p>
+                  <p className="text-[10px] text-zinc-500">
+                    لكل خيار مرتبط عدّاد مستقل. مخزون الخيار في الأعلى هو مجموع هذه الصفوف تلقائيًا.
+                  </p>
+                </div>
+                {errors[`color_stock:${c.id}`] && (
+                  <p className="mb-2 text-[11px] text-red-400">{errors[`color_stock:${c.id}`]}</p>
+                )}
+                {c.stock !== null && (
+                  <p className="mb-2 text-[10px] text-amber-300">
+                    يوجد مخزون لون قديم ({c.stock.toLocaleString('en-US')}) محفوظ للتوافق؛ لا يُنسخ على الخيارات كي لا يتضاعف.
+                  </p>
+                )}
+                <div className="space-y-2">
+                  {directCombos
+                    .filter((combo) => combo.color_id === c.id)
+                    .map((combo) => {
+                      const row = variantByKey.get(combinationKey(combo));
+                      const label = combo.option_value_ids.map((id) => optionById.get(id)?.name_en || id).join(' / ');
+                      return (
+                        <div key={combinationKey(combo)} className="grid grid-cols-[minmax(0,1fr)_7rem_7rem] gap-2 items-end">
+                          <div className="min-w-0 pb-2 text-[12px] text-zinc-300 truncate" title={label}>{label}</div>
+                          <Field ar="المخزون" en="Stock">
+                            <Qty
+                              value={row?.stock ?? null}
+                              onChange={(stock) => setCombinationStock(combo, stock)}
+                            />
+                          </Field>
+                          <Field ar="حد التنبيه" en="Low-stock">
+                            <Qty
+                              value={row?.low_stock_threshold ?? null}
+                              onChange={(low) => setCombinationStock(combo, row?.stock ?? null, low)}
+                              placeholder="بدون"
+                            />
+                          </Field>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </Repeater>
 
-      {rel.inventory_mode === 'VARIANT_COMBINATION' && (
-        <VariantsEditor rel={rel} setRel={setRel} canSeeCost={canSeeCost} errors={errors} />
-      )}
     </div>
   );
 }
@@ -524,12 +659,12 @@ function AutoStockNote({ rel }: { rel: RelationsState }) {
   const mode = rel.inventory_mode;
   const text =
     mode === 'VARIANT_COMBINATION'
-      ? 'هذا المنتج يعتمد مخزون التركيبات (إعداد سابق) — عدّل الأرقام في جدول التركيبات أدناه.'
+      ? 'البيع المباشر يعتمد مخزون كل خيار × لون، ومخزون الخيار هو مجموع ألوانه المرتبطة.'
       : mode === 'COLOR'
-        ? 'التوفر يُحسب الآن من مخزون الألوان — لأنك أدخلت أرقامًا على مستوى اللون، وهو الأدق.'
+        ? 'هذا المنتج ما زال يحمل مخزون ألوان قديمًا. اربط الألوان بالخيارات وأدخل مخزون كل صف للانتقال الآمن.'
         : mode === 'OPTION'
-          ? 'التوفر يُحسب الآن من مخزون الخيارات — أدخل رقمًا على لونٍ ما لينتقل الحساب إلى الألوان.'
-          : 'التوفر يُحسب الآن من مخزون المنتج (قسم «البيع والتوفر») — أدخل أرقامًا على الخيارات أو الألوان لينتقل الحساب إليها تلقائيًا.';
+          ? 'البيع المباشر يعتمد مخزون كل خيار. عند ربط ألوان به يُعطّل حقله ويصبح المجموع من الألوان.'
+          : 'لا يوجد مخزون بيع مباشر على الخيارات بعد. الطلب المسبق يبقى متاحًا/غير متاح فقط ولا يملك مخزونًا.';
   return (
     <div className="min-w-0 rounded-lg border border-zinc-700 bg-zinc-800/30 px-2.5 py-2">
       <p className="text-[12px] text-zinc-300 font-bold mb-0.5">
@@ -537,7 +672,7 @@ function AutoStockNote({ rel }: { rel: RelationsState }) {
       </p>
       <p className="text-[11px] text-zinc-400 leading-snug">{text}</p>
       <p className="text-[10px] text-zinc-600 mt-0.5">
-        مصدر واحد فقط هو الحقيقة — لا تُجمع الأرقام بين المستويات. One authoritative source; levels are never summed.
+        الطلب المسبق لا يستهلك هذا المخزون. Pre-order has no stock counter.
       </p>
     </div>
   );
@@ -742,280 +877,149 @@ function PriceCells({
   );
 }
 
-/** Combination stock (§7). Only rendered in VARIANT_COMBINATION mode, because
- *  in every other mode these rows would never be read. */
-function VariantsEditor({
-  rel,
-  setRel,
-  canSeeCost,
-  errors,
-}: {
-  rel: RelationsState;
-  setRel: (fn: (r: RelationsState) => RelationsState) => void;
-  canSeeCost: boolean;
-  errors: Record<string, string>;
-}) {
-  const valueName = new Map(rel.groups.flatMap((g) => g.values.map((v) => [v.id, v.name_en || v.id] as const)));
-  const colorName = new Map(rel.colors.map((c) => [c.id, c.name_en || c.id] as const));
-
-  /** Every combination the current options and colours allow, honouring the
-   *  colour links so an impossible pairing is never offered. */
-  const generate = () => {
-    const groups = rel.groups.filter((g) => g.values.filter((v) => v.active).length > 0);
-    let combos: string[][] = [[]];
-    for (const g of groups) {
-      const next: string[][] = [];
-      for (const c of combos) for (const v of g.values.filter((x) => x.active)) next.push([...c, v.id]);
-      combos = next;
-    }
-    const colors = rel.colors.filter((c) => c.active);
-    const rows: Array<{ option_value_ids: string[]; color_id: string | null }> = [];
-    for (const combo of combos) {
-      if (colors.length === 0) {
-        rows.push({ option_value_ids: combo, color_id: null });
-        continue;
-      }
-      for (const col of colors) {
-        // Respect the link algebra: a linked colour only pairs with the values
-        // it allows, so generation cannot create a row the server rejects.
-        const linkedGroups = new Set(
-          col.option_value_ids
-            .map((vid) => rel.groups.find((g) => g.values.some((v) => v.id === vid))?.id)
-            .filter(Boolean) as string[]
-        );
-        const ok = [...linkedGroups].every((gid) => {
-          const chosen = combo.find((vid) => rel.groups.find((g) => g.id === gid)?.values.some((v) => v.id === vid));
-          return chosen ? col.option_value_ids.includes(chosen) : false;
-        });
-        if (ok) rows.push({ option_value_ids: combo, color_id: col.id });
-      }
-    }
-    setRel((r) => {
-      const key = (x: { option_value_ids: string[]; color_id: string | null }) =>
-        [...x.option_value_ids].sort().join('|') + '#' + (x.color_id ?? '');
-      const existing = new Map(r.variants.map((v) => [key(v), v]));
-      return {
-        ...r,
-        variants: rows.map(
-          (row) =>
-            existing.get(key(row)) ?? {
-              id: localId('pv'),
-              option_value_ids: row.option_value_ids,
-              color_id: row.color_id,
-              sku: '',
-              active: true,
-              stock: null,
-              low_stock_threshold: null,
-              ...emptyPrices(),
-            }
-        ),
-      };
-    });
-  };
-
-  /**
-   * A combination price, written as the ONE canonical half.
-   *
-   * `priceMode` answers 'fixed' the moment `*_price_iqd` is set, so an
-   * adjustment stored beside it is dead data the resolver ignores — right up
-   * until someone clears the fixed price and a delta nobody typed wakes up.
-   * The server collapses the pair on write (productPersistence `readPrices`);
-   * clearing it here means the admin sees what was actually stored instead of
-   * having their adjustment dropped behind a 200.
-   */
-  const setVariantPrice = (id: string, key: PriceKey, value: number | null) =>
-    setRel((r) => ({
-      ...r,
-      variants: r.variants.map((x) => (x.id === id ? { ...x, [key]: value, [ADJUST_OF[key]]: null } : x)),
-    }));
-
-  return (
-    <div className="min-w-0">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <h4 className="text-[13px] font-bold text-zinc-300 truncate">التركيبات / Combinations</h4>
-        <button type="button" onClick={generate} className={`${btnGhost} h-8 px-2.5 text-[12px]`}>
-          توليد التركيبات
-        </button>
-      </div>
-      {rel.variants.length === 0 ? (
-        <p className="text-[12px] text-amber-300">
-          لا توجد تركيبات — لن يُباع أي شيء في هذا الوضع حتى تُنشئ واحدة على الأقل.
-        </p>
-      ) : (
-        <div className="overflow-x-auto -mx-1 px-1">
-          <table className="w-full min-w-[520px] text-[12px]">
-            <thead>
-              <tr className="text-zinc-500 text-[11px]">
-                <th className="text-start font-bold py-1.5">التركيبة</th>
-                <th className="text-start font-bold py-1.5 w-24">المخزون</th>
-                <th className="text-start font-bold py-1.5 w-28">السعر</th>
-                <th className="text-start font-bold py-1.5 w-28">PRIME</th>
-                <th className="text-start font-bold py-1.5 w-28">PRO</th>
-                {canSeeCost && <th className="text-start font-bold py-1.5 w-28">التكلفة</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {rel.variants.map((v) => (
-                <tr key={v.id} className="border-t border-zinc-800">
-                  <td className="py-1.5 pe-2 text-zinc-200">
-                    <span className="block max-w-[220px] truncate">
-                      {[...v.option_value_ids.map((i) => valueName.get(i) ?? i), v.color_id ? colorName.get(v.color_id) : null]
-                        .filter(Boolean)
-                        .join(' / ')}
-                    </span>
-                    {errors[`variant_price:${v.id}`] && (
-                      <span className="block text-[11px] text-red-400">{errors[`variant_price:${v.id}`]}</span>
-                    )}
-                  </td>
-                  <td className="py-1.5 pe-2">
-                    <Qty
-                      value={v.stock}
-                      onChange={(n) =>
-                        setRel((r) => ({
-                          ...r,
-                          variants: r.variants.map((x) => (x.id === v.id ? { ...x, stock: n } : x)),
-                        }))
-                      }
-                    />
-                  </td>
-                  {/*
-                    ONE TYPED NUMBER PINS THE PAIR here too. A combination row
-                    can carry a 0044 adjustment (a TXT import or a Quick Edit
-                    can write one), and writing only the fixed half left a
-                    contradiction behind — silently resolved at the server by
-                    dropping the admin's stored adjustment. `setVariantPrice`
-                    clears the twin in the same patch, exactly as `PriceCells`
-                    does for options and colours.
-                  */}
-                  {(['regular_price_iqd', 'prime_price_iqd', 'pro_price_iqd', 'cost_iqd'] as const)
-                    .filter((k) => k !== 'cost_iqd' || canSeeCost)
-                    .map((k) => (
-                      <td key={k} className="py-1.5 pe-2">
-                        <Money value={v[k]} onChange={(n) => setVariantPrice(v.id, k, n)} />
-                      </td>
-                    ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * HOW THIS ONE OPTION IS SOLD — the editor for the 0043 fields.
- *
- * The three states are deliberately three chips rather than a dropdown with a
- * blank entry: "inherit" is a real, common and correct answer (it is what
- * every option in the catalogue says today), and a select whose empty value
- * means something is a select people mis-read.
- *
- * The rest of the row follows the choice. Pre-order reveals the lead time,
- * because a customer waiting weeks must be told how many; direct sale hides it
- * and the server refuses one, because a thing shipping from the shelf has no
- * wait to describe. The model fields stay visible in both, since they are what
- * lets "A1 — pre-order" and "A1 — direct" appear to the customer as one A1
- * with two ways to buy it instead of two unrelated cards.
- */
-function AvailabilityRow({
+/** Independent order-type switches for one real model. */
+function FulfillmentEditor({
   value,
   onChange,
+  onValueChange,
   error,
 }: {
   value: FormValue;
-  onChange: (patch: Partial<FormValue>) => void;
+  onChange: (next: FormFulfillment[]) => void;
+  onValueChange: (patch: Partial<FormValue>) => void;
   error?: string;
 }) {
-  const CHOICES: Array<{ id: '' | 'direct_sale' | 'pre_order'; ar: string; en: string; hint: string }> = [
-    { id: '', ar: 'حسب المنتج', en: 'Inherit', hint: 'يتبع أنواع بيع المنتج — وهو ما تفعله كل الخيارات القديمة' },
-    { id: 'direct_sale', ar: 'بيع مباشر', en: 'Direct sale', hint: 'من المخزون، يُشحن الآن' },
-    { id: 'pre_order', ar: 'طلب مسبق', en: 'Pre-order', hint: 'يُطلب من المورّد ثم يُشحن' },
+  const cell = (type: 'direct_sale' | 'pre_order') =>
+    value.fulfillments.find((f) => f.fulfillment_type === type) ?? emptyFulfillment(type);
+  const direct = cell('direct_sale');
+  const preorder = cell('pre_order');
+
+  const replaceCell = (next: FormFulfillment) => {
+    const rest = value.fulfillments.filter((f) => f.fulfillment_type !== next.fulfillment_type);
+    onChange([...rest, next].sort((a, b) => a.sort - b.sort));
+  };
+  const route = (method: 'air' | 'sea' | 'land') =>
+    preorder.transports.find((t) => t.method === method) ?? {
+      ...emptyFulfillment('pre_order').transports.find((t) => t.method === method)!,
+    };
+  const replaceRoute = (next: FormTransport) =>
+    replaceCell({
+      ...preorder,
+      transports: [
+        ...preorder.transports.filter((t) => t.method !== next.method),
+        next,
+      ].sort((a, b) => a.sort - b.sort),
+    });
+
+  const ROUTES = [
+    { method: 'land' as const, ar: 'بري', en: 'Land' },
+    { method: 'sea' as const, ar: 'بحري', en: 'Sea' },
+    { method: 'air' as const, ar: 'جوي', en: 'Air' },
   ];
-  const isPre = value.availability_type === 'pre_order';
+
   return (
-    <div className="mt-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-2" data-option-availability={value.id}>
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] font-bold text-zinc-400 me-1">نوع التوفر / Availability</span>
-        {CHOICES.map((ch) => {
-          const on = value.availability_type === ch.id;
-          return (
-            <button
-              key={ch.id || 'inherit'}
-              type="button"
-              data-availability={ch.id || 'inherit'}
-              aria-pressed={on}
-              title={ch.hint}
-              onClick={() =>
-                onChange(
-                  ch.id === 'direct_sale'
-                    ? // Switching to direct sale clears the wait rather than
-                      // leaving a value the server would refuse on save.
-                      { availability_type: ch.id, lead_time_text: '', lead_time_min_days: null, lead_time_max_days: null }
-                    : { availability_type: ch.id }
-                )
-              }
-              className={`min-h-9 px-2.5 rounded-lg border text-[12px] font-bold transition-colors ${
-                on
-                  ? 'border-violet-500 bg-violet-500/10 text-white'
-                  : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:border-zinc-600'
-              }`}
-            >
-              {ch.ar}
-            </button>
-          );
-        })}
+    <div className="mt-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-2.5" data-option-availability={value.id}>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div className={`rounded-lg border p-2.5 ${direct.enabled ? 'border-emerald-700/60 bg-emerald-950/20' : 'border-zinc-800 bg-zinc-900/30'}`}>
+          <Toggle
+            checked={direct.enabled}
+            onChange={(enabled) => replaceCell({ ...direct, enabled })}
+            label="بيع مباشر"
+            sub="Direct sale"
+          />
+          {direct.enabled && (
+            <div className="mt-2">
+              <Field ar="زيادة البيع المباشر" en="Direct increase" hint="تخص هذا الخيار فقط وتُضاف إلى سعره الأساسي">
+                <Money
+                  value={direct.regular_adjust_iqd ?? null}
+                  onChange={(regular_adjust_iqd) =>
+                    replaceCell({ ...direct, regular_price_iqd: null, regular_adjust_iqd })
+                  }
+                  placeholder="بلا زيادة"
+                />
+              </Field>
+            </div>
+          )}
+        </div>
+
+        <div className={`rounded-lg border p-2.5 ${preorder.enabled ? 'border-violet-700/60 bg-violet-950/20' : 'border-zinc-800 bg-zinc-900/30'}`}>
+          <Toggle
+            checked={preorder.enabled}
+            onChange={(enabled) => replaceCell({ ...preorder, enabled })}
+            label="طلب مسبق"
+            sub="Pre-order — بلا مخزون"
+          />
+          {preorder.enabled && (
+            <div className="mt-2 space-y-2">
+              <div className="grid gap-2 sm:grid-cols-3">
+                {ROUTES.map((meta) => {
+                  const current = route(meta.method);
+                  return (
+                    <div key={meta.method} className="rounded-md border border-zinc-800 bg-zinc-950/40 p-2" data-preorder-route={meta.method}>
+                      <Toggle
+                        checked={current.enabled}
+                        onChange={(enabled) => replaceRoute({ ...current, enabled })}
+                        label={meta.ar}
+                        sub={meta.en}
+                      />
+                      {current.enabled && (
+                        <div className="mt-1.5">
+                          <Money
+                            value={current.surcharge_iqd}
+                            onChange={(surcharge_iqd) => replaceRoute({ ...current, surcharge_iqd })}
+                            placeholder="بلا زيادة"
+                          />
+                          <p className="mt-1 text-[10px] text-zinc-600">زيادة هذا المسار فقط؛ لا يوجد مخزون للطلب المسبق.</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <Grid cols={3}>
+                <Field ar="مدة التجهيز" en="Lead time" hint="مثال: 3-4 أسابيع">
+                  <TextInput
+                    value={preorder.lead_time_text}
+                    onChange={(e) => replaceCell({ ...preorder, lead_time_text: e.target.value })}
+                    placeholder="3-4 weeks"
+                  />
+                </Field>
+                <Field ar="أقل عدد أيام" en="Min days">
+                  <Qty
+                    value={preorder.lead_time_min_days}
+                    onChange={(lead_time_min_days) => replaceCell({ ...preorder, lead_time_min_days })}
+                    placeholder="21"
+                  />
+                </Field>
+                <Field ar="أكثر عدد أيام" en="Max days">
+                  <Qty
+                    value={preorder.lead_time_max_days}
+                    onChange={(lead_time_max_days) => replaceCell({ ...preorder, lead_time_max_days })}
+                    placeholder="28"
+                  />
+                </Field>
+              </Grid>
+            </div>
+          )}
+        </div>
       </div>
-      {error && <p className="mt-1 text-[11px] text-red-400">{error}</p>}
+      {error && <p className="mt-2 text-[11px] text-red-400">{error}</p>}
       <div className="mt-2">
-        <Grid cols={3}>
-          <Field ar="اسم النسخة" en="Model" hint="A1 / A1 Combo — ما يجمع طريقتَي الشراء تحت نسخة واحدة">
+        <Grid cols={2}>
+          <Field ar="اسم النسخة" en="Model" hint="مثل التعبئة أو البكرة الكاملة">
             <TextInput
               value={value.variant_label}
-              onChange={(e) => onChange({ variant_label: e.target.value })}
-              placeholder="A1 Combo"
-              aria-label="Model name"
+              onChange={(e) => onValueChange({ variant_label: e.target.value })}
+              placeholder="Full spool"
             />
           </Field>
           <Field ar="مفتاح النسخة" en="Model key" hint="فارغ = يُشتق من الاسم">
             <TextInput
               value={value.variant_key}
-              onChange={(e) => onChange({ variant_key: e.target.value })}
-              placeholder="a1-combo"
-              aria-label="Model key"
+              onChange={(e) => onValueChange({ variant_key: e.target.value })}
+              placeholder="full-spool"
             />
           </Field>
-          {isPre ? (
-            <Field ar="مدة الانتظار" en="Lead time" hint="كما تُعرض للزبون — مثال: 3-4 أسابيع">
-              <TextInput
-                value={value.lead_time_text}
-                onChange={(e) => onChange({ lead_time_text: e.target.value })}
-                placeholder="3-4 weeks"
-                aria-label="Lead time"
-              />
-            </Field>
-          ) : (
-            <div />
-          )}
-          {isPre && (
-            <>
-              <Field ar="أقل عدد أيام" en="Min days" hint="للترتيب والتقدير — النص أعلاه هو ما يُعرض">
-                <Qty
-                  value={value.lead_time_min_days}
-                  onChange={(n) => onChange({ lead_time_min_days: n })}
-                  placeholder="21"
-                />
-              </Field>
-              <Field ar="أكثر عدد أيام" en="Max days">
-                <Qty
-                  value={value.lead_time_max_days}
-                  onChange={(n) => onChange({ lead_time_max_days: n })}
-                  placeholder="28"
-                />
-              </Field>
-            </>
-          )}
         </Grid>
       </div>
     </div>

@@ -1138,8 +1138,12 @@ export function resolveUnitPrice(input: {
    * on top of that would charge the difference twice. So the product number is
    * what it was always meant to be: a FALLBACK, for a model that says nothing.
    */
-  const cellPricesDirect = directPriced && statesPrice(priceRows.fulfillment);
-  if (directPriced && hasDirectPremium && !cellPricesDirect) {
+  // Once a model owns an explicit direct-sale cell, that cell is the whole
+  // answer for this model: a null adjustment means “no increase”, not “fall
+  // back to the removed product-wide increase”. The product scalar remains a
+  // compatibility fallback only for products that have no model cells yet.
+  const modelOwnsDirectPricing = directPriced && priceRows.fulfillment !== null;
+  if (directPriced && hasDirectPremium && !modelOwnsDirectPricing) {
     direct = { surcharge_iqd: directSurcharge as number, waived: isPro };
   }
   // 'preorder' only while the commission is the fee actually in force.

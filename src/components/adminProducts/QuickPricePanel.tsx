@@ -1,11 +1,11 @@
 /**
  * QUICK EDIT — the whole price table of one product, editable in place.
  *
- * The owner's measure of success is time: changing a cost or a price should
- * take seconds, and the daily price change should never require opening the
- * full product form. So this panel is deliberately NOT a second product editor.
- * It shows exactly four numbers per row — cost, regular, PRIME, PRO — and
- * nothing else is editable here.
+ * The owner's measure of success is time: changing a cost, a price, or a
+ * model's availability should take seconds and should not require opening the
+ * full product form. The price grid remains focused on its four price columns;
+ * the compact panel above it mirrors the option fulfilment and direct-stock
+ * controls from the full editor.
  *
  * WHAT MAKES IT FAST, and why each piece is the way it is:
  *
@@ -38,6 +38,21 @@ import { AlertTriangle, ArrowLeftRight, Check, History, Loader2, RotateCcw, Perc
 import { api, ApiError, formatIqd } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import * as T from './theme';
+import { Field as FormField, Money, Qty, Toggle } from './form/formUi';
+import {
+  combinationKey,
+  directStockCombinations,
+  deriveInventoryMode,
+  emptyFulfillment,
+  relationsFromWire,
+  relationsToWire,
+  type FormFulfillment,
+  type FormTransport,
+  type FormVariant,
+  type FormValue,
+  type RelationsResponse,
+  type RelationsState,
+} from './form/model';
 
 // ------------------------------------------------------------------- types
 
@@ -326,6 +341,26 @@ const saleTypesText = (t: Strings, types: readonly string[]): string => {
   if (pre) return t.preOrder;
   return t.directSale;
 };
+
+/** Project legacy product-level availability into the two model checkboxes. */
+const withQuickFulfillmentDefaults = (rel: RelationsState, saleTypes: readonly string[]): RelationsState => ({
+  ...rel,
+  groups: rel.groups.map((group) => ({
+    ...group,
+    values: group.values.map((value) => {
+      const own = value.availability_type;
+      const directEnabled = own
+        ? own === 'direct_sale'
+        : saleTypes.includes('direct_sale') || saleTypes.includes('bundle');
+      const preorderEnabled = own ? own === 'pre_order' : saleTypes.includes('pre_order');
+      const direct = value.fulfillments.find((cell) => cell.fulfillment_type === 'direct_sale') ??
+        emptyFulfillment('direct_sale', directEnabled);
+      const preorder = value.fulfillments.find((cell) => cell.fulfillment_type === 'pre_order') ??
+        emptyFulfillment('pre_order', preorderEnabled);
+      return { ...value, fulfillments: [direct, preorder] };
+    }),
+  })),
+});
 const cellKey = (r: { level: Level; id: string }, f: Field) => `${rowKey(r)}:${f}`;
 
 /**
@@ -389,6 +424,9 @@ export default function QuickPricePanel({
   const t = STRINGS[lang === 'en' ? 'en' : 'ar'];
 
   const [data, setData] = useState<GridResponse | null>(null);
+  const [relations, setRelations] = useState<RelationsState | null>(null);
+  const [relationsBaseline, setRelationsBaseline] = useState('');
+  const [relationsSaving, setRelationsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'grid' | 'bulk' | 'copy' | 'history'>('grid');
@@ -408,16 +446,23 @@ export default function QuickPricePanel({
   const [selected, setSelected] = useState<string[]>([]);
 
   const dirtyCount = Object.keys(draft).length;
+  const relationsDirty = relations !== null && JSON.stringify(relations) !== relationsBaseline;
   useEffect(() => {
-    onDirtyChange?.(dirtyCount > 0);
-  }, [dirtyCount, onDirtyChange]);
+    onDirtyChange?.(dirtyCount > 0 || relationsDirty);
+  }, [dirtyCount, relationsDirty, onDirtyChange]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await api.get<GridResponse>(`/api/admin/products/${productId}/price-grid`);
+      const [res, relResponse] = await Promise.all([
+        api.get<GridResponse>(`/api/admin/products/${productId}/price-grid`),
+        api.get<RelationsResponse>(`/api/admin/products/${productId}/relations`),
+      ]);
+      const nextRelations = withQuickFulfillmentDefaults(relationsFromWire(relResponse), res.product.sale_types ?? []);
       setData(res);
+      setRelations(nextRelations);
+      setRelationsBaseline(JSON.stringify(nextRelations));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'error');
     } finally {
@@ -480,19 +525,8 @@ export default function QuickPricePanel({
     [buildCells, onChanged, productId, t]
   );
 
-  /**
-   * Availability / stock / active, from the same drawer as the prices.
-   *
-   * These write through PATCH /price-grid/traits, which re-derives the
-   * product's sale_types from what its options will say AFTER the change —
-   * §2's rule that the selling type is a CONCLUSION, never a choice. It is
-   * deliberately NOT the relations PUT: that one rewrites the whole option
-   * tree, and a drawer sending a partial body would delete it.
-   *
-   * A trait applies immediately. There is no dirty state for it because
-   * "moved this variant to pre-order" is one decision, not part of a price
-   * edit the admin is still composing — and the undo button takes it back.
-   */
+  /** Active remains an immediate row trait; fulfilment and stock use the
+   * atomic model panel above so a route checkbox and its shelf cannot split. */
   const patchTraits = useCallback(
     async (traits: TraitPatch[]) => {
       if (traits.length === 0) return;
@@ -522,6 +556,94 @@ export default function QuickPricePanel({
     },
     [onChanged, productId, t]
   );
+
+  /** Save the model checkboxes, route increases and direct-only stock. */
+  const saveRelations = useCallback(async () => {
+    if (!relations || !data) return;
+    setRelationsSaving(true);
+    setError('');
+    try {
+      const saleTypes = data.product.sale_types ?? [];
+      const complete: RelationsState = {
+        ...relations,
+        groups: relations.groups.map((g) => ({
+          ...g,
+          values: g.values.map((v) =>
+            v.fulfillments.length > 0
+              ? v
+              : {
+                  ...v,
+                  fulfillments: [
+                    emptyFulfillment('direct_sale', saleTypes.includes('direct_sale') || saleTypes.includes('bundle')),
+                    { ...emptyFulfillment('pre_order', saleTypes.includes('pre_order')), transports: [] },
+                  ],
+                }
+          ),
+        })),
+      };
+      const wire = relationsToWire(complete);
+      const fulfillments = wire.groups.flatMap((g) =>
+        g.values.flatMap((v) => v.fulfillments.map((f) => ({ ...f, option_id: v.id })))
+      );
+      const allValues = complete.groups.flatMap((g) => g.values);
+      const directValueIds = new Set(
+        allValues
+          .filter((v) => v.fulfillments.some((f) => f.fulfillment_type === 'direct_sale' && f.enabled))
+          .map((v) => v.id)
+      );
+      const exact = directStockCombinations(complete).filter((combo) =>
+        combo.option_value_ids.some((id) => directValueIds.has(id))
+      );
+      const variantsByKey = new Map(complete.variants.map((v) => [combinationKey(v), v] as const));
+      const missing = exact.filter((combo) => !variantsByKey.has(combinationKey(combo)));
+      if (missing.length > 0) {
+        throw new Error('أكمل ربط الألوان ومخزونها من التعديل الكامل أولًا، ثم ارجع إلى التعديل السريع.');
+      }
+      const variantRows = exact.map((combo) => variantsByKey.get(combinationKey(combo))!);
+      const optionRows = exact.length === 0
+        ? allValues.filter((v) => directValueIds.has(v.id))
+        : [];
+      if (variantRows.some((v) => v.stock === null) || optionRows.some((v) => v.stock === null)) {
+        throw new Error('أدخل مخزون البيع المباشر لكل خيار أو لون مفعّل قبل الحفظ.');
+      }
+      const directStock = exact.length > 0
+        ? variantRows.map((v) => ({
+            scope: 'variant' as const,
+            id: v.id,
+            stock: v.stock,
+            low_stock_threshold: v.low_stock_threshold,
+          }))
+        : optionRows.map((v) => ({
+            scope: 'option' as const,
+            id: v.id,
+            stock: v.stock,
+            low_stock_threshold: v.low_stock_threshold,
+          }));
+      const inventoryMode = exact.length > 0 ? 'VARIANT_COMBINATION' : 'OPTION';
+      await api.put(`/api/admin/products/${productId}/fulfillment`, {
+        fulfillments,
+        direct_stock: directStock,
+        ...(directStock.length > 0 ? { inventory_mode: inventoryMode } : {}),
+      });
+      const fresh = relationsFromWire(
+        await api.get<RelationsResponse>(`/api/admin/products/${productId}/relations`)
+      );
+      setRelations(fresh);
+      setRelationsBaseline(JSON.stringify(fresh));
+      setData((d) => d ? { ...d, product: { ...d.product, sale_types: Array.from(new Set([
+        ...(d.product.sale_types ?? []).filter((type) => type === 'bundle'),
+        ...fresh.groups.flatMap((g) => g.values.flatMap((v) =>
+          v.fulfillments.filter((f) => f.enabled).map((f) => f.fulfillment_type)
+        )),
+      ])) } } : d);
+      setToast(t.saved(1));
+      onChanged?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'error');
+    } finally {
+      setRelationsSaving(false);
+    }
+  }, [data, onChanged, productId, relations, t]);
 
   const undo = useCallback(async () => {
     setSaving(true);
@@ -564,16 +686,17 @@ export default function QuickPricePanel({
   const discard = useCallback(() => {
     setDraft({});
     setGuards([]);
-  }, []);
+    if (relationsBaseline) setRelations(JSON.parse(relationsBaseline) as RelationsState);
+  }, [relationsBaseline]);
 
   useEffect(() => {
     if (!registerEscape) return;
     registerEscape(() => {
-      if (dirtyCount === 0) return false; // nothing to cancel — let it close
+      if (dirtyCount === 0 && !relationsDirty) return false; // nothing to cancel — let it close
       discard();
       return true;
     });
-  }, [registerEscape, dirtyCount, discard]);
+  }, [registerEscape, dirtyCount, relationsDirty, discard]);
 
   // --------------------------------------------------------------- render
 
@@ -628,18 +751,29 @@ export default function QuickPricePanel({
       )}
 
       {tab === 'grid' && (
-        <GridTab
-          t={t}
-          rows={data.rows}
-          fields={fields}
-          draft={draft}
-          setDraft={setDraft}
-          selected={selected}
-          setSelected={setSelected}
-          minMargin={data.min_margin_percent}
-          onTrait={(patches) => void patchTraits(patches)}
-          busy={saving}
-        />
+        <>
+          {relations && (
+            <QuickFulfillmentPanel
+              rel={relations}
+              setRel={setRelations}
+              dirty={relationsDirty}
+              saving={relationsSaving}
+              onSave={() => void saveRelations()}
+            />
+          )}
+          <GridTab
+            t={t}
+            rows={data.rows}
+            fields={fields}
+            draft={draft}
+            setDraft={setDraft}
+            selected={selected}
+            setSelected={setSelected}
+            minMargin={data.min_margin_percent}
+            onTrait={(patches) => void patchTraits(patches)}
+            busy={saving || relationsSaving}
+          />
+        </>
       )}
       {tab === 'bulk' && (
         <BulkTab
@@ -697,15 +831,15 @@ export default function QuickPricePanel({
             </div>
           )}
           <span className="text-[12px] text-[var(--ap-text-3)]" data-qp-dirty={dirtyCount}>
-            {dirtyCount > 0 ? t.pending(dirtyCount) : t.shorthandHint}
+            {dirtyCount > 0 || relationsDirty ? t.pending(dirtyCount + (relationsDirty ? 1 : 0)) : t.shorthandHint}
           </span>
           <span className="flex-1" />
-          {dirtyCount > 0 && (
+          {(dirtyCount > 0 || relationsDirty) && (
             <button type="button" className={T.btnGhostSm} data-qp="discard" onClick={discard}>
               <X className="w-3.5 h-3.5" /> {t.cancel}
             </button>
           )}
-          {(lastBatch || lastTraits.length > 0) && dirtyCount === 0 && (
+          {(lastBatch || lastTraits.length > 0) && dirtyCount === 0 && !relationsDirty && (
             <button type="button" className={T.btnGhostSm} data-qp="undo" onClick={() => void undo()} disabled={saving}>
               <RotateCcw className="w-3.5 h-3.5" /> {t.undo}
             </button>
@@ -723,6 +857,194 @@ export default function QuickPricePanel({
         </div>
       )}
     </div>
+  );
+}
+
+// ------------------------------------------ model availability + direct stock
+
+function QuickFulfillmentPanel({
+  rel,
+  setRel,
+  dirty,
+  saving,
+  onSave,
+}: {
+  rel: RelationsState;
+  setRel: (next: RelationsState) => void;
+  dirty: boolean;
+  saving: boolean;
+  onSave: () => void;
+}) {
+  const values = rel.groups.flatMap((g) => g.values);
+  const valueName = new Map(values.map((v) => [v.id, v.name_en || v.id] as const));
+  const colorName = new Map(rel.colors.map((c) => [c.id, c.name_en || c.id] as const));
+  // A product has one inventory mode. As soon as one option uses colours,
+  // colour-less options are represented by exact colour-less variant rows too.
+  const combos = directStockCombinations(rel);
+  const variants = new Map(rel.variants.map((v) => [combinationKey(v), v] as const));
+
+  const change = (fn: (current: RelationsState) => RelationsState) => {
+    const next = fn(rel);
+    setRel({ ...next, inventory_mode: deriveInventoryMode(next) });
+  };
+  const patchValue = (id: string, fn: (value: FormValue) => FormValue) =>
+    change((current) => ({
+      ...current,
+      groups: current.groups.map((g) => ({
+        ...g,
+        values: g.values.map((v) => (v.id === id ? fn(v) : v)),
+      })),
+    }));
+  const cellOf = (value: FormValue, type: 'direct_sale' | 'pre_order') =>
+    value.fulfillments.find((f) => f.fulfillment_type === type) ?? emptyFulfillment(type);
+  const setCell = (value: FormValue, next: FormFulfillment) =>
+    patchValue(value.id, (v) => ({
+      ...v,
+      fulfillments: [
+        ...v.fulfillments.filter((f) => f.fulfillment_type !== next.fulfillment_type),
+        next,
+      ].sort((a, b) => a.sort - b.sort),
+    }));
+  const setVariantStock = (variant: FormVariant, stock: number | null) =>
+    change((current) => ({
+      ...current,
+      variants: current.variants.map((v) => (v.id === variant.id ? { ...v, stock } : v)),
+    }));
+  const routeOf = (cell: FormFulfillment, method: 'land' | 'sea' | 'air') =>
+    cell.transports.find((t) => t.method === method) ??
+    emptyFulfillment('pre_order').transports.find((t) => t.method === method)!;
+  const setRoute = (value: FormValue, preorder: FormFulfillment, next: FormTransport) =>
+    setCell(value, {
+      ...preorder,
+      transports: [
+        ...preorder.transports.filter((t) => t.method !== next.method),
+        next,
+      ].sort((a, b) => a.sort - b.sort),
+    });
+  const routes = [
+    ['land', 'بري', 'Land'],
+    ['sea', 'بحري', 'Sea'],
+    ['air', 'جوي', 'Air'],
+  ] as const;
+
+  if (values.length === 0) return null;
+  return (
+    <section className={`${T.surface} mb-3 p-3`} data-qp="fulfillment-stock">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <h3 className="text-[13px] font-bold text-[var(--ap-text-1)]">التوفر والزيادة والمخزون حسب الخيار</h3>
+          <p className="mt-0.5 text-[11px] text-[var(--ap-text-3)]">
+            البيع المباشر يملك مخزونًا؛ الطلب المسبق متوفر أو غير متوفر فقط.
+          </p>
+        </div>
+        <button type="button" className={T.btnSecondary} disabled={!dirty || saving} onClick={onSave} data-qp-save-fulfillment>
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+          حفظ التوفر
+        </button>
+      </div>
+      <div className="space-y-2">
+        {values.map((value) => {
+          const direct = cellOf(value, 'direct_sale');
+          const preorder = cellOf(value, 'pre_order');
+          const mine = combos.filter((combo) => combo.option_value_ids.includes(value.id));
+          const total = mine.reduce((sum, combo) => sum + (variants.get(combinationKey(combo))?.stock ?? 0), 0);
+          return (
+            <div key={value.id} className="rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] bg-[var(--ap-surface-2)] p-2.5">
+              <p className="mb-2 text-[12.5px] font-semibold text-[var(--ap-text-1)]">{value.name_en || value.id}</p>
+              <div className="grid gap-2 lg:grid-cols-2">
+                <div className="rounded-md border border-[var(--ap-hairline)] p-2">
+                  <Toggle
+                    checked={direct.enabled}
+                    onChange={(enabled) => setCell(value, { ...direct, enabled })}
+                    label="بيع مباشر"
+                    sub="Direct sale"
+                  />
+                  {direct.enabled && (
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <FormField ar="الزيادة" en="Direct increase">
+                        <Money
+                          value={direct.regular_adjust_iqd ?? null}
+                          onChange={(regular_adjust_iqd) =>
+                            setCell(value, { ...direct, regular_price_iqd: null, regular_adjust_iqd })
+                          }
+                          placeholder="بلا زيادة"
+                        />
+                      </FormField>
+                      <FormField ar="المخزون" en="Direct stock" hint={mine.length ? `مجموع الألوان: ${total}` : undefined}>
+                        {mine.length === 0 ? (
+                          <Qty
+                            value={value.stock}
+                            onChange={(stock) => patchValue(value.id, (v) => ({ ...v, stock }))}
+                          />
+                        ) : (
+                          <div className="space-y-1.5">
+                            {mine.map((combo) => {
+                              const variant = variants.get(combinationKey(combo));
+                              const color = combo.color_id
+                                ? colorName.get(combo.color_id) || combo.color_id
+                                : 'بدون لون';
+                              const other = combo.option_value_ids
+                                .filter((id) => id !== value.id)
+                                .map((id) => valueName.get(id) || id)
+                                .join(' / ');
+                              return (
+                                <label key={combinationKey(combo)} className="grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-1.5">
+                                  <span className="truncate text-[10.5px] text-[var(--ap-text-3)]">{color}{other ? ` · ${other}` : ''}</span>
+                                  {variant ? (
+                                    <Qty value={variant.stock} onChange={(stock) => setVariantStock(variant, stock)} />
+                                  ) : (
+                                    <span className="text-[10px] text-[var(--ap-warning)]">من التعديل الكامل</span>
+                                  )}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </FormField>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-md border border-[var(--ap-hairline)] p-2">
+                  <Toggle
+                    checked={preorder.enabled}
+                    onChange={(enabled) => setCell(value, { ...preorder, enabled })}
+                    label="طلب مسبق"
+                    sub="Pre-order — بلا مخزون"
+                  />
+                  {preorder.enabled && (
+                    <div className="mt-2 grid gap-1.5 sm:grid-cols-3">
+                      {routes.map(([method, ar, en]) => {
+                        const current = routeOf(preorder, method);
+                        return (
+                          <div key={method} className="rounded-md border border-[var(--ap-hairline)] p-1.5">
+                            <Toggle
+                              checked={current.enabled}
+                              onChange={(enabled) => setRoute(value, preorder, { ...current, enabled })}
+                              label={ar}
+                              sub={en}
+                            />
+                            {current.enabled && (
+                              <div className="mt-1">
+                                <Money
+                                  value={current.surcharge_iqd}
+                                  onChange={(surcharge_iqd) => setRoute(value, preorder, { ...current, surcharge_iqd })}
+                                  placeholder="بلا زيادة"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -840,13 +1162,8 @@ function GridTab({
 }
 
 /**
- * The row's identity AND the three things about it that are not prices.
- *
- * Availability, stock and active used to be read-only here, so moving one
- * variant from pre-order to direct sale meant leaving the drawer and opening
- * the eight-section product form — the round trip this drawer exists to
- * remove. They write through PATCH /price-grid/traits, which re-derives the
- * product's sale types from its options; the admin never types "mixed".
+ * The row's identity and active state. Availability and direct stock live in
+ * QuickFulfillmentPanel above, where they are saved atomically per model.
  *
  * `variant_label` stays TEXT, never a control: it is the link between the A1
  * and the A1 Combo rows and it is edited where variants are, in the form.
@@ -862,12 +1179,9 @@ function RowLabel({
   onTrait?: (patches: TraitPatch[]) => void;
   busy?: boolean;
 }) {
-  const availability =
-    row.availability_type === 'direct_sale' ? t.directSale : row.availability_type === 'pre_order' ? t.preOrder : '';
   const editable = !!onTrait && row.level !== 'product';
   const level = row.level as 'option' | 'color';
-  const send = (field: TraitPatch['field'], value: unknown) =>
-    onTrait?.([{ level, id: row.id, field, value }]);
+  const setActive = (value: boolean) => onTrait?.([{ level, id: row.id, field: 'active', value }]);
 
   return (
     <div className="min-w-0">
@@ -893,116 +1207,19 @@ function RowLabel({
             aria-pressed={row.active}
             disabled={busy}
             data-qp-active={rowKey(row)}
-            onClick={() => send('active', !row.active)}
+            onClick={() => setActive(!row.active)}
           >
             {row.active ? t.activeOn : t.activeOff}
           </button>
         )}
       </div>
 
-      {!editable && (row.variant_label || availability || row.stock !== null) && (
+      {!editable && row.variant_label && (
         <p className="text-[11px] text-[var(--ap-text-3)] mt-0.5 truncate">
-          {[row.variant_label, availability, row.stock === null ? '' : `${t.stock}: ${row.stock}`]
-            .filter(Boolean)
-            .join(' · ')}
+          {row.variant_label}
         </p>
       )}
-
-      {/*
-        FOUR CONTROLS IN A WRAPPING PILE BECAME TWO TIDY LINES.
-        `flex-wrap` in a column squeezed by four fixed price columns turned the
-        route select, the stock box and the active chip into a three-storey
-        tower, and every row was a different height — which is most of why the
-        grid read as مربك. A GRID here instead: the route and the stock sit in
-        the same two tracks on every row, so the eye can run down a column of
-        routes and a column of quantities the way it runs down the prices.
-      */}
-      {editable && (
-        <div className="mt-1.5 min-w-0" data-qp-traits={rowKey(row)}>
-          <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-1.5">
-            {/* Only an option carries a fulfilment route; a colour inherits the
-                option it hangs from, so it is not offered one. */}
-            {row.level === 'option' ? (
-              <select
-                className={`${T.selectSm} h-7 px-1.5 min-w-0`}
-                value={row.availability_type}
-                disabled={busy}
-                data-qp-availability={row.id}
-                aria-label={t.route}
-                onChange={(e) => send('availability_type', e.target.value)}
-              >
-                <option value="">{t.followProduct}</option>
-                <option value="direct_sale">{t.directSale}</option>
-                <option value="pre_order">{t.preOrder}</option>
-              </select>
-            ) : (
-              <span className="text-[11px] text-[var(--ap-text-3)] truncate">{availability || '—'}</span>
-            )}
-            <StockTrait t={t} row={row} busy={busy} onCommit={(v) => send('stock', v)} />
-          </div>
-        </div>
-      )}
     </div>
-  );
-}
-
-/**
- * Stock as a number the admin types, where EMPTY IS A REAL ANSWER: it means
- * "we do not count these", which is not the same as zero ("sold out"). The
- * input is uncontrolled between edits so a slow round trip cannot swallow a
- * digit; it re-syncs whenever the server's value changes.
- */
-function StockTrait({
-  t,
-  row,
-  busy,
-  onCommit,
-}: {
-  t: Strings;
-  row: Row;
-  busy?: boolean;
-  onCommit: (value: number | null) => void;
-}) {
-  const stored = row.stock === null ? '' : String(row.stock);
-  const [text, setText] = useState(stored);
-  useEffect(() => setText(stored), [stored]);
-
-  const commit = () => {
-    const trimmed = text.trim();
-    if (trimmed === '') {
-      if (row.stock !== null) onCommit(null);
-      return;
-    }
-    const n = Number(trimmed);
-    if (!Number.isInteger(n) || n < 0) {
-      setText(stored);
-      return;
-    }
-    if (n !== row.stock) onCommit(n);
-  };
-
-  /* The word «المخزون» beside every box was a label repeated on every row of a
-     column that already has one. The box keeps its accessible name and drops
-     the visible duplicate, which is what lets the route select beside it have
-     the width it needs. */
-  return (
-    <input
-      type="text"
-      inputMode="numeric"
-      className={`${T.input} h-7 w-full px-1.5 text-[11px] text-center`}
-      value={text}
-      disabled={busy}
-      placeholder={t.stockUntracked}
-      data-qp-stock={rowKey(row)}
-      title={t.stock}
-      aria-label={`${t.stock} — ${row.label_ar || row.label_en}`}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-        if (e.key === 'Escape') setText(stored);
-      }}
-    />
   );
 }
 
@@ -1237,7 +1454,6 @@ function BulkTab({
   const [chosen, setChosen] = useState<Field[]>(['regular']);
   const [value, setValue] = useState('');
   const [levels, setLevels] = useState<Level[]>([]);
-  const [availability, setAvailability] = useState<string>('');
   const [variant, setVariant] = useState<string>('');
   const [onlySelected, setOnlySelected] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -1248,7 +1464,9 @@ function BulkTab({
 
   const scope = () => ({
     levels,
-    availability: availability ? [availability] : [],
+    // Availability is now two independent cells per model, not one legacy
+    // option label. Direct/pre-order increases are edited in the panel above.
+    availability: [],
     variant_keys: variant ? [variant] : [],
     row_ids: onlySelected ? selected : [],
   });
@@ -1362,22 +1580,6 @@ function BulkTab({
           ))}
           <select
             className={T.selectSm}
-            value={availability}
-            data-qp="bulk-availability"
-            onChange={(e) => {
-              setAvailability(e.target.value);
-              invalidate();
-            }}
-          >
-            <option value="">{t.anyAvailability}</option>
-            {data.availability.map((a) => (
-              <option key={a} value={a}>
-                {a === 'direct_sale' ? t.directSale : t.preOrder}
-              </option>
-            ))}
-          </select>
-          <select
-            className={T.selectSm}
             value={variant}
             data-qp="bulk-variant"
             onChange={(e) => {
@@ -1449,12 +1651,10 @@ function CopyTab({
   onApplied: (rows: Row[]) => void;
   onBatch: (id: string) => void;
 }) {
-  // "availability:pre_order" or "variant:a1" — one control, two axes, so the
-  // pairing rule ("copy across routes pairs by model") stays legible.
-  const choices = [
-    ...data.availability.map((a) => ({ id: `availability:${a}`, label: a === 'direct_sale' ? t.directSale : t.preOrder })),
-    ...data.variants.map((v) => ({ id: `variant:${v.key}`, label: v.label })),
-  ];
+  // Direct/pre-order differences have their own cells above. Price-copy here
+  // therefore stays on real model variants and never consults the removed
+  // single availability label.
+  const choices = data.variants.map((v) => ({ id: `variant:${v.key}`, label: v.label }));
   const [from, setFrom] = useState(choices[0]?.id ?? '');
   const [to, setTo] = useState(choices[1]?.id ?? '');
   const [chosen, setChosen] = useState<Field[]>(['regular', 'prime', 'pro']);

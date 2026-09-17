@@ -20,6 +20,8 @@ import type { ColorV2, MediaV2, OptionV2 } from '../../../lib/productTypes';
 
 export type SaleType = 'direct_sale' | 'pre_order' | 'bundle';
 export type InventoryMode = 'BASE' | 'OPTION' | 'COLOR' | 'VARIANT_COMBINATION';
+export type FulfillmentType = 'direct_sale' | 'pre_order';
+export type TransportMethod = 'air' | 'sea' | 'land';
 
 export interface FormPrices {
   regular_price_iqd: number | null;
@@ -55,6 +57,8 @@ export interface FormValue extends FormPrices {
   sort: number;
   active: boolean;
   stock: number | null;
+  /** Read-only evidence carried so a stock edit can never undercut a live hold. */
+  reserved: number;
   low_stock_threshold: number | null;
   /** 0043. '' = inherit the product's sale types, which is what every option
    *  saved before this field existed does. */
@@ -65,6 +69,34 @@ export interface FormValue extends FormPrices {
   /** The MODEL this option is a fulfilment of — A1 vs A1 Combo. */
   variant_key: string;
   variant_label: string;
+  /** The two independent checkboxes shown on this model. */
+  fulfillments: FormFulfillment[];
+}
+
+export interface FormTransport extends FormPrices {
+  method: TransportMethod;
+  enabled: boolean;
+  surcharge_iqd: number | null;
+  sort: number;
+  lead_time_text: string;
+  lead_time_min_days: number | null;
+  lead_time_max_days: number | null;
+  /** Legacy compatibility only. New UI never authors a pre-order quantity. */
+  capacity: number | null;
+  capacity_reserved: number;
+}
+
+export interface FormFulfillment extends FormPrices {
+  fulfillment_type: FulfillmentType;
+  enabled: boolean;
+  sort: number;
+  lead_time_text: string;
+  lead_time_min_days: number | null;
+  lead_time_max_days: number | null;
+  /** Legacy compatibility only. Pre-order is available/unavailable, not stocked. */
+  capacity: number | null;
+  capacity_reserved: number;
+  transports: FormTransport[];
 }
 
 export interface FormGroup {
@@ -87,6 +119,7 @@ export interface FormColor extends FormPrices {
   sort: number;
   active: boolean;
   stock: number | null;
+  reserved: number;
   low_stock_threshold: number | null;
   /** §7 many-to-many: OR inside a group, AND across groups. */
   option_value_ids: string[];
@@ -99,6 +132,7 @@ export interface FormVariant extends FormPrices {
   sku: string;
   active: boolean;
   stock: number | null;
+  reserved: number;
   low_stock_threshold: number | null;
 }
 
@@ -144,6 +178,85 @@ export interface RelationsState {
    */
   hydration_issues?: string[];
 }
+
+export interface LinkedColorCombination {
+  option_value_ids: string[];
+  color_id: string;
+}
+
+/** Exact option selections for colours explicitly attached to models. */
+export function linkedColorCombinations(rel: RelationsState): LinkedColorCombination[] {
+  const groups = rel.groups
+    .filter((g) => g.active)
+    .map((g) => ({ ...g, values: g.values.filter((v) => v.active) }))
+    .filter((g) => g.values.length > 0);
+  let choices: string[][] = [[]];
+  for (const group of groups) {
+    choices = choices.flatMap((chosen) => group.values.map((v) => [...chosen, v.id]));
+  }
+  if (choices.length === 1 && choices[0].length === 0) return [];
+
+  const groupOf = new Map<string, string>();
+  for (const group of groups) for (const value of group.values) groupOf.set(value.id, group.id);
+  const out: LinkedColorCombination[] = [];
+  for (const color of rel.colors.filter((c) => c.active && c.option_value_ids.length > 0)) {
+    const byGroup = new Map<string, Set<string>>();
+    for (const valueId of color.option_value_ids) {
+      const groupId = groupOf.get(valueId);
+      if (!groupId) continue;
+      const set = byGroup.get(groupId) ?? new Set<string>();
+      set.add(valueId);
+      byGroup.set(groupId, set);
+    }
+    for (const chosen of choices) {
+      const ok = [...byGroup.entries()].every(([groupId, allowed]) => {
+        const selected = chosen.find((id) => groupOf.get(id) === groupId);
+        return !!selected && allowed.has(selected);
+      });
+      if (ok) out.push({ option_value_ids: [...chosen].sort(), color_id: color.id });
+    }
+  }
+  return out;
+}
+
+/**
+ * Every exact direct-sale shelf once any model uses per-colour stock. Models
+ * without colours become a colour-less variant row, allowing one product to
+ * mix “stock on the option” and “stock on option×colour” while the database
+ * keeps one authoritative VARIANT_COMBINATION mode.
+ */
+export function directStockCombinations(
+  rel: RelationsState
+): Array<{ option_value_ids: string[]; color_id: string | null }> {
+  const directIds = new Set(
+    rel.groups
+      .flatMap((g) => g.values)
+      .filter((v) =>
+        v.active && v.fulfillments.some((f) => f.fulfillment_type === 'direct_sale' && f.enabled)
+      )
+      .map((v) => v.id)
+  );
+  const isDirect = (ids: string[]) => ids.some((id) => directIds.has(id));
+  const coloured = linkedColorCombinations(rel).filter((combo) => isDirect(combo.option_value_ids));
+  if (coloured.length === 0) return [];
+  const groups = rel.groups
+    .filter((g) => g.active)
+    .map((g) => g.values.filter((v) => v.active))
+    .filter((values) => values.length > 0);
+  let choices: string[][] = [[]];
+  for (const values of groups) choices = choices.flatMap((chosen) => values.map((v) => [...chosen, v.id]));
+  const colouredSelections = new Set(coloured.map((x) => [...x.option_value_ids].sort().join('|')));
+  return [
+    ...coloured,
+    ...choices
+      .filter(isDirect)
+      .filter((ids) => !colouredSelections.has([...ids].sort().join('|')))
+      .map((option_value_ids) => ({ option_value_ids: [...option_value_ids].sort(), color_id: null })),
+  ];
+}
+
+export const combinationKey = (x: { option_value_ids: string[]; color_id: string | null }): string =>
+  [...x.option_value_ids].sort().map((id) => `o:${id}`).concat(x.color_id ? [`c:${x.color_id}`] : []).join('|');
 
 export const emptyRelations = (): RelationsState => ({
   inventory_mode: 'BASE',
@@ -249,6 +362,7 @@ interface WireValue extends FormPrices {
   sort: number;
   active: number;
   stock: number | null;
+  reserved?: number | null;
   low_stock_threshold: number | null;
   /** 0043 — optional on the wire so this client still reads a response from a
    *  server that has not deployed them yet. */
@@ -276,6 +390,7 @@ interface WireColor extends FormPrices {
   sort: number;
   active: number;
   stock: number | null;
+  reserved?: number | null;
   low_stock_threshold: number | null;
 }
 interface WireLink {
@@ -289,7 +404,31 @@ interface WireVariant extends FormPrices {
   sku: string | null;
   active: number;
   stock: number | null;
+  reserved?: number | null;
   low_stock_threshold: number | null;
+}
+interface WireTransport extends FormPrices {
+  method: string;
+  enabled: number | boolean;
+  surcharge_iqd: number | null;
+  sort?: number | null;
+  lead_time_text?: string | null;
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
+  capacity?: number | null;
+  capacity_reserved?: number | null;
+}
+interface WireFulfillment extends FormPrices {
+  option_id: string;
+  fulfillment_type: string;
+  enabled: number | boolean;
+  sort?: number | null;
+  lead_time_text?: string | null;
+  lead_time_min_days?: number | null;
+  lead_time_max_days?: number | null;
+  capacity?: number | null;
+  capacity_reserved?: number | null;
+  transports?: WireTransport[];
 }
 interface WireImage {
   id: string;
@@ -318,11 +457,40 @@ export interface RelationsResponse {
   links?: WireLink[];
   variants?: WireVariant[];
   images?: WireImage[];
+  fulfillments?: WireFulfillment[];
 }
 
 /** Anything the server might hold, narrowed to what the editor can render. */
 const readAvailability = (raw: unknown): '' | 'direct_sale' | 'pre_order' =>
   raw === 'direct_sale' || raw === 'pre_order' ? raw : '';
+
+const TRANSPORT_METHODS: TransportMethod[] = ['air', 'sea', 'land'];
+
+export const emptyTransport = (method: TransportMethod, enabled = false): FormTransport => ({
+  method,
+  enabled,
+  surcharge_iqd: null,
+  sort: TRANSPORT_METHODS.indexOf(method),
+  lead_time_text: '',
+  lead_time_min_days: null,
+  lead_time_max_days: null,
+  capacity: null,
+  capacity_reserved: 0,
+  ...emptyPrices(),
+});
+
+export const emptyFulfillment = (type: FulfillmentType, enabled = false): FormFulfillment => ({
+  fulfillment_type: type,
+  enabled,
+  sort: type === 'direct_sale' ? 0 : 1,
+  lead_time_text: '',
+  lead_time_min_days: null,
+  lead_time_max_days: null,
+  capacity: null,
+  capacity_reserved: 0,
+  transports: type === 'pre_order' ? TRANSPORT_METHODS.map((method) => emptyTransport(method)) : [],
+  ...emptyPrices(),
+});
 
 const prices = (x: FormPrices): FormPrices => ({
   regular_price_iqd: x.regular_price_iqd ?? null,
@@ -335,6 +503,32 @@ const prices = (x: FormPrices): FormPrices => ({
   cost_adjust_iqd: x.cost_adjust_iqd ?? null,
 });
 
+const transportFromWire = (t: WireTransport): FormTransport => ({
+  method: t.method === 'air' || t.method === 'sea' ? t.method : 'land',
+  enabled: t.enabled !== 0 && t.enabled !== false,
+  surcharge_iqd: t.surcharge_iqd ?? null,
+  sort: Number.isInteger(t.sort) ? Number(t.sort) : TRANSPORT_METHODS.indexOf(t.method as TransportMethod),
+  lead_time_text: t.lead_time_text ?? '',
+  lead_time_min_days: t.lead_time_min_days ?? null,
+  lead_time_max_days: t.lead_time_max_days ?? null,
+  capacity: t.capacity ?? null,
+  capacity_reserved: t.capacity_reserved ?? 0,
+  ...prices(t),
+});
+
+const fulfillmentFromWire = (f: WireFulfillment): FormFulfillment => ({
+  fulfillment_type: f.fulfillment_type === 'pre_order' ? 'pre_order' : 'direct_sale',
+  enabled: f.enabled !== 0 && f.enabled !== false,
+  sort: Number.isInteger(f.sort) ? Number(f.sort) : f.fulfillment_type === 'pre_order' ? 1 : 0,
+  lead_time_text: f.lead_time_text ?? '',
+  lead_time_min_days: f.lead_time_min_days ?? null,
+  lead_time_max_days: f.lead_time_max_days ?? null,
+  capacity: f.capacity ?? null,
+  capacity_reserved: f.capacity_reserved ?? 0,
+  transports: (f.transports ?? []).map(transportFromWire),
+  ...prices(f),
+});
+
 /** Decodes the server's canonical `o:<id>|c:<id>` combination key. */
 export function parseComboKey(key: string): { option_value_ids: string[]; color_id: string | null } {
   const parts = key.split('|').filter(Boolean);
@@ -344,7 +538,7 @@ export function parseComboKey(key: string): { option_value_ids: string[]; color_
   };
 }
 
-const valueFromWire = (v: WireValue): FormValue => ({
+const valueFromWire = (v: WireValue, fulfillments: FormFulfillment[] = []): FormValue => ({
   id: v.id,
   name_en: v.name_en,
   ...(typeof v.name_ar === 'string' && v.name_ar !== '' ? { name_ar: v.name_ar } : {}),
@@ -354,6 +548,7 @@ const valueFromWire = (v: WireValue): FormValue => ({
   sort: v.sort,
   active: v.active !== 0,
   stock: v.stock ?? null,
+  reserved: v.reserved ?? 0,
   low_stock_threshold: v.low_stock_threshold ?? null,
   ...prices(v),
   availability_type: readAvailability(v.availability_type),
@@ -362,6 +557,7 @@ const valueFromWire = (v: WireValue): FormValue => ({
   lead_time_max_days: v.lead_time_max_days ?? null,
   variant_key: v.variant_key ?? '',
   variant_label: v.variant_label ?? '',
+  fulfillments,
 });
 
 /**
@@ -374,6 +570,13 @@ const valueFromWire = (v: WireValue): FormValue => ({
 export function relationsFromWire(r: RelationsResponse): RelationsState {
   const values = r.values ?? [];
   const links = r.links ?? [];
+  const fulfillmentsByOption = new Map<string, FormFulfillment[]>();
+  for (const raw of r.fulfillments ?? []) {
+    const cell = fulfillmentFromWire(raw);
+    const arr = fulfillmentsByOption.get(raw.option_id);
+    if (arr) arr.push(cell);
+    else fulfillmentsByOption.set(raw.option_id, [cell]);
+  }
   const byColor = new Map<string, string[]>();
   for (const l of links) {
     const arr = byColor.get(l.color_id);
@@ -393,7 +596,7 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
     values: values
       .filter((v) => v.group_id === g.id)
       .sort((a, b) => a.sort - b.sort)
-      .map(valueFromWire),
+      .map((v) => valueFromWire(v, fulfillmentsByOption.get(v.id) ?? [])),
   }));
 
   // Orphans: values referencing a group the response does not carry.
@@ -405,7 +608,7 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
       name_en: '',
       sort: groups.length,
       active: true,
-      values: orphaned.map(valueFromWire),
+      values: orphaned.map((v) => valueFromWire(v, fulfillmentsByOption.get(v.id) ?? [])),
     });
     issues.push(
       `${orphaned.length} خيار (${orphaned.map((v) => v.name_en || v.id).join(', ')}) مخزّن بلا مجموعة — سمِّ المجموعة ثم احفظ لتُكتب.`
@@ -427,6 +630,7 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
       sort: c.sort,
       active: c.active !== 0,
       stock: c.stock ?? null,
+      reserved: c.reserved ?? 0,
       low_stock_threshold: c.low_stock_threshold ?? null,
       option_value_ids: byColor.get(c.id) ?? [],
       ...prices(c),
@@ -437,6 +641,7 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
       sku: v.sku ?? '',
       active: v.active !== 0,
       stock: v.stock ?? null,
+      reserved: v.reserved ?? 0,
       low_stock_threshold: v.low_stock_threshold ?? null,
       ...prices(v),
     })),
@@ -473,6 +678,9 @@ export interface DocStructure {
   options?: OptionV2[] | null;
   colors?: ColorV2[] | null;
   media?: MediaV2[] | null;
+  sale_types?: string[] | null;
+  selling_type?: string | null;
+  preorder_transports?: Array<{ method: TransportMethod; commission_iqd: number | null; active: boolean }> | null;
 }
 
 export function docHasStructure(doc: DocStructure): boolean {
@@ -543,6 +751,7 @@ export function relationsFromDoc(doc: DocStructure): RelationsState {
       sort: typeof o.order === 'number' ? o.order : i,
       active: o.active !== false,
       stock: o.stock ?? null,
+      reserved: 0,
       low_stock_threshold: o.low_stock_threshold ?? null,
       ...docPrices(o),
       availability_type: readAvailability(o.availability_type),
@@ -551,6 +760,7 @@ export function relationsFromDoc(doc: DocStructure): RelationsState {
       lead_time_max_days: o.lead_time_max_days ?? null,
       variant_key: o.variant_key ?? '',
       variant_label: o.variant_label ?? '',
+      fulfillments: [],
     });
   });
   for (const g of groups) g.values.forEach((v, i) => (v.sort = i));
@@ -574,6 +784,7 @@ export function relationsFromDoc(doc: DocStructure): RelationsState {
         sort: i,
         active: c.active !== false,
         stock: c.stock ?? null,
+        reserved: 0,
         low_stock_threshold: c.low_stock_threshold ?? null,
         option_value_ids: linked,
         ...docPrices(c),
@@ -615,15 +826,60 @@ export function relationsFromDoc(doc: DocStructure): RelationsState {
  */
 export function hydrateRelations(wire: RelationsResponse, doc: DocStructure): RelationsState {
   const fromRows = relationsFromWire(wire);
-  if (hasRelationStructure(fromRows) || !docHasStructure(doc)) return fromRows;
+  if (hasRelationStructure(fromRows) || !docHasStructure(doc)) return withFulfillmentDefaults(fromRows, doc);
   const fromDoc = relationsFromDoc(doc);
   const n = { v: fromDoc.groups.reduce((a, g) => a + g.values.length, 0), c: fromDoc.colors.length, i: fromDoc.images.length };
   return {
-    ...fromDoc,
+    ...withFulfillmentDefaults(fromDoc, doc),
     hydration_issues: [
       ...(fromRows.hydration_issues ?? []),
       `الخيارات (${n.v}) والألوان (${n.c}) والصور (${n.i}) مقروءة من مستند المنتج — لا صفوف علاقات بعد. الحفظ من هنا يكتبها كصفوف.`,
     ],
+  };
+}
+
+/**
+ * The editor always renders two independent checkboxes for every model. Old
+ * products may have no cell rows yet, so their current product-level behaviour
+ * is projected into those checkboxes without copying any legacy fee. A null
+ * cell price continues to inherit the old product surcharge/transport tariff,
+ * preserving the customer's final price until the admin deliberately changes
+ * this model.
+ */
+function withFulfillmentDefaults(rel: RelationsState, doc: DocStructure): RelationsState {
+  const fallback = Array.isArray(doc.sale_types) && doc.sale_types.length
+    ? doc.sale_types
+    : [doc.selling_type || 'direct_sale'];
+  const productRoutes = new Map((doc.preorder_transports ?? []).map((t) => [t.method, t] as const));
+
+  const completeTransports = (stored: FormTransport[]): FormTransport[] =>
+    TRANSPORT_METHODS.map((method) => {
+      const found = stored.find((t) => t.method === method);
+      if (found) return found;
+      const legacy = productRoutes.get(method);
+      return emptyTransport(method, legacy?.active === true);
+    });
+
+  return {
+    ...rel,
+    groups: rel.groups.map((g) => ({
+      ...g,
+      values: g.values.map((v) => {
+        const stored = v.fulfillments ?? [];
+        const own = readAvailability(v.availability_type);
+        const directEnabled = own ? own === 'direct_sale' : fallback.includes('direct_sale') || fallback.includes('bundle');
+        const preorderEnabled = own ? own === 'pre_order' : fallback.includes('pre_order');
+        const direct = stored.find((f) => f.fulfillment_type === 'direct_sale') ?? emptyFulfillment('direct_sale', directEnabled);
+        const preorder = stored.find((f) => f.fulfillment_type === 'pre_order') ?? emptyFulfillment('pre_order', preorderEnabled);
+        return {
+          ...v,
+          fulfillments: [
+            { ...direct, transports: [] },
+            { ...preorder, transports: completeTransports(preorder.transports) },
+          ],
+        };
+      }),
+    })),
   };
 }
 
@@ -640,11 +896,49 @@ export function hydrateRelations(wire: RelationsResponse, doc: DocStructure): Re
  * levels never summed) is untouched; only WHO chooses the level changed.
  */
 export function deriveInventoryMode(rel: RelationsState): InventoryMode {
+  // A colour tied to a model is an exact (option + colour) shelf. The variant
+  // row is therefore authoritative even when its stock is currently blank;
+  // falling back to the option row would make all colours spend one counter.
+  const exact = directStockCombinations(rel);
+  const variants = new Map(rel.variants.filter((v) => v.active).map((v) => [combinationKey(v), v] as const));
+  if (exact.length > 0 && exact.every((x) => variants.get(combinationKey(x))?.stock !== null && variants.get(combinationKey(x))?.stock !== undefined)) {
+    return 'VARIANT_COMBINATION';
+  }
   if (rel.inventory_mode === 'VARIANT_COMBINATION' && rel.variants.length > 0) return 'VARIANT_COMBINATION';
+  // COLOR is retained only as a legacy bridge. New edits use exact variants,
+  // because one colour linked to two models needs two independent counters.
   if (rel.colors.some((c) => c.stock !== null)) return 'COLOR';
   if (rel.groups.some((g) => g.values.some((v) => v.stock !== null))) return 'OPTION';
   return 'BASE';
 }
+
+const fulfillmentToWire = (f: FormFulfillment) => ({
+  fulfillment_type: f.fulfillment_type,
+  enabled: f.enabled,
+  sort: f.sort,
+  ...prices(f),
+  lead_time_text: f.lead_time_text,
+  lead_time_min_days: f.lead_time_min_days,
+  lead_time_max_days: f.lead_time_max_days,
+  // Pre-order quantity tracking was removed. A legacy counter is carried only
+  // while a live order still holds units, so its later release can reach the
+  // same row. Once drained, the next save retires it to NULL.
+  capacity: f.capacity_reserved > 0 ? f.capacity : null,
+  transports:
+    f.fulfillment_type === 'pre_order'
+      ? f.transports.map((t, sort) => ({
+          method: t.method,
+          enabled: t.enabled,
+          surcharge_iqd: t.surcharge_iqd,
+          sort,
+          ...prices(t),
+          lead_time_text: t.lead_time_text,
+          lead_time_min_days: t.lead_time_min_days,
+          lead_time_max_days: t.lead_time_max_days,
+          capacity: t.capacity_reserved > 0 ? t.capacity : null,
+        }))
+      : [],
+});
 
 export function relationsToWire(rel: RelationsState) {
   return {
@@ -666,15 +960,20 @@ export function relationsToWire(rel: RelationsState) {
         stock: v.stock,
         low_stock_threshold: v.low_stock_threshold,
         ...prices(v),
-        availability_type: v.availability_type,
-        // A direct-sale option has nothing to wait for; sending a lead time
-        // with it would be refused by the server, so the form clears it here
-        // rather than letting the admin hit an error they cannot see.
-        lead_time_text: v.availability_type === 'direct_sale' ? '' : v.lead_time_text,
-        lead_time_min_days: v.availability_type === 'direct_sale' ? null : v.lead_time_min_days,
-        lead_time_max_days: v.availability_type === 'direct_sale' ? null : v.lead_time_max_days,
+        // Legacy readers still receive the only unambiguous single answer.
+        // Both enabled is represented by the fulfillment cells, not by a fake
+        // "mixed" option value.
+        availability_type: (() => {
+          const direct = v.fulfillments.some((f) => f.fulfillment_type === 'direct_sale' && f.enabled);
+          const preorder = v.fulfillments.some((f) => f.fulfillment_type === 'pre_order' && f.enabled);
+          return direct !== preorder ? (direct ? 'direct_sale' : 'pre_order') : '';
+        })(),
+        lead_time_text: v.fulfillments.find((f) => f.fulfillment_type === 'pre_order')?.lead_time_text ?? '',
+        lead_time_min_days: v.fulfillments.find((f) => f.fulfillment_type === 'pre_order')?.lead_time_min_days ?? null,
+        lead_time_max_days: v.fulfillments.find((f) => f.fulfillment_type === 'pre_order')?.lead_time_max_days ?? null,
         variant_key: v.variant_key,
         variant_label: v.variant_label,
+        fulfillments: v.fulfillments.map(fulfillmentToWire),
       })),
     })),
     colors: rel.colors.map((c, ci) => ({
@@ -898,6 +1197,27 @@ export function validateForm(input: {
     for (const v of g.values) {
       if (!v.name_en.trim()) e[`value:${v.id}`] = 'اسم الخيار مطلوب';
       ladder(v, v.name_en || 'خيار', e, `value_price:${v.id}`, base);
+      const enabled = v.fulfillments.filter((f) => f.enabled);
+      if (v.active && enabled.length === 0) {
+        e[`value_availability:${v.id}`] = 'فعّل البيع المباشر أو الطلب المسبق لهذا الخيار';
+      }
+      const optionBase = base.regular === null
+        ? null
+        : derivedRung(v, { regular: base.regular, prime: base.prime, pro: base.pro });
+      for (const f of enabled) {
+        if (optionBase) {
+          ladder(
+            f,
+            `${v.name_en || 'خيار'} — ${f.fulfillment_type === 'direct_sale' ? 'بيع مباشر' : 'طلب مسبق'}`,
+            e,
+            `value_availability:${v.id}`,
+            optionBase
+          );
+        }
+        if (f.fulfillment_type === 'pre_order' && !f.transports.some((t) => t.enabled)) {
+          e[`value_availability:${v.id}`] = 'فعّل طريقة واحدة على الأقل للطلب المسبق: بري أو بحري أو جوي';
+        }
+      }
     }
   }
   // What every ACTIVE option resolves to on top of the base — the rungs a
@@ -922,6 +1242,31 @@ export function validateForm(input: {
       e[`variant:${v.id}`] = 'التركيبة تحتاج خيارًا أو لونًا';
     }
     ladder(v, 'تركيبة', e, `variant_price:${v.id}`);
+  }
+  const valuesById = new Map(input.rel.groups.flatMap((g) => g.values.map((v) => [v.id, v] as const)));
+  const variantsByKey = new Map(input.rel.variants.map((v) => [combinationKey(v), v] as const));
+  const exactDirectStock = directStockCombinations(input.rel);
+  if (exactDirectStock.length === 0) {
+    for (const value of valuesById.values()) {
+      const direct = value.active && value.fulfillments.some(
+        (f) => f.fulfillment_type === 'direct_sale' && f.enabled
+      );
+      if (direct && value.stock === null) {
+        e[`option_stock:${value.id}`] = 'أدخل مخزون البيع المباشر لهذا الخيار';
+      }
+    }
+  }
+  for (const combo of exactDirectStock) {
+    const direct = combo.option_value_ids.some((id) =>
+      valuesById.get(id)?.fulfillments.some((f) => f.fulfillment_type === 'direct_sale' && f.enabled)
+    );
+    if (!direct) continue;
+    const row = variantsByKey.get(combinationKey(combo));
+    if (!row || row.stock === null) {
+      e[combo.color_id ? `color_stock:${combo.color_id}` : 'inventory_mode'] = combo.color_id
+        ? 'أدخل مخزون البيع المباشر لكل خيار مرتبط بهذا اللون'
+        : 'أدخل مخزون البيع المباشر للخيارات التي لا ترتبط بألوان';
+    }
   }
   if (input.rel.inventory_mode === 'VARIANT_COMBINATION' && input.rel.variants.length === 0) {
     e.inventory_mode = 'وضع التركيبات يحتاج تركيبة واحدة على الأقل وإلا لا يمكن البيع';
