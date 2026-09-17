@@ -399,3 +399,38 @@ test('DELIVERY — the email staging allowlist does not silence WhatsApp', async
     w.restore();
   }
 });
+
+// =========================================================================
+// WALLET — the third channel joins the two that were already there
+// =========================================================================
+
+test('WALLET — a deposit decision now reaches WhatsApp too, on the proven number', async () => {
+  const { enqueueUserDepositStatusNotification } = await import('../worker/lib/walletNotify');
+  const raw = freshDb();
+  seedUser(raw, { chat: 777 });
+  raw.prepare(
+    `INSERT INTO wallet_transactions (id, user_id, type, amount, status, note)
+     VALUES ('wtx_1', 'u_1', 'deposit', 5000, 'approved', 'top-up')`
+  ).run();
+
+  const out = await enqueueUserDepositStatusNotification(env(raw), 'wtx_1');
+  assert.deepEqual(out, { telegram: true, email: true, whatsapp: true });
+
+  const wa = rows(raw).find((r) => r.kind === 'whatsapp')!;
+  assert.equal(wa.recipient, PHONE);
+  assert.equal(wa.event_key, 'wallet.deposit.approved:wtx_1:whatsapp');
+});
+
+test('WALLET — an account with no proven number simply does not get the WhatsApp row', async () => {
+  const { enqueueUserDepositStatusNotification } = await import('../worker/lib/walletNotify');
+  const raw = freshDb();
+  seedUser(raw, { phone: null, chat: null });
+  raw.prepare(
+    `INSERT INTO wallet_transactions (id, user_id, type, amount, status, note)
+     VALUES ('wtx_2', 'u_1', 'deposit', 5000, 'rejected', 'top-up')`
+  ).run();
+
+  const out = await enqueueUserDepositStatusNotification(env(raw), 'wtx_2');
+  assert.equal(out.whatsapp, false);
+  assert.equal(rows(raw).some((r) => r.kind === 'whatsapp'), false);
+});

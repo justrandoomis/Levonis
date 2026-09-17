@@ -2,6 +2,7 @@ import type { Env } from './types';
 import { newId, randomToken, sha256Hex } from './crypto';
 import { audit } from './audit';
 import { enqueue as enqueueOutbox } from './outbox';
+import { isE164 } from './wasender';
 import { maskPhone } from './phone';
 import { getSetting } from './settings';
 import { escapeHtml, emailLang, type EmailLang } from './emailTemplates';
@@ -1443,9 +1444,9 @@ const STATUS_COPY: Record<'approved' | 'rejected', Record<EmailLang, { subject: 
 export async function enqueueUserDepositStatusNotification(
   env: Env,
   requestId: string
-): Promise<{ telegram: boolean; email: boolean }> {
+): Promise<{ telegram: boolean; email: boolean; whatsapp: boolean }> {
   const row = await env.DB.prepare(
-    `SELECT t.id, t.status, t.amount, t.user_id, u.locale, u.email, u.email_verified_at,
+    `SELECT t.id, t.status, t.amount, t.user_id, u.locale, u.email, u.email_verified_at, u.phone_e164,
             (SELECT l.chat_id FROM telegram_links l WHERE l.user_id = t.user_id AND l.revoked_at IS NULL) AS chat_id
        FROM wallet_transactions t JOIN users u ON u.id = t.user_id
       WHERE t.id = ? AND t.type = 'deposit'`
@@ -1459,9 +1460,12 @@ export async function enqueueUserDepositStatusNotification(
       locale: string;
       email: string;
       email_verified_at: string | null;
+      phone_e164: string | null;
       chat_id: number | null;
     }>();
-  if (!row || (row.status !== 'approved' && row.status !== 'rejected')) return { telegram: false, email: false };
+  if (!row || (row.status !== 'approved' && row.status !== 'rejected')) {
+    return { telegram: false, email: false, whatsapp: false };
+  }
 
   const status = row.status as 'approved' | 'rejected';
   const lang = emailLang(row.locale === 'ku' ? 'ckb' : row.locale);
@@ -1501,5 +1505,18 @@ export async function enqueueUserDepositStatusNotification(
     });
     email = id !== null;
   }
-  return { telegram, email };
+  // WhatsApp, on the number migration 0013 already proved the account owns.
+  // Money moving is exactly the kind of news a customer should not have to
+  // open the site to discover, and it is the same words as the other two.
+  let whatsapp = false;
+  if (isE164(row.phone_e164)) {
+    const id = await enqueueOutbox(env, `wallet.deposit.${status}:${row.id}:whatsapp`, {
+      kind: 'whatsapp',
+      to: row.phone_e164,
+      text: `LEVONIS\n${copy.line}\n\nرقم العملية: ${opNo}\nالمبلغ: ${amountLine}`,
+    });
+    whatsapp = id !== null;
+  }
+
+  return { telegram, email, whatsapp };
 }
