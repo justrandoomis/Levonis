@@ -1,4 +1,4 @@
-import { MotionCharacterHome, useCharacterBusy } from '../components/bloub/MotionCharacterAnchor';
+import { MotionCharacterAnchor, MotionCharacterHome, useCharacterBusy } from '../components/bloub/MotionCharacterAnchor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 // The standalone `loc` — this helper runs outside the component, and the
@@ -1079,11 +1079,29 @@ export default function Checkout() {
     return (
       <div className="h-full min-h-0 w-full overflow-y-auto bg-canvas text-text-primary flex flex-col font-sans selection:bg-white/20">
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in-95 duration-700">
-          <div className="w-24 h-24 mb-8 relative flex items-center justify-center">
-            <div className="absolute inset-0 bg-white/20 rounded-full animate-ping opacity-50" />
-            <div className="relative w-16 h-16 bg-white rounded-full flex items-center justify-center">
-              <Check className="w-8 h-8 text-black" strokeWidth={3} />
-            </div>
+          {/*
+            THE CHARACTER ARRIVES; THE CHECKMARK DOES NOT PULSE.
+
+            This was a white disc with a `animate-ping` ring behind it — a
+            decorative loop that ran for as long as the screen was open, which
+            is exactly the kind of motion the motion system rules out: it says
+            nothing, it cannot be interrupted, and it goes on saying nothing
+            after the news has been read.
+
+            A `stage` anchor replaces it. The character is docked in the header
+            when the order is placed, so registering a destination HERE makes
+            it travel down the page — the existing journey, with its wind-up,
+            its deceleration and its settle squash, none of it written twice.
+            The descent is the animation the owner asked for, and it is the
+            mechanism the character already uses to go anywhere.
+
+            `celebrate` is signalled beside it: priority 65 for 1.5s, above the
+            notification the order will produce, then back to calm. Under
+            reduced motion the engine cross-fades instead of travelling, and
+            the character is simply already here.
+          */}
+          <div className="mb-8 flex items-center justify-center">
+            <MotionCharacterAnchor kind="stage" />
           </div>
 
           <h2 className="text-2xl md:text-4xl font-normal mb-3 tracking-tight">

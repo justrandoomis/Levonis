@@ -18,9 +18,11 @@
  * short by design:
  *
  *  1. `data-mascot="…"` — the explicit opt-in, and the way new controls join.
- *  2. `.lv-button-primary` — the design system's own "this is the primary
- *     action here" token. A new primary button is noticed the day it is
- *     written, without anybody remembering to tell the mascot about it.
+ *  2. `.lv-button-primary` and `.lv-button-danger` — the design system's own
+ *     "this commits the user to something" tokens: the one action a screen is
+ *     FOR, and the one that takes something away. A new button carrying either
+ *     is noticed the day it is written, without anybody remembering to tell
+ *     the mascot about it.
  *  3. A handful of `data-testid`s that already exist on this app's three
  *     genuine commerce CTAs. Reusing them means the behaviour works today, on
  *     the buttons that actually matter, without editing three pages to say
@@ -66,9 +68,26 @@ const KNOWN_CTA_TESTIDS = new Set([
  */
 const PRIMARY_CLASS = 'lv-button-primary';
 
+/**
+ * THE DESTRUCTIVE TOKEN, ON THE SAME ARGUMENT.
+ *
+ * `.lv-button-danger` is the other half of the same declaration: where
+ * `lv-button-primary` means "the one thing this screen is FOR",
+ * `lv-button-danger` means "this takes something away, and it may not come
+ * back" — cancelling an order, deleting an address. Both are commitments, and
+ * the character has exactly as much business noticing the second as the first.
+ *
+ * Reading the token rather than tagging each site means a destructive button
+ * written next year is noticed the day it is written, which is the whole point
+ * of the rule above. It stays a DECLARATION either way: a chip, a toggle or a
+ * bespoke red Tailwind button is still invisible, because none of them said
+ * they were consequential.
+ */
+const DANGER_CLASS = 'lv-button-danger';
+
 /** The selector the delegated listener climbs to. Interest is a property of a
  *  CONTROL, so a hover on the label inside a button resolves to the button. */
-const CONTROL = `button, a[href], [role="button"], summary, input[type="submit"], [data-mascot], .${PRIMARY_CLASS}`;
+const CONTROL = `button, a[href], [role="button"], summary, input[type="submit"], [data-mascot], .${PRIMARY_CLASS}, .${DANGER_CLASS}`;
 
 export interface InterestTarget {
   kind: Exclude<InterestKind, 'ignore'>;
@@ -94,6 +113,7 @@ export function classify(element: Element | null): InterestKind | null {
   const testid = element.getAttribute('data-testid');
   if (testid && KNOWN_CTA_TESTIDS.has(testid)) return 'cta';
   if (element.classList.contains(PRIMARY_CLASS)) return 'cta';
+  if (element.classList.contains(DANGER_CLASS)) return 'cta';
   return null;
 }
 

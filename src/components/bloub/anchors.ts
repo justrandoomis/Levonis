@@ -1,5 +1,17 @@
 /** Shared layout registry. Only real mounted DOM anchors participate. */
-export type AnchorKind = 'bottom-home' | 'top-header' | 'top-fallback';
+/**
+ * `stage` is a destination that OWNS the screen for a moment — today, the
+ * order-confirmation panel. It outranks every dock because when it exists the
+ * character's whole job is to be there; the header and the navigation are
+ * still on screen, and without a higher priority the character would stay
+ * docked in one of them while the page it belongs on waited for it.
+ *
+ * It is deliberately not `top-header`. Reusing that kind would have worked by
+ * accident (nothing else on a full-screen route competes with it) and would
+ * have made `anchor-travel` announce the journey as `navigating`, which is the
+ * wrong thing for the character to feel on arriving somewhere to celebrate.
+ */
+export type AnchorKind = 'bottom-home' | 'top-header' | 'top-fallback' | 'stage';
 export type CharacterFrame = { x: number; y: number; size: number };
 export type CharacterAnchor = { element: HTMLElement; kind: AnchorKind; busy: boolean };
 const anchors = new Map<HTMLElement, CharacterAnchor>();
@@ -149,7 +161,7 @@ export function measureHomeTarget(root?: ParentNode): CharacterFrame | null {
 }
 
 export function measureCharacterAnchor(): (CharacterAnchor & { frame: CharacterFrame }) | null {
-  const priority: Record<AnchorKind, number> = { 'top-header': 3, 'bottom-home': 2, 'top-fallback': 1 };
+  const priority: Record<AnchorKind, number> = { stage: 4, 'top-header': 3, 'bottom-home': 2, 'top-fallback': 1 };
   for (const anchor of [...anchors.values()].sort((a, b) => priority[b.kind] - priority[a.kind])) {
     if (!anchor.element.isConnected) continue;
     const style = window.getComputedStyle(anchor.element);

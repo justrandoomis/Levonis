@@ -597,7 +597,14 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       );
       journeyRef.current = { plan, startedAt: performance.now(), boot };
       setPhase('travelling');
-      mascot.activity('anchor-travel', target.kind === 'bottom-home' ? 'returning' : 'navigating');
+      // Arriving on a stage is not navigation. The page that raised it says
+      // what the character should feel there (the confirmation panel signals
+      // `celebrate`), so the journey itself stays unlabelled rather than
+      // announcing a page change that is not happening.
+      mascot.activity(
+        'anchor-travel',
+        target.kind === 'stage' ? null : target.kind === 'bottom-home' ? 'returning' : 'navigating'
+      );
       start();
     };
 

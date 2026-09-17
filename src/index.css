@@ -888,11 +888,27 @@ html[data-overlay-open='true'] .lv-app-intro__character {
   */
   --lv-header-visual: clamp(52px, 13.5vw, 64px);
   --lv-header-hit: calc(var(--lv-header-visual) + 8px);
+  --lv-stage-visual: clamp(96px, 28vw, 128px);
   --lv-header-visual-compact: clamp(36px, 10vw, 44px);
   --lv-header-hit-compact: max(44px, calc(var(--lv-header-visual-compact) + 8px));
 }
 .lv-character-anchor { display: grid; place-items: center; width: var(--lv-header-visual); height: var(--lv-header-visual); flex: none; }
 .lv-character-anchor[data-bloub-anchor='bottom-home'] { width: var(--lv-home-visual); height: var(--lv-home-visual); }
+/*
+  THE CONFIRMATION STAGE.
+
+  Sized here rather than with a utility on the call site, for the same reason
+  `bottom-home` is: the anchor's BOX is what the character measures itself
+  against (frameFromRect takes min(width, height)), so its size is part of the
+  character system, not of whichever page happens to raise it. Fighting the
+  base rule with an important utility would also have needed v4's suffix
+  syntax, which appears nowhere else in this codebase.
+
+  Large, because this is the one screen where the character has the page to
+  itself and the news is worth the room — but clamped so it cannot crowd a
+  360px phone.
+*/
+.lv-character-anchor[data-bloub-anchor='stage'] { width: var(--lv-stage-visual); height: var(--lv-stage-visual); }
 .lv-character-bottom-home { display: grid; place-items: center; width: var(--lv-home-hit); height: var(--lv-home-hit); }
 .lv-character-fallback { color: var(--color-text-secondary); font-size: 24px; font-weight: 800; }
 .lv-character-home { display: grid; place-items: center; width: var(--lv-header-hit); height: var(--lv-header-hit); border-radius: 8px; }

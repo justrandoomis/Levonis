@@ -296,6 +296,12 @@ test('importance is DECLARED, never guessed from being a button', () => {
 
   // The design system's own primary token, and the three commerce testids.
   assert.equal(classify(el({}, ['lv-button-primary'])), 'cta');
+  // The destructive token declares a commitment just as the primary one does:
+  // cancelling an order is as consequential as placing it.
+  assert.equal(classify(el({}, ['lv-button-danger'])), 'cta');
+  // ...but a merely tinted or secondary control still says nothing.
+  assert.equal(classify(el({}, ['lv-button-secondary'])), null);
+  assert.equal(classify(el({}, ['lv-button-accent'])), null);
   assert.equal(classify(el({ 'data-testid': 'product-cta' })), 'cta');
   assert.equal(classify(el({ 'data-testid': 'cart-checkout' })), 'cta');
   assert.equal(classify(el({ 'data-testid': 'checkout-place-order' })), 'cta');
