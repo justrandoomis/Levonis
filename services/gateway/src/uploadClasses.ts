@@ -54,6 +54,10 @@ export const UPLOAD_CLASSES: readonly BodyClass[] = [
   { prefix: '/api/admin/import', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/routes/adminImport.ts#MAX_ZIP_BYTES', routeFile: 'adminImport.ts' },
   { prefix: '/api/admin/template/parse-zip', methods: ['POST'], kind: 'multipart', maxBytes: 15 * MB, source: 'worker/routes/template.ts#MAX_ZIP_BYTES', routeFile: 'template.ts' },
   { prefix: '/api/print-quote/uploads', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/routes/printQuote.ts#MODEL_MAX_BYTES', routeFile: 'printQuote.ts' },
+  // Main-page brand marks and service icons. Small by design and WebP-only —
+  // the route refuses anything else by magic bytes — so the gateway's ceiling
+  // is the route's own limit rather than the generic 40 MB upload class.
+  { prefix: '/api/admin/site-media', methods: ['POST'], kind: 'multipart', maxBytes: 2 * MB, source: 'worker/lib/siteMedia.ts#SITE_MEDIA_MAX_BYTES', routeFile: 'admin.ts' },
 ];
 
 export const JSON_CLASSES: readonly BodyClass[] = [

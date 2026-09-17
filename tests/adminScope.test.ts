@@ -71,11 +71,42 @@ test('with no INITIAL_ADMIN_EMAIL configured nobody is the owner', () => {
   assert.equal(isOwner(blank, user({ role: 'admin', email: 'anyone@example.com' })), false);
 });
 
-test('an unknown scope string falls back to unrestricted, not to assistant', () => {
+test('an ABSENT scope is unrestricted; an UNRECOGNISED one is not', () => {
   assert.equal(normalizeAdminScope('assistant'), 'assistant');
   assert.equal(normalizeAdminScope('full'), 'full');
-  assert.equal(normalizeAdminScope('nonsense'), null);
+
+  // ABSENT stays unrestricted. This is the documented upgrade path: migration
+  // 0021 added the column and could not be allowed to demote every live admin
+  // overnight, so NULL means "no restriction was ever recorded".
   assert.equal(normalizeAdminScope(undefined), null);
+  assert.equal(normalizeAdminScope(null), null);
+  assert.equal(normalizeAdminScope(''), null);
+  assert.equal(normalizeAdminScope('   '), null);
+
+  // UNRECOGNISED resolves to the LEAST privilege, and this assertion is the
+  // reverse of what this test used to say. The old behaviour bundled 'nonsense'
+  // with undefined and returned null for both — so `'assisstant'` with a typo,
+  // a value written by an older build, or a half-finished manual UPDATE all
+  // read as "not an assistant" and granted the cost, the margin and the
+  // supplier price. The module's own rationale only ever justified the ABSENT
+  // case; nothing justified failing open on a value nobody could parse. The
+  // one thing certain about such a value is that somebody meant to restrict
+  // something.
+  assert.equal(normalizeAdminScope('nonsense'), 'assistant');
+  assert.equal(normalizeAdminScope('readonly'), 'assistant');
+  assert.equal(normalizeAdminScope('assisstant'), 'assistant', 'a typo must not widen access');
+  assert.equal(normalizeAdminScope('FULL'), 'assistant', 'the values are matched exactly, not case-folded');
+  assert.equal(normalizeAdminScope(42), 'assistant');
+  assert.equal(normalizeAdminScope({}), 'assistant');
+});
+
+test('an unparseable scope cannot see financials', () => {
+  // The consequence of the rule above, at the call site that matters.
+  assert.equal(canViewFinancials(env, user({ role: 'admin', admin_scope: 'nonsense' })), false);
+  assert.equal(canViewFinancials(env, user({ role: 'admin', admin_scope: 'assisstant' })), false);
+  // ...and the documented default is untouched.
+  assert.equal(canViewFinancials(env, user({ role: 'admin', admin_scope: null })), true);
+  assert.equal(canViewFinancials(env, user({ role: 'admin', admin_scope: 'full' })), true);
 });
 
 // ------------------------------------------------------------------ what

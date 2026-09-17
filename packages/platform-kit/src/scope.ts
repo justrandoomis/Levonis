@@ -10,10 +10,29 @@ import type { Principal, PrincipalScope } from '@levonis/contracts/rpc/common';
 
 export type AdminScope = 'full' | 'assistant';
 
+/**
+ * UNSET IS UNRESTRICTED; UNRECOGNISED IS NOT.
+ *
+ * NULL meaning "full" is deliberate and documented above — migration 0021
+ * could not be allowed to quietly demote every live admin. The defect was that
+ * everything ELSE also meant full: `'assisstant'` with a typo, a value written
+ * by an older build, a half-finished manual UPDATE, or anything a future
+ * migration adds and this function has not learned yet all fell through the
+ * same `return null`, and `canViewFinancials` reads that as "not an
+ * assistant" — so a scope nobody recognised granted the cost, the margin and
+ * the supplier price.
+ *
+ * The two cases are now told apart. Absent stays unrestricted, which is the
+ * documented upgrade path. Present-but-unrecognised resolves to the LEAST
+ * privilege, because the one thing certain about a value we cannot read is
+ * that somebody meant to restrict something.
+ */
 export function normalizeAdminScope(v: unknown): AdminScope | null {
   if (v === 'assistant') return 'assistant';
   if (v === 'full') return 'full';
-  return null;
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'string' && v.trim() === '') return null;
+  return 'assistant';
 }
 
 /** Every field name that carries financial information about a product. Used

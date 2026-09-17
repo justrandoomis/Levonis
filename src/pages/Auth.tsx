@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, AtSign, Check, CheckCircle2, Info, Lock, Mail, MailCheck, UserRound, X } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useMotion } from '../lib/motion';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
@@ -458,8 +459,25 @@ export default function Auth() {
   const ob = onboardingStrings(lang);
   // Respect the OS "reduce motion" setting: the screen switch becomes a
   // plain cross-fade with no travel.
-  const reduceMotion = useReducedMotion();
-  const slide = reduceMotion ? 0 : 4;
+  // `useMotion()` already answers prefers-reduced-motion (and the writing
+  // direction) in one place, so a second hook here would be a second source
+  // of truth for the same question.
+  const m = useMotion();
+  /**
+   * WHICH WAY THIS SCREEN CAME FROM.
+   *
+   * The switch used to be a 160ms cross-fade with 4px of VERTICAL travel, the
+   * same in both directions — so going back from step 2 to step 1 looked
+   * exactly like going forward from 1 to 2. docs/MOTION.md §3 states the rule
+   * it broke: «إن اختفى شيء من جهة، توقّعنا عودته من حيث ذهب» — if something
+   * left one way, we expect it back from where it went. A step is a horizontal
+   * journey, and a back step has to run the same path in reverse.
+   *
+   * The sign is stored rather than derived, because by the time the exiting
+   * screen animates, `step` already holds the NEW value and the direction is
+   * no longer recoverable from state.
+   */
+  const [stepDir, setStepDir] = useState<1 | -1>(1);
   // Phone browsers with their bars and landscape tablets: the provider
   // buttons become icon-only so every screen fits without scrolling.
   const shortViewport = useShortViewport();
@@ -678,6 +696,7 @@ export default function Auth() {
 
   const goToStep = (next: SignupStep) => {
     setServerError('');
+    setStepDir(next >= step ? 1 : -1);
     setStep(next);
   };
 
@@ -1735,15 +1754,28 @@ export default function Auth() {
 
   return withGoogle(
     <AuthShell dir={dir}>
-      {/* mode="wait": exactly one screen — and one <form> — is mounted at a
-          time. The switch itself is a 160ms cross-fade with 4px of travel. */}
+      {/*
+        mode="wait": exactly one screen — and one <form> — is mounted at a time.
+
+        The travel is INLINE and DIRECTIONAL: a forward step enters from the
+        leading edge and leaves towards the trailing one, and a back step runs
+        that path in reverse. `m.inline()` carries the writing direction, so an
+        Arabic reader sees the journey mirrored rather than a Latin layout's
+        idea of "forward" (§7).
+
+        A spring, not a 160ms curve. A fixed duration cannot be caught and
+        reversed halfway, and somebody tapping «رجوع» while the previous step
+        is still arriving is the ordinary case this screen has to survive
+        (§2). Under reduced motion `m.spring()` collapses to a cross-fade and
+        `m.travel()` returns 0, so the screen changes without moving.
+      */}
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={screenKey}
-          initial={{ opacity: 0, y: slide }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -slide }}
-          transition={{ duration: reduceMotion ? 0 : 0.16, ease: 'easeOut' }}
+          initial={{ opacity: 0, x: m.inline(m.travel(18) * stepDir) }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: m.inline(m.travel(18) * -stepDir) }}
+          transition={m.spring('ui')}
         >
           {screen}
         </motion.div>

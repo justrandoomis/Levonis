@@ -75,6 +75,12 @@ const STRINGS = {
     emailNotConfigured: 'خدمة البريد غير مهيأة على الخادم بعد، لذا لا يمكن إرسال رسائل التحقق أو تغيير البريد.',
     changeEmail: 'تغيير البريد', newEmail: 'البريد الجديد',
     changeEmailNote: 'لا يتغير البريد إلا بعد تأكيدك من الصندوق الجديد.',
+    emailFormInvalid: 'صيغة البريد غير صحيحة — اكتبه هكذا: name@example.com',
+    notifEmailReady: 'جاهز لاستقبال الفواتير ورسائل الأمان.',
+    notifEmailNeedsVerify: 'أكّد بريدك أولاً لتصلك الفواتير ورسائل الأمان.',
+    notifGoTelegram: 'اذهب إلى الربط',
+    notifWhatsapp: 'واتساب',
+    notifWhatsappWhy: 'غير متاح بعد: يحتاج حساب WhatsApp Business وقوالب رسائل معتمدة من المزوّد. لا نعرض زرًا لا يعمل.',
     changePassword: 'تغيير كلمة المرور', currentPassword: 'كلمة المرور الحالية',
     newPassword: 'كلمة المرور الجديدة', confirmPassword: 'تأكيد كلمة المرور',
     pwMin: `الحد الأدنى ${PASSWORD_MIN} أحرف.`, pwMismatch: 'كلمتا المرور غير متطابقتين.',
@@ -129,6 +135,12 @@ const STRINGS = {
     emailNotConfigured: 'No email service is configured on the server yet, so verification and email changes cannot be sent.',
     changeEmail: 'Change email', newEmail: 'New email',
     changeEmailNote: 'The address changes only after you confirm from the new inbox.',
+    emailFormInvalid: 'That email address is not valid — write it like name@example.com',
+    notifEmailReady: 'Ready to receive invoices and security messages.',
+    notifEmailNeedsVerify: 'Verify your email first so invoices and security messages can reach you.',
+    notifGoTelegram: 'Go to linking',
+    notifWhatsapp: 'WhatsApp',
+    notifWhatsappWhy: 'Not available yet: it needs a WhatsApp Business account and approved message templates from the provider. We do not show a button that cannot work.',
     changePassword: 'Change password', currentPassword: 'Current password',
     newPassword: 'New password', confirmPassword: 'Confirm password',
     pwMin: `Minimum ${PASSWORD_MIN} characters.`, pwMismatch: 'The passwords do not match.',
@@ -183,6 +195,12 @@ const STRINGS = {
     emailNotConfigured: 'خزمەتگوزاری ئیمەیل لەسەر ڕاژەکار ڕێکنەخراوە، بۆیە ناتوانرێت نامەی پشتڕاستکردنەوە یان گۆڕینی ئیمەیل بنێردرێت.',
     changeEmail: 'گۆڕینی ئیمەیل', newEmail: 'ئیمەیلی نوێ',
     changeEmailNote: 'ئیمەیل تەنها دوای پشتڕاستکردنەوە لە ناوسندوقی نوێ دەگۆڕێت.',
+    emailFormInvalid: 'ناونیشانی ئیمەیڵ دروست نییە — وەک name@example.com بینووسە',
+    notifEmailReady: 'ئامادەیە بۆ وەرگرتنی پسوولە و پەیامە ئەمنییەکان.',
+    notifEmailNeedsVerify: 'سەرەتا ئیمەیڵەکەت پشتڕاست بکەرەوە.',
+    notifGoTelegram: 'بڕۆ بەستنەوە',
+    notifWhatsapp: 'واتسئاپ',
+    notifWhatsappWhy: 'هێشتا بەردەست نییە: پێویستی بە هەژماری WhatsApp Business هەیە.',
     changePassword: 'گۆڕینی وشەی تێپەڕ', currentPassword: 'وشەی تێپەڕی ئێستا',
     newPassword: 'وشەی تێپەڕی نوێ', confirmPassword: 'دووبارەکردنەوەی وشەی تێپەڕ',
     pwMin: `لانیکەم ${PASSWORD_MIN} پیت.`, pwMismatch: 'وشە تێپەڕەکان وەک یەک نین.',
@@ -443,7 +461,7 @@ export default function Settings() {
     if (emailLock.current) return;
     setEmailFormError('');
     if (!/^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/.test(newEmail.trim())) {
-      setEmailFormError(s.newEmail);
+      setEmailFormError(s.emailFormInvalid);
       return;
     }
     emailLock.current = true;
@@ -757,7 +775,7 @@ export default function Settings() {
             </SectionCard>
 
             {/* ------------------------------------------------ 3. Linking */}
-            <section className="mb-6">
+            <section className="mb-6" id="settings-linking" style={{ scrollMarginTop: '72px' }}>
               <h2 className="text-text-muted text-xs font-bold uppercase tracking-[0.08em] mb-2 ms-1 flex items-center gap-2">
                 <Link2 aria-hidden="true" className="w-4 h-4" />
                 {s.secLinking}
@@ -879,17 +897,78 @@ export default function Settings() {
                   </button>
                 ) : null}
               </div>
+              {/*
+                EACH CHANNEL SAYS WHETHER IT CAN ACTUALLY REACH YOU, AND
+                CARRIES THE CONTROL THAT FIXES IT.
+
+                These three rows used to be prose: "email notifications are
+                sent to a verified address", "Telegram is used after linking it
+                from the Linking section above". Both sentences are TRUE and
+                neither is usable — the reader is told a precondition and left
+                to find the control themselves, which is the reported
+                «غير مفعل». A channel row now shows its real state and takes
+                you to the one thing that changes it.
+              */}
               <div className="px-4 py-3">
-                <p className="font-bold text-[15px]">{s.emailNotifTitle}</p>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-bold text-[15px]">{s.emailNotifTitle}</span>
+                  {emailStatus ? (
+                    <span
+                      className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                        emailStatus.verified ? 'text-success bg-success/10' : 'text-warning bg-warning/10'
+                      }`}
+                    >
+                      {emailStatus.verified ? s.emailVerified : s.emailUnverified}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">
+                  {emailStatus && !emailStatus.verified ? s.notifEmailNeedsVerify : s.notifEmailReady}
+                </p>
                 <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.emailNotifNote}</p>
-                {emailStatus && !emailStatus.verified ? (
-                  <p className="mt-1 text-[12px] text-amber-300">{s.emailUnverified}</p>
+                {/* The SAME action as the security section, offered where the
+                    consequence is felt — an unverified address is exactly why
+                    notifications do not arrive. */}
+                {emailStatus && emailStatus.emailConfigured && !emailStatus.verified ? (
+                  <button
+                    type="button"
+                    onClick={sendVerification}
+                    disabled={emailBusy}
+                    className="lv-button lv-button-secondary lv-button-sm mt-2"
+                  >
+                    {emailBusy ? s.sending : s.sendVerify}
+                  </button>
+                ) : null}
+                {emailStatus && !emailStatus.emailConfigured ? (
+                  <p className="lv-alert lv-alert-warning mt-2 text-xs">{s.emailNotConfigured}</p>
                 ) : null}
               </div>
+
+              {/* NO STATE PILL HERE, deliberately. A Telegram binding lives in
+                  its own table (`telegram_links`) and is not on the user
+                  object, so this row cannot know whether it is linked without
+                  a second request — and <TelegramLink/> in the Linking section
+                  already asks that question and shows the real answer. A pill
+                  here would either duplicate that fetch or guess. The row says
+                  what the channel is for and takes you to the control. */}
               <div className="px-4 py-3">
                 <p className="font-bold text-[15px]">{s.telegram}</p>
                 <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.tgNotifNote}</p>
+                <a href="#settings-linking" className="lv-button lv-button-secondary lv-button-sm mt-2">
+                  {s.notifGoTelegram}
+                </a>
               </div>
+
+              {/* WhatsApp is named rather than omitted. The owner asked for it
+                  and a reader who cannot find it deserves the reason instead
+                  of an absence they have to interpret. No control, because
+                  there is nothing behind one yet. */}
+              <DisabledRow
+                label={s.notifWhatsapp}
+                reason={s.notifWhatsappWhy}
+                note={s.notAvailable}
+                icon={<Bell aria-hidden="true" className="w-5 h-5" />}
+              />
             </SectionCard>
 
             {/* --------------------------------------- 7. Privacy and help */}

@@ -336,7 +336,29 @@ adminRoutes.patch('/users/:id', async (c) => {
   await c.env.DB.prepare(`UPDATE users SET ${updates.join(', ')}, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`)
     .bind(...params)
     .run();
-  await audit(c.env.DB, admin.id, 'admin.user_update', id, body);
+  /**
+   * THE AUDIT RECORDS WHAT CHANGED, NOT WHAT WAS SENT.
+   *
+   * This logged the raw request body, which is whatever the caller chose to
+   * put in it: fields this route ignores, fields a future client adds, and —
+   * the reason it matters — anything an attacker appends to a request they are
+   * otherwise allowed to make. An audit trail that stores unvalidated input is
+   * a place to hide things in, and it is read by the people investigating
+   * exactly that.
+   *
+   * The columns this handler actually wrote are already assembled above, so
+   * the record is built from THOSE.
+   */
+  await audit(c.env.DB, admin.id, 'admin.user_update', id, {
+    // The COLUMN NAMES this statement actually set, paired with the values the
+    // handler validated. `tier` is block-scoped to its own branch, so the
+    // membership change is read back out of the bound parameters rather than
+    // reaching for a variable that may not exist.
+    fields: updates.map((u) => u.split(' ')[0]),
+    role: role ?? undefined,
+    admin_scope: scope ?? undefined,
+    is_investor: isInvestor ?? undefined,
+  });
   return c.json({ success: true });
 });
 
