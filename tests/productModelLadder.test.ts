@@ -82,13 +82,13 @@ function viaImportCsv(p: PricingProduct): string[] {
 /** 4. The form's own state, judged before the round trip. */
 function viaClient(p: PricingProduct): string[] {
   const value = (o: PricingProduct['options'][number]): FormValue => ({
-    id: o.id, name_en: o.id, sku_part: '', image: '', sort: 0, active: o.active !== false, stock: null, low_stock_threshold: null,
-    availability_type: '', lead_time_text: '', lead_time_min_days: null, lead_time_max_days: null, variant_key: '', variant_label: '',
+    id: o.id, name_en: o.id, sku_part: '', image: '', sort: 0, active: o.active !== false, stock: null, reserved: 0, low_stock_threshold: null,
+    availability_type: '', lead_time_text: '', lead_time_min_days: null, lead_time_max_days: null, variant_key: '', variant_label: '', fulfillments: [],
     regular_price_iqd: o.regular_price_iqd, prime_price_iqd: o.prime_price_iqd, pro_price_iqd: o.pro_price_iqd, cost_iqd: o.cost_iqd,
     regular_adjust_iqd: o.regular_adjust_iqd ?? null, prime_adjust_iqd: o.prime_adjust_iqd ?? null, pro_adjust_iqd: o.pro_adjust_iqd ?? null, cost_adjust_iqd: o.cost_adjust_iqd ?? null,
   });
   const colour = (c: PricingProduct['colors'][number]): FormColor => ({
-    id: c.id, name_en: c.id, hex: '#000000', image: '', sku_part: '', sort: 0, active: c.active !== false, stock: null, low_stock_threshold: null,
+    id: c.id, name_en: c.id, hex: '#000000', image: '', sku_part: '', sort: 0, active: c.active !== false, stock: null, reserved: 0, low_stock_threshold: null,
     option_value_ids: linkedOf(c),
     regular_price_iqd: c.regular_price_iqd, prime_price_iqd: c.prime_price_iqd, pro_price_iqd: c.pro_price_iqd, cost_iqd: c.cost_iqd,
     regular_adjust_iqd: c.regular_adjust_iqd ?? null, prime_adjust_iqd: c.prime_adjust_iqd ?? null, pro_adjust_iqd: c.pro_adjust_iqd ?? null, cost_adjust_iqd: c.cost_adjust_iqd ?? null,

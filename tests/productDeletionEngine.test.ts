@@ -301,7 +301,7 @@ test('1c. deletion still works during the deploy-before-media-migration window',
     result.media_jobs
   );
   assert.deepEqual(cleanup.failed, []);
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM products WHERE id = 'p-no-job-table'").get().n, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM products WHERE id = 'p-no-job-table'").get()!.n, 0);
   assert.equal(bucket.objects.size, 0);
 });
 
