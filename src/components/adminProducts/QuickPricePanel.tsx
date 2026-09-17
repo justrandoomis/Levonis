@@ -929,8 +929,9 @@ function QuickFulfillmentPanel({
       })),
       variants: enabled && hasCombinations
         ? current.variants.map((variant) => {
-            const parts = new Set(variant.combo_key.split('|'));
-            return parts.has(`o:${value.id}`) && variant.stock === null ? { ...variant, stock: 0 } : variant;
+            return variant.option_value_ids.includes(value.id) && variant.stock === null
+              ? { ...variant, stock: 0 }
+              : variant;
           })
         : current.variants,
     }));
