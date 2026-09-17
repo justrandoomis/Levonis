@@ -2716,6 +2716,20 @@ productRoutes.get('/:slug', async (c) => {
         .bind(String(row.id))
         .first<{ n: number; avg_stars: number | null }>(),
     ]);
+    /**
+     * The linked new product's live price, when this listing is a used copy.
+     * One extra read, and only for a graded row — an ordinary product pays
+     * nothing for this feature.
+     */
+    let conditionReference: { reference_iqd: number; saving_iqd: number } | null = null;
+    if (parsed.condition?.new_product_id) {
+      const ref = await c.env.DB.prepare(
+        "SELECT price_iqd FROM products WHERE id = ? AND status = 'active'"
+      )
+        .bind(parsed.condition.new_product_id)
+        .first<{ price_iqd: number }>();
+      conditionReference = conditionSaving(Number(parsed.price_iqd) || 0, ref ? Number(ref.price_iqd) : null);
+    }
     const ratingCount = Number(ratingRow?.n) || 0;
     const ratingSummary = ratingCount > 0
       ? { average: Math.round(Number(ratingRow?.avg_stars ?? 0) * 10) / 10, count: ratingCount }
@@ -2824,6 +2838,14 @@ productRoutes.get('/:slug', async (c) => {
        */
       sales_badge: salesBadge,
       rating: ratingSummary,
+      /**
+       * The new product's CURRENT price, for the struck-through comparison on
+       * a graded listing. Resolved server-side so the page never has to fetch
+       * a second product to price the first, and omitted entirely when there
+       * is nothing honest to show — no link, a hidden reference, or a used
+       * price that is not actually lower.
+       */
+      condition_reference: conditionReference,
       // The structure the JSON model could not express: option GROUPS, the
       // real many-to-many colour links, modelled combinations and bound
       // images. Null when the product has no relational rows at all.

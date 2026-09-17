@@ -45,7 +45,7 @@ import { useWallet } from '../WalletContext';
 import {
   ArrowRight, ArrowLeft, ShoppingCart, Star, Check, Share2, Heart, Clock, Package,
   ChevronDown, Minus, Plus, X, FileText, Settings2, ShieldCheck, Truck,
-  AlertTriangle, Store, ZoomIn, Image as ImageIcon, Box, ExternalLink, PlayCircle, Wrench, TrendingUp,
+  AlertTriangle, Store, ZoomIn, Image as ImageIcon, Box, ExternalLink, PlayCircle, Wrench, TrendingUp, PackageOpen,
 } from 'lucide-react';
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
 import { useGoBack } from '../lib/useGoBack';
@@ -60,6 +60,8 @@ import { monthsLabel } from '../components/orders/format';
 import { captureSupportRefFromSearch } from '../lib/supportRef';
 import { productGalleryForSelection } from '../lib/productImage';
 import { tierLabel } from '../components/subscription/tierMeta';
+import ConditionPanel from '../components/product/ConditionPanel';
+import { conditionKindLabel, type ConditionEntry } from '../lib/condition';
 
 // ------------------------------------------------------------------ strings
 
@@ -584,6 +586,8 @@ interface DetailResponse {
    */
   sales_badge?: number | null;
   rating?: { average: number; count: number } | null;
+  /** The linked new product's CURRENT price, when this is a graded listing. */
+  condition_reference?: { reference_iqd: number; saving_iqd: number } | null;
 }
 
 interface QuoteResponse {
@@ -739,6 +743,16 @@ export default function Product() {
   /** Header signals: the sales TIER (never the exact count) and the score. */
   const [salesBadge, setSalesBadge] = useState<number | null>(null);
   const [rating, setRating] = useState<{ average: number; count: number } | null>(null);
+  /** Open box / used / refurbished — null for an ordinary new product. */
+  const [conditionRef, setConditionRef] = useState<{ reference_iqd: number; saving_iqd: number } | null>(null);
+
+  /**
+   * The condition document rides on the product payload (CARD_FIELDS and the
+   * public projection both carry it), so there is no second fetch and no
+   * separate loading state — a graded page paints graded on first paint.
+   */
+  const productCondition =
+    (product as (typeof product & { condition?: ConditionEntry | null }) | null)?.condition ?? null;
   const [source, setSource] = useState<ProductSource>('catalog');
   const [relations, setRelations] = useState<RelationsPayload | null>(null);
   const [baseAvailability, setBaseAvailability] = useState<Availability | null>(null);
@@ -875,6 +889,7 @@ export default function Product() {
     setProduct(null);
     setSalesBadge(null);
     setRating(null);
+    setConditionRef(null);
     setLoading(true);
   }
 
@@ -915,6 +930,7 @@ export default function Product() {
         setPriceLevels(data.price_levels ?? null);
         setSalesBadge(data.sales_badge ?? null);
         setRating(data.rating ?? null);
+        setConditionRef(data.condition_reference ?? null);
         // THE PRICE IS ALREADY HERE. `pricing` is the server's own resolver
         // result for the opening selection, computed on this request; seeding the
         // quote with it means the page opens with a real, final figure instead
@@ -2802,6 +2818,18 @@ export default function Product() {
                   </span>
                 ) : null}
 
+                {/* A graded unit says so beside its availability, not only
+                    in the panel below — the chip row is what a shopper reads
+                    before scrolling, and "used" is not a footnote. */}
+                {productCondition ? (
+                  <span
+                    data-condition-chip={productCondition.kind}
+                    className="inline-flex items-center gap-1.5 border border-info/30 bg-info/10 rounded-full px-2.5 py-1 text-[11px] font-bold text-info"
+                  >
+                    <PackageOpen aria-hidden="true" className="w-3.5 h-3.5" />
+                    {conditionKindLabel(productCondition.kind, lang)}
+                  </span>
+                ) : null}
                 {product.brand ? (
                   <span className="border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] text-zinc-300">{product.brand}</span>
                 ) : null}
@@ -2821,6 +2849,14 @@ export default function Product() {
                   <>{s.officialStore} · Levonis</>
                 )}
               </p>
+              {/* The frame the price below only makes sense inside: what this
+                  unit is, what was wrong with it, what it is covered for, and
+                  that it cannot be sent back for a change of mind. Above the
+                  purchase controls, never below them. */}
+              {productCondition ? (
+                <ConditionPanel condition={productCondition} reference={conditionRef} />
+              ) : null}
+
               {/* Only honest when the counter really is product-wide: with
                   OPTION/COLOR inventory the pills carry their own counts. */}
               {availability?.stock.tracked &&

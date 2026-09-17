@@ -32,7 +32,7 @@ export interface ConditionEntry {
 }
 
 type Lang = 'ar' | 'en' | 'ckb';
-const asLang = (lang: string): Lang => (lang === 'en' ? 'en' : lang === 'ku' || lang === 'ckb' ? 'ckb' : 'ar');
+const asLang = (lang: string): Lang => (lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar');
 
 /**
  * «Open Box» is left in Latin script in all three languages on purpose: it is
