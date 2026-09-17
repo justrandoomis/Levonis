@@ -16,6 +16,8 @@
  * project docs for native review. Nothing is machine-translated at runtime.
  */
 
+import { PRINT_FONT_LINK, printBaseCss } from './printDocument';
+
 export type EmailLang = 'ar' | 'en' | 'ckb';
 
 export interface RenderedEmail {
@@ -663,22 +665,129 @@ export function renderOrderInvoiceEmail(lang: EmailLang, inv: InvoiceEmailData, 
 export function renderInvoiceHtmlDocument(lang: EmailLang, inv: InvoiceEmailData): string {
   const t = COPY[lang];
   const dir = dirOf(lang);
+  const issued = inv.issued_at.slice(0, 10);
+
+  const meta: Array<[string, string]> = [
+    [t.invoiceNoLabel, inv.invoice_no],
+    [t.orderLabel, inv.order_id],
+    [t.issuedLabel, issued],
+  ];
+  if (inv.revision > 1) meta.push([t.revisionLabel, String(inv.revision)]);
+  const metaHtml = meta
+    .map(
+      ([k, v]) =>
+        `<div class="meta-row"><span class="meta-k">${escapeHtml(k)}</span>` +
+        `<span class="meta-v ltr">${escapeHtml(v)}</span></div>`
+    )
+    .join('');
+
+  const linesHtml = inv.lines
+    .map((l) => {
+      const details: string[] = [];
+      if (l.variant) details.push(escapeHtml(l.variant));
+      if (l.transport_commission_iqd > 0)
+        details.push(`${escapeHtml(t.transportFeeLabel)}: <span class="ltr">${escapeHtml(iqd(l.transport_commission_iqd))}</span>`);
+      if ((l.direct_surcharge_iqd ?? 0) > 0)
+        details.push(`${escapeHtml(t.directFeeLabel)}: <span class="ltr">${escapeHtml(iqd(l.direct_surcharge_iqd ?? 0))}</span>`);
+      if (l.warranty_fee_iqd > 0)
+        details.push(
+          `${escapeHtml(t.warrantyFeeLabel)}${l.warranty_label ? ` (${escapeHtml(l.warranty_label)})` : ''}: <span class="ltr">${escapeHtml(iqd(l.warranty_fee_iqd))}</span>`
+        );
+      return (
+        `<tr>` +
+        `<td class="it"><span class="it-name">${escapeHtml(l.name)}</span>` +
+        (details.length ? `<span class="it-sub">${details.join('<br>')}</span>` : '') +
+        `</td>` +
+        `<td class="qty num">${l.qty}</td>` +
+        `<td class="money ltr num">${escapeHtml(iqd(l.unit_price_iqd))}</td>` +
+        `<td class="money ltr num">${escapeHtml(iqd(l.line_total_iqd))}</td>` +
+        `</tr>`
+      );
+    })
+    .join('');
+
+  const totalRow = (label: string, value: string, cls = '') =>
+    `<tr class="${cls}"><th scope="row">${escapeHtml(label)}</th>` +
+    `<td class="money ltr num">${escapeHtml(value)}</td></tr>`;
+
+  let totals = totalRow(t.subtotalLabel, iqd(inv.subtotal_iqd));
+  totals += inv.delivery_waived
+    ? totalRow(t.deliveryWaivedLabel, iqd(0))
+    : totalRow(t.deliveryLabel, iqd(inv.delivery_fee_iqd));
+  const codBefore = inv.cod_tax_before_exemption_iqd ?? inv.cod_tax_iqd ?? 0;
+  const codExempt = inv.cod_tax_exemption_iqd ?? 0;
+  if (codBefore > 0) totals += totalRow(t.codTaxLabel, iqd(codBefore));
+  if (codExempt > 0) totals += totalRow(t.codTaxExemptLabel, `-${iqd(codExempt)}`);
+  if ((inv.membership_discount_iqd ?? 0) > 0) {
+    totals += totalRow(membershipLabel(t, inv), `-${iqd(inv.membership_discount_iqd ?? 0)}`);
+  }
+  if (inv.coupon_discount_iqd > 0) totals += totalRow(t.couponLabel, `-${iqd(inv.coupon_discount_iqd)}`);
+  if (inv.points_applied_iqd > 0) totals += totalRow(t.pointsLabel, `-${iqd(inv.points_applied_iqd)}`);
+  totals += totalRow(t.totalLabel, iqd(inv.total_iqd), 'grand');
+  if (inv.wallet_applied_iqd > 0) totals += totalRow(t.walletLabel, iqd(inv.wallet_applied_iqd));
+  totals += totalRow(t.paidLabel, iqd(inv.amount_paid_iqd));
+  totals += totalRow(t.dueLabel, iqd(inv.amount_due_iqd), inv.amount_due_iqd > 0 ? 'due-open' : 'due-clear');
+
+  const css =
+    printBaseCss(14) +
+    `
+  .sheet { width: 182mm; margin: 0 auto; background: #fff; }
+  .head { display: flex; justify-content: space-between; align-items: flex-end;
+          border-bottom: 2.5px solid #14161a; padding-bottom: 4mm; margin-bottom: 5mm; }
+  .brand { font-size: 22pt; font-weight: 800; letter-spacing: 2px; color: #14161a; }
+  .brand .tag { display: block; font-size: 8pt; font-weight: 600; color: #6b7280; margin-top: 1mm; }
+  .doc-title { text-align: end; }
+  .doc-title .kind { font-size: 13pt; font-weight: 800; color: #BAA369; }
+  .doc-title .no { display: block; font-size: 10pt; color: #14161a; margin-top: 1mm; }
+  .meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5mm 8mm; margin-bottom: 6mm; }
+  .meta-row { display: flex; justify-content: space-between; gap: 4mm; border-bottom: 1px dotted #d6d9de; padding-bottom: 1mm; }
+  .meta-k { font-size: 9pt; color: #6b7280; }
+  .meta-v { font-size: 9.5pt; font-weight: 700; color: #14161a; }
+  .lines { margin-bottom: 5mm; }
+  .lines thead th { background: #14161a; color: #BAA369; font-size: 9pt; font-weight: 700; padding: 2.5mm 3mm; text-align: start; }
+  .lines thead th.qty { text-align: center; }
+  .lines thead th.money { text-align: end; }
+  .lines td { border-bottom: 1px solid #e6e8ec; padding: 2.5mm 3mm; font-size: 10pt; vertical-align: top; }
+  .it-name { font-weight: 600; }
+  .it-sub { display: block; font-size: 8.5pt; color: #6b7280; margin-top: .8mm; }
+  .qty { text-align: center; white-space: nowrap; }
+  .money { text-align: end; white-space: nowrap; }
+  .totals { width: 88mm; margin-inline-start: auto; }
+  .totals th { text-align: start; font-weight: 400; font-size: 10pt; color: #4b5563; padding: 1.6mm 3mm; }
+  .totals td { padding: 1.6mm 3mm; font-size: 10pt; }
+  .totals .grand th, .totals .grand td { font-weight: 800; font-size: 11.5pt; color: #14161a; border-top: 1.5px solid #14161a; padding-top: 2.2mm; }
+  .totals .due-open td { font-weight: 800; color: #8a6d00; }
+  .totals .due-clear td { font-weight: 800; color: #1a7f37; }
+  .status { margin-top: 4mm; text-align: end; font-size: 10pt; font-weight: 700; }
+  .foot { margin-top: 8mm; padding-top: 3mm; border-top: 1px solid #e6e8ec; font-size: 8.5pt; color: #6b7280; line-height: 1.7; }
+`;
+
   const body =
-    `<div style="max-width:640px;margin:0 auto;padding:24px 16px;">` +
-    `<div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:3px solid #111111;padding-bottom:12px;margin-bottom:16px;">` +
-    `<span style="font-size:24px;font-weight:bold;letter-spacing:2px;color:#111111;">LEVONIS</span>` +
-    `<span style="font-size:16px;color:#8a6d00;font-weight:bold;">${escapeHtml(t.invoiceTitle)} ${escapeHtml(inv.invoice_no)}</span>` +
-    `</div>` +
-    invoiceMetaHtml(t, inv) +
-    invoiceLinesHtml(t, inv) +
-    invoiceTotalsHtml(t, inv) +
-    para(t.invoiceFooter, { small: true }) +
+    `<div class="sheet">` +
+    `<header class="head avoid-break">` +
+    `<div class="brand">LEVONIS<span class="tag">levonis-iq.com</span></div>` +
+    `<div class="doc-title"><span class="kind">${escapeHtml(t.invoiceTitle)}</span>` +
+    `<span class="no ltr">${escapeHtml(inv.invoice_no)}</span></div>` +
+    `</header>` +
+    `<section class="meta avoid-break">${metaHtml}</section>` +
+    `<table class="lines"><thead><tr>` +
+    `<th>${escapeHtml(t.itemLabel)}</th>` +
+    `<th class="qty">${escapeHtml(t.qtyLabel)}</th>` +
+    `<th class="money">${escapeHtml(t.unitPriceLabel)}</th>` +
+    `<th class="money">${escapeHtml(t.lineTotalLabel)}</th>` +
+    `</tr></thead><tbody>${linesHtml}</tbody></table>` +
+    `<table class="totals avoid-break"><tbody>${totals}</tbody></table>` +
+    `<p class="status">${escapeHtml(t.statusLabel)}: ${escapeHtml(t.status[inv.payment_status])}</p>` +
+    `<footer class="foot">${escapeHtml(t.invoiceFooter)}</footer>` +
     `</div>`;
+
   return (
     `<!doctype html><html lang="${lang}" dir="${dir}"><head><meta charset="utf-8">` +
     `<meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<meta name="robots" content="noindex, nofollow">` +
     `<title>${escapeHtml(t.invoiceTitle)} ${escapeHtml(inv.invoice_no)}</title>` +
-    `</head><body style="margin:0;background:#ffffff;color:#111111;font-family:Arial,Helvetica,sans-serif;">${body}</body></html>`
+    PRINT_FONT_LINK +
+    `<style>${css}</style>` +
+    `</head><body>${body}</body></html>`
   );
 }

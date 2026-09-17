@@ -22,6 +22,7 @@
 
 import { escapeHtml } from './emailTemplates';
 import { qrEncode, qrToSvgPath, QR_MAX_BYTES } from './qr';
+import { PRINT_FONT_LINK } from './printDocument';
 
 export type DocLang = 'ar' | 'en';
 
@@ -259,6 +260,10 @@ const CSS = `
   html, body { margin: 0; padding: 0; background: #fff; color: #111; }
   body {
     font-family: 'Cairo', 'Segoe UI', 'Tahoma', 'Arial', system-ui, sans-serif;
+    /* PINNED, because the font is now actually loaded. Cairo sets a taller
+       line box than the Tahoma this document has been falling back to, and
+       this page is budgeted to ONE A4 sheet — an unpinned line-height would
+       let the swap push it onto a second. */
     font-size: 9.5pt; line-height: 1.4;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
@@ -422,6 +427,12 @@ export function renderWarrantyDoc(data: WarrantyDocData, lang: DocLang = 'ar', a
     `<!doctype html><html lang="${lang}" dir="${dir}"><head>` +
     `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<title>${escapeHtml(`${t.title} ${data.receipt_no}`)}</title>` +
+    /* THE FONT THIS DOCUMENT ALREADY ASKED FOR.
+       `font-family` has named Cairo since the document was written and nothing
+       ever fetched it, so every warranty certificate the shop has printed came
+       out in Segoe UI or Tahoma. documentCsp has allowed fonts.googleapis.com
+       and fonts.gstatic.com all along — the request was simply never made. */
+    PRINT_FONT_LINK +
     `<style>${CSS}</style></head><body>` +
     `<div class="sheet">` +
     `<div class="head"><h1>${escapeHtml(t.title)}</h1><div class="sub">${escapeHtml(t.other)}</div></div>` +
