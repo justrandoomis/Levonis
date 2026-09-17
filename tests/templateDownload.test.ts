@@ -36,6 +36,7 @@ import {
   TEMPLATE_VERSION,
 } from '../worker/lib/template';
 import { validateProductDoc } from '../worker/lib/productModel';
+import { narrowGroups } from '../worker/lib/templateFamilies';
 
 // --------------------------------------------------------------- harness
 
@@ -114,9 +115,9 @@ test('blank template parses with zero errors and zero unknown keys', () => {
   assert.deepEqual(d.blank.unknown_keys, []);
 });
 
-test('every per-type blank parses clean too — the scaffold is comments only', () => {
+test('every per-type blank parses clean with active, empty specification rows', () => {
   // `?type=` appends the product type's own specification sheet. It is served
-  // as comments precisely so it cannot break the round-trip contract; this
+  // as empty `spec.*` rows whose update semantics are preserve-on-empty; this
   // proves it for all four types rather than assuming it.
   const d = templateDownloadDiagnostics();
   assert.equal(d.typed.length, 4);
@@ -134,10 +135,31 @@ test('the per-type scaffold names that type\'s spec fields', () => {
   assert.notEqual(printer, filament);
   for (const text of [printer, filament]) {
     for (const line of text.split('\n')) {
-      assert.ok(line === '' || line.startsWith('#'), `scaffold line is not a comment: ${line}`);
+      assert.ok(line === '' || line.startsWith('#') || /^spec\.[a-z0-9_]+=$/.test(line), `unexpected scaffold line: ${line}`);
     }
   }
-  assert.ok(printer.includes('spec_groups.1.rows.1.label_ar='));
+  assert.ok(printer.includes('spec.technology='));
+  assert.ok(filament.includes('spec.material_type='));
+  assert.ok(!filament.includes('spec.build_volume='), 'a filament template must not repeat printer rows');
+});
+
+test('the TXT scaffold changes again when the selected printer section changes', () => {
+  const fdm = typeSpecScaffold(
+    'printer',
+    narrowGroups('printer', [{ id: 'cat_printers_fdm', slug: 'fdm-printers' }]),
+    'FDM printers',
+  ).join('\n');
+  const resin = typeSpecScaffold(
+    'printer',
+    narrowGroups('printer', [{ id: 'cat_printers_resin', slug: 'resin-printers' }]),
+    'Resin printers',
+  ).join('\n');
+
+  assert.notEqual(fdm, resin);
+  assert.match(fdm, /spec\.nozzle_temp_max=/);
+  assert.doesNotMatch(fdm, /spec\.lcd_size=/);
+  assert.match(resin, /spec\.lcd_size=/);
+  assert.doesNotMatch(resin, /spec\.nozzle_temp_max=/);
 });
 
 test('blank template auto-disables only the known unparseable required ints', () => {
@@ -169,11 +191,13 @@ test('a scalar that lives inside a grouped section is served ONCE — never as a
 test('blank template keeps the RICH field set — nothing is slimmed away', () => {
   const text = buildBlankTemplate().text;
   for (const spec of FIELD_REGISTRY.scalars) {
+    if (spec.exported === false) continue;
     assert.ok(text.includes(`${spec.key}=`), `missing scalar key ${spec.key}`);
     assert.ok(text.includes(`# ${spec.key} —`), `missing documentation for ${spec.key}`);
   }
   for (const group of FIELD_REGISTRY.groups) {
     for (const spec of group.fields) {
+      if (spec.exported === false) continue;
       assert.ok(text.includes(`${group.name}.1.${spec.key}=`), `missing ${group.name}.1.${spec.key}`);
     }
     for (const spec of group.rowFields ?? []) {

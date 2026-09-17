@@ -70,6 +70,14 @@ export function webpFilename(name: string): string {
   return `${stem.slice(0, 120)}.webp`;
 }
 
+function rasterFilename(name: string, mime: string): string {
+  if (mime === 'image/webp') return webpFilename(name);
+  const clean = name.split(/[\\/]/).pop()?.trim() || 'image';
+  const stem = clean.replace(/\.[^.]+$/, '').replace(/[^\p{L}\p{N}._ -]/gu, '').trim() || 'image';
+  const extension = mime === 'image/jpeg' ? 'jpg' : 'png';
+  return `${stem.slice(0, 120)}.${extension}`;
+}
+
 export interface WebpEncodeResult {
   blob: Blob;
   width: number;
@@ -148,12 +156,10 @@ async function drawAndEncode(decoded: DecodedImage, maxEdge: number): Promise<We
   // have, in exactly the same way: null. Both are retryable at a smaller edge —
   // and if the smallest rung still yields nothing, the caller says which it was.
   if (!blob || blob.size <= 0) return null;
-  // A browser without a WebP encoder silently substitutes PNG. That is not a
-  // size problem, so a smaller canvas will never fix it — but a PNG this small
-  // is still refused by the server, so it must be named, not retried.
-  if (blob.type !== 'image/webp') {
-    throw new Error('هذا المتصفح لا ينتج صور WebP — جرّب متصفحًا آخر / no WebP encoder in this browser');
-  }
+  // Browsers without a WebP encoder are allowed to return PNG. The upload API
+  // validates magic bytes and dimensions server-side, so this is a safe,
+  // standards-compatible fallback rather than a reason to block the admin.
+  if (!['image/webp', 'image/png', 'image/jpeg'].includes(blob.type)) return null;
   if (blob.size > PRODUCT_IMAGE_MAX_BYTES) return null;
   return { blob, width, height };
 }
@@ -185,7 +191,13 @@ export async function encodeProductRasterAsWebp(
       const result = await drawAndEncode(decoded, edge);
       if (result) return result;
     }
-    throw new Error('تعذّر إنتاج صورة WebP على هذا الجهاز / this device could not encode the image');
+    // Some WebViews return null for every requested canvas encoding. If the
+    // original is already inside the server limit, upload it as-is; the server
+    // now accepts and validates PNG/JPEG directly.
+    if (file.size <= PRODUCT_IMAGE_MAX_BYTES) {
+      return { blob: file, width: decoded.width, height: decoded.height };
+    }
+    throw new Error('تعذّر تحسين الصورة على هذا الجهاز وحجم الأصل يتجاوز الحد / image optimization unavailable and the original is too large');
   } finally {
     decoded.close?.();
   }
@@ -199,8 +211,10 @@ export interface PreparedProductImage {
 }
 
 /**
- * PNG/JPEG become WebP before network upload. GIF/AVIF/video are deliberately
- * left alone because converting those blindly can destroy animation or media.
+ * PNG/JPEG are optimised before upload when the browser provides a usable
+ * encoder. A browser that cannot encode WebP may return PNG/JPEG or the
+ * original file; the upload endpoint validates those bytes server-side.
+ * GIF/AVIF/video are left alone because converting them can destroy motion.
  */
 /**
  * The same conversion, at an avatar's ceiling. A format the codec does not
@@ -221,9 +235,9 @@ function megabytes(bytes: number): string {
 export async function prepareProductImage(file: File, encoder: WebpEncoder = encodeProductRasterAsWebp): Promise<PreparedProductImage> {
   const signature = new Uint8Array(await file.slice(0, 16).arrayBuffer());
 
-  // A PNG or a JPEG is never uploaded as it stands — the encoder below replaces
-  // it with a WebP, and the 8 MB ceiling is measured on THAT. All the original
-  // has to clear is the decoder's own sanity guard.
+  // Prefer the optimised result. When the runtime has no WebP encoder, the
+  // encoder may safely return PNG/JPEG or the original itself; the 8 MB
+  // ceiling still applies to the bytes that actually travel.
   if (detectConvertibleRaster(signature)) {
     if (file.size > PRODUCT_IMAGE_MAX_SOURCE_BYTES) {
       throw new Error(
@@ -231,9 +245,13 @@ export async function prepareProductImage(file: File, encoder: WebpEncoder = enc
       );
     }
     const result = await encoder(file);
+    const mime = result.blob.type || file.type || (detectConvertibleRaster(signature) === 'jpeg' ? 'image/jpeg' : 'image/png');
+    const sameBytes = result.blob === file;
     return {
-      file: new File([result.blob], webpFilename(file.name), { type: 'image/webp', lastModified: file.lastModified }),
-      converted: true,
+      file: sameBytes
+        ? file
+        : new File([result.blob], rasterFilename(file.name, mime), { type: mime, lastModified: file.lastModified }),
+      converted: !sameBytes,
       width: result.width,
       height: result.height,
     };

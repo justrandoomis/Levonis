@@ -434,7 +434,7 @@ export function OptionsSection({
                                 <span className="text-[10px] text-zinc-500">مجموع الألوان</span>
                               </div>
                             ) : (
-                              <Qty value={v.stock} onChange={(n) => patchValue(g.id, v.id, { stock: n })} />
+                              <Qty value={v.stock} onChange={(n) => patchValue(g.id, v.id, { stock: n })} placeholder="مطلوب: 0 = نفد" />
                             )}
                           </Field>
                           {errors[`option_stock:${v.id}`] && (
@@ -627,6 +627,7 @@ export function OptionsSection({
                             <Qty
                               value={row?.stock ?? null}
                               onChange={(stock) => setCombinationStock(combo, stock)}
+                              placeholder="0 = نفد"
                             />
                           </Field>
                           <Field ar="حد التنبيه" en="Low-stock">

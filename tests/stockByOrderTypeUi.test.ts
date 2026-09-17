@@ -89,6 +89,8 @@ test('Quick Price Edit mirrors fulfilment, route increases and exact direct stoc
   assert.match(quick, /scope: 'option' as const/);
   assert.match(quick, /inventoryMode = exact\.length > 0 \? 'VARIANT_COMBINATION' : 'OPTION'/);
   assert.match(quick, /Pre-order — بلا مخزون/);
+  assert.match(quick, /stock: enabled && !hasCombinations && v\.stock === null \? 0 : v\.stock/);
+  assert.match(quick, /aria-selected=\{tab === x\.id\}/);
   assert.doesNotMatch(quick, /preorder\.capacity/);
 });
 
@@ -101,3 +103,12 @@ test('the product price card does not repeat item price or fulfilment surcharge 
   assert.match(page, /item price and fulfilment increases are deliberately/);
 });
 
+test('the desktop product layout uses the viewport and stacks availability choices vertically', () => {
+  const page = read(PRODUCT);
+  assert.match(page, /max-w-\[1540px\]/);
+  assert.match(page, /lg:grid-cols-\[minmax\(0,1fr\)_400px\]/);
+  assert.match(page, /xl:grid-cols-\[minmax\(0,1fr\)_440px\]/);
+  assert.match(page, /<div className="mt-2 flex flex-col gap-2">/);
+  assert.doesNotMatch(page, /عمولة الطلب المسبق غير معدة/);
+  assert.doesNotMatch(page, /Pre-order commission is not configured/);
+});

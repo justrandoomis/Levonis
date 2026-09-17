@@ -71,6 +71,31 @@ test('the 8 MB ceiling is measured on the WebP that is uploaded, not the camera 
   assert.equal(result.file.type, 'image/webp');
 });
 
+test('PNG remains uploadable when the browser cannot encode WebP', async () => {
+  const original = new File([pngBytes(2048)], 'transparent-source.png', { type: 'image/png' });
+
+  // Some Safari/WebView builds ignore the requested WebP MIME and return a
+  // PNG blob. Keep the real MIME and extension instead of lying to the server.
+  const pngResult = await prepareProductImage(original, async () => ({
+    blob: new Blob([pngBytes(1024)], { type: 'image/png' }),
+    width: 24,
+    height: 24,
+  }));
+  assert.equal(pngResult.file.type, 'image/png');
+  assert.match(pngResult.file.name, /\.png$/);
+
+  // When every canvas encoder returns null, encodeProductRasterAsWebp falls
+  // back to this exact original shape. The wrapper must preserve identity and
+  // report that no conversion occurred.
+  const kept = await prepareProductImage(original, async (file) => ({ blob: file, width: 24, height: 24 }));
+  assert.equal(kept.file, original);
+  assert.equal(kept.converted, false);
+
+  const uploadRoute = src('worker/routes/uploads.ts');
+  assert.doesNotMatch(uploadRoute, /PRODUCT_IMAGE_REQUIRES_WEBP/);
+  assert.match(uploadRoute, /image\/webp'.*image\/png'.*image\/jpeg/s);
+});
+
 test('a format that travels untouched still keeps the real ceiling, and says the numbers', async () => {
   // A GIF is deliberately never re-encoded (it would destroy the animation),
   // so for it the upload ceiling really is the ceiling.

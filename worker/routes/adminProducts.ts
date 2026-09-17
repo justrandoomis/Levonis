@@ -420,6 +420,82 @@ adminProductsRoutes.get('/', async (c) => {
   const limit = int(q.limit, 'limit', { min: 1, max: 100, def: 30 });
   const offset = int(q.offset, 'offset', { min: 0, max: 100_000, def: 0 });
 
+  // The list used to read `products.stock`, even though direct inventory now
+  // lives on options or exact option×colour variants. That made a perfectly
+  // tracked product appear “unlimited”. These expressions project the same
+  // authoritative level the storefront uses, aggregated only for the compact
+  // management list. NULL at a required direct level is mapped to sold out in
+  // the response below — never to unlimited.
+  const hasDirectSql = `(CASE
+    WHEN EXISTS (SELECT 1 FROM product_option_fulfillment af WHERE af.product_id = products.id)
+      THEN EXISTS (
+        SELECT 1 FROM product_option_fulfillment df
+         WHERE df.product_id = products.id AND df.fulfillment_type = 'direct_sale' AND df.enabled = 1
+      )
+    ELSE selling_type IN ('direct_sale', 'bundle') OR sale_types LIKE '%direct_sale%' OR sale_types LIKE '%bundle%'
+  END)`;
+  const displayStockSql = `(CASE inventory_mode
+    WHEN 'OPTION' THEN (
+      SELECT CASE
+        WHEN COUNT(*) = 0 OR SUM(CASE WHEN ov.stock IS NULL THEN 1 ELSE 0 END) > 0 THEN NULL
+        ELSE SUM(ov.stock)
+      END
+      FROM product_option_values ov
+      WHERE ov.product_id = products.id AND ov.active = 1
+        AND EXISTS (
+          SELECT 1 FROM product_option_fulfillment df
+           WHERE df.product_id = products.id AND df.option_id = ov.id
+             AND df.fulfillment_type = 'direct_sale' AND df.enabled = 1
+        )
+    )
+    WHEN 'COLOR' THEN (
+      SELECT CASE
+        WHEN COUNT(*) = 0 OR SUM(CASE WHEN pc.stock IS NULL THEN 1 ELSE 0 END) > 0 THEN NULL
+        ELSE SUM(pc.stock)
+      END
+      FROM product_colors pc WHERE pc.product_id = products.id AND pc.active = 1
+    )
+    WHEN 'VARIANT_COMBINATION' THEN (
+      SELECT CASE
+        WHEN COUNT(*) = 0 OR SUM(CASE WHEN pv.stock IS NULL THEN 1 ELSE 0 END) > 0 THEN NULL
+        ELSE SUM(pv.stock)
+      END
+      FROM product_variants pv
+      WHERE pv.product_id = products.id AND pv.active = 1
+        AND EXISTS (
+          SELECT 1 FROM product_option_fulfillment df
+           WHERE df.product_id = products.id AND df.fulfillment_type = 'direct_sale' AND df.enabled = 1
+             AND instr('|' || pv.combo_key || '|', '|o:' || df.option_id || '|') > 0
+        )
+    )
+    ELSE stock
+  END)`;
+  const displayReservedSql = `(CASE inventory_mode
+    WHEN 'OPTION' THEN COALESCE((
+      SELECT SUM(COALESCE(ov.reserved, 0)) FROM product_option_values ov
+      WHERE ov.product_id = products.id AND ov.active = 1
+        AND EXISTS (
+          SELECT 1 FROM product_option_fulfillment df
+           WHERE df.product_id = products.id AND df.option_id = ov.id
+             AND df.fulfillment_type = 'direct_sale' AND df.enabled = 1
+        )
+    ), 0)
+    WHEN 'COLOR' THEN COALESCE((
+      SELECT SUM(COALESCE(pc.reserved, 0)) FROM product_colors pc
+       WHERE pc.product_id = products.id AND pc.active = 1
+    ), 0)
+    WHEN 'VARIANT_COMBINATION' THEN COALESCE((
+      SELECT SUM(COALESCE(pv.reserved, 0)) FROM product_variants pv
+      WHERE pv.product_id = products.id AND pv.active = 1
+        AND EXISTS (
+          SELECT 1 FROM product_option_fulfillment df
+           WHERE df.product_id = products.id AND df.fulfillment_type = 'direct_sale' AND df.enabled = 1
+             AND instr('|' || pv.combo_key || '|', '|o:' || df.option_id || '|') > 0
+        )
+    ), 0)
+    ELSE stock_reserved
+  END)`;
+
   const clauses: string[] = [];
   const params: unknown[] = [];
   if (search) {
@@ -441,12 +517,11 @@ adminProductsRoutes.get('/', async (c) => {
     clauses.push('EXISTS (SELECT 1 FROM product_catalogs pc WHERE pc.product_id = products.id AND pc.catalog_id = ?)');
     params.push(str(q.catalog, 'catalog', { max: 60 }));
   }
-  // BASE-mode honesty: available = stock - stock_reserved; NULL = untracked.
-  if (q.stock === 'untracked') clauses.push('stock IS NULL');
-  else if (q.stock === 'in') clauses.push('(stock IS NULL OR stock - stock_reserved > 0)');
-  else if (q.stock === 'out') clauses.push('(stock IS NOT NULL AND stock - stock_reserved <= 0)');
+  if (q.stock === 'in') clauses.push(`(${hasDirectSql} AND ${displayStockSql} IS NOT NULL AND ${displayStockSql} - ${displayReservedSql} > 0)`);
+  else if (q.stock === 'out') clauses.push(`(${hasDirectSql} AND (${displayStockSql} IS NULL OR ${displayStockSql} - ${displayReservedSql} <= 0))`);
   else if (q.stock === 'low')
-    clauses.push('(stock IS NOT NULL AND stock - stock_reserved > 0 AND stock - stock_reserved <= COALESCE(low_stock_threshold, 5))');
+    clauses.push(`(${hasDirectSql} AND ${displayStockSql} IS NOT NULL AND ${displayStockSql} - ${displayReservedSql} > 0 AND ${displayStockSql} - ${displayReservedSql} <= 5)`);
+  else if (q.stock === 'preorder') clauses.push(`(NOT ${hasDirectSql})`);
   if (q.price_min !== undefined) {
     clauses.push('price_iqd >= ?');
     params.push(int(q.price_min, 'price_min', { min: 0, max: 1_000_000_000 }));
@@ -469,7 +544,7 @@ adminProductsRoutes.get('/', async (c) => {
     price_asc: 'price_iqd ASC, updated_at DESC',
     price_desc: 'price_iqd DESC, updated_at DESC',
     sales: 'sold DESC, updated_at DESC',
-    stock: 'stock IS NULL, stock - stock_reserved ASC, updated_at DESC',
+    stock: `${displayStockSql} IS NULL, ${displayStockSql} - ${displayReservedSql} ASC, updated_at DESC`,
   };
   // Own-property lookup only: a plain object literal would otherwise answer
   // ?sort=constructor with a stringified builtin inside the SQL text.
@@ -478,8 +553,10 @@ adminProductsRoutes.get('/', async (c) => {
 
   const [list, count] = await Promise.all([
     c.env.DB.prepare(
-      `SELECT id, slug, sku, status, name, name_ar, price_iqd, pro_price_iqd, stock,
-              stock_reserved, low_stock_threshold, is_featured, brand_id, images, created_at, updated_at, doc_version,
+      `SELECT id, slug, sku, status, name, name_ar, price_iqd, pro_price_iqd,
+              ${displayStockSql} AS display_stock, ${displayReservedSql} AS display_reserved,
+              ${hasDirectSql} AS has_direct_sale,
+              low_stock_threshold, is_featured, brand_id, images, created_at, updated_at, doc_version,
               composition,
               COALESCE((SELECT SUM(i.qty) FROM order_items i
                          JOIN orders o ON o.id = i.order_id
@@ -511,8 +588,11 @@ adminProductsRoutes.get('/', async (c) => {
         name_en: r.name,
         price_iqd: r.price_iqd,
         pro_price_iqd: (r.pro_price_iqd as number | null) ?? null,
-        stock: (r.stock as number | null) ?? null,
-        stock_reserved: Number(r.stock_reserved ?? 0),
+        // No NULL is ever exposed for an enabled direct sale. A missing row
+        // is a configuration error and therefore sold out until fixed.
+        stock: r.has_direct_sale ? Number(r.display_stock ?? 0) : null,
+        stock_reserved: r.has_direct_sale ? Number(r.display_reserved ?? 0) : 0,
+        has_direct_sale: !!r.has_direct_sale,
         low_stock_threshold: (r.low_stock_threshold as number | null) ?? null,
         sold: Number(r.sold ?? 0),
         is_featured: !!r.is_featured,

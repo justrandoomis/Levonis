@@ -18,6 +18,7 @@ import { resolveOrderExpiry } from './orderExpiry';
 import type { SupportGiftReconciliation } from './membershipOps';
 import { sweepBnplOverdue, type BnplOverdueReport } from './bnpl';
 import { sweepAutomaticReviews, type AutomaticReviewSweepReport } from './reviewAutoSweep';
+import { sweepCancelledOrders, type CancelledOrderSweepReport } from './orderDeletion';
 
 /**
  * Durable scheduled jobs (final-phase §11): one entrypoint the Worker wires
@@ -66,6 +67,8 @@ export interface DurableJobsReport {
    */
   order_stages: SweepReport;
   order_expiry: OrderExpiryReport;
+  /** Cancelled, never-fulfilled orders permanently removed after 30 days. */
+  cancelled_order_retention: CancelledOrderSweepReport;
   /**
    * Local-courier status sync. Separate from order_stages because it is the
    * only thing allowed to move an order to "في الطريق إليك" or "تم التوصيل":
@@ -102,6 +105,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     support_gifts: { scanned: 0, cancelled: 0, became_due: 0, flagged: 0 },
     order_stages: { scanned: 0, promoted: 0, skipped: 0, errors: [] },
     order_expiry: { configured: false, scanned: 0, cancelled: 0, skipped: 0, errors: 0 },
+    cancelled_order_retention: { retention_days: 30, scanned: 0, deleted: 0, skipped: 0, errors: 0 },
     delivery_sync: { configured: false, scanned: 0, moved: 0, unmapped: 0, errors: 0 },
     bnpl_overdue: { scanned: 0, overdue: 0, suspended: 0 },
     automatic_reviews: { scanned: 0, created: 0, skipped: 0 },
@@ -258,6 +262,13 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
       resolveOrderExpiry(await getSetting(env.DB, 'orderExpiryConfig')),
       nowIso
     );
+  });
+
+  // 11c. A cancelled order remains visible for support for exactly thirty
+  //      days. Afterwards only orders that never reached fulfilment are
+  //      removed; serialized/delivered records remain for warranty integrity.
+  await step('cancelled_order_retention', async () => {
+    report.cancelled_order_retention = await sweepCancelledOrders(env.DB, nowIso, 30, 100);
   });
 
   // 12. Ask the local courier what happened to the shipments we handed them.

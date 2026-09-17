@@ -90,7 +90,7 @@ const STRINGS = {
     loading: 'جارٍ التحميل…',
     price: 'السعر',
     stock: 'المخزون',
-    untracked: 'غير محدود',
+    preorderOnly: 'طلب مسبق فقط',
     updated: 'آخر تحديث',
     edit: 'تعديل',
     del: 'حذف / أرشفة',
@@ -119,7 +119,7 @@ const STRINGS = {
     loading: 'Loading…',
     price: 'Price',
     stock: 'Stock',
-    untracked: 'untracked',
+    preorderOnly: 'Pre-order only',
     updated: 'Updated',
     edit: 'Edit',
     del: 'Delete / archive',
@@ -148,7 +148,7 @@ const STRINGS = {
     loading: 'بارکردن…',
     price: 'نرخ',
     stock: 'کۆگا',
-    untracked: 'بێ سنوور',
+    preorderOnly: 'تەنها پێشداواکاری',
     updated: 'دوا نوێکردنەوە',
     edit: 'دەستکاری',
     del: 'سڕینەوە / ئەرشیف',
@@ -182,9 +182,12 @@ function relTime(iso: string | null | undefined, loc: Loc): string {
   return loc(`منذ ${Math.floor(d / 30)} شهر`, `${Math.floor(d / 30)}mo ago`, `${Math.floor(d / 30)} مانگ`);
 }
 
-type StockState = { key: 'untracked' | 'out' | 'low' | 'in'; available: number | null };
+type StockState = { key: 'preorder' | 'out' | 'low' | 'in'; available: number | null };
 function stockState(p: ListingItem): StockState {
-  if (p.stock === null) return { key: 'untracked', available: null };
+  if (p.has_direct_sale === false) return { key: 'preorder', available: null };
+  // A direct-sale item without a level is invalid configuration, not
+  // unlimited inventory. Render it as sold out until the admin enters stock.
+  if (p.stock === null) return { key: 'out', available: 0 };
   const available = p.stock - (p.stock_reserved ?? 0);
   if (available <= 0) return { key: 'out', available };
   if (available <= (p.low_stock_threshold ?? 5)) return { key: 'low', available };
@@ -513,7 +516,7 @@ export default function AdminProducts() {
   // ------------------------------------------------------------ list mode
 
   const stockLabel = (s: StockState) =>
-    s.key === 'untracked' ? t.untracked
+    s.key === 'preorder' ? t.preorderOnly
     : s.key === 'out' ? loc('نفد المخزون', 'out of stock', 'تەواو بوو')
     : s.key === 'low' ? loc('منخفض', 'low stock', 'کەم')
     : loc('متوفر', 'in stock', 'بەردەست');
@@ -805,7 +808,7 @@ export default function AdminProducts() {
             <option value="in">{loc('متوفر', 'In stock', 'بەردەست')}</option>
             <option value="low">{loc('منخفض', 'Low', 'کەم')}</option>
             <option value="out">{loc('نفد المخزون', 'Out of stock', 'تەواو بوو')}</option>
-            <option value="untracked">{loc('غير محدود', 'Untracked', 'بێ سنوور')}</option>
+            <option value="preorder">{loc('طلب مسبق فقط', 'Pre-order only', 'تەنها پێشداواکاری')}</option>
           </select>
           <select
             value={priceBand}
@@ -982,7 +985,7 @@ export default function AdminProducts() {
                   <div className="flex items-center justify-between gap-2 mt-1">
                     <span className="text-[13px] font-bold text-[var(--ap-text-1)]"><span dir="ltr">{formatIqd(p.price_iqd || 0)}</span></span>
                     <span className={`text-[11px] ${s.key === 'out' ? 'text-[var(--ap-danger)]' : s.key === 'low' ? 'text-[var(--ap-warning)]' : 'text-[var(--ap-text-3)]'}`}>
-                      {s.available === null ? t.untracked : <><span dir="ltr">{s.available}</span> {stockLabel(s)}</>}
+                      {s.available === null ? stockLabel(s) : <><span dir="ltr">{s.available}</span> {stockLabel(s)}</>}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2 mt-2.5 pt-2.5 border-t border-[var(--ap-hairline)]">
@@ -1006,7 +1009,7 @@ export default function AdminProducts() {
                 <span
                   className={`hidden md:inline text-[12px] shrink-0 ${s.key === 'out' ? 'text-[var(--ap-danger)] font-semibold' : s.key === 'low' ? 'text-[var(--ap-warning)] font-semibold' : 'text-[var(--ap-text-2)]'}`}
                   title={`${t.stock}: ${stockLabel(s)}`}
-                  aria-label={`${t.stock}: ${s.available === null ? t.untracked : `${s.available} — ${stockLabel(s)}`}`}
+                  aria-label={`${t.stock}: ${s.available === null ? stockLabel(s) : `${s.available} — ${stockLabel(s)}`}`}
                 >
                   {s.available === null ? '—' : <span dir="ltr">{s.available}</span>}
                 </span>
@@ -1130,6 +1133,7 @@ export default function AdminProducts() {
       {pricing && (
         <Modal
           wide
+          workspace
           titleAr={`${STRINGS.ar.quickPriceTitle} — ${pricing.name}`}
           titleEn={`${STRINGS.en.quickPriceTitle} — ${pricing.name}`}
           onClose={() => {

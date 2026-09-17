@@ -1,18 +1,6 @@
-/*
- * Design tokens for the admin products management screen (scoped to .ap).
- *
- * The admin shell paints its content column #18181b, so every surface here
- * is defined as a step ABOVE that ground — cards lift off the page, controls
- * lift off the cards — separated by ~3 L* and 1px hairlines, never by glow.
- * One violet accent does four jobs (primary CTA, focus, selection, active
- * chip); semantic colours are desaturated for dark and sit on 14% tinted
- * beds with lifted text. Contrast (WCAG, against surface-1 #1f1f24):
- * text-1 15.1:1 · text-2 6.9:1 · text-3 5.8:1 · white on accent 5.2:1
- * (hover 4.6, pressed 6.1) · accent text 8.0:1 · every badge ≥ 6.3:1.
- * text-3 is the dimmest text token and it also sits on surface-2 (5.3:1)
- * and surface-3 (4.8:1) — placeholders, kbd hints, highlighted list rows —
- * so it is pitched to clear AA on surface-3, not just on the card.
- */
+/* Admin-products visual tokens. The modal shell also carries `.ap` because
+   dialogs are portalled to document.body and would otherwise lose these
+   variables. */
 .ap {
   color-scheme: dark;
   font-variant-numeric: tabular-nums;
@@ -22,16 +10,13 @@
   --ap-surface-2: #26262c;
   --ap-surface-3: #2d2d34;
   --ap-surface-4: #35353d;
-
   --ap-hairline: rgb(255 255 255 / 0.06);
   --ap-border: rgb(255 255 255 / 0.08);
   --ap-border-strong: rgb(255 255 255 / 0.13);
   --ap-border-hover: rgb(255 255 255 / 0.18);
-
   --ap-text-1: #eceef2;
   --ap-text-2: #a3a8b6;
   --ap-text-3: #9399a8;
-
   --ap-accent: #6558e0;
   --ap-accent-hover: #6e62ea;
   --ap-accent-active: #5a4dd2;
@@ -39,7 +24,6 @@
   --ap-accent-soft: rgb(101 88 224 / 0.16);
   --ap-accent-border: rgb(101 88 224 / 0.45);
   --ap-ring: #8f85f0;
-
   --ap-success: #66c992;
   --ap-success-bg: rgb(63 168 107 / 0.14);
   --ap-success-border: rgb(63 168 107 / 0.28);
@@ -53,7 +37,6 @@
   --ap-info: #82b1f2;
   --ap-info-bg: rgb(60 126 230 / 0.14);
   --ap-info-border: rgb(60 126 230 / 0.28);
-
   --ap-radius-sm: 8px;
   --ap-radius-md: 10px;
   --ap-radius-lg: 14px;
@@ -61,11 +44,6 @@
   --ap-shadow-menu: 0 12px 40px -12px rgb(0 0 0 / 0.75), 0 0 0 1px rgb(255 255 255 / 0.07);
 }
 
-/* Native selects share the input chrome; the chevron is drawn once here so
-   every select on the screen matches. Direction-aware whether dir sits on
-   the .ap wrapper or on an ancestor. Unlayered rules beat utilities, so the
-   one select that also carries a glyph gets its room from a modifier class
-   here rather than from a padding utility. */
 .ap select.ap-select {
   appearance: none;
   -webkit-appearance: none;
@@ -76,19 +54,22 @@
   padding-inline-end: 32px;
   padding-inline-start: 12px;
 }
-.ap:where([dir='rtl'], [dir='rtl'] *) select.ap-select {
-  background-position: left 12px center;
+.ap:where([dir='rtl'], [dir='rtl'] *) select.ap-select { background-position: left 12px center; }
+.ap select.ap-select.ap-select--icon { padding-inline-end: 56px; }
+.ap select.ap-select option { background: #26262c; color: #eceef2; }
+
+/* Quick Price is a focused workspace rather than a stack of outlined boxes.
+   Translucency is restrained to the shell; editable surfaces stay opaque. */
+.ap .ap-quick-workspace {
+  background:
+    radial-gradient(circle at 50% -20%, rgb(101 88 224 / 0.12), transparent 38%),
+    var(--ap-surface-1);
 }
-.ap select.ap-select.ap-select--icon {
-  padding-inline-end: 56px;
-}
-.ap select.ap-select option {
-  background: #26262c;
-  color: #eceef2;
+.ap .ap-quick-scroll {
+  scrollbar-color: rgb(255 255 255 / 0.16) transparent;
+  scrollbar-width: thin;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ap * {
-    transition-duration: 0.01ms !important;
-  }
+  .ap * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

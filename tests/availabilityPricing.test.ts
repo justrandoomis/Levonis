@@ -151,7 +151,7 @@ test('an option direct-sale cell replaces the removed product-wide increase, inc
 
 // -------------------------------------- 2. card price = cheapest variant
 
-import { publicWithDisplayPrice } from '../worker/routes/products';
+import { publicWithDisplayPrice, saleAvailability } from '../worker/routes/products';
 import { DEFAULT_PRO_POLICY } from '../worker/lib/pricing';
 
 const row = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
@@ -205,6 +205,46 @@ test('card price: a flat product (no variants) keeps its plain base numbers', ()
   const out = publicWithDisplayPrice(row({ options: '[]' }), freeCtx);
   assert.equal(out.display_price_iqd, 100_000);
   assert.equal(out.display_from, false);
+});
+
+test('availability: direct sale without a numeric stock counter fails closed, never unlimited', () => {
+  const availability = saleAvailability({
+    selling_type: 'direct_sale',
+    sale_types: ['direct_sale'],
+    stock: null,
+    options: [],
+    colors: [],
+    preorder_transports: [],
+  } as never);
+
+  assert.equal(availability.mode, 'unavailable');
+  assert.equal(availability.reason, 'OUT_OF_STOCK');
+  assert.equal(availability.stock.tracked, false);
+  assert.equal(availability.stock.max_qty, 0);
+  assert.deepEqual(availability.modes, [
+    { type: 'direct_sale', usable: false, reason: 'OUT_OF_STOCK' },
+  ]);
+});
+
+test('availability: an enabled pre-order route needs no stock and an omitted increase means zero', () => {
+  const availability = saleAvailability({
+    selling_type: 'pre_order',
+    sale_types: ['pre_order'],
+    stock: null,
+    options: [],
+    colors: [],
+    preorder_transports: [{ method: 'sea', commission_iqd: null, active: true }],
+  } as never);
+
+  assert.equal(availability.mode, 'preorder');
+  assert.equal(availability.reason, null);
+  assert.equal(availability.preorder.usable, true);
+  assert.deepEqual(availability.preorder.transports, [
+    { method: 'sea', commission_iqd: 0, configured: true },
+  ]);
+  assert.equal(availability.preorder.capacity.tracked, false);
+  assert.equal(availability.preorder.capacity.available, null);
+  assert.equal(availability.modes[0]?.reason, null);
 });
 
 // -------------------------------------------- 3. derived inventory source

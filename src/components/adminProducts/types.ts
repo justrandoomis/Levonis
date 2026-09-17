@@ -244,6 +244,10 @@ export interface ListingItem {
   sold: number;
   stock_reserved?: number;
   low_stock_threshold?: number | null;
+  /** True only when at least one enabled direct-sale route exists. Direct
+   *  products always carry a numeric stock (zero means sold out); null is
+   *  reserved for products that are pre-order-only. */
+  has_direct_sale?: boolean;
 }
 
 export interface ListingResponse {

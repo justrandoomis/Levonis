@@ -86,7 +86,7 @@ const STRINGS = {
     options: 'الخيارات المتاحة', colors: 'الألوان المتاحة', chooseOption: 'اختر خيارًا',
     chooseColor: 'اختر لونًا', transport: 'وسيلة النقل للطلب المسبق', chooseTransport: 'اختر وسيلة النقل',
     transportAir: 'شحن جوي', transportSea: 'شحن بحري', transportLand: 'شحن بري',
-    transportUnset: 'العمولة غير مُعدّة', warranty: 'الضمان الممدد', noWarranty: 'بدون ضمان ممدد',
+    transportUnset: 'بدون زيادة', warranty: 'الضمان الممدد', noWarranty: 'بدون ضمان ممدد',
     months: 'شهرًا', extension: 'تمديد', total: 'إجمالي',
     warrantyIntro: (base: string) => `الضمان الأساسي ${base} من التسليم. أضف تمديدًا الآن أو من السلة — قبل إتمام الطلب فقط.`,
     warrantyIntroNoBase: 'يُشترى التمديد الآن أو من السلة — قبل إتمام الطلب فقط.',
@@ -125,7 +125,7 @@ const STRINGS = {
     directSoldOutPreorderOpen: 'نفد مخزون البيع المباشر — الطلب المسبق ما زال متاحًا.',
     PREORDER_NOT_ENABLED: 'الطلب المسبق غير مفعّل لهذا المنتج.',
     NO_TRANSPORT_OFFERED: 'الطلب المسبق مفعّل لكن لا توجد وسيلة نقل معروضة.',
-    TRANSPORT_COMMISSION_UNCONFIGURED: 'الطلب المسبق مفعّل لكن عمولة النقل غير مُعدّة بعد.',
+    TRANSPORT_COMMISSION_UNCONFIGURED: 'طريقة الشحن هذه غير متاحة حاليًا.',
     COMMUNITY_LISTING_NOT_SELLABLE: 'هذا عرض من متجر مجتمعي ولا يُشترى عبر سلة المتجر.',
     OPTION_REQUIRED: 'اختر خيارًا أولًا.', COLOR_REQUIRED: 'اختر لونًا أولًا.',
     OPTION_NOT_FOUND: 'الخيار المحدد غير موجود.', OPTION_INACTIVE: 'الخيار المحدد لم يعد متاحًا.',
@@ -151,7 +151,7 @@ const STRINGS = {
     options: 'Options', colors: 'Colours', chooseOption: 'Choose an option',
     chooseColor: 'Choose a colour', transport: 'Pre-order transport', chooseTransport: 'Choose transport',
     transportAir: 'Air freight', transportSea: 'Sea freight', transportLand: 'Land freight',
-    transportUnset: 'Commission not configured', warranty: 'Extended Warranty', noWarranty: 'No extended warranty',
+    transportUnset: 'No added fee', warranty: 'Extended Warranty', noWarranty: 'No extended warranty',
     months: 'months', extension: 'extension', total: 'total',
     warrantyIntro: (base: string) => `${base} base warranty from delivery. Add an extension now or in the cart — before placing the order only.`,
     warrantyIntroNoBase: 'An extension is bought now or in the cart — before placing the order only.',
@@ -184,7 +184,7 @@ const STRINGS = {
     directSoldOutPreorderOpen: 'Direct sale is sold out — pre-order is still open.',
     PREORDER_NOT_ENABLED: 'Pre-order is not enabled for this product.',
     NO_TRANSPORT_OFFERED: 'Pre-order is enabled but no transport option is offered.',
-    TRANSPORT_COMMISSION_UNCONFIGURED: 'Pre-order is enabled but the transport commission is not configured yet.',
+    TRANSPORT_COMMISSION_UNCONFIGURED: 'This shipping route is not available right now.',
     COMMUNITY_LISTING_NOT_SELLABLE: 'This is a community listing and is not sold through the store cart.',
     OPTION_REQUIRED: 'Choose an option first.', COLOR_REQUIRED: 'Choose a colour first.',
     OPTION_NOT_FOUND: 'The selected option does not exist.', OPTION_INACTIVE: 'The selected option is no longer available.',
@@ -218,7 +218,7 @@ const STRINGS = {
     options: 'هەڵبژاردەکان', colors: 'ڕەنگەکان', chooseOption: 'هەڵبژاردەیەک هەڵبژێرە',
     chooseColor: 'ڕەنگێک هەڵبژێرە', transport: 'گواستنەوەی پێشداواکاری', chooseTransport: 'شێوازی گواستنەوە هەڵبژێرە',
     transportAir: 'بار بە ئاسمان', transportSea: 'بار بە دەریا', transportLand: 'بار بە وشکانی',
-    transportUnset: 'کۆمیشن ڕێکنەخراوە', warranty: 'گەرەنتی درێژکراوە', noWarranty: 'بێ گەرەنتی درێژکراوە',
+    transportUnset: 'بێ زیادە', warranty: 'گەرەنتی درێژکراوە', noWarranty: 'بێ گەرەنتی درێژکراوە',
     months: 'مانگ', extension: 'درێژکردنەوە', total: 'کۆ',
     warrantyIntro: (base: string) => `گەرەنتی بنەڕەتی ${base} لە گەیاندنەوە. درێژکردنەوە ئێستا یان لە سەبەتە زیاد بکە — تەنها پێش تەواوکردنی داواکاری.`,
     warrantyIntroNoBase: 'درێژکردنەوە ئێستا یان لە سەبەتە دەکڕدرێت — تەنها پێش تەواوکردنی داواکاری.',
@@ -259,7 +259,7 @@ const STRINGS = {
     directSoldOutPreorderOpen: 'نفد مخزون البيع المباشر — الطلب المسبق ما زال متاحًا.',
     PREORDER_NOT_ENABLED: 'پێشداواکاری بۆ ئەم بەرهەمە چالاک نەکراوە.',
     NO_TRANSPORT_OFFERED: 'پێشداواکاری چالاکە بەڵام هیچ شێوازی گواستنەوە پێشکەش نەکراوە.',
-    TRANSPORT_COMMISSION_UNCONFIGURED: 'پێشداواکاری چالاکە بەڵام کۆمیشنی گواستنەوە هێشتا ڕێکنەخراوە.',
+    TRANSPORT_COMMISSION_UNCONFIGURED: 'ئەم ڕێگای ناردنە لە ئێستادا بەردەست نییە.',
     COMMUNITY_LISTING_NOT_SELLABLE: 'ئەمە ڕیکلامی فرۆشگای کۆمەڵگایە و بە سەبەتەی فرۆشگا نافرۆشرێت.',
     OPTION_REQUIRED: 'سەرەتا هەڵبژاردەیەک هەڵبژێرە.', COLOR_REQUIRED: 'سەرەتا ڕەنگێک هەڵبژێرە.',
     OPTION_NOT_FOUND: 'هەڵبژاردەی دیاریکراو نییە.', OPTION_INACTIVE: 'هەڵبژاردەی دیاریکراو چیتر بەردەست نییە.',
@@ -2021,7 +2021,7 @@ export default function Product() {
             <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
             {s.fulfilment}
           </legend>
-          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="mt-2 flex flex-col gap-2">
             <button
               type="button"
               disabled={!directUsable}
@@ -2473,7 +2473,7 @@ export default function Product() {
       {/* Bottom clearance equals the phone purchase bar (its height + safe
           area). BottomNav does not render on /product/*, so this is the only
           reserved space and nothing is covered. */}
-      <div className="mx-auto w-full max-w-[1240px] px-4 pt-2 pb-[calc(156px+env(safe-area-inset-bottom))] sm:pb-[calc(112px+env(safe-area-inset-bottom))] lg:pb-12">
+      <div className="mx-auto w-full max-w-[1540px] px-4 sm:px-6 xl:px-8 pt-2 pb-[calc(156px+env(safe-area-inset-bottom))] sm:pb-[calc(112px+env(safe-area-inset-bottom))] lg:pb-12">
         {/*
           THE LEFT COLUMN NEEDED A CEILING. With a single `minmax(0,1fr)` track
           against a fixed 400px panel inside a 1240px shell, the content side
@@ -2483,7 +2483,7 @@ export default function Product() {
           the panel and to the gutter instead of all to the gallery, and the
           grid centres rather than stretching.
         */}
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,660px)_420px] lg:gap-8 xl:gap-10 lg:justify-center lg:items-start">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px] lg:gap-8 xl:gap-12 lg:items-start">
           {/* -------------------------------------------------- left column */}
           <div className="min-w-0">
             <section aria-label={s.gallery}>

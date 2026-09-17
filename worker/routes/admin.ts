@@ -13,6 +13,7 @@ import { canViewFinancials, normalizeAdminScope, userPatchRefusal } from '../lib
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { deductOrderStock, planOrderReturn, stockReturnNote } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
+import { deleteCancelledOrder, OrderDeletionRefusal } from '../lib/orderDeletion';
 import { reclaimOrderRedemptionsStatement } from '../lib/offers';
 import { resolveOrderExpiry } from '../lib/orderExpiry';
 import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
@@ -748,6 +749,36 @@ adminRoutes.get('/orders', async (c) => {
     delivered_at: o.delivered_at ?? null,
   }));
   return c.json({ success: true, orders: out, total: countRow?.n ?? out.length, limit, offset });
+});
+
+/**
+ * An explicit database cleanup action, available only after cancellation.
+ * Normal cancellation continues to keep the order for 30 days; this button is
+ * the owner's deliberate override. Fulfilled/serialized orders are refused so
+ * a cleanup click cannot erase a device identity or its warranty history.
+ */
+adminRoutes.delete('/orders/:id', async (c) => {
+  const admin = c.get('user')!;
+  const id = c.req.param('id');
+  try {
+    const result = await deleteCancelledOrder(c.env.DB, id);
+    if (result.deleted) {
+      await audit(c.env.DB, admin.id, 'order.delete_permanent', id, {
+        rows_deleted_by_table: result.rows_deleted_by_table,
+        rows_unlinked_by_table: result.rows_unlinked_by_table,
+      });
+    }
+    return c.json({ success: true, ...result });
+  } catch (error) {
+    if (error instanceof OrderDeletionRefusal) {
+      const ar =
+        error.code === 'ORDER_NOT_CANCELLED'
+          ? 'يجب إلغاء الطلب أولاً قبل حذفه نهائياً.'
+          : 'لا يمكن حذف هذا الطلب لأنه يحتوي على سجل تسليم أو جهاز أو ضمان.';
+      throw new HttpError(409, ar, error.code);
+    }
+    throw error;
+  }
 });
 
 /**

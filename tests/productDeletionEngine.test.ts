@@ -287,6 +287,24 @@ test('1b. pressing Delete a second time is a quiet success, not a 500', async ()
   assert.deepEqual(again.rows_deleted_by_table, {});
 });
 
+test('1c. deletion still works during the deploy-before-media-migration window', async () => {
+  const db = freshSchema();
+  const built = buildFullProduct(db, 'p-no-job-table', 'no-job-table');
+  db.exec('DROP TABLE media_cleanup_jobs');
+  const bucket = new FakeBucket();
+  for (const key of built.keys) bucket.put(key);
+
+  const result = await deleteProductPermanently(sqlite(db), 'p-no-job-table', { newId: () => 'transient-job' });
+  assert.equal(result.product_deleted, true);
+  const cleanup = await runMediaCleanup(
+    { DB: sqlite(db) as never, BUCKET: bucket as never, R2_PUBLIC: bucket as never, R2_PRIVATE: bucket as never },
+    result.media_jobs
+  );
+  assert.deepEqual(cleanup.failed, []);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM products WHERE id = 'p-no-job-table'").get().n, 0);
+  assert.equal(bucket.objects.size, 0);
+});
+
 // ---------------------------------------------------------------------------
 //  2 — A SHARED IMAGE
 // ---------------------------------------------------------------------------

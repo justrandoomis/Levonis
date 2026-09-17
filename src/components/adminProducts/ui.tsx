@@ -422,7 +422,7 @@ const MODAL_STRINGS = {
  * silently throwing template text away.
  */
 export function Modal({
-  titleAr, titleEn, onClose, children, wide, footer, dirty = false, onEscape,
+  titleAr, titleEn, onClose, children, wide, footer, dirty = false, onEscape, workspace = false,
 }: {
   titleAr: string;
   titleEn: string;
@@ -433,6 +433,8 @@ export function Modal({
   footer?: ReactNode;
   /** Unsaved work — dismissing asks before discarding. */
   dirty?: boolean;
+  /** A larger, calmer editor surface for dense tools such as Quick Price. */
+  workspace?: boolean;
   /**
    * FIRST REFUSAL ON ESCAPE, for content that has its own meaning for the key.
    *
@@ -530,7 +532,7 @@ export function Modal({
       // document.body — no ancestor stacking context can trap it.
       // Bound to the VISUAL viewport, not inset-0, so the on-screen keyboard
       // shrinks the dialog instead of hiding its footer.
-      className="fixed inset-x-0 z-[1000] flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4"
+      className="ap fixed inset-x-0 z-[1000] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-md p-0 sm:p-4"
       style={{ top: viewport.offsetTop, height: viewport.height }}
       onMouseDown={(e) => { if (e.target === e.currentTarget) requestClose(); }}
     >
@@ -543,25 +545,26 @@ export function Modal({
         // Height follows the VISUAL viewport so the sticky footer survives the
         // on-screen keyboard; min-w-0 keeps wide tables from pushing the panel.
         style={{ maxHeight: Math.max(240, viewport.height - 24) }}
-        className={`bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl w-full min-w-0 ${
-          wide ? 'sm:max-w-5xl' : 'sm:max-w-2xl'
-        } overflow-hidden flex flex-col shadow-2xl outline-none`}
+        className={`${workspace ? 'ap-quick-workspace sm:max-w-[1180px]' : wide ? 'sm:max-w-5xl' : 'sm:max-w-2xl'}
+          bg-[rgba(31,31,36,0.96)] border border-[var(--ap-border-strong)] rounded-t-[24px] sm:rounded-[24px]
+          w-full min-w-0 overflow-hidden flex flex-col shadow-[0_32px_90px_-24px_rgb(0_0_0_/_0.85)] outline-none`}
       >
-        <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between gap-3 shrink-0 bg-zinc-900">
-          <h3 id={titleId} className="text-white font-bold text-sm sm:text-base min-w-0 truncate">
-            {titleAr} <span className="text-xs font-medium text-zinc-500 mx-1">{titleEn}</span>
+        <div className="px-4 sm:px-5 py-3.5 border-b border-[var(--ap-hairline)] flex items-center justify-between gap-3 shrink-0 bg-[rgba(31,31,36,0.82)] backdrop-blur-xl">
+          <h3 id={titleId} className="min-w-0">
+            <span className="block text-[15px] sm:text-[17px] leading-tight font-semibold tracking-[-0.01em] text-[var(--ap-text-1)] truncate">{titleAr}</span>
+            <span className="block mt-1 text-[11px] sm:text-[12px] leading-tight font-medium text-[var(--ap-text-3)] truncate" dir="ltr">{titleEn}</span>
           </h3>
           <button
             type="button"
             onClick={requestClose}
             aria-label={t.close}
-            className="p-2 min-h-11 min-w-11 flex items-center justify-center text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 shrink-0"
+            className="min-h-11 min-w-11 grid place-items-center text-[var(--ap-text-2)] hover:text-[var(--ap-text-1)] rounded-full hover:bg-[var(--ap-surface-3)] active:bg-[var(--ap-surface-4)] shrink-0 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ap-ring)]"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-4">{children}</div>
+        <div className={`ap-quick-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain ${workspace ? 'p-3 sm:p-5' : 'p-3 sm:p-4'}`}>{children}</div>
 
         {confirmingClose && (
           <div className="shrink-0 border-t border-amber-500/30 bg-amber-500/10 px-4 py-3">

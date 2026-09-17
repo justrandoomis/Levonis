@@ -410,7 +410,7 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
   const admin = c.get('user')!;
   const productId = c.req.param('id');
   const existing = await c.env.DB
-    .prepare('SELECT id, sale_types, selling_type FROM products WHERE id = ?')
+    .prepare('SELECT id, sale_types, selling_type, inventory_mode FROM products WHERE id = ?')
     .bind(productId)
     .first<Record<string, unknown>>();
   if (!existing) throw notFound('Product not found');
@@ -431,13 +431,14 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
     : [];
   const variants = directStockRaw.some((r) => r.scope === 'variant')
     ? await c.env.DB
-        .prepare('SELECT id, reserved FROM product_variants WHERE product_id = ?')
+        .prepare('SELECT id, combo_key, active, reserved FROM product_variants WHERE product_id = ?')
         .bind(productId)
-        .all<{ id: string; reserved: number }>()
-    : { results: [] as Array<{ id: string; reserved: number }> };
+        .all<{ id: string; combo_key: string; active: number; reserved: number }>()
+    : { results: [] as Array<{ id: string; combo_key: string; active: number; reserved: number }> };
   const optionById = new Map(live.map((v) => [v.id, v] as const));
   const variantById = new Map((variants.results ?? []).map((v) => [v.id, v] as const));
   const stockStatements: D1PreparedStatement[] = [];
+  const submittedStock = new Set<string>();
   for (const [i, raw] of directStockRaw.entries()) {
     const where = `direct_stock[${i}]`;
     const scope = String(raw.scope ?? '');
@@ -445,6 +446,11 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
       throw badRequest(`${where}.scope must be option or variant`, 'DIRECT_STOCK_SCOPE');
     }
     const id = String(raw.id ?? '').trim();
+    const submittedKey = `${scope}:${id}`;
+    if (submittedStock.has(submittedKey)) {
+      throw badRequest(`${where}.id is listed more than once`, 'DIRECT_STOCK_DUPLICATE');
+    }
+    submittedStock.add(submittedKey);
     const stored = scope === 'option' ? optionById.get(id) : variantById.get(id);
     if (!stored) throw badRequest(`${where}.id is not on this product`, 'DIRECT_STOCK_ROW');
     const readQty = (value: unknown, field: string): number | null => {
@@ -474,14 +480,63 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
         .bind(stock, low, id, productId)
     );
   }
-  if (directStockRaw.length > 0) {
+  const enabledDirectIds = new Set(
+    cells
+      .filter((cell) => cell.fulfillment_type === 'direct_sale' && cell.enabled)
+      .map((cell) => cell.option_id)
+  );
+  if (enabledDirectIds.size > 0) {
     const requestedMode = String(body.inventory_mode ?? '');
     if (requestedMode !== 'OPTION' && requestedMode !== 'VARIANT_COMBINATION') {
       throw badRequest('inventory_mode must be OPTION or VARIANT_COMBINATION for direct stock', 'DIRECT_STOCK_MODE');
     }
+    const expectedScope = requestedMode === 'OPTION' ? 'option' : 'variant';
+    if (directStockRaw.some((row) => row.scope !== expectedScope)) {
+      throw badRequest(
+        `direct_stock rows must all use scope=${expectedScope} for inventory_mode=${requestedMode}`,
+        'DIRECT_STOCK_SCOPE'
+      );
+    }
+
+    // Enabling direct sale and omitting its row used to leave NULL behind,
+    // which every reader labelled “unlimited”. Direct stock is now a required
+    // part of the same atomic request: zero means sold out, any positive
+    // integer means available, and absence is invalid.
+    if (requestedMode === 'OPTION') {
+      for (const optionId of enabledDirectIds) {
+        if (!submittedStock.has(`option:${optionId}`)) {
+          throw badRequest(
+            `direct_stock is missing the enabled option ${optionId}; send stock 0 when it is sold out`,
+            'DIRECT_STOCK_REQUIRED'
+          );
+        }
+      }
+    } else {
+      const expectedVariants = (variants.results ?? []).filter((variant) => {
+        if (!variant.active) return false;
+        const parts = new Set(String(variant.combo_key ?? '').split('|'));
+        return [...enabledDirectIds].some((id) => parts.has(`o:${id}`));
+      });
+      if (expectedVariants.length === 0) {
+        throw badRequest(
+          'enabled direct-sale options need an option×colour stock row for every available combination',
+          'DIRECT_STOCK_REQUIRED'
+        );
+      }
+      for (const variant of expectedVariants) {
+        if (!submittedStock.has(`variant:${variant.id}`)) {
+          throw badRequest(
+            `direct_stock is missing combination ${variant.combo_key}; send stock 0 when it is sold out`,
+            'DIRECT_STOCK_REQUIRED'
+          );
+        }
+      }
+    }
     stockStatements.push(
       c.env.DB.prepare('UPDATE products SET inventory_mode = ? WHERE id = ?').bind(requestedMode, productId)
     );
+  } else if (directStockRaw.length > 0) {
+    throw badRequest('direct_stock was sent but no option has direct sale enabled', 'DIRECT_STOCK_WITHOUT_DIRECT_SALE');
   }
 
   // 0075. What this product's cells ARE right now, so the replace below keeps
