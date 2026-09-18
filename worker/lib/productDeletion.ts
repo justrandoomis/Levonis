@@ -60,6 +60,19 @@ export const OWNED_TABLES: OwnedTable[] = [
     table: 'product_color_option_links',
     by: { sql: 'color_id IN (SELECT id FROM product_colors WHERE product_id = ?1)' },
   },
+  // A back-in-stock alert (0092) belongs with the link rows and not down in the
+  // customer-state section below, for the reason stated at the top of this list:
+  // it names an option value AND a colour, so it has to be gone before
+  // `product_option_values` and `product_colors` are. Those two columns carry
+  // NO FOREIGN KEY — they are `NOT NULL DEFAULT ''`, and '' is not a row in
+  // either table — so nothing in the database will move this row for us, in
+  // either direction. Delete it after its targets and there is a window inside
+  // this batch where an armed alert points at an option value that no longer
+  // exists; the sweep's reconciliation (`dead_reason = 'TARGET_REMOVED'`) is for
+  // the owner editing a live product, not for rows this delete is destroying
+  // anyway. Deleting by `product_id` means the direct column is enough here —
+  // an alert on a model or a colour of this product also carries the product.
+  { table: 'product_stock_alerts', by: { column: 'product_id' } },
   { table: 'product_images', by: { column: 'product_id' } },
   { table: 'product_variants', by: { column: 'product_id' } },
   // The fulfilment/transport cells (migration 0073) hang off an option row and

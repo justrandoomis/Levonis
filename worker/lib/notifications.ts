@@ -25,12 +25,23 @@
 
 import { newId } from './crypto';
 
+/**
+ * `user_notifications.kind` and `.entity_type` are bare TEXT with no CHECK
+ * (0045), so these two unions are the ONLY thing that decides what may be
+ * written. That is why a new sender has to appear in BOTH of them and why
+ * neither is a formality: TypeScript is the whole constraint.
+ */
 export type NotificationKind =
   | 'print_request_match'
   | 'offer_received'
   | 'offer_accepted'
   | 'order_update'
-  | 'review_reward_pending';
+  | 'review_reward_pending'
+  /**
+   * «رجع المنتج» — the back-in-stock sweep (0092, worker/lib/stockAlerts.ts)
+   * telling a customer the thing they armed an alert on is buyable again.
+   */
+  | 'stock_back';
 
 export interface NotificationInput {
   userId: string;
@@ -41,7 +52,16 @@ export interface NotificationInput {
   body_en?: string;
   /** In-app path, e.g. `/requests?request=req_123`. */
   link: string;
-  entity_type?: 'request' | 'offer' | 'order' | 'review' | '';
+  /**
+   * WIDENED WITH `kind`, NEVER AFTER IT. `notifyStatement` writes
+   * `n.entity_type ?? ''`, so a sender whose kind compiles but whose entity
+   * type does not has exactly one way out: drop the field and store ''. The row
+   * still arrives, still reads correctly, and has permanently lost the join
+   * back to what it is about — which for a stock alert is the product the
+   * customer is being told to go and buy. 'product' is here because
+   * 'stock_back' is above.
+   */
+  entity_type?: 'request' | 'offer' | 'order' | 'review' | 'product' | '';
   entity_id?: string;
   meta?: Record<string, unknown>;
   /** Unique per user. Empty means "no replay protection wanted". */
