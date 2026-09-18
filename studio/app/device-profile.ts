@@ -18,6 +18,14 @@
  * one of them BEFORE the kernel reports ready. On a phone that is the whole
  * budget, spent before a single triangle is on the bed.
  *
+ * Two of those three costs are now paid somewhere else, and this comment is
+ * the map: the pool size is capped at two by
+ * `patches/three-slicer+0.2.2.patch`, and the 4 GiB reservation is cut to
+ * 1 GiB on handhelds by the `singleKernel` transform in `vite.config.ts` —
+ * which also stops the build emitting the 6.24 MB kernel twice. What is left
+ * for this module is the third: whether the kernel is compiled at all before
+ * the user asks for a slice.
+ *
  * And the viewer asks for exactly that at MOUNT:
  *
  *     De(() => { if (q !== !1) try { D().postMessage({ cmd: "warmup", … }) } catch {} }, [])

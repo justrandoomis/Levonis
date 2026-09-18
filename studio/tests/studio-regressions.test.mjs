@@ -522,10 +522,16 @@ test("6: the patch is installed and pinned by patch-package", async () => {
   assert.match(parsed.scripts.postinstall, /patch-package --error-on-fail/,
     "the patch must fail the install rather than vanish silently");
   assert.match(patch, /__vpReleaseWorker/);
-  // Purely additive: the patch adds one property to an existing assignment.
+  // This guard is about the release hook, and the hook rides on an existing
+  // assignment rather than replacing it. The rest of the patch is reviewed by
+  // tests/engine-patch.test.mjs, which owns the total count — so what is
+  // checked here is that the worker-registration line is rewritten once and
+  // that every OTHER rewrite is one somebody named.
   const removed = patch.split("\n").filter((line) => line.startsWith("-") && !line.startsWith("---"));
-  assert.equal(removed.length, 1, "the patch rewrites exactly one line");
-  assert.ok(removed[0].includes("window.__vpWorker = k"), "and it is the worker-registration line");
+  const workerLines = removed.filter((line) => line.includes("window.__vpWorker = k"));
+  assert.equal(workerLines.length, 1, "the worker-registration line is rewritten exactly once");
+  const unaccounted = removed.filter((line) => !line.includes("window.__vpWorker = k") && !line.includes("keep_stages"));
+  assert.deepEqual(unaccounted, [], "an engine line is being removed that no test here has reviewed");
 });
 
 // =================================================================== meta

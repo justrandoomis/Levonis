@@ -1,0 +1,17 @@
+{
+  "origin": "http://127.0.0.1:40283",
+  "sliceWorker": "slicer.worker-DE1f8KoI.js",
+  "kernelsInBuild": [
+    "slicer_core.mt-Dkzz5L4r.js"
+  ],
+  "crossOriginIsolated": true,
+  "boot": {
+    "ok": true,
+    "ms": 404
+  },
+  "kernelUrlsFetched": [
+    "http://127.0.0.1:40283/assets/slicer_core.mt-Dkzz5L4r.js"
+  ],
+  "poolCapLine": "[slicer.worker] pthread pool capped at 2 (device reports 4)",
+  "failures": 0
+}

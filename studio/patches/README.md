@@ -146,3 +146,69 @@ default in place.
 threaded core is imported, and that `worker/platform.ts` still has **no**
 Android branch. The second is the one that matters — without it, a later
 "simplification" would remove cancellation from Android phones silently.
+
+## `three-slicer+0.2.2.patch` — let a phone decline the stage cache
+
+**One line changed**, and it restores the kernel's own default rather than
+inventing a behaviour: `keep_stages` goes back to `false` when the shell asks
+for it, and stays `true` for everyone else.
+
+### The trade the viewer makes for you
+
+The kernel's parameter table is explicit about what this flag costs:
+
+| `keep_stages` | `boolean` | `false` | — | keep the stages cached after slicing (skips the early release — a memory trade-off) |
+
+Default `false`. The viewer overrides it on every non-economy slice:
+
+```js
+function J(k, F) {
+  k.economy || (k.keep_stages = !0, k.reuse_stages = F && F === w.current ? 2 : 0);
+}
+```
+
+So the intermediate buffers of the slice that just finished are still resident
+in the WASM heap when the next slice starts allocating on top of them, and
+`reuse_stages: 2` on a re-slice of the same mesh is what buys the trade back:
+the second run skips PASS1 and the surface stage.
+
+### Why a phone must not make it
+
+Releasing the idle worker (the first patch above) covers the user who walks
+away. It does nothing for the loop this is actually about — slice, look at the
+preview, change something, slice again — because there is no idle window in it
+and nothing has been released. WebAssembly memory never shrinks, so on a phone
+the second slice is handed a heap already holding a full set of stages, and it
+is the one the OS kills.
+
+The saving on the other side of the trade is a re-slice that is never reached.
+A desktop keeps the cache and keeps the speedup; a constrained device takes the
+kernel's default and finishes.
+
+### Why the shell cannot do this without a patch
+
+`keep_stages` is a *host runtime flag* — the engine README lists it beside
+`economy` as a decision "the caller makes about a particular run" — but the
+caller here is the viewer, not the app. The app's settings map reaches the
+params through `sn(settings, …)` and `J()` runs **after** that and overwrites
+whatever was there. The only value that suppresses the override is
+`economy: true`, which would also drop the preview toolpaths and the time
+estimate from every slice. There is no seam short of the patch.
+
+### What the changed line does
+
+```js
+k.economy || (k.keep_stages = !(typeof window < "u" && window.__vpNoStageCache),
+              k.reuse_stages = k.keep_stages && F && F === w.current ? 2 : 0);
+```
+
+With the flag unset — every desktop, and any build where the shell never sets
+it — `!(false)` is `true` and `reuse_stages` is the engine's original
+expression, so the behaviour is byte-for-byte what it was. With it set, both go
+off together, which is not tidiness: `w.current` is still assigned the mesh
+hash after a successful run, so leaving `reuse_stages` alone would ask the
+kernel to reuse stages it had already released.
+
+The shell sets it once per device from `app/device-profile.ts`, through
+`adapter.setStageCacheAllowed()`, and the engine reads it while building the
+next run's parameters.

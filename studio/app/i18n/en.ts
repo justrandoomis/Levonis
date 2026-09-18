@@ -109,6 +109,8 @@ export const en = {
   overBedError: "{printer}: the model or generated path exceeds the selected build volume. The result was rejected and cannot be exported.",
   printNotReady: "Slice the plate first to create a printable file.",
   printStale: "The sliced result is outdated after your edits. Re-slice to export.",
+  presetTookEdits: "The new preset replaced {count} setting(s) you had changed: {names}. Everything else you edited was kept.",
+  presetKeptEdits: "{count} setting(s) you had changed were kept.",
 
   // Import
   imported: "Files were added to the project.",

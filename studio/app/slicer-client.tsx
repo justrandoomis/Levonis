@@ -43,6 +43,8 @@ import { createImportOrchestrator, ImportError, type ImportNotice, type ImportPr
 import { useSlicingState, type SlicePayload, type SlicingViewportEvent } from "./hooks/use-slicing-state";
 import { EDITOR_SHADOW_CSS } from "./editor-theme";
 import { fallbackMachineSettings, loadPrinterProfile, type MissingPreset } from "./profile-loader";
+import { applyMachineLock } from "./machine-lock";
+import { carryUserEdits, changedKeys, type PresetSelection } from "./settings-carryover";
 import {
   DEFAULT_PROFILE_ID,
   PROFILES,
@@ -192,8 +194,7 @@ function SettingsBook({
   const pages = uiTree[builder] ?? [];
   // React DOM has no `defaultOpen` for <details> (the monolith's attribute was
   // silently dropped) — open state is tracked explicitly instead.
-  const [openPages, setOpenPages] = useState<Set<number>>(() => new Set([0]));
-  const [loadedPages, setLoadedPages] = useState<Set<number>>(() => new Set([0]));
+  const [openPages, setOpenPages] = useState<Set<number>>(() => new Set<number>());
   return <div className="settings-book">{pages.map((page, index) => (
     <details
       key={`${builder}:${page.page}:${index}`}
@@ -207,11 +208,10 @@ function SettingsBook({
           else next.delete(index);
           return next;
         });
-        if (isOpen) setLoadedPages((current) => current.has(index) ? current : new Set(current).add(index));
       }}
     >
       <summary>{page.page}</summary>
-      {loadedPages.has(index) && <Panel settings={settings} setSettings={setSettings} embedded only={{ builder, page: page.page }} />}
+      {openPages.has(index) && <Panel settings={settings} setSettings={setSettings} embedded only={{ builder, page: page.page }} />}
     </details>
   ))}</div>;
 }
@@ -253,7 +253,6 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
    * state — so the inline transform is only applied while it is non-zero and
    * the CSS transition owns every other movement.
    */
-  const [sheetDrag, setSheetDrag] = useState(0);
   const sheetRef = useRef<HTMLElement | null>(null);
   const [profileId, setProfileId] = useState<ProfileId>(DEFAULT_PROFILE_ID);
   const [quality, setQuality] = useState<QualityId>("standard");
@@ -322,7 +321,18 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const suppressNextExportNoticeRef = useRef(false);
   const restoredSettingsRef = useRef<{ key: string; settings: SlicerSettings } | null>(null);
   const machineRef = useRef<SlicerSettings>(fallbackMachineSettings(PROFILES[DEFAULT_PROFILE_ID]));
-  const machineKeysRef = useRef<string[]>([]);
+  /**
+   * The keys the user changed by hand since the last preset load, and the
+   * selection that load was for. Together they are what lets a Support toggle
+   * stop discarding a hand-tuned infill — see app/settings-carryover.ts.
+   *
+   * Refs rather than state: nothing renders from them, and a settings write
+   * must not cost a render just to record that it happened.
+   */
+  const userEditedKeysRef = useRef<Set<string>>(new Set());
+  const loadedSelectionRef = useRef<PresetSelection | null>(null);
+  /** The live settings map, for the preset effect's async continuation. */
+  const settingsRef = useRef<SlicerSettings>(settings);
   const projectFilesRef = useRef<File[]>([]);
   const arrangeUndoRef = useRef<(() => boolean) | null>(null);
   const orientUndoRef = useRef<(() => boolean) | null>(null);
@@ -428,6 +438,14 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const t = DICTIONARIES[locale];
   const requestedPresetKey = `${profileId}:${quality}:${strength}:${support}`;
   const profileLoading = loadedPresetKey !== requestedPresetKey;
+  /**
+   * The dictionary, for the preset effect's async continuation.
+   *
+   * It cannot take `t` as a dependency: that would make switching language
+   * reload the printer profile and throw away every slice result. A ref kept
+   * current by its own effect is the same trick `plateCountRef` uses below.
+   */
+  const textRef = useRef(t);
 
   // -- account persistence (S5: namespaced drafts + upload pipeline) ---------
   // Engine-driven full snapshot capture: click save-project through the
@@ -623,6 +641,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   }, [nativeEnvironment.capabilities.telemetry, printerStatus.connected]);
 
   useEffect(() => { plateCountRef.current = plateCount; }, [plateCount]);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
+  useEffect(() => { textRef.current = t; }, [t]);
 
   useEffect(() => () => {
     if (exportIntentTimerRef.current !== null) window.clearTimeout(exportIntentTimerRef.current);
@@ -632,20 +652,59 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   useEffect(() => {
     const requestId = profileRequestRef.current + 1;
     profileRequestRef.current = requestId;
+    const nextSelection: PresetSelection = { printerId: profileId, quality, strength, support };
     setProfileLoadState(null);
     loadPrinterProfile(profile, quality, strength, support)
       .then((loaded) => {
         if (profileRequestRef.current !== requestId) return;
         machineRef.current = loaded.machine;
-        machineKeysRef.current = loaded.machineKeys;
         const restored = restoredSettingsRef.current?.key === requestedPresetKey ? restoredSettingsRef.current.settings : null;
         if (restored) restoredSettingsRef.current = null;
-        setSettings(restored ?? loaded.settings);
+        /**
+         * THE SELECTOR TAKES BACK ITS OWN KEYS, AND NOTHING ELSE.
+         *
+         * This used to be `setSettings(restored ?? loaded.settings)` — the map
+         * rebuilt from scratch — followed by `setNotice("")`. So flipping the
+         * Support switch, which has nothing to do with infill, discarded a
+         * hand-tuned infill density, every changed filament temperature and
+         * anything else the owner had set, and then cleared the message line
+         * so nothing said so. See app/settings-carryover.ts for the rule.
+         *
+         * A restored project is exempt: its saved map already IS the user's
+         * settings, and there is nothing to carry onto it.
+         */
+        if (restored) {
+          setSettings(restored);
+          userEditedKeysRef.current = new Set();
+          setNotice("");
+        } else {
+          const carried = carryUserEdits({
+            loaded: loaded.settings,
+            previous: settingsRef.current,
+            editedKeys: userEditedKeysRef.current,
+            previousSelection: loadedSelectionRef.current,
+            nextSelection,
+            processKeys: loaded.processKeys,
+          });
+          setSettings(carried.settings);
+          userEditedKeysRef.current = new Set(carried.kept);
+          const text = textRef.current;
+          setNotice(
+            carried.overwritten.length
+              ? templateText(text.presetTookEdits, {
+                count: carried.overwritten.length,
+                names: carried.overwritten.slice(0, 4).join("، "),
+              })
+              : carried.kept.length
+                ? templateText(text.presetKeptEdits, { count: carried.kept.length })
+                : ""
+          );
+        }
+        loadedSelectionRef.current = nextSelection;
         setProfileLoadState({ verified: loaded.verified, missingPresets: loaded.missingPresets });
         slicing.clearResults();
         setHandyProjectReady(false);
         setLoadedPresetKey(requestedPresetKey);
-        setNotice("");
       })
       .catch((reason: unknown) => {
         if (profileRequestRef.current !== requestId) return;
@@ -661,13 +720,24 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const setEditorSettings: Dispatch<SetStateAction<SlicerSettings>> = useCallback((next) => {
     setSettings((current) => {
       const proposed = typeof next === "function" ? next(current) : next;
-      const locked = { ...proposed };
-      const lockedRecord = locked as Record<string, unknown>;
-      const machineRecord = machineRef.current as Record<string, unknown>;
-      for (const key of machineKeysRef.current) {
-        if (Object.prototype.hasOwnProperty.call(machineRecord, key)) lockedRecord[key] = machineRecord[key];
-        else delete lockedRecord[key];
-      }
+      /**
+       * Only the MACHINE's own keys are pinned — see app/machine-lock.ts.
+       *
+       * This used to re-apply every key in three-slicer's `printerKeys`, a
+       * list documented as "every option key a printer profile CAN set" and
+       * meant for clearing on a printer switch. It contains `layer_height`,
+       * `z_hop` and all sixteen `machine_max_*`, so changing the layer height
+       * snapped back to the profile's value and the whole Motion panel was
+       * inert. That is «الإعدادات لا تطبق».
+       */
+      const locked = applyMachineLock(proposed, machineRef.current);
+      /**
+       * Remember WHICH keys the user changed, so a later preset change can
+       * carry them instead of discarding them — app/settings-carryover.ts.
+       * Machine keys can never land here: `applyMachineLock` has just pinned
+       * them back to the preset, so they compare equal.
+       */
+      for (const key of changedKeys(current, locked)) userEditedKeysRef.current.add(key);
       return locked;
     });
     // Any settings change makes stored slice results stale — never silently
@@ -1323,6 +1393,27 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   }, []);
 
   /**
+   * THE HEAP THE SECOND SLICE LANDS ON.
+   *
+   * Releasing the idle worker above covers the case where the user walks away
+   * between slices. It does nothing for the one the owner actually hits:
+   * slice, look at the preview, change something, slice again — forty seconds
+   * of work, no idle window, and the engine has been holding the first slice's
+   * intermediate stages in the WASM heap the whole time because the viewer
+   * forces `keep_stages: true` on every non-economy run. The kernel's own
+   * default is `false` and its parameter table calls the override "a memory
+   * trade-off"; on a phone that trade buys a faster re-slice that the tab does
+   * not live long enough to perform.
+   *
+   * So a constrained device takes the kernel's default. Desktops keep the
+   * cache — see engine-adapter.ts#setStageCacheAllowed for the whole reasoning
+   * and for why `reuse_stages` has to go with it.
+   */
+  useEffect(() => {
+    adapter.setStageCacheAllowed(!device.memoryConstrained);
+  }, [adapter, device.memoryConstrained]);
+
+  /**
    * DRAG THE HANDLE DOWN TO DISMISS.
    *
    * Pointer events, not touch events, so a mouse and a stylus behave the same
@@ -1347,14 +1438,16 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     let travelled = 0;
     const move = (moveEvent: PointerEvent) => {
       travelled = Math.max(0, moveEvent.clientY - startY);
-      setSheetDrag(travelled);
+      const sheet = sheetRef.current;
+      if (sheet) { sheet.style.transition = "none"; sheet.style.transform = `translateY(${travelled}px)`; }
     };
     const end = (endEvent: PointerEvent) => {
       node.releasePointerCapture?.(endEvent.pointerId);
       node.removeEventListener("pointermove", move);
       node.removeEventListener("pointerup", end);
       node.removeEventListener("pointercancel", end);
-      setSheetDrag(0);
+      const sheet = sheetRef.current;
+      if (sheet) { sheet.style.transform = ""; sheet.style.transition = ""; }
       const elapsed = Math.max(1, endEvent.timeStamp - startedAt);
       const flicked = travelled > 48 && travelled / elapsed > 0.5;
       if (flicked || (height > 0 && travelled > height / 3)) setSheet(null);
@@ -1603,6 +1696,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     seenObjectIdsRef.current = new Set();
     everSeenObjectIdsRef.current = new Set();
     restoreInFlightRef.current = false;
+    // A new project starts from the preset, not from the last project's edits.
+    userEditedKeysRef.current = new Set();
     arrangeUndoRef.current = null;
     orientUndoRef.current = null;
     setOrientUndoAvailable(false);
@@ -1647,15 +1742,111 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     <SettingsBook Panel={SettingsPanel} settings={settings} setSettings={setEditorSettings} builder="TabPrint::build" />
   ) : null, [SettingsPanel, setEditorSettings, settings]);
 
+  /**
+   * THE MOTION PANEL WAS NOT THE MOTION PANEL.
+   *
+   * `machine-lock.ts` unlocked the sixteen `machine_max_*` motion limits, and
+   * they were still unreachable, because this slot was rendering the wrong
+   * page of the engine's option tree. three-slicer's own type says what the
+   * slot is for:
+   *
+   *     motionPanel?: React.ReactNode
+   *       Motion-limits editor, folded into the printer card — usually
+   *       `<SettingsPanel only={{builder:'TabPrinter::build_kinematics_page'}}/>`
+   *
+   * and `TabPrinter::build_kinematics_page` is one page, "Motion ability",
+   * whose groups are Speed / Acceleration / Jerk limitation — i.e. exactly the
+   * `machine_max_*` keys. What was passed instead, `TabPrinter::build_fff`, is
+   * "Basic information": nozzle type, G-code flavor, extruder clearances.
+   *
+   * Both are rendered now rather than swapping one for the other, because the
+   * 35 Basic-information options were the only place the user could reach them
+   * and taking them away to fix a different bug is not a fix. Kinematics comes
+   * first: it is what the slot is named for and what was missing.
+   */
   const motionPanel = useMemo(() => SettingsPanel ? (
-    <SettingsBook Panel={SettingsPanel} settings={settings} setSettings={setEditorSettings} builder="TabPrinter::build_fff" />
+    <>
+      <SettingsBook Panel={SettingsPanel} settings={settings} setSettings={setEditorSettings} builder="TabPrinter::build_kinematics_page" />
+      <SettingsBook Panel={SettingsPanel} settings={settings} setSettings={setEditorSettings} builder="TabPrinter::build_fff" />
+    </>
   ) : null, [SettingsPanel, setEditorSettings, settings]);
 
   const filamentPanel = useMemo(() => SettingsPanel ? ((filamentSettings: SlicerSettings, setFilamentSettings: Dispatch<SetStateAction<SlicerSettings>>) => (
     <SettingsBook Panel={SettingsPanel} settings={filamentSettings} setSettings={setFilamentSettings} builder="TabFilament::build" />
   )) : null, [SettingsPanel]);
 
+  /**
+   * THE ENGINE'S TREE, HELD STILL WHILE THE SHELL TICKS AROUND IT.
+   *
+   * `Viewport` is the engine's default export and it is a plain function
+   * component — not wrapped in `memo`. React re-renders a plain child on every
+   * parent render regardless of whether its props changed, and what is behind
+   * this one is not a small tree: the gizmo rail, the object list, the plate
+   * bar, the stats card, the slice bar, and three `SettingsBook`s whose pages
+   * are the kernel's entire option surface.
+   *
+   * The shell re-renders far more often than any of that changes. Slice
+   * progress alone is ~6 renders a second (PROGRESS_THROTTLE_MS is 160), and
+   * every notice, every status label, every sheet or tool-tray toggle is
+   * another. On a desktop that reconciliation is invisible. On a phone it
+   * lands on the same main thread the engine is posting worker replies to,
+   * while the kernel has the CPU — which is exactly when the owner reports the
+   * editor going sticky.
+   *
+   * Hoisting the props to constants (see EXTRUDER_COLORS above) was half of
+   * this and could not finish the job: identical props do not stop a plain
+   * component re-rendering. An identical ELEMENT does — React bails out of a
+   * subtree whose element is referentially the same as last render — so the
+   * element itself is what gets cached. The dependency list is every prop
+   * below, which is why it is written out rather than trimmed: a prop that
+   * stops being listed is a prop the engine stops being told about.
+   */
+  const viewportElement = useMemo(() => Viewport ? (
+    <Viewport
+      key={workspaceKey}
+      settings={settings}
+      setSettings={setEditorSettings}
+      processPanel={processPanel}
+      motionPanel={motionPanel}
+      filamentPanel={filamentPanel}
+      panels={EDITOR_PANELS}
+      features={device.memoryConstrained ? EDITOR_FEATURES_COLD : EDITOR_FEATURES_WARM}
+      defaultExtruderColors={EXTRUDER_COLORS}
+      onEvent={handleEvent}
+      onSliced={handleEngineSliced}
+      onExport={handleViewportExport}
+    />
+  ) : null, [
+    Viewport,
+    workspaceKey,
+    settings,
+    setEditorSettings,
+    processPanel,
+    motionPanel,
+    filamentPanel,
+    device.memoryConstrained,
+    handleEvent,
+    handleEngineSliced,
+    handleViewportExport,
+  ]);
+
   // -- derived display state -------------------------------------------------
+  /**
+   * The layer height the KERNEL will use, not the tier's nominal number.
+   *
+   * The header printed `QUALITY[quality].layer` — the label on the Quality
+   * selector — while the engine slices `settings.layer_height`. Those agree
+   * only until somebody edits the layer height, which is the first thing
+   * anybody does in a slicer, and then the header confidently states a number
+   * the print will not use. Reading the same value the engine reads is the
+   * whole fix; `QUALITY` keeps its own layer figures for the Setup sheet,
+   * where they are labels on the choices rather than a claim about the print.
+   */
+  const effectiveLayerHeight = useMemo(() => {
+    const value = Number((settings as unknown as Record<string, unknown>).layer_height);
+    return Number.isFinite(value) && value > 0 ? value : QUALITY[quality].layer;
+  }, [quality, settings]);
+
   const displayStatus: EditorStatus = status === "ready" && !printReady ? "editing" : status;
   const statusLabel = status === "slicing"
     ? `${Math.round(slicing.progress * 100)}%`
@@ -1713,7 +1904,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         profileLoading={profileLoading}
         profileVerified={profileLoadState?.verified ?? true}
         profileShortName={profile.shortName}
-        qualityLayer={QUALITY[quality].layer}
+        qualityLayer={effectiveLayerHeight}
         engineReady={Boolean(Viewport)}
         importBusy={Boolean(importProgress)}
         printReady={printReady}
@@ -1735,22 +1926,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         onDropCapture={handleDropFiles}
       >
         <div className="viewport-mount" ref={viewportMountRef}>
-          {Viewport ? (
-            <Viewport
-              key={workspaceKey}
-              settings={settings}
-              setSettings={setEditorSettings}
-              processPanel={processPanel}
-              motionPanel={motionPanel}
-              filamentPanel={filamentPanel}
-              panels={EDITOR_PANELS}
-              features={device.memoryConstrained ? EDITOR_FEATURES_COLD : EDITOR_FEATURES_WARM}
-              defaultExtruderColors={EXTRUDER_COLORS}
-              onEvent={handleEvent}
-              onSliced={handleEngineSliced}
-              onExport={handleViewportExport}
-            />
-          ) : (
+          {viewportElement ?? (
             <div className="editor-loader" aria-live="polite"><span /><strong>{t.loading}</strong><small>{profile.shortName} · {profile.bed}</small></div>
           )}
         </div>
@@ -1946,7 +2122,6 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           aria-modal="true"
           aria-label={sheetTitle}
           tabIndex={-1}
-          style={sheetDrag > 0 ? { transform: `translateY(${sheetDrag}px)`, transition: "none" } : undefined}
         >
           <div
             className="sheet-handle"

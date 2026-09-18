@@ -38,7 +38,31 @@ export interface LoadedProfileResult {
   /** The locked machine layer (re-applied over user edits by the shell). */
   machine: SlicerSettings;
   /** Keys the shell must keep locked to the machine layer. */
+  /**
+   * The engine's own `printerKeys` plus the two identity keys the app adds.
+   *
+   * ITS DOCUMENTED PURPOSE IS CLEARING, NOT LOCKING: "every option key a
+   * printer profile can set … delete these from the settings map before
+   * applying a different printer". Using it to re-apply the preset over a
+   * user's edit is what froze `layer_height` and the whole Motion panel — see
+   * app/machine-lock.ts. Nothing consumes this today (a profile change
+   * replaces the settings object wholesale, which clears by construction); it
+   * is kept because it is the engine's answer to a real question and the next
+   * caller should get it from here rather than re-deriving it.
+   */
   machineKeys: string[];
+  /**
+   * Keys the chosen QUALITY's process preset carries.
+   *
+   * These are the keys the Quality selector owns: picking "Draft" after "Fine"
+   * is a request for that whole preset, so a hand-edited `layer_height` must
+   * not survive it — while a hand-edited filament temperature must, because
+   * Quality has nothing to say about it. `app/settings-carryover.ts` is where
+   * that distinction is made; this is the list it needs and the only place it
+   * can be read honestly (a fallback preset carries no keys at all, and then
+   * there is nothing for Quality to take).
+   */
+  processKeys: string[];
   /** True only when machine, process and filament presets all loaded from the engine. */
   verified: boolean;
   /** Explicit needs-attention list — empty when `verified` is true. */
@@ -136,6 +160,7 @@ export async function loadPrinterProfile(
     settings: combined,
     machine: lockedMachine,
     machineKeys: [...api.printerKeys, "printer_model", "printer_settings_id"],
+    processKeys: Object.keys(process),
     verified: missingPresets.length === 0,
     missingPresets,
     presetStatus,

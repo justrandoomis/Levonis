@@ -467,3 +467,171 @@ Two consequences worth stating plainly:
 | `studio/tests/perf-shell.mjs` | Autosave, page-load and placement cost, in Node. |
 | `studio/tests/perf-browser-editor.mjs` | The three failures, measured in Chromium against a real build. |
 | `studio/tests/perf-browser-memory.mjs` | Renderer RSS held by stored slice results. |
+
+---
+
+## 7. Round two — the phone still died, and the settings never applied
+
+The owner reported again, from an Android phone, with two screenshots:
+
+> هناك مشكلة في levo studio حيث ما زال التقطيع وlagging موجود / كما يظهر الرسالة
+> خطأ بأن worker terminated / وعند محاولة التقطيع يفشل أيضا / كما أن الإعدادات
+> جميعها لا تعمل لا تطبق فعليا على المشروع
+
+Four complaints: **"Worker terminated (likely out of memory)"**, **"Slice
+failed (economy mode failed too)"**, **lag**, and **none of the settings
+actually apply**. Everything in §1–§6 above was live when those screenshots
+were taken — the pool cap was verified present in the deployed bundle — so
+round one was necessary and not sufficient.
+
+### 7.1 The build was shipping the 6.24 MB kernel TWICE
+
+The largest single cost, and it was ours, not the engine's. The threaded
+kernel spawns its pthread pool from its own module:
+
+```js
+new Worker(new URL("slicer_core.mt.js", import.meta.url), { type: "module", … })
+```
+
+Vite's `vite:worker-import-meta-url` plugin has a branch that recognises a
+worker module referencing *itself* and rewrites the URL to
+`self.location.href`. It decides that by comparing the file against the last
+entry of the bundle chain — which here is `slicer.worker.js`, the module that
+dynamically imports the kernel, not the kernel. The self-reference was missed
+and a whole second copy was emitted:
+
+```
+slicer_core.mt-CzWwNuLo.js   6,235,835 bytes   ← the slice worker imported this
+slicer_core.mt-DbNgvolI.js   6,235,768 bytes   ← every pool worker imported this
+```
+
+Byte-for-byte identical, at two URLs, which to a browser is two unrelated
+scripts: two downloads, two parses, two V8 code caches, nothing shared. And
+98 % of each file is the 5.2 MB wasm binary carried as a JS string literal and
+decoded a character at a time, so each parse is expensive on its own.
+
+Fixed by a build transform (`singleKernel` in `studio/vite.config.ts`) that
+hands `import.meta.url` to `new Worker` directly. Vite's pattern only matches
+`new URL("…", import.meta.url)`, so the rewritten form is left alone and no
+second asset is emitted.
+
+| | before | after |
+|---|---|---|
+| `slicer_core.mt-*.js` in `dist/client/assets` | 2 | **1** |
+| bytes of threaded kernel served per session | 12,471,603 | **6,235,874** |
+| distinct kernel URLs fetched at warmup (measured) | 2 | **1** |
+
+### 7.2 The 4 GiB shared reservation
+
+```js
+wasmMemory = new WebAssembly.Memory({ initial: 256, maximum: 65536, shared: true })
+```
+
+A *shared* memory cannot be relocated when it grows, so the whole `maximum` —
+4 GiB — is reserved as contiguous address space at construction. There is no
+host hook for it: the worker calls the factory with no module argument, and the
+glue exposes neither `Module.wasmMemory` nor `Module.INITIAL_MEMORY`. The
+single-threaded core never does this.
+
+On a 64-bit browser the reservation is cheap. On 32-bit Chrome for Android it
+is more address space than the process has, and the constructor throws during
+boot — which the page reports as *"Worker terminated (likely out of memory):
+worker error"* on an empty bed, and again on the economy rung, because every
+rung of the retry ladder boots the same kernel. Both screenshots.
+
+**This is the one change in this round that is a hypothesis rather than a
+measurement**, so it is made the cheap way round: the same build transform cuts
+`maximum` to 16384 pages (1 GiB) **on handhelds only**, 64× the 16 MiB the
+kernel starts with and far beyond what a phone tab is allowed to commit.
+Desktops keep 4 GiB. If a model somehow needs more, the kernel aborts and the
+viewer's retry ladder takes over — a slice that finishes in economy mode
+instead of one that is killed.
+
+`tests/browser-kernel-boot.mjs` drives a real Chromium with an Android user
+agent against the real `dist/` and proves the transformed kernel still
+compiles and reports ready (404 ms), under COOP/COEP so it is genuinely the
+threaded core being tested.
+
+### 7.3 The stage cache nobody asked for
+
+The kernel's parameter table:
+
+| `keep_stages` | `boolean` | `false` | — | keep the stages cached after slicing (skips the early release — **a memory trade-off**) |
+
+Default `false`. The viewer overrides it to `true` on every non-economy slice,
+so the intermediate buffers of the slice that just finished are still resident
+when the next one starts allocating on top of them. Releasing the idle worker
+(§1 #2) does not help here: the loop this is about — slice, look at the
+preview, change something, slice again — has no idle window in it.
+
+A constrained device now takes the kernel's own default, through
+`adapter.setStageCacheAllowed(!device.memoryConstrained)` and one more line in
+the engine patch. Desktops keep the cache and keep the re-slice speedup it
+buys.
+
+### 7.4 The lag: the engine's whole tree was re-rendering ~6× a second
+
+`Viewport` is three-slicer's default export and it is a **plain function
+component**, not `memo`-wrapped. React re-renders a plain child on every parent
+render whether or not its props changed, and behind this one are the gizmo
+rail, the object list, the plate bar, the stats card, the slice bar and three
+`SettingsBook`s carrying the kernel's entire option surface.
+
+`SlicerClient` re-renders for reasons that have nothing to do with any of that:
+slice progress alone is ~6 renders a second (`PROGRESS_THROTTLE_MS` is 160 ms),
+plus every notice, status label, sheet and tool-tray toggle. On a phone that
+reconciliation runs on the same main thread that services the engine's worker
+replies, while the kernel has the CPU.
+
+Round one hoisted the props to module constants (§1 #6) and could not finish
+the job, because identical props do not stop a plain component re-rendering —
+only an identical *element* does. The element is now built in a `useMemo`, so
+the shell's own ticks never reach the engine's tree.
+`tests/viewport-memo.test.mjs` reads the props and the dependency list out of
+the syntax tree and fails if a prop is added without its dependency — the
+failure mode that would make the engine silently keep a stale value.
+
+### 7.5 «الإعدادات جميعها لا تعمل» — three separate bugs
+
+**(a) Every edit deleted the layer height.** `setEditorSettings` re-applied the
+printer preset over each write using three-slicer's `printerKeys`. That list is
+documented as *"every option key a printer profile can set — delete these
+before applying a different printer"*: a clear-on-switch list, not a lock list,
+and it contains `layer_height`, `z_hop` and all sixteen `machine_max_*`. The
+loaded preset does not itself carry `layer_height`, so the `else delete` branch
+fired and `deriveKernelParams` substituted its default of 0.2 mm. Picking Fine
+(0.12) and then editing anything at all sliced at 0.20. Replaced by an explicit
+11-key identity lock in `app/machine-lock.ts`, with a parity test that fails if
+a three-slicer upgrade adds a key nobody classified.
+
+**(b) The Motion panel was the wrong page.** Unlocking the sixteen motion
+limits achieved nothing while the shell's `motionPanel` slot rendered
+`TabPrinter::build_fff` — the printer's *Basic information* page. The
+`machine_max_*` controls live on `TabPrinter::build_kinematics_page`
+("Motion ability": Speed / Acceleration / Jerk limitation), which is also what
+the engine's own type for the slot names. Both are rendered now; the 35 Basic
+information options had nowhere else to be reached from.
+
+**(c) Changing one selector discarded every other setting.** Printer, quality,
+strength and support each rebuilt the settings map from scratch and then
+cleared the message line. Flipping the Support switch threw away a hand-tuned
+infill density and every changed filament temperature, silently.
+`app/settings-carryover.ts` gives each selector only the keys it owns —
+support → `enable_support`/`support_type`, strength → `sparse_infill_density`/
+`wall_loops`, quality → the whole new process preset, printer → everything —
+carries the rest, and reports what it took.
+
+**(d) The header stated a layer height the print would not use.** It printed
+`QUALITY[quality].layer`, the label on the Quality selector, while the engine
+slices `settings.layer_height`. It now reads the same value the engine reads.
+
+### 7.6 Files added in this round
+
+| File | What it does |
+|---|---|
+| `studio/vite.config.ts` (`singleKernel`) | One kernel copy in the build; 1 GiB shared heap on handhelds. |
+| `studio/app/machine-lock.ts` | Which settings belong to the printer and which to the print. Pure; `tests/machine-lock.test.mjs`. |
+| `studio/app/settings-carryover.ts` | What survives a preset change. Pure; `tests/settings-carryover.test.mjs`. |
+| `studio/tests/single-kernel.test.mjs` | The build invariants, checked against the real `dist/`. |
+| `studio/tests/browser-kernel-boot.mjs` | The transformed kernel really boots, in Chromium, on a phone UA. |
+| `studio/tests/viewport-memo.test.mjs` | The engine element stays cached and its dependency list stays complete. |

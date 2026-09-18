@@ -88,15 +88,17 @@ export const ENGINE_API_METHODS = [
 /**
  * Engine globals this adapter reaches for that are NOT part of `__vpApi`.
  *
- * `__vpReleaseWorker` is added by `patches/three-slicer+0.2.2.patch` — see
- * patches/README.md for why the shell cannot free the idle slice worker
- * without it. Listing it here means tests/editor-capabilities.test.mjs fails
- * loudly if the patch ever stops being applied, instead of Studio quietly
- * going back to holding a WASM heap and a pthread pool on phones.
+ * `__vpReleaseWorker` and `__vpNoStageCache` are both added by
+ * `patches/three-slicer+0.2.2.patch` — see patches/README.md for why the shell
+ * can neither free the idle slice worker nor decline the stage cache without
+ * it. Listing them here means tests/editor-capabilities.test.mjs fails loudly
+ * if the patch ever stops being applied, instead of Studio quietly going back
+ * to holding a WASM heap and a pthread pool on phones.
  */
 export const ENGINE_WINDOW_HOOKS = [
   "__vpApi",
   "__vpReleaseWorker",
+  "__vpNoStageCache",
 ] as const;
 
 export type EngineStaticTestId = (typeof ENGINE_STATIC_TEST_IDS)[number];
@@ -135,6 +137,14 @@ declare global {
      * slice is pending. Absent when the patch is not applied.
      */
     __vpReleaseWorker?: () => boolean;
+    /**
+     * Added by patches/three-slicer+0.2.2.patch. When true, a slice runs with
+     * `keep_stages: false` — the engine's own default — instead of the
+     * viewer's forced `keep_stages: true`, and does not try to reuse stages it
+     * no longer has. Ignored by an unpatched build, where the cache is always
+     * kept.
+     */
+    __vpNoStageCache?: boolean;
   }
 }
 
@@ -555,6 +565,32 @@ export class EngineAdapter {
   /** True when the installed engine build carries the worker-release patch. */
   canReleaseSlicerWorker(): boolean {
     return typeof window !== "undefined" && typeof window.__vpReleaseWorker === "function";
+  }
+
+  /**
+   * Allow or decline the engine's post-slice STAGE CACHE.
+   *
+   * The kernel's own default for `keep_stages` is `false`, and the engine's
+   * parameter table calls turning it on what it is: "keep the stages cached
+   * after slicing (skips the early release — **a memory trade-off**)". The
+   * viewer nevertheless forces it on for every non-economy slice, so the
+   * intermediate buffers of the slice you just finished are still resident in
+   * the WASM heap when the next one starts allocating on top of them.
+   *
+   * On a desktop that trade is worth making — a re-slice of the same mesh
+   * skips its first two stages. On a phone it is the reason the SECOND slice
+   * is the one that dies, and a re-slice that never happens because the tab
+   * was killed saves no time at all.
+   *
+   * Declining also clears `reuse_stages`: asking the kernel to reuse stages
+   * that were released is worse than not caching them.
+   *
+   * Takes effect on the NEXT slice — the engine reads the flag while it builds
+   * that run's parameters — so it is set once per device, not per slice.
+   */
+  setStageCacheAllowed(allowed: boolean): void {
+    if (typeof window === "undefined") return;
+    window.__vpNoStageCache = !allowed;
   }
 
   /**

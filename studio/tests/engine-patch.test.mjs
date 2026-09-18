@@ -37,25 +37,75 @@ test("the patch file matches the installed engine version", async () => {
   assert.equal(pkg.dependencies["three-slicer"], "0.2.2", "the patch file name pins this version");
   // Two hunks, in two files, for two different problems. Both are named here
   // so that a third arriving without its own review is visible.
-  assert.match(patch, /viewer\/dist\/Viewport\.js/, "the idle-worker release hook");
+  assert.match(patch, /viewer\/dist\/Viewport\.js/, "the idle-worker release hook and the stage-cache opt-out");
   assert.match(patch, /engine\/src\/slicer\.worker\.js/, "the pthread pool cap");
-  assert.equal((patch.match(/^diff --git /gm) ?? []).length, 2, "an unreviewed third hunk");
+  assert.equal((patch.match(/^diff --git /gm) ?? []).length, 2, "an unreviewed third FILE");
 
   /**
-   * EXACTLY ONE LINE OF ENGINE BEHAVIOUR IS REPLACED IN THE WHOLE PATCH, and
-   * the replacement keeps everything the original did. Every other line is an
+   * EXACTLY TWO LINES OF ENGINE BEHAVIOUR ARE REPLACED IN THE WHOLE PATCH, and
+   * each replacement keeps everything its original did. Every other line is an
    * addition. A patch that starts REMOVING engine behaviour needs a different
    * review than this test can stand in for, and it should fail here first.
+   *
+   * The count is asserted rather than the shape alone, because the cheapest
+   * way to break an engine is to delete one of its lines while adding yours.
    */
   const removed = patch.split("\n").filter((line) => line.startsWith("-") && !line.startsWith("---"));
-  assert.equal(removed.length, 1, "the patch must replace exactly one engine line");
+  assert.equal(removed.length, 2, "the patch must replace exactly two engine lines");
   const added = patch.split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++"));
-  const originalPrefix = removed[0].slice(1, removed[0].lastIndexOf("(window.__vpWorker = k"));
+
+  // 1. The worker-release hook rides on the line that publishes __vpWorker.
+  const removedWorkerLine = removed.find((line) => line.includes("window.__vpWorker = k"));
+  assert.ok(removedWorkerLine, "the worker-handle line should be the one replaced");
+  const originalPrefix = removedWorkerLine.slice(1, removedWorkerLine.lastIndexOf("(window.__vpWorker = k"));
   assert.ok(originalPrefix.length > 100, "unexpected patch shape");
   const replacement = added.find((line) => line.includes("window.__vpReleaseWorker"));
   assert.ok(replacement, "the patch must add the release hook");
   assert.ok(replacement.includes(originalPrefix), "the replacement dropped part of the original line");
   assert.ok(replacement.includes("window.__vpWorker = k"), "the engine's own worker handle must survive");
+
+  // 2. The stage-cache opt-out replaces the viewer's forced keep_stages.
+  const removedStageLine = removed.find((line) => line.includes("keep_stages"));
+  assert.ok(removedStageLine, "the forced keep_stages line should be the other one replaced");
+  assert.match(removedStageLine, /k\.keep_stages = !0/, "the original forced it on unconditionally");
+  const stageReplacement = added.find((line) => line.includes("__vpNoStageCache"));
+  assert.ok(stageReplacement, "the patch must add the stage-cache opt-out");
+  // Unset flag == the engine's original behaviour, byte for byte.
+  assert.ok(
+    stageReplacement.includes("k.economy || (k.keep_stages = !(typeof window < \"u\" && window.__vpNoStageCache)"),
+    "with the flag unset, keep_stages must still be true"
+  );
+  // …and reuse_stages must go off WITH it: w.current still holds the mesh hash
+  // after a run, so reusing stages that were released is the worse bug.
+  assert.ok(
+    stageReplacement.includes("k.reuse_stages = k.keep_stages && F && F === w.current ? 2 : 0"),
+    "reuse_stages must be gated on keep_stages, not left on its own"
+  );
+});
+
+test("a constrained device declines the stage cache, and only through the adapter", async () => {
+  /**
+   * THE HEAP THE SECOND SLICE LANDS ON.
+   *
+   * The engine's own parameter table calls `keep_stages` "a memory trade-off"
+   * and defaults it to false; the viewer forces it true on every non-economy
+   * slice. Releasing the idle worker does not help here — the loop this is
+   * about (slice, look, edit, slice) has no idle window in it.
+   */
+  const [engine, adapter, app, profile] = await Promise.all([
+    readFile(engineUrl, "utf8"),
+    readFile(adapterUrl, "utf8"),
+    readFile(appUrl, "utf8"),
+    readFile(new URL("../app/device-profile.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(engine, /window\.__vpNoStageCache/, "the installed build must read the flag");
+  assert.match(adapter, /setStageCacheAllowed\(allowed: boolean\): void/);
+  assert.match(adapter, /window\.__vpNoStageCache = !allowed/);
+  // Same rule as the release hook: no direct global poking outside the adapter.
+  assert.doesNotMatch(app, /__vpNoStageCache/);
+  assert.match(app, /adapter\.setStageCacheAllowed\(!device\.memoryConstrained\)/);
+  // A desktop keeps the cache and keeps the re-slice speedup it buys.
+  assert.match(profile, /memoryConstrained/);
 });
 
 test("the pool cap keeps threads — it does not fall back to the single-threaded core", async () => {
@@ -140,4 +190,12 @@ test("the patch mechanism is documented where the next person will look", async 
   assert.match(readme, /--error-on-fail/);
   assert.match(readme, /npm ci/);
   assert.match(readme, /__vpReleaseWorker/);
+  assert.match(readme, /__vpNoStageCache/);
+  // Every replaced engine line needs its own section, because the reason is
+  // never obvious from the minified line it changes.
+  assert.equal(
+    (readme.match(/^## `three-slicer\+0\.2\.2\.patch`/gm) ?? []).length,
+    3,
+    "a change to the patch must bring its own section here"
+  );
 });
