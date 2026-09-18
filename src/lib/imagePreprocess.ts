@@ -156,10 +156,25 @@ async function drawAndEncode(decoded: DecodedImage, maxEdge: number): Promise<We
   // have, in exactly the same way: null. Both are retryable at a smaller edge —
   // and if the smallest rung still yields nothing, the caller says which it was.
   if (!blob || blob.size <= 0) return null;
-  // Browsers without a WebP encoder are allowed to return PNG. The upload API
-  // validates magic bytes and dimensions server-side, so this is a safe,
-  // standards-compatible fallback rather than a reason to block the admin.
-  if (!['image/webp', 'image/png', 'image/jpeg'].includes(blob.type)) return null;
+  /**
+   * WEBP OR NOTHING — and this line used to be the opposite.
+   *
+   * `canvas.toBlob(cb, 'image/webp')` DOES NOT FAIL on a browser with no WebP
+   * encoder. The specification tells it to fall back to PNG, silently, with a
+   * perfectly valid Blob whose `type` is `image/png`. The previous version of
+   * this check accepted that Blob as a successful conversion, so the file was
+   * renamed, uploaded, sniffed by the server as PNG and stored as PNG — while
+   * every screen in between said the image had been converted.
+   *
+   * That is exactly the «تحويل وهمي» the owner reported: it claims to have
+   * converted and the database holds the original format. A conversion that
+   * cannot be trusted is worse than one that refuses, because nobody goes
+   * looking for it.
+   *
+   * So anything that is not WebP is a FAILED rung. The ladder tries a smaller
+   * canvas, and if every rung fails the caller says so out loud.
+   */
+  if (blob.type !== 'image/webp') return null;
   if (blob.size > PRODUCT_IMAGE_MAX_BYTES) return null;
   return { blob, width, height };
 }
@@ -191,13 +206,22 @@ export async function encodeProductRasterAsWebp(
       const result = await drawAndEncode(decoded, edge);
       if (result) return result;
     }
-    // Some WebViews return null for every requested canvas encoding. If the
-    // original is already inside the server limit, upload it as-is; the server
-    // now accepts and validates PNG/JPEG directly.
-    if (file.size <= PRODUCT_IMAGE_MAX_BYTES) {
-      return { blob: file, width: decoded.width, height: decoded.height };
-    }
-    throw new Error('تعذّر تحسين الصورة على هذا الجهاز وحجم الأصل يتجاوز الحد / image optimization unavailable and the original is too large');
+    /**
+     * EVERY RUNG FAILED, AND THAT IS AN ERROR RATHER THAN A FALLBACK.
+     *
+     * This used to hand back the ORIGINAL file when the canvas produced
+     * nothing, and the upload then stored a PNG. The owner's complaint was
+     * precisely that: a conversion that reports success and leaves the original
+     * format in the database. Silence is what made it invisible; an error is
+     * what makes it fixable.
+     *
+     * The server refuses PNG and JPEG on this route now, so a fallback here
+     * would only move the same failure one step later and describe it worse.
+     */
+    throw new Error(
+      'تعذّر تحويل الصورة إلى WebP على هذا المتصفح. جرّب متصفحًا آخر أو صورة أصغر. / ' +
+        'This browser could not convert the image to WebP. Try another browser or a smaller image.'
+    );
   } finally {
     decoded.close?.();
   }
@@ -226,6 +250,37 @@ export async function prepareAvatarImage(
   encoder: WebpEncoder = (f) => encodeProductRasterAsWebp(f, AVATAR_IMAGE_MAX_EDGE)
 ): Promise<PreparedProductImage> {
   return prepareProductImage(file, encoder);
+}
+
+/**
+ * THE CEILING EACH KIND OF PICTURE DESERVES.
+ *
+ * Until now only `product` and `avatar` were converted at all: a photograph
+ * sent in a chat, a payment receipt and a merchant's community image were
+ * stored exactly as the phone produced them — several megabytes of camera
+ * JPEG each. The owner asked for «جميع الصور بدون استثناء», and this is the
+ * table that makes that true.
+ *
+ * A chat photo and a receipt are read at screen size and never printed, so
+ * 2048 is generous. An avatar's largest box is a profile hero.
+ */
+export const UPLOAD_MAX_EDGE: Record<string, number> = {
+  product: PRODUCT_IMAGE_MAX_EDGE,
+  avatar: AVATAR_IMAGE_MAX_EDGE,
+  chat: 2_048,
+  receipt: 2_048,
+  community: 2_048,
+};
+
+/**
+ * Prepare ANY upload, whatever it is for. One door, so a new purpose cannot be
+ * added without deciding what its pictures should weigh — and cannot silently
+ * default to "store whatever the camera produced", which is how three of the
+ * five purposes ended up unconverted.
+ */
+export async function prepareUploadImage(file: File, purpose: string): Promise<PreparedProductImage> {
+  const edge = UPLOAD_MAX_EDGE[purpose] ?? PRODUCT_IMAGE_MAX_EDGE;
+  return prepareProductImage(file, (f) => encodeProductRasterAsWebp(f, edge));
 }
 
 function megabytes(bytes: number): string {
@@ -257,9 +312,18 @@ export async function prepareProductImage(file: File, encoder: WebpEncoder = enc
     };
   }
 
-  // Everything else travels exactly as picked — GIF and AVIF are deliberately
-  // not re-encoded (it would destroy animation), and MP4 is not an image at
-  // all — so for these the ceiling really is the ceiling.
+  /**
+   * Everything else travels exactly as picked — GIF and AVIF are deliberately
+   * not re-encoded, and MP4 is not an image at all — so for these the ceiling
+   * really is the ceiling.
+   *
+   * THE GIF EXCEPTION IS A DECISION, NOT AN OVERSIGHT. A canvas can only draw
+   * ONE frame, so "converting" an animated GIF to WebP would silently throw the
+   * animation away and hand back a still picture — the same class of quiet
+   * damage as the fake conversion this file was just fixed for. AVIF is already
+   * a modern compressed format and arrives from vendor CDNs rather than from a
+   * camera. Both are stored honestly under their own type.
+   */
   const limit = isMp4(signature) ? PRODUCT_VIDEO_MAX_BYTES : PRODUCT_IMAGE_MAX_BYTES;
   if (file.size > limit) {
     throw new Error(`الملف ${megabytes(file.size)} — الحد ${megabytes(limit)} / file exceeds the limit`);

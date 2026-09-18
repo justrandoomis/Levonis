@@ -1194,16 +1194,22 @@ export async function uploadFile(
   let prepared = file;
   let width: number | undefined;
   let height: number | undefined;
-  if (purpose === 'product' || purpose === 'avatar') {
-    // Lazy because image conversion belongs to the upload moment, not to the
-    // entry bundle every shopper downloads.
-    //
-    // AN AVATAR IS CONVERTED TOO, and at its own much smaller ceiling. It was
-    // stored as the phone produced it — several megabytes of camera JPEG — and
-    // then downloaded in full to fill the 32x32 chip in the header, on every
-    // page, for every visitor.
+  {
+    /**
+     * EVERY PURPOSE, not two of them.
+     *
+     * This used to run for `product` and `avatar` only, so a photograph sent in
+     * a chat, a payment receipt and a merchant's community image were stored
+     * exactly as the phone produced them — several megabytes of camera JPEG,
+     * downloaded in full every time anyone opened the thread. The owner asked
+     * for «جميع الصور بدون استثناء»; `prepareUploadImage` owns the ceiling for
+     * each one.
+     *
+     * Lazy because image conversion belongs to the upload moment, not to the
+     * entry bundle every shopper downloads.
+     */
     const mod = await import('./imagePreprocess');
-    const result = purpose === 'avatar' ? await mod.prepareAvatarImage(file) : await mod.prepareProductImage(file);
+    const result = await mod.prepareUploadImage(file, purpose);
     prepared = result.file;
     width = result.width;
     height = result.height;

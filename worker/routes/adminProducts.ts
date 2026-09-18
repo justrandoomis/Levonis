@@ -16,6 +16,7 @@
  */
 
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, int, str, forbidden, pickFrom, HttpError } from '../lib/http';
 import { audit } from '../lib/audit';
@@ -1256,6 +1257,94 @@ adminProductsRoutes.post('/:id/reprice', async (c) => {
  * answers `already_deleted: true` with a 200 — an admin who did not see the
  * first response must not be shown a 500.
  */
+/**
+ * RUN THE DELETE AND, IF IT FAILS, SAY WHAT FAILED.
+ *
+ * A destructive admin action that answers "Something went wrong. Please try
+ * again." is telling the owner to repeat an action that will fail again, for a
+ * reason only the logs hold — and the owner does not have the logs. That is
+ * what the screenshot showed, three times in a row.
+ *
+ * So the database's own words are carried out, trimmed, under a stable code.
+ * They are not a leak: an admin is already authorised to read every row this
+ * could name, the message is a schema fact rather than customer data, and the
+ * alternative is a shop whose owner cannot delete a product and cannot find out
+ * why.
+ */
+async function deleteOrExplain(
+  db: D1Database,
+  id: string,
+  newIdFn: () => string
+): Promise<Awaited<ReturnType<typeof deleteProductPermanently>>> {
+  try {
+    return await deleteProductPermanently(db, id, { newId: newIdFn });
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
+    console.error(`product delete failed for ${id}:`, reason);
+    throw new HttpError(
+      500,
+      `تعذّر حذف المنتج: ${reason.slice(0, 300)} / could not delete the product: ${reason.slice(0, 300)}`,
+      'DELETE_FAILED',
+      { reason: reason.slice(0, 300) }
+    );
+  }
+}
+
+/**
+ * THE HALF THAT RUNS AFTER THE COMMIT, AND CANNOT UNDO IT.
+ *
+ * The rows are gone by the time these run. An R2 call, a cache purge or an
+ * audit insert that throws here would surface as "delete failed" for a product
+ * that is already deleted — the worst possible answer, because the owner then
+ * presses the button again on an id that no longer exists.
+ *
+ * `runMediaCleanup` already records rather than throws; this closes the other
+ * two, and reports what did not finish instead of pretending it did.
+ */
+async function afterCommit(
+  c: Context<AppContext>,
+  adminId: string,
+  id: string,
+  result: Awaited<ReturnType<typeof deleteProductPermanently>>,
+  action: string
+): Promise<{ deleted: string[]; pending: number; invalidated: string[]; warnings: string[] }> {
+  const warnings: string[] = [];
+  let cleanup: { deleted: string[]; failed: Array<{ key: string; error: string }> } = { deleted: [], failed: [] };
+  try {
+    cleanup = await runMediaCleanup(c.env, result.media_jobs);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('media cleanup threw after a committed delete:', msg);
+    warnings.push(`media cleanup: ${msg.slice(0, 200)}`);
+  }
+  let invalidated: string[] = [];
+  try {
+    invalidated = await invalidateMediaCache(new URL(c.req.url).origin, cleanup.deleted);
+  } catch (e) {
+    console.error('cache invalidation threw after a committed delete:', e instanceof Error ? e.message : String(e));
+  }
+  try {
+    await audit(c.env.DB, adminId, action, id, {
+      rows_deleted_by_table: result.rows_deleted_by_table,
+      rows_unlinked_by_table: result.rows_unlinked_by_table,
+      r2_objects_deleted: cleanup.deleted.length,
+      r2_objects_shared_skipped: result.r2_objects_shared_skipped.length,
+      r2_cleanup_pending: cleanup.failed.length,
+    });
+  } catch (e) {
+    // An audit row is a record of something that already happened. Losing it is
+    // worth a log line, never worth telling the owner their delete failed.
+    console.error('audit row failed after a committed delete:', e instanceof Error ? e.message : String(e));
+    warnings.push('audit row not written');
+  }
+  return {
+    deleted: cleanup.deleted,
+    pending: cleanup.failed.length,
+    invalidated,
+    warnings,
+  };
+}
+
 adminProductsRoutes.delete('/:id', async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id');
@@ -1303,7 +1392,7 @@ adminProductsRoutes.delete('/:id', async (c) => {
   }
 
   if (permanent) {
-    const result = await deleteProductPermanently(c.env.DB, id, { newId: () => newId('mcj') });
+    const result = await deleteOrExplain(c.env.DB, id, () => newId('mcj'));
     if (result.blocked) {
       throw new HttpError(409, result.blocked.remedy, result.blocked.code, {
         table: result.blocked.table,
@@ -1312,19 +1401,14 @@ adminProductsRoutes.delete('/:id', async (c) => {
     }
 
     // R2 AFTER THE COMMIT, NEVER INSIDE IT. A bucket failure here leaves a
-    // pending job, not a half-deleted product.
-    const cleanup = await runMediaCleanup(c.env, result.media_jobs);
-    const invalidated = await invalidateMediaCache(new URL(c.req.url).origin, cleanup.deleted);
-
-    await audit(c.env.DB, admin.id, 'product_v2.delete_permanent', id, {
-      rows_deleted_by_table: result.rows_deleted_by_table,
-      rows_unlinked_by_table: result.rows_unlinked_by_table,
-      r2_objects_deleted: cleanup.deleted.length,
-      r2_objects_shared_skipped: result.r2_objects_shared_skipped.length,
-      r2_cleanup_pending: cleanup.failed.length,
-    });
+    // pending job, not a half-deleted product — and never a failed response for
+    // a delete that already happened.
+    const after = await afterCommit(c, admin.id, id, result, 'product_v2.delete_permanent');
+    const cleanup = { deleted: after.deleted, failed: { length: after.pending } };
+    const invalidated = after.invalidated;
 
     return c.json({
+      ...(after.warnings.length ? { warnings: after.warnings } : {}),
       success: true,
       permanent: true,
       already_deleted: false,
@@ -1363,20 +1447,18 @@ adminProductsRoutes.delete('/:id', async (c) => {
 
   // No order history: the same engine, so a plain Delete leaves no residue
   // either. It is only the ARCHIVE decision above that differs between modes.
-  const result = await deleteProductPermanently(c.env.DB, id, { newId: () => newId('mcj') });
+  const result = await deleteOrExplain(c.env.DB, id, () => newId('mcj'));
   if (result.blocked) {
     throw new HttpError(409, result.blocked.remedy, result.blocked.code, {
       table: result.blocked.table,
       count: result.blocked.count,
     });
   }
-  const cleanup = await runMediaCleanup(c.env, result.media_jobs);
-  const invalidated = await invalidateMediaCache(new URL(c.req.url).origin, cleanup.deleted);
-  await audit(c.env.DB, admin.id, 'product_v2.delete', id, {
-    rows_deleted_by_table: result.rows_deleted_by_table,
-    r2_objects_deleted: cleanup.deleted.length,
-  });
+  const after = await afterCommit(c, admin.id, id, result, 'product_v2.delete');
+  const cleanup = { deleted: after.deleted, failed: { length: after.pending } };
+  const invalidated = after.invalidated;
   return c.json({
+    ...(after.warnings.length ? { warnings: after.warnings } : {}),
     success: true,
     archived: false,
     deleted: true,

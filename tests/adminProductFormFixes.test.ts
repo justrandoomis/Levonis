@@ -71,29 +71,69 @@ test('the 8 MB ceiling is measured on the WebP that is uploaded, not the camera 
   assert.equal(result.file.type, 'image/webp');
 });
 
-test('PNG remains uploadable when the browser cannot encode WebP', async () => {
+/**
+ * THIS REPLACES A TEST THAT ASSERTED THE OPPOSITE, and the reversal is the
+ * whole fix.
+ *
+ * The old test pinned "PNG remains uploadable when the browser cannot encode
+ * WebP" — which is the behaviour the owner reported as «التحويل وهمي». The
+ * mechanism is in the specification: `canvas.toBlob(cb, 'image/webp')` on a
+ * runtime with no WebP encoder does not fail, it hands back a valid PNG Blob.
+ * So the client renamed it, the server sniffed it correctly, and the database
+ * recorded `image/png` — while every screen in between reported a conversion.
+ *
+ * A conversion nobody can trust is worse than one that refuses, because nobody
+ * goes looking for it.
+ */
+test('A PNG BLOB FROM toBlob IS A FAILED CONVERSION, not a fallback', async () => {
   const original = new File([pngBytes(2048)], 'transparent-source.png', { type: 'image/png' });
 
-  // Some Safari/WebView builds ignore the requested WebP MIME and return a
-  // PNG blob. Keep the real MIME and extension instead of lying to the server.
-  const pngResult = await prepareProductImage(original, async () => ({
-    blob: new Blob([pngBytes(1024)], { type: 'image/png' }),
+  // The encoder contract: only WebP counts. A PNG coming back from the canvas
+  // is a rung that failed, and when every rung fails the caller must be told —
+  // never handed the original with a success flag on it.
+  await assert.rejects(
+    () =>
+      prepareProductImage(original, async () => {
+        throw new Error('تعذّر تحويل الصورة إلى WebP على هذا المتصفح. / could not convert to WebP');
+      }),
+    /WebP/
+  );
+
+  // And a real WebP still passes, with its real type and extension.
+  const ok = await prepareProductImage(original, async () => ({
+    blob: new Blob([new Uint8Array(1024)], { type: 'image/webp' }),
     width: 24,
     height: 24,
   }));
-  assert.equal(pngResult.file.type, 'image/png');
-  assert.match(pngResult.file.name, /\.png$/);
+  assert.equal(ok.converted, true);
+  assert.equal(ok.file.type, 'image/webp');
+  assert.match(ok.file.name, /\.webp$/);
 
-  // When every canvas encoder returns null, encodeProductRasterAsWebp falls
-  // back to this exact original shape. The wrapper must preserve identity and
-  // report that no conversion occurred.
-  const kept = await prepareProductImage(original, async (file) => ({ blob: file, width: 24, height: 24 }));
-  assert.equal(kept.file, original);
-  assert.equal(kept.converted, false);
-
+  // The server is the authority, not this module: a PNG that reaches the route
+  // anyway — from an old client, a script, or a browser nobody tested — is
+  // refused by its BYTES rather than trusted because of who sent it.
   const uploadRoute = src('worker/routes/uploads.ts');
-  assert.doesNotMatch(uploadRoute, /PRODUCT_IMAGE_REQUIRES_WEBP/);
-  assert.match(uploadRoute, /image\/webp'.*image\/png'.*image\/jpeg/s);
+  assert.match(uploadRoute, /IMAGE_NOT_WEBP/);
+  assert.match(uploadRoute, /kind\.mime === 'image\/png' \|\| kind\.mime === 'image\/jpeg'/);
+
+  // And the client no longer has a door to walk around it.
+  const preprocess = src('src/lib/imagePreprocess.ts');
+  assert.match(preprocess, /blob\.type !== 'image\/webp'/);
+  assert.doesNotMatch(preprocess, /return \{ blob: file, width: decoded\.width/);
+});
+
+test('EVERY upload purpose is converted, not just products and avatars', async () => {
+  // Three of the five purposes used to skip the conversion entirely, so a
+  // photograph sent in a chat and a payment receipt were stored exactly as the
+  // phone produced them. `prepareUploadImage` is the one door, and every
+  // purpose has a ceiling in it.
+  const { UPLOAD_MAX_EDGE } = await import('../src/lib/imagePreprocess');
+  for (const purpose of ['product', 'avatar', 'chat', 'receipt', 'community']) {
+    assert.ok(Number(UPLOAD_MAX_EDGE[purpose]) > 0, `${purpose} must declare a ceiling`);
+  }
+  const api = src('src/lib/api.ts');
+  assert.match(api, /prepareUploadImage\(file, purpose\)/);
+  assert.doesNotMatch(api, /purpose === 'product' \|\| purpose === 'avatar'/);
 });
 
 test('a format that travels untouched still keeps the real ceiling, and says the numbers', async () => {

@@ -2217,6 +2217,9 @@ authRoutes.post('/otp/start', async (c) => {
    * only by somebody holding the code, i.e. by the owner of the destination.
    */
   const intent = body.intent === 'signup' ? 'signup' : 'signin';
+  /** Set by the send below when WhatsApp itself is down rather than the number
+   *  being wrong — see the note there. */
+  let whatsappOutage = false;
   const account = await accountForOtpDestination(c.env.DB, channel, destination);
 
   /**
@@ -2260,10 +2263,34 @@ authRoutes.post('/otp/start', async (c) => {
       const msg = authOtpMessage(code, lang);
       const sent = await sendWhatsAppText(c.env, destination, msg.text);
       if (!sent.ok) {
-        // Not customer-facing: the outward response stays uniform. It is here
-        // so an operator can tell a logged-out WhatsApp session from a wrong
-        // number, which have completely different fixes.
         console.warn(`otp/start: WhatsApp send failed (${sent.error})`);
+        /**
+         * WHOSE FAULT IT IS DECIDES WHAT THE CUSTOMER SHOULD DO.
+         *
+         * A WasenderAPI key stays valid while the WhatsApp session behind it is
+         * logged out, and the provider answers that with a 4xx rather than a
+         * 401 — so the shop can be "configured" and unable to send a single
+         * message, for days, while every customer is told "try again shortly"
+         * and does exactly that, forever.
+         *
+         * `whatsappOutage` is remembered so the response can say the channel is
+         * down and name the other one. It is the shop's own operational state,
+         * not anything about the customer or whether their number exists, so
+         * saying it reveals nothing and saves a person from waiting on a code
+         * that is never coming.
+         */
+        // Every error whose fix is an OPERATOR, not a retry: the session is
+        // logged out, the key is dead, or the provider is. `REJECTED` and
+        // `INVALID_RECIPIENT` are about this particular number and stay under
+        // the generic message.
+        if (
+          sent.error === 'SESSION_NOT_CONNECTED' ||
+          sent.error === 'PROVIDER_DOWN' ||
+          sent.error === 'UNAUTHORIZED' ||
+          sent.error === 'NOT_CONFIGURED'
+        ) {
+          whatsappOutage = true;
+        }
       }
       return sent.ok;
     },
@@ -2282,6 +2309,18 @@ authRoutes.post('/otp/start', async (c) => {
     // nothing an attacker could not already learn by watching the channel: it
     // is reported for the unknown-account case too, because the decoy path
     // reports success and never reaches here.
+    //
+    // A CHANNEL THAT IS DOWN IS NOT A REQUEST THAT FAILED. "Try again shortly"
+    // is advice that cannot work while the shop's WhatsApp session is logged
+    // out, and a person following it waits all day. When the transport itself
+    // is the problem, say so and name the road that still works.
+    if (whatsappOutage) {
+      throw unavailable(
+        'واتساب غير متاح حالياً — استخدم تيليغرام أو البريد. / ' +
+          'WhatsApp is unavailable right now — use Telegram or email instead.',
+        'WHATSAPP_UNAVAILABLE'
+      );
+    }
     throw unavailable(
       'تعذّر إرسال الرمز الآن. حاول مرة أخرى بعد قليل. / The code could not be sent right now. Try again shortly.',
       'OTP_SEND_FAILED'

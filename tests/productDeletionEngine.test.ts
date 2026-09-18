@@ -23,6 +23,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, SqliteD1 } from './fixtures/d1';
+import { APEX, asD1, ctx, freshDb, json, stubApp } from './fixtures/app';
 import {
   collectProductMediaKeys,
   deleteProductPermanently,
@@ -510,4 +511,89 @@ test('the delete order satisfies the declared foreign keys when they ARE enforce
   assert.equal(result.product_deleted, true);
   assert.equal(count(db, 'SELECT COUNT(*) AS n FROM products WHERE id = ?', 'p-fk'), 0);
   assert.equal(count(db, 'SELECT COUNT(*) AS n FROM product_color_option_links WHERE color_id = ?', 'p-fk-c'), 0);
+});
+
+/**
+ * A DESTRUCTIVE ACTION THAT FAILS MUST SAY WHY.
+ *
+ * The owner pressed Delete on a live product three times and got
+ * «Something went wrong. Please try again.» every time — a message that asks
+ * somebody to repeat an action that will fail again, for a reason only the logs
+ * hold, which the owner does not have.
+ *
+ * The database's own words are not a leak here: an admin is already authorised
+ * to read every row the message could name, and the alternative is a shop whose
+ * owner cannot delete a product and cannot find out why.
+ */
+test('a delete that fails names the reason instead of "something went wrong"', async () => {
+  const { adminProductsRoutes } = await import('../worker/routes/adminProducts');
+  const raw = freshDb();
+  raw.exec("INSERT INTO users (id,name,email,password_hash,role) VALUES ('adm','A','a@x.co','h','admin')");
+  const real = asD1(raw);
+
+  // A database that answers every batch with a failure, the way a live D1
+  // does when one statement in the batch is refused.
+  const db = {
+    ...real,
+    prepare: (sql: string) => real.prepare(sql),
+    batch: async () => {
+      throw new Error('D1_ERROR: FOREIGN KEY constraint failed');
+    },
+  } as unknown as D1Database;
+
+  raw.prepare(
+    "INSERT INTO products (id, slug, name, name_ar, price_iqd, status) VALUES ('p1','s','N','ن',1000,'active')"
+  ).run();
+
+  const a = stubApp(db, { id: 'adm', role: 'admin', email: 'a@x.co', admin_scope: 'full' }, (x) =>
+    x.route('/api/admin/products-v2', adminProductsRoutes), { host: APEX, env: { DB: db, INITIAL_ADMIN_EMAIL: 'a@x.co', EXTRA_ALLOWED_ORIGINS: '' } });
+
+  const res = await a.request('/api/admin/products-v2/p1', { method: 'DELETE', headers: { 'CF-Connecting-IP': '1.2.3.4' } }, undefined, ctx);
+  const body = await json(res);
+  assert.equal(res.status, 500);
+  assert.equal(body.code, 'DELETE_FAILED');
+  assert.match(String(body.error), /FOREIGN KEY constraint failed/, 'the real reason, not a shrug');
+  assert.match(String(body.error), /تعذّر حذف المنتج/, 'and in the owner`s language too');
+});
+
+/**
+ * AND A DELETE THAT SUCCEEDED MUST NEVER REPORT FAILURE.
+ *
+ * R2, the cache purge and the audit row all run AFTER the commit, when the rows
+ * are already gone. One of them throwing used to surface as "delete failed" for
+ * a product that no longer exists — so the owner presses the button again, on
+ * an id that is not there any more.
+ */
+test('a bucket that throws after the commit does not turn a finished delete into an error', async () => {
+  const { adminProductsRoutes } = await import('../worker/routes/adminProducts');
+  const raw = freshDb();
+  raw.exec("INSERT INTO users (id,name,email,password_hash,role) VALUES ('adm','A','a@x.co','h','admin')");
+  raw.prepare(
+    "INSERT INTO products (id, slug, name, name_ar, price_iqd, status) VALUES ('p1','s','N','ن',1000,'active')"
+  ).run();
+  raw.prepare(
+    `INSERT INTO product_images (id, product_id, url, alt_en, alt_ar, alt_ckb, sort_order, is_primary, content_type, r2_key, source_url)
+     VALUES ('pi1','p1','/files/products/catalog/gallery/a.webp','','','',0,1,'image/webp','products/catalog/gallery/a.webp','')`
+  ).run();
+  const db = asD1(raw);
+
+  const angryBucket = {
+    delete: async () => { throw new Error('R2 is having a day'); },
+    put: async () => { throw new Error('R2 is having a day'); },
+    get: async () => null,
+    head: async () => null,
+  } as unknown as R2Bucket;
+
+  const a = stubApp(db, { id: 'adm', role: 'admin', email: 'a@x.co', admin_scope: 'full' }, (x) =>
+    x.route('/api/admin/products-v2', adminProductsRoutes), {
+    host: APEX,
+    env: { DB: db, BUCKET: angryBucket, R2_PUBLIC: angryBucket, R2_PRIVATE: angryBucket, INITIAL_ADMIN_EMAIL: 'a@x.co', EXTRA_ALLOWED_ORIGINS: '' },
+  });
+
+  const res = await a.request('/api/admin/products-v2/p1?permanent=true', { method: 'DELETE', headers: { 'CF-Connecting-IP': '1.2.3.4' } }, undefined, ctx);
+  const body = await json(res);
+  assert.equal(res.status, 200, `the rows are gone, so the answer is success: ${JSON.stringify(body)}`);
+  assert.equal(body.product_deleted, true);
+  assert.ok(Number(body.r2_cleanup_pending) >= 1, 'and the file is reported as still pending, not as done');
+  assert.equal((raw.prepare("SELECT COUNT(*) AS n FROM products WHERE id='p1'").get() as { n: number }).n, 0);
 });

@@ -411,8 +411,20 @@ test('WHATSAPP — a logged-out session is reported honestly, not as a sent code
   try {
     const a = app(raw);
     const r = await start(a, { channel: 'whatsapp', identifier: PHONE });
+    const body = await json(r);
     assert.equal(r.status, 503);
-    assert.equal((await json(r)).code, 'OTP_SEND_FAILED');
+    /**
+     * `WHATSAPP_UNAVAILABLE`, NOT `OTP_SEND_FAILED`, and the difference is what
+     * the customer does next.
+     *
+     * The stub answers the way the provider really does when the shop's
+     * WhatsApp session has been logged out: a 4xx saying "Session is not
+     * Connected", with a perfectly valid API key. "Try again shortly" is advice
+     * that cannot work in that state, and a person following it waits all day.
+     * A channel that is down is named, and so is the road that still works.
+     */
+    assert.equal(body.code, 'WHATSAPP_UNAVAILABLE');
+    assert.match(String(body.error), /تيليغرام|Telegram/, 'and it names the other channel');
     // And the undelivered challenge is VOIDED, so the next attempt is not
     // blocked by a code that never arrived.
     const st = row<{ consumed_at: string | null }>(raw, 'SELECT consumed_at FROM auth_otp');

@@ -96,7 +96,22 @@ test('an admin WebP product upload lands only in the public bucket with verified
   assert.equal(legacyBucket.objects.size, 0);
 });
 
-test('the server accepts a valid product PNG when browser-side WebP conversion is unavailable', async () => {
+/**
+ * THIS TEST IS THE REVERSE OF THE ONE IT REPLACES, AND THAT IS THE POINT.
+ *
+ * The previous version asserted that a PNG is accepted "when browser-side WebP
+ * conversion is unavailable". That acceptance is exactly what the owner
+ * reported as «التحويل وهمي»: `canvas.toBlob(cb, 'image/webp')` is specified to
+ * fall back to PNG on a runtime with no WebP encoder — silently, with a valid
+ * Blob — so a failed conversion arrived here as an ordinary PNG, was sniffed
+ * correctly, and was stored as PNG while every screen in between said it had
+ * been converted.
+ *
+ * A rule that only exists in the browser is off for whoever has the browser it
+ * does not work in. So the rule lives on the server, the client is no longer
+ * allowed to fall back, and the two cannot disagree any more.
+ */
+test('a PNG is REFUSED — the conversion is the client`s job and the server is what proves it', async () => {
   const { hono, publicBucket } = app(true);
   const png = new Uint8Array(32);
   png.set([0x89, 0x50, 0x4e, 0x47], 0);
@@ -106,12 +121,40 @@ test('the server accepts a valid product PNG when browser-side WebP conversion i
   form.set('purpose', 'product');
   form.set('file', new File([png], 'catalog.png', { type: 'image/png' }));
   const response = await hono.request('/api/uploads', { method: 'POST', body: form });
+  assert.equal(response.status, 400);
+  const body = await response.json() as { code?: string; error?: string };
+  assert.equal(body.code, 'IMAGE_NOT_WEBP');
+  assert.equal(publicBucket.objects.size, 0, 'and nothing reached the bucket');
+});
+
+test('a JPEG is refused the same way, on EVERY purpose — chats and receipts included', async () => {
+  for (const purpose of ['product', 'chat', 'receipt', 'avatar', 'community']) {
+    const { hono, publicBucket, privateBucket } = app(true);
+    const jpeg = new Uint8Array(32);
+    jpeg.set([0xff, 0xd8, 0xff, 0xe0], 0);
+    const form = new FormData();
+    form.set('purpose', purpose);
+    form.set('file', new File([jpeg], 'photo.jpg', { type: 'image/jpeg' }));
+    const response = await hono.request('/api/uploads', { method: 'POST', body: form });
+    assert.equal(response.status, 400, `${purpose} must refuse a JPEG`);
+    assert.equal((await response.json() as { code?: string }).code, 'IMAGE_NOT_WEBP');
+    assert.equal(publicBucket.objects.size + privateBucket.objects.size, 0, `${purpose} stored nothing`);
+  }
+});
+
+test('a GIF is still accepted, and that exception is deliberate', async () => {
+  // A canvas draws ONE frame, so re-encoding an animated GIF would throw the
+  // animation away — the same quiet damage as the fake conversion, pointing the
+  // other way. It is stored honestly under its own type.
+  const { hono, publicBucket } = app(true);
+  const gif = new Uint8Array(32);
+  gif.set([0x47, 0x49, 0x46, 0x38], 0);
+  const form = new FormData();
+  form.set('purpose', 'product');
+  form.set('file', new File([gif], 'spin.gif', { type: 'image/gif' }));
+  const response = await hono.request('/api/uploads', { method: 'POST', body: form });
   assert.equal(response.status, 200);
-  const body = await response.json() as { mime: string; width: number; height: number; key: string };
-  assert.equal(body.mime, 'image/png');
-  assert.equal(body.width, 640);
-  assert.equal(body.height, 480);
-  assert.match(body.key, /^products\/catalog\/gallery\/[a-f0-9]+\.png$/);
+  assert.equal((await response.json() as { mime: string }).mime, 'image/gif');
   assert.equal(publicBucket.objects.size, 1);
 });
 

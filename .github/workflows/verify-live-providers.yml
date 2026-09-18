@@ -76,6 +76,76 @@ jobs:
           [ "$FAIL" = "0" ] || exit 1
           echo "every sign-in method this shop is configured for is live"
 
+      # ---------------------------------------------------------------------
+      # THE ONE THING /api/auth/capabilities CANNOT ANSWER.
+      #
+      # `whatsappOtp: true` means a WasenderAPI KEY is present. It does not mean
+      # a single message can be sent. WasenderAPI drives a REAL WhatsApp account
+      # — a phone linked by QR code — and that session can be logged out while
+      # the key stays perfectly valid. The provider then answers a 4xx saying
+      # "Session is not Connected", not a 401, so nothing that only checks
+      # configuration can tell the difference.
+      #
+      # That is the shop being "configured" and unable to send one code, for
+      # days, while every customer is told to try again shortly. The only honest
+      # way to know is to ask the provider, which needs the key — and the key is
+      # a repository secret, so this workflow can ask and the public capabilities
+      # endpoint cannot.
+      #
+      # It prints the SESSION STATE and never the key.
+      # ---------------------------------------------------------------------
+      - name: Is the shop's WhatsApp actually linked, or only configured?
+        env:
+          WASENDER_API_KEY: ${{ secrets.WASENDER_API_KEY }}
+        run: |
+          set -e
+          if [ -z "$WASENDER_API_KEY" ]; then
+            echo "::warning::no WASENDER_API_KEY repository secret — WhatsApp codes are off by configuration, not by session"
+            exit 0
+          fi
+          CODE=$(curl -sS -o /tmp/wa.json -w '%{http_code}' --max-time 20             -H "Authorization: Bearer $WASENDER_API_KEY"             https://www.wasenderapi.com/api/status || echo 000)
+          echo "provider answered HTTP $CODE"
+          # Session state only. The body can carry account details, so a fixed
+          # whitelist of fields is echoed rather than the whole answer.
+          STATUS=$(jq -r '.status // .data.status // .session_status // "unknown"' /tmp/wa.json 2>/dev/null || echo unknown)
+          echo "session status : $STATUS"
+          echo "| WhatsApp session | $STATUS |" >> "$GITHUB_STEP_SUMMARY"
+          case "$CODE:$STATUS" in
+            200:connected)
+              echo "WhatsApp can send — the phone is linked" ;;
+            401:*|403:*)
+              echo "::error::the WasenderAPI key is rejected (401/403). Replace the WASENDER_API_KEY secret and re-run workflow 7."
+              exit 1 ;;
+            *)
+              echo "::error::WhatsApp is configured but NOT connected (status: $STATUS). Re-link the phone in the WasenderAPI dashboard by scanning its QR code — no deploy will fix this, and every sign-in code over WhatsApp fails until it is done."
+              exit 1 ;;
+          esac
+
+      - name: What Telegram has registered for this bot
+        env:
+          TG: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          set -e
+          if [ -z "$TG" ]; then
+            echo "::warning::no TELEGRAM_BOT_TOKEN repository secret"
+            exit 0
+          fi
+          curl -sS --max-time 20 "https://api.telegram.org/bot${TG}/getWebhookInfo" -o /tmp/tg.json
+          URL=$(jq -r '.result.url // ""' /tmp/tg.json)
+          PENDING=$(jq -r '.result.pending_update_count // 0' /tmp/tg.json)
+          LAST=$(jq -r '.result.last_error_message // "none"' /tmp/tg.json)
+          echo "registered url : ${URL:-<none>}"
+          echo "pending updates: $PENDING"
+          echo "last error     : $LAST"
+          echo "| Telegram webhook | ${URL:-none} |" >> "$GITHUB_STEP_SUMMARY"
+          [ "$URL" = "https://levonis-iq.com/api/telegram/webhook" ] \
+            || { echo "::error::the bot does not point at the live handler — run workflow 16 in repair mode"; exit 1; }
+          # A backlog means Telegram is retrying because the handler is refusing
+          # it. A stale last_error with no backlog is history, not a fault.
+          [ "$PENDING" -lt 5 ] \
+            || { echo "::error::$PENDING updates are queued — the webhook handler is refusing Telegram"; exit 1; }
+          echo "Telegram is delivering to the live handler"
+
       - name: The schema the live code expects is the schema it has
         run: |
           set -e

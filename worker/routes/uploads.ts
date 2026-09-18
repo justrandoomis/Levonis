@@ -92,6 +92,38 @@ uploadRoutes.post('/', async (c) => {
     throw badRequest(`Image is too large (max ${Math.round(IMAGE_MAX / 1024 / 1024)} MB)`);
   }
 
+  /**
+   * THE SERVER DECIDES WHETHER A PICTURE IS WEBP, AND NOTHING ELSE DOES.
+   *
+   * The conversion runs in the browser, and a browser is not a place a rule can
+   * be enforced. `canvas.toBlob(cb, 'image/webp')` is specified to fall back to
+   * PNG on a runtime with no WebP encoder — silently, with a valid Blob — so a
+   * failed conversion used to arrive here as a perfectly ordinary PNG, get
+   * sniffed correctly, and get stored as PNG while every screen along the way
+   * said it had been converted. That is the «تحويل وهمي» the owner reported:
+   * the claim and the database disagreeing, with nothing to notice it.
+   *
+   * A check that lives only on the client is a check that is off for whoever
+   * has the browser it does not work in. So the rule lives here: a photograph
+   * that reaches this route as PNG or JPEG is refused, by its BYTES, and the
+   * uploader is told why. The stored object and its recorded type can no longer
+   * disagree, because the only still raster this route accepts is the one it
+   * claims to be storing.
+   *
+   * GIF AND AVIF ARE NOT REFUSED, and that is a decision. A canvas draws one
+   * frame, so re-encoding an animated GIF would throw the animation away — the
+   * same quiet damage in the other direction — and AVIF is already a modern
+   * compressed format that arrives from vendor CDNs rather than from a camera.
+   * Both are stored honestly under their own type.
+   */
+  if (kind.mime === 'image/png' || kind.mime === 'image/jpeg') {
+    throw badRequest(
+      'يجب تحويل الصورة إلى WebP قبل الرفع. إذا تعذّر ذلك على متصفحك، جرّب متصفحًا آخر. / ' +
+        'Images must be converted to WebP before upload. If your browser could not do it, try another browser.',
+      'IMAGE_NOT_WEBP'
+    );
+  }
+
   const dimensions = kind.mime.startsWith('image/') ? rasterDimensions(buf, kind.mime) : null;
   if (
     purpose === 'product' &&
