@@ -35,6 +35,19 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // to the same owner as the option rows they hang off.
     'product_option_fulfillment', 'product_option_transports',
     'product_imports', 'price_history', 'inventory_ledger', 'catalogs', 'brands', 'facets', 'hashtags', 'bundles', 'bundle_items',
+    // 0093 — «لكيتها بمكان أرخص». A customer's report that a competitor sells
+    // this product for less, with OUR price frozen into the row at the moment
+    // it was filed.
+    //
+    // It looks like a Support table (a customer wrote it) and it is not: this
+    // file's tie-break is ownership follows THE WRITER, and nothing here is
+    // ever answered as a conversation. It is read by exactly one decision —
+    // "should this product's price move" — which is Pricing, and it sits
+    // beside `price_history`, the other table that exists only to say what a
+    // catalogue row cost and when. Its frozen `our_price_iqd` is a copy of
+    // `products.price_iqd`, so filing it anywhere else would mean a second
+    // service holding a snapshot of a column Catalogue owns.
+    'price_reports',
     // THE SEARCH INDEX (migration 0089) and the dictionary it reads. Both are
     // derived from the catalogue and rebuilt from it, so they belong to the
     // owner that writes it — a search index owned by anyone but the catalogue

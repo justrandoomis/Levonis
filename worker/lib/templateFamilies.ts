@@ -29,6 +29,35 @@
 
 export type FieldType = 'text' | 'number' | 'select' | 'multiline' | 'hex';
 
+/**
+ * HOW TO READ A SPEC, AND WHICH WAY IS BETTER — the annotation the comparison
+ * (worker/lib/compareSpecs.ts) reads. It lives on the field for the reason
+ * stated at the top of this file: a spec added to the form must not be able to
+ * mean one thing here and another thing in a comparison table.
+ *
+ * THE DEFAULT IS ABSENCE. A field with no `compare` is shown and never scored,
+ * which is the honest state for a spec nobody has judged yet.
+ *
+ * THE THREE JUDGEMENTS THAT KEEP RECURRING, recorded once here rather than on
+ * thirty fields:
+ *   - `weight` and `dimensions` are NOT virtues on a machine. A heavier printer
+ *     is not a better one and a smaller one is not a worse one; both are shown
+ *     because they decide whether it fits on the desk, and neither is scored.
+ *   - `power` is consumption. 350 W does not beat 150 W; it is a number on the
+ *     electricity bill, not a capability.
+ *   - Two fields that look alike point opposite ways: a LAYER height is finer
+ *     as it FALLS and a screen RESOLUTION is finer as it RISES. They are
+ *     annotated one at a time, never by the shape of their name.
+ */
+export interface SpecCompare {
+  /** How to read the stored string as something comparable. */
+  parse: 'number' | 'dimensions' | 'boolean' | 'list' | 'range' | 'text';
+  /** Which direction wins. 'none' = shown, never scored. */
+  better: 'higher' | 'lower' | 'yes' | 'none';
+  /** Relative weight in the headline verdict. Omitted or 0 = not scored. */
+  weight?: number;
+}
+
 export interface TemplateField {
   id: string;
   label_ar: string;
@@ -42,6 +71,8 @@ export interface TemplateField {
   required?: boolean;
   /** Short helper line; long prose belongs in a tooltip, never in the form. */
   hint_ar?: string;
+  /** How a comparison reads and ranks this field. Absent = shown, unscored. */
+  compare?: SpecCompare;
 }
 
 export interface TemplateGroup {
@@ -80,18 +111,53 @@ export const DEVICES: TemplateFamilyDef = {
     fields: [
       t('technology', 'التقنية', 'Technology', 'select', { options: ['FDM', 'Resin (MSLA)', 'SLA', 'DLP', 'Other'] }),
       t('model', 'الموديل', 'Model'),
-      t('build_volume', 'حجم الطباعة', 'Build volume', 'text', { unit: 'mm', hint_ar: 'مثال: 256 x 256 x 256' }),
-      t('print_speed', 'السرعة', 'Print speed', 'number', { unit: 'mm/s' }),
-      t('resolution', 'الدقة', 'Resolution'),
-      t('nozzle', 'القطر / النوزل', 'Nozzle diameter', 'text', { unit: 'mm' }),
-      t('supported_materials', 'الأنظمة والمواد المتوافقة', 'Supported materials'),
-      t('power', 'الطاقة', 'Power', 'text', { unit: 'W' }),
-      t('dimensions', 'الأبعاد', 'Dimensions', 'text', { unit: 'mm' }),
-      t('weight', 'الوزن', 'Weight', 'text', { unit: 'kg' }),
-      t('connectivity', 'الاتصال', 'Connectivity'),
+      t('build_volume', 'حجم الطباعة', 'Build volume', 'text', {
+        unit: 'mm',
+        hint_ar: 'مثال: 256 x 256 x 256',
+        /* Ranked on the VOLUME and displayed as the three axes. A buyer with a
+           tall part is asking about Z, and «16.7 لتر» answers a question
+           nobody asked — so the comparison keeps both readings. */
+        compare: { parse: 'dimensions', better: 'higher', weight: 3 },
+      }),
+      /* Scored, but under `max_flow_rate`: the quoted maximum speed is a
+         TRAVEL number and the flow rate is what the hotend can actually melt,
+         which is the one that decides how long the print really takes. */
+      t('print_speed', 'السرعة', 'Print speed', 'number', {
+        unit: 'mm/s',
+        compare: { parse: 'number', better: 'higher', weight: 2 },
+      }),
+      /* NOT SCORED, and the field most likely to tempt someone into scoring
+         it. «الدقة» carries no unit and vendors fill it with a layer height
+         (0.05-0.35 mm), an XY step (50 µm) or a positioning tolerance — three
+         quantities, two of which get BETTER as the number falls. One direction
+         would be wrong for somebody. The resin group asks the same question in
+         units (`xy_resolution`, `layer_height_range`) and those are scored. */
+      t('resolution', 'الدقة', 'Resolution', 'text', { compare: { parse: 'text', better: 'none' } }),
+      /* Read as a number, ranked in neither direction: 0.8 prints faster and
+         0.2 prints finer, and which of those a buyer wants is not ours to
+         decide. */
+      t('nozzle', 'القطر / النوزل', 'Nozzle diameter', 'text', {
+        unit: 'mm',
+        compare: { parse: 'number', better: 'none' },
+      }),
+      /* Scored on the COUNT and at the lowest weight the scale has: a longer
+         list is a more versatile machine, but it is not automatically a better
+         one, and the items themselves are what the reader actually compares. */
+      t('supported_materials', 'الأنظمة والمواد المتوافقة', 'Supported materials', 'text', {
+        compare: { parse: 'list', better: 'higher', weight: 1 },
+      }),
+      t('power', 'الطاقة', 'Power', 'text', { unit: 'W', compare: { parse: 'number', better: 'none' } }),
+      t('dimensions', 'الأبعاد', 'Dimensions', 'text', { unit: 'mm', compare: { parse: 'dimensions', better: 'none' } }),
+      t('weight', 'الوزن', 'Weight', 'text', { unit: 'kg', compare: { parse: 'number', better: 'none' } }),
+      /* A list, and deliberately an unscored one: «Wi-Fi 2.4/5G» is one radio
+         written as two items, so a count here would be scoring punctuation. */
+      t('connectivity', 'الاتصال', 'Connectivity', 'text', { compare: { parse: 'list', better: 'none' } }),
       t('compatibility', 'التوافق', 'Compatibility'),
       t('display', 'الشاشة', 'Display'),
-      t('camera', 'الكاميرا', 'Camera', 'select', { options: ['Yes', 'No', 'Optional'] }),
+      t('camera', 'الكاميرا', 'Camera', 'select', {
+        options: ['Yes', 'No', 'Optional'],
+        compare: { parse: 'boolean', better: 'yes', weight: 1 },
+      }),
       /*
        * The camera's NUMBERS, separate from whether one exists. Two people ask
        * two different questions — "does it watch the print?" and "can I read a
@@ -102,10 +168,26 @@ export const DEVICES: TemplateFamilyDef = {
        */
       t('camera_resolution', 'دقة الكاميرا', 'Camera resolution', 'text', {
         hint_ar: 'مثال: 1080p أو 1920×1080',
+        /* Read so it can be DISPLAYED tidily, never ranked — for exactly the
+           reason stated above. «1080p» is a count of lines, «1920x1080» a count
+           of pixels and «3 MP» a third scale; ranking them would rank a
+           notation, not a camera. */
+        compare: { parse: 'dimensions', better: 'none' },
       }),
-      t('camera_fps', 'إطارات الكاميرا', 'Camera frame rate', 'number', { unit: 'fps' }),
-      t('noise_level', 'مستوى الضجيج', 'Noise level', 'number', { unit: 'dB' }),
-      t('slicer_software', 'برامج التقطيع المدعومة', 'Slicer software'),
+      t('camera_fps', 'إطارات الكاميرا', 'Camera frame rate', 'number', {
+        unit: 'fps',
+        compare: { parse: 'number', better: 'higher', weight: 1 },
+      }),
+      /* THE ONE FIELD ON A PRINTER WHERE THE SMALLER NUMBER WINS, and it sits
+         between two where the bigger one does. 48 dB beats 58 dB, and a machine
+         that lives in a bedroom is bought on this row. */
+      t('noise_level', 'مستوى الضجيج', 'Noise level', 'number', {
+        unit: 'dB',
+        compare: { parse: 'number', better: 'lower', weight: 2 },
+      }),
+      t('slicer_software', 'برامج التقطيع المدعومة', 'Slicer software', 'text', {
+        compare: { parse: 'list', better: 'higher', weight: 1 },
+      }),
       /* The phone/desktop app is a separate answer from the slicer: a machine
          can be driven by OrcaSlicer and still have no app of its own. */
       t('companion_app', 'التطبيق المرافق', 'Companion app', 'text', {
@@ -113,9 +195,14 @@ export const DEVICES: TemplateFamilyDef = {
       }),
       t('assembly', 'الحالة عند التسليم', 'Assembly', 'select', {
         options: ['Pre-assembled', 'Partially assembled', 'Kit'],
+        /* NOT SCORABLE. A kit is cheaper and a whole kind of buyer comes for
+           one; ranking «Pre-assembled» above it would tell that buyer their
+           choice is the worse machine. */
+        compare: { parse: 'text', better: 'none' },
       }),
-      t('warranty', 'الضمان', 'Warranty', 'text', { unit: 'months' }),
+      t('warranty', 'الضمان', 'Warranty', 'text', { unit: 'months', compare: { parse: 'number', better: 'higher', weight: 2 } }),
       t('in_the_box', 'محتويات العلبة', 'In the box', 'multiline', {
+        compare: { parse: 'list', better: 'none' },
         hint_ar: 'عنصر في كل سطر — تُعرض للزبون كنقاط',
       }),
     ],
@@ -126,15 +213,53 @@ export const DEVICES: TemplateFamilyDef = {
       label_ar: 'خاص بطابعات FDM',
       label_en: 'FDM specifics',
       fields: [
-        t('nozzle_temp_max', 'أقصى حرارة نوزل', 'Max nozzle temperature', 'number', { unit: '°C' }),
-        t('bed_temp_max', 'أقصى حرارة سرير', 'Max bed temperature', 'number', { unit: '°C' }),
-        t('extruders', 'عدد الباثقات', 'Extruders', 'number'),
-        t('enclosed', 'هيكل مغلق', 'Enclosed', 'select', { options: ['Yes', 'No'] }),
-        t('auto_leveling', 'التسوية التلقائية', 'Auto leveling', 'select', { options: ['Yes', 'No'] }),
-        t('multi_color', 'دعم تعدد الألوان', 'Multi-colour support'),
-        t('motion_system', 'نظام الحركة', 'Motion system', 'text', { hint_ar: 'مثال: CoreXY أو Bed slinger' }),
-        t('filament_diameter', 'قطر الفلامنت', 'Filament diameter', 'text', { unit: 'mm' }),
-        t('max_flow_rate', 'أقصى معدل تدفق', 'Max flow rate', 'number', { unit: 'mm³/s' }),
+        /* Both heat ceilings are scored upward and for the same reason: they
+           are what decides WHICH MATERIALS the machine can print at all. */
+        t('nozzle_temp_max', 'أقصى حرارة نوزل', 'Max nozzle temperature', 'number', {
+          unit: '°C',
+          compare: { parse: 'number', better: 'higher', weight: 2 },
+        }),
+        t('bed_temp_max', 'أقصى حرارة سرير', 'Max bed temperature', 'number', {
+          unit: '°C',
+          compare: { parse: 'number', better: 'higher', weight: 2 },
+        }),
+        t('extruders', 'عدد الباثقات', 'Extruders', 'number', {
+          compare: { parse: 'number', better: 'higher', weight: 1 },
+        }),
+        t('enclosed', 'هيكل مغلق', 'Enclosed', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 2 },
+        }),
+        t('auto_leveling', 'التسوية التلقائية', 'Auto leveling', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 2 },
+        }),
+        /* Free text by declaration, and filled with everything from «No» to
+           «AMS lite (4 colours)». A yes/no reading of it would be scoring a
+           sentence, so it is shown and left alone. */
+        t('multi_color', 'دعم تعدد الألوان', 'Multi-colour support', 'text', {
+          compare: { parse: 'text', better: 'none' },
+        }),
+        /* An architecture, not a magnitude. CoreXY against bed-slinger is a
+           trade-off that `print_speed` and `max_acceleration` already express
+           as numbers; saying it twice, once as a verdict, would double-count
+           it. */
+        t('motion_system', 'نظام الحركة', 'Motion system', 'text', {
+          hint_ar: 'مثال: CoreXY أو Bed slinger',
+          compare: { parse: 'text', better: 'none' },
+        }),
+        /* A standard (1.75 / 2.85), not a virtue. */
+        t('filament_diameter', 'قطر الفلامنت', 'Filament diameter', 'text', {
+          unit: 'mm',
+          compare: { parse: 'number', better: 'none' },
+        }),
+        /* THE HONEST SPEED FIGURE, and weighted above the quoted mm/s for it:
+           a hotend that melts 32 mm³/s finishes a real print sooner than one
+           whose box says 600 mm/s and melts 12. */
+        t('max_flow_rate', 'أقصى معدل تدفق', 'Max flow rate', 'number', {
+          unit: 'mm³/s',
+          compare: { parse: 'number', better: 'higher', weight: 3 },
+        }),
         /*
          * The specs a buyer compares two machines by, and the reason this
          * group grew rather than a new system appearing: they are ordinary
@@ -142,24 +267,34 @@ export const DEVICES: TemplateFamilyDef = {
          * existing template round-trip and the existing storefront table
          * without a single new column.
          */
-        t('max_acceleration', 'أقصى تسارع', 'Maximum acceleration', 'number', { unit: 'mm/s²' }),
+        t('max_acceleration', 'أقصى تسارع', 'Maximum acceleration', 'number', {
+          unit: 'mm/s²',
+          compare: { parse: 'number', better: 'higher', weight: 2 },
+        }),
         /* PLURAL, and deliberately not the same field as `nozzle`: that one is
            the diameter SHIPPED, this is the set the machine accepts. */
         t('supported_nozzle_sizes', 'مقاسات النوزل المدعومة', 'Supported nozzle sizes', 'text', {
           unit: 'mm',
           hint_ar: 'مثال: 0.2 / 0.4 / 0.6 / 0.8',
+          compare: { parse: 'list', better: 'higher', weight: 1 },
         }),
         t('build_plate', 'سطح الطباعة', 'Build plate', 'text', {
           hint_ar: 'مثال: PEI مزدوج الوجه، قابل للإزالة',
         }),
+        /* «Optional» is a real third answer here, and the comparison treats it
+           as one: it does not beat a «Yes» and it is not recorded as a loss
+           against one — the part can simply be bought. */
         t('filament_sensor', 'حساس الفلامنت', 'Filament sensor', 'select', {
           options: ['Yes', 'No', 'Optional'],
+          compare: { parse: 'boolean', better: 'yes', weight: 1 },
         }),
         t('power_loss_recovery', 'الاستئناف بعد انقطاع الكهرباء', 'Power-loss recovery', 'select', {
           options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 1 },
         }),
         t('input_shaping', 'Input shaping', 'Input shaping', 'select', {
           options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 2 },
         }),
         /* AMS compatibility is not the same question as `multi_color`: a
            machine can print multi-colour by hand-swapping and still not take
@@ -169,6 +304,7 @@ export const DEVICES: TemplateFamilyDef = {
         }),
         t('supported_filaments', 'الفلامنتات المدعومة', 'Supported filaments', 'text', {
           hint_ar: 'مثال: PLA, PETG, ABS, ASA, TPU, PA-CF',
+          compare: { parse: 'list', better: 'higher', weight: 1 },
         }),
       ],
     },
@@ -177,13 +313,47 @@ export const DEVICES: TemplateFamilyDef = {
       label_ar: 'خاص بطابعات Resin',
       label_en: 'Resin specifics',
       fields: [
-        t('lcd_size', 'مقاس الشاشة', 'LCD size', 'text', { unit: 'in' }),
-        t('lcd_resolution', 'دقة الشاشة', 'LCD resolution'),
-        t('xy_resolution', 'دقة XY', 'XY resolution', 'text', { unit: 'µm' }),
-        t('layer_height_range', 'مدى ارتفاع الطبقة', 'Layer height range', 'text', { unit: 'mm' }),
+        /* Panel size is not a quality on its own: the SAME panel size at a
+           lower pixel count prints coarser. The two questions it gets confused
+           with are asked properly by `build_volume` and `xy_resolution`. */
+        t('lcd_size', 'مقاس الشاشة', 'LCD size', 'text', {
+          unit: 'in',
+          compare: { parse: 'number', better: 'none' },
+        }),
+        /* HIGHER WINS — and it sits two lines above a field where lower wins,
+           which is the whole reason these are annotated one at a time. More
+           pixels across the same panel is a finer print. «4K» is left unread
+           rather than expanded to 3840: shown, not scored. */
+        t('lcd_resolution', 'دقة الشاشة', 'LCD resolution', 'text', {
+          compare: { parse: 'dimensions', better: 'higher', weight: 2 },
+        }),
+        /* LOWER WINS. This is the micron a single pixel covers, so a smaller
+           number is a finer feature — the opposite direction to the row above
+           it, from a field whose name reads almost the same. */
+        t('xy_resolution', 'دقة XY', 'XY resolution', 'text', {
+          unit: 'µm',
+          compare: { parse: 'number', better: 'lower', weight: 2 },
+        }),
+        /* A range, ranked on the FINEST end it reaches — which is the minimum,
+           hence 'lower'. */
+        t('layer_height_range', 'مدى ارتفاع الطبقة', 'Layer height range', 'text', {
+          unit: 'mm',
+          compare: { parse: 'range', better: 'lower', weight: 1 },
+        }),
         t('light_source', 'مصدر الضوء', 'Light source'),
-        t('exposure_time', 'زمن التعريض', 'Exposure time', 'text', { unit: 's' }),
-        t('uv_power', 'قدرة الضوء UV', 'UV power', 'text', { unit: 'W' }),
+        /* Not the machine's number alone: exposure is a property of the RESIN
+           and the layer as much as the light, so a lower figure quoted against
+           a different resin is not a faster printer. */
+        t('exposure_time', 'زمن التعريض', 'Exposure time', 'text', {
+          unit: 's',
+          compare: { parse: 'range', better: 'none' },
+        }),
+        /* Watts say nothing about uniformity or wavelength match, and two
+           panels of equal wattage cure at different speeds. */
+        t('uv_power', 'قدرة الضوء UV', 'UV power', 'text', {
+          unit: 'W',
+          compare: { parse: 'number', better: 'none' },
+        }),
         t('release_film', 'فيلم الفصل', 'Release film'),
       ],
     },
@@ -208,7 +378,10 @@ export const DEVICES: TemplateFamilyDef = {
       id: 'acc_resin',
       label_ar: 'ملحق Resin',
       label_en: 'Resin accessory',
-      fields: [t('capacity', 'السعة', 'Capacity', 'text', { unit: 'L' })],
+      fields: [t('capacity', 'السعة', 'Capacity', 'text', {
+        unit: 'L',
+        compare: { parse: 'number', better: 'higher', weight: 1 },
+      })],
     },
   },
 };
@@ -223,26 +396,44 @@ export const MATERIALS: TemplateFamilyDef = {
     label_en: 'Material specifications',
     fields: [
       t('material_type', 'نوع المادة', 'Material type'),
-      t('diameter', 'القطر', 'Diameter', 'text', { unit: 'mm' }),
-      t('net_weight', 'الوزن الصافي', 'Net weight', 'text', { unit: 'g' }),
+      /* 1.75 or 2.85 is a fitment, not a grade. */
+      t('diameter', 'القطر', 'Diameter', 'text', { unit: 'mm', compare: { parse: 'number', better: 'none' } }),
+      /* Here the weight IS a virtue — it is how much product is in the box —
+         which is why the printer's own `weight` is annotated separately. */
+      t('net_weight', 'الوزن الصافي', 'Net weight', 'text', {
+        unit: 'g',
+        compare: { parse: 'number', better: 'higher', weight: 2 },
+      }),
       t('color_name', 'اللون', 'Colour'),
       t('color_hex', 'كود اللون', 'Colour HEX', 'hex'),
-      t('print_temp', 'حرارة الطباعة', 'Printing temperature', 'text', { unit: '°C' }),
-      t('bed_temp', 'حرارة السرير', 'Bed temperature', 'text', { unit: '°C' }),
+      /* A requirement the printer has to meet, not a score: 190-220 is not
+         worse than 240-260, it is a different material. */
+      t('print_temp', 'حرارة الطباعة', 'Printing temperature', 'text', {
+        unit: '°C',
+        compare: { parse: 'range', better: 'none' },
+      }),
+      t('bed_temp', 'حرارة السرير', 'Bed temperature', 'text', {
+        unit: '°C',
+        compare: { parse: 'range', better: 'none' },
+      }),
       t('compatibility', 'التوافق', 'Compatibility'),
       t('processing_mode', 'نمط المعالجة', 'Processing mode', 'select', {
         options: ['Laser Material', 'Blade Cutting Material', 'Not applicable'],
       }),
-      t('dimensions', 'الأبعاد', 'Dimensions', 'text', { unit: 'mm' }),
+      t('dimensions', 'الأبعاد', 'Dimensions', 'text', { unit: 'mm', compare: { parse: 'dimensions', better: 'none' } }),
       t('finish', 'الخامة / التشطيب', 'Finish'),
-      t('quantity_per_pack', 'الكمية داخل العبوة', 'Quantity per pack', 'number'),
-      t('operating_temp', 'حرارة التشغيل', 'Operating temperature', 'text', { unit: '°C' }),
+      t('quantity_per_pack', 'الكمية داخل العبوة', 'Quantity per pack', 'number', { compare: { parse: 'number', better: 'higher', weight: 1 } }),
+      t('operating_temp', 'حرارة التشغيل', 'Operating temperature', 'text', {
+        unit: '°C',
+        compare: { parse: 'range', better: 'none' },
+      }),
       t('storage', 'شروط التخزين', 'Storage'),
-      t('certifications', 'الشهادات', 'Certifications'),
+      t('certifications', 'الشهادات', 'Certifications', 'text', { compare: { parse: 'list', better: 'none' } }),
       // Shared with devices ON PURPOSE: a filament box and a printer box both
       // have contents, and both templates should declare the field so imports
       // treat it as sheet-authoritative for either family.
       t('in_the_box', 'محتويات العلبة', 'In the box', 'multiline', {
+        compare: { parse: 'list', better: 'none' },
         hint_ar: 'عنصر في كل سطر — تُعرض للزبون كنقاط',
       }),
     ],
@@ -255,8 +446,17 @@ export const MATERIALS: TemplateFamilyDef = {
       fields: [
         t('spool_type', 'نوع البكرة', 'Spool type', 'select', { options: ['With spool', 'Refill', 'Cardboard'] }),
         t('drying', 'التجفيف', 'Drying'),
-        t('tolerance', 'التفاوت', 'Tolerance', 'text', { unit: 'mm' }),
-        t('density', 'الكثافة', 'Density', 'text', { unit: 'g/cm³' }),
+        /* LOWER WINS: ±0.02 mm is a tighter spool than ±0.05, and this is the
+           one number that separates a good filament from a cheap one. */
+        t('tolerance', 'التفاوت', 'Tolerance', 'text', {
+          unit: 'mm',
+          compare: { parse: 'number', better: 'lower', weight: 2 },
+        }),
+        /* A property of the polymer, in neither direction a grade. */
+        t('density', 'الكثافة', 'Density', 'text', {
+          unit: 'g/cm³',
+          compare: { parse: 'number', better: 'none' },
+        }),
       ],
     },
     'resin-materials': {
@@ -264,10 +464,16 @@ export const MATERIALS: TemplateFamilyDef = {
       label_ar: 'خاص بمواد Resin',
       label_en: 'Resin material specifics',
       fields: [
-        t('volume', 'الحجم', 'Volume', 'text', { unit: 'ml' }),
+        t('volume', 'الحجم', 'Volume', 'text', {
+          unit: 'ml',
+          compare: { parse: 'number', better: 'higher', weight: 2 },
+        }),
         t('wavelength', 'الطول الموجي', 'Wavelength', 'text', { unit: 'nm' }),
         t('hardness', 'الصلابة', 'Hardness'),
-        t('shelf_life', 'مدة الصلاحية', 'Shelf life', 'text', { unit: 'months' }),
+        t('shelf_life', 'مدة الصلاحية', 'Shelf life', 'text', {
+          unit: 'months',
+          compare: { parse: 'number', better: 'higher', weight: 1 },
+        }),
       ],
     },
     'model-kits': {
@@ -275,7 +481,9 @@ export const MATERIALS: TemplateFamilyDef = {
       label_ar: 'أطقم المجسمات',
       label_en: 'Model kits',
       fields: [
-        t('pieces', 'عدد القطع', 'Pieces', 'number'),
+        /* A 1200-piece kit is a DIFFERENT product from a 200-piece one, not a
+           better one; the count is shown and left unranked. */
+        t('pieces', 'عدد القطع', 'Pieces', 'number', { compare: { parse: 'number', better: 'none' } }),
         t('assembly_time', 'زمن التجميع', 'Assembly time'),
         t('age_rating', 'الفئة العمرية', 'Age rating'),
       ],
@@ -286,8 +494,13 @@ export const MATERIALS: TemplateFamilyDef = {
       label_en: 'CyberBrick RC',
       fields: [
         t('battery', 'البطارية', 'Battery'),
-        t('control_range', 'مدى التحكم', 'Control range', 'text', { unit: 'm' }),
-        t('channels', 'عدد القنوات', 'Channels', 'number'),
+        t('control_range', 'مدى التحكم', 'Control range', 'text', {
+          unit: 'm',
+          compare: { parse: 'number', better: 'higher', weight: 2 },
+        }),
+        t('channels', 'عدد القنوات', 'Channels', 'number', {
+          compare: { parse: 'number', better: 'higher', weight: 1 },
+        }),
       ],
     },
     electronics: {
@@ -383,14 +596,15 @@ const PHYSICAL_CORE: TemplateGroup = {
     t('material', 'الخامة', 'Material'),
     t('color_name', 'اللون', 'Colour'),
     t('color_hex', 'كود اللون', 'Colour HEX', 'hex'),
-    t('dimensions', 'الأبعاد', 'Dimensions', 'text', { unit: 'mm' }),
-    t('weight', 'الوزن', 'Weight', 'text', { unit: 'kg' }),
-    t('quantity_per_pack', 'الكمية داخل العبوة', 'Quantity per pack', 'number'),
+    t('dimensions', 'الأبعاد', 'Dimensions', 'text', { unit: 'mm', compare: { parse: 'dimensions', better: 'none' } }),
+    t('weight', 'الوزن', 'Weight', 'text', { unit: 'kg', compare: { parse: 'number', better: 'none' } }),
+    t('quantity_per_pack', 'الكمية داخل العبوة', 'Quantity per pack', 'number', { compare: { parse: 'number', better: 'higher', weight: 1 } }),
     t('compatibility', 'التوافق', 'Compatibility'),
-    t('certifications', 'الشهادات', 'Certifications'),
+    t('certifications', 'الشهادات', 'Certifications', 'text', { compare: { parse: 'list', better: 'none' } }),
     t('storage', 'شروط التخزين', 'Storage'),
-    t('warranty', 'الضمان', 'Warranty', 'text', { unit: 'months' }),
+    t('warranty', 'الضمان', 'Warranty', 'text', { unit: 'months', compare: { parse: 'number', better: 'higher', weight: 2 } }),
     t('in_the_box', 'محتويات العلبة', 'In the box', 'multiline', {
+      compare: { parse: 'list', better: 'none' },
       hint_ar: 'عنصر في كل سطر — تُعرض للزبون كنقاط',
     }),
   ],
@@ -718,6 +932,18 @@ const ALL_GROUPS: TemplateGroup[] = (() => {
   }
   return out;
 })();
+
+/**
+ * Every group of both families, in definition order — the walk
+ * `specGroupsFromFields` makes, exported because the comparison
+ * (worker/lib/compareSpecs.ts) must make exactly the same one. A second copy of
+ * it there would be the fourth definition of what a spec is, and the first
+ * chance for a comparison row to sit under a heading the product page never
+ * shows.
+ */
+export function allTemplateGroups(): TemplateGroup[] {
+  return ALL_GROUPS.slice();
+}
 
 export function specGroupsFromFields(
   values: Record<string, string> | null | undefined,

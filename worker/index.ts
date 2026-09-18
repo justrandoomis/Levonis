@@ -34,6 +34,8 @@ import { adminPriceGridRoutes } from './routes/adminPriceGrid';
 import { printRequestRoutes } from './routes/printRequests';
 import { notificationRoutes } from './routes/notifications';
 import { stockAlertRoutes } from './routes/stockAlerts';
+import { compareRoutes } from './routes/compare';
+import { priceReportRoutes, adminPriceReportRoutes } from './routes/priceReports';
 import { merchantPrinterRoutes } from './routes/merchantPrinters';
 import { printQuoteRoutes } from './routes/printQuote';
 import { membershipsRoutes } from './routes/memberships';
@@ -209,12 +211,28 @@ app.route('/api/farm', farmRoutes);
 // same reason the farm is, and it carries no requireAuth of its own: a guest
 // may upload and be quoted, and each route states its own guard.
 app.route('/api/print-quote', printQuoteRoutes);
+// «المقارنة» — comparing two machines on the shop's own spec sheet. Mounted
+// before the '/api' misc catch-all for the same reason the farm is, and
+// deliberately with NO auth of its own: a comparison is a reason to visit the
+// shop, and a sign-in wall in front of the page that answers «أي وحدة أشتري؟»
+// turns it into a page that asks for an email address instead.
+app.route('/api/compare', compareRoutes);
+// «لكيتها بمكان أرخص» — the customer's competitor-price report (0093). Its own
+// prefix rather than a branch of /api/products, and every route inside is
+// behind its own requireAuth: an anonymous form that writes a row the owner
+// reads is a spam endpoint.
+app.route('/api/price-reports', priceReportRoutes);
 app.route('/api', miscRoutes);
 app.route('/api/admin', adminRoutes);
 // The farm's balancing console. Under /api/admin/* on purpose: the apex-only
 // host guard above covers it, and the generic settings PUT refuses its key so
 // this normalising, versioned, audited route is the only way to change it.
 app.route('/api/admin/farm', farmAdminRoutes);
+// The owner's competitor-price queue. Under /api/admin/* so the apex-only host
+// guard above covers it, and it carries its own requireAdmin as well — that
+// function is where the host rule lives, so neither guard depends on a mount
+// somebody remembered to write.
+app.route('/api/admin/price-reports', adminPriceReportRoutes);
 app.route('/api/admin/products-v2', adminProductsRoutes);
 app.route('/api/admin/template', templateRoutes);
 app.route('/api/admin/media', mediaRoutes);

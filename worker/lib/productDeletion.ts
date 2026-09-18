@@ -93,6 +93,14 @@ export const OWNED_TABLES: OwnedTable[] = [
   // ---- stock and pricing history owned by the product --------------------
   { table: 'inventory_ledger', by: { column: 'product_id' } },
   { table: 'price_history', by: { column: 'product_id' } },
+  // A competitor-price report (0093) is OWNED and not HISTORY, and the choice
+  // is forced twice over. `product_id` is NOT NULL, so there is nothing to
+  // clear — and clearing it would be wrong even if it were possible: the row's
+  // only readable content is «somebody found THIS product cheaper», and its
+  // frozen `our_price_iqd` is a snapshot of a price column that is going with
+  // the product. Detached from the product it names, it is a number with no
+  // subject sitting in the owner's working queue forever.
+  { table: 'price_reports', by: { column: 'product_id' } },
   // A membership benefit rule SCOPED TO THIS PRODUCT (migration 0074) is the
   // product's own configuration and goes with it. Leaving it behind would let
   // the next product to take this id inherit a discount nobody wrote for it —
