@@ -65,6 +65,10 @@ const STRINGS = {
     step2HintTable: 'النوع يحدد أعمدة القالب، والقسم يحدد أين يُحفظ المنتج.',
     step2HintTxt: 'ملف TXT يحمل تصنيفه بداخله. اختر النوع والقسم هنا لتوليد صفوف مواصفات مطابقة للقسم في القالب الفارغ.',
     typeColumns: '{n} حقل مواصفات',
+    sectionColumns: 'قالب هذا القسم: {n} حقل مواصفات',
+    sectionNarrowed: 'أقل بـ {n} حقلاً من «{type}» — الحقول التي لا تخص هذا القسم محذوفة.',
+    sectionSame: 'كل حقول «{type}» — هذا القسم لا يضيّق القائمة.',
+    sectionGroups: 'المجموعات:',
     anyType: 'كل الأنواع',
     pickTypeFirst: 'اختر نوع المنتج أولًا.',
     sectionPlaceholder: 'اختر قسمًا…',
@@ -178,6 +182,10 @@ const STRINGS = {
     step2HintTable: 'The type decides the template columns; the section decides where the product is filed.',
     step2HintTxt: 'A TXT file carries its own classification. Choose a type and section here to generate the matching specification rows in the blank template.',
     typeColumns: '{n} spec fields',
+    sectionColumns: 'This section\u2019s template: {n} spec fields',
+    sectionNarrowed: '{n} fewer than \u201c{type}\u201d — the fields that do not belong to this section are dropped.',
+    sectionSame: 'Every field of \u201c{type}\u201d — this section does not narrow the list.',
+    sectionGroups: 'Groups:',
     anyType: 'All types',
     pickTypeFirst: 'Choose a product type first.',
     sectionPlaceholder: 'Choose a section…',
@@ -301,6 +309,13 @@ interface Catalog {
   effective_template_family: 'devices' | 'materials' | null;
   product_type: ProductTypeId | null;
   product_count: number;
+  /**
+   * What THIS section's template actually carries, narrowed — not the product
+   * type's union. See the note beside the section select: the panel used to
+   * show only the type's number, and it never moved.
+   */
+  spec_columns?: number;
+  spec_groups?: Array<{ id: string; label_ar: string; label_en: string; fields: number }>;
 }
 
 interface TypeChoice {
@@ -720,6 +735,44 @@ export default function ImportPanel({
             ))}
           </select>
         </div>
+        {/*
+            WHAT THE CHOSEN SECTION ACTUALLY DOES TO THE TEMPLATE.
+            The panel used to show one number — the product TYPE's «47 حقل
+            مواصفات» — and nothing else moved when a section was picked. So
+            choosing «طابعات Resin» looked identical to choosing «طابعات FDM»,
+            and the owner reported that the template does not change by
+            section. It does: 47 fields become 39 and 30, and the two sets
+            differ by 25 fields. This says so, from the same narrowing the
+            download runs, before anything is downloaded.
+        */}
+        {section && typeof section.spec_columns === 'number' && (
+          <div className="mt-2 rounded-xl border border-border-subtle bg-black/20 p-2.5" data-import="section-shape">
+            <p className="text-[12px] font-bold text-white">
+              {fill(t.sectionColumns, { n: section.spec_columns })}
+            </p>
+            {(() => {
+              const typeDef = types.find((x) => x.id === section.product_type);
+              if (!typeDef) return null;
+              const typeName = lang === 'en' ? typeDef.label_en : typeDef.label_ar;
+              const dropped = typeDef.spec_columns - section.spec_columns;
+              return (
+                <p className="text-[11px] text-zinc-400 mt-0.5">
+                  {dropped > 0
+                    ? fill(t.sectionNarrowed, { n: dropped, type: typeName })
+                    : fill(t.sectionSame, { type: typeName })}
+                </p>
+              );
+            })()}
+            {section.spec_groups && section.spec_groups.length > 0 && (
+              <p className="text-[11px] text-zinc-400 mt-1.5">
+                <span className="text-zinc-500">{t.sectionGroups} </span>
+                {section.spec_groups
+                  .map((g) => `${lang === 'en' ? g.label_en : g.label_ar} (${g.fields})`)
+                  .join(lang === 'en' ? ', ' : ' · ')}
+              </p>
+            )}
+          </div>
+        )}
         {!isTable && <p className="text-[11px] text-zinc-500 mt-2">{t.sectionOptional}</p>}
         {catalogs.length > 0 && options.length === 0 && <p className="text-amber-300/90 text-[11px] mt-2">{t.noFamily}</p>}
         {lookups && <LookupsBox lookups={lookups} section={section} lang={lang} t={t} />}

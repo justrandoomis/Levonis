@@ -1383,6 +1383,7 @@ templateRoutes.get('/blank', async (c) => {
   const category = (c.req.query('category') ?? '').trim();
   let groups = groupsForType(raw);
   let sectionName = '';
+  let selectedSlug = '';
   if (category) {
     const { results } = await c.env.DB.prepare('SELECT * FROM catalogs').all<CatalogRow>();
     const selected = results.find((row) => row.id === category || row.slug === category);
@@ -1396,9 +1397,23 @@ templateRoutes.get('/blank', async (c) => {
     }
     groups = narrowGroups(raw, branch);
     sectionName = selected.name_ar || selected.name_en || selected.slug;
+    selectedSlug = selected.slug;
   }
   const text = `${buildBlankTemplate().text}\n${typeSpecScaffold(raw, groups, sectionName).join('\n')}`;
-  return attachment(text, `levonis-product-template-${raw}.txt`);
+  /**
+   * THE NAME CARRIES THE SECTION, and the absence of that is what turned a
+   * working feature into a bug report.
+   *
+   * This served every printer template as `levonis-product-template-printer.txt`
+   * whatever section was chosen. The CONTENTS were right — 47 spec rows narrow
+   * to 39 for «طابعات FDM» and 30 for «طابعات Resin», differing by 25 fields —
+   * but the owner downloaded both, got two files with one name, and had no
+   * reason on screen or in the Downloads folder to believe anything had
+   * changed. `/api/admin/import/template` already named its CSV after the
+   * section; this lane simply never did.
+   */
+  const stem = selectedSlug || raw;
+  return attachment(text, `levonis-product-template-${stem}.txt`);
 });
 
 /** A filled, valid example. Creating from it yields a DRAFT — never a live

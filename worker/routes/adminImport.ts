@@ -263,10 +263,17 @@ adminImportRoutes.get('/template', async (c) => {
   const withExample = c.req.query('example') !== '0';
   const money = canViewFinancials(c.env, admin);
 
-  // TWO WAYS IN, ONE FILE. `?type=` downloads the template for a product type
-  // straight away — the owner's «ويكون حسب نوع المنتج» — and `?category=`
-  // keeps working for an admin who thinks in sections, resolving that section
-  // to its type. Both produce identical columns for the same type.
+  // TWO WAYS IN, TWO SHAPES. `?type=` downloads the template for a product
+  // type straight away — the owner's «ويكون حسب نوع المنتج» — and `?category=`
+  // resolves the section to its type AND NARROWS WITHIN IT: a sheet for
+  // «طابعات Resin» carries 30 spec columns where the bare printer type carries
+  // 47, and they differ by 25 fields.
+  //
+  // This comment used to end "Both produce identical columns for the same
+  // type", which was true before `shapeFor` started passing the branch and
+  // has been false since. It is corrected rather than deleted because the
+  // owner's report — «لا تتغير القالب» — is exactly the belief this sentence
+  // would have confirmed to anyone who read it.
   let shape: TemplateShape;
   let stem: string;
   if (rawCategory) {

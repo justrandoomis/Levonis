@@ -8,6 +8,7 @@ import {
   FAMILIES,
   groupsForSection,
   isTemplateFamily,
+  narrowGroups,
   productTypeForBranch,
   type SectionRef,
 } from '../lib/templateFamilies';
@@ -212,13 +213,34 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
     success: true,
     catalogs: results.map((r) => {
       const family = families.get(r.id) ?? null;
+      const type = family ? productTypeForBranch(family, branch(r.id)) : null;
+      /**
+       * WHAT THIS SECTION'S TEMPLATE ACTUALLY CONTAINS — narrowed, not the
+       * type's union.
+       *
+       * The import panel showed one number, «٤٧ حقل مواصفات», taken from the
+       * product TYPE. It never moved when a section was chosen, so the owner
+       * picked «طابعات Resin», saw the same 47, downloaded a file with the
+       * same name as the FDM one, and reported that the template does not
+       * change. It does — 47 fields become 39 for FDM and 30 for Resin, and
+       * the two sets differ by 25 fields — but nothing on the screen said so.
+       *
+       * The groups travel with the count because the count alone is still a
+       * number to be taken on trust: «خاص بطابعات Resin» under the select is
+       * the thing that makes the narrowing visible rather than merely true.
+       * Both are computed from the same `narrowGroups` the download uses, so
+       * the panel cannot promise a shape the file does not have.
+       */
+      const groups = type ? narrowGroups(type, branch(r.id)) : [];
       return {
         ...r,
         is_printer_catalog: !!r.is_printer_catalog,
         active: !!r.active,
         effective_template_family: family,
-        product_type: family ? productTypeForBranch(family, branch(r.id)) : null,
+        product_type: type,
         product_count: countById.get(r.id) ?? 0,
+        spec_columns: groups.reduce((n, g) => n + g.fields.length, 0),
+        spec_groups: groups.map((g) => ({ id: g.id, label_ar: g.label_ar, label_en: g.label_en, fields: g.fields.length })),
       };
     }),
   });
