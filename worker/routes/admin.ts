@@ -10,6 +10,8 @@ import { newId, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { canViewFinancials, normalizeAdminScope, userPatchRefusal } from '../lib/adminScope';
+import { degradeIfSchemaMissing } from '../lib/membershipBenefits';
+import { normalizeText } from '../lib/search/normalize';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import {
   findSiteMediaSlot,
@@ -2541,4 +2543,70 @@ adminRoutes.post('/invest/users/:userId/messages', async (c) => {
     .run();
   await audit(c.env.DB, adminUser.id, 'invest.message', userId);
   return c.json({ success: true, id });
+});
+
+// ------------------------------------------------------- blocked name terms
+
+/**
+ * THE WORDS A CUSTOMER MAY NOT CALL THEMSELVES — the owner's own list.
+ *
+ * `worker/lib/nameGuard.ts` ships a seed and explains the matching; this is
+ * the door that lets the owner extend it without a deploy, because the words
+ * people actually type at a shop in Baghdad are known in Baghdad. A word added
+ * here works on the next sign-up.
+ *
+ * `scope` IS THE SAFETY STORY, not a detail. 'word' matches only between
+ * non-letters, which is what keeps «كس» from rejecting «مكسور» and `ass` from
+ * rejecting `Cassandra`. 'any' matches anywhere and belongs only to terms long
+ * and specific enough that no ordinary word contains them. It defaults to
+ * 'word' for exactly that reason: the safer answer is the one a person gets
+ * when they do not say.
+ */
+adminRoutes.get('/blocked-terms', async (c) => {
+  // A Worker can be live before migration 0090 applies. A missing TABLE holds
+  // no rows, so an empty list is the literal truth — and far better than a
+  // screen that 500s at an owner who only wanted to look.
+  const results = await degradeIfSchemaMissing(
+    'blocked terms (migration 0090)',
+    async () =>
+      (
+        await c.env.DB
+          .prepare('SELECT term, scope, owner_added, created_at FROM blocked_terms ORDER BY owner_added DESC, term LIMIT 2000')
+          .all<{ term: string; scope: string; owner_added: number }>()
+      ).results ?? [],
+    [] as Array<{ term: string; scope: string; owner_added: number }>
+  );
+  return c.json({
+    success: true,
+    terms: results.map((r) => ({ ...r, owner_added: !!r.owner_added })),
+  });
+});
+
+adminRoutes.post('/blocked-terms', async (c) => {
+  const admin = c.get('user')!;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  // NORMALIZED on the way in — folded hamza and ta marbuta, no diacritics —
+  // so one row covers «قندرة» and «قندره» and the owner never has to think
+  // about spelling variants.
+  const term = normalizeText(str(body.term, 'term', { min: 2, max: 60 }));
+  if (!term) throw badRequest('term must contain letters or digits');
+  const scope = body.scope === 'any' ? 'any' : 'word';
+  // REPLACE, not insert-or-ignore: this door exists so the owner can CORRECT
+  // an entry, including one the seed got wrong. `owner_added = 1` is what stops
+  // the migration's re-seed resetting their correction.
+  await c.env.DB
+    .prepare('INSERT OR REPLACE INTO blocked_terms (term, scope, owner_added) VALUES (?, ?, 1)')
+    .bind(term, scope)
+    .run();
+  await audit(c.env.DB, admin.id, 'moderation.blocked_term.set', term, { term, scope });
+  return c.json({ success: true, term, scope });
+});
+
+adminRoutes.delete('/blocked-terms/:term', async (c) => {
+  const admin = c.get('user')!;
+  const term = normalizeText(c.req.param('term'));
+  if (!term) throw badRequest('term is required');
+  const res = await c.env.DB.prepare('DELETE FROM blocked_terms WHERE term = ?').bind(term).run();
+  await audit(c.env.DB, admin.id, 'moderation.blocked_term.delete', term, { term });
+  return c.json({ success: true, deleted: (res.meta.changes ?? 0) > 0 });
 });

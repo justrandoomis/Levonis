@@ -113,7 +113,7 @@ Producer names are the end-state services; until a service is extracted, the leg
 | Field | Type | pii | Notes |
 |---|---|---|---|
 | `user_id` | `string` | | |
-| `method` | `'password'\|'google'\|'telegram'\|'email_first'` | | |
+| `method` | `'password'\|'google'\|'telegram'\|'email_first'\|'otp'` | | `'otp'` is a sign-up completed by a code sent to a phone or a mailbox (`/signup/otp-complete`). The list is WIDENED, never re-meant — a consumer switching on it needs a default branch. |
 | `locale` | `'ar'\|'en'\|'ckb'` | | |
 | `referrer_code` | `string \| null` | | the code entered at signup; Referrals resolves it |
 | `email_verified` | `boolean` | | |

@@ -25,18 +25,36 @@ import FillButton, { lengthProgress } from './FillButton';
  *   the cost of not handing an attacker a way to test a list of addresses
  *   against the shop's user table.
  *
- *   IT DOES NOT CREATE ACCOUNTS. A code proves you control an address; it does
- *   not decide what a new account should be called, who referred it, or
- *   whether it wants a password. Sign-up stays where those questions are
- *   asked, and this screen says so when there is nothing to sign into.
+ *   ON THE SIGN-IN PATH IT STILL DOES NOT CREATE ACCOUNTS, and `/otp/start`
+ *   still sends nothing to a destination with no account — the decoy that
+ *   stops the endpoint answering "does this address exist" is exactly that
+ *   property and it is not given up.
  *
- * WHATSAPP GOES TO THE ACCOUNT'S VERIFIED NUMBER — the one proven through
- * Telegram's contact sharing (migration 0013). It is therefore offered as a
- * SIGN-IN only, never as a way in for a number the shop has never seen.
+ * `mode="signup"` IS THE OTHER HALF, and it is a different question, not a
+ * relaxed version of the same one. There the destination is a stranger by
+ * definition, so the code is really sent, and proving it earns a TICKET rather
+ * than a session: an account still needs a name, and that is the third screen
+ * here. A person who turns out to already have an account on that number is
+ * simply signed in — they proved the number, which is all signing in ever
+ * required.
  */
 
 const STRINGS = {
   ar: {
+    introSignupWhatsapp: 'سنرسل رمزاً من ٦ أرقام إلى واتساب على هذا الرقم لتأكيد ملكيته.',
+    introSignupEmail: 'سنرسل رمزاً من ٦ أرقام إلى بريدك لتأكيد ملكيته.',
+    sentForSignup: 'أرسلنا رمزاً الآن. اكتبه لإكمال إنشاء حسابك.',
+    profileTitle: 'بقي اسمك فقط',
+    profileHint: 'تم توثيق الرقم. اختر الاسم الذي سيظهر للآخرين.',
+    nameLabel: 'الاسم',
+    namePlaceholder: 'مثال: علي حسن',
+    usernameLabel: 'اسم المستخدم',
+    usernameOptional: 'اختياري',
+    usernamePlaceholder: 'ali3d',
+    createCta: 'إنشاء الحساب',
+    creating: 'جارٍ الإنشاء…',
+    createdLabel: 'تم',
+    nameRequired: 'اكتب اسمك لإكمال الحساب.',
     introEmail: 'سنرسل رمزاً من ٦ أرقام إلى بريدك. لا حاجة لكلمة المرور.',
     introWhatsapp: 'سنرسل رمزاً من ٦ أرقام إلى واتساب على رقم حسابك الموثّق.',
     emailLabel: 'البريد الإلكتروني',
@@ -45,6 +63,8 @@ const STRINGS = {
     countryLabel: 'الدولة',
     commonCountries: 'الأكثر استخداماً',
     allCountries: 'كل الدول',
+    countrySearch: 'ابحث عن دولة أو رمز',
+    countryEmpty: 'لا توجد دولة بهذا الاسم أو الرمز',
     phoneHint: 'الرقم نفسه الموثّق على حسابك. تُقبل الأرقام العربية أيضاً.',
     phoneInvalid: 'هذا الرقم غير صحيح للدولة المختارة.',
     emailInvalid: 'اكتب بريداً إلكترونياً صحيحاً.',
@@ -72,6 +92,20 @@ const STRINGS = {
     createAccount: 'إنشاء حساب',
   },
   en: {
+    introSignupWhatsapp: 'We will send a 6-digit code on WhatsApp to this number to confirm it is yours.',
+    introSignupEmail: 'We will send a 6-digit code to your email to confirm it is yours.',
+    sentForSignup: 'A code is on its way. Type it to finish creating your account.',
+    profileTitle: 'Just your name left',
+    profileHint: 'The number is confirmed. Choose the name other people will see.',
+    nameLabel: 'Name',
+    namePlaceholder: 'e.g. Ali Hassan',
+    usernameLabel: 'Username',
+    usernameOptional: 'optional',
+    usernamePlaceholder: 'ali3d',
+    createCta: 'Create the account',
+    creating: 'Creating…',
+    createdLabel: 'Done',
+    nameRequired: 'Type your name to finish the account.',
     introEmail: 'We will send a 6-digit code to your email. No password needed.',
     introWhatsapp: "We will send a 6-digit code on WhatsApp to your account's verified number.",
     emailLabel: 'Email',
@@ -80,6 +114,8 @@ const STRINGS = {
     countryLabel: 'Country',
     commonCountries: 'Most used',
     allCountries: 'All countries',
+    countrySearch: 'Search a country or code',
+    countryEmpty: 'No country matches that',
     phoneHint: 'The same number verified on your account.',
     phoneInvalid: 'That number is not valid for the selected country.',
     emailInvalid: 'Enter a valid email address.',
@@ -107,6 +143,20 @@ const STRINGS = {
     createAccount: 'Create an account',
   },
   ckb: {
+    introSignupWhatsapp: 'کۆدێکی ٦ ژمارەیی بۆ ئەم ژمارەیە لە واتساپ دەنێرین بۆ دڵنیابوون لێی.',
+    introSignupEmail: 'کۆدێکی ٦ ژمارەیی بۆ ئیمەیڵەکەت دەنێرین بۆ دڵنیابوون لێی.',
+    sentForSignup: 'کۆدەکە نێردرا. بینووسە بۆ تەواوکردنی هەژمارەکەت.',
+    profileTitle: 'تەنها ناوەکەت ماوە',
+    profileHint: 'ژمارەکە پشتڕاست کرایەوە. ئەو ناوە هەڵبژێرە کە خەڵک دەیبینێت.',
+    nameLabel: 'ناو',
+    namePlaceholder: 'نموونە: عەلی حەسەن',
+    usernameLabel: 'ناوی بەکارهێنەر',
+    usernameOptional: 'ئارەزوومەندانە',
+    usernamePlaceholder: 'ali3d',
+    createCta: 'دروستکردنی هەژمار',
+    creating: 'دروست دەکرێت…',
+    createdLabel: 'تەواو',
+    nameRequired: 'ناوەکەت بنووسە بۆ تەواوکردنی هەژمارەکە.',
     introEmail: 'کۆدێکی ٦ ژمارەیی بۆ ئیمەیڵەکەت دەنێرین. پێویست بە وشەی نهێنی ناکات.',
     introWhatsapp: 'کۆدێکی ٦ ژمارەیی بە واتساپ دەنێرین بۆ ژمارە پشتڕاستکراوەکەی هەژمارەکەت.',
     emailLabel: 'ئیمەیڵ',
@@ -115,6 +165,8 @@ const STRINGS = {
     countryLabel: 'وڵات',
     commonCountries: 'زۆرترین بەکارهاتوو',
     allCountries: 'هەموو وڵاتان',
+    countrySearch: 'گەڕان بە ناوی وڵات یان کۆد',
+    countryEmpty: 'هیچ وڵاتێک نەدۆزرایەوە',
     phoneHint: 'هەمان ژمارەی پشتڕاستکراو لەسەر هەژمارەکەت.',
     phoneInvalid: 'ئەم ژمارەیە بۆ ئەم وڵاتە دروست نییە.',
     emailInvalid: 'ئیمەیڵێکی دروست بنووسە.',
@@ -147,22 +199,42 @@ export type CodeChannel = 'email' | 'whatsapp';
 
 interface CodeAuthProps {
   channel: CodeChannel;
-  onSuccess?: () => void;
+  /** 'signin' asks for a session; 'signup' asks for an account. */
+  mode?: 'signin' | 'signup';
+  /** A number already chosen on the screen before this one. When it is given,
+   *  the destination step is skipped — asking twice for something the person
+   *  just typed is how a flow loses people. */
+  initialPhone?: PhoneValue | null;
+  /** Carried into the account this flow may create. */
+  referralCode?: string;
+  onSuccess?: (created: boolean) => void;
   onSwitchMode?: (view: 'signup') => void;
 }
 
-type Phase = 'target' | 'code' | 'done';
+type Phase = 'target' | 'code' | 'profile' | 'done';
 
-export default function CodeAuth({ channel, onSuccess, onSwitchMode }: CodeAuthProps) {
+export default function CodeAuth({
+  channel,
+  mode = 'signin',
+  initialPhone = null,
+  referralCode = '',
+  onSuccess,
+  onSwitchMode,
+}: CodeAuthProps) {
   const { lang } = useLanguage();
   const s = STRINGS[lang] || STRINGS.ar;
   const { refreshUser } = useAuth();
   const navigate = useNavigate();
 
+  const signup = mode === 'signup';
   const [phase, setPhase] = useState<Phase>('target');
   const [emailValue, setEmailValue] = useState('');
-  const [phone, setPhone] = useState<PhoneValue>(() => emptyPhoneValue());
+  const [phone, setPhone] = useState<PhoneValue>(() => initialPhone ?? emptyPhoneValue());
   const [code, setCode] = useState('');
+  /** The proof, once the code is spent. Never a session — see the note. */
+  const [ticket, setTicket] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newUsername, setNewUsername] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -223,29 +295,70 @@ export default function CodeAuth({ channel, onSuccess, onSwitchMode }: CodeAuthP
         channel,
         identifier,
         lang,
+        // The one field that decides whether a stranger's phone rings. On the
+        // sign-in path the server keeps its decoy; here it must really send,
+        // because reaching somebody with no account is the entire point.
+        intent: signup ? 'signup' : 'signin',
       });
       if (!mounted.current) return;
       setPhase('code');
       setCode('');
       setCooldown(Math.max(1, Number(res?.resend_after_seconds) || 60));
-      setNotice(channel === 'email' ? s.sentToEmail : s.sentToWhatsapp);
+      // On the sign-up path the code REALLY went out, so the hedged "if you
+      // have an account…" wording would be a lie. It exists on the sign-in
+      // path because there the message is deliberately identical whether or
+      // not anything was sent.
+      setNotice(signup ? s.sentForSignup : channel === 'email' ? s.sentToEmail : s.sentToWhatsapp);
     } catch (e) {
       if (mounted.current) setError(describeError(e));
     } finally {
       if (mounted.current) setBusy(false);
     }
-  }, [identifier, busy, channel, lang, s, describeError]);
+  }, [identifier, busy, channel, lang, s, describeError, signup]);
+
+  /**
+   * The number was chosen on the screen before this one, so send immediately
+   * rather than showing the same field again. Runs once; `sentOnce` is a ref
+   * because React 18 mounts effects twice in development and a code sent
+   * twice burns the resend cooldown the person is about to need.
+   */
+  const sentOnce = useRef(false);
+  useEffect(() => {
+    if (!initialPhone?.valid || sentOnce.current) return;
+    sentOnce.current = true;
+    void send();
+    // `send` is stable enough for this one-shot; re-running on its identity
+    // would re-send on every keystroke it closes over.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const verify = useCallback(async () => {
     if (code.length !== 6 || busy || !identifier) return;
     setBusy(true);
     setError('');
     try {
-      await api.post('/api/auth/otp/verify', { channel, identifier, code });
+      const res = await api.post<{ signup?: boolean; ticket?: string }>('/api/auth/otp/verify', {
+        channel,
+        identifier,
+        code,
+        // Without this the server answers a code for an unknown destination
+        // the way it always has — a failure. Sign-up is the only caller that
+        // asks for the other answer.
+        ...(signup ? { allow_signup: true } : {}),
+      });
+      if (!mounted.current) return;
+      // A ticket means there was no account on this destination, so the next
+      // question is what to call the one about to exist. There is no session
+      // yet and nothing to refresh.
+      if (res?.signup && typeof res.ticket === 'string') {
+        setTicket(res.ticket);
+        setPhase('profile');
+        return;
+      }
       await refreshUser();
       if (!mounted.current) return;
       setPhase('done');
-      if (onSuccess) onSuccess();
+      if (onSuccess) onSuccess(false);
       else navigate('/');
     } catch (e) {
       if (!mounted.current) return;
@@ -257,7 +370,36 @@ export default function CodeAuth({ channel, onSuccess, onSwitchMode }: CodeAuthP
     } finally {
       if (mounted.current) setBusy(false);
     }
-  }, [code, busy, identifier, channel, refreshUser, onSuccess, navigate, describeError]);
+  }, [code, busy, identifier, channel, refreshUser, onSuccess, navigate, describeError, signup]);
+
+  /**
+   * Spend the ticket. The destination is NOT sent: the server reads it from the
+   * ticket, which is what stops a proof earned on one number from creating an
+   * account on another.
+   */
+  const createAccount = useCallback(async () => {
+    if (busy || !ticket) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api.post('/api/auth/signup/otp-complete', {
+        ticket,
+        name: newName.trim(),
+        username: newUsername.trim() || undefined,
+        lang,
+        referral_code: referralCode || undefined,
+      });
+      await refreshUser();
+      if (!mounted.current) return;
+      setPhase('done');
+      if (onSuccess) onSuccess(true);
+      else navigate('/');
+    } catch (e) {
+      if (mounted.current) setError(describeError(e));
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
+  }, [busy, ticket, newName, newUsername, lang, referralCode, refreshUser, onSuccess, navigate, describeError]);
 
   if (notConfigured) {
     return (
@@ -269,6 +411,72 @@ export default function CodeAuth({ channel, onSuccess, onSwitchMode }: CodeAuthP
   }
 
   const Icon = channel === 'email' ? Mail : MessageCircle;
+
+  /**
+   * THE THIRD SCREEN, and only on the sign-up path. The number is proven; what
+   * is missing is what to call the person. Username is optional because a
+   * handle is a public thing somebody may want to think about, and the account
+   * works without one.
+   */
+  if (phase === 'profile') {
+    return (
+      <div>
+        <h2 className="lv-title" style={{ fontSize: 22 }}>
+          {s.profileTitle}
+        </h2>
+        <p className="lv-sub">{s.profileHint}</p>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void createAccount();
+          }}
+          noValidate
+          aria-busy={busy}
+        >
+          <div className="lv-fields">
+            <AuthTextField
+              id="otp-signup-name"
+              label={s.nameLabel}
+              value={newName}
+              onChange={setNewName}
+              autoComplete="name"
+              placeholder={s.namePlaceholder}
+              disabled={busy}
+            />
+            <AuthTextField
+              id="otp-signup-username"
+              label={`${s.usernameLabel} · ${s.usernameOptional}`}
+              value={newUsername}
+              onChange={setNewUsername}
+              autoComplete="username"
+              placeholder={s.usernamePlaceholder}
+              valueDir="ltr"
+              autoCapitalize="none"
+              spellCheck={false}
+              disabled={busy}
+            />
+          </div>
+          {error ? (
+            <p className="lv-alert lv-alert-danger mt-3 text-xs" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="lv-cta">
+            <FillButton
+              id="otp-signup-create"
+              label={s.createCta}
+              workingLabel={s.creating}
+              successLabel={s.createdLabel}
+              progress={lengthProgress(newName.trim(), 2)}
+              ready={newName.trim().length >= 2}
+              status={busy ? 'submitting' : 'idle'}
+              hint={newName.trim().length >= 2 ? '' : s.nameRequired}
+            />
+          </div>
+        </form>
+      </div>
+    );
+  }
 
   if (phase === 'code') {
     return (
@@ -335,7 +543,15 @@ export default function CodeAuth({ channel, onSuccess, onSwitchMode }: CodeAuthP
     <div>
       <p className="text-sm text-text-muted mb-3 flex items-start gap-2">
         <Icon aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0" />
-        <span>{channel === 'email' ? s.introEmail : s.introWhatsapp}</span>
+        <span>
+          {signup
+            ? channel === 'email'
+              ? s.introSignupEmail
+              : s.introSignupWhatsapp
+            : channel === 'email'
+              ? s.introEmail
+              : s.introWhatsapp}
+        </span>
       </p>
       <form
         onSubmit={(e) => {
@@ -369,6 +585,8 @@ export default function CodeAuth({ channel, onSuccess, onSwitchMode }: CodeAuthP
               countryLabel={s.countryLabel}
               commonLabel={s.commonCountries}
               allLabel={s.allCountries}
+              searchLabel={s.countrySearch}
+              emptyLabel={s.countryEmpty}
               value={phone}
               onChange={setPhone}
               lang={lang}

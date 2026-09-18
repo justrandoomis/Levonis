@@ -396,6 +396,58 @@ html {
    feedback. Both are latency and noise on the input path — exactly what the
    response rule says to hunt down.
    --------------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------------
+   TYPING MUST NOT ZOOM THE PAGE.
+   
+   The owner reported it as "on some devices the page zooms a little when I
+   type in a field", which is exactly right and is not a bug in any one screen:
+   MOBILE SAFARI ZOOMS THE VIEWPORT WHENEVER A FOCUSED TEXT CONTROL COMPUTES TO
+   LESS THAN 16px. It is a readability feature, it cannot be turned off from
+   JavaScript, and the page does not zoom back out afterwards — the customer is
+   left on a form that no longer fits the screen, mid-sentence.
+   
+   THE ONE FIX THAT IS NOT A FIX: `maximum-scale=1` on the viewport meta. It
+   stops the zoom by stopping ALL zoom, including the pinch a person with poor
+   eyesight needs to read the page at all. It is an accessibility regression
+   traded for a layout one, and it is never taken here.
+   
+   So the controls are raised instead. This is a floor, not a design: 143 text
+   controls across the admin panels, the merchant dashboard and the storefront
+   carry `text-xs`, `text-sm` or an arbitrary size below 16px, and editing each
+   one would be 143 chances to miss one and no way to stop the 144th being
+   added next week.
+   
+   WHY `!important`, WHICH IS OTHERWISE NOT DONE HERE. Tailwind's `text-sm` is
+   a utility, and utilities beat the base layer by design — the whole point of
+   the layer order. A floor that loses to the thing it is a floor for is not a
+   floor. The larger sizes are excluded by name rather than clamped, so a
+   control that deliberately shows 18px keeps it; `tests/inputZoom.test.mjs`
+   fails if a control ever declares an arbitrary size above 16px, which is the
+   one case this list cannot know about.
+   
+   `pointer: coarse` and not a width query: a narrow window on a desktop has a
+   mouse and does not zoom, and a large phone does. The rule costs nothing
+   where it does not apply.
+   --------------------------------------------------------------------------- */
+@layer base {
+  @media (pointer: coarse) {
+    input:not(
+        [type="checkbox"],
+        [type="radio"],
+        [type="range"],
+        [type="color"],
+        [type="file"],
+        [type="submit"],
+        [type="button"],
+        [type="reset"]
+      ):not(.text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl),
+    select:not(.text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl),
+    textarea:not(.text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl) {
+      font-size: 16px !important;
+    }
+  }
+}
+
 @layer base {
   button,
   summary,

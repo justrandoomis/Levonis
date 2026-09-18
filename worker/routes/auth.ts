@@ -13,9 +13,13 @@ import {
   str,
   email,
   username,
+  displayName,
   oneOf,
   requireMainHost,
 } from '../lib/http';
+import { assertDecent } from '../lib/decency';
+import { degradeIfSchemaMissing } from '../lib/membershipBenefits';
+import { consumeTicketStatement, findSignupTicket, issueSignupTicket } from '../lib/signupTicket';
 import { newId, hashPassword, verifyPassword, isLegacyHash, randomToken, sha256Hex } from '../lib/crypto';
 import { trustedOrigin } from '../lib/appOrigin';
 import { createSession, destroySession, destroyAllSessions, loadSessionUser , FRESH_SESSION_SECONDS, sessionAgeSeconds } from '../lib/session';
@@ -213,7 +217,7 @@ async function resolveReferrer(env: Env, raw: string): Promise<SupportRef | null
  */
 async function emitUserCreated(
   c: { env: Env },
-  p: { userId: string; method: 'password' | 'google' | 'telegram' | 'email_first'; localeDb: string; referrerCode: string; emailVerified: boolean; createdAt?: string }
+  p: { userId: string; method: 'password' | 'google' | 'telegram' | 'email_first' | 'otp'; localeDb: string; referrerCode: string; emailVerified: boolean; createdAt?: string }
 ): Promise<void> {
   if (!eventsEnabled(c.env)) return;
   await emitFromRequest(
@@ -364,14 +368,24 @@ authRoutes.get('/capabilities', async (c) => {
     telegramBot: botUsername ?? '',
     /**
      * A phone number is a valid thing to SIGN IN with (it is matched against
-     * the account's verified `phone_e164`), and it is never a way to sign UP
-     * on its own — creating an account on a phone number requires proving
-     * ownership of it, which happens through Telegram. `phoneOtp` says
-     * whether an SMS provider exists to do that without Telegram. It does
-     * not, so the UI must not offer an SMS flow.
+     * the account's verified `phone_e164`) AND, since the code-signup flow, a
+     * valid thing to sign UP with — what has never changed is that creating an
+     * account on a number requires PROVING the number, which is why the two
+     * flags below are about the channels that can carry that proof rather than
+     * about the phone itself.
+     *
+     * `phoneOtp` says whether an SMS provider exists. There is none, so the UI
+     * must not offer an SMS flow; WhatsApp and Telegram are the two roads.
      */
     phoneSignIn: true,
     phoneOtp: false,
+    /**
+     * Can somebody with only a phone number open an account today? True when
+     * at least one channel can carry the proof. The sign-up screen asks this
+     * ONE question instead of re-deriving it from three flags and getting it
+     * subtly different from the server.
+     */
+    phoneSignup: wasenderConfigured(c.env) || !!botUsername,
     /**
      * Passwordless sign-in by a six-digit code, per channel. Both are
      * SIGN-IN only — neither creates an account (see /otp/start).
@@ -431,7 +445,11 @@ authRoutes.post('/register', async (c) => {
   }
   const mail = email(body.email);
   const uname = body.username ? username(body.username) : null;
-  const name = str(body.name, 'name', { min: 0, max: 100, required: false });
+  const name = displayName(body.name);
+  // The seed list already answered inside `username()` and `displayName()`;
+  // this adds the words the OWNER blocked, which live in a table so they do
+  // not need a deploy (worker/lib/decency.ts).
+  await assertDecent(c.env.DB, { name, username: uname });
   // Both optional, both only ever affect what this person is shown. An
   // unknown value is stored as "not said" rather than rejected — a signup
   // must not fail over a country dropdown.
@@ -651,7 +669,8 @@ authRoutes.post('/signup/complete', async (c) => {
     if (taken) throw conflict('This username is taken', 'USERNAME_TAKEN');
   }
   const uname = overrideUname ?? p.username;
-  const name = typeof body.name === 'string' ? str(body.name, 'name', { min: 0, max: 100, required: false }) : p.name;
+  const name = typeof body.name === 'string' ? displayName(body.name) : p.name;
+  await assertDecent(c.env.DB, { name, username: uname });
   const country = body.country !== undefined ? countryCodeOrNull(body.country) : p.country;
   // The referral is decided by the person FINISHING, not by whoever submitted
   // the sign-up: the finish page shows the pending code and sends back what
@@ -1463,7 +1482,8 @@ authRoutes.post('/telegram/complete', async (c) => {
   let realEmail: string | null = null;
   if (ch.purpose === 'signup') {
     uname = body.username ? username(body.username) : null;
-    name = str(body.name, 'name', { min: 0, max: 100, required: false });
+    name = displayName(body.name);
+    await assertDecent(c.env.DB, { name, username: uname });
     // §2.3: a phone account is NOT a fabricated email address. When the
     // person also gives a real address it is stored as-is and stays
     // UNVERIFIED (email_verified_at NULL) until they confirm it from that
@@ -1683,6 +1703,153 @@ authRoutes.post('/telegram/complete', async (c) => {
     user: publicUser(user!),
     created: true,
     email_placeholder: realEmail === null,
+  });
+});
+
+/**
+ * CREATE AN ACCOUNT ON A DESTINATION THE PERSON HAS JUST PROVEN THEY CONTROL.
+ *
+ * The other half of `/otp/verify { allow_signup: true }`. What this route is
+ * FOR is the thing the owner was looking at on their own phone: a number the
+ * shop can reach, a screen saying no account has it, and no way forward. A
+ * code proves the number; this spends that proof.
+ *
+ * THE DESTINATION COMES FROM THE TICKET AND NEVER FROM THE BODY. A ticket
+ * earned on one number creating an account on another is the one attack this
+ * shape exists to prevent, and reading a `phone` field here — even a
+ * "convenience" one — would be exactly that hole.
+ *
+ * WHAT THE ACCOUNT IS. A phone account stores the number in `phone_e164` and
+ * NOTHING in the email column but the non-routable placeholder (§2.3, decision
+ * row 27): a phone is not an address, and inventing `+9647xx@something` would
+ * make every later "is this a real mailbox" test wrong. A person who also
+ * gives a real address gets it stored UNVERIFIED — receiving a WhatsApp code
+ * proves the phone, and says nothing whatever about the mailbox.
+ *
+ * A PASSWORD IS OPTIONAL. The account can live on codes alone; forcing one
+ * would mean every phone sign-up invents a password it will never type again.
+ */
+authRoutes.post('/signup/otp-complete', async (c) => {
+  await rateLimit(c, 'otp-signup-complete', 10, 900);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const token = str(body.ticket, 'ticket', { min: 20, max: 128 });
+
+  const ticket = await degradeIfSchemaMissing(
+    'signup tickets (migration 0090)',
+    () => findSignupTicket(c.env, token),
+    null as Awaited<ReturnType<typeof findSignupTicket>>
+  );
+  if (!ticket) {
+    throw badRequest(
+      'انتهت صلاحية هذا الطلب — اطلب رمزًا جديدًا. / This request is no longer valid — request a new code.',
+      'TICKET_INVALID'
+    );
+  }
+
+  const uname = body.username ? username(body.username) : null;
+  const name = displayName(body.name);
+  await assertDecent(c.env.DB, { name, username: uname });
+  const country = countryCodeOrNull(body.country);
+  const locale = localeOrDefault(body.locale ?? body.lang);
+  const referralCode = referralCodeFrom(body);
+
+  const isPhone = ticket.channel === 'whatsapp';
+  const id = newId('usr');
+
+  /**
+   * The address. On the WhatsApp path the proven destination is a PHONE, so
+   * the email column takes the placeholder unless the person typed a real
+   * address — which then stays unverified. On the email path the proven
+   * destination IS the address, and it is stamped verified for the same reason
+   * `/otp/verify` stamps it: receiving the code is the mailbox proof.
+   */
+  let realEmail: string | null = null;
+  if (typeof body.email === 'string' && body.email.trim() !== '') {
+    realEmail = email(body.email);
+    if (isPlaceholderEmail(realEmail)) throw badRequest('Invalid email address');
+  }
+  const accountEmail = isPhone ? realEmail ?? `tg-${id}@telegram.local` : ticket.destination;
+  const emailVerifiedAt = isPhone ? null : new Date().toISOString();
+  const phone = isPhone ? ticket.destination : null;
+
+  let rawPassword: string | null = null;
+  if (body.password !== undefined && body.password !== null && body.password !== '') {
+    rawPassword = String(body.password);
+    checkPassword(rawPassword);
+  }
+  // Validated BEFORE the ticket is spent, so a taken handle does not cost the
+  // person their proof and send them back to the first screen.
+  if (uname) {
+    const taken = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(uname).first();
+    if (taken) throw conflict('This username is taken', 'USERNAME_TAKEN');
+  }
+  const passwordHash = rawPassword === null ? null : await hashPassword(rawPassword);
+
+  /**
+   * ONE BATCH, and the guards inside it are what make it race-proof. The
+   * ticket is spent by the same transaction that creates the account, and the
+   * insert is conditional on the ticket still being live — so two submissions
+   * arriving together create one account, not two, and a failure creates none.
+   */
+  let results: D1Result[];
+  try {
+    results = await c.env.DB.batch([
+      c.env.DB.prepare(
+        `INSERT INTO users (id, email, username, name, password_hash, phone_e164, country, locale, email_verified_at)
+         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
+          WHERE EXISTS (SELECT 1 FROM signup_tickets WHERE id = ?10 AND consumed_at IS NULL AND expires_at > ?11)
+            AND NOT EXISTS (SELECT 1 FROM users WHERE email = ?2)
+            AND (?6 IS NULL OR NOT EXISTS (SELECT 1 FROM users WHERE phone_e164 = ?6))`
+      ).bind(id, accountEmail, uname, name, passwordHash, phone, country, locale, emailVerifiedAt, ticket.id, new Date().toISOString()),
+      consumeTicketStatement(c.env, ticket.id),
+    ]);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('UNIQUE')) {
+      throw conflict(
+        'هذا الرقم أو البريد مرتبط بحساب موجود — سجّل الدخول بدلًا من إنشاء حساب. / ' +
+          'This phone or email already belongs to an account — please sign in instead.',
+        'ALREADY_REGISTERED'
+      );
+    }
+    throw e;
+  }
+
+  const created = results[0]?.meta?.changes === 1;
+  const spent = results[1]?.meta?.changes === 1;
+  if (!created || !spent) {
+    // The destination was claimed between the code and this request, or a
+    // parallel submit won. The batch is one transaction and every statement
+    // was a no-op, so there is no half-made account to clean up.
+    throw conflict(
+      'هذا الرقم أو البريد مرتبط بحساب موجود — سجّل الدخول بدلًا من إنشاء حساب. / ' +
+        'This phone or email already belongs to an account — please sign in instead.',
+      'ALREADY_REGISTERED'
+    );
+  }
+
+  await emitUserCreated(c, {
+    userId: id,
+    method: 'otp',
+    localeDb: locale,
+    referrerCode: referralCode,
+    emailVerified: !isPhone,
+  });
+  await tryAttributeReferral(c.env, id, referralCode);
+  await audit(c.env.DB, id, 'auth.otp_signup', `user:${id}`, {
+    channel: ticket.channel,
+    // Never the address or the number: an audit row is read by staff.
+    destination_masked: isPhone ? maskPhone(ticket.destination) : maskEmail(ticket.destination),
+    email_placeholder: isPhone && realEmail === null,
+    password_set: passwordHash !== null,
+  });
+  await createSession(c, id);
+  const user = await getFullUser(c.env.DB, id);
+  return c.json({
+    success: true,
+    user: publicUser(user!),
+    created: true,
+    email_placeholder: isPhone && realEmail === null,
   });
 });
 
@@ -2028,6 +2195,28 @@ authRoutes.post('/otp/start', async (c) => {
     );
   }
 
+  /**
+   * SIGN IN, OR SIGN UP — the one thing that changes whether a stranger's
+   * phone rings.
+   *
+   * On the SIGN-IN path an unknown destination gets the decoy: the row is
+   * written, nothing is sent, and the response is identical, so the endpoint
+   * cannot be used to ask whether an address has an account. That property is
+   * load-bearing and is not given up here.
+   *
+   * On the SIGN-UP path the destination is a stranger BY DEFINITION — the
+   * whole point is to reach somebody who has no account yet — so the code is
+   * always sent. That does mean a person can make the shop send a code to a
+   * number that is not theirs, which is true of every sign-up-by-phone flow
+   * ever built; it is answered by the two rate limits above (eight per IP per
+   * quarter hour, four per destination per hour) rather than by refusing to
+   * have the feature.
+   *
+   * It does NOT become an existence oracle: both paths answer the same shape,
+   * and which of the two happens next — a session or a ticket — is learned
+   * only by somebody holding the code, i.e. by the owner of the destination.
+   */
+  const intent = body.intent === 'signup' ? 'signup' : 'signin';
   const account = await accountForOtpDestination(c.env.DB, channel, destination);
 
   /**
@@ -2059,11 +2248,14 @@ authRoutes.post('/otp/start', async (c) => {
     send: async (code) => {
       // The decoy. 'skipped' — not `true` — so the row records honestly that
       // nothing left, while the cooldown and the response stay identical to a
-      // real request.
-      if (!account) return 'skipped';
+      // real request. Sign-up never takes this path: see the note above.
+      if (!account && intent === 'signin') return 'skipped';
       if (channel === 'email') {
         const msg = renderSignInCodeEmail(lang, code);
-        return sendEmail(c.env, account.email, msg.subject, msg.html, msg.text);
+        // The DESTINATION, not the account's stored address: on the sign-up
+        // path there is no account, and on the sign-in path they are the same
+        // string — `accountForOtpDestination` matched on it.
+        return sendEmail(c.env, destination, msg.subject, msg.html, msg.text);
       }
       const msg = authOtpMessage(code, lang);
       const sent = await sendWhatsAppText(c.env, destination, msg.text);
@@ -2132,6 +2324,32 @@ authRoutes.post('/otp/verify', async (c) => {
   // email) or to none. The proof this code carries is "somebody controls this
   // destination" — who that is, is decided now.
   const account = await accountForOtpDestination(c.env.DB, channel, destination);
+
+  /**
+   * NO ACCOUNT, AND THE CALLER SAID IT CAME FROM THE SIGN-UP SCREEN.
+   *
+   * The code proved control of this destination. That is exactly the proof
+   * creating an account on it requires, so rather than throwing the proof away
+   * and telling the person to go and do something else — which is what this
+   * route did, and what the owner was looking at on their own phone — it is
+   * exchanged for a ticket and the sign-up continues.
+   *
+   * `allow_signup` is required rather than assumed. Without it the answer is
+   * unchanged, which keeps every existing caller, and the sign-in screen
+   * itself, behaving exactly as before: a code for an address with no account
+   * is a failure there, not an invitation.
+   */
+  if (!account && body.allow_signup === true) {
+    const ticket = await issueSignupTicket(c.env, channel, destination);
+    return c.json({
+      success: true,
+      signup: true,
+      ticket: ticket.token,
+      expires_in_seconds: ticket.expires_in_seconds,
+      channel,
+      destination,
+    });
+  }
   if (!account) throw fail();
   if (result.user_id && result.user_id !== account.id) {
     // The destination moved between issue and use. Refusing is the only safe

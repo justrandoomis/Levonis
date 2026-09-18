@@ -17,6 +17,7 @@ curl -s https://levonis-iq.com/api/auth/capabilities | jq
   "telegramBot": "",
   "phoneSignIn": true,
   "phoneOtp": false,
+  "phoneSignup": false,
   "emailOtp": false,
   "whatsappOtp": false,
   "defaultCountry": "IQ"
@@ -277,3 +278,100 @@ Fields counted: name, username, avatar, locale, country, phone, email. Birth
 date and gender are **not** — the platform does not use them, and putting them
 in the score would turn "complete your profile" into pressure to hand over
 data for nothing.
+
+
+---
+
+## 8. Opening an account on a phone number
+
+For a long time a phone could sign you IN and could not sign you UP, unless you
+went through Telegram. That was never a policy — it is which flow was built
+first — and what it looked like from outside was the owner standing on their
+own sign-in page holding a number the shop can reach, told
+«لا يوجد حساب موثّق بهذا الرقم» with nothing to do about it.
+
+### The shape
+
+```
+/auth  →  «المتابعة برقم الهاتف»
+          ├─ the number            (PhoneField + CountryPicker)
+          └─ where should the code go?
+             ├─ WhatsApp  → POST /api/auth/otp/start   { intent: 'signup' }
+             │              POST /api/auth/otp/verify  { allow_signup: true }
+             │                → signed in, if the number already has an account
+             │                → a TICKET, if it does not
+             │              POST /api/auth/signup/otp-complete { ticket, name }
+             └─ Telegram  → the existing /telegram/* flow, which already creates
+                            accounts and proves the number its own way
+```
+
+**One button for the phone, not one per channel.** "WhatsApp or Telegram" is a
+question about a number that already exists, so it is asked after the number
+and not instead of it.
+
+### Why a ticket and not a session
+
+A six-digit code proves one thing — that the person is holding the phone — and
+`auth_otp` consumes it the instant it does, because single use is what a code is
+for. Creating an account needs more: a name, maybe a handle, maybe a password,
+and typing those takes longer than a code should live.
+
+So the proof is exchanged for a row in `signup_tickets`: fifteen minutes, one
+use, and it authorises **exactly one thing** — creating one account on the one
+destination it names.
+
+* It carries no user id, because no user exists yet.
+* It is consumed by the same batch that inserts the account, guarded by
+  `consumed_at IS NULL`, so two submissions racing make one account.
+* **The destination is read from the ticket and never from the request body.**
+  A ticket earned on one number creating an account on another is the whole
+  attack this shape exists to prevent, and a "convenience" `phone` field in the
+  body would be exactly that hole. `tests/authPhoneSignup.test.ts` sends four of
+  them at once and asserts the proven number wins.
+
+### What did not change
+
+`/otp/start` still keeps its decoy on the **sign-in** path: an unknown
+destination gets a row, gets no message, and gets the same response, so the
+endpoint cannot be used to ask whether an address has an account. Only
+`intent: 'signup'` really sends, because there the destination is a stranger by
+definition — and that is answered by the two rate limits (eight per IP per
+quarter hour, four per destination per hour), not by refusing to have the
+feature.
+
+It does not become an existence oracle either: both paths answer the same
+shape, and which of the two happens next — a session or a ticket — is learned
+only by somebody holding the code.
+
+### What the account is
+
+A phone account stores the number in `users.phone_e164` and nothing in the email
+column but the non-routable placeholder (§2.3, decision row 27). A phone is not
+an address, and inventing `+9647xx@something` would make every later "is this a
+real mailbox" test wrong. A person who also gives a real address gets it stored
+**unverified**: a WhatsApp code proves the phone and says nothing whatever about
+the mailbox. A password is optional — the account can live on codes alone.
+
+---
+
+## 9. Names a customer may not use
+
+`worker/lib/nameGuard.ts` refuses a display name or a handle that is not
+something the next customer should have to read, and
+`worker/lib/decency.ts` adds the owner's own words from `blocked_terms`
+(`GET/POST/DELETE /api/admin/blocked-terms`, no deploy needed).
+
+The whole difficulty is the Scunthorpe problem, so every term declares **how**
+it may match: `word` only between non-letters, `any` anywhere. «كس» is `word`
+because «مكسور» exists; `fuck` is `any` because nothing ordinary contains it.
+Arabic takes its article as a prefix, so «الحمار» matches «حمار» — and takes
+real names as suffixes, so «خولة» and «زبيدة» do **not** match «خول» and «زب».
+
+Evasion is spelling, not meaning, so it is answered by normalising: repeated
+letters (`fuuuck`), one separator between letters (`f.u.c.k`), and Latin
+leetspeak (`sh1t`, `a$$`). The Arabizi digits `3 5 7` are deliberately **not**
+folded — `5` is خ, not `s`, and folding it would reject everyone named Sara.
+
+The message never names what was found. A filter that quotes the word back
+teaches people exactly which letter to change, and repeats the insult to
+whoever is holding the phone.

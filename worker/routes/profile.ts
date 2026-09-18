@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { publicUser, localeToDb } from '../lib/types';
-import { requireAuth, badRequest, conflict, notFound, str, oneOf, username } from '../lib/http';
+import { requireAuth, badRequest, conflict, notFound, str, oneOf, username, displayName } from '../lib/http';
+import { assertDecent } from '../lib/decency';
 import { newId } from '../lib/crypto';
 import { allCountries } from '../lib/phone';
 import { computeCompletion, nextPromptAt, shouldPromptCompletion } from '../lib/profileCompletion';
@@ -23,7 +24,8 @@ profileRoutes.patch('/', async (c) => {
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
 
-  const name = body.name !== undefined ? str(body.name, 'name', { max: 100, required: false }) : user.name;
+  const name = body.name !== undefined ? displayName(body.name) : user.name;
+  if (body.name !== undefined) await assertDecent(c.env.DB, { name });
   const bio = body.bio !== undefined ? str(body.bio, 'bio', { max: 500, required: false }) : user.bio;
   const website = body.website !== undefined ? str(body.website, 'website', { max: 200, required: false }) : user.website;
   // API speaks 'ckb'; the DB column stores 'ku' (see localeToDb).
@@ -45,6 +47,7 @@ profileRoutes.patch('/', async (c) => {
   let newUsername = user.username;
   if (body.username !== undefined && body.username !== user.username) {
     const uname = username(body.username);
+    await assertDecent(c.env.DB, { username: uname });
     // Server-enforced 14-day cooldown, from the audit trail of past changes.
     const recent = await c.env.DB.prepare(
       `SELECT created_at FROM audit_log WHERE actor_id = ? AND action = 'profile.username_change'

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   AsYouType,
   getCountries,
@@ -7,6 +7,7 @@ import {
   validatePhoneNumberLength,
   type CountryCode,
 } from 'libphonenumber-js';
+import CountryPicker from './CountryPicker';
 
 /**
  * PhoneField — a phone input for everyone, not for Iraq.
@@ -209,6 +210,10 @@ export interface PhoneFieldProps {
   /** Groups the frequently used countries at the top of the picker. */
   commonLabel?: string;
   allLabel?: string;
+  /** Placeholder for the picker's search field ("country or code"). */
+  searchLabel?: string;
+  /** Shown when the search matches nothing. */
+  emptyLabel?: string;
 }
 
 export default function PhoneField({
@@ -224,31 +229,17 @@ export default function PhoneField({
   placeholder,
   commonLabel,
   allLabel,
+  searchLabel,
+  emptyLabel,
 }: PhoneFieldProps) {
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
   const country = countryByIso(value.iso);
 
-  const { common, rest, nameOf } = useMemo(() => {
-    const nameOf = countryNames(lang);
-    const commonSet = new Set(COMMON_ISO);
-    const common = COMMON_ISO.map((iso) => BY_ISO.get(iso)).filter(Boolean) as Country[];
-    const rest = COUNTRIES.filter((c) => !commonSet.has(c.iso)).sort((a, b) =>
-      nameOf(a.iso).localeCompare(nameOf(b.iso), lang)
-    );
-    return { common, rest, nameOf };
-  }, [lang]);
-
   const handleText = (raw: string) => {
     const { iso, national } = normalizePhoneInput(raw, value.iso);
     onChange(buildPhoneValue(iso, national));
   };
-
-  const option = (c: Country) => (
-    <option key={c.iso} value={c.iso}>
-      {c.flag} {nameOf(c.iso)} +{c.dial}
-    </option>
-  );
 
   return (
     <div>
@@ -259,29 +250,27 @@ export default function PhoneField({
           every language, including on the Arabic and Kurdish pages. */}
       <div className="lv-phone" dir="ltr">
         <div className="lv-phone__country">
-          {/* Compact closed display; the real, accessible <select> sits on
-              top at full size with localized names. */}
-          <span
-            aria-hidden
-            className={`lv-phone__display${error ? ' is-error' : ''}${disabled ? ' is-disabled' : ''}`}
-          >
-            <span className="text-base leading-none">{country.flag}</span>
-            <span className="font-semibold tabular-nums">+{country.dial}</span>
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-              <path d="M5.3 7.7a1 1 0 0 1 1.4 0L10 11l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4Z" />
-            </svg>
-          </span>
-          <select
+          {/*
+            THE PICKER, NOT A <select>. The native control opens the operating
+            system's own list — grey system chrome in the middle of a black and
+            gold page, 245 rows deep, with no way to type «العراق» or `964` and
+            land on the answer. CountryPicker keeps every keyboard behaviour the
+            native one had and adds the search; see its own note.
+          */}
+          <CountryPicker
             id={`${id}-country`}
-            aria-label={countryLabel}
+            label={countryLabel}
             value={country.iso}
-            onChange={(e) => onChange(buildPhoneValue(e.target.value, value.national))}
+            onChange={(iso) => onChange(buildPhoneValue(iso, value.national))}
+            lang={lang}
+            compact
             disabled={disabled}
-            className="lv-phone__select"
-          >
-            <optgroup label={commonLabel ?? '—'}>{common.map(option)}</optgroup>
-            <optgroup label={allLabel ?? '—'}>{rest.map(option)}</optgroup>
-          </select>
+            error={!!error}
+            placeholder={searchLabel}
+            commonLabel={commonLabel}
+            allLabel={allLabel}
+            emptyLabel={emptyLabel}
+          />
         </div>
         <input
           id={id}

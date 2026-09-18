@@ -19,6 +19,11 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ...owned('identity', [
     'users', 'sessions', 'password_reset_tokens', 'email_verification_tokens', 'pending_signups', 'telegram_links',
     'link_challenges', 'otp_challenges', 'auth_otp', 'studio_handoff_codes', 'addresses', 'favorites', 'community_product_favorites',
+    // A sign-up proof waiting to become an account, and the words a name may
+    // not contain. Both belong to whoever creates accounts, which is Identity:
+    // `signup_tickets` authorises an INSERT into `users` and nothing else, and
+    // `blocked_terms` is consulted by the same request that writes the name.
+    'signup_tickets', 'blocked_terms',
     'follows', 'service_keys', 'rate_limits',
   ]),
   ...owned('kyc', ['kyc_cases', 'approved_addresses']),

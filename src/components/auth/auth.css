@@ -1671,3 +1671,230 @@
 }
 
 .lv-field__help.is-warn { color: var(--lv-gold-text); font-weight: 500; }
+
+/* -------------------------------------------------------------------------
+ * CountryPicker — the themed, searchable replacement for the native select.
+ *
+ * The --lv-* tokens are declared on `.lv-auth`, so these rules only paint
+ * correctly inside the auth shell. That is where every country choice on this
+ * screen lives (the sign-in phone, the Telegram phone, the sign-up country);
+ * using the component outside it means giving the tokens a second home first.
+ *
+ * TWO LAYOUTS, one component. On a desktop it is a popover anchored under the
+ * control. On a phone it is a sheet from the bottom, because a popover
+ * anchored to a control near the top of a tall page puts its search field
+ * exactly where the on-screen keyboard is about to be.
+ * ---------------------------------------------------------------------- */
+.lv-cpick {
+  position: relative;
+}
+.lv-cpick__button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 46px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--lv-line-strong);
+  background: var(--lv-ground-2);
+  color: var(--lv-text-1);
+  /* ≥16px: a control that opens a text field must not be the thing that
+     makes the page zoom when the field takes focus. */
+  font-size: 16px;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.lv-cpick__button.is-compact {
+  width: auto;
+  flex: none;
+  gap: 6px;
+}
+.lv-cpick__button:hover:not(:disabled) { border-color: var(--lv-line-hover); }
+.lv-cpick__button:focus-visible,
+.lv-cpick__button.is-open {
+  outline: none;
+  border-color: var(--lv-focus-ring);
+  box-shadow: 0 0 0 3px rgba(201, 173, 106, 0.14);
+}
+.lv-cpick__button.is-error { border-color: var(--lv-red); }
+.lv-cpick__button:disabled { opacity: 0.55; cursor: not-allowed; }
+.lv-cpick__flag { font-size: 17px; line-height: 1; }
+.lv-cpick__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lv-cpick__dial {
+  color: var(--lv-text-2);
+  font-variant-numeric: tabular-nums;
+  /* A dial code reads left-to-right in every language, including on the
+     Arabic and Kurdish pages. */
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.lv-cpick__caret { width: 13px; height: 13px; flex: none; color: var(--lv-text-3); }
+
+.lv-cpick__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: transparent;
+}
+.lv-cpick__panel {
+  position: absolute;
+  z-index: 61;
+  inset-inline-start: 0;
+  top: calc(100% + 6px);
+  width: min(360px, 84vw);
+  display: flex;
+  flex-direction: column;
+  max-height: 340px;
+  border-radius: 12px;
+  border: 1px solid var(--lv-panel-line);
+  background: var(--lv-panel);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.lv-cpick__panel.is-compact { width: min(320px, 84vw); }
+
+.lv-cpick__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--lv-panel-line);
+  color: var(--lv-text-3);
+}
+.lv-cpick__search svg { width: 16px; height: 16px; flex: none; }
+.lv-cpick__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--lv-text-1);
+  /* ≥16px, same reason as everywhere else: iOS Safari zooms the page when a
+     field smaller than this takes focus. */
+  font-size: 16px;
+}
+.lv-cpick__input::placeholder { color: var(--lv-placeholder); }
+
+.lv-cpick__list {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.lv-cpick__head {
+  padding: 8px 10px 4px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lv-text-3);
+}
+.lv-cpick__opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--lv-text-1);
+  font-size: 14px;
+}
+.lv-cpick__opt.is-active { background: var(--lv-ground-2); }
+.lv-cpick__opt.is-selected { color: var(--lv-gold-text); }
+.lv-cpick__opt.is-selected .lv-cpick__dial { color: var(--lv-gold-deep); }
+.lv-cpick__optname {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lv-cpick__empty {
+  padding: 18px 12px;
+  text-align: center;
+  color: var(--lv-text-3);
+  font-size: 13px;
+}
+
+/* The sheet. `pointer: coarse` rather than a width query: a small window on a
+   desktop still has a mouse and a popover is right there, while a large phone
+   still has a keyboard that covers the bottom half of the screen. */
+@media (pointer: coarse) {
+  .lv-cpick__scrim { background: rgba(0, 0, 0, 0.55); }
+  .lv-cpick__panel,
+  .lv-cpick__panel.is-compact {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: 100%;
+    max-height: min(70vh, 480px);
+    border-radius: 16px 16px 0 0;
+    border-inline: 0;
+    border-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .lv-cpick__opt { padding: 12px 12px; font-size: 15px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lv-cpick__panel { animation: lv-cpick-in 0.16s ease-out; }
+}
+@keyframes lv-cpick-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.lv-cpick__name.is-unset,
+.lv-cpick__optname.is-unset { color: var(--lv-placeholder); }
+
+/* -------------------------------------------------------------------------
+ * The channel chooser: where a code should go, once a number is on screen.
+ *
+ * Two cards rather than two plain buttons, because the choice is between two
+ * DIFFERENT experiences — one arrives as a message, the other asks you to
+ * share your number with a bot — and a person deciding needs the second line.
+ * ---------------------------------------------------------------------- */
+.lv-chanpick {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.lv-chan {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--lv-line-strong);
+  background: var(--lv-ground-2);
+  color: var(--lv-text-1);
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+}
+.lv-chan:hover:not(:disabled) {
+  border-color: var(--lv-line-hover);
+  background: var(--lv-panel);
+}
+.lv-chan:focus-visible {
+  outline: none;
+  border-color: var(--lv-focus-ring);
+  box-shadow: 0 0 0 3px rgba(201, 173, 106, 0.14);
+}
+.lv-chan:disabled { opacity: 0.45; cursor: not-allowed; }
+.lv-chan svg { width: 20px; height: 20px; flex: none; color: var(--lv-gold-text); }
+.lv-chan span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lv-chan b { font-size: 14px; font-weight: 600; }
+.lv-chan small { font-size: 12px; color: var(--lv-text-3); }
+
+@media (min-width: 420px) {
+  .lv-chanpick { grid-template-columns: 1fr 1fr; }
+}

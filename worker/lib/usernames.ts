@@ -17,6 +17,8 @@
  * are refused. Ordinary names nobody could mistake for staff are not.
  */
 
+import { isIndecent } from './nameGuard';
+
 /** Handles nobody but LEVONIS may hold. Lowercase, matched exactly. */
 export const RESERVED_USERNAMES: ReadonlySet<string> = new Set([
   // 1. THE PLATFORM ITSELF, and the near-spellings of it.
@@ -51,7 +53,8 @@ export type UsernameRejection =
   | 'bad_edges'
   | 'repeated_punctuation'
   | 'reserved'
-  | 'all_digits';
+  | 'all_digits'
+  | 'indecent';
 
 /**
  * The canonical form of what somebody typed: trimmed and lowercased.
@@ -85,6 +88,21 @@ export function usernameRejection(raw: string): UsernameRejection | null {
   if (/[._-]{2,}/.test(s)) return 'repeated_punctuation';
   // An all-digit handle collides with the shape of an id in support threads.
   if (/^\d+$/.test(s)) return 'all_digits';
+  /**
+   * LAST, and on purpose. A handle that is too short or badly shaped has a
+   * mechanical answer the person can act on; "this name is not acceptable" is
+   * a judgement, and telling somebody their name was judged when the real
+   * problem was a stray dot is both wrong and insulting. So every mechanical
+   * rule answers first and this one only speaks about a handle that would
+   * otherwise have been allowed.
+   *
+   * Only the SEED is consulted here, because this function is synchronous and
+   * the owner's own additions live in a table. The routes that write a name
+   * apply both — see `assertDecent` in worker/lib/decency.ts — and this is the
+   * floor beneath them, which is what makes /username-available and every
+   * caller of `username()` covered without anyone remembering to.
+   */
+  if (isIndecent(s)) return 'indecent';
   return null;
 }
 

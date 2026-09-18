@@ -9,6 +9,8 @@ import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
 import AuthShell from '../components/auth/AuthShell';
 import AuthDivider from '../components/auth/AuthDivider';
+import CountryPicker from '../components/auth/CountryPicker';
+import PhoneField, { emptyPhoneValue, type PhoneValue } from '../components/auth/PhoneField';
 import AuthTextField from '../components/auth/AuthTextField';
 import GoogleAuthButton from '../components/auth/GoogleAuthButton';
 import SocialAuthButton, { TelegramIcon } from '../components/auth/SocialAuthButton';
@@ -26,7 +28,7 @@ import FillButton, {
   signinIdentifierPart,
 } from '../components/auth/FillButton';
 import { useCapabilities } from '../hooks/useCapabilities';
-import { COUNTRIES, COMMON_ISO, countryNames, flagOf, toAsciiDigitsClient } from '../components/auth/PhoneField';
+import { countryNames, flagOf, toAsciiDigitsClient } from '../components/auth/PhoneField';
 import ReferralBar from '../components/auth/ReferralBar';
 import { useUsernameAvailability } from '../components/auth/useUsernameAvailability';
 import { usernameRejection } from '../lib/usernameRules';
@@ -103,6 +105,16 @@ const STRINGS = {
     continueWithTelegram: 'المتابعة باستخدام تيليغرام',
     signInWithEmailCode: 'رمز إلى بريدي',
     signInWithWhatsapp: 'رمز على واتساب',
+    usePhone: 'المتابعة برقم الهاتف',
+    phonePanelTitle: 'رقم الهاتف',
+    phonePanelHint: 'اكتب رقمك، ثم اختر أين يصلك رمز التحقق.',
+    phoneChannelQuestion: 'أين نرسل الرمز؟',
+    channelWhatsapp: 'واتساب',
+    channelWhatsappHint: 'رسالة فيها رمز من ٦ أرقام',
+    channelTelegram: 'تيليغرام',
+    channelTelegramHint: 'شارك رقمك مع البوت',
+    phoneNoChannel: 'لا توجد قناة متاحة لإرسال الرمز حالياً.',
+    signUpWithPhoneHint: 'أنشئ حسابك برقم الهاتف — بدون بريد وبدون كلمة مرور.',
     codeSignInTitle: 'الدخول برمز',
     googleWorking: 'جارٍ المتابعة عبر Google…',
     errPasswordMismatch: 'كلمتا المرور غير متطابقتين',
@@ -217,6 +229,16 @@ const STRINGS = {
     continueWithTelegram: 'Continue with Telegram',
     signInWithEmailCode: 'Email me a code',
     signInWithWhatsapp: 'Code on WhatsApp',
+    usePhone: 'Continue with a phone number',
+    phonePanelTitle: 'Phone number',
+    phonePanelHint: 'Type your number, then choose where the code should reach you.',
+    phoneChannelQuestion: 'Where should the code go?',
+    channelWhatsapp: 'WhatsApp',
+    channelWhatsappHint: 'A message with a 6-digit code',
+    channelTelegram: 'Telegram',
+    channelTelegramHint: 'Share your number with the bot',
+    phoneNoChannel: 'No channel is available to carry a code right now.',
+    signUpWithPhoneHint: 'Open an account on your phone number — no email, no password.',
     codeSignInTitle: 'Sign in with a code',
     googleWorking: 'Continuing with Google…',
     errPasswordMismatch: 'Passwords do not match',
@@ -330,6 +352,16 @@ const STRINGS = {
     continueWithTelegram: 'بەردەوامبوون بە تێلێگرام',
     signInWithEmailCode: 'کۆد بۆ ئیمەیڵەکەم',
     signInWithWhatsapp: 'کۆد لە واتساپ',
+    usePhone: 'بەردەوامبوون بە ژمارەی مۆبایل',
+    phonePanelTitle: 'ژمارەی مۆبایل',
+    phonePanelHint: 'ژمارەکەت بنووسە، پاشان هەڵبژێرە کۆدەکە بۆ کوێ بێت.',
+    phoneChannelQuestion: 'کۆدەکە بۆ کوێ بنێرین؟',
+    channelWhatsapp: 'واتساپ',
+    channelWhatsappHint: 'نامەیەک بە کۆدی ٦ ژمارەیی',
+    channelTelegram: 'تێلێگرام',
+    channelTelegramHint: 'ژمارەکەت لەگەڵ بۆتەکە هاوبەش بکە',
+    phoneNoChannel: 'ئێستا هیچ ڕێگایەک نییە بۆ ناردنی کۆد.',
+    signUpWithPhoneHint: 'هەژمار بە ژمارەی مۆبایلەکەت بکەرەوە — بێ ئیمەیڵ، بێ وشەی نهێنی.',
     codeSignInTitle: 'چوونەژوورەوە بە کۆد',
     googleWorking: 'بەردەوامبوون بە Google…',
     errPasswordMismatch: 'وشە نهێنیيەکان یەک ناگرنەوە',
@@ -421,7 +453,15 @@ const STRINGS = {
 
 type AuthView = 'signin' | 'signup' | 'forgot';
 /** What the card is currently showing inside a view. */
-type AuthPanel = 'form' | 'telegram' | 'code-email' | 'code-whatsapp';
+type AuthPanel = 'form' | 'telegram' | 'code-email' | 'code-whatsapp' | 'phone';
+
+/**
+ * Which road carries the code once a number is on the screen. '' means the
+ * person has not chosen yet, which is its own step: the owner asked for the
+ * number FIRST and the channel second, because "WhatsApp or Telegram" is a
+ * question about a number that already exists, not a way of starting.
+ */
+type PhoneChannel = '' | 'whatsapp' | 'telegram';
 /** The three signup screens (one request, on the last one). */
 type SignupStep = 1 | 2 | 3;
 
@@ -514,6 +554,8 @@ export default function Auth() {
   // first and the inviter's name is resolved before they finish registering.
   const [view, setView] = useState<AuthView>(() => (searchParams.get('ref') ? 'signup' : 'signin'));
   const [panel, setPanel] = useState<AuthPanel>('form');
+  const [phoneChannel, setPhoneChannel] = useState<PhoneChannel>('');
+  const [phoneValue, setPhoneValue] = useState<PhoneValue>(() => emptyPhoneValue('IQ'));
   const [step, setStep] = useState<SignupStep>(1);
   const [submitting, setSubmitting] = useState(false);
   // Which action is in flight. The form CTA and the Google slot are both on
@@ -622,6 +664,9 @@ export default function Auth() {
     if (panel === 'telegram' && !caps.telegram) setPanel('form');
     if (panel === 'code-email' && !caps.emailOtp) setPanel('form');
     if (panel === 'code-whatsapp' && !caps.whatsappOtp) setPanel('form');
+    // The phone panel needs at least one road for the code. Without one it is
+    // a dead end, so it is not a panel this deployment has.
+    if (panel === 'phone' && !caps.whatsappOtp && !caps.telegram) setPanel('form');
   }, [caps, panel]);
 
   /**
@@ -713,6 +758,14 @@ export default function Auth() {
   const openCodePanel = (next: 'code-email' | 'code-whatsapp') => {
     clearMessages();
     setPanel(next);
+  };
+
+  const openPhonePanel = () => {
+    clearMessages();
+    // The channel choice is reset every time, not remembered: coming back
+    // usually means the last road did not work.
+    setPhoneChannel('');
+    setPanel('phone');
   };
 
   const goToStep = (next: SignupStep) => {
@@ -1235,8 +1288,15 @@ export default function Auth() {
    * needs it), Telegram is a quiet outline button; both sit under the
    * primary form, never above it, and only when the deployment offers them.
    */
+  /**
+   * A phone is a way IN and a way to START, so the button is offered on both
+   * screens — and only when at least one channel can carry the code, because a
+   * button that leads to "no channel available" is worse than no button.
+   */
+  const phoneEntry = whatsappCodeConfigured || telegramConfigured;
+
   const providerBlock =
-    googleConfigured || telegramConfigured ? (
+    googleConfigured || telegramConfigured || phoneEntry || emailCodeConfigured ? (
       <>
         <div className="lv-provider-row">
           <AuthDivider label={s.orLabel} />
@@ -1267,13 +1327,15 @@ export default function Auth() {
               />
             )}
             {/*
-              SIGN-IN ONLY, and not by omission. A code proves control of an
-              address; it does not answer the questions a NEW account needs
-              answered — a username, a referral, whether a password is wanted
-              — so offering it on the sign-up screen would promise an account
-              this button cannot create. The server refuses the same way.
+              ON BOTH SCREENS NOW, and that is the change the owner asked for.
+              A code used to be sign-in only because it answers "do you control
+              this destination" and not "what should this account be called" —
+              but the second question has a screen of its own now
+              (CodeAuth's profile step), so the first one is enough to start
+              from. The server agrees: /otp/verify hands back a ticket instead
+              of a session when there is no account yet.
             */}
-            {view === 'signin' && emailCodeConfigured && (
+            {emailCodeConfigured && (
               <SocialAuthButton
                 icon={<Mail aria-hidden="true" className="w-5 h-5" />}
                 label={s.signInWithEmailCode}
@@ -1282,11 +1344,16 @@ export default function Auth() {
                 compact={shortViewport}
               />
             )}
-            {view === 'signin' && whatsappCodeConfigured && (
+            {/*
+              ONE BUTTON FOR THE PHONE, not one per channel. "Which of WhatsApp
+              or Telegram" is a question about a number that already exists, so
+              it is asked after the number and not instead of it.
+            */}
+            {phoneEntry && (
               <SocialAuthButton
                 icon={<MessageCircle aria-hidden="true" className="w-5 h-5" />}
-                label={s.signInWithWhatsapp}
-                onClick={() => openCodePanel('code-whatsapp')}
+                label={s.usePhone}
+                onClick={openPhonePanel}
                 disabled={submitting}
                 compact={shortViewport}
               />
@@ -1297,18 +1364,10 @@ export default function Auth() {
       </>
     ) : null;
 
-  // Country list: the frequently used ones first, then everything in the
-  // reader's language — the same recipe /welcome uses.
-  const countryOptions = (() => {
-    const nameOf = countryNames(lang);
-    const commonSet = new Set(COMMON_ISO);
-    const common = COMMON_ISO.map((iso) => COUNTRIES.find((c) => c.iso === iso)).filter(Boolean) as typeof COUNTRIES;
-    const rest = COUNTRIES.filter((c) => !commonSet.has(c.iso)).sort((a, b) =>
-      nameOf(a.iso).localeCompare(nameOf(b.iso), lang)
-    );
-    return { common, rest, nameOf };
-  })();
-  const countryLabel = country ? `${flagOf(country)} ${countryOptions.nameOf(country)}` : '';
+  // The ordering and the search moved into CountryPicker, which is the only
+  // thing that needed the list. What is left is the one line the REVIEW step
+  // still needs: what to call the country the person chose.
+  const countryLabel = country ? `${flagOf(country)} ${countryNames(lang)(country)}` : '';
 
   const stepper = (
     <div className="lv-stepper" role="group" aria-label={s.steps}>
@@ -1339,6 +1398,138 @@ export default function Auth() {
       </button>
     </div>
   );
+
+  /**
+   * THE CODE PANEL — a six-digit code to an address, on either view.
+   *
+   * Sign-up reaches it too now: /otp/verify answers a proven destination with
+   * no account by handing back a ticket, and CodeAuth's own third screen asks
+   * the one question a code cannot answer, which is what to call the person.
+   */
+  const codePanel = (signup: boolean) => (
+    <div>
+      {backLink(() => setPanel('form'))}
+      {heading(SHEET.code, signup ? s.signUpTitle : s.codeSignInTitle)}
+      {errorSummary}
+      <CodeAuth
+        channel={panel === 'code-email' ? 'email' : 'whatsapp'}
+        mode={signup ? 'signup' : 'signin'}
+        referralCode={referralCode}
+        onSuccess={(created) => finishAuth(created)}
+        onSwitchMode={signup ? undefined : switchView}
+      />
+    </div>
+  );
+
+  /**
+   * THE PHONE PANEL — one number, then one choice of road.
+   *
+   * It serves BOTH views: the only difference is the word on the heading and
+   * the `mode` the two children get, because "prove this number" is the same
+   * act whether an account is waiting at the end of it or is about to be made.
+   */
+  const phonePanel = (signup: boolean) => {
+    if (phoneChannel === 'whatsapp') {
+      return (
+        <div>
+          {backLink(() => setPhoneChannel(''))}
+          {heading(SHEET.code, signup ? s.signUpTitle : s.signInTitle)}
+          {errorSummary}
+          <CodeAuth
+            channel="whatsapp"
+            mode={signup ? 'signup' : 'signin'}
+            initialPhone={phoneValue}
+            referralCode={referralCode}
+            onSuccess={(created) => finishAuth(created)}
+          />
+        </div>
+      );
+    }
+    if (phoneChannel === 'telegram') {
+      return (
+        <div>
+          {backLink(() => setPhoneChannel(''))}
+          {heading(SHEET.telegram, signup ? s.signUpTitle : s.signInTitle)}
+          {errorSummary}
+          {/* TelegramAuth renders its own <form>s; never nested in another. */}
+          <TelegramAuth
+            mode={signup ? 'signup' : 'signin'}
+            initialPhone={phoneValue}
+            onSuccess={() => finishAuth(signup)}
+            onSwitchMode={switchView}
+            referralCode={referralCode}
+          />
+        </div>
+      );
+    }
+    return (
+      <div>
+        {backLink(() => setPanel('form'))}
+        {heading(SHEET.code, s.phonePanelTitle, signup ? s.signUpWithPhoneHint : s.phonePanelHint)}
+        {errorSummary}
+        <div className="lv-fields">
+          <PhoneField
+            id="auth-phone"
+            label={s.phonePanelTitle}
+            countryLabel={ob.country}
+            commonLabel={ob.commonCountries}
+            allLabel={ob.allCountries}
+            searchLabel={ob.countrySearch}
+            emptyLabel={ob.countryEmpty}
+            value={phoneValue}
+            onChange={setPhoneValue}
+            lang={lang}
+          />
+        </div>
+        <p className="lv-field__label" style={{ marginTop: 6 }}>
+          {s.phoneChannelQuestion}
+        </p>
+        {/* The roads. Disabled until the number is real for its country, so
+            nobody sends a code to a half-typed number and then waits. */}
+        <div className="lv-chanpick">
+          {whatsappCodeConfigured && (
+            <button
+              type="button"
+              className="lv-chan"
+              disabled={!phoneValue.valid}
+              onClick={() => {
+                clearMessages();
+                setPhoneChannel('whatsapp');
+              }}
+            >
+              <MessageCircle aria-hidden="true" />
+              <span>
+                <b>{s.channelWhatsapp}</b>
+                <small>{s.channelWhatsappHint}</small>
+              </span>
+            </button>
+          )}
+          {telegramConfigured && (
+            <button
+              type="button"
+              className="lv-chan"
+              disabled={!phoneValue.valid}
+              onClick={() => {
+                clearMessages();
+                setPhoneChannel('telegram');
+              }}
+            >
+              <TelegramIcon />
+              <span>
+                <b>{s.channelTelegram}</b>
+                <small>{s.channelTelegramHint}</small>
+              </span>
+            </button>
+          )}
+          {!whatsappCodeConfigured && !telegramConfigured && (
+            <p className="lv-notice lv-notice--warn" role="status">
+              {s.phoneNoChannel}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   // ------------------------------------------------------------- screens
 
@@ -1531,7 +1722,9 @@ export default function Auth() {
       </form>
     );
   } else if (view === 'signup') {
-    screenKey = pendingEmail ? 'signup:pending' : `signup:${panel}:${panel === 'form' ? step : 0}`;
+    screenKey = pendingEmail
+      ? 'signup:pending'
+      : `signup:${panel}:${panel === 'form' ? step : 0}:${phoneChannel}`;
     if (pendingEmail) {
       screen = (
         <div>
@@ -1546,6 +1739,10 @@ export default function Auth() {
           </button>
         </div>
       );
+    } else if (panel === 'phone') {
+      screen = phonePanel(true);
+    } else if (panel === 'code-email' || panel === 'code-whatsapp') {
+      screen = codePanel(true);
     } else if (panel === 'telegram') {
       screen = (
         <div>
@@ -1655,26 +1852,26 @@ export default function Auth() {
                 <label htmlFor="country" className="lv-field__label">
                   {ob.country} <span style={{ fontWeight: 400, color: 'var(--lv-text-3)' }}>· {s.optional}</span>
                 </label>
-                <select
+                {/*
+                  The picker, not a native <select>: 245 rows of operating-system
+                  chrome in the middle of this page, with no way to type «العراق»
+                  or `964`. `unsetLabel` keeps the question optional — a picker
+                  with no way back to blank turns "you may tell us" into
+                  "you already did".
+                */}
+                <CountryPicker
                   id="country"
-                  name="country"
+                  label={ob.country}
                   value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className="lv-field__input lv-select"
-                  autoComplete="country"
-                >
-                  <option value="">{ob.countryPlaceholder}</option>
-                  {countryOptions.common.map((c) => (
-                    <option key={c.iso} value={c.iso}>
-                      {flagOf(c.iso)} {countryOptions.nameOf(c.iso)}
-                    </option>
-                  ))}
-                  {countryOptions.rest.map((c) => (
-                    <option key={c.iso} value={c.iso}>
-                      {flagOf(c.iso)} {countryOptions.nameOf(c.iso)}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setCountry}
+                  lang={lang}
+                  showDial={false}
+                  unsetLabel={ob.countryPlaceholder}
+                  commonLabel={ob.commonCountries}
+                  allLabel={ob.allCountries}
+                  placeholder={ob.countrySearch}
+                  emptyLabel={ob.countryEmpty}
+                />
               </div>
             </div>
             <div className="lv-cta">
@@ -1734,20 +1931,11 @@ export default function Auth() {
       );
     }
   } else {
-    screenKey = `signin:${panel}`;
-    if (panel === 'code-email' || panel === 'code-whatsapp') {
-      screen = (
-        <div>
-          {backLink(() => setPanel('form'))}
-          {heading(SHEET.code, s.codeSignInTitle)}
-          {errorSummary}
-          <CodeAuth
-            channel={panel === 'code-email' ? 'email' : 'whatsapp'}
-            onSuccess={() => finishAuth(false)}
-            onSwitchMode={switchView}
-          />
-        </div>
-      );
+    screenKey = `signin:${panel}:${phoneChannel}`;
+    if (panel === 'phone') {
+      screen = phonePanel(false);
+    } else if (panel === 'code-email' || panel === 'code-whatsapp') {
+      screen = codePanel(false);
     } else if (panel === 'telegram') {
       screen = (
         <div>

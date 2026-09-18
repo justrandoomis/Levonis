@@ -3,6 +3,7 @@ import { adminAllowedOn, classifyHost, rootDomainFrom, type HostInfo } from './h
 import { STATIC_SECURITY_HEADERS, STRICT_TRANSPORT_SECURITY, spaCsp } from './securityPolicy';
 import type { AppContext } from './types';
 import { canonicalUsername, usernameRejection, type UsernameRejection } from './usernames';
+import { isIndecent } from './nameGuard';
 
 export class HttpError extends Error {
   constructor(
@@ -204,6 +205,7 @@ const USERNAME_MESSAGES: Record<UsernameRejection, string> = {
   repeated_punctuation: 'Username may not contain two dots, dashes or underscores in a row',
   all_digits: 'Username must contain at least one letter',
   reserved: 'This username is reserved',
+  indecent: 'Please choose a different username',
 };
 
 export function username(v: unknown): string {
@@ -211,6 +213,27 @@ export function username(v: unknown): string {
   const rejection = usernameRejection(s);
   if (rejection) throw badRequest(USERNAME_MESSAGES[rejection], `USERNAME_${rejection.toUpperCase()}`);
   return canonicalUsername(s);
+}
+
+/**
+ * A person's DISPLAY name, which other customers read next to their reviews,
+ * their community posts and their store.
+ *
+ * Same shape rules as before (`str` with a length bound) plus one judgement:
+ * it may not be something the next customer should have to read. Only the
+ * SEED list is applied here, for the same reason `usernameRejection` applies
+ * only the seed — this is a synchronous chokepoint and the owner's own words
+ * live in a table. A route with a database handle should call `assertDecent`
+ * as well; this is the floor that holds when nobody remembers to.
+ *
+ * The message says "choose a different name" and not what was found in it. A
+ * filter that quotes the word back is a filter that teaches people exactly
+ * which letter to change.
+ */
+export function displayName(v: unknown, field = 'name', opts: { max?: number; required?: boolean } = {}): string {
+  const s = str(v, field, { min: 0, max: opts.max ?? 100, required: opts.required ?? false });
+  if (s && isIndecent(s)) throw badRequest('Please choose a different name', 'NAME_NOT_ALLOWED');
+  return s;
 }
 
 export function jsonArray(v: unknown, name: string, maxItems = 100): string {

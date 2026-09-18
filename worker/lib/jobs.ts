@@ -52,6 +52,8 @@ export interface DurableJobsReport {
   pruned_otp_challenges: number;
   /** Email/WhatsApp sign-in codes pruned (auth_otp, migration 0087). */
   pruned_auth_otp: number;
+  /** Spent or expired sign-up proofs pruned (signup_tickets, migration 0090). */
+  pruned_signup_tickets: number;
   /**
    * Products indexed for search this run (search_tokens, migration 0089).
    *
@@ -111,6 +113,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     expired_link_challenges: 0,
     pruned_otp_challenges: 0,
     pruned_auth_otp: 0,
+    pruned_signup_tickets: 0,
     search_indexed: 0,
     pruned_email_tokens: 0,
     pruned_reset_tokens: 0,
@@ -192,6 +195,15 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   await step('auth_otp', async () => {
     const res = await env.DB.prepare('DELETE FROM auth_otp WHERE expires_at < ?').bind(pruneBefore).run();
     report.pruned_auth_otp = res.meta.changes ?? 0;
+  });
+
+  // 3c. And the sign-up proofs those codes are exchanged for (signup_tickets,
+  //     migration 0090). Same reasoning as above and the same mistake not to
+  //     repeat: a table of proofs that is never swept is a growing list of the
+  //     numbers and addresses somebody went through a sign-up with.
+  await step('signup_tickets', async () => {
+    const res = await env.DB.prepare('DELETE FROM signup_tickets WHERE expires_at < ?').bind(pruneBefore).run();
+    report.pruned_signup_tickets = res.meta.changes ?? 0;
   });
 
   /**

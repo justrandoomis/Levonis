@@ -32,6 +32,8 @@ const STRINGS = {
     countryLabel: 'الدولة',
     commonCountries: 'الأكثر استخدامًا',
     allCountries: 'كل الدول',
+    countrySearch: 'ابحث عن دولة أو رمز',
+    countryEmpty: 'لا توجد دولة بهذا الاسم أو الرمز',
     phoneHint: 'اختر دولتك ثم اكتب رقمك بدون صفر البداية. تُقبل الأرقام العربية أيضًا.',
     phoneInvalid: 'هذا الرقم غير صحيح للدولة المختارة. تحقق من الدولة ومن الرقم.',
     continueTg: 'المتابعة عبر تيليغرام',
@@ -80,6 +82,8 @@ const STRINGS = {
     countryLabel: 'Country',
     commonCountries: 'Frequently used',
     allCountries: 'All countries',
+    countrySearch: 'Search a country or code',
+    countryEmpty: 'No country matches that',
     phoneHint: 'Pick your country, then type your number without the leading zero. Arabic digits are accepted too.',
     phoneInvalid: 'That is not a valid number for the selected country. Check the country and the number.',
     continueTg: 'Continue with Telegram',
@@ -128,6 +132,8 @@ const STRINGS = {
     countryLabel: 'وڵات',
     commonCountries: 'زۆرترین بەکارهاتوو',
     allCountries: 'هەموو وڵاتان',
+    countrySearch: 'گەڕان بە ناوی وڵات یان کۆد',
+    countryEmpty: 'هیچ وڵاتێک نەدۆزرایەوە',
     phoneHint: 'وڵاتەکەت هەڵبژێرە، پاشان ژمارەکەت بەبێ سفری سەرەتا بنووسە. ژمارە عەرەبییەکانیش قبوڵن.',
     phoneInvalid: 'ئەم ژمارەیە بۆ وڵاتی هەڵبژێردراو دروست نییە. وڵات و ژمارەکە بپشکنە.',
     continueTg: 'بەردەوامبوون لە ڕێگەی تەلەگرام',
@@ -184,6 +190,14 @@ interface TelegramAuthProps {
    * resolved or trusted in the browser.
    */
   referralCode?: string;
+  /**
+   * A number already chosen on the screen before this one. It only PRE-FILLS
+   * the field — the person still presses the button, and the server still
+   * proves the number through Telegram. Asking twice for something somebody
+   * just typed is how a flow loses people; skipping their confirmation is how
+   * a flow sends a code to a typo.
+   */
+  initialPhone?: PhoneValue | null;
   /** Called after a confirmed successful completion (session already
    *  created and the auth context refreshed). Defaults to navigate('/'). */
   onSuccess?: () => void;
@@ -271,7 +285,7 @@ function storeFlow(v: StoredFlow | null) {
 
 type Phase = 'phone' | 'waiting' | 'otp' | 'blocked' | 'expired' | 'done';
 
-export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCode }: TelegramAuthProps) {
+export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCode, initialPhone = null }: TelegramAuthProps) {
   const { lang } = useLanguage();
   const s = STRINGS[lang] || STRINGS.ar;
   const navigate = useNavigate();
@@ -284,7 +298,7 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
   const [serverState, setServerState] = useState<string>('pending');
   const [hint, setHint] = useState<string | null>(null);
 
-  const [phone, setPhone] = useState<PhoneValue>(() => emptyPhoneValue('IQ'));
+  const [phone, setPhone] = useState<PhoneValue>(() => initialPhone ?? emptyPhoneValue('IQ'));
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [notConfigured, setNotConfigured] = useState(false);
@@ -561,6 +575,8 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
             countryLabel={s.countryLabel}
             commonLabel={s.commonCountries}
             allLabel={s.allCountries}
+            searchLabel={s.countrySearch}
+            emptyLabel={s.countryEmpty}
             value={phone}
             onChange={setPhone}
             lang={lang}
