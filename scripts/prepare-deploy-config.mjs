@@ -32,7 +32,11 @@
  *   5. PRESERVES the plain-text vars already live on that Worker (wrangler
  *      replaces vars wholesale, so an empty config would silently erase
  *      GOOGLE_CLIENT_ID / APP_ORIGIN / … from a running site). Build
- *      environment variables win over the preserved values.
+ *      environment variables win over the preserved values, and a name that
+ *      resolves to EMPTY is dropped rather than deployed as "" — with
+ *      `keep_vars: true` an unsent var is an untouched var, while a var sent
+ *      as "" is a cleared one. That half is what took the live shop's sign-in
+ *      methods down on 2026-09-18 even after keep_vars was set.
  *
  * Worker SECRETS are never touched by a deploy and are never read here.
  */
@@ -235,18 +239,22 @@ const live = await liveVars(cfg.name).catch(() => null);
 // subdomain resolution with it.
 const merged = mergeVars(cfg.vars, live, fromEnv);
 cfg.vars = merged.vars;
-const { preserved, overridden } = merged;
+const { preserved, overridden, dropped } = merged;
 
 if (overridden.length) console.log(`  vars from build variables: ${overridden.join(', ')}`);
 if (preserved.length) console.log(`  vars preserved from the live Worker: ${preserved.join(', ')}`);
 if (!live) {
-  console.log('  (could not read the live Worker settings — vars come from build variables only)');
+  // Expected on this path rather than exceptional: the Workers Builds container
+  // authenticates wrangler by its own means and carries no CLOUDFLARE_API_TOKEN,
+  // so this read has no credentials and returns null on every build. The deploy
+  // is still safe, because `keep_vars` plus the drop below mean an unread var is
+  // an untouched var.
+  console.log('  (could not read the live Worker settings — nothing is preserved FROM, so nothing is set)');
 }
-const stillEmpty = merged.empty;
-if (stillEmpty.length) {
-  console.warn(
-    `  WARNING: deploying with empty ${stillEmpty.join(', ')}. wrangler replaces vars wholesale, so any ` +
-      'value currently live for those names will be cleared. Add them as build variables to keep them.'
+if (dropped.length) {
+  console.log(
+    `  vars NOT sent, so the running Worker keeps its own: ${dropped.join(', ')}\n` +
+      '  (`keep_vars: true` is what makes an unsent var an untouched one. Sending "" would CLEAR it.)'
   );
 }
 

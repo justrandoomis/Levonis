@@ -27,7 +27,7 @@ const { liveVars, mergeVars, toTsv } = mod as {
     configVars?: Record<string, string>,
     live?: Record<string, string> | null,
     overrides?: Record<string, string | undefined>
-  ) => { vars: Record<string, string>; preserved: string[]; overridden: string[]; empty: string[] };
+  ) => { vars: Record<string, string>; preserved: string[]; overridden: string[]; dropped: string[]; empty: string[] };
   toTsv: (vars: Record<string, string>) => string;
 };
 
@@ -41,7 +41,7 @@ test('EVERY live name is preserved — including one the committed config does n
   const merged = mergeVars(config, live, {});
   assert.equal(merged.vars.STORE_ROOT_DOMAIN, 'levonis-iq.com');
   assert.deepEqual(merged.preserved, ['APP_ORIGIN', 'GOOGLE_CLIENT_ID', 'STORE_ROOT_DOMAIN']);
-  assert.deepEqual(merged.empty, []);
+  assert.deepEqual(merged.dropped, [], 'every name had a live value, so nothing is dropped');
 });
 
 test('an explicit value wins over the live one, and a new name is added', () => {
@@ -51,9 +51,38 @@ test('an explicit value wins over the live one, and a new name is added', () => 
   assert.deepEqual(merged.overridden, ['APP_ORIGIN', 'EMAIL_FROM']);
 });
 
-test('a name that ends up empty is reported, because deploying it CLEARS the live value', () => {
+/**
+ * THE 2026-09-18 OUTAGE, FOURTH OCCURRENCE — the one that happened AFTER
+ * `keep_vars: true` was already set, which is how the real rule was found.
+ *
+ * `keep_vars` keeps the vars wrangler is NOT GIVEN. A var passed as "" IS
+ * given, so it is deployed and it clears the live value. Reporting it was never
+ * enough: the build log's warning went out over a shop that had just lost
+ * Google sign-in, password reset, email verification and email sign-in codes,
+ * and nobody read it until a customer could not get in.
+ *
+ * So an empty name is now DROPPED. "I have no value for this" and "set this to
+ * nothing" are different instructions, and only the first one can be meant by a
+ * deploy whose live-settings read failed.
+ */
+test('a name that ends up empty is DROPPED, because deploying it CLEARS the live value', () => {
   const merged = mergeVars({ GOOGLE_CLIENT_ID: '', APP_ORIGIN: '' }, null, {});
-  assert.deepEqual(merged.empty, ['APP_ORIGIN', 'GOOGLE_CLIENT_ID']);
+  assert.deepEqual(merged.dropped, ['APP_ORIGIN', 'GOOGLE_CLIENT_ID']);
+  assert.deepEqual(merged.vars, {}, 'nothing empty may reach wrangler — `keep_vars` then leaves the live values alone');
+  assert.deepEqual(merged.empty, [], 'always empty by construction now, not by luck');
+});
+
+test('a real value still wins over dropping — only the emptiness is dropped, never the name', () => {
+  const merged = mergeVars(
+    { GOOGLE_CLIENT_ID: '', EMAIL_ALLOWLIST_REQUIRED: 'off' },
+    { GOOGLE_CLIENT_ID: 'x.apps.googleusercontent.com' },
+    {}
+  );
+  assert.deepEqual(merged.vars, {
+    GOOGLE_CLIENT_ID: 'x.apps.googleusercontent.com',
+    EMAIL_ALLOWLIST_REQUIRED: 'off',
+  });
+  assert.deepEqual(merged.dropped, []);
 });
 
 test('an unreadable Worker is null and an undeployed one is {} — the caller must be able to tell them apart', async () => {
@@ -86,6 +115,14 @@ test('an unreadable Worker is null and an undeployed one is {} — the caller mu
 
 test('the TSV the workflow reads is name<TAB>value, sorted', () => {
   assert.equal(toTsv({ B: '2', A: '1' }), 'A\t1\nB\t2');
+});
+
+test('an empty live value is left out of the TSV — `--var NAME:` would SET it to nothing', () => {
+  // The shape after a wipe: the Worker still HAS the names, holding "". Passing
+  // them back re-applies the wipe; omitting them lets keep_vars leave them
+  // alone, so the step that supplies the real value is the one that wins.
+  assert.equal(toTsv({ GOOGLE_CLIENT_ID: '', APP_ORIGIN: 'https://levonis-iq.com' }), 'APP_ORIGIN\thttps://levonis-iq.com');
+  assert.equal(toTsv({ A: '', B: '' }), '', 'a fully wiped Worker produces no --var at all');
 });
 
 test('prepare-deploy-config.mjs uses the extracted module and kept everything else', () => {

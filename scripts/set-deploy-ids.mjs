@@ -134,7 +134,20 @@ if (!explicitId && targetBlock.includes(PLACEHOLDER)) {
 // -------------------------------------------------------------- plain vars
 // `wrangler deploy` replaces vars wholesale, so anything left empty here is
 // erased on the live Worker. Fill from the environment when the caller
-// supplied a value; leave the committed empty string otherwise.
+// supplied a value.
+//
+// AS OF 2026-09-18 THESE SUBSTITUTIONS ARE USUALLY NO-OPS, and that is the
+// fix rather than a regression: wrangler.jsonc no longer DECLARES these names
+// at all, because a declared "" is a value wrangler is given and it clears the
+// live one — which took the shop's sign-in methods down four times in a day,
+// the last time with `keep_vars: true` already set. The regexes below only
+// match `"NAME": ""`, so with the declarations gone they match nothing and
+// nothing is written. The values reach the Worker the way they always really
+// did: workflow 7 passes every one with --var, read back from the running
+// Worker by scripts/lib/preserve-vars.mjs.
+//
+// The code stays because a future config MAY legitimately declare one of these
+// with a real value, and then filling it from the environment is still right.
 const VARS = {
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID,
   INITIAL_ADMIN_EMAIL: process.env.INITIAL_ADMIN_EMAIL,
@@ -163,6 +176,10 @@ if (filled.length) changes.push(`${target} vars: ${filled.join(', ')}`);
 // loudly rather than silently shipping a config that breaks Google sign-in
 // or the origin used in e-mail links. (Worker SECRETS are unaffected by a
 // deploy — only these plain-text vars are replaced.)
+//
+// An ABSENT name is not caught here and must not be: absent is now the correct
+// state, and with `keep_vars: true` it means "leave the live value alone".
+// Only a name still sitting at "" is the dangerous one.
 const criticalEmpty = ['GOOGLE_CLIENT_ID', 'APP_ORIGIN', 'INITIAL_ADMIN_EMAIL', 'STORE_ROOT_DOMAIN'].filter((k) =>
   new RegExp(`"${k}"\\s*:\\s*""`).test(target === 'staging' ? tail : head)
 );

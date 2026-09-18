@@ -100,7 +100,13 @@ jobs:
           echo "vars currently set on the worker:"
           jq -r '[.result.bindings[] | select(.type == "plain_text") | .name] | sort | join(", ")' /tmp/settings.json
 
-          jq -r '.result.bindings[] | select(.type == "plain_text") | "\(.name)\t\(.text)"' /tmp/settings.json \
+          # `select(.text != "")` matters: each line below becomes `--var name:value`,
+          # and `--var name:` SETS the var to nothing. On a Worker whose vars were
+          # just wiped, carrying the empty values forward re-applies the wipe —
+          # dropping them lets `keep_vars: true` leave the live value alone and
+          # lets the steps below supply the real one. Same rule as
+          # scripts/lib/preserve-vars.mjs `toTsv`.
+          jq -r '.result.bindings[] | select(.type == "plain_text") | select(.text != "") | "\(.name)\t\(.text)"' /tmp/settings.json \
             > /tmp/vars.tsv
           while IFS=$'\t' read -r name value; do
             [ -n "$name" ] || continue

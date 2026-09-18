@@ -66,10 +66,30 @@ export async function liveVars(scriptName, opts = {}) {
 /**
  * Merge the three sources in the order the deploys have always used:
  * an explicit value wins, then whatever is live on the Worker, then the
- * (usually empty) value the config declares.
+ * value the config declares.
  *
  * EVERY live name is considered, not only the ones the config happens to
  * declare — that gap is exactly what erased `STORE_ROOT_DOMAIN`.
+ *
+ * A NAME THAT RESOLVES TO EMPTY IS DROPPED, NOT DEPLOYED EMPTY. This is the
+ * half that `keep_vars` alone could not give:
+ *
+ *   `keep_vars: true` tells wrangler to leave alone every var it is NOT GIVEN.
+ *   A var passed as "" IS given, so it is deployed, and it replaces the live
+ *   value with nothing.
+ *
+ * That is not theory. On 2026-09-18 the deploy at 13:12 carried `keep_vars:
+ * true` and still took Google sign-in, password reset, email verification and
+ * email sign-in codes off the live shop, because `wrangler.jsonc` still
+ * declared those names as "" and this merge still passed them through. Dropping
+ * them turns "I have no value for this" into "leave the running Worker's value
+ * alone", which is the only thing it can safely mean on a deploy that could not
+ * read the live settings.
+ *
+ * WHAT IS GIVEN UP, said out loud: a var can no longer be CLEARED by emptying
+ * it here. Clearing is now a deliberate act (`wrangler deploy --var NAME:` or
+ * the dashboard). That trade is not close — one side is a stale value, the
+ * other is the shop losing its sign-in methods about a minute after any push.
  */
 export function mergeVars(configVars = {}, live = null, overrides = {}) {
   const vars = { ...configVars };
@@ -91,16 +111,36 @@ export function mergeVars(configVars = {}, live = null, overrides = {}) {
       overridden.push(key);
     }
   }
-  const empty = Object.entries(vars)
+  const dropped = Object.entries(vars)
     .filter(([, v]) => !v)
     .map(([k]) => k)
     .sort();
-  return { vars, preserved: preserved.sort(), overridden: [...new Set(overridden)].sort(), empty };
+  for (const key of dropped) delete vars[key];
+  return {
+    vars,
+    preserved: preserved.sort(),
+    overridden: [...new Set(overridden)].sort(),
+    dropped,
+    // Kept under its old name for callers that only report it. It is now always
+    // empty BY CONSTRUCTION — nothing empty survives into `vars` — and that is
+    // the point rather than an oversight.
+    empty: [],
+  };
 }
 
-/** `name<TAB>value` lines, one per var, sorted so a diff of two runs is readable. */
+/**
+ * `name<TAB>value` lines, one per var, sorted so a diff of two runs is readable.
+ *
+ * A var whose live value is EMPTY is left out, for the same reason `mergeVars`
+ * drops it: the caller turns each line into `--var name:value`, and
+ * `--var name:` is an instruction to SET it to nothing. Leaving the line out
+ * lets `keep_vars` govern instead, which on a Worker that was wiped is the
+ * difference between carrying the wipe forward and letting the next step supply
+ * the real value.
+ */
 export function toTsv(vars) {
   return Object.keys(vars)
+    .filter((name) => vars[name])
     .sort()
     .map((name) => `${name}\t${vars[name]}`)
     .join('\n');

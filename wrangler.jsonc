@@ -18,13 +18,22 @@
    * docs/AUTH_PROVIDERS.md §10).
    *
    * With this, wrangler leaves untouched any variable it is not explicitly
-   * given. Deploys that DO mean to set a value still set it — workflow 7 passes
+   * GIVEN. Deploys that DO mean to set a value still set it — workflow 7 passes
    * every one with --var — so nothing loses the ability to configure the
-   * Worker; what is lost is the ability to blank it by omission.
+   * Worker; what is lost is the ability to blank it by OMISSION.
+   *
+   * ⚠ OMISSION IS ONLY HALF OF IT, and the other half cost a fourth outage the
+   * same day. A var this file DECLARES as "" is a var wrangler is given, so it
+   * is deployed and the live value is replaced by nothing — `keep_vars` does
+   * not apply to it at all. The deploy at 13:12 carried this key and blanked
+   * them anyway. The `vars` block below therefore names nothing it cannot fill,
+   * and `scripts/lib/preserve-vars.mjs` drops any name that still resolves to
+   * empty before wrangler sees it.
    *
    * TOP-LEVEL ONLY: wrangler refuses this key inside a named environment, so it
    * cannot be repeated in env.staging / env.dark and does not need to be.
-   * `tests/deployVarsSurvive.test.ts` fails if it is removed.
+   * `tests/deployVarsSurvive.test.ts` fails if it is removed, and fails again if
+   * any vars block reintroduces an empty string.
    */
   "keep_vars": true,
 
@@ -115,62 +124,45 @@
    */
   "images": { "binding": "IMAGES" },
 
-  // Non-secret runtime configuration. GOOGLE_CLIENT_ID and
-  // INITIAL_ADMIN_EMAIL are passed by the deploy workflows via --var.
-  // Secrets (TELEGRAM_BOT_TOKEN, optional GEMINI/EMAIL keys) are uploaded
-  // with `wrangler secret put` by the workflows — never committed.
+  // Non-secret runtime configuration.
   //
-  // ⚠ AN EMPTY STRING HERE IS NOT "UNSET". IT IS AN INSTRUCTION TO BLANK THE
-  // LIVE VALUE — unless `keep_vars` stops it, which is why that key is set at
-  // the top of this file and must stay there.
+  // ⚠ THIS BLOCK MAY ONLY CONTAIN NAMES WITH A REAL VALUE. A name declared
+  // here as "" is NOT "unset" — `wrangler deploy` sends it, and the live
+  // Worker's value is replaced by the empty string. `keep_vars` does NOT
+  // save it: wrangler's own schema says keep_vars keeps the vars it "is not
+  // explicitly given", and a declared "" IS being given.
   //
-  // WHAT HAPPENED, with timestamps. On 2026-09-18 workflow 7 finished at
-  // 03:37:56 with the live site reporting google:true, passwordReset:true,
-  // emailVerification:true and nine vars intact. A push to the default branch
-  // at 03:57 fired the Cloudflare Workers Builds deploy, and by 04:00 the site
-  // reported google:false, googleClientId:"" and emailOtp:false — while
-  // whatsappOtp stayed TRUE, because that one is a SECRET and secrets live in a
-  // store `wrangler deploy` does not touch. A var lost beside a secret kept is
-  // the signature of this failure every time.
+  // That distinction cost the live shop Google sign-in, password reset, email
+  // verification and email sign-in codes FOUR times on 2026-09-18. The last
+  // one is the one that proves the rule: the deploy at 13:12 carried
+  // `keep_vars: true` and still blanked them, because these names were still
+  // declared "" below. Every time the signature was identical — vars off,
+  // SECRETS still on (whatsappOtp stayed true), because secrets live in a
+  // store `wrangler deploy` does not touch.
   //
-  // AND THE GUARD THAT WAS ALREADY THERE IS WHY IT LOOKED RANDOM.
-  // `scripts/prepare-deploy-config.mjs` exists precisely to preserve the live
-  // vars on that build path, and it tries: it reads the running Worker and
-  // merges. But the read is `await liveVars(cfg.name).catch(() => null)` — when
-  // the build container cannot authenticate that read, `live` is null, the
-  // merge falls back to what this file declares, and these empty strings go out
-  // over a working site. The script even warns into the build log, which nobody
-  // reads until something is already dark.
+  // So the rule now has two halves and needs both:
   //
-  // `keep_vars: true` removes the question. Wrangler then leaves alone any var
-  // it is not explicitly given, so a deploy whose var read failed can no longer
-  // blank anything — and workflow 7, which passes every value with --var, still
-  // sets exactly what it means to. A guard that depends on a network call
-  // succeeding is not a guard; this one cannot fail.
+  //   1. `keep_vars: true` (top of this file) — wrangler leaves alone any var
+  //      it is not given, so a deploy can no longer erase by OMISSION.
+  //   2. this block names nothing it cannot fill — so a deploy can no longer
+  //      erase by DECLARATION either.
   //
-  // See docs/AUTH_PROVIDERS.md §10.
+  // The real values are supplied at deploy time: GitHub workflow 7 passes each
+  // one with --var, and `scripts/prepare-deploy-config.mjs` merges the live
+  // Worker's values on the Cloudflare Workers Builds path. That script's read
+  // is best-effort — `await liveVars(cfg.name).catch(() => null)` — and in the
+  // Workers Builds container it has no CLOUDFLARE_API_TOKEN to read with, so
+  // it returns null every time and the merge falls back to what this file
+  // declares. Which is why what this file declares must be nothing.
+  //
+  // `tests/deployVarsSurvive.test.ts` fails if an empty string appears in any
+  // vars block, in any environment. See docs/AUTH_PROVIDERS.md §10.
   "vars": {
-    "GOOGLE_CLIENT_ID": "",
-    "INITIAL_ADMIN_EMAIL": "",
-    "EXTRA_ALLOWED_ORIGINS": "",
-    "APP_ORIGIN": "",
-    "EMAIL_ALLOWED_RECIPIENTS": "",
-    // `on` makes an EMPTY allowlist mean "mail NOBODY" rather than "mail
-    // everybody" (`worker/lib/outbox.ts` `allowedRecipient`). Off here: on the
-    // live Worker the allowlist is a staging convenience and mail must reach
-    // real customers.
-    "EMAIL_ALLOWLIST_REQUIRED": "off",
-    "EMAIL_FROM": "",
-    // The root domain the host classifier measures every request against.
-    // Declared here even though it is filled at deploy time: a name that is
-    // not in this file is a name the Workers-Builds preservation pass cannot
-    // see, and an unpreserved var is a wiped var.
-    "STORE_ROOT_DOMAIN": "",
-    // Declared for exactly the reason above. The Studio sign-in allowlist is
-    // set at deploy time from a repository secret, and being absent here is
-    // how it would be silently wiped by a build that preserves only the names
-    // this file knows — after the owner had finally set it.
-    "STUDIO_ALLOWED_DESTINATIONS": ""
+    // `off` makes an EMPTY allowlist mean "mail everybody" rather than "mail
+    // NOBODY" (`worker/lib/outbox.ts` `allowedRecipient`). On the live Worker
+    // the allowlist is a staging convenience and mail must reach real
+    // customers. This is a real value, which is why it may be here.
+    "EMAIL_ALLOWLIST_REQUIRED": "off"
   },
 
   "observability": { "enabled": true },
@@ -222,17 +214,19 @@
       ],
       "images": { "binding": "IMAGES" },
       "vars": {
-        "GOOGLE_CLIENT_ID": "",
-        "INITIAL_ADMIN_EMAIL": "",
-        "EXTRA_ALLOWED_ORIGINS": "",
-        "APP_ORIGIN": "",
-        "EMAIL_ALLOWED_RECIPIENTS": "",
-        "EMAIL_ALLOWLIST_REQUIRED": "off",
-        "EMAIL_FROM": "",
-        "STORE_ROOT_DOMAIN": "",
-        // levonis-staging is the Worker that serves levonis-iq.com, so this
-        // is the block that matters for the live site.
-        "STUDIO_ALLOWED_DESTINATIONS": ""
+        // ONLY NAMES WITH A REAL VALUE — see the top-level `vars` note. Every
+        // other name this block used to declare empty (GOOGLE_CLIENT_ID,
+        // INITIAL_ADMIN_EMAIL, EXTRA_ALLOWED_ORIGINS, APP_ORIGIN,
+        // EMAIL_ALLOWED_RECIPIENTS, EMAIL_FROM, STORE_ROOT_DOMAIN,
+        // STUDIO_ALLOWED_DESTINATIONS) is set by the deploy workflow and kept
+        // between deploys by `keep_vars`. levonis-staging is the Worker that
+        // serves levonis-iq.com, so this is the block that took the live site
+        // down four times.
+        //
+        // `off`: on the live Worker the allowlist is a staging convenience and
+        // mail must reach real customers (`worker/lib/outbox.ts`
+        // `allowedRecipient`).
+        "EMAIL_ALLOWLIST_REQUIRED": "off"
       },
       "observability": { "enabled": true },
       "triggers": { "crons": ["*/15 * * * *"] }
@@ -297,37 +291,30 @@
       ],
       "images": { "binding": "IMAGES" },
       "vars": {
-        // The same names env.staging declares — an undeclared name is a name
-        // the deploy-config preservation pass cannot see, and an unpreserved
-        // var is a wiped var.
-        "GOOGLE_CLIENT_ID": "",
-        "INITIAL_ADMIN_EMAIL": "",
-        "EXTRA_ALLOWED_ORIGINS": "",
-        // Both are the DARK zone (D21), filled by svc-core-dark.yml.
-        "APP_ORIGIN": "",
-        "STORE_ROOT_DOMAIN": "",
-        // The dark stack must never be able to mail a real address — and
-        // `EMAIL_ALLOWLIST_REQUIRED` is what makes that true rather than
-        // merely intended: with it the empty allowlist below means "nobody",
-        // so the dark core mails no one until the owner puts real dark
-        // addresses in `EMAIL_ALLOWED_RECIPIENTS`.
-        "EMAIL_ALLOWED_RECIPIENTS": "",
+        // ONLY NAMES WITH A REAL VALUE. See the top-level `vars` note: a name
+        // declared here as "" is deployed as "" and overwrites whatever the
+        // dark Worker is running with. The names this block used to declare
+        // empty — GOOGLE_CLIENT_ID, INITIAL_ADMIN_EMAIL, EXTRA_ALLOWED_ORIGINS,
+        // APP_ORIGIN, STORE_ROOT_DOMAIN, EMAIL_ALLOWED_RECIPIENTS, EMAIL_FROM,
+        // STUDIO_ALLOWED_DESTINATIONS, CORE_SIGNING_PUBLIC_KEY,
+        // ALLOWED_CALLER_KIDS, LEVONIS_VERSION — are all set by svc-core-dark.yml
+        // at deploy time, and `keep_vars` keeps them between deploys.
+        //
+        // The dark stack must never be able to mail a real address, and
+        // `EMAIL_ALLOWLIST_REQUIRED: "on"` is what makes that true rather than
+        // merely intended: with it an EMPTY `EMAIL_ALLOWED_RECIPIENTS` means
+        // "nobody" instead of "everybody", so the dark core mails no one until
+        // the owner puts real dark addresses in it. Being absent from this file
+        // is the same as being empty for that rule — `worker/lib/outbox.ts`
+        // `allowedRecipient` reads `(env.EMAIL_ALLOWED_RECIPIENTS || '')` — so
+        // the safety holds without the declaration.
         "EMAIL_ALLOWLIST_REQUIRED": "on",
-        "EMAIL_FROM": "",
-        "STUDIO_ALLOWED_DESTINATIONS": "",
-        // Phase 1 additions (`worker/lib/types.ts` Env, slice 1.6). Every one
-        // of them is optional in the code and absent on the live Worker; they
-        // exist here so the dark stack can publish while the live core cannot.
+        // Phase 1 (`worker/lib/types.ts` Env, slice 1.6). These exist here so
+        // the dark stack can publish while the live core cannot.
         "EVENT_BUS_ENABLED": "on",
         "EVENT_BUS_MODE": "rpc",
-        // The core's own public half is set by the workflow beside the secret.
-        "CORE_SIGNING_PUBLIC_KEY": "",
-        // `service:kid:publicKey,…` — empty means the entrypoints run with hop
-        // verification off, exactly as the live core does today.
-        "ALLOWED_CALLER_KIDS": "",
         // off | log | on. `off` until one release after G3.
-        "GATEWAY_ONLY": "off",
-        "LEVONIS_VERSION": ""
+        "GATEWAY_ONLY": "off"
       },
       // The four dark leaf consumers (slice 1.7). They are bound ONLY here:
       // the live core binds nothing until G2, and `subscriptionsFor` narrows

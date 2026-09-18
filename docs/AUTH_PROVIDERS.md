@@ -412,14 +412,14 @@ There are **two deployers** for `levonis-staging`:
 | Cloudflare **Workers Builds** Git integration | every push to the default branch | reads `wrangler.jsonc` and passes **no** `--var` |
 
 `wrangler deploy` replaces a Worker's plain-text vars **wholesale**, and
-`wrangler.jsonc` declares them as empty strings:
+`wrangler.jsonc` used to declare them as empty strings:
 
 ```jsonc
 "GOOGLE_CLIENT_ID": "",  "EMAIL_FROM": "",  "APP_ORIGIN": "",  "STORE_ROOT_DOMAIN": "", …
 ```
 
 An empty string there is not "unset" — it is an instruction to blank the live
-value. So the Git integration writes `""` over nine working vars on every push.
+value. So the Git integration wrote `""` over nine working vars on every push.
 
 **Secrets survive, vars do not.** `WASENDER_API_KEY`, `EMAIL_API_KEY` and the
 Telegram tokens live in a separate store that `wrangler deploy` does not touch,
@@ -430,18 +430,49 @@ store it lives in.
 `emailOtp` needs **both** halves: `EMAIL_API_KEY` (a secret, survived) **and**
 `EMAIL_FROM` (a var, blanked). One of the two being wiped is enough.
 
-### The fix is one deployer
+### The fix, and the half of it that was wrong at first
 
-Disconnect the Git integration in Cloudflare — **Workers & Pages →
-`levonis-staging` → Settings → Builds** — and deploy through workflow 7, which
-reads the running Worker first and refuses outright if that read fails. This is
-the whole reason workflow 7's header says `wrangler deploy` replaces vars
-wholesale: the file was written against this exact failure, and the Git
-integration walks into it from the other side.
+**`keep_vars: true` alone does not fix this, and believing it did cost a fourth
+outage.** It was set at 04:19; the deploy at 13:12 carried it and blanked the
+vars anyway. Wrangler's own schema says what it actually does:
 
-The alternative is committing the real values into `wrangler.jsonc`. The Google
-client id is public by construction and `APP_ORIGIN` / `STORE_ROOT_DOMAIN` are
-the shop's own domain, so that would work — but it puts the owner's
+> If you want to keep your dashboard vars when wrangler deploys, set this field
+> to true.
+
+It keeps the vars wrangler is **not given**. A var declared `""` in
+`wrangler.jsonc` **is** given — so it is deployed, and it replaces the live
+value with nothing. `keep_vars` never applied to those names at all.
+
+So the rule has two halves and needs both:
+
+1. **`keep_vars: true`** (top of `wrangler.jsonc`) — a deploy can no longer
+   erase a var by **omission**.
+2. **`wrangler.jsonc` names nothing it cannot fill** — so a deploy can no longer
+   erase one by **declaration** either. Every name that used to sit at `""` is
+   gone from all three blocks, and `tests/deployVarsSurvive.test.ts` fails if one
+   comes back.
+
+Behind both, `scripts/lib/preserve-vars.mjs` drops any name that still resolves
+to empty before wrangler sees it, and workflow 7 no longer carries a live empty
+value forward as `--var NAME:`.
+
+One more thing this made clear: on the Workers Builds path the preservation
+read has **no credentials at all**. `liveVars` needs `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID`, and the Workers Builds container authenticates wrangler
+by its own means without exporting either, so the read returns `null` on *every*
+build — not occasionally. A guard that never runs is not a guard, which is why
+the protection had to move into the config itself.
+
+**Disconnecting the Git integration is still the cleanest answer** — Cloudflare
+dashboard, **Workers & Pages → `levonis-staging` → Settings → Builds** — leaving
+workflow 7 as the only deployer. It reads the running Worker first and refuses
+outright if that read fails. The two halves above mean it is no longer required
+to keep the shop's sign-in methods on, but one deployer is still one fewer thing
+that can surprise anyone.
+
+The other alternative is committing the real values into `wrangler.jsonc`. The
+Google client id is public by construction and `APP_ORIGIN` / `STORE_ROOT_DOMAIN`
+are the shop's own domain, so that would work — but it puts the owner's
 configuration in the repository, which is the owner's decision and not a default
 this repo takes on its own.
 
