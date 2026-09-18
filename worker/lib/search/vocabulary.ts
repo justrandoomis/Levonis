@@ -47,6 +47,19 @@ export const SYNONYM_SEED: readonly SynonymSeed[] = [
   { term: 'طابعه', canonical: 'printer' },
   { term: 'طابعات', canonical: 'printer' },
   { term: 'طباعه', canonical: 'printer' },
+  /**
+   * «طبعات» AND «طبعه» — «طابعات» and «طابعه» with the alif dropped, which is
+   * how the word is actually typed in a hurry, and the owner's own example.
+   *
+   * They are here rather than left to the typo pass because the typo pass
+   * cannot reach them: the candidate vocabulary is fetched by the token's first
+   * TWO characters, and «طب» is not «طا». A misspelling INSIDE the first two
+   * letters is invisible to a prefix scan however generous the edit budget is —
+   * which is precisely the case the owner's table exists to answer, one row at
+   * a time, without a deploy.
+   */
+  { term: 'طبعات', canonical: 'printer' },
+  { term: 'طبعه', canonical: 'printer' },
   { term: 'برنتر', canonical: 'printer' },
   { term: 'چاپکەر', canonical: 'printer' },
   { term: 'چاپکەرەکان', canonical: 'printer' },

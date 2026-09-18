@@ -40,7 +40,7 @@
 
 import { isUsefulToken, normalizeText, tokenize } from './normalize';
 import { bestMatches, candidatePrefix } from './match';
-import { collapseSpelledLetters, hasArabicScript, romanize } from './translit';
+import { collapseSpelledLetters, hasArabicScript, loneSpelledLetter, romanize } from './translit';
 
 /**
  * How much a token is worth, by where it was found.
@@ -147,6 +147,22 @@ export function expandQuery(raw: string, synonyms: ReadonlyMap<string, string>):
       if (isUsefulToken(collapsed)) lookup.add(collapsed);
       const viaSynonym = synonyms.get(collapsed);
       if (viaSynonym) lookup.add(viaSynonym);
+    }
+    /**
+     * A SINGLE spelled-out letter, which a run of three never sees. The owner
+     * types «اكس» on its own and means the X2D, and neither romanisation
+     * («اكس» → `aks`) nor the run collapser can reach it.
+     *
+     * The letter is added as a ONE-CHARACTER term on purpose, and it is the
+     * only place `isUsefulToken` is bypassed: `candidatePrefix` turns it into a
+     * one-character index range and `bestMatches` treats it as a prefix, so
+     * «اكس» lands on `x2d` and `x1c` — which is exactly what somebody saying
+     * "X" at a printer shop means. Only the letters that are not also Arabic
+     * words are allowed through; see `loneSpelledLetter`.
+     */
+    for (const token of literal) {
+      const letter = loneSpelledLetter(token);
+      if (letter) lookup.add(letter);
     }
   }
 

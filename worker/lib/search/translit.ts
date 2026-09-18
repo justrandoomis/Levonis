@@ -131,6 +131,31 @@ const SPELLED_LETTERS: Record<string, string> = {
 };
 
 /**
+ * The spelled letters that are SAFE TO READ AS A LETTER WHEN THEY STAND ALONE.
+ *
+ * Most of the table above is only safe inside a RUN, and that is not a detail:
+ * «ال» is the Arabic definite article, «في» is "in", «او» is "or", «ان» is
+ * "that", «ام» is "mother". Reading a lone «في» as the letter V would turn the
+ * commonest word in the language into a wildcard, and «ال» would match every
+ * product whose name contains an L.
+ *
+ * These are the ones that are not Arabic words at all — they exist only as
+ * somebody saying a Latin letter out loud. The owner's own example «اكس» is
+ * the reason this set exists: they type it alone and expect the X2D.
+ */
+const SAFE_ALONE = new Set(['اكس', 'دبليو', 'كيو', 'جاي', 'اتش', 'زد', 'بيي']);
+
+/**
+ * The single Latin letter this word spells, when the word can only be that —
+ * or null. One character, deliberately: the caller uses it as a PREFIX, so
+ * «اكس» reaches `x2d` and `x1c` without pretending to be a word of its own.
+ */
+export function loneSpelledLetter(token: string): string | null {
+  if (!SAFE_ALONE.has(token)) return null;
+  return SPELLED_LETTERS[token] ?? null;
+}
+
+/**
  * Collapse a run of spelled-out letters into the string they spell.
  *
  * «اكس تو دي» → "x2d". Only applied to a run of THREE OR MORE consecutive

@@ -91,6 +91,9 @@ one — the classic failure of a naive index, and the reason weights exist.
   → expand       synonyms  (بمبو → bambu)
                  romanise  (بمبو → bmbw)
                  collapse spelled-out Latin letters (اكس تو دي → x2d)
+                 a LONE spelled letter becomes a one-character prefix
+                   (اكس → x → x2d, x1c) — only for the words that are not
+                   also Arabic words, since «في» is "in" and «ال» is "the"
   → candidates   ONE indexed range scan per 2-char prefix
   → match        exact > prefix > bounded edit distance, over that set only
   → score        Σ (field weight × match quality), × coverage
@@ -121,6 +124,15 @@ what makes typo tolerance affordable at all.
 one edit apart and are a plastic and a filament changer. A shopper shown an AMS
 when they searched for ABS has been misled; being wrong is worse than finding
 nothing.
+
+A MISSPELLING INSIDE THE FIRST TWO LETTERS is not forgiven either, and that is
+a consequence of the cost model rather than an oversight. The candidate
+vocabulary is fetched by each query token's first two characters — that bound is
+what makes the fuzzy pass affordable — so «طبعات» never sees «طابعات», because
+«طب» is not «طا». Widening the scan to rescue it would mean reading a far larger
+slice of the vocabulary on *every* search. The owner's table answers it in one
+row instead (migration 0091 seeds «طبعات» and «طبعه»), which is what §7 means by
+the vocabulary being the owner's.
 
 And a query that matches nothing returns nothing. There is no substring
 fallback — one would quietly hand back whatever happened to contain the

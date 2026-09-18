@@ -107,9 +107,40 @@ test('«اكس تو دي» — the model spelled out letter by letter — finds 
   assert.equal(await first(raw, 'اكس تو دي'), 'p_x2d');
 });
 
+test('«اكس» ON ITS OWN reaches the X2D — one spelled letter, used as a prefix', async () => {
+  // The owner lists «اكس» beside «اكس تو دي». A run of three collapses to
+  // `x2d`; a lone letter has no run to collapse, and romanising «اكس» gives
+  // `aks`, nowhere near anything. It is expanded to the single character `x`
+  // and used as a PREFIX, which is what somebody saying "X" at a printer shop
+  // means.
+  const raw = await shop();
+  const got = await ids(raw, 'اكس');
+  assert.ok(got.includes('p_x2d'), '«اكس» must reach the X2D');
+  assert.ok(!got.includes('p_pla'), 'and must not drag the filament in with it');
+});
+
+test('A SPELLED LETTER THAT IS ALSO AN ARABIC WORD IS NOT READ AS A LETTER', async () => {
+  // «في» means "in" and «ال» is the definite article. Reading them as V and L
+  // would turn the two commonest words in the language into wildcards — which
+  // is the whole reason `loneSpelledLetter` has a list instead of using the
+  // spelled-letter table directly.
+  const { loneSpelledLetter } = await import('../worker/lib/search/translit');
+  for (const word of ['في', 'ال', 'او', 'ان', 'ام', 'تي', 'كي']) {
+    assert.equal(loneSpelledLetter(word), null, `${word} is an Arabic word, not a letter`);
+  }
+  assert.equal(loneSpelledLetter('اكس'), 'x');
+  assert.equal(loneSpelledLetter('دبليو'), 'w');
+});
+
 test('«طابعه» and «طبعات» find printers and not filament', async () => {
   const raw = await shop();
-  for (const q of ['طابعه', 'طابعات', 'طابعة']) {
+  // «طبعات» and «طبعه» are the same words with the alif dropped — how they are
+  // typed in a hurry, and two of the owner's own examples. They are SEEDED
+  // rather than forgiven, because the candidate vocabulary is fetched by the
+  // first two characters and «طب» is not «طا»: a misspelling inside the prefix
+  // is invisible to the fuzzy pass however generous its budget. See
+  // migrations/0091.
+  for (const q of ['طابعه', 'طابعات', 'طابعة', 'طبعات', 'طبعه']) {
     const got = await ids(raw, q);
     assert.ok(got.includes('p_x2d'), `${q} must reach the printers`);
     assert.ok(!got.includes('p_pla'), `${q} must not reach the filament`);
