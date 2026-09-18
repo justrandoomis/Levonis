@@ -20,12 +20,14 @@ import {
   getBotUsername,
   scrubTokens,
   sendToChat,
+  telegramCanDeliver,
   verifyOtp,
   maybeSendAuthChallengeOtp,
   botToken,
   OTP_PURPOSES,
   type OtpPurpose,
 } from '../lib/telegram';
+import { setPrimaryChannelStatements } from '../lib/channelReadiness';
 import {
   TOPIC_KEYS,
   adminBotConfigured,
@@ -166,7 +168,12 @@ telegramRoutes.post('/link/start', requireAuth, async (c) => {
     );
   }
 
-  if (!c.env.TELEGRAM_BOT_TOKEN) {
+  // ONE definition of "Telegram can deliver", shared with readiness, with the
+  // outbox's own send gate and with `channelsLive` (lib/telegram.ts). The bare
+  // `!c.env.TELEGRAM_BOT_TOKEN` that used to be here treated a whitespace-only
+  // secret as configured, so the activation sheet offered a button that led to
+  // a bot nothing could reach.
+  if (!telegramCanDeliver(c.env)) {
     throw unavailable('Telegram linking is not configured yet (TELEGRAM_BOT_TOKEN is unset)');
   }
   const botUsername = await getBotUsername(c.env);
@@ -329,6 +336,32 @@ telegramRoutes.post('/link/confirm', requireAuth, async (c) => {
     phone_masked: maskPhone(ch.phone_entered),
     telegram_user_id: ch.telegram_user_id,
   });
+
+  /**
+   * LINKING TELEGRAM IS AN EXPLICIT ACTIVATION, AND EXPLICIT ACTIVATION IS THE
+   * ONLY THING ALLOWED TO CHOOSE A PRIMARY CHANNEL.
+   *
+   * A person who has just walked through a deep link, shared their contact with
+   * the bot and confirmed it in this browser has told the shop, unambiguously,
+   * where they want to be reached. Nothing else in the system may write
+   * `is_primary` — in particular not `email_verified_at`, which is stamped in
+   * six places including the first Google sign-in and would otherwise make
+   * every Google account email-primary before it had opened a product page
+   * (see `setPrimaryChannelStatements`). This one write is what makes the
+   * owner's rule — «تيليغرام أولاً» — true for the great majority of customers,
+   * who will never open the notification settings screen at all.
+   *
+   * Written AFTER the link is committed and guarded on its own: the preference
+   * is a consequence of the link, never a condition of it. A failure here loses
+   * a default the person can still set by hand; undoing a verified link because
+   * a preference row would not write is not a trade worth making.
+   */
+  try {
+    await c.env.DB.batch(setPrimaryChannelStatements(c.env.DB, user.id, 'telegram'));
+  } catch (e) {
+    console.error('telegram link: primary channel not stored:', e instanceof Error ? e.message : String(e));
+  }
+
   c.executionCtx.waitUntil(sendToChat(c.env, ch.chat_id, TXT_LINKED_DONE, REMOVE_KEYBOARD).then(() => undefined));
 
   return c.json({ success: true, linked: true, phone_masked: maskPhone(ch.phone_entered), verified_at: now });
@@ -585,7 +618,10 @@ telegramRoutes.post('/admin/set-webhook', requireAdmin, async (c) => {
   }
 
   const missing: string[] = [];
-  if (!c.env.TELEGRAM_BOT_TOKEN) missing.push('TELEGRAM_BOT_TOKEN');
+  // Same predicate as the linking gate above, so a whitespace-only secret is
+  // reported as missing here rather than passing this check and failing at the
+  // Telegram API with a 401 nobody reads.
+  if (!telegramCanDeliver(c.env)) missing.push('TELEGRAM_BOT_TOKEN');
   if (!c.env.TELEGRAM_WEBHOOK_SECRET) missing.push('TELEGRAM_WEBHOOK_SECRET');
   if (!c.env.APP_ORIGIN) missing.push('APP_ORIGIN');
   if (missing.length) {
@@ -635,7 +671,7 @@ telegramRoutes.post('/admin/set-webhook', requireAdmin, async (c) => {
 
 telegramRoutes.get('/admin/webhook-info', requireAdmin, async (c) => {
   await rateLimit(c, 'tg-webhook-info', 30, 3600);
-  if (!c.env.TELEGRAM_BOT_TOKEN) {
+  if (!telegramCanDeliver(c.env)) {
     throw unavailable('Telegram is not configured (TELEGRAM_BOT_TOKEN is unset)');
   }
   let info: Record<string, unknown> | null = null;

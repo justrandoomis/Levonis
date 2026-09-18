@@ -19,6 +19,7 @@ import type { SupportGiftReconciliation } from './membershipOps';
 import { sweepBnplOverdue, type BnplOverdueReport } from './bnpl';
 import { sweepAutomaticReviews, type AutomaticReviewSweepReport } from './reviewAutoSweep';
 import { sweepCancelledOrders, type CancelledOrderSweepReport } from './orderDeletion';
+import { sweepStockAlerts, type StockAlertSweepReport } from './stockAlerts';
 import { planSearchIndex, searchIndexInstalled } from './search/store';
 import { toSearchDoc } from './search/document';
 
@@ -96,6 +97,21 @@ export interface DurableJobsReport {
   bnpl_overdue: BnplOverdueReport;
   /** Seven-day system ratings; these never create reward records. */
   automatic_reviews: AutomaticReviewSweepReport;
+  /**
+   * «خبرني لما يرجع» — the back-in-stock sweep (0092). This is the ONLY thing
+   * that answers a customer's standing restock request: availability rises
+   * about sixteen ways in this catalogue and only five of them write to
+   * `inventory_ledger`, so there is no write path to hang it on that would not
+   * silently miss most of them (worker/lib/stockAlerts.ts states each one).
+   */
+  stock_alerts: StockAlertSweepReport;
+  /**
+   * The SECOND outbox drain, at the very end of the run. Reported separately
+   * from `outbox` above so an operator can see whether a match found this run
+   * was also delivered this run, rather than having the two drains add up into
+   * one number that answers neither question.
+   */
+  outbox_final: { sent: number; failed: number };
   errors: string[];
 }
 
@@ -128,6 +144,8 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     delivery_sync: { configured: false, scanned: 0, moved: 0, unmapped: 0, errors: 0 },
     bnpl_overdue: { scanned: 0, overdue: 0, suspended: 0 },
     automatic_reviews: { scanned: 0, created: 0, skipped: 0 },
+    stock_alerts: { scanned: 0, matched: 0, notified: 0, dead: 0, deferred: 0 },
+    outbox_final: { sent: 0, failed: 0 },
     errors: [],
   };
 
@@ -384,6 +402,28 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     report.cancelled_order_retention = await sweepCancelledOrders(env.DB, nowIso, 30, 100);
   });
 
+  /**
+   * 11d. «خبرني لما يرجع» — answer the standing restock requests (0092).
+   *
+   * PLACED HERE, AFTER THE EXPIRY SWEEP, ON PURPOSE. Step 11b releases the
+   * units an abandoned checkout was holding, and a release raises availability
+   * through `stock_reserved` without touching `stock` at all — one of the
+   * paths a ledger hook would never see. Running the alert sweep after it in
+   * the SAME tick means a customer whose colour came back because somebody
+   * else's basket timed out is told this run rather than next.
+   *
+   * The two bounds are different questions and are sized differently. 200 alert
+   * rows is the write/notify budget; 60 products is the CATALOGUE budget, and
+   * it is the smaller of the two because `loadAlertContexts` is seven chunked
+   * reads plus the mystery-pool membership read per pass — flat in N, but the
+   * rows it pulls back are not. Rows whose product misses the product budget
+   * keep their old `last_checked_at` and sort to the front of the next pass, so
+   * bounding costs latency and never coverage.
+   */
+  await step('stock_alerts', async () => {
+    report.stock_alerts = await sweepStockAlerts(env, 60, 200);
+  });
+
   // 12. Ask the local courier what happened to the shipments we handed them.
   //     Skipped entirely, and reported as unconfigured rather than as an
   //     error, when the credentials are not set — an unconfigured courier is
@@ -407,6 +447,35 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   //     seven days without a customer review. It never enters reward logic.
   await step('automatic_reviews', async () => {
     report.automatic_reviews = await sweepAutomaticReviews(env.DB, nowIso, 200);
+  });
+
+  /**
+   * 15. DRAIN THE OUTBOX AGAIN, LAST.
+   *
+   * WHY A SECOND DRAIN AND NOT A BIGGER FIRST ONE. Step 1 runs EARLY — it is
+   * the first thing after the event pump, and deliberately so: rows enqueued by
+   * REQUESTS since the last tick have been waiting up to fifteen minutes and go
+   * out before this run does anything else. But every step after it that
+   * enqueues — the wallet notifications, the stage promotions, and now the
+   * stock alerts — writes rows the early drain has already walked past. Without
+   * a second drain a restock matched at step 11d waits for the NEXT tick, and
+   * the cron fires every fifteen minutes, so the shopper's «رجع!» takes up to half an hour to
+   * arrive for a fact the shop knew in the first minute. This is the same
+   * shape, and the same reason, as the event pump running first and event
+   * retention second.
+   *
+   * AND WHY IT IS BOUNDED RATHER THAN RAISED. `processOutbox` is strict FIFO
+   * over one table shared with order invoices and OTP references. A single
+   * popular restock with three hundred subscribers puts three hundred alert
+   * rows into that queue; raising step 1's limit to swallow them would make
+   * EVERY tick pay for the worst case, and would still leave the next order's
+   * invoice queued behind three hundred alert messages. A separate bounded
+   * drain keeps the normal path's latency where it was and lets a large
+   * fan-out spill across a few ticks — which is the right trade for a message
+   * that says "it is back" and the wrong one for a receipt.
+   */
+  await step('outbox_final', async () => {
+    report.outbox_final = await processOutbox(env, 25);
   });
 
   return report;

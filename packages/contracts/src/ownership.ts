@@ -106,6 +106,21 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // first bot's, so they cannot share one).
     'telegram_admin_config', 'telegram_admin_topics', 'telegram_admin_updates',
     'notify_deliveries',
+    // 0092 — «أبلغني عند التوفر». Which channels a customer wants, and the
+    // standing requests the back-in-stock sweep answers.
+    //
+    // `product_stock_alerts` NAMES A CATALOGUE ROW, so it looks like it belongs
+    // to Catalogue, and it is a per-customer wish about a product, so it looks
+    // like `favorites` under Identity. It is neither, and the tie-break is this
+    // file's own rule: ownership follows THE WRITER. Nobody but the customer
+    // ever changes a `favorites` row; a stock alert has a state machine
+    // (armed → firing → notified, re-armed when the outbox row dies) that is
+    // driven entirely by `lib/stockAlerts.ts` and settled against `outbox.state`
+    // — both of which are here. Filing it anywhere else would mean the
+    // Notifications service mutating a table it does not own on every cron tick.
+    // Catalogue stays the authority on AVAILABILITY, which the sweep reads
+    // through `saleAvailability` and never re-derives.
+    'product_stock_alerts', 'user_notification_channels',
     // `notify_outbox` is the service's own copy of the legacy `outbox` SHAPE
     // (`02-MIGRATION-PLAN.md` 1.7), column for column, so the monolith's rows
     // can be copied into the Notifications database in Phase 3 without a

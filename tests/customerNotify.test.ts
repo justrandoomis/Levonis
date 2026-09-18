@@ -366,15 +366,33 @@ test('DELIVERY — a 429 stays RETRYABLE, because a burst is the ordinary case o
   }
 });
 
-test('DELIVERY — with no WASENDER_API_KEY the row dies honestly instead of retrying forever', async () => {
+test('DELIVERY — with no WASENDER_API_KEY the row is refused BEFORE it is queued, naming why', async () => {
+  // THIS USED TO ASSERT 'dead', AND THE CHANGE IS THE POINT.
+  //
+  // The old shape enqueued a pending row on a deployment that has no WhatsApp
+  // at all, let processOutbox discover that at send time, and only then marked
+  // it dead. For fifteen minutes the row read as queued, and the shop had told
+  // the customer something it could never do — which is exactly the lie the
+  // «أبلغني عند التوفر» sheet must not repeat when it names a channel.
+  //
+  // notifyCustomer now consults the DEPLOYMENT half before enqueuing, so the
+  // row is born 'skipped': recorded, never queued, never retried. What did not
+  // change is the sentence. `last_error` still carries the same bare code the
+  // send path would have written, so ONE query over the outbox answers «ليش ما
+  // وصلت؟» whichever path noticed.
   const raw = freshDb();
   seedUser(raw, { verified: false, chat: null });
   const e = env(raw, { WASENDER_API_KEY: '' });
   await notifyCustomer(e, 'u_1', 'order.placed:ORD-12', MSG);
+  const before = rows(raw)[0];
+  assert.equal(before.state, 'skipped', 'refused at the door, not queued and then killed');
+  assert.equal(before.last_error, 'WHATSAPP_NOT_CONFIGURED');
+
+  // And a drain does not resurrect it or spend an attempt on it.
   await processOutbox(e, 10);
-  const r = rows(raw)[0];
-  assert.equal(r.state, 'dead');
-  assert.equal(r.last_error, 'WHATSAPP_NOT_CONFIGURED');
+  const after = rows(raw)[0];
+  assert.equal(after.state, 'skipped');
+  assert.equal(after.attempts, 0, 'a channel the deployment does not have costs no attempts');
 });
 
 test('DELIVERY — the email staging allowlist does not silence WhatsApp', async () => {

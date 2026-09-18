@@ -33,6 +33,7 @@ import { adminProductRelationsRoutes } from './routes/adminProductRelations';
 import { adminPriceGridRoutes } from './routes/adminPriceGrid';
 import { printRequestRoutes } from './routes/printRequests';
 import { notificationRoutes } from './routes/notifications';
+import { stockAlertRoutes } from './routes/stockAlerts';
 import { merchantPrinterRoutes } from './routes/merchantPrinters';
 import { printQuoteRoutes } from './routes/printQuote';
 import { membershipsRoutes } from './routes/memberships';
@@ -267,6 +268,13 @@ app.route('/api/marketplace', marketplaceRoutes);
 // The in-app notification inbox. General, not print-specific: it is what was
 // missing when a merchant needed to be told a matching request had been posted.
 app.route('/api/notifications', notificationRoutes);
+// «خبرني لما يرجع» — the customer's standing restock requests (0092). Its own
+// prefix rather than a branch of /api/products, and mounted on every host: the
+// shopper arms the alert from the product page wherever that page is served,
+// and the shared parent-domain cookie carries their session there. Every route
+// inside is behind its own requireAuth — a standing request belongs to an
+// account, never to a browser.
+app.route('/api/stock-alerts', stockAlertRoutes);
 // Checkout for merchant store products — the other merchant commerce path.
 app.route('/api/store-orders', storeOrderRoutes);
 // Customer-side reviews and store follows.

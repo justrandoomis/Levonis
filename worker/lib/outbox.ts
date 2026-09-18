@@ -9,7 +9,9 @@
 
 import type { Env } from './types';
 import { newId } from './crypto';
+import { clearSessionOutage, recordSessionOutage } from './channelReadiness';
 import { emailConfigured, emailAllowsRecipient, sendEmailNow } from './emailSend';
+import { telegramCanDeliver } from './telegram';
 import { sendWhatsAppText, wasenderConfigured, whatsappErrorIsRetryable } from './wasender';
 
 export interface OutboxEmail {
@@ -71,6 +73,59 @@ export async function enqueue(
 }
 
 /**
+ * The same enqueue, as a STATEMENT the caller batches — and the reason it is
+ * `ON CONFLICT DO NOTHING` rather than a plain INSERT.
+ *
+ * A sweep that notifies a customer has three writes that belong together: the
+ * outbox rows, the in-app row, and the state flip that stops the next tick
+ * doing it all again. `db.batch` is one transaction, which is exactly what
+ * makes them safe — and exactly what breaks `enqueue()` above.
+ *
+ * `enqueue()`'s replay-safety is a try/catch around `.run()` that inspects the
+ * error message for 'UNIQUE'. INSIDE a batch there is no such catch: a
+ * collision on the unique `event_key` aborts the WHOLE batch, rolling back the
+ * notification AND the state flip. The next sweep then builds the identical
+ * batch, hits the identical collision, and fails identically — for ever. The
+ * atomicity would destroy the idempotency it was added to protect.
+ *
+ * So the conflict is handled by the DATABASE, in the statement: a replay is a
+ * zero-row no-op that leaves the rest of the batch to commit. `meta.changes`
+ * on the result tells the caller whether this particular row was new.
+ */
+export interface OutboxStatement {
+  id: string;
+  event_key: string;
+  stmt: D1PreparedStatement;
+}
+
+export function enqueueStatement(
+  db: D1Database,
+  eventKey: string,
+  message: OutboxMessage,
+  opts: { state?: 'pending' | 'skipped'; note?: string } = {}
+): OutboxStatement {
+  const id = newId('obx');
+  const recipient =
+    message.kind === 'email' || message.kind === 'whatsapp' ? message.to : String(message.chat_id);
+  const stmt = db
+    .prepare(
+      `INSERT INTO outbox (id, kind, event_key, recipient, payload, state, last_error)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(event_key) DO NOTHING`
+    )
+    .bind(
+      id,
+      message.kind,
+      eventKey,
+      recipient,
+      JSON.stringify(message),
+      opts.state ?? 'pending',
+      (opts.note ?? '').slice(0, 500)
+    );
+  return { id, event_key: eventKey, stmt };
+}
+
+/**
  * The staging guard. An empty allowlist normally means "everyone" — the live
  * Worker has to be able to mail real customers — but a deployment that must
  * NOT reach a real address (the dark core) sets `EMAIL_ALLOWLIST_REQUIRED=on`,
@@ -81,6 +136,73 @@ export async function enqueue(
 function allowedRecipient(env: Env, kind: string, recipient: string): boolean {
   if (kind !== 'email') return true;
   return emailAllowsRecipient(env, recipient);
+}
+
+/**
+ * A 403 FROM sendMessage IS THE END OF A BINDING, NOT A BAD MINUTE.
+ *
+ * Telegram answers 403 "Forbidden: bot was blocked by the user" (also "user is
+ * deactivated", "bot was kicked") when the recipient has ended the
+ * conversation. Nothing about that changes in five minutes, and the old code
+ * returned the bare string `telegram <status>`, which the terminal test in
+ * processOutbox never matched: the row burned all five attempts and landed
+ * dead with nothing anywhere recording that the binding is gone. The shopper
+ * went on being told "we will message you on Telegram" for ever.
+ *
+ * So 403 is TERMINAL the way a WhatsApp REJECTED already is, and it REVOKES
+ * the link (below) — which is what finally gives readiness a falsifiable
+ * column to read instead of the constant-true `revoked_at IS NULL` filter that
+ * six queries have been applying to a column nothing ever wrote.
+ *
+ * 400 is terminal too (a malformed payload does not improve on retry) but only
+ * revokes when the description says the CHAT is gone rather than the message.
+ * 429 and 5xx stay retryable: those are the outages the outbox exists for.
+ */
+function classifyTelegramFailure(status: number, body: string): { terminal: boolean; revoke: boolean } {
+  const lowered = body.toLowerCase();
+  if (status === 403) return { terminal: true, revoke: true };
+  if (status === 400) {
+    const gone =
+      lowered.includes('chat not found') ||
+      lowered.includes('user is deactivated') ||
+      lowered.includes('peer_id_invalid');
+    return { terminal: true, revoke: gone };
+  }
+  return { terminal: false, revoke: false };
+}
+
+/**
+ * Write the column six queries already read.
+ *
+ * CONSEQUENCE, STATED ON PURPOSE: a revoked link also stops Telegram OTP
+ * sign-in for that account (`sendOtp` filters on `revoked_at IS NULL`). That
+ * is the honest outcome, not a regression — a bot the user has blocked cannot
+ * deliver a code either, and today that path fails at SEND_FAILED after
+ * pretending it might work. Re-linking clears it: `/api/telegram/link/confirm`
+ * upserts with `revoked_at = NULL`.
+ *
+ * Keyed on chat_id because that is what the outbox payload carries, and never
+ * throws: this is bookkeeping beside a delivery that has already failed.
+ */
+async function revokeTelegramBinding(env: Env, chatId: number | string, reason: string): Promise<void> {
+  const id = typeof chatId === 'number' ? chatId : Number(String(chatId).trim());
+  // chat_id is INTEGER in SQLite; binding a non-numeric string would silently
+  // match nothing and look like a successful revoke.
+  if (!Number.isFinite(id)) return;
+  try {
+    const res = await env.DB.prepare(
+      `UPDATE telegram_links SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        WHERE chat_id = ? AND revoked_at IS NULL`
+    )
+      .bind(id)
+      .run();
+    if ((res.meta.changes ?? 0) > 0) {
+      // No chat id in the log line — it identifies a person.
+      console.warn(`outbox: telegram binding revoked after ${reason}`);
+    }
+  } catch (e) {
+    console.error('outbox: telegram revoke failed:', e instanceof Error ? e.message : String(e));
+  }
 }
 
 async function deliver(env: Env, payload: OutboxMessage, eventKey: string): Promise<{ ok: boolean; error?: string }> {
@@ -98,21 +220,46 @@ async function deliver(env: Env, payload: OutboxMessage, eventKey: string): Prom
   if (payload.kind === 'whatsapp') {
     if (!wasenderConfigured(env)) return { ok: false, error: 'WHATSAPP_NOT_CONFIGURED' };
     const sent = await sendWhatsAppText(env, payload.to, payload.text);
-    if (sent.ok) return { ok: true };
+    if (sent.ok) {
+      // A message the shop's phone actually sent is the strongest available
+      // proof that the session is linked RIGHT NOW — stronger than the status
+      // endpoint and free. Clearing here instead of waiting for a probe is
+      // what stops WhatsApp staying hidden from every shopper for up to a
+      // full cron period after an operator reconnects the phone.
+      await clearSessionOutage(env);
+      return { ok: true };
+    }
+    if (sent.error === 'SESSION_NOT_CONNECTED' || sent.error === 'UNAUTHORIZED') {
+      // The API key is valid and the account is still logged out (or the
+      // subscription lapsed). Only the provider can tell us this, and this is
+      // the one place in the system it says so without us paying for a probe,
+      // so the answer is cached for readiness to read on a shopper request.
+      await recordSessionOutage(env, sent.error);
+    }
     // A terminal failure (a number that is not on WhatsApp, a malformed
     // payload) must not burn four more attempts and four more rate-limit
     // slots — the prefix is what processOutbox reads to kill the row.
     const prefix = whatsappErrorIsRetryable(sent.error) ? '' : 'TERMINAL ';
     return { ok: false, error: `${prefix}whatsapp ${sent.error}${sent.detail ? `: ${sent.detail}` : ''}` };
   }
-  if (!env.TELEGRAM_BOT_TOKEN) return { ok: false, error: 'TELEGRAM_NOT_CONFIGURED' };
+  // ONE definition of "Telegram can deliver", shared with readiness and with
+  // the activation gate — see lib/telegram.ts. The bare `!env.TELEGRAM_BOT_TOKEN`
+  // that used to be here was the third of five disagreeing opinions.
+  if (!telegramCanDeliver(env)) return { ok: false, error: 'TELEGRAM_NOT_CONFIGURED' };
   const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: payload.chat_id, text: payload.text.slice(0, 4000), disable_web_page_preview: true }),
   });
-  if (!res.ok) return { ok: false, error: `telegram ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}` };
-  return { ok: true };
+  if (res.ok) return { ok: true };
+
+  const body = (await res.text().catch(() => '')).slice(0, 200);
+  const { terminal, revoke } = classifyTelegramFailure(res.status, body);
+  if (revoke) await revokeTelegramBinding(env, payload.chat_id, `telegram ${res.status}`);
+  // The 'TERMINAL ' prefix is the same contract WhatsApp already uses, and the
+  // same one processOutbox reads to kill the row instead of retrying a
+  // conversation that no longer exists.
+  return { ok: false, error: `${terminal ? 'TERMINAL ' : ''}telegram ${res.status}: ${body}` };
 }
 
 /**

@@ -51,6 +51,36 @@ export function telegramConfigured(env: Env): boolean {
 }
 
 /**
+ * CAN THIS DEPLOYMENT PUSH A MESSAGE TO A CUSTOMER'S PRIVATE CHAT?
+ *
+ * ONE answer, because there were five and they disagreed with each other:
+ *
+ *  - `telegramConfigured()` above is token AND `TELEGRAM_ADMIN_CHAT_ID`. That
+ *    is the ADMIN channel's question. A deployment that never bound an admin
+ *    chat can DM a linked customer perfectly well, so using it as the customer
+ *    test hides a channel that works.
+ *  - `getBotUsername()` is a live `getMe` behind two caches. It answers "can
+ *    somebody START a link", because a deep link needs a real @username — it
+ *    costs a subrequest and it can be null while sending to an ALREADY linked
+ *    chat succeeds, so it is the wrong gate for delivery and the right one for
+ *    activation.
+ *  - a bare `!env.TELEGRAM_BOT_TOKEN` in `lib/outbox.ts`, and another in
+ *    `routes/telegram.ts`: the same idea retyped, and neither of them trimmed.
+ *
+ * DELIVERY needs the customer bot token and nothing else, present and
+ * non-blank — a whitespace secret is not a secret. That is the `EMAIL_FROM`
+ * lesson from `lib/emailSend.ts`, where a single space made the UI say mail
+ * was off while every send POSTed a blank `from` for a provider 422.
+ *
+ * ACTIVATION stays `getBotUsername()`, because that is the predicate
+ * `POST /api/telegram/link/start` actually enforces before it hands out a deep
+ * link. Anything that offers a link button on a weaker test is offering a 503.
+ */
+export function telegramCanDeliver(env: Env): boolean {
+  return (env.TELEGRAM_BOT_TOKEN || '').trim().length > 0;
+}
+
+/**
  * REPLACED BY THE TOPIC ROUTER (0080). What used to be `notifyAdmins(env, text)`
  * — one hard-coded chat, one bot, no topic — is now
  * `notifyAdminTopic(env, topic, text)` in worker/lib/telegramAdmin.ts, which
