@@ -284,12 +284,15 @@ export interface ApiUser {
 
 export interface ApiProduct {
   /**
-   * The product's main section and brand — two ids the card projection keeps
-   * so the «مختارات لك» tile can rank against what this browser has recently
-   * opened, without any of it leaving the device. See src/lib/recentlyViewed.ts.
-   * Optional: a locked composition card carries neither.
+   * The product's main section, sub-section and brand — three ids the card
+   * projection keeps so the «مختارات لك» tile can rank against what this
+   * browser has recently opened, without any of it leaving the device
+   * (src/lib/recentlyViewed.ts), and so the category rails can borrow a real
+   * product photo for a sub-section (`catalogs` has no image column).
+   * Optional: a locked composition card carries none of them.
    */
   category_id?: string | null;
+  sub_category_id?: string | null;
   brand_id?: string | null;
   id: string;
   slug: string;
@@ -1128,6 +1131,38 @@ export interface HomeTaxon {
    * level, which is a different thing from having no products.
    */
   children?: HomeTaxon[];
+}
+
+/**
+ * The catalog a product listing was filtered by, as GET /api/products
+ * resolves it.
+ *
+ * Deliberately NOT `HomeTaxon`: that type carries `product_count`, a
+ * descendant-inclusive roll-up the home tree computes. This is one
+ * primary-key probe and knows no count, and a zero there would read as a
+ * number rather than as an absence.
+ *
+ * CATEGORY names ARE localized — `loc(name_ar, name_en, name_ckb)` — unlike
+ * PRODUCT names, which are English in every language and never translated.
+ */
+export interface ResolvedCategory {
+  id: string;
+  slug: string;
+  name_ar: string;
+  name_en: string;
+  name_ckb: string;
+}
+
+/**
+ * The listing envelope. `category` is ABSENT when the request carried no
+ * category filter, and explicitly `null` when it carried one that names no
+ * catalog — which includes the supported legacy case of a free-text
+ * `products.subcategory_id` token with real products behind it. The heading
+ * renders those two facts differently, which is why they are two facts.
+ */
+export interface ProductsListResponse {
+  products: ApiProduct[];
+  category?: ResolvedCategory | null;
 }
 
 /**

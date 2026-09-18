@@ -299,7 +299,14 @@ export default function Home() {
                   items={itemsFor('categories')}
                 />
               ) : (
-                <CategoryBoard key="categories" categories={categories} />
+                // The covers are borrowed from products this page has
+                // already fetched — no second request, and a section with no
+                // product on screen simply shows its monogram.
+                <CategoryBoard
+                  key="categories"
+                  categories={categories}
+                  products={[...newProducts, ...discountedProducts, ...openBox]}
+                />
               )
             ) : null,
           },

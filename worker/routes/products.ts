@@ -2482,6 +2482,22 @@ const CARD_FIELDS = [
    * guide and three languages of description riding on every tile.
    */
   'category_id',
+  /**
+   * The SECOND consumer, and the reason this one joined the projection: the
+   * category rails on the home page key a representative photo off the
+   * sub-section a product is filed under. `catalogs` has no image column and
+   * never has had, so the alternative to this id was a monogram on every
+   * card or a second query per section.
+   *
+   * WHAT IT DOES NOT PROMISE. This is the CLASSIFICATION column, while a
+   * section's `product_count` rolls up through the union of classification
+   * and `product_catalogs` across every descendant
+   * (worker/lib/catalogMembership.ts). A sub-section can therefore truthfully
+   * say «4 منتجات» and still have no product here to take a picture from. The
+   * card is built to be correct with no picture; the count and the artwork
+   * are allowed to disagree.
+   */
+  'sub_category_id',
   'brand_id',
 ] as const;
 
@@ -2566,6 +2582,22 @@ productRoutes.get('/print-calculator', async (c) => {
   });
 });
 
+/**
+ * The catalog a listing was filtered by, as this endpoint resolves it.
+ *
+ * Deliberately NOT the home page's `HomeTaxon`: that type carries a
+ * descendant-inclusive `product_count` computed by the home tree's counting
+ * CTE, and this is one primary-key probe that knows no count. A zero there
+ * would be read as a number rather than as an absence.
+ */
+interface ResolvedCategoryRow {
+  id: string;
+  slug: string;
+  name_ar: string;
+  name_en: string;
+  name_ckb: string;
+}
+
 productRoutes.get('/', async (c) => {
   const q = c.req.query();
   const search = str(q.search, 'search', { max: 100, required: false });
@@ -2573,6 +2605,58 @@ productRoutes.get('/', async (c) => {
   const type = str(q.type, 'type', { max: 20, required: false }); // 'bundle' | 'discounted' | 'featured'
   const limit = int(q.limit, 'limit', { min: 1, max: 50, def: 20 });
   const offset = int(q.offset, 'offset', { min: 0, max: 10_000, def: 0 });
+
+  /**
+   * WHAT THE CUSTOMER IS LOOKING AT, NOT WHICH ROW WE FILTERED ON.
+   *
+   * The storefront heading read «الفئة: cat_printers_fdm» — the owner reported
+   * it from their phone, with a screenshot. The page had no honest
+   * alternative: this listing echoed nothing about the category, so the only
+   * string it could print was the URL parameter.
+   *
+   * WHY THE CLIENT CANNOT LOOK IT UP ITSELF. The only public source of catalog
+   * names is /api/home's tree, and that tree is deliberately partial —
+   * `homeCategoryTree` caps at 12 roots and 8 children, drops every catalog
+   * whose roll-up count is zero, excludes inactive ones and dedupes by display
+   * name (worker/lib/catalogMembership.ts). A perfectly valid deep link can
+   * therefore name a catalog that list does not contain, and a client-side
+   * lookup would be right most of the time and silently wrong on exactly the
+   * links nobody tests.
+   *
+   * WHY IT IS RESOLVED HERE, twenty lines early. The search branch below
+   * returns from inside itself when the index matches nothing, long before the
+   * category clause. Resolving at the bottom would answer a
+   * `?search=…&category=…` request with the field missing — a fix that works
+   * on three links out of four is the kind that gets reported again.
+   *
+   * ONE PROBE ON A PRIMARY KEY (or on the UNIQUE `slug`) returning one short
+   * row is the whole cost. `active` is deliberately NOT filtered:
+   * `catalogSubtreeFilter` does not check it either, so a deactivated catalog
+   * still lists its products, and an unnamed heading over a full grid is worse
+   * than the name.
+   */
+  let categoryRef: ResolvedCategoryRow | null = null;
+  if (category) {
+    categoryRef =
+      (await c.env.DB.prepare(
+        // `id` first in the tiebreak: the id is the identifier this API
+        // documents, and accepting the slug as well is what makes a
+        // hand-typed /products?category=fdm-printers work.
+        'SELECT id, slug, name_ar, name_en, name_ckb FROM catalogs WHERE id = ?1 OR slug = ?1 ORDER BY (id = ?1) DESC LIMIT 1'
+      )
+        .bind(category)
+        .first<ResolvedCategoryRow>()) ?? null;
+  }
+  /**
+   * ABSENT vs NULL, because they are different facts and the heading renders
+   * them differently: no key at all means "no filter was applied", and an
+   * explicit null means "a filter was applied and it names no catalog we can
+   * put a word to". The second is a SUPPORTED live state, not an error —
+   * `products.subcategory_id` still holds free-text tokens from before the
+   * taxonomy existed, and tests/homeCategories.test.ts pins that those rows
+   * keep listing.
+   */
+  const categoryField = category ? { category: categoryRef } : {};
 
   let sql = "SELECT * FROM products WHERE status = 'active'";
   const params: unknown[] = [];
@@ -2619,7 +2703,8 @@ productRoutes.get('/', async (c) => {
       const like = likePattern(search);
       params.push(like, like, like, like);
     } else if (hits.ids.length === 0) {
-      return c.json({ success: true, products: [] });
+      // The category block rides this exit as well — see the note above.
+      return c.json({ success: true, products: [], ...categoryField });
     } else {
       searchOrder = hits.ids;
       sql += ` AND id IN (${hits.ids.map(() => '?').join(',')})`;
@@ -2638,7 +2723,15 @@ productRoutes.get('/', async (c) => {
      * because the products are classified under "FDM Printers" and the
      * placement table was empty. See worker/lib/catalogMembership.ts.
      */
-    const subtree = catalogSubtreeFilter(category, 'products');
+    /**
+     * The RESOLVED id when the parameter named a catalog, the parameter itself
+     * when it did not. The fallback is not padding: a pre-taxonomy free-text
+     * `products.subcategory_id` token has no `catalogs` row at all and those
+     * products must keep listing. Binding the resolved id is also what makes
+     * accepting a SLUG safe — otherwise the slug would name a heading over a
+     * grid the subtree filter left empty.
+     */
+    const subtree = catalogSubtreeFilter(categoryRef?.id ?? category, 'products');
     sql += ` AND ${subtree.sql}`;
     params.push(...subtree.params);
   }
@@ -2732,6 +2825,7 @@ productRoutes.get('/', async (c) => {
     : new Map<string, ResolvedBundle>();
   return c.json({
     success: true,
+    ...categoryField,
     products: results.map((p) => {
       const b = compositions.get(String(p.id));
       // A composition card has its own narrow shape, and a LOCKED one has its

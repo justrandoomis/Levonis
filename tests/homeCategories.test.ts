@@ -30,6 +30,8 @@ import {
   withClassificationPlacements,
 } from '../worker/lib/catalogMembership';
 import { printerProductIds } from '../worker/lib/printerIdentity';
+import { planSearchIndex } from '../worker/lib/search/store';
+import { toSearchDoc } from '../worker/lib/search/document';
 
 type Raw = ReturnType<typeof freshDb>;
 
@@ -179,6 +181,103 @@ test('the legacy free-text subcategory_id still matches — old rows keep workin
   ).run();
   const got = await json(await request(app(raw), '/api/products?category=legacy-token'));
   assert.deepEqual((got.products as { id: string }[]).map((p) => p.id), ['old']);
+});
+
+// =========================================================================
+// «الفئة: cat_printers_fdm» — THE HEADING THAT PRINTED THE URL PARAMETER
+// =========================================================================
+//
+// The owner tapped a sub-section and photographed what they got: the raw
+// catalog id where the section's name belongs. The page had no honest
+// alternative — this listing echoed nothing about the category it filtered
+// on, so the only string it held was the one in the URL.
+//
+// A client-side lookup could not have fixed it. The only public source of
+// catalog names is /api/home's tree, and that tree caps at 12 roots and 8
+// children, drops zero-count and inactive catalogs and dedupes by display
+// name (worker/lib/catalogMembership.ts) — so a perfectly valid deep link can
+// name a catalog that list does not contain, and the fix would have been
+// right most of the time and silently wrong on exactly the links nobody
+// tests.
+
+type CategoryBlock = { id: string; slug: string; name_ar: string; name_en: string; name_ckb: string } | null;
+
+test('a filtered listing names the category it filtered on, in every language the shop speaks', async () => {
+  const raw = freshDb();
+  fileProduct(raw, 'p1', 'X2D', 'cat_printers', 'cat_printers_fdm');
+
+  const got = await json(await request(app(raw), '/api/products?category=cat_printers_fdm'));
+  const block = got.category as CategoryBlock;
+  assert.ok(block, 'the listing must carry the resolved category');
+  assert.equal(block.id, 'cat_printers_fdm');
+  assert.ok(block.name_ar.trim().length > 0, 'the Arabic name is what the shop actually renders');
+  assert.ok(typeof block.slug === 'string' && block.slug.length > 0);
+  // The id must never be the thing shown. This is the whole defect.
+  assert.notEqual(block.name_ar, 'cat_printers_fdm');
+});
+
+test('NO category filter means the key is ABSENT, not null — they are different facts', async () => {
+  const raw = freshDb();
+  fileProduct(raw, 'p1', 'X2D', 'cat_printers', 'cat_printers_fdm');
+  const got = await json(await request(app(raw), '/api/products'));
+  assert.equal('category' in got, false, 'absent means "no filter was applied"');
+});
+
+test('a category that names no catalog resolves to NULL and still lists its products', async () => {
+  // Both halves in one assertion, because they are one case: the pre-taxonomy
+  // free-text token has real products behind it AND no `catalogs` row. A fix
+  // that treated null as an error would take those products off the screen.
+  const raw = freshDb();
+  raw.prepare(
+    `INSERT INTO products (id, slug, name, description, price_iqd, status, subcategory_id)
+     VALUES ('old', 'old', 'Old row', '', 1000, 'active', 'legacy-token')`
+  ).run();
+  const got = await json(await request(app(raw), '/api/products?category=legacy-token'));
+  assert.equal('category' in got, true, 'a filter WAS applied, so the key is present');
+  assert.equal(got.category, null, 'and explicitly null: there is nothing to name');
+  assert.deepEqual((got.products as { id: string }[]).map((p) => p.id), ['old'], 'the products still list');
+});
+
+test('a slug filters the same rows as the id — the heading and the grid cannot disagree', async () => {
+  const raw = freshDb();
+  fileProduct(raw, 'p1', 'X2D', 'cat_printers', 'cat_printers_fdm');
+  const slug = raw
+    .prepare('SELECT slug FROM catalogs WHERE id = ?')
+    .get('cat_printers_fdm') as { slug: string } | undefined;
+  assert.ok(slug?.slug, 'the seeded taxonomy gives this catalog a slug');
+
+  const byId = await json(await request(app(raw), '/api/products?category=cat_printers_fdm'));
+  const bySlug = await json(await request(app(raw), `/api/products?category=${encodeURIComponent(slug!.slug)}`));
+  assert.deepEqual(
+    (bySlug.products as { id: string }[]).map((p) => p.id),
+    (byId.products as { id: string }[]).map((p) => p.id),
+    'a slug must resolve to the id BEFORE the subtree filter runs, or it would name a heading over an empty grid'
+  );
+  assert.equal((bySlug.category as CategoryBlock)?.id, 'cat_printers_fdm');
+});
+
+test('a search that matches nothing STILL names the category — the early return carries it too', async () => {
+  // THE EXIT THIS TEST EXISTS FOR. When the search index is READY and matches
+  // nothing, the route returns from inside the search branch — nineteen lines
+  // above the category clause and a hundred above the main response. Emitting
+  // the category block only at the bottom would answer a ?search=&category=
+  // request with the field missing, and a fix that works on three links out of
+  // four is the kind that gets reported again.
+  //
+  // The index has to be REAL for that exit to be taken: an empty `search_tokens`
+  // means "cannot answer yet" and falls back to the LIKE scan, which leaves
+  // through the bottom like everything else. So one product is indexed first.
+  const raw = freshDb();
+  fileProduct(raw, 'p1', 'X2D', 'cat_printers', 'cat_printers_fdm');
+  const db = asD1(raw);
+  await db.batch(planSearchIndex(db, toSearchDoc({ id: 'p1', name: 'Bambu Lab X2D' })));
+
+  const got = await json(
+    await request(app(raw), '/api/products?search=zzzzzznothingmatchesthis&category=cat_printers_fdm')
+  );
+  assert.deepEqual(got.products, [], 'the index answered, and its answer was nothing');
+  assert.equal('category' in got, true, 'and the heading still has a name to show above the empty state');
+  assert.equal((got.category as CategoryBlock)?.id, 'cat_printers_fdm');
 });
 
 // =========================================================================

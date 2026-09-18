@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { ArrowRight, ArrowLeft, PackageSearch } from 'lucide-react';
-import { api, ApiProduct } from '../lib/api';
+import { api, ApiProduct, ResolvedCategory, ProductsListResponse } from '../lib/api';
 import Spinner from '../components/ui/Spinner';
 import SafeImage from '../components/ui/SafeImage';
-import { ProductGridSkeleton } from '../components/ui/Skeleton';
+import { Skeleton, ProductGridSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import CardPrice from '../components/CardPrice';
 import OfferBadge from '../components/ui/OfferBadge';
@@ -24,6 +24,21 @@ export default function Products() {
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
+  /**
+   * THREE STATES, NOT TWO — and that is what keeps the id off the screen.
+   *
+   * The heading used to print the URL parameter: «الفئة: cat_printers_fdm»,
+   * which the owner photographed. There is now no branch in which the
+   * parameter is rendered, because the parameter was never an answer.
+   *
+   *   undefined — not told yet (first paint, or a request in flight). The
+   *               heading shows a placeholder rather than a guess.
+   *   null      — the server looked and there is no such catalog: a deleted
+   *               section, or a pre-taxonomy free-text token that still has
+   *               real products behind it. The heading shows the plain word.
+   *   an object — the name, localized.
+   */
+  const [categoryRef, setCategoryRef] = useState<ResolvedCategory | null | undefined>(undefined);
   // Monotonic request id: when the query changes mid-flight, the stale
   // response is ignored so a previous query's results never flash in.
   const reqIdRef = useRef(0);
@@ -32,18 +47,25 @@ export default function Products() {
     const reqId = ++reqIdRef.current;
     setLoading(true);
     setError(null);
+    // Reset on every query change, so a previous section's name can never sit
+    // above a new section's grid.
+    setCategoryRef(undefined);
     try {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       if (category) params.set('category', category);
       params.set('limit', '50');
-      const data = await api.get<{ products: ApiProduct[] }>(`/api/products?${params.toString()}`);
+      const data = await api.get<ProductsListResponse>(`/api/products?${params.toString()}`);
       if (reqIdRef.current !== reqId) return;
       setProducts(data.products || []);
+      setCategoryRef(category ? data.category ?? null : null);
     } catch (err) {
       console.error(err);
       if (reqIdRef.current !== reqId) return;
       setError(err);
+      // A failed request must not leave the heading pulsing for ever behind
+      // the error card.
+      setCategoryRef(null);
     } finally {
       if (reqIdRef.current === reqId) setLoading(false);
     }
@@ -57,15 +79,50 @@ export default function Products() {
     };
   }, [fetchProducts]);
 
+  // The word above the heading — «القسم», the same word «تصفّح حسب القسم» uses
+  // on the board the customer just tapped. One shop, one word for one thing.
+  const kicker = search ? t('search') : category ? loc('القسم', 'Category', 'بەش') : '';
+  const heading = search
+    ? search
+    : category
+    ? categoryRef
+      ? loc(categoryRef.name_ar, categoryRef.name_en || categoryRef.name_ar, categoryRef.name_ckb)
+      : // Resolved, and there is nothing to name. The honest word, never the id.
+        loc('القسم', 'Category', 'بەش')
+    : // There is no `products` key in translations.ts, so `t('products' as any)`
+      // returned undefined and every Arabic and Kurdish shopper read the
+      // English word "Products" at the top of the catalogue.
+      loc('كل المنتجات', 'All products', 'هەموو بەرهەمەکان');
+  const headingPending = !!category && !search && categoryRef === undefined;
+
   return (
     <div className="w-full pb-24 text-zinc-300 min-h-screen">
-      <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors">
+      <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-2.5 flex items-center gap-3">
+        {/* 44px, because a finger is expected here, and `shrink-0` because the
+            heading beside it is the thing that gives way — never the way back. */}
+        <button
+          onClick={() => navigate(-1)}
+          aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          className="shrink-0 w-11 h-11 inline-flex items-center justify-center bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
           {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
         </button>
-        <h1 className="text-white font-bold text-lg">
-          {search ? `${t('search')}: ${search}` : category ? `${dir === 'rtl' ? 'الفئة' : 'Category'}: ${category}` : t('products' as any) || 'Products'}
-        </h1>
+        {/* `min-w-0` on the flex CHILD is what makes `truncate` work at all:
+            without it the item's automatic minimum size is its content, the row
+            overflows instead of truncating, and in RTL it is the back button
+            that leaves the screen. */}
+        <div className="min-w-0 flex-1">
+          {kicker && <span className="block text-[11px] font-medium text-zinc-500 leading-tight truncate">{kicker}</span>}
+          {headingPending ? (
+            // The name is one round trip away. A placeholder is the honest
+            // stand-in; printing the id was the bug, and flashing a wrong word
+            // would be a smaller version of the same lie. Skeleton honours
+            // prefers-reduced-motion by not animating.
+            <Skeleton className="h-5 w-40 mt-0.5" />
+          ) : (
+            <h1 className="text-white font-bold text-lg leading-tight truncate">{heading}</h1>
+          )}
+        </div>
       </div>
 
       <div className="p-4">

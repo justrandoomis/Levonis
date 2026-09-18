@@ -663,8 +663,14 @@ function SiteMediaSettings({ dir }: { dir: string }) {
     {
       group: 'brand',
       titleAr: 'شعارات العلامات التجارية', titleEn: 'Brand logos',
-      noteAr: 'تظهر في قسم «أبرز العلامات» على الصفحة الرئيسية.',
-      noteEn: 'Shown in the “Top brands” section on the home page.',
+      noteAr:
+        'تظهر في قسم «أبرز العلامات» على الصفحة الرئيسية — بدون إطار وبدون اسم. ' +
+        'ارفع الشعار بخلفية شفافة: الشعار الذي خلفيته بيضاء سيظهر كمربّع أبيض على الصفحة السوداء. ' +
+        'المعاينة هنا بخلفية داكنة لأنها ما سيراه الزبون.',
+      noteEn:
+        'Shown in the “Top brands” section on the home page — no frame, no caption. ' +
+        'Upload the logo on a TRANSPARENT background: one exported on white will show as a white ' +
+        'box on the black page. The preview here is dark because that is what a shopper sees.',
     },
     {
       group: 'service',
@@ -716,7 +722,14 @@ function SiteMediaSettings({ dir }: { dir: string }) {
             <div className="grid gap-2 sm:grid-cols-2">
               {rows.map((m) => (
                 <div key={m.slot} className="flex items-center gap-3 bg-zinc-950/60 border border-zinc-800 rounded-2xl p-3">
-                  <span className="w-12 h-12 shrink-0 rounded-xl bg-zinc-100 border border-zinc-300/30 grid place-items-center overflow-hidden">
+                  {/* A DARK PLATE, BECAUSE THE STOREFRONT IS DARK. This preview
+                      used to be `bg-zinc-100`, so a logo exported on a white
+                      matte looked perfect here and rendered as a white box on
+                      the black home page — the one screen where the owner could
+                      have spotted the problem was the one screen hiding it. The
+                      owner can only fix what they can see, and the Upload button
+                      that fixes it is two centimetres away. */}
+                  <span className="w-12 h-12 shrink-0 rounded-xl bg-zinc-950 border border-zinc-800 grid place-items-center overflow-hidden">
                     {m.url
                       ? <img src={m.url} alt="" width={48} height={48} loading="lazy" decoding="async" className="w-full h-full object-contain p-1" />
                       : <ImageIcon className="w-5 h-5 text-zinc-500" aria-hidden="true" />}
