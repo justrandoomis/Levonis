@@ -72,34 +72,26 @@ test('the 8 MB ceiling is measured on the WebP that is uploaded, not the camera 
 });
 
 /**
- * THIS REPLACES A TEST THAT ASSERTED THE OPPOSITE, and the reversal is the
- * whole fix.
+ * THE CANVAS PASS IS A SHRINK NOW, NOT THE CONVERSION.
  *
- * The old test pinned "PNG remains uploadable when the browser cannot encode
- * WebP" — which is the behaviour the owner reported as «التحويل وهمي». The
- * mechanism is in the specification: `canvas.toBlob(cb, 'image/webp')` on a
- * runtime with no WebP encoder does not fail, it hands back a valid PNG Blob.
- * So the client renamed it, the server sniffed it correctly, and the database
- * recorded `image/png` — while every screen in between reported a conversion.
+ * Two earlier versions of this test were both wrong in the same way. One pinned
+ * "PNG remains uploadable when the browser cannot encode WebP" — which stored a
+ * PNG under a claim it had been converted. The next pinned that a failed canvas
+ * encode must THROW — which made the owner's own phone the reason a product
+ * could not get a photo.
  *
- * A conversion nobody can trust is worse than one that refuses, because nobody
- * goes looking for it.
+ * Both made the visitor's device decide. `env.IMAGES` converts on the server for
+ * every device alike, so what is left for the browser is the one thing a server
+ * cannot do for it: make a 12 MB camera JPEG smaller BEFORE it crosses Iraqi
+ * mobile data. When the canvas can do that, it does; when it cannot, the
+ * original travels and comes back WebP anyway.
+ *
+ * What must never come back is the canvas passing a PNG off as a conversion.
  */
-test('A PNG BLOB FROM toBlob IS A FAILED CONVERSION, not a fallback', async () => {
+test('a PNG blob from toBlob is NOT a conversion — but it is no longer fatal either', async () => {
   const original = new File([pngBytes(2048)], 'transparent-source.png', { type: 'image/png' });
 
-  // The encoder contract: only WebP counts. A PNG coming back from the canvas
-  // is a rung that failed, and when every rung fails the caller must be told —
-  // never handed the original with a success flag on it.
-  await assert.rejects(
-    () =>
-      prepareProductImage(original, async () => {
-        throw new Error('تعذّر تحويل الصورة إلى WebP على هذا المتصفح. / could not convert to WebP');
-      }),
-    /WebP/
-  );
-
-  // And a real WebP still passes, with its real type and extension.
+  // A real WebP still wins, with its real type and extension.
   const ok = await prepareProductImage(original, async () => ({
     blob: new Blob([new Uint8Array(1024)], { type: 'image/webp' }),
     width: 24,
@@ -109,17 +101,15 @@ test('A PNG BLOB FROM toBlob IS A FAILED CONVERSION, not a fallback', async () =
   assert.equal(ok.file.type, 'image/webp');
   assert.match(ok.file.name, /\.webp$/);
 
-  // The server is the authority, not this module: a PNG that reaches the route
-  // anyway — from an old client, a script, or a browser nobody tested — is
-  // refused by its BYTES rather than trusted because of who sent it.
-  const uploadRoute = src('worker/routes/uploads.ts');
-  assert.match(uploadRoute, /IMAGE_NOT_WEBP/);
-  assert.match(uploadRoute, /kind\.mime === 'image\/png' \|\| kind\.mime === 'image\/jpeg'/);
-
-  // And the client no longer has a door to walk around it.
+  // And the encoder only ever counts WebP as a success — a PNG from the canvas
+  // is a failed rung, which is what stops the fake conversion coming back.
   const preprocess = src('src/lib/imagePreprocess.ts');
   assert.match(preprocess, /blob\.type !== 'image\/webp'/);
-  assert.doesNotMatch(preprocess, /return \{ blob: file, width: decoded\.width/);
+
+  // The authority is the server, and it refuses to guess.
+  const uploadRoute = src('worker/routes/uploads.ts');
+  assert.match(uploadRoute, /convertToWebp\(/);
+  assert.match(uploadRoute, /IMAGE_CONVERT_UNAVAILABLE/);
 });
 
 test('EVERY upload purpose is converted, not just products and avatars', async () => {

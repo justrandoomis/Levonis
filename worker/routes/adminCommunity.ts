@@ -19,6 +19,7 @@
  *   and on what day, and the answer comes from the data (§45).
  */
 
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, str, int, oneOf } from '../lib/http';
@@ -152,9 +153,9 @@ adminCommunityRoutes.get('/merchants', async (c) => {
        FROM community_merchants m
        LEFT JOIN merchant_stores s ON s.merchant_id = m.id
        JOIN users u ON u.id = m.user_id
-      WHERE (? = '' OR m.name LIKE '%' || ? || '%' OR s.slug LIKE '%' || ? || '%')
-      ORDER BY m.created_at DESC LIMIT ?`
-  ).bind(q, q, q, limit).all();
+      WHERE (?1 = '' OR ${sqlLikeClause(['m.name', 's.slug'], '?2')})
+      ORDER BY m.created_at DESC LIMIT ?3`
+  ).bind(q, likePattern(q), limit).all();
   return c.json({ success: true, merchants: results });
 });
 
@@ -346,11 +347,11 @@ adminCommunityRoutes.get('/requests', async (c) => {
               WHERE o.request_id = r.id AND o.state = 'pending') AS offers_pending
        FROM community_requests r
        JOIN users u ON u.id = r.customer_id
-      WHERE (? = '' OR r.state = ?)
-        AND (? = '' OR r.title LIKE '%' || ? || '%' OR r.id = ?)
+      WHERE (?1 = '' OR r.state = ?2)
+        AND (?3 = '' OR r.title LIKE ?4 ESCAPE '\\' OR r.id = ?3)
       ORDER BY r.created_at DESC
-      LIMIT ?`
-  ).bind(state, state, q, q, q, limit).all();
+      LIMIT ?5`
+  ).bind(state, state, q, likePattern(q), limit).all();
 
   return c.json({ success: true, requests: results });
 });

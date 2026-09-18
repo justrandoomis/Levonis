@@ -10,6 +10,7 @@
  * is always recomputed at checkout.
  */
 
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -2614,8 +2615,8 @@ productRoutes.get('/', async (c) => {
     // backfill has not caught up — both mean "the index cannot answer yet",
     // and both fall back rather than telling every shopper there is nothing.
     if (hits === null || !hits.indexReady) {
-      sql += ' AND (name LIKE ? OR name_ar LIKE ? OR name_ku LIKE ? OR description LIKE ?)';
-      const like = `%${search}%`;
+      sql += ` AND (${sqlLikeClause(['name', 'name_ar', 'name_ku', 'description'])})`;
+      const like = likePattern(search);
       params.push(like, like, like, like);
     } else if (hits.ids.length === 0) {
       return c.json({ success: true, products: [] });

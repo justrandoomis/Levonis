@@ -30,6 +30,7 @@
  * is an open admin API guarded only by hostname.
  */
 
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -149,8 +150,8 @@ adminOffersRoutes.get('/', async (c) => {
   const params: unknown[] = [];
   let where = "w.subject_type = 'product'";
   if (search) {
-    where += ' AND (p.name LIKE ? OR p.name_ar LIKE ? OR p.slug LIKE ?)';
-    const like = `%${search}%`;
+    where += ` AND (${sqlLikeClause(['p.name', 'p.name_ar', 'p.slug'])})`;
+    const like = likePattern(search);
     params.push(like, like, like);
   }
   if (kind === 'product') where += " AND COALESCE(p.composition, '') = ''";

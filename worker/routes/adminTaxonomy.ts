@@ -1,3 +1,4 @@
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int, oneOf } from '../lib/http';
@@ -487,12 +488,11 @@ interface BrandRow {
 
 adminTaxonomyRoutes.get('/brands', async (c) => {
   const q = str(c.req.query('search'), 'search', { max: 60, required: false });
-  const sql = q
-    ? 'SELECT * FROM brands WHERE name_en LIKE ? OR name_ar LIKE ? OR slug LIKE ? ORDER BY name_en LIMIT 200'
+  const like = likePattern(q);
+  const sql = like
+    ? `SELECT * FROM brands WHERE ${sqlLikeClause(['name_en', 'name_ar', 'slug'])} ORDER BY name_en LIMIT 200`
     : 'SELECT * FROM brands ORDER BY name_en LIMIT 500';
-  const stmt = q
-    ? c.env.DB.prepare(sql).bind(`%${q}%`, `%${q}%`, `%${q}%`)
-    : c.env.DB.prepare(sql);
+  const stmt = like ? c.env.DB.prepare(sql).bind(like, like, like) : c.env.DB.prepare(sql);
   const { results } = await stmt.all<BrandRow>();
   const counts = await c.env.DB
     .prepare('SELECT brand_id AS id, COUNT(*) AS n FROM products WHERE brand_id IS NOT NULL GROUP BY brand_id')

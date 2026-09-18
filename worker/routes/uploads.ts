@@ -1,6 +1,7 @@
+import { IMAGES_MAX_INPUT_BYTES, convertToWebp, extensionFor, isConvertibleToWebp } from '../lib/imageConvert';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAuth, badRequest, forbidden, notFound, oneOf } from '../lib/http';
+import { requireAuth, badRequest, forbidden, notFound, oneOf, unavailable } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
@@ -82,7 +83,7 @@ uploadRoutes.post('/', async (c) => {
     throw badRequest(`File is too large (max ${Math.round(maxSize / 1024 / 1024)} MB)`);
   }
 
-  const buf = new Uint8Array(await file.arrayBuffer());
+  let buf = new Uint8Array(await file.arrayBuffer());
   const kind = sniff(buf);
   if (!kind) throw badRequest('Unsupported file type — please upload a JPEG, PNG, WebP or GIF image' + (allowVideo ? ' or MP4 video' : ''));
   if (kind.mime.startsWith('video/') && !allowVideo) {
@@ -93,38 +94,68 @@ uploadRoutes.post('/', async (c) => {
   }
 
   /**
-   * THE SERVER DECIDES WHETHER A PICTURE IS WEBP, AND NOTHING ELSE DOES.
+   * THE SERVER CONVERTS IT. IT DOES NOT ASK THE BROWSER TO.
    *
-   * The conversion runs in the browser, and a browser is not a place a rule can
-   * be enforced. `canvas.toBlob(cb, 'image/webp')` is specified to fall back to
-   * PNG on a runtime with no WebP encoder — silently, with a valid Blob — so a
-   * failed conversion used to arrive here as a perfectly ordinary PNG, get
-   * sniffed correctly, and get stored as PNG while every screen along the way
-   * said it had been converted. That is the «تحويل وهمي» the owner reported:
-   * the claim and the database disagreeing, with nothing to notice it.
+   * The previous version of this route REFUSED a PNG or a JPEG and told the
+   * uploader to convert it first. That was the right rule in the wrong place:
+   * the conversion ran on a canvas in the visitor's browser, and
+   * `canvas.toBlob(cb, 'image/webp')` is specified to fall back to PNG on a
+   * runtime with no WebP encoder — silently, with a valid Blob. So the format
+   * depended on which phone was in the owner's hand, and on the wrong phone the
+   * answer was either a refusal they could do nothing about or, before that, a
+   * PNG stored under a claim that it had been converted.
    *
-   * A check that lives only on the client is a check that is off for whoever
-   * has the browser it does not work in. So the rule lives here: a photograph
-   * that reaches this route as PNG or JPEG is refused, by its BYTES, and the
-   * uploader is told why. The stored object and its recorded type can no longer
-   * disagree, because the only still raster this route accepts is the one it
-   * claims to be storing.
+   * `env.IMAGES` takes the bytes this Worker is already holding and returns
+   * WebP the same way for every device and every browser, including the ones
+   * that do not exist yet. Nothing about the visitor decides the format any
+   * more.
    *
-   * GIF AND AVIF ARE NOT REFUSED, and that is a decision. A canvas draws one
-   * frame, so re-encoding an animated GIF would throw the animation away — the
-   * same quiet damage in the other direction — and AVIF is already a modern
-   * compressed format that arrives from vendor CDNs rather than from a camera.
-   * Both are stored honestly under their own type.
+   * GIF AND AVIF PASS THROUGH, and that is a decision rather than an oversight:
+   * a transform keeps ONE frame, so re-encoding an animated GIF throws the
+   * animation away — the same quiet damage as the fake conversion, pointing the
+   * other way — and AVIF is already compressed, usually smaller than the WebP
+   * it would become. Both are stored honestly under their own type.
    */
-  if (kind.mime === 'image/png' || kind.mime === 'image/jpeg') {
-    throw badRequest(
-      'يجب تحويل الصورة إلى WebP قبل الرفع. إذا تعذّر ذلك على متصفحك، جرّب متصفحًا آخر. / ' +
-        'Images must be converted to WebP before upload. If your browser could not do it, try another browser.',
-      'IMAGE_NOT_WEBP'
-    );
+  let storedMime = kind.mime;
+  let storedExt = kind.ext;
+  if (isConvertibleToWebp(kind.mime)) {
+    const converted = await convertToWebp(c.env, buf, kind.mime);
+    if (converted.ok) {
+      buf = converted.bytes;
+      storedMime = converted.mime;
+      storedExt = extensionFor(converted.mime);
+    } else if (converted.reason === 'unavailable') {
+      /**
+       * NO BINDING ON THIS DEPLOYMENT. Storing the original would recreate the
+       * exact defect this route was changed to remove — a JPEG in the
+       * catalogue that something, somewhere, calls a WebP. Refusing says the
+       * true thing, names the operator's fix, and is visible immediately
+       * instead of in a database column nobody reads.
+       */
+      console.error('uploads: the Images binding is absent — server-side WebP conversion cannot run');
+      throw unavailable(
+        'تحويل الصور غير مفعّل على الخادم حالياً. راجع إعداد Cloudflare Images. / ' +
+          'Server-side image conversion is not enabled on this deployment (Cloudflare Images binding missing).',
+        'IMAGE_CONVERT_UNAVAILABLE'
+      );
+    } else if (converted.reason === 'too_large') {
+      throw badRequest(
+        `الصورة أكبر من أن تُحوَّل (الحد ${Math.round(IMAGES_MAX_INPUT_BYTES / 1024 / 1024)} ميغابايت). / ` +
+          `Image is too large to convert (max ${Math.round(IMAGES_MAX_INPUT_BYTES / 1024 / 1024)} MB).`,
+        'IMAGE_TOO_LARGE_TO_CONVERT'
+      );
+    } else if (converted.reason === 'failed') {
+      console.error(`uploads: WebP conversion failed: ${converted.detail}`);
+      throw badRequest(
+        'تعذّر تحويل هذه الصورة. جرّب صورة أخرى. / This image could not be converted. Try another one.',
+        'IMAGE_CONVERT_FAILED'
+      );
+    }
   }
 
-  const dimensions = kind.mime.startsWith('image/') ? rasterDimensions(buf, kind.mime) : null;
+  // Measured on the bytes that will actually be STORED, which after a
+  // conversion are a fraction of what arrived.
+  const dimensions = storedMime.startsWith('image/') ? rasterDimensions(buf, storedMime) : null;
   if (
     purpose === 'product' &&
     (kind.mime === 'image/webp' || kind.mime === 'image/png' || kind.mime === 'image/jpeg') &&
@@ -138,8 +169,11 @@ uploadRoutes.post('/', async (c) => {
     purpose === 'avatar' ? { visibility: 'public', domain: 'users', entityId: user.id, keyKind: 'avatar' } :
     purpose === 'chat' ? { visibility: 'private', domain: 'chat', entityId: user.id, keyKind: 'attachments' } :
     purpose === 'community' ? { visibility: 'public', domain: 'merchants', entityId: user.id, keyKind: 'public' } :
-    { visibility: 'public', domain: 'products', entityId: 'catalog', keyKind: kind.mime.startsWith('video/') ? 'video' : 'gallery' };
-  const key = buildMediaKey({ ...target, kind: target.keyKind, extension: kind.ext, objectId: newId() });
+    { visibility: 'public', domain: 'products', entityId: 'catalog', keyKind: storedMime.startsWith('video/') ? 'video' : 'gallery' };
+  // `storedMime` / `storedExt`, never the sniffed pair: after a conversion they
+  // differ, and a key that says .jpg over WebP bytes is the same class of lie
+  // this route was changed to stop telling.
+  const key = buildMediaKey({ ...target, kind: target.keyKind, extension: storedExt, objectId: newId() });
   const cacheControl = target.visibility === 'public' ? 'public, max-age=31536000, immutable' : 'private, max-age=300';
 
   await putMediaObject(
@@ -148,7 +182,7 @@ uploadRoutes.post('/', async (c) => {
       key,
       visibility: target.visibility,
       domain: target.domain,
-      mime: kind.mime,
+      mime: storedMime,
       bytes: buf.byteLength,
       ownerId: user.id,
       entityId: target.entityId,
@@ -157,7 +191,7 @@ uploadRoutes.post('/', async (c) => {
       originalName: String(form.get('originalName') || file.name),
     },
     buf,
-    { httpMetadata: { contentType: kind.mime, cacheControl } }
+    { httpMetadata: { contentType: storedMime, cacheControl } }
   );
 
   return c.json({
@@ -165,7 +199,7 @@ uploadRoutes.post('/', async (c) => {
     key,
     url: `/files/${key}`,
     visibility: target.visibility,
-    mime: kind.mime,
+    mime: storedMime,
     bytes: buf.byteLength,
     width: dimensions?.width ?? null,
     height: dimensions?.height ?? null,

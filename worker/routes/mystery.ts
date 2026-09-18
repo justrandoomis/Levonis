@@ -35,6 +35,7 @@
  *    disagree.
  */
 
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -299,8 +300,9 @@ adminMysteryRoutes.get('/pools/:id/entries', async (c) => {
     args.push(activeFilter);
   }
   if (search) {
-    where.push('(lower(p.name) LIKE ? OR lower(p.slug) LIKE ?)');
-    args.push(`%${search}%`, `%${search}%`);
+    where.push(`(${sqlLikeClause(['lower(p.name)', 'lower(p.slug)'])})`);
+    const like = likePattern(search);
+    args.push(like, like);
   }
   const total = await c.env.DB
     .prepare(`SELECT COUNT(*) AS n FROM mystery_pool_entries e JOIN products p ON p.id = e.product_id WHERE ${where.join(' AND ')}`)

@@ -1,3 +1,4 @@
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAuth, requireAdmin, badRequest, conflict, forbidden, notFound, int, str, oneOf } from '../lib/http';
@@ -143,9 +144,10 @@ walletRoutes.get('/', async (c) => {
   if (search) {
     // Operation numbers are the tail of the id; note/reference search stays
     // scoped to this user's own rows (never a global lookup).
-    sql += ' AND (id LIKE ? OR note LIKE ? OR ref LIKE ?)';
-    const like = `%${search.replace(/^[A-Za-z]+-/, '').toLowerCase()}%`;
-    params.push(like, `%${search}%`, `%${search}%`);
+    sql += ` AND (${sqlLikeClause(['id', 'note', 'ref'])})`;
+    const byId = likePattern(search.replace(/^[A-Za-z]+-/, '').toLowerCase());
+    const byText = likePattern(search);
+    params.push(byId, byText, byText);
   }
   sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);

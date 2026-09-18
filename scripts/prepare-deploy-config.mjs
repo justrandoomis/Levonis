@@ -156,7 +156,13 @@ if (target) {
     console.error(`prepare-deploy-config: environment "${target}" is not defined in wrangler.jsonc`);
     process.exit(1);
   }
-  for (const key of ['name', 'd1_databases', 'r2_buckets', 'vars', 'assets', 'observability', 'triggers']) {
+  // `images` is in this list because it is NON-INHERITABLE in wrangler: an
+  // environment that does not name it deploys a Worker where `env.IMAGES` is
+  // undefined, and every upload silently stops being converted on the server.
+  // The same is true of every key here — the list IS the contract between
+  // wrangler.jsonc's environments and the bare `wrangler deploy` this build
+  // ends with.
+  for (const key of ['name', 'd1_databases', 'r2_buckets', 'images', 'vars', 'assets', 'observability', 'triggers']) {
     if (block[key] !== undefined) cfg[key] = structuredClone(block[key]);
   }
   console.log(`  top-level config now describes: ${cfg.name}`);

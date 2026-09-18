@@ -14,6 +14,7 @@
  * the write routes that create obligations take `requireSellingPrivileges`.
  */
 
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -514,9 +515,10 @@ merchantRoutes.get('/products', async (c) => {
   const where: string[] = ['merchant_id = ?'];
   const binds: unknown[] = [ctx.merchant.id];
   if (q) {
-    // LIKE special characters are literal search text here, not wildcards.
-    const like = `%${q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
-    where.push("(name LIKE ? ESCAPE '\\' OR name_ar LIKE ? ESCAPE '\\' OR sku LIKE ? ESCAPE '\\')");
+    // LIKE special characters are literal search text here, not wildcards —
+    // and the pattern is bounded in BYTES, which D1 caps at 50.
+    const like = likePattern(q);
+    where.push(`(${sqlLikeClause(['name', 'name_ar', 'sku'])})`);
     binds.push(like, like, like);
   }
   if (section === 'none') where.push('section_id IS NULL');

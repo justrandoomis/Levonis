@@ -49,13 +49,42 @@ function database(): D1Database {
   return new SqliteD1(raw) as unknown as D1Database;
 }
 
-function app(session: boolean) {
+/**
+ * The Cloudflare Images binding, stubbed at its real shape.
+ *
+ * `input(stream).output({ format })` → something with `.response()`. The stub
+ * returns a real WebP magic-number header so the rest of the pipeline — the
+ * sniffer, the dimension reader, the stored contentType — is exercised on bytes
+ * that genuinely ARE WebP rather than on a promise that they are.
+ */
+function imagesBinding(opts: { fail?: boolean } = {}) {
+  const calls: Array<{ format: string }> = [];
+  const binding = {
+    input(stream: ReadableStream) {
+      void stream;
+      return {
+        async output(o: { format: string }) {
+          calls.push({ format: o.format });
+          if (opts.fail) throw new Error('the converter refused this image');
+          // A real WebP with a readable VP8X header, because the route measures
+          // the image it is about to STORE — not the one that arrived. A stub
+          // that returned shapeless bytes would let a converter that destroys
+          // an image pass this suite.
+          return { response: () => new Response(webp(640, 480)) };
+        },
+      };
+    },
+  };
+  return { binding, calls };
+}
+
+function app(session: boolean, images?: ReturnType<typeof imagesBinding>['binding']) {
   const publicBucket = new MemoryBucket();
   const privateBucket = new MemoryBucket();
   const legacyBucket = new MemoryBucket();
   const hono = new Hono<AppContext>();
   hono.use('*', async (c, next) => {
-    c.env = { DB: database(), BUCKET: legacyBucket, R2_PUBLIC: publicBucket, R2_PRIVATE: privateBucket } as never;
+    c.env = { DB: database(), BUCKET: legacyBucket, R2_PUBLIC: publicBucket, R2_PRIVATE: privateBucket, IMAGES: images } as never;
     c.set('user', session ? ({ id: 'admin', role: 'admin' } as never) : null);
     await next();
   });
@@ -97,56 +126,113 @@ test('an admin WebP product upload lands only in the public bucket with verified
 });
 
 /**
- * THIS TEST IS THE REVERSE OF THE ONE IT REPLACES, AND THAT IS THE POINT.
+ * THE CONVERSION MOVED TO THE SERVER, AND THESE TESTS MOVED WITH IT.
  *
- * The previous version asserted that a PNG is accepted "when browser-side WebP
- * conversion is unavailable". That acceptance is exactly what the owner
- * reported as «التحويل وهمي»: `canvas.toBlob(cb, 'image/webp')` is specified to
- * fall back to PNG on a runtime with no WebP encoder — silently, with a valid
- * Blob — so a failed conversion arrived here as an ordinary PNG, was sniffed
- * correctly, and was stored as PNG while every screen in between said it had
- * been converted.
+ * An earlier version of this file asserted that a PNG is ACCEPTED, because the
+ * browser was supposed to have converted it. A later one asserted that a PNG is
+ * REFUSED, because the browser could not be trusted to. Both were the same
+ * mistake from opposite ends: they made the visitor's device decide the format
+ * of what this shop stores.
  *
- * A rule that only exists in the browser is off for whoever has the browser it
- * does not work in. So the rule lives on the server, the client is no longer
- * allowed to fall back, and the two cannot disagree any more.
+ * `env.IMAGES` takes the bytes the Worker is already holding and returns WebP
+ * the same way for every device and every browser. So the contract is now the
+ * only one that was ever wanted: whatever arrives, WebP is what is stored.
  */
-test('a PNG is REFUSED — the conversion is the client`s job and the server is what proves it', async () => {
-  const { hono, publicBucket } = app(true);
+test('A PNG IS CONVERTED ON THE SERVER — the browser is not consulted', async () => {
+  const images = imagesBinding();
+  const { hono, publicBucket } = app(true, images.binding);
   const png = new Uint8Array(32);
   png.set([0x89, 0x50, 0x4e, 0x47], 0);
-  png.set([0, 0, 2, 128], 16); // 640 px
-  png.set([0, 0, 1, 224], 20); // 480 px
+  png.set([0, 0, 2, 128], 16);
+  png.set([0, 0, 1, 224], 20);
   const form = new FormData();
   form.set('purpose', 'product');
   form.set('file', new File([png], 'catalog.png', { type: 'image/png' }));
   const response = await hono.request('/api/uploads', { method: 'POST', body: form });
-  assert.equal(response.status, 400);
-  const body = await response.json() as { code?: string; error?: string };
-  assert.equal(body.code, 'IMAGE_NOT_WEBP');
-  assert.equal(publicBucket.objects.size, 0, 'and nothing reached the bucket');
+  const body = await response.json() as { mime: string; key: string; width: number };
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.equal(body.mime, 'image/webp', 'the STORED type, not the uploaded one');
+  assert.match(body.key, /\.webp$/, 'and the key may not disagree with the bytes');
+  // Measured on the CONVERTED bytes: the dimensions recorded in the database
+  // describe the file that is actually in the bucket.
+  assert.equal(body.width, 640);
+  assert.deepEqual(images.calls, [{ format: 'image/webp' }], 'the server did the converting');
+  assert.equal(publicBucket.objects.size, 1);
+  const stored = publicBucket.objects.get(body.key);
+  assert.equal(stored?.metadata.contentType, 'image/webp', 'and R2 serves it as WebP too');
 });
 
-test('a JPEG is refused the same way, on EVERY purpose — chats and receipts included', async () => {
+test('a JPEG is converted on EVERY purpose — chats and receipts included', async () => {
   for (const purpose of ['product', 'chat', 'receipt', 'avatar', 'community']) {
-    const { hono, publicBucket, privateBucket } = app(true);
+    const images = imagesBinding();
+    const { hono } = app(true, images.binding);
     const jpeg = new Uint8Array(32);
     jpeg.set([0xff, 0xd8, 0xff, 0xe0], 0);
     const form = new FormData();
     form.set('purpose', purpose);
     form.set('file', new File([jpeg], 'photo.jpg', { type: 'image/jpeg' }));
     const response = await hono.request('/api/uploads', { method: 'POST', body: form });
-    assert.equal(response.status, 400, `${purpose} must refuse a JPEG`);
-    assert.equal((await response.json() as { code?: string }).code, 'IMAGE_NOT_WEBP');
-    assert.equal(publicBucket.objects.size + privateBucket.objects.size, 0, `${purpose} stored nothing`);
+    const body = await response.json() as { mime?: string };
+    assert.equal(response.status, 200, `${purpose}: ${JSON.stringify(body)}`);
+    assert.equal(body.mime, 'image/webp', `${purpose} must be stored as WebP`);
   }
 });
 
+/**
+ * WITHOUT THE BINDING IT REFUSES, and that is the whole reason this is not a
+ * "best effort" conversion. Storing the original would put a JPEG in the
+ * catalogue that something downstream calls a WebP — the exact defect the whole
+ * change exists to remove — and it would be invisible until somebody read the
+ * database. A 503 naming the missing entitlement is visible immediately and
+ * tells the operator what to do.
+ */
+test('with NO Images binding the upload is refused, never silently stored as-is', async () => {
+  const { hono, publicBucket } = app(true); // no binding
+  const png = new Uint8Array(32);
+  png.set([0x89, 0x50, 0x4e, 0x47], 0);
+  const form = new FormData();
+  form.set('purpose', 'product');
+  form.set('file', new File([png], 'catalog.png', { type: 'image/png' }));
+  const response = await hono.request('/api/uploads', { method: 'POST', body: form });
+  const body = await response.json() as { code?: string };
+  assert.equal(response.status, 503);
+  assert.equal(body.code, 'IMAGE_CONVERT_UNAVAILABLE');
+  assert.equal(publicBucket.objects.size, 0, 'and nothing reached the bucket');
+});
+
+test('a converter that throws is reported, not swallowed', async () => {
+  const images = imagesBinding({ fail: true });
+  const { hono, publicBucket } = app(true, images.binding);
+  const jpeg = new Uint8Array(32);
+  jpeg.set([0xff, 0xd8, 0xff, 0xe0], 0);
+  const form = new FormData();
+  form.set('purpose', 'product');
+  form.set('file', new File([jpeg], 'photo.jpg', { type: 'image/jpeg' }));
+  const response = await hono.request('/api/uploads', { method: 'POST', body: form });
+  assert.equal(response.status, 400);
+  assert.equal((await response.json() as { code?: string }).code, 'IMAGE_CONVERT_FAILED');
+  assert.equal(publicBucket.objects.size, 0);
+});
+
+test('an image ALREADY WebP is stored untouched — no pointless re-encode', async () => {
+  const images = imagesBinding();
+  const { hono } = app(true, images.binding);
+  const form = new FormData();
+  form.set('purpose', 'product');
+  form.set('file', new File([webp()], 'printer.webp', { type: 'image/webp' }));
+  const response = await hono.request('/api/uploads', { method: 'POST', body: form });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json() as { mime: string }).mime, 'image/webp');
+  assert.deepEqual(images.calls, [], 'the converter was never called');
+});
+
 test('a GIF is still accepted, and that exception is deliberate', async () => {
-  // A canvas draws ONE frame, so re-encoding an animated GIF would throw the
+  // A transform keeps ONE frame, so re-encoding an animated GIF would throw the
   // animation away — the same quiet damage as the fake conversion, pointing the
-  // other way. It is stored honestly under its own type.
-  const { hono, publicBucket } = app(true);
+  // other way. It is stored honestly under its own type, and the converter is
+  // never even asked.
+  const images = imagesBinding();
+  const { hono, publicBucket } = app(true, images.binding);
   const gif = new Uint8Array(32);
   gif.set([0x47, 0x49, 0x46, 0x38], 0);
   const form = new FormData();
@@ -156,6 +242,7 @@ test('a GIF is still accepted, and that exception is deliberate', async () => {
   assert.equal(response.status, 200);
   assert.equal((await response.json() as { mime: string }).mime, 'image/gif');
   assert.equal(publicBucket.objects.size, 1);
+  assert.deepEqual(images.calls, [], 'an animated format is never re-encoded');
 });
 
 test('public media resolves anonymously while a private namespace never does', async () => {

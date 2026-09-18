@@ -1,3 +1,4 @@
+import { isSafeMediaKey } from './mediaStorage';
 import { deleteMediaObject, isAnonymousPublicMediaKey } from './mediaStorage';
 
 /**
@@ -338,7 +339,18 @@ export function mediaKeysInJson(value: unknown, out: Set<string> = new Set()): S
     // one of OUR references is taken; `mediaKeyFromRef` returning a bare string
     // for arbitrary prose is the one case to guard, so a bare key is accepted
     // only when it looks like a media path.
-    if (k && (value.includes('/files/') || /^[\w.-]+\/[\w./-]+\.[a-z0-9]{2,5}$/i.test(value))) out.add(k);
+    if (
+      k &&
+      isSafeMediaKey(k) &&
+      // `.includes('/files/')` was too weak: a sentence of usage-guide prose
+      // that happens to mention the path adopted the whole sentence as a key.
+      // The value has to BE a reference — start as one, or be a bare key.
+      (value.startsWith('/files/') ||
+        /^https?:\/\//i.test(value) ||
+        /^[\w.-]+\/[\w./-]+\.[a-z0-9]{2,5}$/i.test(value))
+    ) {
+      out.add(k);
+    }
     return out;
   }
   if (Array.isArray(value)) {
@@ -424,7 +436,13 @@ export async function collectProductMediaKeys(db: DeletionDb, productId: string)
       .all<{ v: unknown }>();
     for (const row of rows.results ?? []) {
       const key = mediaKeyFromRef(row.v);
-      if (key) keys.add(key);
+      // `isSafeMediaKey` OR NOTHING. These strings become R2 deletions, and
+      // `mediaKeyFromRef` hands back whatever it was given when the value is
+      // not a URL — a `data:` URI, a paragraph of Arabic prose, an empty-ish
+      // fragment. The validator is the same one every write already passes
+      // (length, shape, no traversal), so anything it refuses was never a key
+      // this shop stored and has no business in a delete list.
+      if (key && isSafeMediaKey(key)) keys.add(key);
     }
   }
 
@@ -462,10 +480,42 @@ export async function collectProductMediaKeys(db: DeletionDb, productId: string)
  * the product being deleted — if anything answers, the R2 object stays and only
  * the relation goes.
  *
- * The JSON columns are matched with LIKE rather than parsed, deliberately: a
+ * The JSON columns are matched by SUBSTRING rather than parsed, deliberately: a
  * false POSITIVE here costs one orphaned file, which the scanner reports and an
  * admin can clear; a false negative destroys a live image. The asymmetry decides
  * the design.
+ *
+ * `instr()`, NOT `LIKE`, AND THAT IS A BUG FIX, NOT A STYLE CHOICE.
+ *
+ * This read `"col" LIKE '%' || ?2 || '%'` and it broke the delete outright on
+ * the live shop:
+ *
+ *     D1_ERROR: LIKE or GLOB pattern too complex: SQLITE_ERROR
+ *
+ * SQLite evaluates `X LIKE Y` as `like(Y, X)` — the PATTERN is the right-hand
+ * side, here `'%' || <r2 key> || '%'` — and refuses a pattern longer than
+ * SQLITE_LIMIT_LIKE_PATTERN_LENGTH. D1 sets that limit far below SQLite's own
+ * default, low enough that an ordinary key like
+ * `products/catalog/gallery/65b35fbf52e44ef996a4.webp` goes over it. Every
+ * product whose images live under that prefix was therefore undeletable, with
+ * no way for the owner to know why.
+ *
+ * `instr(col, key) > 0` asks the same question with no pattern at all, so no
+ * limit applies — and it is also MORE CORRECT. `_` and `%` are LIKE wildcards,
+ * and an R2 key is free to contain them: the old form quietly matched keys it
+ * should not have, which on this code path means calling a file SHARED and
+ * leaving it in the bucket forever. Nothing is lost by dropping LIKE here; the
+ * comparison was never meant to be a pattern match.
+ *
+ * BOTH SIDES ARE `lower()`, AND THAT IS THE ONE THING THE SWAP MUST NOT DROP.
+ * SQLite's LIKE is case-INSENSITIVE for ASCII; `instr` is not. On this code
+ * path a comparison that misses is a comparison that calls a file unshared —
+ * and then deletes it out of the bucket while another product is still showing
+ * it. If any import ever wrote `Products/…` into a JSON column and
+ * `products/…` into `product_images.r2_key`, the narrower test would destroy a
+ * live image. `lower()` is ASCII-only in SQLite, which is exactly the range
+ * LIKE's own case-folding covers, so this restores the old behaviour precisely
+ * and keeps only the fix.
  */
 export async function partitionSharedMedia(
   db: DeletionDb,
@@ -492,7 +542,7 @@ export async function partitionSharedMedia(
     probes.push({
       sql:
         `SELECT 1 AS hit FROM products WHERE id <> ?1 AND (` +
-        jsonCols.map((c) => `"${c}" LIKE '%' || ?2 || '%'`).join(' OR ') +
+        jsonCols.map((c) => `instr(lower("${c}"), lower(?2)) > 0`).join(' OR ') +
         `) LIMIT 1`,
     });
   }
@@ -897,7 +947,10 @@ export async function scanProductOrphans(
       .all<{ v: unknown }>();
     for (const row of rows.results ?? []) {
       const key = mediaKeyFromRef(row.v);
-      if (key) referenced.add(key);
+      // Same gate as the collector above — the orphan scanner compares the two
+      // sets, so a junk string on one side and not the other reads as an orphan
+      // and gets proposed for deletion.
+      if (key && isSafeMediaKey(key)) referenced.add(key);
     }
   }
   const productCols = await columnsOf(db, 'products');

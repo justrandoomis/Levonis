@@ -15,6 +15,7 @@
  * moves a warranty clock, and a receipt is never the reason a unit exists.
  */
 
+import { likePattern } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import { asDocument } from '../lib/securityPolicy';
 import type { Context } from 'hono';
@@ -229,12 +230,16 @@ warrantyAdminRoutes.get('/', async (c) => {
   const binds: unknown[] = [];
   if (search) {
     // One box, five things an admin actually has in hand.
-    const like = `%${search}%`;
+    const like = likePattern(search);
+    // COLLATE binds tighter than ESCAPE, so `LIKE ? COLLATE NOCASE ESCAPE '\\'`
+    // is valid and keeps the case-insensitive comparison these columns need.
     where.push(
-      `(receipt_no LIKE ? COLLATE NOCASE OR serial_norm LIKE ? OR customer_phone LIKE ? OR customer_name LIKE ? COLLATE NOCASE
-        OR order_id LIKE ? COLLATE NOCASE OR product_description LIKE ? COLLATE NOCASE OR product_model LIKE ? COLLATE NOCASE)`
+      `(receipt_no LIKE ? COLLATE NOCASE ESCAPE '\\' OR serial_norm LIKE ? ESCAPE '\\' OR customer_phone LIKE ? ESCAPE '\\'
+        OR customer_name LIKE ? COLLATE NOCASE ESCAPE '\\'
+        OR order_id LIKE ? COLLATE NOCASE ESCAPE '\\' OR product_description LIKE ? COLLATE NOCASE ESCAPE '\\'
+        OR product_model LIKE ? COLLATE NOCASE ESCAPE '\\')`
     );
-    binds.push(like, `%${normalizeSerial(search)}%`, like, like, like, like, like);
+    binds.push(like, likePattern(normalizeSerial(search)), like, like, like, like, like);
   }
   const now = nowIso();
   if (status === 'expired') {

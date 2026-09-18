@@ -157,7 +157,7 @@ async function drawAndEncode(decoded: DecodedImage, maxEdge: number): Promise<We
   // and if the smallest rung still yields nothing, the caller says which it was.
   if (!blob || blob.size <= 0) return null;
   /**
-   * WEBP OR NOTHING — and this line used to be the opposite.
+   * WEBP OR NOTHING FROM THE CANVAS — and this line used to be the opposite.
    *
    * `canvas.toBlob(cb, 'image/webp')` DOES NOT FAIL on a browser with no WebP
    * encoder. The specification tells it to fall back to PNG, silently, with a
@@ -207,21 +207,21 @@ export async function encodeProductRasterAsWebp(
       if (result) return result;
     }
     /**
-     * EVERY RUNG FAILED, AND THAT IS AN ERROR RATHER THAN A FALLBACK.
+     * EVERY RUNG FAILED — AND THE SERVER WILL DO IT INSTEAD.
      *
-     * This used to hand back the ORIGINAL file when the canvas produced
-     * nothing, and the upload then stored a PNG. The owner's complaint was
-     * precisely that: a conversion that reports success and leaves the original
-     * format in the database. Silence is what made it invisible; an error is
-     * what makes it fixable.
+     * This is now a shrink, not a conversion. `env.IMAGES` converts on the
+     * server for every device and every browser alike, so a canvas that cannot
+     * encode WebP is no longer a reason anybody's upload fails: the original
+     * travels and comes back WebP.
      *
-     * The server refuses PNG and JPEG on this route now, so a fallback here
-     * would only move the same failure one step later and describe it worse.
+     * What the browser pass is still FOR is the uplink. A 12 MB camera JPEG on
+     * Iraqi mobile data is a minute of waiting before the server ever sees it,
+     * and this pass makes that 400 KB when the device can. When it cannot, the
+     * upload is slower and still correct, which is the right way round — the
+     * previous version of this line threw, and made the owner's own phone the
+     * reason a product could not get a photo.
      */
-    throw new Error(
-      'تعذّر تحويل الصورة إلى WebP على هذا المتصفح. جرّب متصفحًا آخر أو صورة أصغر. / ' +
-        'This browser could not convert the image to WebP. Try another browser or a smaller image.'
-    );
+    return { blob: file, width: decoded.width, height: decoded.height };
   } finally {
     decoded.close?.();
   }

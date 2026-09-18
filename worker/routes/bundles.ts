@@ -48,6 +48,7 @@
  * in the tree and a live write path into the frozen tables.
  */
 
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -122,8 +123,8 @@ bundlesRoutes.get('/', async (c) => {
     where += " AND p.composition <> ''";
   }
   if (search) {
-    where += ' AND (p.name LIKE ? OR p.name_ar LIKE ? OR p.name_ku LIKE ? OR p.description LIKE ?)';
-    const like = `%${search}%`;
+    where += ` AND (${sqlLikeClause(['p.name', 'p.name_ar', 'p.name_ku', 'p.description'])})`;
+    const like = likePattern(search);
     params.push(like, like, like, like);
   }
   if (categoryId) {

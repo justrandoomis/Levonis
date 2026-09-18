@@ -597,3 +597,110 @@ test('a bucket that throws after the commit does not turn a finished delete into
   assert.ok(Number(body.r2_cleanup_pending) >= 1, 'and the file is reported as still pending, not as done');
   assert.equal((raw.prepare("SELECT COUNT(*) AS n FROM products WHERE id='p1'").get() as { n: number }).n, 0);
 });
+
+/**
+ * THE DELETE THAT COULD NOT RUN ON D1, AND THE WILDCARD BUG UNDERNEATH IT.
+ *
+ * The live shop answered every Delete with
+ *
+ *     D1_ERROR: LIKE or GLOB pattern too complex: SQLITE_ERROR
+ *
+ * from one clause in `partitionSharedMedia`: `"col" LIKE '%' || ?2 || '%'`.
+ * SQLite evaluates `X LIKE Y` as `like(Y, X)`, so the PATTERN is the built
+ * string, and D1 caps pattern length far below SQLite's own default — low
+ * enough that an ordinary R2 key went over it. Local SQLite has the generous
+ * default, so no test against this fixture could ever have reproduced the
+ * error; what it CAN prove is that the clause no longer uses a pattern at all.
+ *
+ * And the second half is a real behavioural bug that local SQLite does show:
+ * `_` is a LIKE wildcard, R2 keys may contain one, and a key that matches
+ * another product's key by wildcard is reported SHARED — which means its file
+ * is left in the bucket forever on every delete.
+ */
+test('no LIKE pattern is built from a value — that is what D1 refused', () => {
+  const src = readFileSync(join(ROOT, 'worker/lib/productDeletion.ts'), 'utf8');
+  const code = src
+    .split('\n')
+    .filter((l) => !l.trimStart().startsWith('*') && !l.trimStart().startsWith('//'))
+    .join('\n');
+  assert.doesNotMatch(
+    code,
+    /LIKE\s*'%'\s*\|\|/,
+    "a LIKE pattern concatenated from a bound value is what produced 'pattern too complex' on D1"
+  );
+  assert.match(code, /instr\(/, 'the substring test is instr(), which takes no pattern and has no such limit');
+});
+
+test('AN UNDERSCORE IN A KEY IS A LETTER, NOT A WILDCARD', async () => {
+  const raw = freshDb();
+  // Two products. The second holds a key that differs from the first ONLY where
+  // the first has an underscore — so `LIKE` would call them the same file and
+  // `instr` does not.
+  raw.prepare(
+    "INSERT INTO products (id, slug, name, name_ar, price_iqd, status, images) VALUES ('p1','a','A','أ',1,'active', ?)"
+  ).run(JSON.stringify(['/files/products/catalog/gallery/ab_cd.webp']));
+  raw.prepare(
+    "INSERT INTO products (id, slug, name, name_ar, price_iqd, status, images) VALUES ('p2','b','B','ب',1,'active', ?)"
+  ).run(JSON.stringify(['/files/products/catalog/gallery/abXcd.webp']));
+
+  const db = new SqliteD1(raw) as unknown as D1Database;
+  const { partitionSharedMedia } = await import('../worker/lib/productDeletion');
+
+  // p1's own key, asked of everything that is NOT p1. Only p2 holds anything,
+  // and p2's key is a different file.
+  const { shared, owned } = await partitionSharedMedia(db, 'p1', ['products/catalog/gallery/ab_cd.webp']);
+  assert.deepEqual(shared, [], 'p2 holds a DIFFERENT file — the underscore must not match p2`s X');
+  assert.deepEqual(owned, ['products/catalog/gallery/ab_cd.webp'], 'so the file is p1`s to delete');
+
+  // And a genuinely shared key is still detected, which is the property the
+  // whole function exists for: a false negative here destroys a live image.
+  raw.prepare("UPDATE products SET images = ? WHERE id = 'p2'").run(
+    JSON.stringify(['/files/products/catalog/gallery/ab_cd.webp'])
+  );
+  const second = await partitionSharedMedia(db, 'p1', ['products/catalog/gallery/ab_cd.webp']);
+  assert.deepEqual(second.shared, ['products/catalog/gallery/ab_cd.webp'], 'a real share is still a share');
+  assert.deepEqual(second.owned, []);
+});
+
+/**
+ * A SENTENCE IS NOT A FILENAME.
+ *
+ * `mediaKeyFromRef` hands back whatever it was given when the value is not a
+ * URL, and everything it returns is queued for a REAL R2 deletion. A `data:`
+ * URI pasted into an image field, and a paragraph of usage-guide prose that
+ * happens to mention `/files/`, both became "keys" — 223 characters and 130
+ * bytes of Arabic respectively. Nothing downstream asked whether they could
+ * possibly name an object this shop stored.
+ *
+ * They are gated on `isSafeMediaKey` now, the same validator every WRITE
+ * already passes. Anything it refuses was never stored under that name, so it
+ * cannot be a file to delete.
+ */
+test('a data: URI and a paragraph of prose never become keys to delete', async () => {
+  const raw = freshDb();
+  raw.prepare(
+    "INSERT INTO products (id, slug, name, name_ar, price_iqd, status, usage_guide) VALUES ('p1','a','A','أ',1,'active', ?)"
+  ).run(
+    JSON.stringify([
+      'افتح الصندوق ثم راجع الصور في /files/ قبل التركيب، وتأكد من محتويات العلبة بالكامل قبل البدء.',
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    ])
+  );
+  raw.prepare(
+    `INSERT INTO product_images (id, product_id, url, alt_en, alt_ar, alt_ckb, sort_order, is_primary, content_type, r2_key, source_url)
+     VALUES ('pi1','p1','data:image/png;base64,iVBORw0KGgo=','','','',0,1,'image/png','products/catalog/gallery/real.webp','')`
+  ).run();
+
+  const db = new SqliteD1(raw) as unknown as D1Database;
+  const { collectProductMediaKeys } = await import('../worker/lib/productDeletion');
+  const keys = [...(await collectProductMediaKeys(db, 'p1'))];
+
+  assert.deepEqual(
+    keys,
+    ['products/catalog/gallery/real.webp'],
+    'only the real key — the prose and the data: URI are not files'
+  );
+  for (const k of keys) {
+    assert.ok(k.length <= 500 && !k.includes(' '), `"${k.slice(0, 40)}…" is not a plausible R2 key`);
+  }
+});

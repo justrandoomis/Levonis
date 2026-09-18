@@ -102,12 +102,30 @@ test('header dimensions are bounded before product media is accepted', () => {
   assert.equal(validRasterDimensions({ width: 10_000, height: 10_000 }), false);
 });
 
-test('upload route re-sniffs bytes and accepts product PNG/JPEG without browser conversion', () => {
+/**
+ * THE ROUTE NO LONGER *ACCEPTS* A PNG — IT CONVERTS ONE.
+ *
+ * This test used to pin "accepts product PNG/JPEG without browser conversion",
+ * which was true and was the defect: the format a product photo was stored in
+ * depended on which browser the owner happened to be using, because the only
+ * conversion ran on a canvas and `canvas.toBlob(cb, 'image/webp')` falls back to
+ * PNG, silently, wherever there is no WebP encoder.
+ *
+ * `env.IMAGES` converts the bytes the Worker is already holding, the same way
+ * for every device. What this test pins now is that the route measures and
+ * stores the CONVERTED bytes — a key or a contentType taken from the sniffed
+ * original would be the same lie in a new place.
+ */
+test('the upload route converts server-side and records what it actually stored', () => {
   const route = readFileSync(new URL('../worker/routes/uploads.ts', import.meta.url), 'utf8');
   const browser = readFileSync(new URL('../src/lib/imagePreprocess.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(route, /PRODUCT_IMAGE_REQUIRES_WEBP/);
-  assert.match(route, /rasterDimensions\(buf, kind\.mime\)/);
-  assert.match(route, /kind\.mime === 'image\/png'/);
+  assert.match(route, /convertToWebp\(c\.env, buf, kind\.mime\)/, 'the server does the converting');
+  assert.match(route, /rasterDimensions\(buf, storedMime\)/, 'measured on the bytes that will be stored');
+  assert.match(route, /extension: storedExt/, 'and the key names the format that is really in the bucket');
+  assert.match(route, /IMAGE_CONVERT_UNAVAILABLE/, 'no binding is refused, never silently stored as-is');
+  // The browser pass survives as a SHRINK — it saves the uplink on a phone —
+  // so the canvas settings that preserve alpha still matter.
   assert.match(browser, /getContext\('2d', \{ alpha: true \}\)/);
   assert.doesNotMatch(browser, /fillRect\(/);
 });

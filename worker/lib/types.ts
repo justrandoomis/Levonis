@@ -10,6 +10,16 @@ export interface Env {
   R2_PUBLIC?: R2Bucket;
   /** New authenticated/sensitive media bucket. Optional during rolling/local setup. */
   R2_PRIVATE?: R2Bucket;
+  /**
+   * Cloudflare Workers Images — server-side format conversion.
+   *
+   * OPTIONAL, and that is not hedging: `wrangler dev` without the entitlement,
+   * a unit test, and an account whose Images subscription lapses all present
+   * the same way — `undefined`. `worker/lib/imageConvert.ts` is the only place
+   * allowed to read it, so there is exactly one answer to "what happens when it
+   * is not there" instead of one per call site.
+   */
+  IMAGES?: ImagesBinding;
   ASSETS: Fetcher;
   GOOGLE_CLIENT_ID: string;
   INITIAL_ADMIN_EMAIL: string;

@@ -28,6 +28,7 @@
  * support access.
  */
 
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
@@ -612,10 +613,6 @@ function deviceCard(d: DeviceLite, loc: Locale): AssistantCard {
   };
 }
 
-function escapeLike(s: string): string {
-  return s.replace(/[\\%_]/g, (ch) => `\\${ch}`);
-}
-
 // ------------------------------------------------------------------ handlers
 
 async function handleOrderStatus(c: Context<AppContext>, user: SessionUser, params: Record<string, unknown>, loc: Locale): Promise<AssistantReply> {
@@ -761,7 +758,7 @@ function handlePasswordHelp(loc: Locale, signedIn: boolean): AssistantReply {
 async function handleProductSearch(c: Context<AppContext>, params: Record<string, unknown>, freeText: string, loc: Locale): Promise<AssistantReply> {
   const q = str(params.q, 'q', { max: 100, required: false }) || freeText.trim();
   if (q.length < 2) return { intent: 'product_search', text: tr(loc, 'search_empty') };
-  const like = `%${escapeLike(q)}%`;
+  const like = likePattern(q);
   const { results } = await c.env.DB.prepare(
     `SELECT * FROM products
       WHERE status = 'active'
@@ -1245,8 +1242,8 @@ supportRoutes.get('/admin/members', async (c) => {
   const conds: string[] = [];
   const params: unknown[] = [];
   if (q) {
-    const like = `%${escapeLike(q)}%`;
-    conds.push("(email LIKE ? ESCAPE '\\' OR username LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\')");
+    const like = likePattern(q);
+    conds.push(`(${sqlLikeClause(['email', 'username', 'name'])})`);
     params.push(like, like, like);
   }
   if (tier === 'pro' || tier === 'prime' || tier === 'plus') {

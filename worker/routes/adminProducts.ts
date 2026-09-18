@@ -15,6 +15,7 @@
  * mutations are written to the audit log.
  */
 
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -502,8 +503,8 @@ adminProductsRoutes.get('/', async (c) => {
   if (search) {
     // SKU is searchable too: §4 made it a real identifier, and an admin who
     // has a packing slip in hand has the SKU, not the Arabic name.
-    clauses.push('(name LIKE ? OR name_ar LIKE ? OR name_ku LIKE ? OR slug LIKE ? OR sku LIKE ?)');
-    const like = `%${search}%`;
+    clauses.push(`(${sqlLikeClause(['name', 'name_ar', 'name_ku', 'slug', 'sku'])})`);
+    const like = likePattern(search);
     params.push(like, like, like, like, like);
   }
   if (['draft', 'active', 'hidden'].includes(q.status ?? '')) {

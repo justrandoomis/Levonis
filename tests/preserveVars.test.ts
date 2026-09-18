@@ -99,6 +99,11 @@ test('prepare-deploy-config.mjs uses the extracted module and kept everything el
   assert.match(src, /if \(!inWorkersBuilds\) process\.exit\(0\)/, 'it still does nothing outside Workers Builds');
   assert.match(src, /Refusing to guess which database this Worker should bind to/, 'it still refuses an ambiguous environment');
   assert.match(src, /wrangler', 'd1', 'list', '--json'/, 'it still resolves the D1 id by name');
-  assert.match(src, /for \(const key of \['name', 'd1_databases', 'r2_buckets', 'vars', 'assets', 'observability', 'triggers'\]\)/, 'it still folds the target environment into the top level');
+  // `images` joined the fold list when server-side WebP conversion landed: it
+  // is a NON-INHERITABLE wrangler key, so an environment folded without it
+  // deploys a Worker where `env.IMAGES` is undefined and every upload quietly
+  // stops being converted. The list IS the contract between wrangler.jsonc's
+  // environments and the bare `wrangler deploy` this build ends with.
+  assert.match(src, /for \(const key of \['name', 'd1_databases', 'r2_buckets', 'images', 'vars', 'assets', 'observability', 'triggers'\]\)/, 'it still folds the target environment into the top level, now including images');
   assert.match(src, /mergeVars\(cfg\.vars, live, fromEnv\)/, 'the merge is the shared one');
 });

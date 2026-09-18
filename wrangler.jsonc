@@ -8,6 +8,26 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "levonis",
   "main": "worker/index.ts",
+  /**
+   * NEVER DELETE A VAR THIS FILE DID NOT MENTION.
+   *
+   * `wrangler deploy` replaces a Worker's plain-text vars WHOLESALE by default,
+   * so any deploy carrying an incomplete config silently erases the rest. That
+   * took Google sign-in, password reset, email verification and email sign-in
+   * codes off the live shop on 2026-09-18 (see the note at `vars`, and
+   * docs/AUTH_PROVIDERS.md §10).
+   *
+   * With this, wrangler leaves untouched any variable it is not explicitly
+   * given. Deploys that DO mean to set a value still set it — workflow 7 passes
+   * every one with --var — so nothing loses the ability to configure the
+   * Worker; what is lost is the ability to blank it by omission.
+   *
+   * TOP-LEVEL ONLY: wrangler refuses this key inside a named environment, so it
+   * cannot be repeated in env.staging / env.dark and does not need to be.
+   * `tests/deployVarsSurvive.test.ts` fails if it is removed.
+   */
+  "keep_vars": true,
+
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
 
@@ -70,35 +90,63 @@
     }
   ],
 
+  /**
+   * SERVER-SIDE IMAGE CONVERSION, so a picture does not depend on the phone it
+   * was taken with.
+   *
+   * The conversion to WebP used to run in the BROWSER, on a canvas, and a
+   * browser is not a place a rule can be enforced: `canvas.toBlob(cb,
+   * 'image/webp')` is specified to fall back to PNG on a runtime with no WebP
+   * encoder, silently, with a valid Blob. So the owner's own phone decided the
+   * format, and on the wrong phone the answer was "converted" and the database
+   * held a PNG.
+   *
+   * `env.IMAGES` is Cloudflare's Workers Images binding: it takes the BYTES the
+   * Worker is already holding and returns WebP, the same way for every visitor.
+   * The other mechanism — `fetch(url, { cf: { image } })` — cannot see bytes in
+   * memory, and in this Worker it would re-enter itself through `/files/*` in
+   * `run_worker_first` and fail; that is the live bug behind the hand-written
+   * MEDIA_TRANSFORM_UNAVAILABLE fallback in routes/media.ts.
+   *
+   * NON-INHERITABLE, so it is repeated in every environment below. An
+   * environment that omits it gets `env.IMAGES === undefined`, which
+   * `worker/lib/imageConvert.ts` degrades on honestly rather than crashing —
+   * but the point of declaring it here is that no environment has to.
+   */
+  "images": { "binding": "IMAGES" },
+
   // Non-secret runtime configuration. GOOGLE_CLIENT_ID and
   // INITIAL_ADMIN_EMAIL are passed by the deploy workflows via --var.
   // Secrets (TELEGRAM_BOT_TOKEN, optional GEMINI/EMAIL keys) are uploaded
   // with `wrangler secret put` by the workflows — never committed.
   //
   // ⚠ AN EMPTY STRING HERE IS NOT "UNSET". IT IS AN INSTRUCTION TO BLANK THE
-  // LIVE VALUE. `wrangler deploy` replaces a Worker's plain-text vars WHOLESALE,
-  // so any deploy that reads this file and does NOT pass --var writes these
-  // empty strings over whatever the Worker is running on.
+  // LIVE VALUE — unless `keep_vars` stops it, which is why that key is set at
+  // the top of this file and must stay there.
   //
-  // That is not hypothetical. On 2026-09-18, workflow 7 finished at 03:37:56
-  // with the live site reporting google:true, passwordReset:true,
+  // WHAT HAPPENED, with timestamps. On 2026-09-18 workflow 7 finished at
+  // 03:37:56 with the live site reporting google:true, passwordReset:true,
   // emailVerification:true and nine vars intact. A push to the default branch
-  // at 03:57 fired the Cloudflare Workers Builds Git integration — a SECOND
-  // deployer, which reads this file and passes no --var — and by 04:00 the live
-  // site reported google:false, googleClientId:"" and emailOtp:false. The
-  // WhatsApp key survived only because it is a SECRET, and secrets live in a
-  // different store that `wrangler deploy` does not touch.
+  // at 03:57 fired the Cloudflare Workers Builds deploy, and by 04:00 the site
+  // reported google:false, googleClientId:"" and emailOtp:false — while
+  // whatsappOtp stayed TRUE, because that one is a SECRET and secrets live in a
+  // store `wrangler deploy` does not touch. A var lost beside a secret kept is
+  // the signature of this failure every time.
   //
-  // So: Google sign-in, password reset, email verification and email sign-in
-  // codes go dark on EVERY push to the default branch, silently, and come back
-  // only when somebody runs workflow 7 again.
+  // AND THE GUARD THAT WAS ALREADY THERE IS WHY IT LOOKED RANDOM.
+  // `scripts/prepare-deploy-config.mjs` exists precisely to preserve the live
+  // vars on that build path, and it tries: it reads the running Worker and
+  // merges. But the read is `await liveVars(cfg.name).catch(() => null)` — when
+  // the build container cannot authenticate that read, `live` is null, the
+  // merge falls back to what this file declares, and these empty strings go out
+  // over a working site. The script even warns into the build log, which nobody
+  // reads until something is already dark.
   //
-  // THE FIX IS ONE DEPLOYER, not a better file. Disconnect the Git integration
-  // in Cloudflare (Workers & Pages → levonis-staging → Settings → Builds) and
-  // deploy through workflow 7, which reads the running Worker's vars FIRST and
-  // carries every one of them forward. The alternative — real values committed
-  // here — puts the owner's configuration in the repository, which is a
-  // decision for the owner and not a default taken by this file.
+  // `keep_vars: true` removes the question. Wrangler then leaves alone any var
+  // it is not explicitly given, so a deploy whose var read failed can no longer
+  // blank anything — and workflow 7, which passes every value with --var, still
+  // sets exactly what it means to. A guard that depends on a network call
+  // succeeding is not a guard; this one cannot fail.
   //
   // See docs/AUTH_PROVIDERS.md §10.
   "vars": {
@@ -172,6 +220,7 @@
           "bucket_name": "levonis-media-private-staging"
         }
       ],
+      "images": { "binding": "IMAGES" },
       "vars": {
         "GOOGLE_CLIENT_ID": "",
         "INITIAL_ADMIN_EMAIL": "",
@@ -246,6 +295,7 @@
           "bucket_name": "levonis-media-private-dark"
         }
       ],
+      "images": { "binding": "IMAGES" },
       "vars": {
         // The same names env.staging declares — an undeclared name is a name
         // the deploy-config preservation pass cannot see, and an unpreserved

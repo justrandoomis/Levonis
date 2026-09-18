@@ -38,6 +38,7 @@
  * `migrations/0059_bundles_migrate_legacy.sql` onward; nothing here writes them.
  */
 
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -217,8 +218,9 @@ adminBundlesRoutes.get('/', async (c) => {
     args.push(status);
   }
   if (search) {
-    where.push('(lower(name) LIKE ? OR lower(name_ar) LIKE ? OR lower(slug) LIKE ?)');
-    args.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    where.push(`(${sqlLikeClause(['lower(name)', 'lower(name_ar)', 'lower(slug)'])})`);
+    const like = likePattern(search);
+    args.push(like, like, like);
   }
   const { results } = await c.env.DB.prepare(
     `SELECT * FROM products WHERE ${where.join(' AND ')} ORDER BY display_order, created_at DESC LIMIT 200`

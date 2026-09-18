@@ -1,3 +1,4 @@
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import { asDocument } from '../lib/securityPolicy';
 import { approvableWithdrawalSql, decideDeposit } from '../lib/walletOps';
@@ -416,8 +417,8 @@ adminRoutes.get('/users', async (c) => {
                FROM users`;
   const params: unknown[] = [];
   if (search) {
-    sql += ' WHERE email LIKE ? OR username LIKE ? OR name LIKE ?';
-    const like = `%${search}%`;
+    sql += ` WHERE ${sqlLikeClause(['email', 'username', 'name'])}`;
+    const like = likePattern(search);
     params.push(like, like, like);
   }
   sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
