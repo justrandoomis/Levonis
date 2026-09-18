@@ -194,7 +194,8 @@ function SettingsBook({
   const pages = uiTree[builder] ?? [];
   // React DOM has no `defaultOpen` for <details> (the monolith's attribute was
   // silently dropped) — open state is tracked explicitly instead.
-  const [openPages, setOpenPages] = useState<Set<number>>(() => new Set<number>());
+  const [openPages, setOpenPages] = useState<Set<number>>(() => new Set([0]));
+  const [loadedPages, setLoadedPages] = useState<Set<number>>(() => new Set([0]));
   return <div className="settings-book">{pages.map((page, index) => (
     <details
       key={`${builder}:${page.page}:${index}`}
@@ -208,10 +209,11 @@ function SettingsBook({
           else next.delete(index);
           return next;
         });
+        if (isOpen) setLoadedPages((current) => current.has(index) ? current : new Set(current).add(index));
       }}
     >
       <summary>{page.page}</summary>
-      {openPages.has(index) && <Panel settings={settings} setSettings={setSettings} embedded only={{ builder, page: page.page }} />}
+      {loadedPages.has(index) && <Panel settings={settings} setSettings={setSettings} embedded only={{ builder, page: page.page }} />}
     </details>
   ))}</div>;
 }
@@ -253,6 +255,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
    * state — so the inline transform is only applied while it is non-zero and
    * the CSS transition owns every other movement.
    */
+  const [sheetDrag, setSheetDrag] = useState(0);
   const sheetRef = useRef<HTMLElement | null>(null);
   const [profileId, setProfileId] = useState<ProfileId>(DEFAULT_PROFILE_ID);
   const [quality, setQuality] = useState<QualityId>("standard");
@@ -562,6 +565,18 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     }),
     getMeta: () => ({ schemaVersion: 2, engineVersion: "three-slicer@0.2.2" }),
     contentSignature: () => projectContentSignature(),
+    /**
+     * NOT WHILE A SLICE IS RUNNING.
+     *
+     * The effect below already refuses to call `markDirty()` during a slice,
+     * and that was not enough: on a constrained device the debounce is nine
+     * seconds, so a timer armed by the edit that PRECEDED the slice fires
+     * squarely inside it — and what runs then is a full engine 3MF export, a
+     * canvas read-back and a SHA-256 over the whole file, on the main thread,
+     * while the kernel has the CPU and the phone's memory is already spent on
+     * the WASM heap. The save is deferred, never dropped.
+     */
+    busy: () => status === "slicing",
     // A save costs a full 3MF export, a canvas read-back and a SHA-256 over
     // the result. On a phone that is worth doing less often; see
     // app/device-profile.ts.
@@ -1438,16 +1453,14 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     let travelled = 0;
     const move = (moveEvent: PointerEvent) => {
       travelled = Math.max(0, moveEvent.clientY - startY);
-      const sheet = sheetRef.current;
-      if (sheet) { sheet.style.transition = "none"; sheet.style.transform = `translateY(${travelled}px)`; }
+      setSheetDrag(travelled);
     };
     const end = (endEvent: PointerEvent) => {
       node.releasePointerCapture?.(endEvent.pointerId);
       node.removeEventListener("pointermove", move);
       node.removeEventListener("pointerup", end);
       node.removeEventListener("pointercancel", end);
-      const sheet = sheetRef.current;
-      if (sheet) { sheet.style.transform = ""; sheet.style.transition = ""; }
+      setSheetDrag(0);
       const elapsed = Math.max(1, endEvent.timeStamp - startedAt);
       const flicked = travelled > 48 && travelled / elapsed > 0.5;
       if (flicked || (height > 0 && travelled > height / 3)) setSheet(null);
@@ -2122,6 +2135,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           aria-modal="true"
           aria-label={sheetTitle}
           tabIndex={-1}
+          style={sheetDrag > 0 ? { transform: `translateY(${sheetDrag}px)`, transition: "none" } : undefined}
         >
           <div
             className="sheet-handle"

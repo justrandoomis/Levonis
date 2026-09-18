@@ -1118,3 +1118,80 @@ test("a null content hash stays an ordinary value, not a new state", async () =>
   // server — not the local draft's.
   assert.match(persistence, /opened\.revision\.content_hash/);
 });
+
+// ---------------------------------------------------------------------------
+// A DEBOUNCED SAVE MUST NOT LAND INSIDE A SLICE
+// ---------------------------------------------------------------------------
+
+test("a debounce armed before a slice waits for it — the capture never runs mid-slice", async () => {
+  /**
+   * The shell already refuses to call markDirty() while `status === "slicing"`.
+   * That is not enough: on a constrained device the debounce is NINE SECONDS,
+   * so the timer armed by the edit that preceded the slice fires squarely
+   * inside it — and the capture is a full engine 3MF export plus a canvas
+   * read-back plus a SHA-256 over the whole file, on the main thread, while
+   * the kernel owns the CPU and the phone's memory is already spent on the
+   * WASM heap. It is the lag and the dead slice worker at the same time.
+   */
+  const { timers, advance } = makeTimers();
+  const callbacks = makeCallbacks();
+  let slicing = true;
+  callbacks.busy = () => slicing;
+  const controller = new ProjectSyncController({ userId: null, callbacks, timers, debounceMs: 100 });
+
+  controller.markDirty();
+  await advance(100);
+  await idle(controller);
+  assert.equal(callbacks.persisted.length, 0, "nothing was captured while the slice was running");
+  assert.equal(controller.getState().dirty, true, "and the edit is still owed a save");
+
+  // Still waiting one whole debounce later — deferral is not a single skip.
+  await advance(100);
+  await idle(controller);
+  assert.equal(callbacks.persisted.length, 0);
+
+  slicing = false;
+  await advance(100);
+  await idle(controller);
+  assert.equal(callbacks.persisted.length, 1, "the save happens one debounce after the editor is free");
+  assert.equal(controller.getState().dirty, false);
+  controller.dispose();
+});
+
+test("an EXPLICIT save is never deferred — intent and teardown outrank the guard", async () => {
+  // The Save button pressed during a slice is the user's call, and the flush
+  // on unmount must not be refused or the work is lost.
+  const { timers } = makeTimers();
+  const callbacks = makeCallbacks();
+  callbacks.busy = () => true;
+  const controller = new ProjectSyncController({ userId: null, callbacks, timers, debounceMs: 100 });
+
+  await controller.saveNow();
+  await idle(controller);
+  assert.equal(callbacks.persisted.length, 1, "saveNow() bypasses the busy guard");
+  controller.dispose();
+});
+
+test("a busy() that throws is read as not busy — a broken guard must not stop saving", async () => {
+  const { timers, advance } = makeTimers();
+  const callbacks = makeCallbacks();
+  callbacks.busy = () => { throw new Error("no"); };
+  const controller = new ProjectSyncController({ userId: null, callbacks, timers, debounceMs: 100 });
+
+  controller.markDirty();
+  await advance(100);
+  await idle(controller);
+  assert.equal(callbacks.persisted.length, 1, "the save still happened");
+  controller.dispose();
+});
+
+test("no busy() at all behaves exactly as before", async () => {
+  const { timers, advance } = makeTimers();
+  const callbacks = makeCallbacks();
+  const controller = new ProjectSyncController({ userId: null, callbacks, timers, debounceMs: 100 });
+  controller.markDirty();
+  await advance(100);
+  await idle(controller);
+  assert.equal(callbacks.persisted.length, 1);
+  controller.dispose();
+});

@@ -708,6 +708,31 @@ export interface ProjectSyncCallbacks {
    * to skip work that would have produced identical bytes.
    */
   contentSignature?(): string | null;
+
+  /**
+   * "Not right now." True while the editor is doing something a DEBOUNCED save
+   * must not land in the middle of.
+   *
+   * WHY IT EXISTS. The shell already refuses to call `markDirty()` during a
+   * slice, and that is not enough: on a constrained device the debounce is
+   * nine seconds, so a timer armed by the edit that preceded the slice fires
+   * squarely inside it. What then runs is the most expensive thing this editor
+   * does — a full engine 3MF export (merge every object's geometry, write the
+   * XML, deflate it), a canvas read-back, and a SHA-256 needing the whole
+   * multi-megabyte file in one ArrayBuffer — on the main thread, at the moment
+   * the kernel owns the CPU and the phone's memory budget is already spent on
+   * the WASM heap. That is both halves of the owner's report at once: the
+   * editor goes sticky, and the slice worker is what gets killed.
+   *
+   * ONLY THE DEBOUNCED PATH ASKS. An explicit `saveNow()` — the Save button,
+   * the flush on unmount — is intent or teardown and is never deferred: the
+   * user asking to save during a slice is the user's call, and refusing a
+   * teardown flush would lose work.
+   *
+   * A deferral re-arms the debounce rather than dropping the save, so nothing
+   * is forgotten; the save happens one debounce after the editor is free.
+   */
+  busy?(): boolean;
 }
 
 export interface SyncTimers {
@@ -817,6 +842,19 @@ export class ProjectSyncController {
     if (this.debounceHandle !== null) this.timers.clear(this.debounceHandle);
     this.debounceHandle = this.timers.set(() => {
       this.debounceHandle = null;
+      // Never start the expensive capture inside a slice — see the doc comment
+      // on ProjectSyncCallbacks.busy. Re-arm rather than drop: the save then
+      // happens one debounce after the editor is free.
+      let busy = false;
+      try {
+        busy = this.opts.callbacks.busy?.() === true;
+      } catch {
+        busy = false;
+      }
+      if (busy) {
+        this.markDirty();
+        return;
+      }
       void this.saveNow();
     }, this.opts.debounceMs);
   }

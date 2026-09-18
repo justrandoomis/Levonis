@@ -74,6 +74,13 @@ export interface UseProjectPersistenceOptions {
    * save.
    */
   contentSignature?: () => string | null;
+  /**
+   * True while a DEBOUNCED autosave must wait — see the doc comment on
+   * ProjectSyncCallbacks.busy in app/project-sync.ts. The shell answers "a
+   * slice is running": the capture is a full 3MF export on the main thread,
+   * and on a phone that is exactly what the slice worker does not survive.
+   */
+  busy?: () => boolean;
   debounceMs?: number;
   api?: StudioProjectsApi;
 }
@@ -150,6 +157,7 @@ export function useProjectPersistence(options: UseProjectPersistenceOptions): Us
       buildManifest: (kind) => callbacksRef.current.buildManifest(kind),
       getMeta: () => callbacksRef.current.getMeta(),
       contentSignature: () => callbacksRef.current.contentSignature?.() ?? null,
+      busy: () => callbacksRef.current.busy?.() === true,
       persistDraft: async (payload) => {
         const draft = callbacksRef.current.buildDraft(payload);
         await saveDraft(namespace, draft);
