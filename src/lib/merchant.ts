@@ -458,6 +458,20 @@ export interface StoreQuote {
   coupon_code: string;
   discount_iqd: number;
   total_iqd: number;
+  /**
+   * PREPAID ONLY (§74). A community-store order is paid from the wallet
+   * before the merchant ships it — there is no cash on delivery and no
+   * warehouse pickup on this path — so the quote answers whether the wallet
+   * can actually pay, rather than leaving the customer to find out at the
+   * last tap. Every number is the server's.
+   */
+  payment_method: 'wallet';
+  /** Spendable only — money already held for another order is not it. */
+  wallet_available_iqd: number;
+  wallet_covers: boolean;
+  wallet_shortfall_iqd: number;
+  /** Absolute: a merchant subdomain does not route `/wallet` itself. */
+  wallet_topup_url: string;
 }
 
 export const storeCheckoutApi = {
@@ -471,7 +485,10 @@ export const storeCheckoutApi = {
   removeLine: (cartItemId: string) => api.delete<MerchantCartData>(`/api/cart/merchant-items/${cartItemId}`),
   quote: (couponCode = '') =>
     api.post<{ quote: StoreQuote }>('/api/store-orders/quote', couponCode ? { couponCode } : {}),
-  place: (body: { addressId: string; payWithWallet: boolean; idempotencyKey: string; couponCode?: string }) =>
+  // No `payWithWallet`: there is nothing to choose. The server refuses an
+  // explicit `false` with STORE_PREPAID_ONLY rather than silently charging a
+  // wallet for a method the customer did not pick.
+  place: (body: { addressId: string; idempotencyKey: string; couponCode?: string }) =>
     api.post<{ order: Record<string, unknown>; replay?: boolean }>('/api/store-orders', body),
 };
 

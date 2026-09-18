@@ -88,7 +88,13 @@ test('merchant checkout uses the same reachable viewport, choices, and in-flow a
   assert.match(checkout, /h-full min-h-0 bg-canvas[^\n]+flex flex-col/);
   assert.match(checkout, /min-h-0 flex-1 overflow-y-auto/);
   assert.match(checkout, /aria-pressed=\{addressId === a\.id\}/);
-  assert.match(checkout, /aria-pressed=\{payWithWallet\}/);
+  // Payment is NOT a choice here and must not be dressed as one: a community
+  // order is prepaid from the wallet (tests/merchantCartSeparation.test.ts),
+  // so there is no pressed state to render — only a balance and, when it is
+  // short, the one action that changes the answer.
+  assert.doesNotMatch(checkout, /Cash on delivery/);
+  assert.doesNotMatch(checkout, /payWithWallet/);
+  assert.match(checkout, /wallet_covers/);
   assert.match(checkout, /htmlFor="store-coupon-code"/);
   assert.doesNotMatch(checkout, /className="[^"]*fixed bottom-0[^"]*"/);
 });

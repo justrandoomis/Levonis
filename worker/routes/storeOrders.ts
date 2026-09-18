@@ -23,6 +23,14 @@
  * and becomes `available` when it completes (§77) — so a merchant can see
  * what is coming without being able to spend it before the customer has the
  * goods.
+ *
+ * AND IT IS PREPAID. Every order on this path is paid from the customer's
+ * wallet before the merchant ships — there is no cash on delivery and no
+ * warehouse pickup, because Levonis holds neither the merchant's stock nor
+ * their cash and has nobody at either end to collect. The two halves of that
+ * rule are one line each and both are here: `delivery_method_id` is fixed to
+ * `'merchant'`, and `payment_method_id` to `'wallet'` with nothing due on
+ * delivery. Neither is a client's choice.
  */
 
 import { Hono } from 'hono';
@@ -34,8 +42,11 @@ import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { feeFor } from '../lib/merchantOps';
-import { exchangeRate, iqdToUsdCents } from '../lib/escrowOps';
-import { createPurchaseHold, commitHoldStatements, holdSettledEventStatements } from '../lib/walletOps';
+import { exchangeRate, iqdToUsdCents, usdCentsToIqd } from '../lib/escrowOps';
+import {
+  createPurchaseHold, commitHoldStatements, holdSettledEventStatements, getAvailableBalances,
+} from '../lib/walletOps';
+import { rootDomainFrom } from '../lib/hosts';
 
 export const storeOrderRoutes = new Hono<AppContext>();
 storeOrderRoutes.use('*', requireAuth);
@@ -189,14 +200,53 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode = ''): Promi
 
 /** What the order will cost, before committing to it. */
 storeOrderRoutes.post('/quote', async (c) => {
+  const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
   const cart = await priceMerchantCart(c, typeof body.couponCode === 'string' ? body.couponCode : '');
   // The commission base is what the customer actually pays for the goods.
   const split = await feeFor(c.env.DB, 'store', cart.subtotal_iqd - cart.discount_iqd);
+
+  // PREPAID ONLY. On this path the wallet is not one payment method among
+  // several — it is the only one — so whether it covers this total decides
+  // whether the order can be placed at all. That has to be on the screen
+  // BEFORE the button: a customer who finds out at the last tap has already
+  // chosen an address and typed a coupon for an order they cannot place.
+  //
+  // The comparison is done in CENTS, against the same conversion the hold
+  // will run, so the answer here and the answer there cannot disagree by a
+  // rounding step.
+  const [rate, balances] = await Promise.all([
+    exchangeRate(c.env.DB),
+    getAvailableBalances(c.env, user.id),
+  ]);
+  const requiredCents = iqdToUsdCents(cart.total_iqd, rate);
+
   return c.json({
     success: true,
     quote: {
       ...cart,
+      payment_method: 'wallet' as const,
+      /** Spendable only — money already held for another order is not it. */
+      wallet_available_iqd: usdCentsToIqd(balances.usd_cents_available, rate),
+      wallet_covers: requiredCents <= balances.usd_cents_available,
+      wallet_shortfall_iqd: Math.max(
+        0,
+        cart.total_iqd - usdCentsToIqd(balances.usd_cents_available, rate)
+      ),
+      /**
+       * Where to top up, as an ABSOLUTE url.
+       *
+       * A merchant subdomain serves the storefront app, which routes the
+       * cart, the checkout and the order history but deliberately not the
+       * wallet (§94) — so a relative `/wallet` from `ali3d.levonis-iq.com`
+       * lands on the shop's catch-all instead of the wallet, which is the
+       * one screen a customer who cannot pay actually needs. Only the server
+       * knows the root domain, so it is the server that answers.
+       */
+      wallet_topup_url: (() => {
+        const root = rootDomainFrom(c.env);
+        return root ? `https://${root}/wallet` : '/wallet';
+      })(),
       // Shown to the customer as a total; the commission split is the
       // merchant's and the platform's business, and is returned so the
       // merchant's own screens can render it without a second call.
@@ -238,7 +288,26 @@ storeOrderRoutes.post('/', async (c) => {
     .first<Record<string, unknown>>();
   if (!address) throw notFound('Address not found');
 
-  const payWithWallet = body.payWithWallet === true;
+  // PREPAID ONLY — the rule for every merchant sale in Levo community.
+  //
+  // A merchant's goods are shipped by the merchant, and Levonis holds neither
+  // the stock nor the cash: there is no driver of ours to collect at the door
+  // and no counter of ours to collect from, so cash on delivery and warehouse
+  // pickup are not options that happen to be turned off — they do not exist
+  // on this path. Delivery is already fixed to the merchant's own
+  // (`delivery_method_id = 'merchant'`, below), and payment is the wallet.
+  //
+  // This route USED TO accept `payWithWallet: false` and write the order as
+  // `cod` with the full total due on delivery, which is the order nobody
+  // could collect. A client that still offers the choice is now refused IN
+  // WORDS rather than having its customer's wallet silently debited for a
+  // method they did not pick.
+  if (body.payWithWallet === false) {
+    throw badRequest(
+      'Orders from a community store are paid from your wallet before the store ships them',
+      'STORE_PREPAID_ONLY'
+    );
+  }
   const cart = await priceMerchantCart(c, typeof body.couponCode === 'string' ? body.couponCode : '');
   const split = await feeFor(c.env.DB, 'store', cart.subtotal_iqd - cart.discount_iqd);
   const rate = await exchangeRate(c.env.DB);
@@ -246,33 +315,29 @@ storeOrderRoutes.post('/', async (c) => {
   // Wallet payment is reserved and committed in the same request. A hold
   // rather than a bare debit, so an insufficient balance writes nothing at
   // all instead of a half-paid order.
-  let walletCents = 0;
-  let holdId: string | null = null;
-  if (payWithWallet) {
-    walletCents = iqdToUsdCents(cart.total_iqd, rate);
-    const hold = await createPurchaseHold(c.env.DB, {
-      userId: user.id,
-      amountCents: walletCents,
-      // SERVER-MINTED, never the client's key. `wallet_holds.event_key` is
-      // global, so a key another account had already spent would refuse this
-      // buyer's hold — the same cross-user denial 0064 closes on `orders`.
-      // The hold is created before the order id exists, so the key is the
-      // user plus their key, which is exactly the pair 0064 makes unique.
-      eventKey: `store-order:${user.id}:${idempotencyKey}`,
-      refType: 'store_order',
-      refId: `${user.id}:${idempotencyKey}`,
-      note: `Order from ${cart.store_name}`,
-    });
-    if (!hold.ok) {
-      if (hold.reason === 'INSUFFICIENT_AVAILABLE') {
-        throw badRequest('Your wallet balance does not cover this order', 'INSUFFICIENT_FUNDS', {
-          required_iqd: cart.total_iqd,
-        });
-      }
-      throw badRequest('Could not reserve the payment', 'WALLET_ERROR', { reason: hold.reason });
+  const walletCents = iqdToUsdCents(cart.total_iqd, rate);
+  const hold = await createPurchaseHold(c.env.DB, {
+    userId: user.id,
+    amountCents: walletCents,
+    // SERVER-MINTED, never the client's key. `wallet_holds.event_key` is
+    // global, so a key another account had already spent would refuse this
+    // buyer's hold — the same cross-user denial 0064 closes on `orders`.
+    // The hold is created before the order id exists, so the key is the
+    // user plus their key, which is exactly the pair 0064 makes unique.
+    eventKey: `store-order:${user.id}:${idempotencyKey}`,
+    refType: 'store_order',
+    refId: `${user.id}:${idempotencyKey}`,
+    note: `Order from ${cart.store_name}`,
+  });
+  if (!hold.ok) {
+    if (hold.reason === 'INSUFFICIENT_AVAILABLE') {
+      throw badRequest('Your wallet balance does not cover this order', 'INSUFFICIENT_FUNDS', {
+        required_iqd: cart.total_iqd,
+      });
     }
-    holdId = hold.holdId;
+    throw badRequest('Could not reserve the payment', 'WALLET_ERROR', { reason: hold.reason });
   }
+  const holdId = hold.holdId;
 
   const orderId = `ORD-${newId().slice(0, 10).toUpperCase()}`;
   const ts = nowIso();
@@ -291,10 +356,12 @@ storeOrderRoutes.post('/', async (c) => {
                'merchant', ?, ?, 'store_product', ?, ?, ?, 'received', ?, ?, ?)`
     ).bind(
       orderId, user.id, JSON.stringify(address), JSON.stringify({ by: 'merchant', store: cart.store_name }),
-      payWithWallet ? 'wallet' : 'cod',
+      // Always 'wallet', and nothing is ever due at the door: see the
+      // prepaid-only rule above.
+      'wallet',
       cart.subtotal_iqd, cart.delivery_iqd, rate, cart.total_iqd,
-      payWithWallet ? 0 : cart.total_iqd,
-      payWithWallet ? cart.total_iqd : 0, walletCents,
+      0,
+      cart.total_iqd, walletCents,
       idempotencyKey, ts, ts,
       cart.merchant_id, cart.store_id,
       split.commission_percent_x100, split.platform_fee_iqd, split.merchant_receivable_iqd,
@@ -359,20 +426,18 @@ storeOrderRoutes.post('/', async (c) => {
   // buyer's spendable balance while the merchant was credited for the sale.
   // The debit's guard aborts the whole batch if the hold is not an active,
   // still-funded reservation, so no order can exist unpaid.
-  if (holdId) {
-    stmts.push(
-      ...commitHoldStatements(c.env.DB, {
-        holdId,
-        note: `Wallet payment on order ${orderId}`,
-        ref: orderId,
-      }),
-      // The settlement event (§3.9) rides in the SAME batch as the debit,
-      // guarded by it: this is the path that actually settles a store order,
-      // so publishing afterwards would lose the event to any crash in between.
-      // Nothing at all while the bus is off.
-      ...(await holdSettledEventStatements(c.env.DB, holdId))
-    );
-  }
+  stmts.push(
+    ...commitHoldStatements(c.env.DB, {
+      holdId,
+      note: `Wallet payment on order ${orderId}`,
+      ref: orderId,
+    }),
+    // The settlement event (§3.9) rides in the SAME batch as the debit,
+    // guarded by it: this is the path that actually settles a store order,
+    // so publishing afterwards would lose the event to any crash in between.
+    // Nothing at all while the bus is off.
+    ...(await holdSettledEventStatements(c.env.DB, holdId))
+  );
 
   // The hold taken above deliberately SURVIVES a failed batch: the key is
   // deterministic per user and checkout key, so the buyer's retry reuses that

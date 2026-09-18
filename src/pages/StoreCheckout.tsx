@@ -17,7 +17,7 @@ import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Check, Loader2, MapPin, Plus, Store, Tag, Wallet as WalletIcon, Banknote, ShoppingBag,
+  ArrowLeft, Check, Loader2, MapPin, Plus, Store, Tag, Wallet as WalletIcon, ShoppingBag,
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, type ApiAddress } from '../lib/api';
@@ -36,7 +36,6 @@ export default function StoreCheckout() {
   const [addresses, setAddresses] = useState<ApiAddress[] | null>(null);
   const [addressId, setAddressId] = useState('');
   const [addingAddress, setAddingAddress] = useState(false);
-  const [payWithWallet, setPayWithWallet] = useState(false);
   const [couponInput, setCouponInput] = useState('');
   const [coupon, setCoupon] = useState('');
   const [couponError, setCouponError] = useState('');
@@ -102,7 +101,6 @@ export default function StoreCheckout() {
     try {
       const r = await storeCheckoutApi.place({
         addressId,
-        payWithWallet,
         idempotencyKey: idemKey.current,
         ...(coupon ? { couponCode: coupon } : {}),
       });
@@ -111,9 +109,9 @@ export default function StoreCheckout() {
       if (e instanceof ApiError && e.code === 'INSUFFICIENT_FUNDS') {
         setPlaceError(
           loc(
-            'رصيد محفظتك لا يغطي هذا الطلب — اختر الدفع عند الاستلام أو اشحن المحفظة.',
-            'Your wallet balance does not cover this order — choose cash on delivery or top up.',
-            'باڵانسی جزدانەکەت بەش ناکات.'
+            'رصيد محفظتك لا يغطي هذا الطلب. اشحن المحفظة ثم أكمل الطلب.',
+            'Your wallet balance does not cover this order. Top up, then finish the order.',
+            'باڵانسی جزدانەکەت بەش ناکات. پڕی بکەرەوە.'
           )
         );
       } else {
@@ -122,6 +120,32 @@ export default function StoreCheckout() {
     } finally {
       setPlacing(false);
     }
+  }
+
+  /**
+   * The one action that changes a short balance — and it has to leave this
+   * hostname to do it.
+   *
+   * A merchant subdomain serves the storefront app, which routes the cart,
+   * the checkout and the order history but NOT the wallet (§94). A relative
+   * `/wallet` from there falls through to the shop's catch-all, so the link
+   * the customer needs most would quietly land them back in the catalogue.
+   * The server hands us the absolute url; on the main site we keep the
+   * in-app navigation, because a full page load there would throw the
+   * checkout away for no reason.
+   */
+  function topUpLink(label: string) {
+    const cls =
+      'lv-button lv-button-ghost min-h-11 mt-1.5 text-[12px] font-bold text-gold';
+    return hostStore ? (
+      <a href={quote?.wallet_topup_url ?? '/wallet'} className={cls}>
+        {label}
+      </a>
+    ) : (
+      <Link to="/wallet" className={cls}>
+        {label}
+      </Link>
+    );
   }
 
   if (done) {
@@ -263,31 +287,47 @@ export default function StoreCheckout() {
               )}
             </section>
 
-            {/* Payment */}
+            {/*
+              PAYMENT — A STATEMENT, NOT A CHOICE.
+              This section used to offer two buttons, and "cash on delivery"
+              was the one selected by default. It wrote the order as `cod`
+              with the whole total due at the door — an order with nobody to
+              collect it, because a merchant ships their own goods and
+              Levonis holds neither their stock nor their cash. There is one
+              way to pay here, so the screen says so and then answers the
+              only question that is actually open: does the wallet cover it.
+            */}
             <section className="lv-surface p-3.5">
-              <h2 className="text-white font-bold text-[13px] mb-2.5">{loc('طريقة الدفع', 'Payment', 'پارەدان')}</h2>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPayWithWallet(false)}
-                  aria-pressed={!payWithWallet}
-                  data-selected={!payWithWallet}
-                  className="lv-choice min-h-11 text-[12.5px] font-bold flex items-center justify-center gap-1.5"
+              <h2 className="text-white font-bold text-[13px] mb-1.5 flex items-center gap-1.5">
+                <WalletIcon className="w-4 h-4 text-gold" />
+                {loc('الدفع من المحفظة', 'Paid from your wallet', 'پارەدان لە جزدان')}
+              </h2>
+              <p className="text-zinc-400 text-[11.5px] leading-[1.6] mb-2.5">
+                {loc(
+                  'طلبات متاجر المجتمع تُدفع مقدمًا. لا دفع عند الاستلام ولا استلام من المخزن.',
+                  'Community-store orders are prepaid — no cash on delivery and no warehouse pickup.',
+                  'داواکاری فرۆشگاکانی کۆمەڵگە پێشوەخت دەدرێن.'
+                )}
+              </p>
+              <div className="flex items-center justify-between gap-2 text-[12.5px]">
+                <span className="text-zinc-400">{loc('الرصيد المتاح', 'Available balance', 'باڵانسی بەردەست')}</span>
+                <span
+                  className={`font-bold tabular-nums ${quote.wallet_covers ? 'text-zinc-200' : 'text-amber-400'}`}
+                  dir="ltr"
                 >
-                  <Banknote className="w-4 h-4" />
-                  {loc('عند الاستلام', 'Cash on delivery', 'لە کاتی گەیاندن')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPayWithWallet(true)}
-                  aria-pressed={payWithWallet}
-                  data-selected={payWithWallet}
-                  className="lv-choice min-h-11 text-[12.5px] font-bold flex items-center justify-center gap-1.5"
-                >
-                  <WalletIcon className="w-4 h-4" />
-                  {loc('من المحفظة', 'From wallet', 'لە جزدان')}
-                </button>
+                  {iqd(quote.wallet_available_iqd)}
+                </span>
               </div>
+
+              {!quote.wallet_covers && (
+                <div className="mt-2.5 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] p-2.5">
+                  <p className="text-amber-300 text-[12px] font-semibold">
+                    {loc('ينقصك', 'Short by', 'کەمته')}{' '}
+                    <span dir="ltr" className="tabular-nums">{iqd(quote.wallet_shortfall_iqd)}</span>
+                  </p>
+                  {topUpLink(loc('شحن المحفظة', 'Top up the wallet', 'پڕکردنەوەی جزدان'))}
+                </div>
+              )}
             </section>
 
             {/* The store's own coupon. */}
@@ -370,11 +410,7 @@ export default function StoreCheckout() {
             {placeError && (
               <div className="lv-alert lv-alert-danger">
                 <p className="text-text-secondary text-[12.5px]">{placeError}</p>
-                {payWithWallet && !hostStore && (
-                  <Link to="/wallet" className="text-gold text-[12px] font-bold mt-1 inline-block">
-                    {loc('شحن المحفظة', 'Top up the wallet', 'پڕکردنەوەی جزدان')}
-                  </Link>
-                )}
+                {topUpLink(loc('شحن المحفظة', 'Top up the wallet', 'پڕکردنەوەی جزدان'))}
               </div>
             )}
           </>
@@ -385,20 +421,28 @@ export default function StoreCheckout() {
       {quote && (
         <div className="shrink-0 border-t border-border-subtle/70 bg-surface-raised/98 px-3 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="max-w-2xl mx-auto">
+            {/* The wallet is the only way to pay here, so a balance that
+                cannot cover the total is as blocking as a missing address —
+                and is said in the same place, before the tap rather than
+                after it. */}
             <button
               onClick={place}
-              disabled={placing || !addressId}
+              disabled={placing || !addressId || !quote.wallet_covers}
               className="lv-button lv-button-primary w-full min-h-12 text-[14px]"
             >
               {placing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               {loc('تأكيد الطلب', 'Place the order', 'دووپاتکردنەوە')}
               <span dir="ltr">· {iqd(quote.total_iqd)}</span>
             </button>
-            {!addressId && (
+            {!addressId ? (
               <p className="text-amber-400/90 text-[11px] text-center mt-1.5">
                 {loc('اختر عنوان التوصيل أولًا', 'Choose a delivery address first', 'سەرەتا ناونیشان هەڵبژێرە')}
               </p>
-            )}
+            ) : !quote.wallet_covers ? (
+              <p className="text-amber-400/90 text-[11px] text-center mt-1.5">
+                {loc('اشحن المحفظة لإتمام الطلب', 'Top up the wallet to finish', 'جزدان پڕ بکەرەوە')}
+              </p>
+            ) : null}
           </div>
         </div>
       )}

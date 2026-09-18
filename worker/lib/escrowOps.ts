@@ -86,6 +86,20 @@ export function iqdToUsdCents(iqd: number, rate: number): number {
   return Math.ceil((iqd * 100) / Math.max(1, rate));
 }
 
+/**
+ * USD cents → IQD, rounding DOWN — the mirror of the rule above.
+ *
+ * The pair has to lean the same way or a balance would be reported as
+ * covering a total it cannot actually pay: `iqdToUsdCents` rounds UP, so a
+ * spendable balance converted back must never round up too, or the last IQD
+ * of a cart would be promised and then refused by the hold. This is the
+ * number shown to a customer as "what your wallet can pay", so it is the
+ * conservative one by construction.
+ */
+export function usdCentsToIqd(cents: number, rate: number): number {
+  return Math.floor((cents * Math.max(1, rate)) / 100);
+}
+
 /** The authoritative rate, from the same setting the rest of checkout reads. */
 export async function exchangeRate(db: D1Database): Promise<number> {
   const row = await db.prepare("SELECT value FROM admin_settings WHERE key = 'exchangeRate'").first<{ value: string }>();
