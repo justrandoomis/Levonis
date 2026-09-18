@@ -48,12 +48,13 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
-import { badRequest, conflict, notFound, oneOf, requireAuth, str } from '../lib/http';
+import { badRequest, conflict, notFound, oneOf, requireAuth, str, unavailable } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
 import { newId } from '../lib/crypto';
 import { channelReadiness } from '../lib/channelReadiness';
 import {
   armRefusal,
+  contextDegraded,
   loadAlertContexts,
   resolveWish,
   type AlertDeadReason,
@@ -178,6 +179,25 @@ async function contextFor(c: Context<AppContext>, productId: string): Promise<Al
 
 /** Refuse at the door, in the shopper's own language, naming the real cause. */
 function assertArmable(ctx: AlertProductContext, wish: AlertWish): void {
+  /*
+   * A DEGRADED CONTEXT PRODUCES NO REFUSAL, AND SILENCE IS NOT CONSENT.
+   *
+   * `armRefusal` answers by looking for a permanent reason this wish cannot be
+   * kept; when a relational read failed, every check that could produce one was
+   * short-circuited (see resolveWish), so it returns null. Accepting on that
+   * basis would arm a standing promise against a catalogue we could not read —
+   * exactly the combination that makes a customer wait for a message about a
+   * model that may not exist.
+   *
+   * 503, not 400: nothing is wrong with what they asked for, and «حاول مرة
+   * أخرى» is the truthful instruction. The next request usually succeeds.
+   */
+  if (contextDegraded(ctx)) {
+    throw unavailable(
+      'تعذّر التحقق من هذا المنتج الآن. حاول بعد لحظات.',
+      'ALERT_TEMPORARILY_UNAVAILABLE'
+    );
+  }
   const refusal = armRefusal(ctx, wish);
   if (refusal) throw badRequest(REFUSAL_TEXT[refusal], `ALERT_${refusal}`);
 }

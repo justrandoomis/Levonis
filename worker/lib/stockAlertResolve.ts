@@ -150,6 +150,16 @@ export interface AlertVerdict {
    */
   available: number | null;
   dead: AlertDeadReason | null;
+  /**
+   * A READ FAILED, SO THIS VERDICT DECIDES NOTHING.
+   *
+   * Distinct from `dead: null` alone, which means «we looked and it is not
+   * buyable yet» — a real answer the sweep records. This means «we could not
+   * look», and the sweep must leave the row exactly as it found it, including
+   * `last_checked_at`, so the alert keeps its place in the queue and the next
+   * pass decides. See `soft()` for the failure this exists to survive.
+   */
+  degraded?: boolean;
   /** What the message will NAME. Never the stock engine's own `label`, which
    *  is `name_en` for an option and the machine `combo_key` for a variant. */
   label: { ar: string; en: string; ckb: string };
@@ -189,6 +199,8 @@ interface TargetRow {
 interface LoadedContext extends AlertProductContext {
   status: string;
   composition: string;
+  /** See `soft()`: a read failed, so no verdict from this context is final. */
+  degraded: boolean;
   /** Exactly the `AvailabilityDoc` slice `saleAvailability` reads. */
   doc: Pick<ProductDoc, 'selling_type' | 'stock' | 'options' | 'colors' | 'preorder_transports'> & {
     sale_types?: string[];
@@ -227,15 +239,37 @@ const truthy = (v: unknown): boolean => v !== 0 && v !== false && v !== null && 
  * `softAll` in productOverlay.ts makes, for the same tables, after the same
  * incident: a Worker can reach an edge before its migration reaches D1.
  *
- * A product whose relations failed to load simply resolves from its own row,
- * which for an alert means "not buyable yet" — never a false fire.
+ * BUT A FAILED READ IS NOT AN EMPTY TABLE, and this function used to return
+ * the same `[]` for both. That is the difference between «لا يوجد» and «لم
+ * نستطع القراءة», and here it decides whether a customer keeps their alert.
+ *
+ * An empty `product_option_values` read makes `valueById` empty, and
+ * `resolveWish` then answers TARGET_REMOVED — which this file documents three
+ * lines from its definition as PERMANENT, because ids are never reused. The
+ * sweep writes `state='dead'` on it and the driving query never reads a dead
+ * row again. So one transient `D1_ERROR: Network connection lost` on one of
+ * these six reads would have told every waiting customer «الخيار الذي اخترته
+ * ما عاد موجود» about a model sitting live and sellable on the product page,
+ * and nothing would ever have told them otherwise.
+ *
+ * Worse than transient: this also swallows `no such column`, so during the
+ * deploy-ahead-of-migration window this module's own header cites, EVERY pass
+ * would have killed EVERY option and colour alert in the shop, deterministically.
+ *
+ * So the caller learns `ok`, and a chunk with a failed read is DEGRADED: every
+ * wish in it answers "not buyable yet" with no dead reason at all, the sweep
+ * leaves the row armed, and the next pass — against a working database — is
+ * what decides. Only a read that SUCCEEDED may justify a permanent verdict.
  */
-async function soft<T>(label: string, run: () => Promise<{ results: T[] }>): Promise<T[]> {
+async function soft<T>(
+  label: string,
+  run: () => Promise<{ results: T[] }>
+): Promise<{ rows: T[]; ok: boolean }> {
   try {
-    return (await run()).results;
+    return { rows: (await run()).results, ok: true };
   } catch (e) {
     console.error(`stock alert relations unavailable (${label}): ${e instanceof Error ? e.message : String(e)}`);
-    return [];
+    return { rows: [], ok: false };
   }
 }
 
@@ -341,6 +375,8 @@ export async function loadAlertContexts(
   if (ids.length === 0) return out;
 
   const products: ProductRow[] = [];
+  /** Products whose relational reads did not all succeed this pass. */
+  const degraded = new Set<string>();
   const groups: GroupRow[] = [];
   const values: ValueRow[] = [];
   const colors: ColorRowLite[] = [];
@@ -430,12 +466,23 @@ export async function loadAlertContexts(
       ),
     ]);
     products.push(...p);
-    groups.push(...g);
-    values.push(...v);
-    colors.push(...c);
-    variants.push(...vr);
-    links.push(...l);
-    cells.push(...f);
+    groups.push(...g.rows);
+    values.push(...v.rows);
+    colors.push(...c.rows);
+    variants.push(...vr.rows);
+    links.push(...l.rows);
+    cells.push(...f.rows);
+    /*
+     * ONE FAILED READ DEGRADES THE WHOLE CHUNK, not just the table that failed.
+     * These six answers are read together — a value's activity is gated by its
+     * group, a colour's reachability by the links, the direct-sale verdict by
+     * the cells — so a hole in any one of them can produce a wrong answer in
+     * another. Marking the chunk is the conservative reading, and the cost of
+     * being conservative is one fifteen-minute cron tick.
+     */
+    if (!g.ok || !v.ok || !c.ok || !vr.ok || !l.ok || !f.ok) {
+      for (const row of p) degraded.add(row.id);
+    }
   }
 
   /**
@@ -468,6 +515,7 @@ export async function loadAlertContexts(
       links: linksBy.get(row.id) ?? [],
       cells: cellsBy.get(row.id) ?? [],
       coarse: pooled.has(row.id),
+      degraded: degraded.has(row.id),
     }));
   }
   return out;
@@ -483,6 +531,8 @@ function buildContext(
     links: Array<ColorLinkRow & { product_id: string }>;
     cells: FulfillmentRowLite[];
     coarse: boolean;
+    /** At least one relational read failed; nothing here may be called permanent. */
+    degraded: boolean;
   }
 ): LoadedContext {
   const activeGroupIds = rel.groups.filter((g) => truthy(g.active)).map((g) => g.id);
@@ -656,6 +706,7 @@ function buildContext(
       ckb: row.name_ku || row.name_ar || row.name,
     },
     coarse: rel.coarse,
+    degraded: rel.degraded,
     status: row.status,
     composition,
     doc: {
@@ -981,11 +1032,45 @@ const dead = (reason: AlertDeadReason, label: AlertVerdict['label']): AlertVerdi
  * under an "untracked fires immediately" rule it would self-fire the instant
  * it was armed.
  */
+/**
+ * Did the relational reads behind this context all succeed?
+ *
+ * The SWEEP does not need this — it reads `verdict.degraded` and simply skips
+ * the row. The ARM ENDPOINT does, because `armRefusal` answers "is this wish
+ * armable" by looking for a permanent refusal, and a degraded context produces
+ * none: every check that could refuse was short-circuited. Without this the
+ * door would read that silence as consent and accept a standing request it had
+ * no data to validate — the opposite mistake to the one the short-circuit
+ * fixes, and just as wrong.
+ */
+export function contextDegraded(ctx: AlertProductContext): boolean {
+  return (ctx as LoadedContext).degraded === true;
+}
+
 export function resolveWish(ctx: AlertProductContext, wish: AlertWish): AlertVerdict {
   const c = ctx as LoadedContext;
   const label = labelOf(c, wish);
 
   if (malformed(wish)) return dead('NOT_A_STOCK_TARGET', label);
+
+  /**
+   * NOTHING FROM A DEGRADED CONTEXT IS PERMANENT — see `soft()`.
+   *
+   * This sits FIRST, before COMPOSITION, before PRODUCT_UNAVAILABLE, before
+   * any lookup in a map built from the reads that failed. All of those answer
+   * `dead`, the sweep writes `state='dead'` on a dead verdict, and a dead row
+   * is never scanned again — so one transient read error would end a
+   * customer's alert permanently, and the shop would never learn it had.
+   *
+   * The neutral verdict loses nothing: not buyable, no reason, no count.
+   *
+   * `malformed` still runs first, because it reads the WISH rather than the
+   * catalogue. A wish that names nothing at all is wrong whatever the database
+   * did, and refusing it needs no data.
+   */
+  if (c.degraded) {
+    return { buyable: false, available: null, dead: null, degraded: true, label };
+  }
 
   /**
    * A COMPOSITION HAS NO SHELF OF ITS OWN, EVER. `products.stock` is NULL on a

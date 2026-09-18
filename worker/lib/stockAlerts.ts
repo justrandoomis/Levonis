@@ -772,6 +772,25 @@ export async function sweepStockAlerts(
     }
 
     const verdict = resolveWish(ctx, wishOf(row));
+
+    /*
+     * A READ FAILED, SO THIS ROW IS LEFT EXACTLY AS IT WAS FOUND.
+     *
+     * Not `last_checked_at`, not `last_available`, not `last_buyable` — the
+     * pass simply did not happen for this alert. Moving `last_checked_at`
+     * would send it to the back of the least-recently-examined ordering as if
+     * it had been judged, so a product whose relations are failing would drift
+     * behind everything else precisely while it needs a retry.
+     *
+     * `deferred` rather than `scanned` says so in the report, which is how an
+     * operator sees a degraded loader at all: the alternative reads as a quiet
+     * pass where nothing happened to be back in stock.
+     */
+    if (verdict.degraded) {
+      report.deferred += 1;
+      continue;
+    }
+
     if (verdict.dead) {
       bookkeeping.push(deadStatement(env, row, verdict.dead, now));
       report.dead += 1;
