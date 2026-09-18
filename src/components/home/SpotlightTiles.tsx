@@ -84,6 +84,19 @@ const TOUCH_HOLD_MS = 15000;
 /** Products per set. Two columns, two rows — the same shape at every width. */
 const PER_PAGE = 4;
 
+/**
+ * At most this many sets per tile, so eight products are reachable and the dot
+ * row stays small: two dots at 28px plus one 4px gap is 60px, well inside the
+ * 152.5px a phone tile has.
+ *
+ * It is a CEILING, not a constant, and the difference matters: a shop with
+ * three super deals gets one set and NO dots at all (the row only renders
+ * above one page). The server may legitimately send twelve — the rest are
+ * behind the section link, because dots are the wrong control for twelve
+ * things and a second scroller inside a tile this size is worse.
+ */
+const MAX_PAGES = 2;
+
 function PricePlate({ p }: { p: ApiProduct }) {
   const display = p.display_price_iqd ?? p.price_iqd;
   const regular = p.display_regular_iqd ?? p.price_iqd;
@@ -92,9 +105,15 @@ function PricePlate({ p }: { p: ApiProduct }) {
     // `min-h` reserves the second line so a wrapping price cannot change the
     // tile's height when the set rotates. `flex-wrap` rather than `truncate`:
     // see the note above — a clipped price is a different number.
-    <span className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 content-start min-w-0 min-h-[1.1rem] sm:min-h-[1.15rem]">
+    // `leading-4` (16px) on both spans is what makes the reserve exact. An
+    // arbitrary `text-[11px]` sets the font size ONLY — the line height is
+    // still inherited from the page's 1.5, so the line box would be 16.5px or
+    // 18px depending on the breakpoint and a height reserved in `rem` would be
+    // a guess. Pinning the leading makes one line exactly 16px, and that is
+    // the number below.
+    <span className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 content-start min-w-0 min-h-4">
       <span
-        className={`text-[11px] sm:text-[12px] font-bold tabular-nums whitespace-nowrap ${
+        className={`text-[11px] sm:text-[12px] leading-4 font-bold tabular-nums whitespace-nowrap ${
           discounted ? 'text-gold' : 'text-white'
         }`}
       >
@@ -105,7 +124,7 @@ function PricePlate({ p }: { p: ApiProduct }) {
           gold display price is what says "this is less than it was" — the same
           signal, in the space that exists. */}
       {discounted && (
-        <span className="hidden sm:inline text-[10px] text-zinc-500 line-through tabular-nums whitespace-nowrap">
+        <span className="hidden sm:inline text-[10px] leading-4 text-zinc-400 line-through tabular-nums whitespace-nowrap">
           {formatIqd(regular)}
         </span>
       )}
@@ -227,7 +246,9 @@ function Tile({
       >
         <span aria-hidden className={`w-1 h-4 rounded-full shrink-0 ${accent}`} />
         {icon}
-        <span className="text-[12px] sm:text-[13px] font-bold text-white truncate">{title}</span>
+        {/* An h2, like every other shelf on this page. It was a plain span, so
+            these two sections did not exist to heading navigation at all. */}
+        <h2 className="text-[12px] sm:text-[13px] font-bold text-white truncate">{title}</h2>
         <Chevron aria-hidden className="w-4 h-4 shrink-0 ms-auto text-zinc-500" />
       </Link>
 
@@ -287,11 +308,19 @@ export default function SpotlightTiles({
   // Read the history once per mount. Re-reading on every render would make the
   // tile reorder itself while the shopper is looking at it.
   const [history] = useState(() => (typeof window === 'undefined' ? [] : readRecentlyViewed()));
-  const selection = useMemo(
-    () => rankByAffinity(selectionPool, history).slice(0, PER_PAGE * 2),
-    [selectionPool, history]
-  );
-  const deals = useMemo(() => superDeals.slice(0, PER_PAGE * 2), [superDeals]);
+  /**
+   * DEDUPE BEFORE RANKING. `selectionPool` is best-sellers concatenated with
+   * the newest arrivals, from two different endpoints, and a product that is
+   * both appears twice. At four slots a tile that is showing eight products
+   * can put the same one in two of them, side by side, which reads as a bug
+   * rather than as a recommendation.
+   */
+  const selection = useMemo(() => {
+    const seen = new Set<string>();
+    const unique = selectionPool.filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
+    return rankByAffinity(unique, history).slice(0, PER_PAGE * MAX_PAGES);
+  }, [selectionPool, history]);
+  const deals = useMemo(() => superDeals.slice(0, PER_PAGE * MAX_PAGES), [superDeals]);
 
   if (selection.length === 0 && deals.length === 0) return null;
 

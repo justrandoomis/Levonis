@@ -1,6 +1,6 @@
 import AnimatedItem from '../components/AnimatedItem';
 import { useRail } from '../lib/useRail';
-import React, { Suspense, useState, useEffect, useRef, useCallback } from 'react';
+import React, { Suspense, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { PackageSearch } from 'lucide-react';
 import { api, ApiProduct, PublicSettings, HomeTaxon, SiteMediaEntry } from '../lib/api';
@@ -211,6 +211,19 @@ export default function Home() {
     return i === -1 ? Number.MAX_SAFE_INTEGER : i;
   };
 
+  /**
+   * The products the category rails borrow a cover photo from.
+   *
+   * Memoised HERE rather than built inline at the call site: a fresh array
+   * literal in JSX is a new reference on every Home render, which would defeat
+   * the `useMemo` inside CategoryBoard and rebuild the cover map on every
+   * scroll tick this page already re-renders for.
+   */
+  const coverPool = useMemo(
+    () => [...newProducts, ...discountedProducts, ...openBox],
+    [newProducts, discountedProducts, openBox]
+  );
+
   const bannersFor = (slot: string) =>
     sectionVisible(slot) ? settings?.homeBanners?.[slot] ?? [] : [];
   const itemsFor = (slot: string) =>
@@ -302,11 +315,7 @@ export default function Home() {
                 // The covers are borrowed from products this page has
                 // already fetched — no second request, and a section with no
                 // product on screen simply shows its monogram.
-                <CategoryBoard
-                  key="categories"
-                  categories={categories}
-                  products={[...newProducts, ...discountedProducts, ...openBox]}
-                />
+                <CategoryBoard key="categories" categories={categories} products={coverPool} />
               )
             ) : null,
           },

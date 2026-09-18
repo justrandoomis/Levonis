@@ -175,8 +175,64 @@ interface MarqueeEntry {
 /**
  * What the brightening does, in one place so both the CSS and the reason
  * travel together. See the section note above for the measurements.
+ *
+ * IT IS SCOPED TO THE SHOP'S OWN BRAND MARKS and never applied to a card the
+ * owner authored. The constant was tuned against seven specific transparent
+ * logo files; an authored card's picture can be a photograph, and doubling a
+ * photograph's brightness is not a correction, it is damage. `entry.data`
+ * separates them: 'brand' is a slot or a taxonomy row, 'strip' is a card the
+ * owner typed.
  */
 const LOGO_FILTER = 'brightness(2) saturate(1.25)';
+
+function filterFor(entry: MarqueeEntry): string | undefined {
+  return entry.data === 'brand' ? LOGO_FILTER : undefined;
+}
+
+/**
+ * A brand mark with nothing behind it — and an answer for the logo that does
+ * not arrive.
+ *
+ * A raw `<img>` whose URL 404s renders the browser's broken-image glyph, which
+ * on a black belt is a grey box with a torn-corner icon: worse than the puck
+ * it replaced, and the one state the caption used to cover. SafeImage is not
+ * the tool here either — its failure state renders a RETRY BUTTON, and this
+ * image lives inside a `<Link>`. So a dead logo falls back to the gold
+ * monogram the captioned mode already uses, which is the honest stand-in this
+ * component has always had for "there is no picture".
+ */
+function BrandLogo({ entry }: { entry: MarqueeEntry }) {
+  const [broken, setBroken] = React.useState(false);
+  if (broken) {
+    return (
+      <span className="w-14 h-14 rounded-full flex items-center justify-center border bg-gold/10 border-gold/30 text-gold font-black text-base">
+        <span aria-hidden>{monogramOf(entry.name)}</span>
+        <span className="sr-only">{entry.name}</span>
+      </span>
+    );
+  }
+  return (
+    <img
+      src={entry.image}
+      /* THE LINK'S ONLY NAME. There is no caption any more and no wrapper to
+         hide this from assistive tech, so `alt=""` would leave a screen
+         reader announcing the href — "products search Bambu%20Lab". `logoOnly`
+         is gated on this string being non-empty, so it is never blank. */
+      alt={entry.name}
+      /* A FIXED BOX. Marquee measures ONE set and then walks exactly that
+         stride; these logos range from a square roundel to a wordmark and
+         they load lazily, so an auto-width mark would widen the set after the
+         stride was measured and the whole belt would visibly re-lay-out. */
+      width={112}
+      height={56}
+      loading="lazy"
+      decoding="async"
+      onError={() => setBroken(true)}
+      className="w-full h-full object-contain"
+      style={{ filter: filterFor(entry) }}
+    />
+  );
+}
 
 function MarqueeMark({
   entry,
@@ -185,7 +241,7 @@ function MarqueeMark({
 }: {
   entry: MarqueeEntry;
   first: boolean;
-  /** True when EVERY entry in the belt has a picture — see the note above. */
+  /** True when EVERY entry in the belt has a picture AND a name. */
   logoOnly: boolean;
 }) {
   /**
@@ -201,23 +257,7 @@ function MarqueeMark({
     : 'bg-gold/10 border-gold/30 text-gold font-black text-base';
 
   const body = logoOnly ? (
-    <img
-      src={entry.image}
-      /* THE LINK'S ONLY NAME. There is no caption any more and no wrapper to
-         hide this from assistive tech, so `alt=""` would leave a screen
-         reader announcing the href — "products search Bambu%20Lab". */
-      alt={entry.name}
-      /* A FIXED BOX. Marquee measures ONE set and then walks exactly that
-         stride; these logos range from a square roundel to a wordmark and
-         they load lazily, so an auto-width mark would widen the set after the
-         stride was measured and the whole belt would visibly re-lay-out. */
-      width={112}
-      height={56}
-      loading="lazy"
-      decoding="async"
-      className="w-full h-full object-contain"
-      style={{ filter: LOGO_FILTER }}
-    />
+    <BrandLogo entry={entry} />
   ) : (
     <>
       <span
@@ -233,7 +273,7 @@ function MarqueeMark({
             loading="lazy"
             decoding="async"
             className="w-full h-full object-contain p-2"
-            style={{ filter: LOGO_FILTER }}
+            style={{ filter: filterFor(entry) }}
           />
         ) : (
           monogramOf(entry.name)
@@ -247,10 +287,22 @@ function MarqueeMark({
   const cls = logoOnly
     ? // 112×56 so a wordmark has room to be read; `h-14` matches the puck the
       // captioned mode draws, so switching modes does not change the belt's
-      // height. The opacity shift is the hover affordance the caption used to
-      // provide, and the focus ring is its own because a bare <Link> gets none
-      // from the button system.
-      'group w-[112px] h-14 shrink-0 flex items-center justify-center min-w-0 rounded-lg opacity-90 transition-opacity motion-reduce:transition-none hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+      // height.
+      //
+      // `ring-inset`, not an outer ring. The belt's container is
+      // `overflow-hidden` and the track is exactly the height of one mark, so
+      // an outer 2px ring — or an `outline-offset` — is drawn outside the
+      // clip and never seen. The ring exists because a bare <Link> gets none
+      // from the button system and the caption that used to signal focus is
+      // gone; a ring nobody can see would have been worse than no ring, since
+      // it reads as solved.
+      //
+      // NO `opacity-90` RESTING STATE. Tailwind v4 gates `hover:` behind
+      // `@media (hover: hover)`, so on the phone the owner filed this from it
+      // would never lift — every logo would sit permanently at 90%, giving
+      // back a tenth of the contrast the brightening was added to win. The
+      // press feedback is a scale, which a finger also gets.
+      'group w-[112px] h-14 shrink-0 flex items-center justify-center min-w-0 rounded-lg transition-transform motion-reduce:transition-none active:scale-[0.97] motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus'
     : 'group w-[84px] shrink-0 flex flex-col items-center gap-1.5 min-w-0';
   const dataProps: Record<string, unknown> = first
     ? { [entry.data === 'brand' ? 'data-brand-chip' : 'data-strip-item']: entry.id }
@@ -337,8 +389,17 @@ export function BrandMarquee({ items, brands, siteMedia = [] }: {
    * gets a captioned belt rather than a silently dropped card — quietly
    * discarding what the owner typed is the failure this codebase keeps
    * refusing to commit.
+   *
+   * IT GATES ON THE NAME AS WELL AS THE PICTURE, and that half is not
+   * cosmetic. `normalizeSectionItems` keeps an authored card when it has a
+   * title OR an image (worker/lib/homeContent.ts), so a card with a picture
+   * and an EMPTY title is legal and reachable. In bare mode its `alt` would be
+   * the empty string and the link would have NO accessible name at all — a
+   * screen reader would read out the href. A nameless card drops the whole
+   * belt to captioned mode, where the same card is visibly incomplete instead
+   * of invisibly broken.
    */
-  const logoOnly = entries.every((e) => !!e.image);
+  const logoOnly = entries.every((e) => !!e.image && !!e.name.trim());
 
   return (
     <section data-home-section="top_brands" className="mb-10 sm:mb-12">

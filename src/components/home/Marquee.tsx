@@ -88,7 +88,13 @@ export default function Marquee({
         @keyframes ${anim} { to { transform: translateX(${dir === 'rtl' ? '' : '-'}${step}%); } }
         .${anim} { animation: ${anim} ${duration}s linear infinite; }
         .lv-mq:hover > .lv-mq__track,
-        .lv-mq.is-held > .lv-mq__track { animation-play-state: paused; }
+        .lv-mq.is-held > .lv-mq__track,
+        /* A KEYBOARD USER MUST BE ABLE TO STAY WHERE THEY LANDED. Tabbing into
+           the belt focused a mark that then slid out from under the focus
+           ring — the ring was correct and the thing it was ringing was gone.
+           Hover and hold were handled; focus was not, and focus is the one
+           that cannot be recovered by moving a finger. */
+        .lv-mq:focus-within > .lv-mq__track { animation-play-state: paused; }
         @media (prefers-reduced-motion: reduce) {
           .lv-mq { overflow-x: auto; }
           .lv-mq__track { animation: none !important; }

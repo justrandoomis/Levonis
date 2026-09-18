@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../LanguageContext';
 import type { ApiProduct, HomeTaxon } from '../../lib/api';
-import SafeImage from '../ui/SafeImage';
 import SectionHeader from './SectionHeader';
+import { itemCountLabel } from '../orders/format';
 import { productPrimaryImage } from '../../lib/productImage';
 import { useRail } from '../../lib/useRail';
 
@@ -25,11 +25,13 @@ import { useRail } from '../../lib/useRail';
  * truncated name beside a bare unlabelled numeral. A department name never
  * appeared as a heading at all.
  *
- * THERE IS NO BLOCK HEADING ANY MORE, and that is deliberate. «تصفّح حسب
- * القسم» above «الطابعات» is a heading over a heading; with the live
- * catalogue — one department — it would be two lines of chrome introducing one
- * rail. The words survive as this region's accessible name, so the block is
- * still announced as one thing.
+ * TWO HEADING LEVELS, NOT ONE. «تصفّح حسب القسم» stays as the block's h2 and
+ * each department is an h3 beneath it. The owner's sentence asks for the
+ * department name to read «كما هو في تصفح حسب الأقسام» — at that altitude,
+ * alongside it — not instead of it, and dropping the block heading would put
+ * «تصفّح حسب القسم» nowhere while five department names arrived as siblings of
+ * every other shelf on the page. A heading over a heading is only clutter when
+ * they are the same size; these are not.
  *
  * WHERE THE PICTURES COME FROM, and what they do not promise. `catalogs` has
  * no image column and never has had (migrations/0002), so a sub-section
@@ -62,20 +64,83 @@ function monogramOf(name: string): string {
  * «طابعات Resin» all seed «ط» — so the monogram alone cannot tell them apart.
  * The hash is over the id, which is stable across renders and across reloads;
  * two siblings can still collide, which is why the NAME under the tile is
- * what identifies it and the tint is only there to break up the row.
+ * what identifies it and the tint is only there to break up the row. Nothing
+ * here carries meaning by colour alone.
+ *
+ * THESE COLOURS ARE NOT DECORATIVE CHOICES, they are measured ones. The first
+ * attempt used the olive tokens, and olive on this page is nearly black:
+ * `--color-olive` is #1B2010 and `--color-olive-dark` is #0F1208, so
+ * `from-olive/40` over `--color-surface` (#131519) composites to #161915 — a
+ * contrast of 1.03:1 against the card it sits in, which is to say invisible.
+ * The tint would have been a no-op and every plate would have read as an
+ * empty black rectangle with a letter in it.
+ *
+ * Each entry below composites to between 1.50:1 and 1.68:1 against the card,
+ * which is enough to read as a panel, and the monogram over it lands between
+ * 4.4:1 and 4.9:1, which is enough to read as a letter. They separate by HUE
+ * rather than by luminance, on purpose: a row of plates at five different
+ * brightnesses would imply a ranking that does not exist.
  */
 const TINTS = [
-  'from-olive/40 to-olive-dark/20 text-gold',
-  'from-gold/25 to-olive/20 text-gold',
-  'from-zinc-700/50 to-zinc-800/30 text-zinc-200',
-  'from-rose-500/20 to-olive/20 text-rose-200',
-  'from-sky-500/20 to-olive/20 text-sky-200',
+  'from-gold/25 to-gold/10 text-gold',
+  'from-sky-400/25 to-sky-400/10 text-sky-200',
+  'from-rose-400/25 to-rose-400/10 text-rose-200',
+  'from-emerald-400/25 to-emerald-400/10 text-emerald-200',
+  'from-violet-400/25 to-violet-400/10 text-violet-200',
 ] as const;
 
 function tintOf(id: string): string {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return TINTS[h % TINTS.length];
+}
+
+/**
+ * The picture, or the monogram when there is not one — and when there is one
+ * that does not load.
+ *
+ * THIS IS NOT SafeImage, and that is the point. SafeImage's failure state
+ * renders a RETRY BUTTON (src/components/ui/SafeImage.tsx:128-136), and these
+ * plates live inside a `<Link>`: a button inside an anchor is interactive
+ * content nested in interactive content, which no browser agrees on and no
+ * keyboard user can escape cleanly. A broken cover here has a better answer
+ * anyway — the monogram, which is already the designed state for a section
+ * with no photo at all. A shopper cannot tell the two apart, and should not
+ * have to.
+ */
+function CoverPlate({
+  cover,
+  tint,
+  monogram,
+  className,
+  imgClassName = '',
+}: {
+  cover?: string;
+  tint: string;
+  monogram: string;
+  className: string;
+  imgClassName?: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  const usable = cover && !broken;
+  return (
+    <span className={`block overflow-hidden bg-black ${className}`}>
+      {usable ? (
+        <img
+          src={cover}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setBroken(true)}
+          className={`w-full h-full object-cover ${imgClassName}`}
+        />
+      ) : (
+        <span aria-hidden className={`w-full h-full grid place-items-center bg-gradient-to-br font-black ${tint}`}>
+          {monogram}
+        </span>
+      )}
+    </span>
+  );
 }
 
 /**
@@ -87,47 +152,41 @@ function tintOf(id: string): string {
  * affordance that says the rail scrolls.
  */
 function SubCard({ node, cover }: { node: HomeTaxon; cover?: string }) {
-  const { loc, t } = useLanguage();
+  const { loc, lang } = useLanguage();
   const name = loc(node.name_ar, node.name_en || node.name_ar, node.name_ckb);
   return (
-    <div role="listitem" className="snap-start shrink-0">
-      <Link
-        to={`/products?category=${encodeURIComponent(node.id)}`}
-        data-category-chip={node.id}
-        data-category-level="sub"
-        className="group flex w-[132px] sm:w-[150px] flex-col overflow-hidden rounded-xl border border-border-subtle bg-surface hover:bg-surface-raised hover:border-gold/40 transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-      >
-        <span className="block aspect-[4/3] overflow-hidden bg-black">
-          {cover ? (
-            <SafeImage
-              src={cover}
-              alt=""
-              aspect="auto"
-              className="w-full h-full group-hover:scale-[1.04] transition-transform duration-500 motion-reduce:transition-none"
-            />
-          ) : (
-            <span
-              aria-hidden
-              className={`w-full h-full grid place-items-center bg-gradient-to-br font-black text-2xl ${tintOf(node.id)}`}
-            >
-              {monogramOf(name)}
-            </span>
-          )}
-        </span>
-        <span className="p-2.5 flex flex-col gap-0.5 min-w-0">
-          <span className="text-[13px] font-bold text-white leading-snug line-clamp-2 min-h-[2.2em]">{name}</span>
-          <span className="text-[11px] text-zinc-500 tabular-nums">
-            {node.product_count} {t('productCount')}
-          </span>
-        </span>
-      </Link>
-    </div>
+    <Link
+      to={`/products?category=${encodeURIComponent(node.id)}`}
+      data-category-chip={node.id}
+      data-category-level="sub"
+      className="group snap-start shrink-0 flex w-[132px] sm:w-[150px] flex-col overflow-hidden rounded-xl border border-border-subtle bg-surface hover:bg-surface-raised hover:border-gold/40 transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+    >
+      <CoverPlate
+        cover={cover}
+        tint={`text-2xl ${tintOf(node.id)}`}
+        monogram={monogramOf(name)}
+        className="aspect-[4/3]"
+        imgClassName="group-hover:scale-[1.04] transition-transform duration-500 motion-reduce:transition-none"
+      />
+      <span className="p-2.5 flex flex-col gap-0.5 min-w-0">
+        <span className="text-[13px] font-bold text-white leading-snug line-clamp-2 min-h-[2.2em]">{name}</span>
+        {/* zinc-400, not zinc-500: at 11px on `--color-surface` zinc-500 is
+            about 3.8:1, under the 4.5:1 that small text needs. */}
+        <span className="text-[11px] text-zinc-400 tabular-nums">{itemCountLabel(node.product_count, lang)}</span>
+      </span>
+    </Link>
   );
 }
 
 /**
  * A department whose products are filed at its own level — no sub-sections to
- * scroll, so the card IS the way in rather than a strip of nothing.
+ * scroll, so this card IS the way in rather than a strip of nothing.
+ *
+ * It deliberately does NOT repeat the department's name or its count: both are
+ * three millimetres above it in the heading this sits under, and a card that
+ * says the same two things again is the redundancy the old panels were made
+ * of. Its accessible name carries the department, because «عرض الكل» on its
+ * own is not a destination.
  */
 function DoorCard({ category, cover }: { category: HomeTaxon; cover?: string }) {
   const { loc, t } = useLanguage();
@@ -137,27 +196,17 @@ function DoorCard({ category, cover }: { category: HomeTaxon; cover?: string }) 
       to={`/products?category=${encodeURIComponent(category.id)}`}
       data-category-chip={category.id}
       data-category-level="main"
+      aria-label={loc(`عرض كل ${name}`, `See all ${name}`, `هەموو ${name}`)}
       className="group flex items-center gap-3 rounded-xl border border-border-subtle bg-surface hover:bg-surface-raised hover:border-gold/40 transition-colors p-2.5 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
-      <span className="block w-16 h-16 shrink-0 overflow-hidden rounded-lg bg-black">
-        {cover ? (
-          <SafeImage src={cover} alt="" aspect="auto" className="w-full h-full" />
-        ) : (
-          <span
-            aria-hidden
-            className={`w-full h-full grid place-items-center bg-gradient-to-br font-black text-xl ${tintOf(category.id)}`}
-          >
-            {monogramOf(name)}
-          </span>
-        )}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[14px] font-bold text-white truncate group-hover:text-gold transition-colors">
-          {name}
-        </span>
-        <span className="block text-[11px] text-zinc-500 tabular-nums">
-          {category.product_count} {t('productCount')}
-        </span>
+      <CoverPlate
+        cover={cover}
+        tint={`text-xl ${tintOf(category.id)}`}
+        monogram={monogramOf(name)}
+        className="w-16 h-16 shrink-0 rounded-lg"
+      />
+      <span aria-hidden className="text-[14px] font-bold text-zinc-300 group-hover:text-white transition-colors">
+        {t('seeAll')}
       </span>
     </Link>
   );
@@ -183,17 +232,38 @@ function CategoryShelf({
   const to = `/products?category=${encodeURIComponent(category.id)}`;
 
   return (
-    <section data-category-shelf={category.id} aria-labelledby={headingId} className="mb-7 sm:mb-9 last:mb-0">
-      <SectionHeader id={headingId} title={name} accent="bg-olive" count={category.product_count} to={to} />
+    // A plain div, not a <section aria-labelledby>. A named section is an ARIA
+    // LANDMARK, and five departments would put five new landmarks on a page
+    // whose every other shelf is an unnamed <section>. The h2/h3 hierarchy
+    // already carries the structure, and a screen reader navigates it by
+    // heading like every other shelf here.
+    <div data-category-shelf={category.id} className="mb-7 sm:mb-9 last:mb-0">
+      <SectionHeader
+        level="h3"
+        id={headingId}
+        title={name}
+        accent="bg-olive"
+        to={to}
+        linkLabel={loc(`عرض كل ${name}`, `See all ${name}`, `هەموو ${name}`)}
+        // The count rides the HEADING only when there are no cards below to
+        // carry it. With sub-sections the roll-up would sit three millimetres
+        // above the same numbers broken down — and on the live shop, where one
+        // department holds one sub-section, it would print «3 منتجات» twice.
+        count={children.length > 0 ? undefined : category.product_count}
+      />
       {children.length > 0 ? (
         <div
           ref={rail.ref}
-          role="list"
           // The `-mx-4 px-4` bleed is SYMMETRIC on purpose and must not become
           // `-ms-4 ps-4` in a later logical-properties sweep: a one-sided bleed
           // leaves the other edge unbled and causes a horizontal page scroll in
           // exactly one direction, which is the hardest kind to notice.
-          className="flex gap-2.5 sm:gap-3 overflow-x-auto overscroll-x-contain hide-scrollbar pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x"
+          //
+          // `pt-1` is not spacing. `overflow-x-auto` forces the computed
+          // `overflow-y` to `auto`, so without it a card's 2px focus ring is
+          // clipped along its top edge — visible only to whoever is using the
+          // keyboard, which is exactly who needs it.
+          className="flex gap-2.5 sm:gap-3 overflow-x-auto overscroll-x-contain hide-scrollbar pt-1 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x"
         >
           {children.map((child) => (
             <SubCard key={child.id} node={child} cover={coverOf(child.id)} />
@@ -202,7 +272,7 @@ function CategoryShelf({
       ) : (
         <DoorCard category={category} cover={coverOf(category.id)} />
       )}
-    </section>
+    </div>
   );
 }
 
@@ -238,10 +308,12 @@ export default function CategoryBoard({
   if (categories.length === 0) return null;
 
   return (
-    // Named by `aria-label` rather than a visible heading — see the note at
-    // the top of this file. If that label is ever dropped, this becomes an
-    // unnamed run of h2s with nothing saying they belong together.
-    <section data-home-section="categories" aria-label={t('browseCategories')} className="mb-10 sm:mb-12">
+    <section data-home-section="categories" className="mb-10 sm:mb-12">
+      {/* The block keeps its own heading. Each department below is an h3 under
+          it, so «تصفّح حسب القسم» is still somewhere in the outline and the
+          department names sit at the altitude the owner asked for without
+          replacing the thing they were meant to sit beside. */}
+      <SectionHeader title={t('browseCategories')} accent="bg-olive" to="/products" />
       {categories.map((category) => (
         <CategoryShelf key={category.id} category={category} coverOf={(id) => covers.get(id)} />
       ))}

@@ -114,7 +114,11 @@ test('a price is never truncated, because a clipped price reads as a smaller num
   assert.ok(plate.length > 0, 'PricePlate must still exist');
   assert.doesNotMatch(plate, /truncate/, '«1,525,0…» is not an unfinished number, it is a wrong one');
   assert.match(plate, /flex-wrap/, 'it wraps instead');
-  assert.match(plate, /min-h-\[/, 'and reserves the wrapped height so the tile does not jump between pages');
+  assert.match(plate, /min-h-4/, 'and reserves the wrapped height so the tile does not jump between pages');
+  // An arbitrary `text-[11px]` sets font-size ONLY; the line height is still
+  // the page's inherited 1.5, so a reserve in rem would be a guess. Pinning
+  // the leading is what makes 16px the real line box.
+  assert.match(plate, /leading-4/, 'the reserve is only exact if the line box is pinned');
 });
 
 test('the rotation dots are real targets — for a reduced-motion visitor they are the only way through', () => {
@@ -123,6 +127,21 @@ test('the rotation dots are real targets — for a reduced-motion visitor they a
   // makes these buttons the sole control, and a 6px button is not a control.
   assert.match(src, /h-11\s+min-w-\[28px\]/, 'the button is 44px tall with the small dot drawn inside it');
   assert.match(src, /motion-reduce:transition-none/, 'and the dot honours reduced motion by not animating');
+});
+
+test('the spotlight sections are reachable by heading navigation', () => {
+  const src = read('src/components/home/SpotlightTiles.tsx');
+  // The title was a plain span inside a link, so neither section existed to a
+  // screen reader browsing by heading — unlike every other shelf here.
+  assert.match(src, /<h2 className=[^>]*>\{title\}<\/h2>/);
+});
+
+test('the same product cannot appear twice in one tile', () => {
+  const src = read('src/components/home/SpotlightTiles.tsx');
+  // selectionPool is best-sellers concatenated with the newest arrivals, from
+  // two endpoints; a product that is both appeared twice, side by side.
+  assert.match(src, /new Set<string>\(\)/);
+  assert.match(src, /seen\.has\(p\.id\)/);
 });
 
 test('a touch is not a hover — a tap used to pause the rotation for about a tenth of a second', () => {
@@ -135,11 +154,24 @@ test('a touch is not a hover — a tap used to pause the rotation for about a te
 // «تصفّح حسب القسم»
 // =========================================================================
 
-test('every department gets its own heading and its own labelled region', () => {
+test('the block keeps its own heading and each department is an h3 beneath it', () => {
   const src = read('src/components/home/CategoryBoard.tsx');
-  assert.match(src, /aria-labelledby=\{headingId\}/, 'the region is named by its own heading');
-  assert.match(src, /<SectionHeader\s+id=\{headingId\}/, 'and that heading is the shared one, at heading altitude');
+  // The owner asked for the department name to read «كما هو في تصفح حسب
+  // الأقسام» — at that altitude, ALONGSIDE it. Dropping the block heading
+  // would have put «تصفّح حسب القسم» nowhere and made every department a
+  // sibling of every other shelf on the page.
+  assert.match(src, /title=\{t\('browseCategories'\)\}/, 'the block heading stays');
+  assert.match(src, /level="h3"/, 'and departments sit under it, not beside it');
   assert.match(src, /data-category-shelf=/, 'each department is addressable');
+});
+
+test('a department is a plain div — five named sections would be five new ARIA landmarks', () => {
+  const src = read('src/components/home/CategoryBoard.tsx');
+  assert.doesNotMatch(
+    src,
+    /<section[^>]*aria-labelledby/,
+    'every other shelf on this page is an unnamed section; the h2/h3 outline carries the structure'
+  );
 });
 
 test('the sub-sections are a horizontal rail with the house scroll mechanics', () => {
@@ -148,8 +180,47 @@ test('the sub-sections are a horizontal rail with the house scroll mechanics', (
   for (const cls of ['overflow-x-auto', 'overscroll-x-contain', 'hide-scrollbar', 'snap-x']) {
     assert.ok(src.includes(cls), `the rail must carry ${cls}, like every other rail on this page`);
   }
-  assert.match(src, /role="list"/, 'and it is announced as a list of sections');
-  assert.match(src, /role="listitem"/);
+  // `overflow-x-auto` forces the computed overflow-y to auto, so a card's
+  // focus ring is clipped along its top edge without room above it.
+  assert.match(src, /pt-1/, 'the focus ring needs somewhere to be drawn');
+  // Deliberately NOT role="list": no other rail here uses it, and
+  // BestSellersRail documents choosing against it. A convention pinned in one
+  // file is a convention that gets reverted.
+  assert.doesNotMatch(src, /role="list"/);
+});
+
+test('counts use the shared Arabic plural helper rather than a bare numeral', () => {
+  const board = read('src/components/home/CategoryBoard.tsx');
+  const header = read('src/components/home/SectionHeader.tsx');
+  // «3 منتج» is wrong for the commonest counts a small shop has; the repo
+  // already had itemCountLabel with the dual and both plurals.
+  assert.match(board, /itemCountLabel\(/, 'the card count');
+  assert.match(header, /itemCountLabel\(/, 'and the heading count');
+});
+
+test('small counts clear the contrast floor — zinc-500 does not', () => {
+  const board = read('src/components/home/CategoryBoard.tsx');
+  const header = read('src/components/home/SectionHeader.tsx');
+  // #71717a on --color-surface (#131519) is about 3.8:1, under the 4.5:1 that
+  // text below 18.66px needs.
+  assert.doesNotMatch(board, /text-\[11px\][^"`]*text-zinc-500/);
+  assert.doesNotMatch(header, /text-\[12px\][^"`]*text-zinc-500/);
+});
+
+test('a broken cover falls back to the monogram, and never nests a button inside a link', () => {
+  const src = read('src/components/home/CategoryBoard.tsx');
+  // SafeImage's failure state renders a retry BUTTON, and these plates live
+  // inside a <Link>. Interactive content inside interactive content is
+  // something no browser agrees on and no keyboard user escapes cleanly.
+  assert.doesNotMatch(src, /SafeImage/, 'the card draws its own image');
+  assert.match(src, /onError=\{\(\) => setBroken\(true\)\}/, 'and a dead URL becomes the monogram');
+});
+
+test('the department heading does not print the count its own cards already carry', () => {
+  const src = read('src/components/home/CategoryBoard.tsx');
+  // On the live shop one department holds one sub-section, so a roll-up on the
+  // heading would print the same number twice, three millimetres apart.
+  assert.match(src, /count=\{children\.length > 0 \? undefined : category\.product_count\}/);
 });
 
 test('the 11px chips are gone — they were a third of the 44px this app holds for a finger', () => {
@@ -163,6 +234,15 @@ test('no artwork is invented, and a section with no photo is a designed state ra
   assert.match(src, /monogramOf/, 'the monogram is the honest stand-in — `catalogs` has no image column');
   assert.match(src, /sub_category_id/, 'a real photo is borrowed from a product already on the page');
   assert.doesNotMatch(src, /api\.get|fetch\(/, 'and nothing is re-fetched for it');
+});
+
+test('the monogram tints are visible against the card they sit in', () => {
+  const src = read('src/components/home/CategoryBoard.tsx');
+  // The first attempt used the olive tokens. `--color-olive` is #1B2010, so
+  // `from-olive/40` over `--color-surface` composites to 1.03:1 — the tint was
+  // a no-op and every plate read as an empty black rectangle with a letter.
+  assert.doesNotMatch(src, /from-olive/, 'olive on this page is nearly black');
+  assert.match(src, /from-gold\/25/, 'these were measured: 1.50:1 to 1.68:1 against the card');
 });
 
 test('the rail bleed stays SYMMETRIC — a one-sided bleed scrolls the page in one direction only', () => {
@@ -218,14 +298,63 @@ test('the admin preview is dark too, because the owner can only fix what they ca
 
 test('with the caption gone the alt text IS the link name — half this change is an empty link', () => {
   const src = read('src/components/home/Strips.tsx');
-  const mark = src.slice(src.indexOf('function MarqueeMark'), src.indexOf('const cls = logoOnly'));
-  assert.ok(mark.length > 0, 'MarqueeMark must still exist');
-  assert.match(mark, /alt=\{entry\.name\}/, 'the logo carries the brand name');
+  const logo = src.slice(src.indexOf('function BrandLogo'), src.indexOf('function MarqueeMark'));
+  assert.ok(logo.length > 0, 'BrandLogo must still exist');
+  assert.match(logo, /alt=\{entry\.name\}/, 'the logo carries the brand name');
   // The trap: the wrapper span used to carry `aria-hidden` whenever there was
   // an image. Writing an alt into an aria-hidden subtree cancels both, and the
   // screen reader falls back to announcing the href.
-  const logoBranch = mark.slice(mark.indexOf('logoOnly ? ('), mark.indexOf(') : ('));
-  assert.doesNotMatch(logoBranch, /aria-hidden/, 'nothing may hide the element the alt is on');
+  assert.doesNotMatch(logo, /aria-hidden=\{!!entry\.image/, 'nothing may hide the element the alt is on');
+});
+
+test('a nameless card cannot produce a nameless link', () => {
+  const src = read('src/components/home/Strips.tsx');
+  // An authored card is legal with a picture and an EMPTY title, and in bare
+  // mode its alt would be '' — a link a screen reader announces by its href.
+  assert.match(
+    src,
+    /entries\.every\(\(e\) => !!e\.image && !!e\.name\.trim\(\)\)/,
+    'bare mode requires a name as well as a picture'
+  );
+});
+
+test('a logo that does not load falls back to the monogram, not to a broken-image glyph', () => {
+  const src = read('src/components/home/Strips.tsx');
+  assert.match(src, /onError=\{\(\) => setBroken\(true\)\}/);
+  assert.match(src, /sr-only">\{entry\.name\}/, 'and the fallback keeps the link named');
+});
+
+test('the focus ring is INSET, because the belt clips everything outside itself', () => {
+  const src = read('src/components/home/Strips.tsx');
+  // The marquee container is overflow-hidden and the track is exactly one mark
+  // tall, so an outer ring or an outline-offset is drawn outside the clip and
+  // never seen. A ring nobody can see is worse than none: it reads as solved.
+  assert.match(src, /focus-visible:ring-inset/);
+  assert.doesNotMatch(src, /outline-offset-2/);
+});
+
+test('the belt stops when focus lands in it', () => {
+  const src = read('src/components/home/Marquee.tsx');
+  // Hover and press-hold were handled; focus was not, so a keyboard user
+  // landed on a mark that immediately slid out from under the ring.
+  assert.match(src, /:focus-within > \.lv-mq__track \{ animation-play-state: paused; \}/);
+});
+
+test('the resting logo is at full opacity — `hover:` never fires on a phone', () => {
+  const src = read('src/components/home/Strips.tsx');
+  // Tailwind v4 gates `hover:` behind `@media (hover: hover)`. An
+  // `opacity-90` resting state would be permanent on the device the owner
+  // filed this from, giving back a tenth of the contrast the brightening won.
+  assert.doesNotMatch(src, /opacity-90/);
+  assert.match(src, /active:scale-\[0\.97\]/, 'the press feedback is one a finger also gets');
+});
+
+test('the brightening is scoped to the shop own brand marks, not to owner photos', () => {
+  const src = read('src/components/home/Strips.tsx');
+  // The constant was tuned against seven specific transparent logo files. An
+  // authored card's picture can be a photograph, and doubling a photograph's
+  // brightness is damage rather than correction.
+  assert.match(src, /entry\.data === 'brand' \? LOGO_FILTER : undefined/);
 });
 
 test('a dark logo is brightened rather than backed — measured, not guessed', () => {

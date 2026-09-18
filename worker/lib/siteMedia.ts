@@ -46,7 +46,17 @@ export interface SiteMediaSlot {
   /** Stable id. Also the filename stem an upload is minted under. */
   slot: string;
   group: SiteMediaGroup;
-  /** Shown in the admin list. Not user-facing on the storefront. */
+  /**
+   * Shown in the admin list — AND, for a brand slot, it is now the only
+   * accessible name the storefront has for that mark.
+   *
+   * This comment used to say "not user-facing on the storefront", and that
+   * stopped being true when the brand belt dropped its captions: the logo's
+   * `alt` is this string (src/components/home/Strips.tsx), so a screen reader
+   * reads it aloud and nothing else names the link. Changing a brand slot's
+   * label is therefore a user-facing edit, and it must stay a brand's actual
+   * name rather than a note to whoever maintains the list.
+   */
   label: string;
   /**
    * The object name inside MAIN_PAGE_PREFIX to use when the owner has not
