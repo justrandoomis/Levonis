@@ -34,6 +34,11 @@ export const IDENTITY_TERMS: readonly string[] = [
   'stl', 'obj', '3mf', 'gcode', 'g-code', 'step', 'stp', 'svg', 'dxf', 'ply',
   'ce', 'fcc', 'rohs', 'iso', 'ul', 'ip65',
   'ac', 'dc', 'rc', 'pid', 'cnc', 'diy', 'qr', 'ai',
+  // Firmware and hardware PRODUCT NAMES, plus the polymers and standards a
+  // spec sheet quotes by name. An Iraqi buyer reads «Klipper» as Klipper; an
+  // Arabic transliteration would be a word nobody searches for and nobody says.
+  'klipper', 'marlin', 'reprapfirmware', 'bowden', 'bltouch',
+  'hepa', 'pom', 'ptfe', 'dmd', 'corexy',
 ];
 
 /**
@@ -168,7 +173,7 @@ export const PHRASES: Record<string, TermEntry> = {
   'operating system': { ar: 'نظام التشغيل', ckb: 'سیستەمی کارپێکردن' },
   'software': { ar: 'البرنامج', ckb: 'نەرمەکاڵا' },
   'slicer': { ar: 'برنامج التقطيع' },
-  'firmware': { ar: 'البرنامج الثابت' },
+  'firmware': { ar: 'البرنامج الثابت', ckb: 'فێرموێر' },
   'auto leveling': { ar: 'التسوية التلقائية', ckb: 'هاوسەنگکردنی خۆکار' },
   'automatic leveling': { ar: 'التسوية التلقائية' },
   'filament runout sensor': { ar: 'حساس نفاد الفلامنت' },
@@ -210,6 +215,80 @@ export const PHRASES: Record<string, TermEntry> = {
   'light source': { ar: 'مصدر الضوء', ckb: 'سەرچاوەی ڕووناکی' },
   'exposure time': { ar: 'زمن التعريض', ckb: 'ماوەی ڕووناکخستن' },
   'release film': { ar: 'غشاء الفصل', ckb: 'فیلمی جیاکردنەوە' },
+  // ---------------------------------------------------------------- 0093
+  // The vocabulary the EXPANDED printer template introduced. The owner asked
+  // for «توسعة» so the comparison has real specs to draw on, and every label
+  // and every select option it added has to be sayable in all three languages
+  // — a spec the customer cannot read is not a spec they can compare.
+  //
+  // Where the correct rendering IS the English token (Klipper, Bowden,
+  // BLTouch, HEPA, POM) the word is in IDENTITY_TERMS above rather than
+  // transliterated here, which is the same call `input shaping` already makes.
+  'release year': { ar: 'سنة الإصدار', ckb: 'ساڵی دەرچوون' },
+  'required skill level': { ar: 'مستوى الخبرة المطلوب', ckb: 'ئاستی شارەزایی پێویست' },
+  'beginner': { ar: 'مبتدئ', ckb: 'دەستپێکەر' },
+  'intermediate': { ar: 'متوسط', ckb: 'ناوەندی' },
+  'advanced': { ar: 'متقدم', ckb: 'پێشکەوتوو' },
+  'professional': { ar: 'احترافي', ckb: 'پیشەیی' },
+
+  'air filtration': { ar: 'تنقية الهواء', ckb: 'پاڵاوتنی هەوا' },
+  'none': { ar: 'لا يوجد', ckb: 'نییە' },
+  'activated carbon': { ar: 'كربون منشّط', ckb: 'کاربۆنی چالاککراو' },
+  'hepa + activated carbon': { ar: 'HEPA + كربون منشّط', ckb: 'HEPA + کاربۆنی چالاککراو' },
+  'external exhaust port': { ar: 'منفذ عادم خارجي', ckb: 'دەرگای دەرکردنی هەوا بۆ دەرەوە' },
+  'optional add-on': { ar: 'إضافة اختيارية', ckb: 'زیادکراوی ئارەزوومەندانە' },
+  'ambient operating temperature': { ar: 'حرارة الغرفة المناسبة للتشغيل', ckb: 'پلەی گەرمی ژوور بۆ کارکردن' },
+  'max chamber temperature': { ar: 'أقصى حرارة للغرفة', ckb: 'بەرزترین پلەی گەرمی ژوورەکە' },
+  'maximum colours': { ar: 'أقصى عدد ألوان', ckb: 'زۆرترین ژمارەی ڕەنگ' },
+  'thermal runaway protection': { ar: 'الحماية من الانفلات الحراري', ckb: 'پاراستن لە دەرچوونی گەرمی' },
+
+  'extruder drive type': { ar: 'نظام الإكسترودر', ckb: 'جۆری سیستەمی ئێکسترودەر' },
+  'direct drive': { ar: 'دفع مباشر', ckb: 'ڕاستەوخۆ' },
+  'hotend construction': { ar: 'تركيب الهوت إند', ckb: 'پێکهاتەی هۆت ئێند' },
+  'all-metal': { ar: 'معدني بالكامل', ckb: 'تەواو مەعدەنی' },
+  'ptfe-lined': { ar: 'مبطّن بـ PTFE', ckb: 'بە PTFE ڕووپۆشکراو' },
+  'bi-metal heat break': { ar: 'فاصل حراري ثنائي المعدن', ckb: 'بڕەری گەرمی دوو مەعدەنی' },
+  'brass': { ar: 'نحاس أصفر', ckb: 'برنج' },
+  'hardened steel': { ar: 'فولاذ مقسّى', ckb: 'پۆڵای ڕەقکراو' },
+  'stainless steel': { ar: 'فولاذ مقاوم للصدأ', ckb: 'پۆڵای زەنگ‌نەگر' },
+  'tungsten carbide': { ar: 'كربيد التنغستن', ckb: 'کاربایدی تەنگستن' },
+  'coated / other': { ar: 'مطلي / أخرى', ckb: 'ڕووپۆشکراو / هیتر' },
+  'auxiliary part cooling': { ar: 'مروحة تبريد إضافية للقطعة', ckb: 'فێنککەرەوەی زیادەی پارچە' },
+
+  'axis guidance': { ar: 'نظام توجيه المحاور', ckb: 'سیستەمی ڕێنمایی تەوەرەکان' },
+  'linear rails (all axes)': { ar: 'قضبان خطية (كل المحاور)', ckb: 'ڕێڕەوی هێڵی (هەموو تەوەرەکان)' },
+  'linear rails (x/y only)': { ar: 'قضبان خطية (X/Y فقط)', ckb: 'ڕێڕەوی هێڵی (تەنها X/Y)' },
+  'linear rods + bearings': { ar: 'أعمدة خطية + رولمان', ckb: 'چەقی هێڵی + بەرینگ' },
+  'pom wheels on extrusion': { ar: 'بكرات POM على قضبان الألمنيوم', ckb: 'چەرخی POM لەسەر ئەلەمنیۆم' },
+  'mixed / other': { ar: 'مختلط / أخرى', ckb: 'تێکەڵ / هیتر' },
+  'levelling sensor': { ar: 'نوع حساس التسوية', ckb: 'جۆری هەستەوەری هاوسەنگکردن' },
+  'strain gauge / load cell': { ar: 'حساس ضغط (Load cell)', ckb: 'هەستەوەری فشار (Load cell)' },
+  'inductive probe': { ar: 'مجس حثّي', ckb: 'هەستەوەری ئیندەکتیڤ' },
+  'bltouch / touch probe': { ar: 'مجس لمسي BLTouch', ckb: 'هەستەوەری بەرکەوتەی BLTouch' },
+  'eddy current': { ar: 'تيار دوّامي', ckb: 'جەریانی ئێدی' },
+  'piezo': { ar: 'بيزو', ckb: 'پیزۆ' },
+  'manual (no probe)': { ar: 'يدوي (بدون مجس)', ckb: 'دەستی (بێ هەستەوەر)' },
+  'minimum layer height': { ar: 'أقل ارتفاع للطبقة', ckb: 'نزمترین بەرزی چین' },
+
+  'proprietary': { ar: 'خاص بالشركة', ckb: 'تایبەت بە کۆمپانیا' },
+  'print failure detection': { ar: 'كشف فشل الطباعة', ckb: 'دۆزینەوەی شکستی چاپ' },
+
+  'screen type': { ar: 'نوع الشاشة', ckb: 'جۆری شاشە' },
+  'monochrome lcd': { ar: 'شاشة أحادية اللون', ckb: 'شاشەی تاک‌ڕەنگ' },
+  'colour lcd': { ar: 'شاشة ملوّنة', ckb: 'شاشەی ڕەنگاوڕەنگ' },
+  'dlp (dmd)': { ar: 'DLP (DMD)', ckb: 'DLP (DMD)' },
+  'lcd (unspecified)': { ar: 'شاشة LCD (غير محددة)', ckb: 'شاشەی LCD (دیارینەکراو)' },
+  'screen rated life': { ar: 'العمر الافتراضي للشاشة', ckb: 'تەمەنی پێشبینیکراوی شاشە' },
+  'z-axis accuracy': { ar: 'دقة محور Z', ckb: 'وردی تەوەری Z' },
+  'max vertical print speed': { ar: 'أقصى سرعة طباعة عمودية', ckb: 'بەرزترین خێرایی چاپی ستوونی' },
+  'layer release mechanism': { ar: 'آلية فصل الطبقة', ckb: 'میکانیزمی جیاکردنەوەی چین' },
+  'tilt release': { ar: 'فصل بالإمالة', ckb: 'جیاکردنەوە بە لارکردن' },
+  'standard lift-and-peel': { ar: 'رفع وفصل تقليدي', ckb: 'بەرزکردنەوە و جیاکردنەوەی ئاسایی' },
+  'rotary / roller release': { ar: 'فصل دوّار', ckb: 'جیاکردنەوەی سووڕاوە' },
+  'build plate levelling': { ar: 'تسوية منصة الطباعة', ckb: 'هاوسەنگکردنی پلێتی چاپ' },
+  'levelling-free': { ar: 'بدون تسوية', ckb: 'بێ هاوسەنگکردن' },
+  'auto levelling': { ar: 'تسوية تلقائية', ckb: 'هاوسەنگکردنی خۆکار' },
+
   'fits models': { ar: 'الموديلات المتوافقة', ckb: 'گونجاوە بۆ مۆدێلەکان' },
   'installation': { ar: 'التركيب', ckb: 'دامەزراندن' },
   'use case': { ar: 'حالة الاستخدام', ckb: 'شێوازی بەکارهێنان' },

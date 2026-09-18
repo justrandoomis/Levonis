@@ -111,6 +111,12 @@ export const DEVICES: TemplateFamilyDef = {
     fields: [
       t('technology', 'التقنية', 'Technology', 'select', { options: ['FDM', 'Resin (MSLA)', 'SLA', 'DLP', 'Other'] }),
       t('model', 'الموديل', 'Model'),
+      t('release_year', 'سنة الإصدار', 'Release year', 'number', {
+        compare: { parse: 'number', better: 'higher', weight: 1 }, hint_ar: 'مثال: 2024',
+      }),
+      t('skill_level', 'مستوى الخبرة المطلوب', 'Required skill level', 'select', {
+        options: ['Beginner', 'Intermediate', 'Advanced', 'Professional'], compare: { parse: 'text', better: 'none' }, hint_ar: 'لمن صُممت الطابعة — مثال: Beginner',
+      }),
       t('build_volume', 'حجم الطباعة', 'Build volume', 'text', {
         unit: 'mm',
         hint_ar: 'مثال: 256 x 256 x 256',
@@ -302,6 +308,15 @@ export const DEVICES: TemplateFamilyDef = {
         t('ams_compatibility', 'التوافق مع AMS', 'AMS compatibility', 'text', {
           hint_ar: 'مثال: AMS / AMS lite / غير مدعوم',
         }),
+        t('chamber_temp_max', 'أقصى حرارة الغرفة', 'Max chamber temperature', 'number', {
+          unit: '°C', compare: { parse: 'number', better: 'higher', weight: 2 }, hint_ar: 'للغرفة المُسخّنة فعليًا فقط — مثال: 60. اتركه فارغًا إذا الهيكل مغلق بلا تسخين',
+        }),
+        t('max_colors', 'أقصى عدد ألوان', 'Maximum colours', 'number', {
+          compare: { parse: 'number', better: 'higher', weight: 1 }, hint_ar: 'أقصى عدد ألوان في طبعة واحدة — مثال: 16',
+        }),
+        t('thermal_runaway_protection', 'الحماية من الانفلات الحراري', 'Thermal runaway protection', 'select', {
+          options: ['Yes', 'No'], compare: { parse: 'boolean', better: 'yes', weight: 2 }, hint_ar: 'مثال: Yes',
+        }),
         t('supported_filaments', 'الفلامنتات المدعومة', 'Supported filaments', 'text', {
           hint_ar: 'مثال: PLA, PETG, ABS, ASA, TPU, PA-CF',
           compare: { parse: 'list', better: 'higher', weight: 1 },
@@ -354,7 +369,113 @@ export const DEVICES: TemplateFamilyDef = {
           unit: 'W',
           compare: { parse: 'number', better: 'none' },
         }),
+        t('lcd_type', 'نوع الشاشة', 'Screen type', 'select', {
+          options: ['Monochrome LCD', 'Colour LCD', 'DLP (DMD)', 'LCD (unspecified)'], compare: { parse: 'text', better: 'none' }, hint_ar: 'مثال: Monochrome LCD — مكتوب بجانب مقاس الشاشة',
+        }),
+        t('lcd_lifespan', 'عمر الشاشة الافتراضي', 'Screen rated life', 'number', {
+          unit: 'h', compare: { parse: 'number', better: 'higher', weight: 1 }, hint_ar: 'اكتب الرقم فقط — مثال: 2000',
+        }),
         t('release_film', 'فيلم الفصل', 'Release film'),
+      ],
+    },
+    /*
+     * THE PRINTER SECTIONS ARE SUB-GROUPED, AND THE GROUPS ARE THE POINT.
+     *
+     * «خاص بطابعات FDM» was one flat list of seventeen fields, and the owner
+     * asked for the template to grow «لكي يتم وضعها في تفاصيل المنتج» while
+     * staying «كمميزات بنقاط مرتبة كما هو حاليا» — ordered points, not a wall.
+     * Thirty more fields in one group would have produced exactly the wall.
+     *
+     * Splitting costs a sparsely-filled product NOTHING, which is what makes
+     * it safe: `specGroupsFromFields` skips a field with no value and DROPS a
+     * group that ends up with no rows, so a machine whose admin filled twelve
+     * fields still shows twelve lines under however many headings apply.
+     *
+     * Each sub-group is owned by its technology leaf in AXES, so choosing
+     * Resin still removes every FDM group at once — the narrowing means what
+     * it always meant.
+     */
+    'device-environment': {
+      id: 'device_env',
+      label_ar: 'الكهرباء والبيئة',
+      label_en: 'Power & environment',
+      fields: [
+        t('input_voltage', 'جهد الدخل', 'Input voltage', 'text', {
+          unit: 'V', compare: { parse: 'range', better: 'none' }, hint_ar: 'مثال: 100-240 أو 220 فقط',
+        }),
+        t('air_filtration', 'تنقية الهواء', 'Air filtration', 'select', {
+          options: ['None', 'Activated carbon', 'HEPA', 'HEPA + activated carbon', 'External exhaust port', 'Optional add-on'], compare: { parse: 'text', better: 'none' }, hint_ar: 'مثال: Activated carbon — أو None إذا لا يوجد فلتر',
+        }),
+        t('ambient_temp_range', 'حرارة الغرفة المناسبة', 'Ambient operating temperature', 'text', {
+          unit: '°C', compare: { parse: 'range', better: 'none' }, hint_ar: 'حرارة الغرفة التي يعمل بها الجهاز — مثال: 15-30',
+        }),
+      ],
+    },
+    'fdm-extrusion': {
+      id: 'fdm_extrusion',
+      label_ar: 'الإكسترودر والهوت إند',
+      label_en: 'Extruder & hotend',
+      fields: [
+        t('extruder_drive', 'نظام الإكسترودر', 'Extruder drive type', 'select', {
+          options: ['Direct drive', 'Bowden'], compare: { parse: 'text', better: 'none' }, hint_ar: 'مثال: Direct drive — مذكور في صفحة مواصفات الشركة',
+        }),
+        t('hotend_type', 'تركيب الهوت إند', 'Hotend construction', 'select', {
+          options: ['All-metal', 'PTFE-lined', 'Bi-metal heat break'], compare: { parse: 'text', better: 'none' }, hint_ar: 'مثال: All-metal — يعني تشغيل مستمر فوق 260°C بأمان',
+        }),
+        t('nozzle_material', 'خامة النوزل', 'Nozzle material', 'select', {
+          options: ['Brass', 'Hardened steel', 'Stainless steel', 'Tungsten carbide', 'Coated / other'], compare: { parse: 'text', better: 'none' }, hint_ar: 'الخامة المرفقة مع الجهاز — مثال: Hardened steel',
+        }),
+        t('auxiliary_part_cooling', 'مروحة تبريد إضافية', 'Auxiliary part cooling', 'select', {
+          options: ['Yes', 'No', 'Optional'], compare: { parse: 'boolean', better: 'yes', weight: 1 }, hint_ar: 'مروحة جانبية إضافية غير مروحة الرأس — مثال: Yes',
+        }),
+      ],
+    },
+    'fdm-motion': {
+      id: 'fdm_motion',
+      label_ar: 'الحركة والتسوية والدقة',
+      label_en: 'Motion, levelling & accuracy',
+      fields: [
+        t('linear_guides', 'نظام التوجيه للمحاور', 'Axis guidance', 'select', {
+          options: ['Linear rails (all axes)', 'Linear rails (X/Y only)', 'Linear rods + bearings', 'POM wheels on extrusion', 'Mixed / other'], compare: { parse: 'text', better: 'none' }, hint_ar: 'مثال: Linear rails (X/Y only)',
+        }),
+        t('leveling_sensor', 'نوع حساس التسوية', 'Levelling sensor', 'select', {
+          options: ['Strain gauge / load cell', 'Inductive probe', 'BLTouch / touch probe', 'Eddy current', 'Piezo', 'Manual (no probe)'], compare: { parse: 'text', better: 'none' }, hint_ar: 'مثال: Strain gauge / load cell — أو Manual (no probe) إذا التسوية يدوية',
+        }),
+        t('min_layer_height', 'أقل ارتفاع طبقة', 'Minimum layer height', 'number', {
+          unit: 'mm', compare: { parse: 'number', better: 'lower', weight: 1 }, hint_ar: 'أصغر رقم في سطر layer height — مثال: 0.05',
+        }),
+      ],
+    },
+    'fdm-control': {
+      id: 'fdm_control',
+      label_ar: 'التحكم والمراقبة',
+      label_en: 'Control & monitoring',
+      fields: [
+        t('firmware', 'البرنامج الثابت', 'Firmware', 'select', {
+          options: ['Klipper', 'Marlin', 'RepRapFirmware', 'Proprietary', 'Other'], compare: { parse: 'text', better: 'none' }, hint_ar: 'مثال: Klipper',
+        }),
+        t('print_failure_detection', 'كشف فشل الطباعة', 'Print failure detection', 'select', {
+          options: ['Yes', 'No', 'Optional'], compare: { parse: 'boolean', better: 'yes', weight: 1 }, hint_ar: 'كشف السباغيتي أو فحص الطبقة الأولى بالكاميرا — مثال: Yes',
+        }),
+      ],
+    },
+    'resin-motion': {
+      id: 'resin_motion',
+      label_ar: 'الحركة والتسوية',
+      label_en: 'Motion & levelling',
+      fields: [
+        t('z_accuracy', 'دقة محور Z', 'Z-axis accuracy', 'number', {
+          unit: 'mm', compare: { parse: 'number', better: 'lower', weight: 2 }, hint_ar: 'اكتب الرقم فقط — مثال: 0.01',
+        }),
+        t('max_print_speed_z', 'أقصى سرعة طباعة (عمودية)', 'Max vertical print speed', 'number', {
+          unit: 'mm/h', compare: { parse: 'number', better: 'higher', weight: 2 }, hint_ar: 'سرعة الطابعة الراتنجية بالـ mm/h — مثال: 150 (لا تكتبها في حقل «السرعة»)',
+        }),
+        t('release_mechanism', 'آلية فصل الطبقة', 'Layer release mechanism', 'select', {
+          options: ['Tilt release', 'Standard lift-and-peel', 'Rotary / roller release', 'Other'], compare: { parse: 'text', better: 'none' }, hint_ar: 'مثال: Tilt release',
+        }),
+        t('leveling_type', 'تسوية منصة الطباعة', 'Build plate levelling', 'select', {
+          options: ['Levelling-free', 'Manual 4-point', 'Manual 2-point', 'Auto levelling'], compare: { parse: 'text', better: 'none' }, hint_ar: 'مثال: Levelling-free',
+        }),
       ],
     },
     // The parent «ملحقات الطابعات» section: an accessory picked at the parent
@@ -623,7 +744,16 @@ export const PRODUCT_TYPES: ProductTypeDef[] = [
     family: 'devices',
     hint_ar: 'الطابعات ثلاثية الأبعاد بكل أنواعها — FDM و Resin.',
     sectionSlugs: ['fdm-printers', 'resin-printers', 'printers'],
-    groups: [DEVICES.common, ...g(DEVICES, 'fdm-printers'), ...g(DEVICES, 'resin-printers')],
+    groups: [
+      DEVICES.common,
+      ...g(DEVICES, 'device-environment'),
+      ...g(DEVICES, 'fdm-printers'),
+      ...g(DEVICES, 'fdm-extrusion'),
+      ...g(DEVICES, 'fdm-motion'),
+      ...g(DEVICES, 'fdm-control'),
+      ...g(DEVICES, 'resin-printers'),
+      ...g(DEVICES, 'resin-motion'),
+    ],
   },
   {
     id: 'parts',
@@ -703,26 +833,35 @@ interface SeededLeaf {
   id: string;
   /** The slug 0018 PREFERS. `<slug>-levo` and the bare id are its fallbacks. */
   slug: string;
-  /** The group this leaf selects, '' when the leaf adds no group of its own
-   *  but must still be able to say "not my sibling's". */
-  group: string;
+  /**
+   * The groups this leaf selects. EMPTY is meaningful: a leaf can add no group
+   * of its own and still need to say "not my sibling's".
+   *
+   * A LIST, not one id, since the printer sections were split into readable
+   * sub-groups. «خاص بطابعات FDM» was one flat group of seventeen fields and
+   * adding the extrusion, motion and control specs to it would have produced
+   * the wall of text the owner explicitly refused. Each sub-group is still
+   * owned by the same leaf, so the narrowing is unchanged in meaning: choose
+   * Resin and every FDM group leaves the form together, as one always did.
+   */
+  groups: string[];
 }
 
 const AXES: Record<string, SeededLeaf[]> = {
   'printer-technology': [
-    { id: 'cat_printers_fdm', slug: 'fdm-printers', group: 'fdm' },
-    { id: 'cat_printers_resin', slug: 'resin-printers', group: 'resin' },
+    { id: 'cat_printers_fdm', slug: 'fdm-printers', groups: ['fdm', 'fdm_extrusion', 'fdm_motion', 'fdm_control'] },
+    { id: 'cat_printers_resin', slug: 'resin-printers', groups: ['resin', 'resin_motion'] },
   ],
   'material-technology': [
-    { id: 'cat_materials_fdm', slug: 'fdm-materials', group: 'fdm_mat' },
-    { id: 'cat_materials_resin', slug: 'resin-materials', group: 'resin_mat' },
+    { id: 'cat_materials_fdm', slug: 'fdm-materials', groups: ['fdm_mat'] },
+    { id: 'cat_materials_resin', slug: 'resin-materials', groups: ['resin_mat'] },
   ],
   // «ملحقات طابعات FDM» declares no group of its own, but it is still the
   // statement "this is not a Resin accessory" — without the empty entry an FDM
   // accessory would keep being asked for a wash-station capacity.
   'accessory-technology': [
-    { id: 'cat_pacc_fdm', slug: 'fdm-printer-accessories', group: '' },
-    { id: 'cat_pacc_resin', slug: 'resin-printer-accessories', group: 'acc_resin' },
+    { id: 'cat_pacc_fdm', slug: 'fdm-printer-accessories', groups: [] },
+    { id: 'cat_pacc_resin', slug: 'resin-printer-accessories', groups: ['acc_resin'] },
   ],
 };
 
@@ -750,7 +889,8 @@ function excludedGroups(branch: SectionRef[]): Set<string> {
     // walks through both) → also no opinion, rather than an empty form.
     if (named.length === 0 || named.length === leaves.length) continue;
     for (const l of leaves) {
-      if (l.group && !named.includes(l)) out.add(l.group);
+      if (named.includes(l)) continue;
+      for (const gid of l.groups) out.add(gid);
     }
   }
   return out;
