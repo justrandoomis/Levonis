@@ -1223,7 +1223,17 @@ export function newIdempotencyKey(): string {
 /** Upload a file; returns its key + URL. */
 export async function uploadFile(
   file: File,
-  purpose: 'receipt' | 'avatar' | 'chat' | 'product' | 'community'
+  purpose: 'receipt' | 'avatar' | 'chat' | 'product' | 'community',
+  /**
+   * The thing this file belongs to, when it is not the uploader.
+   *
+   * A chat attachment is filed under the CONVERSATION — the owner chose that
+   * ordering so one thread's pictures sit in one folder — so a chat upload
+   * must say which conversation. The server verifies participation before it
+   * stores a byte, so passing a chat you are not in is refused rather than
+   * trusted.
+   */
+  entityId?: string
 ): Promise<{ key: string; url: string; mime?: string; bytes?: number; width?: number | null; height?: number | null; visibility?: 'public' | 'private' }> {
   const originalName = file.name;
   let prepared = file;
@@ -1251,6 +1261,7 @@ export async function uploadFile(
   }
   const form = new FormData();
   form.append('purpose', purpose);
+  if (entityId) form.append('entity_id', entityId);
   form.append('file', prepared);
   form.append('originalName', originalName);
   if (width) form.append('width', String(width));

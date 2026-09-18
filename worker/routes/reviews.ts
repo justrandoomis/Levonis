@@ -19,7 +19,7 @@ import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { sniff } from './uploads';
-import { getMediaObject, headMediaObject, putMediaObject } from '../lib/mediaStorage';
+import { getMediaObject, headMediaObject, storeMedia } from '../lib/mediaStorage';
 import { notifyStatement } from '../lib/notifications';
 import {
   evaluateReviewQuality,
@@ -870,28 +870,45 @@ reviewRoutes.post('/uploads', requireAuth, async (c) => {
     throw badRequest(`Image is too large (max ${Math.round(IMAGE_MAX / 1024 / 1024)} MB)`);
   }
 
-  const prefix = purpose === 'evidence' ? `reviews-evidence/${user.id}` : `reviews/${user.id}`;
-  const key = `${prefix}/${newId()}.${kind.ext}`;
   const sha256 = await digestBytes(buf);
-  await putMediaObject(
-    c.env,
-    {
-      key,
+  /**
+   * THROUGH THE ONE DOOR — converted on the server, and filed where the rule
+   * says.
+   *
+   * This wrote `reviews/<userId>/<id>.jpg` by hand: three segments where the
+   * layout is four, and whatever the customer's phone produced, stored as it
+   * arrived. A review photo is the commonest image on a product page after the
+   * catalogue's own, and it was the one nobody converted.
+   *
+   * `storeMedia` takes the PARTS of a key and never the key, so the missing
+   * `kind` segment cannot be forgotten again, and it decides the extension
+   * from the bytes it actually stored — which is what stops a key claiming
+   * `.jpg` over WebP or the reverse. A video passes through untouched: a
+   * transform keeps one frame, and one frame of a video is not the video.
+   */
+  const stored = await storeMedia(c.env, {
+    placement: {
       visibility: 'private',
       domain: purpose === 'evidence' ? 'reviews-evidence' : 'reviews',
-      mime: kind.mime,
-      bytes: buf.byteLength,
-      ownerId: user.id,
       entityId: user.id,
-      originalName: file.name,
+      kind: isVideo ? 'video' : purpose === 'evidence' ? 'evidence' : 'photos',
+      objectId: newId(),
     },
-    buf,
-    {
-      httpMetadata: { contentType: kind.mime, cacheControl: 'private, max-age=300' },
-      customMetadata: { sha256 },
-    }
-  );
-  return c.json({ success: true, key, kind: isVideo ? 'video' : 'image', sha256, bytes: buf.byteLength, url: mediaUrl(key) });
+    bytes: buf,
+    mime: kind.mime,
+    ownerId: user.id,
+    originalName: file.name,
+    cacheControl: 'private, max-age=300',
+  });
+  const key = stored.key;
+  return c.json({
+    success: true,
+    key,
+    kind: isVideo ? 'video' : 'image',
+    sha256,
+    bytes: stored.bytes,
+    url: mediaUrl(key),
+  });
 });
 
 /**

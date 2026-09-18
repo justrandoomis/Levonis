@@ -1,4 +1,5 @@
 import type { Env } from './types';
+import { convertToWebp, extensionFor, isConvertibleToWebp } from './imageConvert';
 
 export type MediaVisibility = 'public' | 'private';
 export type MediaDomain =
@@ -343,6 +344,148 @@ async function recordMediaObject(db: D1Database | undefined, meta: StoredMediaMe
  * because "the specified bucket does not exist" with no binding name is a
  * message the owner cannot act on.
  */
+/**
+ * THE ONE DOOR EVERY STORED FILE GOES THROUGH.
+ *
+ * WHY IT EXISTS. Two rules were true of this codebase and enforced nowhere:
+ * every raster image is converted to WebP on the server, and every object key
+ * is `domain/entityId/kind/objectId.ext`. Both were enforced by whoever
+ * remembered them. An audit of all twenty-nine files that write to R2 found
+ * that only `routes/uploads.ts` did:
+ *
+ *   reviews/<userId>/<id>.jpg           a customer's review photo, unconverted
+ *   reviews-evidence/<userId>/<id>.png  the Instagram capture behind it
+ *   kyc/<userId>/<id>.jpg               a photograph of someone's identity card
+ *   claims/<userId>/<id>.jpg            a warranty claim's evidence
+ *   products/import/<sha256>.jpg        a vendor photo pulled in at import
+ *
+ * Five key shapes with three segments where the rule says four, and five paths
+ * storing whatever arrived. The owner found the consequence in their own
+ * bucket — `users/.../avatar/<id>.png`, 316 KB — and asked for both rules to
+ * hold everywhere: «تتحول في السيرفر ... وكل شيء له ترتيب مضبوط ومرتب».
+ *
+ * A COMMENT CANNOT ENFORCE A RULE, AND A CODE REVIEW ONLY CATCHES WHAT IT
+ * READS. So this function does not accept a key at all. It accepts the four
+ * PARTS of one, and builds it — which makes a hand-rolled layout not
+ * discouraged but unrepresentable. The extension is not an input either: it is
+ * whatever the bytes turn out to be after conversion, so a key can no longer
+ * claim `.jpg` over WebP bytes or the reverse.
+ *
+ * WHAT IT REFUSES TO CONVERT, as decisions rather than omissions:
+ *   - an animated GIF, because a transform keeps ONE frame and the animation
+ *     is the content;
+ *   - AVIF, which is already smaller than the WebP it would become;
+ *   - a video, a 3D model, a PDF, a CSV — a receipt PDF is evidence, and
+ *     re-encoding evidence destroys it;
+ *   - anything at all when `env.IMAGES` is absent, where the caller decides
+ *     between refusing and storing honestly under the true extension. This
+ *     function never silently stores an unconverted image as if it had been
+ *     converted — that is the lie the whole change exists to remove.
+ */
+export interface MediaPlacement {
+  visibility: MediaVisibility;
+  domain: MediaDomain;
+  /** The thing this file belongs to: a chat id, a review id, a user id. */
+  entityId: string;
+  /** What KIND of file it is within that entity — the segment that was missing. */
+  kind: string;
+  /** The object's own id. The extension is decided here, never passed in. */
+  objectId: string;
+}
+
+export interface StoreMediaInput {
+  placement: MediaPlacement;
+  bytes: Uint8Array;
+  /** The MIME the bytes were sniffed as — never the one the browser claimed. */
+  mime: string;
+  ownerId?: string | null;
+  width?: number | null;
+  height?: number | null;
+  originalName?: string | null;
+  /** Cache-Control for the stored object; the caller knows if it is public. */
+  cacheControl?: string;
+}
+
+export interface StoreMediaResult {
+  key: string;
+  mime: string;
+  bytes: number;
+  /** True when these bytes were re-encoded here rather than stored as they arrived. */
+  converted: boolean;
+}
+
+export async function storeMedia(
+  env: Pick<Env, 'DB' | 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE' | 'IMAGES'>,
+  input: StoreMediaInput
+): Promise<StoreMediaResult> {
+  let bytes = input.bytes;
+  let mime = input.mime;
+  let converted = false;
+
+  if (isConvertibleToWebp(mime)) {
+    const out = await convertToWebp(env, bytes, mime);
+    if (out.ok) {
+      bytes = out.bytes;
+      mime = out.mime;
+      converted = true;
+    } else if (out.reason === 'unavailable') {
+      // The binding is absent on this deployment. Storing the original under
+      // its TRUE extension is honest; storing it under `.webp` would not be.
+      // The caller is told, and decides whether that is acceptable for its
+      // purpose — `routes/uploads.ts` refuses, because a catalogue photo that
+      // is silently a JPEG is the defect this all began with.
+      console.error('storeMedia: the Images binding is absent — stored without conversion', input.placement.domain);
+    } else if (out.reason === 'too_large') {
+      throw new Error('IMAGE_TOO_LARGE_TO_CONVERT');
+    } else if (out.reason === 'failed') {
+      throw new Error(`IMAGE_CONVERT_FAILED: ${out.detail}`);
+    }
+    // `not_convertible` cannot be reached — `isConvertibleToWebp` guards this
+    // whole branch — and it is left unhandled rather than thrown on, so the
+    // bytes fall through and are stored under their true type if the set of
+    // convertible formats ever widens without this call site being told.
+
+  }
+
+  const key = buildMediaKey({
+    visibility: input.placement.visibility,
+    domain: input.placement.domain,
+    entityId: input.placement.entityId,
+    kind: input.placement.kind,
+    objectId: input.placement.objectId,
+    extension: extensionFor(mime),
+  });
+
+  await putMediaObject(
+    env,
+    {
+      key,
+      visibility: input.placement.visibility,
+      domain: input.placement.domain,
+      mime,
+      bytes: bytes.byteLength,
+      ownerId: input.ownerId ?? null,
+      entityId: input.placement.entityId,
+      width: input.width ?? null,
+      height: input.height ?? null,
+      originalName: input.originalName ?? null,
+    },
+    bytes,
+    {
+      httpMetadata: {
+        contentType: mime,
+        cacheControl:
+          input.cacheControl ??
+          (input.placement.visibility === 'public'
+            ? 'public, max-age=31536000, immutable'
+            : 'private, max-age=300'),
+      },
+    }
+  );
+
+  return { key, mime, bytes: bytes.byteLength, converted };
+}
+
 export async function putMediaObject(
   env: Pick<Env, 'DB' | 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>,
   meta: StoredMediaMetadata,

@@ -6,7 +6,8 @@ import { audit } from '../lib/audit';
 import { validateOutboundUrl } from '../lib/fetchGuard';
 import { sniff } from './uploads';
 import { extractPageImages, imageCandidates, isVendorHost } from '../lib/pageImages';
-import { buildMediaKey, headMediaObject, isSafeMediaKey, mediaBucket, probeMediaBucket, putMediaObject } from '../lib/mediaStorage';
+import { buildMediaKey, headMediaObject, isSafeMediaKey, mediaBucket, probeMediaBucket, putMediaObject, storeMedia } from '../lib/mediaStorage';
+import { isConvertibleToWebp } from '../lib/imageConvert';
 import { currentMediaReferences, hasDedicatedBucket, inventoryLegacyMedia, planLegacyMediaKey } from '../lib/mediaMigration';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { newId } from '../lib/crypto';
@@ -183,28 +184,44 @@ export async function ingestImageUrl(
       };
     }
 
+    /**
+     * THE BIGGEST SOURCE OF UNCONVERTED IMAGES ON THE WHOLE SITE.
+     *
+     * This stored a vendor's PNG or JPEG byte-for-byte under
+     * `products/import/<sha>.<ext>` — three segments where the layout is four,
+     * and no conversion at all, because `imageConvert` was never imported
+     * here. An import of one vendor page can pull in forty pictures, so a
+     * single admin action wrote forty unconverted files.
+     *
+     * THE HASH STILL NAMES THE OBJECT, and that is worth keeping: it is the
+     * digest of the bytes as they ARRIVED, so fetching the same vendor image
+     * twice still recognises it and skips the second write. Hashing the
+     * CONVERTED bytes instead would look tidier and would defeat the
+     * deduplication, because a conversion is not guaranteed to be
+     * byte-identical between runs.
+     *
+     * The `head` probe cannot know the stored extension before conversion, so
+     * it asks for the WebP first — the shape every convertible image now takes
+     * — and falls back to the arrival extension for the formats that pass
+     * through (GIF, AVIF). Two cheap HEADs against forty avoided downloads.
+     */
     const digest = await crypto.subtle.digest('SHA-256', buf as unknown as BufferSource);
     const sha = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
-    const key = `products/import/${sha}.${kind.ext}`;
+    const converted = isConvertibleToWebp(kind.mime);
+    const probeExt = converted ? 'webp' : kind.ext;
+    const probeKey = `products/import/gallery/${sha}.${probeExt}`;
 
-    const existing = await headMediaObject(env, 'public', key);
-    if (!existing) {
-      await putMediaObject(
-        env,
-        {
-          key,
-          visibility: 'public',
-          domain: 'products',
-          entityId: 'import',
-          mime: kind.mime,
-          bytes: buf.byteLength,
-          originalName: new URL(sourceUrl).pathname.split('/').pop() ?? null,
-        },
-        buf,
-        { httpMetadata: { contentType: kind.mime, cacheControl: 'public, max-age=31536000, immutable' } }
-      );
-    }
-    return { source_url: sourceUrl, key, url: `/files/${key}`, status: 'stored' };
+    const existing = await headMediaObject(env, 'public', probeKey);
+    if (existing) return { source_url: sourceUrl, key: probeKey, url: `/files/${probeKey}`, status: 'stored' };
+
+    const stored = await storeMedia(env, {
+      placement: { visibility: 'public', domain: 'products', entityId: 'import', kind: 'gallery', objectId: sha },
+      bytes: buf,
+      mime: kind.mime,
+      originalName: new URL(sourceUrl).pathname.split('/').pop() ?? null,
+      cacheControl: 'public, max-age=31536000, immutable',
+    });
+    return { source_url: sourceUrl, key: stored.key, url: `/files/${stored.key}`, status: 'stored' };
   } catch (e) {
     const reason =
       e instanceof DOMException && e.name === 'TimeoutError'

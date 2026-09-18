@@ -72,7 +72,7 @@ import {
 import { upgradeWarranty } from '../lib/productModel';
 import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
 import { sniff } from './uploads';
-import { getMediaObject, putMediaObject } from '../lib/mediaStorage';
+import { getMediaObject, storeMedia } from '../lib/mediaStorage';
 import {
   coverageState,
   normalizeSerial,
@@ -636,23 +636,31 @@ deviceRoutes.post('/claims/upload', async (c) => {
     throw badRequest('Image is too large (max 8 MB)');
   }
 
-  const key = `claims/${user.id}/${newId()}.${kind.ext}`;
-  await putMediaObject(
-    c.env,
-    {
-      key,
+  /**
+   * THROUGH THE ONE DOOR. `claims/<userId>/<id>.jpg`, hand-built, unconverted
+   * — a warranty claim is photographed by a customer holding a broken printer,
+   * so these are full-resolution camera files, and an admin opening a claim
+   * downloaded every megabyte of them.
+   *
+   * A video passes through untouched, because a transform keeps one frame and
+   * the whole point of a claim video is the thing that happens over time.
+   */
+  const isVideo = kind.mime.startsWith('video/');
+  const stored = await storeMedia(c.env, {
+    placement: {
       visibility: 'private',
       domain: 'claims',
-      mime: kind.mime,
-      bytes: buf.byteLength,
-      ownerId: user.id,
       entityId: user.id,
-      originalName: file.name,
+      kind: isVideo ? 'video' : 'photos',
+      objectId: newId(),
     },
-    buf,
-    { httpMetadata: { contentType: kind.mime, cacheControl: 'private, max-age=300' } }
-  );
-  return c.json({ success: true, key, url: `/api/devices/claim-files/${key}` });
+    bytes: buf,
+    mime: kind.mime,
+    ownerId: user.id,
+    originalName: file.name,
+    cacheControl: 'private, max-age=300',
+  });
+  return c.json({ success: true, key: stored.key, url: `/api/devices/claim-files/${stored.key}` });
 });
 
 deviceRoutes.get('/claim-files/*', async (c) => {

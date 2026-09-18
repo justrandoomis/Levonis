@@ -1,7 +1,7 @@
 import { IMAGES_MAX_INPUT_BYTES, convertToWebp, extensionFor, isConvertibleToWebp } from '../lib/imageConvert';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAuth, badRequest, forbidden, notFound, oneOf, unavailable } from '../lib/http';
+import { requireAuth, badRequest, forbidden, notFound, oneOf, str, unavailable } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
@@ -77,7 +77,20 @@ uploadRoutes.post('/', async (c) => {
     throw forbidden('Only administrators can upload product media');
   }
 
-  const allowVideo = purpose === 'product';
+  /**
+   * A CONVERSATION CARRIES VIDEO TOO.
+   *
+   * `purpose === 'product'` was the whole rule, so a customer trying to send a
+   * short clip of a failed print — the single most useful thing they can send
+   * a support agent — got «Videos are not allowed here». The owner named both
+   * when they asked for the per-conversation layout: «الصور أو الفيديوهات التي
+   * يرسلها داخل المحادثة».
+   *
+   * The 40 MB ceiling is the same one a product video has, and the image
+   * ceiling below still applies to images regardless — a video allowance must
+   * not become an 8 MB photo allowance of 40.
+   */
+  const allowVideo = purpose === 'product' || purpose === 'chat';
   const maxSize = allowVideo ? VIDEO_MAX : IMAGE_MAX;
   if (file.size > maxSize) {
     throw badRequest(`File is too large (max ${Math.round(maxSize / 1024 / 1024)} MB)`);
@@ -164,10 +177,40 @@ uploadRoutes.post('/', async (c) => {
     throw badRequest('The image has invalid or unsupported dimensions', 'BAD_IMAGE_DIMENSIONS');
   }
 
+  /**
+   * A CHAT FILE BELONGS TO THE CONVERSATION, NOT TO WHOEVER SENT IT.
+   *
+   * It was filed under the UPLOADER — `chat/<userId>/attachments/…` — so one
+   * thread's pictures were scattered across as many folders as it had
+   * participants, and opening a conversation in the bucket browser was
+   * impossible. The owner chose the other ordering explicitly, for exactly
+   * that reason: «الثاني الاسهل في فتح المحادثه».
+   *
+   * It is also the stronger rule. Under the old layout the delivery route
+   * granted the uploader access by prefix and everyone else by a lookup for a
+   * MESSAGE carrying the key — so between the upload and the send, the file
+   * belonged to nobody but its uploader, and the check had two branches that
+   * could disagree. Keyed by chat, access is one question with one answer:
+   * are you in this conversation.
+   *
+   * Participation is verified HERE, before a byte is stored, so the key cannot
+   * name a conversation the uploader is not in.
+   */
+  let chatEntity = '';
+  if (purpose === 'chat') {
+    chatEntity = str(form.get('entity_id'), 'entity_id', { max: 64 });
+    const member = await c.env.DB.prepare(
+      'SELECT 1 AS x FROM chat_participants WHERE chat_id = ? AND user_id = ? LIMIT 1'
+    )
+      .bind(chatEntity, user.id)
+      .first();
+    if (!member) throw forbidden('Not a participant in this conversation');
+  }
+
   const target: { visibility: MediaVisibility; domain: MediaDomain; entityId: string; keyKind: string } =
     purpose === 'receipt' ? { visibility: 'private', domain: 'receipts', entityId: user.id, keyKind: 'evidence' } :
     purpose === 'avatar' ? { visibility: 'public', domain: 'users', entityId: user.id, keyKind: 'avatar' } :
-    purpose === 'chat' ? { visibility: 'private', domain: 'chat', entityId: user.id, keyKind: 'attachments' } :
+    purpose === 'chat' ? { visibility: 'private', domain: 'chat', entityId: chatEntity, keyKind: storedMime.startsWith('video/') ? 'video' : 'attachments' } :
     purpose === 'community' ? { visibility: 'public', domain: 'merchants', entityId: user.id, keyKind: 'public' } :
     { visibility: 'public', domain: 'products', entityId: 'catalog', keyKind: storedMime.startsWith('video/') ? 'video' : 'gallery' };
   // `storedMime` / `storedExt`, never the sniffed pair: after a conversion they
@@ -224,19 +267,24 @@ fileRoutes.get('/*', async (c) => {
       const isOwner = key.startsWith(`receipts/${user.id}/`);
       if (!isOwner && user.role !== 'admin') throw forbidden('Not your file');
     } else if (key.startsWith('chat/')) {
-      const isOwner = key.startsWith(`chat/${user.id}/`);
-      if (!isOwner) {
-        // A non-uploader may view a chat image only if they participate in a
-        // chat whose message references this file.
-        const row = await c.env.DB.prepare(
-          `SELECT 1 AS x FROM chat_messages m
-             JOIN chat_participants p ON p.chat_id = m.chat_id AND p.user_id = ?
-            WHERE m.file_key = ? LIMIT 1`
-        )
-          .bind(user.id, key)
-          .first();
-        if (!row) throw forbidden('Not your file');
-      }
+      /**
+       * ONE QUESTION: ARE YOU IN THIS CONVERSATION.
+       *
+       * The key now names the chat, so the answer is a single membership
+       * lookup. It replaces two branches that could disagree — the uploader
+       * was granted access by key prefix, and everyone else by searching for a
+       * MESSAGE carrying the key, which meant a file that had been uploaded
+       * but not yet sent belonged to nobody else, and a file whose message was
+       * deleted belonged to nobody at all while still being served to the one
+       * who sent it.
+       */
+      const chatId = key.split('/')[1] ?? '';
+      const row = await c.env.DB.prepare(
+        'SELECT 1 AS x FROM chat_participants WHERE chat_id = ? AND user_id = ? LIMIT 1'
+      )
+        .bind(chatId, user.id)
+        .first();
+      if (!row && user.role !== 'admin') throw forbidden('Not your file');
     } else {
       throw notFound();
     }

@@ -16,7 +16,7 @@ import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { safeParse } from '../lib/types';
 import { sniff } from './uploads';
-import { getMediaObject, putMediaObject } from '../lib/mediaStorage';
+import { getMediaObject, storeMedia } from '../lib/mediaStorage';
 
 /**
  * PRO KYC (final-phase brief §9) + approved-address versioning.
@@ -189,23 +189,36 @@ kycRoutes.post('/upload', async (c) => {
     throw badRequest('Unsupported file type — please upload a JPEG, PNG, WebP or GIF image');
   }
 
-  const key = `kyc/${user.id}/${newId()}.${kind.ext}`;
-  await putMediaObject(
-    c.env,
-    {
-      key,
+  /**
+   * THROUGH THE ONE DOOR. This built `kyc/<userId>/<id>.jpg` by hand — three
+   * segments where the layout is four — and stored the photograph exactly as
+   * the phone produced it.
+   *
+   * Converting it matters more here than anywhere else on the site, and not
+   * for the bytes: a camera JPEG carries EXIF, and EXIF carries the GPS
+   * coordinates where the picture was taken. A photograph of an identity
+   * document, filed with the place it was photographed, is a worse thing to
+   * hold than the document. The WebP this produces has no EXIF at all, because
+   * the transform re-encodes the pixels and nothing else.
+   *
+   * `no-store` stays: this is the one kind of object that must never sit in
+   * any cache, however private.
+   */
+  const stored = await storeMedia(c.env, {
+    placement: {
       visibility: 'private',
       domain: 'kyc',
-      mime: kind.mime,
-      bytes: buf.byteLength,
-      ownerId: user.id,
       entityId: user.id,
-      originalName: file.name,
+      kind: 'identity',
+      objectId: newId(),
     },
-    buf,
-    { httpMetadata: { contentType: kind.mime, cacheControl: 'private, no-store' } }
-  );
-  return c.json({ success: true, key });
+    bytes: buf,
+    mime: kind.mime,
+    ownerId: user.id,
+    originalName: file.name,
+    cacheControl: 'private, no-store',
+  });
+  return c.json({ success: true, key: stored.key });
 });
 
 // -------------------------------------------------------------------- mine

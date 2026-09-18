@@ -193,7 +193,10 @@ export default function Chat() {
       { tempId, serverId: null, kind: 'image', body: null, fileUrl: localUrl, created_at: new Date().toISOString(), failed: false },
     ]);
     try {
-      const uploaded = await uploadFile(file, 'chat');
+      // The conversation, not the sender: a chat file is filed under the chat
+      // so one thread's pictures sit in one folder, and the server checks that
+      // this account is in it before storing anything.
+      const uploaded = await uploadFile(file, 'chat', id);
       const res = await api.post<{ id: string }>(`/api/chats/${id}/messages`, { kind: 'image', fileKey: uploaded.key });
       setPending((prev) => prev.map((p) => (p.tempId === tempId ? { ...p, serverId: res.id } : p)));
     } catch (err) {

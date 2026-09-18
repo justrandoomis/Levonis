@@ -46,6 +46,13 @@ function database(): D1Database {
     raw.exec(readFileSync(join(ROOT, 'migrations', file), 'utf8'));
   }
   raw.exec("INSERT INTO users (id,name,email,password_hash,role) VALUES ('admin','Admin','a@x.test','h','admin')");
+  /**
+   * A conversation the admin is in, because a chat upload is now filed under
+   * the CHAT and refused outright for anyone who is not a participant — the
+   * key names the conversation, so the server has to be able to check it.
+   */
+  raw.exec("INSERT INTO chats (id) VALUES ('chat_1')");
+  raw.exec("INSERT INTO chat_participants (chat_id,user_id) VALUES ('chat_1','admin')");
   return new SqliteD1(raw) as unknown as D1Database;
 }
 
@@ -170,12 +177,72 @@ test('a JPEG is converted on EVERY purpose — chats and receipts included', asy
     jpeg.set([0xff, 0xd8, 0xff, 0xe0], 0);
     const form = new FormData();
     form.set('purpose', purpose);
+    // A chat upload names its conversation: the file is filed under the chat.
+    if (purpose === 'chat') form.set('entity_id', 'chat_1');
     form.set('file', new File([jpeg], 'photo.jpg', { type: 'image/jpeg' }));
     const response = await hono.request('/api/uploads', { method: 'POST', body: form });
     const body = await response.json() as { mime?: string };
     assert.equal(response.status, 200, `${purpose}: ${JSON.stringify(body)}`);
     assert.equal(body.mime, 'image/webp', `${purpose} must be stored as WebP`);
   }
+});
+
+/**
+ * A CHAT FILE BELONGS TO THE CONVERSATION — the owner chose that ordering so
+ * one thread's pictures sit in one folder («الثاني الاسهل في فتح المحادثه»),
+ * and it is the stronger rule as well as the tidier one: access becomes one
+ * question with one answer instead of an uploader-prefix shortcut beside a
+ * message lookup that could disagree with it.
+ */
+test('a chat upload is filed under the CHAT, not under whoever sent it', async () => {
+  const images = imagesBinding();
+  const { hono, privateBucket } = app(true, images.binding);
+  const jpeg = new Uint8Array(32);
+  jpeg.set([0xff, 0xd8, 0xff, 0xe0], 0);
+  const form = new FormData();
+  form.set('purpose', 'chat');
+  form.set('entity_id', 'chat_1');
+  form.set('file', new File([jpeg], 'photo.jpg', { type: 'image/jpeg' }));
+  const response = await hono.request('/api/uploads', { method: 'POST', body: form });
+  const body = await response.json() as { key: string };
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.equal(body.key.split('/')[1], 'chat_1', 'the conversation names the folder');
+  assert.match(body.key, /^chat\/chat_1\/attachments\/[a-z0-9]+\.webp$/, 'four segments, converted');
+  assert.equal(privateBucket.objects.size, 1, 'and it is private');
+});
+
+test('a chat you are not in cannot be written to — checked before a byte is stored', async () => {
+  const images = imagesBinding();
+  const { hono, privateBucket } = app(true, images.binding);
+  const jpeg = new Uint8Array(32);
+  jpeg.set([0xff, 0xd8, 0xff, 0xe0], 0);
+  const form = new FormData();
+  form.set('purpose', 'chat');
+  form.set('entity_id', 'chat_someone_else');
+  form.set('file', new File([jpeg], 'photo.jpg', { type: 'image/jpeg' }));
+  const response = await hono.request('/api/uploads', { method: 'POST', body: form });
+  assert.equal(response.status, 403);
+  assert.equal(privateBucket.objects.size, 0, 'nothing reached the bucket');
+});
+
+test('a conversation carries video too — it used to answer «Videos are not allowed here»', async () => {
+  const images = imagesBinding();
+  const { hono, privateBucket } = app(true, images.binding);
+  // An MP4 by magic bytes: ....ftyp
+  const mp4 = new Uint8Array(32);
+  mp4.set([0x00, 0x00, 0x00, 0x18], 0);
+  mp4.set([0x66, 0x74, 0x79, 0x70], 4);
+  const form = new FormData();
+  form.set('purpose', 'chat');
+  form.set('entity_id', 'chat_1');
+  form.set('file', new File([mp4], 'clip.mp4', { type: 'video/mp4' }));
+  const response = await hono.request('/api/uploads', { method: 'POST', body: form });
+  const body = await response.json() as { key: string; mime: string };
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.equal(body.mime, 'video/mp4', 'a video is stored as itself — one frame is not the video');
+  assert.match(body.key, /^chat\/chat_1\/video\//, 'and it is filed as video, beside the pictures');
+  assert.equal(privateBucket.objects.size, 1);
+  assert.deepEqual(images.calls, [], 'the converter is never asked to re-encode a video');
 });
 
 /**
