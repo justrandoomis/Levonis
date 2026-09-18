@@ -1843,9 +1843,24 @@ adminRoutes.patch('/orders/:id', async (c) => {
 
   // delivered_at is stamped in the SAME conditional update as the status flip
   // so a concurrent transition can never produce a delivered order without it.
+  //
+  // AND IT IS STAMPED ONCE, NOT ON EVERY FLIP. This line used to re-stamp
+  // unconditionally while the stage door (worker/lib/orderStageOps.ts:177)
+  // COALESCEd and kept the first value — so the two doors to the same event
+  // disagreed, and which one an admin happened to press decided when the
+  // customer's clocks started.
+  //
+  // That is not a tidiness point. `delivered_at` IS the start of the warranty
+  // (worker/routes/warranty.ts:494) and of the seven-day return window
+  // (worker/routes/returns.ts:7-8) — «الضمان والاسترجاع يبدأ من تاريخ
+  // تم التوصيل». An admin toggling a delivered order back to shipped and
+  // forward again re-stamped it to today, which silently re-opened a return
+  // window that had already closed and moved the warranty's end a month out.
+  // The customer received the goods once; there is one date.
   const flipStmt = c.env.DB.prepare(
     next === 'delivered'
-      ? `UPDATE orders SET status = ?, admin_note = ?, delivered_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+      ? `UPDATE orders SET status = ?, admin_note = ?,
+           delivered_at = COALESCE(NULLIF(delivered_at,''), strftime('%Y-%m-%dT%H:%M:%fZ','now')),
            updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
           WHERE id = ? AND status = ?`
       : `UPDATE orders SET status = ?, admin_note = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
