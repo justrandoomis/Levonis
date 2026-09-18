@@ -30,6 +30,11 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // to the same owner as the option rows they hang off.
     'product_option_fulfillment', 'product_option_transports',
     'product_imports', 'price_history', 'inventory_ledger', 'catalogs', 'brands', 'facets', 'hashtags', 'bundles', 'bundle_items',
+    // THE SEARCH INDEX (migration 0089) and the dictionary it reads. Both are
+    // derived from the catalogue and rebuilt from it, so they belong to the
+    // owner that writes it — a search index owned by anyone but the catalogue
+    // is an index that can disagree with the catalogue.
+    'search_tokens', 'search_synonyms',
     // A bundle and a mystery offer ARE `products` rows (docs/BUNDLES_MYSTERY.md §1.2);
     // their composition is catalogue structure, beside options and colours.
     'bundle_config', 'bundle_components', 'bundle_component_choices',

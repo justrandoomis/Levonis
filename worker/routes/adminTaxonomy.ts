@@ -12,6 +12,8 @@ import {
 } from '../lib/templateFamilies';
 import { findHashtagRow, hashtagKey, hashtagUsage, normalizeHashtag, rewriteHashtag, type HashtagUsage } from '../lib/hashtags';
 import { catalogTreeWithCounts } from '../lib/catalogMembership';
+import { normalizeText } from '../lib/search/normalize';
+import { degradeIfSchemaMissing } from '../lib/membershipBenefits';
 
 /**
  * Database-managed category tree, facets and brands — mandate §4 and §9:
@@ -716,4 +718,74 @@ adminTaxonomyRoutes.delete('/hashtags/:id', async (c) => {
   const productsUpdated = strip ? await rewriteHashtag(c.env.DB, row.tag, null) : 0;
   await audit(c.env.DB, admin.id, 'hashtag.delete', id, { tag: row.tag, stripped: strip, products_updated: productsUpdated });
   return c.json({ success: true, deleted: true, products_updated: productsUpdated });
+});
+
+// ------------------------------------------------------------ search vocabulary
+
+/**
+ * THE WORDS CUSTOMERS SEARCH WITH, WHICH ONLY THE OWNER FINDS OUT.
+ *
+ * `worker/lib/search/vocabulary.ts` seeds the dictionary that makes «طابعة»
+ * mean "printer" and «بمبو» mean "bambu". It covers this shop's own catalogue
+ * and the owner's own examples, and it will be wrong the first time a customer
+ * searches for something in a way nobody predicted — which for a shop in Iraq
+ * selling foreign hardware is constantly.
+ *
+ * So the dictionary is a TABLE and this is its door. A word the owner adds
+ * here works on the next search, with no deploy. Rows they add are marked
+ * `owner_added`, and the migration's re-seed is `INSERT OR IGNORE`, so their
+ * meaning is never reset to the seed's.
+ *
+ * BOTH SIDES ARE STORED NORMALISED — folded hamza and ta marbuta, no
+ * diacritics. That is what lets one row cover «طابعة» and «طابعه» at once, and
+ * it is why the owner does not have to think about spelling variants at all.
+ */
+adminTaxonomyRoutes.get('/search-vocabulary', async (c) => {
+  // A Worker can be live before migration 0089 applies. A missing TABLE holds
+  // no rows, so an empty dictionary is the literal truth — the sanctioned
+  // degrade of worker/lib/membershipBenefits.ts, and far better than a screen
+  // that 500s at an owner who only wanted to look.
+  const results = await degradeIfSchemaMissing(
+    'search vocabulary (migration 0089)',
+    async () =>
+      (
+        await c.env.DB
+          .prepare('SELECT term, canonical, owner_added, created_at FROM search_synonyms ORDER BY owner_added DESC, canonical, term LIMIT 2000')
+          .all<{ term: string; canonical: string; owner_added: number }>()
+      ).results ?? [],
+    [] as Array<{ term: string; canonical: string; owner_added: number }>
+  );
+  return c.json({
+    success: true,
+    synonyms: results.map((r) => ({ ...r, owner_added: !!r.owner_added })),
+  });
+});
+
+adminTaxonomyRoutes.post('/search-vocabulary', async (c) => {
+  const admin = c.get('user')!;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const term = normalizeText(str(body.term, 'term', { min: 2, max: 60 }));
+  const canonical = normalizeText(str(body.canonical, 'canonical', { min: 2, max: 60 }));
+  if (!term || !canonical) throw badRequest('term and canonical must contain letters or digits');
+  if (term === canonical) throw badRequest('a word cannot be a synonym of itself');
+  /**
+   * REPLACE, not insert-or-ignore: this door exists so the owner can CORRECT a
+   * meaning, including one the seed got wrong. `owner_added = 1` is what stops
+   * the next re-seed overwriting their correction.
+   */
+  await c.env.DB
+    .prepare('INSERT OR REPLACE INTO search_synonyms (term, canonical, owner_added) VALUES (?, ?, 1)')
+    .bind(term, canonical)
+    .run();
+  await audit(c.env.DB, admin.id, 'search.vocabulary.set', term, { term, canonical });
+  return c.json({ success: true, term, canonical });
+});
+
+adminTaxonomyRoutes.delete('/search-vocabulary/:term', async (c) => {
+  const admin = c.get('user')!;
+  const term = normalizeText(c.req.param('term'));
+  if (!term) throw badRequest('term is required');
+  const res = await c.env.DB.prepare('DELETE FROM search_synonyms WHERE term = ?').bind(term).run();
+  await audit(c.env.DB, admin.id, 'search.vocabulary.delete', term, { term });
+  return c.json({ success: true, deleted: (res.meta.changes ?? 0) > 0 });
 });

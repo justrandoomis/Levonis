@@ -19,6 +19,8 @@ import type { SupportGiftReconciliation } from './membershipOps';
 import { sweepBnplOverdue, type BnplOverdueReport } from './bnpl';
 import { sweepAutomaticReviews, type AutomaticReviewSweepReport } from './reviewAutoSweep';
 import { sweepCancelledOrders, type CancelledOrderSweepReport } from './orderDeletion';
+import { planSearchIndex, searchIndexInstalled } from './search/store';
+import { toSearchDoc } from './search/document';
 
 /**
  * Durable scheduled jobs (final-phase §11): one entrypoint the Worker wires
@@ -50,6 +52,16 @@ export interface DurableJobsReport {
   pruned_otp_challenges: number;
   /** Email/WhatsApp sign-in codes pruned (auth_otp, migration 0087). */
   pruned_auth_otp: number;
+  /**
+   * Products indexed for search this run (search_tokens, migration 0089).
+   *
+   * The index is written with every product save, so this only ever has work
+   * to do for rows that predate migration 0089 — the backfill, done in small
+   * chunks across cron runs rather than as one statement in the migration
+   * itself, because indexing needs the brand and section NAMES and a
+   * migration cannot call the tokeniser.
+   */
+  search_indexed: number;
   pruned_email_tokens: number;
   pruned_reset_tokens: number;
   pruned_sessions: number;
@@ -99,6 +111,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     expired_link_challenges: 0,
     pruned_otp_challenges: 0,
     pruned_auth_otp: 0,
+    search_indexed: 0,
     pruned_email_tokens: 0,
     pruned_reset_tokens: 0,
     pruned_sessions: 0,
@@ -179,6 +192,79 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   await step('auth_otp', async () => {
     const res = await env.DB.prepare('DELETE FROM auth_otp WHERE expires_at < ?').bind(pruneBefore).run();
     report.pruned_auth_otp = res.meta.changes ?? 0;
+  });
+
+  /**
+   * 3b. BACKFILL THE SEARCH INDEX, a chunk at a time.
+   *
+   * Every product save writes its own index rows, so this is only for the
+   * catalogue that existed before migration 0089. It is not in the migration
+   * because indexing reads the brand and section NAMES and runs them through
+   * the tokeniser — work SQL cannot do — and because a shop with thousands of
+   * products cannot be indexed inside one invocation, so pretending otherwise
+   * would mean a backfill that silently stops halfway.
+   *
+   * Bounded per run and resumable: it takes the products with no rows in the
+   * index, oldest id first, and does fifty. A shop of any size converges in a
+   * few hours of cron, and a shop that is already indexed does one cheap query
+   * that returns nothing.
+   */
+  await step('search_index_backfill', async () => {
+    // A Worker can be live one migration ahead of the database. `step` would
+    // catch the "no such table", but it would also report an error on every
+    // cron run until the migration lands, which is noise in the one place an
+    // operator looks for real failures.
+    if (!(await searchIndexInstalled(env.DB))) return;
+    const { results } = await env.DB.prepare(
+      `SELECT p.id, p.name, p.name_ar, p.name_ku, p.description, p.hashtags, p.sku, p.brand_id,
+              p.category_id, p.sub_category_id
+         FROM products p
+        WHERE p.status = 'active'
+          AND NOT EXISTS (SELECT 1 FROM search_tokens t WHERE t.product_id = p.id)
+        ORDER BY p.id
+        LIMIT 50`
+    ).all<Record<string, unknown>>();
+    if (!results || results.length === 0) return;
+
+    const nameIds = [
+      ...new Set(
+        results.flatMap((r) => [r.brand_id, r.category_id, r.sub_category_id]).filter((x): x is string => typeof x === 'string' && x !== '')
+      ),
+    ];
+    const names = new Map<string, string>();
+    if (nameIds.length > 0) {
+      const ph = nameIds.map(() => '?').join(',');
+      const { results: rows } = await env.DB.prepare(
+        `SELECT id, COALESCE(NULLIF(name_en,''), name_ar) AS n FROM brands WHERE id IN (${ph})
+         UNION ALL
+         SELECT id, COALESCE(NULLIF(name_en,''), name_ar) AS n FROM catalogs WHERE id IN (${ph})`
+      )
+        .bind(...nameIds, ...nameIds)
+        .all<{ id: string; n: string }>();
+      for (const r of rows ?? []) names.set(String(r.id), String(r.n ?? ''));
+    }
+
+    const stmts: D1PreparedStatement[] = [];
+    for (const r of results) {
+      stmts.push(
+        ...planSearchIndex(
+          env.DB,
+          toSearchDoc({
+            id: String(r.id),
+            name: r.name,
+            name_ar: r.name_ar,
+            name_ku: r.name_ku,
+            description: r.description,
+            hashtags: r.hashtags,
+            sku: r.sku,
+            brandName: names.get(String(r.brand_id ?? '')) ?? null,
+            categoryNames: [names.get(String(r.category_id ?? '')) ?? '', names.get(String(r.sub_category_id ?? '')) ?? ''].filter(Boolean),
+          })
+        )
+      );
+    }
+    if (stmts.length > 0) await env.DB.batch(stmts);
+    report.search_indexed = results.length;
   });
 
   // 4. Prune consumed/long-expired email-verification tokens.

@@ -71,6 +71,10 @@ export const OWNED_TABLES: OwnedTable[] = [
   // ---- placement, search, i18n ------------------------------------------
   { table: 'product_catalogs', by: { column: 'product_id' } },
   { table: 'product_facets', by: { column: 'product_id' } },
+  // The search index (migration 0089). It holds the product's NAME, broken
+  // into tokens — leave it behind and the shop keeps offering a product that
+  // no longer exists to anyone who searches for it.
+  { table: 'search_tokens', by: { column: 'product_id' } },
   { table: 'product_translations', by: { column: 'product_id' } },
   // ---- stock and pricing history owned by the product --------------------
   { table: 'inventory_ledger', by: { column: 'product_id' } },

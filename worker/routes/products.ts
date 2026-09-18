@@ -27,6 +27,7 @@ import { pricingTierContext } from '../lib/entitlements';
 import { activeBenefitRules, ancestryFor, catalogAncestry, degradeIfSchemaMissing, fallbackFor } from '../lib/membershipBenefits';
 import { isConditionColumnMissing } from '../lib/conditionProjection';
 import { catalogSubtreeFilter, homeCategoryTree } from '../lib/catalogMembership';
+import { searchProducts } from '../lib/search/store';
 import {
   SHELF_LIMIT,
   bestSellerIds,
@@ -2574,10 +2575,55 @@ productRoutes.get('/', async (c) => {
 
   let sql = "SELECT * FROM products WHERE status = 'active'";
   const params: unknown[] = [];
+  /**
+   * THE SEARCH THAT COULD NOT FIND THIS SHOP'S OWN FLAGSHIP.
+   *
+   * This was `name LIKE '%q%' OR name_ar LIKE '%q%' OR name_ku LIKE '%q%' OR
+   * description LIKE '%q%'` — four unindexed substring scans, no tokenisation,
+   * no ranking. A customer typing «بامبو» or «بمبو» or «اكس تو دي» or «طابعه»
+   * got nothing, because none of those is a substring of "Bambu Lab X2D
+   * Combo". The owner's brief was «مهما كتب يظهر الذي يريده».
+   *
+   * It is an INDEX now — see worker/lib/search/ for the whole design: Arabic
+   * normalisation, romanisation so «بامبو» and "bambu" meet, a dictionary the
+   * owner can extend for «طابعة» → printer, bounded typo tolerance, and
+   * weighted ranking. The engine returns ids, best first; this route keeps
+   * that order and resolves them through the same pricing path every other
+   * listing uses, so a search result can never quote a price the product page
+   * does not.
+   *
+   * A SEARCH THAT MATCHES NOTHING RETURNS NOTHING. There is no substring
+   * fallback: one would quietly hand back whatever happened to contain the
+   * letters, which is how a search engine starts showing people things they
+   * did not ask for. An honest empty state is the better answer.
+   *
+   * DEGRADES TO THE OLD BEHAVIOUR while migration 0089 has not been applied:
+   * a missing `search_tokens` TABLE genuinely holds no postings, which is the
+   * sanctioned reading in worker/lib/membershipBenefits.ts — and answering
+   * "no results" for every search on a shop that is mid-deploy would be worse
+   * than the substring scan it replaces, so that one case falls back.
+   */
+  let searchOrder: string[] | null = null;
   if (search) {
-    sql += ' AND (name LIKE ? OR name_ar LIKE ? OR name_ku LIKE ? OR description LIKE ?)';
-    const like = `%${search}%`;
-    params.push(like, like, like, like);
+    const hits = await degradeIfSchemaMissing(
+      'search index (migration 0089)',
+      () => searchProducts(c.env.DB, search, { limit: 200 }),
+      null as { ids: string[]; indexReady: boolean } | null
+    );
+    // A missing TABLE, or a table that exists and is still empty because the
+    // backfill has not caught up — both mean "the index cannot answer yet",
+    // and both fall back rather than telling every shopper there is nothing.
+    if (hits === null || !hits.indexReady) {
+      sql += ' AND (name LIKE ? OR name_ar LIKE ? OR name_ku LIKE ? OR description LIKE ?)';
+      const like = `%${search}%`;
+      params.push(like, like, like, like);
+    } else if (hits.ids.length === 0) {
+      return c.json({ success: true, products: [] });
+    } else {
+      searchOrder = hits.ids;
+      sql += ` AND id IN (${hits.ids.map(() => '?').join(',')})`;
+      params.push(...hits.ids);
+    }
   }
   if (category) {
     /**
@@ -2626,7 +2672,21 @@ productRoutes.get('/', async (c) => {
     sql += ' AND ((pro_price_iqd IS NOT NULL AND pro_price_iqd < price_iqd) OR (prime_price_iqd IS NOT NULL AND prime_price_iqd < price_iqd))';
   }
   if (type === 'featured') sql += ' AND is_featured = 1';
-  sql += ' ORDER BY display_order ASC, created_at DESC LIMIT ? OFFSET ?';
+  /**
+   * A SEARCH RESULT IS ORDERED BY RELEVANCE, NOT BY THE SHELF ORDER.
+   *
+   * `IN (...)` has no order at all, and `display_order` is the merchandiser's
+   * order — right for browsing a section, wrong for a query, where the whole
+   * point is that the best match comes first. So a search keeps the ranking
+   * the engine produced and pages through it, and everything else keeps the
+   * shelf order it always had.
+   */
+  if (searchOrder) {
+    sql += ` ORDER BY CASE id ${searchOrder.map((_, i) => `WHEN ? THEN ${i}`).join(' ')} ELSE ${searchOrder.length} END LIMIT ? OFFSET ?`;
+    params.push(...searchOrder);
+  } else {
+    sql += ' ORDER BY display_order ASC, created_at DESC LIMIT ? OFFSET ?';
+  }
   params.push(limit, offset);
 
   const [{ results }, ctx] = await Promise.all([

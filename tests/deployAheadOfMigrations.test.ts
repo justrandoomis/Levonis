@@ -390,3 +390,53 @@ test('SIGN-IN CODES report themselves unavailable when their table is not instal
   assert.equal(verify.status, 503);
   assert.equal((await json(verify)).code, 'OTP_NOT_AVAILABLE');
 });
+
+/**
+ * `search_tokens` arrives with migration 0089, and the product write path feeds
+ * it in the SAME batch as the product row — which is the right thing for an
+ * index that must never disagree with the catalogue, and exactly the thing that
+ * kills the save when the table is one deploy behind the code.
+ *
+ * This shop has two deploy paths and only one of them applies migrations, so
+ * that window is not hypothetical. The save drops the index rows and lands; the
+ * backfill cron indexes the product as soon as the table exists. An owner who
+ * cannot correct a price because of a search index they never asked about is
+ * the failure this whole file is about.
+ */
+test('A PRODUCT SAVE still works on a database without the search index', async () => {
+  const { adminProductsRoutes } = await import('../worker/routes/adminProducts');
+  const raw = dbThrough('0088'); // everything except search_tokens
+  assert.equal(
+    (raw.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='search_tokens'").get() as unknown) ?? null,
+    null,
+    'the table must be absent for this test to mean anything'
+  );
+  raw.exec("INSERT INTO users (id,name,email,password_hash,role) VALUES ('adm','Admin','a@x.co','h','admin')");
+  const db = asD1(raw);
+  const a = stubApp(db, { id: 'adm', role: 'admin', email: 'a@x.co', admin_scope: 'full' }, (x) =>
+    x.route('/api/admin/products-v2', adminProductsRoutes), { host: APEX, env: { DB: db, INITIAL_ADMIN_EMAIL: 'a@x.co', EXTRA_ALLOWED_ORIGINS: '' } });
+
+  const create = await a.request('/api/admin/products-v2', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.9' },
+    body: JSON.stringify({ slug: 'x2d-combo', name_en: 'Bambu Lab X2D Combo', name_ar: 'بامبو لاب X2D كومبو', price_iqd: 2_400_000 }),
+  }, undefined, ctx);
+  const body = await json(create);
+  assert.equal(create.status, 200, `the save must survive a missing index: ${JSON.stringify(body)}`);
+
+  const id = String((body.product as { id?: unknown } | undefined)?.id ?? body.id ?? '');
+  assert.ok(id, 'and the product is really filed');
+
+  // And the storefront still finds it, through the substring scan the index
+  // was going to replace — a shop is not searchless for the length of a deploy.
+  const { productRoutes } = await import('../worker/routes/products');
+  const pub = stubApp(db, null, (x) => x.route('/api/products', productRoutes), { host: APEX, env: { DB: db, INITIAL_ADMIN_EMAIL: 'a@x.co', EXTRA_ALLOWED_ORIGINS: '' } });
+  const found = await pub.request('/api/products?search=Bambu', undefined, undefined, ctx);
+  const fb = await json(found);
+  assert.equal(found.status, 200, JSON.stringify(fb));
+  assert.deepEqual(
+    (fb.products as Array<{ id: string }>).map((p) => p.id),
+    [id],
+    'the LIKE fallback answers while the index does not exist'
+  );
+});

@@ -74,6 +74,8 @@ import {
 } from './productModel';
 import { productsHaveConditionDoc } from './conditionProjection';
 import { withClassificationPlacements } from './catalogMembership';
+import { planSearchIndex, searchIndexInstalled } from './search/store';
+import { toSearchDoc } from './search/document';
 import {
   isValidHex,
   normalizeHex,
@@ -1943,6 +1945,10 @@ export interface ProductSavePlan {
   /** The vocabulary tags this save is the first to register — the rows a
    *  caller must remove if it rolls the product back. */
   hashtagsAdded: string[];
+  /** Search-index rows this save writes (migration 0089). Zero on a database
+   *  that does not have the index yet, which is a deploy window and not an
+   *  error — see the guard beside the block that fills this in. */
+  searchTokens: number;
   translations: { written: number; review_needed: string[] } | null;
   /** Cost fields an actor without financial scope asked to change: refused,
    *  carried forward, and named here so a caller can report them as
@@ -2464,6 +2470,63 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
     hashtagsAdded = tags.added;
   }
 
+  // ---- search index -------------------------------------------------------
+  /**
+   * THE INDEX IS WRITTEN IN THE SAME BATCH AS THE PRODUCT.
+   *
+   * A search index maintained in a second transaction is an index that
+   * disagrees with the catalogue every time the second one fails — a product
+   * that exists and cannot be found, or worse, one that was renamed and is
+   * still found under its old name. So the rows ride along with the save and
+   * either both land or neither does.
+   *
+   * The names, not the ids: a shopper types «الطابعات» and "Bambu Lab", never
+   * `cat_printers` or `brd_1c09…`. Resolving them here — once, on a write —
+   * costs nothing at query time and is correct for as long as the names are.
+   * See worker/lib/search/document.ts for what is indexed and how heavily.
+   */
+  let searchTokens = 0;
+  // AND ONLY WHEN THE INDEX IS THERE. A Worker reaches production without its
+  // migrations on one of this shop's two deploy paths, so the table can be one
+  // deploy behind the code that feeds it. A save that names it then dies, and
+  // an owner who cannot correct a price because of a search index they never
+  // asked about is the exact failure `deployAheadOfMigrations` exists to
+  // prevent. The backfill cron indexes the product as soon as the table lands.
+  if (doc && (await searchIndexInstalled(db))) {
+    const nameRows = await db
+      .prepare(
+        `SELECT (SELECT COALESCE(NULLIF(b.name_en, ''), b.name_ar) FROM brands b WHERE b.id = ?) AS brand,
+                (SELECT COALESCE(NULLIF(c.name_en, ''), c.name_ar) FROM catalogs c WHERE c.id = ?) AS main,
+                (SELECT COALESCE(NULLIF(c2.name_en, ''), c2.name_ar) FROM catalogs c2 WHERE c2.id = ?) AS sub`
+      )
+      .bind(doc.brand_id ?? '', doc.category_id ?? '', doc.sub_category_id ?? '')
+      .first<{ brand: string | null; main: string | null; sub: string | null }>();
+    // Model and colour names in all three languages: "X2D Combo" is an OPTION
+    // name on this shop's products, not part of the product name, so a search
+    // for «كومبو» reaches nothing without them.
+    const variantNames = [
+      ...(doc.options ?? []).flatMap((o) => [o.name_en, o.name_ar, o.name_ckb]),
+      ...(doc.colors ?? []).flatMap((c) => [c.name_en, c.name_ar, c.name_ckb]),
+    ].filter((n): n is string => typeof n === 'string' && n.trim() !== '');
+    const indexStmts = planSearchIndex(
+      db,
+      toSearchDoc({
+        id: productId,
+        name: doc.name_en,
+        name_ar: doc.name_ar,
+        name_ckb: doc.name_ckb,
+        description: doc.description_en,
+        hashtags: doc.hashtags,
+        sku: doc.sku,
+        brandName: nameRows?.brand ?? null,
+        categoryNames: [nameRows?.main ?? '', nameRows?.sub ?? ''].filter(Boolean),
+        variantNames,
+      })
+    );
+    statements.push(...indexStmts);
+    searchTokens = Math.max(0, indexStmts.length - 1);
+  }
+
   // ---- translations -------------------------------------------------------
   let translations: ProductSavePlan['translations'] = null;
   if (intent.translations) {
@@ -2512,6 +2575,7 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
     priceHistory,
     hashtagsRegistered,
     hashtagsAdded,
+    searchTokens,
     translations,
     costRefused,
     warnings,
