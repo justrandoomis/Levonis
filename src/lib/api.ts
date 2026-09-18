@@ -283,6 +283,14 @@ export interface ApiUser {
 }
 
 export interface ApiProduct {
+  /**
+   * The product's main section and brand — two ids the card projection keeps
+   * so the «مختارات لك» tile can rank against what this browser has recently
+   * opened, without any of it leaving the device. See src/lib/recentlyViewed.ts.
+   * Optional: a locked composition card carries neither.
+   */
+  category_id?: string | null;
+  brand_id?: string | null;
   id: string;
   slug: string;
   /**
@@ -1111,7 +1119,15 @@ export interface HomeTaxon {
   name_ar: string;
   name_en: string;
   name_ckb: string;
+  /** Active products in this catalog OR anywhere below it. */
   product_count: number;
+  /**
+   * The sub-sections that actually hold products — «الأقسام الفرعية التي فيها
+   * المنتجات». Present on a main section, absent on a brand and on a child.
+   * An empty array means the section's products are all filed at its own
+   * level, which is a different thing from having no products.
+   */
+  children?: HomeTaxon[];
 }
 
 /**

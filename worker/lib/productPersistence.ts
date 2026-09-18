@@ -73,6 +73,7 @@ import {
   type TranslationMeta,
 } from './productModel';
 import { productsHaveConditionDoc } from './conditionProjection';
+import { withClassificationPlacements } from './catalogMembership';
 import {
   isValidHex,
   normalizeHex,
@@ -2418,9 +2419,30 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
   }
 
   // ---- catalog placement --------------------------------------------------
+  /**
+   * A SAVE MUST NOT BE ABLE TO UNSHELVE THE PRODUCT IT IS SAVING.
+   *
+   * `planCatalogs` is a REPLACE: whatever is not in the list it is given is
+   * deleted. The admin form initialises `catalog_ids` to `[]` and never fills
+   * it from the two selects the owner actually uses — «القسم الرئيسي» and
+   * «القسم الفرعي» write `category_id` and `sub_category_id` — so every save
+   * posted an empty list and deleted the product's placements. The storefront
+   * counts through that table, so the home page ended up with NO categories
+   * at all while the admin still listed «الطابعات · 3».
+   *
+   * The server folds the classification back in rather than trusting the
+   * client to remember it. See worker/lib/catalogMembership.ts for why a
+   * classification implies a placement and this is completion rather than a
+   * second source of truth. The importer is unaffected: it sends the same ids
+   * already, so the union changes nothing for it.
+   */
   let catalogIds: string[] | null = null;
   if (intent.catalogIds !== undefined) {
-    const cat = await planCatalogs(db, productId, intent.catalogIds);
+    const classified = withClassificationPlacements(
+      intent.catalogIds,
+      doc ?? (prev as { category_id?: unknown; sub_category_id?: unknown } | null) ?? {}
+    );
+    const cat = await planCatalogs(db, productId, classified);
     statements.push(...cat.stmts);
     catalogIds = cat.ids;
   }

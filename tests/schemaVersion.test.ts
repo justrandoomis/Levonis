@@ -83,12 +83,19 @@ test('a database with every migration applied reads CURRENT', async () => {
   assert.equal(s.applied, EXPECTED_MIGRATION);
 });
 
-test('THE OUTAGE: a database at 0083 under code that expects 0087 reads BEHIND, by four', async () => {
+/** How many migrations a database stopped at `through` is missing. Derived,
+ *  not typed: a hard-coded 4 made adding migration 0088 fail HERE, which is
+ *  noise — the fact under test is that drift is SEEN, not how far it was on
+ *  the day the outage happened. */
+const shortfallFrom = (through: string) => migrations().filter((f) => f.slice(0, 4) > through).length;
+
+test('THE OUTAGE: a database left at 0083 under newer code reads BEHIND, by exactly what is missing', async () => {
   const raw = dbThrough('0083');
   recordApplied(raw, migrations().filter((f) => f.slice(0, 4) <= '0083'));
   const s = await readSchemaStatus(asD1(raw));
   assert.equal(s.state, 'behind', 'this is the state that answered {"status":"ok"} for hours');
-  assert.equal(s.behind, 4, '0084, 0085, 0086, 0087');
+  assert.equal(s.behind, shortfallFrom('0083'), 'every migration from 0084 onwards');
+  assert.ok(s.behind >= 4, 'the outage itself was four: 0084, 0085, 0086, 0087');
   assert.equal(s.expected, EXPECTED_MIGRATION);
   assert.equal(s.applied, '0083_cart_multi_option_identity_contract.sql');
 });
@@ -144,7 +151,7 @@ test('the counts are reported, so a reader can see WHAT is short as well as that
   recordApplied(raw, migrations().filter((f) => f.slice(0, 4) <= '0083'));
   const s = await readSchemaStatus(asD1(raw));
   assert.equal(s.expected_count, EXPECTED_MIGRATION_COUNT);
-  assert.equal(s.applied_count, EXPECTED_MIGRATION_COUNT - 4);
+  assert.equal(s.applied_count, EXPECTED_MIGRATION_COUNT - shortfallFrom('0083'));
 });
 
 // =========================================================================

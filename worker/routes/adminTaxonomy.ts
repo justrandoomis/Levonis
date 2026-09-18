@@ -11,6 +11,7 @@ import {
   type SectionRef,
 } from '../lib/templateFamilies';
 import { findHashtagRow, hashtagKey, hashtagUsage, normalizeHashtag, rewriteHashtag, type HashtagUsage } from '../lib/hashtags';
+import { catalogTreeWithCounts } from '../lib/catalogMembership';
 
 /**
  * Database-managed category tree, facets and brands — mandate §4 and §9:
@@ -172,10 +173,23 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
     .prepare('SELECT * FROM catalogs ORDER BY sort, name_en, name_ar')
     .all<CatalogRow>();
   const families = resolveTemplateFamilies(results);
-  const counts = await c.env.DB
-    .prepare('SELECT category_id AS id, COUNT(*) AS n FROM products WHERE category_id IS NOT NULL GROUP BY category_id')
-    .all<{ id: string; n: number }>();
-  const countById = new Map(counts.results.map((r) => [r.id, r.n]));
+  /**
+   * THE SAME NUMBER THE STOREFRONT SHOWS — that was the whole confusion.
+   *
+   * This counted `SELECT category_id, COUNT(*) FROM products GROUP BY
+   * category_id`: the MAIN section column only. So «الطابعات» read 3 while
+   * every sub-section under it — «طابعات FDM», «طابعات Resin» — read 0 even
+   * though that is where the products are actually filed, and the home page,
+   * counting through a third definition again, showed nothing at all.
+   *
+   * One relation, one roll-up, used by both doors: worker/lib/catalogMembership.ts.
+   * A count here is now descendant-inclusive for the same reason it is on the
+   * storefront — the owner asking "how many are in Printers" means everything
+   * under Printers, not the rows that happen to stop at that level.
+   */
+  const countById = new Map(
+    (await catalogTreeWithCounts(c.env.DB)).map((r) => [r.id, r.product_count] as const)
+  );
 
   // The branch slugs, leaf-first, so a section resolves to the product type
   // its template is built for — the panel and the form both need to say

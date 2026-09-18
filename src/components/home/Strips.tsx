@@ -110,50 +110,6 @@ function monogramOf(name: string): string {
 }
 
 /**
- * The real catalogue, as a browsing rail near the top of the page.
- *
- * Sourced from the `catalogs` table rather than from owner-typed items, so it
- * is right the day a section is added and cannot drift out of step with the
- * taxonomy. /api/home already filters out catalogs with no active product —
- * a category card that leads to an empty list is a dead end. The table has no
- * image column, so each card carries a monogram tile instead of pretending
- * to have artwork.
- */
-export function CategoryChips({ categories }: { categories: HomeTaxon[] }) {
-  const { t, loc } = useLanguage();
-  if (categories.length === 0) return null;
-  return (
-    <section data-home-section="categories" className="mb-10 sm:mb-12">
-      <SectionHeader title={t('browseCategories')} accent="bg-olive" to="/products" />
-      <Rail>
-        {categories.map((c) => {
-          const name = loc(c.name_ar, c.name_en || c.name_ar, c.name_ckb);
-          return (
-            <Link
-              key={c.id}
-              to={`/products?category=${encodeURIComponent(c.id)}`}
-              data-category-chip={c.id}
-              className="w-[148px] sm:w-[190px] shrink-0 snap-start flex items-center gap-2.5 rounded-xl border border-zinc-800 bg-zinc-900/50 p-2.5 min-h-[60px] hover:border-olive/60 hover:bg-olive/10 transition-colors min-w-0"
-            >
-              <span
-                aria-hidden
-                className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center bg-olive/20 border border-olive/30 text-olive-light font-black text-sm"
-              >
-                {monogramOf(name)}
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[13px] font-bold text-white truncate">{name}</span>
-                <span className="block text-[11px] text-zinc-500">{c.product_count}</span>
-              </span>
-            </Link>
-          );
-        })}
-      </Rail>
-    </section>
-  );
-}
-
-/**
  * The brands strip: a self-scrolling ticker of brand marks, at the owner's
  * request — logos only, no cards or counts, drifting sideways until a finger
  * or pointer rests on it and resuming when it leaves.
@@ -286,10 +242,16 @@ export function BrandMarquee({ items, brands, siteMedia = [] }: {
           wider than any viewport, so ONE brand still fills an iPad edge to
           edge and the loop has no visible seam. The set carries its own
           trailing space (pe-3 = the internal gap) so every copy's stride is
-          identical — that exactness is what makes the wrap invisible. */}
+          identical — that exactness is what makes the wrap invisible.
+
+          `bleed-x` is what makes "edge to edge" true on a LARGE screen. The
+          negative margins that were here before (-mx-4 … lg:-mx-8) only
+          cancelled the column's own padding, so above 80rem the belt stopped
+          at the column's edge and left a gutter on each side — the owner's
+          «يظهر اليمين واليسار فارغا ومقصوصا». See index.css. */}
       <Marquee
         speed={34}
-        className="-mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+        className="bleed-x"
         renderSet={(first) => (
           <div className="flex items-start gap-3 pe-3">
             {entries.map((e) => (

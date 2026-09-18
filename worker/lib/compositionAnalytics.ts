@@ -70,9 +70,13 @@ export async function bumpMetric(
   }
 }
 
+import { SOLD_STATES_SQL } from './soldStates';
+
 /** The order states in which stock has actually moved — the same set the
- *  inventory lifecycle uses, so revenue here matches revenue there. */
-const SOLD_STATES = "('confirmed','processing','shipped','delivered')";
+ *  inventory lifecycle uses, so revenue here matches revenue there. Read from
+ *  worker/lib/soldStates.ts now, because the home page's best-seller ranking
+ *  has to agree with this analytics screen about what "sold" means. */
+const SOLD_STATES = SOLD_STATES_SQL;
 
 export interface BundleAnalyticsRow {
   product_id: string;

@@ -607,6 +607,37 @@ html:lang(ckb) .leading-tight {
   }
 }
 
+/*
+  ESCAPE THE CENTRED COLUMN AND RUN TO BOTH EDGES OF THE SCREEN.
+
+  THE DEFECT THIS EXISTS FOR. The home page's body lives in
+  `max-w-7xl mx-auto px-4 sm:px-6 lg:px-8`, and the two moving strips — the ads
+  ticker and the brands belt — tried to break out of it with `-mx-4 sm:-mx-6
+  lg:-mx-8`. A negative margin equal to the padding reaches the container's
+  BORDER box, which is 80rem wide and no wider. On the owner's iPad in
+  landscape (~2000 CSS px) that leaves a 360 px gutter of dead black on each
+  side, so a belt whose whole point is to have no visible edge visibly stops
+  short: «يظهر اليمين واليسار كأنه مقصوص».
+
+  WHY THIS FORM. Margin percentages resolve against the containing block's
+  inline size, so `50% - 50vw` is exactly half the difference between the
+  column and the viewport — the element's inline start lands on the viewport's
+  edge whatever the breakpoint, with no hard-coded widths and nothing to keep
+  in step with the `max-w-*` above it. `margin-inline` is logical, so RTL needs
+  no second rule: both sides take the same value.
+
+  THE SCROLLBAR. `100vw` includes the classic scrollbar, so on a desktop with
+  one this is a few pixels wider than the content box and would add a
+  horizontal scrollbar. The page wrapper answers that with `overflow-x: clip`
+  rather than `hidden`: clip does not create a scroll container, so `position:
+  sticky` inside the page keeps working — which `hidden` would silently break.
+*/
+@utility bleed-x {
+  margin-inline: calc(50% - 50vw);
+  width: 100vw;
+  max-width: 100vw;
+}
+
 @theme {
   --animate-day-pop: day-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }

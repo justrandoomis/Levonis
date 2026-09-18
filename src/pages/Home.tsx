@@ -10,7 +10,8 @@ import OpenBoxShelf from '../components/home/OpenBoxShelf';
 import ProductCard from '../components/home/ProductCard';
 import SectionHeader from '../components/home/SectionHeader';
 import Marquee from '../components/home/Marquee';
-import { ItemStrip, CategoryChips, BrandMarquee } from '../components/home/Strips';
+import { ItemStrip, BrandMarquee } from '../components/home/Strips';
+import CategoryBoard from '../components/home/CategoryBoard';
 /**
  * THE BUNDLES SHELF IS LAZY (docs/BUNDLES_MYSTERY.md §14). This page is the
  * storefront's first paint, so importing the bundle card — and with it the
@@ -19,6 +20,23 @@ import { ItemStrip, CategoryChips, BrandMarquee } from '../components/home/Strip
  * `Bundles` off the eager list just achieved.
  */
 const BundlesShelf = React.lazy(() => import('../components/home/BundlesShelf'));
+/**
+ * The same reasoning, for the same reason: the combo card reads
+ * `BundleCard`'s composition block, so eager-importing it would pull the
+ * bundle payload's whole surface into the first-paint chunk.
+ * `tests/bundleBudget.test.ts` measures exactly that closure.
+ */
+const ComboShelf = React.lazy(() => import('../components/home/ComboShelf'));
+/**
+ * THE SHELVES BELOW THE FOLD ARE THEIR OWN CHUNKS AND THEIR OWN REQUEST.
+ * None of them is on the first screen, and each renders null until it has
+ * cards — so a slow or failed second fetch costs the shopper nothing they are
+ * currently looking at.
+ */
+const BestSellersRail = React.lazy(() => import('../components/home/BestSellersRail'));
+const FlashDealsBoard = React.lazy(() => import('../components/home/FlashDealsBoard'));
+const FilamentShelf = React.lazy(() => import('../components/home/FilamentShelf'));
+const SpotlightTiles = React.lazy(() => import('../components/home/SpotlightTiles'));
 import Spinner from '../components/ui/Spinner';
 import { Skeleton, SkeletonGroup, ProductCardSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
@@ -47,6 +65,19 @@ export default function Home() {
 
   const [discountedProducts, setDiscountedProducts] = useState<ApiProduct[]>([]);
   const [newProducts, setNewProducts] = useState<ApiProduct[]>([]);
+  /**
+   * The below-the-fold shelves, from `/api/home/sections` — a SECOND request,
+   * deliberately. Folding these queries into `/api/home` would make the first
+   * paint every visitor waits on slower in order to serve the part most of
+   * them scroll past. An empty object is the honest default: every shelf
+   * renders nothing until it has cards.
+   */
+  const [shelves, setShelves] = useState<{
+    best_sellers?: ApiProduct[];
+    flash_deals?: ApiProduct[];
+    filament?: ApiProduct[];
+    super_deals?: ApiProduct[];
+  }>({});
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
 
@@ -98,6 +129,22 @@ export default function Home() {
       homeReqRef.current += 1;
     };
   }, [fetchHome]);
+
+  // Fired alongside the critical fetch but never awaited by it: a failure here
+  // silently costs the shelves, never the page.
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<typeof shelves>('/api/home/sections')
+      .then((data) => {
+        if (!cancelled) setShelves(data ?? {});
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // The app intro masks real bootstrap work, never a theatrical timeout.
   // A settled error counts as ready because the page then has honest retry UI.
@@ -176,19 +223,30 @@ export default function Home() {
   const homeAds = sectionVisible('ads_panel') ? settings?.homeAds ?? [] : [];
 
   return (
-    <div className="w-full pb-24 text-zinc-300 bg-black">
+    /**
+     * `overflow-x: clip` is what lets a child run to both screen edges without
+     * adding a horizontal scrollbar — see the `bleed-x` utility in index.css.
+     * CLIP, not hidden: hidden would make this a scroll container and silently
+     * kill `position: sticky` anywhere inside the page.
+     */
+    <div className="w-full pb-24 text-zinc-300 bg-black overflow-x-clip">
       <Hero banners={heroBanners} loading={initialLoading} />
 
-      <div className="relative z-30 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-2 bg-black rounded-t-[28px] -mt-7">
+      {/* THE BLACK PANEL IS THE FULL WIDTH OF THE SCREEN; only its CONTENT is
+          a centred column. It used to be `max-w-7xl mx-auto` itself, so every
+          full-bleed attempt inside it could only reach 80rem — which is why
+          the ads ticker and the brands belt stopped short of the edges on a
+          large screen while the hero above them did not. */}
+      <div className="relative z-30 pt-8 sm:pt-10 pb-2 bg-black rounded-t-[28px] -mt-7">
 
-        {/* Ads Marquee — the cap of the black panel: flush with its top
-            edge, bleeding across the full width so the rounded corners clip
-            it, no rule underneath (the owner asked the line gone). Marquee
-            measures the viewport and repeats the notices until the belt is
-            wider than any screen, so it loops endlessly with no visible
-            edge even when the owner wrote a single short line. */}
+        {/* Ads Marquee — the cap of the black panel: flush with its top edge,
+            running the whole width of the screen, no rule underneath (the
+            owner asked the line gone). Marquee measures the viewport and
+            repeats the notices until the belt is wider than any screen, so it
+            loops endlessly with no visible edge even when the owner wrote a
+            single short line. */}
         {homeAds.length > 0 && (
-          <div className="-mt-8 sm:-mt-10 -mx-4 sm:-mx-6 lg:-mx-8 mb-8 sm:mb-10 rounded-t-[28px] bg-zinc-900/40 overflow-hidden">
+          <div className="-mt-8 sm:-mt-10 mb-8 sm:mb-10 rounded-t-[28px] bg-zinc-900/40 overflow-hidden">
             <Marquee speed={42}>
               <div className="flex items-center whitespace-nowrap py-2.5">
                 {homeAds.map((ad) => (
@@ -201,6 +259,8 @@ export default function Home() {
             </Marquee>
           </div>
         )}
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <ServicesGrid siteMedia={siteMedia} />
 
@@ -239,7 +299,7 @@ export default function Home() {
                   items={itemsFor('categories')}
                 />
               ) : (
-                <CategoryChips key="categories" categories={categories} />
+                <CategoryBoard key="categories" categories={categories} />
               )
             ) : null,
           },
@@ -283,6 +343,73 @@ export default function Home() {
                     ))}
                   </div>
                 </section>
+              ) : null,
+          },
+          {
+            id: 'best_sellers',
+            order: orderOf('best_sellers'),
+            // A RANKED rail, not another row of identical cards — the position
+            // is the only thing this shelf knows that the catalogue does not.
+            node:
+              sectionVisible('best_sellers') && (shelves.best_sellers?.length ?? 0) > 0 ? (
+                <Suspense key="best_sellers" fallback={null}>
+                  <BestSellersRail products={shelves.best_sellers!} />
+                </Suspense>
+              ) : null,
+          },
+          {
+            id: 'flash_deals',
+            order: orderOf('flash_deals'),
+            // A BOARD with a lead tile and live countdowns: a deal has a clock,
+            // and a clock has to be read rather than flicked past.
+            node:
+              sectionVisible('flash_deals') && (shelves.flash_deals?.length ?? 0) > 0 ? (
+                <Suspense key="flash_deals" fallback={null}>
+                  <FlashDealsBoard products={shelves.flash_deals!} />
+                </Suspense>
+              ) : null,
+          },
+          {
+            id: 'spotlight',
+            order: orderOf('spotlight'),
+            /**
+             * The two rotating tiles. «سلكشن» is ranked HERE, in the browser,
+             * over products this page already fetched — the shop records no
+             * browsing telemetry and none is added for a tile. See
+             * src/lib/recentlyViewed.ts.
+             */
+            node:
+              sectionVisible('spotlight') &&
+              ((shelves.super_deals?.length ?? 0) > 0 || newProducts.length > 0) ? (
+                <Suspense key="spotlight" fallback={null}>
+                  <SpotlightTiles
+                    selectionPool={[...(shelves.best_sellers ?? []), ...newProducts].slice(0, 24)}
+                    superDeals={shelves.super_deals ?? []}
+                  />
+                </Suspense>
+              ) : null,
+          },
+          {
+            id: 'combos',
+            order: orderOf('combos'),
+            // Newegg-shaped: [part] + [part] = [price], with the saving called
+            // out above it. Its own request, like the bundles shelf.
+            node: sectionVisible('combos') ? (
+              <Suspense key="combos" fallback={null}>
+                <ComboShelf />
+              </Suspense>
+            ) : null,
+          },
+          {
+            id: 'filament',
+            order: orderOf('filament'),
+            // A dense swatch wall: filament is chosen by comparison, and a
+            // rail hides most of the range behind a swipe.
+            node:
+              sectionVisible('filament') && (shelves.filament?.length ?? 0) > 0 ? (
+                <Suspense key="filament" fallback={null}>
+                  <FilamentShelf products={shelves.filament!} />
+                </Suspense>
               ) : null,
           },
           {
@@ -394,6 +521,7 @@ export default function Home() {
             title={loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا هیچ بەرهەمێک نییە')}
           />
         )}
+      </div>
       </div>
     </div>
   );

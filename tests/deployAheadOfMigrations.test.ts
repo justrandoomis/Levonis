@@ -122,17 +122,27 @@ test('a DIFFERENT missing column still fails loudly — the repair is not a blan
   // is repaired here, and only because its declared DEFAULT makes the empty
   // answer exact.
   const raw = dbThrough(BEFORE_CONDITION);
-  // Rebuild products WITH condition_doc but WITHOUT original_price_iqd, which
-  // the discounted strip names. The shelf is now readable; another strip is not.
+  /**
+   * Rebuild products WITH condition_doc but WITHOUT a column another strip
+   * names. The shelf is now readable; that other strip is not.
+   *
+   * The column used to be `original_price_iqd`, which is what the discounts
+   * strip selected on — until that strip was found to be selecting on a
+   * RETIRED concept and always returning nothing. It now reads the membership
+   * prices, the same predicate `/api/products?type=discounted` uses, so
+   * `pro_price_iqd` is the column the handler really depends on and therefore
+   * the one this test has to remove to mean anything.
+   */
+  const MISSING = 'pro_price_iqd';
   const cols = (raw.prepare('PRAGMA table_info(products)').all() as { name: string }[]).map((r) => r.name);
-  assert.ok(cols.includes('original_price_iqd'), 'the column this test removes must exist first');
-  const kept = cols.filter((c) => c !== 'original_price_iqd');
+  assert.ok(cols.includes(MISSING), 'the column this test removes must exist first');
+  const kept = cols.filter((c) => c !== MISSING);
   raw.exec('PRAGMA foreign_keys = OFF;');
   raw.exec(`CREATE TABLE products_x AS SELECT ${kept.join(', ')} FROM products;`);
   raw.exec('DROP TABLE products; ALTER TABLE products_x RENAME TO products;');
   raw.exec("ALTER TABLE products ADD COLUMN condition_doc TEXT NOT NULL DEFAULT '{}';");
   assert.equal(hasColumn(raw, 'products', 'condition_doc'), true);
-  assert.equal(hasColumn(raw, 'products', 'original_price_iqd'), false);
+  assert.equal(hasColumn(raw, 'products', MISSING), false);
 
   const res = await home(app(asD1(raw)));
   assert.equal(res.status, 500, 'an unreadable column that is NOT the shelf must still stop the page');

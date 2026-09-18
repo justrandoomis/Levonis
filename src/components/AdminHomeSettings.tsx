@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, uploadFile } from '../lib/api';
 import type { SiteMediaEntry } from '../lib/api';
-import { GripVertical, Plus, Settings, Eye, EyeOff, Save, Trash2, LayoutTemplate, Megaphone, Image as ImageIcon, Ticket, Tag, Star, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Upload, Check, AlertTriangle, Package, PackageOpen, RotateCcw } from 'lucide-react';
+import { GripVertical, Plus, Settings, Eye, EyeOff, Save, Trash2, LayoutTemplate, Megaphone, Image as ImageIcon, Ticket, Tag, Star, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Upload, Check, AlertTriangle, Package, PackageOpen, RotateCcw, TrendingUp, Zap, Sparkles, Boxes, Palette } from 'lucide-react';
 import AdminAds from './AdminAds';
 
 interface HomeSection {
@@ -92,6 +92,11 @@ const SECTION_ICONS: Record<string, React.ElementType> = {
   top_brands: Star,
   open_box: PackageOpen,
   bundles: Package,
+  best_sellers: TrendingUp,
+  flash_deals: Zap,
+  spotlight: Sparkles,
+  combos: Boxes,
+  filament: Palette,
 };
 
 const INITIAL_SECTIONS: HomeSection[] = [
@@ -113,6 +118,20 @@ const INITIAL_SECTIONS: HomeSection[] = [
   // home page for ever, cannot be hidden, and never appears in the admin's
   // drag-to-reorder list (docs/BUNDLES_MYSTERY.md §13.2).
   { id: 'bundles', titleEn: 'Bundles & Offers Shelf', titleAr: 'رف الباقات والعروض', isVisible: true },
+  /**
+   * THE SHELVES BELOW THE FOLD, each drawn differently on purpose — the owner
+   * asked for that explicitly: «لا تجعلها كلها يتبع نفس النمط وهو الشريط
+   * الأفقي». They have no editable CARDS here: their contents come from the
+   * catalogue itself (units sold, scheduled offers, the materials branch, the
+   * `is_featured` flag), so what this panel controls is the ORDER and whether
+   * each one appears at all. A shelf with nothing to show renders nothing,
+   * whatever its toggle says.
+   */
+  { id: 'best_sellers', titleEn: 'Best sellers', titleAr: 'الأكثر مبيعًا', isVisible: true },
+  { id: 'flash_deals', titleEn: 'Flash deals (scheduled offers)', titleAr: 'العروض السريعة (العروض المجدولة)', isVisible: true },
+  { id: 'spotlight', titleEn: 'Selection & Super deals tiles', titleAr: 'بطاقتا «مختارات لك» و«صفقات مميّزة»', isVisible: true },
+  { id: 'combos', titleEn: 'Combos', titleAr: 'الكومبو', isVisible: true },
+  { id: 'filament', titleEn: 'Filament picks', titleAr: 'مختارات الفيلمنت', isVisible: true },
 ];
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -483,7 +502,88 @@ export default function AdminHomeSettings() {
         )}
 
         {activeTab === 'site-media' && <SiteMediaSettings dir={dir} />}
+
+        {DATA_DRIVEN_SECTIONS[activeTab] && (
+          <DataDrivenSectionPanel dir={dir} info={DATA_DRIVEN_SECTIONS[activeTab]} />
+        )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * THE SECTIONS WITH NOTHING TO TYPE IN, AND WHY THAT IS NOT A BLANK SCREEN.
+ *
+ * Picking «الأكثر مبيعًا» or «رف الباقات» in the tab bar used to show an empty
+ * panel: none of the editors matched, so nothing rendered and the owner was
+ * left wondering what they had broken. These shelves are filled by the
+ * CATALOGUE — units actually sold, scheduled offers, the materials branch,
+ * the featured flag — so there is nothing to author here, and saying so is
+ * the panel's whole job. Each row names exactly which screen DOES control it,
+ * because "it fills itself" is not an answer an owner can act on.
+ */
+const DATA_DRIVEN_SECTIONS: Record<string, { ar: string; en: string; controlAr: string; controlEn: string }> = {
+  best_sellers: {
+    ar: 'يُملأ تلقائيًا من المبيعات الفعلية: الكميات المباعة في الطلبات المؤكَّدة وما بعدها.',
+    en: 'Filled automatically from real sales: units in orders that are confirmed or later.',
+    controlAr: 'لا يُحرَّر يدويًا. يتغيّر مع مبيعات المتجر.',
+    controlEn: 'Not editable. It follows the shop’s own sales.',
+  },
+  flash_deals: {
+    ar: 'يعرض المنتجات التي عليها عرض مجدول فعّال، الأقرب انتهاءً أولًا.',
+    en: 'Shows products with a live scheduled offer, the ones ending soonest first.',
+    controlAr: 'يُدار من صفحة العروض المجدولة (Offers).',
+    controlEn: 'Managed from the scheduled Offers screen.',
+  },
+  spotlight: {
+    ar: '«صفقات مميّزة» تعرض المنتجات المعلَّمة كمميّزة. «مختارات لك» تُرتَّب في متصفح الزائر نفسه ولا تُرسل أي بيانات تتبّع.',
+    en: '“Super deals” shows products marked featured. “Selection” is ranked inside the visitor’s own browser — no tracking data is sent anywhere.',
+    controlAr: 'علّم المنتج كـ«مميّز» في نموذج المنتج ليظهر في صفقات مميّزة.',
+    controlEn: 'Mark a product as featured in the product form to put it in Super deals.',
+  },
+  combos: {
+    ar: 'يعرض الباقات التي تحتوي على قطعتين أو أكثر، بتصميم يوضّح القطع والسعر المجمّع.',
+    en: 'Shows bundles with two or more parts, drawn to make the parts and the combined price obvious.',
+    controlAr: 'يُدار من صفحة الباقات.',
+    controlEn: 'Managed from the Bundles screen.',
+  },
+  filament: {
+    ar: 'عيّنة عشوائية من قسم مواد الطباعة وما تحته، تتغيّر كل عشر دقائق.',
+    en: 'A random sample from the printing-materials section and everything under it, changing every ten minutes.',
+    controlAr: 'يُدار من شجرة الأقسام: كل منتج تحت «مواد الطباعة» مرشَّح.',
+    controlEn: 'Managed from the taxonomy: anything under “Printing materials” is a candidate.',
+  },
+  open_box: {
+    ar: 'يعرض المنتجات التي لها حالة (مستعمل / مفتوح العلبة / مجدَّد).',
+    en: 'Shows products that carry a condition (used / open box / refurbished).',
+    controlAr: 'تُحدَّد حالة المنتج في نموذج المنتج.',
+    controlEn: 'The condition is set in the product form.',
+  },
+  bundles: {
+    ar: 'يعرض الباقات والعروض المنشورة.',
+    en: 'Shows published bundles and offers.',
+    controlAr: 'يُدار من صفحة الباقات.',
+    controlEn: 'Managed from the Bundles screen.',
+  },
+};
+
+function DataDrivenSectionPanel({
+  dir,
+  info,
+}: {
+  dir: string;
+  info: { ar: string; en: string; controlAr: string; controlEn: string };
+}) {
+  const rtl = dir === 'rtl';
+  return (
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-3">
+      <p className="text-sm text-zinc-300 leading-relaxed">{rtl ? info.ar : info.en}</p>
+      <p className="text-[13px] text-zinc-500 leading-relaxed">{rtl ? info.controlAr : info.controlEn}</p>
+      <p className="text-[12px] text-zinc-600 leading-relaxed">
+        {rtl
+          ? 'من تبويب «الترتيب» يمكنك تغيير موضع هذا القسم أو إخفاؤه. القسم الذي لا يجد ما يعرضه لا يظهر أصلًا.'
+          : 'Use the Layout tab to move or hide this section. A section with nothing to show does not appear at all.'}
+      </p>
     </div>
   );
 }

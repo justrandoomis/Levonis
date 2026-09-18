@@ -48,6 +48,7 @@ import {
   AlertTriangle, Store, ZoomIn, Image as ImageIcon, Box, ExternalLink, PlayCircle, Wrench, TrendingUp, PackageOpen,
 } from 'lucide-react';
 import { api, ApiError, CartItem, formatIqd } from '../lib/api';
+import { rememberViewed } from '../lib/recentlyViewed';
 import { useGoBack } from '../lib/useGoBack';
 import { setCartCount, countCartItems } from '../lib/cartCount';
 import ReviewSection from '../components/reviews/ReviewSection';
@@ -915,6 +916,18 @@ export default function Product() {
           return;
         }
         setProduct(data.product);
+        /**
+         * Remember this view in THIS BROWSER, for the «مختارات لك» tile on the
+         * home page. Nothing is sent anywhere: the list lives in localStorage,
+         * holds an id plus its section and brand, and never leaves the device.
+         * See src/lib/recentlyViewed.ts for why it is done here rather than by
+         * adding a views table on the busiest read path in the shop.
+         */
+        rememberViewed({
+          id: String((data.product as { id?: unknown }).id ?? ''),
+          category_id: (data.product as { category_id?: string | null }).category_id ?? null,
+          brand_id: (data.product as { brand_id?: string | null }).brand_id ?? null,
+        });
         setSource(data.source);
         setFavorite(data.favorite);
         setRelations(data.relations ?? null);

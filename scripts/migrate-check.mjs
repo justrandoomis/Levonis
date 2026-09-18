@@ -73,7 +73,7 @@ const isIdempotent = (s) =>
   /^CREATE (TABLE|INDEX|UNIQUE INDEX|TRIGGER)\s+IF NOT EXISTS/i.test(s) ||
   /^CREATE UNIQUE INDEX IF NOT EXISTS/i.test(s) ||
   /^INSERT OR IGNORE\s+INTO/i.test(s) ||
-  (/^INSERT\s+INTO/i.test(s) && /WHERE NOT EXISTS/i.test(s)) ||
+  isGuardedInsert(s) ||
   // An UPDATE that only assigns LITERALS is idempotent by construction:
   // running it again writes the same constants over the same rows. One that
   // assigns an expression (`SET n = n + 1`) is not, and is excluded — that is
@@ -82,6 +82,26 @@ const isIdempotent = (s) =>
   // "0 idempotent statements re-ran with no row change" printed green while
   // testing nothing at all.
   (/^UPDATE\s+\w+\s+SET\s/i.test(s) && isLiteralAssignment(s));
+
+/**
+ * An INSERT that cannot insert the same row twice, because it is guarded by a
+ * `NOT EXISTS` over the very table it writes.
+ *
+ * THE GUARD MUST NAME THE TARGET TABLE. Testing only for the words
+ * `WHERE NOT EXISTS` — which is what this did — accepted the shape and nothing
+ * about the meaning: an INSERT guarded against a row in some OTHER table is
+ * not idempotent at all, and one whose guard sits later in a compound WHERE
+ * (`WHERE a IS NOT NULL AND NOT EXISTS (...)`) is idempotent and was rejected.
+ * Migration 0088's backfill is the second kind, and rather than contorting the
+ * SQL to put the guard first, the recogniser learns the real rule: the
+ * sub-select must read the table being written.
+ */
+function isGuardedInsert(stmt) {
+  const target = /^INSERT\s+(?:OR\s+\w+\s+)?INTO\s+([A-Za-z_]\w*)/i.exec(stmt);
+  if (!target) return false;
+  if (!/\bWHERE\b/i.test(stmt)) return false;
+  return new RegExp(`NOT\\s+EXISTS\\s*\\(\\s*SELECT[\\s\\S]*?\\bFROM\\s+${target[1]}\\b`, 'i').test(stmt);
+}
 
 /** true when every `col = value` in the SET clause assigns a literal. */
 function isLiteralAssignment(stmt) {

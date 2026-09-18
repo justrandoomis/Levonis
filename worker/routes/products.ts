@@ -26,6 +26,16 @@ import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
 import { pricingTierContext } from '../lib/entitlements';
 import { activeBenefitRules, ancestryFor, catalogAncestry, degradeIfSchemaMissing, fallbackFor } from '../lib/membershipBenefits';
 import { isConditionColumnMissing } from '../lib/conditionProjection';
+import { catalogSubtreeFilter, homeCategoryTree } from '../lib/catalogMembership';
+import {
+  SHELF_LIMIT,
+  bestSellerIds,
+  featuredIds,
+  filamentCandidateIds,
+  flashDealIds,
+  seededShuffle,
+  shuffleSeed,
+} from '../lib/homeShelves';
 import type { BenefitRule } from '@levonis/pricing/membershipBenefits';
 import type { TierStatus } from '../lib/entitlements';
 import { rateLimit } from '../lib/ratelimit';
@@ -2456,6 +2466,21 @@ const CARD_FIELDS = [
   'display_plus_iqd',
   // The countdown and the members-only lock chip.
   'offer',
+  /**
+   * WHICH SECTION AND WHICH BRAND — two id strings, for the «مختارات لك» tile.
+   *
+   * That tile ranks products against what THIS BROWSER has recently opened,
+   * entirely on the client (src/lib/recentlyViewed.ts), because the shop
+   * records no browsing telemetry and none was added for one tile. The
+   * ranking needs something to match on, and "same section" is the signal
+   * that actually predicts interest.
+   *
+   * Two short ids are not what this projection exists to keep out: it exists
+   * to stop the option ladder, the colour matrix, the spec groups, the usage
+   * guide and three languages of description riding on every tile.
+   */
+  'category_id',
+  'brand_id',
 ] as const;
 
 export function cardShape(out: Record<string, unknown>): Record<string, unknown> {
@@ -2555,9 +2580,20 @@ productRoutes.get('/', async (c) => {
     params.push(like, like, like, like);
   }
   if (category) {
-    // Legacy subcategory ids and v2 catalog ids share this filter.
-    sql += ' AND (subcategory_id = ? OR id IN (SELECT product_id FROM product_catalogs WHERE catalog_id = ?))';
-    params.push(category, category);
+    /**
+     * A CATEGORY MEANS THAT CATALOG AND EVERYTHING UNDER IT.
+     *
+     * This used to be `subcategory_id = ? OR id IN (SELECT product_id FROM
+     * product_catalogs WHERE catalog_id = ?)`, which missed both halves of the
+     * membership relation: the classification columns the product form
+     * actually writes, and every descendant catalog. Tapping "Printers" — the
+     * main section the owner put three products under — listed nothing,
+     * because the products are classified under "FDM Printers" and the
+     * placement table was empty. See worker/lib/catalogMembership.ts.
+     */
+    const subtree = catalogSubtreeFilter(category, 'products');
+    sql += ` AND ${subtree.sql}`;
+    params.push(...subtree.params);
   }
   /**
    * COMPOSITION ROWS ARE NOT ORDINARY CATALOGUE PRODUCTS (§10).
@@ -3193,8 +3229,28 @@ export const homeRoutes = new Hono<AppContext>();
 homeRoutes.get('/', async (c) => {
   const [settings, discounted, latest, openBoxRows, categories, brands, ctx] = await Promise.all([
     getSettings(c.env.DB, PUBLIC_SETTING_KEYS),
+    /**
+     * THE DISCOUNTS STRIP SELECTED ON A RETIRED CONCEPT, so it was always empty.
+     *
+     * It asked for `original_price_iqd > price_iqd` — the compare-at price
+     * that §4 retired and the admin form now shows read-only, which nothing
+     * writes any more. Live, this returned zero rows, so a section the owner
+     * can see in the admin panel simply never appeared on the page.
+     *
+     * The honest reading of "discounted" in this shop is the one
+     * `/api/products?type=discounted` already uses: a real membership price
+     * BELOW the regular one. Same predicate, so the home strip and the
+     * listing behind its "see all" can no longer disagree about what the word
+     * means. `composition = ''` for the same reason the listing excludes
+     * them — a bundle's availability is computed from its members and it
+     * belongs on the bundles shelf, not here.
+     */
     c.env.DB.prepare(
-      "SELECT * FROM products WHERE status = 'active' AND original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd ORDER BY created_at DESC LIMIT 10"
+      `SELECT * FROM products
+        WHERE status = 'active' AND composition = ''
+          AND ((pro_price_iqd IS NOT NULL AND pro_price_iqd < price_iqd)
+            OR (prime_price_iqd IS NOT NULL AND prime_price_iqd < price_iqd))
+        ORDER BY created_at DESC LIMIT 10`
     ).all<Record<string, unknown>>(),
     c.env.DB.prepare("SELECT * FROM products WHERE status = 'active' ORDER BY created_at DESC LIMIT 20").all<
       Record<string, unknown>
@@ -3211,38 +3267,19 @@ homeRoutes.get('/', async (c) => {
     // error card when a deploy landed ahead of its database — see
     // worker/lib/conditionProjection.ts.
     openBoxShelf(c.env.DB),
-    // The REAL taxonomy, so the categories strip works without the owner
-    // retyping their own catalog into the home settings. Only catalogs that
-    // actually have something to show are returned — an empty category on the
-    // home page is a dead end for the customer.
-    //
-    // GROUPED BY NAME, and that is not cosmetic. The live database holds
-    // SEVEN top-level catalogs called "Printers" and seven brands called
-    // "Bambu Lab", left behind by repeated seeding — so the ungrouped query
-    // rendered seven identical chips in a row. One chip per distinct name,
-    // pointing at the id that actually holds the most products, is what a
-    // customer can use. The duplicate ROWS are a data problem for the owner
-    // to clean up; the storefront must not put them on the home page
-    // meanwhile.
-    c.env.DB.prepare(
-      `WITH counted AS (
-         SELECT c.id, c.slug, c.name_ar, c.name_en, c.name_ckb, c.sort,
-                (SELECT COUNT(*) FROM product_catalogs pc
-                   JOIN products p ON p.id = pc.product_id
-                  WHERE pc.catalog_id = c.id AND p.status = 'active') AS n
-           FROM catalogs c
-          WHERE c.active = 1 AND c.parent_id IS NULL
-       )
-       SELECT id, slug, name_ar, name_en, name_ckb,
-              SUM(n) OVER (PARTITION BY COALESCE(NULLIF(name_en,''), name_ar)) AS product_count
-         FROM counted
-        WHERE n = (SELECT MAX(n) FROM counted c2
-                    WHERE COALESCE(NULLIF(c2.name_en,''), c2.name_ar)
-                        = COALESCE(NULLIF(counted.name_en,''), counted.name_ar))
-        GROUP BY COALESCE(NULLIF(name_en,''), name_ar)
-        ORDER BY sort, name_en
-        LIMIT 12`
-    ).all<Record<string, unknown>>(),
+    /**
+     * THE REAL TAXONOMY — MAIN SECTIONS, EACH WITH THE SUB-SECTIONS THAT HOLD
+     * SOMETHING. «الأقسام الرئيسية ثم الأقسام الفرعية التي فيها المنتجات».
+     *
+     * This used to count through `product_catalogs` alone and returned `[]`
+     * against the live database, so the home page showed no categories at all
+     * while the admin listed «الطابعات · 3». The join table was empty — and
+     * being emptied on every product save — because the product form records
+     * the owner's choice in `category_id` / `sub_category_id`. One membership
+     * relation over both, with counts that roll up from descendants, lives in
+     * worker/lib/catalogMembership.ts along with the whole story.
+     */
+    homeCategoryTree(c.env.DB),
     c.env.DB.prepare(
       `WITH counted AS (
          SELECT b.id, b.slug, b.name_ar, b.name_en, b.name_ckb,
@@ -3286,11 +3323,33 @@ homeRoutes.get('/', async (c) => {
   for (const r of [...discounted.results, ...latest.results, ...openBoxRows]) {
     homeRows.set(String(r.id), { id: String(r.id), inventory_mode: r.inventory_mode });
   }
-  const [homeViews, homePooled] = await Promise.all([
+  const [homeViews, homePooled, homeOffers] = await Promise.all([
     loadRelationsViews(c.env.DB, [...homeRows.values()]),
     // §8.2 row 18 on the home rails too: the same card, the same `stock` field.
     degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, [...homeRows.keys()].map(String)), new Set<string>()),
+    /**
+     * SCHEDULED OFFERS, ON THE FIRST SCREEN — the shop's flash deals.
+     *
+     * `offer_windows` (migration 0060) is fully built, admin-editable at
+     * /api/admin/offers, and honoured by /api/products and /api/bundles. The
+     * home page passed a literal `null` where every one of those passes the
+     * offer view, so a deal the owner scheduled priced correctly on the
+     * listing and the product page and at NO price at all on the page every
+     * visitor lands on first — no offer price, no countdown, no badge.
+     *
+     * One batched read for every card on the page, exactly as the listing
+     * does it (§14), and the price still comes from `resolveOfferPrice` — the
+     * same resolution the checkout charges, never a discount computed here.
+     */
+    degradeIfSchemaMissing(
+      'offers (migration 0060)',
+      () => loadOffers(c.env.DB, [...homeRows.keys()].map((id) => subjectOf(String(id)))),
+      EMPTY_OFFERS()
+    ),
   ]);
+
+  /** The offer view for one card, or undefined when nothing is scheduled. */
+  const offerFor = (id: unknown) => homeOffers.get(offerKey(subjectOf(String(id))));
 
   /**
    * The new-product prices the graded shelf compares against, in ONE read.
@@ -3317,7 +3376,7 @@ homeRoutes.get('/', async (c) => {
   }
   const openBoxCards = openBoxRows.map((p) => {
     const card = cardShape(
-      publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, null, homePooled.has(String(p.id)))
+      publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id)))
     );
     const condition = parseConditionDoc(p.condition_doc);
     const reference = condition?.new_product_id ? referencePrices.get(condition.new_product_id) : undefined;
@@ -3329,12 +3388,14 @@ homeRoutes.get('/', async (c) => {
     success: true,
     settings: safeSettings,
     discounted: discounted.results.map((p) =>
-      cardShape(publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, null, homePooled.has(String(p.id))))
+      cardShape(publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id))))
     ),
     latest: latest.results.map((p) =>
-      cardShape(publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, null, homePooled.has(String(p.id))))
+      cardShape(publicWithDisplayPrice(p, ctx, homeViews.get(String(p.id)), undefined, offerFor(p.id), homePooled.has(String(p.id))))
     ),
-    categories: categories.results.filter((r) => Number(r.product_count) > 0),
+    // Already filtered to catalogs that hold something, at both levels —
+    // homeCategoryTree drops the empties rather than making the client do it.
+    categories,
     brands: brands.results.filter((r) => Number(r.product_count) > 0),
     // The first screen's own artwork — brand marks and service icons. Resolved
     // here rather than in the client so the seeded defaults and the owner's
@@ -3353,5 +3414,105 @@ homeRoutes.get('/', async (c) => {
      * a zero or negative saving beside a struck-through number.
      */
     open_box: openBoxCards,
+  });
+});
+
+// ------------------------------------------------------- home shelves (§below the fold)
+
+/**
+ * THE SECOND REQUEST THE HOME PAGE MAKES, and the reason it is second.
+ *
+ * `/api/home` is what the first screen waits on. These shelves — best sellers,
+ * flash deals, the combo rail, the filament shuffle, the two rotating tiles —
+ * are all below the fold, so making the paint wait on them would slow the page
+ * every visitor sees to serve the part most of them scroll past. They are
+ * fetched after it, and a slow or failed answer here costs the shopper nothing
+ * they are currently looking at.
+ *
+ * EVERY SHELF IS PRICED THROUGH ONE RESOLUTION. The queries in
+ * worker/lib/homeShelves.ts return IDS; the rows are read once, the relational
+ * overlay and the offer windows are loaded once for all of them together, and
+ * every card goes through the same `publicWithDisplayPrice` the product page
+ * and the cart use. No shelf computes a discount of its own — that is how a
+ * page ends up quoting a number the checkout refuses.
+ *
+ * A SHELF THAT CANNOT BE BUILT IS ABSENT, NOT WRONG. Each one degrades to an
+ * empty list only where the doctrine in worker/lib/membershipBenefits.ts
+ * permits it: a missing TABLE genuinely holds no rows. `offer_windows`
+ * (migration 0060) is the one that matters here, and "no offers table" really
+ * does mean "no offer is running".
+ */
+homeRoutes.get('/sections', async (c) => {
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+
+  /**
+   * The filament root, by SLUG rather than by the seeded id.
+   *
+   * Nothing else in the worker matches on a seed id, and an owner may rename,
+   * re-parent or replace this branch. Looking it up by slug means a shop that
+   * calls its materials section something else still gets a shelf, and one
+   * that has no such section gets no shelf instead of an error.
+   */
+  const filamentRoot = await c.env.DB
+    .prepare("SELECT id FROM catalogs WHERE slug IN ('printing-materials','fdm-materials') AND active = 1 ORDER BY parent_id IS NOT NULL LIMIT 1")
+    .first<{ id: string }>();
+
+  const [bestIds, dealIds, filamentPool, featured, ctx] = await Promise.all([
+    bestSellerIds(c.env.DB),
+    degradeIfSchemaMissing('offers (migration 0060)', () => flashDealIds(c.env.DB, nowIso), [] as string[]),
+    filamentRoot ? filamentCandidateIds(c.env.DB, filamentRoot.id) : Promise.resolve([] as string[]),
+    featuredIds(c.env.DB),
+    pricingCtx(c),
+  ]);
+
+  // The shuffle happens here, over ids, with a seed that is stable inside a
+  // ten-minute bucket — see homeShelves.ts for why not ORDER BY RANDOM().
+  const filament = seededShuffle(filamentPool, shuffleSeed(nowMs)).slice(0, SHELF_LIMIT);
+
+  const wanted = [...new Set([...bestIds, ...dealIds, ...filament, ...featured])];
+  if (wanted.length === 0) {
+    return c.json({ success: true, best_sellers: [], flash_deals: [], filament: [], super_deals: [] });
+  }
+
+  const ph = wanted.map(() => '?').join(',');
+  const { results: rows } = await c.env.DB
+    .prepare(`SELECT * FROM products WHERE id IN (${ph})`)
+    .bind(...wanted)
+    .all<Record<string, unknown>>();
+
+  const [views, offers, pooled] = await Promise.all([
+    loadRelationsViews(c.env.DB, rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))),
+    degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(c.env.DB, rows.map((r) => subjectOf(String(r.id)))), EMPTY_OFFERS()),
+    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, rows.map((r) => String(r.id))), new Set<string>()),
+  ]);
+
+  const cardById = new Map<string, Record<string, unknown>>();
+  for (const p of rows) {
+    const id = String(p.id);
+    cardById.set(
+      id,
+      cardShape(
+        publicWithDisplayPrice(
+          p,
+          ctx,
+          views.get(id),
+          undefined,
+          offers.get(offerKey(subjectOf(id))),
+          pooled.has(id)
+        )
+      )
+    );
+  }
+  // `IN (...)` does not preserve the ranking each query established, so the
+  // order is re-applied from the id lists rather than read off the rows.
+  const pick = (ids: string[]) => ids.map((id) => cardById.get(id)).filter((x): x is Record<string, unknown> => !!x);
+
+  return c.json({
+    success: true,
+    best_sellers: pick(bestIds),
+    flash_deals: pick(dealIds),
+    filament: pick(filament),
+    super_deals: pick(featured),
   });
 });

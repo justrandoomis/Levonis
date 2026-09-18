@@ -105,6 +105,7 @@ import {
 import { localizeRespectingAuthored } from '../lib/productPersistence';
 import { syncProductTranslations } from '../lib/translate/store';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
+import { withClassificationPlacements } from '../lib/catalogMembership';
 
 export const adminImportRoutes = new Hono<AppContext>();
 adminImportRoutes.use('*', requireAdmin);
@@ -1490,7 +1491,17 @@ adminImportRoutes.post('/confirm', async (c) => {
         failedCount++;
         continue;
       }
-      const catalogIds = (item.catalogIds as string[]) ?? [];
+      /**
+       * The importer writes `product_catalogs` DIRECTLY rather than through
+       * `planCatalogs`, so it needs the same guarantee the save path gets: the
+       * main and sub section this row is being filed under are placements,
+       * whatever the sheet's catalog column said. Without it an import could
+       * leave a product classified but unshelved — invisible to the home
+       * page's category counts, and to `printerIdentity`, which is what
+       * decides whether the PLUS printer gift and the printer delivery advance
+       * apply at all. See worker/lib/catalogMembership.ts.
+       */
+      const catalogIds = withClassificationPlacements((item.catalogIds as string[]) ?? [], doc);
       const relStmts = [...plan.stmts];
       relStmts.push(c.env.DB.prepare('DELETE FROM product_catalogs WHERE product_id = ?').bind(productId));
       for (const cid of catalogIds) {
