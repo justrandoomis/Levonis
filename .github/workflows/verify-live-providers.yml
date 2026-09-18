@@ -1,0 +1,85 @@
+# ---------------------------------------------------------------------------
+# WHICH WAYS IN ARE ACTUALLY WORKING RIGHT NOW — ten seconds, no deploy.
+#
+# Workflow 7 already prints this, but it prints it after a seventeen-minute
+# deploy, which is no use when the question is "is Google sign-in on?" and the
+# answer changes without anyone deploying anything.
+#
+# THE FAILURE THIS EXISTS FOR (docs/AUTH_PROVIDERS.md §10). There are two
+# deployers for levonis-staging. Workflow 7 reads the running Worker's vars and
+# carries them forward; the Cloudflare Workers Builds Git integration reads
+# wrangler.jsonc, where those vars are empty strings, and writes the empty
+# strings over them. `wrangler deploy` replaces plain-text vars WHOLESALE, so
+# every push to the default branch blanks GOOGLE_CLIENT_ID and EMAIL_FROM —
+# and Google sign-in, password reset, email verification and email sign-in
+# codes all go dark, silently, until somebody runs workflow 7 again.
+#
+# SECRETS SURVIVE AND VARS DO NOT, which is why the symptom looks random:
+# `whatsappOtp:true` beside `google:false` is that bug every time, because
+# WASENDER_API_KEY is a secret and GOOGLE_CLIENT_ID is a var.
+#
+# MANUAL ONLY, on purpose. A schedule here would email on every push until the
+# Git integration is disconnected, and a check that cries every hour is a check
+# people turn off. Add a `schedule:` line once there is one deployer.
+#
+# READ-ONLY: four unauthenticated GETs against the live site. It creates
+# nothing, changes nothing, and prints no secret — the Google client id is
+# public by construction and is still only reported as present or absent.
+# ---------------------------------------------------------------------------
+name: 46 - Verify LIVE sign-in methods (read-only, 10 seconds)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask the live site what it offers
+        run: |
+          set -e
+          BODY=$(curl -sS --max-time 25 "https://levonis-iq.com/api/auth/capabilities")
+          echo "$BODY" | jq -e '.success == true' > /dev/null \
+            || { echo "::error::/api/auth/capabilities did not answer"; echo "$BODY" | head -c 300; exit 1; }
+
+          {
+            echo "| Method | Live |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for k in emailPassword google telegram phoneSignIn phoneSignup emailOtp whatsappOtp passwordReset emailVerification; do
+            V=$(echo "$BODY" | jq -r ".$k")
+            echo "  $k: $V"
+            echo "| $k | $V |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          # The two halves of the same story, told apart. A var that was blanked
+          # and a secret that was never uploaded look identical from outside,
+          # and they have completely different fixes.
+          GOOGLE=$(echo "$BODY" | jq -r '.google')
+          WA=$(echo "$BODY" | jq -r '.whatsappOtp')
+          MAIL=$(echo "$BODY" | jq -r '.emailOtp')
+
+          FAIL=0
+          if [ "$GOOGLE" != "true" ]; then
+            echo "::error::Google sign-in is OFF. GOOGLE_CLIENT_ID is a VAR on the Worker."
+            FAIL=1
+          fi
+          if [ "$MAIL" != "true" ]; then
+            echo "::error::Email codes, password reset and email verification are OFF. They need EMAIL_API_KEY (a secret) AND EMAIL_FROM (a var)."
+            FAIL=1
+          fi
+
+          if [ "$FAIL" = "1" ] && [ "$WA" = "true" ]; then
+            echo "::warning::A VAR was lost while a SECRET survived — that is the signature of a Cloudflare Git-integration deploy overwriting wrangler.jsonc's empty vars. See docs/AUTH_PROVIDERS.md §10. Run workflow 7 to restore, and disconnect the Git integration so it stops happening."
+          fi
+
+          [ "$FAIL" = "0" ] || exit 1
+          echo "every sign-in method this shop is configured for is live"
+
+      - name: The schema the live code expects is the schema it has
+        run: |
+          set -e
+          H=$(curl -sS --max-time 25 "https://levonis-iq.com/api/health")
+          echo "$H" | jq -c '.schema'
+          [ "$(echo "$H" | jq -r '.schema.state')" = "current" ] \
+            || { echo "::error::the live database is behind the code that is serving it"; exit 1; }

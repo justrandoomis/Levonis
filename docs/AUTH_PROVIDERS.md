@@ -375,3 +375,81 @@ folded — `5` is خ, not `s`, and folding it would reject everyone named Sara.
 The message never names what was found. A filter that quotes the word back
 teaches people exactly which letter to change, and repeats the insult to
 whoever is holding the phone.
+
+
+---
+
+## 10. Why the providers keep switching themselves off
+
+**Every push to the default branch blanks Google sign-in and all outbound email
+on the live shop, silently.** It is not the secrets, it is not the code, and
+re-running the deploy fixes it only until the next push.
+
+### The evidence
+
+Workflow 7 (run 109) finished at **03:37:56** on 2026-09-18, and its own
+verification step read the live site back:
+
+```
+passwordReset: true          googleClientId: present and Google-shaped
+emailVerification: true      plain-text vars: 9 before, 9 after
+google: true                 APP_ORIGIN, EMAIL_FROM, GOOGLE_CLIENT_ID, …
+```
+
+A push to the default branch at **03:57**. Three minutes later:
+
+```json
+{ "google": false, "googleClientId": "", "emailOtp": false, "whatsappOtp": true }
+```
+
+### The mechanism
+
+There are **two deployers** for `levonis-staging`:
+
+| Deployer | Fires on | Vars |
+|---|---|---|
+| `.github/workflows/deploy-staging-code.yml` (workflow 7) | manual dispatch | reads the RUNNING Worker's vars first and passes every one back with `--var` |
+| Cloudflare **Workers Builds** Git integration | every push to the default branch | reads `wrangler.jsonc` and passes **no** `--var` |
+
+`wrangler deploy` replaces a Worker's plain-text vars **wholesale**, and
+`wrangler.jsonc` declares them as empty strings:
+
+```jsonc
+"GOOGLE_CLIENT_ID": "",  "EMAIL_FROM": "",  "APP_ORIGIN": "",  "STORE_ROOT_DOMAIN": "", …
+```
+
+An empty string there is not "unset" — it is an instruction to blank the live
+value. So the Git integration writes `""` over nine working vars on every push.
+
+**Secrets survive, vars do not.** `WASENDER_API_KEY`, `EMAIL_API_KEY` and the
+Telegram tokens live in a separate store that `wrangler deploy` does not touch,
+which is exactly why `whatsappOtp` stayed `true` while `google` went `false` —
+and why the failure looks random until you sort the configuration by which
+store it lives in.
+
+`emailOtp` needs **both** halves: `EMAIL_API_KEY` (a secret, survived) **and**
+`EMAIL_FROM` (a var, blanked). One of the two being wiped is enough.
+
+### The fix is one deployer
+
+Disconnect the Git integration in Cloudflare — **Workers & Pages →
+`levonis-staging` → Settings → Builds** — and deploy through workflow 7, which
+reads the running Worker first and refuses outright if that read fails. This is
+the whole reason workflow 7's header says `wrangler deploy` replaces vars
+wholesale: the file was written against this exact failure, and the Git
+integration walks into it from the other side.
+
+The alternative is committing the real values into `wrangler.jsonc`. The Google
+client id is public by construction and `APP_ORIGIN` / `STORE_ROOT_DOMAIN` are
+the shop's own domain, so that would work — but it puts the owner's
+configuration in the repository, which is the owner's decision and not a default
+this repo takes on its own.
+
+### How to tell, in one request
+
+```bash
+curl -s https://levonis-iq.com/api/auth/capabilities | jq '{google, emailOtp, whatsappOtp}'
+```
+
+`google:false` with `whatsappOtp:true` is this bug, every time: a var was lost
+and a secret was not.

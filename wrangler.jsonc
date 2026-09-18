@@ -74,6 +74,33 @@
   // INITIAL_ADMIN_EMAIL are passed by the deploy workflows via --var.
   // Secrets (TELEGRAM_BOT_TOKEN, optional GEMINI/EMAIL keys) are uploaded
   // with `wrangler secret put` by the workflows — never committed.
+  //
+  // ⚠ AN EMPTY STRING HERE IS NOT "UNSET". IT IS AN INSTRUCTION TO BLANK THE
+  // LIVE VALUE. `wrangler deploy` replaces a Worker's plain-text vars WHOLESALE,
+  // so any deploy that reads this file and does NOT pass --var writes these
+  // empty strings over whatever the Worker is running on.
+  //
+  // That is not hypothetical. On 2026-09-18, workflow 7 finished at 03:37:56
+  // with the live site reporting google:true, passwordReset:true,
+  // emailVerification:true and nine vars intact. A push to the default branch
+  // at 03:57 fired the Cloudflare Workers Builds Git integration — a SECOND
+  // deployer, which reads this file and passes no --var — and by 04:00 the live
+  // site reported google:false, googleClientId:"" and emailOtp:false. The
+  // WhatsApp key survived only because it is a SECRET, and secrets live in a
+  // different store that `wrangler deploy` does not touch.
+  //
+  // So: Google sign-in, password reset, email verification and email sign-in
+  // codes go dark on EVERY push to the default branch, silently, and come back
+  // only when somebody runs workflow 7 again.
+  //
+  // THE FIX IS ONE DEPLOYER, not a better file. Disconnect the Git integration
+  // in Cloudflare (Workers & Pages → levonis-staging → Settings → Builds) and
+  // deploy through workflow 7, which reads the running Worker's vars FIRST and
+  // carries every one of them forward. The alternative — real values committed
+  // here — puts the owner's configuration in the repository, which is a
+  // decision for the owner and not a default taken by this file.
+  //
+  // See docs/AUTH_PROVIDERS.md §10.
   "vars": {
     "GOOGLE_CLIENT_ID": "",
     "INITIAL_ADMIN_EMAIL": "",
