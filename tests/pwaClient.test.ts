@@ -23,6 +23,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { translations } from '../src/translations';
 import {
   INSTALL_DISMISS_KEY,
@@ -447,4 +448,95 @@ test('the storage key is namespaced and versioned', () => {
   // The version is what lets a later change to the shape retire the old value
   // instead of misreading it.
   assert.match(INSTALL_DISMISS_KEY, /^lv\..*\.v1$/);
+});
+
+// ------------------------------------------- the affordance is actually reachable
+
+/**
+ * THESE ASSERTIONS ARE ON SOURCE TEXT, WHICH IS UNUSUAL HERE AND DELIBERATE.
+ *
+ * Every other test in this file drives a pure function. These cannot: the
+ * defect they exist to catch is not a wrong return value, it is a correct
+ * component mounted somewhere no customer can reach. `InstallAppButton` was
+ * rendered in exactly one place — the Settings row — and `/settings` is a
+ * `<ProtectedRoute>` on the main site and is not declared AT ALL in the
+ * storefront shell. So the feature was behind a login wall on every device
+ * and entirely absent on merchant subdomains, while
+ * `src/hooks/useInstallApp.ts` suppressed Chrome's own install banner for
+ * everyone. Every unit test passed the whole time.
+ */
+const SRC = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), 'utf8');
+
+test('the install affordance is reachable WITHOUT an account, on both shells', () => {
+  const app = SRC('App.tsx');
+
+  // The main site: /profile is the first BottomNav item and is NOT wrapped in
+  // ProtectedRoute. If that ever changes, the signed-out shopper loses the
+  // only entry point the platform shell has.
+  assert.match(
+    app,
+    /<Route path="\/profile" element=\{<Profile \/>\} \/>/,
+    '/profile is no longer unprotected — the install card there is now behind auth'
+  );
+  assert.match(SRC('pages/Profile.tsx'), /<InstallAppButton offered \/>/);
+
+  // The storefront shell: this is the ENTIRE application on a merchant
+  // subdomain, and it is the only host where the per-host manifest (the
+  // merchant's name, tagline and logo) is the thing being installed.
+  assert.match(SRC('pages/Storefront.tsx'), /<InstallAppButton offered \/>/);
+
+  // And Settings keeps its row, without `offered`: the customer who navigated
+  // there came looking for the control.
+  assert.match(SRC('pages/Settings.tsx'), /<InstallAppButton \/>/);
+});
+
+test('an offered install button goes quiet after «ليس الآن»; the Settings control does not', () => {
+  // The dismissal used to be written to localStorage and read by nothing at
+  // all, so «ليس الآن» and the X button behaved identically and the sheet's
+  // own comment described a month of silence that did not exist.
+  const button = SRC('components/pwa/InstallAppButton.tsx');
+  assert.match(button, /offered\?: boolean;/);
+  assert.match(button, /dismissed/, 'InstallAppButton must READ the dismissal, not just record it');
+  assert.match(
+    button,
+    /if \(offered && dismissed && !everOpened\) return null;/,
+    'the offered button no longer honours the dismissal'
+  );
+
+  // The storage helpers behind it, driven directly.
+  const store = memoryStorage();
+  const now = Date.UTC(2026, 0, 1);
+  assert.equal(isInstallDismissed(store, now), false);
+  const until = recordInstallDismissal(store, now);
+  assert.equal(until, now + INSTALL_DISMISS_MS);
+  assert.equal(isInstallDismissed(store, now + 1), true);
+  assert.equal(isInstallDismissed(store, until - 1), true);
+  // Exclusive on purpose: at exactly `until` the quiet period is over.
+  assert.equal(isInstallDismissed(store, until), false);
+});
+
+test('iOS home-screen identity is per host, not the shared index.html', () => {
+  // index.html is ONE document served byte-identically on every host, and iOS
+  // prefers `apple-mobile-web-app-title` over the manifest's per-host
+  // `short_name`. With the tag present, every merchant's shop installed on an
+  // iPhone as "LEVONIS" — the exact outcome worker/routes/manifest.ts exists to
+  // prevent, on the platform whose five manual steps this file describes.
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(
+    !/apple-mobile-web-app-title/i.test(html.replace(/<!--[\s\S]*?-->/g, '')),
+    'apple-mobile-web-app-title is back; it names every merchant shop LEVONIS'
+  );
+
+  // <title> is iOS's next fallback, so a merchant host has to own it while its
+  // storefront is on screen — and the apple-touch-icon with it.
+  const identity = SRC('components/pwa/HostAppleIdentity.tsx');
+  assert.match(identity, /document\.title = name;/);
+  assert.match(identity, /link\[rel="apple-touch-icon"\]/);
+  assert.match(SRC('App.tsx'), /<HostAppleIdentity \/>/);
+
+  // The icon is repointed ONLY for formats iOS decodes. A merchant logo is
+  // often a WebP, and iOS does not fall back when it cannot read this link —
+  // it uses a SCREENSHOT OF THE PAGE, which is the bug the PNG replaced.
+  assert.match(identity, /APPLE_ICON_EXTENSIONS = \['\.png', '\.jpg', '\.jpeg'\]/);
+  assert.ok(!/webp/i.test(identity.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '')));
 });

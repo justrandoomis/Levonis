@@ -32,7 +32,7 @@ import { before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -104,15 +104,65 @@ test('the static-import parser counts a static import and never a dynamic one', 
  *
  * Building here costs a few seconds exactly once, when `dist/assets` is
  * absent, and makes the number honest in both places.
+ *
+ * ABSENT WAS NOT A STRICT ENOUGH TEST, and the PWA work is what proved it.
+ *
+ * A `dist/` forty minutes older than the newest source file satisfies
+ * `existsSync` perfectly, so this hook returned early and all six tests passed
+ * — against a build that predated every file in the change. `dist/sw.js` and
+ * `dist/_headers` did not exist, `dist/index.html` still carried the old head
+ * with no `rel="manifest"` in it, and the one question the suite was there to
+ * answer (does the new static import push the entry past 120 KB gzip?) went
+ * unanswered while reading as a pass. A stale green is worse than a skip: a
+ * skip is visible.
+ *
+ * So the freshness of the artifact is now part of the condition. The newest
+ * mtime under `src/`, plus the three root files that end up in the bundle, is
+ * compared against `dist/index.html`; older means rebuild. Comparing against
+ * index.html rather than a chunk is deliberate — chunk names are
+ * content-hashed, so an unchanged chunk keeps its old file, while the entry
+ * document is rewritten by every build.
  */
+/** The most recent mtime under a directory, or 0 if it does not exist. */
+function newestMtime(path: string): number {
+  if (!existsSync(path)) return 0;
+  const info = statSync(path);
+  if (!info.isDirectory()) return info.mtimeMs;
+  let newest = info.mtimeMs;
+  for (const entry of readdirSync(path)) {
+    // `node_modules` cannot appear under the roots below, so there is nothing
+    // to prune here and the walk stays a plain recursion.
+    newest = Math.max(newest, newestMtime(join(path, entry)));
+  }
+  return newest;
+}
+
+/** True when `dist/` cannot possibly describe the source tree on disk. */
+function distIsStale(): boolean {
+  const built = newestMtime(join(DIST, 'index.html'));
+  if (!built) return true;
+  const sources = [
+    join(ROOT, 'src'),
+    join(ROOT, 'public'),
+    join(ROOT, 'index.html'),
+    join(ROOT, 'vite.config.ts'),
+  ];
+  return sources.some((path) => newestMtime(path) > built);
+}
+
 before(() => {
-  if (existsSync(ASSETS)) return;
+  if (existsSync(ASSETS) && !distIsStale()) return;
   execFileSync('npx', ['vite', 'build'], { cwd: ROOT, stdio: 'inherit' });
   assert.ok(existsSync(ASSETS), 'vite build produced no dist/assets');
+  assert.ok(!distIsStale(), 'vite build left dist/ older than the sources it was built from');
 });
 
-test('dist/ exists — this suite measures a real build, never an empty directory', () => {
+test('dist/ exists AND is newer than the sources — never a stale build', () => {
   assert.ok(existsSync(ASSETS), 'dist/assets is missing even after a build');
+  // The assertion that would have caught the PWA change measuring an artifact
+  // from before it existed. `before` rebuilds when this is true, so reaching
+  // here still stale means the build itself did not take.
+  assert.ok(!distIsStale(), 'dist/ is older than src/, public/ or index.html — every number below is from another commit');
   assert.ok(
     readdirSync(ASSETS).some((f) => f.endsWith('.js')),
     'dist/assets holds no JavaScript — a budget over an empty directory proves nothing'
