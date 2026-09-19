@@ -95,7 +95,7 @@ export const CHANNEL_NUDGE_COPY: Record<NudgeContext, { title: Trio; body: Trio 
   ticket: {
     title: ['تم فتح تذكرتك', 'Your ticket is open', 'تیکتەکەت کرایەوە'],
     body: [
-      'فعّل قناة لتصلك ردود الدعم على تذكرتك دون أن تعود للتحقق.',
+      'فعّل قناة لتصلك ردود الدعم على تذكرتك دون الحاجة إلى العودة والتحقق بنفسك.',
       'Turn on a channel so support replies on your ticket reach you without checking back.',
       'کەناڵێک چالاک بکە تا وەڵامی پشتگیری بۆ تیکتەکەت پێت بگات بەبێ گەڕانەوە.',
     ],
@@ -108,9 +108,14 @@ export const CHANNEL_NUDGE_ACTION_LABEL: Record<
   'link_telegram' | 'link_telegram_whatsapp' | 'verify_email',
   Trio
 > = {
-  link_telegram: ['تفعيل تيليجرام', 'Turn on Telegram', 'تێلێگرام چالاک بکە'],
+  // «تيليغرام» WITH غ, which is how the other 53 places in this
+  // codebase spell it — including the linking screen these buttons navigate to.
+  // A gold button spelling it with ج, landing on a page that spells it with
+  // غ, makes a customer stop and wonder whether they tapped the right thing —
+  // at the exact moment the window is asking them to trust it with a channel.
+  link_telegram: ['تفعيل تيليغرام', 'Turn on Telegram', 'تێلێگرام چالاک بکە'],
   link_telegram_whatsapp: [
-    'تفعيل تيليجرام وواتساب',
+    'تفعيل تيليغرام وواتساب',
     'Turn on Telegram & WhatsApp',
     'تێلێگرام و واتساپ چالاک بکە',
   ],
@@ -226,7 +231,7 @@ export interface NudgeAction {
  * into a form is never stored here") — so `channelReadiness` gives the
  * WhatsApp row the SAME `link_telegram` action as Telegram's. Rendering both
  * would be two buttons that go to one place and do one thing. They are merged,
- * and the merge is what earns the label «تفعيل تيليجرام وواتساب»: one tap, two
+ * and the merge is what earns the label «تفعيل تيليغرام وواتساب»: one tap, two
  * channels, said honestly.
  *
  * A channel with `can_activate === false` produces nothing. That covers the
@@ -351,6 +356,10 @@ export default function ChannelNudge({ context, active }: ChannelNudgeProps) {
   if (!readiness || actions.length === 0) return null;
 
   const copy = CHANNEL_NUDGE_COPY[context];
+  // Defensive `?? []`: `delivery` is declared on the response but this window
+  // draws over a paid order, and an older worker that answers without the field
+  // must produce a missing sentence, never a thrown render.
+  const inappIsOn = (readiness.delivery ?? []).includes('inapp');
 
   return (
     <Sheet
@@ -412,17 +421,39 @@ export default function ChannelNudge({ context, active }: ChannelNudgeProps) {
           </button>
         </div>
 
-        {/* The floor, stated rather than assumed. A customer who declines has
-            NOT been cut off: `channelReadiness` keeps 'inapp' ready for every
-            signed-in account, so the message is in their inbox to find. Saying
-            so is what makes «ليس الآن» a safe answer instead of a gamble. */}
-        <p className="mt-3 text-[11.5px] leading-relaxed text-text-muted">
-          {loc(
-            'في كل الأحوال ستجد التحديثات داخل التطبيق في صندوق الإشعارات.',
-            'Either way, the updates are waiting in your in-app notifications.',
-            'بە هەر حاڵ، نوێکارییەکان لە ناو ئەپەکە لە سندوقی ئاگادارکردنەوە دەبن.'
-          )}
-        </p>
+        {/* THE CLOSING LINE IS CHECKED, NOT ASSUMED — it is the only sentence in
+            this window that makes a PROMISE rather than an offer, so it is the
+            only one that can be false.
+
+            `channelReadiness` keeps 'inapp' in `delivery` for every signed-in
+            account EXCEPT one: somebody who has explicitly switched the in-app
+            inbox off in their preferences (worker/lib/channelReadiness.ts drops
+            it from `delivery` when it is disabled). That person also has
+            `any_outbound_ready === false`, so they are exactly who this window
+            appears for — and telling them their updates are waiting in an inbox
+            they silenced would talk the one customer who most needs the offer
+            out of taking it. `delivery` is already in hand, so the truth costs
+            one array check.
+
+            What makes «ليس الآن» a safe answer for everybody else stays
+            exactly as it was. */}
+        {inappIsOn ? (
+          <p className="mt-3 text-[11.5px] leading-relaxed text-text-muted">
+            {loc(
+              'في كل الأحوال ستجد التحديثات داخل التطبيق في صندوق الإشعارات.',
+              'Either way, the updates are waiting in your in-app notifications.',
+              'بە هەر حاڵ، نوێکارییەکان لە سندوقی ئاگادارکردنەوەی ئەپەکەدا دەمێننەوە.'
+            )}
+          </p>
+        ) : (
+          <p className="mt-3 text-[11.5px] leading-relaxed text-text-muted">
+            {loc(
+              'إشعارات التطبيق مطفأة عندك، فلن تصلك التحديثات إلى أي مكان حالياً.',
+              'Your in-app notifications are switched off, so these updates have nowhere to reach you right now.',
+              'ئاگادارکردنەوەکانی ئەپەکەت کوژاوەتە، کەواتە ئێستا نوێکارییەکان بە هیچ شوێنێک پێت ناگات.'
+            )}
+          </p>
+        )}
       </div>
     </Sheet>
   );

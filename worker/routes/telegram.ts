@@ -29,7 +29,7 @@ import {
 } from '../lib/telegram';
 import { setPrimaryChannelStatements } from '../lib/channelReadiness';
 import {
-  TOPIC_KEYS,
+  BINDABLE_TOPIC_KEYS,
   adminBotConfigured,
   adminTelegramIds,
   auditAdminBot,
@@ -1070,17 +1070,45 @@ telegramRoutes.get('/admin/bot-status', requireAdmin, async (c) => {
      * two lists had drifted. This names the gap instead.
      */
     identities_missing_from_allow_list: await identitiesOutsideAllowList(c.env),
-    topics: TOPIC_KEYS.map((key) => {
-      const t = bound.get(key);
-      return {
-        key,
-        label: topicLabel(key),
-        bound: !!t,
-        // null = the forum's General topic, which Telegram addresses with no
-        // thread id at all. Not a missing value.
-        message_thread_id: t ? t.messageThreadId : null,
-      };
-    }),
+    /**
+     * THE SAME NINE THE BOT ASKS FOR, AND NOT ONE ROW MORE.
+     *
+     * This listed `TOPIC_KEYS`, which carries the legacy `orders` key as a
+     * tenth entry. The owner would bind the nine topics their group actually
+     * has, the bot would answer «🎉 كل المواضيع مربوطة», and then this
+     * screen would show a tenth row sitting at `bound: false` for a topic that
+     * does not exist in Telegram — two of the shop's own surfaces disagreeing
+     * about whether the setup is finished. `BINDABLE_TOPIC_KEYS` is the list
+     * `/topics` counts against, so the two now cannot drift.
+     *
+     * A live legacy binding is NOT hidden: it is appended below as its own
+     * labelled row, which is the same treatment `topicsText` gives it — an
+     * existing binding that still carries traffic must stay visible, it just
+     * must not read as an unfinished checklist item.
+     */
+    topics: [
+      ...BINDABLE_TOPIC_KEYS.map((key) => {
+        const t = bound.get(key);
+        return {
+          key,
+          label: topicLabel(key),
+          bound: !!t,
+          legacy: false,
+          // null = the forum's General topic, which Telegram addresses with no
+          // thread id at all. Not a missing value.
+          message_thread_id: t ? t.messageThreadId : null,
+        };
+      }),
+      ...(bound.has('orders')
+        ? [{
+            key: 'orders',
+            label: topicLabel('orders'),
+            bound: true,
+            legacy: true,
+            message_thread_id: bound.get('orders')!.messageThreadId,
+          }]
+        : []),
+    ],
   });
 });
 

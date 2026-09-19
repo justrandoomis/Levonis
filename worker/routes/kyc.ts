@@ -17,6 +17,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { safeParse } from '../lib/types';
 import { sniff } from './uploads';
 import { getMediaObject, storeMedia } from '../lib/mediaStorage';
+import { announceAfterResponse } from '../lib/adminTopicRouting';
 
 /**
  * PRO KYC (final-phase brief §9) + approved-address versioning.
@@ -412,6 +413,32 @@ kycRoutes.post('/submit', async (c) => {
 
   // Audit without any identity PII.
   await audit(db, user.id, 'kyc.submit', caseId, { doc_type: docType, evidence_count: evidenceKeys.length });
+  /**
+   * A VERIFICATION CASE WITH NOBODY TOLD IS A CUSTOMER WAITING FOR NOTHING.
+   *
+   * The case is now 'submitted' and cannot move again until a human decides
+   * it; the customer is blocked from whatever they submitted identity for
+   * until then, and nothing announced it. «⚡ Merchants verification» is the
+   * only verification queue the group has, and the owner's own words for what
+   * the topic is for were «توثيق المجتمع» — community verification, not
+   * merchants specifically. If the owner would rather keep that topic purely
+   * for shopfronts, this one string becomes 'general' and nothing else moves.
+   *
+   * THE MESSAGE CARRIES NO IDENTITY AT ALL, and that is not a style choice:
+   * the name, the date of birth and the document number are SEALED in this
+   * very handler (`seal(secret, …)`) because they must not exist in plaintext
+   * where they can be read. Putting any of them into a group chat would undo
+   * the encryption three lines after performing it. The case id, the document
+   * TYPE and how many files came with it are what decides who picks it up.
+   */
+  announceAfterResponse(
+    c,
+    'merchant_verification',
+    `⚡ Identity verification submitted` +
+      `\nCase: ${caseId}` +
+      `\nDocument: ${docType}` +
+      `\nEvidence files: ${evidenceKeys.length}`
+  );
   return c.json({ success: true, id: caseId, state: 'submitted' });
 });
 

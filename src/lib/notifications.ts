@@ -30,7 +30,9 @@ export type NotificationKind =
   | 'print_request_match'
   | 'offer_received'
   | 'offer_accepted'
-  | 'order_update';
+  | 'order_update'
+  /** «رد من الدعم» — staff answered a support ticket. */
+  | 'support_reply';
 
 export interface NotificationRow {
   id: string;

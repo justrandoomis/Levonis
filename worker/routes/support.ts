@@ -47,6 +47,7 @@ import {
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { announceAfterResponse, ticketTopic } from '../lib/adminTopicRouting';
+import { notifySupportReply } from '../lib/engagementNotify';
 import { rateLimit } from '../lib/ratelimit';
 import { getBalances } from '../lib/wallet';
 import { ENTITLEMENT_MINIMUM_TIER, benefits, getTierStatus, type MembershipEntitlement } from '../lib/entitlements';
@@ -1428,14 +1429,36 @@ supportRoutes.post('/tickets/:id/messages', requireAuth, async (c) => {
    * it. The same topic rule as the opening message, from the ticket's own
    * `unit_id`, so a conversation never changes topic halfway through.
    */
-  announceAfterResponse(
-    c,
-    ticketTopic(ticket.unit_id),
-    `${ticket.unit_id ? '🔥' : '‼️'} Customer replied on ticket ${ticket.id}` +
-      `\nSubject: ${String(ticket.subject ?? '').slice(0, 120)}` +
-      (ticket.priority ? '\nPriority: PRO' : '') +
-      (ticket.state === 'resolved' ? '\nThis reopens a resolved ticket' : '')
-  );
+  /**
+   * ONLY WHEN THE REPLY ACTUALLY MOVES THE TICKET — the guard the comment
+   * above promised and did not have.
+   *
+   * `ticket.state` is read BEFORE the UPDATE, so the pre-reply state is
+   * already in hand. Without this test the announcement fired on EVERY
+   * customer message: the rate limit here is thirty per hour per customer, so
+   * one person typing four consecutive lines into a ticket that was already
+   * `waiting_staff` put four identical lines into «‼️ Support», none of them
+   * telling staff anything the first had not. That is the exact failure the
+   * topics were opened to end — a feed nobody reads, and then a muted topic.
+   *
+   * The two transitions that survive the guard are the two the comment above
+   * describes: 'open' → the customer adds to a ticket staff have not answered
+   * yet, and 'resolved' → a reopen, which is the worse of the two because the
+   * ticket had already dropped off the queue somebody was watching.
+   *
+   * The SUBJECT is not repeated here. It went out with the opening message and
+   * it is customer-typed free text in a group chat that gets screenshotted;
+   * the ticket id is what staff paste into the admin panel anyway.
+   */
+  if (ticket.state !== 'waiting_staff') {
+    announceAfterResponse(
+      c,
+      ticketTopic(ticket.unit_id),
+      `${ticket.unit_id ? '🔥' : '‼️'} Customer replied on ticket ${ticket.id}` +
+        (ticket.priority ? '\nPriority: PRO' : '') +
+        (ticket.state === 'resolved' ? '\nThis reopens a resolved ticket' : '')
+    );
+  }
 
   return c.json({ success: true });
 });
@@ -1494,9 +1517,13 @@ supportRoutes.post('/admin/tickets/:id/messages', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const message = str(body.body, 'body', { min: 1, max: 4000 });
   const now = new Date().toISOString();
+  // The id is minted into a variable rather than inline because the
+  // notification below keys its replay protection on THIS message: one reply,
+  // one buzz, however many times the request is retried.
+  const msgId = newId('tkm');
   await c.env.DB.batch([
     c.env.DB.prepare('INSERT INTO support_ticket_messages (id, ticket_id, sender_id, is_staff, body) VALUES (?, ?, ?, 1, ?)').bind(
-      newId('tkm'),
+      msgId,
       ticket.id,
       admin.id,
       message
@@ -1508,6 +1535,33 @@ supportRoutes.post('/admin/tickets/:id/messages', async (c) => {
     ),
   ]);
   await audit(c.env.DB, admin.id, 'support.ticket.reply', ticket.id, { chars: message.length });
+  /**
+   * THE CUSTOMER IS TOLD THEIR TICKET WAS ANSWERED.
+   *
+   * Until this line they were not, by anything: no in-app row, no email, no
+   * WhatsApp, no Telegram. `grep -c notify worker/routes/support.ts` returned
+   * ZERO. The only way to discover that support had replied was to come back
+   * and look — while the site was separately offering, on the screen right
+   * after the ticket was opened, to send this very news to their phone. That
+   * offer was a promise no code path could keep.
+   *
+   * The message id and not the ticket id is the event key, inside
+   * `notifySupportReply`: support may answer three times and each answer is
+   * news the customer has not seen.
+   *
+   * `waitUntil` through the guarded accessor, and the function itself cannot
+   * throw — a staff reply must be recorded whether or not anything can be
+   * delivered. `c.executionCtx` throws in Hono when there is no context, which
+   * is every test in this suite, so it is reached inside the try.
+   */
+  try {
+    c.executionCtx.waitUntil(notifySupportReply(c.env, ticket.id, msgId));
+  } catch {
+    // No ExecutionContext on this path (a test harness, or a composed
+    // context). The send is already in flight and cannot reject; there is
+    // simply nothing to keep the isolate alive for.
+    void notifySupportReply(c.env, ticket.id, msgId);
+  }
   return c.json({ success: true });
 });
 

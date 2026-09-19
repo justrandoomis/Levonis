@@ -37,6 +37,7 @@ import {
 import { checkSlug, suggestSlug, SLUG_RESERVATION_DAYS } from '../lib/merchantOps';
 import { parseCsv, toCsv } from '../lib/importCsv';
 import { merchantBalance } from '../lib/escrowOps';
+import { announceAfterResponse } from '../lib/adminTopicRouting';
 
 export const merchantRoutes = new Hono<AppContext>();
 
@@ -222,6 +223,24 @@ merchantRoutes.post('/onboard', async (c) => {
   ]);
 
   await audit(c.env.DB, user.id, 'merchant.store_created', storeId, { slug, name });
+  /**
+   * A STORE OPENING IS THE OTHER HALF OF «⚡ Merchants verification».
+   *
+   * community.ts announces the bare merchant profile; this batch creates the
+   * merchant AND a public storefront on its own address, which is the version
+   * a customer will actually land on. Nobody was told either. The slug is
+   * included because it is the public URL and because a slug is the one field
+   * of a new store an admin ever has to refuse — an impersonating address is
+   * caught by reading it, not by opening the record.
+   */
+  announceAfterResponse(
+    c,
+    'merchant_verification',
+    `⚡ New store awaiting verification` +
+      `\nStore: ${storeId}` +
+      `\nName: ${name.slice(0, 80)}` +
+      `\nAddress: /${slug}`
+  );
   const ctx = await storeForUser(c.env.DB, user.id);
   return c.json({ success: true, store: storePublicShape(ctx!, rootDomainFrom(c.env)) }, 201);
 });

@@ -71,6 +71,7 @@ import {
 } from '../lib/warrantyPlans';
 import { upgradeWarranty } from '../lib/productModel';
 import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
+import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { sniff } from './uploads';
 import { getMediaObject, storeMedia } from '../lib/mediaStorage';
 import {
@@ -575,6 +576,41 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
     .bind(id, user.id, unit.order_item_id, productName, description, unit.id, subject, JSON.stringify(attachments), priority)
     .run();
 
+  /**
+   * «تذاكر الضمان» — THE THING THE OWNER ASKED FOR BY NAME, AND THE ONE
+   * EVENT THAT WAS STILL TELLING NOBODY.
+   *
+   * A support ticket that happens to carry a `unit_id` already reaches
+   * «🔥 Warranty support». This is the FORMAL claim — a `warranty_claims` row
+   * with stages, a decision and up to six pieces of private evidence — and it
+   * reached the group by no path at all: it sat in `stage='received'` until
+   * somebody happened to open the admin queue. A claim is the customer saying
+   * a machine they paid for has stopped working, which is the one message that
+   * must not wait for a page refresh.
+   *
+   * WHAT IS IN IT. The claim id, the device and product it is about, whether
+   * PRO priority reorders the queue, and the subject clipped to one lock-screen
+   * line. NOT the description and NOT the evidence keys: the description is up
+   * to 5000 characters the customer wrote to support, and the attachments are
+   * owner-scoped private R2 objects (`claims/<uid>/…`) whose whole point is
+   * that they are served only through the authorized route. A key pasted into a
+   * group chat is a key in everyone's screenshot.
+   *
+   * Contained and after the response: the claim row has committed, and an
+   * unreachable Telegram must never turn it into an error for a customer whose
+   * printer is already broken.
+   */
+  announceAfterResponse(
+    c,
+    'warranty',
+    `🔥 Warranty claim ${id}` +
+      `\nSubject: ${subject.slice(0, 120)}` +
+      (priority ? '\nPriority: PRO' : '') +
+      `\nProduct: ${productName.slice(0, 80)}` +
+      `\nDevice: ${unit.id}` +
+      `\nAttachments: ${attachments.length}`
+  );
+
   const cov = coverageState(unit.delivered_at, unit.warranty_end_at);
   return c.json({
     success: true,
@@ -611,6 +647,28 @@ deviceRoutes.post('/claims/:id/messages', async (c) => {
   )
     .bind(id, claim.id, user.id, isAdmin ? 1 : 0, text, fileKey)
     .run();
+  /**
+   * THE CUSTOMER'S SIDE OF THE CLAIM THREAD ONLY.
+   *
+   * `isAdmin` is already resolved above by `loadClaimAuthorized`, and it is the
+   * whole guard: telling the staff group what a member of the staff group just
+   * typed is noise, and a topic that fills with noise is a topic the owner
+   * mutes — which is the failure the topics were opened to end. This fires when
+   * the customer adds evidence or answers a question, which is the half of the
+   * thread staff are waiting on.
+   *
+   * The BODY and the attachment key stay out, for the same reason they stay out
+   * of the opening message: the customer wrote to support, not to a group, and
+   * the file key is a private R2 path.
+   */
+  if (!isAdmin) {
+    announceAfterResponse(
+      c,
+      'warranty',
+      `🔥 Customer replied on warranty claim ${claim.id}` +
+        (fileKey ? '\nA file is attached' : '')
+    );
+  }
   return c.json({ success: true, id });
 });
 

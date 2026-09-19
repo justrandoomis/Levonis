@@ -358,9 +358,19 @@ test('/topics — lists the nine, marks the unbound ones, and spells out the com
       assert.ok(text.includes(`❌ ${topicLabel(key)}`), `${key} is shown as unbound`);
       assert.ok(text.includes(`/topic_here ${key}`), `${key}'s exact command is printed`);
     }
-    // The legacy row is explained rather than left to look like a lost message.
-    assert.ok(text.includes('orders'), 'the legacy orders binding is named');
-    assert.ok(text.includes(topicLabel('orders_preorder')), 'and the split topics appear by their Arabic names');
+    /**
+     * THE LEGACY ROW IS EXPLAINED rather than left to look like a lost message.
+     *
+     * This used to assert `text.includes('orders')`, which CANNOT FAIL: the
+     * loop above already proves the reply contains `/topic_here orders_preorder`
+     * and `/topic_here orders_direct`, and both of those contain the substring
+     * 'orders'. Delete the whole legacy-explanation block and the assertion
+     * still passed — it defended nothing. The sentence the block actually emits
+     * is what is asserted now, and so is the follow-up line that tells the owner
+     * the old topic is safe to leave alone until the two new ones are bound.
+     */
+    assert.match(text, /ربط قديم باسم orders/, 'the legacy orders binding is explained in words');
+    assert.match(text, /لا تحذفه قبل ذلك/, 'and the owner is told not to delete it yet');
   } finally {
     tg.restore();
   }

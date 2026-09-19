@@ -59,6 +59,7 @@ import { badRequest, conflict, int, notFound, oneOf, requireAdmin, requireAuth, 
 import { rateLimit } from '../lib/ratelimit';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
+import { announceAfterResponse } from '../lib/adminTopicRouting';
 
 export const priceReportRoutes = new Hono<AppContext>();
 /**
@@ -203,6 +204,30 @@ priceReportRoutes.post('/', async (c) => {
   )
     .bind(id, user.id, productId, priceIqd, ourPrice, sellerName, url, note, nowIso())
     .run();
+
+  /**
+   * «❗ Report» GETS ITS TRAFFIC — without it that topic is decorative.
+   *
+   * A price report is a customer saying "you are more expensive than this shop
+   * down the road", and it is perishable: the competitor's price is true this
+   * week. Nothing told anyone it had arrived, so a report's whole value
+   * depended on somebody opening the reports queue while it was still current.
+   *
+   * The numbers ARE the message here — the two prices and the gap between them
+   * are what decides whether this is worth acting on, and none of them is
+   * personal data. `seller_name` and the free-text note are NOT included: the
+   * note is customer prose and the seller name is unvalidated text that would
+   * be pasted straight into a group. The report id opens all of it.
+   */
+  announceAfterResponse(
+    c,
+    'report',
+    `❗ Price report ${id}` +
+      `\nProduct: ${productId}` +
+      `\nSeen at: ${priceIqd.toLocaleString()} IQD` +
+      `\nOurs: ${ourPrice.toLocaleString()} IQD` +
+      (url ? '\nA link was provided' : '')
+  );
 
   return c.json({
     success: true,

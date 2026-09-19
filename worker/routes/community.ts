@@ -7,6 +7,7 @@ import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { getTierStatus, benefits, usersWithEntitlement } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
+import { announceAfterResponse } from '../lib/adminTopicRouting';
 
 export const communityRoutes = new Hono<AppContext>();
 
@@ -265,6 +266,26 @@ communityRoutes.post('/my-store', requireAuth, async (c) => {
   await c.env.DB.prepare('INSERT INTO community_merchants (id, user_id, name, bio) VALUES (?, ?, ?, ?)')
     .bind(id, user.id, name, bio)
     .run();
+  /**
+   * «⚡ Merchants verification» GETS ITS TRAFFIC.
+   *
+   * `verified` stays 0 above — the flag is the admin's mark, deliberately — so
+   * this row is a person WAITING on a human. Nothing told that human. A new
+   * merchant sat unverified for as long as it took somebody to notice, and an
+   * unverified merchant is one whose customers see no badge on a store they
+   * are being asked to pay.
+   *
+   * The name is a shopfront the merchant chose to publish, so it is the one
+   * customer-supplied string that belongs here; the bio is not, because it is
+   * 500 characters of prose and the id opens all of it in the admin panel.
+   */
+  announceAfterResponse(
+    c,
+    'merchant_verification',
+    `⚡ New merchant profile awaiting verification` +
+      `\nMerchant: ${id}` +
+      `\nName: ${name.slice(0, 80)}`
+  );
   return c.json({ success: true, id });
 });
 

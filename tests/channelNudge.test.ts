@@ -205,11 +205,24 @@ test('the dismissal is one answer for all three contexts, not three', () => {
   const storage = memoryStorage();
   const now = Date.now();
   recordChannelNudgeDismissal(storage, now);
+  /**
+   * BE HONEST ABOUT WHAT THIS LOOP PROVES. `shouldOfferChannelNudge` takes no
+   * context, so the three iterations run one identical assertion three times —
+   * it holds the line at the SIGNATURE level ("one answer, not three") and
+   * nothing more. If a context parameter is ever added to that function, this
+   * loop starts testing three different things and the intent above is what it
+   * should be held to; until then, do not read it as covering more than it does.
+   */
   const contexts: NudgeContext[] = ['order', 'request', 'ticket'];
   for (const context of contexts) {
     assert.ok(CHANNEL_NUDGE_COPY[context], `${context} has copy`);
     assert.equal(shouldOfferChannelNudge(unreachable(), storage, now), false);
   }
+  assert.equal(
+    shouldOfferChannelNudge.length,
+    3,
+    'the memory is context-free by construction: readiness, storage, now — and no context'
+  );
 });
 
 test('a corrupted or hostile stored value reads as «not dismissed», never as a crash', () => {
@@ -424,4 +437,83 @@ test('it is the app’s own sheet, non-blocking, and it never invents a path', (
   // settings anchor moves.
   assert.match(source, /href: action\.href/);
   assert.doesNotMatch(source, /to="\/settings/);
+});
+
+// ------------------------------- the sentence that makes a promise, not an offer
+
+test('the in-app reassurance is only shown to a customer for whom it is TRUE', () => {
+  /**
+   * THE ONE SENTENCE IN THIS WINDOW THAT CAN BE FALSE. Everything else is an
+   * offer; «في كل الأحوال ستجد التحديثات داخل التطبيق» is a PROMISE.
+   *
+   * worker/lib/channelReadiness.ts keeps 'inapp' in `delivery` for every
+   * signed-in account EXCEPT somebody who has switched the in-app inbox off in
+   * their own preferences. That person also has `any_outbound_ready === false`,
+   * so they are exactly who this window appears for — and telling them their
+   * updates are waiting in an inbox they silenced talks the one customer who
+   * most needs the offer out of taking it.
+   *
+   * `delivery` is already on the response the component reads, so the check
+   * costs nothing. Asserted at the source because there is no DOM runner here;
+   * the branch and both sentences are what is pinned.
+   */
+  const source = read('src/components/notify/ChannelNudge.tsx');
+  assert.match(source, /const inappIsOn = \(readiness\.delivery \?\? \[\]\)\.includes\('inapp'\)/);
+  assert.match(source, /\{inappIsOn \? \(/);
+  // The true-branch sentence stays exactly as it was for everybody else…
+  assert.match(source, /في كل الأحوال ستجد التحديثات داخل التطبيق/);
+  // …and the other branch says what is actually true for that customer,
+  // instead of the line that would mislead them.
+  assert.match(source, /إشعارات التطبيق مطفأة عندك/);
+  // A missing field on an older worker's answer must produce a missing
+  // sentence, never a thrown render over a paid order.
+  assert.match(source, /readiness\.delivery \?\? \[\]/);
+});
+
+test('Telegram is spelled the way the rest of the app spells it', () => {
+  /**
+   * The codebase writes «تيليغرام» with غ in 53 places, including the linking
+   * screen these very buttons navigate to. A gold button reading تيليجرام that
+   * lands on a page headed تيليغرام makes a customer stop and wonder whether
+   * they tapped the right thing — at the exact moment the window is asking them
+   * to trust it with a channel.
+   */
+  const source = read('src/components/notify/ChannelNudge.tsx');
+  assert.match(source, /'تفعيل تيليغرام'/);
+  assert.match(source, /'تفعيل تيليغرام وواتساب'/);
+  assert.doesNotMatch(source, /تيليجرام/, 'the ج spelling appears nowhere in this file');
+});
+
+test('publishing a request does not remount the window — one fetch, one answer', () => {
+  /**
+   * THE DEFECT THIS PINS. `<ChannelNudge context="request">` lived in TWO
+   * mutually exclusive returns: a fragment when a request was open, and inside
+   * the board `<div>` otherwise. Different positions in the tree, so React
+   * unmounted and remounted it on every toggle — and publishing toggles
+   * immediately, because `onCreated` moves the URL and the deep-link effect
+   * then sets `open`.
+   *
+   * Two costs. A wasted readiness GET per publish, on a route the server marks
+   * `no-store` so neither call could be served from cache. And worse: Escape or
+   * a drag records NOTHING deliberately — it means "not this window", not
+   * «ليس الآن» — so pressing Back remounted the component with `active` still
+   * latched and popped the sheet again 1.6 seconds later. To the customer that
+   * is a window refusing to go away, which is the nagging «أو لا» forbids.
+   *
+   * The fix is structural, so the assertion is structural: ONE return, with the
+   * element in the same position in both branches.
+   */
+  const source = read('src/pages/Requests.tsx');
+  // Comments are stripped first: the note ABOVE the element quotes `{nudge}`
+  // to explain itself, and an assertion that counted that would pass for the
+  // very arrangement it is meant to forbid.
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const occurrences = code.match(/\{nudge\}/g) ?? [];
+  assert.equal(occurrences.length, 1, 'the window is rendered from exactly one place');
+  // And that one place is AFTER the branch closes, so the instance survives the
+  // board → detail transition rather than being torn down and rebuilt.
+  const branch = code.indexOf('{open ? (');
+  assert.ok(branch > 0, 'the two screens are one conditional inside one return');
+  assert.ok(code.indexOf('{nudge}') > branch, 'the window sits outside the conditional, not in a arm of it');
+  assert.doesNotMatch(code, /if \(open\)\s*\n\s*return \(/, 'the second early return is gone');
 });

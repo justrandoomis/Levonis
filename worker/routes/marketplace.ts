@@ -38,6 +38,8 @@ import { getTierStatus, benefits, usersWithEntitlement } from '../lib/entitlemen
 import { requireSellingPrivileges, storeForUser } from '../lib/merchantAuth';
 import { feeFor, autoCompleteDays } from '../lib/merchantOps';
 import { holdEscrow, escrowForOrder, releaseEscrow, refundEscrow, disputeEscrow } from '../lib/escrowOps';
+import { announceAfterResponse } from '../lib/adminTopicRouting';
+import { notifyOfferReceived } from '../lib/engagementNotify';
 import { deleteMediaObject, getMediaObject, putMediaObject } from '../lib/mediaStorage';
 import {
   REQUEST_OPEN_STATES,
@@ -585,6 +587,27 @@ marketplaceRoutes.post('/requests/:id/offers', requireAuth, async (c) => {
   }
 
   await audit(c.env.DB, user.id, 'community.offer_created', id, { request: requestId, price });
+  /**
+   * THE CUSTOMER WHOSE REQUEST THIS IS HEARS THAT AN OFFER ARRIVED.
+   *
+   * `'offer_received'` has been a declared `NotificationKind` since 0045 and was
+   * never written by anything — a grep found the declaration and no sender. So
+   * the whole community flow told the MERCHANTS a request matched them
+   * (printRequests.ts) and told the CUSTOMER nothing at all when the answers
+   * came back. They had to keep reopening the board to find out, which is what
+   * the offer to send them a notification was supposed to end.
+   *
+   * It is deliberately NOT inside the batch above. That batch is the offer and
+   * the request's counter, and a failed notification must never roll back a
+   * merchant's bid; `notifyOfferReceived` cannot throw, and its replay
+   * protection is per offer, so a retry cannot buzz the customer twice.
+   */
+  try {
+    c.executionCtx.waitUntil(notifyOfferReceived(c.env, id));
+  } catch {
+    // No ExecutionContext on this path. Already in flight, cannot reject.
+    void notifyOfferReceived(c.env, id);
+  }
   const row = await c.env.DB.prepare('SELECT * FROM community_offers WHERE id = ?').bind(id).first();
   return c.json({ success: true, offer: offerShape(row as Record<string, unknown>) }, 201);
 });
@@ -988,6 +1011,31 @@ marketplaceRoutes.post('/orders/:id/dispute', requireAuth, async (c) => {
   }
 
   await audit(c.env.DB, user.id, 'community.order_disputed', orderId, { complaint: complaintId });
+  /**
+   * MONEY IS NOW FROZEN AND A HUMAN HAS TO DECIDE — SO A HUMAN IS TOLD.
+   *
+   * This is the strongest case in the whole platform for «❗ Report», the
+   * owner's «الإبلاغات أو الشكاوي» topic: the route above flips the order
+   * and the request to 'disputed' and calls `disputeEscrow`, and §45 is
+   * explicit that settlement then stops until an admin decides. Until this
+   * line nothing told that admin. Two people's money sat frozen for as long as
+   * it took somebody to open the complaints queue on their own initiative —
+   * and neither party can do anything but wait.
+   *
+   * THE DESCRIPTION IS NOT IN THE MESSAGE. It is up to 4000 characters of one
+   * party accusing the other, often by name; a group chat is not where that
+   * gets read, and the complaint id opens it in the admin panel. Who raised it
+   * IS here, as a role and not as an identity, because "the merchant is
+   * disputing" and "the customer is disputing" are two different afternoons.
+   */
+  announceAfterResponse(
+    c,
+    'report',
+    `❗ Dispute on community order ${orderId}` +
+      `\nComplaint: ${complaintId}` +
+      `\nRaised by: ${isCustomer ? 'customer' : 'merchant'}` +
+      (escrow ? `\nEscrow frozen: ${escrow.id}` : '\nNo escrow on this order')
+  );
   return c.json({ success: true, complaint_id: complaintId }, 201);
 });
 

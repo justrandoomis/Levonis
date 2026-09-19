@@ -449,13 +449,25 @@ export interface AdminDestination {
  *   'no_group_bound'            the bot works; nobody has run `/topic_here` yet.
  *   'not_configured'            the legacy chat is set but the CUSTOMER bot,
  *                               which carries it, has no token.
+ *   'group_row_invalid'         a group IS bound, but its stored chat id is not
+ *                               a group id, so the read-side guard below refused
+ *                               it. This used to report `no_group_bound`, which
+ *                               is the one answer that guarantees the wrong
+ *                               repair: it sends the operator into Telegram to
+ *                               run `/topic_here` in a group that is already
+ *                               bound, while the actual fault is a corrupt row
+ *                               in `telegram_admin_config` that only a re-bind
+ *                               (or a delete) clears. The dedicated log line
+ *                               `telegram_admin_group_not_a_group` already said
+ *                               so; the RETURNED reason now agrees with it.
  * There is deliberately no `no_topic_and_no_general`: a bound group with no
  * topics still delivers, into its General topic, so that is never a miss.
  */
 export type DestinationMiss =
   | 'admin_bot_not_configured'
   | 'no_group_bound'
-  | 'not_configured';
+  | 'not_configured'
+  | 'group_row_invalid';
 
 export type DestinationResult =
   | { ok: true; destination: AdminDestination }
@@ -474,7 +486,22 @@ export async function resolveAdminDestination(env: Env, topicKey: TopicKey): Pro
   // different afternoon's work in the operator's hands, so they never share a
   // name: reporting the first as `no_group_bound` sends someone into Telegram
   // to run `/topic_here` in a group the bot cannot even read.
-  const legacy = (): DestinationResult => {
+  /**
+   * `reason` is what to report when the legacy rung ALSO has nothing to offer.
+   * It is a parameter rather than a constant because the same rung is reached
+   * from two different faults: nobody has bound a group yet, and a group is
+   * bound but its row is unusable. Those are opposite repairs.
+   *
+   * NOTE, deliberately: `legacyChat` itself is NOT put through `isGroupChatId`.
+   * The pre-0080 arrangement was an operator pointing `TELEGRAM_ADMIN_CHAT_ID`
+   * at whatever chat they wanted — very often their own private chat with the
+   * customer bot, which is a POSITIVE id and was the intended setup. Refusing it
+   * here would silently switch off admin notifications on a deployment that is
+   * working today, to defend against a configuration its owner chose. The guard
+   * belongs where a value is written by the platform (`bindAdminGroup`) and read
+   * back as authoritative, not on a secret a human set by hand.
+   */
+  const legacy = (reason: DestinationMiss): DestinationResult => {
     if (legacyChat && botConfigured(env, 'customer')) {
       return {
         ok: true,
@@ -482,12 +509,12 @@ export async function resolveAdminDestination(env: Env, topicKey: TopicKey): Pro
       };
     }
     if (legacyChat) return { ok: false, miss: 'not_configured' };
-    return { ok: false, miss: adminBot ? 'no_group_bound' : 'admin_bot_not_configured' };
+    return { ok: false, miss: reason };
   };
 
-  if (!adminBot) return legacy();
+  if (!adminBot) return legacy('admin_bot_not_configured');
   const group = await readAdminGroup(env.DB);
-  if (!group) return legacy();
+  if (!group) return legacy('no_group_bound');
   /**
    * THE BOT BOUNDARY, CHECKED AT THE READ AND NOT ONLY AT THE WRITE.
    *
@@ -508,7 +535,7 @@ export async function resolveAdminDestination(env: Env, topicKey: TopicKey): Pro
         detail: 'the bound admin chat id is not a group id; refusing to send admin traffic to it',
       })
     );
-    return legacy();
+    return legacy('group_row_invalid');
   }
 
   const topics = await readTopics(env.DB);

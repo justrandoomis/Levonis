@@ -1,14 +1,18 @@
 /**
  * WHAT @alilevobot SAYS BACK.
  *
- * The whole setup the owner asked for is five lines typed into Telegram:
+ * The whole setup the owner asked for is NINE lines typed into Telegram — one
+ * inside each topic their group actually has, and nothing else:
  *
  *     (in the Wallet topic)          /topic_here wallet
  *     (in «Orders direct»)           /topic_here orders_direct
  *     (in «Orders pre-order»)        /topic_here orders_preorder
  *     (in «Warranty support»)        /topic_here warranty
- *     …
+ *     … and the same for review, report, merchant_verification, support, general
  *                              /topics
+ *
+ * It said "five" while the list under it asked for nine, which is the kind of
+ * small untruth that makes an owner stop half way and assume they are done.
  *
  * No JSON, no Chat ID, no `message_thread_id`. Every number comes out of the
  * update Telegram already sent (§4, §8).
@@ -279,7 +283,7 @@ async function bindHere(ctx: CommandContext, rawKey: string | undefined): Promis
      * case would send them to reset a group that is not the problem.
      */
     if (bound.reason === 'not_a_group') {
-      await reply(ctx, '⚠️ لا يمكن اعتماد هذه المحادثة كمجموعة إدارة. استخدم مجموعة Forum.');
+      await reply(ctx, '⚠️ لا يمكن اعتماد هذه المحادثة كمجموعة إدارة. افتح مجموعة ذات مواضيع (Forum) وأعد المحاولة.');
       await auditAdminBot(env.DB, actor.userId, 'telegram_admin.group.refused', String(chatId), ctx.telegramUserId, {
         reason: 'not_a_group',
         attempted_topic: key,
@@ -355,6 +359,15 @@ async function bindHere(ctx: CommandContext, rawKey: string | undefined): Promis
  * looking for messages that were delivered all along, or worse, stop trusting
  * the screen. So every unbound line also names where its traffic goes today.
  *
+ * THE WORDING IS CONDITIONAL AND NOT PRESENT-TENSE, on purpose. «تصل حالياً إلى»
+ * asserts that messages for this key ARE being delivered somewhere right now,
+ * which is only true while something actually produces them; «عند وصول رسالة»
+ * is true either way. Every one of the nine does have a producer today — report
+ * gets the community dispute and the price report, merchant_verification gets
+ * the new store, the new merchant profile and the identity case — but a screen
+ * whose truth depends on a call site somewhere else staying alive is a screen
+ * that will lie the first time one is removed.
+ *
  * It reproduces the ladder in `resolveAdminDestination` deliberately and reads
  * the SAME rows, so the two cannot disagree about a binding. It stops at the
  * group, because `/topics` is only ever answered when the bot is running and
@@ -378,11 +391,21 @@ async function topicsText(ctx: CommandContext): Promise<string> {
     const t = byKey.get(key);
     if (!t || !t.enabled) {
       missing += 1;
-      // The EXACT command, on its own line, ready to copy — the owner should
-      // never have to go back to /help to find out what to type next.
-      lines.push(`❌ ${topicLabel(key)} — غير مربوط`);
-      lines.push(`     تصل حالياً إلى: ${landingNow(key, byKey)}`);
-      lines.push(`     للربط، اكتب داخل الموضوع: /topic_here ${key}`);
+      /**
+       * ONE LINE PER TOPIC, and it still ends in the exact command.
+       *
+       * This pushed THREE lines for every unbound topic. On a fresh deployment
+       * that is twenty-seven lines plus a header, a footer and the group note
+       * — a wall of text on the phone the owner is holding inside the topic
+       * they are trying to bind, which is the screen this reply exists to make
+       * easy. The three facts are all still here: what the topic is, where its
+       * messages land until it is bound, and the command. The command stays
+       * LAST so a tap-and-hold still selects it cleanly, and the owner never
+       * has to go back to /help to find out what to type next.
+       */
+      lines.push(
+        `❌ ${topicLabel(key)} — عند وصول رسالة ستنزل في «${landingNow(key, byKey)}» · /topic_here ${key}`
+      );
       continue;
     }
     lines.push(`✅ ${topicLabel(key)}${t.messageThreadId === null ? ' (الموضوع العام)' : ''}`);
@@ -391,7 +414,7 @@ async function topicsText(ctx: CommandContext): Promise<string> {
   lines.push(
     missing === 0
       ? '🎉 كل المواضيع مربوطة.'
-      : `بقي ${missing} من ${BINDABLE_TOPIC_KEYS.length} — اكتب الأمر داخل الموضوع المطلوب.`
+      : `بقي ${missing} من ${BINDABLE_TOPIC_KEYS.length} مواضيع بدون ربط — اكتب الأمر داخل كل موضوع.`
   );
   /**
    * THE LEGACY `orders` ROW, SHOWN ONLY IF IT EXISTS.
@@ -406,6 +429,7 @@ async function topicsText(ctx: CommandContext): Promise<string> {
   if (legacyOrders?.enabled) {
     lines.push('');
     lines.push('ℹ️ يوجد ربط قديم باسم orders ما زال يستقبل الطلبات حتى تربط «الطلبات المسبقة» و«الطلبات المباشرة».');
+    lines.push('بعد ربطهما لن يصله شيء ويمكنك تركه أو حذفه بأمان — لا تحذفه قبل ذلك.');
   }
   lines.push('');
   // "Is this the configured group?" — §7 asks for it explicitly, and it is the

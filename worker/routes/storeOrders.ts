@@ -47,6 +47,7 @@ import {
   createPurchaseHold, commitHoldStatements, holdSettledEventStatements, getAvailableBalances,
 } from '../lib/walletOps';
 import { rootDomainFrom } from '../lib/hosts';
+import { announceAfterResponse, orderTopic } from '../lib/adminTopicRouting';
 
 export const storeOrderRoutes = new Hono<AppContext>();
 storeOrderRoutes.use('*', requireAuth);
@@ -468,6 +469,37 @@ storeOrderRoutes.post('/', async (c) => {
     total: cart.total_iqd,
     fee: split.platform_fee_iqd,
   });
+
+  /**
+   * A WHOLE CLASS OF PAID ORDERS WAS INVISIBLE IN EVERY ORDERS TOPIC.
+   *
+   * This route writes a REAL `orders` row and commits a real wallet debit, and
+   * it told nobody — not the admin group and not, before this, any topic at
+   * all. Only worker/routes/orders.ts announced a sale, so the owner's
+   * «📝 Orders» topics showed the platform's own sales and silently omitted
+   * every purchase made from a community store. A topic that is missing a
+   * whole category is worse than a topic that is empty: it looks complete.
+   *
+   * `orderTopic('direct')` and not the pre-order queue, stated as a literal
+   * because there is nothing to derive it from: a store sale is goods that
+   * already exist, paid from the wallet before the merchant ships, with no
+   * `shipping_type` on this path at all (see the prepaid-only rule above). It
+   * is a direct sale by definition, and the day that stops being true this
+   * line is the one that has to change.
+   *
+   * The merchant and the store are in the message because the platform is not
+   * the seller here — the first question about a store order is always whose
+   * store it was.
+   */
+  announceAfterResponse(
+    c,
+    orderTopic('direct'),
+    `🛒 New store order ${orderId}` +
+      `\nStore: ${String(cart.store_name).slice(0, 80)}` +
+      `\nItems: ${cart.lines.length}` +
+      `\nTotal: ${cart.total_iqd.toLocaleString()} IQD (paid from wallet)` +
+      `\nMerchant receives: ${split.merchant_receivable_iqd.toLocaleString()} IQD`
+  );
 
   const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
   return c.json({ success: true, order }, 201);

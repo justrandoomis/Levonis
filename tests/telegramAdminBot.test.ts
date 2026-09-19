@@ -328,7 +328,21 @@ test('/topics reports each topic and whether THIS chat is the configured group',
     await hook(a, message({ text: '/topics', thread: 42 }));
     const text = String(tg.calls.find((c) => c.method === 'sendMessage')?.body.text ?? '');
     assert.match(text, /✅ المحفظة/);
-    assert.match(text, /❌ الدعم — غير مربوط/);
+    /**
+     * ONE LINE PER UNBOUND TOPIC, and it still carries all three facts.
+     *
+     * The reply used to spend THREE lines on every unbound topic, which on a
+     * fresh deployment is a twenty-seven-line wall on the phone the owner is
+     * holding inside the topic they are binding. The assertion follows the
+     * reply's real shape rather than being relaxed: the topic's Arabic name,
+     * where its messages land until it is bound, and the exact command — all
+     * on the one line, with the command LAST so a tap-and-hold still copies it.
+     */
+    assert.match(text, /❌ الدعم — .*\/topic_here support/);
+    assert.ok(
+      !text.includes('للربط، اكتب داخل الموضوع'),
+      'the three-line-per-topic form is gone, not merely unasserted'
+    );
     assert.match(text, /هذه هي مجموعة الإدارة المعتمدة/);
 
     // …and from a DIFFERENT group it says so plainly rather than looking fine.
@@ -560,7 +574,24 @@ test('SECURITY — bot-status reports what is CONFIGURED, never a secret value',
   assert.equal(parsed.configured.admin_user_ids, 1, 'a COUNT, not the ids');
   assert.deepEqual(
     parsed.topics.find((t) => t.key === 'wallet'),
-    { key: 'wallet', label: 'المحفظة', bound: true, message_thread_id: 10 }
+    // `legacy` distinguishes a checklist row from the pre-split `orders`
+    // binding, which the panel now appends separately instead of listing as a
+    // tenth topic the owner has no Telegram topic for.
+    { key: 'wallet', label: 'المحفظة', bound: true, legacy: false, message_thread_id: 10 }
+  );
+  /**
+   * THE PANEL AND THE BOT MUST COUNT THE SAME TOPICS.
+   *
+   * This listed `TOPIC_KEYS`, so an owner who bound the nine topics their group
+   * actually has would be told «🎉 كل المواضيع مربوطة» by the bot and
+   * then see a tenth unbound row on this screen. Nine rows, none of them the
+   * legacy key, unless that legacy binding actually exists.
+   */
+  assert.equal(parsed.topics.length, 9, 'the panel lists the nine bindable topics');
+  assert.equal(
+    parsed.topics.find((t) => t.key === 'orders'),
+    undefined,
+    'the legacy key is not advertised as a tenth topic to go and create'
   );
 });
 

@@ -158,7 +158,7 @@ import { coverageState, maskSerial } from '../lib/deviceOps';
 import type { ShippingType } from '../lib/shippingType';
 import type { PolicyRef } from '../lib/policyOps';
 import { createInvoiceForOrder } from '../lib/invoices';
-import { notifyAdminTopic } from '../lib/telegramAdmin';
+import { announceAfterResponse, orderTopic } from '../lib/adminTopicRouting';
 import { notifyOrderPlaced } from '../lib/orderNotify';
 
 export const orderRoutes = new Hono<AppContext>();
@@ -3975,12 +3975,33 @@ orderRoutes.post('/', async (c) => {
   // Telegram, on whichever of the three can reach them. Until this line the
   // only party told an order existed was the admin group below.
   c.executionCtx.waitUntil(notifyOrderPlaced(c.env, orderId));
-  c.executionCtx.waitUntil(
-    notifyAdminTopic(
-      c.env,
-      'orders',
-      `🛒 New order ${orderId}\nCustomer: ${user.username || user.email}\nItems: ${comp.lines.filter((l) => !l.bundle_parent_item_id).length}\nTotal: ${comp.totalIqd.toLocaleString()} IQD (${input.paymentMethodId})\n${comp.bnplAmount > 0 ? `BNPL due: ${comp.bnplAmount.toLocaleString()} IQD · ${comp.bnplDueAt}` : `Due on delivery: ${comp.dueOnDelivery.toLocaleString()} IQD`}\nFulfilment: ${fulfillmentService}`
-    )
+  /**
+   * THE GROUP HEARS ABOUT IT IN THE QUEUE THE ORDER ACTUALLY BELONGS TO.
+   *
+   * This passed the flat literal `'orders'`, and that one word defeated the
+   * whole reason the owner split the topic in two. The group has «📝 Orders
+   * pre-order» and «📝 Orders direct», never a single «Orders»: while the old
+   * `orders` binding survives, every pre-order and every same-day sale piled
+   * into one thread; the moment that legacy row goes away the fallback chain
+   * (`orders → orders_direct`) files EVERY order as a direct sale. Either way
+   * the highest-volume notification on the platform was the one event the
+   * split never applied to — a shipment six weeks out sitting in the queue the
+   * owner scans for what to print this morning.
+   *
+   * `orderShippingType` is the value this handler already priced the cart with
+   * (line 3326), so the topic cannot disagree with the order; `orderTopic`
+   * derives the answer from the shared `isPreorder`, never a second copy of it.
+   *
+   * `announceAfterResponse` rather than a bare `waitUntil(notifyAdminTopic(…))`:
+   * the router reads D1 twice before it reaches Telegram and a D1 error there
+   * is a REJECTED promise, not the returned miss this call site assumed — an
+   * unhandled rejection riding on the request of a customer who has just paid.
+   * The wrapper cannot reject.
+   */
+  announceAfterResponse(
+    c,
+    orderTopic(orderShippingType),
+    `🛒 New order ${orderId}\nCustomer: ${user.username || `#${user.id}`}\nItems: ${comp.lines.filter((l) => !l.bundle_parent_item_id).length}\nTotal: ${comp.totalIqd.toLocaleString()} IQD (${input.paymentMethodId})\n${comp.bnplAmount > 0 ? `BNPL due: ${comp.bnplAmount.toLocaleString()} IQD · ${comp.bnplDueAt}` : `Due on delivery: ${comp.dueOnDelivery.toLocaleString()} IQD`}\nFulfilment: ${fulfillmentService}`
   );
   const data = (await loadOrder(c.env.DB, orderId))!;
   const snaps = await getOrderPointsSnapshots(c.env, [orderId]);

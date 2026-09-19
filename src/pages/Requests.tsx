@@ -172,101 +172,123 @@ export default function Requests() {
   }, [setParams]);
 
   /**
-   * The window follows the customer, not the view. Publishing a request moves
-   * the URL to that request, so the detail screen below replaces this one the
-   * moment it exists — and a window rendered only in the board branch would be
-   * unmounted before it could ever appear. It portals to document.body and
-   * carries no scrim, so the request's own page stays fully usable behind it,
-   * and it decides for itself whether there is anything worth offering.
+   * THE WINDOW IS RENDERED ONCE, OUTSIDE THE BRANCH — and that is the whole
+   * point of the fragment below.
+   *
+   * This element used to appear in TWO mutually exclusive returns: a fragment
+   * when `open` was set, and inside the board `<div>` otherwise. Different
+   * positions in the tree, so React unmounted and remounted the component on
+   * every toggle, and the publish flow toggles immediately: `onCreated` calls
+   * `openRequestId`, which moves the URL, which wakes the deep-link effect,
+   * which sets `open`. That cost two things.
+   *
+   *   ONE WASTED ROUND TRIP per publish. The board-branch instance fired its
+   *   readiness GET, was unmounted (its AbortController cancelling the request
+   *   in flight), and the detail-branch instance fired a second one — on a
+   *   route the server marks `no-store`, so neither could be served from cache.
+   *
+   *   AND A WINDOW THAT CAME BACK FROM THE DEAD. Escape or a drag sets only the
+   *   sheet's local `open` to false and deliberately records NOTHING — it means
+   *   "not this window", not «ليس الآن». Pressing Back then flipped the branch,
+   *   remounted the component with `active` still latched true, and popped the
+   *   sheet again 1.6 seconds later. To the customer that is a window refusing
+   *   to go away, which is precisely the nagging the owner's «أو لا» forbids.
+   *
+   * Rendered from one place, the instance survives the board ↔ detail
+   * transition: one fetch, one reveal, and a dismissal that stays dismissed.
+   * It portals to document.body and carries no scrim, so the request's own page
+   * stays fully usable behind it either way.
    */
   const nudge = <ChannelNudge context="request" active={requestJustCreated} />;
 
-  if (open)
-    return (
-      <>
-        <RequestDetail request={open} me={me} onBack={closeRequest} />
-        {nudge}
-      </>
-    );
-
+  /**
+   * ONE RETURN, so `{nudge}` below keeps the same position in the tree whether
+   * the board or the request's own screen is showing. See the note above it.
+   */
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 pb-28">
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[380px] bg-olive/15 rounded-full blur-[120px] pointer-events-none z-0" />
+    <>
+      {open ? (
+        <RequestDetail request={open} me={me} onBack={closeRequest} />
+      ) : (
+        <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 pb-28">
+          <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[380px] bg-olive/15 rounded-full blur-[120px] pointer-events-none z-0" />
 
-      <div className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 pt-6">
-        <h1 className="text-gold font-bold text-lg mb-1">
-          {loc('طلبات العملاء', 'Customer requests', 'داواکاری کڕیاران')}
-        </h1>
-        <p className="text-zinc-500 text-[12.5px] mb-5">
-          {loc(
-            'اطلب شيئًا مخصصًا، واستقبل عروضًا من التجار.',
-            'Ask for something custom, and receive offers from merchants.',
-            'داوای شتێکی تایبەت بکە و ئۆفەر لە بازرگانەکانەوە وەربگرە.'
-          )}
-        </p>
+          <div className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 pt-6">
+            <h1 className="text-gold font-bold text-lg mb-1">
+              {loc('طلبات العملاء', 'Customer requests', 'داواکاری کڕیاران')}
+            </h1>
+            <p className="text-zinc-500 text-[12.5px] mb-5">
+              {loc(
+                'اطلب شيئًا مخصصًا، واستقبل عروضًا من التجار.',
+                'Ask for something custom, and receive offers from merchants.',
+                'داوای شتێکی تایبەت بکە و ئۆفەر لە بازرگانەکانەوە وەربگرە.'
+              )}
+            </p>
 
-        {deepLinkError && (
-          <p
-            className="mb-4 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-[12.5px] text-amber-200"
-            data-requests="deep-link-error"
-            role="status"
-          >
-            {deepLinkError}
-          </p>
-        )}
+            {deepLinkError && (
+              <p
+                className="mb-4 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-[12.5px] text-amber-200"
+                data-requests="deep-link-error"
+                role="status"
+              >
+                {deepLinkError}
+              </p>
+            )}
 
-        <div className="flex gap-1.5 mb-5 overflow-x-auto hide-scrollbar">
-          {([['board', loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان')],
-             ['mine', loc('طلباتي', 'My requests', 'داواکاریەکانم')],
-             ...(user ? [['orders', loc('تنفيذ طلباتي', 'My custom orders', 'داواکاریە تایبەتەکانم')] as [View, string]] : []),
-            ] as Array<[View, string]>).map(([v, label]) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`shrink-0 px-4 min-h-[40px] rounded-2xl text-[12.5px] font-semibold border transition-colors ${
-                view === v ? 'bg-olive text-white border-olive' : 'bg-white/[0.03] text-zinc-400 border-white/10'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-          {(
-            <button
-              onClick={() => (user ? setView('new') : signIn())}
-              className="ms-auto shrink-0 px-4 min-h-[40px] rounded-2xl bg-olive text-white text-[12.5px] font-semibold flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              {loc('طلب جديد', 'New', 'نوێ')}
-            </button>
-          )}
+            <div className="flex gap-1.5 mb-5 overflow-x-auto hide-scrollbar">
+              {([['board', loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان')],
+                 ['mine', loc('طلباتي', 'My requests', 'داواکاریەکانم')],
+                 ...(user ? [['orders', loc('تنفيذ طلباتي', 'My custom orders', 'داواکاریە تایبەتەکانم')] as [View, string]] : []),
+                ] as Array<[View, string]>).map(([v, label]) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className={`shrink-0 px-4 min-h-[40px] rounded-2xl text-[12.5px] font-semibold border transition-colors ${
+                    view === v ? 'bg-olive text-white border-olive' : 'bg-white/[0.03] text-zinc-400 border-white/10'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+              {(
+                <button
+                  onClick={() => (user ? setView('new') : signIn())}
+                  className="ms-auto shrink-0 px-4 min-h-[40px] rounded-2xl bg-olive text-white text-[12.5px] font-semibold flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  {loc('طلب جديد', 'New', 'نوێ')}
+                </button>
+              )}
+            </div>
+
+            {view === 'new' ? (
+              /* THE WIZARD REPLACED THE FORM. `NewRequest` asked for eighteen
+                 fields before it would create anything; the wizard asks for a file
+                 and a sentence, measures the model itself, prices it, and only
+                 then offers the rest behind "خيارات متقدمة". It still creates the
+                 SAME `community_requests` row through the same endpoint — the
+                 print side hangs off it, and publishing is what notifies the
+                 merchants who can make it. */
+              <PrintRequestWizard
+                onCreated={(id) => {
+                  setView('mine');
+                  openRequestId(id);
+                  setRequestJustCreated(true);
+                }}
+                onCancel={() => setView('board')}
+              />
+            ) : view === 'orders' ? (
+              <MyCommunityOrders />
+            ) : view === 'mine' ? (
+              <MyRequestsList onOpen={openRequestId} />
+            ) : (
+              <RequestList onOpen={openRequest} />
+            )}
+          </div>
         </div>
-
-        {view === 'new' ? (
-          /* THE WIZARD REPLACED THE FORM. `NewRequest` asked for eighteen
-             fields before it would create anything; the wizard asks for a file
-             and a sentence, measures the model itself, prices it, and only
-             then offers the rest behind "خيارات متقدمة". It still creates the
-             SAME `community_requests` row through the same endpoint — the
-             print side hangs off it, and publishing is what notifies the
-             merchants who can make it. */
-          <PrintRequestWizard
-            onCreated={(id) => {
-              setView('mine');
-              openRequestId(id);
-              setRequestJustCreated(true);
-            }}
-            onCancel={() => setView('board')}
-          />
-        ) : view === 'orders' ? (
-          <MyCommunityOrders />
-        ) : view === 'mine' ? (
-          <MyRequestsList onOpen={openRequestId} />
-        ) : (
-          <RequestList onOpen={openRequest} />
-        )}
-      </div>
+      )}
       {nudge}
-    </div>
+    </>
   );
 }
 

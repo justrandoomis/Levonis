@@ -41,7 +41,15 @@ export type NotificationKind =
    * «رجع المنتج» — the back-in-stock sweep (0092, worker/lib/stockAlerts.ts)
    * telling a customer the thing they armed an alert on is buyable again.
    */
-  | 'stock_back';
+  | 'stock_back'
+  /**
+   * «رد من الدعم» — staff answered a support ticket
+   * (worker/lib/engagementNotify.ts). Added because the ticket conversation had
+   * NO notification of any kind: a customer learned that support had replied
+   * only by opening the site and looking, while a sheet on the site offered to
+   * send them exactly that news on WhatsApp or Telegram.
+   */
+  | 'support_reply';
 
 export interface NotificationInput {
   userId: string;
@@ -61,7 +69,7 @@ export interface NotificationInput {
    * customer is being told to go and buy. 'product' is here because
    * 'stock_back' is above.
    */
-  entity_type?: 'request' | 'offer' | 'order' | 'review' | 'product' | '';
+  entity_type?: 'request' | 'offer' | 'order' | 'review' | 'product' | 'ticket' | '';
   entity_id?: string;
   meta?: Record<string, unknown>;
   /** Unique per user. Empty means "no replay protection wanted". */

@@ -35,6 +35,7 @@ import {
   type WithdrawalRow,
 } from '../lib/walletOps';
 import { notifyAdminTopic } from '../lib/telegramAdmin';
+import { announceAfterResponse } from '../lib/adminTopicRouting';
 
 /**
  * Wallet API (integrated mandate §11.1–§11.4).
@@ -305,7 +306,7 @@ walletRoutes.post('/deposits', async (c) => {
         await notifyAdminTopic(
           c.env,
           'wallet',
-          `💰 New deposit request (pending review)\nOperation: ${operationNumber(id)}\nUser: ${user.username || user.email}\nAmount: $${(amount / 100).toFixed(2)}${provider ? `\nMethod: ${provider}` : ''}${reference ? `\nReference: ${reference}` : ''}${reviewState !== 'awaiting_review' ? `\nSignal: ${reviewState}` : ''}`
+          `💰 New deposit request (pending review)\nOperation: ${operationNumber(id)}\nUser: ${user.username || `#${user.id}`}\nAmount: $${(amount / 100).toFixed(2)}${provider ? `\nMethod: ${provider}` : ''}${reference ? `\nReference: ${reference}` : ''}${reviewState !== 'awaiting_review' ? `\nSignal: ${reviewState}` : ''}`
         );
       })
       .catch((e) => console.error('deposit admin notification failed', e instanceof Error ? e.message : e))
@@ -355,12 +356,27 @@ walletRoutes.post('/withdrawals', async (c) => {
     replayed: res.replayed,
   });
   if (!res.replayed) {
-    c.executionCtx.waitUntil(
-      notifyAdminTopic(
-        c.env,
-        'wallet',
-        `🏧 New withdrawal request (pending review — no transfer made)\nOperation: ${operationNumber(res.id, 'WD')}\nUser: ${user.username || user.email}\nAmount: $${(amount / 100).toFixed(2)}\nDestination: ${kind}`
-      )
+    /**
+     * CONTAINED, AND WITHOUT THE CUSTOMER'S EMAIL IN A GROUP CHAT.
+     *
+     * Two defects lived on this line. It handed a BARE promise to `waitUntil`:
+     * `notifyAdminTopic` reads D1 twice before it reaches Telegram and a D1
+     * error there is a rejected promise, not the returned miss this call site
+     * assumed — an unhandled rejection riding on the request of a customer who
+     * just asked for their money. `announceAfterResponse` cannot reject.
+     *
+     * And it put `user.email` into a message broadcast to a staff group that
+     * gets screenshotted. worker/lib/walletNotify.ts masks the phone even in
+     * the wallet caption, where the reviewer genuinely needs to call — so an
+     * email in a line whose whole job is to say "something arrived" is not
+     * defensible. The operation number opens the row in the admin panel, which
+     * is where the identity belongs; the username stays because it is a public
+     * handle the customer chose, not a contact address.
+     */
+    announceAfterResponse(
+      c,
+      'wallet',
+      `🏧 New withdrawal request (pending review — no transfer made)\nOperation: ${operationNumber(res.id, 'WD')}\nUser: ${user.username || `#${user.id}`}\nAmount: $${(amount / 100).toFixed(2)}\nDestination: ${kind}`
     );
   }
   return c.json({

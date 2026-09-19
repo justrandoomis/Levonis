@@ -21,14 +21,26 @@
  *      returns its misses rather than throwing, which is right — but it
  *      reaches D1 twice (`readAdminGroup`, `readTopics`) before it reaches
  *      Telegram, and a D1 error there is a REJECTED promise, not a returned
- *      miss. Most call sites hand that promise straight to
- *      `executionCtx.waitUntil` bare (worker/routes/returns.ts, and
- *      worker/routes/wallet.ts:359 for the withdrawal line). A rejection there
- *      is an unhandled rejection on the request, and on the one call site that
- *      does NOT use waitUntil it would be an exception inside the handler —
- *      i.e. a customer who placed an order, or opened a ticket, being shown a
- *      500 for a Telegram outage that has nothing to do with them.
- *      `announceToAdmins` is the containment: it cannot reject, ever.
+ *      miss. Every call site that predated this file handed that promise
+ *      straight to `executionCtx.waitUntil` bare; all of them now go through
+ *      here instead (returns.ts, orders.ts, wallet.ts and the four new ones).
+ *
+ *      BEING PRECISE ABOUT WHAT THAT COSTS, because the wrong model of it is
+ *      how the wrapper gets deleted by the next reader. Inside `waitUntil` the
+ *      response has ALREADY been returned, so a rejection there is an unhandled
+ *      rejection in the isolate — log noise and a lost notification, not a 500
+ *      the shopper sees. The 500 is the OTHER path: a call site with no
+ *      ExecutionContext, where the promise would be awaited or where reaching
+ *      for `c.executionCtx` throws in Hono, and there a Telegram outage really
+ *      does surface as an error on a purchase that actually went through.
+ *      `announceToAdmins` closes both: it cannot reject, ever.
+ *
+ *      WHAT IT DOES NOT COVER, and the next caller should know it: the `text`
+ *      argument is evaluated EAGERLY by the caller before this function is
+ *      entered. A throw while formatting it — `.toLocaleString()` on an
+ *      undefined, `.repeat()` with a negative count — happens outside the
+ *      try/catch and lands on the request. Build the string from values the
+ *      handler has already validated.
  *
  * WHY THIS IS NOT IN telegramAdmin.ts. That file is the TRANSPORT — the bot,
  * the group, the binding commands. This is the POLICY its callers share: which
@@ -93,11 +105,14 @@ export function orderTopic(shippingType: unknown): TopicKey {
  * against `order_item_units.owner_user_id`), and that is exactly the
  * after-sale, still-under-warranty conversation the topic exists for.
  *
- * NOTE, and this is the honest limitation: the FORMAL warranty claim — the
- * `warranty_claims` row with its stages and its evidence — is opened by
- * `POST /api/devices/units/:unitId/claims` in worker/routes/devices.ts, which
- * this change does not own and which still tells staff nothing at all. This
- * predicate covers the tickets, not the claims. See the handover note.
+ * THIS PREDICATE COVERS THE TICKETS, NOT THE CLAIMS — and that is not a gap
+ * any more. The FORMAL warranty claim (the `warranty_claims` row with its
+ * stages and its private evidence, opened by
+ * `POST /api/devices/units/:unitId/claims`) announces itself directly with the
+ * `warranty` key in worker/routes/devices.ts, because there is nothing to
+ * decide there: a claim is always a warranty claim. Both kinds of after-sale
+ * conversation therefore reach «🔥 Warranty support», by two paths that each
+ * say so in plain terms rather than one clever shared predicate.
  */
 export function ticketTopic(unitId: unknown): TopicKey {
   return unitId ? 'warranty' : 'support';
@@ -113,8 +128,9 @@ export type AnnounceResult = NotifyOutcome | { ok: false; reason: 'threw'; error
  * has already committed. The order exists. The ticket exists. The review is
  * published. Nothing here can undo any of it and nothing here is allowed to
  * look as though it might: a rejected promise handed to `waitUntil` is an
- * unhandled rejection on that request, and a rejected promise awaited inline
- * is a 500 for a shopper whose purchase actually went through.
+ * unhandled rejection in the isolate and a silently lost notification, and the
+ * same rejection on a path with no ExecutionContext is a 500 for a shopper
+ * whose purchase actually went through.
  *
  * So the whole function is a try/catch that returns instead of throwing, and
  * the catch LOGS — structured, with the topic — because a routing failure the

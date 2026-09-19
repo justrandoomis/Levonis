@@ -6,6 +6,7 @@ import {
   CheckCheck,
   CircleCheck,
   Loader2,
+  LifeBuoy,
   Package,
   Printer,
   RotateCw,
@@ -119,6 +120,8 @@ function kindIcon(kind: string) {
       return CircleCheck;
     case 'order_update':
       return Package;
+    case 'support_reply':
+      return LifeBuoy;
     default:
       return Bell;
   }
