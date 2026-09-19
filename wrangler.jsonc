@@ -58,6 +58,17 @@
   // product's own name, picture and description into the document before it
   // leaves (worker/lib/socialPreview.ts). The Worker passes every other
   // request on these prefixes straight through to the same assets.
+  //
+  // /manifest.webmanifest IS HERE FOR THE OPPOSITE REASON: IT IS NOT AN ASSET
+  // AT ALL. There is no such file in dist/, and `not_found_handling` means a
+  // path with no file behind it is answered with index.html at HTTP 200 and
+  // Content-Type: text/html — not a 404. Every browser would read that as a
+  // manifest, fail to parse it, and report only "Manifest: Line: 1, column: 1,
+  // Syntax error"; the site would be silently uninstallable on every device.
+  // It cannot be a static file either: merchant subdomains serve this same
+  // bundle, so one file would install every shop as "LEVONIS" with the
+  // platform's mark. Only the Worker sees the Host header, so only the Worker
+  // can answer with the identity of the host that asked (worker/routes/manifest.ts).
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
@@ -68,7 +79,8 @@
       "/product/*",
       "/bundles/*",
       "/p/*",
-      "/community/store/*"
+      "/community/store/*",
+      "/manifest.webmanifest"
     ]
   },
 
@@ -176,7 +188,7 @@
     // never to the production domain.
     "staging": {
       "name": "levonis-staging",
-      // See the top-level `assets` block for why the product paths are here.
+      // See the top-level `assets` block for why each of these paths is here.
       "assets": {
         "directory": "./dist",
         "binding": "ASSETS",
@@ -187,7 +199,8 @@
           "/product/*",
           "/bundles/*",
           "/p/*",
-          "/community/store/*"
+          "/community/store/*",
+          "/manifest.webmanifest"
         ]
       },
       "d1_databases": [
@@ -251,7 +264,7 @@
     // of the whole product should not also answer on a second, unrouted door.
     "dark": {
       "name": "levonis-core-dark",
-      // See the top-level `assets` block for why the product paths are here.
+      // See the top-level `assets` block for why each of these paths is here.
       "assets": {
         "directory": "./dist",
         "binding": "ASSETS",
@@ -262,7 +275,8 @@
           "/product/*",
           "/bundles/*",
           "/p/*",
-          "/community/store/*"
+          "/community/store/*",
+          "/manifest.webmanifest"
         ]
       },
       "workers_dev": false,

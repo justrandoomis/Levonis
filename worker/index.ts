@@ -20,6 +20,7 @@ import { communityRoutes } from './routes/community';
 import { chatRoutes } from './routes/chats';
 import { profileRoutes } from './routes/profile';
 import { uploadRoutes, fileRoutes } from './routes/uploads';
+import { webManifestRoute } from './routes/manifest';
 import { miscRoutes } from './routes/misc';
 import { adminRoutes } from './routes/admin';
 import { adminProductsRoutes } from './routes/adminProducts';
@@ -148,6 +149,23 @@ app.use('*', async (c, next) => {
    * treats differently.
    */
   if (productSlugFromPath(path)) {
+    await next();
+    return;
+  }
+  /**
+   * NOR DOES THE MANIFEST, AND EVERY INSTALLING BROWSER ASKS FOR IT.
+   *
+   * `/manifest.webmanifest` joins `run_worker_first` below for the same
+   * reason the product paths did, and it inherits the same cost: the Worker is
+   * now invoked for a document that every page load links to. The handler
+   * answers from the Host header and, on a merchant subdomain, from one store
+   * row — it never reads `user`, and it never can: an installed app's name and
+   * icon are the same for a signed-in customer and an anonymous one. Without
+   * this branch a shared `.levonis-iq.com` cookie would buy a
+   * `sessions` x `users` JOIN on every install check, for an answer that
+   * cannot depend on the result.
+   */
+  if (path === '/manifest.webmanifest') {
     await next();
     return;
   }
@@ -299,6 +317,33 @@ app.route('/api/store-orders', storeOrderRoutes);
 app.route('/api/community-reviews', communityReviewRoutes);
 app.route('/api/community-favorites', communityFavoriteRoutes);
 app.route('/files', fileRoutes);
+
+// THE INSTALLED APP'S IDENTITY — the one SPA path the asset layer may not answer.
+//
+// GET /manifest.webmanifest is what a browser reads when a visitor asks to
+// install this site, and it is a Worker route whose path is named in the
+// run_worker_first list in wrangler.jsonc. Both halves of that sentence are
+// load-bearing.
+//
+// WITHOUT THE wrangler.jsonc ENTRY THIS LINE IS DEAD CODE. Anything not named
+// in run_worker_first is answered by the asset layer before the Worker exists
+// for that request, and not_found_handling is "single-page-application" — so a
+// path with no file behind it is answered with index.html, at HTTP 200, with
+// Content-Type: text/html. It is not a 404. Every browser would then report
+// "Manifest: Line: 1, column: 1, Syntax error" to a console nobody is
+// watching, the install prompt would never appear on any device, and nothing
+// in any log would say why.
+//
+// AND A FILE IN public/ COULD NOT DO THIS JOB. Merchant subdomains serve the
+// same built bundle, so a single static manifest would install every
+// merchant's shop as "LEVONIS", carrying the platform's mark, on the phone of
+// a customer who believes they are installing that shop. The Host header is
+// the only thing that tells the two apart, and it reaches nothing but the
+// Worker.
+//
+// Top-level and on every host, deliberately: this is not admin surface, and a
+// storefront that cannot be installed is the defect, not the risk.
+app.get('/manifest.webmanifest', webManifestRoute);
 
 // The previous architecture exposed raw SQL and schema management over HTTP.
 // Those endpoints are gone; explicit 410s make the removal visible to any

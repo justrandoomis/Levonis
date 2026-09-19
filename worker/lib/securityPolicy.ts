@@ -170,12 +170,89 @@ export function spaCsp(): string {
 export const ASSET_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 export const DOCUMENT_CACHE_CONTROL = 'no-cache';
 
+/**
+ * THE SERVICE WORKER AND THE APP ICONS BOTH NEED A CACHE RULE THE CATCH-ALL
+ * ABOVE CANNOT GIVE THEM.
+ *
+ * `/sw.js` — public/sw.js, copied verbatim into dist by vite — is the single
+ * file in this deployment that can keep hurting people after it is fixed. An
+ * installed browser goes on running the copy it already has until it fetches a
+ * newer one, and it fetches a newer one on navigation. So `no-cache`
+ * (revalidate every time, one cheap 304, exactly what index.html gets and for
+ * exactly the same reason) is what makes a correction reach an installed
+ * visitor on their NEXT navigation. Browsers already refuse to trust a cached
+ * worker script for more than 24 hours whatever this header says, so it cannot
+ * make matters worse; what it prevents is the layer in between — a corporate
+ * proxy, an ISP cache, the browser's own HTTP cache — holding a broken worker
+ * for the whole of that day.
+ *
+ * CONTENT-TYPE IS THE ASSET LAYER'S, AND IT IS ALREADY RIGHT. A `.js` file is
+ * served as `text/javascript` (observed live on a built chunk under /assets),
+ * which is one of the JavaScript MIME types a service worker registration
+ * requires; registration is refused outright otherwise, with a MIME error and
+ * no offline mode. Nothing here may change it, and nothing here sets it.
+ *
+ * NO `Service-Worker-Allowed` HEADER, ON PURPOSE. The script is served from
+ * the ROOT, so its default scope is already the whole origin. That header
+ * would only be needed to widen the scope of a worker living in a
+ * subdirectory, and widening scope by header is the kind of thing that should
+ * have to be asked for.
+ *
+ * `/icons/*` are the installed app's icons, and they are NOT content-hashed:
+ * the names are fixed (`icon-192.png`), which is the whole point — the
+ * manifest and index.html name them literally. So `immutable` would be a lie
+ * here in a way it is not under /assets, and the day the owner changes the
+ * mark every installed home screen would keep the old one for a year. A week
+ * with revalidation is the honest compromise: an already-installed phone stops
+ * re-fetching its icon on every visit, and a new mark still reaches everyone
+ * within seven days.
+ *
+ * WHY EACH RULE BELOW DELETES EVERY HEADER IT IS ABOUT TO SET. Read the note
+ * above about the last, more specific rule replacing the earlier one — and
+ * then read this, because the live site disagrees with it. EVERY matching rule
+ * is applied, in file order, and a header name an earlier rule already set is
+ * APPENDED to rather than overwritten. A built chunk comes back today carrying
+ * `Cache-Control: no-cache, public, max-age=31536000, immutable`, and its
+ * Content-Security-Policy and its nosniff twice over.
+ *
+ * For Cache-Control the cost is obvious: the leading `no-cache` inherited from
+ * the catch-all wins in every conformant client, which is why the `immutable`
+ * in the block above has in fact never done anything, and why an `/icons/*`
+ * rule written the same way would cost a round trip and buy nothing.
+ *
+ * For Strict-Transport-Security it is worse and much quieter. Its grammar has
+ * no room for a comma, so `max-age=31536000; includeSubDomains,
+ * max-age=31536000; includeSubDomains` is not a weaker HSTS — it is an
+ * unparseable one, and an unparseable STS header is discarded whole. A rule
+ * that "repeats the security headers" would therefore have removed HSTS from
+ * exactly the paths it was written to protect.
+ *
+ * So every rule here is made COMPLETE and EXCLUSIVE: it unsets each header
+ * first, then sets it. The unset operator is the two characters `! ` followed
+ * by the header name, on a line that carries no colon, and unsets are applied
+ * before sets within a rule whatever their order in the file. Each header then
+ * ships exactly once, with the value written here — which is what the note
+ * above always meant, and now is.
+ *
+ * `/*` and `/assets/*` ARE LEFT EXACTLY AS THEY WERE. Their duplication is
+ * pre-existing and live; correcting it changes the headers on every page and
+ * every chunk in the application, which is a decision of its own and is not
+ * being smuggled in behind a service worker.
+ */
+export const SERVICE_WORKER_CACHE_CONTROL = 'no-cache';
+export const ICON_CACHE_CONTROL = 'public, max-age=604800';
+
 export function assetHeadersFile(): string {
   const security = [
     `  Content-Security-Policy: ${spaCsp()}`,
     `  Strict-Transport-Security: ${STRICT_TRANSPORT_SECURITY}`,
     ...Object.entries(STATIC_SECURITY_HEADERS).map(([k, v]) => `  ${k}: ${v}`),
   ];
+  // Derived from the very lines above, so the two can never drift: a header
+  // added to `security` and forgotten here would be the one that ships twice.
+  const clear = ['Content-Security-Policy', 'Strict-Transport-Security', ...Object.keys(STATIC_SECURITY_HEADERS), 'Cache-Control'].map(
+    (name) => `  ! ${name}`
+  );
   const lines = [
     '# GENERATED by scripts/write-asset-headers.mjs from worker/lib/securityPolicy.ts — do not edit.',
     '# Headers for every response the asset layer serves (index.html, SPA routes, /assets/*).',
@@ -189,6 +266,27 @@ export function assetHeadersFile(): string {
     '/assets/*',
     ...security,
     `  Cache-Control: ${ASSET_CACHE_CONTROL}`,
+    '',
+    '# The service worker script itself. It is the one file that keeps running',
+    '# after it is wrong, so it must revalidate on every navigation — that is how',
+    '# a fix reaches an already-installed browser on its next page view instead of',
+    '# up to a day later. The unsets are not decoration: the catch-all above already',
+    '# set them, and a second rule APPENDS to a header rather than replacing it —',
+    '# which for Strict-Transport-Security means an unparseable value the browser',
+    '# discards whole.',
+    '/sw.js',
+    ...clear,
+    ...security,
+    `  Cache-Control: ${SERVICE_WORKER_CACHE_CONTROL}`,
+    '',
+    '# The installed app icons. Fixed names, not content-hashed, so never',
+    '# `immutable`: a changed mark would sit on installed home screens for a year.',
+    '# A week, with revalidation — and the same unsets, for the same reason, or the',
+    '# inherited no-cache would make this rule buy nothing at all.',
+    '/icons/*',
+    ...clear,
+    ...security,
+    `  Cache-Control: ${ICON_CACHE_CONTROL}`,
   ];
   return lines.join('\n') + '\n';
 }
