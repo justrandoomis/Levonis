@@ -301,7 +301,15 @@ test('strategyFor routes documents, hashed assets and the install surface', () =
 
   assert.equal(decide('/icons/icon-192.png'), 'stale-while-revalidate');
   assert.equal(decide('/icons/maskable-512.png'), 'stale-while-revalidate');
-  assert.equal(decide('/manifest.webmanifest'), 'stale-while-revalidate');
+
+  // THE MANIFEST IS NOT A STATIC FILE, and this assertion is the tripwire that
+  // stops it being treated as one again. `worker/routes/manifest.ts` builds the
+  // body per host out of a live merchant row, so a stored copy either pins a
+  // renamed shop's old name past the route's own 300-second budget (the Cache
+  // API keeps no expiry) or, if the first fetch landed while D1 was unreachable,
+  // pins the platform fallback «LEVONIS» onto that merchant's origin. It gets
+  // `/api/*`'s treatment: never read, never written.
+  assert.equal(decide('/manifest.webmanifest'), 'network-only');
 });
 
 // ----------------------------------------------------------- the fetch handler
@@ -361,6 +369,68 @@ test('when the network is gone the cached document is served', async () => {
   assert.ok(response);
   assert.equal(response.status, 200);
   assert.equal(await response.text(), '<!doctype html><title>cached shell</title>');
+});
+
+test('the offline page follows Accept-Language through all three languages', async () => {
+  const sw = loadWorker();
+  sw.setFetch(async () => {
+    throw new TypeError('Failed to fetch');
+  });
+
+  // The service worker cannot read `localStorage`, so it cannot read the choice
+  // LanguageContext stores there. `Accept-Language` on the failed navigation is
+  // the only signal it has, and this is the test that it is actually used —
+  // otherwise a customer who set the interface to English or Sorani gets an RTL
+  // Arabic page at the one moment they are already unsure the shop works.
+  const offlineFor = async (acceptLanguage?: string) => {
+    const request = makeRequest('/', {
+      mode: 'navigate',
+      destination: 'document',
+      headers: acceptLanguage ? { 'accept-language': acceptLanguage } : {},
+    });
+    const event = sw.dispatch('fetch', makeEvent(request));
+    const response = await event.response;
+    assert.ok(response);
+    return { response, body: await response.text() };
+  };
+
+  const en = await offlineFor('en-GB,en;q=0.9');
+  assert.match(en.body, /No internet connection/);
+  assert.match(en.body, /lang="en"/);
+  assert.match(en.body, /dir="ltr"/);
+
+  const ckb = await offlineFor('ckb,ar;q=0.8');
+  assert.match(ckb.body, /پەیوەندی ئینتەرنێت نییە/);
+  assert.match(ckb.body, /lang="ckb"/);
+  assert.match(ckb.body, /dir="rtl"/);
+
+  // A device set to plain Kurdish gets Sorani, which is the Kurdish the shop
+  // actually speaks, rather than falling through to Arabic.
+  const ku = await offlineFor('ku-IQ');
+  assert.match(ku.body, /lang="ckb"/);
+
+  // Arabic is the floor: an unrecognised language, and no header at all.
+  for (const header of ['fr-FR,fr;q=0.9', undefined]) {
+    const fallback = await offlineFor(header);
+    assert.match(fallback.body, /لا يوجد اتصال بالإنترنت/);
+    assert.match(fallback.body, /lang="ar"/);
+  }
+
+  // The body varies by a request header, so the response has to say so — a
+  // response that varies silently is how one visitor's language reaches the
+  // next one through whatever store sits in front of it.
+  assert.equal(en.response.headers.get('vary'), 'Accept-Language');
+  assert.equal(en.response.headers.get('content-language'), 'en');
+
+  // Every language keeps the properties the offline page lives or dies by: it
+  // may reference nothing, because everything it referenced would also fail.
+  for (const body of [en.body, ckb.body, ku.body]) {
+    assert.doesNotMatch(body, /<script/i);
+    assert.doesNotMatch(body, /<link/i);
+    assert.doesNotMatch(body, /<img/i);
+    assert.doesNotMatch(body, /https?:\/\//);
+    assert.match(body, /#000000/);
+  }
 });
 
 test('with no cached document the offline page comes back: 200, HTML, and Arabic', async () => {

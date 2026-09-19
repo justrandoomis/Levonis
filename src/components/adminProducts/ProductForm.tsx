@@ -71,6 +71,8 @@ import {
   Select,
   TextArea,
   TextInput,
+  TierPriceDisclosure,
+  type TierPriceMark,
   Toggle,
   btnGhost,
   btnPrimary,
@@ -1167,19 +1169,47 @@ export default function ProductForm({
               />
             )}
           </Field>
-          <Field
-            ar="سعر LEVO PRIME"
-            en="PRIME"
-            hint="فارغ = السعر الاعتيادي"
-            tip="خصم PRIME أقل من PRO. الترتيب المطلوب: PRO ≤ PRIME ≤ الاعتيادي."
+          {/*
+            THE SAME FOLD AS EVERY OPTION AND COLOUR ROW, so one control means
+            one thing everywhere in this form. The product row is the one rung
+            that carries NO adjustment column — `ProductDocV2` states
+            `prime_price_iqd` / `pro_price_iqd` and nothing else, while
+            `PriceFieldsV2` adds `*_adjust_iqd` only for options, colours and
+            variants — so `!== null` is the honest "is it typed" test HERE and
+            only here. It is still not truthiness: a typed 0 is a price, and 0
+            must open this panel exactly as 855,000 does.
+
+            Folding is safe at product level for the same reason it is safe on a
+            colour: a set price opens the panel by itself, so the
+            MembershipDiscountSection banner below — which tells the admin a
+            typed price «في الأعلى» is why their rule is not being read — can
+            never point at a box that is out of sight.
+          */}
+          <TierPriceDisclosure
+            scope="product"
+            marks={
+              [
+                doc.prime_price_iqd !== null ? { label: 'PRIME', iqd: doc.prime_price_iqd } : null,
+                doc.pro_price_iqd !== null ? { label: 'PRO', iqd: doc.pro_price_iqd } : null,
+              ].filter((m): m is TierPriceMark => m !== null)
+            }
           >
-            <Money value={doc.prime_price_iqd} onChange={(v) => setDoc((d) => ({ ...d, prime_price_iqd: v }))} />
-            <MirrorNote kind="replaces" where="خصم العضوية أسفل هذا القسم" detail="السعر المكتوب يفوز على أي قاعدة خصم" />
-          </Field>
-          <Field ar="سعر LEVO PRO" en="PRO" hint="فارغ = سياسة المتجر">
-            <Money value={doc.pro_price_iqd} onChange={(v) => setDoc((d) => ({ ...d, pro_price_iqd: v }))} />
-            <MirrorNote kind="replaces" where="خصم العضوية أسفل هذا القسم" detail="السعر المكتوب يفوز على أي قاعدة خصم" />
-          </Field>
+            <Grid cols={3}>
+              <Field
+                ar="سعر LEVO PRIME"
+                en="PRIME"
+                hint="فارغ = السعر الاعتيادي"
+                tip="خصم PRIME أقل من PRO. الترتيب المطلوب: PRO ≤ PRIME ≤ الاعتيادي."
+              >
+                <Money value={doc.prime_price_iqd} onChange={(v) => setDoc((d) => ({ ...d, prime_price_iqd: v }))} />
+                <MirrorNote kind="replaces" where="خصم العضوية أسفل هذا القسم" detail="السعر المكتوب يفوز على أي قاعدة خصم" />
+              </Field>
+              <Field ar="سعر LEVO PRO" en="PRO" hint="فارغ = سياسة المتجر">
+                <Money value={doc.pro_price_iqd} onChange={(v) => setDoc((d) => ({ ...d, pro_price_iqd: v }))} />
+                <MirrorNote kind="replaces" where="خصم العضوية أسفل هذا القسم" detail="السعر المكتوب يفوز على أي قاعدة خصم" />
+              </Field>
+            </Grid>
+          </TierPriceDisclosure>
           {canSeeCost && (
             <Field ar="التكلفة" en="Cost" tip="إداري فقط — لا تظهر للعميل ولا لمساعد الأدمن، ولا في أي تصدير.">
               <Money value={doc.product_cost_iqd} onChange={(v) => setDoc((d) => ({ ...d, product_cost_iqd: v }))} />

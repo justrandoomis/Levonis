@@ -154,6 +154,35 @@ const DESCRIPTION_MAX = 200;
 const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
 
 /**
+ * THE SENTENCE A SHOP GETS WHEN IT HAS WRITTEN NO TAGLINE, and it is a
+ * generated string in a language with a definite article, so it needs care.
+ *
+ * The obvious form, `متجر ${name} على منصة LEVONIS`, stutters for the commonest
+ * shop-name shape on this platform. Iraqi merchants overwhelmingly name
+ * themselves «متجر X», «محل X», «شركة X» or «مؤسسة X» — the noun is already in
+ * the name — so prefixing another one produced «متجر متجر علي على منصة LEVONIS»
+ * for a real, ordinary store. Chromium shows this string in its install dialog
+ * and some launchers print it under the app, so it is read by the customer at
+ * the exact moment they are deciding whether this shop is a real one.
+ *
+ * The noun is therefore added only when the name does not already open with
+ * one. The list is the four that actually occur; it is a readability fix, not
+ * a parser, and a name that slips past it reads as «متجر <name>» — which is
+ * correct, merely wordier, and never wrong the way the double noun was.
+ *
+ * The brand is written «ليفونيس» rather than `PLATFORM_NAME`. Latin letters in
+ * the middle of an Arabic sentence flip the run direction mid-line, and this
+ * string has no surrounding page to steady it; the Arabic spelling is the one
+ * PLATFORM_DESCRIPTION two constants above already uses for the same reason.
+ */
+const NAME_ALREADY_HAS_A_NOUN = /^(?:متجر|محل|شركة|مؤسسة|معمل|ورشة)\s/;
+
+function storeDescription(name: string): string {
+  const subject = NAME_ALREADY_HAS_A_NOUN.test(name) ? name : `متجر ${name}`;
+  return `${subject} على منصة ليفونيس`;
+}
+
+/**
  * Text as it may appear in a manifest, or `''`.
  *
  * `Array.from` rather than `slice`, because a name may contain an emoji: a
@@ -343,7 +372,7 @@ export function buildWebManifest(identity?: ManifestIdentity | null): WebManifes
 
   const isStore = name.length > 0;
   const displayName = isStore ? name : PLATFORM_NAME;
-  const description = tagline || (isStore ? `متجر ${name} على منصة ${PLATFORM_NAME}` : PLATFORM_DESCRIPTION);
+  const description = tagline || (isStore ? storeDescription(name) : PLATFORM_DESCRIPTION);
 
   return {
     /**

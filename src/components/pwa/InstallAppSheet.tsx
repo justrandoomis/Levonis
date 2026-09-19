@@ -24,7 +24,7 @@
  * without internet". A customer who installs this expecting an offline
  * catalogue has been lied to by the install sheet.
  */
-import { Check, Download, Globe, MoreVertical, Plus, Share } from 'lucide-react';
+import { Check, Download, Globe, Menu, MoreVertical, Plus, Share } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useStore } from '../../StoreContext';
 import { Sheet } from '../ui/Overlay';
@@ -43,6 +43,11 @@ function Glyph({ glyph }: { glyph: StepGlyph }) {
       return <Share aria-hidden="true" className={common} />;
     case 'menu':
       return <MoreVertical aria-hidden="true" className={common} />;
+    // «☰», and it is a separate case from `menu` on purpose: the Samsung step
+    // text names a hamburger, and drawing «⋮» next to it pointed the customer
+    // at the wrong button on the browser where they are already hunting.
+    case 'lines':
+      return <Menu aria-hidden="true" className={common} />;
     case 'plus':
       return <Plus aria-hidden="true" className={common} />;
     case 'check':
@@ -72,10 +77,19 @@ export default function InstallAppSheet({ open, onClose }: InstallAppSheetProps)
   // visitor exactly as it does inside the shop.
   const icon = store?.logoUrl || '/icons/icon-192.png';
 
-  // «ليس الآن» is an ANSWER, not a close. It records the dismissal so the
-  // affordance goes quiet for a month, which is the difference between an
-  // offer and a nag. The X and the drag-away call `onClose` alone: those mean
-  // "not this window", not "stop asking".
+  // «ليس الآن» is an ANSWER, not a close. It records the dismissal, and the
+  // dismissal is READ — by every `InstallAppButton` the app volunteered
+  // (`offered`), which is the Profile card and the storefront row. Those go
+  // quiet for the thirty days `INSTALL_DISMISS_MS` argues for, which is the
+  // difference between an offer and a nag.
+  //
+  // The Settings row deliberately keeps its button: the customer who opened
+  // Settings and scrolled to Preferences came looking for that control, and
+  // hiding a setting from the person who came to change it is not restraint,
+  // it is a missing control.
+  //
+  // The X and the drag-away call `onClose` alone: those mean "not this
+  // window", not "stop asking".
   const later = () => {
     dismiss();
     onClose();
@@ -105,7 +119,15 @@ export default function InstallAppSheet({ open, onClose }: InstallAppSheetProps)
       <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5">
         <div className="flex items-center gap-3">
           <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border-subtle bg-black">
-            <img src={icon} alt="" className="h-full w-full object-cover" />
+            {/* `object-contain`, NOT `object-cover`. A merchant's logo is whatever
+                they uploaded, and shop logos are very often wide wordmarks:
+                `cover` scales to fill this 56px square and clips the overflow,
+                so a horizontal wordmark loses its left and right thirds in the
+                window that is asking the customer to install that shop. The
+                container is already `bg-black`, which is the same black the
+                platform icons carry baked in, so the letterboxing `contain`
+                leaves is invisible. */}
+            <img src={icon} alt="" className="h-full w-full object-contain" />
           </span>
           <div className="min-w-0">
             <h2 id="install-app-title" className="text-[16px] font-bold text-white">

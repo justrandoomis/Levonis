@@ -6,7 +6,7 @@ import {
   Headset, Settings, MapPin, QrCode, Store,
   Wallet, Package, Truck, MessageSquare, RefreshCcw,
   Star, Clock, Heart, Gamepad2, Coins, Zap, Shield,
-  ChevronRight, ChevronLeft, Gift, UserRound, UserPlus
+  ChevronRight, ChevronLeft, Gift, UserRound, UserPlus, Download
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
@@ -16,6 +16,7 @@ import GuestCard from '../components/profile/GuestCard';
 import MyReviewsTab from '../components/profile/MyReviewsTab';
 import QrCodeModal from '../components/profile/QrCodeModal';
 import DirectStockEdge from '../components/DirectStockEdge';
+import InstallAppButton from '../components/pwa/InstallAppButton';
 
 interface FavoriteItem {
   id: string;
@@ -389,6 +390,46 @@ export default function Profile() {
 
         {/* Guest: honest signed-out card, no member fabrications below. */}
         {!isAuthenticated && <GuestCard />}
+
+        {/*
+          «تحميل التطبيق», WHERE A SIGNED-OUT SHOPPER CAN ACTUALLY REACH IT.
+
+          This card is not decoration; it is the fix for a feature that did not
+          work. The install affordance was mounted in exactly one place —
+          Settings §5 — and `/settings` is a `<ProtectedRoute>`, so it
+          redirected a signed-out visitor to `/auth`. Most first-time visitors
+          are signed out, and every visitor arriving from an Instagram or
+          Telegram link certainly is.
+
+          That alone would only have been hard to find. What made it a defect
+          is `src/hooks/useInstallApp.ts` calling `preventDefault()` on
+          `beforeinstallprompt`: that call suppresses Chrome's own install
+          banner for 100% of visitors, so on Android — the browser most of this
+          shop's customers use — the browser's promotion was taken away and the
+          replacement was behind a login wall. Net cost of the feature was
+          negative until this card existed.
+
+          `/profile` is the first item in BottomNav and is NOT protected (see
+          the route table in App.tsx), which is the whole reason it is here and
+          not on another page.
+
+          `offered` because nobody asked for this card: it goes quiet for a
+          month if the customer says «ليس الآن». The Settings row does not,
+          because that one the customer went looking for.
+
+          The card renders for members and guests alike — an installed app is
+          not a member benefit — and `InstallAppButton` returns null on its own
+          once the shop IS installed, so this whole block disappears inside the
+          app rather than offering to install what the customer is standing in.
+        */}
+        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-4 mb-3 shadow-sm text-black dark:text-white">
+          <p className="font-bold text-[14px] flex items-center gap-2">
+            <Download aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+            {t('pwaInstallTitle')}
+          </p>
+          <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{t('pwaSettingsNote')}</p>
+          <InstallAppButton offered />
+        </div>
 
         {/* First Card: Membership Center — members only (real ledger data). */}
         {isAuthenticated && (

@@ -31,6 +31,8 @@ import {
   Repeater,
   TextInput,
   Toggle,
+  TierPriceDisclosure,
+  type TierPriceMark,
   btnGhost,
   iconBtn,
   field as fieldCls,
@@ -800,6 +802,50 @@ function PriceCell({
   );
 }
 
+/**
+ * WHICH TIERS THIS ROW HAS ACTUALLY TYPED — the answer the folded line prints
+ * and the reason the panel opens by itself.
+ *
+ * Two things here are deliberate and both were wrong in the obvious version:
+ *
+ *   THE GATE IS `cell.mode`, not the scalar. `priceMode` is the resolver's own
+ *   three-way answer (fixed / adjust / inherit) and it is already what decides
+ *   whether this cell shows its «يرث» button. A check on
+ *   `prices.pro_price_iqd !== null` reads one half of a pair: a row whose PRO
+ *   is stored as `pro_adjust_iqd` — the shape `normalizeCheapestBase` and
+ *   Quick Edit write — would read as untyped, fold shut, and hide a live
+ *   override on one of a hundred colours. Truthiness would be worse still,
+ *   because a typed 0 IS a price here (a colour's PRIME of 0 is charged as 0).
+ *
+ *   THE NUMBER COMES FROM `charges`, BUT ONLY AFTER THAT GATE HAS PASSED —
+ *   and the order is the whole point. `rowCharges` returns
+ *   `charged: v ?? regular`, the regular price standing in for a tier that has
+ *   none, so `charges.pro.charged` is non-null on essentially every row:
+ *   gating on it would stamp «سعر خاص · PRO …» on all hundred colours and the
+ *   plain invitation would never appear once. That is why the gate is the
+ *   mode. But `cell.effective` is the wrong number to PRINT, because it is
+ *   this row's stored value before the rung carry, and the carry is not
+ *   cosmetic: `memberAtRung` drops a member price that lands at zero or below,
+ *   so an OPTION with a PRIME of 0 is charged the regular price (see `level`
+ *   above). Printing `effective` there put «· PRIME 0 د.ع» on the folded line
+ *   while the till took 885,000 and the cell inside the panel said so in
+ *   words — the one line that exists so a row cannot hide its override was
+ *   contradicting the box beneath it and telling the owner a customer pays
+ *   nothing. `viaRegular` is precisely "this row states a price and the
+ *   resolver charges the regular one instead", so it becomes `null` and
+ *   `tierPriceSummary` prints «(لا يُحتسب)»: the mark survives — the row is
+ *   still flagged as having something typed, which is rule 1 — while the
+ *   amount stops lying.
+ */
+export function tierPriceMarks(
+  cells: ReturnType<typeof rowCells>,
+  charges: ReturnType<typeof rowCharges>,
+): TierPriceMark[] {
+  return ([['PRIME', 'prime'], ['PRO', 'pro']] as const)
+    .filter(([, f]) => cells[f].mode !== 'inherit')
+    .map(([label, f]) => ({ label, iqd: charges[f].viaRegular ? null : charges[f].charged }));
+}
+
 function PriceCells({
   prices,
   beneath,
@@ -843,6 +889,7 @@ function PriceCells({
     onCommit: commit(field),
   });
   const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n);
+  const memberMarks = tierPriceMarks(cells, charges);
   return (
     <>
       {/*
@@ -864,8 +911,22 @@ function PriceCells({
         </p>
       )}
       <PriceCell label_ar="السعر" label_en="Regular" {...cellProps('regular')} />
-      <PriceCell label_ar="PRIME" label_en="PRIME" {...cellProps('prime')} />
-      <PriceCell label_ar="PRO" label_en="PRO" {...cellProps('pro')} />
+      {/*
+        PRIME AND PRO FOLD; «السعر» AND «التكلفة» NEVER DO. The two member
+        boxes are the ones an option or a colour usually says nothing about,
+        and they are also the two that can quietly take this row out of the
+        product's membership discount — so they get the line that names them
+        when they are folded, and the panel that opens by itself when they are
+        set. The nested `Grid cols={3}` matches the parent's track count so the
+        two boxes stay under «السعر» instead of re-dividing the band into
+        halves.
+      */}
+      <TierPriceDisclosure scope={level} marks={memberMarks}>
+        <Grid cols={3}>
+          <PriceCell label_ar="PRIME" label_en="PRIME" {...cellProps('prime')} />
+          <PriceCell label_ar="PRO" label_en="PRO" {...cellProps('pro')} />
+        </Grid>
+      </TierPriceDisclosure>
       {canSeeCost && (
         <PriceCell
           label_ar="التكلفة"

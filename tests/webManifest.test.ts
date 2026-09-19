@@ -76,9 +76,32 @@ test('a merchant identity replaces the name, the short name and the description'
 });
 
 test('a merchant with no tagline still gets a sentence, naming their own shop', () => {
+  // ASSERTED WHOLE, NOT WITH `includes`. An `includes('متجر علي')` check passed
+  // happily while the sentence read «متجر متجر علي على منصة LEVONIS» — the noun
+  // doubled, because most shops here are already named «متجر X». The full string
+  // is the only assertion that can see that, and this is the exact name that
+  // exposed it.
   const m = buildWebManifest({ name: 'متجر علي', tagline: '', logoKey: null });
-  assert.ok(m.description.includes('متجر علي'));
-  assert.ok(m.description.includes(PLATFORM_NAME));
+  assert.equal(m.description, 'متجر علي على منصة ليفونيس');
+
+  // A bare name still gets the noun — that is what the prefix is for.
+  assert.equal(
+    buildWebManifest({ name: 'علي', tagline: '', logoKey: null }).description,
+    'متجر علي على منصة ليفونيس'
+  );
+
+  // The other nouns merchants actually use, none of which may double either.
+  for (const name of ['محل الرافدين', 'شركة بغداد', 'مؤسسة النهرين', 'ورشة الموصل']) {
+    assert.equal(
+      buildWebManifest({ name, tagline: '', logoKey: null }).description,
+      `${name} على منصة ليفونيس`
+    );
+  }
+
+  // The brand is spelled in Arabic in this sentence on purpose: a Latin run in
+  // the middle of an Arabic line flips direction mid-sentence, and a manifest
+  // description has no surrounding page to steady it.
+  assert.ok(!m.description.includes(PLATFORM_NAME));
 });
 
 test('a long name is cut at a word boundary, never mid-word, and never to nothing', () => {

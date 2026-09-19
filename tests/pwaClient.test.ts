@@ -108,7 +108,12 @@ test('an iPad reports a Mac, and maxTouchPoints is the only thing that knows', (
   // about an address-bar icon their screen does not have.
   assert.equal(UA.ipadSafari, UA.macSafari, 'the fixtures are deliberately identical');
   assert.equal(detectPlatform({ userAgent: UA.ipadSafari, maxTouchPoints: PHONE }), 'ios-safari');
-  assert.equal(detectPlatform({ userAgent: UA.macSafari, maxTouchPoints: DESKTOP }), 'unknown');
+  // The Mac is `mac-safari`, and it used to be `unknown` — which routed it to
+  // `{kind:'none'}` and told a Mac owner «استخدم Chrome أو Edge» although
+  // Safari has installed web apps through File ▸ Add to Dock since Sonoma.
+  // The two lines still differ by nothing but the touch count; what changed is
+  // that the desktop half is now identified rather than given up on.
+  assert.equal(detectPlatform({ userAgent: UA.macSafari, maxTouchPoints: DESKTOP }), 'mac-safari');
   assert.equal(isApplePlatform({ userAgent: UA.ipadSafari, maxTouchPoints: PHONE }), true);
   assert.equal(isApplePlatform({ userAgent: UA.macSafari, maxTouchPoints: DESKTOP }), false);
   // A Mac with a drawing tablet plugged in reports 1, not 5.
@@ -259,6 +264,67 @@ test('iOS is never offered a button it cannot have, and Safari and the rest diff
   assert.notDeepEqual(stepsFor('ios-safari'), stepsFor('ios-other-browser'));
   assert.ok(stepsFor('ios-safari').some((s) => s.glyph === 'share'));
   assert.ok(stepsFor('ios-other-browser').some((s) => s.key === 'pwaStepIosUseSafari'));
+
+  // SAFARI GETS THE ESCAPE HATCH TOO, and this is the single most common
+  // arrival path for this shop. Telegram and friends open links in an
+  // SFSafariViewController, which sends an ordinary Mobile Safari user-agent
+  // with no app token — `isInAppWebView` cannot see it and this branch is what
+  // the customer gets. Apple gates «إضافة إلى الشاشة الرئيسية» behind an
+  // entitlement the host app does not have, so the item the first steps
+  // describe is simply absent from the share sheet. Without this last step
+  // there is nothing else on the screen to read.
+  assert.ok(stepsFor('ios-safari').some((s) => s.key === 'pwaStepIosUseSafari'));
+});
+
+test('macOS Safari installs web apps and is told so', () => {
+  // Safari has had File ▸ Add to Dock since Sonoma (Safari 17). This platform
+  // used to fall through to `unknown`, which on a desktop is `{kind:'none'}` —
+  // «هذا المتصفح على الحاسوب لا يثبّت المواقع كتطبيقات. استخدم Chrome أو Edge».
+  // That sentence was false, and it was told to a machine with a working
+  // install path.
+  const mac = guidance('mac-safari', { mobile: false });
+  assert.equal(mac.kind, 'steps');
+  assert.ok(stepsFor('mac-safari').length > 0);
+
+  // It must NOT be handed Chromium's first step: Safari has no install icon in
+  // the address bar, and sending someone to look for one is the exact failure
+  // the platform table exists to prevent.
+  assert.ok(!stepsFor('mac-safari').some((step) => step.key === 'pwaStepDesktopIcon'));
+  assert.notDeepEqual(stepsFor('mac-safari'), stepsFor('desktop-chromium'));
+});
+
+test('a hamburger step draws a hamburger', () => {
+  // The Samsung string names «☰» and the `menu` glyph draws «⋮», so the
+  // picture and the sentence beside it pointed at two different buttons on the
+  // one screen where the customer is hunting for a button.
+  const samsungMenu = stepsFor('samsung').find((step) => step.key === 'pwaStepSamsungMenu');
+  assert.ok(samsungMenu);
+  assert.equal(samsungMenu.glyph, 'lines');
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.ok((translations[lang] as Record<string, string>).pwaStepSamsungMenu.includes('☰'));
+  }
+
+  // Android's string names «⋮» and keeps the dots, which is the other half of
+  // the same rule.
+  const androidMenu = stepsFor('android-chromium').find((step) => step.key === 'pwaStepAndroidMenu');
+  assert.ok(androidMenu);
+  assert.equal(androidMenu.glyph, 'menu');
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.ok((translations[lang] as Record<string, string>).pwaStepAndroidMenu.includes('⋮'));
+  }
+});
+
+test('the iPad is not told about a bottom bar it does not have', () => {
+  // `detectPlatform` deliberately classifies an iPad as `ios-safari`, which is
+  // the case this file exists for — and the reward for getting it right was a
+  // sentence naming «شريط Safari بالأسفل». iPadOS Safari puts Share in the TOP
+  // toolbar and has no bottom browser bar at all, so the step described a
+  // control that is not on the screen. The wording is device-neutral now: the
+  // button is named by what it LOOKS like, which is true on both.
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const step = (translations[lang] as Record<string, string>).pwaStepIosShare;
+    assert.doesNotMatch(step, /بالأسفل|bottom|خوارەوە/i, `${lang}.pwaStepIosShare names a bottom bar`);
+  }
 });
 
 test('a desktop with no install path is told so rather than given invented steps', () => {
@@ -278,6 +344,7 @@ test('every step names a string that exists in all three languages', () => {
     'android-chromium',
     'huawei',
     'samsung',
+    'mac-safari',
     'firefox',
     'desktop-chromium',
     'unknown',

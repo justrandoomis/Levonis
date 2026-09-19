@@ -19,6 +19,22 @@
  * false would skip its exit animation entirely — `AnimatePresence` inside the
  * primitive needs the element to survive the close in order to animate it
  * out, and a window that vanishes is the defect Overlay.tsx exists to remove.
+ *
+ * `offered` IS THE DIFFERENCE BETWEEN AN OFFER AND A CONTROL, and the «ليس
+ * الآن» memory only means anything because of it.
+ *
+ * The button sits in two kinds of place. In Settings the customer went
+ * looking for it: they opened Settings, scrolled to Preferences and are
+ * reading the row. Hiding that control because they once said "not now"
+ * would be hiding a setting from the person who came to change it — the
+ * "control with no effect" defect in reverse.
+ *
+ * On the Profile card and in the storefront the app VOLUNTEERS it. Nobody
+ * asked; it is there because we put it there. That is the surface «ليس الآن»
+ * is an answer to, and it is the surface that has to go quiet for the thirty
+ * days `INSTALL_DISMISS_MS` argues for. Before this flag existed the
+ * dismissal was written to `localStorage` and never read by anything, so the
+ * sheet's own comment described a month of silence that did not happen.
  */
 import { Download } from 'lucide-react';
 import React, { Suspense, useState } from 'react';
@@ -30,17 +46,28 @@ const InstallAppSheet = React.lazy(() => import('./InstallAppSheet'));
 export interface InstallAppButtonProps {
   /** Geometry and variant only; the caller owns where this sits. */
   className?: string;
+  /**
+   * True where the app volunteered this button rather than the customer going
+   * looking for it. An offered button disappears for the month after «ليس
+   * الآن»; a control the customer navigated to does not. See the header.
+   */
+  offered?: boolean;
 }
 
 export default function InstallAppButton({
   className = 'lv-button lv-button-secondary mt-2',
+  offered = false,
 }: InstallAppButtonProps) {
   const { t } = useLanguage();
-  const { standalone } = useInstallApp();
+  const { standalone, dismissed } = useInstallApp();
   const [open, setOpen] = useState(false);
   const [everOpened, setEverOpened] = useState(false);
 
   if (standalone) return null;
+  // Read AFTER `everOpened`, so a sheet that is open when the customer taps
+  // «ليس الآن» is not torn out from under its own exit animation: `dismissed`
+  // flips synchronously, and unmounting here would take the window with it.
+  if (offered && dismissed && !everOpened) return null;
 
   const show = () => {
     setEverOpened(true);

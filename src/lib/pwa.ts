@@ -55,6 +55,7 @@ export type PwaStringKey = keyof (typeof translations)['en'];
 export type Platform =
   | 'ios-safari'
   | 'ios-other-browser'
+  | 'mac-safari'
   | 'android-chromium'
   | 'huawei'
   | 'samsung'
@@ -142,6 +143,31 @@ export function detectPlatform(probe: PlatformProbe): Platform {
   }
 
   if (CHROMIUM.test(ua)) return 'desktop-chromium';
+
+  // SAFARI ON A MAC INSTALLS WEB APPS, AND THIS BRANCH IS THE APOLOGY FOR
+  // SAYING IT DID NOT.
+  //
+  // Everything above has already failed, so what is left is a desktop that is
+  // not Chromium. A Mac user-agent with a Safari token and no touchscreen is
+  // real Safari on a real Mac — the iPad was taken by `isApplePlatform` at the
+  // top of this function, which is the ONLY reason the touch check can be
+  // trusted this far down.
+  //
+  // Without this branch that machine fell through to `'unknown'`, and
+  // `installGuidance` answers a non-mobile `'unknown'` with `{kind:'none'}` —
+  // «هذا المتصفح على الحاسوب لا يثبّت المواقع كتطبيقات. استخدم Chrome أو Edge».
+  // That was false. Safari has installed web apps since Sonoma (Safari 17,
+  // September 2023) through File ▸ Add to Dock, and `none` is documented here
+  // as the branch for where inventing steps would be lying. It was the `none`
+  // that lied: it told a Mac owner with a working install path to go and get
+  // another browser.
+  //
+  // The menu is named rather than an address-bar icon, because Safari has no
+  // install icon in the address bar — that is Chrome's affordance, and sending
+  // someone to look for it is the failure this whole platform table exists to
+  // avoid.
+  if (MAC.test(ua) && /safari/i.test(ua)) return 'mac-safari';
+
   return 'unknown';
 }
 
@@ -235,7 +261,11 @@ export function isStandalone(probe: StandaloneProbe): boolean {
 
 /** Which picture sits beside a step. The SHEET owns the drawing; this file
  *  owns only the name, so no platform hard-codes any markup. */
-export type StepGlyph = 'share' | 'menu' | 'plus' | 'check' | 'browser' | 'install';
+// `menu` is «⋮» (three vertical dots) and `lines` is «☰» (a hamburger). They
+// are two glyphs rather than one because the step text names the character the
+// customer is looking for, and drawing the other one beside it sends them
+// hunting for a button that is not the button.
+export type StepGlyph = 'share' | 'menu' | 'lines' | 'plus' | 'check' | 'browser' | 'install';
 
 export interface InstallStep {
   /** A key in `src/translations.ts`, present in ar, en and ckb. */
@@ -256,10 +286,35 @@ export type InstallGuidance =
   | { kind: 'steps'; platform: Platform; steps: readonly InstallStep[] }
   | { kind: 'none' };
 
+// THE LAST STEP IS FOR THE BROWSER THAT IS NOT THE BROWSER IT SAYS IT IS.
+//
+// Telegram, and a long tail of other iOS apps, open links in an
+// SFSafariViewController. That view reports a completely ordinary Mobile
+// Safari user-agent — no app token at all — so `isInAppWebView` cannot see it
+// and `detectPlatform` correctly, and uselessly, answers `'ios-safari'`.
+// Apple gates «إضافة إلى الشاشة الرئيسية» in the share sheet behind the
+// `com.apple.developer.web-browser` entitlement, which a host app embedding
+// that view does not have, so the menu item the first two steps describe is
+// simply absent.
+//
+// It is the commonest arrival path there is — the customer taps the shop's
+// link inside a chat — and without this line it is a dead end: they tap Share,
+// scroll a menu that does not contain the item, and there is nothing else to
+// read. The escape hatch already existed for `ios-other-browser`; it belongs
+// here for the same reason, and it costs a line that a genuine Safari user
+// reaching step two never needs to read.
 const IOS_SAFARI_STEPS: readonly InstallStep[] = [
   { key: 'pwaStepIosShare', glyph: 'share' },
   { key: 'pwaStepIosAdd', glyph: 'plus' },
   { key: 'pwaStepIosConfirm', glyph: 'check' },
+  { key: 'pwaStepIosUseSafari', glyph: 'browser' },
+];
+
+// File ▸ Add to Dock. Two steps, and no address-bar icon: Safari does not
+// have one, and `desktop-chromium`'s first step names exactly that.
+const MAC_SAFARI_STEPS: readonly InstallStep[] = [
+  { key: 'pwaStepMacSafariShare', glyph: 'share' },
+  { key: 'pwaStepMacSafariAdd', glyph: 'install' },
 ];
 
 // Chrome, Edge and Firefox on an iPhone all have "Add to Home Screen" in
@@ -283,8 +338,12 @@ const HUAWEI_STEPS: readonly InstallStep[] = [
   { key: 'pwaStepHuaweiAdd', glyph: 'plus' },
 ];
 
+// `lines`, not `menu`. The Samsung string names «☰» and the `menu` glyph draws
+// three vertical dots, so the picture and the sentence beside it pointed at two
+// different buttons — on the one screen where the customer is being asked to
+// hunt for a button they have not found yet.
 const SAMSUNG_STEPS: readonly InstallStep[] = [
-  { key: 'pwaStepSamsungMenu', glyph: 'menu' },
+  { key: 'pwaStepSamsungMenu', glyph: 'lines' },
   { key: 'pwaStepSamsungAdd', glyph: 'plus' },
 ];
 
@@ -310,6 +369,8 @@ export function stepsFor(platform: Platform): readonly InstallStep[] {
       return IOS_SAFARI_STEPS;
     case 'ios-other-browser':
       return IOS_OTHER_STEPS;
+    case 'mac-safari':
+      return MAC_SAFARI_STEPS;
     case 'android-chromium':
       return ANDROID_STEPS;
     case 'huawei':
@@ -344,8 +405,15 @@ export interface GuidanceInput {
  * rare cases surface a stale event it cannot act on. A real captured event
  * beats written instructions, because one tap beats five. Written
  * instructions beat nothing. And `none` is reserved for the case where there
- * is genuinely no install path — desktop Firefox and desktop Safari — where
- * inventing steps would be lying to the customer.
+ * is genuinely no install path — desktop Firefox, and a desktop this file
+ * could not identify at all — where inventing steps would be lying to the
+ * customer.
+ *
+ * DESKTOP SAFARI USED TO BE IN THAT LIST AND IS NOT ANY MORE. It reached
+ * `none` by falling through `detectPlatform` to `'unknown'`, and `none` then
+ * told a Mac owner to install a different browser. Safari has had File ▸ Add
+ * to Dock since Sonoma; `'mac-safari'` now catches it above and it gets steps
+ * like everyone else.
  */
 export function installGuidance(input: GuidanceInput): InstallGuidance {
   if (input.standalone) return { kind: 'installed' };

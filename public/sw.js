@@ -22,12 +22,15 @@
  *                  else, so a deploy is live on the very next navigation.
  *   /assets/*      cache-first, because Vite content-hashes them: the URL
  *                  changes whenever the bytes do, so a hit can never be stale.
- *   /icons/*,      stale-while-revalidate. Small, rarely changed, and wanted
- *   the manifest   instantly by the install prompt.
+ *   /icons/*       stale-while-revalidate. Small, rarely changed, and wanted
+ *                  instantly by the install prompt.
  *   /api/*,        NEVER touched. Prices, stock, the cart, orders and the
- *   /files/*       session live there. A cached price is a customer shown a
- *                  number that is not the price, and a cached /files object is
- *                  one person's private receipt handed to the next.
+ *   /files/*,      session live there. A cached price is a customer shown a
+ *   the manifest   number that is not the price, and a cached /files object is
+ *                  one person's private receipt handed to the next. The
+ *                  manifest joins them because its body is built per host from
+ *                  a live merchant row — see `strategyFor` for the two ways a
+ *                  stored copy gets a shop's name wrong.
  *
  * WHY THE ROUTING DECISION IS A PURE FUNCTION. `strategyFor` takes a URL and a
  * request and returns a string. It reads no cache, performs no I/O and has no
@@ -70,14 +73,24 @@ const DOCUMENT_KEY = '/';
 /**
  * Hashed chunk names never collide, so a cache-first asset store grows by a
  * full bundle on every deploy and is never emptied by anything: the cache name
- * is keyed to THIS file's version, not to the app build. Vite currently emits
- * on the order of 180 chunks plus stylesheets, so this holds roughly the
- * current build plus a little slack, and the oldest entries are evicted first.
- * Without a cap the store reaches the origin's quota, `cache.put` starts
- * throwing QuotaExceededError, and — if a put were ever awaited on the critical
- * path — the page would stop loading. It is not; see `rememberAsset`.
+ * is keyed to THIS file's version, not to the app build. Without a cap the
+ * store reaches the origin's quota, `cache.put` starts throwing
+ * QuotaExceededError, and — if a put were ever awaited on the critical path —
+ * the page would stop loading. It is not; see `rememberAsset`.
+ *
+ * WHY THE NUMBER IS THIS BIG, AND WHY 220 WAS WRONG. Eviction is oldest-first
+ * over `cache.keys()`, which is insertion order and carries no idea of which
+ * deploy an entry belongs to. Vite emits 192 files into dist/assets today, so
+ * a cap of 220 gave one build 28 entries of slack: a visitor who had walked
+ * most of the app and then hit a new deploy would push past the cap and start
+ * evicting chunks of the deploy they were CURRENTLY RUNNING, which re-fetches
+ * them over the network and re-inserts them, evicting more. Cache-first turned
+ * into cache-thrash, quietly, on exactly the slow connection this file exists
+ * for. The cap has to clear two builds so that the old deploy's entries are
+ * the oldest ones and are the ones that go. 500 is that, with room for the
+ * admin surfaces still being added.
  */
-const ASSET_CACHE_LIMIT = 220;
+const ASSET_CACHE_LIMIT = 500;
 
 /**
  * Precached at install, and only these. They are tiny, they genuinely never
@@ -101,7 +114,7 @@ const PRECACHE_URLS = [
 // ------------------------------------------------------------ offline shell
 
 /**
- * The offline document, as a string constant with NO external reference of any
+ * The offline document, synthesised here with NO external reference of any
  * kind — no stylesheet, no font, no image, no script. It is the response shown
  * when the network is gone AND nothing has been cached yet, i.e. on the very
  * first visit of a browser that has already installed the worker. Anything it
@@ -116,45 +129,126 @@ const PRECACHE_URLS = [
  * site's Content-Security-Policy refuses inline script everywhere else and a
  * synthesised document should not be the one place that asks for an exception.
  *
- * Arabic-first and RTL, like the rest of the interface, on the site's real
- * black (#000000 — the document's colour, not the softened `--color-canvas`
- * token) with the gold accent.
+ * On the site's real black (#000000 — the document's colour, not the softened
+ * `--color-canvas` token) with the gold accent.
+ *
+ * IT SPEAKS ALL THREE LANGUAGES, AND GETTING HERE TOOK AN ARGUMENT.
+ *
+ * The house rule is that every user-facing string exists in ar, en and ckb,
+ * and the first version of this file broke it: it hard-coded Arabic because a
+ * service worker cannot reach `src/translations.ts` (no bundler runs over this
+ * file) and cannot read `localStorage` (no window, no storage access from a
+ * worker thread), which is where LanguageContext keeps the customer's choice.
+ * Both of those are true and neither is an excuse — a customer who set the
+ * interface to English or Sorani and then lost signal was handed an RTL Arabic
+ * page, which is the one screen in the app that ignores them, at the one
+ * moment they are already unsure whether the shop is broken.
+ *
+ * The worker is not blind, though. It is handed the failed navigation REQUEST,
+ * and that request carries `Accept-Language` — a header the browser sets from
+ * the device's own language list, which is the best available proxy for a
+ * preference we genuinely cannot read. So the strings live here as a small
+ * table, the block is chosen off that header, and Arabic remains the default
+ * for everything unrecognised, because Arabic-first is the site's floor and
+ * this page is the one place with no second chance to ask.
  */
-const OFFLINE_HTML = [
-  '<!doctype html>',
-  '<html lang="ar" dir="rtl">',
-  '<head>',
-  '<meta charset="utf-8">',
-  '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
-  '<meta name="theme-color" content="#000000">',
-  '<title>LEVONIS — لا يوجد اتصال بالإنترنت</title>',
-  '<style>',
-  '  :root { color-scheme: dark; }',
-  '  html, body { margin: 0; height: 100%; background: #000000; color: #f2f3f5; }',
-  '  body { display: flex; align-items: center; justify-content: center;',
-  '         font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;',
-  '         padding: 24px; text-align: center; }',
-  '  main { max-width: 26rem; }',
-  '  .mark { margin: 0 0 1.5rem; font-size: 0.75rem; font-weight: 700;',
-  '          letter-spacing: 0.35em; color: #BAA369; }',
-  '  h1 { margin: 0 0 0.75rem; font-size: 1.25rem; font-weight: 700; line-height: 1.5; }',
-  '  p.hint { margin: 0 0 2rem; font-size: 0.875rem; line-height: 1.8; color: #b7bbc3; }',
-  '  a.retry { display: inline-flex; align-items: center; justify-content: center;',
-  '            min-height: 44px; padding: 0 1.5rem; border-radius: 12px;',
-  '            background: #ece8dc; color: #101114; font-size: 0.875rem;',
-  '            font-weight: 700; text-decoration: none; }',
-  '</style>',
-  '</head>',
-  '<body>',
-  '<main>',
-  '<p class="mark">LEVONIS</p>',
-  '<h1>لا يوجد اتصال بالإنترنت</h1>',
-  '<p class="hint">تعذّر الوصول إلى المتجر. تحقّق من اتصالك ثم أعد المحاولة.</p>',
-  '<a class="retry" href="">إعادة المحاولة</a>',
-  '</main>',
-  '</body>',
-  '</html>',
-].join('\n');
+const OFFLINE_TEXT = {
+  ar: {
+    dir: 'rtl',
+    title: 'LEVONIS — لا يوجد اتصال بالإنترنت',
+    heading: 'لا يوجد اتصال بالإنترنت',
+    hint: 'تعذّر الوصول إلى المتجر. تحقّق من اتصالك ثم أعد المحاولة.',
+    retry: 'إعادة المحاولة',
+  },
+  en: {
+    dir: 'ltr',
+    title: 'LEVONIS — No internet connection',
+    heading: 'No internet connection',
+    hint: 'The store could not be reached. Check your connection and try again.',
+    retry: 'Try again',
+  },
+  ckb: {
+    dir: 'rtl',
+    title: 'LEVONIS — پەیوەندی ئینتەرنێت نییە',
+    heading: 'پەیوەندی ئینتەرنێت نییە',
+    hint: 'نەتوانرا بگەیت بە فرۆشگا. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەرەوە.',
+    retry: 'دووبارە هەوڵ بدەرەوە',
+  },
+};
+
+/**
+ * The language tag off `Accept-Language`, reduced to one of the three the shop
+ * speaks. Deliberately crude: it scans for the first tag we recognise rather
+ * than parsing q-values, because the header's ORDER already puts the
+ * customer's preferred language first in every browser that sends one, and a
+ * quality-value parser here would be a second implementation of a thing no
+ * other part of this codebase does.
+ *
+ * `ckb` is checked before `ku`: Sorani is what the interface offers, and a
+ * device set to plain Kurdish is closer to it than to Arabic. Anything else,
+ * including a missing or unreadable header, is Arabic.
+ */
+function offlineLanguage(request) {
+  let header = '';
+  try {
+    header = String(request?.headers?.get('accept-language') || '').toLowerCase();
+  } catch {
+    // A stub request, or headers that throw. Unknown is Arabic, like everything
+    // else here, and it must never be the reason a page fails to render.
+    return 'ar';
+  }
+  for (const tag of header.split(',')) {
+    const code = tag.split(';')[0].trim();
+    if (!code) continue;
+    if (code === 'ckb' || code.startsWith('ckb-') || code === 'ku' || code.startsWith('ku-')) return 'ckb';
+    if (code === 'ar' || code.startsWith('ar-')) return 'ar';
+    if (code === 'en' || code.startsWith('en-')) return 'en';
+  }
+  return 'ar';
+}
+
+/** The document itself, for one of the three languages. */
+function offlineHtml(lang) {
+  const text = OFFLINE_TEXT[lang] || OFFLINE_TEXT.ar;
+  return [
+    '<!doctype html>',
+    '<html lang="' + lang + '" dir="' + text.dir + '">',
+    '<head>',
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
+    '<meta name="theme-color" content="#000000">',
+    '<title>' + text.title + '</title>',
+    '<style>',
+    '  :root { color-scheme: dark; }',
+    '  html, body { margin: 0; height: 100%; background: #000000; color: #f2f3f5; }',
+    '  body { display: flex; align-items: center; justify-content: center;',
+    '         font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;',
+    '         padding: 24px; text-align: center; }',
+    '  main { max-width: 26rem; }',
+    '  .mark { margin: 0 0 1.5rem; font-size: 0.75rem; font-weight: 700;',
+    '          letter-spacing: 0.35em; color: #BAA369; }',
+    '  h1 { margin: 0 0 0.75rem; font-size: 1.25rem; font-weight: 700; line-height: 1.5; }',
+    '  p.hint { margin: 0 0 2rem; font-size: 0.875rem; line-height: 1.8; color: #b7bbc3; }',
+    '  a.retry { display: inline-flex; align-items: center; justify-content: center;',
+    '            min-height: 44px; padding: 0 1.5rem; border-radius: 12px;',
+    '            background: #ece8dc; color: #101114; font-size: 0.875rem;',
+    '            font-weight: 700; text-decoration: none; }',
+    '</style>',
+    '</head>',
+    '<body>',
+    '<main>',
+    '<p class="mark">LEVONIS</p>',
+    '<h1>' + text.heading + '</h1>',
+    '<p class="hint">' + text.hint + '</p>',
+    '<a class="retry" href="">' + text.retry + '</a>',
+    '</main>',
+    '</body>',
+    '</html>',
+  ].join('\n');
+}
+
+/** Arabic, the default, kept as a constant so the internals surface keeps it. */
+const OFFLINE_HTML = offlineHtml('ar');
 
 /**
  * Its own locked-down policy, because this document is synthesised here and so
@@ -164,12 +258,22 @@ const OFFLINE_HTML = [
 const OFFLINE_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
-function offlineResponse() {
-  return new Response(OFFLINE_HTML, {
+/**
+ * `Vary: Accept-Language` is set because the body now depends on that header,
+ * and this response can be stored by whatever sits in front of it. Nothing in
+ * this worker caches it — `Cache-Control: no-store` and the navigation handler
+ * never stores a synthesised body — but a response whose content varies and
+ * does not say so is how one visitor's language reaches the next one.
+ */
+function offlineResponse(request) {
+  const lang = offlineLanguage(request);
+  return new Response(offlineHtml(lang), {
     status: 200,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
+      'Content-Language': lang,
       'Cache-Control': 'no-store',
+      'Vary': 'Accept-Language',
       'Content-Security-Policy': OFFLINE_CSP,
       'X-Content-Type-Options': 'nosniff',
     },
@@ -223,12 +327,33 @@ function strategyFor(url, request) {
 
   const path = url.pathname;
 
-  // The two surfaces the Worker owns. `/api/*` is prices, stock, cart, orders
+  // The three surfaces the Worker owns. `/api/*` is prices, stock, cart, orders
   // and the session; `/files/*` serves R2 objects, and the private ones are
-  // authorised per request by worker/routes/uploads.ts. Neither is ever read
-  // from, or written to, a cache here.
+  // authorised per request by worker/routes/uploads.ts. None of them is ever
+  // read from, or written to, a cache here.
   if (path === '/api' || path.startsWith('/api/')) return NETWORK_ONLY;
   if (path === '/files' || path.startsWith('/files/')) return NETWORK_ONLY;
+
+  // THE MANIFEST IS THE THIRD, AND IT IS THE ONE THAT LOOKS CACHEABLE.
+  //
+  // It is a few static-looking kilobytes of JSON, so an earlier version of
+  // this file put it on the stale-while-revalidate path beside `/icons/*`.
+  // That was wrong, and the reason is worth keeping: its body is NOT static.
+  // `worker/routes/manifest.ts` builds it per request from the merchant row
+  // `storeBySlug()` returns, so the bytes carry a shop's NAME and ICON.
+  //
+  // Two failures follow from storing it. A merchant renames their shop, the
+  // Worker serves the new name under `Cache-Control: public, max-age=300` —
+  // and the Cache API keeps no expiry at all, so the copy here is served
+  // first on every later read and the 300 seconds the route reasons about
+  // never elapse. Worse, that route answers 200 with the PLATFORM manifest
+  // whenever the store row cannot be read (a D1 blip, a missing binding);
+  // cached, a single unlucky first fetch pins «LEVONIS» and the platform mark
+  // onto a merchant's own origin for as long as the cache lives.
+  //
+  // So it is treated exactly like `/api/*`: left alone, and the Worker's own
+  // `max-age=300` is the only cache in front of it. That is what it is for.
+  if (path === '/manifest.webmanifest') return NETWORK_ONLY;
 
   // Documents are decided BEFORE the query-string guard below. A navigation is
   // never served from a query-keyed entry — the only document ever stored is
@@ -248,9 +373,9 @@ function strategyFor(url, request) {
 
   // Small, stable, and wanted instantly by the install prompt — but not
   // immutable, so they are revalidated in the background after being served.
-  // The manifest is answered per host by the Worker, which is why it is
-  // refreshed rather than pinned.
-  if (path.startsWith('/icons/') || path === '/manifest.webmanifest') return STALE_WHILE_REVALIDATE;
+  // Icons only: the bytes behind these paths are the same for every visitor
+  // on every host, which is the property the manifest above does not have.
+  if (path.startsWith('/icons/')) return STALE_WHILE_REVALIDATE;
 
   return NETWORK_ONLY;
 }
@@ -376,7 +501,7 @@ async function handleNavigation(event) {
     // Genuinely unreachable. A 404 or a 500 is a response, and was returned.
     const cached = await matchSafely(DOCUMENT_CACHE, DOCUMENT_KEY);
     if (cached) return cached;
-    return offlineResponse();
+    return offlineResponse(request);
   }
 
   // Only the ROOT document is kept, and only a genuine HTML 200. A path that
@@ -420,7 +545,7 @@ async function handleAsset(event) {
   return response;
 }
 
-/** /icons/*, /manifest.webmanifest — instant from cache, refreshed behind it. */
+/** /icons/* — instant from cache, refreshed behind it. */
 async function handleStatic(event) {
   const request = event.request;
   const cached = await matchSafely(STATIC_CACHE, request);
@@ -562,8 +687,11 @@ self.__LEVONIS_SW__ = {
   ASSET_CACHE_LIMIT,
   PRECACHE_URLS,
   OFFLINE_HTML,
+  OFFLINE_TEXT,
   strategyFor,
   cacheable,
+  offlineLanguage,
+  offlineHtml,
   offlineResponse,
 };
 

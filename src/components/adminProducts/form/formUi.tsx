@@ -20,7 +20,7 @@
 
 import React, { useId, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ImagePlus, Info, Link2, RefreshCw, X } from 'lucide-react';
-import { uploadFile, failureText } from '../../../lib/api';
+import { uploadFile, failureText, formatIqd } from '../../../lib/api';
 import SafeImage from '../../ui/SafeImage';
 
 /** 40px control (the §12 floor), 13px text, never wider than its track. */
@@ -182,6 +182,272 @@ export function MirrorNote({
         {detail ? <span className="text-zinc-600">{` · ${detail}`}</span> : null}
       </span>
     </p>
+  );
+}
+
+/**
+ * THE TWO MEMBER PRICES, FOLDED BEHIND ONE LINE THAT NAMES WHAT IS FOLDED.
+ *
+ * The owner's instruction, in their words: «لا تحذف الخيارات أو الميزة …
+ * اجعل هنالك زر وسيط صغير سطر بكتابة وليس زرا عند النقر عليه يفتح خانتين سعر
+ * البرو لهذا الخيار او اللون وسعر البريميوم … التصميم يكون بزر خفيف صغير وناعم
+ * قابل للضغط عند النقر عليه يفتح الخانتين بشكل ناعم».
+ *
+ * The feature it hides is not cosmetic. A member price typed on ONE option or
+ * ONE colour is how that row steps out of the product's membership discount
+ * while every other row keeps it: `memberPrice` in packages/pricing takes an
+ * explicit number FIRST and never consults the rule (`rule_id: null`), and
+ * `pickMember` walks base → option → fulfilment → transport → colour, so the
+ * number typed on the row wins for that row alone. A 10% discount capped at
+ * 100,000 still applies to the other nine options and the other ninety-nine
+ * colours. Nothing here changes that; this only decides when the two boxes are
+ * on screen.
+ *
+ * WHAT MAKES FOLDING SAFE, AND IT IS NOT OPTIONAL. With a hundred colours
+ * collapsed into a hundred identical lines, the ONE row quietly taking itself
+ * out of the discount would be invisible, and the only way to find it would be
+ * to open all hundred. Two rules answer that and the control is dishonest
+ * without either:
+ *
+ *   1. a row that already carries a member price OPENS BY ITSELF — and keeps
+ *      opening by itself until the admin decides otherwise FOR THAT ROW;
+ *   2. wherever it IS collapsed, the line names the amount — «سعر خاص لهذا
+ *      اللون · PRO 855,000 د.ع» — which is the shape section 3's own collapsed
+ *      summary already uses for the product's PRIME/PRO, through the same
+ *      `formatIqd`.
+ *
+ * `marks` is therefore what the CALLER resolved as typed, never what it read
+ * out of a column. An option's PRO may be stored as `pro_adjust_iqd` instead of
+ * `pro_price_iqd` — the base+adjustment shape `normalizeCheapestBase` writes —
+ * and a caller reading only half of that pair would fold shut over a live
+ * override, which is the exact defect the price cells were rebuilt to end. The
+ * caller passes the resolver's own answer (`Cell.mode !== 'inherit'`), and a
+ * typed 0 is a real price, so the test is never truthiness.
+ *
+ * OPENING SMOOTHLY. `grid-template-rows: 0fr → 1fr` over a `min-h-0
+ * overflow-hidden` child is the only way to animate to an unknown height in CSS
+ * alone — no measurement, no library, no second render — and it is already the
+ * repo's one unfold recipe (`.lv-refbar__panel`). The folded panel is
+ * `invisible`, as that panel's is, which takes the two money inputs out of the
+ * tab order so a hidden price box cannot be typed into blind.
+ * `motion-reduce:transition-none` is load-bearing, not garnish: src/index.css's
+ * reduce block clamps ANIMATIONS and deliberately leaves transitions running,
+ * and this form renders outside the `.ap` scope whose theme.css clamps both — so
+ * without it a reduced-motion admin would still get the travel. Under reduce the
+ * panel still changes state, instantly; the feedback is kept, the movement is
+ * not.
+ *
+ * It is a real `<button type="button">` and not a `<span role="button">` so it
+ * inherits the global `:active` dim in src/index.css — the admin panel runs on
+ * an iPad, where Tailwind v4 gates `hover:` behind `@media (hover: hover)` and a
+ * hover underline is decoration only. The always-present chevron is the resting
+ * affordance.
+ */
+export interface TierPriceMark {
+  /** The tier as this form labels it — 'PRIME' or 'PRO'. */
+  label: string;
+  /** What that tier is charged on this row: already resolved and clamped by the
+   *  caller, so this never formats a raw stored scalar. */
+  iqd: number | null;
+}
+
+/**
+ * The folded line's tail, as one string — «· PRO 855,000 د.ع». Split out so the
+ * shape a folded row prints can be asserted directly: the state that produces
+ * it (an admin who folded a row that HAS a price) is reachable only by a click,
+ * and a rule this load-bearing must not be testable only through one.
+ */
+export function tierPriceSummary(marks: readonly TierPriceMark[]): string {
+  /**
+   * A NULL AMOUNT IS NOT "UNKNOWN", IT IS "TYPED AND NOT CHARGED", and the tail
+   * has to say so in words. The case is real and it is the one the resolver
+   * creates, not a missing-data accident: `memberAtRung` carries a member price
+   * through the colour rung and DROPS anything that lands at zero or below, so
+   * an OPTION with a PRIME of 0 is charged the regular price while a COLOUR
+   * with the same 0 is charged 0 (PriceCells documents this on `level`). The
+   * caller hands us `null` for exactly that row — it states a price, the till
+   * ignores it — and a bare «—» would read as "a special price is set, value
+   * unknown", which is the one impression that must never be given about a
+   * price. «لا يُحتسب» is the same verdict the cell underneath prints as
+   * `data-price-mode="regular-fallback"», so the folded line and the open box
+   * cannot disagree.
+   */
+  return marks.map((m) => `· ${m.label} ${m.iqd === null ? '(لا يُحتسب)' : formatIqd(m.iqd)}`).join(' ');
+}
+
+/**
+ * IS THE PANEL OPEN? Pulled out as a pure function because it is the whole
+ * feature and it is otherwise only reachable through a click, and this repo has
+ * no DOM test environment — only `react-dom/server`, and adding jsdom would
+ * mean a new dependency. Rendering can only ever observe `choice === null`, so
+ * without this export the entire branch where the admin has chosen, and the
+ * entire transition from "has a price" to "no longer has one", would ship
+ * unverified. They did once: see the latch below.
+ *
+ * @param choice        what the admin decided, or null while they have not touched it
+ * @param hasMarks      does the row state a member price RIGHT NOW
+ * @param everHadMarks  has it stated one at any point since this row mounted
+ */
+export function tierPriceOpen(choice: boolean | null, hasMarks: boolean, everHadMarks: boolean): boolean {
+  return choice ?? (hasMarks || everHadMarks);
+}
+
+export function TierPriceDisclosure({
+  scope,
+  marks,
+  children,
+}: {
+  /** Which row this is, for the wording — «لهذا الخيار» / «لهذا اللون» /
+   *  «لهذا المنتج». Presentation only; it decides no price. */
+  scope: 'option' | 'color' | 'product';
+  /** The tiers this row has TYPED, in field order. Empty = nothing is set, so
+   *  the line is the plain invitation and the panel starts folded. */
+  marks: readonly TierPriceMark[];
+  children: ReactNode;
+}) {
+  const panelId = useId();
+  /**
+   * NULL until the admin touches it, and that is the whole trick.
+   * `useState(marks.length > 0)` would read the data ONCE, at mount — and the
+   * product document arrives from the server AFTER this control has mounted, so
+   * a PRO price loaded a moment later would land inside a panel that had already
+   * decided to stay shut. That is precisely the hidden override rule 1 exists to
+   * prevent. Deriving `open` from `marks` on every render until the admin
+   * overrules it means a price can never arrive into a closed panel; once they
+   * choose, their choice stands and the line beside it still names the amount.
+   *
+   * IT IS LOCAL ON PURPOSE, not a `Record<rowId, boolean>` held by the parent.
+   * The flag is per row and the rows are a list, so the only question is what
+   * identifies a row — and React already answers it: the option and colour
+   * repeaters render `key={v.id}` / `key={c.id}`, so this component's own state
+   * is bound to that id and nothing else. A map keyed by list INDEX (or a
+   * component keyed by index) would hand row 7's «open» to whatever slid into
+   * slot 7 after a colour was deleted or dragged — which, on a control whose
+   * entire job is to show that row 7 has a price of its own, means showing it
+   * on the wrong row. There is no id to plumb through and no map to keep in
+   * sync with deletions, because the key already is the identity.
+   */
+  const [choice, setChoice] = useState<boolean | null>(null);
+  /**
+   * THE LATCH, AND WHY `open` IS NOT A LIVE FUNCTION OF `marks`.
+   *
+   * It was, and it made the documented way to UNDO an override unusable. The
+   * panel's own sentence tells the admin «واتركه فارغًا ليسري الخصم» — clear the
+   * box to put this colour back on the discount. But `Money` fires
+   * `onChange(null)` on the last backspace, `PriceCells.commit` writes both
+   * columns null, the mode falls to 'inherit' and `marks` empties — mid
+   * keystroke. On a row that auto-opened (i.e. every row that already had a
+   * price, which is the whole population of rows this control matters on)
+   * `choice` is still null, so `open` flipped to false under the admin's
+   * finger: the panel folded, the wrapper took `visibility: hidden`, and
+   * hiding an ancestor of the focused input drops focus to <body>. The «يرث»
+   * button did the same thing to itself — it destroyed the container it was
+   * standing in. The opposite of «يفتح الخانتين بشكل ناعم».
+   *
+   * Latching keeps the property that mattered (a price ARRIVING — from the
+   * server, after mount — still forces the panel open, so an override can
+   * never land inside a closed panel) and drops the one that did not (a price
+   * LEAVING closing it). The admin's own click still overrules both.
+   *
+   * Written during render on purpose: the assignment is monotonic and
+   * idempotent, so a double invocation under StrictMode reaches the same
+   * value. An effect would run after paint and fold the panel for one frame.
+   */
+  const everSet = useRef(false);
+  if (marks.length > 0) everSet.current = true;
+  const open = tierPriceOpen(choice, marks.length > 0, everSet.current);
+
+  const noun = scope === 'color' ? 'اللون' : scope === 'product' ? 'المنتج' : 'الخيار';
+  const rest = scope === 'color' ? 'الألوان' : 'الخيارات';
+  /**
+   * ONE sentence, and it is scoped on purpose. MembershipDiscountSection's own
+   * banner speaks about the PRODUCT («لن يُقرأ هذا التجاوز حتى يُفرَّغ ذلك
+   * الحقل»); repeating that here without «وحده» would contradict it, because a
+   * price typed on one option leaves every other option on the rule. The verb is
+   * the house's «يسبق» / «يستبدل», not the owner's «يطغى», which appears nowhere
+   * else in this codebase.
+   */
+  const rule =
+    scope === 'product'
+      ? 'السعر المكتوب هنا يسبق خصم العضوية لهذا المنتج كله — واتركه فارغًا ليسري الخصم.'
+      : `السعر المكتوب هنا يسبق خصم العضوية لهذا ${noun} وحده، وتبقى بقية ${rest} على الخصم — واتركه فارغًا ليسري الخصم.`;
+  /**
+   * THE ENGLISH SECONDARY IS SCOPED BY THE SAME TERNARY, and it must be: an
+   * unconditional «for this row only» sat beside the product sentence and said
+   * the opposite of it in the same paragraph. At product scope the override is
+   * not a per-row exception — MembershipDiscountSection's banner states that the
+   * rule «لن يُقرأ» at all while that field holds a number — so an English
+   * reader was being told the discount still applied to everything else when it
+   * applied to nothing.
+   */
+  const ruleEn =
+    scope === 'product'
+      ? 'A price written here replaces the membership discount for this whole product.'
+      : 'A price written here replaces the membership discount for this row only.';
+
+  return (
+    // A FULL-WIDTH BAND, because the parent is
+    // `grid … [grid-template-columns:minmax(0,1fr)] md:repeat(2,…) xl:repeat(3,…)`
+    // (see `Grid`) and every `PriceCell` is a DIRECT item of it. Dropped in as
+    // one more ordinary item this would land beside «السعر» at md/xl and read as
+    // a fourth price box; `col-span-full` puts it on its own row instead. The
+    // caller nests a `Grid` of the same column count inside, so PRIME and PRO
+    // still line up under «السعر» at every breakpoint rather than re-dividing
+    // the row into halves.
+    <div className="col-span-full min-w-0">
+      <button
+        type="button"
+        onClick={() => setChoice(!open)}
+        aria-expanded={open}
+        aria-controls={panelId}
+        data-tier-price-toggle={scope}
+        className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-h-9 max-w-full min-w-0 py-1 rounded
+                   text-[11px] leading-snug font-medium text-zinc-400 text-start
+                   underline-offset-4 hover:text-zinc-200 hover:underline transition-colors
+                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6B46FF]"
+      >
+        {/* A ChevronDown that only ever rotates 180° — vertical, so it is
+            direction-neutral and cannot point the wrong way in RTL the way a
+            rotated ChevronRight does. */}
+        <ChevronDown
+          className={`w-3.5 h-3.5 shrink-0 text-zinc-500 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
+          aria-hidden="true"
+        />
+        <span className="min-w-0">
+          سعر خاص لهذا {noun}{' '}
+          <span className="text-[10px] leading-snug font-medium text-zinc-600">PRIME / PRO</span>
+        </span>
+        {/* THE HONEST COLLAPSED LINE. Only while folded, because open the two
+            boxes state it better — but folded, this is the only thing standing
+            between the admin and an override they cannot see. */}
+        {!open && marks.length > 0 && (
+          <span className="min-w-0 text-zinc-300 tabular-nums" data-tier-price-set>
+            {tierPriceSummary(marks)}
+          </span>
+        )}
+      </button>
+      {/* The id sits on the wrapper that is ALWAYS rendered, so `aria-controls`
+          resolves whether the panel is open or not. */}
+      <div
+        id={panelId}
+        data-tier-price-panel={scope}
+        className={`grid min-w-0 transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${
+          open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div
+          className={`min-h-0 min-w-0 overflow-hidden transition-[visibility] duration-200 motion-reduce:transition-none ${
+            open ? 'visible' : 'invisible'
+          }`}
+        >
+          <p className="mb-2 text-[11px] leading-snug text-zinc-500">
+            {rule}
+            <span className="text-zinc-600"> {ruleEn}</span>
+          </p>
+          {children}
+        </div>
+      </div>
+    </div>
   );
 }
 
