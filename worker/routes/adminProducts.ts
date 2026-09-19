@@ -47,10 +47,23 @@ import { bundlesUsing, compositionConflict } from '../lib/bundleComposition';
 import {
   deleteProductPermanently,
   invalidateMediaCache,
-  pendingMediaCleanup,
   runMediaCleanup,
   scanProductOrphans,
 } from '../lib/productDeletion';
+/**
+ * The full map of where an R2 key can live, and the gate that refuses the
+ * destructive sweep until that map is provably complete for the live schema.
+ * `productDeletion`'s reference set answers a narrower question — what one
+ * PRODUCT points at — and using it to decide what the BUCKET may lose is the
+ * defect this import exists to correct.
+ */
+import {
+  deleteSweptObjects,
+  markObjectsDeleted,
+  partitionSweepCandidates,
+  runGuardedMediaCleanup,
+  verifyMediaCoverage,
+} from '../lib/mediaRefs';
 import {
   localizeRespectingAuthored,
   readTranslationOverrides,
@@ -720,7 +733,59 @@ adminProductsRoutes.get('/stats', async (c) => {
  */
 adminProductsRoutes.get('/maintenance/orphans', async (c) => {
   const report = await scanProductOrphans(c.env.DB, c.env.R2_PUBLIC ?? c.env.BUCKET ?? null, { dryRun: true });
-  return c.json({ success: true, ...report, scanned_at: new Date().toISOString() });
+
+  /**
+   * THE REPORT TELLS THE TRUTH ABOUT ITSELF NOW.
+   *
+   * `scanProductOrphans` calls an object an orphan when the PRODUCT tables do
+   * not name it. That is not the same question as "is anything on this site
+   * still showing it", and the difference had a list: the home-page banners
+   * (their pointers live in a JSON blob in `admin_settings`) and every past
+   * order's thumbnail (`order_items.image_snapshot`). Both are stored under
+   * `products/`, which is the prefix this scan lists, so both were reported as
+   * orphans and would have been deleted.
+   *
+   * The wide reference set (worker/lib/mediaRefs.ts) is applied here, and what
+   * it rescues is reported as `r2_objects_protected` rather than quietly
+   * dropped — the admin should be able to SEE that the old report was wrong,
+   * on the screen, before deciding anything.
+   *
+   * This call stays read-only whatever the coverage says. Only the delete is
+   * gated; a report that refuses to run helps nobody diagnose anything.
+   */
+  const coverage = await verifyMediaCoverage(c.env.DB);
+  const partition = partitionSweepCandidates(report.orphan_r2_objects, coverage.scan.keys);
+
+  return c.json({
+    success: true,
+    ...report,
+    orphan_r2_objects: partition.removable,
+    r2_objects_protected: partition.protected_keys,
+    /**
+     * Uploaded too recently to be judged. An admin with a product form open
+     * has pictures in R2 that no row names yet, and they are not orphans —
+     * they are halfway through being saved. See `SWEEP_MIN_AGE_MS`.
+     */
+    r2_objects_too_new: partition.staged_keys,
+    totals: {
+      ...report.totals,
+      orphan_r2_objects: partition.removable.length,
+      orphan_bytes: partition.removable.reduce((n, o) => n + o.bytes, 0),
+      r2_objects_protected: partition.protected_keys.length,
+      r2_objects_too_new: partition.staged_keys.length,
+    },
+    reference_coverage: {
+      ok: coverage.ok,
+      refusals: coverage.refusals,
+      unclassified_columns: coverage.audit.unclassified,
+      sources_scanned: coverage.scan.scanned.length,
+      sources_absent: coverage.scan.absent,
+      sources_failed: coverage.scan.failed,
+      referenced_keys: coverage.scan.keys.size,
+      cleanup_allowed: coverage.ok,
+    },
+    scanned_at: new Date().toISOString(),
+  });
 });
 
 adminProductsRoutes.post('/maintenance/orphans/cleanup', async (c) => {
@@ -731,48 +796,210 @@ adminProductsRoutes.post('/maintenance/orphans/cleanup', async (c) => {
   }
   const bucket = c.env.R2_PUBLIC ?? c.env.BUCKET ?? null;
 
-  // Re-scan and compare against what the admin was shown. If the database moved
-  // under them, the numbers differ and nothing is deleted.
+  /**
+   * THE BUTTON REFUSES ITSELF UNTIL THE REFERENCE SET IS PROVABLY COMPLETE.
+   *
+   * The narrowing that made the banners invisible was not a typo — it was a
+   * reference set that nobody had checked against the schema. So the check is
+   * the gate: every column in the live schema that can hold an object key must
+   * be classified in `worker/lib/mediaRefs.ts`, as a source that is scanned or
+   * as an exclusion with a written reason, and every one of those scans must
+   * have actually run. A migration that adds a key-bearing column makes this
+   * refuse on the next request, naming the column.
+   *
+   * A refusal, never a silent no-op and never a partial sweep: nothing is
+   * deleted, the reason is the response body, and the read-only report above
+   * still works so the admin can see exactly what is unverified.
+   */
+  /**
+   * THE BUCKET IS LISTED FIRST AND THE REFERENCES ARE READ SECOND. ALWAYS.
+   *
+   * This is an ordering, not a preference, and getting it the other way round
+   * is the one arrangement that can destroy a live image through pure timing.
+   * Suppose the references are read first: a key is absent from that snapshot,
+   * correctly, because nothing names it at that instant. A product save then
+   * commits and writes `product_images.r2_key = <key>`. The bucket listing
+   * that runs afterwards returns the key, the partition asks the OLDER
+   * snapshot, gets a miss, and the object is destroyed while a live row names
+   * it. Listing first inverts the window: anything already in the candidate
+   * list has its references read AFTER it, so a reference written during the
+   * gap is still seen and the object is protected. The read-only report above
+   * has always been ordered this way; this handler had not been.
+   */
   const preview = await scanProductOrphans(c.env.DB, bucket, { dryRun: true });
+  const coverage = await verifyMediaCoverage(c.env.DB);
+  if (!coverage.ok) {
+    throw new HttpError(
+      409,
+      'لا يمكن تشغيل التنظيف: مجموعة المراجع غير مكتملة لهذا المخطط. ' +
+        'Refusing the destructive sweep: the reference set is not provably complete for the current schema. / ' +
+        'ناتوانرێت پاککردنەوە جێبەجێ بکرێت: کۆمەڵەی ئاماژەکان بۆ ئەم پێکهاتەیە تەواو نییە.',
+      'ORPHAN_CLEANUP_COVERAGE_INCOMPLETE',
+      {
+        refusals: coverage.refusals,
+        unclassified_columns: coverage.audit.unclassified,
+        sources_failed: coverage.scan.failed,
+        remedy: 'Classify each column in MEDIA_REFERENCE_SOURCES or NON_MEDIA_COLUMNS (worker/lib/mediaRefs.ts).',
+      }
+    );
+  }
+
+  // Compare against what the admin was shown. If the database moved under
+  // them, the numbers differ and nothing is deleted. The comparison is
+  // against the WIDENED count, which is the one the report displays.
+  const partition = partitionSweepCandidates(preview.orphan_r2_objects, coverage.scan.keys);
   const expect = (body.expect ?? {}) as { orphan_rows?: unknown; orphan_r2_objects?: unknown };
   if (
     Number(expect.orphan_rows) !== preview.totals.orphan_rows ||
-    Number(expect.orphan_r2_objects) !== preview.totals.orphan_r2_objects
+    Number(expect.orphan_r2_objects) !== partition.removable.length
   ) {
     throw new HttpError(
       409,
       'The database changed since the dry run — re-run the report and confirm the new numbers.',
       'ORPHAN_REPORT_STALE',
-      { current: preview.totals, expected: { orphan_rows: expect.orphan_rows, orphan_r2_objects: expect.orphan_r2_objects } }
+      {
+        current: { orphan_rows: preview.totals.orphan_rows, orphan_r2_objects: partition.removable.length },
+        expected: { orphan_rows: expect.orphan_rows, orphan_r2_objects: expect.orphan_r2_objects },
+      }
     );
   }
 
-  const report = await scanProductOrphans(c.env.DB, bucket, { dryRun: false });
+  /**
+   * THE ROWS AND THE OBJECTS ARE REMOVED BY DIFFERENT HANDS, ON PURPOSE.
+   *
+   * The dangling-row half of `scanProductOrphans` is correct and is reused
+   * exactly as it is — passing `null` for the bucket runs it and nothing else.
+   * The R2 half is NOT reused, because it deletes from its own narrow
+   * reference set and that is the defect: it would remove the banners no
+   * matter what this route checked first. The objects are removed here, from
+   * the partition the wide reference set cleared, and nowhere else.
+   */
+  const report = await scanProductOrphans(c.env.DB, null, { dryRun: false });
+
+  /**
+   * ONE LAST READ OF THE REFERENCES, IMMEDIATELY BEFORE THE BUCKET IS TOUCHED.
+   *
+   * The staleness check above is computed before the row-delete pass, and the
+   * row-delete pass walks every owned table — so a save committing in that gap
+   * is guarded by nothing at all. This is the same re-check the queue performs
+   * for its own jobs (`runGuardedMediaCleanup`), applied to the sweep: the set
+   * is rebuilt, the candidates are strained through it a second time, and
+   * anything that came back in the meantime is reported as protected instead
+   * of deleted. It costs one more coverage scan on a button pressed a few
+   * times a year. An image deleted by mistake does not come back.
+   */
+  const recheck = await verifyMediaCoverage(c.env.DB);
+  if (!recheck.ok) {
+    throw new HttpError(
+      409,
+      'أُلغي حذف الملفات: تعذّر إثبات اكتمال مجموعة المراجع قبل الحذف مباشرة — لم يُحذف أي ملف. / ' +
+        'Aborted before touching the bucket: the reference set could not be proven complete on the final check, so no object was deleted. / ' +
+        'پێش دەستلێدان بە کۆگاکە ڕاگیرا: کۆمەڵەی ئاماژەکان نەسەلمێنرا، هیچ فایلێک نەسڕایەوە.',
+      'ORPHAN_CLEANUP_COVERAGE_INCOMPLETE',
+      { refusals: recheck.refusals, rows_removed: report.removed?.rows_by_table ?? {} }
+    );
+  }
+  const finalPartition = partitionSweepCandidates(partition.removable, recheck.scan.keys);
+  const swept = await deleteSweptObjects(c.env, finalPartition.removable);
+  await markObjectsDeleted(c.env.DB, swept.deleted);
+  const invalidated = await invalidateMediaCache(new URL(c.req.url).origin, swept.deleted);
+
+  const protectedKeys = [...partition.protected_keys, ...finalPartition.protected_keys];
   await audit(c.env.DB, admin.id, 'product_v2.orphan_cleanup', 'maintenance', {
     rows: report.removed?.rows_by_table ?? {},
-    r2_objects: report.removed?.r2_objects.length ?? 0,
+    r2_objects: swept.deleted.length,
+    r2_objects_protected: protectedKeys.length,
+    r2_objects_saved_by_recheck: finalPartition.protected_keys.length,
+    r2_objects_too_new: partition.staged_keys.length,
+    r2_objects_failed: swept.failed.length,
   });
-  return c.json({ success: true, ...report });
+  return c.json({
+    success: true,
+    ...report,
+    orphan_r2_objects: finalPartition.removable,
+    r2_objects_protected: protectedKeys,
+    /** Saved by the FINAL re-check: a row started naming them mid-sweep. */
+    r2_objects_saved_by_recheck: finalPartition.protected_keys,
+    r2_objects_too_new: partition.staged_keys,
+    /**
+     * `report` comes from the row-only scan (`bucket = null`), so its own
+     * totals count zero objects and zero bytes. Spreading it and then
+     * overriding only `orphan_r2_objects` left the body contradicting itself:
+     * twelve keys listed as removed beside `totals.orphan_r2_objects: 0`. The
+     * GET handler already overrides `totals`; so does this one now, because
+     * `totals` is the shape any admin screen reads for a headline number.
+     */
+    totals: {
+      ...report.totals,
+      orphan_r2_objects: finalPartition.removable.length,
+      orphan_bytes: finalPartition.removable.reduce((n, o) => n + o.bytes, 0),
+      r2_objects_protected: protectedKeys.length,
+      r2_objects_too_new: partition.staged_keys.length,
+      r2_scanned: preview.r2_scanned,
+    },
+    r2_scanned: preview.r2_scanned,
+    removed: { rows_by_table: report.removed?.rows_by_table ?? {}, r2_objects: swept.deleted },
+    r2_delete_failures: swept.failed,
+    cache_keys_invalidated: invalidated,
+  });
 });
 
-/** Retry every queued R2 removal a previous delete could not finish. */
+/**
+ * DRAIN THE QUEUE — the removals a product delete could not finish, AND the
+ * images an ordinary product save detached.
+ *
+ * `runGuardedMediaCleanup` replaces the bare `runMediaCleanup` here for two
+ * reasons the queue now depends on:
+ *
+ *   1. IT RE-CHECKS. A job queued when an admin removed a picture from a
+ *      product may, minutes later, name a key that the same admin has attached
+ *      to another product or pasted into a home banner. The question the
+ *      bucket delete answers is "is this unreferenced NOW", not "was it
+ *      unreferenced when we queued it". A key that came back is closed as
+ *      `skipped_shared` and its bytes are left alone.
+ *   2. IT STOPS. `runMediaCleanup` bumps `attempts` and leaves the job pending
+ *      however often it fails, so a key R2 will never accept is retried for
+ *      ever. Past `MEDIA_CLEANUP_MAX_ATTEMPTS` the job moves to `failed` with
+ *      its last error, where a human can read it.
+ *
+ * The full-product delete path (below) still calls `runMediaCleanup` directly
+ * and deliberately: its product is already gone, so there is nothing left to
+ * re-check, and its jobs land in the same queue for this endpoint to finish.
+ */
 adminProductsRoutes.post('/maintenance/media-cleanup/retry', async (c) => {
   const admin = c.get('user')!;
-  const jobs = await pendingMediaCleanup(c.env.DB);
-  const outcome = await runMediaCleanup(c.env, jobs);
+  const outcome = await runGuardedMediaCleanup(c.env);
+  if (!outcome.ran) {
+    throw new HttpError(
+      409,
+      'لا يمكن تشغيل التنظيف: مجموعة المراجع غير مكتملة لهذا المخطط. / ' +
+        'Refusing to delete queued objects: the reference set is not provably complete, so a queued key cannot be shown to be unreferenced. / ' +
+        'ناتوانرێت فایلە ڕیزکراوەکان بسڕدرێنەوە: کۆمەڵەی ئاماژەکان تەواو نییە.',
+      'MEDIA_CLEANUP_COVERAGE_INCOMPLETE',
+      { refusals: outcome.refusals, pending: outcome.attempted }
+    );
+  }
   const invalidated = await invalidateMediaCache(new URL(c.req.url).origin, outcome.deleted);
-  if (jobs.length) {
+  if (outcome.attempted) {
     await audit(c.env.DB, admin.id, 'product_v2.media_cleanup_retry', 'maintenance', {
-      attempted: jobs.length,
+      attempted: outcome.attempted,
       deleted: outcome.deleted.length,
-      failed: outcome.failed.length,
+      still_referenced: outcome.still_referenced.length,
+      dead_lettered: outcome.dead_lettered.length,
+      retrying: outcome.retrying.length,
     });
   }
   return c.json({
     success: true,
-    attempted: jobs.length,
+    attempted: outcome.attempted,
     r2_objects_deleted: outcome.deleted,
-    r2_cleanup_pending: outcome.failed.length,
+    r2_objects_still_referenced: outcome.still_referenced,
+    r2_cleanup_dead_lettered: outcome.dead_lettered,
+    r2_cleanup_pending: outcome.retrying.length,
+    /** One per chunk: which reference snapshot each delete was judged against. */
+    reference_snapshots: outcome.verified_at,
+    /** A ledger write that failed after the bucket had already answered. */
+    bookkeeping_failures: outcome.bookkeeping_failures,
     cache_keys_invalidated: invalidated,
   });
 });

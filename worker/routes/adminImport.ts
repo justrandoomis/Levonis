@@ -42,8 +42,9 @@ import { newId, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { canViewFinancials } from '../lib/adminScope';
 import { rateLimit } from '../lib/ratelimit';
-import { sniff } from './uploads';
-import { headMediaObject, putMediaObject } from '../lib/mediaStorage';
+import { HEIF_REFUSAL, isHeifBytes, sniff } from './uploads';
+import { headMediaObject, storeMedia } from '../lib/mediaStorage';
+import { IMAGE_SOURCE_CAP, isConvertibleToWebp, webpConversionAvailable } from '../lib/imageConvert';
 import { ingestImageUrl } from './media';
 import { planRelationsWrite } from './adminProductRelations';
 import {
@@ -64,7 +65,9 @@ import {
   type TemplateShape,
 } from '../lib/importCsv';
 import {
+  EXTERNAL_IMAGE_REFUSAL,
   fulfillmentPayloadFrom,
+  isOwnedMediaUrl,
   normKey,
   relationValues,
   resolveProduct,
@@ -114,7 +117,22 @@ const MAX_CSV_BYTES = 4 * 1024 * 1024;
 const MAX_ZIP_BYTES = 40 * 1024 * 1024;
 const MAX_ZIP_FILES = 400;
 const MAX_PRODUCTS = 500;
-const IMAGE_CAP = 4 * 1024 * 1024;
+/**
+ * ONE CEILING FOR A PRODUCT PICTURE, AND IT IS THE FORM'S.
+ *
+ * This said 4 MB while `routes/uploads.ts` — the product form the same admin
+ * uses — accepts 8. So a photograph that the owner had just added to a product
+ * by hand was refused when the same photograph arrived inside a ZIP, and
+ * nothing anywhere said the two numbers were different. The form's number wins
+ * because it is the one the owner has already been taught — and it is now the
+ * SHARED constant, so the URL half of this same import (`ingestImageUrl` in
+ * routes/media.ts, which kept its own 4 MB) can no longer disagree with the
+ * ZIP half about one photograph inside one run.
+ */
+const IMAGE_CAP = IMAGE_SOURCE_CAP;
+
+/** For a message that names the real size rather than making the owner guess. */
+const mb = (bytes: number): string => (bytes / 1024 / 1024).toFixed(1);
 
 // ------------------------------------------------------------- downloads
 
@@ -741,9 +759,20 @@ async function readUpload(c: { req: { formData: () => Promise<FormData> } }): Pr
     const dataName = names.find((k) => k.toLowerCase().endsWith('data.csv')) ?? names.find((k) => k.toLowerCase().endsWith('.csv'));
     if (!dataName) throw badRequest('The ZIP has no data.csv');
     const assets = new Map<string, Uint8Array>();
+    /**
+     * AN OVERSIZE PICTURE IS KEPT HERE AND REFUSED LATER, BY NAME.
+     *
+     * This used to `continue` past anything over the cap, which dropped the
+     * entry from the map — and `resolveImages`, finding no bytes under that
+     * filename, told the owner the image was «غير موجودة في مجلد images/».
+     * That sentence was false: the file was in the ZIP, in front of them, and
+     * they had just put it there. They could open the archive, see the picture,
+     * and have no way to learn that its SIZE was the problem. The bytes are
+     * already decompressed in `entries`, so keeping the reference costs
+     * nothing and lets `storeAsset` say the true thing with the real number.
+     */
     for (const k of names) {
       if (k === dataName) continue;
-      if (entries[k].byteLength > IMAGE_CAP) continue;
       assets.set(k.toLowerCase(), entries[k]);
     }
     return { file: { name, csv: new TextDecoder().decode(entries[dataName]), assets }, categoryId };
@@ -753,22 +782,101 @@ async function readUpload(c: { req: { formData: () => Promise<FormData> } }): Pr
   return { file: { name, csv: new TextDecoder().decode(bytes), assets: new Map() }, categoryId };
 }
 
-/** Stores one image from the ZIP under a content-addressed key. */
-async function storeAsset(env: Env, bytes: Uint8Array): Promise<string | null> {
+/**
+ * ONE IMAGE OUT OF THE ZIP, CONVERTED BEFORE IT IS STORED — OR NOT STORED.
+ *
+ * WHAT THIS WAS DOING. It called the raw R2 writer `putMediaObject` directly
+ * and wrote the supplier's JPEG or PNG byte for byte under
+ * `products/import/<sha>.<ext>` — three segments where the media layout says
+ * four, and no conversion at all, because `lib/imageConvert` was never
+ * imported into this file. The REMOTE-URL branch of `resolveImages` had
+ * already been moved to the converting door, so the two halves of the same
+ * import disagreed: paste a supplier's address into the `image` column and the
+ * picture arrived as WebP; put the identical file inside the ZIP and it
+ * arrived as the camera wrote it. A 400-file ZIP is one admin click, so this
+ * was the biggest single writer of unconverted bytes left in the system.
+ *
+ * `storeMedia` is that door, and it is REUSED rather than re-implemented:
+ * same function, same placement, same four-segment key
+ * `products/import/gallery/<sha>.webp` that `ingestImageUrl` produces — so the
+ * same photograph supplied both ways now lands on one object instead of two.
+ *
+ * THE HASH IS STILL OF THE BYTES AS THEY ARRIVED, deliberately: it is what
+ * makes the second copy of the same picture in the same ZIP cost a HEAD
+ * instead of a conversion, and a converter is not guaranteed to emit identical
+ * bytes twice. The probe asks for `.webp` when the format is convertible and
+ * for the arrival extension otherwise (GIF and AVIF pass through, by decision
+ * — see lib/imageConvert).
+ *
+ * AND WHAT HAPPENS WHEN CONVERSION FAILS. Never "store it anyway", and never
+ * an exception out of a 400-row import either: `storeMedia` THROWS on a
+ * converter failure, and an uncaught throw here would have ended the whole
+ * preview with a 500 that named no row and no file — the owner's entire
+ * afternoon of data entry, refused as one opaque error. Every answer below is
+ * a REASON, in three languages; `resolveImages` turns it into a row issue, the
+ * row fails with its line number, and every other row in the file still
+ * imports. That is what «ويكمل الاستيراد» has to mean.
+ */
+type AssetOutcome = { ok: true; url: string } | { ok: false; reason: string };
+
+const NOT_AN_IMAGE_REASON = 'ليس ملف صورة صالحًا';
+
+const tooLargeReason = (bytes: number): string =>
+  `حجم الصورة ${mb(bytes)} ميغابايت ويتجاوز الحد ${IMAGE_CAP / 1024 / 1024} ميغابايت — صغّرها ثم أعد الاستيراد / ` +
+  `the image is ${mb(bytes)} MB and the limit is ${IMAGE_CAP / 1024 / 1024} MB — shrink it and import again / ` +
+  `قەبارەی وێنەکە ${mb(bytes)} مێگابایتە و سنوورەکە ${IMAGE_CAP / 1024 / 1024} مێگابایتە — بچووکی بکەرەوە و دووبارە هاوردەی بکە`;
+
+const CONVERT_UNAVAILABLE_REASON =
+  'تحويل الصور إلى WebP غير مفعّل على الخادم، فلم نحفظ الصورة إطلاقًا — راجع إعداد Cloudflare Images / ' +
+  'WebP conversion is not enabled on this deployment — the image was NOT stored unconverted; check the Cloudflare Images binding / ' +
+  'گۆڕینی وێنە بۆ WebP لەم سێرڤەرە چالاک نییە، بۆیە وێنەکەمان هەرگیز هەڵنەگرت — ڕێکخستنی Cloudflare Images بپشکنە';
+
+const CONVERT_FAILED_REASON =
+  'تعذّر تحويل هذه الصورة إلى WebP فلم تُخزَّن — جرّب صورة أخرى أو احفظها بصيغة JPEG / ' +
+  'this image could not be converted to WebP and was not stored — try another file, or re-save it as JPEG / ' +
+  'نەتوانرا ئەم وێنەیە بگۆڕدرێت بۆ WebP بۆیە هەڵنەگیرا — فایلێکی تر تاقی بکەرەوە یان بە JPEG پاشەکەوتی بکە';
+
+async function storeAsset(env: Env, bytes: Uint8Array): Promise<AssetOutcome> {
   const kind = sniff(bytes);
-  if (!kind || !kind.mime.startsWith('image/')) return null;
+  // A photograph from an iPhone is an ISO-BMFF file with a HEIF brand, which
+  // `sniff` deliberately refuses to name rather than storing something no
+  // browser here can display. It gets the one message that ends the problem.
+  if (!kind) return { ok: false, reason: isHeifBytes(bytes) ? HEIF_REFUSAL : NOT_AN_IMAGE_REASON };
+  if (!kind.mime.startsWith('image/')) return { ok: false, reason: NOT_AN_IMAGE_REASON };
+  if (bytes.byteLength > IMAGE_CAP) return { ok: false, reason: tooLargeReason(bytes.byteLength) };
+
+  const convertible = isConvertibleToWebp(kind.mime);
+  /**
+   * ASKED BEFORE THE FIRST `put`, NOT AFTER IT.
+   *
+   * Without the binding `storeMedia` stores the original under its true
+   * extension and only LOGS — honest for a chat attachment, wrong for a
+   * catalogue that the owner was told converts everything. Checked here, the
+   * answer costs one boolean and no byte of a supplier's PNG reaches the
+   * bucket on a deployment that cannot convert it.
+   */
+  if (convertible && !webpConversionAvailable(env)) return { ok: false, reason: CONVERT_UNAVAILABLE_REASON };
+
   const digest = await crypto.subtle.digest('SHA-256', bytes as unknown as BufferSource);
   const sha = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
-  const key = `products/import/${sha}.${kind.ext}`;
-  if (!(await headMediaObject(env, 'public', key))) {
-    await putMediaObject(
-      env,
-      { key, visibility: 'public', domain: 'products', entityId: 'import', mime: kind.mime, bytes: bytes.byteLength },
-      bytes as unknown as ArrayBuffer | ArrayBufferView,
-      { httpMetadata: { contentType: kind.mime, cacheControl: 'public, max-age=31536000, immutable' } }
-    );
+  const probeKey = `products/import/gallery/${sha}.${convertible ? 'webp' : kind.ext}`;
+  if (await headMediaObject(env, 'public', probeKey)) return { ok: true, url: `/files/${probeKey}` };
+
+  try {
+    const stored = await storeMedia(env, {
+      placement: { visibility: 'public', domain: 'products', entityId: 'import', kind: 'gallery', objectId: sha },
+      bytes,
+      mime: kind.mime,
+      cacheControl: 'public, max-age=31536000, immutable',
+    });
+    return { ok: true, url: `/files/${stored.key}` };
+  } catch (e) {
+    // IMAGE_CONVERT_FAILED / IMAGE_TOO_LARGE_TO_CONVERT, or anything R2 itself
+    // threw. The detail goes to the log for whoever is debugging; the owner
+    // gets the sentence that tells them what to do with THIS file.
+    console.error(`adminImport: image "${probeKey}" was not stored: ${e instanceof Error ? e.message : String(e)}`);
+    return { ok: false, reason: CONVERT_FAILED_REASON };
   }
-  return `/files/${key}`;
 }
 
 /**
@@ -778,6 +886,12 @@ async function storeAsset(env: Env, bytes: Uint8Array): Promise<string | null> {
  * `/files/...` URL this store already serves (which is what an export writes,
  * so a round-trip re-uses the same object), and a direct image URL, verified
  * by magic bytes.
+ *
+ * ALL THREE END AT A KEY WE OWN. A URL in a cell is an instruction to FETCH,
+ * never a picture to keep pointing at: the bytes are downloaded, converted to
+ * WebP and stored here, and `isOwnedMediaUrl` is asked about the result before
+ * it may enter the map. The map is what `resolveProduct` reads, so this is the
+ * gate that decides what a product image is allowed to be.
  *
  * A spreadsheet cell is ONE image, so this path calls `ingestImageUrl` and not
  * the page reader: pasting a product page into a cell that means "this row's
@@ -809,7 +923,12 @@ async function resolveImages(
 
   for (const [cell, line] of wanted) {
     if (cell.startsWith('/files/')) {
-      map.set(cell, cell); // already ours; a round-trip must not re-upload
+      // Already ours; a round-trip of this store's own export must not
+      // re-upload. `isOwnedMediaUrl` rather than the prefix alone, so a cell
+      // that merely BEGINS with `/files/` and then walks somewhere else
+      // (`/files/../…`) is refused here instead of being copied into a product.
+      if (isOwnedMediaUrl(cell)) map.set(cell, cell);
+      else issues.push({ line, severity: 'error', message: `image: "${cell}" — ${EXTERNAL_IMAGE_REFUSAL}` });
       continue;
     }
     const zipKey = cell.toLowerCase().replace(/^\.?\//, '');
@@ -818,15 +937,27 @@ async function resolveImages(
       assets.get(`images/${zipKey}`) ??
       [...assets.entries()].find(([k]) => k.endsWith(`/${zipKey}`))?.[1];
     if (bytes) {
-      const url = await storeAsset(env, bytes);
-      if (url) map.set(cell, url);
-      else issues.push({ line, severity: 'error', message: `image: "${cell}" ليس ملف صورة صالحًا` });
+      const outcome = await storeAsset(env, bytes);
+      if (outcome.ok) map.set(cell, outcome.url);
+      else issues.push({ line, severity: 'error', message: `image: "${cell}" ${outcome.reason}` });
       continue;
     }
     if (/^https?:\/\//i.test(cell)) {
+      /**
+       * FETCH AND CONVERT — the address is never what gets stored.
+       *
+       * `ingestImageUrl` downloads the bytes, sniffs them, converts them and
+       * returns a `/files/…` key. The check on the way out is not paranoia
+       * about that function: it is the rule stated where a product image is
+       * actually decided, so no future edit to the ingest path can put a
+       * supplier's `https://` address into a product the way the three that
+       * are live on the A1 today got there.
+       */
       const res = await ingestImageUrl(env, cell);
-      if (res.status === 'stored' && res.url) map.set(cell, res.url);
-      else issues.push({ line, severity: 'error', message: `image: "${cell}" — ${res.reason ?? 'تعذّر التحميل'}` });
+      if (res.status === 'stored' && res.url && isOwnedMediaUrl(res.url)) map.set(cell, res.url);
+      else if (res.status === 'stored' && res.url) {
+        issues.push({ line, severity: 'error', message: `image: "${cell}" — ${EXTERNAL_IMAGE_REFUSAL}` });
+      } else issues.push({ line, severity: 'error', message: `image: "${cell}" — ${res.reason ?? 'تعذّر التحميل'}` });
       continue;
     }
     issues.push({

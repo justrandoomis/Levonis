@@ -7,7 +7,7 @@ import { validateOutboundUrl } from '../lib/fetchGuard';
 import { sniff } from './uploads';
 import { extractPageImages, imageCandidates, isVendorHost } from '../lib/pageImages';
 import { buildMediaKey, headMediaObject, isSafeMediaKey, mediaBucket, probeMediaBucket, putMediaObject, storeMedia } from '../lib/mediaStorage';
-import { isConvertibleToWebp } from '../lib/imageConvert';
+import { IMAGE_SOURCE_CAP, IMAGE_SOURCE_CAP_MB, isConvertibleToWebp } from '../lib/imageConvert';
 import { currentMediaReferences, hasDedicatedBucket, inventoryLegacyMedia, planLegacyMediaKey } from '../lib/mediaMigration';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { newId } from '../lib/crypto';
@@ -49,7 +49,16 @@ import { newId } from '../lib/crypto';
 export const mediaRoutes = new Hono<AppContext>();
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; LevonisBot/1.0; +https://levonis-iq.com)';
-const IMAGE_CAP = 4 * 1024 * 1024;
+/**
+ * ONE CONSTANT, SHARED WITH THE ZIP HALF OF THE IMPORT.
+ *
+ * This was 4 MB while `adminImport.ts` allowed 8, so one import run could
+ * accept a photograph supplied as a ZIP entry and refuse the identical
+ * photograph supplied as a URL — the same two-numbers-for-one-rule problem the
+ * import fix set out to remove, pointing the other way. See
+ * `IMAGE_SOURCE_CAP` in worker/lib/imageConvert.ts for why it lives there.
+ */
+const IMAGE_CAP = IMAGE_SOURCE_CAP;
 const MAX_PER_CALL = 12;
 /** The most pictures one vendor page may queue. A gallery is a dozen shots;
  *  a page that offers fifty is offering cross-sells, not this product. */
@@ -153,7 +162,7 @@ export async function ingestImageUrl(
     const buf = await readCapped(res, Math.min(IMAGE_CAP + 1, budget ? budget.bytes : IMAGE_CAP + 1));
     if (budget) budget.bytes -= buf.length;
     if (buf.length > IMAGE_CAP) {
-      return { source_url: sourceUrl, status: 'failed', reason: 'Image exceeds the 4 MB limit' };
+      return { source_url: sourceUrl, status: 'failed', reason: `Image exceeds the ${IMAGE_SOURCE_CAP_MB} MB limit` };
     }
     // Magic bytes decide, not the extension and not the remote Content-Type.
     const kind = sniff(buf);
@@ -458,7 +467,7 @@ async function convertedWebp(env: Env, oldKey: string): Promise<{ bytes: Uint8Ar
   const response = await fetch(`${origin}/files/${encoded}`, init);
   if (!response.ok) throw unavailable(`Image transform failed with HTTP ${response.status}`, 'MEDIA_TRANSFORM_UNAVAILABLE');
   const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength > IMAGE_CAP) throw badRequest('Converted image exceeds the 4 MB migration limit');
+  if (bytes.byteLength > IMAGE_CAP) throw badRequest(`Converted image exceeds the ${IMAGE_SOURCE_CAP_MB} MB migration limit`);
   const kind = sniff(bytes);
   const dimensions = kind?.mime === 'image/webp' ? rasterDimensions(bytes, kind.mime) : null;
   if (kind?.mime !== 'image/webp' || !validRasterDimensions(dimensions)) {

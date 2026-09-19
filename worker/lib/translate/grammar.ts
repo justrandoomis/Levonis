@@ -336,6 +336,20 @@ const ARTICLE_RE = /^(?:a|an|the)\s+/i;
 
 const stripArticle = (s: string): string => s.replace(ARTICLE_RE, '');
 
+/**
+ * A bare count, for "up to N" and for NOTHING ELSE in this file.
+ *
+ * Deliberately not exposed through `GrammarContext`: a bare number is what let
+ * rule 3 peel "389" off the front of "389 x 389 x 458 mm" and scramble the
+ * rest. "up to" is the one context where a number with no unit is unambiguous
+ * — it is a ceiling — so the reading is safe there and only there.
+ */
+const BARE_COUNT_RE = /^[±~]?\d+(?:[.,]\d+)?$/;
+
+/** See the bound in `resolveNoun`: the most tokens the compositional rules
+ *  will explore. A noun phrase is not thirteen words long. */
+const MAX_COMPOSITION_TOKENS = 12;
+
 /** Resolver for measurements and identity tokens, injected by index.ts so this
  *  module never duplicates R2/R3 and the two can never disagree. */
 export interface AtomResolver {
@@ -345,8 +359,38 @@ export interface AtomResolver {
 
 export interface GrammarContext {
   lang: TargetLang;
-  /** R2 + R3 from index.ts: identity terms and measurements. */
+  /**
+   * "Can this stand alone as a VALUE?" — R2 + R3 + R4 from index.ts, so a
+   * dictionary phrase counts. "Black" is a complete value on a colour line.
+   */
   atom: AtomResolver;
+  /**
+   * "Is this a FIGURE, of the kind Arabic moves behind its head noun?" — R3
+   * and R3 ALONE: a number WITH a unit. NOT a dictionary phrase, NOT a bare
+   * number, and — since the code rule below took it over — NOT an opaque code
+   * either.
+   *
+   * This exists because rule 3 below used to ask `atom` while meaning this,
+   * and `atom` says yes to "gross weight". The consequence was «13 كغم الوزن
+   * الإجمالي» reported as a finished translation. Keep the two apart.
+   */
+  measure: AtomResolver;
+  /**
+   * "Is this an opaque CODE?" — a model number, a material name, a part
+   * number: PLA, A1, X1C.
+   *
+   * SEPARATE FROM `measure`, AND THE SEPARATION IS A CORRECTION. A code used
+   * to satisfy `measure`, so rule 3 — the rule that MOVES a figure to the end
+   * of the line — moved codes too. On its own that read acceptably («فلامنت
+   * PLA»), but once rule 3b started resolving "<head> <figure>" there was a
+   * figure sitting between the code and its noun, and the output became
+   * «فلامنت 1 كغم PLA», «فوهة 0.4 مم A1», «حرارة الفوهة 220 °م PLA» — the very
+   * defect class this round was opened to close, shipped as `status:'machine'`
+   * with no review flag. A code is not a figure: a figure is what the noun
+   * MEASURES and goes after it, a code is what the noun IS and must stay
+   * beside it.
+   */
+  code: AtomResolver;
   /** R4 from index.ts: the flat PHRASES table, for labels and short values. */
   phrase: (term: string, lang: TargetLang) => string | null;
 }
@@ -381,6 +425,38 @@ function resolveNoun(raw: string, ctx: GrammarContext): Resolved | null {
     return null;
   }
 
+  /**
+   * A HARD BOUND ON COMPOSITION, and it is a safety property, not a tuning
+   * knob. Rules 2, 3, 3b and 4 each try every split point and RECURSE on the
+   * remainder, so their cost is exponential in the token count. That was
+   * hidden until now by an accident: rule 3 used to accept the first head it
+   * could resolve AT ALL, so on a run of measurements it returned on the
+   * second iteration and never explored the tree. Requiring a real head noun
+   * is what the correctness fix demanded, and it removed that accidental early
+   * exit, so a pasted spec run such as
+   *
+   *   "256 x 256 x 256 mm 0.4 mm 0.4 mm 0.4 mm …"
+   *
+   * — every token a measurement, no token a noun — went from milliseconds to
+   * not returning. This runs on the ADMIN SAVE PATH inside a Cloudflare
+   * Worker, where a CPU-limit kill is a failed save, so the bound is not
+   * optional.
+   *
+   * Twelve is chosen because a NOUN PHRASE is not thirteen words long. The
+   * longest one this engine actually composes is "256 x 256 x 256 mm build
+   * volume" at eight. Past the bound the compositional rules are skipped and
+   * the input can still resolve as a whole recorded phrase (rule 1), a whole
+   * measurement (rule 5) or a product name (rule 6) — or it is refused, kept
+   * in English and flagged, which is the correct answer for a thirteen-word
+   * run that no frame matched anyway.
+   */
+  const tokens = input.split(/\s+/);
+  if (tokens.length > MAX_COMPOSITION_TOKENS) {
+    const whole = ctx.atom(input, ctx.lang);
+    if (whole) return { text: whole, gender: undefined };
+    return null;
+  }
+
   // 2. "up to <measurement> <head>" — the quantifier moves behind the head,
   //    which is where Arabic puts it.
   //
@@ -393,7 +469,14 @@ function resolveNoun(raw: string, ctx: GrammarContext): Resolved | null {
   if (upTo) {
     const rest = upTo[1].split(/\s+/);
     for (let cut = rest.length - 1; cut >= 1; cut--) {
-      const measure = ctx.atom(rest.slice(0, cut).join(' '), ctx.lang);
+      const quantified = rest.slice(0, cut).join(' ');
+      // `measure`, NOT `atom` — see the note on GrammarContext. A bare COUNT
+      // is allowed here and nowhere else, because "up to" pins what the number
+      // is: "up to 16 colours" is a quantity, and «الألوان تصل إلى 16» keeps
+      // it a quantity. Longest reading first, so the unit is consumed as part
+      // of the measurement before the bare-count fallback is ever reached.
+      const measure =
+        ctx.measure(quantified, ctx.lang) ?? (BARE_COUNT_RE.test(quantified) ? quantified : null);
       if (!measure) continue;
       const head = resolveNoun(rest.slice(cut).join(' '), ctx);
       if (!head) continue;
@@ -403,17 +486,99 @@ function resolveNoun(raw: string, ctx: GrammarContext): Resolved | null {
   }
 
   // 3. "<measurement> <head>" — English puts the figure first, Arabic after.
-  //    Split at the LAST token that still parses as a measurement, so
-  //    "256 × 256 × 256 mm build volume" keeps the whole dimension together.
   //    Counting DOWN from the longest possible measurement, so
   //    "256 x 256 x 256 mm build volume" keeps the whole dimension together
   //    instead of stopping at the bare "256".
-  const tokens = input.split(/\s+/);
+  //
+  //    IT MUST BE `ctx.measure`, NOT `ctx.atom`. This one substitution is the
+  //    whole word-order defect. `atom` consults the PHRASES dictionary first,
+  //    so it answered "yes, that is a measurement" for "gross weight", for
+  //    "product dimensions", for "automatic" — for any label at all. The rule
+  //    then did exactly what it is built to do and moved that "measurement"
+  //    behind the head, producing «13 كغم الوزن الإجمالي» and reporting
+  //    `status: 'machine'` with no review flag.
+  //
+  //    `atom` also said yes to a BARE NUMBER, which is how the dimension tore
+  //    itself apart: on "389 x 389 x 458 mm" every longer reading failed for
+  //    want of a unit, the loop reached cut=1, took "389" as the measurement,
+  //    and re-entered on "x 389 x 458 mm" — which parses as a measurement of
+  //    its own. Out came «× 389 × 458 مم 389». `measure` requires a unit, so
+  //    the loop now fails cleanly and step 5 reads the dimension whole.
+  //
+  //    THE HEAD MUST BE A RECORDED NOUN, which is what a recorded GENDER
+  //    means here — only NOUN_PHRASES carries one. This rule MOVES text, and
+  //    moving it is only right if the thing it moves behind is a noun the
+  //    figure describes. Without the check the head could be any short value
+  //    in the flat PHRASES table, and the A1's own nozzle line proves what
+  //    that costs: "0.4 mm included" resolved `included` → «مشمول» and came
+  //    out «مشمول 0.4 مم», which reads "included 0.4 mm". Arabic wants
+  //    «0.4 مم مشمولة» — an agreement this engine has no recorded pair for —
+  //    so the honest answer is to refuse and let a human write it.
   for (let cut = tokens.length - 1; cut >= 1; cut--) {
-    const measure = ctx.atom(tokens.slice(0, cut).join(' '), ctx.lang);
+    const measure = ctx.measure(tokens.slice(0, cut).join(' '), ctx.lang);
     if (!measure) continue;
     const head = resolveNoun(tokens.slice(cut).join(' '), ctx);
+    if (head?.gender) return { text: `${head.text} ${measure}`, gender: head.gender };
+  }
+
+  // 3b. "<head> <measurement>" — the order Arabic ALREADY wants, so nothing
+  //     moves. A spec line writes it constantly: "Gross weight 13 kg",
+  //     "Product dimensions 389 x 389 x 458 mm", "Print speed 500 mm/s".
+  //     Arabic names the thing and then measures it — «الوزن الإجمالي 13 كغم»
+  //     is an ordinary nominal sentence — so the English order is already the
+  //     Arabic order and this rule only has to resolve the two halves.
+  //
+  //     It is a SEPARATE rule rather than a relaxation of rule 3 because the
+  //     two are opposites and only one can be right for a given line. Rule 3
+  //     runs first: with `measure` on both sides the prefix and the suffix can
+  //     never both be figures, so there is nothing to disambiguate.
+  //
+  //     The measurement is matched from the LONGEST SUFFIX inwards, so a
+  //     dimension is consumed in one piece and the head keeps every token in
+  //     front of it. Cheap test first, recursion only once it passes.
+  //
+  //     No recorded-gender requirement here, unlike rule 3, and the asymmetry
+  //     is the point: rule 3 REORDERS and may only reorder around a real head
+  //     noun, while this rule moves nothing. "Warranty period 12 months" is a
+  //     PHRASES label with no gender recorded, and «مدة الضمان 12 شهر» is the
+  //     author's own order — there is nothing here to get wrong.
+  for (let cut = 1; cut < tokens.length; cut++) {
+    const measure = ctx.measure(tokens.slice(cut).join(' '), ctx.lang);
+    if (!measure) continue;
+    const head = resolveNoun(tokens.slice(0, cut).join(' '), ctx);
     if (head) return { text: `${head.text} ${measure}`, gender: head.gender };
+  }
+
+  /**
+   * 3c. "<code> <head>" — the code follows the head and STAYS BESIDE IT.
+   *
+   *     English writes the code first ("PLA filament", "A1 nozzle"); Arabic
+   *     names the thing and then qualifies it — «فلامنت PLA», «فوهة A1». The
+   *     code is not a measurement of the noun, it is part of what the noun IS,
+   *     so it must end up adjacent to the head and nowhere else.
+   *
+   *     AFTER 3b, AND THE ORDER IS THE ENTIRE FIX. This used to be folded into
+   *     rule 3 by letting a code satisfy `ctx.measure`, which moved the code to
+   *     the END of whatever rule 3 produced. Once 3b could resolve "<head>
+   *     <figure>", the figure landed between the code and its noun:
+   *
+   *       "PLA filament 1 kg"  →  «فلامنت 1 كغم PLA»
+   *       "A1 nozzle 0.4 mm"   →  «فوهة 0.4 مم A1»
+   *
+   *     Running 3b first makes the measurement the OUTER frame and hands the
+   *     remainder — "PLA filament", "A1 nozzle" — back to this rule, which
+   *     puts the code where it belongs: «فلامنت PLA 1 كغم», «فوهة A1 0.4 مم».
+   *
+   *     A RECORDED HEAD NOUN IS REQUIRED, for the same reason rule 3 requires
+   *     one: this rule moves text, and text may only be moved behind a noun
+   *     that is really a noun. Longest code first, so a two-token code is not
+   *     torn in half.
+   */
+  for (let cut = tokens.length - 1; cut >= 1; cut--) {
+    const code = ctx.code(tokens.slice(0, cut).join(' '), ctx.lang);
+    if (!code) continue;
+    const head = resolveNoun(tokens.slice(cut).join(' '), ctx);
+    if (head?.gender) return { text: `${head.text} ${code}`, gender: head.gender };
   }
 
   // 4. "<adjective> <head>" — the adjective follows the head and agrees with
@@ -525,7 +690,17 @@ function splitList(text: string): string[] | null {
 function joinList(items: string[], lang: TargetLang): string {
   if (items.length === 1) return items[0];
   const head = items.slice(0, -1).join('، ');
-  const and = lang === 'ar' ? 'و' : 'و';
+  /**
+   * «و» IS A PREFIX IN ARABIC AND A FREE WORD IN SORANI.
+   *
+   * Both branches used to be the same character AND the same spacing, which
+   * is correct for Arabic — «الوزن والأبعاد» is written joined — and wrong for
+   * Kurdish, where «و نۆزڵ» takes a space. The live corpus showed it:
+   * "Layer height 0.2 mm, nozzle 0.4 mm" came back as «... مم ونۆزڵ ...».
+   * The ternary is kept, with a real difference in it, rather than removed —
+   * the two languages genuinely differ here.
+   */
+  const and = lang === 'ar' ? 'و' : 'و ';
   return `${head} ${and}${items[items.length - 1]}`;
 }
 

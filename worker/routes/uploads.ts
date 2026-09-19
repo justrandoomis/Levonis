@@ -26,6 +26,97 @@ import {
 const IMAGE_MAX = 8 * 1024 * 1024;
 const VIDEO_MAX = 40 * 1024 * 1024;
 
+/**
+ * THE MAJOR BRAND OF AN ISO-BMFF FILE, OR NULL IF IT IS NOT ONE.
+ *
+ * Layout: 4 bytes of box size, then `ftyp` at 4..7, then the four-character
+ * major brand at 8..11. Everything below reads the brand instead of guessing
+ * from the container, because the container is the thing HEIC and MP4 share.
+ */
+function isoBrand(b: Uint8Array): string | null {
+  if (b.length < 12) return null;
+  if (!(b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70)) return null;
+  return String.fromCharCode(b[8], b[9], b[10], b[11]);
+}
+
+/**
+ * The HEIF/HEIC brands. `heic`/`heix` are a single still, `hevc`/`hevm`/`hevs`
+ * an image sequence, `heim`/`heis` the multi-view variants, and `mif1`/`msf1`
+ * the generic HEIF image and sequence brands an iPhone also writes.
+ *
+ * AVIF IS NOT HERE, AND THE GENERIC BRANDS ARE WHY `declaresAvif` EXISTS.
+ * AVIF shares this container, and a real AVIF may declare `mif1` as its MAJOR
+ * brand with `avif` only in the compatible-brands list — several encoders do,
+ * and so do AVIF image sequences. Reading the major brand alone, such a file
+ * fell past the AVIF entry, was caught here, and the uploader told the owner
+ * their AVIF was an iPhone photograph and to export it as JPEG. So the
+ * compatible-brands list is read before the HEIF verdict is given.
+ */
+const HEIF_BRANDS = new Set(['heic', 'heix', 'hevc', 'heim', 'heis', 'hevm', 'hevs', 'mif1', 'msf1']);
+
+/**
+ * THE `ftyp` BOX'S COMPATIBLE-BRANDS LIST, AFTER THE MAJOR BRAND.
+ *
+ * Layout: a big-endian u32 box size at 0..3, `ftyp` at 4..7, the major brand
+ * at 8..11, a minor VERSION (not a brand) at 12..15, then four-byte brands to
+ * the end of the box. Bounded by the declared box size AND by the buffer, so a
+ * truncated or lying header walks a few entries and stops rather than reading
+ * a megabyte of pixels as brand names.
+ */
+function isoCompatibleBrands(b: Uint8Array): string[] {
+  if (b.length < 16) return [];
+  const declared = (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3];
+  const end = Math.min(b.length, declared > 16 ? declared : b.length, 16 + 64);
+  const out: string[] = [];
+  for (let i = 16; i + 4 <= end; i += 4) out.push(String.fromCharCode(b[i], b[i + 1], b[i + 2], b[i + 3]));
+  return out;
+}
+
+/** True when the file says it is AVIF, as a major brand or a compatible one. */
+export function declaresAvif(b: Uint8Array): boolean {
+  const brand = isoBrand(b);
+  if (brand === null) return false;
+  if (brand === 'avif' || brand === 'avis') return true;
+  return isoCompatibleBrands(b).some((x) => x === 'avif' || x === 'avis');
+}
+
+/**
+ * TRUE FOR THE PHOTO AN iPHONE TAKES OUT OF THE BOX.
+ *
+ * `sniff` returns NULL for these bytes rather than a MIME, and that is the
+ * whole point of this predicate existing beside it. Every caller of `sniff` in
+ * this Worker either refuses what it cannot name or hands the bytes to
+ * `storeMedia`, which stores an unconvertible image under its true extension —
+ * and `env.IMAGES` cannot decode HEIF, so "accept it" would mean a product
+ * photo, a KYC document or a warranty-claim picture sitting in R2 that no
+ * browser on the site can render. A refusal that names the format and the fix
+ * is the honest answer; returning a MIME would have made every one of those
+ * call sites accept it silently, and none of them are in a position to know.
+ *
+ * The owner's remedy is one setting away: iPhone → Settings → Camera →
+ * Formats → Most Compatible, or Share → export as JPEG.
+ */
+export function isHeifBytes(buf: Uint8Array): boolean {
+  const brand = isoBrand(buf);
+  if (brand === null || !HEIF_BRANDS.has(brand)) return false;
+  // A generic HEIF brand that also declares `avif` is an AVIF file. Refusing
+  // it would be a lie in the owner's own language: it is a format this shop
+  // stores happily, and the message would tell them to re-export a photograph
+  // they never took with a phone.
+  return !declaresAvif(buf);
+}
+
+/**
+ * The refusal an iPhone photograph gets, in the three languages this shop
+ * speaks. It lives here, beside the detection, so the import and the upload
+ * form cannot drift into telling the owner two different things about the same
+ * file.
+ */
+export const HEIF_REFUSAL =
+  'هذه الصورة بصيغة HEIC (صيغة كاميرا الآيفون) ولا يمكن تحويلها — صدّرها بصيغة JPEG ثم أعد رفعها / ' +
+  'This is a HEIC photo (the iPhone camera format) and cannot be converted — export it as JPEG and upload again / ' +
+  'ئەم وێنەیە بە شێوازی HEIC ـە (شێوازی کامێرای ئایفۆن) و ناتوانرێت بگۆڕدرێت — بە JPEG دەریبکە و دووبارە بارکە';
+
 const MAGIC: Array<{ ext: string; mime: string; match: (b: Uint8Array) => boolean }> = [
   { ext: 'jpg', mime: 'image/jpeg', match: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
   { ext: 'png', mime: 'image/png', match: (b) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 },
@@ -43,13 +134,35 @@ const MAGIC: Array<{ ext: string; mime: string; match: (b: Uint8Array) => boolea
    */
   {
     ext: 'avif', mime: 'image/avif',
-    match: (b) =>
-      b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70 &&
-      b[8] === 0x61 && b[9] === 0x76 && b[10] === 0x69 && (b[11] === 0x66 || b[11] === 0x73),
+    // The MAJOR brand is the common case; `declaresAvif` also reads the
+    // compatible-brands list, because an encoder may write `mif1` as the major
+    // brand and put `avif` there instead. Without that, such a file reached the
+    // mp4 entry, was caught by the HEIF check, and was refused as an iPhone photo.
+    match: (b) => declaresAvif(b),
   },
   {
+    /**
+     * MP4, LAST, AND ONLY AFTER THE BRAND HAS BEEN READ.
+     *
+     * This used to be `ftyp at offset 4` and nothing else, which made it the
+     * catch-all for EVERY ISO-BMFF file — and a HEIC photograph is an ISO-BMFF
+     * file. So every picture taken by an iPhone with the default camera setting
+     * was sniffed as `video/mp4`, stored under a `.mp4` key with
+     * `Content-Type: video/mp4`, and served to the shop as a video that no
+     * player can play and no browser can show. The customer had done nothing
+     * wrong and the file was never named as the problem.
+     *
+     * The brand at 8..11 is what separates the two, so the brand is what is
+     * read. `isHeifBytes` is checked here rather than a list of MP4 brands
+     * being demanded, and that direction is deliberate: the real world writes
+     * far more MP4 brands than the five in the specification everyone quotes
+     * (`isom`, `iso2`, `mp41`, `mp42`, `avc1`) — `iso4`/`iso5`/`iso6` for
+     * fragmented files, `M4V `, `mp4v`, `qt  ` from an iPhone shooting video,
+     * `dash`. An allowlist would have started refusing warranty-claim clips and
+     * chat videos that work today, which is the opposite of a fix.
+     */
     ext: 'mp4', mime: 'video/mp4',
-    match: (b) => b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70,
+    match: (b) => { const brand = isoBrand(b); return brand !== null && !HEIF_BRANDS.has(brand); },
   },
 ];
 
@@ -98,6 +211,17 @@ uploadRoutes.post('/', async (c) => {
 
   let buf = new Uint8Array(await file.arrayBuffer());
   const kind = sniff(buf);
+  /**
+   * NAME THE FORMAT BEFORE SAYING "UNSUPPORTED".
+   *
+   * A HEIC photograph used to reach here as `video/mp4` and be STORED — and on
+   * the purposes that forbid video it was refused with «Videos are not allowed
+   * here», which is a sentence that tells someone holding a photograph nothing
+   * they can act on. It is the single most common file a customer on an iPhone
+   * will pick, so it gets the one message that ends the problem: the format,
+   * and the export that fixes it.
+   */
+  if (!kind && isHeifBytes(buf)) throw badRequest(HEIF_REFUSAL, 'IMAGE_HEIC_UNSUPPORTED');
   if (!kind) throw badRequest('Unsupported file type — please upload a JPEG, PNG, WebP or GIF image' + (allowVideo ? ' or MP4 video' : ''));
   if (kind.mime.startsWith('video/') && !allowVideo) {
     throw badRequest('Videos are not allowed here');

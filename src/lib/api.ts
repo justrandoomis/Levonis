@@ -1349,6 +1349,137 @@ export interface ProductsListResponse {
   category?: ResolvedCategory | null;
 }
 
+// ----------------------------------------------- «خبرني لما يرجع» (0092)
+
+/**
+ * THE STOCK-ALERT DOOR, WRITTEN DOWN SO THE UI CANNOT GUESS AT IT.
+ *
+ * Every route below is mounted at /api/stock-alerts and sits behind
+ * `requireAuth`, so an anonymous request is answered 401 — the sign-in bounce
+ * is part of the contract, not an error to report.
+ *
+ *   POST   /api/stock-alerts
+ *     body { productId, kind, optionValueId?, colorId? }
+ *     → { success, alert: StockAlertRow | null, readiness, channel }
+ *
+ *   PUT    /api/stock-alerts/product/:productId        (the sheet's Save)
+ *     body { alerts: Array<{ kind, optionValueId?, colorId? }> }
+ *     → { success, alerts: StockAlertRow[], readiness, channel }
+ *     ONE batch: the wishes that left are cancelled and the wishes that stayed
+ *     are re-armed together or not at all. An empty array cancels every
+ *     standing alert on that product. An unarmable wish refuses the WHOLE
+ *     save, so a partial set never reaches the screen.
+ *
+ *   GET    /api/stock-alerts/product/:productId
+ *     → { success, alerts: StockAlertRow[] }   live rows only ('armed'/'firing')
+ *
+ *   GET    /api/stock-alerts                            («تنبيهاتي»)
+ *     → { success, limit, alerts: StockAlertListEntry[] }
+ *
+ *   DELETE /api/stock-alerts/:alertId
+ *     → { success, removed }                   404 when it is not yours
+ *
+ * REFUSALS, AND THE ONE THAT IS NOT A FAILURE.
+ *
+ *   400 ALERT_<reason>             permanent: this wish can never come true.
+ *                                  The reasons are 0092's AlertDeadReason plus
+ *                                  VARIANT_NOT_MODELLED, which only the DOOR
+ *                                  refuses (the sweep tolerates it, because
+ *                                  creating the variant row is itself one of
+ *                                  the restock paths).
+ *   409 ALERT_LIMIT_REACHED        forty standing alerts is the cap.
+ *   429 RATE_LIMITED               the route's own limiter.
+ *   503 ALERT_TEMPORARILY_UNAVAILABLE
+ *                                  «ASK AGAIN LATER», NOT «FAILED». The
+ *                                  resolver's context was degraded — a
+ *                                  relational read did not come back — so the
+ *                                  door refused to promise something it could
+ *                                  not verify. Nothing is wrong with the
+ *                                  request and the next one usually succeeds,
+ *                                  so any UI that renders this as an error is
+ *                                  telling the customer something untrue.
+ */
+export interface StockAlertRow {
+  id: string;
+  product_id: string;
+  /** 'product' | 'option_value' | 'color' | 'combination' (0092's CHECK). */
+  kind: string;
+  /** '' — the schema's sentinel — when the alert does not name one. */
+  option_value_id: string;
+  color_id: string;
+  state: string;
+  /** How many times this person has re-armed it; the row survives a re-arm. */
+  arm_seq: number;
+  armed_channel: string;
+  armed_at: string;
+  notified_at: string;
+  expires_at: string;
+  dead_reason: string;
+}
+
+/** One channel's readiness, as the server judged it for THIS account. The
+ *  destination is masked or null and is never the address itself. */
+export interface StockAlertChannelState {
+  channel: string;
+  ready: boolean;
+  blocker: string | null;
+  destination_masked: string | null;
+  can_activate: boolean;
+  action: { kind: 'link_telegram' | 'verify_email'; href: string } | null;
+}
+
+export interface StockAlertReadiness {
+  channels: StockAlertChannelState[];
+  any_outbound_ready: boolean;
+  /** Never null: the in-app inbox is the floor. This is the ONLY thing a
+   *  confirmation sentence may name. */
+  recommended: string;
+  primary_channel: string;
+  delivery: string[];
+}
+
+export interface StockAlertSaveResponse {
+  success: boolean;
+  alerts: StockAlertRow[];
+  readiness: StockAlertReadiness;
+  channel: string;
+}
+
+export interface StockAlertsForProductResponse {
+  success: boolean;
+  alerts: StockAlertRow[];
+}
+
+/** A row of «تنبيهاتي»: the same alert plus the labels the list needs, so a
+ *  list of forty alerts costs one query rather than forty catalogue loads. */
+export interface StockAlertListEntry {
+  id: string;
+  product_id: string;
+  slug: string;
+  name: LocalizedText;
+  image: string | null;
+  kind: string;
+  option_value_id: string;
+  color_id: string;
+  option_value: LocalizedText | null;
+  color: LocalizedText | null;
+  state: string;
+  arm_seq: number;
+  armed_channel: string;
+  armed_at: string;
+  notified_at: string | null;
+  expires_at: string | null;
+  /** Why a reconciled alert can never come true. Null while it is still
+   *  waiting — the two must never render the same. */
+  dead_reason: string | null;
+}
+
+export interface StockAlertListResponse {
+  success: boolean;
+  limit: number;
+  alerts: StockAlertListEntry[];
+}
+
 /**
  * One piece of main-page artwork, already resolved by the server.
  *

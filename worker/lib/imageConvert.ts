@@ -30,14 +30,38 @@
  * WHAT HAPPENS WITHOUT THE BINDING. `env.IMAGES` is undefined on an account
  * without the entitlement, in `wrangler dev`, and in tests. This module is the
  * ONLY place that reads it, so "what then" has one answer instead of one per
- * call site: `convertToWebp` reports `unavailable` and the caller decides. It
- * never pretends a conversion happened.
+ * call site: `convertToWebp` reports `unavailable` and the caller decides, and
+ * `webpConversionAvailable` lets a caller that writes to R2 ask BEFORE it
+ * writes rather than after. It never pretends a conversion happened.
  */
 
 import type { Env } from './types';
 
 /** What the Images binding will accept in one call. */
 export const IMAGES_MAX_INPUT_BYTES = 20 * 1024 * 1024;
+
+/**
+ * THE ONE SIZE LIMIT A PICTURE ENTERING THIS CATALOGUE HAS TO MEET.
+ *
+ * It lives here, next to the converter, because the owner meets it through
+ * three different doors — the product form, a ZIP entry in an import, and a
+ * URL cell in the same import — and until it was one constant those doors
+ * disagreed. The product form allowed 8 MB; the import's ZIP path refused at
+ * 4 MB and then told the owner the file was «غير موجود في مجلد images/» about
+ * a file sitting in the ZIP in front of them. Raising the ZIP path alone
+ * simply inverted the contradiction: the same 6 MB photograph imported as a
+ * ZIP entry and was refused as a URL, in the same run, with two different
+ * numbers in the message.
+ *
+ * It is a SOURCE-size limit. The message then names a file the owner can look
+ * at and act on, rather than the size of something the server produced.
+ * `IMAGES_MAX_INPUT_BYTES` above is a separate, larger ceiling imposed by the
+ * binding itself.
+ */
+export const IMAGE_SOURCE_CAP = 8 * 1024 * 1024;
+
+/** The cap as the owner reads it, so no message hard-codes the number twice. */
+export const IMAGE_SOURCE_CAP_MB = IMAGE_SOURCE_CAP / (1024 * 1024);
 
 /** Quality: high enough that a product photo survives a pinch-zoom, low enough
  *  that the file is a fraction of the camera original. */
@@ -54,6 +78,24 @@ const CONVERTIBLE = new Set(['image/png', 'image/jpeg']);
 
 export function isConvertibleToWebp(mime: string): boolean {
   return CONVERTIBLE.has(mime);
+}
+
+/**
+ * CAN THIS DEPLOYMENT CONVERT AT ALL — asked BEFORE any byte is written.
+ *
+ * `convertToWebp` already answers `unavailable`, but it answers it with the
+ * image in hand, and a caller that stores first and asks afterwards has
+ * already put the unconverted bytes in R2 by the time it hears the word. The
+ * import needs the answer one step earlier: it writes image objects during
+ * PREVIEW, so «تحققت أن الصور تتحول إلى WebP قبل التخزين» has to be decidable
+ * before the first `put`, not after the fortieth.
+ *
+ * This stays in this module for the reason the header gives: `env.IMAGES` is
+ * read in exactly one file, so "what does an account without the entitlement
+ * do" keeps having one answer instead of one per call site.
+ */
+export function webpConversionAvailable(env: Pick<Env, 'IMAGES'>): boolean {
+  return Boolean(env.IMAGES);
 }
 
 export type ConvertOutcome =

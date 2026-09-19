@@ -63,6 +63,13 @@ import { captureSupportRefFromSearch } from '../lib/supportRef';
 import { productGalleryForSelection } from '../lib/productImage';
 import { tierLabel } from '../components/subscription/tierMeta';
 import ConditionPanel from '../components/product/ConditionPanel';
+import StockAlertPanel from '../components/product/StockAlertPanel';
+import {
+  decodeAlertIntent,
+  type AlertColorOption,
+  type AlertModel,
+  type StockAlertWish,
+} from '../components/product/stockAlertTargets';
 import { conditionKindLabel, type ConditionEntry } from '../lib/condition';
 
 // ------------------------------------------------------------------ strings
@@ -1166,6 +1173,38 @@ export default function Product() {
   }, [location.search, location.pathname]);
 
   /**
+   * «خبرني لما يرجع» — THE CHOICE COMING BACK FROM /auth.
+   *
+   * Every stock-alert route is behind requireAuth, so a signed-out visitor who
+   * picked the model they are waiting for has to go and sign in. `?alert=`
+   * (src/components/product/stockAlertTargets.ts) is what carries that choice
+   * through the round trip inside the existing `?next=` machinery, so they
+   * return to a pre-ticked sheet instead of an empty one — which is exactly
+   * where, on a phone, people give up.
+   *
+   * It is decoded as UNTRUSTED input (anyone can type it) and nothing is ever
+   * armed from it: the sheet opens with the boxes ticked and waits for the
+   * customer's own Save. The parameter is then dropped from the URL with a
+   * REPLACE, so a refresh or a shared link does not re-open the sheet — and a
+   * replace rather than a push, because a Back that only removes a query
+   * parameter is a Back that appears not to work.
+   */
+  const [alertIntent, setAlertIntent] = useState<StockAlertWish[]>([]);
+  useEffect(() => {
+    if (!location.search || location.search.indexOf('alert=') === -1) return;
+    const decoded = decodeAlertIntent(new URLSearchParams(location.search).get('alert'));
+    if (decoded.length > 0) setAlertIntent(decoded);
+  }, [location.search]);
+  const consumeAlertIntent = useCallback(() => {
+    setAlertIntent([]);
+    const params = new URLSearchParams(location.search);
+    if (!params.has('alert')) return;
+    params.delete('alert');
+    const rest = params.toString();
+    navigate(`${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`, { replace: true });
+  }, [navigate, location.search, location.pathname, location.hash]);
+
+  /**
    * THE SUPPORT LINK IS FETCHED BEFORE THE TAP, NOT DURING IT.
    *
    * §3.3 — a signed-in sharer's link carries THEIR support handle, built by the
@@ -1776,8 +1815,48 @@ export default function Product() {
    * `modes` is the server's own per-type verdict, so this sentence appears
    * exactly when direct sale is offered-but-empty and pre-order is open.
    */
-  const directSoldOutPreorderOpen =
-    preUsable && modesArr.some((m) => m.type === 'direct_sale' && !m.usable && m.reason === 'OUT_OF_STOCK');
+  const directOutOfStock = modesArr.some(
+    (m) => m.type === 'direct_sale' && !m.usable && m.reason === 'OUT_OF_STOCK'
+  );
+  const directSoldOutPreorderOpen = preUsable && directOutOfStock;
+
+  /**
+   * «خبرني لما يرجع» — WHEN THE AFFORDANCE EXISTS AT ALL.
+   *
+   * Exactly when the server says direct sale is OFFERED and EMPTY. That is the
+   * one situation an alert can be honest about: the shelf is the thing that
+   * refills, and OUT_OF_STOCK is the server's own verdict that this target
+   * sells from a shelf and the shelf is at zero. Every other closed reason is
+   * something an alert can never answer — a pre-order-only model has no shelf
+   * to watch, an untracked one has no counter to watch it with, and the door
+   * would refuse both (worker/lib/stockAlertResolve.ts). Offering a button
+   * that the next tap refuses is worse than not offering one.
+   *
+   * A community listing is excluded for the same reason it cannot be bought:
+   * it is not the shop's stock, and nothing here sweeps it.
+   */
+  const stockAlertOffered = source === 'catalog' && directOutOfStock;
+  /** The ONE option group's values, labelled exactly as the chooser labels
+   *  them. Empty for a product with several groups — see buildAlertTargets:
+   *  a stored alert has one `option_value_id`, so per-model rows would be a
+   *  promise about a model in a combination nobody chose. */
+  const alertModels: AlertModel[] =
+    relationOptionGroups.length === 1
+      ? relationOptionGroups[0].values.map((value) => {
+          const option = options.find((item) => item.id === value.id);
+          return {
+            id: value.id,
+            label: (option ? pickName(option.name_en, option.name, option.name_ar) : value.name_en) || value.id,
+          };
+        })
+      : [];
+  /** Every colour the product models, not only the ones visible for the
+   *  current selection: a colour that has gone out of view still has to be
+   *  NAMEABLE, or a standing alert on it renders as an unexplained id. */
+  const alertColors: AlertColorOption[] = (product.colors ?? []).map((col) => ({
+    id: col.id,
+    label: pickName(col.name_en, col.name, col.name_ar) || col.id,
+  }));
   /**
    * THE CHOICE IS SHOWN WHENEVER THE PRODUCT OFFERS ONE — not only when both
    * halves happen to be buyable today.
@@ -2319,6 +2398,33 @@ export default function Product() {
             </p>
           ) : null}
         </fieldset>
+      ) : null}
+
+      {/*
+        «خبرني لما يرجع» — DIRECTLY UNDER «طريقة التوفر», BESIDE THE DISABLED CARD.
+
+        The disabled «بيع مباشر / نفد المخزون حاليًا» card above is where the
+        customer learns the cheap route is empty, so the answer to «and then
+        what?» belongs in the same block and not at the bottom of the page. It
+        sits AFTER the chooser rather than inside it on purpose: the two cards
+        in there are a choice between ways to BUY, and a third card that arms a
+        notification would read as a third way to buy — «طلب مسبق» would then be
+        competing with something that is not an alternative to it.
+      */}
+      {stockAlertOffered ? (
+        <StockAlertPanel
+          productId={product.id}
+          productSlug={product.slug}
+          productLabel={name}
+          models={alertModels}
+          optionGroupCount={relationOptionGroups.length}
+          colors={alertColors}
+          selectedColorId={colorId}
+          preorderOpen={preUsable}
+          isAuthenticated={isAuthenticated}
+          intent={alertIntent}
+          onIntentConsumed={consumeAlertIntent}
+        />
       ) : null}
 
       {showTransports ? (

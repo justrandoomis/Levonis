@@ -67,8 +67,29 @@ export type TargetLang = 'ar' | 'ckb';
  *     written under version 1 is therefore not equivalent to the same source
  *     translated today, and leaving the number alone would have let the two
  *     coexist with nothing to tell them apart.
+ *
+ * 3 — WORD ORDER. Version 2 could print a value before its label and still
+ *     report `status: 'machine'`, `coverage: 1`: "gross weight 13 kg" came out
+ *     «13 كغم الوزن الإجمالي» and "Product dimensions 389 x 389 x 458 mm" came
+ *     out «× 389 × 458 مم 389 أبعاد المنتج», with the dimension itself torn
+ *     apart. The cause and the repair are written up in
+ *     `tests/translateWordOrder.test.ts` and at rule 3 of `./grammar.ts`.
+ *
+ *     This bump matters more than version 2's did, because the corrupted rows
+ *     are INDISTINGUISHABLE from good ones by their status — they were stored
+ *     as finished machine translations. The version is the only thing that
+ *     tells a version-2 row apart from what the same English produces today,
+ *     and `hashSource` folds it in, so an admin re-save now genuinely
+ *     re-generates instead of seeing an unchanged hash and skipping.
+ *
+ *     Three things in this version also REFUSE what version 2 accepted — a
+ *     colour glued to a noun without gender agreement, two units with no
+ *     number between them, a list written with two different separators. Those
+ *     rows become `review_needed` on their next save. That is the intended
+ *     direction: §3 says an absent translation is a flag a human clears, while
+ *     a wrong one is shipped to a customer with nobody knowing to look.
  */
-export const TRANSLATION_VERSION = 2;
+export const TRANSLATION_VERSION = 3;
 
 /** The ONLY fields that are ever machine-translated. `name` is absent on
  *  purpose (§3). */
@@ -109,8 +130,96 @@ const MODEL_CODE_RE = /^[A-Za-z]{0,3}\d+[A-Za-z0-9-]*$|^[A-Z]{1,6}\d[A-Za-z0-9-]
 
 /** A number, optionally signed or decimal: "0.4", "220", "0,5". */
 const NUMBER_RE = /^[±~]?\d+(?:[.,]\d+)?$/;
+
+/**
+ * A number OR a numeric range written as one token: "220-240", "15-30", "3-4".
+ *
+ * R3's doc comment above has claimed "220-240 V" since it was written, and the
+ * 0079 note in `dictionary.ts` records `week`/`weeks` specifically so that a
+ * lead time of "3-4 weeks" would translate. NEITHER EVER DID. A range token
+ * matched no pattern here, R3 declined, and both lines came back English and
+ * flagged — a silent hole in exactly the two places the comments promised
+ * coverage. This closes it, and nothing is invented: the digits are kept and
+ * only the unit is localized, same as any other measurement.
+ *
+ * Kept SEPARATE from NUMBER_RE on purpose. NUMBER_RE is also what `isIdentity`
+ * and `translateAtom` read to decide what a bare, unit-less token is, and a
+ * bare "3-4" standing alone is not a value this engine should wave through as
+ * language-neutral — inside a measurement it is a range, outside one it could
+ * be anything.
+ */
+const NUMBER_OR_RANGE_RE = /^[±~]?\d+(?:[.,]\d+)?(?:[-–—~]\d+(?:[.,]\d+)?)*$/;
+
+/**
+ * THE UNITS THAT ARE REALLY COUNTING NOUNS, AND SO INFLECT WITH THE NUMBER.
+ *
+ * Arabic number-noun agreement depends on the numeral: «3 أسابيع», not «3
+ * أسبوع». The `UNITS` table stores ONE form per key, so the engine has no
+ * plural to reach for. With a single figure that is an old, pre-existing
+ * infelicity and out of scope — «12 شهر» has always been written that way
+ * here. With a RANGE it is different, and it is different because of this
+ * round: before ranges parsed at all, "3-4 weeks" was kept in English and
+ * FLAGGED, which is what §3 asks for. Letting the range through turned a
+ * correctly-flagged line into a wrong one marked `machine` — a regression
+ * created by this engine, not inherited by it.
+ *
+ * A range also makes the noun plural in a way no singular entry can render.
+ * So a range is refused in front of these, and accepted in front of an
+ * ordinary metric unit («220-240 فولت», «0.2-0.3 مم»), which does not inflect
+ * in an Arabic spec sheet. When the plural forms are recorded in `UNITS`, this
+ * set is what should shrink.
+ */
+const COUNTING_UNITS = new Set([
+  'pcs', 'pc', 'pack', 'roll', 'rolls', 'spool', 'spools', 'set', 'sets',
+  'hour', 'hours', 'day', 'days', 'week', 'weeks', 'month', 'months', 'year', 'years',
+  'business day', 'business days', 'working day', 'working days',
+]);
+
+/** True for a token that is a RANGE rather than a single figure: "3-4". */
+const IS_RANGE_RE = /\d[-–—~]\d/;
+
 const DIM_SEP_RE = /^[x×*]$/i;
 const RANGE_SEP_RE = /^[-–—~]$/;
+
+/**
+ * NUMBERS ARE NEVER CONVERTED TO ARABIC-INDIC, anywhere in this engine.
+ *
+ * Stated once, here, because an inconsistent mix inside one sentence is its
+ * own defect and there was nothing written down to stop one appearing. The
+ * reasons, in order of weight:
+ *
+ *   - the value must stay comparable with the English row it was produced
+ *     from. «٠٫٤ مم» and "0.4 mm" are the same nozzle, but no code path in
+ *     this project — search, filtering, spec comparison, the admin's diff of
+ *     the English source against the stored Arabic — knows that;
+ *   - the product NAME and every model code stay Latin by §3, so a spec sheet
+ *     already contains Latin characters. Latin digits beside them read
+ *     normally; ٠١٢ beside "X1C" does not;
+ *   - Iraqi storefronts and vendor spec sheets are written with Western
+ *     digits. This is what the owner's own hand-written Arabic uses.
+ *
+ * THE ONE CONSEQUENCE, spelled out so it is not mistaken for a bug: a comma
+ * BETWEEN DIGITS is a thousands separator belonging to a Latin number, so it
+ * stays a Latin comma — «10,000 مم/ث²». A comma between WORDS is Arabic
+ * punctuation and becomes «،». Same for the semicolon. That is what
+ * `arabicPunctuation` below does, and it only ever sees the between-words kind
+ * because a thousands separator is never at the end of a token.
+ */
+const ARABIC_PUNCTUATION: Record<string, string> = { ',': '،', ';': '؛', '?': '؟' };
+
+/** Arabic and Sorani share the script, so both take Arabic punctuation. */
+const arabicPunctuation = (s: string): string =>
+  s.replace(/[,;?]/g, (ch) => ARABIC_PUNCTUATION[ch] ?? ch);
+
+/**
+ * The multiplication sign inside a GLUED dimension, "256x256x256mm".
+ *
+ * The spaced form already became «256 × 256 × 256 مم» — the glued one kept the
+ * Latin x, which in RTL text renders as a stray Latin letter in the middle of
+ * Arabic. Two spellings of the same source producing two different Arabic
+ * strings is the inconsistency; this makes them one.
+ */
+const dimensionSigns = (n: string): string => n.replace(/\s*[x×*]\s*/gi, ' × ');
 
 function lookup(term: string, lang: TargetLang): string | null {
   const e = PHRASES[norm(term)];
@@ -136,44 +245,92 @@ function isIdentity(token: string): boolean {
  * EVERY unit token has a rendering in the requested language, so a missing
  * Sorani unit downgrades the segment to review_needed rather than emitting a
  * half-translated string.
+ *
+ * THE ONE THING THIS RULE IS ALLOWED TO ASSUME is that "<figure> <unit>" means
+ * the same thing in the same order in Arabic as in English — «0.4 مم» is not a
+ * reordering of "0.4 mm", it is the same phrase. That holds for a figure and
+ * its unit and for nothing else, which is why the guard below exists: TWO
+ * UNITS WITH NO NUMBER BETWEEN THEM are not a measurement, they are a measured
+ * NOUN, and Arabic puts the noun first.
+ *
+ * "1 kg spool" is the shape. `spool` is a UNITS entry — a spool is a countable
+ * quantity on a materials line — so this rule read the segment as "1, kg,
+ * spool", joined the three in English order and returned «1 كغم بكرة» with
+ * `status: 'machine'`. That is word salad; Arabic says «بكرة 1 كغم». Nothing
+ * in the token stream says which of the two units is the head noun, so this
+ * rule cannot know, and §3 says it must not guess. It refuses, the segment
+ * keeps its English, and the review page tells a human.
  */
 function translateMeasurement(seg: string, lang: TargetLang): string | null {
   const tokens = seg.trim().split(/\s+/);
   if (tokens.length === 0) return null;
   let sawNumber = false;
   let sawUnit = false;
+  /** See the note above: a unit may not directly follow another unit. */
+  let prevWasUnit = false;
+  /** Was the figure immediately before this token a RANGE? See COUNTING_UNITS. */
+  let prevWasRange = false;
   const out: string[] = [];
   for (const raw of tokens) {
     const tok = raw.replace(/[,;]$/, '');
-    const trailing = raw.length > tok.length ? raw.slice(tok.length) : '';
-    if (NUMBER_RE.test(tok)) {
+    // A comma or semicolon ENDING a token separates words, never digits — a
+    // thousands separator is never last. So it is punctuation, and in Arabic
+    // and Sorani output it is Arabic punctuation. See the NUMBERS note above.
+    const trailing = raw.length > tok.length ? arabicPunctuation(raw.slice(tok.length)) : '';
+    if (NUMBER_OR_RANGE_RE.test(tok)) {
       sawNumber = true;
+      prevWasUnit = false;
+      prevWasRange = IS_RANGE_RE.test(tok);
       out.push(tok + trailing);
       continue;
     }
     if (DIM_SEP_RE.test(tok)) {
       // Arabic and Kurdish spec sheets write a dimension with the multiplication
       // sign, not a Latin "x" — which in RTL text reads as a stray letter.
-      out.push('\u00d7' + trailing);
+      out.push('×' + trailing);
+      prevWasUnit = false;
       continue;
     }
     if (RANGE_SEP_RE.test(tok) || tok === '/' || tok === '±') {
       out.push(tok + trailing);
+      prevWasUnit = false;
       continue;
     }
-    // "0.4mm" / "220V" / "100-240V" written without a space.
+    // "0.4mm" / "220V" / "100-240V" / "256x256x256mm" written without a space.
     const glued = tok.match(/^([±~]?[\d.,\-–~x×*]+)\s*([A-Za-zµ°/²³]+)$/);
     if (glued) {
+      // The numeric half is a character CLASS, so "xmm" satisfies it with no
+      // digit in it at all and used to set sawNumber on nothing.
+      if (!/\d/.test(glued[1])) return null;
       const unit = lookupUnit(glued[2], lang);
       if (unit === null) return null;
+      if (prevWasUnit) return null;
       sawNumber = true;
       sawUnit = true;
-      out.push(`${glued[1]} ${unit}${trailing}`);
+      prevWasUnit = true;
+      out.push(`${dimensionSigns(glued[1])} ${unit}${trailing}`);
       continue;
     }
     const unit = lookupUnit(tok, lang);
     if (unit !== null) {
+      if (prevWasUnit) return null;
+      /**
+       * A UNIT BEFORE ANY NUMBER IS THE HEAD NOUN, NOT A UNIT.
+       *
+       * The same reasoning as the two-adjacent-units guard above, from the
+       * other side. "spool 1 kg" is «بكرة 1 كغم» — a noun and then its weight —
+       * but read as a measurement it is "spool, 1, kg" and joins in English
+       * order, so "PLA spool 1 kg" came out «PLA بكرة 1 كغم» with the code
+       * stranded in front. Refusing here hands the segment to the grammar
+       * layer, which knows `spool` as a head noun and composes it correctly.
+       */
+      if (!sawNumber) return null;
+      // A RANGE cannot be put in front of a counting noun this table has only
+      // one form of — see COUNTING_UNITS. Refuse, keep the English, flag it.
+      if (prevWasRange && COUNTING_UNITS.has(norm(tok))) return null;
       sawUnit = true;
+      prevWasUnit = true;
+      prevWasRange = false;
       out.push(unit + trailing);
       continue;
     }
@@ -198,9 +355,29 @@ function translateMeasurement(seg: string, lang: TargetLang): string | null {
  */
 function translateEnumeration(seg: string, lang: TargetLang): string | null {
   if (/\d,\d/.test(seg)) return null;
-  if (!/[,/،]/.test(seg)) return null;
-  const sep = /[,،]/.test(seg) ? '، ' : ' / ';
-  const parts = seg.split(/[,/،]/).map((p) => p.trim()).filter(Boolean);
+  const hasComma = /[,،]/.test(seg);
+  const hasSlash = seg.includes('/');
+  if (!hasComma && !hasSlash) return null;
+  /**
+   * ONE SEPARATOR PER LIST. The split used to be on `[,/،]` — both kinds at
+   * once — and that did two wrong things, both marked `machine`:
+   *
+   *   "Black, White / Red"  →  «أسود، أبيض، أحمر»
+   *       Three equal items where the source had two, and the "or" the slash
+   *       carried inside the second member silently deleted. Nothing here can
+   *       tell whether a slash means "or" or is part of a member, so mixing
+   *       the two separators is refused outright and a human decides.
+   *
+   *   "500 mm/s, 10000 mm/s2"  →  refused
+   *       The slash inside the UNIT was read as a list separator, tearing
+   *       "500 mm/s" into "500 mm" and "s". One broken member abandoned the
+   *       whole line, so a perfectly ordinary speed list came back English.
+   *
+   * Choosing the comma when both are present is not a preference: a comma
+   * between top-level members is unambiguous, a slash is not.
+   */
+  const sep = hasComma ? '، ' : ' / ';
+  const parts = seg.split(hasComma ? /[,،]/ : /\//).map((p) => p.trim()).filter(Boolean);
   if (parts.length < 2) return null;
   const out: string[] = [];
   for (const part of parts) {
@@ -242,11 +419,35 @@ function translateLabelled(seg: string, lang: TargetLang): string | null {
  * The grammar layer never re-implements R2-R4 — it borrows them, so a
  * measurement or an identity term means exactly the same thing inside a
  * sentence as it does on a spec line, for ever.
+ *
+ * `atom` AND `measure` ARE NOT THE SAME QUESTION, and conflating them is the
+ * whole word-order defect. `atom` answers "can this stand alone as a value?"
+ * and says yes to a dictionary phrase, because "Black" IS a complete value on
+ * a colour line. `measure` answers "is this a FIGURE that Arabic moves behind
+ * its head noun?" and must say no to "gross weight" and no to a bare "389".
+ * `grammar.ts` rule 3 asked the first question while meaning the second, so
+ * every label it met was treated as a figure and shipped to the end of the
+ * line. See `tests/translateWordOrder.test.ts`.
  */
 function grammarContext(lang: TargetLang): GrammarContext {
   return {
     lang,
     atom: (value, l) => translateAtom(value, l),
+    /**
+     * R3 AND R3 ALONE: a figure WITH a unit. Never a dictionary phrase, and
+     * never a bare number — a bare number is what let "389 x 389 x 458 mm" be
+     * peeled apart one figure at a time.
+     *
+     * An opaque CODE used to be accepted here too, on the reasoning that
+     * «فلامنت PLA» puts the code behind the head exactly as a figure goes
+     * behind it. That reasoning holds only while nothing else is behind the
+     * head. Once rule 3b could resolve "<head> <figure>", the figure took that
+     * place and the code was pushed past it — «فلامنت 1 كغم PLA». A code is now
+     * `code` below, and `grammar.ts` rule 3c places it beside its noun.
+     */
+    measure: (value, l) => translateMeasurement(value, l),
+    /** R2: an opaque model or material code. See GrammarContext.code. */
+    code: (value) => (isIdentity(value.trim()) ? value.trim() : null),
     phrase: (term, l) => lookup(term, l),
   };
 }
@@ -279,7 +480,15 @@ function translateSegment(
     ['sentence', translateSentence(body, grammarContext(lang))],
   ];
   for (const [rule, out] of attempts) {
-    if (out !== null) return { out: `${bullet}${out}${trailing}`, translated: true, rule };
+    if (out !== null) {
+      // The terminator was stripped from ENGLISH and is being re-attached to
+      // ARABIC, so it is Arabic punctuation now. «؟» and «؛» are the Arabic
+      // question mark and semicolon; the full stop and the exclamation mark
+      // are shared and are left exactly as the author typed them. An
+      // UNTRANSLATED segment falls through below and is returned byte for
+      // byte, English punctuation included.
+      return { out: `${bullet}${out}${arabicPunctuation(trailing)}`, translated: true, rule };
+    }
   }
   return { out: seg, translated: false, rule: 'untranslated' };
 }
@@ -288,6 +497,22 @@ function translateSegment(
  * Splits on line breaks and sentence terminators, CAPTURING the separators so
  * that `segment(s).join('') === s` exactly. Dropping the inter-sentence space
  * would silently reflow the author's text on every save.
+ *
+ * THE SEMICOLON IS A TERMINATOR HERE, and leaving it out of this list was a
+ * live corruption on the storefront. The A1's own dimensions line reads
+ *
+ *   "596 × 536 × 325 mm; gross weight 13 kg"
+ *
+ * — two independent clauses. As ONE segment nothing matched until the noun
+ * rule, which read the dimension as a MODIFIER of "gross weight 13 kg" and
+ * moved it behind, returning «13 كغم الوزن الإجمالي 596 × 536 × 325 مم;» —
+ * the weight before the dimensions, a Latin semicolon inside Arabic, and
+ * `status: 'machine'`. Split at the semicolon, each clause is an ordinary spec
+ * line the engine already handles correctly and the order is the author's.
+ *
+ * A semicolon is a clause boundary in Arabic too («؛»), so this is not an
+ * English-only convenience — and `translateSegment` re-attaches it in its
+ * Arabic form.
  */
 export function segment(source: string): string[] {
   const out: string[] = [];
@@ -297,7 +522,7 @@ export function segment(source: string): string[] {
       continue;
     }
     if (!line) continue;
-    for (const p of line.split(/((?<=[.!?؟])\s+)/)) {
+    for (const p of line.split(/((?<=[.!?؟;؛])\s+)/)) {
       if (p !== '') out.push(p);
     }
   }

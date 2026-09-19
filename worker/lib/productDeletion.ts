@@ -333,7 +333,26 @@ export const MEDIA_JSON_COLUMNS = [
  */
 export function mediaKeyFromRef(ref: unknown): string | null {
   if (typeof ref !== 'string') return null;
-  const s = ref.trim();
+  const raw = ref.trim();
+  if (!raw) return null;
+  /**
+   * A QUERY STRING OR A FRAGMENT IS NOT PART OF THE KEY.
+   *
+   * The absolute-URL branch below has always dropped both, because `new URL`
+   * hands back `pathname`. The relative branch sliced the string raw, so
+   * `/files/products/catalog/gallery/ab12.webp?v=2` produced the "key"
+   * `products/catalog/gallery/ab12.webp?v=2` — which `isSafeMediaKey` then
+   * rejects for the `?`, so the reference was DROPPED from the set entirely
+   * and the real object looked unreferenced to the sweep.
+   *
+   * That is reachable by hand: `product_images.url` is free text the admin
+   * types or pastes into, the form's own `classifyImageUrl` waves through any
+   * string starting with `/`, and a cache-busted path is exactly what somebody
+   * writes after re-uploading a picture. The browser ignores the query and the
+   * product looks perfect — right up until the next cleanup deletes the file.
+   * Both branches now normalise the same way.
+   */
+  const s = raw.split(/[?#]/)[0];
   if (!s) return null;
   if (s.startsWith('/files/')) return s.slice('/files/'.length) || null;
   // An absolute URL on our own origin still points at /files/.
@@ -896,7 +915,7 @@ export interface OrphanGroup {
 export interface OrphanReport {
   dry_run: boolean;
   dangling_rows: OrphanGroup[];
-  orphan_r2_objects: Array<{ key: string; bytes: number }>;
+  orphan_r2_objects: Array<{ key: string; bytes: number; uploaded: string | null }>;
   r2_scanned: number;
   /** True when the R2 listing hit its cap — the report is a floor, not a total. */
   r2_truncated: boolean;
@@ -993,7 +1012,16 @@ export async function scanProductOrphans(
     }
   }
 
-  const orphanObjects: Array<{ key: string; bytes: number }> = [];
+  /**
+   * `uploaded` is carried so a caller can tell a STAGED upload from an orphan.
+   *
+   * An object written minutes ago may be sitting in an admin's open product
+   * form, where the only thing naming it is React state — no row in this
+   * database can point at it until Save. The scan cannot know that; the
+   * partition that decides what may be destroyed can, given the date. See
+   * `SWEEP_MIN_AGE_MS` in worker/lib/mediaRefs.ts.
+   */
+  const orphanObjects: Array<{ key: string; bytes: number; uploaded: string | null }> = [];
   let r2Scanned = 0;
   let truncated = false;
   if (bucket) {
@@ -1002,7 +1030,10 @@ export async function scanProductOrphans(
       const page: R2Objects = await bucket.list({ prefix: 'products/', cursor, limit: 500 });
       for (const obj of page.objects) {
         r2Scanned += 1;
-        if (!referenced.has(obj.key)) orphanObjects.push({ key: obj.key, bytes: Number(obj.size ?? 0) });
+        if (!referenced.has(obj.key)) {
+          const uploaded = obj.uploaded instanceof Date ? obj.uploaded.toISOString() : null;
+          orphanObjects.push({ key: obj.key, bytes: Number(obj.size ?? 0), uploaded });
+        }
       }
       cursor = page.truncated ? page.cursor : undefined;
       if (r2Scanned >= r2Limit && cursor) {

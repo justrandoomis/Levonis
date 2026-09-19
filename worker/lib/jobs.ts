@@ -20,6 +20,7 @@ import { sweepBnplOverdue, type BnplOverdueReport } from './bnpl';
 import { sweepAutomaticReviews, type AutomaticReviewSweepReport } from './reviewAutoSweep';
 import { sweepCancelledOrders, type CancelledOrderSweepReport } from './orderDeletion';
 import { sweepStockAlerts, type StockAlertSweepReport } from './stockAlerts';
+import { runGuardedMediaCleanup } from './mediaRefs';
 import { planSearchIndex, searchIndexInstalled } from './search/store';
 import { toSearchDoc } from './search/document';
 
@@ -112,6 +113,31 @@ export interface DurableJobsReport {
    * one number that answers neither question.
    */
   outbox_final: { sent: number; failed: number };
+  /**
+   * THE R2 CLEANUP QUEUE — the step without which the whole leak fix is inert.
+   *
+   * When an admin removes one picture from a saved product, the save no longer
+   * abandons the object in R2: it writes a `media_cleanup_jobs` row. But a row
+   * is not a deletion. Until this step existed, nothing anywhere emptied that
+   * queue — the only drain was an admin calling the maintenance endpoint by
+   * hand — so the owner was paying for the same bytes as before AND carrying a
+   * growing queue table with no way in the product to empty it.
+   *
+   * IT IS SAFE INSIDE A CRON, which is why it can run unattended at all:
+   * `runGuardedMediaCleanup` rebuilds the full reference set immediately
+   * before it touches the bucket and refuses to delete anything it cannot
+   * prove is unreferenced — a key that came back is closed `skipped_shared`
+   * and its bytes survive. If the reference set cannot be proven complete it
+   * deletes NOTHING and leaves every job pending for the next tick.
+   */
+  media_cleanup: {
+    attempted: number;
+    deleted: number;
+    still_referenced: number;
+    dead_lettered: number;
+    retrying: number;
+    refusals: string[];
+  };
   errors: string[];
 }
 
@@ -146,6 +172,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     automatic_reviews: { scanned: 0, created: 0, skipped: 0 },
     stock_alerts: { scanned: 0, matched: 0, notified: 0, dead: 0, deferred: 0 },
     outbox_final: { sent: 0, failed: 0 },
+    media_cleanup: { attempted: 0, deleted: 0, still_referenced: 0, dead_lettered: 0, retrying: 0, refusals: [] },
     errors: [],
   };
 
@@ -476,6 +503,27 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
    */
   await step('outbox_final', async () => {
     report.outbox_final = await processOutbox(env, 25);
+  });
+
+  /**
+   * 16. DRAIN THE MEDIA CLEANUP QUEUE, LAST, AND DELIBERATELY SO.
+   *
+   * It is the only step that talks to R2, it is bounded
+   * (`MEDIA_CLEANUP_RUN_LIMIT`), and nothing else in this run depends on its
+   * result — so if the Worker's CPU budget is going to run out on a tick, this
+   * is the right step to lose. Losing it costs a fifteen-minute delay on
+   * reclaiming disk; losing a customer's «رجع!» message does not compare.
+   */
+  await step('media_cleanup', async () => {
+    const outcome = await runGuardedMediaCleanup(env);
+    report.media_cleanup = {
+      attempted: outcome.attempted,
+      deleted: outcome.deleted.length,
+      still_referenced: outcome.still_referenced.length,
+      dead_lettered: outcome.dead_lettered.length,
+      retrying: outcome.retrying.length,
+      refusals: outcome.refusals,
+    };
   });
 
   return report;

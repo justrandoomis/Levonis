@@ -41,6 +41,7 @@ import { normalizeHashtag } from './hashtags';
 import type { ParsedMembershipRule, ParsedProduct, RowIssue } from './importCsv';
 import { printerWarrantyRules, readOpsWarranty } from './warrantyPlans';
 import { parseConditionDoc, type ConditionDoc } from './condition';
+import { isOwnedMediaUrl } from './mediaStorage';
 
 export interface CatalogRef {
   id: string;
@@ -183,6 +184,42 @@ export function splitComboKey(key: string): { option_value_ids: string[]; color_
   return { option_value_ids, color_id };
 }
 
+/**
+ * AN IMAGE REFERENCE MUST BE A KEY THIS SHOP OWNS — NOT A LINK TO SOMEBODY'S CDN.
+ *
+ * The live catalogue is the argument for this function existing. One printer
+ * carries three product images whose `url` is `https://static.insales-cdn.com/…`,
+ * `https://3d.nice-cdn.com/…` and `https://cdn-reichelt.de/…` with an EMPTY
+ * `key` — about 1.17 MB of a supplier's PNGs, unconverted, fetched by every
+ * visitor from three foreign hosts. Nothing here can keep them alive: the
+ * supplier can rename the file, put a referrer check in front of it, or bill
+ * for the traffic, and the shop's own product page goes blank in Baghdad with
+ * no deploy and no warning. The bytes are also PNG rather than WebP, so the
+ * whole «كل صورة تتحول قبل التخزين» rule was never applied to them.
+ *
+ * So the import refuses to write one. A cell may name a file inside the ZIP or
+ * an address to FETCH — and what is fetched is converted and stored under a key
+ * we own, which is what `resolveImages` produces. What may never happen is the
+ * address itself being written into the product as if it were a picture.
+ *
+ * `/files/<key>` is the shape this shop serves. `..` is refused outright so a
+ * cell can never walk out of the media namespace, and the character class
+ * refuses a scheme, a host and a query string by construction — `https://…`
+ * cannot pass, with or without a `/files/` prefix glued in front of it.
+ */
+// The rule moved to `worker/lib/mediaStorage.ts` so the ordinary admin save
+// enforces it too — closing the import alone left a door open that one
+// authenticated PUT could walk through. Re-exported here because this module's
+// callers already name it.
+export { isOwnedMediaUrl };
+
+/** Said in all three languages, because the admin reading the preview may be
+ *  reading it in any of them. */
+export const EXTERNAL_IMAGE_REFUSAL =
+  'رابط خارجي لا يُخزَّن كصورة منتج — الصورة تُنزَّل وتُحوَّل إلى WebP وتُحفظ عندنا / ' +
+  'an external link is never stored as a product image — the picture is fetched, converted to WebP and kept on our own storage / ' +
+  'بەستەری دەرەکی وەک وێنەی بەرهەم هەڵناگیرێت — وێنەکە دادەبەزێنرێت و دەکرێت بە WebP و لای خۆمان هەڵدەگیرێت';
+
 const err = (line: number, message: string): RowIssue => ({ line, severity: 'error', message });
 const warn = (line: number, message: string): RowIssue => ({ line, severity: 'warning', message });
 
@@ -198,6 +235,28 @@ export function resolveProduct(
 ): ResolvedProduct {
   const issues: RowIssue[] = [];
   const productId = existing?.id ?? opts.newId('prd');
+
+  /**
+   * EVERY IMAGE CELL IN THIS PRODUCT GOES THROUGH HERE — options, colours, the
+   * gallery, the content blocks and the guide steps alike.
+   *
+   * Five call sites each wrote `maps.images.get(cell) ?? ''`, so a rule about
+   * what an image URL may be would have had to be repeated five times and
+   * would have been missed on the sixth. One function is the rule, and a cell
+   * that resolved to anything other than a key we own is refused by LINE, so
+   * the admin sees which row of their sheet to fix rather than a product that
+   * failed for no stated reason.
+   */
+  const imageUrl = (cell: string, line: number): string => {
+    if (!cell) return '';
+    const url = maps.images.get(cell) ?? '';
+    if (!url) return '';
+    if (!isOwnedMediaUrl(url)) {
+      issues.push(err(line, `image: "${cell}" — ${EXTERNAL_IMAGE_REFUSAL}`));
+      return '';
+    }
+    return url;
+  };
 
   // ---- brand -------------------------------------------------------------
   let brandId: string | null = (existing?.doc.brand_id as string | null) ?? null;
@@ -304,7 +363,7 @@ export function resolveProduct(
       id,
       name_en: o.value,
       sku_part: o.sku_part,
-      image: o.image ? (maps.images.get(o.image) ?? '') : '',
+      image: imageUrl(o.image, o.line),
       sort: g.values.length,
       active: o.active,
       stock: o.stock,
@@ -353,7 +412,7 @@ export function resolveProduct(
       id,
       name_en: col.name,
       hex: col.hex,
-      image: col.image ? (maps.images.get(col.image) ?? '') : '',
+      image: imageUrl(col.image, col.line),
       sku_part: col.sku_part,
       sort: i,
       active: col.active,
@@ -374,7 +433,7 @@ export function resolveProduct(
   // ---- images ------------------------------------------------------------
   const imageIdByUrl = new Map(existing?.images.map((im) => [im.url, im.id]) ?? []);
   const images = p.images.map((im, i) => {
-    const url = maps.images.get(im.image) ?? '';
+    const url = imageUrl(im.image, im.line);
     if (!url) issues.push(err(im.line, `image: تعذّر إيجاد "${im.image}"`));
     let optionValueId: string | null = null;
     let colorId: string | null = null;
@@ -720,7 +779,20 @@ export function resolveProduct(
   let contentBlocks: unknown = existing?.doc.content_blocks ?? [];
   if (p.content_blocks !== null) {
     contentBlocks = p.content_blocks.map((b, i) => {
-      const url = b.image ? (maps.images.get(b.image) ?? b.url) : b.url;
+      /*
+       * A CONTENT BLOCK HAS ONE `url` FIELD AND TWO THINGS WANT IT.
+       *
+       * The column is a LINK when the row has no image (a vendor page, a
+       * video — the live A1 carries `https://us.store.bambulab.com/...` on
+       * five text blocks) and it is the PICTURE when the row names an image
+       * cell. So when a cell is named it wins, and the author's link is not
+       * kept: there is nowhere to keep it.
+       *
+       * What changed is the `?? b.url` fallback that used to sit on the end.
+       * With it, an image cell that FAILED to resolve fell back to the block's
+       * own link, and a vendor page URL quietly became the block's image.
+       */
+      const url = b.image ? imageUrl(b.image, b.line) : b.url;
       if (b.image && !maps.images.has(b.image)) {
         issues.push(err(b.line, `image: تعذّر إيجاد "${b.image}"`));
       }
@@ -756,7 +828,7 @@ export function resolveProduct(
           : p.guide_steps.map((step, i) => {
               const urls: string[] = [];
               for (const cell of step.images) {
-                const resolved = maps.images.get(cell);
+                const resolved = imageUrl(cell, step.line);
                 if (!resolved) issues.push(err(step.line, `image: تعذّر إيجاد "${cell}"`));
                 else urls.push(resolved);
               }

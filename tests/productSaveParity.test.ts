@@ -117,7 +117,7 @@ colors.1.name_ar=أسود
 colors.1.name_en=Black
 colors.1.hex=#000000
 images.1.id=img_a
-images.1.url=https://cdn.example/a.jpg
+images.1.url=/files/products/catalog/gallery/aaa00001.jpg
 images.1.primary=true
 `;
 
@@ -199,7 +199,7 @@ test('the same structure leaves the same `products` row whether it came from a T
         ],
         colors: [{ id: 'fc1', name_en: 'Black', name_ar: 'أسود', hex: '#000000', sort: 0, active: true, option_value_ids: [] }],
         variants: [],
-        images: [{ id: 'fi1', url: 'https://cdn.example/a.jpg', alt_en: '', sort_order: 0, is_primary: true }],
+        images: [{ id: 'fi1', url: '/files/products/catalog/gallery/aaa00001.jpg', alt_en: '', sort_order: 0, is_primary: true }],
       },
     })
   );
@@ -486,7 +486,7 @@ test('a hundred option values and a hundred images save through D1s 100-paramete
   const values = Array.from({ length: 120 }, (_, i) => ({ id: `ov_${i}`, name_en: `V${i}`, sort: i, active: true }));
   const images = Array.from({ length: 120 }, (_, i) => ({
     id: `pi_${i}`,
-    url: `https://cdn.example/${i}.jpg`,
+    url: `/files/products/catalog/gallery/img0000${i}.jpg`,
     alt_en: '',
     sort_order: i,
     is_primary: i === 0,
@@ -724,7 +724,7 @@ test('a legacy JSON-only product keeps an Arabic name equal to its English one t
       JSON.stringify([
         { id: 'ov_l', name_en: 'Alpha', name_ar: 'Alpha', name_ckb: 'Alpha', group_en: 'Model', order: 0, active: true, stock: 0 },
       ]),
-      JSON.stringify([{ id: 'md_l', url: 'https://cdn.example/a.jpg', alt_en: 'Pic', alt_ar: 'Pic', order: 0, primary: true }]),
+      JSON.stringify([{ id: 'md_l', url: '/files/products/catalog/gallery/aaa00001.jpg', alt_en: 'Pic', alt_ar: 'Pic', order: 0, primary: true }]),
       id
     );
 

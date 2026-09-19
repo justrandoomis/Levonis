@@ -89,6 +89,7 @@ import { applyRelations, loadRelationsView, type ImageRow, type ProductRelations
 import { localizeProductDoc, type LocalizeResult } from './translate/localizeProduct';
 import { planProductTranslations, type TranslationInput } from './translate/store';
 import { dedupeHashtags, hashtagKey } from './hashtags';
+import { detachedMediaKey, enqueueMediaDetach } from './mediaRefs';
 import { docToEntries } from './template';
 import { localizableSlots } from './translationSlots';
 
@@ -461,6 +462,17 @@ export type RelationsPlan =
       /** Things the planner decided for the caller — a variant kept alive
        *  for an open order instead of deleted, for instance. */
       warnings: string[];
+      /**
+       * R2 KEYS THIS SAVE STOPS REFERENCING — the objects behind the
+       * `product_images` rows the payload dropped.
+       *
+       * PLANNED, NOT ACTED ON, and that is the point: these statements have
+       * not run yet, and a batch that rolls back leaves every one of these
+       * images still on the product's page. Queueing a deletion here would
+       * destroy a picture the product is still showing. The caller enqueues
+       * them AFTER its batch commits (`saveProductAtomic`).
+       */
+      detachedMedia: string[];
     };
 
 /**
@@ -1067,7 +1079,36 @@ export async function planRelationsWriteFrom(
       if (!keep.has(r.id)) stmts.push(db.prepare(`DELETE FROM ${table} WHERE id = ?`).bind(r.id));
     }
   };
-  del('product_images', new Set(imageInputs.map((i) => i.id)), snap.existingImages);
+  const keptImageIds = new Set(imageInputs.map((i) => i.id));
+  del('product_images', keptImageIds, snap.existingImages);
+
+  /**
+   * THE OBJECT BEHIND EVERY IMAGE ROW THIS SAVE DROPS.
+   *
+   * Deleting the row was the whole of the old behaviour, and the bytes stayed
+   * in R2 for ever — nothing in this file had ever heard of the bucket. The
+   * keys are collected HERE, where the decision to drop the row is actually
+   * made, rather than re-derived later from a diff that could disagree with
+   * it.
+   *
+   * `detachedMediaKey` returns null for an image that is not ours: the live
+   * catalogue holds three rows whose `url` is an `https://` hotlink to another
+   * server with an empty `r2_key`. That file belongs to someone else and must
+   * never reach the deletion queue.
+   *
+   * A key another KEPT row of this same product still uses can appear in this
+   * list — two rows may carry the same picture. That is not a defect to fix
+   * here: the cleanup worker re-reads every reference immediately before it
+   * touches the bucket, so a key that is still named anywhere is closed as
+   * `skipped_shared` instead of deleted. Deciding it now would only be
+   * deciding it too early.
+   */
+  const detachedMedia: string[] = [];
+  for (const row of snap.existingImages) {
+    if (keptImageIds.has(row.id)) continue;
+    const key = detachedMediaKey(row);
+    if (key && !detachedMedia.includes(key)) detachedMedia.push(key);
+  }
   const retainedVariantIds = new Set(retainedVariants.map((v) => v.id));
   for (const v of snap.existingVariants) {
     if (keptVariants.has(v.id)) continue;
@@ -1409,6 +1450,7 @@ export async function planRelationsWriteFrom(
     mode,
     warnings,
     requested,
+    detachedMedia,
     summary: {
       inventory_mode: mode,
       groups: groupInputs.length + retainedGroupIds.size,
@@ -1945,6 +1987,14 @@ export interface ProductSavePlan {
   /** The vocabulary tags this save is the first to register — the rows a
    *  caller must remove if it rolls the product back. */
   hashtagsAdded: string[];
+  /**
+   * R2 KEYS THIS SAVE STOPS REFERENCING. Carried out of the plan so that
+   * `saveProductAtomic` can queue them for removal ONCE THE BATCH HAS
+   * COMMITTED — see the field of the same name on `RelationsPlan` for why the
+   * ordering is not negotiable. Empty for a save that touched no images, and
+   * empty for a create.
+   */
+  detachedMedia: string[];
   /** Search-index rows this save writes (migration 0089). Zero on a database
    *  that does not have the index yet, which is a deploy window and not an
    *  error — see the guard beside the block that fills this in. */
@@ -2181,6 +2231,8 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
   // first, then everything that references it.
   let relations: ProductSavePlan['relations'] = null;
   const relationStatements: D1PreparedStatement[] = [];
+  /** Filled by the relations planner; queued for R2 removal only after commit. */
+  const detachedMedia: string[] = [];
   if (intent.relations) {
     const snap =
       intent.mode === 'create'
@@ -2201,6 +2253,7 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
     }
     relationStatements.push(...plan.stmts);
     warnings.push(...plan.warnings);
+    detachedMedia.push(...plan.detachedMedia);
     relations = { mode: plan.mode, summary: plan.summary, requested: plan.requested };
     if (doc) {
       applyPlannedMirror(doc, plan.requested, snap, actor.money);
@@ -2575,6 +2628,7 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
     priceHistory,
     hashtagsRegistered,
     hashtagsAdded,
+    detachedMedia,
     searchTokens,
     translations,
     costRefused,
@@ -2622,6 +2676,22 @@ async function anyPrinterCatalog(db: D1Database, ids: string[]): Promise<boolean
  * tree either both land or neither does), then writes the audit rows named
  * by the caller plus `product.relations.save` whenever relations were part of
  * the batch, so a template apply and a form save leave the same trail.
+ *
+ * AND THEN, ONLY THEN, QUEUES THE PICTURES THE SAVE DROPPED.
+ *
+ * Removing an image from a product deleted its `product_images` row and left
+ * the object in R2 for ever — the owner pays for those bytes every month, and
+ * nothing in this file had ever mentioned the bucket. It is queued rather than
+ * deleted for the reason the owner gave: with a queue an object may outlive
+ * the save by a few minutes, but an image that is still on a page can never be
+ * destroyed, because the worker re-reads every reference before it touches the
+ * bucket. With an immediate delete, one error is a broken image on a live
+ * page. The same `media_cleanup_jobs` table the full-product delete writes to.
+ *
+ * AFTER THE BATCH, NEVER INSIDE IT. A rolled-back save leaves the image row in
+ * place and the product still showing the picture; a deletion queued in the
+ * same batch would roll back with it, but one queued BEFORE it would survive
+ * and destroy a live image. So this runs only once `db.batch` has returned.
  */
 export async function saveProductAtomic(
   db: D1Database,
@@ -2631,6 +2701,32 @@ export async function saveProductAtomic(
   if (plan.statements.length) await db.batch(plan.statements);
   for (const row of auditRows) await audit(db, plan.actorId, row.action, plan.productId, row.detail);
   if (plan.relations) await audit(db, plan.actorId, 'product.relations.save', plan.productId, { ...plan.relations.summary });
+
+  if (plan.detachedMedia.length) {
+    try {
+      const queued = await enqueueMediaDetach(db, plan.detachedMedia, plan.productId);
+      if (queued.length) {
+        await audit(db, plan.actorId, 'product.media.detach_queued', plan.productId, {
+          keys: queued.slice(0, 50),
+          count: queued.length,
+        });
+      }
+    } catch (error) {
+      /**
+       * THE SAVE HAS ALREADY COMMITTED. Reporting a failure now would tell the
+       * admin their edit did not land when it did, and a thrown error here
+       * would do exactly that. A queue row that could not be written — most
+       * likely a deployment running ahead of migration 0072 — leaves the
+       * object merely unreferenced, which is precisely the condition
+       * `GET /maintenance/orphans` exists to find and report. So it is
+       * recorded in the audit trail and swallowed, and nowhere else.
+       */
+      await audit(db, plan.actorId, 'product.media.detach_queue_failed', plan.productId, {
+        keys: plan.detachedMedia.slice(0, 50),
+        error: error instanceof Error ? error.message : String(error),
+      }).catch(() => {});
+    }
+  }
 }
 
 // =========================================================================

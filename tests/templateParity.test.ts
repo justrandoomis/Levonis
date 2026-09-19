@@ -149,7 +149,7 @@ transports.2.method=sea
 transports.2.commission_iqd=9000
 transports.2.active=true
 images.1.id=img_front
-images.1.url=https://example.com/front.jpg
+images.1.url=/files/products/catalog/gallery/front0001.jpg
 images.1.alt_ar=الواجهة
 images.1.alt_en=Front
 images.1.alt_ckb=پێشەوە
@@ -159,11 +159,11 @@ images.1.source_url=https://vendor.example/front.jpg
 images.1.width=1200
 images.1.height=900
 images.2.id=img_combo
-images.2.url=https://example.com/combo.jpg
+images.2.url=/files/products/catalog/gallery/combo0001.jpg
 images.2.alt_en=Combo
 images.2.option_value_id=opt_combo
 images.3.id=img_black
-images.3.url=https://example.com/black.jpg
+images.3.url=/files/products/catalog/gallery/black0001.jpg
 images.3.alt_en=Black
 images.3.color_id=col_black
 options.1.id=opt_base
@@ -307,7 +307,7 @@ test('TEST A: a TXT create fills EVERY section the file wrote, read back through
   assert.deepEqual(rel.images.map((i) => i.id), ['img_front', 'img_combo', 'img_black']);
   const front = rel.images[0];
   assert.equal(front.is_primary, true);
-  assert.equal(front.url, 'https://example.com/front.jpg');
+  assert.equal(front.url, '/files/products/catalog/gallery/front0001.jpg');
   assert.equal(front.alt_en, 'Front');
   assert.equal(front.alt_ar, 'الواجهة');
   assert.equal(front.alt_ckb, 'پێشەوە');
@@ -422,11 +422,11 @@ product_id=${id}
 name_en=Legacy Grown Up
 description_en=Now it has structure
 images.1.id=img_legacy
-images.1.url=https://example.com/legacy.jpg
+images.1.url=/files/products/catalog/gallery/legacy001.jpg
 images.1.alt_en=Legacy
 images.1.primary=true
 images.2.id=img_legacy2
-images.2.url=https://example.com/legacy-2.jpg
+images.2.url=/files/products/catalog/gallery/legacy002.jpg
 images.2.alt_en=Second
 options.1.id=opt_s
 options.1.group=Size
@@ -706,7 +706,7 @@ test('TEST D: a dropped relation statement on an UPDATE is refused and names the
   };
   const dropped = A_TXT.replace('slug=parity-full', 'slug=parity-full\nproduct_id=' + id).replace(
     'images.3.alt_en=Black',
-    'images.3.alt_en=Black\nimages.4.id=img_extra\nimages.4.url=https://example.com/extra.jpg\nimages.4.alt_en=Extra'
+    'images.3.alt_en=Black\nimages.4.id=img_extra\nimages.4.url=/files/products/catalog/gallery/extra0001.jpg\nimages.4.alt_en=Extra'
   );
   const res = await post(app, '/api/admin/template/apply', { text: dropped, mode: 'update', confirm: true });
   const body = await json(res);

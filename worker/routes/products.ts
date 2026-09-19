@@ -38,6 +38,7 @@ import {
   seededShuffle,
   shuffleSeed,
 } from '../lib/homeShelves';
+import { isUnitExpressible, withinWindow } from '@levonis/pricing/membershipBenefits';
 import type { BenefitRule } from '@levonis/pricing/membershipBenefits';
 import type { TierStatus } from '../lib/entitlements';
 import { rateLimit } from '../lib/ratelimit';
@@ -194,6 +195,177 @@ export function benefitFallbackFor(
     },
     ctx.benefitNowIso
   );
+}
+
+/* --------------------------------------------- «المخفَّضة» — what is on offer */
+
+/**
+ * WHICH PRODUCTS THE WORD «مخفّض» NAMES — ONE ANSWER, FOR BOTH SURFACES.
+ *
+ * THE DEFECT THIS EXISTS FOR. Two places decide it: the home page's
+ * «المخفَّضة» strip and `/api/products?type=discounted` behind its «عرض الكل».
+ * Both asked the same obsolete question —
+ *
+ *     (pro_price_iqd IS NOT NULL AND pro_price_iqd < price_iqd)
+ *  OR (prime_price_iqd IS NOT NULL AND prime_price_iqd < price_iqd)
+ *
+ * — "is there a TYPED tier price below the regular one?". That was the whole
+ * truth while the only way to state a membership discount was to type a number
+ * on every product. It stopped being the whole truth at migration 0074, when
+ * `membership_benefit_rules` let the owner say «PRO 10% على الطابعات» ONCE —
+ * which is how this shop actually states BOTH memberships. Live,
+ * `/api/products/bambu-lab-a1` returns `pro_price_iqd: null` and
+ * `prime_price_iqd: null` while its `membership_preview` carries a PRIME
+ * saving of 15,000 and a PRO saving of 67,500. The only product in the
+ * catalogue has two real discounts, both queries matched zero rows, and a
+ * customer opening the shop concluded it runs no offers at all.
+ *
+ * THE OLD QUESTION IS KEPT, NOT REPLACED — the owner asked for this in so many
+ * words. A typed `pro_price_iqd` below the regular price is the owner stating
+ * a discount for that exact product, and it OUTRANKS any rule (`memberPrice`
+ * in packages/pricing/src/pricing.ts). Dropping it to gain the rules would
+ * trade one empty shelf for another. The predicate is the UNION.
+ *
+ * AND IT IS ONE FUNCTION, called from both places, because a fix applied to
+ * one of them leaves the strip and the listing behind its own «عرض الكل»
+ * disagreeing about what the word means — which is worse than being
+ * consistently wrong, and impossible to report.
+ *
+ * WHAT IT COSTS: NOTHING. No new query, on either surface. `pricingCtx` already
+ * loads every enabled rule and the whole `catalogs` ancestry ONCE per request
+ * — it has to, because the product page's membership teaser needs them — so
+ * the rules are already in memory before either statement is built. Asking D1
+ * per product instead would be N+1 on the shop's first screen; asking it once
+ * per request is what this reuses. The rules are turned into ONE `WHERE`
+ * fragment carrying AT MOST TWO bound parameters (a JSON array each), so the
+ * 100-parameter ceiling D1 refuses past is not approached however many rules
+ * the owner writes.
+ */
+
+/**
+ * Whether a rule still describes a real saving a CARD can print.
+ *
+ * `unitDiscountIqd` returns 0 for a percent/fixed of zero and for a per-unit
+ * ceiling of zero, so a rule configured that way reaches products without
+ * discounting them. Putting such a product on the offers shelf would be the
+ * same empty promise from the other direction.
+ */
+function quotableDiscount(rule: BenefitRule): boolean {
+  if (rule.cap_scope === 'per_unit' && rule.max_discount_iqd !== null && rule.max_discount_iqd <= 0) return false;
+  if (rule.discount_mode === 'percent') return rule.percent !== null && Number.isFinite(rule.percent) && rule.percent > 0;
+  if (rule.discount_mode === 'fixed') return rule.fixed_iqd !== null && Number.isFinite(rule.fixed_iqd) && rule.fixed_iqd > 0;
+  return false;
+}
+
+/**
+ * The rules that may put a product on the offers shelf.
+ *
+ * A SCHEDULED OR EXPIRED RULE IS NOT A DISCOUNT TODAY. `withinWindow` is the
+ * same test `selectRule` applies when the cart prices the line, judged against
+ * `ctx.benefitNowIso` — the clock frozen once per request — so a rule that
+ * ended last week cannot badge a product, and one that starts next month
+ * cannot either. Two shelves in one response can never disagree about whether
+ * a dated rule was live, for the same reason.
+ *
+ * `isUnitExpressible` is the other filter, and it is what keeps the badge
+ * honest. A rule whose effect depends on the ORDER — «أول قطعتين», a per-order
+ * ceiling, a minimum subtotal — cannot be written as a unit price, so
+ * `fallbackFor` deliberately keeps it out of the price resolver and the card
+ * has no number to print for it. Letting it onto the shelf would put a card
+ * there that looks exactly like every un-discounted card.
+ *
+ * Only PRIME and PRO. `membership_benefit_rules.tier` also accepts 'plus', but
+ * PLUS is an offer-scoped rung (§4.4) that no ordinary product emits and no
+ * card teases, so a PLUS rule has nothing to show here.
+ */
+export function shelfDiscountRules(ctx: PricingCtx): BenefitRule[] {
+  return ctx.benefitRules.filter(
+    (rule) =>
+      rule.enabled &&
+      rule.benefit_type === 'product_discount' &&
+      (rule.tier === 'prime' || rule.tier === 'pro') &&
+      withinWindow(rule, ctx.benefitNowIso) &&
+      isUnitExpressible(rule) &&
+      quotableDiscount(rule)
+  );
+}
+
+/** The typed half of the union — the question both surfaces asked before. */
+const TYPED_TIER_DISCOUNT =
+  '(products.pro_price_iqd IS NOT NULL AND products.pro_price_iqd < products.price_iqd)' +
+  ' OR (products.prime_price_iqd IS NOT NULL AND products.prime_price_iqd < products.price_iqd)';
+
+/**
+ * The whole `«مخفّض»` predicate as a parenthesised `WHERE` fragment, with its
+ * own bindings.
+ *
+ * WHY THE SECTION RULES BECOME A RECURSIVE CTE AND NOT A LIST OF IDS. A rule
+ * written on «الطابعات» reaches a product filed under «الطابعات ← FDM ←
+ * Bambu»: `scopeMatches` tests the rule's catalog against the product's whole
+ * ANCESTRY, not against the id on the row. Expanding that branch in TypeScript
+ * would mean binding one parameter per descendant catalog, and a taxonomy that
+ * grows past ~90 of them would start being refused by D1 mid-request — a
+ * failure that arrives with the shop's growth and not with this change. The
+ * CTE walks DOWN from the rule's own catalog inside SQLite instead, so the
+ * whole set costs ONE parameter however deep the tree gets. `UNION` (not
+ * `UNION ALL`) terminates a cycle, exactly as `catalogSubtreeFilter` does.
+ *
+ * It matches `category_id` / `sub_category_id` ONLY — deliberately NOT
+ * `product_catalogs`. A placement says which shelves list a product; the rule
+ * engine reads the CLASSIFICATION columns and nothing else
+ * (`ancestryFor`), so folding placements in here would badge products the
+ * resolver then refuses to discount.
+ *
+ * A KNOWN, BOUNDED IMPRECISION, stated rather than hidden: `selectRule` picks
+ * the MOST SPECIFIC matching rule, so a product-scoped «اشترِ اثنتين» rule can
+ * shadow a section-wide percentage that would otherwise have priced it. This
+ * fragment tests "is any quotable rule reaching this product", which cannot see
+ * that shadowing, so such a product appears on the shelf with no member number
+ * on its card. It is a SUPERSET, never a wrong amount — the card prints only
+ * what `resolveUnitPrice` returns, and for that product it returns nothing. A
+ * sharper test would have to be per product, which is the N+1 this design
+ * exists to avoid.
+ */
+export function discountedWhere(ctx: PricingCtx): { sql: string; params: string[] } {
+  const rules = shelfDiscountRules(ctx);
+  /**
+   * A GLOBAL RULE REACHES EVERY PRODUCT, so the predicate is simply true and
+   * the shelf is the catalogue. Not a special case being clever — it is what
+   * «خصم على كل شيء» means, and narrowing it would hide products that really
+   * are discounted.
+   */
+  if (rules.some((rule) => rule.scope === 'global')) return { sql: '(1 = 1)', params: [] };
+
+  const ids = (pick: (r: BenefitRule) => string | null) => [
+    ...new Set(rules.map(pick).filter((id): id is string => typeof id === 'string' && id !== '')),
+  ];
+  const productIds = ids((r) => (r.scope === 'product' ? r.product_id : null));
+  // Both section scopes resolve against the SAME ancestry union in
+  // `scopeMatches`, so one branch walk answers both.
+  const catalogIds = ids((r) =>
+    r.scope === 'category' ? r.category_id : r.scope === 'sub_category' ? r.sub_category_id : null
+  );
+
+  const parts = [TYPED_TIER_DISCOUNT];
+  const params: string[] = [];
+  if (productIds.length > 0) {
+    parts.push('products.id IN (SELECT value FROM json_each(?))');
+    params.push(JSON.stringify(productIds));
+  }
+  if (catalogIds.length > 0) {
+    parts.push(`products.id IN (
+      WITH RECURSIVE benefit_branch(id) AS (
+        SELECT value FROM json_each(?)
+        UNION
+        SELECT c.id FROM catalogs c JOIN benefit_branch b ON c.parent_id = b.id
+      )
+      SELECT p.id FROM products p JOIN benefit_branch b ON b.id = p.category_id
+      UNION
+      SELECT p.id FROM products p JOIN benefit_branch b ON b.id = p.sub_category_id
+    )`);
+    params.push(JSON.stringify(catalogIds));
+  }
+  return { sql: `(${parts.join('\n      OR ')})`, params };
 }
 
 // ------------------------------------------------- sale mode / availability
@@ -2219,6 +2391,8 @@ export function publicWithDisplayPrice(
     if (r.pro_iqd !== null) proMin = proMin === null ? r.pro_iqd : Math.min(proMin, r.pro_iqd);
   }
   let resolved = best!;
+  /** A LIVE OFFER REPLACED THE LADDER — read by the membership teaser below. */
+  let offerPriced = false;
   if (offer && (doc.composition ?? '') === '') {
     // ELIGIBILITY GATES THE PRICE, not only the purchase. Showing an
     // ineligible viewer the members-only offer price and then refusing them
@@ -2230,6 +2404,7 @@ export function publicWithDisplayPrice(
       ? applyOfferToResolved(resolved, offer, ctx.tier, ctx.tierActive, Date.now())
       : { resolved, source: 'ladder' as const, offer_id: offer.window?.id ?? null, plus_iqd: null };
     if (applied.source === 'offer') {
+      offerPriced = true;
       // The rungs move together, so the "from" comparison below stays honest:
       // every level is discounted by the same rule.
       const delta = resolved.applied_iqd - applied.resolved.applied_iqd;
@@ -2251,6 +2426,99 @@ export function publicWithDisplayPrice(
         locked: !check.ok && check.reason === 'MEMBERSHIP_REQUIRED',
       };
       if (applied.plus_iqd !== null) out.display_plus_iqd = applied.plus_iqd;
+    }
+  }
+  /**
+   * THE FAINT «PRIME … / PRO … للمشتركين» LINE, WHEN THE SAVING IS A RULE
+   * RATHER THAN A TYPED NUMBER.
+   *
+   * THE OTHER HALF OF THE EMPTY-SHELF DEFECT, and the half that would have made
+   * fixing the query pointless. `display_prime_iqd` / `display_pro_iqd` are
+   * read straight out of the loop above, and that loop resolves with
+   * `benefitFallbackFor(ctx, doc)` — the fallback for THE VIEWER, which is
+   * `{ pro: null, prime: null }` for anyone signed out. So on a shop whose
+   * memberships live entirely in `membership_benefit_rules`, both came back
+   * null for every visitor and `CardPrice` drew no teaser at all. Repairing the
+   * shelf alone would have filled it with cards that look exactly like every
+   * un-discounted card — the same complaint, one screen later.
+   *
+   * WHAT A SIGNED-OUT VISITOR SEES, and why it is not a member price. These two
+   * fields are TIER-LABELLED advertisements — `CardPrice` prints them as
+   * «PRIME 660,000 (للمشتركين)», under the regular price the guest actually
+   * pays. `display_price_iqd` and `display_applied_tier` are NOT touched here:
+   * the guest's own price stays the regular price and their own tier stays
+   * 'regular'. Nothing below prices this viewer as a member — it prices the
+   * MEMBERSHIP, exactly as `membershipPreview` already does for the same
+   * product on `/api/products/:slug`, with the same rules and the same frozen
+   * clock. Those two answers disagreed before this: the product page told a
+   * guest PRO saves 67,500 while the card beside it said nothing.
+   *
+   * ONE TIER AT A TIME, IN ITS OWN RESOLUTION. `fallbackFor` fills only the
+   * tier it is asked about, and the result is read back from that tier's rung
+   * alone, because `clampMemberLadder` fills an empty PRO rung DOWN from PRIME.
+   * Folding both fallbacks into the loop above would be the inversion
+   * `fallbackFor`'s own comment warns about — a PRO member handed a PREMIUM
+   * discount larger than their own — and it would be doing it on the price the
+   * viewer is charged.
+   *
+   * IT NEVER RUNS FOR A PRODUCT NO RULE REACHES. `fallbackFor` is pure
+   * in-memory work over rules `pricingCtx` already loaded, and it returns
+   * nothing unless a rule genuinely selects for this product, so the extra
+   * price resolutions happen only on the handful of cards that have something
+   * to say. No query, on any card.
+   *
+   * A LIVE OFFER SUPPRESSES IT. When `applyOfferToResolved` priced this line the
+   * offer replaced the whole ladder, and what a membership would then be worth
+   * on top of it is not a question this function can answer. It prints nothing
+   * rather than a number the door might not honour.
+   */
+  if (!offerPriced && (primeMin === null || proMin === null)) {
+    const benefitTarget = {
+      product_id: doc.id,
+      category_id: doc.category_id,
+      sub_category_id: doc.sub_category_id,
+      ancestry: ancestryFor(ctx.catalogAncestry, doc.category_id, doc.sub_category_id),
+    };
+    for (const tier of ['prime', 'pro'] as const) {
+      // A price the owner TYPED on this product already won in the loop above
+      // and outranks any rule (`memberPrice`), so that tier is left alone.
+      if (tier === 'prime' ? primeMin !== null : proMin !== null) continue;
+      const memberFallback = fallbackFor(ctx.benefitRules, previewStatus(tier), benefitTarget, ctx.benefitNowIso);
+      if (memberFallback.prime === null && memberFallback.pro === null) continue;
+      let cheapest: number | null = null;
+      for (const sel of levels) {
+        const r = resolveUnitPrice({
+          product: doc,
+          optionId: sel.optionId ?? null,
+          colorId: sel.colorId ?? null,
+          tier,
+          tierActive: true,
+          proPolicy: ctx.proPolicy,
+          transportDefaults: ctx.transportDefaults,
+          memberFallback,
+        });
+        const rung = tier === 'prime' ? r.prime_iqd : r.pro_iqd;
+        /**
+         * Strictly below the regular price of the SAME level, so a rung the
+         * ladder merely clamped level with the regular price is not advertised
+         * as a discount — AND STRICTLY ABOVE ZERO.
+         *
+         * `quotableDiscount` validates the RULE (a percent above zero, a fixed
+         * amount above zero, a per-unit cap above zero) but nothing can
+         * validate it against a PRICE it has not met yet. A fixed rule of
+         * 50,000 reaching a product that costs 20,000 makes `unitDiscountIqd`
+         * clamp the discount at the price and the rung comes back 0 — which is
+         * "strictly below the regular price" and would have printed «PRO 0
+         * (للمشتركين)» on every card, to every signed-out visitor. Before the
+         * teaser existed a misconfigured rule was visible only to the member it
+         * affected; it is now published store-wide, so the guard belongs here.
+         */
+        if (rung !== null && rung > 0 && rung < r.regular_iqd) {
+          cheapest = cheapest === null ? rung : Math.min(cheapest, rung);
+        }
+      }
+      if (tier === 'prime') primeMin = cheapest;
+      else proMin = cheapest;
     }
   }
   out.display_price_iqd = resolved.applied_iqd;
@@ -2607,6 +2875,28 @@ productRoutes.get('/', async (c) => {
   const offset = int(q.offset, 'offset', { min: 0, max: 10_000, def: 0 });
 
   /**
+   * STARTED HERE, at the top, because `type=discounted` now BUILDS ITS WHERE
+   * CLAUSE out of the membership rules this carries (`discountedWhere`), and
+   * that clause has to exist before the ORDER BY and the LIMIT are appended.
+   *
+   * Moving it up costs nothing and saves a round trip: it runs alongside the
+   * category probe and the search-index read below — both of which this route
+   * already awaited before touching `pricingCtx` — so by the time the filter
+   * block needs it, it is almost always resolved. Every other listing awaits it
+   * exactly where it always did, in the wave with the main statement, and its
+   * behaviour is unchanged.
+   *
+   * THE `catch` IS NOT DECORATION. The search branch below RETURNS from inside
+   * itself when the index matches nothing, leaving this promise in flight; a
+   * rejection with no handler attached surfaces as an unhandled rejection on
+   * the isolate rather than as this request's error. The handler discards
+   * nothing — every path that needs the value still awaits the promise itself
+   * and still sees the rejection.
+   */
+  const ctxPromise = pricingCtx(c);
+  ctxPromise.catch(() => {});
+
+  /**
    * WHAT THE CUSTOMER IS LOOKING AT, NOT WHICH ROW WE FILTERED ON.
    *
    * The storefront heading read «الفئة: cat_printers_fdm» — the owner reported
@@ -2759,11 +3049,20 @@ productRoutes.get('/', async (c) => {
   if (type === 'preorder') {
     sql += " AND (selling_type = 'pre_order' OR EXISTS (SELECT 1 FROM json_each(products.sale_types) st WHERE st.value = 'pre_order'))";
   }
-  // 'discounted' used to mean "has a compare-at price above the selling
-  // price". Compare-at was retired in §4, so the honest reading is now "has a
-  // real membership price below the regular one".
+  /**
+   * 'discounted' used to mean "has a compare-at price above the selling
+   * price". Compare-at was retired in §4, and the replacement — "a TYPED tier
+   * price below the regular one" — went stale in its turn at migration 0074,
+   * when a membership discount became a RULE the owner writes once instead of
+   * a number typed on every product. Both readings are true at once now, and
+   * `discountedWhere` is the single place that says so, shared with the home
+   * page's «المخفَّضة» strip so the strip and this listing behind its «عرض
+   * الكل» cannot drift apart again.
+   */
   if (type === 'discounted') {
-    sql += ' AND ((pro_price_iqd IS NOT NULL AND pro_price_iqd < price_iqd) OR (prime_price_iqd IS NOT NULL AND prime_price_iqd < price_iqd))';
+    const reach = discountedWhere(await ctxPromise);
+    sql += ` AND ${reach.sql}`;
+    params.push(...reach.params);
   }
   if (type === 'featured') sql += ' AND is_featured = 1';
   /**
@@ -2785,7 +3084,7 @@ productRoutes.get('/', async (c) => {
 
   const [{ results }, ctx] = await Promise.all([
     c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>(),
-    pricingCtx(c),
+    ctxPromise,
   ]);
   // One batched read for the whole page rather than N+1 per card — and one
   // chunked read of every scheduled offer on it, so a special offer costs the
@@ -3382,6 +3681,18 @@ async function openBoxShelf(db: D1Database): Promise<Record<string, unknown>[]> 
 export const homeRoutes = new Hono<AppContext>();
 
 homeRoutes.get('/', async (c) => {
+  /**
+   * THE MEMBERSHIP RULES ARE NOW AN INPUT TO THE DISCOUNTS QUERY, so the one
+   * request that already loads them is started first and the strip's statement
+   * is CHAINED off it rather than awaited before the wave.
+   *
+   * Everything else on the first screen — the settings, the latest strip, the
+   * graded shelf, the taxonomy, the brands — keeps flying in parallel with it,
+   * so the page waits on `max(the rest, pricingCtx + discounted)` instead of
+   * gaining a round trip of its own. `pricingCtx` is two small reads that this
+   * route already performed; nothing new is read.
+   */
+  const ctxPromise = pricingCtx(c);
   const [settings, discounted, latest, openBoxRows, categories, brands, ctx] = await Promise.all([
     getSettings(c.env.DB, PUBLIC_SETTING_KEYS),
     /**
@@ -3399,14 +3710,26 @@ homeRoutes.get('/', async (c) => {
      * means. `composition = ''` for the same reason the listing excludes
      * them — a bundle's availability is computed from its members and it
      * belongs on the bundles shelf, not here.
+     *
+     * AND THEN IT WAS EMPTY AGAIN, for the second time and the same reason:
+     * "a real membership price" was read as a TYPED `pro_price_iqd` /
+     * `prime_price_iqd`, while this shop states both memberships in
+     * `membership_benefit_rules` and types neither column. The predicate is
+     * now the UNION of the two, built by `discountedWhere` — which is a
+     * function, and not a copy of a WHERE clause, precisely so that "same
+     * predicate" above stays a fact rather than a hope.
      */
-    c.env.DB.prepare(
-      `SELECT * FROM products
-        WHERE status = 'active' AND composition = ''
-          AND ((pro_price_iqd IS NOT NULL AND pro_price_iqd < price_iqd)
-            OR (prime_price_iqd IS NOT NULL AND prime_price_iqd < price_iqd))
-        ORDER BY created_at DESC LIMIT 10`
-    ).all<Record<string, unknown>>(),
+    ctxPromise.then((ready) => {
+      const reach = discountedWhere(ready);
+      return c.env.DB.prepare(
+        `SELECT * FROM products
+          WHERE status = 'active' AND composition = ''
+            AND ${reach.sql}
+          ORDER BY created_at DESC LIMIT 10`
+      )
+        .bind(...reach.params)
+        .all<Record<string, unknown>>();
+    }),
     c.env.DB.prepare("SELECT * FROM products WHERE status = 'active' ORDER BY created_at DESC LIMIT 20").all<
       Record<string, unknown>
     >(),
@@ -3453,7 +3776,7 @@ homeRoutes.get('/', async (c) => {
         ORDER BY product_count DESC, name_en
         LIMIT 12`
     ).all<Record<string, unknown>>(),
-    pricingCtx(c),
+    ctxPromise,
   ]);
 
   // Normalize on the way OUT as well as on the way in: rows written before

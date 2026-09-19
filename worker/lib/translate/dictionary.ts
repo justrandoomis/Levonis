@@ -191,6 +191,37 @@ export const PHRASES: Record<string, TermEntry> = {
   'resin (msla)': { ar: 'ريزن (MSLA)', ckb: 'ڕەزین (MSLA)' },
   'other': { ar: 'أخرى', ckb: 'هی تر' },
   'camera frame rate': { ar: 'معدل إطارات الكاميرا', ckb: 'ڕێژەی چوارچێوەی کامێرا' },
+  // NOT A VOCABULARY EXPANSION — six holes that were HIDDEN BY FABRICATED
+  // OUTPUT, and that only became visible when the word-order repair stopped
+  // fabricating (TRANSLATION_VERSION 3, tests/translateWordOrder.test.ts).
+  //
+  // Every one of them is a two-noun compound. Arabic joins those as an
+  // «إضافة» — head + definite genitive, «دقة الكاميرا» — and the head loses
+  // its own article in the process. The engine cannot derive that: it would
+  // have to strip «ال» from «الدقة» and add one to «كاميرا», which is a rule
+  // about Arabic morphology, and this project records pairs rather than
+  // deriving them (see the ADJECTIVES note in grammar.ts). So it composed the
+  // two stored forms in whatever order the rule reached them, and marked the
+  // result finished:
+  //
+  //   "Camera resolution"  → «الدقة كاميرا»   (should be «دقة الكاميرا»)
+  //   "Nozzle material"    → «المادة الفوهة»  (should be «مادة الفوهة»)
+  //   "AMS compatibility"  → «التوافق AMS»    (should be «التوافق مع AMS»)
+  //   "LCD size"           → «المقاس LCD»     (should be «مقاس شاشة LCD»)
+  //   "LCD resolution"     → «الدقة LCD»      (should be «دقة شاشة LCD»)
+  //   "UV power"           → «الطاقة UV»      (should be «قدرة UV»)
+  //
+  // These six are BUILT-IN TEMPLATE LABELS, so every product of that type
+  // carried one. Recording the finished phrase is the only honest repair
+  // available here — the alternative was six template labels flagged
+  // review_needed on every save for ever. The Latin code stays inside the
+  // Arabic exactly as «دقة XY» and «شاشة LCD (غير محددة)» above keep theirs.
+  'camera resolution': { ar: 'دقة الكاميرا', ckb: 'ڕوونی کامێرا' },
+  'nozzle material': { ar: 'مادة الفوهة', ckb: 'کەرەستەی نۆزڵ' },
+  'ams compatibility': { ar: 'التوافق مع AMS', ckb: 'گونجان لەگەڵ AMS' },
+  'lcd size': { ar: 'مقاس شاشة LCD', ckb: 'قەبارەی شاشەی LCD' },
+  'lcd resolution': { ar: 'دقة شاشة LCD', ckb: 'ڕوونی شاشەی LCD' },
+  'uv power': { ar: 'قدرة UV', ckb: 'وزەی UV' },
   'slicer software': { ar: 'برنامج التقطيع', ckb: 'نەرمەکاڵای سلایسەر' },
   'companion app': { ar: 'التطبيق المرافق', ckb: 'ئەپی هاوڕێ' },
   'assembly': { ar: 'التجميع', ckb: 'پێکەوەنان' },
@@ -288,6 +319,16 @@ export const PHRASES: Record<string, TermEntry> = {
   'build plate levelling': { ar: 'تسوية منصة الطباعة', ckb: 'هاوسەنگکردنی پلێتی چاپ' },
   'levelling-free': { ar: 'بدون تسوية', ckb: 'بێ هاوسەنگکردن' },
   'auto levelling': { ar: 'تسوية تلقائية', ckb: 'هاوسەنگکردنی خۆکار' },
+  // The other two options of the SAME select («تسوية منصة الطباعة»), recorded
+  // for the same reason as the six above: they were being composed rather than
+  // recorded, and what came out was «4-point يدوي» — an English fragment with
+  // an Arabic adjective in front of it, shipped as a finished translation.
+  // Once the code rule stopped moving an opaque token to the end of the line
+  // these two had nothing left to compose from and would have been flagged on
+  // every resin product for ever. Two of the four options of this field were
+  // already recorded here; this completes the set rather than expanding it.
+  'manual 4-point': { ar: 'تسوية يدوية بأربع نقاط', ckb: 'هاوسەنگکردنی دەستی بە چوار خاڵ' },
+  'manual 2-point': { ar: 'تسوية يدوية بنقطتين', ckb: 'هاوسەنگکردنی دەستی بە دوو خاڵ' },
 
   'fits models': { ar: 'الموديلات المتوافقة', ckb: 'گونجاوە بۆ مۆدێلەکان' },
   'installation': { ar: 'التركيب', ckb: 'دامەزراندن' },

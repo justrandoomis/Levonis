@@ -250,3 +250,35 @@ test('a pending admin notification is claimed, and stays reviewable when deliver
     'and §9 requires the routing miss to be REPORTED'
   );
 });
+
+/**
+ * THE QUEUE THE CRON HAD TO LEARN TO DRAIN.
+ *
+ * Removing one picture from a saved product stopped abandoning the object in
+ * R2 and started writing a `media_cleanup_jobs` row instead — but a row is not
+ * a deletion, and for a while NOTHING emptied that queue: the only drain was
+ * an admin calling the maintenance endpoint by hand, and there is no button in
+ * the product that does it. So the owner paid for the same bytes as before AND
+ * carried a growing table. The step is last in the run and bounded, and it
+ * refuses to delete anything it cannot prove is unreferenced.
+ *
+ * This fixture has no `media_cleanup_jobs` table at all, which is the
+ * deploy-ahead-of-0072 case — the step must fail ALONE, exactly like every
+ * other step here, and the report must still carry its shape.
+ */
+test('the cron drains the media cleanup queue, and a missing queue table fails alone', async () => {
+  const { env } = freshDb();
+  const report = await runDurableJobs(env);
+
+  assert.ok(report.media_cleanup, 'the report must carry the step');
+  assert.equal(report.media_cleanup.deleted, 0, 'nothing to delete, and nothing invented');
+  assert.equal(report.media_cleanup.attempted, 0);
+  // The later steps still ran — isolation is the property this file exists for.
+  assert.deepEqual(report.outbox_final, { sent: 0, failed: 0 });
+});
+
+/** The wiring itself: the cron entrypoint must actually call the drain. */
+test('runDurableJobs calls runGuardedMediaCleanup — the drain is wired, not merely available', () => {
+  const src = readFileSync(join(ROOT, 'worker/lib/jobs.ts'), 'utf8');
+  assert.match(src, /runGuardedMediaCleanup\(env\)/, 'the 15-minute cron must empty the queue');
+});

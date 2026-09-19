@@ -70,6 +70,28 @@ export function buildMediaKey(input: MediaKeyInput): string {
   return `${domain}/${entity}/${kind}/${object}.${extension}`;
 }
 
+/**
+ * IS THIS REFERENCE AN OBJECT THIS SHOP ISSUED?
+ *
+ * `/files/<key>` is how the Worker serves R2, and it is the ONLY shape a
+ * stored product picture may have. Anything absolute — a vendor's CDN, an
+ * imgur link — is somebody else's file: it is fetched by the VISITOR's
+ * browser, from a host nobody here controls, it disappears when that host
+ * decides it should, and no cleanup, no conversion and no backup in this
+ * project can reach it. The live catalogue still carries three of them.
+ *
+ * It lives HERE, beside `isSafeMediaKey`, because there are at least two doors
+ * a product image comes through — the import and the ordinary admin save — and
+ * a rule that only one door enforces is not a rule. It is a check on a
+ * DISPLAY URL, not a key validator: the key itself is still built and checked
+ * by `buildMediaKey` / `isSafeMediaKey` below.
+ */
+export function isOwnedMediaUrl(url: string): boolean {
+  if (!url.startsWith('/files/')) return false;
+  if (url.includes('..')) return false;
+  return /^\/files\/[A-Za-z0-9][A-Za-z0-9._\-/]*$/.test(url);
+}
+
 /** Strict validation for stored/requested keys; percent escapes are refused. */
 export function isSafeMediaKey(key: unknown): key is string {
   if (typeof key !== 'string' || key.length < 5 || key.length > 500) return false;

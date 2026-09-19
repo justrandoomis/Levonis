@@ -17,6 +17,7 @@
  */
 
 import { safeParse } from './types';
+import { isOwnedMediaUrl, isSafeMediaKey } from './mediaStorage';
 import { safeLink } from './homeContent';
 import { badRequest } from './http';
 import { newId } from './crypto';
@@ -876,6 +877,37 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
   const options = upgradeOptions(body.options ?? []);
   const colors = upgradeColors(body.colors ?? []);
   const media = upgradeMedia(body.media ?? body.images ?? []);
+
+  /**
+   * A PRODUCT PICTURE IS AN OBJECT WE HOLD, NOT AN ADDRESS SOMEWHERE ELSE.
+   *
+   * The import was taught this and the ordinary admin save was not, which made
+   * the import fix a door closed beside an open one: `upgradeMedia` accepts
+   * `{ url: "https://…", key: "" }` verbatim and `productPersistence` writes
+   * that string straight into `product_images.url`. That is exactly the shape
+   * of the three hotlinks the live catalogue still carries, and a single
+   * authenticated PUT recreates them — which the owner's browser will do every
+   * time it posts a media array built from an external paste.
+   *
+   * WHY IT REFUSES INSTEAD OF DROPPING THE ENTRY. A silent drop loses a
+   * picture the admin can see on their own screen and explains nothing. The
+   * refusal names the offending address, and the remedy is the one the form
+   * already offers: upload the file, or paste the URL into the field that
+   * FETCHES it (which converts to WebP and stores it here).
+   *
+   * `source_url` is untouched and stays absolute on purpose: it records where
+   * a picture came FROM. It is never what the page loads.
+   */
+  media.forEach((m, i) => {
+    if (m.key && isSafeMediaKey(m.key) && (!m.url || isOwnedMediaUrl(m.url))) return;
+    if (isOwnedMediaUrl(m.url)) return;
+    fail(
+      `media[${i}].url`,
+      `رابط خارجي لا يُخزَّن كصورة منتج ("${m.url.slice(0, 120)}") — ارفع الصورة أو استعمل حقل جلب الصورة / ` +
+        'an external link is never stored as a product image — upload the file, or use the fetch-by-URL field which downloads and converts it / ' +
+        'بەستەری دەرەکی وەک وێنەی بەرهەم هەڵناگیرێت — وێنەکە بار بکە یان خانەی هێنانی وێنە بەکاربهێنە'
+    );
+  });
   const specGroups = upgradeSpecGroups(body.spec_groups ?? body.specifications ?? []);
   const labels = upgradeLabels(body.labels ?? []);
   const warranty = upgradeWarranty(body.warranty_plans ?? []);
