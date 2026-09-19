@@ -120,3 +120,97 @@ export function allCountries(): { iso: string; dial: string }[] {
     .map((iso) => ({ iso: iso as string, dial: getCountryCallingCode(iso) as string }))
     .sort((a, b) => a.iso.localeCompare(b.iso));
 }
+
+// ===========================================================================
+//  SEARCH KEYS — AND THE INVARIANT THEY DO NOT REPEAL
+// ===========================================================================
+/**
+ * THIS IS SEARCH. IT IS NOT IDENTITY.
+ *
+ * The header of this module states the rule the rest of the platform runs on:
+ * «Comparison is always full E.164. There is no suffix matching anywhere.»
+ * That rule is about deciding WHO SOMEBODY IS — logging in, claiming an
+ * account, binding a Telegram contact to a user — and it still governs every
+ * one of those paths without exception.
+ *
+ * What follows is for ONE caller: the admin order board's search box, where a
+ * person is holding a paper receipt or a courier is on the phone and the
+ * question is "which order is this", not "who is this". Nothing here decides a
+ * permission, an ownership or a login. A suffix match that shows an admin one
+ * extra order costs a second glance; a suffix match that decides identity is
+ * account takeover, and that is why the two live behind different functions
+ * with this paragraph between them.
+ *
+ * WHY A SUFFIX IS NEEDED AT ALL. `orders.address_snapshot` is frozen history —
+ * a JSON copy of the address row as it stood at checkout. Orders placed before
+ * the address validator normalised phones carry `+964-0770 123 4567`; orders
+ * placed after carry `+9647701234567`. Exact equality finds the second and
+ * misses the first, and the admin searching for a customer they served last
+ * year gets nothing with no error to explain it. The NATIONAL NUMBER is what
+ * both shapes end with, so that is the key.
+ */
+export interface PhoneSearchKeys {
+  /**
+   * Full E.164 when the input is a real number in some country, else null.
+   * This is the IDENTITY key and is compared with `=` against
+   * `users.phone_e164` — the account's own phone, which is always normalised.
+   */
+  e164: string | null;
+  /** Every ASCII digit typed, Arabic-Indic folded. '' when none were. */
+  digits: string;
+  /**
+   * The national significant number — no country code, no trunk zero. The
+   * suffix BOTH stored snapshot shapes end with, and therefore the only part
+   * of a phone worth matching loosely.
+   */
+  national: string;
+}
+
+/**
+ * The longest national number in the world is 15 digits (E.164's ceiling
+ * minus nothing); capping here keeps a pasted paragraph of digits from
+ * becoming a LIKE pattern, which `likePattern` would truncate anyway.
+ */
+const MAX_NATIONAL_DIGITS = 15;
+
+/**
+ * What an admin typed, turned into the two keys the board's phone clause
+ * binds. Pure: no database, no clock, no I/O.
+ *
+ * The fallback path matters as much as the parsed one. `libphonenumber`
+ * refuses a PARTIAL number — an admin who has typed `07701` while reading it
+ * off a receipt has no valid number yet — and a search that only worked on
+ * complete numbers would be dead for every keystroke but the last. So when
+ * parsing fails, the international and trunk prefixes are stripped by hand and
+ * whatever remains is used as the suffix.
+ */
+export function phoneSearchKeys(raw: unknown): PhoneSearchKeys {
+  const text = typeof raw === 'string' ? raw : '';
+  const digits = toAsciiDigits(text).replace(/\D/g, '').slice(0, 20);
+  if (!digits) return { e164: null, digits: '', national: '' };
+
+  const parsed = normalizePhone(text);
+  if (parsed) {
+    const p = parsePhoneNumberFromString(parsed);
+    const national = p?.nationalNumber ? String(p.nationalNumber) : strippedNational(digits);
+    return { e164: parsed, digits, national: national.slice(-MAX_NATIONAL_DIGITS) };
+  }
+  return { e164: null, digits, national: strippedNational(digits).slice(-MAX_NATIONAL_DIGITS) };
+}
+
+/**
+ * The by-hand fallback: drop the `00` international prefix, then Iraq's `964`,
+ * then the trunk `0`. In that order, because `009647...`, `9647...`, `07...`
+ * and `7...` are the four shapes a number reaches this codebase in, and each
+ * is the previous one with a prefix in front.
+ *
+ * Only Iraq's code is stripped by hand. A foreign number that fails to parse
+ * is left with its country code on, which narrows the suffix rather than
+ * widening it — the safe direction for a match that must not surprise.
+ */
+function strippedNational(digits: string): string {
+  let n = digits;
+  if (n.startsWith('00')) n = n.slice(2);
+  if (n.startsWith('964')) n = n.slice(3);
+  return n.replace(/^0+/, '') || n;
+}

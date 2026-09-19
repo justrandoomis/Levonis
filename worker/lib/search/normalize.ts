@@ -39,8 +39,16 @@ const TATWEEL = /ـ/g;
 /**
  * One character in, one character out. Only folds that never merge two words
  * the shop actually sells.
+ *
+ * EXPORTED, AND THAT IS THE WHOLE REASON IT IS NOT PRIVATE ANY MORE.
+ * `worker/lib/sqlFold.ts` generates BOTH a SQLite `REPLACE(...)` chain and its
+ * TypeScript twin from this one object. Two hand-maintained copies of a
+ * twenty-entry Arabic map will drift, and when they do the admin search does
+ * not error: it silently returns nothing for every name containing the drifted
+ * letter, which nobody notices until a customer calls. Behaviour here is
+ * unchanged — this is the same table `normalizeText` has always used.
  */
-const FOLD: Record<string, string> = {
+export const FOLD: Record<string, string> = {
   // Alef, every hamza carrier and the superscript form.
   'أ': 'ا', // أ
   'إ': 'ا', // إ

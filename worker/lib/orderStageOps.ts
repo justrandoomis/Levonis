@@ -31,8 +31,10 @@
  */
 
 import type { Env } from './types';
+import { safeParse } from './types';
 import type { ShippingType } from './shippingType';
 import { typeForTransport } from './shippingType';
+import { addDays, baghdadDayOf } from './baghdadTime';
 import {
   type OrderStage,
   type StageSource,
@@ -49,9 +51,10 @@ import { deductOrderStock, returnOrderStock, stockReturnNote } from './orderInve
 import { emitEvent, eventsEnabled } from './eventBus';
 import { OrderStatusChangedV1 } from '@levonis/contracts/events/v1/OrderStatusChanged';
 import { OrderDeliveredV1 } from '@levonis/contracts/events/v1/OrderDelivered';
-import { getSetting } from './settings';
+import { deliversToHome, getSetting } from './settings';
 import { reachedMilestones, revealStampStatement } from './mysteryReveal';
 import { reclaimOrderRedemptionsStatement } from './offers';
+import { notifyOrderDelivered } from './orderNotify';
 
 /** Mirrors STOCK_DEDUCTED_STATES in the admin route — the same four statuses. */
 const STOCK_DEDUCTED_STATES = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
@@ -130,6 +133,127 @@ export function newHistoryId(orderId: string, at: string): string {
   return `osh_${orderId.slice(-12)}_${at.replace(/[^0-9]/g, '')}`;
 }
 
+// ------------------------------------------- the delivery day, at two moments
+
+/**
+ * DOES THIS ORDER END AT A CUSTOMER'S DOOR? — asked of a row that already
+ * exists, so never of today's settings.
+ *
+ * Read off the order's OWN frozen `delivery_method_snapshot` rather than
+ * `checkoutDeliveryMethods`, for the reason the snapshot exists: the array is
+ * admin-editable, and a method deleted or re-flagged while a container was at
+ * sea must not change the answer for an order already placed under it.
+ *
+ * MERCHANT ORDERS ARE REFUSED BY NAME, not left to `deliversToHome`. They
+ * insert into this same table with `delivery_method_id = 'merchant'` and a
+ * snapshot of `{by, store}` that carries no id at all — so the id fallback
+ * (`id !== 'pickup'`) would answer "yes, home delivery" for every one of them.
+ * settings.ts states the same rule on `deliversToHome` itself: a caller that
+ * cannot resolve the method must decide for itself and must not fall through
+ * to true.
+ *
+ * IT LIVES HERE, beside the move that opens a pre-order's window, because the
+ * customer route asks the same question about the same row and a second copy
+ * of this rule is how the two start disagreeing about whose order gets a
+ * picker. It cannot live in `deliveryDay.ts`, which is a leaf that may not
+ * import `settings.ts` (its own header says why).
+ */
+export function orderEndsAtTheDoor(row: Record<string, unknown>): boolean {
+  if (String(row.seller_type ?? '') === 'merchant') return false;
+  const methodId = String(row.delivery_method_id ?? '');
+  if (methodId === 'merchant' || methodId === '') return false;
+  const snap = safeParse<Record<string, unknown>>(row.delivery_method_snapshot, {});
+  const flag = snap?.home_delivery;
+  return deliversToHome({
+    id: typeof snap?.id === 'string' && snap.id ? snap.id : methodId,
+    home_delivery: typeof flag === 'boolean' ? flag : undefined,
+  });
+}
+
+/** Extra `SET` clauses for the flip, and the values they bind. */
+interface DayPatch {
+  sql: string;
+  binds: unknown[];
+}
+
+const NO_DAY_PATCH: DayPatch = { sql: '', binds: [] };
+
+/**
+ * THE TWO MOMENTS A STAGE MOVE TOUCHES THE DELIVERY DAY — and why both ride
+ * inside the flip statement instead of running as a second UPDATE.
+ *
+ * A separate write is not fenced on anything. `moveOrderStage` can lose its
+ * race and return RACED, and a window opened by a follow-up UPDATE would have
+ * opened on an order the caller never actually moved — a customer offered a
+ * delivery day because somebody ELSE's move to `at_levo_warehouse` won.
+ * Riding the flip means the window exists exactly when the move that earns it
+ * exists.
+ *
+ *  1. THE PRE-ORDER WINDOW OPENS AT `at_levo_warehouse`. A pre-order cannot be
+ *     given its week at checkout: the goods are thirty or ninety days away and
+ *     every day in that window would be a day we cannot deliver on. A picker
+ *     disabled for three months is worse than no picker. The stage where the
+ *     container reaches the LEVO warehouse is the first moment a last-mile day
+ *     is a real choice, so that is where the ceiling is anchored — from TODAY,
+ *     not from the order date, which is the only anchor that means anything by
+ *     then.
+ *
+ *     Only when the order is not already schedulable, so an admin stepping
+ *     back to `en_route_to_levo` and forward again does not hand the customer
+ *     a fresh week each time. The ceiling is frozen once, exactly as
+ *     checkout's is.
+ *
+ *  2. RE-OPENING FROM CANCELLED RE-ANCHORS IT. `canMoveStage` lets a cancelled
+ *     order back to `confirmed` with no time limit, and an order cancelled in
+ *     September and re-opened in December carries a ceiling that shut months
+ *     ago — the customer opens the picker and every chip in it is illegal. So
+ *     the day is cleared (nobody has chosen one for THIS attempt) and the
+ *     ceiling is measured from today.
+ *
+ * NEITHER IS GATED ON `policy.enabled`. The flag answers "may this order have
+ * a day at all", which is a fact about the delivery method; whether a day is
+ * OFFERED is a live question the read side asks of the policy. Freezing the
+ * policy's off switch into the row would leave these orders permanently
+ * unschedulable after the owner switched it back on.
+ */
+async function deliveryDayPatch(
+  env: Env,
+  row: Record<string, unknown>,
+  to: OrderStage,
+  reopening: boolean,
+  nowIso: string
+): Promise<DayPatch> {
+  const schedulable = Number(row.delivery_day_schedulable) === 1;
+  const opening =
+    to === 'at_levo_warehouse' &&
+    !schedulable &&
+    String(row.shipping_type ?? '').startsWith('preorder_') &&
+    orderEndsAtTheDoor(row);
+  const reanchoring = reopening && schedulable;
+  if (!opening && !reanchoring) return NO_DAY_PATCH;
+
+  // `baghdadDayOf`, never `nowIso.slice(0, 10)`: between 21:00 and 24:00 UTC
+  // the two disagree by a whole day, and the short one sells the customer a
+  // six-day week (worker/lib/baghdadTime.ts).
+  const policy = await getSetting(env.DB, 'deliveryDayPolicy');
+  const windowEnd = addDays(baghdadDayOf(nowIso), policy.max_days);
+  // An unparseable clock yields '' — leave every column alone rather than
+  // write a ceiling no comparison can read.
+  if (!windowEnd) return NO_DAY_PATCH;
+
+  if (opening) {
+    return {
+      sql: ', delivery_day_schedulable = 1, delivery_day_window_end = ?',
+      binds: [windowEnd],
+    };
+  }
+  return {
+    sql: `, delivery_due_day = NULL, delivery_day_window_end = ?,
+            delivery_day_source = '', delivery_day_changed_at = ?`,
+    binds: [windowEnd, nowIso],
+  };
+}
+
 /**
  * Moves one order to `to`. Returns { moved: false } rather than throwing when
  * the move is illegal or lost a race — the sweep processes many orders and
@@ -155,6 +279,13 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   const durations = resolveDurations(await getSetting(env.DB, 'orderStageDurations'));
   const schedule = scheduleFrom(opts.to, order.shipping_type, durations, nowIso, spreadFor(order.id));
 
+  // Computed here so the two delivery-day moments can ride the flip below.
+  // `reopening` is read twice — by the offer re-claim further down, as it
+  // always was, and by the day patch — and both mean the same thing: the
+  // order was cancelled and is coming back.
+  const reopening = legacyFrom === 'cancelled' && legacyTo !== 'cancelled';
+  const dayPatch = await deliveryDayPatch(env, row, opts.to, reopening, nowIso);
+
   // Conditional on BOTH the stage AND the status we read. Two movers arriving
   // together — the sweep and an admin, or two sweeps — leave exactly one
   // winner, and the loser reports RACED instead of writing a second history
@@ -175,12 +306,13 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
         SET stage = ?, stage_changed_at = ?, stage_source = ?,
             next_stage = ?, next_stage_at = ?, status = ?,
             delivered_at = CASE WHEN ? = 'delivered' THEN COALESCE(NULLIF(delivered_at,''), ?) ELSE delivered_at END,
-            updated_at = ?
+            updated_at = ?${dayPatch.sql}
       WHERE id = ? AND stage = ? AND status = ?`
   ).bind(
     opts.to, nowIso, opts.source === 'system' ? 'manual' : opts.source,
     schedule.next_stage ?? '', schedule.next_stage_at, legacyTo,
     opts.to, nowIso, nowIso,
+    ...dayPatch.binds,
     order.id, from, legacyFrom
   );
 
@@ -212,7 +344,6 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   // refunds nothing (it calls returnOrderStock alone, never
   // cancelledOrderRefundStatements), and the owner's rule frees a slot only
   // for an order that was genuinely cancelled AND refunded.
-  const reopening = legacyFrom === 'cancelled' && legacyTo !== 'cancelled';
   const moveStatements = [flipStatement];
   if (stamp) moveStatements.push(stamp);
   if (reopening) moveStatements.push(reclaimOrderRedemptionsStatement(env.DB, order.id));
@@ -268,6 +399,22 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
     }
     if (opts.to === 'delivered') await emitOrderDelivered(env, row, order.id, nowIso, opts.source);
   }
+
+  /*
+   * THE STAGE DOOR TELLS THE CUSTOMER — and the courier sync with it, because
+   * this is the function `worker/lib/delivery/sync.ts` calls.
+   *
+   * OUTSIDE the `eventsEnabled` block above, deliberately. That block is a
+   * DEPLOYMENT SWITCH, off on the live Worker, so a parcel Al-Waseet reported
+   * delivered would otherwise grant points and create warranty units in total
+   * silence — which is exactly what happens today.
+   *
+   * Before the stock block below, so a deduction that needs a human cannot
+   * also cost the customer their message. `notifyOrderDelivered` never throws
+   * and the event key is the STATUS, so the admin door's own call for the same
+   * order is a no-op rather than a second message.
+   */
+  if (opts.to === 'delivered') await notifyOrderDelivered(env, order.id);
 
   const notes: string[] = [];
   const wasDeducted = STOCK_DEDUCTED_STATES.has(legacyFrom);

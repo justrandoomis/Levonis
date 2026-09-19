@@ -11,10 +11,17 @@ import type { FarmConfig, PrinterModelSpec, ProductSpec, Quality } from './confi
 
 export const GAME_SECONDS_PER_HOUR = 3600;
 
-/** Iraq is UTC+3 year-round (no DST since 2007) — the platform's day boundary. */
-export function baghdadDayOf(iso: string): string {
-  return new Date(Date.parse(iso) + 3 * 3600_000).toISOString().slice(0, 10);
-}
+/**
+ * Iraq is UTC+3 year-round (no DST since 2007) — the platform's day boundary.
+ *
+ * RE-EXPORTED, NOT REIMPLEMENTED. The same three-hour offset was written here
+ * and in `pointsTasks.ts`, and the delivery board needed it a third time;
+ * `worker/lib/baghdadTime.ts` is now the one copy. The signature is
+ * unchanged, so every caller of `baghdadDayOf` reads exactly as before — the
+ * only difference is that an unparseable instant now yields '' instead of
+ * throwing a RangeError out of `toISOString`.
+ */
+export { baghdadDayOf } from '../baghdadTime';
 
 export function msOf(iso: string): number {
   const t = Date.parse(iso);

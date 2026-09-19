@@ -7,8 +7,16 @@ import { cartLineSelect } from '../lib/cartLineProjection';
 import { newId, newOrderId } from '../lib/crypto';
 import { primaryMedia, readProductDeliveryOptions } from '../lib/productModel';
 import { productImageForSelection } from '../lib/productSelectionImage';
-import { getSettings, printerNoteIqdFrom } from '../lib/settings';
+import { deliversToHome, getSetting, getSettings, printerNoteIqdFrom } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig } from '../lib/settings';
+import { addDays, baghdadDay, baghdadDayOf, isDay } from '../lib/baghdadTime';
+import {
+  MAX_DELIVERY_DAYS,
+  dayLabel,
+  deliveryWindow,
+  validateDeliveryDay,
+  type DeliveryDayPolicy,
+} from '../lib/deliveryDay';
 import {
   resolveCartLine,
   pricingContextFrom,
@@ -143,7 +151,7 @@ import type { ProductDeliveryMethod, ShippingConfig, ShippingItem, ShippingQuote
 import { codDeliveryTaxIqd } from '../lib/codTax';
 import { getRequiredCheckoutPolicies, preparePolicyAcceptance, isPolicyAcceptanceConflict } from '../lib/policyOps';
 import { cartShippingType, typeForTransport, SHIPPING_TYPE_LABELS } from '../lib/shippingType';
-import { initOrderStage, stagePath, stageRowFrom } from '../lib/orderStageOps';
+import { initOrderStage, orderEndsAtTheDoor, stagePath, stageRowFrom } from '../lib/orderStageOps';
 import { stageLabel, stagesFor, stageForLegacyStatus } from '../lib/orderStages';
 import type { OrderStage } from '../lib/orderStages';
 import { coverageState, maskSerial } from '../lib/deviceOps';
@@ -363,6 +371,229 @@ export interface MysteryView {
   lang?: string;
 }
 
+// ====================================================== the delivery day
+
+/**
+ * WHY THE PICKER IS NOT ON THE SCREEN — one of six sentences, never a
+ * disabled control with nothing beside it.
+ *
+ *   PICKUP               there is no last mile of ours to schedule at all.
+ *   PREORDER_NOT_ARRIVED the goods are still in transit; the window opens when
+ *                        they reach the LEVO warehouse.
+ *   WITH_COURIER         the parcel is already at the courier, and a day
+ *                        changed now cannot reach the driver.
+ *   FINISHED             delivered or cancelled — there is nothing left to
+ *                        schedule.
+ *   WINDOW_CLOSED        the frozen ceiling has passed, or this row predates
+ *                        the feature and never had a window.
+ */
+export type DeliveryDateReason =
+  | 'PICKUP'
+  | 'PREORDER_NOT_ARRIVED'
+  | 'WITH_COURIER'
+  | 'FINISHED'
+  | 'WINDOW_CLOSED';
+
+/** One chip in the picker, with the words already on it. */
+interface OfferedDay {
+  day: string;
+  label: string;
+  is_today: boolean;
+  is_tomorrow: boolean;
+}
+
+/**
+ * The days still on offer for an order whose ceiling is ALREADY FROZEN.
+ *
+ * DELIBERATELY NOT `deliveryWindow()`. That function derives the ceiling from
+ * an ANCHOR, which is the question checkout asks once. Asking it again later
+ * with today as the anchor is the rolling window migration 0094 exists to
+ * prevent: each hop looks legal on its own and the customer walks the order
+ * forward for ever in weekly steps. Here the ceiling is a stored fact and
+ * only the FLOOR moves, because yesterday cannot be offered however generous
+ * the policy is.
+ *
+ * `policy.enabled` is read LIVE, not off the row: the flag on the order says
+ * whether this order could ever have a day, and the policy says whether one is
+ * being offered today. An owner switching the picker off closes it for every
+ * order at once and switching it back on re-opens the same windows.
+ */
+function offeredDays(windowEnd: string, todayDay: string, policy: DeliveryDayPolicy, lang: string): OfferedDay[] {
+  if (!policy.enabled || !isDay(windowEnd) || !isDay(todayDay)) return [];
+  const start = policy.allow_same_day ? todayDay : addDays(todayDay, 1);
+  const out: OfferedDay[] = [];
+  // Bounded by the policy's own maximum, so a corrupt ceiling cannot become an
+  // unbounded loop building a JSON array on a request thread.
+  for (let d = start; d && d <= windowEnd && out.length <= MAX_DELIVERY_DAYS; d = addDays(d, 1)) {
+    out.push({ day: d, ...dayLabel(d, todayDay, lang) });
+  }
+  return out;
+}
+
+export interface DeliveryDateVerb {
+  can_change: boolean;
+  /** The day the customer already asked for, or null for "as soon as possible". */
+  selected: string | null;
+  /** The frozen ceiling, reported even when shut so the screen can name it. */
+  window_end: string | null;
+  reason: DeliveryDateReason | null;
+  days: OfferedDay[];
+}
+
+/**
+ * THE THIRD VERB ON THE ORDER SCREEN, beside `can_cancel` and `can_review`.
+ *
+ * THE ORDER OF THE CHECKS IS THE ORDER OF THE SENTENCES. Pickup comes first
+ * because it is permanent and true at every stage: a customer collecting from
+ * the warehouse must not be told «تم التوصيل» is the reason there is no day
+ * picker — there was never going to be one. After that the checks run from the
+ * most final fact to the least.
+ */
+function deliveryDateVerb(
+  o: Record<string, unknown>,
+  policy: DeliveryDayPolicy,
+  nowMs: number,
+  lang: string
+): DeliveryDateVerb {
+  const selected = isDay(o.delivery_due_day) ? String(o.delivery_due_day) : null;
+  const window_end = isDay(o.delivery_day_window_end) ? String(o.delivery_day_window_end) : null;
+  const shut = (reason: DeliveryDateReason): DeliveryDateVerb => ({
+    can_change: false,
+    selected,
+    window_end,
+    reason,
+    days: [],
+  });
+
+  if (!orderEndsAtTheDoor(o)) return shut('PICKUP');
+
+  const status = String(o.status ?? '');
+  const stage = String(o.stage || 'received');
+  if (status === 'delivered' || status === 'cancelled' || stage === 'delivered' || stage === 'cancelled') {
+    return shut('FINISHED');
+  }
+  /**
+   * THE SHIPMENT IS A HARD BOUNDARY, not a soft one. `DeliveryDriver` exposes
+   * `listStatuses`, `createShipment` and `getShipment` — and NO
+   * `updateShipment` — so once Al-Waseet holds the parcel a day changed here
+   * can never reach the driver. A promise we cannot transmit is not a promise,
+   * it is a screen that disagrees with a van.
+   */
+  if (stage === 'out_for_delivery' || String(o.delivery_remote_id ?? '')) return shut('WITH_COURIER');
+
+  if (Number(o.delivery_day_schedulable) !== 1) {
+    // A pre-order earns its window at `at_levo_warehouse` (orderStageOps).
+    // Anything else unschedulable is a row from before migration 0094: it has
+    // no window and never will, which is the same closed answer by a different
+    // name.
+    return shut(String(o.shipping_type ?? '').startsWith('preorder_') ? 'PREORDER_NOT_ARRIVED' : 'WINDOW_CLOSED');
+  }
+
+  const days = window_end ? offeredDays(window_end, baghdadDay(nowMs), policy, lang) : [];
+  if (days.length === 0) return shut('WINDOW_CLOSED');
+  return { can_change: true, selected, window_end, reason: null, days };
+}
+
+/**
+ * THE LAST GUARD BEFORE A DAY IS WRITTEN — the same one on both doors, the
+ * checkout and the customer's later change.
+ *
+ * TWO CHECKS, NOT ONE. `validateDeliveryDay` decides the two facts that hold
+ * whatever the policy says (not in the past, not past the frozen ceiling) and
+ * names which one failed, so the customer reads a reason instead of "invalid".
+ * Membership of `offered` is the other half: it is what enforces
+ * `allow_same_day` and the policy's off switch, neither of which the validator
+ * is given — its own docstring says so, and says that a caller letting a day
+ * through that the offer never contained has skipped the offer.
+ */
+function refuseUnlessOffered(requested: string, todayDay: string, windowEnd: string, offered: string[]): void {
+  switch (validateDeliveryDay({ requested, todayDay, windowEnd })) {
+    case 'BAD_FORMAT':
+      throw badRequest('The delivery day must be a calendar day, as YYYY-MM-DD.', 'DELIVERY_DAY_INVALID');
+    case 'PAST':
+      throw badRequest('That delivery day has already passed.', 'DELIVERY_DAY_PAST');
+    case 'BEYOND_WINDOW':
+      throw badRequest(
+        'That delivery day is past the latest this order can be scheduled for.',
+        'DELIVERY_DAY_BEYOND_WINDOW',
+        { window_end: windowEnd }
+      );
+    case 'ok':
+      break;
+  }
+  if (!offered.includes(requested)) {
+    throw badRequest('That delivery day is not on offer for this order.', 'DELIVERY_DAY_NOT_OFFERED', {
+      days: offered,
+    });
+  }
+}
+
+/** The four delivery-day columns checkout freezes onto a brand new order. */
+interface CheckoutDeliveryDay {
+  schedulable: 0 | 1;
+  window_end: string | null;
+  day: string | null;
+  source: string;
+}
+
+/**
+ * THE THREE FACTS CHECKOUT FREEZES, and the one it refuses.
+ *
+ * SCHEDULABLE is decided from the METHOD and the SALE, once: a home delivery
+ * on a direct sale. A pre-order gets 0 here and earns it later, at
+ * `at_levo_warehouse` — the first moment a last-mile day is a real choice
+ * rather than a guess about a container (see orderStageOps).
+ *
+ * THE CEILING IS FROZEN, and that is owner decision (ب): «الأسبوع أقصد به مدة
+ * سبعة أيام من تاريخ الطلب». It is the same rule as the benefit snapshot this
+ * INSERT already writes — «تغيير الإعدادات غدًا يجب ألا يغيّر طلب الأمس» — and
+ * it is also what makes the limit un-gameable: recomputed as "today + 7" it
+ * would let a customer roll the order forward for ever in weekly hops, each
+ * one looking perfectly legal on its own. A pre-order carries NULL, because
+ * there is no honest ceiling to name before the goods are in the country.
+ *
+ * A DAY IS OPTIONAL AND A REFUSAL IS LOUD. Absent means "as soon as possible"
+ * and is the ordinary case. But a day sent for an order that can never have
+ * one is not silently dropped: the customer who picked Thursday would be shown
+ * a confirmation with no day on it and no explanation anywhere.
+ */
+function checkoutDeliveryDay(
+  comp: Pick<CheckoutComputation, 'delivery' | 'isPickup' | 'deliveryDayPolicy'>,
+  shippingType: ShippingType,
+  requested: string,
+  createdAt: string
+): CheckoutDeliveryDay {
+  const toTheDoor = !comp.isPickup && deliversToHome(comp.delivery);
+  const schedulable = toTheDoor && shippingType === 'direct';
+  if (!schedulable) {
+    if (requested) {
+      throw badRequest(
+        'A delivery day cannot be chosen for this order yet.',
+        'DELIVERY_DAY_NOT_OFFERED',
+        // Named, so the screen says WHICH of the two it is rather than
+        // «غير متاح» — the two have opposite answers to "will I ever be able
+        // to choose one?".
+        { reason: toTheDoor ? 'PREORDER_NOT_ARRIVED' : 'PICKUP' }
+      );
+    }
+    return { schedulable: 0, window_end: null, day: null, source: '' };
+  }
+
+  /**
+   * `baghdadDayOf(created_at)`, NEVER `created_at.slice(0, 10)`. An order
+   * placed at 01:00 Baghdad carries a created_at of 22:00 UTC the PREVIOUS
+   * day, and slicing that string anchors the window a day early — selling that
+   * customer a six-day week, silently, for the first three hours of every day.
+   */
+  const anchorDay = baghdadDayOf(createdAt);
+  const window = deliveryWindow({ anchorDay, todayDay: anchorDay, policy: comp.deliveryDayPolicy });
+  const window_end = window.end || null;
+
+  if (!requested) return { schedulable: 1, window_end, day: null, source: '' };
+  refuseUnlessOffered(requested, anchorDay, window.end, window.days);
+  return { schedulable: 1, window_end, day: requested, source: 'customer' };
+}
+
 export function orderPublic(
   o: Record<string, unknown>,
   items: Record<string, unknown>[],
@@ -394,6 +625,23 @@ export function orderPublic(
      */
     next_stage: o.next_stage || null,
     next_stage_at: o.next_stage_at ?? null,
+    /**
+     * THE DELIVERY DAY, and it sits beside `next_stage_at` rather than inside
+     * it. The two are deliberately different columns: `next_stage_at` is the
+     * cron's alarm clock, which `sweepDueStages` selects on and then PROMOTES
+     * the order by. A customer postponing 18-9 to 23-9 would, if the day lived
+     * there, stop their own order being PREPARED for five days and receive it
+     * unpacked. The day the box goes out and the clock that walks an order
+     * through its stages are different facts (migration 0094).
+     *
+     * `null` means no day has been named — never "today", and nothing may
+     * COALESCE it to one.
+     */
+    delivery_due_day: o.delivery_due_day ?? null,
+    /** The frozen ceiling — «سبعة أيام من تاريخ الطلب» — never recomputed. */
+    delivery_day_window_end: o.delivery_day_window_end ?? null,
+    /** Could this order EVER have a day? A method fact, decided once. */
+    delivery_day_schedulable: Number(o.delivery_day_schedulable) === 1,
     tracking_no: o.delivery_tracking_no || null,
     /**
      * A membership gift that ships WITH this order — today only «PRO + طلب
@@ -1199,6 +1447,17 @@ interface CheckoutInput {
   /** The customer asked for protected (boxed) delivery — a paid add-on on top
    *  of the standard tariff, free for an eligible PRO. */
   protectedDelivery: boolean;
+  /**
+   * «يستطيع اختيار وتغيير يوم التوصيل» — the day the customer would like the
+   * box to arrive, as 'YYYY-MM-DD', or '' for "as soon as possible".
+   *
+   * ABSENT IS LEGAL and is the common case. Checkout already asks for five
+   * things; a sixth REQUIRED choice to complete a purchase is a step, not a
+   * convenience. An empty value is not "today" and is never coerced to one —
+   * the order simply carries no promised day, exactly as every order did
+   * before this field existed.
+   */
+  requestedDeliveryDate: string;
 }
 
 interface ComputedLine {
@@ -1361,6 +1620,9 @@ interface CheckoutComputation {
   prepaidByWallet: boolean;
   /** The printer home-delivery note amount (settings), or null when unset. */
   printerNoteIqd: number | null;
+  /** The live delivery-day policy, as this checkout saw it. Its `max_days` is
+   *  frozen onto the row as a ceiling and never re-read for this order again. */
+  deliveryDayPolicy: DeliveryDayPolicy;
   lines: ComputedLine[];
   /** The composition products in this order — the offer subjects a redemption
    *  row is written for (§1.8). A bundle and a mystery offer share the subject
@@ -1453,6 +1715,10 @@ async function computeCheckout(
     'printerHomeDeliveryNoteIqd',
     'bnplPolicy',
     'proPriorityDelivery',
+    // Read in the SAME batch as the other eleven: checkout has to freeze the
+    // day ceiling onto the row, and a second round trip for one small object
+    // would be one more thing between the customer and a placed order.
+    'deliveryDayPolicy',
   ]);
   const delivery = (settings.checkoutDeliveryMethods as DeliveryMethod[]).find((m) => m.id === input.deliveryMethodId);
   if (!delivery) throw badRequest('Please choose a valid delivery method');
@@ -2553,6 +2819,8 @@ async function computeCheckout(
     codReprices,
     prepaidByWallet,
     printerNoteIqd: printerNoteIqdFrom(settings.printerHomeDeliveryNoteIqd),
+    // Already clamped to 1..30 by `normalizedSetting` → `resolveDeliveryDayPolicy`.
+    deliveryDayPolicy: settings.deliveryDayPolicy as DeliveryDayPolicy,
     lines: priced.lines,
     compositionSubjects: new Set([...compositionRows.map((r) => String(r.id)), ...offerSubjects]),
     mysteryLines,
@@ -2621,6 +2889,10 @@ function checkoutInputFrom(body: Record<string, unknown>, requirePayment: boolea
     // 0 IQD to the buyer — it only attributes the order to a supporter.
     supportRef: str(body.supportCode ?? body.supportRef, 'supportCode', { max: 60, required: false }),
     protectedDelivery: body.protectedDelivery === true,
+    // A civil day is ten characters; anything longer is not one, and the
+    // shape itself is checked against the order's own window below rather
+    // than here — this only keeps a megabyte out of the validator.
+    requestedDeliveryDate: str(body.requestedDeliveryDate, 'requestedDeliveryDate', { max: 10, required: false }),
   };
 }
 
@@ -3136,6 +3408,13 @@ orderRoutes.post('/', async (c) => {
   });
   const membershipGift = gift ? JSON.stringify(gift) : '';
 
+  /**
+   * «يستطيع اختيار وتغيير يوم التوصيل في أي وقت يريد ولكن بحد أقصى أسبوع» —
+   * resolved BEFORE the batch, because a day the customer may not have is a
+   * refusal, and a refusal must happen before any row is written.
+   */
+  const deliveryDay = checkoutDeliveryDay(comp, orderShippingType, input.requestedDeliveryDate, now);
+
   const stmts = [
     c.env.DB.prepare(
       `INSERT INTO orders (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot,
@@ -3145,8 +3424,10 @@ orderRoutes.post('/', async (c) => {
          support_snapshot, shipping_type, membership_gift, referral_delivery_waived,
          fulfillment_service, priority_due_at, bnpl_due_iqd, bnpl_due_at,
          benefit_version_id, membership_discount_iqd, shipping_before_benefit_iqd, shipping_benefit_iqd,
-         cod_tax_before_exemption_iqd, cod_tax_exemption_iqd, benefit_snapshot, created_at, updated_at)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         cod_tax_before_exemption_iqd, cod_tax_exemption_iqd, benefit_snapshot,
+         delivery_day_schedulable, delivery_day_window_end, delivery_due_day, delivery_day_source,
+         created_at, updated_at)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       orderId, user.id, JSON.stringify(comp.address), input.deliveryMethodId, deliverySnapshot,
       input.paymentMethodId, comp.subtotal, shippingTotal, comp.codTaxIqd, comp.pointsDiscount, comp.walletApplied,
@@ -3175,7 +3456,16 @@ orderRoutes.post('/', async (c) => {
        */
       benefitVersionId, comp.benefits.discount_total_iqd,
       comp.shipping.total_before_waiver_iqd, comp.shipping.total_before_waiver_iqd - shippingTotal,
-      comp.codTaxBeforeExemptionIqd, comp.codTaxExemptionIqd, benefitSnapshot, now, now
+      comp.codTaxBeforeExemptionIqd, comp.codTaxExemptionIqd, benefitSnapshot,
+      /**
+       * THE DELIVERY DAY, frozen by the same rule as the benefit snapshot
+       * above it. `delivery_day_changed_at` and `delivery_day_changes` are
+       * deliberately left at their defaults: a choice made AT checkout is the
+       * first value, not a change to one, and a support question about an
+       * order whose day kept moving must be able to tell those apart.
+       */
+      deliveryDay.schedulable, deliveryDay.window_end, deliveryDay.day, deliveryDay.source,
+      now, now
     ),
   ];
 
@@ -3722,11 +4012,128 @@ orderRoutes.get('/:id', async (c) => {
       ...orderPublic(data.order, data.items, snaps.get(id), await mysteryViewFor(c.env.DB, [id], 'customer', langOf(c))),
       item_count: itemCount(data.items),
       invoice: invoice ?? null,
-      // The two verbs the detail screen offers, decided here so the page
+      // The three verbs the detail screen offers, decided here so the page
       // never has to know which statuses permit which.
       can_cancel: status === 'pending',
       can_review: status === 'delivered',
+      /**
+       * The day picker, as a whole answer rather than a boolean: which days
+       * may be picked, which one is picked, where the ceiling is, and — when
+       * none of it applies — WHY. A disabled control with no sentence beside
+       * it is a support ticket.
+       */
+      delivery_date: deliveryDateVerb(
+        data.order,
+        await getSetting(c.env.DB, 'deliveryDayPolicy'),
+        Date.now(),
+        langOf(c)
+      ),
     },
+  });
+});
+
+/**
+ * «يستطيع اختيار وتغيير يوم التوصيل في أي وقت يريد» — the customer moves their
+ * own delivery day, or clears it back to "as soon as possible" with `null`.
+ *
+ * THE OWNER BOUND THE DESTINATION, NOT THE COUNT. «في أي وقت يريد» is the
+ * whole instruction, so there is no quota here — every legal day inside the
+ * frozen ceiling is reachable however many times the customer changes their
+ * mind. `delivery_day_changes` is still incremented, because the first
+ * question asked about an order the courier keeps missing is how often the day
+ * moved, and a single `changed_at` cannot answer it.
+ *
+ * REFUSED ONCE THE PARCEL EXISTS, and that is a hard boundary rather than a
+ * courtesy: `DeliveryDriver` has `listStatuses`, `createShipment` and
+ * `getShipment`, and NO `updateShipment`. A day accepted after the shipment is
+ * created would live on our screen and nowhere else.
+ */
+orderRoutes.patch('/:id/delivery-date', async (c) => {
+  const user = c.get('user')!;
+  const id = c.req.param('id');
+  await rateLimit(c, 'order_delivery_date', 30, 300);
+
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
+  // `null` CLEARS the day — the customer changing their mind back to "as soon
+  // as possible" is a change like any other, not a missing field. `undefined`
+  // is the missing field, and it is refused rather than read as a clear.
+  const raw = body.date;
+  if (raw !== null && typeof raw !== 'string') {
+    throw badRequest('date must be a day as YYYY-MM-DD, or null to clear it.', 'DELIVERY_DAY_INVALID');
+  }
+  const requested = raw === null ? '' : str(raw, 'date', { max: 10, required: false });
+
+  const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?')
+    .bind(id)
+    .first<Record<string, unknown>>();
+  // OWNER ONLY, and 404 for everyone else — the same answer the cancel route
+  // gives, so nobody learns an order exists by trying to reschedule it. An
+  // admin does not get a back door here either: an admin changing a customer's
+  // promised day is a support action with its own audit trail, not this route.
+  if (!order || String(order.user_id) !== user.id) throw notFound('Order not found');
+
+  const policy = await getSetting(c.env.DB, 'deliveryDayPolicy');
+  const lang = langOf(c);
+  const verb = deliveryDateVerb(order, policy, Date.now(), lang);
+  if (!verb.can_change) {
+    // The refusal carries the same vocabulary GET /:id reports, so the screen
+    // that drew the picker and the error that closed it say the same word.
+    throw conflict(
+      'The delivery day for this order can no longer be changed.',
+      `DELIVERY_DAY_${verb.reason ?? 'WINDOW_CLOSED'}`
+    );
+  }
+  if (requested) {
+    refuseUnlessOffered(requested, baghdadDay(Date.now()), verb.window_end ?? '', verb.days.map((d) => d.day));
+  }
+
+  const now = new Date().toISOString();
+  /**
+   * FENCED ON EVERYTHING THE VERB ABOVE WAS DECIDED FROM.
+   * `POST /api/admin/orders/:id/delivery` can create the courier shipment in
+   * the same second this request read the row, and an unfenced UPDATE would
+   * write a day onto a parcel that is already on a waybill — the one outcome
+   * the refusal above exists to prevent. Zero changes is not silence: it is
+   * reported as a race, in words the customer can act on.
+   */
+  const res = await c.env.DB.prepare(
+    `UPDATE orders
+        SET delivery_due_day = ?, delivery_day_source = ?, delivery_day_changed_at = ?,
+            delivery_day_changes = delivery_day_changes + 1,
+            updated_at = ?
+      WHERE id = ? AND delivery_day_schedulable = 1 AND delivery_remote_id = ''
+        AND stage = ? AND status NOT IN ('delivered','cancelled')`
+  )
+    // The stage bound is the COLUMN as it was read, not the defaulted reading
+    // of it — a fence that quietly substitutes a value is not fencing on what
+    // it saw.
+    .bind(
+      requested || null, requested ? 'customer' : '', now, now,
+      id, String(order.stage ?? '')
+    )
+    .run();
+  if ((res as unknown as { meta: { changes: number } }).meta.changes === 0) {
+    throw conflict(
+      'This order moved while you were choosing — please reopen it and try again.',
+      'DELIVERY_DAY_RACED'
+    );
+  }
+
+  await audit(c.env.DB, user.id, 'order.delivery_date', id, {
+    from: order.delivery_due_day ?? null,
+    to: requested || null,
+    // The running total AFTER this change — the number a support agent reads
+    // when a customer says the courier keeps missing them.
+    changes: (Number(order.delivery_day_changes) || 0) + 1,
+    window_end: verb.window_end,
+  });
+
+  const after = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?')
+    .bind(id)
+    .first<Record<string, unknown>>();
+  return c.json({
+    success: true,
+    delivery_date: deliveryDateVerb(after ?? order, policy, Date.now(), lang),
   });
 });
 

@@ -39,7 +39,11 @@ import { walletTxPublic } from '../lib/wallet';
 import { productPublic } from './products';
 import { parseProductRow } from '../lib/productModel';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
-import { mysteryViewFor, orderPublic, shippingConfigFrom, ORDER_ITEMS_SELECT } from './orders';
+import { langOf, mysteryViewFor, orderPublic, shippingConfigFrom, ORDER_ITEMS_SELECT } from './orders';
+import { baghdadDay, isDay } from '../lib/baghdadTime';
+import { dayLabel } from '../lib/deliveryDay';
+import { classifyOrderSearch } from '../lib/orderSearch';
+import { arabicFoldSql, phoneDigitsSql } from '../lib/sqlFold';
 import { getOrderPointsSnapshots } from '../lib/pointsOps';
 import { telegramConfigured, telegramGetMe } from '../lib/telegram';
 import {
@@ -71,7 +75,7 @@ import { emailConfigured, sendEmailNow } from '../lib/emailSend';
 import { sendWhatsAppText, wasenderConfigured, wasenderStatus } from '../lib/wasender';
 import { normalizePhone, maskPhone } from '../lib/phone';
 import { escapeHtml } from '../lib/emailTemplates';
-import { notifyOrderStatus } from '../lib/orderNotify';
+import { notifyOrderDelivered, notifyOrderStatus } from '../lib/orderNotify';
 
 export const adminRoutes = new Hono<AppContext>();
 adminRoutes.use('*', requireAdmin);
@@ -873,41 +877,313 @@ adminRoutes.post('/wallet/credit', async (c) => {
 
 // ---------------------------------------------------------------- orders
 
+/**
+ * ===========================================================================
+ *  THE ORDER BOARD — «ترتيب إدارة الطلبات في اللوحة الإدارة بشكل أفضل»
+ * ===========================================================================
+ * Four orthogonal parameters and one search box, over one page of rows and one
+ * COUNT that also carries the group headers.
+ *
+ * `scope` IS THE BOARD, `due`/`type`/`status` NARROW IT. They are orthogonal on
+ * purpose: `due=today` means the same thing inside every scope, so a screen can
+ * put them on separate rows of controls and never have to explain which
+ * combinations exist.
+ *
+ *   scope=open       the work: everything not delivered and not cancelled,
+ *                    DIRECT orders only — pre-orders are their own scope.
+ *   scope=preorder   «فصلها في الطلبات المسبقة» — owner decision (أ) point 2. A
+ *                    container in transit is a different kind of waiting from a
+ *                    box that has to go out this morning, and interleaving them
+ *                    by day puts a shipment forty days out in among today's.
+ *   scope=delivered  «الطلبات التي تم توصيلها يتم عزلها»
+ *   scope=cancelled  «الطلبات الملغية … يتم عزلها»
+ */
+const BOARD_SCOPES = ['open', 'preorder', 'delivered', 'cancelled'] as const;
+const BOARD_DUE = ['today', 'tomorrow', 'week', 'later', 'unscheduled'] as const;
+const BOARD_TYPES = ['direct', 'preorder_air', 'preorder_sea', 'preorder_land'] as const;
+
+/**
+ * THE CUSTOMER'S NAME AND DELIVERY PHONE ARE NOT COLUMNS. They live at `$.name`
+ * and `$.phone` inside `orders.address_snapshot`, a frozen JSON copy of the
+ * whole `addresses` row.
+ *
+ * THE GUARD IS THE POINT. `json_extract` over a row whose text is not JSON
+ * THROWS and kills the statement — and this statement's twin, the COUNT, runs
+ * beside it in one `Promise.all`, so one malformed snapshot is a blank admin
+ * screen rather than one odd row. `CASE WHEN json_valid(...)` yields NULL for
+ * such a row instead, which simply fails to match.
+ *
+ * AND NOT A `LIKE` OVER THE RAW TEXT, which is the shortcut this replaces: the
+ * blob also holds `user_id`, `created_at` and free-text address lines, so
+ * searching it whole matches digits inside an id and street names against a
+ * person's name.
+ */
+const SNAPSHOT_NAME_SQL = `CASE WHEN json_valid(o.address_snapshot) THEN json_extract(o.address_snapshot,'$.name') END`;
+const SNAPSHOT_PHONE_SQL = `CASE WHEN json_valid(o.address_snapshot) THEN json_extract(o.address_snapshot,'$.phone') END`;
+
+/** Which group header a row belongs under. Computed on the SERVER — see below. */
+export type OrderDueBucket = 'overdue' | 'today' | 'tomorrow' | 'week' | 'later' | 'unscheduled';
+
+/**
+ * A row's bucket, from its day and the server's three Baghdad anchors.
+ *
+ * ############################################################################
+ * #  WHY THIS IS NOT COMPUTED IN THE BROWSER                                 #
+ * ############################################################################
+ * The browser's clock is the admin's laptop. Between 00:00 and 03:00 Baghdad a
+ * UTC-derived "today" is still YESTERDAY, so an order due today would be
+ * bucketed `overdue` — or, on a laptop set east of Baghdad, tomorrow's work
+ * would show as today's. That window is exactly the early-morning shift when
+ * the day's delivery runs are planned, which is to say the one time of day
+ * this screen is load-bearing. The server has one clock and one rule
+ * (`baghdadDay`), so it answers once and the screen renders what it was given.
+ */
+function dueBucketOf(day: unknown, today: string, tomorrow: string, weekEnd: string): OrderDueBucket {
+  const d = typeof day === 'string' ? day : '';
+  if (!isDay(d)) return 'unscheduled';
+  // Fixed-width civil days compare lexicographically in date order, so none of
+  // this constructs a Date or picks a timezone.
+  if (d < today) return 'overdue';
+  if (d === today) return 'today';
+  if (d === tomorrow) return 'tomorrow';
+  return d <= weekEnd ? 'week' : 'later';
+}
+
 adminRoutes.get('/orders', async (c) => {
+  const scopeRaw = c.req.query('scope');
+  const dueRaw = str(c.req.query('due'), 'due', { max: 12, required: false });
+  const typeRaw = str(c.req.query('type'), 'type', { max: 20, required: false });
   const status = str(c.req.query('status'), 'status', { max: 20, required: false });
+  const q = str(c.req.query('q'), 'q', { max: 80, required: false });
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 30 });
   const offset = int(c.req.query('offset'), 'offset', { min: 0, max: 100_000, def: 0 });
+
+  let scope = oneOf(scopeRaw || 'open', 'scope', BOARD_SCOPES);
+  const due = dueRaw ? oneOf(dueRaw, 'due', BOARD_DUE) : '';
+  const type = typeRaw ? oneOf(typeRaw, 'type', BOARD_TYPES) : '';
+
+  // COMPATIBILITY, AND IT IS NOT COSMETIC. `status` predates `scope` and the
+  // existing screen's dropdown still sends `status=delivered`. Under the new
+  // default that would read "open orders which are delivered" — an empty
+  // screen, with a 200 and no error, for a filter that worked yesterday. An
+  // explicit status of `delivered` or `cancelled` with NO scope therefore
+  // CHOOSES that scope. Passing `scope` explicitly always wins.
+  if (!scopeRaw && (status === 'delivered' || status === 'cancelled')) scope = status;
+
+  // The server's own Baghdad day, and never `date('now')` — SQLite's is UTC and
+  // is therefore a day behind for the first three hours of every Iraqi day.
+  // All three are BOUND AS PARAMETERS below, so the comparison in SQL is a
+  // plain string compare against fixed-width civil days.
+  const nowMs = Date.now();
+  const today = baghdadDay(nowMs);
+  const tomorrow = baghdadDay(nowMs, 1);
+  const weekEnd = baghdadDay(nowMs, 7);
+
+  const search = classifyOrderSearch(q, nowMs);
+
+  /**
+   * AN EXPLICIT LOOKUP PIERCES THE BOARD; A BROWSE DOES NOT.
+   *
+   * Typing an order number or a phone number is not filtering, it is looking
+   * ONE order up — and most of why an admin searches at all is to answer a
+   * question about an order that is already finished: "was this delivered?",
+   * "did we cancel this?". Honouring the default hiding of delivered and
+   * cancelled orders there produces the worst possible answer: an empty result
+   * for an order that plainly exists.
+   *
+   * A NAME or DATE search is browsing — "the Ahmeds in today's work" — so it
+   * respects the scope and every narrowing parameter beside it. The screen is
+   * told which happened (`search_kind`, `search.pierced`) so it can say so.
+   */
+  const pierces = search.kind === 'order_id' || search.kind === 'phone';
+
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+
+  if (!pierces) {
+    if (scope === 'open' || scope === 'preorder') {
+      // ######################################################################
+      // #  THIS STRING IS VERBATIM FROM idx_orders_board_open. DO NOT REWRITE #
+      // ######################################################################
+      // A partial index is usable only when the query's WHERE is SYNTACTICALLY
+      // implied by the index's — SQLite matches the text, it does not reason
+      // about sets. Rewriting this as the equivalent positive
+      // `status IN ('pending','confirmed',…)` costs the board this index, and
+      // the failure is SILENT: the planner falls back to
+      // idx_orders_cancelled_retention, EXPLAIN still reads "USING INDEX", and
+      // the ORDER BY quietly becomes a temp B-tree over every open order, re-
+      // sorted on every page. Nothing breaks until the table is large, and
+      // then the screen takes nine seconds. See migrations/0094.
+      clauses.push("o.status NOT IN ('delivered','cancelled')");
+      // Pre-orders are a SCOPE, not a bucket — decision (أ) point 2.
+      //
+      // ######################################################################
+      // #  THE LEADING `+` IS LOAD-BEARING. IT IS NOT A TYPO.                 #
+      // ######################################################################
+      // `+expr` is SQLite's documented way to say "do not use an index for
+      // this term". It changes no value and no row — `+shipping_type` is the
+      // same string — and without it the planner prefers
+      // `idx_orders_shipping_type` for the equality and ABANDONS the board's
+      // partial index, which is the exact silent regression migration 0094
+      // warns about: EXPLAIN still reads "USING INDEX" and looks healthy,
+      // while the scan widens from "open orders" to "every direct order ever
+      // placed" — a set that grows for ever as orders are delivered.
+      // Measured on this schema, and asserted in tests/adminOrderBoard.test.ts:
+      //
+      //   +shipping_type = 'direct'   SCAN o USING INDEX idx_orders_board_open
+      //    shipping_type = 'direct'   SEARCH o USING INDEX idx_orders_shipping_type
+      //
+      // The `<>` form does not need it — an inequality is not indexable here
+      // anyway — but both carry it so the two branches cannot drift.
+      clauses.push(scope === 'open' ? "+o.shipping_type = 'direct'" : "+o.shipping_type <> 'direct'");
+    } else {
+      clauses.push('o.status = ?');
+      params.push(scope);
+    }
+
+    if (status) {
+      clauses.push('o.status = ?');
+      params.push(status);
+    }
+    if (type) {
+      clauses.push('o.shipping_type = ?');
+      params.push(type);
+    }
+    if (due) {
+      // `due=today` INCLUDES OVERDUE, and that is a decision rather than an
+      // oversight. A box that should have gone out on Tuesday is not a
+      // separate kind of work on Wednesday — it is today's work, and it is the
+      // most urgent of it. The counts still report `overdue` on its own so the
+      // header can say how much of today is late.
+      if (due === 'today') {
+        clauses.push('o.delivery_due_day IS NOT NULL AND o.delivery_due_day <= ?');
+        params.push(today);
+      } else if (due === 'tomorrow') {
+        clauses.push('o.delivery_due_day = ?');
+        params.push(tomorrow);
+      } else if (due === 'week') {
+        clauses.push('o.delivery_due_day > ? AND o.delivery_due_day <= ?');
+        params.push(tomorrow, weekEnd);
+      } else if (due === 'later') {
+        clauses.push('o.delivery_due_day > ?');
+        params.push(weekEnd);
+      } else {
+        clauses.push('o.delivery_due_day IS NULL');
+      }
+    }
+  }
+
+  if (search.kind === 'order_id') {
+    // A PREFIX match on the primary key, with no COLLATE NOCASE: ids are
+    // `ORD-` + uppercase hex, the classifier has already upper-cased what was
+    // typed, and a NOCASE comparison would throw away the primary-key index
+    // and scan the table for a lookup that should be one seek.
+    const pattern = likePattern(search.id_prefix, 'prefix');
+    if (pattern) {
+      clauses.push(sqlLikeClause(['o.id']));
+      params.push(pattern);
+    }
+  } else if (search.kind === 'phone') {
+    // SEARCH, NOT IDENTITY. `phone.ts`'s rule — comparison is always full
+    // E.164, no suffix matching anywhere — still governs everything that
+    // decides WHO someone is. This clause decides which ORDER is on the
+    // screen. The suffix exists because `address_snapshot` is frozen history:
+    // orders placed before the address validator normalised phones carry
+    // `+964-0770 123 4567`, and the national number is what both that and
+    // `+9647701234567` end with.
+    const ors: string[] = [];
+    if (search.phone.e164) {
+      ors.push('u.phone_e164 = ?');
+      params.push(search.phone.e164);
+    }
+    const suffix = likePattern(search.phone.national, 'suffix');
+    if (suffix) {
+      ors.push(sqlLikeClause([`COALESCE(u.phone_e164,'')`, phoneDigitsSql(`COALESCE(${SNAPSHOT_PHONE_SQL},'')`)]));
+      params.push(suffix, suffix);
+    }
+    // '0' rather than nothing: a phone search that produced no usable key must
+    // return NO rows, not the whole table.
+    clauses.push(ors.length > 0 ? `(${ors.join(' OR ')})` : '0');
+  } else if (search.kind === 'date') {
+    // A HALF-OPEN UTC RANGE, never `substr(created_at,1,10)`. An order placed
+    // at 01:00 Baghdad carries a `created_at` dated the PREVIOUS day in UTC, so
+    // slicing the string files three hours of every day under yesterday.
+    clauses.push('o.created_at >= ? AND o.created_at < ?');
+    params.push(search.date.from, search.date.to);
+  } else if (search.kind === 'name') {
+    // BOTH NAMES: the account's `u.name` and the delivery name frozen in the
+    // snapshot, which is often a different person — a gift, or an office.
+    //
+    // `json_valid` IS NOT OPTIONAL. An unguarded `json_extract` over a row
+    // whose text is not JSON THROWS, and this statement and the COUNT run in
+    // one Promise.all, so one malformed snapshot takes the whole screen down.
+    // Every other reader of this column parses it in TypeScript with
+    // `safeParse`; putting it in a WHERE is new exposure, and this is its
+    // guard.
+    const pattern = likePattern(search.folded);
+    if (pattern) {
+      clauses.push(
+        `(${sqlLikeClause([
+          arabicFoldSql(`COALESCE(u.name,'')`),
+          arabicFoldSql(`COALESCE(${SNAPSHOT_NAME_SQL},'')`),
+        ])})`
+      );
+      params.push(pattern, pattern);
+    }
+  }
+
+  const where = clauses.length > 0 ? ` WHERE ${clauses.map((x) => `(${x})`).join(' AND ')}` : '';
+
+  /**
+   * ONE `FROM`, SHARED BY BOTH STATEMENTS, AND THAT IS THE POINT.
+   *
+   * The COUNT used to be `FROM orders o` with no join while the rows query
+   * joined `users`. The moment any predicate names `u.name` — which a name
+   * search does — the COUNT fails with `no such column: u.name`, and because
+   * the two run in one `Promise.all` the rejection takes the whole screen
+   * down. It fails only when somebody actually types a name, which is why it
+   * would have shipped. Binding both statements to this one constant is what
+   * makes the two WHERE clauses structurally incapable of disagreeing.
+   */
+  const FROM = 'FROM orders o LEFT JOIN users u ON u.id = o.user_id';
+
+  const [{ results }, countRow] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT o.*, u.email, u.username, u.name AS user_name, u.phone_e164 AS user_phone
+         ${FROM}${where}
+        ORDER BY o.delivery_due_day IS NULL,
+                 o.delivery_due_day ASC,
+                 o.priority DESC,
+                 (o.priority_due_at IS NULL), o.priority_due_at ASC,
+                 o.created_at ASC,
+                 o.id ASC
+        LIMIT ? OFFSET ?`
+    )
+      .bind(...params, limit, offset)
+      .all<Record<string, unknown>>(),
+    // THE GROUP HEADERS RIDE IN THE COUNT THAT ALREADY RUNS. Six SUM(CASE)
+    // columns over the same WHERE cost one scan the board was paying for
+    // anyway; six separate COUNT queries would be six more round trips to D1
+    // for numbers nobody can act on individually.
+    c.env.DB.prepare(
+      `SELECT COUNT(*) AS n,
+              SUM(CASE WHEN o.delivery_due_day IS NOT NULL AND o.delivery_due_day < ? THEN 1 ELSE 0 END) AS overdue,
+              SUM(CASE WHEN o.delivery_due_day = ? THEN 1 ELSE 0 END) AS due_today,
+              SUM(CASE WHEN o.delivery_due_day = ? THEN 1 ELSE 0 END) AS due_tomorrow,
+              SUM(CASE WHEN o.delivery_due_day > ? AND o.delivery_due_day <= ? THEN 1 ELSE 0 END) AS due_week,
+              SUM(CASE WHEN o.delivery_due_day > ? THEN 1 ELSE 0 END) AS due_later,
+              SUM(CASE WHEN o.delivery_due_day IS NULL THEN 1 ELSE 0 END) AS unscheduled
+         ${FROM}${where}`
+    )
+      .bind(today, today, tomorrow, tomorrow, weekEnd, weekEnd, ...params)
+      .first<Record<string, number>>(),
+  ]);
 
   // TWO QUERIES, NOT 201. This used to fetch 200 orders and then run a
   // separate `SELECT * FROM order_items WHERE order_id = ?` for EACH one —
   // 201 round trips to D1 for one screen, which is why the orders tab took
   // seconds to appear. The items now come back in a single IN query over the
   // page's ids, and the page is 30 rows rather than 200.
-  let where = '';
-  const params: unknown[] = [];
-  if (status) {
-    where = ' WHERE o.status = ?';
-    params.push(status);
-  }
-
-  const [{ results }, countRow] = await Promise.all([
-    c.env.DB.prepare(
-      `SELECT o.*, u.email, u.username FROM orders o
-         LEFT JOIN users u ON u.id = o.user_id${where}
-        ORDER BY o.priority DESC,
-                 CASE WHEN o.priority_due_at IS NULL THEN 1 ELSE 0 END,
-                 o.priority_due_at ASC,
-                 CASE WHEN o.priority = 1 THEN o.created_at END ASC,
-                 CASE WHEN o.priority = 0 THEN o.created_at END DESC
-        LIMIT ? OFFSET ?`
-    )
-      .bind(...params, limit, offset)
-      .all<Record<string, unknown>>(),
-    c.env.DB.prepare(`SELECT COUNT(*) AS n FROM orders o${where}`)
-      .bind(...params)
-      .first<{ n: number }>(),
-  ]);
-
   const ids = results.map((o) => String(o.id));
   const byOrder = new Map<string, Record<string, unknown>[]>(ids.map((id) => [id, []]));
   if (ids.length > 0) {
@@ -925,17 +1201,81 @@ adminRoutes.get('/orders', async (c) => {
   // list is the screen staff scan before opening one — and the projection
   // marks each one `pending_customer_reveal` until the customer's milestone.
   const adminMystery = await mysteryViewFor(c.env.DB, ids, 'admin');
-  const out = results.map((o) => ({
-    ...orderPublic(o, byOrder.get(String(o.id)) ?? [], undefined, adminMystery),
-    email: o.email,
-    username: o.username,
-    user_id: o.user_id,
-    priority: Number(o.priority) || 0,
-    delivery_waived: Number(o.delivery_waived) || 0,
-    membership_tier_snapshot: o.membership_tier_snapshot ?? 'free',
-    delivered_at: o.delivered_at ?? null,
-  }));
-  return c.json({ success: true, orders: out, total: countRow?.n ?? out.length, limit, offset });
+  const lang = langOf(c);
+  const out = results.map((o) => {
+    const day = typeof o.delivery_due_day === 'string' ? o.delivery_due_day : '';
+    return {
+      ...orderPublic(o, byOrder.get(String(o.id)) ?? [], undefined, adminMystery),
+      email: o.email,
+      username: o.username,
+      user_id: o.user_id,
+      /**
+       * WHAT PACKING A BOX NEEDS. The delivery name and the governorate are
+       * already on `address` — `orderPublic` returns the parsed snapshot — so
+       * the row carries the person the parcel is FOR. `customer_name` is the
+       * account holder beside it, because the two differ often enough (a gift,
+       * an office address) that showing only one sends parcels to the wrong
+       * name. The email stays only because the existing screen reads it; it is
+       * the least useful thing to put in front of someone packing a box, and
+       * nothing new should be built on it.
+       */
+      customer_name: o.user_name ?? '',
+      customer_phone: o.user_phone ?? null,
+      /** Merchant orders share this table and are BADGED, never counted as ours. */
+      seller_type: o.seller_type ?? 'levonis',
+      priority: Number(o.priority) || 0,
+      delivery_waived: Number(o.delivery_waived) || 0,
+      membership_tier_snapshot: o.membership_tier_snapshot ?? 'free',
+      delivered_at: o.delivered_at ?? null,
+      /** «يستطيع اختيار وتغيير يوم التوصيل» — the day itself, and when it moved. */
+      delivery_due_day: day || null,
+      delivery_day_changed_at: o.delivery_day_changed_at ?? null,
+      due_bucket: dueBucketOf(day, today, tomorrow, weekEnd),
+      due_label: day ? dayLabel(day, today, lang).label : '',
+    };
+  });
+
+  const total = Number(countRow?.n ?? out.length);
+  return c.json({
+    success: true,
+    orders: out,
+    total,
+    limit,
+    offset,
+    scope,
+    due: due || null,
+    type: type || null,
+    status: status || null,
+    /** The three anchors the buckets were computed against, so the screen can
+     *  label a header without deriving a day from the browser's clock. */
+    today,
+    tomorrow,
+    week_end: weekEnd,
+    /**
+     * WHICH READING WON, so the board can say «بحث برقم الهاتف» with a one-tap
+     * «ابحث كاسم» beside it. A classifier that guesses wrong is cheap to
+     * correct and expensive to hide.
+     */
+    search_kind: search.kind,
+    search:
+      search.kind === 'none'
+        ? null
+        : {
+            raw: search.raw,
+            /** True when this lookup ignored the scope and every filter. */
+            pierced: pierces,
+            ...(search.kind === 'date' ? { date: search.date } : {}),
+          },
+    counts: {
+      total,
+      overdue: Number(countRow?.overdue ?? 0),
+      today: Number(countRow?.due_today ?? 0),
+      tomorrow: Number(countRow?.due_tomorrow ?? 0),
+      week: Number(countRow?.due_week ?? 0),
+      later: Number(countRow?.due_later ?? 0),
+      unscheduled: Number(countRow?.unscheduled ?? 0),
+    },
+  });
 });
 
 /**
@@ -1211,6 +1551,19 @@ async function deliveredEffects(
   if (printerGift?.enabled === true && printerGift.milestone === 'delivered') {
     c.executionCtx.waitUntil(grantPrinterGiftIfEligible(c.env, id));
   }
+  /*
+   * THE MESSAGE LEAVES FROM THE SAME PLACE THE GRANTS DO. `deliveredEffects`
+   * is where both delivered doors converge, and its own docstring says that is
+   * why it exists — «the day those two granted different things would be the
+   * day a customer's warranty depended on which button was pressed». The same
+   * argument applies to telling them at all.
+   *
+   * `waitUntil`, because an admin pressing a button must not wait on three
+   * providers. The event key is the status, so the stage door's own call for
+   * this order costs one no-op enqueue, never a second message.
+   */
+  c.executionCtx.waitUntil(notifyOrderDelivered(c.env, id));
+
   return { deviceUnits, deviceUnitsWarning };
 }
 

@@ -25,6 +25,21 @@ export interface OutboxTelegram {
   kind: 'telegram';
   chat_id: number | string;
   text: string;
+  /**
+   * A Telegram keyboard — `{ inline_keyboard: [[{ text, url }]] }` — carried
+   * through to sendMessage verbatim. It is here because the admin group has
+   * had tappable buttons since §12.2 (`decisionKeyboard` in walletNotify.ts)
+   * while a CUSTOMER message could only ever be a wall of text: `deliver()`
+   * hand-built the body from three fields and silently dropped anything else.
+   *
+   * `outbox.payload` is free-form JSON, so this needs no migration — an old
+   * pending row simply has no key here and sends exactly as before.
+   *
+   * Typed as free JSON rather than a keyboard shape on purpose: Telegram owns
+   * this vocabulary (inline_keyboard, force_reply, remove_keyboard), and a
+   * half-copy of it here would be a second, staler definition to keep in step.
+   */
+  reply_markup?: Record<string, unknown>;
 }
 /**
  * WhatsApp, through WasenderAPI (migration 0087). Queued rather than sent
@@ -249,7 +264,16 @@ async function deliver(env: Env, payload: OutboxMessage, eventKey: string): Prom
   const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: payload.chat_id, text: payload.text.slice(0, 4000), disable_web_page_preview: true }),
+    body: JSON.stringify({
+      chat_id: payload.chat_id,
+      text: payload.text.slice(0, 4000),
+      disable_web_page_preview: true,
+      // The key is ABSENT on a message with no button rather than present and
+      // empty — a keyboard is not something to send half of. Spread rather
+      // than `reply_markup: payload.reply_markup`, which would leave the
+      // body's shape depending on JSON.stringify quietly dropping `undefined`.
+      ...(payload.reply_markup ? { reply_markup: payload.reply_markup } : {}),
+    }),
   });
   if (res.ok) return { ok: true };
 

@@ -42,6 +42,7 @@
 import type { Env } from './types';
 import { safeParse } from './types';
 import { multipliedPointsSql, multiplierSql, tierNameSql } from './pointsMultiplier';
+import { baghdadDay as baghdadDayAt } from './baghdadTime';
 
 export type MissionId = 'checkin' | 'push' | 'video' | 'browse';
 
@@ -118,12 +119,26 @@ export const MISSIONS: Record<MissionId, MissionSpec> = {
 /**
  * The Baghdad calendar day, from the SERVER clock only.
  *
- * Iraq is UTC+3 year-round (no DST since 2007). `nowMs` exists so a test can
- * pin an instant; no request path ever passes it, and nothing derived from a
- * request can reach it.
+ * THE ARITHMETIC NO LONGER LIVES HERE. It is `worker/lib/baghdadTime.ts`, the
+ * one copy of the day boundary, so that this module and `farm/time.ts` and the
+ * delivery board cannot drift apart about which day it is. Nothing else about
+ * this function changed.
+ *
+ * THE ARGUMENT ORDER IS DELIBERATELY NOT THE LEAF'S. `baghdadTime.baghdadDay`
+ * takes `(nowMs, offsetDays)`; this one keeps `(offsetDays, nowMs)` because
+ * every existing caller — nine of them in `worker/routes/rewards.ts` alone —
+ * is written `baghdadDay(0, nowMs)` and `baghdadDay(-1)`. Both parameters are
+ * numbers, so swapping them is INVISIBLE to the type checker: `baghdadDay(0,
+ * nowMs)` read in the leaf's order means "1.7 trillion days after the epoch",
+ * which formats as a plausible-looking string and silently awards every
+ * check-in against a day nobody will ever reach again. A re-export would have
+ * been that swap. The delegation is the fix; the order stays.
+ *
+ * `nowMs` exists so a test can pin an instant; no request path ever passes it,
+ * and nothing derived from a request can reach it.
  */
 export function baghdadDay(offsetDays = 0, nowMs: number = Date.now()): string {
-  return new Date(nowMs + 3 * 3600_000 + offsetDays * 86_400_000).toISOString().slice(0, 10);
+  return baghdadDayAt(nowMs, offsetDays);
 }
 
 /**

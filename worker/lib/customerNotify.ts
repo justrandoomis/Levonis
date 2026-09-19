@@ -203,6 +203,47 @@ export interface CustomerMessage {
   body: string;
   /** Optional lines of label/value detail — order number, amount, status. */
   details?: Array<{ label: string; value: string }>;
+  /**
+   * ONE thing to tap, rendered three ways because the three channels can
+   * carry three different amounts of it — and NOT rendered at all when the
+   * deployment cannot build an absolute address (see `ctaOf`).
+   *
+   *   telegram — a real `inline_keyboard`, the same mechanism the admin group
+   *              has had since §12.2.
+   *   whatsapp — the bare URL on its own last line. `sendWhatsAppText` posts
+   *              `{to, text}` to a REAL linked account (lib/wasender.ts), not
+   *              the Business API: there is no button field to send, and a
+   *              provider-specific one would simply be refused. A URL alone on
+   *              a line is tappable in every WhatsApp client, which is the
+   *              most the channel can honestly do.
+   *   email    — one escaped <a> in the card, and the same bare URL in the
+   *              text alternative, because a text part with no address is a
+   *              message whose whole point is missing for anyone reading it.
+   *
+   * It is ONE field rather than one per channel for the same reason `body` is:
+   * a notification that offers different destinations on different channels is
+   * one the shop cannot answer a question about.
+   */
+  cta?: { label: string; url: string };
+}
+
+/**
+ * THE ONE GATE EVERY RENDERER GOES THROUGH.
+ *
+ * A CTA is only ever built from `env.APP_ORIGIN` (configuration) — never from
+ * a request, whose Host header is merchant-controlled — and this is the last
+ * check that the thing about to be put in front of a customer is really an
+ * absolute https address. A relative path in a WhatsApp message is text, not a
+ * link; `http://` in a message the shop sent is a downgrade the shop chose;
+ * and a `javascript:` label would be neither. Any of those omits the CTA
+ * entirely, which is the same rule `adminDeepLink` applies for the same
+ * reason: an unlinked message is honest, a half-built one is not.
+ */
+function ctaOf(msg: CustomerMessage): { label: string; url: string } | null {
+  const url = (msg.cta?.url ?? '').trim();
+  const label = (msg.cta?.label ?? '').trim();
+  if (!url.startsWith('https://') || !label) return null;
+  return { label, url };
 }
 
 /** The LEVONIS card, for the email part only. Same shell idea as the auth
@@ -217,6 +258,14 @@ function notifyHtml(lang: EmailLang, msg: CustomerMessage): string {
         `${escapeHtml(d.label)}: <span dir="ltr" style="unicode-bidi:isolate;">${escapeHtml(d.value)}</span></p>`
     )
     .join('');
+  // One escaped <a>, and escaped for BOTH positions it sits in: the href and
+  // the visible label. `escapeHtml` is the same helper the auth templates use.
+  const cta = ctaOf(msg);
+  const action = cta
+    ? `<p style="margin:16px 0 0;"><a href="${escapeHtml(cta.url)}" ` +
+      `style="display:inline-block;background-color:#111111;color:#d4af37;text-decoration:none;` +
+      `font-size:14px;font-weight:bold;padding:11px 20px;border-radius:10px;">${escapeHtml(cta.label)}</a></p>`
+    : '';
   return (
     `<div dir="${dir}" style="margin:0;padding:24px 12px;background-color:#f4f4f2;font-family:Arial,Helvetica,sans-serif;">` +
     `<div style="max-width:520px;margin:0 auto;">` +
@@ -225,14 +274,28 @@ function notifyHtml(lang: EmailLang, msg: CustomerMessage): string {
     `<div style="background-color:#ffffff;border-radius:0 0 14px 14px;padding:26px 24px;color:#111111;">` +
     `<p style="margin:0 0 14px 0;font-size:14px;line-height:1.7;">${escapeHtml(msg.body).replace(/\n/g, '<br>')}</p>` +
     details +
+    action +
     `</div></div></div>`
   );
 }
 
-/** The plain-text form both chat channels send and the email carries too. */
+/**
+ * The plain-text form both chat channels send and the email carries too.
+ *
+ * EVERY DETAIL IS ANOTHER LINE ON A LOCK SCREEN — which is what makes the
+ * `details` list expensive and why the order messages now carry almost none.
+ *
+ * The CTA is the LAST line and is the bare URL, with no label in front of it:
+ * a URL alone on its own line is what WhatsApp, Telegram and every mail client
+ * turn into something tappable, while «الرابط: https://…» is a line that may
+ * or may not linkify depending on the client. The label already rode along in
+ * `body` as the reason to tap.
+ */
 export function plainNotification(msg: CustomerMessage): string {
   const lines = [msg.body];
   for (const d of msg.details ?? []) lines.push(`${d.label}: ${d.value}`);
+  const cta = ctaOf(msg);
+  if (cta) lines.push(cta.url);
   return `LEVONIS\n${lines.join('\n')}`;
 }
 
@@ -304,6 +367,11 @@ function planChannels(
   wanted: readonly CustomerChannel[]
 ): ChannelPlan {
   const text = plainNotification(msg);
+  const cta = ctaOf(msg);
+  // Telegram carries the CTA as a real button, so its TEXT must not also end
+  // with the bare URL: the same address twice in one short message reads as
+  // padding, and on a lock screen the preview is the message.
+  const telegramText = cta ? plainNotification({ ...msg, cta: undefined }) : text;
   const plan: ChannelPlan = { send: [], blocked: [] };
 
   // A channel the ACCOUNT cannot receive is absent, not blocked: a customer
@@ -346,7 +414,15 @@ function planChannels(
   if (wanted.includes('telegram') && reach.telegram_chat_id !== null) {
     const item: ChannelItem = {
       channel: 'telegram',
-      message: { kind: 'telegram', chat_id: reach.telegram_chat_id, text },
+      message: {
+        kind: 'telegram',
+        chat_id: reach.telegram_chat_id,
+        text: telegramText,
+        // ONE button, one row. A customer message has exactly one thing worth
+        // doing; a keyboard with choices on it is an admin decision surface
+        // (walletNotify's `decisionKeyboard`), and this is not one.
+        ...(cta ? { reply_markup: { inline_keyboard: [[{ text: cta.label, url: cta.url }]] } } : {}),
+      },
     };
     if (!live.telegram) plan.blocked.push({ ...item, blocker: 'DEPLOYMENT_NOT_CONFIGURED' });
     else plan.send.push(item);

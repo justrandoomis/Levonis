@@ -31,6 +31,14 @@ import { asLang } from '../components/orders/format';
  * Unknown ?status= values fall back to "All" — never an accidental empty
  * list from a bogus server filter.
  *
+ * `?needs_review=1` NARROWS THE DELIVERED LIST TO A TASK. The delivered
+ * notification's button says «قيّم منتجاتك» and opens this page; without the
+ * flag it lands on every order the customer ever received, with the review
+ * verb on one of them — a list, not the thing the button promised. The flag
+ * hides the delivered orders that are already fully rated, says so in one
+ * line, and offers the way back. It is a query parameter rather than a tab
+ * because it is where a message SENT the customer, not a view they chose.
+ *
  * The list is cursor-paginated (limit + before). Search is client-side over
  * what is loaded and says so when more pages exist.
  */
@@ -97,6 +105,12 @@ const STRINGS = {
     loadMore: 'تحميل المزيد',
     loadingMore: 'جارٍ التحميل…',
     loadMoreFailed: 'تعذر تحميل المزيد.',
+    // The one line the narrowed list owes the customer: what was hidden, and
+    // the way out of it. Never a count — the page holds one page of orders.
+    needsReviewNote: 'نعرض الطلبات المستلمة التي تنتظر تقييمك.',
+    showAllDelivered: 'عرض كل الطلبات المستلمة',
+    allRated: 'قيّمت كل طلباتك المستلمة.',
+    allRatedLoaded: 'كل الطلبات المحمّلة مقيّمة — حمّل المزيد للمتابعة.',
     cancelledNotice: (id: string) => `أُلغي الطلب ${id}.`,
     // POST /api/reviews writes status='published' and answers published:true —
     // the review is LIVE, and only the separate gift/points decision waits.
@@ -126,6 +140,10 @@ const STRINGS = {
     loadMore: 'Load more',
     loadingMore: 'Loading…',
     loadMoreFailed: 'Could not load more.',
+    needsReviewNote: 'Showing delivered orders that are still waiting for your rating.',
+    showAllDelivered: 'Show all delivered orders',
+    allRated: 'You have rated every delivered order.',
+    allRatedLoaded: 'Every loaded order is rated — load more to keep looking.',
     cancelledNotice: (id: string) => `Order ${id} was cancelled.`,
     reviewThanks: 'Thank you — your review is published. Reward approval is separate.',
   },
@@ -153,6 +171,10 @@ const STRINGS = {
     loadMore: 'زیاتر بار بکە',
     loadingMore: 'بارکردن…',
     loadMoreFailed: 'زیاتر بار نەکرا.',
+    needsReviewNote: 'ئەو داواکارییە گەیەنراوانە پیشان دەدرێن کە چاوەڕێی هەڵسەنگاندنی تۆن.',
+    showAllDelivered: 'هەموو داواکارییە گەیەنراوەکان پیشان بدە',
+    allRated: 'هەموو داواکارییە گەیەنراوەکانت هەڵسەنگاندووە.',
+    allRatedLoaded: 'هەموو داواکارییە بارکراوەکان هەڵسەنگێنراون — زیاتر بار بکە.',
     cancelledNotice: (id: string) => `داواکاری ${id} هەڵوەشێنرایەوە.`,
     // OWNER: Sorani to be written by hand. The previous Kurdish line said the
     // review was "awaiting approval", which the server contradicts — it
@@ -171,6 +193,29 @@ function listUrl(filter: Filter, before?: string | null): string {
   return `/api/orders?${p.toString()}`;
 }
 
+/**
+ * The orders the flag hides — the same predicate `OrderCard` computes as
+ * `allReviewed`, and deliberately not a second opinion about it: the list and
+ * the card must agree about the same order, or a card appears with no verb on
+ * a screen that says everything on it is waiting for one.
+ *
+ * `reviewed === null` means /api/reviews/mine has not answered (or failed).
+ * NOTHING is hidden then. That is the page's existing rule — unknown is never
+ * read as "already done", which is why the card offers the verb and lets the
+ * sheet ask the server — and hiding on an unknown would silently empty the
+ * screen the customer was just sent to.
+ *
+ * An order with no reviewable line at all (a mystery spool) is NOT hidden,
+ * because `allReviewed` is false for it too. Its card offers no verb and
+ * claims nothing; hiding it here would be the list knowing something about
+ * that order the card does not.
+ */
+function fullyReviewed(order: ApiOrder, reviewed: ReadonlySet<string> | null): boolean {
+  if (order.status !== 'delivered' || reviewed === null) return false;
+  const reviewable = order.items.filter((it) => !!it.product_id);
+  return reviewable.length > 0 && reviewable.every((it) => reviewed.has(it.product_id!));
+}
+
 export default function Orders() {
   const navigate = useNavigate();
   const { dir, lang } = useLanguage();
@@ -178,6 +223,12 @@ export default function Orders() {
   const s = STRINGS[asLang(lang)];
 
   const filter = useMemo(() => parseFilter(new URLSearchParams(location.search).get('status')), [location.search]);
+  // Exactly '1', not "any value": a flag that turns on for `needs_review=0` is
+  // a flag that turns on by accident.
+  const needsReview = useMemo(
+    () => new URLSearchParams(location.search).get('needs_review') === '1',
+    [location.search]
+  );
 
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [nextBefore, setNextBefore] = useState<string | null>(null);
@@ -317,11 +368,18 @@ export default function Orders() {
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return orders;
-    return orders.filter(
-      (o) => o.id.toLowerCase().includes(q) || o.items.some((it) => (it.name || '').toLowerCase().includes(q))
-    );
-  }, [orders, search]);
+    const matched = q
+      ? orders.filter(
+          (o) => o.id.toLowerCase().includes(q) || o.items.some((it) => (it.name || '').toLowerCase().includes(q))
+        )
+      : orders;
+    return needsReview ? matched.filter((o) => !fullyReviewed(o, reviewed)) : matched;
+  }, [orders, search, needsReview, reviewed]);
+
+  /** Everything loaded was already rated — a finished task, not a bad search. */
+  const nothingLeftToReview = needsReview && !search.trim() && orders.length > 0 && visible.length === 0;
+
+  const showAllDelivered = () => navigate('/orders?status=review', { replace: true });
 
   const onCancelled = (order: ApiOrder) => {
     setCancelFor(null);
@@ -418,6 +476,24 @@ export default function Orders() {
           {notice}
         </p>
 
+        {/* The list is narrowed and says so — with the way back on the same
+            line, because a filter a customer cannot see is a list that is
+            missing orders. Held back until the reviewed set has answered:
+            before that nothing is hidden, so there is nothing to announce. */}
+        {needsReview && reviewed !== null && !loading && !error && !nothingLeftToReview && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-zinc-900/60 border border-zinc-800/60 rounded-xl px-3 py-2 mb-4 text-xs text-zinc-400">
+            <p className="min-w-0">{s.needsReviewNote}</p>
+            <button
+              type="button"
+              onClick={showAllDelivered}
+              data-show-all-delivered
+              className="font-bold text-[#BAA369] underline underline-offset-2 hover:text-[#d4c089] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+            >
+              {s.showAllDelivered}
+            </button>
+          </div>
+        )}
+
         {/* Honest explanation of the returns view: it IS the delivered list. */}
         {filter === 'returns' && !loading && !error && (
           <div className="flex items-start gap-2 bg-zinc-900/60 border border-zinc-800/60 rounded-xl p-3 mb-4 text-xs text-zinc-400 leading-relaxed">
@@ -432,6 +508,51 @@ export default function Orders() {
           <ErrorState error={error} onRetry={loadFirst} />
         ) : orders.length === 0 ? (
           <EmptyState title={filter === 'All' ? s.empty : s.emptyFiltered} />
+        ) : nothingLeftToReview ? (
+          // Not «لا نتائج مطابقة»: nothing failed to match. The customer rated
+          // everything, which deserves saying — and the way back with it, or
+          // the delivered orders they DO have are simply gone from the screen.
+          //
+          // «قيّمت كل طلباتك» IS ONLY TRUE WHEN THERE IS NOTHING LEFT TO LOAD.
+          // With a cursor still in hand it is a claim about one page, and the
+          // unrated order may be on the next one — so the page says what it
+          // actually knows and keeps the way to find out on the screen, which
+          // is the branch that renders the list's own Load more button.
+          <EmptyState
+            title={nextBefore ? s.allRatedLoaded : s.allRated}
+            action={
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {nextBefore && (
+                  <button
+                    type="button"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    data-load-more
+                    className="min-h-[44px] px-4 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                  >
+                    {loadingMore && <Spinner size="sm" delayMs={0} decorative />}
+                    {loadingMore ? s.loadingMore : s.loadMore}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={showAllDelivered}
+                  data-show-all-delivered
+                  className="min-h-[44px] px-4 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                >
+                  {s.showAllDelivered}
+                </button>
+                {/* The list's own error line lives in the other branch, and a
+                    load that fails here would otherwise look like a button
+                    that does nothing. */}
+                {moreError && (
+                  <p role="alert" className="w-full text-red-400 text-[12.5px] text-center">
+                    {moreError}
+                  </p>
+                )}
+              </div>
+            }
+          />
         ) : visible.length === 0 ? (
           <EmptyState title={s.noMatches} description={nextBefore ? s.searchHint : undefined} compact />
         ) : (

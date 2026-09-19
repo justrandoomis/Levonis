@@ -4,6 +4,11 @@ import { DEFAULT_PRICING, DEFAULT_MATERIALS, type PrintPricingConfig, type Print
 import { DEFAULT_MATCH_WEIGHTS, type MatchWeights } from './printMatching';
 import { DEFAULT_LINK_PROVIDERS, type LinkProviderConfig } from './externalModels';
 import { FARM_CONFIG_DEFAULTS, type FarmConfig } from './farm/config';
+import {
+  DEFAULT_DELIVERY_DAY_POLICY,
+  resolveDeliveryDayPolicy,
+  type DeliveryDayPolicy,
+} from './deliveryDay';
 
 /** Typed access to the admin_settings key/value store, with safe defaults. */
 
@@ -15,6 +20,21 @@ export interface DeliveryMethod {
   descEn: string;
   price_iqd: number;
   icon: string;
+  /**
+   * Does this method end at the CUSTOMER'S DOOR? It decides whether an order
+   * gets a delivery day at all — there is no "which day do you want it" for a
+   * pickup, because nobody is driving anywhere.
+   *
+   * OPTIONAL, AND `undefined` MEANS "infer `id !== 'pickup'`". The existing
+   * test for "no last mile" is the hardcoded `delivery.id === 'pickup'` at
+   * checkout, and `checkoutDeliveryMethods` is an ADMIN-EDITABLE array: the
+   * day the owner adds «استلام من الفرع الثاني» that test silently
+   * misclassifies it as a home delivery and starts asking its customers which
+   * day to drive to them. A method that carries the flag declares itself; one
+   * that does not keeps exactly today's behaviour, so nothing stored before
+   * this field existed changes meaning. Read it through `deliversToHome`.
+   */
+  home_delivery?: boolean;
 }
 export interface CheckoutPaymentMethod {
   id: string;
@@ -63,9 +83,9 @@ export const SETTING_DEFAULTS = {
   adVideoUrl: '',
   paymentMethods: [] as ManualPaymentMethod[],
   checkoutDeliveryMethods: [
-    { id: 'standard', titleAr: 'توصيل عادي', titleEn: 'Standard Delivery', descAr: '2-3 أيام عمل', descEn: '2-3 business days', price_iqd: 5000, icon: 'Truck' },
-    { id: 'personal', titleAr: 'توصيل شخصي', titleEn: 'Personal Delivery', descAr: 'نفس اليوم', descEn: 'Same day delivery', price_iqd: 10000, icon: 'User' },
-    { id: 'pickup', titleAr: 'استلام من المخزن', titleEn: 'Store Pickup', descAr: 'جاهز خلال ساعتين', descEn: 'Ready in 2 hours', price_iqd: 0, icon: 'Store' },
+    { id: 'standard', titleAr: 'توصيل عادي', titleEn: 'Standard Delivery', descAr: '2-3 أيام عمل', descEn: '2-3 business days', price_iqd: 5000, icon: 'Truck', home_delivery: true },
+    { id: 'personal', titleAr: 'توصيل شخصي', titleEn: 'Personal Delivery', descAr: 'نفس اليوم', descEn: 'Same day delivery', price_iqd: 10000, icon: 'User', home_delivery: true },
+    { id: 'pickup', titleAr: 'استلام من المخزن', titleEn: 'Store Pickup', descAr: 'جاهز خلال ساعتين', descEn: 'Ready in 2 hours', price_iqd: 0, icon: 'Store', home_delivery: false },
   ] as DeliveryMethod[],
   checkoutPaymentMethods: [
     { id: 'wallet', titleAr: 'محفظة ليفو', titleEn: 'Levo Wallet', icon: 'Wallet' },
@@ -93,6 +113,25 @@ export const SETTING_DEFAULTS = {
     shipping_types: ['direct'],
     governorates: [],
   } as ProPriorityDeliveryConfig,
+  /**
+   * «يستطيع اختيار وتغيير يوم التوصيل في أي وقت يريد ولكن بحد أقصى أسبوع» —
+   * the customer names their delivery day, up to a week out.
+   *
+   * SHIPS ENABLED, at 7 days, AGAINST the house rule that a new policy ships
+   * off (orderExpiryConfig, printerGiftConfig, preorderGiftConfig all do). The
+   * owner asked for this one directly and named the number — «الأسبوع أقصد به
+   * مدة سبعة أيام من تاريخ الطلب» — so it is a decision, not an oversight, and
+   * it is written down in both places rather than left to be discovered.
+   *
+   * Deployed behaviour still does not change: migration 0094 backfills
+   * nothing, so every existing order stays `delivery_day_schedulable = 0` with
+   * a NULL day and the policy first applies to the next new checkout.
+   *
+   * The shape and the 1..30 clamp live in worker/lib/deliveryDay.ts, and
+   * `normalizedSetting` reads through the same `resolveDeliveryDayPolicy` the
+   * admin route validates with — so what is stored is what runs.
+   */
+  deliveryDayPolicy: DEFAULT_DELIVERY_DAY_POLICY as DeliveryDayPolicy,
   cartShippingMethods: [
     { id: 'direct', titleAr: 'شحن مباشر', titleEn: 'Direct Shipping', descAr: 'يصل خلال 3-5 أيام عمل', descEn: 'Arrives in 3-5 business days' },
     { id: 'preorder_air', titleAr: 'طلب مسبق (شحن جوي)', titleEn: 'Pre-order (Air Freight)', descAr: 'يصل خلال 10-14 يوم عمل', descEn: 'Arrives in 10-14 business days' },
@@ -333,6 +372,24 @@ export function printerNoteIqdFrom(value: unknown): number | null {
   return typeof n === 'number' && Number.isInteger(n) && n > 0 ? n : null;
 }
 
+/**
+ * Does this delivery method end at the customer's door?
+ *
+ * THE ONE PLACE THE INFERENCE LIVES. An explicit `home_delivery` wins; absent,
+ * it falls back to the existing hardcoded test — `id !== 'pickup'` — so every
+ * method configured before the flag existed keeps behaving exactly as it does
+ * today. Callers use this instead of re-testing the id, which is how a method
+ * the owner adds tomorrow gets to declare itself.
+ *
+ * MERCHANT ORDERS DO NOT PASS THROUGH HERE AT ALL. They insert into the same
+ * `orders` table with `delivery_method_id = 'merchant'`, which is not a row in
+ * this array, so a caller resolving a method by id gets `undefined` and must
+ * decide for itself — it must not fall through to "true".
+ */
+export function deliversToHome(method: Pick<DeliveryMethod, 'id' | 'home_delivery'>): boolean {
+  return typeof method.home_delivery === 'boolean' ? method.home_delivery : method.id !== 'pickup';
+}
+
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 export const SETTING_KEYS = Object.keys(SETTING_DEFAULTS) as SettingKey[];
 
@@ -358,6 +415,11 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   // The printer note is customer-facing copy: the product page and the cart
   // read it before any quote exists.
   'printerHomeDeliveryNoteIqd',
+  // Checkout has to draw the day picker BEFORE an order exists, so it needs
+  // `max_days` and `allow_same_day` with nothing to read them off. The three
+  // values are the offer itself — the same thing the picker puts on screen —
+  // not internal policy.
+  'deliveryDayPolicy',
   // NOTE: proPricingPolicy, preorderTransportDefaults, launchConfig and
   // printerGiftConfig are intentionally NOT public — internal policy data.
 ];
@@ -369,6 +431,14 @@ function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeo
     return (configured.some((m) => typeof m === 'object' && m !== null && (m as { id?: unknown }).id === 'bnpl')
       ? configured
       : [...configured, bnpl]) as (typeof SETTING_DEFAULTS)[K];
+  }
+  // Merged over the defaults like `bnplPolicy` below, but through the policy
+  // module's own resolver rather than a bare spread: a stored `max_days` of 0
+  // would otherwise reach the picker as an empty window with no error, and a
+  // stored 10_000 would let a customer park an order thirty years out. The
+  // clamp belongs to the policy, so the read side calls it.
+  if (key === 'deliveryDayPolicy') {
+    return resolveDeliveryDayPolicy(value) as (typeof SETTING_DEFAULTS)[K];
   }
   if (key === 'bnplPolicy' || key === 'proPriorityDelivery') {
     const object: Record<string, unknown> =
