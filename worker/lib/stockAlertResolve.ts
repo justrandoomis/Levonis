@@ -106,7 +106,8 @@ export interface AlertWish {
 /**
  * WHY AN ALERT CAN NEVER COME TRUE. Every one of these is a REFUSAL the
  * customer is entitled to hear, not a silent skip: an alert that is quietly
- * dropped from the driving set sits armed for its full ninety days while
+ * dropped from the driving set sits armed INDEFINITELY — an alert has no
+ * deadline (see the note at the top of worker/routes/stockAlerts.ts) — while
  * «تنبيهاتي» presents it as live.
  *
  *   NOT_A_STOCK_TARGET    the wish names nothing this catalogue sells from a
@@ -1081,15 +1082,15 @@ export function resolveWish(ctx: AlertProductContext, wish: AlertWish): AlertVer
    * never observe a member restocking — while the page shows the customer the
    * ordinary sold-out copy, which is exactly how such an alert gets armed.
    * Refusing at the door is the only honest answer; the alternative is a row
-   * that sits armed for ninety days and fires never.
+   * that sits armed for ever — an alert has no deadline — and fires never.
    */
   if (c.composition !== '') return dead('COMPOSITION', label);
 
   /**
    * A DRAFT OR HIDDEN PRODUCT IS A REFUSAL, NOT A SILENT SKIP. If the sweep
-   * merely filtered it out of the driving set the alert would sit armed for
-   * its full ninety days while «تنبيهاتي» presented it as live. The reason
-   * travels so the sweep can kill it WITH an explanation.
+   * merely filtered it out of the driving set the alert would sit armed
+   * INDEFINITELY — nothing expires it — while «تنبيهاتي» presented it as live.
+   * The reason travels so the sweep can kill it WITH an explanation.
    */
   if (c.status !== 'active') return dead('PRODUCT_UNAVAILABLE', label);
 

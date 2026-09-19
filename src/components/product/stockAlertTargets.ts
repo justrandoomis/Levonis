@@ -313,7 +313,7 @@ const ALERT_REFUSALS: Record<string, { ar: string; en: string; ckb: string }> = 
   ALERT_PREORDER_ONLY: {
     ar: 'هذا الخيار بالطلب المسبق فقط — ما عنده مخزون ننتظره. تكدر تطلبه هسه.',
     en: 'This option is pre-order only — there is no shelf to wait for. You can order it now.',
-    ckb: 'ئەم هەڵبژاردەیە تەنها پێش‌داواکارییە — کۆگایەک نییە چاوەڕێی بکەین. ئێستا دەتوانیت داوای بکەیت.',
+    ckb: 'ئەم هەڵبژاردەیە تەنها پێش-داواکارییە — کۆگایەک نییە چاوەڕێی بکەین. ئێستا دەتوانیت داوای بکەیت.',
   },
   ALERT_UNTRACKED: {
     ar: 'هذا الخيار ما عنده عدّاد مخزون، فما نكدر نعرف متى يرجع.',

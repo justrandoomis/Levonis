@@ -117,17 +117,44 @@ const LIVE_STATES = new Set(['armed', 'firing']);
  * on this screen the thing has already happened: the customer is not being
  * refused, they are being told why they stopped waiting.
  *
- * THE SORANI HERE HAS BEEN REVIEWED, AND THIS LINE EXISTS SO NOBODY RE-OPENS
- * IT. The owner asked for the Kurdish on this page to be read rather than
- * assumed, which is the project's standing rule: `ckb` is written by someone
- * who reads it, never machined off the Arabic. The review was done and the
- * strings stand — «ئاگادارکردنەوە» for the notification, «هەڵوەشێنرایەوە» for
- * a cancelled alert, «کۆگا» for stock are the ordinary Sorani terms, not
- * calques of «تنبيه» / «ملغي» / «مخزون». Reviewed 2026-09; the eight sentences
- * below and `DEAD_REASON_FALLBACK` and `STATE_LABEL` were all in scope. Do not
- * silently rewrite them to look more like the Arabic — that is the failure
- * this note is here to prevent, and it looks like an improvement while it is
- * happening.
+ * THE SORANI ON THIS PAGE HAS BEEN READ, LINE BY LINE, AND THIS NOTE RECORDS
+ * WHAT THAT FOUND — including what it changed, because a note that only says
+ * "reviewed" proves nothing and invites the next person to redo it.
+ *
+ * The owner asked for the Kurdish here to be read rather than assumed, which is
+ * the project's standing rule: `ckb` is written by someone who reads it, never
+ * machined off the Arabic.
+ *
+ * SCOPE, 2026-09: every `loc()` call on this page, all eight sentences below,
+ * `DEAD_REASON_FALLBACK`, `STATE_LABEL`, and the empty state — plus the two
+ * strings the same feature shows on the product page
+ * (`StockAlertPanel`/`stockAlertTargets`), because a customer meets both.
+ *
+ * WHAT STANDS: «ئاگادارکردنەوە» for the notification, «هەڵوەشێنرایەوە» for a
+ * cancelled alert, «کۆگا» for stock — ordinary Sorani, not calques of «تنبيه» /
+ * «ملغي» / «مخزون». The empty state quotes «ئاگادارم بکەوە کە گەڕایەوە», which
+ * is `StockAlertPanel`'s `cta` byte for byte, so the instruction names a button
+ * that really carries that label; changing either one alone breaks that.
+ *
+ * WHAT WAS CORRECTED, and why each was wrong rather than merely different:
+ *   - TARGET_REMOVED ended «ئاگادارکردنەوەیەکی بۆ ناگات», where «بۆ» was left
+ *     with nothing to attach to and the "to YOU" of «ما راح يوصلك» was lost.
+ *   - VARIANT_NOT_MODELLED called a model-and-colour variant a «تێکەڵە», a
+ *     mixture or blend. It now says «ئەم مۆدێلە بەم ڕەنگەوە», which is what the
+ *     Arabic says.
+ *   - PREORDER_ONLY said «داواکاری پێشوەختە», a phrase used NOWHERE else in the
+ *     shop. Pre-order is «پێش-داواکاری» here — seventeen uses across checkout,
+ *     the product page, bundles and the admin — and the alert sheet on the
+ *     product page now spells it the same way. A customer who taps pre-order in
+ *     one screen must meet the same word in the other.
+ *   - «Since» before a date was a bare «لە», which reads as "on". Sorani marks
+ *     "since" with «لە … ەوە» and the trailing part cannot attach across a JSX
+ *     <time> node, so it is «هەر لە».
+ *
+ * DO NOT silently rewrite these to look more like the Arabic. That is the
+ * failure this note exists to prevent, and it looks like an improvement the
+ * whole time it is happening. Corrections found by READING — like the four
+ * above — are the opposite thing and are welcome.
  */
 export const DEAD_REASON_TEXT: Record<string, Trio> = {
   NOT_A_STOCK_TARGET: {
@@ -138,12 +165,12 @@ export const DEAD_REASON_TEXT: Record<string, Trio> = {
   VARIANT_NOT_MODELLED: {
     ar: 'هذا الموديل بهذا اللون ما عاد معروض بالمتجر، فلغينا التنبيه.',
     en: 'This exact model-and-colour combination is no longer offered, so the alert was cancelled.',
-    ckb: 'ئەم تێکەڵەیە (مۆدێل لەگەڵ ڕەنگ) چیتر پێشکەش ناکرێت، بۆیە ئاگادارکردنەوەکە هەڵوەشێنرایەوە.',
+    ckb: 'ئەم مۆدێلە بەم ڕەنگەوە چیتر لە فرۆشگا پێشکەش ناکرێت، بۆیە ئاگادارکردنەوەکە هەڵوەشێنرایەوە.',
   },
   TARGET_REMOVED: {
     ar: 'الخيار اللي كنت تنتظره انحذف من المتجر، فما راح يوصلك تنبيه عنه أبداً.',
     en: 'The option you were waiting for was removed from the shop, so no alert about it can ever arrive.',
-    ckb: 'ئەو هەڵبژاردەیەی چاوەڕێت دەکرد لە فرۆشگا لابرا، بۆیە هەرگیز ئاگادارکردنەوەیەکی بۆ ناگات.',
+    ckb: 'ئەو هەڵبژاردەیەی چاوەڕێت دەکرد لە فرۆشگا لابرا، بۆیە هەرگیز ئاگادارکردنەوەیەکت بۆ نانێرین.',
   },
   TARGET_INACTIVE: {
     ar: 'الخيار اللي كنت تنتظره ما عاد معروض، فبطّلنا ننتظره.',
@@ -163,7 +190,7 @@ export const DEAD_REASON_TEXT: Record<string, Trio> = {
   PREORDER_ONLY: {
     ar: 'هذا الخيار صار بالطلب المسبق فقط — ما عنده مخزون ننتظره، وتكدر تطلبه هسه.',
     en: 'This option is pre-order only now — there is no shelf to wait for, and you can order it today.',
-    ckb: 'ئەم هەڵبژاردەیە ئێستا تەنها داواکاری پێشوەختە — کۆگایەک نییە چاوەڕێی بکەین، ئەمڕۆ دەتوانیت داوای بکەیت.',
+    ckb: 'ئەم هەڵبژاردەیە ئێستا تەنها پێش-داواکارییە — کۆگایەک نییە چاوەڕێی بکەین، ئەمڕۆ دەتوانیت داوای بکەیت.',
   },
   COMPOSITION: {
     ar: 'هذا منتج مركّب (بكج أو صندوق)، وما إله مخزون خاص بيه نراقبه — لغينا التنبيه.',
@@ -544,7 +571,7 @@ export default function StockAlerts() {
                           </span>
                         ) : a.armed_at ? (
                           <span className="text-[11px] leading-4 text-zinc-500">
-                            {loc('من', 'Since', 'لە')}{' '}
+                            {loc('من', 'Since', 'هەر لە')}{' '}
                             <time dateTime={a.armed_at}>{formatDate(a.armed_at, l)}</time>
                           </span>
                         ) : null}

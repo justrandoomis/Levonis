@@ -56,7 +56,10 @@
  * right for both.
  *
  * ---------------------------------------------------------------------------
- * 3. ORDER BY last_checked_at ASC, AND BOUND THE RUN.
+ * 3. THE SWEEP ORDERS BY last_checked_at ASC, AND BOUNDS ITS RUN. The heading
+ *    says THE SWEEP because the prune at the foot of this file deliberately
+ *    carries no ORDER BY at all, for reasons of its own; a reader auditing that
+ *    DELETE must not land here and conclude it orders its victims.
  *
  * `product_stock_alerts` has no examined-at column by accident — it has one on
  * purpose, and the sweep MUST order by it. Any stable ordering that is not
@@ -64,7 +67,8 @@
  * first N rows every fifteen minutes and the tail NEVER fires. That is a
  * permanent starvation which looks EXACTLY like the feature working: the rows
  * at the front are examined, messages go out, the report shows traffic, and the
- * shoppers at the back wait for ninety days and are told nothing.
+ * shoppers at the back wait indefinitely — an alert has NO deadline (see the
+ * note at the top of worker/routes/stockAlerts.ts) — and are told nothing.
  *
  * A freshly armed row carries `last_checked_at = ''`, which sorts before every
  * ISO timestamp — so the newest request is examined on the very next pass.
@@ -132,6 +136,20 @@
  * instant on every participating row, written in the same batch from the same
  * string, so the settle step below can rebuild the key from any one of them
  * without a column that does not exist.
+ *
+ * AND THE KEY MUST NOT BE MOVED ONTO `arm_seq`, however tempting that looks
+ * while hunting the duplicate the CLAIM in `fireGroup` exists to stop. Two
+ * overlapping passes would indeed rebuild the same key from `arm_seq` — and so
+ * would two DIFFERENT armings, which is the failure that matters. `arm_seq`
+ * restarts at 1 on a fresh INSERT, and a fresh INSERT is ordinary: the customer
+ * deletes a live alert and arms it again, or `pruneFinishedStockAlerts` erases
+ * the finished row and they tap «نبّهني» a month later. Nothing in this Worker
+ * ever deletes a `user_notifications` row or an `outbox` row, so the FIRST
+ * fire's key outlives the alert row by years — and the second arming's
+ * identical `...:s:1` key would be swallowed by INSERT OR IGNORE and by the
+ * UNIQUE index, in silence, after which the sweep flips the row to `notified`
+ * having delivered nothing. That is the DROPPED message, and it is worse than
+ * the duplicate. The instant stays; concurrency is handled by the claim.
  *
  * ---------------------------------------------------------------------------
  * 8. RECONCILE, DO NOT CASCADE.
@@ -210,6 +228,22 @@ const BOOKKEEPING_BATCH = 50;
 const FIRING_STALE_MS = 6 * 60 * 60 * 1000;
 
 /**
+ * How long a CLAIMED but not yet written fire (`state = 'firing'` with an empty
+ * `notified_at`) is left alone before `settleFiring` treats it as wreckage and
+ * returns it to `armed`.
+ *
+ * It measures the window between `fireGroup`'s claim and the batch that writes
+ * the message — a `planNotifyCustomer` call and one `db.batch`, seconds. One
+ * cron period is already enormous next to that, and it is the shortest value
+ * that cannot mistake a fire in flight for a dead one: an overlapping
+ * invocation's settle pass that re-armed a live claim would reset
+ * `last_buyable` under a message about to be written, and the alert would fire
+ * a SECOND time on the next tick. Deliberately far shorter than
+ * `FIRING_STALE_MS`, which times a queue that is retrying, not a gap of seconds.
+ */
+const UNDATED_FIRING_GRACE_MS = 15 * 60 * 1000;
+
+/**
  * The key prefix, shared by the in-app row and by every outbox row this sweep
  * writes. `planNotifyCustomer` appends `:email` / `:whatsapp` / `:telegram`.
  */
@@ -234,11 +268,14 @@ interface AlertRow {
   last_available: number | null;
   last_buyable: number;
   notified_at: string;
+  /** Written by every judgement AND by `fireGroup`'s claim, which is what lets
+   *  `settleFiring` date an undated `firing` row. See UNDATED_FIRING_GRACE_MS. */
+  last_checked_at: string;
 }
 
 const ALERT_COLUMNS =
   'id, user_id, product_id, kind, option_value_id, color_id, state, arm_seq, ' +
-  'last_available, last_buyable, notified_at';
+  'last_available, last_buyable, notified_at, last_checked_at';
 
 const wishOf = (row: AlertRow): AlertWish => ({
   // The CHECK constraint on `kind` is the guarantee; the cast states it rather
@@ -387,10 +424,24 @@ async function settleFiring(
 
   const groups = new Map<string, FiringGroup>();
   for (const row of firing) {
-    // A row with no `notified_at` cannot have been fired by this module — it is
-    // a hand-edited or half-migrated row. Returning it to `armed` is the safe
-    // reading: the worst case is one extra message, where the alternative is a
-    // row parked in `firing` that nothing will ever move.
+    /*
+     * A `firing` ROW WITH NO `notified_at` IS A CLAIM THAT HAS NOT LANDED YET.
+     *
+     * `fireGroup` claims its rows — 'armed' -> 'firing' — BEFORE it composes or
+     * enqueues anything, and deliberately leaves `notified_at` empty until the
+     * batch that actually writes the message. So an undated `firing` row is one
+     * of exactly two things: a fire in flight right now in another (overlapping)
+     * invocation, or the wreckage of one that died between the claim and the
+     * batch. The wreckage MUST go back to `armed` or the customer waits for
+     * ever; the fire in flight MUST be left alone, because re-arming it resets
+     * `last_buyable` underneath a message that is about to be written and buys
+     * the second lock-screen buzz the claim exists to prevent.
+     *
+     * `UNDATED_FIRING_GRACE_MS` against the row's own `last_checked_at` — which
+     * the claim writes — is what tells them apart, in the verdict loop below.
+     * (A hand-edited or half-migrated row lands here too, undated, and is
+     * re-armed on the same reading: one extra message is the safe direction.)
+     */
     const key = groupKey(row.user_id, row.product_id, row.notified_at);
     const g = groups.get(key);
     if (g) g.rows.push(row);
@@ -425,7 +476,16 @@ async function settleFiring(
 
     let verdict: 'notified' | 'rearm' | 'wait';
     if (!g.notified_at) {
-      verdict = 'rearm';
+      // The newest claim instant in the group: "how long ago did something take
+      // these rows". Nothing refreshes it while we wait — see the `wait` branch
+      // below, which is the one place in this module that writes NOTHING.
+      let claimedAt = 0;
+      for (const row of g.rows) {
+        const t = Date.parse(row.last_checked_at);
+        if (Number.isFinite(t) && t > claimedAt) claimedAt = t;
+      }
+      const wreckage = claimedAt === 0 || Date.now() - claimedAt > UNDATED_FIRING_GRACE_MS;
+      verdict = wreckage ? 'rearm' : 'wait';
     } else {
       const base = eventKeyFor(g.user_id, g.product_id, g.notified_at);
       const found = OUTBOUND.map((ch) => states.get(`${base}:${ch}`)).filter(
@@ -457,9 +517,12 @@ async function settleFiring(
        * matcher because it is `firing`, permanently silent.
        *
        * Six hours is far past any real retry schedule (five attempts across
-       * fifteen-minute ticks) and far short of the ninety days the standing
-       * request is good for. Re-arming costs at worst one duplicate message on
-       * a queue that later unsticks; the alternative costs the whole promise.
+       * fifteen-minute ticks), and there is no ceiling on the other side to
+       * compare it against: the standing request behind it has NO deadline and
+       * may wait a year (worker/routes/stockAlerts.ts), so a row stuck in
+       * `firing` is stuck for ever rather than until some expiry rescues it.
+       * Re-arming costs at worst one duplicate message on a queue that later
+       * unsticks; the alternative costs the whole promise.
        */
       const age = Date.now() - Date.parse(g.notified_at);
       if (verdict === 'wait' && Number.isFinite(age) && age > FIRING_STALE_MS) verdict = 'rearm';
@@ -470,10 +533,14 @@ async function settleFiring(
         report.notified += 1;
         stmts.push(
           env.DB.prepare(
+            // `notified_at = ?` pins this to the FIRE that was judged. Without
+            // it an overlapping invocation's freshly claimed row — same id,
+            // same state, a different fire entirely — could be settled by a
+            // verdict that was never about it.
             `UPDATE product_stock_alerts
                 SET state = 'notified', last_checked_at = ?
-              WHERE id = ? AND state = 'firing'`
-          ).bind(now, row.id)
+              WHERE id = ? AND state = 'firing' AND notified_at = ?`
+          ).bind(now, row.id, g.notified_at)
         );
       } else if (verdict === 'rearm') {
         /**
@@ -484,9 +551,14 @@ async function settleFiring(
          * The alert would be alive in the customer's list and permanently
          * incapable of firing, which is worse than having been consumed.
          *
-         * `arm_seq` is bumped for the same reason the arm upsert bumps it: a
-         * re-armed row must not reuse the identity of the fire that died, or
-         * the replacement message dedupes against the corpse of the first.
+         * `arm_seq` is bumped for the same reason the arm upsert bumps it —
+         * and it is worth being exact about what that reason is NOT. It is not
+         * what stops the replacement message deduping against the corpse of the
+         * first. NOTHING in this codebase reads `arm_seq` for behaviour: the
+         * event key carries the FIRING INSTANT (§7), and that is what makes the
+         * next fire a new identity. The bump is bookkeeping the customer is
+         * shown — how many times this person has had to wait for this exact
+         * thing — and §7 explains why the key must never be moved onto it.
          */
         report.deferred += 1;
         stmts.push(
@@ -497,10 +569,10 @@ async function settleFiring(
                     last_buyable = 0,
                     notified_at = '',
                     last_checked_at = ?
-              WHERE id = ? AND state = 'firing'`
-          ).bind(now, row.id)
+              WHERE id = ? AND state = 'firing' AND notified_at = ?`
+          ).bind(now, row.id, g.notified_at)
         );
-      } else {
+      } else if (g.notified_at) {
         // Still in flight. `last_checked_at` still moves, so a group whose
         // outbox is retrying does not hold the front of the queue and starve
         // the rows behind it.
@@ -510,6 +582,22 @@ async function settleFiring(
             `UPDATE product_stock_alerts SET last_checked_at = ? WHERE id = ? AND state = 'firing'`
           ).bind(now, row.id)
         );
+      } else {
+        /*
+         * A CLAIM STILL INSIDE ITS GRACE — THE ONE ROW THIS MODULE WRITES
+         * NOTHING TO, AND THE REASON IT MUST NOT.
+         *
+         * The grace is measured against `last_checked_at`. Moving it here would
+         * refresh the very clock the grace is read from, so a claim orphaned by
+         * a crash would look fresh on every single pass, for ever, and never be
+         * re-armed: permanent silence, which is the failure this module is
+         * defined against. These rows exist only in the seconds between a claim
+         * and its batch (or after a crash in that gap), they are bounded by the
+         * group size, and they clear within a pass or two — so letting them
+         * hold the front of the least-recently-examined ordering for that long
+         * costs nothing anybody can feel.
+         */
+        report.deferred += 1;
       }
     }
   }
@@ -532,7 +620,7 @@ interface MatchGroup {
 }
 
 /**
- * ONE CUSTOMER, ONE PRODUCT, ONE MESSAGE, ONE BATCH.
+ * ONE CUSTOMER, ONE PRODUCT, ONE MESSAGE — A CLAIM, THEN ONE BATCH.
  *
  * The in-app row, the outbox rows and the state flip for every participating
  * alert commit together or not at all. Run separately, a worker that died
@@ -583,10 +671,68 @@ async function fireGroup(
 
   const outbound = readiness.delivery.filter(isOutbound);
 
-  const productWide = group.rows.some((m) => m.row.kind === 'product');
+  /**
+   * THE CLAIM. ONE ARMING, ONE MESSAGE, EVEN WHEN TWO CRON RUNS OVERLAP.
+   *
+   * `runDurableJobs` is handed to `ctx.waitUntil` with NO lock of any kind
+   * (worker/index.ts), and a run that outlives the fifteen-minute gap overlaps
+   * the next one — index.ts already concedes that on `media_cleanup`, and this
+   * pass is a plausible candidate: up to fifty provider sends across two
+   * `processOutbox` drains happen before it is even reached.
+   *
+   * THE FAILURE, PRECISELY. Two overlapping passes both SELECT the same armed
+   * row, both read `last_buyable = 0` against a buyable verdict, and both
+   * arrive here. Every dedupe this module owns is keyed on the FIRING INSTANT
+   * (§7) and the two passes computed DIFFERENT instants — so `INSERT OR IGNORE`
+   * on `user_notifications` and `ON CONFLICT DO NOTHING` on `outbox.event_key`
+   * are each handed a key nobody has ever seen, and each lets its message
+   * through. The state guard on the final UPDATE below protects the ROW and
+   * never the MESSAGE: the loser's UPDATE matches zero rows, which is not an
+   * error in SQLite, so its batch COMMITS the notification sitting beside it
+   * anyway. The customer's phone buzzes «رجع للبيع» twice for one press of
+   * «نبّهني» — and «تنبيهاتي» shows one alert, so nothing in the shop records
+   * that it happened.
+   *
+   * SO THE ROWS ARE CLAIMED BEFORE ANYTHING IS COMPOSED OR ENQUEUED, with the
+   * same compare-and-swap the rest of this cron already uses for exactly this
+   * reason (`processOutbox` claims by bumping `attempts`; `releaseDueAccruals`
+   * by a conditional UPDATE). `db.batch` is ONE transaction and reports
+   * `meta.changes` per statement, so a single round trip says precisely which
+   * rows this pass owns. A row the other pass already flipped reports zero
+   * changes and is simply not ours to speak about.
+   *
+   * `notified_at` IS DELIBERATELY LEFT EMPTY BY THE CLAIM, and that is what
+   * makes a half-done fire recoverable instead of a swallowed promise. If this
+   * invocation dies between the claim and the batch — an eviction, a throwing
+   * `planNotifyCustomer` — the row is `firing` with no instant, and
+   * `settleFiring` reads exactly that shape as wreckage and returns it to
+   * `armed` with `last_buyable = 0`. The cost is one extra tick of latency. The
+   * alternative — claiming WITH the instant — leaves a row that settles as
+   * `notified` with no message behind it, which is the one failure the shopper
+   * can neither see nor repair.
+   */
+  const claims = await env.DB.batch(
+    group.rows.map((m) =>
+      env.DB.prepare(
+        `UPDATE product_stock_alerts
+            SET state = 'firing', notified_at = '', last_checked_at = ?
+          WHERE id = ? AND state = 'armed'`
+      ).bind(now, m.row.id)
+    )
+  );
+  const mine = group.rows.filter((_, i) => Number(claims[i]?.meta?.changes ?? 0) > 0);
+  if (mine.length === 0) {
+    // Another invocation owns this arming and is writing the message. Counted
+    // as deferred rather than matched: this pass did nothing for these rows.
+    report.deferred += group.rows.length;
+    return;
+  }
+  report.deferred += group.rows.length - mine.length;
+
+  const productWide = mine.some((m) => m.row.kind === 'product');
   const labels: Trilingual[] = [];
   const seenLabels = new Set<string>();
-  for (const m of group.rows) {
+  for (const m of mine) {
     if (m.row.kind === 'product') continue;
     const l = m.verdict.label;
     const seen = groupKey(l.ar, l.en, l.ckb);
@@ -639,7 +785,7 @@ async function fireGroup(
       link: path,
       entity_type: 'product',
       entity_id: group.product_id,
-      meta: { alert_ids: group.rows.map((m) => m.row.id) },
+      meta: { alert_ids: mine.map((m) => m.row.id) },
       eventKey: base,
     }).stmt
   );
@@ -652,20 +798,23 @@ async function fireGroup(
    */
   const nextState = plan.statements.length > 0 ? 'firing' : 'notified';
 
-  for (const m of group.rows) {
+  for (const m of mine) {
     stmts.push(
       env.DB.prepare(
+        // `state = 'firing' AND notified_at = ''` is the claim this pass took,
+        // named exactly. The old guard read `state = 'armed'`, which any
+        // concurrent pass could also satisfy — see the claim above.
         `UPDATE product_stock_alerts
             SET state = ?, last_buyable = 1, last_available = ?, notified_at = ?,
                 last_checked_at = ?, dead_reason = ''
-          WHERE id = ? AND state = 'armed'`
+          WHERE id = ? AND state = 'firing' AND notified_at = ''`
       ).bind(nextState, m.verdict.available, firedAt, now, m.row.id)
     );
   }
 
   await env.DB.batch(stmts);
-  report.matched += group.rows.length;
-  if (nextState === 'notified') report.notified += group.rows.length;
+  report.matched += mine.length;
+  if (nextState === 'notified') report.notified += mine.length;
 }
 
 // -------------------------------------------------------------- the pass
@@ -739,7 +888,9 @@ export async function sweepStockAlerts(
   // budget is skipped in full — see the note on starvation.
   const productIds: string[] = [];
   const chosen = new Set<string>();
-  const examined: AlertRow[] = [];
+  // Reassigned when a (user, product) group turns out to be split by the page
+  // boundary — see the note below.
+  let examined: AlertRow[] = [];
   for (const row of armed) {
     if (!chosen.has(row.product_id)) {
       if (chosen.size >= productBudget) continue;
@@ -749,6 +900,79 @@ export async function sweepStockAlerts(
     examined.push(row);
   }
   if (examined.length === 0) return report;
+
+  /**
+   * A (CUSTOMER, PRODUCT) IS JUDGED WHOLE OR NOT AT ALL — THE ALERT BUDGET'S
+   * MISSING HALF OF THE RULE THE PRODUCT BUDGET ABOVE ALREADY KEEPS.
+   *
+   * `fireGroup` writes ONE message per (user, product) over the rows it is
+   * handed. If the `LIMIT ?` on the SELECT cut a customer's wishes on ONE
+   * product in half — the product sheet allows up to twenty on a single
+   * product — the half on this page fires now, and the half left behind keeps
+   * its old `last_checked_at`, sorts to the FRONT of the next pass, is still
+   * buyable and still carries `last_buyable = 0`. Fifteen minutes later it
+   * fires as a "fresh" group, with a fresh instant and therefore a fresh event
+   * key, and the customer gets a SECOND «رجع للبيع» for one restock. The claim
+   * in `fireGroup` cannot catch this one: the two halves are different rows and
+   * both fires are legitimate.
+   *
+   * ONE COUNT, AND ONLY WHEN THE PAGE WAS FULL. A page shorter than its budget
+   * saw every live row there is, so nothing can have been cut and this costs
+   * exactly nothing on the overwhelmingly common tick. The bound parameters are
+   * product ids only, chunked at the documented ceiling, and the read is soft:
+   * a count that fails leaves the pass judging the page as it stands, which is
+   * what this code did before the check existed.
+   *
+   * A DEFERRED GROUP CANNOT STARVE. Its rows are left COMPLETELY untouched —
+   * `last_checked_at` does not move — so they lead the very next pass, where
+   * the group sits at the front of the page and is therefore whole.
+   * `MAX_WISHES_PER_PRODUCT` (20, worker/routes/stockAlerts.ts) is far below
+   * any real `limitAlerts`, so one group can never be too large to fit. The
+   * last resort is stated anyway: if deferring would leave NOTHING to judge —
+   * a caller with a tiny budget — the page is judged as it stands, because a
+   * duplicate message is a nuisance and permanent silence is a broken promise.
+   */
+  if (rows.length >= alertBudget) {
+    const held = new Map<string, number>();
+    for (const row of examined) {
+      const k = groupKey(row.user_id, row.product_id);
+      held.set(k, (held.get(k) ?? 0) + 1);
+    }
+
+    const live = new Map<string, number>();
+    let counted = true;
+    for (const part of chunk(productIds, IN_CHUNK)) {
+      const ph = part.map(() => '?').join(', ');
+      const res = await env.DB.prepare(
+        `SELECT user_id, product_id, COUNT(*) AS n
+           FROM product_stock_alerts
+          WHERE state = 'armed' AND product_id IN (${ph})
+          GROUP BY user_id, product_id`
+      )
+        .bind(...part)
+        .all<{ user_id: string; product_id: string; n: number }>()
+        .catch((e) => {
+          console.error(
+            'stock alert sweep: group completeness read failed:',
+            e instanceof Error ? e.message : String(e)
+          );
+          counted = false;
+          return { results: [] as Array<{ user_id: string; product_id: string; n: number }> };
+        });
+      for (const r of res.results ?? []) live.set(groupKey(r.user_id, r.product_id), Number(r.n));
+    }
+
+    if (counted) {
+      const whole = examined.filter((row) => {
+        const k = groupKey(row.user_id, row.product_id);
+        return live.get(k) === held.get(k);
+      });
+      if (whole.length > 0 && whole.length < examined.length) {
+        report.deferred += examined.length - whole.length;
+        examined = whole;
+      }
+    }
+  }
 
   const contexts = await loadAlertContexts(env.DB, productIds);
 
@@ -865,7 +1089,8 @@ export async function sweepStockAlerts(
 /**
  * Kill the row WITH the reason. `dead_reason` is what «تنبيهاتي» renders, so a
  * customer whose colour was deleted reads «ما عاد موجود» instead of watching an
- * alert sit live for ninety days waiting for a message that can never come.
+ * alert sit live indefinitely — an alert has no deadline — waiting for a
+ * message that can never come.
  * The state guard means a row the customer cancelled in the same second is not
  * resurrected as dead.
  */
@@ -897,8 +1122,16 @@ function deadStatement(env: Env, row: AlertRow, reason: AlertDeadReason, now: st
  * The customer cannot clear any of the three: DELETE /:id is guarded on
  * `state IN ('armed','firing')` — deliberately, because a re-arm must find the
  * SAME row (see `armStatement`) rather than start a second one beside it. The
- * consequence is a list that only grows, against the route's hard LIMIT 100,
- * with a bin button that does nothing on the rows that need it most.
+ * page does not lie about that: «تنبيهاتي» renders the bin ONLY on a live row,
+ * "where the server will honour it", so nothing dead-clicks. The grievance is
+ * simpler and worse — the customer has NO control at all that removes a
+ * finished row.
+ *
+ * `notified` and `dead` are the two they watch pile up, against the route's
+ * hard LIMIT 100. `cancelled` never reaches that page at all — the list route
+ * reads `state IN ('armed','firing','notified','dead')` — so pruning it clears
+ * no screen; it is table hygiene, and it is named in the DELETE because a row
+ * the customer withdrew has no future either.
  *
  * Nothing before this pruned it. `idx_stock_alerts_armed` is partial, so these
  * rows cost the sweep nothing to carry — which is exactly why the table could

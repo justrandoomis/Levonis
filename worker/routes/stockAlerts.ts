@@ -228,17 +228,29 @@ function assertArmable(ctx: AlertProductContext, wish: AlertWish): void {
 }
 
 /**
- * THE UPSERT, AND THE ONE LINE IN IT THAT DECIDES WHETHER THE FEATURE WORKS
- * TWICE.
+ * THE UPSERT, AND WHAT EACH LINE IN IT IS ACTUALLY FOR.
  *
  * `arm_seq` is incremented IN THE STATEMENT, on every transition INTO 'armed',
  * and nowhere else — never on a UI path, never as a separate UPDATE that could
- * be skipped. Without it the commonest flow in the whole feature is silent:
- * the alert fires, the shopper misses the units, they tap «خبرني» again, the
- * row resurrects with its counters unchanged, and every downstream guard turns
- * the replacement message into a no-op — `user_notifications` is INSERT OR
- * IGNORE, `outbox.event_key` is UNIQUE — after which the sweep flips the row to
- * `notified` having delivered nothing. For ever, and invisibly.
+ * be skipped. BE EXACT ABOUT WHAT IT IS NOT, because an earlier version of this
+ * comment was not and the error is the dangerous direction: `arm_seq` is NOT
+ * what stops a replacement message deduping against the first. Nothing in this
+ * codebase reads it for behaviour — grep it: the sweep does not, and it is not
+ * in `eventKeyFor` (worker/lib/stockAlerts.ts), which is built from (user id,
+ * product id, FIRING INSTANT). The instant is what makes the second fire a new
+ * identity, so that «تنبيهاتي» cannot end up showing a `notified` row for a
+ * message `user_notifications`' INSERT OR IGNORE and `outbox.event_key`'s
+ * UNIQUE index quietly swallowed.
+ *
+ * `arm_seq` is bookkeeping: how many times this person has had to wait for this
+ * exact thing. It is carried to the client and rendered by nothing. It is kept
+ * in the statement because it is the natural place to count an arming and it
+ * costs nothing — NOT because the feature's second message depends on it. And
+ * it must never become the event key: `arm_seq` restarts at 1 on a fresh INSERT
+ * (a deleted row re-armed, or a finished row erased by
+ * `pruneFinishedStockAlerts` and armed again a month later) while the first
+ * fire's notification row lives for ever, so that key would collide and the
+ * second message would vanish. §7 of worker/lib/stockAlerts.ts states the rule.
  *
  * THE CONFLICT TARGET NAMES FIVE PLAIN COLUMNS because the schema made them
  * plain. `idx_stock_alerts_target` carries no COALESCE, so there is nothing to

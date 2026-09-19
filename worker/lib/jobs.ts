@@ -528,10 +528,12 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
    * alert has no deadline — it waits until the product is back, ninety days or
    * a year — but it does have an end: it fires once, and then it is finished.
    * The customer cannot clear what it leaves behind, because DELETE /:id is
-   * guarded on the live states so a re-arm finds the SAME row, so «تنبيهاتي»
-   * accumulates `notified`, `cancelled` and `dead` rows against a hard LIMIT
-   * 100 with a bin button that does nothing on them. This step is the server
-   * doing the clearing instead.
+   * guarded on the live states so a re-arm finds the SAME row — and «تنبيهاتي»
+   * offers the bin only where the server will honour it, so there is no button
+   * to press at all. `notified` and `dead` therefore pile up on that page
+   * against its hard LIMIT 100; `cancelled` never appears on it (the list route
+   * excludes that state) and is pruned as table hygiene. This step is the
+   * server doing the clearing instead.
    *
    * ITS OWN STEP, AND AFTER THE SWEEP — both on purpose.
    *

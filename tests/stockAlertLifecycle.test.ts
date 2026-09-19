@@ -244,8 +244,81 @@ test('the Sorani review is recorded so nobody re-opens a settled question', () =
   // stop and which looks like an improvement while it happens.
   const block = /EVERY REASON THE SERVER CAN KILL AN ALERT WITH[\s\S]*?\*\//.exec(page);
   assert.ok(block, 'the note above DEAD_REASON_TEXT still stands');
-  assert.ok(/REVIEWED/i.test(block[0]), 'it records that the Sorani was reviewed, not assumed');
+  assert.ok(/READ, LINE BY LINE/i.test(block[0]), 'it records that the Sorani was read, not assumed');
   for (const term of ['ئاگادارکردنەوە', 'هەڵوەشێنرایەوە', 'کۆگا']) {
     assert.ok(block[0].includes(term), `the note names the reviewed term ${term}`);
+  }
+});
+
+/**
+ * Every `ckb` value in one of the three tables the note covers, paired with the
+ * `ar` it sits beside. The three declarations are sliced out by name so this
+ * cannot silently start reading some other table's strings the day one is added.
+ */
+function trios(symbol: string): Array<{ ar: string; ckb: string }> {
+  const start = page.indexOf(symbol);
+  assert.ok(start >= 0, `${symbol} still exists on the page`);
+  const block = page.slice(start, page.indexOf('\n};', start));
+  const out: Array<{ ar: string; ckb: string }> = [];
+  const re = /ar: '((?:[^'\\]|\\.)*)',\s*\n?\s*en: '(?:[^'\\]|\\.)*',\s*\n?\s*ckb: '((?:[^'\\]|\\.)*)'/g;
+  for (let m = re.exec(block); m; m = re.exec(block)) out.push({ ar: m[1], ckb: m[2] });
+  assert.ok(out.length > 0, `${symbol} still holds ar/en/ckb trios in that order`);
+  return out;
+}
+
+test('the Kurdish is Kurdish — not the Arabic sentence wearing a ckb label', () => {
+  /*
+   * WHAT BREAKS THIS, and it is the failure the note above warns about in its
+   * own words: somebody "harmonises" a ckb string toward the Arabic — pasting
+   * the Arabic in whole, or half-translating it and leaving Arabic orthography
+   * behind. The note alone cannot catch that; a test over the NOTE catches only
+   * the note's deletion, which is the one edit nobody makes by accident.
+   *
+   * Two properties, both cheap and both decisive:
+   *   - no ckb value equals its Arabic sibling; and
+   *   - every ckb value carries at least one letter Arabic does not have
+   *     (ە ڕ ۆ ێ پ چ ژ گ ک) and NONE of the letters Sorani never uses
+   *     (ة, Arabic ي and ك — Sorani writes ی and ک — and the harakat).
+   * A machine translation would trip the second long before a reader did.
+   */
+  const KURDISH_ONLY = /[ەڕۆێپچژگک]/;
+  // Escaped, not typed: the harakat are COMBINING marks and a linter cannot
+  // tell a base letter followed by one from a single character in a class.
+  const ARABIC_ONLY = /[\u0629\u064A\u0643]|[\u064B-\u0652]/;
+  for (const symbol of ['DEAD_REASON_TEXT', 'DEAD_REASON_FALLBACK', 'STATE_LABEL']) {
+    for (const t of trios(symbol)) {
+      assert.notEqual(t.ckb, t.ar, `${symbol}: a ckb string that IS the Arabic is not a translation`);
+      assert.match(t.ckb, KURDISH_ONLY, `${symbol}: «${t.ckb}» carries no Kurdish-only letter`);
+      assert.doesNotMatch(t.ckb, ARABIC_ONLY, `${symbol}: «${t.ckb}» uses Arabic-only orthography`);
+    }
+  }
+});
+
+test('pre-order is spelled the shop\u2019s way on both surfaces of this one feature', () => {
+  /*
+   * WHAT BREAKS THIS: a new alert string that invents a fifth spelling of
+   * «pre-order», or a "tidy-up" that swaps the hyphen for a zero-width joiner
+   * again. The customer taps pre-order in the alert sheet on the product page
+   * and then reads about it in «تنبيهاتي»; two spellings of one word across two
+   * screens of ONE feature is the inconsistency the owner asked to have looked
+   * for, and search and copy/paste both break on the invisible separators.
+   *
+   * `پێش-داواکاری` with a plain ASCII hyphen is the house term — checkout, the
+   * product page, bundles, memberships and the admin all use it.
+   */
+  const HOUSE = 'پێش-داواکاری';
+  const targets = read(TARGETS);
+  for (const [name, src] of [[PAGE, page], [PANEL, panel], [TARGETS, targets]] as const) {
+    // Executable text only: the note above DEAD_REASON_TEXT QUOTES the spelling
+    // it replaced, and a check that could not tell the record from the offence
+    // would have to be deleted the first time somebody documented the fix.
+    // An alternation and not a character class: a zero-width joiner inside a
+    // class is a sequence the linter cannot read as one character, which is the
+    // very property that makes these spellings invisible in the first place.
+    const hits =
+      code(src).match(/پێش(?:\u0640|\u200c|\u200d|-)?داواکاری|داواکاری پێشوەختە/g) ?? [];
+    for (const hit of hits) {
+      assert.equal(hit, HOUSE, `${name} spells pre-order «${hit}» where the shop writes «${HOUSE}»`);
+    }
   }
 });

@@ -64,8 +64,8 @@
  *        stricter than the sweep on purpose (worker/routes/stockAlerts.ts): a
  *        pre-order-only model, an untracked shelf, a combination the shop does
  *        not model. Each is a promise that could never be kept, and the
- *        alternative to refusing it here is a row that sits armed for ninety
- *        days and fires never.
+ *        alternative to refusing it here is a row that sits armed for ever —
+ *        an alert has no deadline — and fires never.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -168,7 +168,7 @@ const STRINGS = {
     armedChange: 'گۆڕین یان هەڵوەشاندنەوە',
     title: 'ئاگادارم بکەوە کە گەڕایەوە',
     introPreorder:
-      'پێش‌داواکاری کراوەیە و ئێستا دەتوانیت داوای بکەیت. ئەگەر پێت باشترە چاوەڕێی نرخی هەرزانتری فرۆشتنی ڕاستەوخۆ بکەیت، هەڵبژێرە چاوەڕێی چی دەکەیت و هەرکە گەڕایەوە بۆ کۆگا پێت دەڵێین.',
+      'پێش-داواکاری کراوەیە و ئێستا دەتوانیت داوای بکەیت. ئەگەر پێت باشترە چاوەڕێی نرخی هەرزانتری فرۆشتنی ڕاستەوخۆ بکەیت، هەڵبژێرە چاوەڕێی چی دەکەیت و هەرکە گەڕایەوە بۆ کۆگا پێت دەڵێین.',
     introPlain: 'بە وردی هەڵبژێرە چاوەڕێی چی دەکەیت، هەرکە گەڕایەوە بۆ کۆگا پێت دەڵێین.',
     pickTitle: 'چاوەڕێی چی دەکەیت؟',
     anyModel: 'هەر مۆدێلێک',

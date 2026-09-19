@@ -41,6 +41,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
+import { readFileSync } from 'node:fs';
 
 import { freshDb, asD1, all, count } from './fixtures/app';
 import { SqliteD1 } from './fixtures/d1';
@@ -175,6 +176,42 @@ test('the DELETE names the three finished states rather than negating the live o
   await pruneFinishedStockAlerts(asD1(raw), NOW, FINISHED_RETENTION_DAYS, PRUNE_RUN_LIMIT);
 
   assert.deepEqual(idsLeft(raw), ['s_armed', 's_firing']);
+});
+
+test('and it names them LITERALLY — the negation is what a future state falls into', () => {
+  /*
+   * THE ASSERTION ABOVE CANNOT FAIL FOR THE REASON THE RULE EXISTS, and that is
+   * worth saying plainly rather than trusting the test above to cover it.
+   * 0092's CHECK constraint allows exactly five states, so over ANY seed of
+   * those five `state IN ('notified','cancelled','dead')` and
+   * `state NOT IN ('armed','firing')` select the identical rows. Swap one for
+   * the other in production and every behavioural test here still passes.
+   *
+   * The defect the rule exists to prevent is not observable today at all: it is
+   * a SIXTH state added to 0092 next year — a second in-flight state, a
+   * 'paused', a 'held' — being swept into a DELETE by the absence of its name
+   * from a negation, and the first anybody hears of it is a customer's alert
+   * gone. The only thing that can fail on that edit is a test that reads the
+   * statement, so this one does.
+   *
+   * Comments are stripped first: the function's own note QUOTES the negation in
+   * order to forbid it.
+   */
+  const src = readFileSync(new URL('../worker/lib/stockAlerts.ts', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  const fn = /export async function pruneFinishedStockAlerts\([\s\S]*?\n}/.exec(src);
+  assert.ok(fn, 'pruneFinishedStockAlerts is still where the prune lives');
+  assert.match(
+    fn[0],
+    /state IN \('notified','cancelled','dead'\)/,
+    'the DELETE still names the three finished states one by one'
+  );
+  assert.doesNotMatch(
+    fn[0],
+    /state NOT IN/,
+    'and never selects its victims by what they are NOT — that is a standing order to delete a state nobody has written yet'
+  );
 });
 
 test('a finished row with no recorded finish instant is left alone, not erased instantly', async () => {

@@ -72,6 +72,27 @@ export const OWNED_TABLES: OwnedTable[] = [
   // the owner editing a live product, not for rows this delete is destroying
   // anyway. Deleting by `product_id` means the direct column is enough here —
   // an alert on a model or a colour of this product also carries the product.
+  //
+  // AND IT TAKES `firing` ROWS WITH IT, WHICH IS ACCEPTED HERE AND SAID OUT
+  // LOUD, because the one other place that deletes from this table refuses to.
+  // `pruneFinishedStockAlerts` (worker/lib/stockAlerts.ts) names the three
+  // FINISHED states one by one and argues at length that a `firing` row must
+  // never be erased — its message is in the outbox being retried and
+  // `settleFiring` is the only thing allowed to judge it. This DELETE has no
+  // state predicate at all, so it erases those rows too, and the outbox rows
+  // they belong to are NOT deleted with them (nothing in this Worker deletes
+  // from `outbox`). The consequence is small and real: `processOutbox` later
+  // sends «رجع للبيع: <name>» pointing at /product/<slug> for a product that no
+  // longer exists, the surviving `user_notifications` row points at the same
+  // dead page, and nothing records that the message went out because the alert
+  // row it would have settled is gone.
+  //
+  // It is accepted rather than fixed because the product IS gone — a state
+  // predicate here would leave alert rows orphaned on a deleted product, which
+  // is worse — and because a hard product delete is rare. What is NOT accepted
+  // is leaving it unstated: a reader who finds the prune's principle first
+  // would otherwise take this line for an oversight and add a guard that
+  // strands rows.
   { table: 'product_stock_alerts', by: { column: 'product_id' } },
   { table: 'product_images', by: { column: 'product_id' } },
   { table: 'product_variants', by: { column: 'product_id' } },
