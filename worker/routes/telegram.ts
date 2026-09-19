@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context, Next } from 'hono';
 import type { AppContext, Env } from '../lib/types';
 import {
   requireAuth,
@@ -28,6 +29,7 @@ import {
   type OtpPurpose,
 } from '../lib/telegram';
 import { setPrimaryChannelStatements } from '../lib/channelReadiness';
+import { canViewFinancials } from '../lib/adminScope';
 import {
   BINDABLE_TOPIC_KEYS,
   adminBotConfigured,
@@ -721,8 +723,37 @@ function maskBotToken(env: Env, s: string): string {
 // That mapping is created here and nowhere else: never by /start, never by
 // joining the group, never by the bot. Every seed and revocation is audited.
 
+/**
+ * BINDING A TELEGRAM IDENTITY IS HANDING OUT FINANCIAL AUTHORITY, SO IT IS
+ * GATED LIKE ONE.
+ *
+ * A row in `admin_tg_identities` is what lets a Telegram account press
+ * «موافقة» on a wallet deposit — `resolveAdminActor` in
+ * worker/lib/walletNotify.ts resolves the button press through exactly this
+ * table. `requireAdmin` alone was therefore not enough: an ASSISTANT admin
+ * (`users.admin_scope = 'assistant'`), whom mandate §11 forbids even from
+ * SEEING a cost, satisfies `requireAdmin` and satisfies the `u.role = 'admin'`
+ * test inside both writes below — so they could bind their own numeric id and
+ * approve money from the bot, which is the one authority the scope exists to
+ * withhold.
+ *
+ * The READ is gated with the same key and not a weaker one: the list is the
+ * roster of who may approve payments, and handing an assistant the map of the
+ * financial approval path is disclosure of the same fact the write grants.
+ *
+ * 403 and not 404, matching adminFinance and adminPriceGrid: the caller IS an
+ * administrator and the route exists for them as a person — what they lack is
+ * financial scope, and saying so is how they know to ask the owner.
+ */
+async function requireFinancialAdmin(c: Context<AppContext>, next: Next) {
+  if (!canViewFinancials(c.env, c.get('user'))) {
+    throw forbidden('Telegram payment-approval authority is restricted to financial admins');
+  }
+  await next();
+}
+
 /** Live identity rows (never exposes anything but the mapping itself). */
-telegramRoutes.get('/admin/tg-identities', requireAdmin, async (c) => {
+telegramRoutes.get('/admin/tg-identities', requireAdmin, requireFinancialAdmin, async (c) => {
   await rateLimit(c, 'tg-identities-list', 60, 3600);
   const { results } = await c.env.DB.prepare(
     `SELECT i.telegram_user_id, i.user_id, i.label, i.created_at, i.created_by,
@@ -767,7 +798,7 @@ telegramRoutes.get('/admin/tg-identities', requireAdmin, async (c) => {
  * mapping cannot be created for a non-admin even under a concurrent role
  * change, and an existing LIVE mapping is never silently retargeted.
  */
-telegramRoutes.post('/admin/tg-identities', requireAdmin, async (c) => {
+telegramRoutes.post('/admin/tg-identities', requireAdmin, requireFinancialAdmin, async (c) => {
   await rateLimit(c, 'tg-identity-seed', 20, 3600);
   const admin = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
@@ -823,7 +854,7 @@ telegramRoutes.post('/admin/tg-identities', requireAdmin, async (c) => {
 /** Revokes approval authority. The reason is mandatory (schema CHECK): a
  *  silent de-authorization would leave an unauditable hole in a financial
  *  approval path. */
-telegramRoutes.post('/admin/tg-identities/:telegramUserId/revoke', requireAdmin, async (c) => {
+telegramRoutes.post('/admin/tg-identities/:telegramUserId/revoke', requireAdmin, requireFinancialAdmin, async (c) => {
   await rateLimit(c, 'tg-identity-revoke', 20, 3600);
   const admin = c.get('user')!;
   const telegramUserId = int(c.req.param('telegramUserId'), 'telegramUserId', { min: 1, max: Number.MAX_SAFE_INTEGER });

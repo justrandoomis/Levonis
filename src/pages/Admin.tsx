@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle } from 'lucide-react';
+import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
+import { useAuth } from '../AuthContext';
 
 /**
  * THE NINETEEN ADMIN PANELS, EACH ITS OWN CHUNK (`01-TARGET.md` §10, plan 1.8).
@@ -50,6 +51,18 @@ const AdminWarranties = React.lazy(() => import('../components/adminWarranty/Adm
 const AdminAds = React.lazy(() => import('../components/AdminAds'));
 const AdminHomeSettings = React.lazy(() => import('../components/AdminHomeSettings'));
 const AdminOverview = React.lazy(() => import('../components/AdminOverview'));
+/**
+ * «لوحة الأرباح» — the financial dashboard, and the twenty-first panel.
+ *
+ * Lazy like every other tab, and for a sharper reason than most: it is the
+ * only screen in the application that imports `recharts`. That library is
+ * grouped into the `vendor-charts` manual chunk (vite.config.ts), which
+ * tests/bundleBudget.test.ts asserts is NOT in the entry's static closure — so
+ * this import must stay dynamic. A static import here would put an SVG
+ * charting engine into the first byte of every customer's first visit, for a
+ * screen only the owner can open.
+ */
+const AdminFinance = React.lazy(() => import('../components/adminFinance/AdminFinance'));
 const AdminUsers = React.lazy(() => import('../components/AdminUsers'));
 const AdminWalletRequests = React.lazy(() => import('../components/AdminWalletRequests'));
 const AdminWalletSettings = React.lazy(() => import('../components/AdminWalletSettings'));
@@ -83,6 +96,7 @@ function PanelFallback({ dir }: { dir: 'rtl' | 'ltr' }) {
 
 type AdminTab =
   | 'overview'
+  | 'finance'
   | 'orders'
   | 'products'
   | 'bundles'
@@ -111,12 +125,26 @@ type AdminTab =
 
 export default function Admin() {
   const { t, dir, loc } = useLanguage();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+
+  /**
+   * A COURTESY, NOT THE GATE. The three finance endpoints refuse an assistant
+   * admin on the SERVER with FINANCIAL_SCOPE_REQUIRED, before a query runs
+   * (mandate §11). Hiding the tab only spares that person a screen they can
+   * never use; `undefined` — an older session payload with no such field —
+   * deliberately shows the tab and lets the server answer, because guessing
+   * "no" would take the owner's own numbers away from them.
+   */
+  const canSeeFinance = user?.can_view_financials !== false;
 
   const section = (id: string, ar: string, en: string, ckb?: string) => ({ section: id, sectionLabel: loc(ar, en, ckb) });
   const sidebarItems = [
     { id: 'overview', icon: LayoutDashboard, label: loc('نظرة عامة', 'Overview', 'پێداچوونەوە'), ...section('operations', 'التشغيل', 'Operations', 'بەڕێوەبردن') },
     { id: 'orders', icon: ClipboardList, label: loc('الطلبات', 'Orders', 'داواکارییەکان'), ...section('operations', 'التشغيل', 'Operations') },
+    ...(canSeeFinance
+      ? [{ id: 'finance', icon: TrendingUp, label: loc('الأرباح والتكاليف', 'Profit & costs', 'قازانج و تێچوون'), ...section('operations', 'التشغيل', 'Operations') }]
+      : []),
     { id: 'wallet_requests', icon: Bell, label: loc('طلبات المحفظة', 'Wallet requests'), ...section('operations', 'التشغيل', 'Operations') },
     { id: 'products', icon: Package, label: t('adminProducts'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') },
     { id: 'bundles', icon: Boxes, label: loc('الباقات', 'Bundles'), ...section('catalog', 'الكتالوج', 'Catalog') },
@@ -153,7 +181,7 @@ export default function Admin() {
       activeTab={activeTab}
       onTabChange={(id) => setActiveTab(id as AdminTab)}
     >
-      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'membership_benefits' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
+      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'membership_benefits' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
         <React.Suspense fallback={<PanelFallback dir={dir} />}>
 
         {activeTab === 'overview' && (
@@ -162,6 +190,10 @@ export default function Admin() {
 
         {activeTab === 'orders' && (
           <OrdersBoard />
+        )}
+
+        {activeTab === 'finance' && canSeeFinance && (
+          <AdminFinance />
         )}
 
         {activeTab === 'products' && (

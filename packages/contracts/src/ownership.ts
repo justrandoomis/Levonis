@@ -80,6 +80,21 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'wallet_transactions', 'wallet_holds', 'wallet_adjustments', 'ledger_balances', 'ledger_idempotency', 'wallet_withdrawals',
     'wallet_deposit_meta', 'wallet_review_requests', 'admin_tg_identities', 'bnpl_accounts', 'bnpl_ledger', 'points_accruals',
     'points_reservations', 'points_awards', 'reward_claims', 'browse_sessions', 'mission_streaks', 'ticket_ledger', 'game_sessions',
+    // 0095 — THE OPERATING-EXPENSE LEDGER: «تكاليف اخرى ... خاصه في لوحه الادمن».
+    // Rent, salaries, advertising, customs. They belong to no product and no
+    // order, which is exactly why they are not Commerce's: an expense row has
+    // no product id and there is no column for one, deliberately, because a
+    // per-product net profit would be an invention.
+    //
+    // They sit with the money for the same reason `admin_tg_identities` does —
+    // «who may approve stays with the money» two lines up. These rows ARE the
+    // shop's cost base: they are the second half of the net-profit arithmetic
+    // whose first half is `wallet_transactions` and `bnpl_ledger`, and every
+    // route that touches them is behind the same financial scope §11 uses to
+    // keep a cost away from an assistant admin. `expense_categories` is the
+    // label set those rows point at, under ON DELETE RESTRICT, so it cannot
+    // live under a different owner than the rows it names.
+    'operating_expenses', 'expense_categories',
   ]),
   ...owned('subscriptions', [
     'membership_plans', 'memberships', 'entitlement_snapshots',

@@ -10,6 +10,7 @@ import { productImageForSelection } from '../lib/productSelectionImage';
 import { deliversToHome, getSetting, getSettings, printerNoteIqdFrom } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig } from '../lib/settings';
 import { addDays, baghdadDay, baghdadDayOf, isDay } from '../lib/baghdadTime';
+import { COMPOSED_SNAPSHOT, COST_BASIS, costSnapshot, type CostBasis } from '../lib/financeLedger';
 import {
   MAX_DELIVERY_DAYS,
   dayLabel,
@@ -1180,8 +1181,29 @@ function priceCompositionLine(
      * refused as COMPONENT_UNAVAILABLE.
      */
     const counter = counters.get(`${String(row.cart_item_id)}:${k.component_id}`) ?? k.resolution;
+    /**
+     * THE COST LEAVES THE SNAPSHOT AND GOES ONTO THE ROW (migration 0095).
+     *
+     * The destructure still STRIPS `cost_iqd` from `snapshot`, and that has not
+     * become optional: `pricing_snapshot` is serialized straight back to the
+     * buyer by `orderPublic`, so a cost inside it is a cost published to the
+     * customer. What changed is where the stripped value goes. It used to be
+     * thrown away — and because `order_items` had no cost column either, the
+     * cost at the moment of sale was recorded NOWHERE, so profit could only be
+     * computed against the product's cost TODAY and editing one supplier price
+     * silently rewrote last month's profit.
+     *
+     * It is now carried to `order_items.cost_iqd`, which no customer-facing
+     * serializer selects. THE SAME resolved value, never re-derived from the
+     * product: `k.unit` already walked this component's option and colour
+     * rungs, and a second walk can disagree with the first.
+     *
+     * A COMPONENT IS WHERE A BUNDLE'S GOODS ARE, so this is the row that
+     * carries the bundle's cost of goods sold. The parent carries none — see
+     * `COMPOSED_SNAPSHOT` below.
+     */
     const { cost_iqd, ...snapshot } = k.unit;
-    void cost_iqd;
+    const componentCost = costSnapshot(cost_iqd);
     // The component's own resolver output, with `applied_iqd` set to 0 AFTER
     // the cost strip: points accrue on the parent and on the number actually
     // charged, never a second time on an inflated component total.
@@ -1210,6 +1232,9 @@ function priceCompositionLine(
       breakdown: publicBreakdown(k.unit),
       is_printer: printerIds.has(k.member_product_id),
       pricing_basis: basis,
+      // ADMIN-ONLY, never serialized to a customer (migration 0095).
+      cost_iqd: componentCost.cost_iqd,
+      cost_basis: componentCost.cost_basis,
       bundle_parent_item_id: parentId,
       bundle_component_id: k.component_id,
       component_value_iqd: Math.max(0, k.unit.applied_iqd),
@@ -1245,6 +1270,25 @@ function priceCompositionLine(
     });
   });
 
+  /**
+   * THE PARENT RECORDS NO COST, AND THAT IS A DECISION, NOT AN OMISSION.
+   *
+   * The strip itself is unchanged and stays for the same reason as everywhere
+   * else: `pricing_snapshot` is served back to the buyer.
+   *
+   * What is NOT carried onto the row is the bundle product's own `cost_iqd`,
+   * even when the owner typed one. A bundle's goods are its COMPONENTS, and
+   * each component is a separate `order_items` row in this same order already
+   * carrying its own snapshotted cost. Recording a cost here as well would
+   * count the same physical goods twice, and a gross margin that
+   * double-subtracts is not merely wrong — it is wrong in the direction that
+   * makes a profitable bundle look like a loss, which is the number that makes
+   * an owner stop selling it.
+   *
+   * `COMPOSED_SNAPSHOT` says exactly that on the row, so the dashboard reads
+   * "zero COGS by construction" rather than "cost unknown" and never estimates
+   * a parent against the catalogue.
+   */
   const { cost_iqd, ...bundleSnapshot } = b.pricing.resolved;
   void cost_iqd;
   const parent: ComputedLine = {
@@ -1313,6 +1357,10 @@ function priceCompositionLine(
       included.some((k) => printerIds.has(k.member_product_id)) ||
       spools.some((sp) => printerIds.has(sp.candidate.product_id)),
     pricing_basis: basis,
+    // Zero cost of goods sold BY CONSTRUCTION — the goods are the component
+    // rows. See the strip site above.
+    cost_iqd: COMPOSED_SNAPSHOT.cost_iqd,
+    cost_basis: COMPOSED_SNAPSHOT.cost_basis,
     bundle_parent_item_id: null,
     bundle_component_id: null,
     component_value_iqd: null,
@@ -1489,6 +1537,27 @@ interface ComputedLine {
   is_printer: boolean;
   /** Which availability fee priced this line (worker/lib/pricing.ts). */
   pricing_basis: 'direct' | 'preorder';
+  /**
+   * THE COST OF GOODS SOLD FOR THIS LINE, FROZEN (migration 0095) — and the
+   * one field on this interface that must never reach a customer.
+   *
+   * It is the value the three `const { cost_iqd, ... }` strips above pull out
+   * of the resolver output, carried here instead of discarded. Before 0095 it
+   * was discarded and `order_items` had no cost column, so profit could only be
+   * computed against the product's cost TODAY: editing a supplier price
+   * rewrote the reported profit of sales already made and already banked.
+   *
+   * BOTH FIELDS ARE OPTIONAL, AND THAT IS LOAD-BEARING. A line that sets
+   * neither — a mystery-box spool, whose draw carries no cost to snapshot and
+   * whose `product_id` is bound NULL on purpose (§7.7) — falls through to the
+   * `unrecorded` default at the INSERT, which is the honest answer for it. An
+   * optional field cannot silently become a zero cost, which would report a
+   * mystery box as pure margin.
+   */
+  cost_iqd?: number | null;
+  /** Whether `cost_iqd` above is a recorded fact, a recorded absence, zero by
+   *  construction, or nothing at all. See worker/lib/financeLedger.ts. */
+  cost_basis?: CostBasis;
   /**
    * WHAT THE MEMBERSHIP BENEFIT RESOLVER NEEDS FROM THIS LINE (§3).
    *
@@ -2232,7 +2301,29 @@ async function computeCheckout(
       // cash-on-delivery pre-order priced as a direct sale must stay legible
       // after the cart that produced it is gone.
       const { cost_iqd, ...pricingSnapshot } = resolved;
-      void cost_iqd;
+      /**
+       * …AND THE STRIPPED COST GOES ONTO THE ROW, NOT INTO THE BIN (0095).
+       *
+       * `void cost_iqd` used to stand here, and it was the whole defect: the
+       * order snapshot correctly refused to publish the cost to the buyer, and
+       * `order_items` had no cost column, so THE COST AT THE MOMENT OF SALE WAS
+       * RECORDED NOWHERE. Every profit figure was therefore computed against
+       * the product's CURRENT cost, and one edit to a supplier price silently
+       * rewrote the profit of every order ever placed for that product. A
+       * history that moves behind the owner cannot be reconciled with anything.
+       *
+       * `costSnapshot` takes THIS resolver's answer — the one that priced the
+       * line, having already walked the option, colour, fulfilment and
+       * transport rungs — and never re-derives it from the product row. Two
+       * derivations of one sale can disagree, and then neither is evidence.
+       *
+       * A NULL here is stored as `unpriced`, a RECORDED FACT meaning "there was
+       * no cost configured when this sold". That is deliberately not the same
+       * as the `unrecorded` default every pre-0095 row carries: only the latter
+       * may be estimated against today's catalogue, and only with the word
+       * «تقدير» beside it on screen.
+       */
+      const lineCost = costSnapshot(cost_iqd);
       /**
        * WHICH OFFER PRODUCED THIS PRICE, frozen (§12). Without the id and its
        * figures on the row, "why was this line 40,000 when the product is
@@ -2281,6 +2372,10 @@ async function computeCheckout(
         breakdown: publicBreakdown(resolved),
         is_printer: isPrinter,
         pricing_basis: resolved.pricing_basis,
+        // ADMIN-ONLY. Stored on the row, stripped from the snapshot above, and
+        // selected by no customer-facing serializer (migration 0095).
+        cost_iqd: lineCost.cost_iqd,
+        cost_basis: lineCost.cost_basis,
         benefit: {
           category_id: (row.category_id as string | null) ?? null,
           sub_category_id: (row.sub_category_id as string | null) ?? null,
@@ -3525,8 +3620,8 @@ orderRoutes.post('/', async (c) => {
            option_id, option_value_ids, color_id, shipping_method_id, qty, unit_price_iqd, line_total_iqd,
            pricing_snapshot, warranty_snapshot, transport_snapshot,
            bundle_parent_item_id, bundle_component_id, component_value_iqd, component_alloc_iqd,
-           membership_discount_iqd, membership_rule_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           membership_discount_iqd, membership_rule_id, cost_iqd, cost_basis)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         it.id, orderId,
         // §7.7: a MYSTERY SPOOL binds NULL here on purpose. It is the single
@@ -3552,7 +3647,36 @@ orderRoutes.post('/', async (c) => {
         // one product answers from the row itself, and an admin editing the
         // rule tomorrow cannot change the answer.
         comp.benefits.byLine.get(it.id)?.total_iqd ?? 0,
-        comp.benefits.byLine.get(it.id)?.rule_id ?? null
+        comp.benefits.byLine.get(it.id)?.rule_id ?? null,
+        /**
+         * THE COST OF GOODS SOLD, AS IT WAS AT THIS INSTANT (migration 0095).
+         *
+         * It is bound here and NOWHERE ELSE, from `ComputedLine`, which took it
+         * from the same resolver output that priced the line. Nothing on this
+         * path re-reads a product to work it out: the resolver already walked
+         * the option, colour, fulfilment and transport rungs for this exact
+         * selection, and a second walk is a second answer.
+         *
+         * WHY THIS DOES NOT LEAK TO THE CUSTOMER, checked rather than assumed:
+         * `orderPublic` builds each item object from an explicit field list, so
+         * a column added to the row cannot appear in a customer payload by
+         * growing it; the invoice (worker/lib/invoices.ts), the delivery and
+         * warranty events, the returns screens and the stage sweep all name
+         * their columns one by one; and the only two `SELECT *`-shaped readers
+         * of this table are `ORDER_ITEMS_SELECT`, whose rows go through
+         * `orderPublic`, and the merchant-store endpoint, which is filtered to
+         * `orders.merchant_id = ?` — a column this checkout never writes, so it
+         * can never see a row this INSERT produced.
+         *
+         * A LINE THAT SET NEITHER FIELD FALLS THROUGH TO 'unrecorded' — today
+         * that is the mystery-box spool, whose draw record carries no cost and
+         * whose `product_id` is bound NULL two lines up so the pick cannot leak
+         * (§7.7). 'unrecorded' makes the dashboard say "unknown"; a bound 0
+         * would make it say "pure profit", which is a lie the owner would price
+         * against.
+         */
+        it.cost_iqd ?? null,
+        it.cost_basis ?? COST_BASIS.unrecorded
       )
     );
     // THE ALLOCATION, in the ORDER'S OWN BATCH — never a second batch and

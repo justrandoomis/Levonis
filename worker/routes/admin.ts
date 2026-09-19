@@ -10,7 +10,7 @@ import { requireAdmin, badRequest, notFound, forbidden, conflict, str, int, oneO
 import { newId, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
-import { canViewFinancials, normalizeAdminScope, userPatchRefusal } from '../lib/adminScope';
+import { canViewFinancials, isOwner, normalizeAdminScope, userPatchRefusal } from '../lib/adminScope';
 import { degradeIfSchemaMissing } from '../lib/membershipBenefits';
 import { normalizeText } from '../lib/search/normalize';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
@@ -35,7 +35,11 @@ import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } fr
 import { onOrderDelivered, grantPrinterGiftIfEligible } from '../lib/membershipOps';
 import { createUnitsOnDelivery, type CreateUnitsResult } from '../lib/deviceOps';
 import { awardOrderPoints } from '../lib/pointsOps';
-import { walletTxPublic } from '../lib/wallet';
+import { getBalances, walletTxPublic } from '../lib/wallet';
+// The member detail reports a BNPL debt, and the sign convention for that sum
+// (charge positive, repayment negative, adjustment signed) lives in one place.
+// Re-deriving it here would give the owner a second, quietly different number.
+import { bnplOutstanding } from '../lib/bnpl';
 import { productPublic } from './products';
 import { parseProductRow } from '../lib/productModel';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
@@ -432,6 +436,339 @@ adminRoutes.get('/users', async (c) => {
   return c.json({ success: true, users: results, total: total?.n ?? 0 });
 });
 
+/**
+ * ONE ACCOUNT, NAMED BEFORE IT IS CHANGED — the lookup behind the «مساعد» grant.
+ *
+ * `GET /users?search=` already exists, and it is the wrong tool for this job
+ * twice over.
+ *
+ *   IT RETURNS A LIST. «أريد وضع مساعد للأدمن عن طريق الايميل» is an act
+ *   against exactly ONE account. An admin who types an address, is handed four
+ *   near-matches and grants the console to the wrong row has put an outsider
+ *   inside the admin panel, and nothing downstream catches that — the grant is
+ *   valid, it is simply on the wrong person.
+ *
+ *   ITS PATTERN IS TRUNCATED. `likePattern` caps at 50 BYTES because that is
+ *   D1's hard limit on a LIKE/GLOB pattern. A long address is silently cut and
+ *   then matches a PREFIX, which is precisely the near-miss above.
+ *
+ * So this is an EQUALITY match on the stored address, which is also the only
+ * comparison that can use the UNIQUE index on the column. `users.email` is
+ * stored lowercased (migrations/0001_init.sql:15) and `email()` lowercases
+ * what was typed, so the two meet without wrapping the column in a function.
+ *
+ * IT ANSWERS WITH IDENTITY ONLY: who this is, what they already are, and
+ * whether they are the owner. No money and no counts — this is the
+ * confirmation step of a grant, not a member profile, and the smaller the
+ * answer the less an assistant can learn by guessing addresses.
+ */
+adminRoutes.get('/users/lookup', async (c) => {
+  const target = await c.env.DB
+    .prepare(
+      `SELECT id, email, username, name, role, admin_scope, membership_tier, created_at
+         FROM users WHERE email = ?`
+    )
+    .bind(email(c.req.query('email')))
+    .first<{
+      id: string;
+      email: string;
+      username: string | null;
+      name: string;
+      role: string;
+      admin_scope: string | null;
+      membership_tier: string | null;
+      created_at: string;
+    }>();
+  if (!target) throw notFound('No account with that email address');
+  return c.json({
+    success: true,
+    user: {
+      id: target.id,
+      email: target.email,
+      username: target.username,
+      name: target.name,
+      role: target.role,
+      // NORMALISED, NOT RAW. `normalizeAdminScope` is what every authorization
+      // decision reads (an unrecognised value resolves to the LEAST privilege),
+      // so the screen that is about to change this value must be looking at the
+      // same interpretation — otherwise the panel could show "full" for a row
+      // the server already treats as restricted.
+      admin_scope: normalizeAdminScope(target.admin_scope),
+      membership_tier: target.membership_tier ?? 'free',
+      created_at: target.created_at,
+      // The owner can never be demoted or restricted (adminScope.ts). Saying so
+      // HERE means the screen can explain why the control is unavailable rather
+      // than letting the admin press it and collect a 403.
+      is_owner: isOwner(c.env, target),
+      is_self: target.id === c.get('user')!.id,
+    },
+  });
+});
+
+/**
+ * THE MEMBER DETAIL — «عند الضغط على مستخدم أريدها نافذة منبثقة ... وأريد
+ * ترتيب أكثر وإضافة تفاصيل أكثر».
+ *
+ * The users table carries six columns; an owner deciding anything about a
+ * person needs more than that, and until now the only way to get it was to
+ * leave the page. This gathers what the panel already stores about one account
+ * into a single answer, organised by the question it answers rather than by the
+ * table it came from.
+ *
+ * ---------------------------------------------------------------------------
+ * THE FINANCIAL GATE IS THE POINT OF THIS HANDLER, not a detail of it.
+ *
+ * Mandate §11: «cost وجميع تفاصيل الربح متاحة فقط للمالك/الدور المالي. مساعد
+ * الأدمن العادي لا يراها في API ولا في HTML ولا في export».
+ *
+ * LIFETIME VALUE IS MONEY. So is a wallet balance, so is a BNPL credit limit
+ * and so is an outstanding debt. An assistant must not receive any of them —
+ * and "must not receive" means they are ABSENT FROM THE RESPONSE, not hidden by
+ * the client. The strongest possible form of that is what is implemented here:
+ * the financial statements are NEVER EXECUTED for a restricted admin. There is
+ * no object to forget to strip, because the numbers were never read out of D1.
+ *
+ * They are also grouped under ONE key, `financial`. A flat payload invites the
+ * next person to add `lifetime_value_iqd` beside `orders_total` and ship a leak;
+ * a payload where every money figure lives in one object that is either present
+ * or absent makes the mistake visible at the point it is made.
+ *
+ * WHAT STAYS OPERATIONAL. An order COUNT, a KYC state, a restriction, a
+ * notification channel and a BNPL account STATE are operations — the work an
+ * assistant exists to do. Counting orders is not reading profit. The credit
+ * LIMIT attached to that BNPL state is money and is therefore on the other side
+ * of the fence, which is why the two are split rather than returned together.
+ *
+ * ---------------------------------------------------------------------------
+ * NO DAY BOUNDARY IS COMPUTED HERE, deliberately. Every timestamp below is
+ * returned as the stored ISO instant and formatted by the client. The moment
+ * this handler buckets anything by DAY it must go through
+ * worker/lib/baghdadTime.ts, because `date('now')` is UTC and Baghdad is UTC+3
+ * — for three hours every night SQLite's idea of "today" is yesterday's.
+ *
+ * Every optional feature's read is wrapped in `degradeIfSchemaMissing`: a
+ * deployment whose D1 has not taken 0092 yet must still be able to open a
+ * member, not 500 on a table that this screen merely decorates.
+ */
+adminRoutes.get('/users/:id/detail', async (c) => {
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const financial = canViewFinancials(c.env, admin);
+
+  const row = await c.env.DB
+    .prepare(
+      `SELECT id, email, username, name, role, is_investor, membership_tier, admin_scope,
+              subscription_plan, subscription_expiry, subscription_days, locale, country,
+              phone_e164, email_verified_at, onboarding_state, checkin_streak,
+              created_at, updated_at
+         FROM users WHERE id = ?`
+    )
+    .bind(id)
+    .first<Record<string, unknown>>();
+  if (!row) throw notFound('User not found');
+
+  /**
+   * `Promise.all` OF INDEPENDENT READS, NOT `DB.batch`.
+   *
+   * `batch` exists to make several WRITES atomic — it opens a transaction, and
+   * these are five aggregates over five unrelated tables with nothing to make
+   * atomic. Using it here would buy a transaction nobody needs and would cost
+   * the ability to test this handler at all: the repository's SQLite adapter
+   * (tests/fixtures/d1.ts) implements `batch` through `run()`, which returns no
+   * rows for a SELECT, so a read batch is invisible to every route test in this
+   * project. A read that cannot be tested is a read that will silently rot.
+   *
+   * Five bound parameters in total, nowhere near D1's refusal at 100 — the
+   * limit that forces the 90-row chunks in worker/lib/stockAlerts.ts is about
+   * batching many ROWS, and this is a fixed set of aggregates.
+   */
+  const [orders, session, kyc, restrictions, address] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT COUNT(*) AS orders_total,
+              COALESCE(SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END), 0) AS orders_delivered,
+              COALESCE(SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END), 0) AS orders_cancelled,
+              COALESCE(SUM(CASE WHEN status IN ('pending','confirmed','processing','shipped') THEN 1 ELSE 0 END), 0) AS orders_open,
+              MAX(created_at) AS last_order_at
+         FROM orders WHERE user_id = ?`
+    ).bind(id).first<Record<string, unknown>>(),
+    // LAST SIGN-IN IS A FLOOR, NOT A FACT, and the field name says so. Sessions
+    // are deleted when they expire or when the person signs out, so the newest
+    // surviving row is the newest sign-in WE STILL HOLD. Reporting it as
+    // "last seen" would quietly turn a swept table into "never signed in".
+    c.env.DB.prepare(
+      `SELECT MAX(created_at) AS newest_session_at,
+              COALESCE(SUM(CASE WHEN expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now') THEN 1 ELSE 0 END), 0) AS live_sessions
+         FROM sessions WHERE user_id = ?`
+    ).bind(id).first<Record<string, unknown>>(),
+    // STATES ONLY. The encrypted identity evidence opens exclusively from the
+    // dedicated KYC review surface; a member card is not a place to decrypt an
+    // identity document into.
+    c.env.DB.prepare(
+      `SELECT state, reason, submitted_at, decided_at, created_at
+         FROM kyc_cases WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`
+    ).bind(id).first<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      `SELECT id, kind, case_type, state, reason, benefit_flags, opened_at, resolved_at
+         FROM restriction_cases WHERE user_id = ?
+        ORDER BY (state = 'active') DESC, opened_at DESC LIMIT 20`
+    ).bind(id).all<Record<string, unknown>>(),
+    // `requested_at`/`approved_at`, not `created_at` — approved_addresses is
+    // VERSIONED and immutable (a change request creates a new row), so the two
+    // dates are the two halves of the staff act: when the member asked and when
+    // staff signed it off. They are aliased so the client reads one shape.
+    c.env.DB.prepare(
+      `SELECT version, state, requested_at, approved_at FROM approved_addresses
+        WHERE user_id = ? ORDER BY version DESC LIMIT 1`
+    ).bind(id).first<Record<string, unknown>>(),
+  ]);
+
+  const channels = await degradeIfSchemaMissing(
+    'user notification channels (0092)',
+    async () =>
+      (
+        await c.env.DB
+          .prepare(
+            `SELECT channel, enabled, is_primary, updated_at
+               FROM user_notification_channels WHERE user_id = ? ORDER BY channel`
+          )
+          .bind(id)
+          .all<{ channel: string; enabled: number; is_primary: number; updated_at: string }>()
+      ).results ?? [],
+    [] as Array<{ channel: string; enabled: number; is_primary: number; updated_at: string }>
+  );
+
+  const bnpl = await degradeIfSchemaMissing(
+    'bnpl account (0002)',
+    () =>
+      c.env.DB
+        .prepare('SELECT state, credit_limit_iqd, created_at FROM bnpl_accounts WHERE user_id = ?')
+        .bind(id)
+        .first<{ state: string; credit_limit_iqd: number; created_at: string }>(),
+    null
+  );
+
+  const restrictionRows = (restrictions.results ?? []) as Array<Record<string, unknown>>;
+  const kycRow = kyc;
+  const orderRow = orders ?? {};
+  const sessionRow = session ?? {};
+  const addressRow = address;
+
+  const member = {
+    identity: {
+      id: row.id,
+      email: row.email,
+      username: row.username,
+      name: row.name,
+      role: row.role,
+      admin_scope: normalizeAdminScope(row.admin_scope),
+      is_owner: isOwner(c.env, row as { email: string }),
+      is_self: row.id === admin.id,
+      // The stored number, unmasked: this is the admin panel's own member
+      // record and support has to be able to CALL the person. The customer's
+      // own /api/auth/me masks it; that is a different audience.
+      phone_e164: row.phone_e164 ?? null,
+      country: row.country ?? null,
+      locale: row.locale,
+      email_verified_at: row.email_verified_at ?? null,
+      onboarding_state: row.onboarding_state ?? null,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    },
+    membership: {
+      tier: row.membership_tier ?? 'free',
+      legacy_plan: row.subscription_plan,
+      expiry: Number(row.subscription_expiry) || 0,
+      term_days: Number(row.subscription_days) || 0,
+      is_investor: Boolean(row.is_investor),
+      checkin_streak: Number(row.checkin_streak) || 0,
+    },
+    activity: {
+      orders_total: Number(orderRow.orders_total) || 0,
+      orders_delivered: Number(orderRow.orders_delivered) || 0,
+      orders_cancelled: Number(orderRow.orders_cancelled) || 0,
+      orders_open: Number(orderRow.orders_open) || 0,
+      last_order_at: (orderRow.last_order_at as string | null) ?? null,
+      newest_session_at: (sessionRow.newest_session_at as string | null) ?? null,
+      live_sessions: Number(sessionRow.live_sessions) || 0,
+    },
+    kyc: kycRow
+      ? {
+          state: kycRow.state,
+          reason: kycRow.reason,
+          submitted_at: kycRow.submitted_at ?? null,
+          decided_at: kycRow.decided_at ?? null,
+        }
+      : null,
+    restrictions: restrictionRows.map((r) => ({
+      id: r.id,
+      kind: r.kind,
+      case_type: r.case_type ?? '',
+      state: r.state,
+      reason: r.reason,
+      benefit_flags: safeParse<string[]>(r.benefit_flags, []),
+      opened_at: r.opened_at,
+      resolved_at: r.resolved_at ?? null,
+    })),
+    active_restrictions: restrictionRows.filter((r) => r.state === 'active').length,
+    channels: channels.map((ch) => ({
+      channel: ch.channel,
+      enabled: Boolean(ch.enabled),
+      is_primary: Boolean(ch.is_primary),
+      updated_at: ch.updated_at,
+    })),
+    approved_address: addressRow
+      ? {
+          version: Number(addressRow.version) || 0,
+          state: addressRow.state,
+          requested_at: (addressRow.requested_at as string | null) ?? null,
+          approved_at: (addressRow.approved_at as string | null) ?? null,
+        }
+      : null,
+    // The STATE is operational — support has to know whether BNPL is live for
+    // this member. The credit LIMIT that goes with it is money and is on the
+    // other side of the gate below.
+    bnpl_state: bnpl?.state ?? 'none',
+  };
+
+  if (!financial) {
+    // §11 in its strongest form: nothing financial was ever read, so there is
+    // nothing here to strip, to forget to strip, or to find in the raw JSON.
+    return c.json({ success: true, can_view_financials: false, member });
+  }
+
+  const [value, wallet, outstanding] = await Promise.all([
+    c.env.DB
+      .prepare(
+        // A CANCELLED ORDER IS NOT LIFETIME VALUE. Including it would inflate
+        // every member's worth by everything they ever changed their mind
+        // about, and the owner would be reading a number that no money ever
+        // matched. `delivered_iqd` is the conservative floor beside it: money
+        // that actually completed its journey.
+        `SELECT COALESCE(SUM(CASE WHEN status <> 'cancelled' THEN total_iqd ELSE 0 END), 0) AS lifetime_iqd,
+                COALESCE(SUM(CASE WHEN status = 'delivered' THEN total_iqd ELSE 0 END), 0) AS delivered_iqd
+           FROM orders WHERE user_id = ?`
+      )
+      .bind(id)
+      .first<{ lifetime_iqd: number; delivered_iqd: number }>(),
+    getBalances(c.env.DB, id),
+    degradeIfSchemaMissing('bnpl ledger (0002)', () => bnplOutstanding(c.env.DB, id), 0),
+  ]);
+
+  return c.json({
+    success: true,
+    can_view_financials: true,
+    member,
+    financial: {
+      lifetime_value_iqd: Number(value?.lifetime_iqd) || 0,
+      delivered_value_iqd: Number(value?.delivered_iqd) || 0,
+      wallet_usd_cents: wallet.usd_cents,
+      wallet_points: wallet.points,
+      bnpl_credit_limit_iqd: Number(bnpl?.credit_limit_iqd) || 0,
+      bnpl_outstanding_iqd: outstanding,
+    },
+  });
+});
+
 adminRoutes.patch('/users/:id', async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id');
@@ -513,7 +850,15 @@ adminRoutes.patch('/users/:id', async (c) => {
     // reaching for a variable that may not exist.
     fields: updates.map((u) => u.split(' ')[0]),
     role: role ?? undefined,
-    admin_scope: scope ?? undefined,
+    // `?? undefined` HERE WAS A HOLE IN THE ONE AUDIT THAT MATTERS MOST.
+    // Revoking a restriction means writing admin_scope = NULL, which IS the
+    // act of handing an account full financial access — and `scope ?? undefined`
+    // turned that null into undefined, which JSON.stringify drops. The record
+    // then said the column changed and refused to say to what, so the grant and
+    // the revoke were indistinguishable in the trail an investigator reads.
+    // Only ABSENT (the field was never sent) may become undefined; a deliberate
+    // null is a value and is recorded as one.
+    admin_scope: scope === undefined ? undefined : scope,
     is_investor: isInvestor ?? undefined,
   });
   return c.json({ success: true });

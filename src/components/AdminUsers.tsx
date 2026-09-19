@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
-import { Search, Edit2, Shield, User, Store, Check, CreditCard, TrendingUp } from 'lucide-react';
+import { Search, Edit2, Shield, User, Store, Check, CreditCard, TrendingUp, Lock, Link2 } from 'lucide-react';
 import { Overlay } from './ui/Overlay';
+import { Segmented } from './ui/Segmented';
+import AssistantAccess from './adminUsers/AssistantAccess';
+import MemberDetailModal from './adminUsers/MemberDetailModal';
+import TelegramIdentities from './adminUsers/TelegramIdentities';
+import { useUsersStrings } from './adminUsers/strings';
+import type { AdminScope } from './adminUsers/types';
 
 interface AdminUserRow {
   id: string;
@@ -14,7 +20,19 @@ interface AdminUserRow {
   membership_tier: 'free' | 'plus' | 'pro' | 'prime';
   subscription_expiry: number;
   created_at: string;
+  /**
+   * NULL/'full' = unrestricted, 'assistant' = no cost, no margin, no supplier
+   * price (worker/lib/adminScope.ts). It is already on the wire — GET
+   * /api/admin/users selects it — and it was simply never rendered, so an
+   * owner looking at this table could not tell a restricted assistant from a
+   * full financial administrator. Who can see the money is the single most
+   * important fact about an admin row; it now has a badge.
+   */
+  admin_scope?: AdminScope;
 }
+
+/** Which of the three jobs this screen is doing. */
+type UsersView = 'members' | 'assistant' | 'telegram';
 
 const ROLE_STYLES: Record<string, string> = {
   admin: 'bg-[#6B46FF]/10 text-[#6B46FF] border-[#6B46FF]/20',
@@ -23,7 +41,9 @@ const ROLE_STYLES: Record<string, string> = {
 };
 
 export default function AdminUsers() {
-  const { t, dir } = useLanguage();
+  const { t } = useLanguage();
+  const s = useUsersStrings();
+  const [view, setView] = useState<UsersView>('members');
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -40,6 +60,20 @@ export default function AdminUsers() {
   // overlay makes it scale out of — and collapse back into — the exact row it
   // belongs to, which is the whole point of the spatial rule.
   const editAnchorRef = useRef<HTMLElement | null>(null);
+
+  /**
+   * THE MEMBER PROFILE'S OWN ANCHOR, and why it is a SECOND ref rather than a
+   * reuse of the editor's.
+   *
+   * Two windows open out of the same row from two different controls: the name
+   * (the profile) and the pencil (the role/plan editor). Sharing one ref means
+   * whichever was pressed last decides where BOTH windows fly from and where
+   * focus returns to — so closing the profile would drop the caret on the
+   * pencil the admin never touched. Each window keeps the control it was
+   * actually opened from.
+   */
+  const detailAnchorRef = useRef<HTMLElement | null>(null);
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
 
   // WHY THE WINDOW DOES NOT READ `editingUser` DIRECTLY. `editingUser` going
   // null IS the close, but the panel is still on screen for the length of its
@@ -121,28 +155,78 @@ export default function AdminUsers() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
           <h2 className="text-2xl font-black text-white">{t('adminUsers')}</h2>
-          <span className="text-xs font-bold text-zinc-500 bg-zinc-800 px-3 py-1 rounded-full border border-zinc-700">
-            {total.toLocaleString()} {dir === 'rtl' ? 'مستخدم' : 'total'}
-          </span>
+          {view === 'members' && (
+            <span className="text-xs font-bold text-zinc-500 bg-zinc-800 px-3 py-1 rounded-full border border-zinc-700">
+              {/* `loc(ar, en, ckb)` AND NOT `dir === 'rtl' ? ar : en`, which is
+                  what stood here. Kurdish is ALSO right-to-left, so the
+                  direction test served ARABIC to every Kurdish admin and called
+                  it a translation. The bug is invisible to an Arabic reader,
+                  which is why it survived. */}
+              {total.toLocaleString()} {s.totalSuffix}
+            </span>
+          )}
         </div>
-        <div className="relative w-full md:w-64">
-          <input
-            type="text"
-            placeholder={dir === 'rtl' ? 'البحث عن مستخدم...' : 'Search users...'}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-700 text-white pl-10 pr-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/50"
-          />
-          <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
-        </div>
+        {view === 'members' && (
+          <div className="relative w-full md:w-64">
+            <label className="sr-only" htmlFor="admin-users-search">
+              {s.searchPlaceholder}
+            </label>
+            <input
+              id="admin-users-search"
+              type="text"
+              placeholder={s.searchPlaceholder}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-700 text-white pl-10 pr-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/50"
+            />
+            <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          </div>
+        )}
       </div>
 
-      {loadError && (
+      {/*
+        THREE JOBS, ONE SCREEN — and a radio group rather than tabs.
+
+        `Segmented` is the app's canonical one-of-N control and it announces
+        itself as a radio group, which is the honest semantics here: choosing
+        «صلاحية المساعد» changes what this screen IS doing, and each choice
+        owns its own data and its own requests. Putting the two authority
+        surfaces behind their own segments — instead of piling them under the
+        member table — also keeps them out of the way of the daily job, which
+        is looking someone up.
+      */}
+      <Segmented
+        group="admin-users-view"
+        label={s.sectionsLabel}
+        dataAttr="data-users-view"
+        value={view}
+        onChange={(id) => setView(id as UsersView)}
+        items={[
+          { id: 'members', label: s.tabMembers, icon: <User className="w-4 h-4" /> },
+          { id: 'assistant', label: s.tabAssistant, icon: <Lock className="w-4 h-4" /> },
+          { id: 'telegram', label: s.tabTelegram, icon: <Link2 className="w-4 h-4" /> },
+        ]}
+      />
+
+      {view === 'assistant' && (
+        <AssistantAccess
+          onChanged={() => {
+            // A grant changes a row that is already on screen behind this
+            // panel. Re-reading the list here means switching back to
+            // «الأعضاء» shows the new badge instead of the stale one.
+            void fetchUsers(searchTerm.trim());
+          }}
+        />
+      )}
+      {view === 'telegram' && <TelegramIdentities />}
+
+      {view === 'members' && loadError && (
         <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-4 text-sm font-medium">
           {loadError}
         </div>
       )}
 
+      {view === 'members' && (
       <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           {/* The actions column is pinned: this table is 900px wide inside a
@@ -166,20 +250,65 @@ export default function AdminUsers() {
               {filteredUsers.map((u) => (
                 <tr key={u.id} className="border-b border-zinc-800 hover:bg-zinc-800/30 transition-colors">
                   <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
+                    {/*
+                      «عند الضغط على مستخدم» — pressing the USER is what opens
+                      the profile, so the identity itself is the control.
+
+                      A REAL <button>, and not an onClick on the <tr>. A
+                      clickable row is invisible to the keyboard and silent to a
+                      screen reader, so half the panel's operators would have no
+                      way to reach the profile at all; and a row that swallows
+                      clicks also swallows the pencil sitting inside it. The
+                      button carries `text-start` because it is a left-aligned
+                      block of text inside a control that centres by default,
+                      and `w-full` so the whole cell is the hit target rather
+                      than the eleven pixels of the name.
+                    */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        detailAnchorRef.current = e.currentTarget;
+                        setDetailUserId(u.id);
+                      }}
+                      aria-label={`${s.openMember}: ${u.name || u.username || u.email}`}
+                      className="flex w-full items-center gap-3 text-start rounded-xl -mx-2 px-2 py-1 transition-colors hover:bg-zinc-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6B46FF]/60"
+                    >
                       <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center shrink-0 border border-zinc-700">
                         {u.role === 'admin' ? <Shield className="w-5 h-5 text-[#6B46FF]" /> : u.role === 'merchant' ? <Store className="w-5 h-5 text-[#D4AF37]" /> : <User className="w-5 h-5 text-zinc-400" />}
                       </div>
-                      <div>
-                        <div className="font-bold text-zinc-200">{u.name || u.username || 'Unnamed User'}</div>
-                        <div className="text-sm text-zinc-500 font-medium">{u.email}</div>
+                      <div className="min-w-0">
+                        <div dir="auto" className="font-bold text-zinc-200 truncate">{u.name || u.username || 'Unnamed User'}</div>
+                        <div dir="auto" className="text-sm text-zinc-500 font-medium truncate">{u.email}</div>
                       </div>
-                    </div>
+                    </button>
                   </td>
                   <td className="py-4 px-6">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold border capitalize ${ROLE_STYLES[u.role] || ROLE_STYLES.customer}`}>
-                      {u.role}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold border capitalize ${ROLE_STYLES[u.role] || ROLE_STYLES.customer}`}>
+                        {u.role}
+                      </span>
+                      {/*
+                        WHO CAN SEE THE MONEY, on the row. `admin_scope` was
+                        already being selected by the server and thrown away
+                        here, so a table of administrators gave no way to tell a
+                        restricted assistant from a full financial admin — the
+                        one distinction §11 is entirely about. A padlock is not
+                        decoration: it is the answer to "does this person see
+                        cost?".
+                      */}
+                      {u.role === 'admin' && (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                            u.admin_scope === 'assistant'
+                              ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30'
+                              : 'bg-[#6B46FF]/10 text-[#6B46FF] border-[#6B46FF]/25'
+                          }`}
+                        >
+                          {u.admin_scope === 'assistant' && <Lock className="w-3 h-3" />}
+                          {u.admin_scope === 'assistant' ? s.assistantBadge : s.fullBadge}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-2">
@@ -201,6 +330,8 @@ export default function AdminUsers() {
                   </td>
                   <td className="py-4 px-6 text-right">
                     <button
+                      type="button"
+                      aria-label={`${s.editMember}: ${u.name || u.username || u.email}`}
                       onClick={(e) => { editAnchorRef.current = e.currentTarget; setSaveError(null); setEditingUser(u); }}
                       className="p-2 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors"
                     >
@@ -212,19 +343,45 @@ export default function AdminUsers() {
               {!loading && filteredUsers.length === 0 && (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-zinc-500 font-medium">
-                    {searchTerm ? `No users found matching "${searchTerm}"` : 'No users found'}
+                    {searchTerm ? `${s.noneFound} — "${searchTerm}"` : s.noneFound}
                   </td>
                 </tr>
               )}
               {loading && users.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-zinc-500 font-medium">Loading...</td>
+                  <td colSpan={6} className="py-12 text-center text-zinc-500 font-medium">{s.loading}</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+      )}
+
+      {/*
+        THE MEMBER PROFILE WINDOW — «عند الضغط على مستخدم أريدها نافذة منبثقة
+        وليس أن يظهر في نهاية الصفحة». It is mounted unconditionally and driven
+        by `detailUserId`, exactly as the editor below is driven by
+        `editingUser`, so it owns its own exit animation instead of being torn
+        out of the DOM mid-flight.
+      */}
+      <MemberDetailModal
+        userId={detailUserId}
+        anchorRef={detailAnchorRef}
+        onClose={() => setDetailUserId(null)}
+        onEdit={(id) => {
+          // Straight from reading a member into changing them, without the
+          // admin having to find the row again. The editor takes over the
+          // profile's own anchor because the profile is the control the second
+          // window is now growing out of.
+          const row = users.find((u) => u.id === id);
+          if (!row) return;
+          setDetailUserId(null);
+          editAnchorRef.current = detailAnchorRef.current;
+          setSaveError(null);
+          setEditingUser(row);
+        }}
+      />
 
       {/*
         THE EDIT-USER WINDOW.

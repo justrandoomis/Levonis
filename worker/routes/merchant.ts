@@ -1250,8 +1250,27 @@ merchantRoutes.get('/orders/:id', async (c) => {
   ).bind(id, ctx.merchant.id).first<Record<string, unknown>>();
   if (!order) throw notFound('Order not found');
 
+  /**
+   * NAMED COLUMNS, NOT `SELECT *` — because this table now carries COST.
+   *
+   * Migration 0095 added `order_items.cost_iqd` and `cost_basis`, and this was
+   * the last serializer in the codebase that returned every column of the
+   * table straight to a third party. It happens to be safe today: the order is
+   * fenced by `o.merchant_id = ?`, LEVONIS's own checkout never writes
+   * `merchant_id`, and worker/routes/storeOrders.ts never writes a cost — so a
+   * merchant would see NULL / 'unrecorded' on their own goods.
+   *
+   * That is a chain of three facts in three other files, and the day the owner
+   * asks for gross margin on marketplace sales (0095's own note says they
+   * might), writing a cost in storeOrders.ts would publish this shop's cost
+   * base to an outside merchant with no code change here and no review. §11 is
+   * «لا يراها في API» — the field list is how that stays true by construction
+   * rather than by the next author noticing.
+   */
   const items = await c.env.DB.prepare(
-    'SELECT * FROM order_items WHERE order_id = ?'
+    `SELECT id, product_id, community_product_id, name_snapshot, image_snapshot, option_snapshot,
+            qty, unit_price_iqd, line_total_iqd
+       FROM order_items WHERE order_id = ?`
   ).bind(id).all();
 
   return c.json({

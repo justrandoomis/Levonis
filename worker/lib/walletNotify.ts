@@ -407,15 +407,34 @@ export interface AdminActor {
  * `users` in the SAME query — a seeded identity whose site account has since
  * been demoted or deleted authorizes nothing — and the mapping is never
  * cached in this module.
+ *
+ * AND THE FINANCIAL SCOPE IS READ IN THE SAME QUERY TOO, for the same reason
+ * the role is. Mandate §11 (worker/lib/adminScope.ts): an assistant admin
+ * «لا يراها في API ولا في HTML ولا في export» — and approving a wallet deposit
+ * is a larger financial act than reading one. `u.role = 'admin'` is TRUE for an
+ * assistant, so without this clause a restricted account whose identity was
+ * bound before the gate landed in worker/routes/telegram.ts (or by an owner who
+ * later restricted them) would keep pressing «موافقة» on real money. Demoting
+ * an admin to assistant must revoke the button, not just the screen.
+ *
+ * THE OWNER IS EXEMPT, exactly as `canViewFinancials` exempts them: the
+ * INITIAL_ADMIN_EMAIL account is always financial and can never be demoted, so
+ * a stray `admin_scope = 'assistant'` on that row must not lock the owner out
+ * of their own bot. The `?2 <> ''` fence is what stops an UNSET env var from
+ * turning into "matches any account with an empty email".
  */
 export async function resolveAdminActor(env: Env, telegramUserId: unknown): Promise<AdminActor | null> {
   if (typeof telegramUserId !== 'number' || !Number.isInteger(telegramUserId)) return null;
+  const ownerEmail = (env.INITIAL_ADMIN_EMAIL ?? '').trim().toLowerCase();
   const row = await env.DB.prepare(
     `SELECT i.user_id, u.name, u.username FROM admin_tg_identities i
        JOIN users u ON u.id = i.user_id
-      WHERE i.telegram_user_id = ? AND i.revoked_at IS NULL AND u.role = 'admin'`
+      WHERE i.telegram_user_id = ?1 AND i.revoked_at IS NULL AND u.role = 'admin'
+        AND (u.admin_scope IS NULL
+             OR u.admin_scope <> 'assistant'
+             OR (?2 <> '' AND lower(trim(u.email)) = ?2))`
   )
-    .bind(telegramUserId)
+    .bind(telegramUserId, ownerEmail)
     .first<{ user_id: string; name: string; username: string | null }>();
   if (!row) return null;
   return { userId: row.user_id, name: row.name, username: row.username, telegramUserId };

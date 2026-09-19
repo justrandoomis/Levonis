@@ -32,6 +32,8 @@ import { warrantyAdminRoutes, warrantyPublicRoutes } from './routes/warranty';
 import { adminImportRoutes } from './routes/adminImport';
 import { adminProductRelationsRoutes } from './routes/adminProductRelations';
 import { adminPriceGridRoutes } from './routes/adminPriceGrid';
+import { adminFinanceRoutes } from './routes/adminFinance';
+import { adminFinanceReportRoutes } from './routes/adminFinanceReport';
 import { printRequestRoutes } from './routes/printRequests';
 import { notificationRoutes } from './routes/notifications';
 import { stockAlertRoutes } from './routes/stockAlerts';
@@ -270,6 +272,21 @@ app.route('/api/admin/products', adminProductRelationsRoutes);
 // /:id/price-history) are distinct from both routers above, so none shadows
 // another.
 app.route('/api/admin/products', adminPriceGridRoutes);
+// The operating-expense ledger — «تكاليف اخرى ... خاصه في لوحه الادمن». Its own
+// prefix, because an expense belongs to no product and must never be reachable
+// through a product route. Every path under it carries the FINANCIAL scope on
+// top of requireAdmin, inside the router itself, so the gate does not depend on
+// this mount being remembered.
+app.route('/api/admin/finance', adminFinanceRoutes);
+// The PROFIT REPORTING that reads that ledger, mounted on the LONGER prefix
+// and therefore AFTER it: Hono matches in registration order, and a router
+// registered at '/api/admin/finance' first keeps its own paths while letting
+// '/report/*' fall through to this one. Reversing these two lines would put
+// the whole dashboard behind a 404 with nothing failing loudly — which is
+// exactly what happened while this feature was being built, and why
+// tests/financeReport.test.ts now reads THIS FILE and asserts both lines and
+// their order rather than assembling its own app.
+app.route('/api/admin/finance/report', adminFinanceReportRoutes);
 app.route('/api/memberships', membershipsRoutes);
 app.route('/api/telegram', telegramRoutes);
 app.route('/api/invoices', invoiceRoutes);

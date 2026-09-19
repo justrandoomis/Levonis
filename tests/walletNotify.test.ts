@@ -133,9 +133,15 @@ function createTableSql(file: string, table: string): string {
 
 function freshDb(): { db: D1Database; raw: DatabaseSync } {
   const raw = new DatabaseSync(':memory:');
+  // `admin_scope` is here because migration 0021 puts it on `users` in
+  // production and `resolveAdminActor` now reads it: approving a wallet
+  // deposit from the bot is a FINANCIAL act, and an assistant admin — who
+  // satisfies `role = 'admin'` — must not be able to perform one (mandate §11,
+  // worker/lib/adminScope.ts). A fixture without the column would hide that
+  // rule rather than test it.
   raw.exec(
     `CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, username TEXT, name TEXT NOT NULL DEFAULT '',
-       role TEXT NOT NULL DEFAULT 'customer')`
+       role TEXT NOT NULL DEFAULT 'customer', admin_scope TEXT)`
   );
   raw.exec(createTableSql('0001_init.sql', 'wallet_transactions'));
   raw.exec(createTableSql('0001_init.sql', 'audit_log'));
@@ -506,8 +512,27 @@ test('only a seeded identity whose site account is STILL an admin may decide', a
   raw.prepare("UPDATE users SET role = 'customer' WHERE id = 'adm1'").run();
   assert.equal(await resolveAdminActor(env, 111), null);
 
-  // …and so does a revocation.
+  // RESTRICTING THE SCOPE REMOVES THE BUTTON, not just the screen.
+  //
+  // `users.role = 'admin'` is TRUE for an assistant admin, so this query used
+  // to authorise one to approve wallet deposits from the bot — the exact
+  // financial authority §11 exists to withhold. Demoting somebody to assistant
+  // must take the approval away, and it did not.
   raw.prepare("UPDATE users SET role = 'admin' WHERE id = 'adm1'").run();
+  raw.prepare("UPDATE users SET admin_scope = 'assistant' WHERE id = 'adm1'").run();
+  assert.equal(await resolveAdminActor(env, 111), null, 'an assistant admin may not decide money from the bot');
+
+  // THE OWNER IS EXEMPT, exactly as `canViewFinancials` exempts them: the
+  // INITIAL_ADMIN_EMAIL account is always financial and can never be demoted,
+  // so a stray 'assistant' on that row must not lock the owner out of the bot.
+  const ownerEnv = envOf(db, { INITIAL_ADMIN_EMAIL: 'A1@Example.com  ' } as Partial<Env>);
+  assert.ok(await resolveAdminActor(ownerEnv, 111), 'the owner is financial whatever the column says');
+
+  // An UNSET owner email must not turn into "matches any empty email".
+  raw.prepare("UPDATE users SET email = '' WHERE id = 'adm1'").run();
+  assert.equal(await resolveAdminActor(envOf(db, { INITIAL_ADMIN_EMAIL: '' } as Partial<Env>), 111), null);
+
+  raw.prepare("UPDATE users SET admin_scope = NULL, email = 'a1@example.com' WHERE id = 'adm1'").run();
   assert.ok(await resolveAdminActor(env, 111));
   raw
     .prepare(

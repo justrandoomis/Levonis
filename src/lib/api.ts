@@ -1679,3 +1679,453 @@ export interface NotifyChannelReadiness {
 export function fetchNotifyChannels(opts?: RequestOptions): Promise<NotifyChannelReadiness> {
   return api.get<NotifyChannelReadiness & { success: boolean }>('/api/notifications/channels', opts);
 }
+
+// ------------------------------------------------ the financial dashboard
+
+/**
+ * «لوحة الأرباح» — the owner's profit reporting, as it comes off the wire.
+ *
+ * THESE TYPES MIRROR worker/lib/financeReport.ts FIELD FOR FIELD, and they are
+ * declared here rather than imported from the Worker for the reason every
+ * other admin type in this file is: `src/` is bundled for a browser and the
+ * Worker tree is not part of that graph. The SHAPE is owned by the server;
+ * this is a reader of it.
+ *
+ * ---------------------------------------------------------------------------
+ * EVERY BYTE BEHIND HERE IS COST AND MARGIN DETAIL.
+ *
+ * Mandate §11, quoted in full in worker/lib/adminScope.ts: «cost وجميع تفاصيل
+ * الربح متاحة فقط للمالك/الدور المالي. مساعد الأدمن العادي لا يراها في API ولا
+ * في HTML ولا في export». The three endpoints below refuse an assistant admin
+ * at the door with `FINANCIAL_SCOPE_REQUIRED` — the WHOLE router, before a
+ * query runs, because there is no safe subset of a profit report. Nothing on
+ * the client may re-derive a financial number from a non-financial endpoint to
+ * work around that, and `ApiUser.can_view_financials` is a UI HINT for hiding
+ * a tab nobody can use — never the gate itself.
+ *
+ * ---------------------------------------------------------------------------
+ * TWO PROFITS, AND THE TYPE SYSTEM IS WHERE THEY STOP BEING MERGED.
+ *
+ *   GROSS = revenue − cost of goods sold.   Belongs to a product, so it is
+ *                                           reported per product and per
+ *                                           category.
+ *   NET   = gross + collections − points − operating expenses. PER PERIOD
+ *                                           ONLY: rent belongs to no product,
+ *                                           so a per-product net profit is an
+ *                                           invention, not a number.
+ *
+ * `FinanceBreakdownTotals` is `FinanceTotals` with the period-only fields
+ * REMOVED — the exact list `stripPeriodOnly()` deletes on the server. So a
+ * component that reaches for `row.totals.net_profit_iqd` on a product does not
+ * render a plausible zero: it fails to compile. That is the whole reason the
+ * two are separate types instead of one optional-field type.
+ */
+
+/** 'day' | 'week' | 'month' | 'range' — 'range' collapses the span to one bucket. */
+export type FinanceGranularity = 'day' | 'week' | 'month' | 'range';
+
+/** An inclusive span of BAGHDAD calendar days. Never a UTC day (see §baghdadTime). */
+export interface FinanceRange {
+  from: string;
+  to: string;
+  days: number;
+}
+
+export interface FinanceTotals {
+  /** Sales revenue recognised in this bucket, before refunds. */
+  gross_revenue_iqd: number;
+  /** Revenue reversed by refunds DECIDED in this bucket. */
+  refunded_revenue_iqd: number;
+  /** `gross_revenue − refunded_revenue`. The headline «المبيعات». */
+  revenue_iqd: number;
+  /** The part of `revenue_iqd` whose cost is known, measured or estimated. */
+  costed_revenue_iqd: number;
+  /** The part whose cost is UNKNOWN. The margin does not speak for it. */
+  uncosted_revenue_iqd: number;
+  cogs_iqd: number;
+  refunded_cogs_iqd: number;
+  /** `costed_revenue − cogs`. Both sides describe the same lines. */
+  gross_profit_iqd: number;
+  /** Over COSTED revenue, or null with no base — never 0. */
+  gross_margin_percent: number | null;
+  shipping_collected_iqd: number;
+  cod_tax_collected_iqd: number;
+  points_redeemed_iqd: number;
+  /**
+   * Order-level coupon discounts, SUBTRACTED in reaching net profit on the
+   * server (`seal()` in worker/lib/financeReport.ts).
+   *
+   * It was missing from this mirror, and the omission was not harmless: the
+   * decomposition card prints every term of that arithmetic so the owner can
+   * take the headline apart, and a term absent from the TYPE is a term the
+   * card cannot print and the compiler cannot miss. The printed lines then
+   * added to a different number than the net profit above them — a gap with
+   * nothing to attribute it to, on the one card whose whole purpose is that
+   * there is never such a gap.
+   */
+  coupon_discount_iqd: number;
+  operating_expenses_iqd: number;
+  net_profit_iqd: number;
+  net_margin_percent: number | null;
+  orders: number;
+  lines: number;
+  units: number;
+  refunded_units: number;
+  refund_cases: number;
+  expense_entries: number;
+  /** True when ANY line here priced its cost from the catalogue, not a snapshot. */
+  estimated: boolean;
+  estimated_lines: number;
+  estimated_units: number;
+  estimated_cogs_iqd: number;
+  uncosted_lines: number;
+  uncosted_units: number;
+}
+
+/**
+ * The period-only fields, named once so the omission below cannot drift out of
+ * step with `PERIOD_ONLY_FIELDS` in worker/lib/financeReport.ts.
+ */
+export type FinancePeriodOnlyField =
+  | 'shipping_collected_iqd'
+  | 'cod_tax_collected_iqd'
+  | 'points_redeemed_iqd'
+  | 'coupon_discount_iqd'
+  | 'operating_expenses_iqd'
+  | 'net_profit_iqd'
+  | 'net_margin_percent'
+  | 'expense_entries';
+
+/** A product's or a category's totals: gross profit, and no net profit to read. */
+export type FinanceBreakdownTotals = Omit<FinanceTotals, FinancePeriodOnlyField>;
+
+/**
+ * A difference between two periods. `*_percent` is NULL when the earlier side
+ * was zero or negative: a month that went from 0 to 900,000 did not grow by a
+ * percentage, it started — and «+∞%» on a profit screen is a fabrication.
+ */
+export interface FinanceChange {
+  revenue_iqd: number;
+  revenue_percent: number | null;
+  gross_profit_iqd: number;
+  gross_profit_percent: number | null;
+  net_profit_iqd: number;
+  net_profit_percent: number | null;
+  orders: number;
+}
+
+export interface FinanceBucket {
+  /** 'YYYY-MM-DD' for a day or a week start, 'YYYY-MM' for a month, 'range'. */
+  key: string;
+  from: string;
+  to: string;
+  totals: FinanceTotals;
+  /** Against the PREVIOUS BUCKET IN THIS LIST. Null on the first one. */
+  change: FinanceChange | null;
+}
+
+export interface FinanceExpenseCategoryTotal {
+  id: string | null;
+  slug: string;
+  name_ar: string;
+  name_en: string;
+  name_ckb: string;
+  entries: number;
+  amount_iqd: number;
+}
+
+/** What the server's fold could not place in any bucket, reported not dropped. */
+export interface FinanceUnbucketed {
+  sale_lines: number;
+  sale_revenue_iqd: number;
+  refund_cases: number;
+  expense_entries: number;
+  expense_amount_iqd: number;
+}
+
+export interface FinanceReportMeta {
+  recognition: 'delivered_baghdad_day';
+  timezone: 'Asia/Baghdad';
+  week_starts_on: 'saturday';
+  currency: 'IQD';
+  /** FALSE = migration 0095 has not landed and EVERY cost is an estimate. */
+  cost_snapshot_available: boolean;
+  /** FALSE = there is no expense ledger, so net profit equals gross profit. */
+  operating_expenses_available: boolean;
+  /** Delivered orders carrying no delivery date — in NO period, at any range. */
+  unrecognized_orders: number;
+  unbucketed: FinanceUnbucketed;
+}
+
+export interface FinancePeriodReport {
+  range: FinanceRange;
+  granularity: FinanceGranularity;
+  buckets: FinanceBucket[];
+  totals: FinanceTotals;
+  expense_categories: FinanceExpenseCategoryTotal[];
+  previous: { range: FinanceRange; totals: FinanceTotals };
+  /** This period against the PRECEDING PERIOD OF EQUAL LENGTH. */
+  change: FinanceChange;
+  meta: FinanceReportMeta;
+}
+
+export interface FinanceBreakdownRow {
+  id: string | null;
+  name_ar: string;
+  name_en: string;
+  name_ckb: string;
+  slug: string;
+  /** Product rows only. */
+  category_id?: string | null;
+  sub_category_id?: string | null;
+  totals: FinanceBreakdownTotals;
+}
+
+/**
+ * A breakdown's metadata is a SHORTER list than a period's on purpose:
+ * `unrecognized_orders` and the unbucketed counts are properties of a period
+ * fold, and a breakdown does not fold by period.
+ */
+export interface FinanceBreakdownMeta {
+  recognition: 'delivered_baghdad_day';
+  timezone: 'Asia/Baghdad';
+  currency: 'IQD';
+  cost_snapshot_available: boolean;
+  net_profit_is_period_only: true;
+}
+
+export interface FinanceProductsReport {
+  range: FinanceRange;
+  /** The database said there are more rows than `limit`, rather than a guess. */
+  truncated: boolean;
+  limit: number;
+  products: FinanceBreakdownRow[];
+  meta: FinanceBreakdownMeta;
+}
+
+export interface FinanceCategoriesReport {
+  range: FinanceRange;
+  level: 'main' | 'sub';
+  truncated: boolean;
+  limit: number;
+  categories: FinanceBreakdownRow[];
+  meta: FinanceBreakdownMeta;
+}
+
+/**
+ * The query every finance endpoint takes. `from`/`to` are BAGHDAD days: the
+ * server rejects anything else, and sending a `toISOString().slice(0,10)`
+ * would ask for yesterday for the first three hours of every Iraqi day.
+ */
+export interface FinanceQuery {
+  from: string;
+  to: string;
+}
+
+const financePath = (path: string, params: Record<string, string | number | undefined>): string => {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') q.set(k, String(v));
+  const query = q.toString();
+  return query ? `${path}?${query}` : path;
+};
+
+/** GET /api/admin/finance/report/summary — buckets, totals, and the comparison. */
+export function fetchFinanceSummary(
+  query: FinanceQuery & { granularity: FinanceGranularity },
+  opts?: RequestOptions
+): Promise<FinancePeriodReport> {
+  return api.get<FinancePeriodReport & { success: boolean }>(
+    financePath('/api/admin/finance/report/summary', {
+      from: query.from,
+      to: query.to,
+      granularity: query.granularity,
+    }),
+    opts
+  );
+}
+
+/** GET /api/admin/finance/report/products — GROSS profit per product. Never net. */
+export function fetchFinanceProducts(
+  query: FinanceQuery & { limit?: number },
+  opts?: RequestOptions
+): Promise<FinanceProductsReport> {
+  return api.get<FinanceProductsReport & { success: boolean }>(
+    financePath('/api/admin/finance/report/products', {
+      from: query.from,
+      to: query.to,
+      limit: query.limit,
+    }),
+    opts
+  );
+}
+
+/** GET /api/admin/finance/report/categories — the same, rolled up to a rung. */
+export function fetchFinanceCategories(
+  query: FinanceQuery & { level: 'main' | 'sub'; limit?: number },
+  opts?: RequestOptions
+): Promise<FinanceCategoriesReport> {
+  return api.get<FinanceCategoriesReport & { success: boolean }>(
+    financePath('/api/admin/finance/report/categories', {
+      from: query.from,
+      to: query.to,
+      level: query.level,
+      limit: query.limit,
+    }),
+    opts
+  );
+}
+
+// ------------------------------------------- the operating-expense ledger
+
+/**
+ * «يستطيع الادمن في لوحه الاداره اضافه تكاليف اخرى ... لا علاقه لها بالمنتج
+ *  الاساسي او ما يظهر للمستخدم، انها خاصه في لوحه الادمن» — THE WRITE SIDE.
+ *
+ * The dashboard above READS operating expenses as one aggregate per period.
+ * These are the calls that put them there, and without them the owner's actual
+ * request is not delivered at all: eight endpoints nothing calls, an empty
+ * `operating_expenses` table forever, and a «الربح الصافي» permanently equal to
+ * «الربح الإجمالي» — a net profit that silently ignores rent and salaries,
+ * which is the number the owner would price against.
+ *
+ * SAME GATE, SAME ROUTER. `/api/admin/finance/*` carries `requireAdmin` plus a
+ * router-level financial check on `*`, so an assistant admin is refused before
+ * a query runs — here as everywhere else, the client's job is to explain the
+ * refusal, never to be the gate.
+ *
+ * AN EXPENSE BELONGS TO NO PRODUCT and there is no field for one. That is the
+ * owner's own model: product cost is ONE level, on the product; everything
+ * else is an operating expense and is period-level only.
+ */
+
+export interface ExpenseCategory {
+  id: string;
+  slug: string;
+  name_ar: string;
+  name_en: string;
+  name_ckb: string;
+  sort?: number;
+  /** A category is deactivated, never deleted: no past expense may lose its label. */
+  active: boolean;
+}
+
+export interface ExpenseEntry {
+  id: string;
+  category_id: string;
+  category_slug: string;
+  category_name_ar: string;
+  amount_iqd: number;
+  /** The BAGHDAD civil day the owner says it belongs to — not the day it was typed. */
+  expense_day: string;
+  title: string;
+  note: string;
+  /** Set when the row was created as one month of a repeat; no report reads it. */
+  series_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Removal is a VOID, not a delete: the row stays, with who removed it and why. */
+  voided: boolean;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string;
+}
+
+export interface ExpenseLedgerPage {
+  from: string;
+  to: string;
+  expenses: ExpenseEntry[];
+  /** The PERIOD's total, from an unbounded SUM — not the page's. */
+  total_iqd: number;
+  /** What the returned rows alone add up to, so the visible list adds up. */
+  page_total_iqd: number;
+  count: number;
+  limit: number;
+  truncated: boolean;
+}
+
+export function fetchExpenseCategories(opts?: RequestOptions): Promise<{ categories: ExpenseCategory[] }> {
+  return api.get<{ categories: ExpenseCategory[]; success: boolean }>('/api/admin/finance/expense-categories', opts);
+}
+
+export function createExpenseCategory(
+  body: { name_ar: string; name_en?: string; name_ckb?: string },
+  opts?: RequestOptions
+): Promise<{ category: ExpenseCategory }> {
+  return api.post<{ category: ExpenseCategory; success: boolean }>('/api/admin/finance/expense-categories', body, opts);
+}
+
+export function updateExpenseCategory(
+  id: string,
+  body: { name_ar?: string; name_en?: string; name_ckb?: string; active?: boolean },
+  opts?: RequestOptions
+): Promise<{ success: boolean }> {
+  return api.patch<{ success: boolean }>(`/api/admin/finance/expense-categories/${encodeURIComponent(id)}`, body, opts);
+}
+
+/** The ledger for a period. `include_voided` shows what was removed, and by whom. */
+export function fetchExpenses(
+  query: { from: string; to: string; category_id?: string; include_voided?: boolean; limit?: number },
+  opts?: RequestOptions
+): Promise<ExpenseLedgerPage> {
+  return api.get<ExpenseLedgerPage & { success: boolean }>(
+    financePath('/api/admin/finance/expenses', {
+      from: query.from,
+      to: query.to,
+      category_id: query.category_id,
+      include_voided: query.include_voided ? '1' : undefined,
+      limit: query.limit,
+    }),
+    opts
+  );
+}
+
+/**
+ * Record an expense. `repeat_months` writes N REAL ROWS NOW — it is not a
+ * recurrence rule, and nothing generates rows later. The server's own comment
+ * says why: a rule evaluated at report time makes last January's profit depend
+ * on this June's edit, which is the same silent rewriting of history the cost
+ * snapshot exists to abolish.
+ */
+export function createExpense(
+  body: {
+    category_id: string;
+    amount_iqd: number;
+    expense_day: string;
+    title?: string;
+    note?: string;
+    repeat_months?: number;
+  },
+  opts?: RequestOptions
+): Promise<{ ids: string[]; series_id: string | null; days: string[] }> {
+  return api.post<{ ids: string[]; series_id: string | null; days: string[]; success: boolean }>(
+    '/api/admin/finance/expenses',
+    body,
+    opts
+  );
+}
+
+export function updateExpense(
+  id: string,
+  body: { category_id?: string; amount_iqd?: number; expense_day?: string; title?: string; note?: string },
+  opts?: RequestOptions
+): Promise<{ success: boolean }> {
+  return api.patch<{ success: boolean }>(`/api/admin/finance/expenses/${encodeURIComponent(id)}`, body, opts);
+}
+
+/** VOID, not delete — a removed expense changes a net profit the owner may
+ *  already have acted on, so the row and the reason stay. */
+export function voidExpense(id: string, reason: string, opts?: RequestOptions): Promise<{ voided: boolean }> {
+  return api.delete<{ voided: boolean; success: boolean }>(
+    financePath(`/api/admin/finance/expenses/${encodeURIComponent(id)}`, { reason }),
+    opts
+  );
+}
+
+export function restoreExpense(id: string, opts?: RequestOptions): Promise<{ restored: boolean }> {
+  return api.post<{ restored: boolean; success: boolean }>(
+    `/api/admin/finance/expenses/${encodeURIComponent(id)}/restore`,
+    undefined,
+    opts
+  );
+}
