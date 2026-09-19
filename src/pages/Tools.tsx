@@ -28,6 +28,19 @@
  * refusing to emit equal range bounds for anything that is not `exact`. This
  * page never computes a price of its own — there is no arithmetic on money
  * here at all — so it cannot drift from the engine that has to defend it.
+ *
+ * TWO DOORS, ONE ENGINE. «أو من الملف» — the owner's own "or". A customer who
+ * already knows they need 100 g of a particular filament in one or two colours
+ * should not have to produce a file to be told a price, and sending them away
+ * to find one is how they go and ask another shop. So there is a second mode,
+ * `src/components/tools/GramsQuotePanel.tsx`, which asks for the WEIGHT.
+ *
+ * It is a different question, not a different price list: the grams route
+ * builds a `PrintAnalysis` and hands it to the same `priceJob`, with the same
+ * per-gram rate, the same material correction and the same minimum job that
+ * this file path uses. tests/printQuoteGrams.test.ts holds the two together to
+ * the dinar, because the day they disagree is the day the number a customer
+ * was shown stops being the number the shop charges.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -44,6 +57,7 @@ import {
   Loader2,
   RefreshCw,
   Ruler,
+  Scale,
   Timer,
   Upload,
   Users,
@@ -64,6 +78,7 @@ import {
   type QuoteMaterial,
   type QuotePrinter,
 } from '../lib/printQuote';
+import GramsQuotePanel from '../components/tools/GramsQuotePanel';
 
 type Lang = 'ar' | 'en' | 'ckb';
 type Quality = 'draft' | 'standard' | 'fine';
@@ -130,6 +145,8 @@ const STRINGS = {
     doesNotFit: 'المجسم أكبر من مساحة طباعة هذه الطابعة. اختر طابعة أكبر أو صغّر المقاس.',
     notMeasurable: 'لا يمكن قياس هذه الصيغة. ارفع STL أو 3MF.',
     zeroVolume: 'الملف لا يحتوي على مجسم مصمت يمكن قياسه.',
+    modeFile: 'من ملف',
+    modeGrams: 'من الغرامات',
   },
   en: {
     title: 'Print price calculator',
@@ -189,6 +206,8 @@ const STRINGS = {
     doesNotFit: 'The model is larger than this printer can build. Pick a larger printer or scale it down.',
     notMeasurable: 'This format cannot be measured. Upload an STL or 3MF.',
     zeroVolume: 'The file contains no solid body to measure.',
+    modeFile: 'From a file',
+    modeGrams: 'By grams',
   },
   ckb: {
     title: 'ژمێرەری نرخی چاپ',
@@ -248,6 +267,8 @@ const STRINGS = {
     doesNotFit: 'مۆدێلەکە لە ڕووبەری چاپی ئەم چاپکەرە گەورەترە. چاپکەرێکی گەورەتر هەڵبژێرە یان بچووکی بکەرەوە.',
     notMeasurable: 'ئەم فۆرماتە ناپێورێت. STL یان 3MF باربکە.',
     zeroVolume: 'فایلەکە هیچ جەستەیەکی ڕەقی تێدا نییە بۆ پێوان.',
+    modeFile: 'لە فایلەوە',
+    modeGrams: 'بە گرام',
   },
 } as const;
 
@@ -264,6 +285,15 @@ export default function Tools() {
   const L = (lang in STRINGS ? lang : 'ar') as Lang;
   const s = STRINGS[L];
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
+
+  /**
+   * WHICH QUESTION THE VISITOR IS ASKING. «أو من الملف» is the owner's own
+   * "or", so it is a choice made once at the top rather than a field buried in
+   * a form — the two modes need different inputs and say different things
+   * about what the answer covers, and a single form pretending to do both
+   * would have to leave half its boxes meaningless in either case.
+   */
+  const [mode, setMode] = useState<'file' | 'grams'>('file');
 
   const [printers, setPrinters] = useState<QuotePrinter[]>([]);
   const [materials, setMaterials] = useState<QuoteMaterial[]>([]);
@@ -397,9 +427,41 @@ export default function Tools() {
       </header>
 
       <div className="px-4 pt-5 max-w-2xl mx-auto space-y-5">
-        <p className="text-zinc-400 text-[13px] leading-relaxed">{s.lead}</p>
+        {/*
+          The two doors, side by side and equal. Not a link and not a tucked-away
+          "advanced" toggle: a customer who knows their weight and a customer who
+          holds a file are both ordinary, and hiding either question behind the
+          other is how one of them decides the calculator is not for them.
+        */}
+        <div role="group" aria-label={s.title} className="grid grid-cols-2 gap-0.5 bg-zinc-900 border border-zinc-800 rounded-2xl p-0.5">
+          {([
+            { value: 'file' as const, label: s.modeFile, Icon: FileUp },
+            { value: 'grams' as const, label: s.modeGrams, Icon: Scale },
+          ]).map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              aria-pressed={mode === o.value}
+              onClick={() => setMode(o.value)}
+              className={`h-10 rounded-[0.9rem] text-[13px] leading-snug flex items-center justify-center gap-2 transition-colors ${
+                mode === o.value ? 'bg-zinc-800 text-white font-medium shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <o.Icon className="w-4 h-4" aria-hidden />
+              {o.label}
+            </button>
+          ))}
+        </div>
 
         {catalogError && <Notice tone="error">{catalogError}</Notice>}
+
+        {mode === 'grams' ? (
+          /* The catalogue is already loaded above, so the weight form reuses it
+             rather than fetching the same two lists a second time. */
+          <GramsQuotePanel printers={printers} materials={materials} />
+        ) : (
+          <>
+        <p className="text-zinc-400 text-[13px] leading-relaxed">{s.lead}</p>
 
         {/* ---------------------------------------------------------- 1. file */}
         <section
@@ -704,6 +766,8 @@ export default function Tools() {
             </button>
             <p className="text-zinc-500 text-[11px] leading-relaxed mt-2.5 text-center">{s.sendNote}</p>
           </section>
+        )}
+          </>
         )}
       </div>
     </div>

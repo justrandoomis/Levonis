@@ -552,6 +552,7 @@ test('a Worker deployed AHEAD of migration 0095 refuses checkout honestly instea
   const raw = seedCatalogue();
   raw.exec(`
     DROP INDEX IF EXISTS idx_order_items_cost_basis;
+    DROP TRIGGER IF EXISTS trg_mystery_allocation_cost;
     ALTER TABLE order_items DROP COLUMN cost_iqd;
     ALTER TABLE order_items DROP COLUMN cost_basis;
   `);
@@ -565,15 +566,21 @@ test('a Worker deployed AHEAD of migration 0095 refuses checkout honestly instea
   assert.deepEqual(all(raw, 'SELECT id FROM orders'), [], 'and no half-written order is left behind');
 });
 
-// ═══════════════════════════════════════════════ the gap this track LEAVES
+// ══════════════════════════════════════ the gap 0096 CLOSED
 
-test('a mystery spool records NO cost, and says so rather than reporting pure margin', async () => {
+test('a mystery spool freezes the drawn filament\u2019s cost at the draw, and still hides the pick', async () => {
   const raw = seedCatalogue();
   seedMysteryPool(raw);
-  // Every pool member has a real cost. None of it can be snapshotted: the draw
-  // record carries no cost field, and re-deriving it from the drawn product is
-  // exactly the second derivation this track forbids (§7.7 also binds the
-  // row's `product_id` to NULL so the pick cannot leak through it).
+  // Every pool member has a real cost, and migration 0096 now freezes it onto
+  // the spool at the INSTANT OF THE DRAW — an AFTER INSERT trigger on
+  // `mystery_allocations`, running inside the checkout's own batch, so the cost
+  // lands with the order or the order does not exist. This is NOT the second
+  // derivation §0095 forbids: for a mystery spool the resolver produces no cost
+  // at all, so there is exactly one derivation and it happens at the sale.
+  //
+  // WHAT MUST NOT CHANGE IS §7.7: the row's `product_id` stays NULL, so the
+  // cost arrives without the pick arriving with it. That assertion below is
+  // the load-bearing one and it is asserted FIRST for that reason.
   for (const p of POOL_PRODUCTS) {
     raw.prepare('UPDATE products SET product_cost_iqd = 11000 WHERE id = ?').run(p.id);
   }
@@ -589,15 +596,15 @@ test('a mystery spool records NO cost, and says so rather than reporting pure ma
   assert.ok(spools.length > 0, 'the offer sells spools');
   for (const sp of spools) {
     assert.equal(sp.product_id, null, '§7.7 — the drawn product never reaches the row');
-    assert.equal(sp.cost_iqd, null);
+    assert.equal(sp.cost_iqd, 11000, 'the cost ladder was walked at the draw and the base product cost frozen');
     assert.equal(
       sp.cost_basis,
-      COST_BASIS.unrecorded,
-      'not zero: a bound 0 would report a mystery box as pure profit, which the owner would price against'
+      COST_BASIS.snapshot,
+      'a snapshot, not zero: a bound 0 would report a mystery box as pure profit, which the owner would price against'
     );
-    // With no product to join to, there is not even an estimate — the honest
-    // answer is "unknown", and the dashboard must print that word.
-    assert.equal(costConfidenceOf(sp.cost_basis, null), 'unknown');
+    // And because the cost is recorded, the dashboard stops printing "unknown"
+    // for this row — which is the whole reason the owner asked for it.
+    assert.equal(costConfidenceOf(sp.cost_basis, sp.cost_iqd), 'recorded');
   }
 });
 

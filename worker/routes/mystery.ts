@@ -53,7 +53,7 @@ import {
   type ProductSavePlan,
 } from '../lib/productPersistence';
 import { MAX_PHYSICAL_LINES, type BundleIssue } from '../lib/bundleComposition';
-import { loadOffers, offerWindowStatements, subjectOf, type OfferView } from '../lib/offers';
+import { loadOffers, offerWindowStatements, parseRequiredTiers, subjectOf, type OfferView } from '../lib/offers';
 import {
   activePoolProductIds,
   ensureOfferSecretStatement,
@@ -89,6 +89,70 @@ const warningBody = (warnings: BundleIssue[]) => ({
   warnings: warnings.map((w) => w.message),
   warning_details: warnings,
 });
+
+/**
+ * THE RANDOM FILAMENT IS PUBLIC — AND A TIER SET IS NOW AN EXCEPTION THAT
+ * ANNOUNCES ITSELF.
+ *
+ * The owner: «الباقات والفيلم العشوائي الذي قلنا عليه سابقا انه خاص بالعضوية
+ * اجعله الان عام لكل المستخدمين لا تجعله خاصا».
+ *
+ * WHAT WAS ACTUALLY ENFORCING A GATE, checked rather than assumed. A mystery
+ * offer is gated in exactly one way: a non-empty `offer_windows.required_tiers`
+ * for its subject, which `offerEligible` (worker/lib/offers.ts) turns into
+ * `MEMBERSHIP_REQUIRED` and which the card, the detail page and the checkout
+ * door each re-ask independently. There is no blanket gate anywhere: this
+ * router already defaults the set to `[]` for every save (`readOffer`), the
+ * duplicate handler writes no window at all, and migration 0063's legacy
+ * members-only set — the «قلنا عليه سابقا» gate — named only
+ * `prd_bnd_*` BUNDLE subjects and never touched a mystery offer.
+ *
+ * SO WHY NOT SIMPLY CLEAR THE COLUMN. Three reasons, and the third decides it.
+ *   1. The owner said make it general. They did NOT say destroy their ability
+ *      to run a members-only promotion later, and `required_tiers` is the only
+ *      mechanism that can express one.
+ *   2. Emptying it from a migration would be a data UPDATE — non-additive, and
+ *      it would silently change whatever an admin has configured, which is the
+ *      one thing this change is forbidden to do.
+ *   3. Ignoring the column in code is worse than clearing it: the panel would
+ *      keep offering a switch that no longer does anything, and the first
+ *      person to discover it would be a member who was promised an exclusive.
+ *
+ * SO THE COLUMN STAYS AN OPTIONAL, PER-OFFER RESTRICTION — and the general
+ * case becomes the one the API guarantees. What changes is VISIBILITY: a
+ * restricted offer can no longer sit quietly in the list. `GET /offers`
+ * publishes the set, and this notice rides the existing `warnings` channel on
+ * every read and every save of an offer that still carries one, so the owner
+ * meets their own exception instead of having to go looking for it.
+ *
+ * It is a WARNING and never a refusal. A refusal would mean an admin could not
+ * save an offer they had deliberately restricted — which is the ability
+ * reason 1 exists to protect.
+ *
+ * All three languages, because this is a real sentence in the panel's
+ * trilingual banner and 'ckb' is a language here, not a fallback to English.
+ */
+const membersOnlyNotice = (tiers: string[]): BundleIssue => {
+  const list = tiers.map((t) => t.toUpperCase()).join(' / ');
+  const en = `this offer is restricted to members (${list}) — the random filament is public by default; clear the tiers to open it to everyone`;
+  return {
+    code: 'MYSTERY_MEMBERS_ONLY_RESTRICTION',
+    message: en,
+    en,
+    // «الفلامنت» with the same spelling the services rail and siteMedia.ts use.
+    // One product named two ways across the panel and the storefront is how an
+    // admin comes to believe they are two products.
+    ar: `هذا العرض مقيّد بالأعضاء (${list}) — الفلامنت العشوائي عام لكل المستخدمين افتراضيًا؛ امسح الفئات لفتحه للجميع`,
+    // SORANI, NOT A TRANSLITERATION OF IT. «هەژاردەیی» is not a Kurdish word
+    // for random; the word is «هەڕەمەکی», which is exactly what
+    // src/components/home/ServicesGrid.tsx puts on the storefront card for the
+    // same product. And «پۆل» is a school class or a category — a membership
+    // TIER is «ئاست». Both were Kurdish-only defects in a hand-written string,
+    // which is the same failure the house rule about 'ckb' exists to catch,
+    // arriving without the banned ternary anywhere near it.
+    ckb: `ئەم ئۆفەرە تەنها بۆ ئەندامانە (${list}) — فیلامێنتی هەڕەمەکی بە بنەڕەت بۆ هەموو بەکارهێنەرانە؛ ئاستەکان بسڕەوە بۆ کردنەوەی بۆ هەمووان`,
+  };
+};
 
 const body = async (c: Context<AppContext>): Promise<Record<string, unknown>> => {
   const b = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
@@ -702,6 +766,11 @@ async function writeOffer(c: Context<AppContext>, mode: 'create' | 'update', pro
   const input = readMysteryInput(b);
   const offer = readOffer(b);
   const { errors, warnings } = await validateMystery(c.env.DB, input, doc.status === 'active');
+  // A SAVE THAT KEEPS A TIER GATE SAYS SO IN THE RESPONSE. `readOffer` already
+  // defaults the set to `[]`, so the only way to reach this is an admin who
+  // deliberately ticked a tier — which is still allowed (see
+  // `membersOnlyNotice`) and is no longer silent.
+  if (offer && offer.required_tiers.length > 0) warnings.push(membersOnlyNotice(offer.required_tiers));
   if (errors.length) {
     throw new HttpError(400, 'this mystery offer cannot be saved as configured', 'BUNDLE_VALIDATION', {
       errors: errors as unknown as Record<string, unknown>[],
@@ -784,39 +853,67 @@ async function writeOffer(c: Context<AppContext>, mode: 'create' | 'update', pro
   });
 }
 
+/**
+ * THE OFFER LIST, AND IT NOW SAYS WHICH OFFERS ARE NOT PUBLIC.
+ *
+ * The window join is the whole point of the change. Until now the only place
+ * `required_tiers` appeared was inside ONE offer's edit form, so an offer that
+ * had been restricted looked exactly like a public one on the list the owner
+ * actually opens — which is how a members-only offer survives an instruction
+ * to make the feature general. It is one LEFT JOIN on the same
+ * `(subject_type, subject_id)` primary key `loadOffers` uses, and no extra
+ * round trip.
+ *
+ * `parseRequiredTiers` rather than `JSON.parse`: it keeps only real tier names
+ * and sorts them, so a hand-edited row cannot put an arbitrary string on an
+ * admin screen and two equal sets always read the same.
+ */
 adminMysteryRoutes.get('/offers', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT p.id, p.slug, p.name, p.name_ar, p.name_ku, p.status, p.price_iqd, p.display_order,
             o.direct_pool_id, o.preorder_pool_id, o.spool_qty, o.allow_direct, o.allow_preorder, o.customer_picks_family,
-            cfg.duplicate_policy, cfg.reveal_stage, cfg.show_odds, cfg.max_qty_per_order
+            cfg.duplicate_policy, cfg.reveal_stage, cfg.show_odds, cfg.max_qty_per_order,
+            w.required_tiers
        FROM products p
        LEFT JOIN mystery_offers o ON o.product_id = p.id
        LEFT JOIN bundle_config cfg ON cfg.product_id = p.id
+       LEFT JOIN offer_windows w ON w.subject_type = 'product' AND w.subject_id = p.id
       WHERE p.composition = 'mystery'
       ORDER BY p.display_order, p.created_at DESC
       LIMIT 200`
   ).all<Record<string, unknown>>();
   return c.json({
     success: true,
-    offers: results.map((r) => ({
-      id: r.id,
-      slug: r.slug,
-      name: r.name,
-      name_ar: r.name_ar,
-      name_ku: r.name_ku,
-      status: r.status,
-      price_iqd: r.price_iqd,
-      spool_qty: r.spool_qty ?? 1,
-      direct_pool_id: r.direct_pool_id ?? null,
-      preorder_pool_id: r.preorder_pool_id ?? null,
-      allow_direct: r.allow_direct === 1,
-      allow_preorder: r.allow_preorder === 1,
-      customer_picks_family: r.customer_picks_family === 1,
-      duplicate_policy: r.duplicate_policy ?? '',
-      reveal_stage: r.reveal_stage ?? '',
-      show_odds: r.show_odds === 1,
-      max_qty_per_order: r.max_qty_per_order ?? 5,
-    })),
+    offers: results.map((r) => {
+      // Parsed ONCE per row and read twice: the tier list and the boolean must
+      // never be able to disagree about one offer.
+      const tiers = parseRequiredTiers(r.required_tiers);
+      return {
+        id: r.id,
+        slug: r.slug,
+        name: r.name,
+        name_ar: r.name_ar,
+        name_ku: r.name_ku,
+        status: r.status,
+        price_iqd: r.price_iqd,
+        spool_qty: r.spool_qty ?? 1,
+        direct_pool_id: r.direct_pool_id ?? null,
+        preorder_pool_id: r.preorder_pool_id ?? null,
+        allow_direct: r.allow_direct === 1,
+        allow_preorder: r.allow_preorder === 1,
+        customer_picks_family: r.customer_picks_family === 1,
+        duplicate_policy: r.duplicate_policy ?? '',
+        reveal_stage: r.reveal_stage ?? '',
+        show_odds: r.show_odds === 1,
+        max_qty_per_order: r.max_qty_per_order ?? 5,
+        // Both, deliberately: the SET so the panel can name the tiers, and the
+        // boolean so a client that only wants to badge the row cannot get the
+        // test wrong. An offer with no window at all reads `[]` / false, which
+        // is what "public" is.
+        required_tiers: tiers,
+        members_only: tiers.length > 0,
+      };
+    }),
   });
 });
 
@@ -854,6 +951,14 @@ adminMysteryRoutes.get('/offers/:productId', async (c) => {
     warnings.push(...preview.warnings);
   }
 
+  // THE EXCEPTION ANNOUNCES ITSELF ON EVERY READ, not only on save. An admin
+  // who opens an offer to change its pool must see that it is still
+  // members-only even if they never touch the eligibility tab.
+  const offerView = offerFromView(offers.get(`product:${id}`));
+  if (offerView && offerView.required_tiers.length > 0) {
+    warnings.push(membersOnlyNotice(offerView.required_tiers));
+  }
+
   return c.json({
     success: true,
     product: projectForAdmin(c.env, admin, projectAdmin(doc)),
@@ -865,7 +970,8 @@ adminMysteryRoutes.get('/offers/:productId', async (c) => {
       show_odds: cfg?.show_odds === 1,
       max_qty_per_order: cfg?.max_qty_per_order ?? 5,
     },
-    offer: offerFromView(offers.get(`product:${id}`)),
+    offer: offerView,
+    members_only: !!offerView && offerView.required_tiers.length > 0,
     previews,
     ...warningBody(warnings),
   });

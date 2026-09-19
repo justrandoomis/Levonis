@@ -47,10 +47,13 @@ test('resolve marks defaults and uploads apart, and gives every slot a url or an
   assert.equal(bambu.url, `/files/${MAIN_PAGE_PREFIX}Bamabulab.webp`);
   assert.equal(bambu.custom, false);
 
-  // Service slots ship with no default on purpose: the drawn lucide icon is a
-  // design, so an empty url means "keep drawing it", not "show a hole".
+  // Service slots now ship WITH a seeded default, because the owner uploaded an
+  // icon for every one of the eleven cards. The drawn lucide icon is still the
+  // fallback, but it is now the storefront's onError latch that falls back to
+  // it — a missing object in R2 — and no longer an empty url here. Pinning the
+  // seeded url is what stops a "reset to default" quietly blanking a card.
   for (const s of SERVICE_SLOTS) {
-    assert.equal(fresh.find((m) => m.slot === s.slot)!.url, '');
+    assert.equal(fresh.find((m) => m.slot === s.slot)!.url, `/files/${MAIN_PAGE_PREFIX}${s.defaultObject}`);
   }
 
   const edited = resolveSiteMedia({ 'brand-bambulab': 'brand-bambulab-ab12cd.webp' });
@@ -108,7 +111,11 @@ test('service slot ids match the ids ServicesGrid already renders', () => {
   // the lookup matching, so the pairing is asserted here.
   assert.deepEqual(
     SERVICE_SLOTS.map((s) => s.slot),
-    ['service-studio', 'service-warranty', 'service-tools', 'service-bundles', 'service-community', 'service-rewards']
+    [
+      'service-studio', 'service-compare', 'service-tools', 'service-bundles', 'service-mystery',
+      'service-tradein', 'service-used', 'service-rewards', 'service-warranty', 'service-community',
+      'service-support',
+    ]
   );
 });
 

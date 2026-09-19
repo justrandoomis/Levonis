@@ -1,9 +1,24 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLanguage } from '../LanguageContext';
-import { api, ApiError, formatIqd, newIdempotencyKey } from '../lib/api';
-import { RefreshCw, Users, Inbox, ShieldAlert, ChevronDown, X, MessageSquare, CreditCard, Rocket } from 'lucide-react';
+import { api, ApiError, formatIqd } from '../lib/api';
+import { RefreshCw, Users, Inbox, MessageSquare, CreditCard, Rocket } from 'lucide-react';
 import { Overlay } from './ui/Overlay';
 import { tierLabel, tierMetaFor } from './subscription/tierMeta';
+/**
+ * THE MEMBER DETAIL IS A WINDOW NOW, AND IT LIVES IN ./adminMemberships/.
+ *
+ * «أما البند الذي لم ينجز شاشة الأعضاء القديمة انقل هذا أيضا» — the owner
+ * asked for the users table's pop-up treatment here too. What used to be a
+ * `MemberDetail` block rendered under the table, five hundred lines down this
+ * file, is now `MemberDetailModal`: the same `Overlay`, the same focus trap and
+ * the same `Section`/`Row`/`Stat`/`Pill` hierarchy the users table already
+ * uses, so the panel behaves identically whichever table an admin opened a
+ * member from. The strings, the shared shapes and the two write actions moved
+ * with it; nothing here reads them any more except the table itself.
+ */
+import MemberDetailModal from './adminMemberships/MemberDetailModal';
+import { STRINGS, shortDate, type S } from './adminMemberships/strings';
+import type { MemberRow } from './adminMemberships/types';
 
 /**
  * PRO-operations console (final-phase brief §10):
@@ -19,94 +34,6 @@ import { tierLabel, tierMetaFor } from './subscription/tierMeta';
  *  - the support-ticket queue with REAL priority-then-age ordering; age is
  *    shown prominently so ordinary customers are visibly not starved.
  */
-
-// ------------------------------------------------------------------- types
-
-interface MemberRow {
-  id: string;
-  email: string;
-  username: string | null;
-  name: string;
-  created_at: string;
-  tier: 'free' | 'plus' | 'pro' | 'prime';
-  membership_state: string;
-  expires_at: string | null;
-  kyc_state: string | null;
-  active_restrictions: number;
-  has_approved_address: boolean;
-}
-
-interface RestrictionCase {
-  id: string;
-  case_type: string;
-  kind: string;
-  state: 'active' | 'resolved';
-  reason: string;
-  evidence: string[];
-  benefit_flags: string[];
-  decision: 'pause' | 'revoke' | null;
-  decision_reason: string;
-  opened_by: string;
-  opened_at: string;
-  resolved_by: string | null;
-  resolved_at: string | null;
-}
-
-interface MemberDetailData {
-  user: { id: string; email: string; username: string | null; name: string; role: string; created_at: string };
-  tier_status: { tier: string; active: boolean; expires_at: string | null; pending_launch: { tier: string; duration_months: number } | null };
-  memberships: Array<{
-    id: string;
-    plan_id: string;
-    tier: string;
-    state: string;
-    duration_months: number;
-    price_paid_iqd: number;
-    purchased_at: string;
-    starts_at: string | null;
-    expires_at: string | null;
-    source: string;
-  }>;
-  kyc_cases: Array<{
-    id: string;
-    case_type: string;
-    doc_type: string | null;
-    state: string;
-    reason: string;
-    submitted_at: string | null;
-    decided_at: string | null;
-    created_at: string;
-  }>;
-  benefit_context: {
-    tier: string;
-    tier_active: boolean;
-    gated_benefit_flags: string[];
-    restrictable_benefits: readonly string[];
-    note: string;
-  };
-  approved_addresses: Array<{
-    id: string;
-    version: number;
-    state: string;
-    name: string;
-    address: string;
-    landmark: string;
-    requested_at: string;
-    approved_at: string | null;
-  }>;
-  debt: {
-    bnpl_enabled: boolean;
-    eligible: boolean;
-    eligibility_reason: string | null;
-    available_iqd: number;
-    account_state: string;
-    credit_limit_iqd: number;
-    outstanding_iqd: number;
-    ledger: Array<{ id: string; kind: string; amount_iqd: number; due_at: string | null; created_at: string }>;
-  };
-  restriction_cases: RestrictionCase[];
-  support_ticket_count: number;
-}
 
 interface AdminTicket {
   id: string;
@@ -129,341 +56,12 @@ interface TicketMsg {
   created_at: string;
 }
 
-// ----------------------------------------------------------------- strings
-
-const STRINGS = {
-  ar: {
-    tabMembers: 'الأعضاء',
-    tabQueue: 'قائمة الدعم',
-    searchPlaceholder: 'بحث بالبريد/الاسم/اسم المستخدم...',
-    fTier: 'الفئة',
-    fStatus: 'حالة الاشتراك',
-    fKyc: 'حالة الهوية',
-    fRestriction: 'القيود',
-    fExpiry: 'ينتهي خلال',
-    all: 'الكل',
-    days: 'يوم',
-    colMember: 'العضو',
-    colTier: 'الفئة',
-    colState: 'الاشتراك',
-    colExpiry: 'الانتهاء',
-    colKyc: 'الهوية',
-    colRestr: 'قيود',
-    colAddr: 'عنوان معتمد',
-    yes: 'نعم',
-    no: 'لا',
-    none: 'لا يوجد',
-    loading: 'جارٍ التحميل...',
-    empty: 'لا نتائج',
-    loadError: 'تعذر التحميل',
-    retry: 'إعادة المحاولة',
-    detailTitle: 'تفاصيل العضو',
-    secSubscription: 'الاشتراك (الدفع والمدة)',
-    secIdentity: 'حالة الهوية (KYC)',
-    secBenefits: 'سياق أهلية المزايا',
-    secAddresses: 'العنوان المعتمد',
-    secDebt: 'الديون (الشراء الآن والدفع لاحقًا)',
-    secRestrictions: 'قضايا القيود',
-    bnplStatus: 'BNPL فعّال حصريًا لأعضاء PRO المستوفين. سجل الدين غير قابل للتعديل؛ إدارة السقف والحالة مدققة أدناه.',
-    eligible: 'مؤهل الآن',
-    ineligible: 'غير مؤهل',
-    available: 'المتاح',
-    approveBnpl: 'اعتماد / تحديث السقف',
-    suspendBnpl: 'تعليق BNPL',
-    limitPlaceholder: 'السقف بالدينار',
-    bnplSaved: 'تم تحديث حساب BNPL',
-    outstanding: 'الرصيد المستحق',
-    creditLimit: 'السقف',
-    accountState: 'حالة الحساب',
-    noLedger: 'لا توجد حركات',
-    kycNone: 'لا توجد قضايا هوية',
-    kycNote: 'تُعرض الحالات فقط — أدلة الهوية المشفّرة تُفتح حصريًا من واجهة مراجعة KYC المخصصة.',
-    benefitActive: 'مزايا سارية',
-    benefitGated: 'مزايا مقيّدة حاليًا',
-    benefitNoneGated: 'لا قيود فعالة على المزايا',
-    benefitNote:
-      'القيود تقيّد احتساب المزايا فقط — لا تحذف طلبات أو محفظة أو نقاطًا ولا تمنع الضمان أو الدعم. اختيار عنوان بديل حالة لكل طلب وليس عقوبة.',
-    gatingScopeNote:
-      'التقييد نافذ عبر طبقة الاستحقاقات المركزية في الدفع والشحن والمجتمع والمتجر والدعم.',
-    addrNone: 'لا يوجد عنوان معتمد',
-    subsNone: 'لا اشتراكات',
-    openCase: 'فتح قضية قيد',
-    caseType: 'نوع القضية',
-    ct_dropshipping_suspected: 'اشتباه دروبشيبينغ',
-    ct_repeated_refusal: 'رفض استلام متكرر',
-    ct_abuse: 'إساءة استخدام',
-    ct_debt: 'دين غير مسدد',
-    evidence: 'الأدلة (نص)',
-    reason: 'السبب',
-    decision: 'القرار',
-    d_pause: 'إيقاف مؤقت',
-    d_revoke: 'سحب حتى القرار',
-    flags: 'المزايا المقيّدة',
-    submitCase: 'فتح القضية',
-    creating: 'جارٍ الحفظ...',
-    resume: 'استئناف المزايا (حل القضية)',
-    resumeReason: 'سبب الاستئناف:',
-    active: 'فعالة',
-    resolved: 'محلولة',
-    openedAt: 'فُتحت',
-    resolvedAt: 'حُلّت',
-    caseNone: 'لا قضايا',
-    required: 'هذا الحقل مطلوب',
-    selectFlag: 'اختر ميزة واحدة على الأقل',
-    close: 'إغلاق',
-    // queue
-    queueTitle: 'قائمة تذاكر الدعم (أولوية PRO ثم الأقدمية — العمر ظاهر دائمًا)',
-    qState: 'الحالة',
-    unresolved: 'غير المحلولة',
-    colTicket: 'التذكرة',
-    colCustomer: 'العميل',
-    colPriority: 'الأولوية',
-    colAge: 'العمر',
-    colMsgs: 'رسائل',
-    proBadge: 'PRO',
-    ordinary: 'عادي',
-    stateOpen: 'مفتوحة',
-    stateWaitingCustomer: 'بانتظار العميل',
-    stateWaitingStaff: 'بانتظار الفريق',
-    stateResolved: 'محلولة',
-    replyPlaceholder: 'رد الفريق...',
-    reply: 'إرسال الرد',
-    moveTo: 'نقل إلى...',
-    customer: 'العميل',
-    staffLabel: 'الفريق',
-    ticketsEmpty: 'لا تذاكر',
-  },
-  en: {
-    tabMembers: 'Members',
-    tabQueue: 'Support queue',
-    searchPlaceholder: 'Search email/name/username...',
-    fTier: 'Tier',
-    fStatus: 'Membership',
-    fKyc: 'KYC',
-    fRestriction: 'Restrictions',
-    fExpiry: 'Expires within',
-    all: 'All',
-    days: 'days',
-    colMember: 'Member',
-    colTier: 'Tier',
-    colState: 'Membership',
-    colExpiry: 'Expires',
-    colKyc: 'KYC',
-    colRestr: 'Restr.',
-    colAddr: 'Appr. address',
-    yes: 'Yes',
-    no: 'No',
-    none: 'None',
-    loading: 'Loading...',
-    empty: 'No results',
-    loadError: 'Failed to load',
-    retry: 'Retry',
-    detailTitle: 'Member detail',
-    secSubscription: 'Subscription (payment & term)',
-    secIdentity: 'Identity status (KYC)',
-    secBenefits: 'Benefit eligibility context',
-    secAddresses: 'Approved address',
-    secDebt: 'Debt (Buy Now Pay Later)',
-    secRestrictions: 'Restriction cases',
-    bnplStatus: 'BNPL is active exclusively for eligible PRO members. Debt entries are immutable; audited limit/state controls are below.',
-    eligible: 'Eligible now',
-    ineligible: 'Not eligible',
-    available: 'Available',
-    approveBnpl: 'Approve / update limit',
-    suspendBnpl: 'Suspend BNPL',
-    limitPlaceholder: 'Credit limit (IQD)',
-    bnplSaved: 'BNPL account updated',
-    outstanding: 'Outstanding',
-    creditLimit: 'Limit',
-    accountState: 'Account state',
-    noLedger: 'No ledger entries',
-    kycNone: 'No identity cases',
-    kycNote: 'States only — encrypted identity evidence opens exclusively in the dedicated KYC review surface.',
-    benefitActive: 'Active benefits basis',
-    benefitGated: 'Currently gated benefits',
-    benefitNoneGated: 'No active benefit restrictions',
-    benefitNote:
-      'Restrictions gate benefit computation ONLY — they never delete orders, wallet or points, and never block warranty or support access. Choosing an alternate address is a per-order condition, not a sanction.',
-    gatingScopeNote:
-      'Gating is enforced through the canonical entitlement layer across checkout, shipping, Community, stores and support.',
-    addrNone: 'No approved address',
-    subsNone: 'No memberships',
-    openCase: 'Open restriction case',
-    caseType: 'Case type',
-    ct_dropshipping_suspected: 'Suspected dropshipping',
-    ct_repeated_refusal: 'Repeated delivery refusal',
-    ct_abuse: 'Abuse',
-    ct_debt: 'Unpaid debt',
-    evidence: 'Evidence (text)',
-    reason: 'Reason',
-    decision: 'Decision',
-    d_pause: 'Pause (temporary)',
-    d_revoke: 'Revoke until resolved',
-    flags: 'Gated benefits',
-    submitCase: 'Open case',
-    creating: 'Saving...',
-    resume: 'Resume benefits (resolve case)',
-    resumeReason: 'Resume reason:',
-    active: 'Active',
-    resolved: 'Resolved',
-    openedAt: 'Opened',
-    resolvedAt: 'Resolved',
-    caseNone: 'No cases',
-    required: 'This field is required',
-    selectFlag: 'Select at least one benefit',
-    close: 'Close',
-    queueTitle: 'Support ticket queue (PRO priority then age — age always visible)',
-    qState: 'State',
-    unresolved: 'Unresolved',
-    colTicket: 'Ticket',
-    colCustomer: 'Customer',
-    colPriority: 'Priority',
-    colAge: 'Age',
-    colMsgs: 'Msgs',
-    proBadge: 'PRO',
-    ordinary: 'Ordinary',
-    stateOpen: 'Open',
-    stateWaitingCustomer: 'Waiting customer',
-    stateWaitingStaff: 'Waiting staff',
-    stateResolved: 'Resolved',
-    replyPlaceholder: 'Staff reply...',
-    reply: 'Send reply',
-    moveTo: 'Move to...',
-    customer: 'Customer',
-    staffLabel: 'Staff',
-    ticketsEmpty: 'No tickets',
-  },
-  ckb: {
-    tabMembers: 'ئەندامان',
-    tabQueue: 'ڕیزی پشتگیری',
-    searchPlaceholder: 'گەڕان بە ئیمەیڵ/ناو...',
-    fTier: 'پلە',
-    fStatus: 'ئەندامێتی',
-    fKyc: 'KYC',
-    fRestriction: 'سنووردارکردن',
-    fExpiry: 'کۆتایی دێت لە ماوەی',
-    all: 'هەموو',
-    days: 'ڕۆژ',
-    colMember: 'ئەندام',
-    colTier: 'پلە',
-    colState: 'ئەندامێتی',
-    colExpiry: 'کۆتایی',
-    colKyc: 'KYC',
-    colRestr: 'سنوور',
-    colAddr: 'ناونیشانی پەسەند',
-    yes: 'بەڵێ',
-    no: 'نەخێر',
-    none: 'نییە',
-    loading: 'بارکردن...',
-    empty: 'هیچ ئەنجامێک نییە',
-    loadError: 'بارکردن سەرکەوتوو نەبوو',
-    retry: 'هەوڵدانەوە',
-    detailTitle: 'وردەکاری ئەندام',
-    secSubscription: 'ئەندامێتی (پارەدان و ماوە)',
-    secIdentity: 'دۆخی ناسنامە (KYC)',
-    secBenefits: 'سیاقی شایستەیی سوودەکان',
-    secAddresses: 'ناونیشانی پەسەندکراو',
-    secDebt: 'قەرز (BNPL)',
-    secRestrictions: 'کەیسەکانی سنووردارکردن',
-    bnplStatus: 'BNPL تەنها بۆ ئەندامی PRO ی گونجاو چالاکە. تۆماری قەرز ناگۆڕدرێت؛ سنوور و دۆخ لە خوارەوە بە پشکنینەوە بەڕێوەدەبرێت.',
-    eligible: 'ئێستا گونجاوە',
-    ineligible: 'گونجاو نییە',
-    available: 'بەردەست',
-    approveBnpl: 'پەسەندکردن / نوێکردنەوەی سنوور',
-    suspendBnpl: 'ڕاگرتنی BNPL',
-    limitPlaceholder: 'سنووری قەرز (IQD)',
-    bnplSaved: 'هەژماری BNPL نوێکرایەوە',
-    outstanding: 'ماوەی قەرز',
-    creditLimit: 'سنوور',
-    accountState: 'دۆخی هەژمار',
-    noLedger: 'هیچ تۆمارێک نییە',
-    kycNone: 'هیچ کەیسێکی ناسنامە نییە',
-    kycNote: 'تەنها دۆخەکان — بەڵگە شفرکراوەکانی ناسنامە تەنها لە ڕووکاری پێداچوونەوەی KYC دەکرێنەوە.',
-    benefitActive: 'بنەمای سوودە چالاکەکان',
-    benefitGated: 'سوودە سنووردارکراوەکان',
-    benefitNoneGated: 'هیچ سنوورێکی چالاک نییە لەسەر سوودەکان',
-    benefitNote:
-      'سنووردارکردنەکان تەنها ژماردنی سوودەکان دەگرنەوە — هەرگیز داواکاری، جزدان یان خاڵ ناسڕنەوە و گەرەنتی و پشتگیری ناگیرێت. هەڵبژاردنی ناونیشانی جیاواز مەرجی هەر داواکارییەکە، نەک سزا.',
-    gatingScopeNote:
-      'سنووردارکردن لە ڕێگەی توێژی ناوەندی سوودەکان لە پارەدان و گەیاندن و کۆمەڵگە و فرۆشگا و پشتگیری جێبەجێ دەکرێت.',
-    addrNone: 'ناونیشانی پەسەندکراو نییە',
-    subsNone: 'هیچ ئەندامێتییەک نییە',
-    openCase: 'کردنەوەی کەیسی سنووردارکردن',
-    caseType: 'جۆری کەیس',
-    ct_dropshipping_suspected: 'گومانی دڕۆپشیپینگ',
-    ct_repeated_refusal: 'ڕەتکردنەوەی دووبارەی وەرگرتن',
-    ct_abuse: 'بەکارهێنانی خراپ',
-    ct_debt: 'قەرزی نەدراوە',
-    evidence: 'بەڵگە (دەق)',
-    reason: 'هۆکار',
-    decision: 'بڕیار',
-    d_pause: 'ڕاگرتنی کاتی',
-    d_revoke: 'سەندنەوە تا چارەسەر',
-    flags: 'سوودە سنووردارکراوەکان',
-    submitCase: 'کردنەوەی کەیس',
-    creating: 'پاشەکەوتکردن...',
-    resume: 'گەڕاندنەوەی سوودەکان (چارەسەری کەیس)',
-    resumeReason: 'هۆکاری گەڕاندنەوە:',
-    active: 'چالاک',
-    resolved: 'چارەسەرکراوە',
-    openedAt: 'کرایەوە',
-    resolvedAt: 'چارەسەرکرا',
-    caseNone: 'هیچ کەیسێک نییە',
-    required: 'ئەم خانەیە پێویستە',
-    selectFlag: 'لانیکەم یەک سوود هەڵبژێرە',
-    close: 'داخستن',
-    queueTitle: 'ڕیزی تیکێتی پشتگیری (پێشینەیی PRO پاشان تەمەن — تەمەن هەمیشە دیارە)',
-    qState: 'دۆخ',
-    unresolved: 'چارەسەرنەکراوەکان',
-    colTicket: 'تیکێت',
-    colCustomer: 'کڕیار',
-    colPriority: 'پێشینەیی',
-    colAge: 'تەمەن',
-    colMsgs: 'پەیام',
-    proBadge: 'PRO',
-    ordinary: 'ئاسایی',
-    stateOpen: 'کراوەیە',
-    stateWaitingCustomer: 'چاوەڕوانی کڕیار',
-    stateWaitingStaff: 'چاوەڕوانی تیم',
-    stateResolved: 'چارەسەرکراوە',
-    replyPlaceholder: 'وەڵامی تیم...',
-    reply: 'ناردنی وەڵام',
-    moveTo: 'گواستنەوە بۆ...',
-    customer: 'کڕیار',
-    staffLabel: 'تیم',
-    ticketsEmpty: 'هیچ تیکێتێک نییە',
-  },
-};
-
-type S = (typeof STRINGS)['en'];
-
-const BENEFIT_LABELS: Record<string, { ar: string; en: string; ckb: string }> = {
-  proPricing: { ar: 'أسعار PRO', en: 'PRO prices', ckb: 'نرخەکانی PRO' },
-  freeDelivery: { ar: 'التوصيل المجاني', en: 'Free delivery', ckb: 'گەیاندنی بێبەرامبەر' },
-  noPreorderCommission: { ar: 'إعفاء عمولة الطلب المسبق', en: 'Preorder commission waiver', ckb: 'لێبوردنی کۆمیسیۆنی پێش-داواکاری' },
-  priorityService: { ar: 'أولوية الخدمة والدعم', en: 'Priority service/support', ckb: 'پێشینەیی خزمەتگوزاری/پشتگیری' },
-  proExclusive: { ar: 'عروض PRO الحصرية', en: 'PRO-exclusive offers', ckb: 'ئۆفەرە تایبەتەکانی PRO' },
-  merchantProfile: { ar: 'ملف التاجر', en: 'Merchant profile', ckb: 'پرۆفایلی بازرگان' },
-  exclusiveSections: { ar: 'الأقسام الحصرية', en: 'Exclusive sections', ckb: 'بەشە تایبەتەکان' },
-  verifiedMerchant: { ar: 'شارة التاجر PRO', en: 'PRO merchant badge', ckb: 'نیشانەی بازرگانی PRO' },
-  proMerchantBadge: { ar: 'شارة التاجر PRO', en: 'PRO merchant badge', ckb: 'نیشانەی بازرگانی PRO' },
-  exclusiveCoupons: { ar: 'كوبونات الأعضاء', en: 'Member coupons', ckb: 'کۆپۆنی ئەندامان' },
-};
-
-const CASE_TYPES = ['dropshipping_suspected', 'repeated_refusal', 'abuse', 'debt'] as const;
-
 const STATE_STYLES: Record<AdminTicket['state'], string> = {
   open: 'bg-blue-500/20 text-blue-300',
   waiting_customer: 'bg-amber-500/20 text-amber-300',
   waiting_staff: 'bg-purple-500/20 text-purple-300',
   resolved: 'bg-emerald-500/20 text-emerald-300',
 };
-
-function benefitLabel(flag: string, lang: 'ar' | 'en' | 'ckb'): string {
-  const l = BENEFIT_LABELS[flag];
-  if (!l) return flag;
-  return lang === 'en' ? l.en : lang === 'ckb' ? l.ckb : l.ar;
-}
 
 function ticketStateLabel(s: S, state: AdminTicket['state']): string {
   if (state === 'open') return s.stateOpen;
@@ -482,13 +80,6 @@ function ageOf(iso: string, s: S): string {
   return `${Math.floor(hours / 24)} ${s.days}`;
 }
 
-function shortDate(iso: string | null): string {
-  if (!iso) return '—';
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return '—';
-  return new Date(ms).toISOString().slice(0, 10);
-}
-
 // ============================================================ members list
 
 function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
@@ -502,6 +93,13 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
+  /**
+   * The control the window grew out of. `Overlay` scales the panel FROM this
+   * element and `useModalFocus` puts the caret back on it when the window
+   * closes, so the admin's eye and the keyboard both return to the row they
+   * pressed instead of to the top of a table that may be a hundred rows long.
+   */
+  const detailAnchorRef = useRef<HTMLElement | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -602,16 +200,40 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
             </thead>
             <tbody>
               {members.map((m) => (
-                <tr
-                  key={m.id}
-                  onClick={() => setSelected(m.id)}
-                  className="border-b border-zinc-800 hover:bg-zinc-800/30 transition-colors cursor-pointer"
-                >
+                <tr key={m.id} className="border-b border-zinc-800 hover:bg-zinc-800/30 transition-colors">
                   <td className="py-3 px-4">
-                    <div className="text-sm text-white font-bold">{m.name || m.username || '—'}</div>
-                    <div className="text-xs text-zinc-500">{m.email}</div>
+                    {/*
+                      PRESSING THE MEMBER IS WHAT OPENS THE PROFILE, so the
+                      member's identity is the control.
+
+                      A REAL <button>, and not an onClick on the <tr>. A
+                      clickable row is unreachable by keyboard and silent to a
+                      screen reader, so half the panel's operators would have no
+                      way into the profile at all — and there is no element for
+                      the window to grow out of or hand focus back to, which is
+                      the other half of what the owner asked for. `text-start`
+                      because this is a left-aligned block of text inside a
+                      control that centres by default, and `w-full` so the hit
+                      target is the cell rather than the width of the name.
+                    */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        detailAnchorRef.current = e.currentTarget;
+                        setSelected(m.id);
+                      }}
+                      aria-label={`${s.openMember}: ${m.name || m.username || m.email}`}
+                      className="-mx-2 w-full rounded-xl px-2 py-1 text-start transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/60"
+                    >
+                      <span dir="auto" className="block truncate text-sm font-bold leading-5 text-white">
+                        {m.name || m.username || '—'}
+                      </span>
+                      <span dir="auto" className="block truncate text-xs leading-4 text-zinc-500">
+                        {m.email}
+                      </span>
+                    </button>
                   </td>
-                  <td className="py-3 px-4 text-xs font-bold uppercase text-zinc-300">{m.tier}</td>
+                  <td className="py-3 px-4 text-xs font-bold uppercase text-zinc-300">{tierLabel(m.tier)}</td>
                   <td className="py-3 px-4 text-xs text-zinc-400">{m.membership_state}</td>
                   <td className="py-3 px-4 text-xs text-zinc-500 whitespace-nowrap">{shortDate(m.expires_at)}</td>
                   <td className="py-3 px-4 text-xs text-zinc-400">{m.kyc_state ?? '—'}</td>
@@ -646,622 +268,20 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
         </div>
       </div>
 
-      {selected && <MemberDetail userId={selected} s={s} lang={lang} onClose={() => setSelected(null)} onChanged={load} />}
-    </div>
-  );
-}
-
-// ============================================================ member detail
-
-function MemberDetail({
-  userId,
-  s,
-  lang,
-  onClose,
-  onChanged,
-}: {
-  userId: string;
-  s: S;
-  lang: 'ar' | 'en' | 'ckb';
-  onClose: () => void;
-  onChanged: () => void;
-}) {
-  const [data, setData] = useState<MemberDetailData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [showCaseForm, setShowCaseForm] = useState(false);
-  const [rowBusy, setRowBusy] = useState<string | null>(null);
-  const [rowError, setRowError] = useState('');
-  const [bnplLimit, setBnplLimit] = useState('');
-  const [bnplBusy, setBnplBusy] = useState(false);
-  const [bnplNote, setBnplNote] = useState<{ ok: boolean; text: string } | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const d = await api.get<{ member: MemberDetailData }>(`/api/support/admin/members/${userId}`);
-      setData(d.member);
-      setBnplLimit(String(d.member.debt.credit_limit_iqd || ''));
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : s.loadError);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, s.loadError]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  // Resuming a paused benefit asks for its reason in the house window (no
-  // browser prompt): the case is remembered while the window is open.
-  const [resumeTarget, setResumeTarget] = useState<RestrictionCase | null>(null);
-  const resumeCase = async (rc: RestrictionCase, reason: string) => {
-    setRowBusy(rc.id);
-    setRowError('');
-    try {
-      await api.patch(`/api/support/admin/restrictions/${rc.id}`, { action: 'resume', reason });
-      setResumeTarget(null);
-      await load();
-      onChanged();
-    } catch (e) {
-      setRowError(e instanceof ApiError ? e.message : s.loadError);
-    } finally {
-      setRowBusy(null);
-    }
-  };
-
-  const updateBnpl = async (state: 'approved' | 'suspended') => {
-    if (bnplBusy || !data) return;
-    const limit = Number(bnplLimit);
-    if (state === 'approved' && (!Number.isInteger(limit) || limit <= 0)) {
-      setBnplNote({ ok: false, text: s.limitPlaceholder });
-      return;
-    }
-    setBnplBusy(true);
-    setBnplNote(null);
-    try {
-      await api.put(`/api/memberships/admin/bnpl/${encodeURIComponent(userId)}`, {
-        state,
-        credit_limit_iqd: state === 'approved' ? limit : data.debt.credit_limit_iqd,
-      });
-      setBnplNote({ ok: true, text: s.bnplSaved });
-      await load();
-      onChanged();
-    } catch (e) {
-      setBnplNote({ ok: false, text: e instanceof ApiError ? e.message : s.loadError });
-    } finally {
-      setBnplBusy(false);
-    }
-  };
-
-  const sec = 'bg-zinc-900 border border-zinc-800 rounded-2xl p-4';
-  const secTitle = 'text-sm font-black text-white mb-2 flex items-center gap-2';
-
-  return (
-    <div className="bg-zinc-950 border border-zinc-700 rounded-2xl p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-white font-black">{s.detailTitle}</h3>
-        <button onClick={onClose} className="p-1.5 bg-zinc-800 rounded-lg text-zinc-400 hover:text-white">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="text-center py-8 text-zinc-500">{s.loading}</div>
-      ) : error || !data ? (
-        <div className="text-center py-8 text-red-400 text-sm">
-          {error || s.loadError}{' '}
-          <button onClick={load} className="underline">
-            {s.retry}
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="text-sm text-white font-bold">
-            {data.user.name || data.user.username || '—'} <span className="text-zinc-500 font-normal">{data.user.email}</span>
-          </div>
-
-          {/* subscription payment/term */}
-          <div className={sec}>
-            <div className={secTitle}>{s.secSubscription}</div>
-            <div className="text-xs text-zinc-400 mb-2">
-              {data.tier_status.tier.toUpperCase()} · {data.tier_status.active ? s.active : s.none} ·{' '}
-              {shortDate(data.tier_status.expires_at)}
-            </div>
-            {data.memberships.length === 0 ? (
-              <div className="text-xs text-zinc-600">{s.subsNone}</div>
-            ) : (
-              <div className="space-y-1">
-                {data.memberships.map((m) => (
-                  <div key={m.id} className="text-xs text-zinc-400 flex flex-wrap gap-x-3">
-                    <span className="font-bold text-zinc-300 uppercase">{m.tier}</span>
-                    <span>{m.state}</span>
-                    <span>{m.duration_months}mo</span>
-                    <span>{formatIqd(m.price_paid_iqd)}</span>
-                    <span>
-                      {shortDate(m.starts_at)} → {shortDate(m.expires_at)}
-                    </span>
-                    <span className="text-zinc-600">{m.source}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <GrantMembership userId={userId} onGranted={() => { load(); onChanged(); }} />
-          </div>
-
-          {/* identity */}
-          <div className={sec}>
-            <div className={secTitle}>{s.secIdentity}</div>
-            <p className="text-[11px] text-zinc-500 mb-2">{s.kycNote}</p>
-            {data.kyc_cases.length === 0 ? (
-              <div className="text-xs text-zinc-600">{s.kycNone}</div>
-            ) : (
-              <div className="space-y-1">
-                {data.kyc_cases.map((k) => (
-                  <div key={k.id} className="text-xs text-zinc-400 flex flex-wrap gap-x-3">
-                    <span className="font-bold text-zinc-300">{k.case_type}</span>
-                    <span className="uppercase">{k.state}</span>
-                    {k.doc_type && <span>{k.doc_type}</span>}
-                    <span className="text-zinc-600">{shortDate(k.submitted_at ?? k.created_at)}</span>
-                    {k.reason && <span className="text-zinc-500">{k.reason}</span>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* benefit context */}
-          <div className={sec}>
-            <div className={secTitle}>{s.secBenefits}</div>
-            <p className="text-[11px] text-zinc-500 mb-2">{s.benefitNote}</p>
-            <p className="text-[11px] text-amber-400/80 mb-2">{s.gatingScopeNote}</p>
-            <div className="text-xs text-zinc-400 mb-1">
-              {s.benefitActive}: <span className="text-zinc-300 font-bold uppercase">{data.benefit_context.tier}</span>{' '}
-              {data.benefit_context.tier_active ? `(${s.active})` : `(${s.none})`}
-            </div>
-            {data.benefit_context.gated_benefit_flags.length === 0 ? (
-              <div className="text-xs text-emerald-400">{s.benefitNoneGated}</div>
-            ) : (
-              <div className="flex flex-wrap gap-1.5 items-center">
-                <span className="text-xs text-zinc-500">{s.benefitGated}:</span>
-                {data.benefit_context.gated_benefit_flags.map((f) => (
-                  <span key={f} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300">
-                    {benefitLabel(f, lang)}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* approved address */}
-          <div className={sec}>
-            <div className={secTitle}>{s.secAddresses}</div>
-            {data.approved_addresses.length === 0 ? (
-              <div className="text-xs text-zinc-600">{s.addrNone}</div>
-            ) : (
-              <div className="space-y-1">
-                {data.approved_addresses.map((a) => (
-                  <div key={a.id} className="text-xs text-zinc-400 flex flex-wrap gap-x-3">
-                    <span className="font-bold text-zinc-300">v{a.version}</span>
-                    <span className="uppercase">{a.state}</span>
-                    <span className="break-words">{a.address}</span>
-                    <span className="text-zinc-600">{shortDate(a.approved_at ?? a.requested_at)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* BNPL credit line and immutable ledger */}
-          <div className={sec}>
-            <div className={secTitle}>{s.secDebt}</div>
-            <div className="text-[11px] text-zinc-500 mb-2">{s.bnplStatus}</div>
-            <div className="text-xs text-zinc-400 flex flex-wrap gap-x-4">
-              <span className={data.debt.eligible ? 'font-bold text-emerald-300' : 'font-bold text-amber-300'}>
-                {data.debt.eligible ? s.eligible : s.ineligible}
-                {!data.debt.eligible && data.debt.eligibility_reason ? ` · ${data.debt.eligibility_reason}` : ''}
-              </span>
-              <span>
-                {s.accountState}: <span className="text-zinc-300">{data.debt.account_state}</span>
-              </span>
-              <span>
-                {s.creditLimit}: <span className="text-zinc-300">{formatIqd(data.debt.credit_limit_iqd)}</span>
-              </span>
-              <span>
-                {s.outstanding}: <span className={data.debt.outstanding_iqd > 0 ? 'text-red-300 font-bold' : 'text-zinc-300'}>{formatIqd(data.debt.outstanding_iqd)}</span>
-              </span>
-              <span>
-                {s.available}: <span className="text-zinc-300">{formatIqd(data.debt.available_iqd)}</span>
-              </span>
-            </div>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                step={1000}
-                value={bnplLimit}
-                onChange={(e) => setBnplLimit(e.target.value)}
-                placeholder={s.limitPlaceholder}
-                aria-label={s.limitPlaceholder}
-                className="min-h-10 min-w-0 flex-1 rounded-xl border border-zinc-700 bg-black px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-gold/60"
-              />
-              <button type="button" disabled={bnplBusy} onClick={() => void updateBnpl('approved')} className="min-h-10 rounded-xl bg-gold px-3 text-xs font-black text-black disabled:opacity-50">
-                {s.approveBnpl}
-              </button>
-              <button type="button" disabled={bnplBusy || data.debt.account_state === 'suspended'} onClick={() => void updateBnpl('suspended')} className="min-h-10 rounded-xl border border-red-500/35 bg-red-500/10 px-3 text-xs font-bold text-red-300 disabled:opacity-50">
-                {s.suspendBnpl}
-              </button>
-            </div>
-            {bnplNote && <p role={bnplNote.ok ? 'status' : 'alert'} className={`mt-2 text-xs ${bnplNote.ok ? 'text-emerald-300' : 'text-red-300'}`}>{bnplNote.text}</p>}
-            {data.debt.ledger.length === 0 ? (
-              <div className="text-xs text-zinc-600 mt-2">{s.noLedger}</div>
-            ) : (
-              <div className="mt-2 space-y-1">
-                {data.debt.ledger.map((l) => (
-                  <div key={l.id} className="text-xs text-zinc-500 flex flex-wrap gap-x-3">
-                    <span className="text-zinc-400">{l.kind}</span>
-                    <span>{formatIqd(l.amount_iqd)}</span>
-                    {l.due_at && <span>→ {shortDate(l.due_at)}</span>}
-                    <span className="text-zinc-600">{shortDate(l.created_at)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* restriction cases */}
-          <div className={sec}>
-            <div className="flex items-center justify-between mb-2">
-              <div className={secTitle}>
-                <ShieldAlert className="w-4 h-4 text-red-400" />
-                {s.secRestrictions}
-              </div>
-              <button
-                onClick={() => setShowCaseForm((v) => !v)}
-                className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-bold hover:bg-red-500/20"
-              >
-                {s.openCase}
-              </button>
-            </div>
-
-            {showCaseForm && (
-              <RestrictionForm
-                userId={userId}
-                s={s}
-                lang={lang}
-                onDone={() => {
-                  setShowCaseForm(false);
-                  load();
-                  onChanged();
-                }}
-              />
-            )}
-
-            {rowError && <div className="text-xs text-red-400 mb-2">{rowError}</div>}
-            {data.restriction_cases.length === 0 ? (
-              <div className="text-xs text-zinc-600">{s.caseNone}</div>
-            ) : (
-              <div className="space-y-2">
-                {data.restriction_cases.map((rc) => (
-                  <div key={rc.id} className="bg-black border border-zinc-800 rounded-xl p-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-bold text-white">
-                        {(s as Record<string, unknown>)[`ct_${rc.case_type}`] as string || rc.case_type}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          rc.state === 'active' ? 'bg-red-500/20 text-red-300' : 'bg-emerald-500/20 text-emerald-300'
-                        }`}
-                      >
-                        {rc.state === 'active' ? s.active : s.resolved}
-                      </span>
-                      {rc.decision && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-300">
-                          {rc.decision === 'pause' ? s.d_pause : s.d_revoke}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-zinc-400 mt-1">{rc.reason}</div>
-                    {rc.evidence.length > 0 && (
-                      <div className="text-xs text-zinc-500 mt-1 whitespace-pre-wrap break-words">{rc.evidence.join('\n')}</div>
-                    )}
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      {rc.benefit_flags.map((f) => (
-                        <span key={f} className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400">
-                          {benefitLabel(f, lang)}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="text-[10px] text-zinc-600 mt-1.5">
-                      {s.openedAt}: {shortDate(rc.opened_at)}
-                      {rc.resolved_at && (
-                        <>
-                          {' '}
-                          · {s.resolvedAt}: {shortDate(rc.resolved_at)} — {rc.decision_reason}
-                        </>
-                      )}
-                    </div>
-                    {rc.state === 'active' && (
-                      <button
-                        type="button"
-                        onClick={() => setResumeTarget(rc)}
-                        disabled={rowBusy === rc.id}
-                        className="mt-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold hover:bg-emerald-500/20 disabled:opacity-50"
-                      >
-                        {rowBusy === rc.id ? s.creating : s.resume}
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-      <ReasonWindow
-        open={!!resumeTarget}
-        busy={!!resumeTarget && rowBusy === resumeTarget.id}
-        title={s.resume}
-        body={s.resumeReason}
-        confirmLabel={s.resume}
-        error={rowError}
-        onClose={() => setResumeTarget(null)}
-        onConfirm={(reason) => {
-          if (resumeTarget) void resumeCase(resumeTarget, reason);
-        }}
+      {/*
+        THE PROFILE WINDOW. Mounted UNCONDITIONALLY and driven by `selected`,
+        so it owns its own exit animation instead of being torn out of the DOM
+        mid-flight — `{selected && <MemberDetail …>}` is exactly the shape that
+        made the old block appear from nowhere and vanish to nowhere.
+      */}
+      <MemberDetailModal
+        userId={selected}
+        anchorRef={detailAnchorRef}
+        s={s}
+        lang={lang}
+        onClose={() => setSelected(null)}
+        onChanged={load}
       />
-    </div>
-  );
-}
-
-/**
- * Give an account a membership without a payment.
- *
- * The schema has allowed `source = 'admin'` since the beginning and nothing
- * ever wrote one, so until now the only way to hold PLUS was to buy it. That
- * left an admin unable to comp a member whose payment failed, restore a
- * subscription cancelled by mistake, or set up a merchant — without pushing
- * real money through a real wallet to do it.
- *
- * It is an ENTITLEMENT, not a transaction: `price_paid_iqd` is 0 and no
- * wallet row moves. A reason is required, because a membership somebody
- * cannot explain later is one that gets revoked by whoever asks loudest.
- */
-function GrantMembership({ userId, onGranted }: { userId: string; onGranted: () => void }) {
-  const { loc } = useLanguage();
-  const [plans, setPlans] = useState<Array<{ id: string; tier: string; duration_months: number; purchasable: boolean }>>([]);
-  const [planId, setPlanId] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [done, setDone] = useState('');
-
-  useEffect(() => {
-    api
-      .get<{ plans: Array<{ id: string; tier: string; duration_months: number; purchasable: boolean }> }>(
-        '/api/memberships/plans'
-      )
-      .then((d) => {
-        setPlans(d.plans);
-        // Default to the shortest PLUS term: a comp should be the smallest
-        // thing that solves the problem, not the largest.
-        const plus = d.plans.filter((p) => p.tier === 'plus').sort((a, b) => a.duration_months - b.duration_months);
-        setPlanId(plus[0]?.id ?? d.plans[0]?.id ?? '');
-      })
-      .catch(() => setPlans([]));
-  }, []);
-
-  // The reason is asked for in the house window, not a browser prompt.
-  const [askOpen, setAskOpen] = useState(false);
-  const grantBtnRef = useRef<HTMLButtonElement>(null);
-
-  async function grant(reason: string) {
-    setBusy(true);
-    setError('');
-    setDone('');
-    try {
-      const r = await api.post<{ replayed: boolean; tier?: string; active?: boolean; note?: string }>(
-        '/api/memberships/admin/grant',
-        { userId, planId, reason, idempotencyKey: newIdempotencyKey() }
-      );
-      setAskOpen(false);
-      setDone(
-        r.replayed
-          ? loc('هذا المنح مسجّل مسبقًا.', 'That grant was already recorded.', 'ئەم پێدانە پێشتر تۆمارکراوە.')
-          : r.note ?? loc('تم المنح.', 'Granted.', 'پێدرا.')
-      );
-      onGranted();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : loc('تعذّر المنح', 'Could not grant it', 'نەتوانرا بدرێت'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (!plans.length) return null;
-
-  return (
-    <div className="mt-3 pt-3 border-t border-zinc-800">
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={planId}
-          onChange={(e) => setPlanId(e.target.value)}
-          className="min-h-[34px] rounded-lg bg-zinc-800 border border-zinc-700 px-2 text-white text-xs outline-none"
-        >
-          {plans.map((p) => (
-            <option key={p.id} value={p.id} className="bg-zinc-900">
-              {p.tier.toUpperCase()} · {p.duration_months}mo
-            </option>
-          ))}
-        </select>
-        <button
-          ref={grantBtnRef}
-          type="button"
-          onClick={() => setAskOpen(true)}
-          disabled={busy || !planId}
-          className="min-h-[34px] px-3 rounded-lg bg-olive text-white text-xs font-bold disabled:opacity-40"
-        >
-          {busy
-            ? loc('جارٍ…', 'Working…', 'خەریکە…')
-            : loc('منح اشتراك بدون دفع', 'Grant without payment', 'بەخشینی بەشداری')}
-        </button>
-      </div>
-      <ReasonWindow
-        open={askOpen}
-        busy={busy}
-        anchor={grantBtnRef}
-        title={loc('منح اشتراك بدون دفع', 'Grant without payment', 'بەخشینی بەشداری')}
-        body={loc(
-          'سبب المنح مطلوب ويُسجَّل في سجل التدقيق. لا تُسجَّل أي حركة في المحفظة.',
-          'The reason for the grant is required and is kept in the audit log. No wallet movement is recorded.',
-          'هۆکاری پێدان پێویستە و لە تۆماری وردبینی هەڵدەگیرێت. هیچ جووڵەیەکی جزدان تۆمار ناکرێت.'
-        )}
-        confirmLabel={loc('منح', 'Grant', 'پێدان')}
-        error={error}
-        onClose={() => setAskOpen(false)}
-        onConfirm={(reason) => void grant(reason)}
-      />
-      <p className="text-[11px] text-zinc-600 mt-1.5">
-        {loc(
-          'منح صلاحية وليس عملية مالية — لا تُسجَّل أي حركة في المحفظة، والسبب يُحفظ في سجل التدقيق.',
-          'An entitlement, not a transaction — no wallet movement is recorded, and the reason is kept in the audit log.',
-          'مافێکە نەک کارێکی دارایی — هیچ جووڵەیەکی جزدان تۆمار ناکرێت.'
-        )}
-      </p>
-      {done && <p className="text-emerald-400 text-[11.5px] mt-1">{done}</p>}
-      {error && <p className="text-red-400 text-[11.5px] mt-1">{error}</p>}
-    </div>
-  );
-}
-
-function RestrictionForm({
-  userId,
-  s,
-  lang,
-  onDone,
-}: {
-  userId: string;
-  s: S;
-  lang: 'ar' | 'en' | 'ckb';
-  onDone: () => void;
-}) {
-  const [caseType, setCaseType] = useState<string>('dropshipping_suspected');
-  const [evidence, setEvidence] = useState('');
-  const [reason, setReason] = useState('');
-  const [decision, setDecision] = useState<'pause' | 'revoke'>('pause');
-  const [flags, setFlags] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  const toggleFlag = (f: string) => {
-    setFlags((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]));
-  };
-
-  const submit = async () => {
-    if (evidence.trim().length < 5 || reason.trim().length < 3) {
-      setError(s.required);
-      return;
-    }
-    if (flags.length === 0) {
-      setError(s.selectFlag);
-      return;
-    }
-    setBusy(true);
-    setError('');
-    try {
-      await api.post(`/api/support/admin/members/${userId}/restrictions`, {
-        case_type: caseType,
-        evidence: evidence.trim(),
-        reason: reason.trim(),
-        decision,
-        benefit_flags: flags,
-      });
-      onDone();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : s.loadError);
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="bg-black border border-red-500/20 rounded-xl p-3 mb-3 space-y-2">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <div>
-          <label className="text-[11px] text-zinc-500 block mb-1">{s.caseType}</label>
-          <div className="relative">
-            <select
-              value={caseType}
-              onChange={(e) => setCaseType(e.target.value)}
-              className="w-full appearance-none bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-2 text-xs text-white focus:outline-none"
-            >
-              {CASE_TYPES.map((ct) => (
-                <option key={ct} value={ct}>
-                  {(s as Record<string, unknown>)[`ct_${ct}`] as string}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-zinc-600 absolute top-2.5 ltr:right-2 rtl:left-2 pointer-events-none" />
-          </div>
-        </div>
-        <div>
-          <label className="text-[11px] text-zinc-500 block mb-1">{s.decision}</label>
-          <div className="relative">
-            <select
-              value={decision}
-              onChange={(e) => setDecision(e.target.value as 'pause' | 'revoke')}
-              className="w-full appearance-none bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-2 text-xs text-white focus:outline-none"
-            >
-              <option value="pause">{s.d_pause}</option>
-              <option value="revoke">{s.d_revoke}</option>
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-zinc-600 absolute top-2.5 ltr:right-2 rtl:left-2 pointer-events-none" />
-          </div>
-        </div>
-      </div>
-      <div>
-        <label className="text-[11px] text-zinc-500 block mb-1">{s.flags}</label>
-        <div className="flex flex-wrap gap-1.5">
-          {Object.keys(BENEFIT_LABELS).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => toggleFlag(f)}
-              className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
-                flags.includes(f)
-                  ? 'bg-red-500/20 border-red-500/40 text-red-300'
-                  : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              {benefitLabel(f, lang)}
-            </button>
-          ))}
-        </div>
-      </div>
-      <textarea
-        value={evidence}
-        onChange={(e) => setEvidence(e.target.value)}
-        rows={2}
-        maxLength={4000}
-        placeholder={s.evidence}
-        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none resize-none"
-      />
-      <input
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-        maxLength={1000}
-        placeholder={s.reason}
-        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none"
-      />
-      {error && <div className="text-xs text-red-400">{error}</div>}
-      <button
-        onClick={submit}
-        disabled={busy}
-        className="px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/40 text-red-200 text-xs font-black hover:bg-red-500/30 disabled:opacity-50"
-      >
-        {busy ? s.creating : s.submitCase}
-      </button>
     </div>
   );
 }
@@ -2024,96 +1044,5 @@ export default function AdminMemberships() {
         <PlansSection lang={lang} />
       )}
     </div>
-  );
-}
-
-/**
- * The house question window for an action that must carry a written reason
- * (a grant, resuming a paused benefit): title, body, a reason field with a
- * three-character floor, cancel and confirm. Replaces the browser prompt so
- * the reason is typed inside the page, in the reader's language, with the
- * server's refusal shown in place.
- */
-function ReasonWindow({
-  open,
-  busy,
-  anchor,
-  title,
-  body,
-  confirmLabel,
-  error,
-  onClose,
-  onConfirm,
-}: {
-  open: boolean;
-  busy: boolean;
-  anchor?: React.RefObject<HTMLElement | null>;
-  title: string;
-  body: string;
-  confirmLabel: string;
-  error?: string;
-  onClose: () => void;
-  onConfirm: (reason: string) => void;
-}) {
-  const { loc } = useLanguage();
-  const [reason, setReason] = useState('');
-  useEffect(() => {
-    if (open) setReason('');
-  }, [open]);
-  const ready = reason.trim().length >= 3 && !busy;
-  const titleId = 'reason-window-title';
-  return (
-    <Overlay
-      open={open}
-      onClose={() => {
-        if (!busy) onClose();
-      }}
-      labelledBy={titleId}
-      label={title}
-      anchor={anchor}
-      dismissOnEscape={!busy}
-      dismissOnScrim={!busy}
-      panelClassName="w-full max-w-md"
-    >
-      <div className="p-5 sm:p-6">
-        <h2 id={titleId} className="text-white font-bold text-lg">
-          {title}
-        </h2>
-        <p className="text-zinc-300 text-sm mt-2 leading-relaxed">{body}</p>
-        <label className="block mt-4">
-          <span className="block text-xs text-zinc-400 mb-1">{loc('السبب (٣ محارف على الأقل)', 'Reason (at least 3 characters)', 'هۆکار (لانیکەم ٣ پیت)')}</span>
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={3}
-            disabled={busy}
-            className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-white text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
-          />
-        </label>
-        {error && (
-          <p className="text-red-400 text-[12px] mt-2" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="flex justify-end gap-2 mt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={busy}
-            className="min-h-[40px] px-4 rounded-xl bg-zinc-800 text-zinc-200 text-sm font-bold disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
-          >
-            {loc('إلغاء', 'Cancel', 'پاشگەزبوونەوە')}
-          </button>
-          <button
-            type="button"
-            onClick={() => ready && onConfirm(reason.trim())}
-            disabled={!ready}
-            className="min-h-[40px] px-4 rounded-xl bg-olive text-white text-sm font-bold disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
-          >
-            {busy ? loc('جارٍ…', 'Working…', 'خەریکە…') : confirmLabel}
-          </button>
-        </div>
-      </div>
-    </Overlay>
   );
 }

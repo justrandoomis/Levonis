@@ -67,6 +67,7 @@ import {
   type SectionRef,
 } from '../lib/templateFamilies';
 import { compareProducts, type CompareResult } from '../lib/compareSpecs';
+import { adviseFromSpecs, type PowerAdvice } from '../lib/powerAdvice';
 
 export const compareRoutes = new Hono<AppContext>();
 
@@ -291,6 +292,35 @@ export function place(row: ProductRow, tax: Taxonomy): Placed {
   };
 }
 
+/**
+ * «كم تستهلك الطابعة من كهرباء في العراق على 220 فولت … بالأمبيرية وكم تحتاج
+ * من الـ UPS» — THE POWER ANSWER, ONE PER COLUMN.
+ *
+ * NOT A COMPARISON ROW, AND THAT IS THE POINT. The wattages themselves ARE
+ * comparison rows already: they are ordinary template fields, so
+ * `compareSpecs` picks them up, gives them their trilingual label and their
+ * unit and shows them under «الكهرباء والبيئة» with no code here at all — the
+ * rule this file's header states, that the comparison owns no definition of
+ * what a spec is. What `compareSpecs` cannot do is DIVIDE: it ranks values, it
+ * does not turn 350 W into 1.77 A and a 1 kVA UPS. That arithmetic lives in
+ * worker/lib/powerAdvice.ts, which is pure, and this is the one line that
+ * feeds it the sheet.
+ *
+ * ORDERED POINTS, NOT A SECOND TABLE — «لا يتم وضعها بشكل جداول وهوسه
+ * وخربطه». `advice.points` is a numbered list of sentences in all three
+ * languages, and `advice.assumptions` carries the figures those sentences were
+ * built from, so the page can show the reader the arithmetic instead of asking
+ * them to trust it.
+ *
+ * `known: false` FOR A PRINTER NOBODY ENTERED WATTS FOR, with no points at
+ * all. A power section assembled out of «غير مذكور» reads as a statement about
+ * the machine when it is a statement about our own data entry — the same D1
+ * rule compareSpecs applies to every other missing value.
+ */
+export function powerOf(p: Placed): PowerAdvice {
+  return adviseFromSpecs(p.specs);
+}
+
 export function cardOf(p: Placed): CompareProductCard {
   const leaf = p.branch[0];
   return {
@@ -422,7 +452,21 @@ compareRoutes.get('/', async (c) => {
   }
 
   const cards = placed.map(cardOf);
-  if (placed.length < 2) return c.json({ success: true, products: cards, comparison: null });
+  /**
+   * ALIGNED WITH `products`, INDEX FOR INDEX, and emitted for a single column
+   * too. The product page opens «قارن» with one machine already in place and
+   * the other slot empty; the mains question is exactly as real then as it is
+   * with two columns, and a customer who never adds a second printer still
+   * deserves to be told what his one printer draws and what UPS carries it.
+   *
+   * A SEPARATE KEY RATHER THAN A FIELD ON THE CARD. `CompareProductCard` is
+   * also what `/candidates` and the support assistant's second-slot picker
+   * return — up to `CANDIDATE_POOL` of them per request — and hanging the
+   * advice off the card would compute a UPS sizing for twelve machines nobody
+   * asked about, on a public, rate-limited route.
+   */
+  const power = placed.map(powerOf);
+  if (placed.length < 2) return c.json({ success: true, products: cards, power, comparison: null });
 
   const comparison: CompareResult = compareProducts({
     products: placed.map((p) => ({
@@ -434,7 +478,7 @@ compareRoutes.get('/', async (c) => {
     })),
   });
 
-  return c.json({ success: true, products: cards, comparison });
+  return c.json({ success: true, products: cards, power, comparison });
 });
 
 // ------------------------------------------------------------- the second slot

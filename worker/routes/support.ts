@@ -52,6 +52,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { getBalances } from '../lib/wallet';
 import { ENTITLEMENT_MINIMUM_TIER, benefits, getTierStatus, type MembershipEntitlement } from '../lib/entitlements';
 import { bnplEligibility } from '../lib/bnpl';
+import { canViewFinancials } from '../lib/adminScope';
 import { coverageState, maskSerial } from '../lib/deviceOps';
 import { compareProducts, type CompareRow } from '../lib/compareSpecs';
 import {
@@ -60,6 +61,7 @@ import {
   hasAnySpec,
   loadCatalogs,
   place,
+  powerOf,
   rankCompareCandidates,
   taxonomy,
   type Placed,
@@ -130,6 +132,17 @@ const INTENTS = [
   'password_help',
   'product_search',
   'compare_products',
+  /**
+   * «كم تستهلك الطابعة من كهرباء … وكم أحتاج UPS» — ITS OWN INTENT.
+   *
+   * It could have hung off `compare_products`, and the power block does ride
+   * along on a comparison reply below. But the mains question is asked about
+   * ONE machine, usually before any comparison has been started, and an intent
+   * that can only answer it after a second printer has been chosen is an
+   * intent that does not answer it. The arithmetic is worker/lib/powerAdvice.ts
+   * — no second copy of it here, and no external call of any kind.
+   */
+  'power_usage',
   'policy_question',
   'open_ticket',
   'human_handoff',
@@ -172,6 +185,19 @@ const KEYWORDS: Record<Intent, string[]> = {
    * inflections.
    */
   compare_products: ['compare', 'comparison', ' vs ', 'مقارنة', 'قارن', 'الفرق بين', 'أيهما أفضل', 'ايهما افضل', 'بەراورد', 'جیاوازی نێوان'],
+  /**
+   * Deliberately NARROW. «كهرباء» alone would swallow every sentence about a
+   * power cut, a bill or a plug; the phrases here all name CONSUMPTION or a
+   * UPS. 'ups' carries no spaces because it is a word nobody types by
+   * accident in this shop, and «واط» / «امبير» are the units a customer
+   * actually asks in.
+   */
+  power_usage: [
+    'power consumption', 'how much power', 'watt', 'wattage', 'ups', 'kva', 'amps', 'amperage',
+    'كم تستهلك', 'شكد تستهلك', 'استهلاك الكهرباء', 'استهلاك الطاقة', 'كم واط', 'واط', 'امبير', 'أمبير',
+    'يو بي اس', 'الكهرباء تنقطع',
+    'چەند وزە', 'خەرجکردنی وزە', 'وات',
+  ],
   policy_question: ['policy', 'policies', 'terms', 'privacy', 'سياسة', 'سياسات', 'شروط', 'خصوصية', 'سیاسەت', 'مەرج'],
   open_ticket: ['ticket', 'complaint', 'تذكرة', 'شكوى', 'مشكلة', 'تیکێت', 'سکاڵا'],
   human_handoff: ['human', 'agent', 'staff', 'talk to', 'موظف', 'انسان', 'إنسان', 'تحدث', 'اتواصل', 'کارمەند', 'مرۆڤ'],
@@ -214,6 +240,11 @@ const T: Record<Locale, Record<string, string>> = {
     compare_lead: '{name} يتفوق في {wins} من {total} مواصفة حاسمة.',
     compare_tie: 'المنتجان متعادلان في المواصفات الحاسمة.',
     compare_open: 'فتح المقارنة الكاملة',
+    c_power: 'استهلاك الكهرباء وحجم الـ UPS',
+    power_need_product: 'أي طابعة تقصد؟ اكتب اسمها وأحسبلك استهلاكها وحجم الـ UPS.',
+    power_pick: 'أي واحدة تقصد؟',
+    power_none: 'ما لقيت هذا المنتج.',
+    power_unknown: 'استهلاك هذا المنتج غير مسجّل عندنا بعد، وما أريد أعطيك رقم مو مضبوط. راجعنا وننطيك الجواب.',
     c_policies: 'السياسات المنشورة',
     c_ticket: 'فتح تذكرة دعم',
     c_human: 'التحدث مع فريق ليفونيس',
@@ -300,6 +331,11 @@ const T: Record<Locale, Record<string, string>> = {
     compare_lead: '{name} leads on {wins} of {total} decisive specifications.',
     compare_tie: 'The two are level on the decisive specifications.',
     compare_open: 'Open the full comparison',
+    c_power: 'Power draw and UPS size',
+    power_need_product: 'Which printer do you mean? Name it and I will work out its draw and the UPS it needs.',
+    power_pick: 'Which one do you mean?',
+    power_none: 'I could not find that product.',
+    power_unknown: 'Its power draw is not recorded here yet, and I will not give you a number I cannot stand behind. Ask us and we will get it for you.',
     c_policies: 'Published policies',
     c_ticket: 'Open a support ticket',
     c_human: 'Talk to LEVONIS staff',
@@ -387,6 +423,11 @@ const T: Record<Locale, Record<string, string>> = {
     compare_lead: '{name} لە {wins} لە {total} تایبەتمەندی چارەنووسسازدا پێشەنگە.',
     compare_tie: 'هەردووکیان لە تایبەتمەندییە چارەنووسسازەکاندا یەکسانن.',
     compare_open: 'کردنەوەی بەراوردی تەواو',
+    c_power: 'ڕاکێشانی کارەبا و قەبارەی UPS',
+    power_need_product: 'کام پرینتەر مەبەستتە؟ ناوی بنووسە و ڕاکێشان و قەبارەی UPSی بۆ دەژمێرم.',
+    power_pick: 'کامیان مەبەستتە؟',
+    power_none: 'ئەو بەرهەمەم نەدۆزییەوە.',
+    power_unknown: 'ڕاکێشانی کارەبای ئەمە هێشتا لای ئێمە تۆمار نەکراوە، و ناتوانم ژمارەیەکت بدەمێ کە پشتی پێ نەبەستم. پەیوەندیمان پێوە بکە.',
     c_policies: 'سیاسەتە بڵاوکراوەکان',
     c_ticket: 'کردنەوەی تیکێتی پشتگیری',
     c_human: 'قسەکردن لەگەڵ ستافی ليڤۆنیس',
@@ -547,6 +588,7 @@ const MENU_ITEMS: Array<{ intent: Intent; labelKey: string }> = [
   { intent: 'password_help', labelKey: 'c_password' },
   { intent: 'product_search', labelKey: 'c_search' },
   { intent: 'compare_products', labelKey: 'c_compare' },
+  { intent: 'power_usage', labelKey: 'c_power' },
   { intent: 'policy_question', labelKey: 'c_policies' },
   { intent: 'open_ticket', labelKey: 'c_ticket' },
   { intent: 'human_handoff', labelKey: 'c_human' },
@@ -940,6 +982,92 @@ async function findComparable(db: D1Database, q: string, tax: ReturnType<typeof 
   return (results ?? []).map((row) => place(row, tax)).filter((p) => hasAnySpec(p.specs));
 }
 
+/**
+ * «كم تستهلك الطابعة من كهرباء … وكم أحتاج UPS» — ANSWERED FROM THE SAME
+ * ARITHMETIC THE COMPARISON PAGE USES, and from nothing else.
+ *
+ * `powerOf` is `compare.ts`'s own export, which calls
+ * worker/lib/powerAdvice.ts. There is no second formula here and there is no
+ * call of any kind out of this process: the module is pure, every sentence it
+ * returns is a literal, and the translation engine is never involved — «ممنوع
+ * استخدام AI أو Gemini أو OpenAI أو أي API توليدي للترجمة».
+ *
+ * WHAT IT REFUSES TO DO. When no wattage was ever entered, `advice.known` is
+ * false and this says so in the customer's own language rather than assembling
+ * a paragraph out of «غير مذكور». A confident «1 kVA يكفيك» derived from an
+ * empty form is the exact defect powerAdvice.ts's header is written about, and
+ * an assistant is the surface where a customer is most likely to act on it
+ * without checking.
+ */
+async function handlePowerUsage(
+  c: Context<AppContext>,
+  params: Record<string, unknown>,
+  freeText: string,
+  loc: Locale
+): Promise<AssistantReply> {
+  const db = c.env.DB;
+  const tax = taxonomy(await loadCatalogs(db));
+  const ids = compareIdsParam(params);
+
+  let target: Placed | null = null;
+  if (ids.length) {
+    const row = await db
+      .prepare(`SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products WHERE id = ? AND status = 'active'`)
+      .bind(ids[0])
+      .first<CompareProductRow>();
+    if (row) target = place(row, tax);
+  }
+
+  if (!target) {
+    const q = str(params.q, 'q', { max: 100, required: false }) || stripPowerWords(freeText);
+    if (q.length < 2) return { intent: 'power_usage', text: tr(loc, 'power_need_product') };
+    const matches = await findComparable(db, q, tax, 6);
+    if (matches.length === 0) return { intent: 'power_usage', text: tr(loc, 'power_none') };
+    // ONE MACHINE NAMED OR NONE. The same rule the comparison follows: an
+    // ambiguous match becomes choices, never a guess — and a guess here is a
+    // UPS recommendation for a printer the customer did not ask about.
+    if (matches.length > 1) {
+      return {
+        intent: 'power_usage',
+        text: tr(loc, 'power_pick'),
+        choices: matches.map((m) => ({
+          label: compareName(m, loc),
+          intent: 'power_usage' as const,
+          params: { ids: m.row.id },
+        })),
+      };
+    }
+    target = matches[0];
+  }
+
+  const advice = powerOf(target);
+  if (!advice.known || advice.points.length === 0) {
+    return { intent: 'power_usage', text: tr(loc, 'power_unknown') };
+  }
+
+  return {
+    intent: 'power_usage',
+    // The points IN ORDER and joined with newlines — the server already shaped
+    // them as ordered sentences, each carrying its own caveat, so nothing is
+    // reordered, summarised or pulled out as a bare figure here.
+    text: advice.points.map((pt) => pt.text[loc] || pt.text.ar).join('\n'),
+    links: [
+      {
+        label: tr(loc, 'compare_open'),
+        to: `/compare?ids=${encodeURIComponent(target.row.id)}`,
+      },
+    ],
+  };
+}
+
+/** The same shape as `stripCompareWords`, for the same reason: «كم تستهلك
+ *  الطابعة بامبو» must search for «الطابعة بامبو» and not for the question. */
+function stripPowerWords(text: string): string {
+  let out = text.toLowerCase();
+  for (const word of KEYWORDS.power_usage) out = out.split(word).join(' ');
+  return out.replace(/\s+/g, ' ').trim();
+}
+
 async function handleCompareProducts(
   c: Context<AppContext>,
   params: Record<string, unknown>,
@@ -1049,9 +1177,22 @@ async function handleCompareProducts(
         total: scored.length,
       });
 
+  /**
+   * AND THE MAINS ANSWER RIDES ALONG. A customer comparing two printers in
+   * Iraq is asking, among other things, which one he can keep running through
+   * the evening cut — so the power points are appended to the verdict rather
+   * than left for a second question. A column whose wattage nobody entered
+   * contributes nothing at all, which is the module's own rule.
+   */
+  const powerLines = placed.flatMap((p) => {
+    const advice = powerOf(p);
+    if (!advice.known || advice.points.length === 0) return [];
+    return [`${compareName(p, loc)}: ${advice.points.map((pt) => pt.text[loc] || pt.text.ar).join(' ')}`];
+  });
+
   return {
     intent: 'compare_products',
-    text,
+    text: powerLines.length ? `${text}\n\n${powerLines.join('\n')}` : text,
     table,
     // THE ONE LINK the owner asked for: the full comparison, one tap, with both
     // machines already placed so nothing has to be chosen twice.
@@ -1217,6 +1358,9 @@ supportRoutes.post('/assistant', async (c) => {
       break;
     case 'compare_products':
       reply = await handleCompareProducts(c, params, freeText, loc);
+      break;
+    case 'power_usage':
+      reply = await handlePowerUsage(c, params, freeText, loc);
       break;
     case 'policy_question':
       reply = await handlePolicyQuestion(c, params, loc);
@@ -1715,6 +1859,27 @@ function restrictionPublic(r: RestrictionRow) {
 supportRoutes.get('/admin/members/:userId', async (c) => {
   const userId = c.req.param('userId');
   const db = c.env.DB;
+  /**
+   * §11 IS AN AUTHORIZATION RULE, NOT A DISPLAY PREFERENCE.
+   *
+   *   «cost وجميع تفاصيل الربح متاحة فقط للمالك/الدور المالي. مساعد الأدمن
+   *    العادي لا يراها في API ولا في HTML ولا في export»
+   *
+   * This endpoint used to be mounted behind `requireAdmin` ALONE and shipped
+   * the BNPL credit limit, the outstanding debt, the available credit, every
+   * ledger amount and every membership's `price_paid_iqd` to any admin — an
+   * assistant included. Hiding those in the browser would have left every one
+   * of them in the devtools network tab, in a saved copy of the page and in
+   * any export, which is precisely what the rule's wording forbids.
+   *
+   * So the keys are OMITTED from the payload, exactly as the sibling profile
+   * does it (`GET /api/admin/users/:id/detail` returns `can_view_financials:
+   * false` with the whole `financial` key absent). The client is already
+   * written for that shape: src/components/adminMemberships/types.ts types
+   * every figure of money optional and the window's one `Money` call site
+   * renders «محجوب» where nothing arrived, so no screen changes here.
+   */
+  const financial = canViewFinancials(c.env, c.get('user'));
   const user = await db
     .prepare('SELECT id, email, username, name, role, created_at FROM users WHERE id = ?')
     .bind(userId)
@@ -1769,13 +1934,27 @@ supportRoutes.get('/admin/members/:userId', async (c) => {
   }
   const bnpl = await bnplEligibility(db, userId);
 
+  /** Drop one key rather than zero it: a 0 reads as a FACT («this member owes
+   *  nothing»), which is a worse answer than «محجوب» and one the screen cannot
+   *  tell apart from the truth. */
+  const withoutMoney = <T extends Record<string, unknown>>(row: T, ...keys: string[]): T => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(row)) if (!keys.includes(k)) out[k] = v;
+    return out as T;
+  };
+
   return c.json({
     success: true,
+    can_view_financials: financial,
     member: {
       user: { id: user.id, email: user.email, username: user.username, name: user.name, role: user.role, created_at: user.created_at },
-      // 1) Subscription payment/term — separate from everything else.
+      // 1) Subscription payment/term — separate from everything else. The TERM
+      // is operations; the PRICE PAID is revenue attributable to one account,
+      // which is the same class of fact as the lifetime value §11 withholds.
       tier_status: tierStatus,
-      memberships: memberships.results,
+      memberships: financial
+        ? memberships.results
+        : memberships.results.map((m) => withoutMoney(m, 'price_paid_iqd')),
       // 2) Identity status — states only, evidence stays in the KYC reviewer flow.
       kyc_cases: kycCases.results,
       // 3) Benefit-eligibility context: independent of login/data access.
@@ -1789,15 +1968,29 @@ supportRoutes.get('/admin/members/:userId', async (c) => {
       approved_addresses: addresses.results,
       // 4) Debt — the ledger is immutable here; approval lives on the audited
       // memberships admin endpoint.
+      //
+      // THE SPLIT IS THE POINT. Whether the line EXISTS and whether this member
+      // is ELIGIBLE are operational facts an assistant needs in order to answer
+      // a customer at all. The SIZE of the line, what is owed against it, what
+      // is left and every movement's amount are money.
       debt: {
         bnpl_enabled: benefits.bnpl(tierStatus),
         eligible: bnpl.eligible,
         eligibility_reason: bnpl.reason,
-        available_iqd: bnpl.available_iqd,
         account_state: bnplAccount?.state ?? 'none',
-        credit_limit_iqd: Number(bnplAccount?.credit_limit_iqd) || 0,
-        outstanding_iqd: Number(bnplSum?.outstanding) || 0,
-        ledger: bnplLedger.results,
+        ...(financial
+          ? {
+              available_iqd: bnpl.available_iqd,
+              credit_limit_iqd: Number(bnplAccount?.credit_limit_iqd) || 0,
+              outstanding_iqd: Number(bnplSum?.outstanding) || 0,
+              ledger: bnplLedger.results,
+            }
+          : {
+              // The ledger's KIND and DATE are operations and stay; only the
+              // amount goes, so an assistant can still see that a charge was
+              // made on the 3rd without seeing what it was for.
+              ledger: bnplLedger.results.map((r) => withoutMoney(r, 'amount_iqd')),
+            }),
       },
       // 5) Restriction cases.
       restriction_cases: restrictions.results.map(restrictionPublic),

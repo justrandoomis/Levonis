@@ -120,9 +120,55 @@ export interface CompareProductCard {
   graded: boolean;
 }
 
+/**
+ * ONE ORDERED POINT OF THE POWER ANSWER. Points, not a table: «لا يتم وضعها
+ * بشكل جداول وهوسه وخربطه». Mirrors `PowerPoint` in worker/lib/powerAdvice.ts.
+ */
+export interface PowerPoint {
+  id: string;
+  text: Trilingual;
+}
+
+/** An assumption the arithmetic rests on, shipped so the page can print the
+ *  working beside the answer rather than handing over an oracle. */
+export interface PowerAssumption {
+  id: string;
+  /** The value as the reader should see it — "220 V", "0.6", "50–80%". */
+  value: string;
+  text: Trilingual;
+}
+
+/**
+ * The mains answer for ONE column — «كم تستهلك الطابعة … وكم تحتاج من الـ UPS».
+ *
+ * Only the fields this page renders are copied, per the file header's rule: the
+ * server object also carries the per-reading watts and amps, the runtime table
+ * and the breaker figure, and the page draws none of them directly because
+ * every one of them is already a sentence in `points`, WITH its caveat
+ * attached. Picking a bare number off this object and rendering it without the
+ * sentence is precisely what the module's own comments forbid — a UPS size or
+ * an MCB rating with the caveat left behind in TypeScript.
+ *
+ * `known: false` means nobody entered a wattage. The page then renders NOTHING:
+ * a power section assembled out of «غير مذكور» reads as a statement about the
+ * machine, and it is a statement about our data entry.
+ */
+export interface PowerAdvice {
+  known: boolean;
+  points: PowerPoint[];
+  assumptions: PowerAssumption[];
+}
+
 export interface CompareResponse {
   success: true;
   products: CompareProductCard[];
+  /**
+   * The power advice, ALIGNED INDEX-FOR-INDEX with `products`, and present for
+   * a single column too — the mains question is worth answering about one
+   * machine. It is a top-level key rather than a field on the card because
+   * `CompareProductCard` is also what /candidates returns up to 120 of.
+   */
+  power?: PowerAdvice[];
   /** null for a single product: a comparison of one is not a comparison. */
   comparison: CompareResult | null;
 }

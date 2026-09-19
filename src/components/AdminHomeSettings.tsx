@@ -673,10 +673,35 @@ function SiteMediaSettings({ dir }: { dir: string }) {
         'box on the black page. The preview here is dark because that is what a shopper sees.',
     },
     {
+      /**
+       * TWO SENTENCES THAT STOPPED BEING TRUE, AND ONE THAT IS THE OPPOSITE OF
+       * WHAT THIS GROUP NEEDS.
+       *
+       * 1. «اتركها فارغة لإبقاء الأيقونة الحالية» was true while every service
+       *    slot had an EMPTY default. Every one of the eleven now seeds a real
+       *    object in worker/lib/siteMedia.ts, so clearing a slot restores the
+       *    seeded artwork rather than keeping whatever is on screen.
+       *
+       * 2. THE BACKGROUND RULE IS THE REVERSE OF THE BRAND-LOGO RULE ABOVE, and
+       *    the two sit side by side on one screen. A service tile composites
+       *    its icon with `mix-blend-screen`, and screen(0, b) = b exactly —
+       *    which is why a pure-black background disappears into the card. The
+       *    same blend has screen(white, b) = white, so an icon exported on a
+       *    WHITE background turns the tile into a solid white square. The
+       *    transparent-background warning next to this one is written for brand
+       *    marks, which are drawn normally; repeating it here would tell the
+       *    owner to do the one thing that breaks these.
+       */
       group: 'service',
       titleAr: 'أيقونات الخدمات', titleEn: 'Service icons',
-      noteAr: 'تستبدل الأيقونة المرسومة في شريط الخدمات. اتركها فارغة لإبقاء الأيقونة الحالية.',
-      noteEn: 'Replaces the drawn icon on the services rail. Leave empty to keep the current icon.',
+      noteAr:
+        'تستبدل الأيقونة المرسومة في شريط الخدمات. مسح الخانة يرجّعها للأيقونة الأصلية المرفوعة، مو يخليها فارغة. ' +
+        'مهم: صدّر أيقونة الخدمة بخلفية سوداء نقية (#000000) أو بشفافية حقيقية — البلاطة تدمج الصورة بطريقة تُخفي الأسود تماماً، ' +
+        'أما الخلفية البيضاء فتتحول إلى مربّع أبيض كامل.',
+      noteEn:
+        'Replaces the drawn icon on the services rail. Clearing a slot restores the seeded artwork, it does not leave it empty. ' +
+        'Important: export a service icon on a PURE BLACK background (#000000) or with real transparency — the tile blends the ' +
+        'image in a way that makes black vanish into the card, while a white background becomes a solid white square.',
     },
     {
       group: 'banner',

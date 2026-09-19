@@ -1503,6 +1503,57 @@ export interface SiteMediaEntry {
   custom: boolean;
 }
 
+/**
+ * A CATALOGUE CARD THAT CARRIES ITS GRADE.
+ *
+ * `ApiProduct` deliberately does not declare `condition`: the field is present
+ * only on a row the owner graded, and putting it on the base type would let
+ * every card in the shop read `p.condition` and get `undefined` for the
+ * hundreds of new products where the question does not apply. Until now the
+ * two consumers that DO care each wrote the same inline cast —
+ * `(p as ApiProduct & { condition?: ConditionEntry | null })` — which is a
+ * type assertion, not a check, repeated in more than one file. Naming it once
+ * is what stops the third copy from being written slightly differently.
+ *
+ * `condition_reference` is the NEW product's current price, computed by the
+ * server when it found an honest saving. It is not a compare-at price on this
+ * row and must never be rendered as one (see OpenBoxShelf's note): striking
+ * through it means "the new one costs this", not "this was cheaper before".
+ */
+export type GradedProduct = ApiProduct & {
+  condition?: import('./condition').ConditionEntry | null;
+  condition_reference?: { reference_iqd: number; saving_iqd: number };
+};
+
+/**
+ * THE SHOP'S GRADED STOCK — open box, used and refurbished.
+ *
+ * WHY THIS READS /api/home AND NOT A FILTER ON /api/products. There is no
+ * condition filter on the listing endpoint. `GET /api/products` accepts
+ * `search`, `category`, `type` and a bounded `limit`/`offset` and nothing
+ * else, so "every used printer in the catalogue" cannot be asked for: a client
+ * would have to page the WHOLE catalogue and sieve it, which means a page that
+ * says «لا توجد طابعات مستعملة» whenever the used units happen to sit past the
+ * pages it bothered to fetch. Answering "none" because we stopped looking is
+ * the one thing a stock page must never do.
+ *
+ * `GET /api/home` already runs the only server-side selection that exists on
+ * this concept — `WHERE status = 'active' AND condition_doc <> '{}'`, newest
+ * first — and publishes it as `open_box`. So this asks the server the question
+ * the server can actually answer, and the page states the shelf's limit in
+ * words rather than implying it has the whole catalogue. A real `condition`
+ * filter on /api/products is the proper fix and needs a Worker change.
+ *
+ * An empty array is an honest answer here, not a degraded one: the same
+ * predicate returns nothing on a database where migration 0085 has not landed,
+ * and the server treats that as "no graded stock yet" by design.
+ */
+export function fetchGradedStock(opts?: RequestOptions): Promise<GradedProduct[]> {
+  return api
+    .get<{ open_box?: GradedProduct[] }>('/api/home', opts)
+    .then((d) => (Array.isArray(d.open_box) ? d.open_box : []));
+}
+
 /** The string to show for `lang`, falling back to the first language the
  *  owner filled in. Mirrors pickText in worker/lib/homeContent.ts. */
 export function pickText(t: LocalizedText | undefined, lang: string): string {

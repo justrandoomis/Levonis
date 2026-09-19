@@ -39,6 +39,13 @@ export const IDENTITY_TERMS: readonly string[] = [
   // Arabic transliteration would be a word nobody searches for and nobody says.
   'klipper', 'marlin', 'reprapfirmware', 'bowden', 'bltouch',
   'hepa', 'pom', 'ptfe', 'dmd', 'corexy',
+  // THE POWER VOCABULARY WHERE THE WORD IS THE SAME IN EVERY LANGUAGE. An
+  // Iraqi buyer says «يو بي إس» out loud and writes UPS, and every unit on
+  // sale in Baghdad has «kVA» printed on the carton — an Arabic or Kurdish
+  // rendering of either would be a word nobody searches for and nobody says.
+  // Contrast «معامل القدرة» and «مدة التشغيل» in PHRASES below, which are real
+  // translations because they are real Arabic and real Sorani.
+  'ups', 'kva', 'va', 'pf', 'avr', 'pfc',
 ];
 
 /**
@@ -67,6 +74,30 @@ export const UNITS: Record<string, TermEntry> = {
   kw: { ar: 'كيلوواط', ckb: 'کیلۆوات' },
   v: { ar: 'فولت', ckb: 'ڤۆڵت' },
   a: { ar: 'أمبير', ckb: 'ئەمپێر' },
+  // THE SPELLED-OUT FORMS, recorded for the same reason `mm/s2` is: a spec
+  // sheet pasted from a vendor page says "350 Watts" and "220 Volts" at least
+  // as often as "350 W", and a unit this table does not recognise makes R3
+  // decline — which sends an ordinary measurement down a path that has no
+  // business reading it. The Arabic keeps the singular after the numeral, the
+  // way an Arabic spec sheet is actually written («350 واط», not «واطات»).
+  watt: { ar: 'واط', ckb: 'وات' },
+  watts: { ar: 'واط', ckb: 'وات' },
+  volt: { ar: 'فولت', ckb: 'ڤۆڵت' },
+  volts: { ar: 'فولت', ckb: 'ڤۆڵت' },
+  amp: { ar: 'أمبير', ckb: 'ئەمپێر' },
+  amps: { ar: 'أمبير', ckb: 'ئەمپێر' },
+  ampere: { ar: 'أمبير', ckb: 'ئەمپێر' },
+  amperes: { ar: 'أمبير', ckb: 'ئەمپێر' },
+  // THE UPS UNITS. kVA and VA stay Latin in all three languages — they are in
+  // IDENTITY_TERMS above for the same reason — and are recorded here as well
+  // so «1000 VA» reads as the measurement it is rather than an unknown token.
+  // Wh and Ah are what a battery is actually specified in, and they are the
+  // two numbers worker/lib/powerAdvice.ts has to assume when nobody states
+  // them.
+  kva: { ar: 'kVA', ckb: 'kVA' },
+  va: { ar: 'VA', ckb: 'VA' },
+  wh: { ar: 'واط·ساعة', ckb: 'وات·کاتژمێر' },
+  ah: { ar: 'أمبير·ساعة', ckb: 'ئەمپێر·کاتژمێر' },
   hz: { ar: 'هرتز', ckb: 'هێرتز' },
   khz: { ar: 'كيلوهرتز', ckb: 'کیلۆهێرتز' },
   db: { ar: 'ديسيبل', ckb: 'دێسیبڵ' },
@@ -158,7 +189,20 @@ export const PHRASES: Record<string, TermEntry> = {
   'power': { ar: 'الطاقة', ckb: 'وزە' },
   'power supply': { ar: 'مزود الطاقة', ckb: 'دابینکەری وزە' },
   'input voltage': { ar: 'جهد الدخل', ckb: 'ڤۆڵتاژی چوونەژوورەوە' },
-  'rated power': { ar: 'القدرة المقننة' },
+  // The Sorani was missing and the label is a TEMPLATE label now —
+  // templateFamilies.ts declares `rated_power` in «الكهرباء والبيئة» — so every
+  // printer would otherwise have carried a line flagged review_needed for
+  // Kurdish for ever. Recorded, not guessed: «وزە» is the word this file
+  // already uses for power.
+  //
+  // ONE FIELD, ONE ARABIC NAME. This entry read «القدرة المقننة» while
+  // templateFamilies.ts labels the very same field «القدرة القصوى» and
+  // powerAdvice.ts's READING_LABELS repeats «القدرة القصوى» — so a customer met
+  // two Arabic names for one number depending on which surface drew it, and
+  // «المقننة» (nominal) and «القصوى» (maximum) are not the same claim. The
+  // template label is the one the owner types against in the admin form, so
+  // the template label wins and this follows it.
+  'rated power': { ar: 'القدرة القصوى', ckb: 'وزەی ناوزەد' },
   'dimensions': { ar: 'الأبعاد', ckb: 'ڕەهەندەکان' },
   'product dimensions': { ar: 'أبعاد المنتج', ckb: 'ڕەهەندی بەرهەم' },
   'package dimensions': { ar: 'أبعاد العبوة', ckb: 'ڕەهەندی پاکێت' },
@@ -474,4 +518,54 @@ export const PHRASES: Record<string, TermEntry> = {
   'eu': { ar: 'الاتحاد الأوروبي', ckb: 'یەکێتی ئەوروپا' },
   'us': { ar: 'الولايات المتحدة', ckb: 'ئەمریکا' },
   'uk': { ar: 'المملكة المتحدة', ckb: 'بەریتانیا' },
+
+  // ------------------------------------------ mains, draw and UPS (Iraq)
+  //
+  // «كم تستهلك الطابعة من كهرباء في العراق على 220 فولت … بالأمبيرية وكم تحتاج
+  // من الـ UPS الأونلاين وما فرقه عن الأوفلاين». The template now asks for the
+  // wattages (templateFamilies.ts, «الكهرباء والبيئة») and
+  // worker/lib/powerAdvice.ts turns them into amps, a UPS rating and a runtime
+  // range. These are the LABELS those fields carry, so a Kurdish customer is
+  // not the one reader shown an English power section.
+  //
+  // THE FILE'S OWN DISTINCTION IS KEPT. `UPS`, `kVA` and `VA` are in
+  // IDENTITY_TERMS above because the word IS the English token in all three
+  // languages; everything below is a real translation because a real Arabic
+  // and a real Sorani word exists. «أونلاين» and «أوفلاين» are the words an
+  // Iraqi customer actually uses for the two topologies — the owner used them
+  // himself — so they are recorded as the Arabic rather than rendered as
+  // «التحويل المزدوج», which is the textbook term and not the shop term.
+  //
+  // A BARE «online» IS DELIBERATELY NOT HERE. It would reach «طلب online» and
+  // every other sentence in the shop that uses the word for the internet, and
+  // change a translation that is already correct. Only the whole phrases are
+  // recorded, which is what this file's header means by never composing a
+  // translation out of separate words.
+  'power factor': { ar: 'معامل القدرة', ckb: 'فاکتەری وزە' },
+  'power consumption': { ar: 'استهلاك الطاقة', ckb: 'خەرجکردنی وزە' },
+  'typical printing power': { ar: 'القدرة أثناء الطباعة', ckb: 'وزە لە کاتی چاپدا' },
+  'heated bed power': { ar: 'قدرة السرير الساخن', ckb: 'وزەی بێدی گەرم' },
+  'standby power': { ar: 'قدرة وضع الانتظار', ckb: 'وزە لە دۆخی چاوەڕوانیدا' },
+  'mains frequency': { ar: 'تردد الكهرباء', ckb: 'فرێکوێنسی کارەبا' },
+  // A BARE «standby» AND A BARE «frequency» ARE NOT HERE EITHER, for exactly
+  // the reason the note above gives for «online»: a single word reaches every
+  // sentence in the shop that happens to use it — a radio frequency, a report
+  // frequency, a device left on standby — and rewrites translations that are
+  // already correct. They were added a few lines after that argument was
+  // written, which is how a rule loses to its own example. Only the whole
+  // phrases are recorded.
+  'mains voltage': { ar: 'جهد الشبكة', ckb: 'ڤۆڵتاژی تۆڕ' },
+  'runtime': { ar: 'مدة التشغيل', ckb: 'ماوەی کارکردن' },
+  'backup time': { ar: 'مدة الاحتياطي', ckb: 'ماوەی یەدەگ' },
+  'transfer time': { ar: 'زمن التحويل', ckb: 'کاتی گۆڕینەوە' },
+  'uninterruptible power supply': { ar: 'مزوّد طاقة غير منقطع', ckb: 'دابینکەری وزەی نەپساوە' },
+  'online ups': { ar: 'UPS أونلاين', ckb: 'UPSی ئۆنلاین' },
+  'offline ups': { ar: 'UPS أوفلاين', ckb: 'UPSی ئۆفلاین' },
+  'line-interactive ups': { ar: 'UPS أوفلاين تفاعلي', ckb: 'UPSی ئۆفلاینی کارلێککەر' },
+  'line interactive': { ar: 'تفاعلي مع الخط', ckb: 'کارلێککەر لەگەڵ هێڵ' },
+  'line-interactive': { ar: 'تفاعلي مع الخط', ckb: 'کارلێککەر لەگەڵ هێڵ' },
+  'double conversion': { ar: 'تحويل مزدوج', ckb: 'گۆڕینی دووجارە' },
+  'battery backup': { ar: 'بطارية احتياطية', ckb: 'باتریی یەدەگ' },
+  'voltage regulator': { ar: 'منظّم جهد', ckb: 'ڕێکخەری ڤۆڵتاژ' },
+  'power cut': { ar: 'انقطاع الكهرباء', ckb: 'بڕانی کارەبا' },
 };

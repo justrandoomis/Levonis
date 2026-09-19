@@ -229,6 +229,18 @@ export const DEVICES: TemplateFamilyDef = {
           unit: '°C',
           compare: { parse: 'number', better: 'higher', weight: 2 },
         }),
+        /* FDM ONLY, AND THE LARGEST SINGLE LOAD IN THE MACHINE. A 220×220 bed
+           is 200–250 W and a 350×350 one can pass 600 W, which is most of what
+           the UPS has to carry and the reason the draw is not steady: the bed
+           switches on and off for the whole print. A resin printer has no
+           heated bed — its equivalent is `uv_power`, already asked for in the
+           resin group — so this field is declared here rather than in the
+           shared «الكهرباء والبيئة» group, where it could only ever be blank on
+           half the catalogue. Unscored, like every other consumption figure. */
+        t('heated_bed_power', 'قدرة السرير الساخن', 'Heated bed power', 'number', {
+          unit: 'W', compare: { parse: 'number', better: 'none' },
+          hint_ar: 'قدرة سخان السرير وحده — مثال: 250',
+        }),
         t('extruders', 'عدد الباثقات', 'Extruders', 'number', {
           compare: { parse: 'number', better: 'higher', weight: 1 },
         }),
@@ -402,6 +414,74 @@ export const DEVICES: TemplateFamilyDef = {
       fields: [
         t('input_voltage', 'جهد الدخل', 'Input voltage', 'text', {
           unit: 'V', compare: { parse: 'range', better: 'none' }, hint_ar: 'مثال: 100-240 أو 220 فقط',
+        }),
+        /*
+         * THE MAINS QUESTION, AND WHY IT IS ASKED OF EVERY MACHINE.
+         *
+         * «كم تستهلك الطابعة من كهرباء في العراق على 220 فولت … بالأمبيرية وكم
+         * تحتاج من الـ UPS». Iraq runs 220–230 V at 50 Hz and the grid fails
+         * daily; a buyer here is sizing a UPS before he has unboxed the
+         * printer. worker/lib/powerAdvice.ts turns these numbers into amps, a
+         * UPS rating in VA and a runtime range — but it can only do that from
+         * figures a human entered, so this group is where they are asked for.
+         *
+         * THEY LIVE IN «الكهرباء والبيئة», WHICH IS SHARED BY FDM AND RESIN,
+         * because the mains question is the same question for both: every
+         * machine has a nameplate, an average draw and an idle draw, and the
+         * UPS arithmetic is identical. What differs is WHERE the watts go, and
+         * that difference is asked one group down — the FDM template asks for
+         * the heated bed (its largest and most duty-cycled load) and the resin
+         * template already asks for `uv_power`, which is the resin equivalent.
+         * A resin printer has no heated bed, so asking it for one would put a
+         * column on the sheet that can only ever be blank.
+         *
+         * NOT ONE VALUE IS INVENTED HERE. These are FIELDS; the numbers come
+         * from the owner's data entry and from the import sheet. An empty field
+         * reads as unknown and powerAdvice returns `known: false` — a printer
+         * reported as drawing 0 W would size a UPS at nothing, which is the
+         * single defect that whole module is written to prevent.
+         *
+         * NONE OF THEM IS SCORED, and that is the file's own standing rule
+         * stated at the top: `power` is consumption, not a capability. 350 W
+         * does not beat 150 W — it is a line on the electricity bill and a
+         * bigger UPS, and a machine that draws more because it prints hotter
+         * and faster must not be marked down for it.
+         */
+        t('rated_power', 'القدرة القصوى', 'Rated power', 'number', {
+          unit: 'W', compare: { parse: 'number', better: 'none' },
+          hint_ar: 'الرقم المكتوب على لوحة الجهاز أو في المواصفات — مثال: 350. هذا الذي يُحسب عليه حجم الـ UPS',
+        }),
+        /* The average over a real print, which is far below the nameplate: the
+           bed and the hotend hold temperature rather than heating flat out.
+           Kept SEPARATE from the rated figure because the two answer different
+           questions — the rated watts size the UPS, this one decides how long
+           it holds. */
+        t('typical_print_power', 'القدرة أثناء الطباعة', 'Typical printing power', 'number', {
+          unit: 'W', compare: { parse: 'number', better: 'none' },
+          hint_ar: 'معدل السحب أثناء طبعة اعتيادية — مثال: 120',
+        }),
+        /* What the machine pulls doing nothing. In a country where the mains
+           come and go, the idle draw is what a UPS carries between prints. */
+        t('standby_power', 'قدرة وضع الانتظار', 'Standby power', 'number', {
+          unit: 'W', compare: { parse: 'number', better: 'none' },
+          hint_ar: 'السحب والجهاز واكف بلا طباعة — مثال: 12',
+        }),
+        /* Iraq is 50 Hz. A unit that accepts only 60 Hz is a real problem here,
+           and the answer belongs beside the voltage rather than buried in the
+           free-text «الطاقة» box. A range, because «50/60» is how it is quoted. */
+        t('input_frequency', 'تردد الكهرباء', 'Mains frequency', 'text', {
+          unit: 'Hz', compare: { parse: 'range', better: 'none' },
+          hint_ar: 'مثال: 50/60 — كهرباء العراق 50 هرتز',
+        }),
+        /* THE NUMBER THAT TURNS WATTS INTO AMPS: P = V × I × PF. Without it
+           powerAdvice assumes 0.9 and SAYS it assumed it; with it the amps are
+           the machine's own. Unscored deliberately — a higher power factor does
+           mean a smaller UPS, but two printers in twenty publish the figure at
+           all, and a verdict drawn from a field that is nearly always blank is
+           a verdict about our data entry. */
+        t('power_factor', 'معامل القدرة', 'Power factor', 'number', {
+          compare: { parse: 'number', better: 'none' },
+          hint_ar: 'بين 0 و1، إذا ذكرته الشركة — مثال: 0.95. اتركه فارغاً إذا غير مذكور',
         }),
         t('air_filtration', 'تنقية الهواء', 'Air filtration', 'select', {
           options: ['None', 'Activated carbon', 'HEPA', 'HEPA + activated carbon', 'External exhaust port', 'Optional add-on'], compare: { parse: 'text', better: 'none' }, hint_ar: 'مثال: Activated carbon — أو None إذا لا يوجد فلتر',

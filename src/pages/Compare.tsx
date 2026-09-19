@@ -18,6 +18,7 @@ import {
   type CompareLang,
   type CompareProductCard,
   type CompareResult,
+  type PowerAdvice,
 } from '../lib/compare';
 import { compareStrings } from '../components/compare/strings';
 import VerdictBand from '../components/compare/VerdictBand';
@@ -27,6 +28,7 @@ import PriceRow from '../components/compare/PriceRow';
 import SpecTable from '../components/compare/SpecTable';
 import CompareSlots from '../components/compare/CompareSlots';
 import ProductPicker, { CandidateGrid } from '../components/compare/ProductPicker';
+import PowerBlock from '../components/compare/PowerBlock';
 
 /**
  * «المقارنة» — THE PAGE.
@@ -100,6 +102,15 @@ export default function Compare() {
 
   const [products, setProducts] = useState<CompareProductCard[]>([]);
   const [comparison, setComparison] = useState<CompareResult | null>(null);
+  /**
+   * The mains answer per column, as GET /api/compare sends it: trilingual
+   * ordered points, aligned index-for-index with `products`, and present for a
+   * SINGLE column too — «كم تستهلك الطابعة» is worth answering about one
+   * machine. Held beside `comparison` rather than inside it because the server
+   * emits it beside the comparison for the same reason: it exists whether or
+   * not there is a second column to compare against.
+   */
+  const [power, setPower] = useState<PowerAdvice[] | undefined>(undefined);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
   /**
@@ -129,6 +140,7 @@ export default function Compare() {
     if (!idsKey) {
       setProducts([]);
       setComparison(null);
+      setPower(undefined);
       setError(null);
       return;
     }
@@ -138,6 +150,7 @@ export default function Compare() {
       .then((res) => {
         setProducts(res.products);
         setComparison(res.comparison);
+        setPower(res.power);
         setError(null);
       })
       .catch((err) => {
@@ -147,6 +160,7 @@ export default function Compare() {
         // the URL the visitor would then share.
         setProducts([]);
         setComparison(null);
+        setPower(undefined);
         setError(err);
       })
       .finally(() => {
@@ -355,6 +369,14 @@ export default function Compare() {
           <SpecTable products={products} result={comparison} />
         </>
       ) : null}
+
+      {/* THE MAINS ANSWER. Below the specs because it is a CONCLUSION drawn
+          from them — the wattage rows are in the table above — and outside the
+          `products.length >= 2` block on purpose: the question «كم تستهلك
+          وشقد UPS أحتاج» is worth answering about a single machine, which is
+          also the state a visitor arrives in from a product page. The block
+          renders nothing of its own accord when no column has a wattage. */}
+      {!error ? <PowerBlock products={products} power={power} /> : null}
 
       {!error && products.length >= 1 ? (
         <CompareSlots

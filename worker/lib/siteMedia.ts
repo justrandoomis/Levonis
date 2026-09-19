@@ -64,7 +64,19 @@ export interface SiteMediaSlot {
    * whatever the surface drew before".
    */
   defaultObject: string;
-  /** Where the storefront sends someone who taps it, for brand marks. */
+  /**
+   * Where the storefront sends someone who taps it.
+   *
+   * A router PATH (`/compare`, optionally with a query string) for everything
+   * that lives inside this application, and an absolute URL for the one card
+   * that does not — LEVO Studio runs on its own subdomain. Empty means the
+   * surface decides, which is still the case for the banner slots.
+   *
+   * This is not decoration for the admin list: tests/serviceSlots.test.ts
+   * resolves every service link against the route table in src/App.tsx and
+   * fails the build if one of them would 404. That check is the whole reason
+   * the destination is data here instead of a string buried in a component.
+   */
   link?: string;
 }
 
@@ -85,21 +97,79 @@ export const BRAND_SLOTS: readonly SiteMediaSlot[] = [
 ] as const;
 
 /**
- * One slot per card on the home services rail. `defaultObject` is empty for
- * all of them on purpose: until the owner uploads something, ServicesGrid
- * keeps drawing its lucide icon, which is a deliberate design and not a
- * placeholder. An upload turns that card into an image card.
+ * ONE SLOT PER CARD ON THE HOME SERVICES RAIL — ELEVEN, IN THE OWNER'S ORDER.
  *
- * The ids match ServicesGrid's `data-service` attributes exactly, so the
- * storefront looks a card's image up by the id it already has.
+ * WHY THESE NOW CARRY A DEFAULT AND A LINK, WHEN THEY CARRIED NEITHER.
+ *
+ * `defaultObject: ''` was correct for exactly as long as the bucket held no
+ * service artwork: an empty url means "keep drawing the lucide icon", which is
+ * a deliberate design and not a hole. The owner has since uploaded the marks
+ * to `UiUx/MainPage/` and named which belongs to which service, so the honest
+ * default is no longer "nothing" — it is the file that is actually there. A
+ * slot whose default stayed empty while its image sat in R2 would mean the
+ * owner has to re-upload, through the admin panel, a file already in the
+ * bucket, and would keep the rail looking unfinished until they did.
+ *
+ * THE CASE IS TRANSCRIBED FROM THE BUCKET, NOT GUESSED. `UiUx/MainPage/` has
+ * been spelled three ways across this codebase's history and an exact-match
+ * rule on the wrong one sent the site's own logo to the private bucket
+ * (worker/lib/mediaStorage.ts documents that live bug at length). The object
+ * NAMES inside the prefix get no such case-insensitive rescue — R2 keys are
+ * byte-exact — so `LevoStudio.webp` written as `Levostudio.webp` is a 404 and
+ * a broken tile. Every name below was read off a live listing of the prefix.
+ *
+ * `service-community` IS THE ONE EXCEPTION AND IT IS DELIBERATE. The owner's
+ * list names `Community.webp`, but that object is not in the bucket: a GET for
+ * it — and for every plausible re-spelling — answers 404 while its ten
+ * neighbours answer 200. The slot still carries the name the owner intends,
+ * because the moment the file is uploaded under it the card lights up with no
+ * code change; until then ServicesGrid's image `onError` falls back to the
+ * drawn icon, so a missing object costs a fallback rather than a broken image.
+ * Do not "fix" this by blanking the default — that would silently discard the
+ * owner's naming decision and make the upload a code change again.
+ *
+ * WHY A LINK LIVES HERE AT ALL. A service card's destination used to exist
+ * only inside ServicesGrid, so the admin list could show the owner an icon
+ * with no way to see, or check, where tapping it goes. The brand slots already
+ * carried `link` for the same reason. tests/serviceSlots.test.ts fails if any
+ * path below is not a route App.tsx actually serves — a list of links nobody
+ * verifies is how a storefront comes to promise a page it does not have.
+ *
+ * The ids are the contract with the storefront: ServicesGrid looks a card's
+ * image up as `service-${card.id}` using the id it already puts in
+ * `data-service`, and `mainPageMedia` stores uploads under these exact
+ * strings. The six that existed before keep their ids unchanged, so no stored
+ * upload is orphaned by this edit.
  */
 export const SERVICE_SLOTS: readonly SiteMediaSlot[] = [
-  { slot: 'service-studio', group: 'service', label: 'Studio', defaultObject: '' },
-  { slot: 'service-warranty', group: 'service', label: 'Warranty', defaultObject: '' },
-  { slot: 'service-tools', group: 'service', label: 'Tools', defaultObject: '' },
-  { slot: 'service-bundles', group: 'service', label: 'Bundles', defaultObject: '' },
-  { slot: 'service-community', group: 'service', label: 'Community', defaultObject: '' },
-  { slot: 'service-rewards', group: 'service', label: 'Rewards', defaultObject: '' },
+  /**
+   * The Studio is a SEPARATE APPLICATION on its own subdomain, so this one
+   * link is an absolute URL and not a router path. The raw origin is pinned to
+   * `STUDIO_URL` in src/translations.ts by tests/serviceSlots.test.ts rather
+   * than left to drift: the store still navigates to it through that constant
+   * (docs/STUDIO_PLAN.md decision 6 — a plain full-page `<a>`, never an
+   * iframe), and this copy exists only so the admin list and the link audit
+   * can see where the card goes. The Worker cannot import from src/.
+   */
+  { slot: 'service-studio', group: 'service', label: 'ليفو استوديو', defaultObject: 'LevoStudio.webp', link: 'https://studio.levonis-iq.com' },
+  { slot: 'service-compare', group: 'service', label: 'المقارنة', defaultObject: 'Compare.webp', link: '/compare' },
+  { slot: 'service-tools', group: 'service', label: 'أدوات الطباعة', defaultObject: 'Tools.webp', link: '/tools' },
+  { slot: 'service-bundles', group: 'service', label: 'الباقات', defaultObject: 'Bundle.webp', link: '/bundles' },
+  /**
+   * «الفلامنت العشوائي» is not a page of its own and must not become one: the
+   * mystery offers are already a FILTER on the bundles page (`?kind=mystery`,
+   * a chip Bundles.tsx reads out of the query string), and inventing a second
+   * surface for the same rows is how two listings of one thing start
+   * disagreeing about stock. The query string is part of the destination, so
+   * the link audit checks the PATH and ignores the search — see the test.
+   */
+  { slot: 'service-mystery', group: 'service', label: 'الفلامنت العشوائي', defaultObject: 'Randoms.webp', link: '/bundles?kind=mystery' },
+  { slot: 'service-tradein', group: 'service', label: 'استبدل القديمة بجديدة', defaultObject: 'Replace.webp', link: '/trade-in' },
+  { slot: 'service-used', group: 'service', label: 'مستعمل ومجدّد و Open Box', defaultObject: 'Used.webp', link: '/used-printers' },
+  { slot: 'service-rewards', group: 'service', label: 'النقاط والمكافآت', defaultObject: 'Reward.webp', link: '/points' },
+  { slot: 'service-warranty', group: 'service', label: 'الضمان والصيانة', defaultObject: 'Warranty.webp', link: '/warranty' },
+  { slot: 'service-community', group: 'service', label: 'المجتمع', defaultObject: 'Community.webp', link: '/community' },
+  { slot: 'service-support', group: 'service', label: 'الدعم', defaultObject: 'Support.webp', link: '/support' },
 ] as const;
 
 /**

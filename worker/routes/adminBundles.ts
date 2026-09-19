@@ -199,6 +199,50 @@ const warningBody = (warnings: BundleIssue[]) => ({
   warning_details: warnings,
 });
 
+/**
+ * «اجعله الان عام» — AND THE HALF OF IT THAT IS STILL NOT.
+ *
+ * The owner's instruction named both the bundles and the random filament. The
+ * filament was never gated: worker/routes/mystery.ts defaults `required_tiers`
+ * to [] and worker/routes/bundles.ts computes `entitled` but never filters on
+ * it, so an ungated bundle is public to a guest as well.
+ *
+ * But migration 0063 INSERTED `["plus","prime","pro"]` onto every MIGRATED
+ * bundle — every `prd_bnd_*` subject — and those rows are still in the
+ * database. `offerEligible` (worker/lib/offers.ts) still turns a non-empty set
+ * into MEMBERSHIP_REQUIRED, and the card, the cart and the checkout door each
+ * re-ask it independently. So today the honest answer to "can a non-member buy
+ * it?" is: for the random filament yes, for a migrated bundle NO.
+ *
+ * CLEARING THOSE ROWS IS A DATA UPDATE and is the owner's call to make, not a
+ * migration this change may write on its own: it would silently overwrite
+ * whatever an admin deliberately configured, and the ability to run a
+ * members-only promotion is the only thing `required_tiers` can express. What
+ * this does instead is make the surviving gate ANNOUNCE ITSELF on the listing
+ * — where the owner can clear the tiers per bundle from the screen the
+ * instruction was given about. It is a warning and never a refusal: a refusal
+ * would destroy the ability it is protecting.
+ *
+ * Deliberately NOT imported from worker/routes/mystery.ts. One route importing
+ * another's private notice is how a sentence written about a filament ends up
+ * printed over a bundle; the shape is shared (BundleIssue), the wording is not.
+ */
+const bundleMembersOnlyNotice = (tiers: string[]): BundleIssue => {
+  const list = tiers.map((t) => t.toUpperCase()).join(' / ');
+  const en = `this bundle is restricted to members (${list}) — a guest cannot buy it; clear the tiers to open it to everyone`;
+  return {
+    code: 'BUNDLE_MEMBERS_ONLY_RESTRICTION',
+    message: en,
+    en,
+    ar: `هذه الباقة مقيّدة بالأعضاء (${list}) — الزائر ما يكدر يشتريها؛ امسح الفئات لفتحها للجميع`,
+    ckb: `ئەم پاکێجە تەنها بۆ ئەندامانە (${list}) — میوان ناتوانێت بیکڕێت؛ ئاستەکان بسڕەوە بۆ کردنەوەی بۆ هەمووان`,
+  };
+};
+
+/** The tiers a bundle's offer window demands, or an empty list. */
+const requiredTiersOf = (offer: BundleOfferInput | null): string[] =>
+  (offer?.required_tiers ?? []).filter((t): t is string => typeof t === 'string' && t.trim() !== '');
+
 // ------------------------------------------------------------------ listing
 
 adminBundlesRoutes.get('/', async (c) => {
@@ -266,7 +310,12 @@ adminBundlesRoutes.get('/', async (c) => {
       nowMs,
       members,
     });
-    const warnings = [...res.warnings, ...compositionPriceWarnings(doc, configFromRow(configById.get(id)), res.preview)];
+    const gatedTiers = requiredTiersOf(offer);
+    const warnings = [
+      ...res.warnings,
+      ...compositionPriceWarnings(doc, configFromRow(configById.get(id)), res.preview),
+      ...(gatedTiers.length ? [bundleMembersOnlyNotice(gatedTiers)] : []),
+    ];
     bundles.push({
       id,
       slug: doc.slug,
@@ -286,6 +335,12 @@ adminBundlesRoutes.get('/', async (c) => {
       max_bundles: res.preview.availability.max_bundles,
       availability_state: res.preview.availability.state,
       offer,
+      // Published as its own key as well as as a warning, so the listing can
+      // FILTER on it. Until now the only place a tier set appeared was inside
+      // ONE offer's edit form, which is exactly how a members-only bundle
+      // survives an instruction to make the feature general.
+      members_only: gatedTiers.length > 0,
+      required_tiers: gatedTiers,
       // A refusal-shaped issue is still a warning on a LISTING: the row exists
       // and the admin must be told why it cannot sell, not shown an error page.
       ...warningBody([...warnings, ...res.errors]),
@@ -333,10 +388,20 @@ async function previewOf(c: Context<AppContext>, id: string) {
     ctx,
     nowMs: Date.now(),
   });
+  // The gate rides on EVERY read, not only on the listing: an admin who opens
+  // one bundle to ask why a guest cannot buy it is the reader this sentence
+  // was written for, and a warning that appears on one screen and not the
+  // other is a warning the next person will assume they imagined.
+  const gatedTiers = requiredTiersOf(loaded.offer);
   return {
     loaded,
     preview: res.preview,
-    issues: [...res.warnings, ...compositionPriceWarnings(loaded.doc, loaded.config, res.preview), ...res.errors],
+    issues: [
+      ...res.warnings,
+      ...compositionPriceWarnings(loaded.doc, loaded.config, res.preview),
+      ...(gatedTiers.length ? [bundleMembersOnlyNotice(gatedTiers)] : []),
+      ...res.errors,
+    ],
   };
 }
 

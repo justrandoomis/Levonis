@@ -694,7 +694,57 @@ export interface SchemaFacts {
  */
 const lineJoins = (schema: SchemaFacts): string => `
        LEFT JOIN products p ON p.id = i.product_id
-       LEFT JOIN (${KIDS_SQL(schema)}) kids ON kids.pid = i.id`;
+       LEFT JOIN (${KIDS_SQL(schema)}) kids ON kids.pid = i.id
+       LEFT JOIN (${MYSTERY_SPOOL_SQL}) mys ON mys.oiid = i.id
+       LEFT JOIN products mp ON mp.id = mys.offer_product_id`;
+
+/**
+ * WHICH MYSTERY OFFER A SPOOL ROW BELONGS TO — the one fact that stops a
+ * mystery box reporting as free goods on the per-product screen.
+ *
+ * THE DEFECT, precisely. A mystery box is two kinds of `order_items` row: the
+ * PARENT, which carries the money and whose `product_id` is the offer, and one
+ * SPOOL row per drawn filament, whose `product_id` is bound NULL on purpose so
+ * the pick cannot leak through the order (worker/routes/orders.ts §7.7). Since
+ * migration 0096 the spool row also carries the COST of what was drawn. But
+ * `salesByProductSql` groups on `l.product_id`, so those two halves of one sale
+ * landed in two different groups: the offer's own product row showed its whole
+ * revenue against a parent cost of zero — 100% gross margin, the exact figure
+ * the owner would price a promotion against — while every mystery cost the shop
+ * ever paid piled up in a single nameless NULL group beside it that reads as
+ * pure loss. The period TOTAL was right all along; every breakdown built from
+ * it was wrong in both directions at once.
+ *
+ * So a spool row is attributed to the offer it was sold under. That id is on
+ * `mystery_allocations.offer_product_id`, frozen at the draw, and it is the
+ * same id the parent row carries — which is what makes revenue and cost meet
+ * in one group again.
+ *
+ * WHY A GROUPED DERIVED TABLE AND NOT A PLAIN JOIN. `mystery_allocations` is
+ * keyed `(order_item_id, spool_index)`, so the TABLE permits several rows per
+ * order item even though the checkout writes exactly one. A plain LEFT JOIN
+ * would therefore be one duplicated line away from double-counting REVENUE on
+ * every query in this module, which is the worst thing this file could do.
+ * `GROUP BY order_item_id` makes one row per order item a property of the
+ * QUERY rather than a property of today's checkout, so no future writer can
+ * turn a dashboard into a revenue-doubling machine. `MIN(offer_product_id)` is
+ * a deterministic pick, not a judgement: every spool of one line is drawn for
+ * one offer.
+ *
+ * It costs one grouped scan of a table that holds one row per spool ever sold,
+ * answered from `idx_mystery_alloc_item_offer` (0096) without touching the
+ * rows. That is strictly cheaper than the `kids` scan beside it, which walks
+ * the whole of `order_items`.
+ *
+ * NO COST AND NO PRODUCT IDENTITY CROSSES THIS JOIN — only the OFFER's id,
+ * which the customer already knows they bought. The drawn `product_id`,
+ * `color_id` and the snapshots stay where `mysteryReveal.ts` guards them, so
+ * widening this join can never become a reveal leak.
+ */
+const MYSTERY_SPOOL_SQL = `
+         SELECT a.order_item_id AS oiid, MIN(a.offer_product_id) AS offer_product_id
+           FROM mystery_allocations a
+          GROUP BY a.order_item_id`;
 
 /**
  * WHAT A BUNDLE'S COMPONENTS KNOW ABOUT THEIR OWN COST, rolled up to the
@@ -717,16 +767,27 @@ const lineJoins = (schema: SchemaFacts): string => `
  *
  *   2. A PARENT'S COST IS ONLY AS KNOWN AS ITS COMPONENTS' COSTS. Booking a
  *      parent at zero cost is sound ONLY when the goods are costed on the
- *      component rows. For a MYSTERY BOX they never are and never can be —
- *      the spool rows carry no cost and their `product_id` is NULL by design
- *      (docs §7.7) — and for an ordinary bundle whose component product has
- *      no `product_cost_iqd` they are not either. The components' own
- *      `line_total_iqd` is 0 (the money is on the parent), so excluding THEM
- *      from the margin base costs nothing, and the parent's whole revenue was
- *      landing in `costed_revenue_iqd` against zero COGS: a 200,000 IQD
- *      mystery box read as 100% gross margin with an "uncosted" notice
- *      announcing one line worth 0 د.ع. That is the single most confident lie
- *      this screen could tell.
+ *      component rows, and for a bundle whose component product has no
+ *      `product_cost_iqd` they are not. The components' own `line_total_iqd`
+ *      is 0 (the money is on the parent), so excluding THEM from the margin
+ *      base costs nothing, and the parent's whole revenue was landing in
+ *      `costed_revenue_iqd` against zero COGS: a 200,000 IQD box read as 100%
+ *      gross margin with an "uncosted" notice announcing one line worth
+ *      0 د.ع. That is the single most confident lie this screen could tell.
+ *
+ *      A MYSTERY BOX USED TO BE PERMANENTLY IN THAT CASE and is not any more.
+ *      Its spool rows carried no cost and their `product_id` is NULL by design
+ *      (docs §7.7), so the roll-up below read `unknown` and the box's revenue
+ *      went to `uncosted_revenue_iqd` — honest, but an answer the owner could
+ *      never act on. The owner has since ruled that the draw is a real stock
+ *      movement — «المخزون يؤخذ من البيع المباشر أو الطلب المسبق
+ *      ويصبح كمباع واللون والخيار يسحب، يعني له تكلفة» — so migration 0096
+ *      freezes the drawn filament's cost onto the spool row's own
+ *      `order_items.cost_iqd` at the instant of the draw. The roll-up needs no
+ *      special case for it: a costed spool is `recorded` like any other
+ *      component, and a pool nobody priced writes `unpriced`, which is still
+ *      `unknown` here. Nothing about this rule changed — only what the spool
+ *      rows know.
  *
  * So the roll-up is the WORST confidence among the components — 2 recorded,
  * 1 estimated, 0 unknown — and `costProjection` turns a 0 into a NULL unit
@@ -845,12 +906,24 @@ const NET_REFUND_IQD = `MAX(0, COALESCE(i.component_alloc_iqd, i.line_total_iqd,
                   - COALESCE(i.coupon_discount_iqd, 0)
                   - COALESCE(i.membership_discount_iqd, 0))`;
 
-/** The per-line facts both the day report and the breakdowns are built on. */
+/**
+ * The per-line facts both the day report and the breakdowns are built on.
+ *
+ * `COALESCE(i.product_id, mys.offer_product_id)` IS THE MYSTERY RULE (see
+ * `MYSTERY_SPOOL_SQL`): a spool row has no product of its own by design, so it
+ * is filed under the OFFER it was drawn for — the same group its parent's
+ * revenue is in. Ordinary rows are untouched, and a row that is neither
+ * (a deleted product) still groups under NULL exactly as it always did.
+ *
+ * The category falls back the same way and for the same reason. Without it the
+ * per-category screen would repeat the per-product lie one rung up: the
+ * mystery box's revenue in its own category, its cost in a nameless one.
+ */
 const lineSelect = (schema: SchemaFacts): string => `
          o.id AS order_id,
-         i.product_id AS product_id,
-         p.category_id AS category_id,
-         p.sub_category_id AS sub_category_id,
+         COALESCE(i.product_id, mys.offer_product_id) AS product_id,
+         COALESCE(p.category_id, mp.category_id) AS category_id,
+         COALESCE(p.sub_category_id, mp.sub_category_id) AS sub_category_id,
          i.qty AS qty,
          (${isParentSql(schema)}) AS is_parent,
          ${NET_LINE_IQD} AS net_iqd,
@@ -1043,12 +1116,18 @@ export const EXPENSES_BY_CATEGORY_SQL = `
  * the result is one row per product that sold, not one per product per day.
  * Binds: startIso, endIso, limit.
  *
- * `GROUP BY l.product_id` keeps a NULL product_id as its own group: a mystery
- * spool deliberately stores NULL (worker/routes/orders.ts §7.7) and a deleted
- * product leaves the column behind. That group is real revenue and is returned
- * with a null id rather than dropped — and 0095 says out loud that a mystery
- * box has no cost basis at all, so it lands in `uncosted_revenue_iqd` and is
- * never reported as 100% margin.
+ * `GROUP BY l.product_id` keeps a NULL product_id as its own group, because a
+ * deleted product leaves the column behind and that group is real revenue —
+ * returned with a null id rather than dropped.
+ *
+ * A MYSTERY SPOOL IS NO LONGER IN THAT GROUP. It still stores NULL on the row
+ * (worker/routes/orders.ts §7.7 — that NULL is what keeps the pick out of every
+ * customer payload, and it is not negotiable), but `lineSelect` now resolves it
+ * to the OFFER it was drawn for through `mystery_allocations`. So the box's
+ * revenue (on its parent) and the filament's cost (on its spools, frozen by
+ * migration 0096) are counted in ONE product group instead of two, and this
+ * screen stops showing a mystery box at 100% margin beside a nameless bucket of
+ * pure loss.
  */
 export const salesByProductSql = (schema: SchemaFacts): string => `
   WITH l AS (
@@ -1071,7 +1150,16 @@ export const salesByProductSql = (schema: SchemaFacts): string => `
 /** Refunds grouped by product, same range, same basis. Binds: startIso, endIso. */
 export const refundsByProductSql = (schema: SchemaFacts): string => `
   WITH r AS (
-    SELECT i.product_id AS product_id,
+    -- THE SAME COALESCE AS \`lineSelect\`, AND FOR THE SAME REASON. A spool row
+    -- binds \`product_id\` NULL so the pick cannot leak, so a refund touching one
+    -- grouped under NULL while the SALE of that same row grouped under the
+    -- offer. The join is already here — this query interpolates \`lineJoins\`
+    -- and is already paying for the \`mys\`/\`mp\` scan — so the only thing the
+    -- old projection bought was two queries encoding two different rules for
+    -- one row. Practically inert today, because a return case is opened
+    -- against the bundle PARENT; the next person to open one against a spool
+    -- would have got a silent mismatch rather than an error.
+    SELECT COALESCE(i.product_id, mys.offer_product_id) AS product_id,
            MIN(rc.qty, i.qty) AS ref_qty,
            MAX(1, i.qty) AS line_qty,
            ${NET_REFUND_IQD} AS net_iqd,

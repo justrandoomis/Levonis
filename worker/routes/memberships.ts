@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { getAvailableBalances, usdSpendStatement } from '../lib/walletOps';
 import type { AppContext, Env, SessionUser } from '../lib/types';
-import { requireAuth, requireAdmin, requireMainHost, badRequest, notFound, oneOf, str, int, HttpError } from '../lib/http';
+import { requireAuth, requireAdmin, requireMainHost, badRequest, forbidden, notFound, oneOf, str, int, HttpError } from '../lib/http';
+import { canViewFinancials } from '../lib/adminScope';
 import { sha256Hex } from '../lib/crypto';
 import { getSetting, setSetting, SETTING_DEFAULTS } from '../lib/settings';
 import {
@@ -1022,6 +1023,23 @@ membershipsRoutes.use('/admin/*', requireMainHost, requireAdmin);
 /** Approve/suspend a PRO BNPL line. No client membership label is accepted. */
 membershipsRoutes.put('/admin/bnpl/:userId', async (c) => {
   const admin = c.get('user')!;
+  /**
+   * SETTING A CREDIT LIMIT IS A FINANCIAL DECISION, AND THIS ROUTE CARRIED NO
+   * FINANCIAL GUARD.
+   *
+   * `requireAdmin` above is a role check; it is satisfied by the restricted
+   * assistant admin whom §11 will not even show a cost. That admin could
+   * therefore hand a member a line of credit, or suspend one, on a screen that
+   * is not allowed to tell them how big it is — and the write is an UPSERT, so
+   * a suspend issued without the figure in hand writes the member's approved
+   * line down to 0 as a side effect.
+   *
+   * A user interface that stops OFFERING the control is not this boundary: the
+   * request can still be sent. The boundary has to be here, in the handler.
+   */
+  if (!canViewFinancials(c.env, admin)) {
+    throw forbidden('Setting a credit limit is a financial decision / تحديد سقف الائتمان قرار مالي');
+  }
   const userId = str(c.req.param('userId'), 'userId', { min: 1, max: 80 });
   const body = await c.req.json().catch(() => ({}));
   const state = oneOf(body.state, 'state', ['requested', 'approved', 'suspended'] as const);

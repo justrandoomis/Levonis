@@ -45,6 +45,7 @@ import {
   materialTotalGrams,
   materialWasteGrams,
   sourced,
+  type AnalysisMaterial,
   type PrintAnalysis,
   type QuoteResult,
 } from '../lib/printQuote/model';
@@ -78,6 +79,14 @@ import {
   quoteStatements,
   type MerchantPrinter,
 } from '../lib/printQuote/repository';
+// THE MINIMUM CHARGE LIVES IN THE OWNER'S OWN CONFIGURATION, not in this file
+// and certainly not in a React component. `printPricingConfig` is the row the
+// admin screen (src/components/adminCommunity/PrintPricingAdmin.tsx) already
+// edits and `worker/routes/printRequests.ts` already prices against, so reading
+// it here is what stops the calculator and the print-request wizard from
+// disagreeing about the smallest job a shop will take.
+import { getSetting } from '../lib/settings';
+import { DEFAULT_PRICING } from '../lib/printPricing';
 
 export const printQuoteRoutes = new Hono<AppContext>();
 
@@ -93,6 +102,36 @@ const GUEST_RETENTION_HOURS = 48;
 const PLATFORM_ELECTRICITY_IQD_PER_KWH = 120;
 const PLATFORM_LABOR_IQD_PER_HOUR = 6_000;
 const PLATFORM_TARGET_MARGIN_PERCENT = 35;
+
+/**
+ * THE SMALLEST JOB ANYBODY WILL ACTUALLY TAKE, read from the owner's settings.
+ *
+ * Why it exists at all: setup, the spool change and the walk to the machine
+ * cost the same whether the part weighs 2 g or 200 g. Without a floor, a
+ * keychain quotes at a few hundred dinars, the customer believes it, and the
+ * merchant either loses money or looks like a liar. `DEFAULT_PRICING.min_job_iqd`
+ * is the number the print-request wizard has always applied; this makes the
+ * calculator apply the SAME one.
+ *
+ * Why it is fetched rather than imported as a constant: the owner edits it in
+ * the admin, and a floor that only moves on a deploy is not a setting.
+ *
+ * Why BOTH the file path and the grams path get it: a floor on one and not the
+ * other is two pricing rules wearing one name. The customer who uploads a tiny
+ * model and the customer who types its weight must be told the same price, or
+ * whichever screen they happened to open decides what the shop charges.
+ */
+async function platformMinimumJobIqd(db: D1Database): Promise<number> {
+  try {
+    const cfg = await getSetting(db, 'printPricingConfig');
+    const value = Number((cfg as { min_job_iqd?: unknown } | null)?.min_job_iqd);
+    if (Number.isFinite(value) && value >= 0) return value;
+  } catch {
+    // A settings row that will not parse must not take the quote down with it;
+    // the seeded default is a real number the owner already agreed to.
+  }
+  return DEFAULT_PRICING.min_job_iqd;
+}
 
 /**
  * A guest needs to read back the analysis they just made, and they have no
@@ -683,6 +722,7 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
     merchantPrinter: null,
     quantity,
     targetMarginPercent: Number(body.target_margin_percent) || PLATFORM_TARGET_MARGIN_PERCENT,
+    minimumJobIqd: await platformMinimumJobIqd(c.env.DB),
   });
 
   const quoteId = newId('pq');
@@ -714,6 +754,320 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
   });
 });
 
+// ------------------------------------------------- the quote that has no file
+
+/**
+ * «عدد الغرامات… ليحسب السعر، أو من الملف» — a price from a WEIGHT.
+ *
+ * WHY THIS EXISTS. The calculator above is built on the idea that the file
+ * answers everything, and for a customer holding an STL it does. But a shop's
+ * real counter question is «شكد يطلع سعر مئة غرام PLA أسود؟», and today the only
+ * way to ask it is to produce a model file you may not have. A customer who
+ * already knows the mass should not have to invent a file to be told a price,
+ * and sending them away to find one is how they find another shop instead.
+ *
+ * ONE PRICING FUNCTION, NOT TWO. Everything below builds a `PrintAnalysis` and
+ * hands it to `priceForPrinter`, which is the SAME path `/analyses/:id/quote`
+ * takes into the same `priceJob`. That is deliberate and it is the whole point
+ * of the route: a second cost model would drift from the first, and the number
+ * the customer was shown would stop being the number the shop charges. The
+ * per-gram rate comes from `loadMaterialPrices` (spool → merchant → catalogue →
+ * platform), the material correction from `loadCalibration`, the floor from
+ * `platformMinimumJobIqd` — every one of them the same source the file path
+ * reads, none of them typed into this file.
+ *
+ * WHAT A WEIGHT CANNOT SAY, AND WHY THE ANSWER SAYS SO.
+ *
+ * A file yields a print TIME; a gram count does not. Machine hours are a real
+ * cost — depreciation, maintenance, electricity — and a quote that silently
+ * leaves them out is not "a simpler quote", it is a wrong one. So the caller
+ * either states an estimated print time, in which case the hours are priced
+ * exactly as they are for a file, or states none, in which case the response
+ * says in `covers` that machine time is EXCLUDED and the screen has to repeat
+ * it. Nothing here guesses an hour count from a weight: grams and minutes are
+ * independent (a 100 g solid cube and a 100 g lattice are hours apart), and a
+ * fabricated figure is precisely what §53 forbids.
+ *
+ * NOTHING IS STORED. A weight is not a file: there is no upload to authorise,
+ * no R2 object to keep private and nothing for a later merchant slice to
+ * replace. Persisting it would mean an additive migration for a row that only
+ * ever describes what somebody typed, so the answer is computed and returned.
+ */
+
+/** A fat-fingered "100000" is a spool and a half, not a print. */
+const GRAMS_MAX_PER_ROW = 20_000;
+const GRAMS_MAX_TOTAL = 50_000;
+/** The owner said «بلون واحد أو أكثر» — more than one, not unlimited. Eight
+ *  rows is past any real multi-colour job and keeps the `IN (…)` lookup far
+ *  under D1's 100-parameter refusal. */
+const GRAMS_MAX_ROWS = 8;
+/** Two weeks of machine time. Past this the caller has mistyped, and an
+ *  accepted mistype becomes a depreciation line in the millions. */
+const GRAMS_MAX_PRINT_MINUTES = 20_160;
+
+/** One line of the form: this much of this filament, in this colour. */
+export interface GramsRow {
+  materialId: string;
+  materialType: string;
+  colorHex: string;
+  densityGPerCm3: number;
+  grams: number;
+}
+
+/**
+ * A stated weight, in the shape the cost engine prices.
+ *
+ * EVERY GRAM IS `modelGrams`. Support, purge and brim are left at zero and are
+ * NOT silently folded into the customer's figure — the customer said how much
+ * plastic the part is, not how much the machine will flush, and inventing a
+ * waste fraction here would be a coefficient nobody can defend. That those
+ * buckets are unknown rather than zero is what `covers.excluded` exists to say.
+ *
+ * `provenance: 'inferred'`, because the mass came from a person rather than
+ * from a measurement. It is the lowest rung on the ladder in model.ts, so the
+ * result can never come back `exact` and is always shown as a range.
+ */
+export function analysisFromGrams(input: {
+  printer: PrinterModel;
+  rows: GramsRow[];
+  /** Minutes the caller estimates the machine will run. 0 = they did not say. */
+  printMinutes: number;
+}): PrintAnalysis {
+  const printMinutes = Math.max(0, input.printMinutes);
+  const materials: AnalysisMaterial[] = input.rows.map((r, index) => ({
+    slot: index,
+    materialId: r.materialId,
+    materialType: r.materialType,
+    colorHex: r.colorHex,
+    modelGrams: r.grams,
+    supportGrams: 0,
+    supportInterfaceGrams: 0,
+    purgeGrams: 0,
+    primeTowerGrams: 0,
+    brimRaftGrams: 0,
+    otherWasteGrams: 0,
+  }));
+
+  return {
+    // No file, so no hash and nothing to cache against — the fingerprint in
+    // §36 identifies a FILE at a profile, and there is no file here.
+    fileSha256: '',
+    // Named for what produced it, the same way `levonis-geometry@1` is. A
+    // stated weight and a measured mesh must never be indistinguishable in a
+    // payload, a log or a screen.
+    slicerVersion: 'levonis-grams@1',
+    profileRevision: input.printer.id,
+    provenance: 'inferred',
+    // A weight has no shape. Zeros rather than a fabricated box: nothing in
+    // the cost engine reads these, and a made-up bounding box would be a lie
+    // that the eligibility check might one day believe.
+    boundingBoxMm: { x: 0, y: 0, z: 0 },
+    // Mass ÷ density IS the volume, so this one derived figure is physics
+    // rather than a guess.
+    modelVolumeMm3: input.rows.reduce(
+      (sum, r) => sum + (r.densityGPerCm3 > 0 ? (r.grams / r.densityGPerCm3) * 1000 : 0),
+      0
+    ),
+    partCount: 1,
+    layerCount: 0,
+    layerHeightMm: 0,
+    printMinutesPerPlate: printMinutes,
+    // Warm-up is a fact about the MACHINE, so it comes from the printer profile
+    // — but only when there is a print to warm up for. With no stated time the
+    // quote covers material and handling, and charging a bed heat-up inside a
+    // "material only" answer would contradict what `covers` promises.
+    preparationMinutes: printMinutes > 0 ? input.printer.warmupMinutes : 0,
+    // The stated grams are the WHOLE job, the way `PrintAnalysis.materials`
+    // requires. There is no per-piece figure here to multiply, which is why the
+    // route leaves quantity at one exactly as the file routes do.
+    plateCount: 1,
+    piecesPerPlate: 1,
+    materials,
+    // Each extra filament beyond the first is a change the machine has to make.
+    // It buys no purge grams here (nobody measured them) but it does tell the
+    // engine that other tools sit warm and idle, which is a real watt.
+    toolChanges: Math.max(0, input.rows.length - 1),
+  };
+}
+
+/**
+ * The form's rows, refused rather than repaired.
+ *
+ * A zero or a negative gram count is the failure this guards: `Number('')` is
+ * 0 and `Number('-5')` is -5, and either one sailing through produces a
+ * confident price for nothing at all. `resolveMaterialPrice` would price 0 g at
+ * 0 IQD, the floor would lift it to the minimum job, and the customer would be
+ * quoted 5,000 dinars for having typed nothing.
+ */
+async function readGramRows(db: D1Database, v: unknown): Promise<GramsRow[]> {
+  if (!Array.isArray(v) || v.length === 0) {
+    throw badRequest('Add at least one filament and the grams you need', 'NO_GRAM_ROWS');
+  }
+  if (v.length > GRAMS_MAX_ROWS) {
+    throw badRequest(`A quote takes at most ${GRAMS_MAX_ROWS} filament rows`, 'TOO_MANY_GRAM_ROWS');
+  }
+
+  const wanted = v.map((x, index) => {
+    const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
+    const materialId = str(o.material_id, `rows[${index}].material_id`, { min: 1, max: 60 });
+    const grams = Number(o.grams);
+    if (!Number.isFinite(grams) || grams <= 0) {
+      throw badRequest(
+        `rows[${index}]: the grams must be a number greater than zero`,
+        'BAD_GRAMS',
+        { row: index }
+      );
+    }
+    if (grams > GRAMS_MAX_PER_ROW) {
+      throw badRequest(
+        `rows[${index}]: ${GRAMS_MAX_PER_ROW} g is more than one job — split it or ask a merchant directly`,
+        'GRAMS_TOO_LARGE',
+        { row: index }
+      );
+    }
+    return {
+      materialId,
+      grams,
+      colorHex: str(o.color_hex, `rows[${index}].color_hex`, { max: 9, required: false }) || '#D9D9D9',
+    };
+  });
+
+  const total = wanted.reduce((sum, r) => sum + r.grams, 0);
+  if (total > GRAMS_MAX_TOTAL) {
+    throw badRequest(`${GRAMS_MAX_TOTAL} g in one quote is a production run, not a print`, 'GRAMS_TOO_LARGE');
+  }
+
+  // The DENSITY comes from the catalogue, never from the payload — the same
+  // rule `readTools` states for the slicer path, for the same reason: letting a
+  // request choose a density lets a request choose its own bill.
+  const ids = [...new Set(wanted.map((r) => r.materialId))];
+  const physics = await loadMaterialPhysics(db, ids);
+
+  return wanted.map((r, index) => {
+    const known = physics[r.materialId];
+    if (!known) throw badRequest(`rows[${index}]: unknown material "${r.materialId}"`, 'UNKNOWN_MATERIAL', { row: index });
+    if (!(known.densityGPerCm3 > 0)) {
+      throw badRequest(`rows[${index}]: that material has no density on file`, 'MATERIAL_NOT_WEIGHABLE', { row: index });
+    }
+    return {
+      materialId: r.materialId,
+      materialType: known.materialType,
+      colorHex: r.colorHex,
+      densityGPerCm3: known.densityGPerCm3,
+      grams: r.grams,
+    };
+  });
+}
+
+/**
+ * WHAT THIS PRICE DOES AND DOES NOT COVER, as codes rather than sentences.
+ *
+ * Codes because the screen speaks three languages and an English sentence built
+ * in a Worker can only ever be one of them. The customer-facing wording lives
+ * in src/components/tools/, where `loc(ar, en, ckb)` can say it properly.
+ *
+ * This is the part of the response that keeps the quote honest. A grams quote
+ * that showed a number and said nothing else would read as a full price, and
+ * the customer would discover the machine hours when the merchant's real offer
+ * arrived at twice the figure.
+ */
+function gramsCoverage(rows: GramsRow[], printMinutes: number) {
+  const timed = printMinutes > 0;
+  const included = ['MATERIAL', 'HANDLING_LABOUR', 'FAILURE_RESERVE'];
+  const excluded: string[] = [];
+  if (timed) included.push('MACHINE_TIME', 'ELECTRICITY');
+  else excluded.push('MACHINE_TIME', 'ELECTRICITY');
+  // Support is a property of a SHAPE. There is no shape here, so it is not
+  // zero — it is unknown, and saying so is the whole of §8 applied to a form.
+  excluded.push('SUPPORT_MATERIAL');
+  if (rows.length > 1) excluded.push('PURGE_ON_COLOR_CHANGE');
+  excluded.push('FINISHING', 'DELIVERY');
+  return {
+    /** True when the answer is a material bill and the customer must be told so. */
+    material_only: !timed,
+    included,
+    excluded,
+  };
+}
+
+/**
+ * The route. Open to a guest for the same reason the upload is (§23) — this is
+ * how somebody finds out the shop exists.
+ */
+printQuoteRoutes.post('/grams-quote', async (c) => {
+  await rateLimit(c, 'print-quote-grams', 60, 3600);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+
+  const printerModelId = str(body.printer_model_id, 'printer_model_id', { min: 1, max: 60 });
+  const modelRow = await c.env.DB.prepare('SELECT * FROM printer_models WHERE id = ? AND active = 1')
+    .bind(printerModelId)
+    .first<Record<string, unknown>>();
+  if (!modelRow) throw badRequest('Unknown printer', 'UNKNOWN_PRINTER');
+  const printer = printerModelFromRow(modelRow);
+
+  const rows = await readGramRows(c.env.DB, body.rows);
+
+  // Optional, and optional on purpose: a customer who knows their print time
+  // gets the machine hours priced, and one who does not gets an answer that
+  // says which half it is. What is NOT offered is a guess in between.
+  const printMinutes =
+    body.print_minutes === undefined || body.print_minutes === null || body.print_minutes === ''
+      ? 0
+      : int(body.print_minutes, 'print_minutes', { min: 0, max: GRAMS_MAX_PRINT_MINUTES });
+
+  // A machine that cannot run the filament cannot quote it. The same rule the
+  // file path applies through `printerEligibility`, applied to the one fact a
+  // weight actually carries: which materials are on the plate. The bounding box
+  // is a zero box on purpose — a weight has no shape, and a zero can never fail
+  // the fit test, so the only thing this check can refuse is a real refusal:
+  // ABS on an open frame, or four colours on a single-tool machine.
+  const eligibility = printerEligibility(printer, {
+    boundingBoxMm: { x: 0, y: 0, z: 0 },
+    materialTypes: rows.map((r) => r.materialType),
+    simultaneousMaterials: new Set(rows.map((r) => r.materialId)).size,
+  });
+  if (!eligibility.eligible) {
+    throw badRequest(`This printer cannot take the job: ${eligibility.reasons.join(', ')}`, 'PRINTER_INELIGIBLE', {
+      reasons: eligibility.reasons,
+    });
+  }
+
+  const user = c.get('user');
+  const store = user ? await storeForUser(c.env.DB, user.id) : null;
+  const merchantId = store?.merchant?.id ?? null;
+
+  const priced = await priceForPrinter(c, {
+    analysis: analysisFromGrams({ printer, rows, printMinutes }),
+    printer,
+    merchantId,
+    merchantPrinter: null,
+    // The stated grams already describe the whole job, so there is nothing left
+    // for a quantity to multiply — the same reading the file routes take.
+    quantity: 1,
+    targetMarginPercent: Number(body.target_margin_percent) || PLATFORM_TARGET_MARGIN_PERCENT,
+    minimumJobIqd: await platformMinimumJobIqd(c.env.DB),
+  });
+
+  return c.json({
+    success: true,
+    // §22 again: the same two shapes, chosen the same way. A merchant asking
+    // the counter question sees their own economics; a customer never does.
+    quote: merchantId ? merchantQuote(priced.result) : publicQuote(priced.result),
+    // Echoed so the screen can show the rows it priced without adding anything
+    // up itself — a total computed in the browser is a total that can disagree
+    // with the one the engine charged.
+    rows: rows.map((r) => ({
+      material_id: r.materialId,
+      material_type: r.materialType,
+      color_hex: r.colorHex,
+      grams: Math.round(r.grams * 100) / 100,
+    })),
+    grams_total: Math.round(rows.reduce((sum, r) => sum + r.grams, 0) * 100) / 100,
+    print_minutes: printMinutes,
+    covers: gramsCoverage(rows, printMinutes),
+  });
+});
+
 /**
  * EVERY MACHINE THIS SHOP OWNS, PRICED, WITH THE REASONS (§25, §41).
  *
@@ -737,6 +1091,10 @@ printQuoteRoutes.post('/analyses/:id/compare', requireAuth, async (c) => {
   const merchantId = store.merchant.id;
 
   const printers = await loadMerchantPrinters(c.env.DB, merchantId);
+  // Read once for the whole comparison: the floor is a property of the shop's
+  // settings, not of the machine, so re-reading it per printer would be the
+  // same row fetched a dozen times for the same answer.
+  const minimumJobIqd = await platformMinimumJobIqd(c.env.DB);
   const analysis = loaded.analysis;
   const materialTypes = analysis.materials.map((m) => m.materialType).filter(Boolean);
 
@@ -766,6 +1124,7 @@ printQuoteRoutes.post('/analyses/:id/compare', requireAuth, async (c) => {
       merchantPrinter: mp,
       quantity,
       targetMarginPercent: Number(body.target_margin_percent) || PLATFORM_TARGET_MARGIN_PERCENT,
+      minimumJobIqd,
     });
 
     rows.push({
@@ -807,6 +1166,10 @@ interface PriceForPrinterInput {
   merchantPrinter: MerchantPrinter | null;
   quantity: number;
   targetMarginPercent: number;
+  /** The owner's configured floor, from `platformMinimumJobIqd`. Passed in
+   *  rather than read here because this function touches no settings of its
+   *  own and a comparison loop must not re-read the same row per printer. */
+  minimumJobIqd: number;
 }
 
 /** Assembles the frozen input set and hands it to the pure engine. Everything
@@ -877,6 +1240,7 @@ async function priceForPrinter(
       averageFailureFraction: calibration.averageFailureFraction,
     },
     targetMarginPercent: input.targetMarginPercent,
+    minimumJobIqd: input.minimumJobIqd,
     timeFactor: resolveFactor(calibration.timeFactor, calibration.samples),
     materialFactor: resolveFactor(calibration.materialFactor, calibration.samples),
     quantity: input.quantity,
@@ -898,6 +1262,9 @@ async function priceForPrinter(
       labor_tasks: laborTasks,
       calibration,
       target_margin_percent: input.targetMarginPercent,
+      // §30: the floor is an INPUT to the price, so a quote that was lifted to
+      // it is only explainable afterwards if the row remembers what it was.
+      minimum_job_iqd: input.minimumJobIqd,
       quantity: input.quantity,
       analysis: input.analysis,
     },

@@ -408,7 +408,17 @@ export function priceJob(input: PricingInputs): QuoteResult {
   // how a shop aiming at 40% quietly runs at 28.6%.
   const priced = margin >= 1 ? trueCost : trueCost / (1 - margin);
   const rushed = priced * Math.max(1, input.rushMultiplier ?? 1);
-  const price = iqd(Math.max(rushed, input.minimumJobIqd ?? 0));
+  // THE FLOOR IS A FLOOR FOR THE WHOLE QUOTE, NOT ONLY FOR ITS MIDPOINT.
+  //
+  // `floor` is applied twice below — once to the price and once to the LOW end
+  // of the range — and that is not belt and braces. The range is built as
+  // price × (1 ± spread), so a tiny job lifted to the 5,000 د.ع minimum was
+  // being shown to the customer as «5,000 د.ع، المتوقع 4,400 – 5,600»: an
+  // expected low end BELOW the very figure the floor exists to make
+  // impossible. Both screens render the range whenever high > low, so the
+  // contradiction was on the customer's screen, not in a log.
+  const floor = input.minimumJobIqd ?? 0;
+  const price = iqd(Math.max(rushed, floor));
 
   const profit = price - trueCost;
   const confidence: QuoteConfidence = unpriced
@@ -440,6 +450,9 @@ export function priceJob(input: PricingInputs): QuoteResult {
     wasteGrams: Math.round(wasteGrams * quantity * 10) / 10,
     wastePercent: grams > 0 ? Math.round(((wasteGrams * quantity) / grams) * 1000) / 10 : 0,
     machineHours: Math.round(hours * 100) / 100,
-    rangeIqd: { low: iqd(price * (1 - spread)), high: iqd(price * (1 + spread)) },
+    // The low end is clamped to the same floor as the price (see above). The
+    // HIGH end is not: a job can legitimately cost more than the minimum, and
+    // capping it would understate what a real merchant will quote.
+    rangeIqd: { low: iqd(Math.max(price * (1 - spread), floor)), high: iqd(price * (1 + spread)) },
   };
 }

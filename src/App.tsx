@@ -228,6 +228,24 @@ const Support = React.lazy(() => import('./pages/Support'));
  * asked for; `tests/bundleBudget.test.ts` measures exactly that closure.
  */
 const Compare = React.lazy(() => import('./pages/Compare'));
+/**
+ * THE TWO SERVICES THE HOME RAIL NAMES AND THE ROUTER DID NOT SERVE.
+ *
+ * «طابعات مستعملة» and «استبدل القديمة بجديدة» are cards on the services rail
+ * (src/components/home/ServicesGrid.tsx) and rows in the owner's icon list
+ * (worker/lib/siteMedia.ts). A card is a promise; without these two routes the
+ * promise resolved to the `*` fallback — the bare «Under Construction» panel
+ * at the bottom of this table, with no header, no back button and nothing in
+ * the customer's own language. tests/serviceSlots.test.ts now fails the build
+ * if any service slot names a path this table does not serve, so the rail and
+ * the router cannot drift apart again.
+ *
+ * Lazy, like every other off-the-buying-path page here: both are reached from
+ * a card the visitor has to swipe to and tap, never from the first paint, so
+ * neither belongs in the bundle everyone downloads.
+ */
+const UsedPrinters = React.lazy(() => import('./pages/UsedPrinters'));
+const TradeIn = React.lazy(() => import('./pages/TradeIn'));
 const MyGifts = React.lazy(() => import('./components/reviews/MyGifts'));
 import EmailVerifyBanner from './components/auth/EmailVerifyBanner';
 import AppIntro from './components/bloub/AppIntro';
@@ -588,6 +606,15 @@ function AppContent() {
           {/* The ids live in the query, not the path, so a comparison is one
               route and one link: /compare, /compare?ids=a, /compare?ids=a,b. */}
           <Route path="/compare" element={<Compare />} />
+          {/* OPEN TO GUESTS, both of them. The graded shelf is catalogue —
+              exactly as public as /products — and the trade-in page is where
+              someone decides whether to ask at all; putting a sign-in in front
+              of "what is my old printer worth" would lose the question before
+              it is asked. The trade-in FORM asks for a sign-in at the point of
+              submission, because the request has to belong to an account
+              somebody can answer. */}
+          <Route path="/used-printers" element={<UsedPrinters />} />
+          <Route path="/trade-in" element={<TradeIn />} />
           <Route path="/bundles" element={<Bundles />} />
           <Route path="/bundles/:slug" element={<BundleDetail />} />
           <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
