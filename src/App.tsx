@@ -4,6 +4,7 @@ import { StoreProvider, useStore } from './StoreContext';
 import Storefront from './pages/Storefront';
 import MerchantStart from './pages/MerchantStart';
 import StorefrontProduct from './pages/StorefrontProduct';
+import UpdateReadyToast from './components/pwa/UpdateReadyToast';
 /**
  * SPLIT OUT ON PURPOSE. The viewer is the only screen in the application that
  * pulls in `ogl`, a WebGL renderer and a mesh parser, and it is reached from a
@@ -624,7 +625,20 @@ export default function App() {
         <WalletProvider>
           <Router>
             <StoreProvider>
+              {/* THE TWO THINGS THAT MUST RENDER ON EVERY SHELL are siblings
+                  of AppContent rather than children of it: the intro, for the
+                  reason written above AppBootstrapLayer, and the update line,
+                  because a deploy reaches the main site, the full-screen
+                  routes and a merchant's own subdomain alike and this is the
+                  only place all three pass through. Neither draws anything
+                  until it has something to say — the toast stays empty until
+                  public/sw.js reports a worker waiting, which never happens on
+                  a first visit. NOTHING MAY SIT BETWEEN THE TWO TAGS BELOW:
+                  tests/bloubNavigation.test.ts pins them within 100
+                  characters of each other, so the character survives the
+                  unresolved-host fallback becoming the real application. */}
               <AppBootstrapLayer />
+              <UpdateReadyToast />
               <AppContent />
             </StoreProvider>
           </Router>

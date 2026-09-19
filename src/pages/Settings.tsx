@@ -50,13 +50,15 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, User, MapPin, Bell, Globe, LogOut, ShieldCheck, Mail, KeyRound, Link2, FileText, LifeBuoy, Loader2, Check, AlertTriangle, Coins, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, User, MapPin, Bell, Globe, LogOut, ShieldCheck, Mail, KeyRound, Link2, FileText, LifeBuoy, Loader2, Check, AlertTriangle, Coins, CheckCircle2, Download } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
 import TelegramLink from '../components/security/TelegramLink';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { useCapabilities } from '../hooks/useCapabilities';
+import { useInstallApp } from '../hooks/useInstallApp';
+import InstallAppButton from '../components/pwa/InstallAppButton';
 
 const PASSWORD_MIN = 8; // mirrors worker/routes/auth.ts checkPassword
 const USERNAME_COOLDOWN_DAYS = 14; // mirrors worker/routes/profile.ts
@@ -376,9 +378,15 @@ function Field({
 export default function Settings() {
   const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
-  const { lang, setLang, dir } = useLanguage();
+  const { lang, setLang, dir, t } = useLanguage();
   const s = STRINGS[lang];
   const rtl = dir === 'rtl';
+
+  // The install row's copy lives in `src/translations.ts` rather than in this
+  // file's own STRINGS table, because the same sentences are read by the
+  // sheet and by the button — three places, one source. Everything else on
+  // this page keeps using `s`.
+  const { standalone: appInstalled } = useInstallApp();
 
   // Whether the DEPLOYMENT has a WhatsApp provider at all. Not whether the
   // shop's WhatsApp session is currently linked — only a live provider call
@@ -898,6 +906,36 @@ export default function Settings() {
                   {s.currency}
                 </p>
                 <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.currencyNote}</p>
+              </div>
+              {/*
+                «تحميل التطبيق» BELONGS IN PREFERENCES, and specifically here.
+
+                It is a device-and-browser preference with no order and no
+                security consequence — the same kind of thing as the language
+                and the currency rows above it — and it sits immediately
+                before the Web Push block, which is its nearest relative in
+                both shape and honesty.
+
+                IT STATES ITS REAL STATE, like every other row on this page.
+                When the shop is already running as an installed app the
+                control disappears and the row says so, because a button that
+                installs something already installed is the "control with no
+                effect" this file's header removed the Appearance row for. The
+                button itself hides on the same condition; the check is
+                repeated here so the row does not become a title and a
+                paragraph with nothing under them.
+              */}
+              <div className="px-4 py-3">
+                <p className="font-bold text-[15px] flex items-center gap-2">
+                  <Download aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+                  {t('pwaInstallTitle')}
+                </p>
+                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{t('pwaSettingsNote')}</p>
+                {appInstalled ? (
+                  <p className="mt-2 text-[12px] text-success">{t('pwaInstallDone')}</p>
+                ) : (
+                  <InstallAppButton />
+                )}
               </div>
             </SectionCard>
 

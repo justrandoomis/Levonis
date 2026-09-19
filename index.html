@@ -69,7 +69,40 @@
       what a share of the site ITSELF should say.
     -->
     <link rel="icon" type="image/webp" href="/files/UiUx/Logo/Logo.webp" />
-    <link rel="apple-touch-icon" href="/files/UiUx/Logo/Logo.webp" />
+
+    <!--
+      THE HOME-SCREEN ICON, AND WHY IT IS A PNG NOW.
+
+      This link used to point at the same WebP as the tab icon above, and that
+      was a bug the owner could see on their own phone: iOS does not accept
+      WebP for `apple-touch-icon`. It does not fall back to another link and it
+      reports nothing — it gives up and uses A SCREENSHOT OF THE PAGE as the
+      home-screen icon. Every iPhone that ever added this shop to its home
+      screen got a picture of whatever page happened to be open instead of the
+      mark. `public/icons/apple-touch-icon.png` has existed since the icons
+      were generated; until now nothing pointed at it.
+
+      180x180 is the size iOS asks for, and `sizes` is declared because iOS
+      chooses between several `apple-touch-icon` links by comparing exactly
+      that attribute — a link without one is only the fallback.
+
+      These three are ORDINARY STATIC FILES. `public/` is copied byte-for-byte
+      into `dist/` by Vite, and `/icons/*` is not in `run_worker_first`, so the
+      asset layer answers them directly. That is deliberately a different path
+      from the two `/files/UiUx/...` URLs above, which the Worker serves out of
+      R2: an icon the browser needs before anything renders should not depend
+      on a database-backed Worker route being healthy.
+
+      THE WEBP `rel="icon"` ABOVE STAYS, and the PNGs join it rather than
+      replace it. That link is the TAB icon, where WebP is universally
+      supported; the two PNG favicons are for the browsers that never shipped
+      WebP favicon decoding at all (older Safari, several embedded webviews).
+      A browser that understands the WebP takes it; the rest now take a PNG
+      instead of drawing a blank square.
+    -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
 
     <meta property="og:site_name" content="LEVONIS" />
     <meta property="og:type" content="website" />
@@ -88,6 +121,60 @@
       content="طابعات وخيوط وقطع الطباعة ثلاثية الأبعاد في العراق، مع خدمة طباعة حسب الطلب."
     />
     <meta name="twitter:image" content="https://levonis-iq.com/files/UiUx/Logo/Logo.webp" />
+
+    <!--
+      INSTALLING THE SHOP AS AN APP.
+
+      «أريد إضافة ميزة تحميل التطبيق للموقع» — the owner asked for the site to
+      be installable on iPhone, Android and Huawei, in every browser. Five
+      lines here are what make the browser offer it; the rest of the work is
+      the service worker and the manifest route.
+
+      THE MANIFEST IS A WORKER ROUTE, NOT A FILE. `/manifest.webmanifest` is
+      answered by the Worker (see worker/routes/manifest.ts) because ONE
+      DEPLOYMENT SERVES EVERY STORE: ali3d.levonis-iq.com runs this same
+      document. A static manifest would make every merchant's shop install
+      itself onto the customer's home screen as "LEVONIS", with LEVONIS's
+      icon, on a subdomain that presents itself as that merchant. The Worker
+      classifies the Host and answers with that host's own name and mark. The
+      href stays RELATIVE for exactly the same reason — the browser resolves
+      it against the page, so each host asks its own origin.
+
+      `mobile-web-app-capable` is the standard name; `apple-mobile-web-app-*`
+      are the legacy WebKit ones, and they are not optional: Safari on iOS
+      fires no `beforeinstallprompt` and reads no `display` field from the
+      manifest. Share -> «إضافة إلى الشاشة الرئيسية» is the ONLY install path
+      on an iPhone, and these three tags are the only thing that decides what
+      the result looks like — without them iOS opens the home-screen entry in
+      a browser tab with a visible address bar, which is not an app.
+
+      THE STATUS BAR IS `black`, NOT `black-translucent`, AND THAT IS A
+      DECISION. `black-translucent` extends the web view UNDER the clock and
+      the battery, and leaves it to the page to pad itself with
+      `env(safe-area-inset-top)`. The main header does that
+      (`.lv-character-header`, `.lv-character-fallback-header` in index.css)
+      but the full-screen shells do not — Settings, the two checkouts and the
+      admin console draw their own sticky top bar with no top inset, so
+      translucency would slide the shop's name and its back arrow underneath
+      the status bar on every notched iPhone. `black` gives an opaque status
+      bar in the page's own #000000, which is seamless against this document,
+      and the web view starts below it. `viewport-fit=cover` above is still
+      right and still needed: it is the BOTTOM inset (the home indicator) that
+      every sheet in the app already pads for.
+
+      NO `apple-touch-startup-image`. It is the obvious next tag and it is a
+      trap: iOS matches a splash image by exact device resolution and
+      orientation, so covering the phones people actually own means roughly
+      thirty <link> tags and thirty generated PNGs that go stale with every
+      new iPhone. Without them iOS paints the manifest's `background_color`,
+      which is #000000 — the same black this page already paints. The correct
+      splash screen is therefore the one we get for free. Do not add them.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="LEVONIS" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

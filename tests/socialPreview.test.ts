@@ -46,7 +46,16 @@ test('the shipped shell carries a card and an icon of its own', () => {
   // The owner reported both symptoms — a generic tab icon and an empty
   // unfurl — and both were the same absence.
   assert.match(SHELL, /<link rel="icon"[^>]*Logo\.webp/i);
-  assert.match(SHELL, /<link rel="apple-touch-icon"[^>]*Logo\.webp/i);
+  // THE HOME-SCREEN ICON IS NO LONGER THAT WEBP, and the change is the fix
+  // rather than a regression this line should have caught. iOS does not
+  // accept WebP for `apple-touch-icon`: it ignores the link entirely and uses
+  // a SCREENSHOT OF THE PAGE as the home-screen icon, which is what every
+  // iPhone that added this shop actually got. The link now points at
+  // /icons/apple-touch-icon.png, a real 180x180 file in public/. What this
+  // test still guards is that the shell declares one at all;
+  // tests/indexHtmlPwa.test.ts owns the format, the size and whether the file
+  // it names exists.
+  assert.match(SHELL, /<link rel="apple-touch-icon"[^>]*\.png/i);
   assert.equal(meta(SHELL, 'property', 'og:site_name'), 'LEVONIS');
   assert.ok((meta(SHELL, 'property', 'og:title') || '').includes('LEVONIS'));
   assert.ok((meta(SHELL, 'property', 'og:description') || '').length > 20);

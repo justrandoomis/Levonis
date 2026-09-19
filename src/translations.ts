@@ -249,6 +249,49 @@ export const translations = {
     svcRewardsTitle: "Points & rewards",
     svcRewardsDesc: "Earn on every order and spend it on your next one.",
     svcCompareTitle: "Comparison",
+
+    // ---- Installing the shop as an app (PWA). There is no single install
+    // API: Chromium hands the page an event and one tap does it, Safari on
+    // iOS fires nothing and the customer must tap Share themselves, and an
+    // in-app browser can install nothing at all. Every one of those paths is
+    // written out below, because the alternative is a button that silently
+    // does nothing on the phone the owner is holding. `src/lib/pwa.ts` picks
+    // which of these keys a given browser sees; it never builds a sentence.
+    pwaInstallTitle: "Install the app",
+    pwaInstallHeading: "Install {name} on your device",
+    pwaInstallWhy: "It opens like an app: no browser bar, an icon on your home screen, and it starts faster.",
+    pwaInstallHonesty: "You still need a connection to shop — prices and stock are fetched from the server every time and are never kept on the device.",
+    pwaInstallNow: "Install now",
+    pwaInstallLater: "Not now",
+    pwaInstallClose: "Close",
+    pwaInstallStepsTitle: "The steps in your browser:",
+    pwaInstallDone: "The app is installed on this device.",
+    pwaInstallInAppTitle: "Open the link in your browser",
+    pwaInstallInAppHow: "You are inside another app's built-in browser, and it cannot install anything. Open its menu, choose 'Open in browser', then try again from there.",
+    pwaInstallNoneHere: "This desktop browser does not install sites as apps. Use Chrome or Edge, or install it from your phone.",
+    pwaSettingsNote: "Add the shop to your home screen so it opens like an app. On iPhone it is added from Safari's Share button — the steps are shown to you.",
+    pwaUpdateReady: "An app update is ready",
+    pwaUpdateAction: "Update",
+    pwaUpdateLater: "Later",
+    pwaUpdateApplying: "Updating…",
+    pwaStepIosShare: "Tap the Share button in Safari's bottom bar — the square with an arrow pointing up.",
+    pwaStepIosOtherShare: "Tap the Share button in your browser — the square with an arrow pointing up.",
+    pwaStepIosAdd: "Scroll down the menu and choose 'Add to Home Screen'.",
+    pwaStepIosConfirm: "Tap 'Add' at the top of the screen.",
+    pwaStepIosUseSafari: "If the option is not there, open the link in Safari and repeat the two steps.",
+    pwaStepAndroidMenu: "Open the browser menu '⋮' at the top of the screen.",
+    pwaStepAndroidAdd: "Choose 'Install app' or 'Add to Home screen'.",
+    pwaStepAndroidConfirm: "Tap 'Install' to confirm.",
+    pwaStepHuaweiMenu: "Open the browser menu '⋮' at the bottom of the screen.",
+    pwaStepHuaweiAdd: "Choose 'Add to home screen'.",
+    pwaStepSamsungMenu: "Open the browser menu '☰' at the bottom of the screen.",
+    pwaStepSamsungAdd: "Choose 'Add page to', then 'Home screen'.",
+    pwaStepFirefoxMenu: "Open the browser menu '⋮'.",
+    pwaStepFirefoxAdd: "Choose 'Add to Home screen'.",
+    pwaStepDesktopIcon: "Click the install icon at the end of the address bar.",
+    pwaStepDesktopConfirm: "Click 'Install' in the browser's dialog.",
+    pwaStepGenericMenu: "Open your browser's menu.",
+    pwaStepGenericAdd: "Look for 'Add to Home screen' or 'Install app'.",
   },
   ar: {
     active: "نشط",
@@ -478,6 +521,49 @@ export const translations = {
     svcRewardsTitle: "النقاط والمكافآت",
     svcRewardsDesc: "اجمع نقاطًا مع كل طلب واصرفها في الطلب التالي.",
     svcCompareTitle: "المقارنة",
+
+    // ---- Installing the shop as an app (PWA). There is no single install
+    // API: Chromium hands the page an event and one tap does it, Safari on
+    // iOS fires nothing and the customer must tap Share themselves, and an
+    // in-app browser can install nothing at all. Every one of those paths is
+    // written out below, because the alternative is a button that silently
+    // does nothing on the phone the owner is holding. `src/lib/pwa.ts` picks
+    // which of these keys a given browser sees; it never builds a sentence.
+    pwaInstallTitle: "تحميل التطبيق",
+    pwaInstallHeading: "ثبّت {name} على جهازك",
+    pwaInstallWhy: "يفتح مثل التطبيق تمامًا: من دون شريط المتصفح، وبأيقونة على الشاشة الرئيسية، وأسرع في الفتح.",
+    pwaInstallHonesty: "يبقى الاتصال بالإنترنت ضروريًا للشراء — الأسعار والتوفّر تُجلب من الخادم في كل مرة ولا تُحفظ على الجهاز.",
+    pwaInstallNow: "تثبيت الآن",
+    pwaInstallLater: "ليس الآن",
+    pwaInstallClose: "إغلاق",
+    pwaInstallStepsTitle: "الخطوات على متصفحك:",
+    pwaInstallDone: "التطبيق مثبّت على هذا الجهاز.",
+    pwaInstallInAppTitle: "افتح الرابط في المتصفح",
+    pwaInstallInAppHow: "أنت داخل متصفح مدمج في تطبيق آخر، وهو لا يستطيع تثبيت أي شيء. افتح قائمته واختر «فتح في المتصفح»، ثم أعد المحاولة من هناك.",
+    pwaInstallNoneHere: "هذا المتصفح على الحاسوب لا يثبّت المواقع كتطبيقات. استخدم Chrome أو Edge، أو ثبّته من هاتفك.",
+    pwaSettingsNote: "أضف المتجر إلى شاشتك الرئيسية ليفتح مثل التطبيق. على الآيفون تتم الإضافة من زر «مشاركة» في Safari، ونعرض لك الخطوات.",
+    pwaUpdateReady: "يتوفر تحديث للتطبيق",
+    pwaUpdateAction: "تحديث",
+    pwaUpdateLater: "لاحقًا",
+    pwaUpdateApplying: "جارٍ التحديث…",
+    pwaStepIosShare: "اضغط زر «مشاركة» في شريط Safari بالأسفل — المربّع الذي يخرج منه سهم إلى الأعلى.",
+    pwaStepIosOtherShare: "اضغط زر «مشاركة» في متصفحك — المربّع الذي يخرج منه سهم إلى الأعلى.",
+    pwaStepIosAdd: "انزل في القائمة واختر «إضافة إلى الشاشة الرئيسية».",
+    pwaStepIosConfirm: "اضغط «إضافة» في أعلى الشاشة.",
+    pwaStepIosUseSafari: "إن لم يظهر الخيار، افتح الرابط في متصفح Safari وكرّر الخطوتين.",
+    pwaStepAndroidMenu: "افتح قائمة المتصفح «⋮» في أعلى الشاشة.",
+    pwaStepAndroidAdd: "اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».",
+    pwaStepAndroidConfirm: "اضغط «تثبيت» للتأكيد.",
+    pwaStepHuaweiMenu: "افتح قائمة المتصفح «⋮» في أسفل الشاشة.",
+    pwaStepHuaweiAdd: "اختر «إضافة إلى الشاشة الرئيسية».",
+    pwaStepSamsungMenu: "افتح قائمة المتصفح «☰» في أسفل الشاشة.",
+    pwaStepSamsungAdd: "اختر «إضافة الصفحة إلى» ثم «الشاشة الرئيسية».",
+    pwaStepFirefoxMenu: "افتح قائمة المتصفح «⋮».",
+    pwaStepFirefoxAdd: "اختر «إضافة إلى الشاشة الرئيسية».",
+    pwaStepDesktopIcon: "اضغط أيقونة التثبيت في نهاية شريط العنوان.",
+    pwaStepDesktopConfirm: "اضغط «تثبيت» في نافذة المتصفح.",
+    pwaStepGenericMenu: "افتح قائمة متصفحك.",
+    pwaStepGenericAdd: "ابحث عن «إضافة إلى الشاشة الرئيسية» أو «تثبيت التطبيق».",
   },
   ckb: {
     active: "چالاکە",
@@ -707,5 +793,48 @@ export const translations = {
     svcRewardsTitle: "خاڵ و خەڵات",
     svcRewardsDesc: "لەگەڵ هەر داواکارییەک خاڵ کۆبکەرەوە و لە داواکاری داهاتوودا خەرجی بکە.",
     svcCompareTitle: "بەراورد",
+
+    // ---- Installing the shop as an app (PWA). There is no single install
+    // API: Chromium hands the page an event and one tap does it, Safari on
+    // iOS fires nothing and the customer must tap Share themselves, and an
+    // in-app browser can install nothing at all. Every one of those paths is
+    // written out below, because the alternative is a button that silently
+    // does nothing on the phone the owner is holding. `src/lib/pwa.ts` picks
+    // which of these keys a given browser sees; it never builds a sentence.
+    pwaInstallTitle: "داگرتنی ئەپ",
+    pwaInstallHeading: "{name} لەسەر ئامێرەکەت دابمەزرێنە",
+    pwaInstallWhy: "وەک ئەپێک دەکرێتەوە: بەبێ شریتی وێبگەڕ، بە ئایکۆنێک لەسەر شاشەی سەرەکی، و خێراتر دەکرێتەوە.",
+    pwaInstallHonesty: "بۆ کڕین هێشتا پێویستت بە ئینتەرنێتە — نرخ و بوونی بەرهەم هەر جارە لە ڕاژەکارەوە دەهێنرێن و لەسەر ئامێرەکە هەڵناگیرێن.",
+    pwaInstallNow: "ئێستا دایبمەزرێنە",
+    pwaInstallLater: "ئێستا نا",
+    pwaInstallClose: "داخستن",
+    pwaInstallStepsTitle: "هەنگاوەکان لە وێبگەڕەکەتدا:",
+    pwaInstallDone: "ئەپەکە لەسەر ئەم ئامێرە دامەزراوە.",
+    pwaInstallInAppTitle: "بەستەرەکە لە وێبگەڕدا بکەرەوە",
+    pwaInstallInAppHow: "تۆ لە ناو وێبگەڕێکی ناوەکیی ئەپێکی تردایت و ناتوانێت هیچ شتێک دابمەزرێنێت. لیستەکەی بکەرەوە و «کردنەوە لە وێبگەڕ» هەڵبژێرە، پاشان لەوێوە دووبارە هەوڵ بدەوە.",
+    pwaInstallNoneHere: "ئەم وێبگەڕەی سەر کۆمپیوتەر ماڵپەڕ وەک ئەپ دانامەزرێنێت. Chrome یان Edge بەکاربهێنە، یان لە مۆبایلەکەتەوە دایبمەزرێنە.",
+    pwaSettingsNote: "فرۆشگاکە زیاد بکە بۆ شاشەی سەرەکی تا وەک ئەپ بکرێتەوە. لەسەر ئایفۆن لە ڕێگەی دوگمەی «هاوبەشکردن» لە Safari زیاد دەکرێت، و هەنگاوەکانت پیشان دەدەین.",
+    pwaUpdateReady: "نوێکردنەوەیەک بۆ ئەپەکە بەردەستە",
+    pwaUpdateAction: "نوێکردنەوە",
+    pwaUpdateLater: "دواتر",
+    pwaUpdateApplying: "نوێ دەکرێتەوە…",
+    pwaStepIosShare: "دوگمەی «هاوبەشکردن» لە شریتی خوارەوەی Safari دابگرە — ئەو چوارگۆشەیەی تیرێکی بەرەو سەرەوەی لێ دەردەچێت.",
+    pwaStepIosOtherShare: "دوگمەی «هاوبەشکردن» لە وێبگەڕەکەتدا دابگرە — ئەو چوارگۆشەیەی تیرێکی بەرەو سەرەوەی لێ دەردەچێت.",
+    pwaStepIosAdd: "لە لیستەکەدا بەرەو خوارەوە بڕۆ و «زیادکردن بۆ شاشەی سەرەکی» هەڵبژێرە.",
+    pwaStepIosConfirm: "لە سەرەوەی شاشەکە «زیادکردن» دابگرە.",
+    pwaStepIosUseSafari: "ئەگەر ئەم هەڵبژاردەیە نەبوو، بەستەرەکە لە Safari بکەرەوە و هەردوو هەنگاوەکە دووبارە بکەرەوە.",
+    pwaStepAndroidMenu: "لیستی وێبگەڕ «⋮» لە سەرەوەی شاشەکە بکەرەوە.",
+    pwaStepAndroidAdd: "«دامەزراندنی ئەپ» یان «زیادکردن بۆ شاشەی سەرەکی» هەڵبژێرە.",
+    pwaStepAndroidConfirm: "بۆ دڵنیاکردنەوە «دامەزراندن» دابگرە.",
+    pwaStepHuaweiMenu: "لیستی وێبگەڕ «⋮» لە خوارەوەی شاشەکە بکەرەوە.",
+    pwaStepHuaweiAdd: "«زیادکردن بۆ شاشەی سەرەکی» هەڵبژێرە.",
+    pwaStepSamsungMenu: "لیستی وێبگەڕ «☰» لە خوارەوەی شاشەکە بکەرەوە.",
+    pwaStepSamsungAdd: "«زیادکردنی پەڕە بۆ» پاشان «شاشەی سەرەکی» هەڵبژێرە.",
+    pwaStepFirefoxMenu: "لیستی وێبگەڕ «⋮» بکەرەوە.",
+    pwaStepFirefoxAdd: "«زیادکردن بۆ شاشەی سەرەکی» هەڵبژێرە.",
+    pwaStepDesktopIcon: "ئایکۆنی دامەزراندن لە کۆتایی شریتی ناونیشان دابگرە.",
+    pwaStepDesktopConfirm: "لە پەنجەرەی وێبگەڕدا «دامەزراندن» دابگرە.",
+    pwaStepGenericMenu: "لیستی وێبگەڕەکەت بکەرەوە.",
+    pwaStepGenericAdd: "بەدوای «زیادکردن بۆ شاشەی سەرەکی» یان «دامەزراندنی ئەپ» بگەڕێ.",
   }
 };
