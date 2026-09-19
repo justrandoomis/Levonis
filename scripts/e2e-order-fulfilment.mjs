@@ -15,6 +15,16 @@
  *   * the price breakdown, collapsed until asked for
  *   * a chat about the order, in the same modal, without navigating away
  *
+ * Since the board was rebuilt it also checks the screen that LISTS the orders:
+ *   * one header line of server counts, one search box, and ONE row of three
+ *     controls — not seven status chips in a sideways-scrolling strip
+ *   * a day-grouped list of cards at EVERY width, with headers that really do
+ *     stick (nothing between them and the page scroller scrolls sideways)
+ *   * a row that names the person and the governorate rather than an email,
+ *     keeps the PRO badge, and marks a day that moved
+ *   * the search box being labelled with the reading the SERVER chose, and the
+ *     browser never re-filtering what the server already folded
+ *
  * Clipboard reads need a granted permission, so the context grants it and the
  * test asserts the CLIPBOARD CONTENT — not merely that a button exists.
  *
@@ -238,6 +248,24 @@ async function main() {
     JSON.stringify((filteredList.data?.orders ?? []).map((o) => o.status).slice(0, 8))
   );
 
+  // ---- what the BOARD is built out of. Every one of these is computed on the
+  // server against the one Baghdad day boundary; the screen renders them and
+  // re-derives none of them, because between 00:00 and 03:00 Baghdad a
+  // UTC-derived "today" in the admin's browser is still yesterday — which is
+  // exactly the early-morning shift when the delivery runs are planned.
+  check('the board answers with its day counts', typeof list.data?.counts?.today === 'number', JSON.stringify(list.data?.counts));
+  check('and with the anchors they were counted against', /^\d{4}-\d{2}-\d{2}$/.test(String(list.data?.today)), String(list.data?.today));
+  check(
+    'every row carries its bucket and its rendered day label',
+    (list.data?.orders ?? []).every((o) => typeof o.due_bucket === 'string' && typeof o.due_label === 'string'),
+    JSON.stringify((list.data?.orders ?? []).map((o) => [o.due_bucket, o.due_label]).slice(0, 4))
+  );
+  check(
+    'and the delivery name, so a row never has to fall back to an email',
+    (list.data?.orders ?? []).every((o) => o.address && typeof o.address === 'object'),
+    'an order came back with no parsed address'
+  );
+
   // ---- corrections in both directions
   console.log('\n1b. an order can be corrected, not just advanced');
   const move = async (to) => admin.call('PATCH', `/api/admin/orders/${orderId}`, { status: to });
@@ -266,6 +294,66 @@ async function main() {
   // moves" check below assert the opposite of what it means to.
   r2 = await move('processing');
   check('the fixture is left mid-flight for the UI checks', r2.status === 200, JSON.stringify(r2.data).slice(0, 140));
+
+  /**
+   * THE THREE FACTS THE BOARD IS ABOUT, written onto the fixture directly.
+   *
+   * `delivery_due_day` is taken from the SERVER's own `today` — never from
+   * this process's clock, which is the same mistake the screen is forbidden to
+   * make. `delivery_day_changed_at` is what makes the row say «مؤجل»: an order
+   * that silently sinks down the list looks, to the admin who read it this
+   * morning, like an order that vanished. `priority` is the owner's pin
+   * («طلباتهم مثبتة في الأعلى دائما»), and its badge is the only visible
+   * evidence that the pin is working at all.
+   */
+  const today = String((await admin.get('/api/admin/orders?limit=1')).data?.today ?? '');
+  check('the server names its own Baghdad day', /^\d{4}-\d{2}-\d{2}$/.test(today), today);
+  sql(
+    `UPDATE orders SET delivery_due_day='${today}', delivery_day_changed_at='${today}T09:00:00.000Z', ` +
+      `delivery_day_schedulable=1, priority=1 WHERE id='${orderId}'`
+  );
+  await settle();
+  const pinned = await admin.get('/api/admin/orders?limit=50');
+  const pinnedRow = (pinned.data?.orders ?? []).find((o) => o.id === orderId);
+  check('the fixture now sits in today\'s bucket', pinnedRow?.due_bucket === 'today', JSON.stringify(pinnedRow?.due_bucket));
+  check(
+    'and its day arrives already written as «اليوم» — the SPA never formats one',
+    pinnedRow?.due_label === 'اليوم',
+    JSON.stringify(pinnedRow?.due_label)
+  );
+  check('the moved day is reported', !!pinnedRow?.delivery_day_changed_at, JSON.stringify(pinnedRow?.delivery_day_changed_at));
+
+  // ---- the search, decided on the SERVER and never re-filtered in the browser
+  console.log('\n1c. one box, four readings, and the fold that makes them useful');
+  const search = async (q) => admin.get(`/api/admin/orders?q=${encodeURIComponent(q)}&limit=20`);
+  let sr = await search(orderId);
+  check('an order number is read as an order number', sr.data?.search_kind === 'order_id', String(sr.data?.search_kind));
+  check('and it PIERCES the board rather than honouring its filters', sr.data?.search?.pierced === true, JSON.stringify(sr.data?.search));
+  sr = await search(PHONE);
+  check('a phone number is read as a phone number', sr.data?.search_kind === 'phone', String(sr.data?.search_kind));
+  sr = await search('5-9');
+  check('«5-9» is read as a date', sr.data?.search_kind === 'date', String(sr.data?.search_kind));
+  check(
+    'day-first, as Iraq writes it, with the other reading offered rather than OR-ed in',
+    sr.data?.search?.date?.assumed_day_first === true && /^\d{4}-05-09$/.test(String(sr.data?.search?.date?.flip_day)),
+    JSON.stringify(sr.data?.search?.date)
+  );
+  /**
+   * THE ASSERTION THAT PROTECTS THE WHOLE FEATURE. «الإختبار» is written with
+   * a hamza the stored name does not have. The server folds Arabic orthography
+   * on BOTH sides of the comparison, so it matches — and a
+   * `.toLowerCase().includes()` laid over the results in the browser, the way
+   * src/components/AdminUsers.tsx does over its own, would then hide the very
+   * row the fold just found. It would pass in English and fail silently in
+   * Arabic, which is the only language this screen is used in.
+   */
+  sr = await search('الإختبار');
+  check('a name is read as a name', sr.data?.search_kind === 'name', String(sr.data?.search_kind));
+  check(
+    'and a hamza the stored name does not carry still finds it — the fold is the feature',
+    (sr.data?.orders ?? []).some((o) => o.id === orderId),
+    JSON.stringify((sr.data?.orders ?? []).map((o) => o.id).slice(0, 5))
+  );
 
   // ------------------------------------------------------------ the modal
   const browser = await chromium.launch({
@@ -297,43 +385,194 @@ async function main() {
       await page.waitForTimeout(400);
     }
     await page.locator('[data-tab="orders"]:visible').first().click({ timeout: 15000 });
-    await page.waitForTimeout(1200);
+    // The board is its own lazy chunk now, like the other nineteen panels, so
+    // wait for the thing itself rather than for a guess at how long it takes.
+    await page.waitForSelector('[data-order-filters]', { timeout: 15000 });
+    await page.waitForTimeout(800);
 
     // ---- the list itself, before anything is opened
+    //
+    // WHAT THIS BLOCK ASSERTED BEFORE, AND WHY IT CHANGED. It pinned SEVEN
+    // status chips in a horizontally scrolling strip, plus "cards on a phone,
+    // a table from the tablet up". The board is now four things rather than a
+    // filter panel: one header line of counts, one search box, ONE ROW OF
+    // THREE controls (type, status, an archive switch — «أكثر تنسيقا» is
+    // better organised, not more controls), and one day-grouped list of cards
+    // at EVERY width. The 44px floor and the no-sideways-scroll rule are the
+    // two assertions that carried over unchanged, because they are about
+    // fingers and phones rather than about this particular layout.
     const layout = await page.evaluate(() => {
       const strip = document.querySelector('[data-order-filters]');
-      const buttons = strip ? [...strip.querySelectorAll('[data-order-filter]')] : [];
-      const last = buttons[buttons.length - 1];
+      const controls = strip ? [...strip.querySelectorAll('[data-order-filter]')] : [];
+      const groups = [...document.querySelectorAll('[data-order-group]')];
+      const header = groups[0]?.querySelector('h3') ?? null;
+      /**
+       * THE STICKY FAILURE THIS ENCODES. A `position: sticky` header sticks to
+       * its nearest SCROLLING ancestor, so a grouped list retrofitted onto the
+       * old 820px-min table would stop sticking the moment it was wrapped in
+       * `overflow-x-auto` — and only at the desktop breakpoint, where the
+       * table was. Computed position alone would not catch that: the rule
+       * would still say `sticky` while sticking to a box the size of the
+       * table. So the ancestors are walked too.
+       */
+      let clippedBy = null;
+      for (let el = header?.parentElement; el && el !== document.body; el = el.parentElement) {
+        const ox = getComputedStyle(el).overflowX;
+        if (ox === 'auto' || ox === 'scroll') { clippedBy = el.className || el.tagName; break; }
+        if (el.scrollHeight > el.clientHeight + 1 && getComputedStyle(el).overflowY === 'auto') break;
+      }
       return {
-        filters: buttons.length,
-        // A strip whose content is wider than its box must be SCROLLABLE. It
-        // used to sit in a flex row with no min-w-0, so on a phone the row
-        // refused to shrink and the last filters were simply unreachable.
-        stripScrollable: strip ? strip.scrollWidth > strip.clientWidth + 1 : false,
-        stripOverflows: strip ? getComputedStyle(strip).overflowX : null,
-        lastFilterReachable: !!last && last.getBoundingClientRect().width > 0,
-        shortestFilter: buttons.length
-          ? Math.round(Math.min(...buttons.map((b) => b.getBoundingClientRect().height)))
+        filters: controls.map((c) => c.getAttribute('data-order-filter')),
+        // Three controls in one row must FIT. The old strip solved its overflow
+        // by scrolling; a row that needs scrolling to reach its third control
+        // has not replaced seven chips, it has hidden them.
+        stripFits: strip ? strip.scrollWidth <= strip.clientWidth + 1 : false,
+        shortestFilter: controls.length
+          ? Math.round(Math.min(...controls.map((c) => c.getBoundingClientRect().height)))
           : 0,
+        searchBoxes: document.querySelectorAll('[data-order-search]').length,
+        statusSelectsOnList: document.querySelectorAll('[data-order-status-select]').length,
+        buckets: document.querySelector('[data-order-buckets]')?.textContent?.trim() ?? '',
+        groups: groups.map((g) => g.getAttribute('data-order-group')),
+        headerPosition: header ? getComputedStyle(header).position : null,
+        headerClippedBy: clippedBy,
         cards: document.querySelectorAll('[data-order-card]').length,
         tables: [...document.querySelectorAll('table')].filter((t) => t.getBoundingClientRect().width > 0).length,
         docOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       };
     });
-    check(`${width}px — all seven status filters are rendered`, layout.filters === 7, JSON.stringify(layout.filters));
-    check(`${width}px — every filter is at least 44px tall`, layout.shortestFilter >= 44, `${layout.shortestFilter}px`);
     check(
-      `${width}px — the filter strip can be scrolled to its last filter`,
-      layout.stripOverflows === 'auto' || layout.stripOverflows === 'scroll' || !layout.stripScrollable,
-      JSON.stringify(layout)
+      `${width}px — three controls, not seven chips: type, status, archive`,
+      JSON.stringify(layout.filters) === JSON.stringify(['type', 'status', 'archive']),
+      JSON.stringify(layout.filters)
     );
+    check(`${width}px — every control is at least 44px tall`, layout.shortestFilter >= 44, `${layout.shortestFilter}px`);
+    check(`${width}px — the three controls fit their row without scrolling`, layout.stripFits, JSON.stringify(layout));
+    check(`${width}px — there is exactly one search box`, layout.searchBoxes === 1, String(layout.searchBoxes));
     check(`${width}px — the orders list does not scroll the page sideways`, layout.docOverflow <= 1, `${layout.docOverflow}px`);
-    if (width === 390) {
-      // CARDS on a phone. A seven-column table on a 390px screen puts the one
-      // control the owner came for off the right edge of a sideways scroll.
-      check('390px — orders render as cards, not a wide table', layout.cards > 0 && layout.tables === 0, JSON.stringify(layout));
-    } else {
-      check(`${width}px — orders render as a table from the tablet up`, layout.tables === 1, JSON.stringify(layout));
+
+    // The header line is the owner's morning question, answered before any
+    // click: it comes from the server's counts and it is TEXT, not chips.
+    check(
+      `${width}px — the header line names today and tomorrow`,
+      /اليوم|Today/.test(layout.buckets) && /غدًا|Tomorrow/.test(layout.buckets),
+      JSON.stringify(layout.buckets)
+    );
+
+    // ONE LAYOUT AT EVERY WIDTH. The grouped list is built as cards from the
+    // phone up precisely so the sticky headers below cannot be broken by a
+    // table's own horizontal scroller at one breakpoint only.
+    check(`${width}px — orders render as cards, never a wide table`, layout.cards > 0 && layout.tables === 0, JSON.stringify(layout));
+
+    // The WHEN dimension is answered by the shape of the list, not by a
+    // control — so the day headers have to actually be there, and stick.
+    check(`${width}px — the list is grouped by day`, layout.groups.length > 0, JSON.stringify(layout.groups));
+    check(`${width}px — the day headers are sticky`, layout.headerPosition === 'sticky', String(layout.headerPosition));
+    check(
+      `${width}px — and nothing between a header and the page scroller scrolls sideways`,
+      layout.headerClippedBy === null,
+      String(layout.headerClippedBy)
+    );
+
+    // The per-row status dropdown is GONE from the list. It moved into the
+    // modal's stage panel, which is already the authority — the mis-tap it
+    // caused on a scan-and-tap list is recorded in this page's own history.
+    check(`${width}px — no status dropdown on a list row`, layout.statusSelectsOnList === 0, String(layout.statusSelectsOnList));
+
+    // ---- what the row says: the person and the place, never the email
+    const row = await page.evaluate((id) => {
+      const el = document.querySelector(`[data-order-card="${id}"]`);
+      if (!el) return null;
+      return {
+        text: el.innerText,
+        pro: el.querySelectorAll('[data-order-pro]').length,
+        day: el.querySelector('[data-order-day]')?.getAttribute('data-order-day') ?? null,
+        dayText: el.querySelector('[data-order-day]')?.textContent?.trim() ?? '',
+        postponed: el.querySelectorAll('[data-order-postponed]').length,
+        kind: el.querySelector('[data-order-kind]')?.getAttribute('data-order-kind') ?? null,
+        actions: el.querySelectorAll('button, a').length,
+      };
+    }, orderId);
+    check(`${width}px — the order has a row`, !!row, String(row));
+    if (row) {
+      check(`${width}px — the row names the person the parcel is for`, row.text.includes(NAME), JSON.stringify(row.text.slice(0, 160)));
+      check(`${width}px — and where it is going, by NAME`, row.text.includes('بغداد'), JSON.stringify(row.text.slice(0, 160)));
+      check(
+        `${width}px — and NOT the customer's email, which is useless to someone packing a box`,
+        !row.text.includes(email),
+        JSON.stringify(row.text.slice(0, 160))
+      );
+      check(`${width}px — the row carries the journey badge`, row.kind === 'direct', String(row.kind));
+      // THE PRO BADGE MUST SURVIVE THE COMPACT ROW. Inside one day the ordering
+      // is entirely tie-breaks; drop the badge for space and the owner loses
+      // the only visible evidence that the pin they asked for is working.
+      check(`${width}px — the PRO badge survives the compact row`, row.pro === 1, JSON.stringify(row));
+      check(`${width}px — the day chip reads "today" from the server's bucket`, row.day === 'today', String(row.day));
+      check(`${width}px — a day that MOVED is marked «مؤجل»`, row.postponed === 1, JSON.stringify(row));
+      // One primary action per row. The delete verb only exists on a cancelled
+      // order, and this fixture is not one.
+      check(`${width}px — the row carries one action, not a control panel`, row.actions === 1, String(row.actions));
+    }
+
+    // ---- ONE BOX, AND A CHIP THAT SAYS WHAT IT DID (1024 only: this is about
+    // behaviour, not about layout, and driving it at four widths buys nothing).
+    if (width === 1024) {
+      const box = page.locator('[data-order-search]');
+      const kindOf = () =>
+        page.evaluate(() => document.querySelector('[data-order-search-kind]')?.getAttribute('data-order-search-kind') ?? null);
+
+      /**
+       * THE SEARCH RESETS THE PAGE, AND THAT IS NOT A DETAIL. Typed from page
+       * 4, a search asks the server for rows 90-120 of a result set that now
+       * has one row in it, and the admin lands on an empty screen for a search
+       * that MATCHED. Only exercised when this database actually has a second
+       * page; the run says so either way rather than reporting a silent pass.
+       */
+      const pager = page.locator('[data-orders-next]');
+      const paged = (await pager.count()) > 0 && (await pager.first().isEnabled());
+      if (paged) {
+        await pager.first().click();
+        await page.waitForTimeout(1200);
+      }
+
+      await box.fill('الإختبار');
+      await page.waitForTimeout(1400);
+      check('1024px — a typed name is labelled as a name', (await kindOf()) === 'name', String(await kindOf()));
+      check(
+        paged
+          ? '1024px — searching from page 2 lands on the match, not on an empty page 2'
+          : '1024px — the match is on screen (one page of orders in this database)',
+        (await page.locator(`[data-order-card="${orderId}"]`).count()) === 1
+      );
+      // The row the SERVER's Arabic fold found is still on screen. A
+      // `.toLowerCase().includes()` over the results — the pattern
+      // src/components/AdminUsers.tsx uses over its own — would have removed it
+      // here, because it does no folding and «الإختبار» is not a substring of
+      // the stored «زبون الاختبار».
+      check('1024px — and the browser did not re-filter the fold away', (await page.locator('[data-order-card]').count()) >= 1);
+
+      await box.fill(PHONE);
+      await page.waitForTimeout(1400);
+      check('1024px — a typed phone number is labelled as one', (await kindOf()) === 'phone', String(await kindOf()));
+      check(
+        '1024px — and the screen says the lookup ignored the board',
+        (await page.locator('[data-order-search-pierced]').count()) === 1
+      );
+
+      await box.fill('5-9');
+      await page.waitForTimeout(1400);
+      check('1024px — an ambiguous date is labelled as a date', (await kindOf()) === 'date', String(await kindOf()));
+      const flip = page.locator('[data-order-search-flip]');
+      check('1024px — with the other reading one tap away', (await flip.count()) === 1);
+      if ((await flip.count()) === 1) {
+        await flip.first().click();
+        await page.waitForTimeout(1400);
+        check('1024px — the flip lands on a day that cannot be read two ways', (await kindOf()) === 'date' && (await page.locator('[data-order-search-flip]').count()) === 0);
+      }
+
+      await page.locator('[data-order-search-clear]').click();
+      await page.waitForTimeout(1400);
+      check('1024px — clearing the box gives the board back', (await page.locator(`[data-order-card="${orderId}"]`).count()) === 1);
     }
 
     if (width === 390 || width === 1024) {
@@ -449,9 +688,16 @@ async function main() {
     const itemText = await page.locator('[data-order-item]').first().innerText();
     check(`${width}px — the quantity is on the card`, /2/.test(itemText), JSON.stringify(itemText.slice(0, 120)));
 
-    // The status control must offer real choices, not two.
+    // THE STATUS CONTROL LIVES HERE NOW, UNDER THE STAGES. It was on every row
+    // of the board, beside the one button the owner came for, on a list they
+    // scan with a thumb — and this page's own history records the mis-tap that
+    // caused. The stage panel above it is the ordinary route; the dropdown is
+    // the correction path (`delivered` back to `shipped`) that the stage graph
+    // does not offer as a forward move.
+    await page.locator('[data-order-tab="stages"]').click();
+    await page.waitForSelector('[data-order-status-correction]', { timeout: 15000 });
+    check(`${width}px — the stage panel is the authority, and it is on screen`, (await page.locator('[data-order-stages]').count()) === 1);
     const options = await page.evaluate(() => {
-      // Both layouts are in the DOM; read the one actually on screen.
       const sel = [...document.querySelectorAll('[data-order-status-select]')].find(
         (e) => e.getBoundingClientRect().width > 0
       );
@@ -462,6 +708,8 @@ async function main() {
       options.length >= 3,
       JSON.stringify(options)
     );
+    await page.locator('[data-order-tab="order"]').click();
+    await page.waitForTimeout(400);
 
     // Nothing spills — this is a modal on a phone.
     const overflow = await page.evaluate(

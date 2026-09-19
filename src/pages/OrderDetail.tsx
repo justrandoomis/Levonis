@@ -23,6 +23,8 @@ import PriceProtection from '../components/orders/PriceProtection';
 import SupportActions from '../components/orders/SupportActions';
 import CancelOrderSheet from '../components/orders/CancelOrderSheet';
 import ReviewSheet from '../components/orders/ReviewSheet';
+import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
+import { apiRefusal } from '../lib/refusalStrings';
 import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, statusLabel, statusStyle } from '../components/orders/format';
 
 /**
@@ -74,6 +76,8 @@ const STRINGS = {
     cancelledNotice: 'أُلغي الطلب.',
     reviewThanks: 'شكرًا — مراجعتك بانتظار الاعتماد.',
     linkedNotice: 'تم ربط الجهاز بحسابك.',
+    dayChanged: 'تم تغيير يوم التوصيل.',
+    dayFailed: 'تعذّر تغيير يوم التوصيل.',
     notFoundBack: 'رجوع إلى الطلبات',
   },
   en: {
@@ -102,6 +106,8 @@ const STRINGS = {
     cancelledNotice: 'The order was cancelled.',
     reviewThanks: 'Thank you — your review is awaiting approval.',
     linkedNotice: 'The device is now linked to your account.',
+    dayChanged: 'The delivery day was changed.',
+    dayFailed: 'The delivery day could not be changed.',
     notFoundBack: 'Back to orders',
   },
   ckb: {
@@ -130,6 +136,8 @@ const STRINGS = {
     cancelledNotice: 'داواکارییەکە هەڵوەشێنرایەوە.',
     reviewThanks: 'سوپاس — پێداچوونەوەکەت چاوەڕێی پەسەندکردنە.',
     linkedNotice: 'ئامێرەکە بە هەژمارەکەت بەسترا.',
+    dayChanged: 'ڕۆژی گەیاندن گۆڕدرا.',
+    dayFailed: 'ڕۆژی گەیاندن نەگۆڕدرا.',
     notFoundBack: 'گەڕانەوە بۆ داواکارییەکان',
   },
 };
@@ -196,9 +204,28 @@ export default function OrderDetail() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewItem, setReviewItem] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
+  /**
+   * THE DAY THE CUSTOMER JUST TAPPED, ahead of the server confirming it.
+   *
+   * `undefined` means "follow the order", which is the resting state; a string
+   * or `null` is a pick in flight. Apple's first rule of a fluid interface is
+   * response — a chip that stays unpressed until a round trip completes reads
+   * as a dead control, and the customer taps it again. On a refusal this goes
+   * straight back to `undefined`, because the server's answer is the only one.
+   */
+  const [dayPick, setDayPick] = useState<string | null | undefined>(undefined);
+  const [daySaving, setDaySaving] = useState(false);
+  const [dayError, setDayError] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  /**
+   * `quiet` RELOADS WITHOUT REPLACING THE SCREEN WITH A SKELETON. A day change
+   * is a one-field edit on a page the customer is looking at; swapping the
+   * whole detail for the loading skeleton after a chip tap loses their scroll
+   * position and reads as a navigation. The noisy form stays the default —
+   * cancelling an order really does change the whole page.
+   */
+  const load = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (!opts?.quiet) setLoading(true);
     setOrderError(null);
     const [o, t, u] = await Promise.allSettled([
       api.get<{ order: ApiOrder }>(`/api/orders/${encodeURIComponent(id)}`),
@@ -269,6 +296,35 @@ export default function OrderDetail() {
   const onReviewSubmitted = (productId: string) => {
     setReviewed((prev) => new Set([...(prev ?? []), productId]));
     setNotice(s.reviewThanks);
+  };
+
+  /**
+   * «يستطيع اختيار وتغيير يوم التوصيل في أي وقت يريد» — one PATCH, then the
+   * order is re-read rather than patched in place.
+   *
+   * RE-READING IS THE POINT. The day is not the only thing that moves with it:
+   * `delivery_day_changed_at` and the counter move too, and the route can
+   * refuse with `DELIVERY_DAY_RACED` when the admin created the courier
+   * shipment in the same second this screen was deciding. A screen that
+   * believed its own optimistic value would keep showing a day the row does
+   * not hold.
+   */
+  const onPickDay = async (day: string | null) => {
+    if (daySaving) return;
+    setDayPick(day);
+    setDaySaving(true);
+    setDayError('');
+    try {
+      await api.patch(`/api/orders/${encodeURIComponent(id)}/delivery-date`, { date: day });
+      setNotice(s.dayChanged);
+      await load({ quiet: true });
+      setDayPick(undefined);
+    } catch (err) {
+      setDayPick(undefined);
+      setDayError(apiRefusal(err, asLang(lang), s.dayFailed));
+    } finally {
+      setDaySaving(false);
+    }
   };
 
   // The pill names the CURRENT stage in the server's words when the tracker
@@ -371,6 +427,29 @@ export default function OrderDetail() {
               {tab === 'tracking' && (
                 <div className="flex flex-col gap-3">
                   <OrderTracker orderId={order.id} lang={lang} tracking={tracking} showTrackingNo={false} />
+                  {/*
+                    THE DAY SITS IN THE TRACKING TAB, directly under the
+                    tracker. This is the tab the customer already opened to ask
+                    "when", so the answer and the one control that changes it
+                    belong in the same column of the same screen. The summary
+                    card above the tabs is money, the order number and the PRO
+                    strip — a day chooser there would compete with the total for
+                    the first thing the eye lands on.
+                  */}
+                  {order.delivery_date && (
+                    <DeliveryDayPicker
+                      days={order.delivery_date.days}
+                      selected={dayPick === undefined ? order.delivery_date.selected : dayPick}
+                      canChange={order.delivery_date.can_change}
+                      reason={order.delivery_date.reason}
+                      onPick={onPickDay}
+                    />
+                  )}
+                  {dayError && (
+                    <p role="alert" className="lv-alert lv-alert-danger text-[12.5px] leading-[1.6] text-text-secondary">
+                      {dayError}
+                    </p>
+                  )}
                   {(tracking?.tracking_no || order.tracking_no) && (
                     <CopyField label={s.trackingNo} value={String(tracking?.tracking_no || order.tracking_no)} mono />
                   )}

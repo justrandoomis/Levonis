@@ -1,5 +1,5 @@
 import { MotionCharacterAnchor, MotionCharacterHome, useCharacterBusy } from '../components/bloub/MotionCharacterAnchor';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 // The standalone `loc` — this helper runs outside the component, and the
 // module-level translator is exactly what LanguageContext documents it for.
@@ -12,6 +12,18 @@ import {
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { api, ApiAddress, ApiError, ApiOrder, CartItem, formatIqd, newIdempotencyKey, usdCentsToIqd } from '../lib/api';
+import type { DeliveryDayOption } from '../lib/api';
+import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
+/**
+ * THE SAME THREE PURE FUNCTIONS THE SERVER USES, not a second implementation
+ * of them — see `offeredCheckoutDays` below for why this one screen computes a
+ * day at all. Both modules are leaves with no imports beyond each other, so
+ * nothing of the Worker runtime enters the bundle; the precedent is
+ * `src/lib/policyReader.ts`, which imports the search fold for the same
+ * reason — one table cannot drift from a copy that does not exist.
+ */
+import { baghdadDay } from '../../worker/lib/baghdadTime';
+import { dayLabel, deliveryWindow, resolveDeliveryDayPolicy } from '../../worker/lib/deliveryDay';
 import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
 import PromoCodeField, { readStoredPromo, storePromo } from '../components/PromoCodeField';
 import Note from '../components/ui/Note';
@@ -255,6 +267,9 @@ const STRINGS = {
     quoteLoading: 'جارٍ حساب التوصيل...',
     quoteError: 'تعذّر حساب عرض السعر — سيُعاد التحقق عند تأكيد الطلب.',
     needsConfig: 'رسوم توصيل جزء من هذا الطلب (طابعة/كرتونة إضافية) لم تُهيَّأ من الإدارة بعد، لذلك لا يمكن إتمام الطلب حالياً. لا نختلق رسوماً.',
+    // The day was refused at the door; the order itself is untouched and one
+    // press away, so the sentence says what happens if they press again.
+    dayRefused: 'لم يعد يوم التوصيل الذي اخترته متاحًا، فأُلغي الاختيار. اضغط «إتمام الطلب» مرة أخرى ليصلك في أقرب وقت، أو اختر يومًا آخر.',
     advanceDue: (v: string) => `رسوم توصيل الطابعة (${v}) تُدفع مقدماً من المحفظة.`,
     freeShipping: 'مجاناً',
     codTax: 'ضريبة الدفع عند الاستلام',
@@ -287,6 +302,7 @@ const STRINGS = {
     quoteLoading: 'Calculating delivery...',
     quoteError: 'The price quote could not be calculated — it will be re-checked when you place the order.',
     needsConfig: 'Delivery fees for part of this order (printer / extra carton) are not configured by the store yet, so the order cannot be completed right now. We never invent a fee.',
+    dayRefused: 'The delivery day you chose is no longer available, so the choice was cleared. Press Place order again to have it as soon as possible, or pick another day.',
     advanceDue: (v: string) => `Printer delivery fees (${v}) are paid in advance from your wallet.`,
     freeShipping: 'Free',
     codTax: 'Cash on Delivery Tax',
@@ -319,6 +335,7 @@ const STRINGS = {
     quoteLoading: 'حسابکردنی گەیاندن...',
     quoteError: 'نرخی گەیاندن حساب نەکرا — لە کاتی تەواوکردنی داواکاری دووبارە پشکنین دەکرێت.',
     needsConfig: 'کرێی گەیاندنی بەشێک لەم داواکارییە (پرینتەر/کارتۆنی زیادە) هێشتا لەلایەن بەڕێوەبەرایەتییەوە ڕێکنەخراوە، بۆیە ئێستا داواکارییەکە تەواو ناکرێت.',
+    dayRefused: 'ئەو ڕۆژەی گەیاندن کە هەڵتبژاردبوو چیتر بەردەست نییە، بۆیە هەڵبژاردنەکە سڕایەوە. دووبارە «تەواوکردنی داواکاری» دابگرە بۆ ئەوەی لە زووترین کاتدا بگات، یان ڕۆژێکی تر هەڵبژێرە.',
     advanceDue: (v: string) => `کرێی گەیاندنی پرینتەر (${v}) پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
     freeShipping: 'بەخۆڕایی',
     codTax: 'باجی پارەدان لە کاتی گەیاندن',
@@ -385,6 +402,45 @@ function refusalWithCounter(err: unknown, lang: string, fallback: string): strin
   return counter ? `${said} ${counter}` : said;
 }
 
+/**
+ * THE DAYS THIS CHECKOUT MAY OFFER — the one place in the app where the
+ * browser works out a calendar day, and the reason is that there is nothing
+ * yet to ask.
+ *
+ * Everywhere else the offer arrives ready-made: `GET /api/orders/:id` answers
+ * with `delivery_date.days[]`, labels included, because the order exists and
+ * the server knows its frozen ceiling. Before the order exists there is no row
+ * to read a ceiling off, which is exactly why `deliveryDayPolicy` is on
+ * `PUBLIC_SETTING_KEYS` — its comment there names this screen.
+ *
+ * WHAT IS AND IS NOT RISKED BY COMPUTING IT HERE. The bug the house rule
+ * guards against is TIMEZONE-DEPENDENT parsing and formatting:
+ * `new Date('2026-09-23')` is UTC midnight and renders as the twenty-second
+ * west of Baghdad, and `toLocaleDateString` answers in the device's calendar.
+ * Neither happens below. `baghdadDay` takes epoch milliseconds — a value with
+ * no timezone in it — and adds Iraq's fixed +3, so a correct phone in New York
+ * and a correct phone in Basra produce the same string. The only remaining
+ * input is whether the DEVICE CLOCK is right to within a day, and the server
+ * re-checks the chosen day against its own clock at the door
+ * (`refuseUnlessOffered`), so a wrong clock produces a loud refusal we handle,
+ * never a promise we cannot keep.
+ *
+ * The window is anchored on TODAY on both sides, which is what
+ * `checkoutDeliveryDay` does with `baghdadDayOf(created_at)` a moment later:
+ * an order is anchored on the day it is placed, so the offer here and the
+ * ceiling frozen on the row are the same seven days.
+ */
+function offeredCheckoutDays(
+  policy: { enabled: boolean; max_days: number; allow_same_day: boolean } | undefined,
+  todayDay: string,
+  lang: string
+): DeliveryDayOption[] {
+  const resolved = resolveDeliveryDayPolicy(policy);
+  if (!resolved.enabled || !todayDay) return [];
+  const window = deliveryWindow({ anchorDay: todayDay, todayDay, policy: resolved });
+  return window.days.map((day) => ({ day, ...dayLabel(day, todayDay, lang) }));
+}
+
 export default function Checkout() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -396,6 +452,7 @@ export default function Checkout() {
     pointBalance,
     exchangeRate,
     refreshWallet,
+    settings,
   } = useWallet();
 
   // Selected cart line ids and points choice arrive from the Cart page via
@@ -435,6 +492,16 @@ export default function Checkout() {
 
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('');
+  /**
+   * THE DAY, AND IT IS OPTIONAL. `null` means «في أقرب وقت» and is where every
+   * checkout starts, because that is what the great majority of orders want —
+   * forcing a choice would add a sixth required step to a checkout that
+   * already has five, to collect an answer the customer did not need to give.
+   * It is sent as `requestedDeliveryDate` and the server freezes it onto the
+   * row; it changes no price, which is why it is deliberately nowhere near the
+   * quote.
+   */
+  const [requestedDay, setRequestedDay] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [useWalletBalance, setUseWalletBalance] = useState(false);
 
@@ -785,6 +852,45 @@ export default function Checkout() {
     quote !== null &&
     quote.wallet.applied_iqd < quote.wallet.required_advance_iqd;
   const selectedDelivery = checkoutDeliveryMethods.find(m => m.id === deliveryMethod);
+
+  /**
+   * WHO IS OFFERED A DAY — the same two facts `checkoutDeliveryDay` decides
+   * from on the server, so the screen cannot draw a picker the door refuses.
+   *
+   *   1. THE METHOD MUST END AT THE CUSTOMER'S DOOR. `home_delivery` is what
+   *      the method declares; `id !== 'pickup'` is only the fallback for a
+   *      method stored before the flag existed. Testing the id alone is what
+   *      breaks the day the owner adds «استلام من الفرع الثاني».
+   *   2. THE CART MUST BE A DIRECT SALE. A pre-order earns its window later,
+   *      at `at_levo_warehouse` — the first moment a last-mile day is a real
+   *      choice rather than a guess about a container — so asking now would be
+   *      collecting an answer the server is about to refuse.
+   */
+  const dayPolicy = settings?.deliveryDayPolicy;
+  const todayDay = baghdadDay(Date.now());
+  const offeredDays = useMemo(
+    () => offeredCheckoutDays(dayPolicy, todayDay, lang),
+    [dayPolicy, todayDay, lang]
+  );
+  const endsAtTheDoor = selectedDelivery
+    ? typeof selectedDelivery.home_delivery === 'boolean'
+      ? selectedDelivery.home_delivery
+      : selectedDelivery.id !== 'pickup'
+    : false;
+  const dayChoiceOffered =
+    settings !== null && endsAtTheDoor && quote?.shipping_type === 'direct' && offeredDays.length > 0;
+
+  // A pick the offer no longer contains must not survive to the POST: the
+  // customer switching to pickup, or leaving the tab open past midnight, would
+  // otherwise send a day the server refuses at the very last button.
+  useEffect(() => {
+    if (!dayChoiceOffered) {
+      setRequestedDay(null);
+      return;
+    }
+    setRequestedDay((prev) => (prev && !offeredDays.some((d) => d.day === prev) ? null : prev));
+  }, [dayChoiceOffered, offeredDays]);
+
   const deliveryPrice = selectedDelivery?.price_iqd || 0;
   const shippingIqd = quote ? quote.shipping.total_iqd : deliveryPrice;
   const codTaxIqd = quote?.cod_tax_iqd ?? 0;
@@ -938,6 +1044,10 @@ export default function Checkout() {
         useWallet: isWalletActive,
         usePoints,
         itemIds: items.map((i) => i.id),
+        // The customer's day, or absent for «في أقرب وقت». It reaches the
+        // server ONLY here: it changes no price, so putting it on the quote
+        // would re-price the whole cart on every tap of a chip.
+        requestedDeliveryDate: requestedDay || undefined,
         idempotencyKey: idempotencyKeyRef.current,
         // §3.3: attribution only — the server answers with the frozen
         // support snapshot and an unchanged total.
@@ -989,6 +1099,19 @@ export default function Checkout() {
         setSubmitError(S.policyRequired);
       } else if (err instanceof ApiError && err.code === 'SHIPPING_NEEDS_CONFIG') {
         setSubmitError(S.needsConfig);
+      } else if (err instanceof ApiError && (err.code ?? '').startsWith('DELIVERY_DAY_')) {
+        /**
+         * THE DAY WAS REFUSED, AND THE ORDER IS ONE TAP FROM GOING THROUGH.
+         *
+         * The server checks the requested day against ITS Baghdad day and the
+         * ceiling it is about to freeze, so this is what a device clock a day
+         * out — or a checkout left open across midnight — arrives at. Clearing
+         * the pick rather than retrying silently is the honest half: the
+         * customer is told their day was not taken and that the order will now
+         * go out as soon as possible, and they press the button again.
+         */
+        setRequestedDay(null);
+        setSubmitError(S.dayRefused);
       } else {
         setSubmitError(msg);
       }
@@ -1314,7 +1437,8 @@ export default function Checkout() {
                 const displayedPrice = serverFee?.fee_iqd ?? selectedQuote?.total_iqd ?? null;
                 const memberWaiver = selectedQuote?.waiver_source === 'pro' || selectedQuote?.waiver_source === 'prime';
                 return (
-                <label key={method.id} data-selected={selected} className="lv-choice relative flex cursor-pointer items-center gap-3 p-4 sm:gap-4">
+                <React.Fragment key={method.id}>
+                <label data-selected={selected} className="lv-choice relative flex cursor-pointer items-center gap-3 p-4 sm:gap-4">
                   <input type="radio" name="delivery" className="sr-only" checked={selected} onChange={() => setDeliveryMethod(method.id)} />
                   <div className="flex-1 flex justify-between items-center">
                     <div className="flex items-center gap-3">
@@ -1355,6 +1479,23 @@ export default function Checkout() {
                   </div>
                   <span className="lv-choice-mark ms-1"><Check className="h-3 w-3" aria-hidden="true" /></span>
                 </label>
+                {/*
+                  UNDER THE CHOSEN METHOD, and only that one. The day is a
+                  property of the delivery that was just picked, so it belongs
+                  against that card rather than in a section of its own — and
+                  drawing a picker under every method would ask the same
+                  question three times.
+                */}
+                {selected && dayChoiceOffered && (
+                  <DeliveryDayPicker
+                    days={offeredDays}
+                    selected={requestedDay}
+                    canChange
+                    reason={null}
+                    onPick={setRequestedDay}
+                  />
+                )}
+                </React.Fragment>
                 );
               })}
             </div>

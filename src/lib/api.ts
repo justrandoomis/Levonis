@@ -810,6 +810,50 @@ export interface OrderPointsEarned {
   redemption_state?: string;
 }
 
+/**
+ * Why the delivery day cannot be chosen — one of five, and the screen prints a
+ * SENTENCE for each rather than disabling a control and saying nothing
+ * (`deliveryDateVerb`, worker/routes/orders.ts).
+ */
+export type DeliveryDateReason =
+  | 'PICKUP'
+  | 'PREORDER_NOT_ARRIVED'
+  | 'WITH_COURIER'
+  | 'FINISHED'
+  | 'WINDOW_CLOSED';
+
+/**
+ * One chip in the day picker, WITH THE WORDS ALREADY ON IT.
+ *
+ * `label` is «اليوم», «غدًا» or «الأربعاء ٢٣ أيلول», localised on the server
+ * from the server's own Baghdad day. The browser renders it and never
+ * re-formats it: `new Date('2026-09-23')` parses as UTC midnight, so a browser
+ * west of Baghdad would render the twenty-second.
+ */
+export interface DeliveryDayOption {
+  /** 'YYYY-MM-DD' — the value sent back, never parsed into a Date. */
+  day: string;
+  label: string;
+  is_today: boolean;
+  is_tomorrow: boolean;
+}
+
+/**
+ * The day picker as a whole answer rather than a boolean: which days may be
+ * picked, which one is picked, where the frozen ceiling sits, and — when none
+ * of it applies — why. `GET /api/orders/:id` only.
+ */
+export interface OrderDeliveryDate {
+  can_change: boolean;
+  /** The chosen day, or null for "as soon as possible". */
+  selected: string | null;
+  /** «سبعة أيام من تاريخ الطلب», frozen at checkout and never recomputed. */
+  window_end: string | null;
+  reason: DeliveryDateReason | null;
+  /** Empty whenever `can_change` is false. */
+  days: DeliveryDayOption[];
+}
+
 export interface ApiOrder {
   id: string;
   status: OrderStatus;
@@ -840,6 +884,18 @@ export interface ApiOrder {
   next_stage_at?: string | null;
   tracking_no?: string | null;
   delivered_at?: string | null;
+  /**
+   * «يستطيع اختيار وتغيير يوم التوصيل» — the Baghdad civil day the box goes
+   * out, as `'YYYY-MM-DD'`, or null when no day has been named. NEVER a
+   * `new Date(...)` argument: that string parses as UTC midnight, so a browser
+   * on a negative offset renders the day before. The server sends a rendered
+   * label beside it (`due_label` on the board) for exactly that reason.
+   */
+  delivery_due_day?: string | null;
+  /** The frozen ceiling — «سبعة أيام من تاريخ الطلب» — never recomputed. */
+  delivery_day_window_end?: string | null;
+  /** Could this order EVER carry a day? A delivery-method fact, decided once. */
+  delivery_day_schedulable?: boolean;
   delivery_waived?: boolean;
   membership_tier_snapshot?: string;
   /** Server-snapshotted fulfilment lane. `pro_priority_12h` is only emitted
@@ -864,6 +920,9 @@ export interface ApiOrder {
   invoice?: OrderInvoiceRef | null;
   can_cancel?: boolean;
   can_review?: boolean;
+  /** The THIRD verb, beside `can_cancel` and `can_review` — the day picker as
+   *  a whole answer, including why there is no picker when there is none. */
+  delivery_date?: OrderDeliveryDate;
   /** A membership gift that ships WITH the order and is worth 0 IQD on every
    *  total — today only «PRO + طلب مسبق مدفوع مقدمًا = فلمنت هدية». */
   membership_gift?: {
@@ -958,6 +1017,110 @@ export interface OrderTrackingPublic {
   next_stage_at: string | null;
   tracking_no: string | null;
   steps: OrderTrackingStep[];
+}
+
+/* ===========================================================================
+ *  THE ADMIN ORDER BOARD — GET /api/admin/orders
+ * ===========================================================================
+ * The server decides; these types only describe what it decided. Every field
+ * below is computed in `worker/routes/admin.ts` against the one Baghdad day
+ * boundary (`worker/lib/baghdadTime.ts`), and NOTHING here may be re-derived
+ * in the browser — the admin's laptop clock is not the shop's clock, and
+ * between 00:00 and 03:00 Baghdad a UTC-derived "today" is still yesterday.
+ * That window is the early-morning shift when the delivery runs are planned,
+ * which is the one time of day this screen is load-bearing.
+ */
+
+/** Which day-group header a row belongs under. Computed SERVER-side. */
+export type OrderDueBucket = 'overdue' | 'today' | 'tomorrow' | 'week' | 'later' | 'unscheduled';
+
+/**
+ * `scope` IS THE BOARD, `type`/`status` narrow it. Pre-orders are a SCOPE and
+ * not a bucket — «فصلها في الطلبات المسبقة» — because a container in transit
+ * is a different kind of waiting from a box that must go out this morning.
+ */
+export type AdminOrderScope = 'open' | 'preorder' | 'delivered' | 'cancelled';
+
+/**
+ * Which reading of the search box won. One box, four readings, tried in a
+ * fixed order (`worker/lib/orderSearch.ts`) — and the screen SAYS which one
+ * won, because a classifier that guesses wrong is cheap to correct and
+ * expensive to hide.
+ */
+export type OrderSearchKind = 'none' | 'order_id' | 'date' | 'phone' | 'name';
+
+/** The resolved date behind a `search_kind === 'date'` result. */
+export interface OrderSearchDateEcho {
+  /** First Baghdad civil day covered, `'YYYY-MM-DD'`. Render its PARTS. */
+  day_from: string;
+  day_to: string;
+  /** True when `5-9` was read day-first, which is how Iraq writes a date. */
+  assumed_day_first: boolean;
+  assumed_year: boolean;
+  /** The day the OTHER reading would give, ready to be sent back verbatim as
+   *  the query for a one-tap flip. Null when there is no second reading. */
+  flip_day: string | null;
+}
+
+/** One row of the board. The fulfilment fields the packing bench reads. */
+export interface AdminOrderRow extends ApiOrder {
+  /**
+   * The ACCOUNT holder's name, which is often not the person the parcel is
+   * for — `address.name` is. Both exist because a gift or an office address
+   * makes them differ often enough that showing only one misdirects parcels.
+   */
+  customer_name?: string;
+  customer_phone?: string | null;
+  /** Merchant orders share this table and are BADGED, never counted as ours. */
+  seller_type?: string;
+  /** Set when the day MOVED after checkout. An order that silently sinks down
+   *  the list looks, to the admin who saw it this morning, like one that
+   *  vanished — so the row says «مؤجل» rather than just re-sorting. */
+  delivery_day_changed_at?: string | null;
+  due_bucket?: OrderDueBucket;
+  /** «اليوم» / «غدًا» / «الأربعاء ٢٣ أيلول», localised BY THE SERVER. The
+   *  screen renders this string and never formats a day itself. */
+  due_label?: string;
+}
+
+/** The whole board in one answer: a page, its totals, and what it understood. */
+export interface AdminOrdersResponse {
+  orders: AdminOrderRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  scope: AdminOrderScope;
+  due: string | null;
+  type: string | null;
+  status: string | null;
+  /** The three anchors the buckets were computed against. */
+  today: string;
+  tomorrow: string;
+  week_end: string;
+  search_kind: OrderSearchKind;
+  search: {
+    raw: string;
+    /** True when this lookup IGNORED the scope and every filter — an order
+     *  number or a phone number is a lookup, not a browse, and most of why an
+     *  admin searches is to ask about an order that is already finished. */
+    pierced: boolean;
+    date?: OrderSearchDateEcho;
+  } | null;
+  /**
+   * The group headers, over the whole filtered board rather than this page.
+   * `today` and `overdue` are disjoint here; the LIST merges them, because a
+   * box that should have gone out on Tuesday is not a separate kind of work on
+   * Wednesday — it is today's work, and the most urgent of it.
+   */
+  counts: {
+    total: number;
+    overdue: number;
+    today: number;
+    tomorrow: number;
+    week: number;
+    later: number;
+    unscheduled: number;
+  };
 }
 
 /** Everything the fulfilment screen needs for ONE order. */
@@ -1068,6 +1231,18 @@ export interface DeliveryMethod {
   descEn: string;
   price_iqd: number;
   icon: string;
+  /**
+   * Does this method end at the CUSTOMER'S DOOR? It decides whether the day
+   * picker is offered at all — there is no "which day would you like it" for a
+   * pickup, because nobody is driving anywhere.
+   *
+   * `undefined` MEANS "infer `id !== 'pickup'`", which is the rule
+   * `deliversToHome` states on the server side of the same array. Reading it
+   * as a bare `id !== 'pickup'` test is what breaks the day the owner adds
+   * «استلام من الفرع الثاني» to this admin-editable list and its customers
+   * start being asked which day to drive to them.
+   */
+  home_delivery?: boolean;
 }
 export interface CheckoutPaymentMethod { id: string; titleAr: string; titleEn: string; icon: string }
 export interface CartShippingMethod { id: string; titleAr: string; titleEn: string; descAr: string; descEn: string }
@@ -1088,6 +1263,15 @@ export interface PublicSettings {
   /** The printer home-delivery NOTE amount — informational, never a fee, and
    *  rendered only when the server sent a positive integer. */
   printerHomeDeliveryNoteIqd?: number | null;
+  /**
+   * The delivery-day offer itself — «بحد أقصى أسبوع» as three values.
+   *
+   * It is public (`PUBLIC_SETTING_KEYS`) for one screen: checkout has to draw
+   * the picker BEFORE an order exists, so there is no `delivery_date` block
+   * to read the offer off. `enabled` is the owner's off switch and closes the
+   * picker everywhere at once.
+   */
+  deliveryDayPolicy?: { enabled: boolean; max_days: number; allow_same_day: boolean };
 }
 
 /** Owner-authored copy, one string per language. Never machine-translated —

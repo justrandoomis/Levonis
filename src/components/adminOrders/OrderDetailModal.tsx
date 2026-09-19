@@ -12,6 +12,7 @@ import CopyField from './CopyField';
 import MysteryReveal from '../offers/MysteryReveal';
 import OrderChatPanel from './OrderChatPanel';
 import OrderStagePanel from './OrderStagePanel';
+import OrderStatusCorrection from './OrderStatusCorrection';
 
 /**
  * The order fulfilment screen.
@@ -181,7 +182,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
         ) : !detail ? null : tab === 'chat' ? (
           <OrderChatPanel orderId={orderId} active />
         ) : tab === 'stages' ? (
-          <div className="flex-1 overflow-y-auto p-4 min-h-0">
+          <div className="flex-1 overflow-y-auto p-4 min-h-0 space-y-4">
             {detail.tracking ? (
               // Moving a stage reloads the whole detail, because the move
               // changes the available list, the history and the legacy
@@ -195,6 +196,11 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 {loc('تعذّر تحميل مراحل هذا الطلب.', 'Stages could not be loaded for this order.', 'قۆناغەکان بار نەکران.')}
               </p>
             )}
+            {/* The legacy status dropdown, demoted off the board's rows and
+                placed UNDER the path it corrects — and it renders even when
+                the tracking enrichment failed, because that is exactly when
+                an admin has nothing else to move the order with. */}
+            <OrderStatusCorrection orderId={orderId} status={detail.status} onChanged={load} />
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0">
