@@ -109,3 +109,56 @@ Rent, salaries and advertising belong to no product. Splitting them across
 products by revenue share is an invention, and an invented per-product net
 profit is exactly the kind of number that gets a real decision wrong. So the
 dashboard refuses to compute it and says why where the owner would look for it.
+
+## 5. A waived fee is not a smaller fee — it is a cost the store paid
+
+Added 2026-09-19, and it refines rule 4 rather than replacing it.
+
+The owner: «في اشتراك الأعضاء التوصيل لهم مجاني والضريبة لهم مجانية، إذا هذا
+يخصم من الأرباح … إذا كان اكو كوبون فيه خصم توصيل مجاني أو بدون ضريبة فإنه
+يخصم من الأرباح».
+
+So delivery is pass-through **only while the customer pays it**. The moment the
+store waives it — a membership benefit, a referral, a coupon — the courier is
+still paid and the tax is still owed. That money leaves the store, and a profit
+figure that does not subtract it is reporting a profit the owner does not have.
+
+Worked through on the owner's own example. A product whose cost is 1,000,000
+with delivery at 50,000 and COD tax at 12,000: a member pays neither, so the
+store keeps **938,000**, not 1,000,000.
+
+### Nothing new has to be recorded — migration 0074 already did it
+
+The schema stores the amounts, not flags, and its own comment says why:
+
+    -- The tax as CALCULATED, beside the part the membership waived. Both,
+    -- always: an exemption that overwrites the tax with zero destroys the
+    -- audit trail the invoice and the COD reconciliation both depend on.
+
+    orders.shipping_before_benefit_iqd   orders.shipping_benefit_iqd
+    orders.cod_tax_before_exemption_iqd  orders.cod_tax_exemption_iqd
+    orders.membership_discount_iqd       order_items.membership_discount_iqd
+    orders.benefit_snapshot              (which rules fired, what each was worth)
+    orders.delivery_waived               orders.referral_delivery_waived
+
+An exemption that had overwritten the tax with zero would have made this rule
+unimplementable after the fact. It did not, so the cost of every benefit ever
+granted is recoverable from orders already in the database.
+
+### What the dashboard therefore shows
+
+A line of its own — **تكلفة امتيازات الأعضاء** — totalling what was given away:
+waived delivery, waived COD tax, and the membership discount on the goods. It
+is subtracted in reaching net profit, and it is broken down by tier and by
+source (membership, referral, coupon).
+
+That figure answers a question the owner has never been able to ask: what does
+the PRO and PRIME programme actually cost per month, against the extra sales it
+brings. A benefit whose cost is invisible is a benefit nobody can price.
+
+### The rule that keeps the two profits honest
+
+The waived amount belongs to the ORDER, not to the product — the same reason
+rent does. So it is subtracted in **net** profit, per period, and never spread
+across products to make a per-product net figure. Gross margin on a product
+stays the margin on that product.
