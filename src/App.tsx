@@ -214,6 +214,17 @@ import { FarmGate } from './pages/farm/shelved';
 import BrowseMissionTimer from './components/BrowseMissionTimer';
 const Policies = React.lazy(() => import('./pages/Policies'));
 const Support = React.lazy(() => import('./pages/Support'));
+/**
+ * THE COMPARISON IS LAZY, and not optionally so.
+ *
+ * `/compare` is reached from a button on a product page and from the assistant
+ * — never from the home page, and never on the path from arriving to buying.
+ * It carries its own six components, its own trilingual dictionary and the
+ * whole spec-table machinery, all for the minority of visitors who ever open
+ * it. Eager here would mean every first visit downloads a comparison nobody
+ * asked for; `tests/bundleBudget.test.ts` measures exactly that closure.
+ */
+const Compare = React.lazy(() => import('./pages/Compare'));
 const MyGifts = React.lazy(() => import('./components/reviews/MyGifts'));
 import EmailVerifyBanner from './components/auth/EmailVerifyBanner';
 import AppIntro from './components/bloub/AppIntro';
@@ -559,6 +570,9 @@ function AppContent() {
           <Route path="/chats" element={<Chats />} />
           <Route path="/product/:slug" element={<Product />} />
           <Route path="/products" element={<Products />} />
+          {/* The ids live in the query, not the path, so a comparison is one
+              route and one link: /compare, /compare?ids=a, /compare?ids=a,b. */}
+          <Route path="/compare" element={<Compare />} />
           <Route path="/bundles" element={<Bundles />} />
           <Route path="/bundles/:slug" element={<BundleDetail />} />
           <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />

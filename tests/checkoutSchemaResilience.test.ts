@@ -31,6 +31,8 @@ import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
 import { orderRoutes } from '../worker/routes/orders';
 import { cartRoutes } from '../worker/routes/cart';
+import { acceptedPolicies } from './lib/policies';
+import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 
 /** Columns `cart_items` grew after 0001, each in its own migration. Dropping
  *  one reproduces the window in which the Worker is deployed and its
@@ -38,6 +40,13 @@ import { cartRoutes } from '../worker/routes/cart';
 const LATE_CART_COLUMNS = ['fulfillment_type', 'option_value_ids', 'transport_method', 'warranty_plan_id', 'draw_salt'];
 
 function setup(dropColumn?: string) {
+  // A NEW DATABASE IS A NEW ARCHIVE. `ensurePolicyCorpus` memoises a COMPLETED
+  // mirror per isolate, and one test process is one isolate holding many
+  // databases: without this, the first database in the run gets the policy
+  // rows and every later one is skipped as already-synced, so checkout refuses
+  // consent it cannot bind to a row. tests/fixtures/app.ts#dbThrough does the
+  // same for the fixtures it builds; this file builds its own.
+  resetPolicyCorpusMemo();
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON;');
   const dir = join(ROOT, 'migrations');
@@ -101,6 +110,7 @@ async function call(db: D1Database, path: string, method: 'GET' | 'POST') {
             usePoints: false,
             itemIds: [],
             idempotencyKey: `schema-resilience-checkout-${++seq}`,
+            policyAcceptance: acceptedPolicies(),
           }),
         },
     undefined,

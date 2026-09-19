@@ -1,733 +1,400 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, FileText, ScrollText, ShieldCheck, RefreshCw, Eye, Pencil, UploadCloud } from 'lucide-react';
-import { useAuth } from '../AuthContext';
-import { useLanguage } from '../LanguageContext';
-import { api, ApiError } from '../lib/api';
-import { parsePolicyVersion, policyDocumentUrl, policyHeadings } from '../lib/policyReader';
-import { Overlay, Sheet } from '../components/ui/Overlay';
-
 /**
- * Public trilingual reader for PUBLISHED policy documents, with an honest
- * empty state while none are published, plus an admin-only drafts panel
- * (seed / preview / edit / publish). Drafts are never shown to customers.
+ * THE POLICY LIBRARY — /policies, and /policies/:key#art-4-2.
  *
- * `/policies/:key` opens that document directly — the product page and the
- * cart link to `/policies/extended_warranty` from the extended-warranty
- * chooser, so the terms are one tap from the choice. The list keeps the URL
- * in step (a tap on a row navigates to its key), and the header's back arrow
- * returns to the list, not out of the page.
+ * WHO OPENS THIS PAGE. Three people, and the page owes each of them something
+ * different. Somebody deciding whether to buy wants one answer before they
+ * commit, and finds it by section. Somebody mid-argument wants ONE clause and
+ * wants to send it, which is why search reaches the article and why every
+ * article has a link of its own. And the owner wants to show a document to a
+ * customer, a courier or a bank, which is why the version, the date it took
+ * effect and a clean printed copy are first-class and not an afterthought.
+ *
+ * IT IS A LIBRARY, NOT A MARKETING PAGE. Eighteen documents grouped by the
+ * registry's own six sections, each stating its own scope in its own words;
+ * nothing here summarises, softens or sells a policy.
+ *
+ * THERE IS NO AUTHORING SURFACE, and that is the point.
+ * The seed / prepare-terms / edit / publish / preview panel that used to live
+ * here is gone, with every string that supported it. Policy text is written in
+ * worker/lib/policies/ and deployed; the endpoints it called no longer exist.
+ * The owner's instruction was «يستطيع أي أحد التعديل عليها لا أريد ذلك» — that
+ * anyone could edit them, and they did not want that — and a page that cannot
+ * write is the only honest way to answer it.
+ *
+ * WHAT THE URL MEANS, because other pages depend on all three parts:
+ *   /policies                     the library index
+ *   /policies/:key                one document, current version
+ *   /policies/:key?version=N      one ARCHIVED version, never silently today's
+ *   /policies/:key?lang=en        one document in a named language
+ *   /policies/:key#art-4-2        one ARTICLE of it
+ * Checkout links the first three (src/pages/Checkout.tsx), the product page
+ * and the cart link the extended-warranty terms, and settings and sign-up link
+ * the index.
  */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ChevronLeft, Library, Link2, Printer, ShieldCheck } from 'lucide-react';
+import { useLanguage } from '../LanguageContext';
+import { ApiError } from '../lib/api';
+import { useMotion } from '../lib/motion';
+import { useGoBack } from '../lib/useGoBack';
+import { parsePolicyVersion, policyOutline } from '../lib/policyReader';
+import { ErrorState } from '../components/ui/AsyncStates';
+import Spinner from '../components/ui/Spinner';
+import { Segmented } from '../components/ui/Segmented';
+import PolicyLibrary from '../components/policies/PolicyLibrary';
+import PolicyOutline from '../components/policies/PolicyOutline';
+import PolicyPrintStyles from '../components/policies/PolicyPrintStyles';
+import PolicyProse from '../components/policies/PolicyProse';
+import { PolicySearchField, PolicySearchResults } from '../components/policies/PolicySearch';
+import { formatPolicyDate, usePolicyStrings } from '../components/policies/policyStrings';
+import { fetchPolicyDoc, usePolicyCorpus, usePolicyLibrary, type PolicyDoc } from '../components/policies/usePolicyCorpus';
 
-const STRINGS = {
-  ar: {
-    title: 'سياسات المتجر',
-    intro: 'الوثائق المنشورة رسميًا أدناه. النسخة المعروضة هي النسخة المنشورة الحالية لكل وثيقة.',
-    empty: 'لم تُنشر أي سياسات بعد.',
-    emptyHint: 'سياسات المتجر قيد الإعداد والمراجعة وستظهر هنا فور نشرها رسميًا.',
-    loadError: 'تعذر تحميل السياسات — حاول مرة أخرى.',
-    retry: 'إعادة المحاولة',
-    version: 'النسخة',
-    requiredBadge: 'مطلوبة عند الشراء',
-    langFallback: 'النص التالي بالعربية — الترجمة لهذه اللغة غير منشورة بعد.',
-    back: 'رجوع',
-    notPublished: 'هذه السياسة غير منشورة بعد — ستظهر هنا فور نشرها رسميًا.',
-    contents: 'محتويات الوثيقة',
-    publishedAt: 'تاريخ النشر',
-    effectiveAt: 'تاريخ السريان',
-    unknownDate: 'غير موثّق في النسخة القديمة',
-    invalidVersion: 'رقم نسخة السياسة غير صالح؛ لم تُعرض نسخة بديلة.',
-    loadingDocument: 'جارٍ تحميل نسخة السياسة…',
-    // admin
-    adminTitle: 'المسودات (للإدارة فقط)',
-    adminNote: 'هذه مسودات غير منشورة ولا يراها الزبائن. راجع الأحكام التجارية مع المالك والأحكام القانونية مع مختص محلي قبل النشر. النشر دائم ومدقَّق ولا يمثل إقرارًا تلقائيًا بالامتثال القانوني.',
-    seed: 'إدراج مسودات LEVONIS الأصلية',
-    prepareTerms: 'إعداد مسودة الشروط المحدثة (25 قسمًا)',
-    termsPrepared: 'مسودة الشروط المحدثة جاهزة للمراجعة؛ لم تُنشر تلقائيًا.',
-    seeded: (n: number) => `أُدرجت مسودات ${n} وثيقة.`,
-    allSeeded: 'كل الوثائق لديها صفوف بالفعل — لم يُدرج شيء.',
-    draft: 'مسودة',
-    published: 'منشورة',
-    archived: 'مؤرشفة',
-    publish: 'نشر…',
-    publishPrompt: (k: string, v: number) =>
-      `النشر دائم ولا يمكن تعديل النسخة بعده.\nاكتب بالضبط: PUBLISH ${k} v${v}`,
-    publishMismatch: 'نص التأكيد غير مطابق — أُلغي النشر.',
-    edit: 'تحرير',
-    save: 'حفظ المسودة',
-    saving: 'جارٍ الحفظ…',
-    cancel: 'إلغاء',
-    docTitle: 'العنوان',
-    docBody: 'النص',
-    actionError: 'تعذر تنفيذ الإجراء',
-  },
-  en: {
-    title: 'Store Policies',
-    intro: 'Officially published documents are listed below. What you see is the current published version of each document.',
-    empty: 'No policies are published yet.',
-    emptyHint: 'The store policies are being prepared and reviewed; they will appear here as soon as they are officially published.',
-    loadError: 'Could not load the policies — please try again.',
-    retry: 'Retry',
-    version: 'Version',
-    requiredBadge: 'Required at checkout',
-    langFallback: 'The text below is in Arabic — the translation for this language is not published yet.',
-    back: 'Back',
-    notPublished: 'This policy is not published yet — it will appear here as soon as it is officially published.',
-    contents: 'On this page',
-    publishedAt: 'Published',
-    effectiveAt: 'Effective',
-    unknownDate: 'Not recorded for this historical version',
-    invalidVersion: 'Invalid policy version; no replacement version has been shown.',
-    loadingDocument: 'Loading this policy version…',
-    adminTitle: 'Drafts (admin only)',
-    adminNote: 'These drafts are not visible to customers. Confirm business rules with the owner and obtain qualified local legal review before publication. Publishing is permanent and audited, not an automatic certification of legal compliance.',
-    seed: 'Seed the original LEVONIS drafts',
-    prepareTerms: 'Prepare updated terms draft (25 sections)',
-    termsPrepared: 'The revised terms draft is ready for review; it was not automatically published.',
-    seeded: (n: number) => `Seeded drafts for ${n} document(s).`,
-    allSeeded: 'Every document already has rows — nothing was seeded.',
-    draft: 'Draft',
-    published: 'Published',
-    archived: 'Archived',
-    publish: 'Publish…',
-    publishPrompt: (k: string, v: number) =>
-      `Publishing is permanent and the version becomes immutable.\nType exactly: PUBLISH ${k} v${v}`,
-    publishMismatch: 'Confirmation text did not match — publish cancelled.',
-    edit: 'Edit',
-    save: 'Save draft',
-    saving: 'Saving…',
-    cancel: 'Cancel',
-    docTitle: 'Title',
-    docBody: 'Body',
-    actionError: 'The action failed',
-  },
-  ckb: {
-    title: 'سیاسەتەکانی فرۆشگا',
-    intro: 'بەڵگەنامە بە فەرمی بڵاوکراوەکان لە خوارەوەن. ئەوەی دەیبینیت وەشانە بڵاوکراوە ئێستاکەیە بۆ هەر بەڵگەنامەیەک.',
-    empty: 'هێشتا هیچ سیاسەتێک بڵاونەکراوەتەوە.',
-    emptyHint: 'سیاسەتەکانی فرۆشگا لە ئامادەکردن و پێداچوونەوەدان؛ هەر کە بە فەرمی بڵاوکرانەوە لێرە دەردەکەون.',
-    loadError: 'سیاسەتەکان بار نەبوون — تکایە دووبارە هەوڵ بدەوە.',
-    retry: 'هەوڵدانەوە',
-    version: 'وەشان',
-    requiredBadge: 'پێویستە لە کاتی کڕیندا',
-    langFallback: 'دەقی خوارەوە بە عەرەبییە — وەرگێڕان بۆ ئەم زمانە هێشتا بڵاونەکراوەتەوە.',
-    back: 'گەڕانەوە',
-    notPublished: 'ئەم سیاسەتە هێشتا بڵاونەکراوەتەوە — هەر کە بە فەرمی بڵاوکرایەوە لێرە دەردەکەوێت.',
-    contents: 'ناوەڕۆکی بەڵگەنامە',
-    publishedAt: 'بەرواری بڵاوکردنەوە',
-    effectiveAt: 'بەرواری جێبەجێبوون',
-    unknownDate: 'بۆ ئەم وەشانە کۆنە تۆمار نەکراوە',
-    invalidVersion: 'ژمارەی وەشانی سیاسەت نادروستە؛ وەشانی جێگرەوە پیشان نەدرا.',
-    loadingDocument: 'بارکردنی ئەم وەشانەی سیاسەت…',
-    adminTitle: 'ڕەشنووسەکان (تەنها بۆ بەڕێوەبەرایەتی)',
-    adminNote: 'ئەم ڕەشنووسانە کڕیاران نایانبینن. پێش بڵاوکردنەوە مەرجە بازرگانییەکان لەگەڵ خاوەن و مەرجە یاساییەکان لەگەڵ پسپۆڕێکی ناوخۆیی پێداچوونەوە بکە. بڵاوکردنەوە هەمیشەیی و تۆمارکراوە؛ بڕوانامەی پابەندبوونی یاسایی نییە.',
-    seed: 'دانانی ڕەشنووسە ڕەسەنەکانی LEVONIS',
-    prepareTerms: 'ئامادەکردنی ڕەشنووسی نوێی مەرجەکان (25 بەش)',
-    termsPrepared: 'ڕەشنووسی نوێی مەرجەکان بۆ پێداچوونەوە ئامادەیە؛ بە خۆکار بڵاو نەکراوەتەوە.',
-    seeded: (n: number) => `ڕەشنووسی ${n} بەڵگەنامە دانرا.`,
-    allSeeded: 'هەموو بەڵگەنامەکان پێشتر ڕیزیان هەیە — هیچ دانەنرا.',
-    draft: 'ڕەشنووس',
-    published: 'بڵاوکراوە',
-    archived: 'ئەرشیفکراو',
-    publish: 'بڵاوکردنەوە…',
-    publishPrompt: (k: string, v: number) =>
-      `بڵاوکردنەوە هەمیشەییە و وەشانەکە نەگۆڕ دەبێت.\nبە تەواوی بنووسە: PUBLISH ${k} v${v}`,
-    publishMismatch: 'دەقی پشتڕاستکردنەوە یەکسان نەبوو — بڵاوکردنەوە هەڵوەشایەوە.',
-    edit: 'دەستکاری',
-    save: 'پاشەکەوتی ڕەشنووس',
-    saving: 'پاشەکەوت دەکرێت…',
-    cancel: 'هەڵوەشاندنەوە',
-    docTitle: 'ناونیشان',
-    docBody: 'دەق',
-    actionError: 'کردارەکە سەرکەوتوو نەبوو',
-  },
-} as const;
+const DOC_LANGS = ['ar', 'en', 'ckb'] as const;
+type DocLang = (typeof DOC_LANGS)[number];
 
-interface PolicyListItem {
-  key: string;
-  version: number;
-  titles: Record<string, string>;
-  required_for_checkout: boolean;
-}
-interface PolicyDoc {
-  key: string;
-  version: number;
-  lang: string;
-  lang_requested: string;
-  title: string;
-  body: string;
-  hash: string;
-  published_at: string | null;
-  effective_at: string | null;
-}
-interface AdminDocRow {
-  id: string;
-  key: string;
-  version: number;
-  lang: string;
-  title: string;
-  status: 'draft' | 'published' | 'archived';
-  body_length: number;
-}
+const asDocLang = (raw: string | null): DocLang | null =>
+  raw === 'ar' || raw === 'en' || raw === 'ckb' ? raw : null;
 
-/** Minimal safe renderer for the policy body ("## " headings, "- " bullets). */
-function PolicyBody({ body }: { body: string }) {
-  const lines = body.split('\n');
+/** The standing statement that the Arabic text governs. */
+function GoverningNote({ text, className = '' }: { text: string; className?: string }) {
   return (
-    <div className="space-y-2 text-[14px] leading-relaxed text-zinc-300">
-      {lines.map((line, i) => {
-        const t = line.trim();
-        if (!t) return <div key={i} className="h-1" />;
-        if (t.startsWith('## ')) {
-          return (
-            <h2 key={i} id={`policy-section-${i}`} className="scroll-mt-24 text-[16px] font-semibold text-text-primary pt-5">
-              {t.slice(3)}
-            </h2>
-          );
-        }
-        if (t.startsWith('- ')) {
-          return (
-            <div key={i} className="flex gap-2">
-              <span className="text-gold shrink-0 mt-[2px]">•</span>
-              <p>{t.slice(2)}</p>
-            </div>
-          );
-        }
-        if (t.startsWith('⚠️')) {
-          return (
-            <p key={i} className="bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl p-3 text-[13px]">
-              {t}
-            </p>
-          );
-        }
-        return <p key={i}>{t}</p>;
-      })}
-    </div>
+    <p className={`lv-alert lv-alert-info text-[13px] leading-[1.8] text-text-secondary ${className}`}>
+      {text}
+    </p>
   );
 }
 
 export default function Policies() {
-  const navigate = useNavigate();
   const { key: routeKey } = useParams<{ key: string }>();
-  const { lang } = useLanguage();
+  const { lang, dir } = useLanguage();
+  const s = usePolicyStrings();
+  const m = useMotion();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const goBack = useGoBack('/');
   const [searchParams] = useSearchParams();
+
   const { version: requestedVersion, valid: validVersion } = parsePolicyVersion(searchParams.get('version'));
-  const langQuery = searchParams.get('lang');
-  const documentLang = langQuery === 'ar' || langQuery === 'en' || langQuery === 'ckb' ? langQuery : lang;
-  const requestSequence = React.useRef(0);
-  const { user } = useAuth();
-  const t = STRINGS[lang] || STRINGS.ar;
-
-  const [list, setList] = useState<PolicyListItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [listError, setListError] = useState('');
-  const [selected, setSelected] = useState<PolicyDoc | null>(null);
-  const [docLoadingKey, setDocLoadingKey] = useState('');
-  const [actionError, setActionError] = useState('');
-  // A deep link to a document the owner has not published yet is a fact about
-  // the store, not a failure of the page — it is told as a status, not an error.
-  const [notice, setNotice] = useState('');
-
-  // Admin drafts panel
-  const isAdmin = !!user?.isAdmin;
-  const [adminDocs, setAdminDocs] = useState<AdminDocRow[]>([]);
-  const [adminMsg, setAdminMsg] = useState('');
-  const [previewDoc, setPreviewDoc] = useState<(AdminDocRow & { body: string }) | null>(null);
-  const [editDoc, setEditDoc] = useState<(AdminDocRow & { body: string }) | null>(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editBody, setEditBody] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-
-  const load = useCallback(async () => {
-    setListError('');
-    setIsLoading(true);
+  // The document's language is its own: a reader may keep the interface in
+  // Arabic and show an English copy to a courier without the app changing
+  // under them. Absent a `?lang`, it follows the interface.
+  const docLang: DocLang = asDocLang(searchParams.get('lang')) ?? (asDocLang(lang) ?? 'ar');
+  // A pasted link can carry a malformed escape («#100%»), and
+  // `decodeURIComponent` throws on one — during render, which would blank the
+  // page for a reader whose only mistake was copying a URL badly. The raw
+  // fragment simply fails to match an anchor, which is the right outcome.
+  const anchor = useMemo(() => {
+    const raw = location.hash.replace(/^#/, '');
     try {
-      const data = await api.get<{ policies: PolicyListItem[] }>('/api/policies');
-      setList(data.policies);
-    } catch (err) {
-      setListError((err as Error)?.message || 'error');
-    } finally {
-      setIsLoading(false);
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  }, [location.hash]);
+
+  const library = usePolicyLibrary();
+  const [query, setQuery] = useState('');
+  const [doc, setDoc] = useState<PolicyDoc | null>(null);
+  const [docError, setDocError] = useState<unknown>(null);
+  const [docLoading, setDocLoading] = useState(false);
+  const [copiedDoc, setCopiedDoc] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  // A stale response from a document the reader has already navigated away
+  // from must never replace the one they are looking at.
+  const sequence = useRef(0);
+
+  // The corpus is what search and the index summaries are built from, and it
+  // is loaded ONLY on the index, where both of them live. A reader who
+  // followed a link to one article wants that article; making them download
+  // the other seventeen documents to read it would be a few hundred kilobytes
+  // spent on nothing they asked for. The cache is shared, so opening a
+  // document after browsing the index costs no request at all.
+  const corpusEnabled = !routeKey && library.list.length > 0;
+  const corpus = usePolicyCorpus(library.list, docLang, corpusEnabled);
+
+  useEffect(() => {
+    if (!routeKey) {
+      setDoc(null);
+      setDocError(null);
+      setDocLoading(false);
+      return;
+    }
+    if (!validVersion) {
+      setDoc(null);
+      setDocError(null);
+      setDocLoading(false);
+      return;
+    }
+    const mine = ++sequence.current;
+    setDoc(null);
+    setDocError(null);
+    setDocLoading(true);
+    fetchPolicyDoc(routeKey, requestedVersion, docLang)
+      .then((policy) => {
+        if (mine !== sequence.current) return;
+        setDoc(policy);
+        setDocLoading(false);
+      })
+      .catch((error: unknown) => {
+        if (mine !== sequence.current) return;
+        setDocError(error);
+        setDocLoading(false);
+      });
+    return () => { sequence.current += 1; };
+  }, [routeKey, requestedVersion, docLang, validVersion, attempt]);
+
+  const headings = useMemo(() => (doc ? policyOutline(doc.body) : []), [doc]);
+
+  // Arriving at /policies/:key#art-4-2 has to LAND on article 4.2. The router
+  // does not scroll for a fragment, and the app scrolls inside a container
+  // rather than the window, so `scrollIntoView` is what actually works here —
+  // it walks every scrollable ancestor instead of assuming the document.
+  useEffect(() => {
+    if (!doc) return;
+    if (!anchor) return;
+    const target = document.getElementById(anchor);
+    if (!target) return;
+    target.scrollIntoView({ block: 'start', behavior: m.reduced ? 'auto' : 'smooth' });
+  }, [doc, anchor, m.reduced]);
+
+  // A new document opens at its beginning, not at the scroll position of the
+  // one before it.
+  useEffect(() => {
+    if (anchor) return;
+    document.getElementById('main-scroll-container')?.scrollTo({ top: 0 });
+  }, [routeKey, anchor]);
+
+  const setDocLang = useCallback(
+    (next: string) => {
+      const params = new URLSearchParams(searchParams);
+      params.set('lang', next);
+      navigate({ pathname: location.pathname, search: `?${params.toString()}`, hash: location.hash }, { replace: true });
+    },
+    [navigate, location.pathname, location.hash, searchParams]
+  );
+
+  const copyDocumentLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopiedDoc(true);
+      setTimeout(() => setCopiedDoc(false), 2400);
+    } catch {
+      setCopiedDoc(false);
     }
   }, []);
 
-  const loadAdmin = useCallback(async () => {
-    if (!isAdmin) return;
-    try {
-      const data = await api.get<{ documents: AdminDocRow[] }>('/api/policies/admin/list');
-      setAdminDocs(data.documents);
-    } catch {
-      /* admin panel stays empty; public part still works */
-    }
-  }, [isAdmin]);
+  const searching = query.trim().length > 0;
+  const showGoverning = docLang !== 'ar';
 
-  useEffect(() => {
-    load();
-  }, [load]);
-  useEffect(() => {
-    loadAdmin();
-  }, [loadAdmin]);
+  // ------------------------------------------------------------- one document
 
-  const openDoc = useCallback(
-    async (key: string) => {
-      const sequence = ++requestSequence.current;
-      setSelected(null);
-      setActionError('');
-      setNotice('');
-      setDocLoadingKey(key);
-      try {
-        const data = await api.get<{ policy: PolicyDoc }>(policyDocumentUrl(key, requestedVersion, documentLang));
-        if (sequence !== requestSequence.current) return;
-        setSelected(data.policy);
-        document.getElementById('main-scroll-container')?.scrollTo({ top: 0 });
-      } catch (err) {
-        if (sequence !== requestSequence.current) return;
-        // A deep link to a document that is not published yet (the
-        // extended-warranty terms before the owner publishes them) is told
-        // so in plain words, not with the server's English sentence — and as
-        // information, not as something that went wrong.
-        if (err instanceof ApiError && err.status === 404) setNotice(t.notPublished);
-        else setActionError((err as Error)?.message || t.actionError);
-      } finally {
-        if (sequence === requestSequence.current) setDocLoadingKey('');
-      }
-    },
-    [documentLang, requestedVersion, t.actionError, t.notPublished]
-  );
+  if (routeKey) {
+    const title = doc?.title || library.list.find((p) => p.key === routeKey)?.titles[docLang] || '';
+    const effective = formatPolicyDate(doc?.effective_at, docLang);
+    // "Is this today's text?" is answered by the registry's current version for
+    // this key, not by the archive row's own status: a superseded row keeps
+    // `status='published'` on purpose (worker/lib/policySync.ts), so trusting
+    // the status would show a customer a retired version with no warning.
+    const current = library.list.find((p) => p.key === routeKey)?.version ?? null;
+    const isArchived = doc !== null && (current !== null ? doc.version !== current : doc.status === 'archived');
 
-  // The URL is the source of truth for which document is open: /policies/:key
-  // opens it (also on a language change, in that language); /policies shows
-  // the list.
-  useEffect(() => {
-    setSelected(null);
-    setDocLoadingKey('');
-    setNotice('');
-    if (routeKey && !validVersion) setNotice(t.invalidVersion);
-    else if (routeKey) void openDoc(routeKey);
-    return () => { requestSequence.current += 1; };
-  }, [routeKey, openDoc, validVersion, t.invalidVersion]);
+    return (
+      <div data-policy-print-root className="flex min-h-screen w-full flex-col bg-canvas font-sans">
+        <PolicyPrintStyles />
 
-  const seedDrafts = async () => {
-    setAdminMsg('');
-    setActionError('');
-    try {
-      const data = await api.post<{ seeded: string[]; skipped: string[] }>('/api/policies/admin/seed-drafts');
-      setAdminMsg(data.seeded.length > 0 ? t.seeded(data.seeded.length) : t.allSeeded);
-      await loadAdmin();
-    } catch (err) {
-      setActionError((err as Error)?.message || t.actionError);
-    }
-  };
-
-  const prepareTerms = async () => {
-    if (isSaving) return;
-    setIsSaving(true);
-    setActionError('');
-    try {
-      await api.post('/api/policies/admin/prepare-terms', { confirm: 'PREPARE TERMS DRAFT' });
-      setAdminMsg(t.termsPrepared);
-      await loadAdmin();
-    } catch (error) {
-      setActionError((error as Error)?.message || t.actionError);
-    } finally { setIsSaving(false); }
-  };
-
-  const openAdminDoc = async (row: AdminDocRow, forEdit: boolean) => {
-    setActionError('');
-    try {
-      const data = await api.get<{ document: AdminDocRow & { body: string } }>(`/api/policies/admin/doc/${row.id}`);
-      if (forEdit && data.document.status === 'draft') {
-        setEditDoc(data.document);
-        setEditTitle(data.document.title);
-        setEditBody(data.document.body);
-      } else {
-        setPreviewDoc(data.document);
-      }
-    } catch (err) {
-      setActionError((err as Error)?.message || t.actionError);
-    }
-  };
-
-  const saveDraft = async () => {
-    if (!editDoc || isSaving) return;
-    setActionError('');
-    setIsSaving(true);
-    try {
-      await api.post('/api/policies/admin/draft', {
-        key: editDoc.key,
-        lang: editDoc.lang,
-        title: editTitle,
-        body: editBody,
-      });
-      setEditDoc(null);
-      await loadAdmin();
-    } catch (err) {
-      setActionError((err as Error)?.message || t.actionError);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const publishVersion = async (key: string, version: number) => {
-    setActionError('');
-    setAdminMsg('');
-    const expected = `PUBLISH ${key} v${version}`;
-    const typed = window.prompt(t.publishPrompt(key, version));
-    if (typed === null) return;
-    if (typed.trim() !== expected) {
-      setActionError(t.publishMismatch);
-      return;
-    }
-    try {
-      await api.post('/api/policies/admin/publish', { key, version, confirm: expected });
-      await Promise.all([load(), loadAdmin()]);
-    } catch (err) {
-      setActionError((err as Error)?.message || t.actionError);
-    }
-  };
-
-  // Group admin docs by key+version for the drafts panel.
-  const draftGroups = React.useMemo(() => {
-    const groups = new Map<string, { key: string; version: number; rows: AdminDocRow[] }>();
-    for (const d of adminDocs.filter((r) => r.status === 'draft')) {
-      const gk = `${d.key}@${d.version}`;
-      const g = groups.get(gk) || { key: d.key, version: d.version, rows: [] };
-      g.rows.push(d);
-      groups.set(gk, g);
-    }
-    return [...groups.values()];
-  }, [adminDocs]);
-
-  return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white w-full font-sans flex flex-col">
-      <div className="flex items-center justify-between p-4 sticky top-0 bg-[#0a0a0a]/90 backdrop-blur-md z-10 border-b border-zinc-900">
-        <button
-          type="button"
-          onClick={() => (selected || routeKey ? navigate('/policies') : navigate(-1))}
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-900 transition-colors"
-          aria-label={t.back}
+        <header
+          data-policy-screen-only
+          className="sticky top-0 z-10 border-b border-border-subtle bg-canvas/92 backdrop-blur-md"
         >
-          <ChevronLeft className="w-6 h-6 rtl:rotate-180" />
-        </button>
-        <h1 className="text-[17px] font-bold">{selected ? selected.title : t.title}</h1>
-        <div className="w-10 h-10" />
-      </div>
-
-      <div className="p-4 flex-1 max-w-2xl w-full mx-auto">
-        {actionError && (
-          <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-2xl p-3 text-center mb-4">
-            {actionError}
+          <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-2">
+            <Link
+              to="/policies"
+              aria-label={s.toLibrary}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <ChevronLeft aria-hidden="true" className="h-5 w-5 rtl:rotate-180" />
+            </Link>
+            <p className="min-w-0 flex-1 truncate text-[15px] font-bold leading-[1.5] text-text-primary">{title}</p>
+            <button
+              type="button"
+              onClick={copyDocumentLink}
+              aria-label={s.copyLink}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <Link2 aria-hidden="true" className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              aria-label={s.print}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <Printer aria-hidden="true" className="h-4 w-4" />
+            </button>
           </div>
-        )}
-        {notice && (
-          <div
-            role="status"
-            data-policy-notice
-            className="bg-amber-500/10 border border-amber-500/25 text-amber-200 text-[13px] rounded-2xl p-3 text-center mb-4"
-          >
-            {notice}
-          </div>
-        )}
+          <p role="status" aria-live="polite" className="sr-only">{copiedDoc ? s.copied : ''}</p>
+        </header>
 
-        {docLoadingKey && <p role="status" className="py-6 text-sm text-text-secondary">{t.loadingDocument}</p>}
-        {selected ? (
-          <article className="py-2 sm:py-4" dir={selected.lang === 'en' ? 'ltr' : 'rtl'}>
-            <div className="flex items-center gap-2 text-[12px] text-zinc-500 mb-4">
-              <ScrollText className="w-4 h-4" />
-              <span>
-                {t.version} {selected.version}
-              </span>
-              <span className="text-zinc-700">·</span>
-              <span dir="ltr" className="font-mono">{selected.hash.slice(0, 12)}…</span>
+        <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+          {!validVersion && (
+            <div role="status" data-policy-notice className="lv-alert lv-alert-warning mb-6 text-[13px] leading-[1.8] text-text-secondary">
+              {s.invalidVersion}
             </div>
-            <dl className="mb-5 grid gap-2 text-xs text-text-secondary sm:grid-cols-2">
-              {([['published_at', t.publishedAt], ['effective_at', t.effectiveAt]] as const).map(([field, label]) => (
-                <div key={field}><dt className="font-medium">{label}</dt><dd>
-                  {selected[field] && Number.isFinite(Date.parse(selected[field]))
-                    ? <time dateTime={selected[field]}>{new Date(selected[field]).toLocaleString(documentLang === 'ckb' ? 'ckb-IQ' : documentLang)}</time>
-                    : t.unknownDate}
-                </dd></div>
-              ))}
-            </dl>
-            {selected.lang !== selected.lang_requested && (
-              <p className="bg-zinc-800/70 border border-zinc-700 text-zinc-300 text-[12px] rounded-xl p-3 mb-4">
-                {t.langFallback}
-              </p>
-            )}
-            {policyHeadings(selected.body).length > 1 && (
-              <nav aria-label={t.contents} className="mb-6 border-b border-border-subtle pb-5">
-                <h2 className="text-sm font-semibold text-text-primary mb-3">{t.contents}</h2>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {policyHeadings(selected.body).map((heading) => (
-                    <a key={heading.id} href={`#${heading.id}`} className="text-sm text-text-secondary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">{heading.title}</a>
-                  ))}
-                </div>
-              </nav>
-            )}
-            <PolicyBody body={selected.body} />
-          </article>
-        ) : (
-          <>
-            <p className="text-zinc-400 text-[13px] mb-5">{t.intro}</p>
+          )}
 
-            {isLoading ? (
-              <div className="flex justify-center py-16">
-                <div className="w-8 h-8 border-2 border-gold/20 border-t-gold rounded-full animate-spin" />
-              </div>
-            ) : listError ? (
-              <div className="text-center py-12">
-                <p className="text-red-400 text-sm mb-4">{t.loadError}</p>
-                <button onClick={load} className="px-6 py-2 bg-zinc-800 rounded-full text-sm font-bold inline-flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4" /> {t.retry}
-                </button>
-              </div>
-            ) : list.length === 0 ? (
-              <div className="text-center py-12 text-zinc-500">
-                <FileText className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                <p className="font-medium">{t.empty}</p>
-                <p className="text-sm mt-1">{t.emptyHint}</p>
+          {docLoading && (
+            <p role="status" className="flex items-center gap-2 py-10 text-[14px] leading-[1.7] text-text-secondary">
+              <Spinner size="sm" decorative />
+              {s.loading}
+            </p>
+          )}
+
+          {docError !== null &&
+            (docError instanceof ApiError && docError.status === 404 ? (
+              // Not an error page: the store simply has no document by that
+              // name, and the reader's next move is the library, not a retry.
+              <div role="status" data-policy-notice className="py-10 text-center">
+                <p className="text-[15px] leading-[1.8] text-text-primary">{s.notFound}</p>
+                <Link
+                  to="/policies"
+                  className="lv-button lv-button-secondary mt-4 inline-flex"
+                >
+                  {s.toLibrary}
+                </Link>
               </div>
             ) : (
-              <div className="space-y-3">
-                {list.map((p) => (
-                  <button
-                    key={p.key}
-                    type="button"
-                    onClick={() => navigate(`/policies/${encodeURIComponent(p.key)}`)}
-                    disabled={docLoadingKey === p.key}
-                    className="w-full text-start bg-zinc-900 border border-zinc-800 hover:border-gold/40 rounded-2xl p-4 flex items-center gap-3 transition-colors disabled:opacity-60"
-                  >
-                    <FileText className="w-5 h-5 text-gold shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-[15px] truncate">
-                        {p.titles[lang] || p.titles.ar || p.key}
-                      </p>
-                      <p className="text-[12px] text-zinc-500">
-                        {t.version} {p.version}
-                      </p>
-                    </div>
-                    {p.required_for_checkout && (
-                      <span className="text-[10px] font-bold bg-gold/15 text-gold px-2 py-1 rounded-full shrink-0 inline-flex items-center gap-1">
-                        <ShieldCheck className="w-3 h-3" /> {t.requiredBadge}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
+              <ErrorState error={docError} onRetry={() => setAttempt((n) => n + 1)} />
+            ))}
 
-            {/* -------------------------------------------- admin drafts panel */}
-            {isAdmin && (
-              <div className="mt-10 border-t border-zinc-800 pt-6">
-                <h2 className="font-bold text-[15px] mb-1 flex items-center gap-2">
-                  <Pencil className="w-4 h-4 text-amber-400" /> {t.adminTitle}
-                </h2>
-                <p className="text-[12px] text-zinc-500 mb-4">{t.adminNote}</p>
-                {adminMsg && (
-                  <p className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[13px] rounded-xl p-3 mb-3">
-                    {adminMsg}
+          {doc && (
+            <article dir={doc.lang === 'en' ? 'ltr' : 'rtl'} lang={doc.lang}>
+              {/* Printed masthead: the facts a document handed to a third party
+                  has to carry on paper — which version, from when, and from
+                  where it was taken. */}
+              <div data-policy-print-only className="mb-6 border-b border-border-subtle pb-4">
+                <h1 className="text-[18px] font-bold leading-[1.5] text-text-primary">{doc.title}</h1>
+                <p dir="ltr" className="mt-1 font-mono text-[11px] leading-[1.7] text-text-muted text-start">
+                  {s.version} {doc.version}
+                  {effective ? ` · ${s.effective}: ${effective}` : ''}
+                </p>
+                <p dir="ltr" className="font-mono text-[10px] leading-[1.7] text-text-muted text-start">
+                  {s.printedFrom}: {typeof window === 'undefined' ? '' : window.location.href}
+                </p>
+                {/* On paper the governing statement travels with EVERY copy,
+                    in every language: the person holding a printed English
+                    page has no other way to learn that the Arabic governs. */}
+                <p className="mt-2 text-[11px] leading-[1.8] text-text-secondary">{s.governing}</p>
+              </div>
+
+              <header data-policy-screen-only className="mb-7">
+                <h1 className="text-[24px] font-bold leading-[1.45] text-text-primary sm:text-[28px]">{doc.title}</h1>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <p dir="ltr" className="font-mono text-[12px] leading-[1.7] text-text-muted text-start">
+                    {s.version} {doc.version}
+                    {effective ? ` · ${s.effective}: ${effective}` : ''}
+                  </p>
+                  {doc.required_for_checkout && (
+                    <span
+                      title={s.requiredExplain}
+                      className="inline-flex items-center gap-1 rounded-full bg-gold/12 px-2 py-1 text-[10px] font-bold leading-[1.4] text-gold"
+                    >
+                      <ShieldCheck aria-hidden="true" className="h-3 w-3" />
+                      {s.requiredBadge}
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-4 max-w-sm">
+                  <Segmented
+                    group="policy-doc-lang"
+                    label={s.readingLang}
+                    value={docLang}
+                    onChange={setDocLang}
+                    dataAttr="data-policy-lang"
+                    items={DOC_LANGS.map((code) => ({ id: code, label: s.langName[code] }))}
+                  />
+                </div>
+
+                {isArchived && (
+                  <p role="status" className="lv-alert lv-alert-warning mt-4 text-[13px] leading-[1.8] text-text-secondary">
+                    {s.historical(doc.version)}
                   </p>
                 )}
-                <button
-                  onClick={seedDrafts}
-                  className="mb-4 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-[13px] font-bold inline-flex items-center gap-2"
-                >
-                  <UploadCloud className="w-4 h-4" /> {t.seed}
-                </button>
-                <button type="button" onClick={prepareTerms} disabled={isSaving}
-                  className="mb-4 ms-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[13px] font-medium disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-                  {t.prepareTerms}
-                </button>
-                <div className="space-y-3">
-                  {draftGroups.map((g) => (
-                    <div key={`${g.key}@${g.version}`} className="bg-zinc-900 border border-amber-500/20 rounded-2xl p-4">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div>
-                          <p className="font-bold text-[14px]">
-                            {g.key} <span className="text-zinc-500 font-normal">v{g.version}</span>
-                          </p>
-                          <p className="text-[11px] text-amber-400 font-bold uppercase">{t.draft}</p>
-                        </div>
-                        <button
-                          onClick={() => publishVersion(g.key, g.version)}
-                          className="px-3 py-1.5 rounded-lg bg-amber-500/15 text-amber-300 text-[12px] font-bold hover:bg-amber-500/25"
-                        >
-                          {t.publish}
-                        </button>
-                      </div>
-                      <div className="flex gap-2 mt-3 flex-wrap">
-                        {g.rows.map((r) => (
-                          <div key={r.id} className="flex items-center gap-1">
-                            <button
-                              onClick={() => openAdminDoc(r, false)}
-                              className="px-2.5 py-1 rounded-lg border border-zinc-700 text-[12px] text-zinc-300 hover:bg-zinc-800 inline-flex items-center gap-1"
-                            >
-                              <Eye className="w-3 h-3" /> {r.lang}
-                            </button>
-                            <button
-                              onClick={() => openAdminDoc(r, true)}
-                              className="px-2 py-1 rounded-lg border border-zinc-700 text-[12px] text-zinc-400 hover:bg-zinc-800"
-                              aria-label={`${t.edit} ${r.lang}`}
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {doc.lang !== doc.lang_requested && (
+                  <p role="status" className="lv-alert lv-alert-warning mt-4 text-[13px] leading-[1.8] text-text-secondary">
+                    {s.langFallback}
+                  </p>
+                )}
+                {showGoverning && doc.lang === doc.lang_requested && <GoverningNote text={s.governing} className="mt-4" />}
+              </header>
+
+              <div className="lg:grid lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-10">
+                <PolicyOutline headings={headings} policyKey={doc.key} version={requestedVersion} activeAnchor={anchor} />
+                <PolicyProse body={doc.body} policyKey={doc.key} version={requestedVersion} activeAnchor={anchor} />
               </div>
-            )}
+            </article>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --------------------------------------------------------- the library index
+
+  return (
+    <div className="flex min-h-screen w-full flex-col bg-canvas font-sans" dir={dir}>
+      <header className="sticky top-0 z-10 border-b border-border-subtle bg-canvas/92 backdrop-blur-md">
+        <div className="mx-auto flex w-full max-w-5xl items-center gap-2 px-4 py-2">
+          <button
+            type="button"
+            onClick={goBack}
+            aria-label={s.back}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            <ChevronLeft aria-hidden="true" className="h-5 w-5 rtl:rotate-180" />
+          </button>
+          <h1 className="min-w-0 flex-1 truncate text-[16px] font-bold leading-[1.5] text-text-primary">
+            {s.libraryTitle}
+          </h1>
+          <Library aria-hidden="true" className="h-5 w-5 shrink-0 text-gold" />
+        </div>
+      </header>
+
+      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+        <p className="mb-5 max-w-[62ch] text-[14px] leading-[1.9] text-text-secondary">{s.libraryIntro}</p>
+
+        {/* The governing statement belongs where a reader in another language
+            will actually meet it: on the index they are browsing, before they
+            open anything. */}
+        {showGoverning && <GoverningNote text={s.governing} className="mb-5" />}
+
+        <div className="mb-8">
+          <PolicySearchField
+            query={query}
+            onQuery={setQuery}
+            loading={corpus.loading && corpus.total > 0}
+            loaded={corpus.loaded}
+            total={corpus.total}
+          />
+        </div>
+
+        {library.loading ? (
+          <p role="status" className="flex items-center gap-2 py-10 text-[14px] leading-[1.7] text-text-secondary">
+            <Spinner size="sm" decorative />
+            {s.loading}
+          </p>
+        ) : library.error !== null ? (
+          <ErrorState error={library.error} onRetry={library.reload} />
+        ) : searching ? (
+          <PolicySearchResults articles={corpus.articles} query={query} loading={corpus.loading} />
+        ) : (
+          <>
+            <p className="mb-4 text-[12px] leading-[1.7] text-text-muted">{s.documentCount(library.list.length)}</p>
+            <PolicyLibrary sections={library.sections} list={library.list} summaries={corpus.summaries} lang={docLang} />
           </>
         )}
       </div>
-
-      {/* ------------------------------------------ admin draft preview window
-
-          A SHEET, because this window is a document to be READ and then thrown
-          away. It carries no state of its own: everything in it is a rendering
-          of a draft that already exists on the server, and the only way out was
-          ever a single "cancel" button in the corner. A long scrollable text
-          that an admin skims and dismisses is precisely the case Apple's sheet
-          is for — it arrives from the bottom edge, and it can be flung back to
-          the bottom edge with the same flick that scrolled it. The old window
-          could do neither: it was `fixed inset-0` mounted on `previewDoc`, so
-          it appeared with no arrival and, because `setPreviewDoc(null)`
-          unmounts it, it VANISHED — the reader was left with no sense of where
-          the document went, and nothing to connect it to the row that produced
-          it. Enter and exit now run the same spring in reverse, and the arrival
-          is interruptible: dismiss it halfway up and it continues from where it
-          actually is.
-
-          The old panel already sat at the bottom edge on phones and centred on
-          `sm` (`items-end sm:items-center`); `Sheet` uses the primitive's
-          `bottom` placement, which is that exact geometry, so nothing moves.
-
-          MODAL (the default) rather than `parallel`: the old backdrop dimmed
-          and blurred the page, and this is an admin reading one specific
-          document — the list behind it should hold still. The scrim is a
-          preservation, not an addition.
-
-          `dismissOnScrim={false}` PRESERVES what this window did: the old
-          backdrop was a plain div with no click handler, so tapping outside
-          never closed it, and a migration must not hand a window a dismissal it
-          never had. The cancel button, Escape and the downward drag are the
-          ways out — all of them equivalent, because nothing here is unsaved.
-          There was no Escape listener in this file to delete; the primitive
-          owns that key now and this window simply gains it, which costs the
-          reader nothing on a read-only view.
-
-          `labelledBy` rather than `label`: the document's own title is already
-          on screen, so a screen reader should name the window with the words
-          everyone else reads instead of a second, invented string.
-
-          z={60} preserves the old `z-[60]` exactly. */}
-      <Sheet
-        open={!!previewDoc}
-        onClose={() => setPreviewDoc(null)}
-        labelledBy="policy-preview-title"
-        z={60}
-        dismissOnScrim={false}
-        testId="policy-draft-preview"
-        // Geometry only — the material, the border and the rounding belong to
-        // the primitive now. The old inner `p-5` moves onto a div in the
-        // children, below the grabber, so the grabber is not padded away from
-        // the top edge it belongs to.
-        panelClassName="w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto"
-      >
-        {previewDoc && (
-          <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p id="policy-preview-title" className="font-bold">{previewDoc.title}</p>
-                <p className="text-[11px] text-amber-400 font-bold uppercase">
-                  {t.draft} — {previewDoc.key} v{previewDoc.version} ({previewDoc.lang})
-                </p>
-              </div>
-              <button onClick={() => setPreviewDoc(null)} className="px-3 py-1.5 bg-zinc-800 rounded-full text-[12px] font-bold">
-                {t.cancel}
-              </button>
-            </div>
-            <PolicyBody body={previewDoc.body} />
-          </div>
-        )}
-      </Sheet>
-
-      {/* --------------------------------------------- admin draft edit window
-
-          An OVERLAY, NOT a `Sheet`, even though it sits in the same place. The
-          preview above is a document you throw away; this one holds a policy
-          body someone is TYPING, and a draft is only in the database once
-          `saveDraft` returns. Making the panel draggable would mean a downward
-          flick — the same gesture used to scroll a fourteen-row textarea — can
-          silently discard an edit with no undo. The window keeps the bottom
-          placement so it still rises from the bottom edge on phones and centres
-          on `sm` exactly as `items-end sm:items-center` did; what it does not
-          get is a dismissal gesture the content cannot afford.
-
-          For the same reason BOTH `dismissOnEscape` and `dismissOnScrim` are
-          false. This is not the primitive being made stubborn: the old markup
-          had no scrim click handler and no key listener, so neither gesture
-          closed this window before, and the thing at stake is unsaved text.
-          Cancel and Save are the two deliberate answers, and they are both one
-          tap away at the bottom of the form. (There was no Escape listener in
-          this file to delete — the primitive owns that key, and this is the one
-          window that opts out of it.)
-
-          What it DOES gain is the part that was missing: an arrival and a
-          symmetric exit. The editor used to appear from nowhere and vanish the
-          instant `setEditDoc(null)` ran — including on a successful save, so
-          the one moment that deserved a sense of completion had none.
-
-          `labelledBy` points at the heading that already names the document.
-
-          z={60} preserves the old `z-[60]`, so a preview and an edit opened in
-          sequence keep the stacking they had. */}
-      <Overlay
-        open={!!editDoc}
-        onClose={() => setEditDoc(null)}
-        labelledBy="policy-edit-title"
-        placement="bottom"
-        dismissOnEscape={false}
-        dismissOnScrim={false}
-        z={60}
-        testId="policy-draft-editor"
-        panelClassName="w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto"
-      >
-        {editDoc && (
-          <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-            <p id="policy-edit-title" className="font-bold mb-3">
-              {t.edit}: {editDoc.key} v{editDoc.version} ({editDoc.lang})
-            </p>
-            <label className="text-[12px] text-zinc-400 block mb-1">{t.docTitle}</label>
-            <input
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-sm mb-3 outline-none focus:border-gold/50"
-            />
-            <label className="text-[12px] text-zinc-400 block mb-1">{t.docBody}</label>
-            <textarea
-              value={editBody}
-              onChange={(e) => setEditBody(e.target.value)}
-              rows={14}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold/50 font-mono"
-            />
-            <div className="flex gap-3 mt-4">
-              <button onClick={() => setEditDoc(null)} className="flex-1 py-3 rounded-2xl bg-zinc-800 font-bold text-sm">
-                {t.cancel}
-              </button>
-              <button
-                onClick={saveDraft}
-                disabled={isSaving}
-                className="flex-1 py-3 rounded-2xl bg-olive hover:bg-olive-light font-bold text-sm disabled:opacity-50"
-              >
-                {isSaving ? t.saving : t.save}
-              </button>
-            </div>
-          </div>
-        )}
-      </Overlay>
     </div>
   );
 }

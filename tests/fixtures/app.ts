@@ -13,6 +13,7 @@ import { ROOT, SqliteD1, SqliteStatement } from './d1';
 import type { AppContext } from '../../worker/lib/types';
 import { HttpError, requireMainHost } from '../../worker/lib/http';
 import { classifyHost } from '../../worker/lib/hosts';
+import { resetPolicyCorpusMemo } from '../../worker/lib/policySync';
 
 export const APEX = 'levonis-iq.com';
 export const MERCHANT_HOST = 'somestore.levonis-iq.com';
@@ -37,6 +38,12 @@ export function freshDb(): DatabaseSync {
  * `null` means every migration, which is what `freshDb()` is.
  */
 export function dbThrough(through: string | null): DatabaseSync {
+  // The policy corpus sync memoises a COMPLETED mirror per isolate, and one
+  // test process is one isolate holding many databases. Without this, the
+  // first database built in a run gets the archive and every later one is
+  // skipped as already-synced — leaving `policy_documents` empty, so checkout
+  // refuses consent it cannot bind to a row. A new database is a new archive.
+  resetPolicyCorpusMemo();
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON;');
   const dir = join(ROOT, 'migrations');

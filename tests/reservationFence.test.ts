@@ -27,6 +27,7 @@ import { freshDb, asD1, failingD1, stubApp, post, json, count, row, all, spendab
 import { orderRoutes } from '../worker/routes/orders';
 import { assertMovesApplied, planInventory, planReservationFence, type StockMove } from '../worker/lib/inventory';
 import { deductOrderStock, planOrderReturn, returnOrderStock } from '../worker/lib/orderInventory';
+import { acceptedPolicies } from './lib/policies';
 
 function seed(raw: DatabaseSync) {
   raw.exec(`
@@ -63,6 +64,7 @@ const orderBody = (over: Record<string, unknown> = {}) => ({
   usePoints: false,
   itemIds: [],
   idempotencyKey: `fence-reservation-key-${++seq}`,
+  policyAcceptance: acceptedPolicies(),
   ...over,
 });
 

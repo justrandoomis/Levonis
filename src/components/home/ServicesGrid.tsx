@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Layers, ShieldCheck, Wrench, Package, Users, Gift } from 'lucide-react';
+import { Layers, ShieldCheck, Wrench, Package, Users, Gift, Scale } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { STUDIO_URL } from '../../translations';
 import SectionHeader from './SectionHeader';
@@ -8,7 +8,7 @@ import { useRail } from '../../lib/useRail';
 import type { SiteMediaEntry } from '../../lib/api';
 
 /**
- * What LEVONIS does besides sell boxes — six compact cards on one
+ * What LEVONIS does besides sell boxes — seven compact cards on one
  * horizontally swiped rail (the owner asked for small modern cards, not a
  * stacked list eating a phone screen).
  *
@@ -82,10 +82,16 @@ export default function ServicesGrid({ siteMedia = [] }: { siteMedia?: SiteMedia
   // is no second naming scheme to keep in step with the server's slot list.
   const iconFor = (id: string): string =>
     siteMedia.find((m) => m.group === 'service' && m.slot === `service-${id}`)?.url || '';
-  // Six short cards: a snappier decay suits a rail this narrow.
+  // Short cards: a snappier decay suits a rail this narrow.
   const rail = useRail({ decelerationRate: 0.99 });
 
   const inApp: Array<{ id: string; to: string; title: string; icon: React.ElementType }> = [
+    // First of the in-app cards because this is the rail's newest service and
+    // the one a buyer reaches for BEFORE choosing — deciding between two
+    // printers comes ahead of warranty or points, which are questions you only
+    // have after you have bought. /compare is registered in App.tsx and opens
+    // with empty slots, so the card is honest with no ids attached.
+    { id: 'compare', to: '/compare', title: t('svcCompareTitle'), icon: Scale },
     { id: 'warranty', to: '/warranty', title: t('svcWarrantyTitle'), icon: ShieldCheck },
     { id: 'tools', to: '/tools', title: t('svcToolsTitle'), icon: Wrench },
     { id: 'bundles', to: '/bundles', title: t('svcBundlesTitle'), icon: Package },
@@ -97,7 +103,7 @@ export default function ServicesGrid({ siteMedia = [] }: { siteMedia?: SiteMedia
     <section data-home-section="services" className="mb-10 sm:mb-12">
       <SectionHeader title={t('services')} accent="bg-olive" />
 
-      {/* One swipe rail at every width; six small cards fit a desktop row
+      {/* One swipe rail at every width; the small cards fit a desktop row
           outright, so the rail only actually scrolls where it should — on a
           phone. min-w-0 so a long Kurdish title wraps inside its card. */}
       <div

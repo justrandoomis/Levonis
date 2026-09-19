@@ -248,6 +248,7 @@ export const translations = {
     svcCommunityDesc: "Stores, makers and requests from across Iraq.",
     svcRewardsTitle: "Points & rewards",
     svcRewardsDesc: "Earn on every order and spend it on your next one.",
+    svcCompareTitle: "Comparison",
   },
   ar: {
     active: "نشط",
@@ -476,6 +477,7 @@ export const translations = {
     svcCommunityDesc: "متاجر وصنّاع وطلبات من عموم العراق.",
     svcRewardsTitle: "النقاط والمكافآت",
     svcRewardsDesc: "اجمع نقاطًا مع كل طلب واصرفها في الطلب التالي.",
+    svcCompareTitle: "المقارنة",
   },
   ckb: {
     active: "چالاکە",
@@ -704,5 +706,6 @@ export const translations = {
     svcCommunityDesc: "فرۆشگا و دروستکەر و داواکاری لە هەموو عێراقەوە.",
     svcRewardsTitle: "خاڵ و خەڵات",
     svcRewardsDesc: "لەگەڵ هەر داواکارییەک خاڵ کۆبکەرەوە و لە داواکاری داهاتوودا خەرجی بکە.",
+    svcCompareTitle: "بەراورد",
   }
 };

@@ -251,6 +251,28 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'Choose a governorate — delivery is routed by it.',
     ckb: 'پارێزگا هەڵبژێرە — گەیاندن بەپێی ئەو ئاڕاستە دەکرێت.',
   },
+
+  // ---- «وجدتها بمكان أرخص» ------------------------------------------------
+  // `worker/routes/priceReports.ts` raises these with an Arabic and an English
+  // sentence joined by a slash on ONE line, because the route has no language
+  // to answer in. Without an entry here that whole pair is what the customer
+  // reads, in the sheet, whichever language they chose — the same defect the
+  // cancel sheet records for `MYSTERY_REVEALED_NO_CANCEL`.
+  REPORT_ALREADY_OPEN: {
+    ar: 'بلاغك عن سعر هذا المنتج وصلنا وقيد المراجعة.',
+    en: 'We already have your price report for this product and it is being reviewed.',
+    ckb: 'ڕاپۆرتەکەت دەربارەی نرخی ئەم بەرهەمە گەیشتووە و لە پێداچوونەوەدایە.',
+  },
+  REPORT_BAD_URL: {
+    ar: 'الرابط مو صحيح. الصقه كامل مع ‎https://‎ أو اتركه فارغ.',
+    en: 'That link is not a valid address. Paste the whole link including https://, or leave it empty.',
+    ckb: 'بەستەرەکە دروست نییە. بە تەواوی لەگەڵ ‎https://‎ بیلکێنە، یان بەتاڵی جێبهێڵە.',
+  },
+  REPORT_BAD_URL_SCHEME: {
+    ar: 'نقبل روابط http أو https فقط.',
+    en: 'Only http and https links are accepted.',
+    ckb: 'تەنها بەستەری http یان https قبوڵ دەکرێت.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

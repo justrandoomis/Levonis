@@ -51,6 +51,18 @@ import { getBalances } from '../lib/wallet';
 import { ENTITLEMENT_MINIMUM_TIER, benefits, getTierStatus, type MembershipEntitlement } from '../lib/entitlements';
 import { bnplEligibility } from '../lib/bnpl';
 import { coverageState, maskSerial } from '../lib/deviceOps';
+import { compareProducts, type CompareRow } from '../lib/compareSpecs';
+import {
+  PRODUCT_COLUMNS as COMPARE_PRODUCT_COLUMNS,
+  cardOf,
+  hasAnySpec,
+  loadCatalogs,
+  place,
+  rankCompareCandidates,
+  taxonomy,
+  type Placed,
+  type ProductRow as CompareProductRow,
+} from './compare';
 
 export const supportRoutes = new Hono<AppContext>();
 
@@ -115,6 +127,7 @@ const INTENTS = [
   'return_help',
   'password_help',
   'product_search',
+  'compare_products',
   'policy_question',
   'open_ticket',
   'human_handoff',
@@ -150,6 +163,13 @@ const KEYWORDS: Record<Intent, string[]> = {
   return_help: ['return', 'refund', 'ارجاع', 'إرجاع', 'استرجاع', 'استبدال', 'گەڕاندنەوە'],
   password_help: ['password', 'forgot', 'كلمة المرور', 'كلمة السر', 'نسيت', 'وشەی نهێنی', 'تێپەڕەوشە'],
   product_search: ['search', 'find product', 'بحث', 'ابحث', 'أبحث', 'منتج', 'گەڕان', 'بەرهەم'],
+  /**
+   * ` vs ` carries its spaces on purpose: a bare 'vs' is a substring of
+   * ordinary words and would drag unrelated sentences into a comparison.
+   * «قارن» is the stem, so «قارنلي» and «نقارن» reach it without a list of
+   * inflections.
+   */
+  compare_products: ['compare', 'comparison', ' vs ', 'مقارنة', 'قارن', 'الفرق بين', 'أيهما أفضل', 'ايهما افضل', 'بەراورد', 'جیاوازی نێوان'],
   policy_question: ['policy', 'policies', 'terms', 'privacy', 'سياسة', 'سياسات', 'شروط', 'خصوصية', 'سیاسەت', 'مەرج'],
   open_ticket: ['ticket', 'complaint', 'تذكرة', 'شكوى', 'مشكلة', 'تیکێت', 'سکاڵا'],
   human_handoff: ['human', 'agent', 'staff', 'talk to', 'موظف', 'انسان', 'إنسان', 'تحدث', 'اتواصل', 'کارمەند', 'مرۆڤ'],
@@ -183,6 +203,15 @@ const T: Record<Locale, Record<string, string>> = {
     c_returns: 'الإرجاع والاستبدال',
     c_password: 'مساعدة كلمة المرور',
     c_search: 'البحث عن منتج',
+    c_compare: 'مقارنة منتجين',
+    compare_need_first: 'أي منتج تريد تقارنه؟ اكتب اسم الطابعة.',
+    compare_pick_first: 'اختر المنتج الأول:',
+    compare_pick_second: 'اخترت {name}. وياه أي وحدة نقارن؟',
+    compare_none: 'ما لقيت منتج بهذا الاسم عنده ورقة مواصفات.',
+    compare_no_candidates: 'ما لقيت منتج مناسب نقارنه وياه.',
+    compare_lead: '{name} يتفوق في {wins} من {total} مواصفة حاسمة.',
+    compare_tie: 'المنتجان متعادلان في المواصفات الحاسمة.',
+    compare_open: 'فتح المقارنة الكاملة',
     c_policies: 'السياسات المنشورة',
     c_ticket: 'فتح تذكرة دعم',
     c_human: 'التحدث مع فريق ليفونيس',
@@ -260,6 +289,15 @@ const T: Record<Locale, Record<string, string>> = {
     c_returns: 'Returns & replacement',
     c_password: 'Password help',
     c_search: 'Search products',
+    c_compare: 'Compare two products',
+    compare_need_first: 'Which product do you want to compare? Type the printer name.',
+    compare_pick_first: 'Choose the first product:',
+    compare_pick_second: 'You chose {name}. Which one should it be compared with?',
+    compare_none: 'I found no product by that name with a specification sheet.',
+    compare_no_candidates: 'I found nothing suitable to compare it with.',
+    compare_lead: '{name} leads on {wins} of {total} decisive specifications.',
+    compare_tie: 'The two are level on the decisive specifications.',
+    compare_open: 'Open the full comparison',
     c_policies: 'Published policies',
     c_ticket: 'Open a support ticket',
     c_human: 'Talk to LEVONIS staff',
@@ -338,6 +376,15 @@ const T: Record<Locale, Record<string, string>> = {
     c_returns: 'گەڕاندنەوە و گۆڕینەوە',
     c_password: 'یارمەتی وشەی نهێنی',
     c_search: 'گەڕان بۆ بەرهەم',
+    c_compare: 'بەراوردی دوو بەرهەم',
+    compare_need_first: 'کام بەرهەم دەتەوێت بەراورد بکەیت؟ ناوی پرینتەرەکە بنووسە.',
+    compare_pick_first: 'بەرهەمی یەکەم هەڵبژێرە:',
+    compare_pick_second: '{name}ت هەڵبژارد. لەگەڵ کامیان بەراورد بکرێت؟',
+    compare_none: 'هیچ بەرهەمێکم بەو ناوە نەدۆزییەوە کە پەڕەی تایبەتمەندی هەبێت.',
+    compare_no_candidates: 'هیچ بەرهەمێکی گونجاوم نەدۆزییەوە بۆ بەراوردکردنی لەگەڵ.',
+    compare_lead: '{name} لە {wins} لە {total} تایبەتمەندی چارەنووسسازدا پێشەنگە.',
+    compare_tie: 'هەردووکیان لە تایبەتمەندییە چارەنووسسازەکاندا یەکسانن.',
+    compare_open: 'کردنەوەی بەراوردی تەواو',
     c_policies: 'سیاسەتە بڵاوکراوەکان',
     c_ticket: 'کردنەوەی تیکێتی پشتگیری',
     c_human: 'قسەکردن لەگەڵ ستافی ليڤۆنیس',
@@ -459,12 +506,30 @@ interface AssistantCard {
   fields?: Array<{ label: string; value: string }>;
   link?: AssistantLink;
 }
+/**
+ * THE COMPACT COMPARISON — «بشكل أصغر لا يحدث هوسة في المحادثة».
+ *
+ * A chat bubble cannot hold the comparison page, and two stacked cards make a
+ * reader scroll up and down to put two numbers beside each other — which is
+ * the one thing a comparison exists to do. So it is a real table, bounded to
+ * the few rows that actually decide the question, with the full page one tap
+ * away in `links`.
+ *
+ * `winners` is per row and may be empty: a tie is a tie, and a table that
+ * marks a winner on every row invents a verdict the engine did not reach.
+ */
+interface AssistantTable {
+  /** One per product, in the order the comparison was asked for. */
+  columns: string[];
+  rows: Array<{ label: string; values: string[]; winners: number[] }>;
+}
 interface AssistantReply {
   intent: string;
   text: string;
   cards?: AssistantCard[];
   choices?: AssistantChoice[];
   links?: AssistantLink[];
+  table?: AssistantTable;
   auth_required?: boolean;
   handoff?: boolean;
 }
@@ -479,6 +544,7 @@ const MENU_ITEMS: Array<{ intent: Intent; labelKey: string }> = [
   { intent: 'return_help', labelKey: 'c_returns' },
   { intent: 'password_help', labelKey: 'c_password' },
   { intent: 'product_search', labelKey: 'c_search' },
+  { intent: 'compare_products', labelKey: 'c_compare' },
   { intent: 'policy_question', labelKey: 'c_policies' },
   { intent: 'open_ticket', labelKey: 'c_ticket' },
   { intent: 'human_handoff', labelKey: 'c_human' },
@@ -805,6 +871,197 @@ async function handleProductSearch(c: Context<AppContext>, params: Record<string
   return { intent: 'product_search', text: tr(loc, 'search_intro'), cards };
 }
 
+/**
+ * «قارن» — THE COMPACT COMPARISON, AND ONE TAP TO THE FULL ONE.
+ *
+ * DETERMINISTIC, like everything else on this route: the products are found by
+ * id or by a LIKE over their names, and every judgement about which value beats
+ * which comes from `compareProducts` — the SAME engine the /compare page runs.
+ * Nothing here scores a specification itself. A second opinion about which
+ * printer is faster, living in the support assistant, would start agreeing with
+ * the page and end contradicting it in front of a customer.
+ *
+ * AND IT NEVER GUESSES WHICH MACHINES WERE MEANT. One name matching three
+ * printers returns three choices; one printer named and no second returns the
+ * candidates for the second slot. That is this file's own rule — an ambiguous
+ * match is answered with choices, never with a pick — and it matters more here
+ * than anywhere else on the route, because guessing the second machine produces
+ * a confident verdict about a comparison the customer never asked for.
+ */
+
+/** Five scored rows plus price. More than this is the page, not a chat reply. */
+const COMPARE_SCORED_ROWS = 5;
+
+/** What the assistant will place: two machines, side by side. The page takes
+ *  four; a chat bubble on a phone does not. */
+const COMPARE_ASSISTANT_SLOTS = 2;
+
+function compareIdsParam(params: Record<string, unknown>): string[] {
+  const raw = str(params.ids, 'ids', { max: 130, required: false });
+  const out: string[] = [];
+  for (const piece of raw.split(',')) {
+    const id = piece.trim();
+    if (!id || id.length > 60 || out.includes(id)) continue;
+    out.push(id);
+  }
+  return out.slice(0, COMPARE_ASSISTANT_SLOTS);
+}
+
+/**
+ * The words that ROUTED the sentence here are not part of the product name:
+ * «قارن الطابعة بامبو» must search for «الطابعة بامبو», not for the whole
+ * sentence, which matches nothing and answers "no such product" about a
+ * product the shop sells.
+ */
+function stripCompareWords(text: string): string {
+  let out = text.toLowerCase();
+  for (const word of KEYWORDS.compare_products) out = out.split(word).join(' ');
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+const compareName = (p: Placed, loc: Locale): string => cardOf(p).name[loc];
+
+/** Active products whose sheet the comparison can actually draw. A candidate
+ *  with no specs is a tap that ends in a refusal. */
+async function findComparable(db: D1Database, q: string, tax: ReturnType<typeof taxonomy>, limit: number): Promise<Placed[]> {
+  const like = likePattern(q);
+  if (!like) return [];
+  const { results } = await db.prepare(
+    `SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products
+      WHERE status = 'active' AND spec_fields <> '{}' AND spec_fields <> ''
+        AND (${sqlLikeClause(['name', 'name_ar', 'name_ku'], '?1')})
+      ORDER BY is_featured DESC, created_at DESC
+      LIMIT ${limit}`
+  )
+    .bind(like)
+    .all<CompareProductRow>();
+  return (results ?? []).map((row) => place(row, tax)).filter((p) => hasAnySpec(p.specs));
+}
+
+async function handleCompareProducts(
+  c: Context<AppContext>,
+  params: Record<string, unknown>,
+  freeText: string,
+  loc: Locale
+): Promise<AssistantReply> {
+  const db = c.env.DB;
+  const tax = taxonomy(await loadCatalogs(db));
+  const ids = compareIdsParam(params);
+
+  let placed: Placed[] = [];
+  if (ids.length) {
+    const { results } = await db.prepare(
+      `SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products
+        WHERE id IN (${ids.map(() => '?').join(',')}) AND status = 'active'`
+    )
+      .bind(...ids)
+      .all<CompareProductRow>();
+    const byId = new Map((results ?? []).map((r) => [String(r.id), r]));
+    // Request order, not database order: the customer put one machine first.
+    placed = ids
+      .map((id) => byId.get(id))
+      .filter((r): r is CompareProductRow => !!r)
+      .map((r) => place(r, tax))
+      .filter((p) => hasAnySpec(p.specs));
+  }
+
+  // Nothing identified yet — read the first machine out of what they typed.
+  if (placed.length === 0) {
+    const q = str(params.q, 'q', { max: 100, required: false }) || stripCompareWords(freeText);
+    if (q.length < 2) return { intent: 'compare_products', text: tr(loc, 'compare_need_first') };
+    const matches = await findComparable(db, q, tax, 6);
+    if (matches.length === 0) return { intent: 'compare_products', text: tr(loc, 'compare_none') };
+    if (matches.length > 1) {
+      return {
+        intent: 'compare_products',
+        text: tr(loc, 'compare_pick_first'),
+        choices: matches.map((m) => ({
+          label: compareName(m, loc),
+          intent: 'compare_products' as const,
+          params: { ids: m.row.id },
+        })),
+      };
+    }
+    placed = matches;
+  }
+
+  // One machine named and not the other: OFFER the second, never choose it.
+  if (placed.length === 1) {
+    const anchor = placed[0];
+    const candidates = await rankCompareCandidates(db, anchor, tax, '', 6);
+    if (candidates.length === 0) return { intent: 'compare_products', text: tr(loc, 'compare_no_candidates') };
+    return {
+      intent: 'compare_products',
+      text: tr(loc, 'compare_pick_second', { name: compareName(anchor, loc) }),
+      choices: candidates.map((cd) => ({
+        label: cd.name[loc],
+        intent: 'compare_products' as const,
+        params: { ids: `${anchor.row.id},${cd.id}` },
+      })),
+    };
+  }
+
+  const comparison = compareProducts({
+    products: placed.map((p) => ({
+      id: p.row.id,
+      product_type: p.productType,
+      section_slugs: p.branch.map((b) => b.slug),
+      spec_fields: p.specs,
+      price_iqd: Number(p.row.price_iqd) || 0,
+    })),
+  });
+
+  const allRows: CompareRow[] = comparison.groups.flatMap((g) => g.rows);
+  /**
+   * WEIGHT IS THE RANKING, and the engine already assigned it — the assistant
+   * does not re-decide which specification matters. `decisive` is the filter
+   * because a row where somebody had no value is not a difference between the
+   * machines, it is a gap in our own data entry (compareSpecs.ts, D1).
+   */
+  const scored = allRows
+    .filter((r) => r.decisive && (r.weight ?? 0) > 0)
+    .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
+
+  // Price leads the table and is never part of the verdict — weight 0 keeps it
+  // out of `scored`, so it is placed by hand rather than ranked in.
+  const priceRow = allRows.find((r) => r.field_id === 'price_iqd');
+  const shown = [...(priceRow ? [priceRow] : []), ...scored.slice(0, COMPARE_SCORED_ROWS)];
+
+  const table: AssistantTable = {
+    columns: placed.map((p) => compareName(p, loc)),
+    rows: shown.map((r) => ({
+      label: r.label[loc] || r.label.en,
+      values: r.values.map((v) => v.text),
+      winners: r.winners,
+    })),
+  };
+
+  const scores = comparison.verdict.scores;
+  const best = scores.indexOf(Math.max(...scores));
+  const tied = scores.every((v) => Math.abs(v - scores[0]) < 1e-9);
+  const text = tied
+    ? tr(loc, 'compare_tie')
+    : tr(loc, 'compare_lead', {
+        name: compareName(placed[best], loc),
+        wins: comparison.verdict.wins[best]?.length ?? 0,
+        total: scored.length,
+      });
+
+  return {
+    intent: 'compare_products',
+    text,
+    table,
+    // THE ONE LINK the owner asked for: the full comparison, one tap, with both
+    // machines already placed so nothing has to be chosen twice.
+    links: [
+      {
+        label: tr(loc, 'compare_open'),
+        to: `/compare?ids=${placed.map((p) => encodeURIComponent(p.row.id)).join(',')}`,
+      },
+    ],
+  };
+}
+
 async function handlePolicyQuestion(c: Context<AppContext>, params: Record<string, unknown>, loc: Locale): Promise<AssistantReply> {
   const db = c.env.DB;
   const key = str(params.key, 'key', { max: 40, required: false });
@@ -881,7 +1138,8 @@ export function contextualChoices(loc: Locale, intent: string): AssistantChoice[
     membership_status: ['points_balance'],
     return_help: ['order_status', 'human_handoff'],
     password_help: ['human_handoff'],
-    product_search: ['human_handoff'],
+    product_search: ['compare_products', 'human_handoff'],
+    compare_products: ['product_search', 'human_handoff'],
     policy_question: ['human_handoff'],
   };
   const next = followups[intent as Intent] ?? [];
@@ -954,6 +1212,9 @@ supportRoutes.post('/assistant', async (c) => {
       break;
     case 'product_search':
       reply = await handleProductSearch(c, params, freeText, loc);
+      break;
+    case 'compare_products':
+      reply = await handleCompareProducts(c, params, freeText, loc);
       break;
     case 'policy_question':
       reply = await handlePolicyQuestion(c, params, loc);

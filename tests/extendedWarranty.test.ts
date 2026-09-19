@@ -61,7 +61,10 @@ import { templateShape, parseImport, blankTemplate, exampleRows, readmeFor } fro
 import { normKey, resolveProduct } from '../worker/lib/importApply';
 import type { CatalogRef, ImportMaps } from '../worker/lib/importApply';
 import { PRODUCT_TYPES } from '../worker/lib/templateFamilies';
-import { POLICY_DRAFTS, POLICY_KEYS, POLICY_LANGS } from '../worker/lib/policyOps';
+import { POLICY_KEYS, POLICY_LANGS } from '../worker/lib/policyOps';
+import { getPolicyDocument } from '../worker/lib/policies';
+import { acceptedPolicies } from './lib/policies';
+import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 import {
   warrantyFee as formWarrantyFee,
   isValidFeePercent as formIsValidFeePercent,
@@ -96,6 +99,13 @@ const PRINTER_PLANS = JSON.stringify([EXT12, EXT24]);
 const OPS = JSON.stringify({ serialized: true, warranty_base_months: 12 });
 
 function setup() {
+  // A NEW DATABASE IS A NEW ARCHIVE. `ensurePolicyCorpus` memoises a COMPLETED
+  // mirror per isolate, and one test process is one isolate holding many
+  // databases: without this, the first database in the run gets the policy
+  // rows and every later one is skipped as already-synced, so checkout refuses
+  // consent it cannot bind to a row. tests/fixtures/app.ts#dbThrough does the
+  // same for the fixtures it builds; this file builds its own.
+  resetPolicyCorpusMemo();
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON;');
   const dir = join(ROOT, 'migrations');
@@ -182,6 +192,7 @@ const orderBody = (paymentMethodId: string, over: Record<string, unknown> = {}) 
   usePoints: false,
   itemIds: [],
   idempotencyKey: `ew-${Date.now()}-${++seq}`,
+  policyAcceptance: acceptedPolicies(),
   ...over,
 });
 
@@ -750,47 +761,77 @@ test('computeCoverage: the frozen total wins over a later product edit; legacy s
 });
 
 // ---------------------------------------------------------------- the policy
+//
+// These two tests used to assert a DRAFT — `POLICY_DRAFTS`, seeded through
+// /api/policies/admin/seed-drafts and published from an admin form. The
+// drafts table, both endpoints and the form are gone: the document is written
+// in worker/lib/policies/extended_warranty.ts and served from there. What is
+// asserted is therefore the same substance against its new source, plus the
+// one thing that could not be tested before — that it is served WITHOUT
+// anybody having published anything.
 
-test('the extended_warranty policy: LEVONIS\'s own draft, in three languages, structured as the mandate asked', () => {
+test('the extended_warranty document states the rules this file tests, in three languages, as article 6', () => {
   assert.ok((POLICY_KEYS as readonly string[]).includes('extended_warranty'));
-  const draft = POLICY_DRAFTS.find((d) => d.key === 'extended_warranty');
-  assert.ok(draft, 'a draft exists for the key');
+  const doc = getPolicyDocument('extended_warranty');
+  if (!doc) throw new assert.AssertionError({ message: 'the registry publishes the document' });
+  const arabicNumbers: string[] = [...doc.body.ar.matchAll(/^### (6\.\d+)/gm)].map((m) => m[1]);
+
   for (const lang of POLICY_LANGS) {
-    const body = draft!.body[lang];
-    assert.ok(body.length >= 200);
-    assert.ok(body.includes('⚠️'), `${lang}: the draft banner`);
-    // Sorani writes its numerals in Arabic-Indic digits (٢٤ / ٣٦); Arabic and English in Latin.
-    assert.ok(/24|٢٤/.test(body) && /36|٣٦/.test(body), `${lang}: names the 24 and 36 month totals`);
-    assert.ok((body.match(/^## /gm) ?? []).length >= 8, `${lang}: eligibility, options, window, price, coverage, exclusions, claims, transfer`);
-    assert.ok(!/bambu/i.test(body) && !/bambulab\.com/i.test(body), `${lang}: not copied from any manufacturer`);
-    assert.ok(body.includes('PRO') && body.includes('PRIME'), `${lang}: says membership does not change the fee`);
+    const body: string = doc.body[lang];
+    assert.ok(body.length >= 1000, `${lang}: body too short to be the document`);
+    assert.ok(!/bambu/i.test(body), `${lang}: copied from a manufacturer`);
+    // The articles are numbered 6.1 upward and carry the same numbers in every
+    // language, because a customer may buy in one and argue in another.
+    const numbers: string[] = [...body.matchAll(/^### (6\.\d+)/gm)].map((m) => m[1]);
+    assert.deepEqual(numbers, arabicNumbers, `${lang}: article numbering differs from the Arabic`);
+    assert.ok(numbers.length >= 8, `${lang}: only ${numbers.length} articles`);
+    // The fee is the same for a member, which is what `planFee` computes on
+    // the regular basis — a member who expects a discount reads silence as a
+    // promise, so every language has to say it.
+    assert.ok(body.includes('PRO'), `${lang}: does not say membership changes nothing`);
   }
-  const en = draft!.body.en;
-  for (const phrase of ['printers only', '+12 months', '+24 months', 'Before the order is placed', 'percentage of the printer', 'nozzles', 'PTFE', 'warranty centre', 'follows the device']) {
-    assert.ok(en.includes(phrase), `en draft mentions "${phrase}"`);
+
+  // The totals the code sells: a 12-month base plus +12 or +24.
+  const ar = doc.body.ar;
+  assert.ok(ar.includes('أربعة وعشرين شهرًا') && ar.includes('ستة وثلاثين شهرًا'), 'ar: the 24 and 36 month totals');
+  assert.ok(ar.includes('قبل إتمام الطلب'), 'ar: bought before the order only');
+  assert.ok(ar.includes('السعر الاعتيادي'), 'ar: the fee is on the regular price');
+
+  const en = doc.body.en;
+  for (const phrase of [
+    'printers',                           // refuseNonPrinterWarranty
+    'twenty-four months',                 // PRINTER_EXTENSION_MONTHS over a 12-month base
+    'thirty-six months',
+    'before the order is placed',         // the plan rides a cart line, never an order
+    'percentage of the regular price',    // planFee takes the regular basis
+    'member price',
+    'Open Box',                           // warrantyExtendable is false for every condition listing
+    'refurbished',
+    'warranty receipt',
+  ]) {
+    assert.ok(en.includes(phrase), `en document states "${phrase}"`);
   }
-  assert.ok(draft!.body.ar.includes('الفوهات') && draft!.body.ar.includes('قبل إتمام الطلب فقط'));
-  assert.ok(draft!.body.ckb.includes('نۆزڵ'));
+  // Sorani keeps the technical vocabulary the customer will actually use.
+  assert.ok(doc.body.ckb.includes('نۆزڵ'), 'ckb: names the nozzle');
 });
 
-test('the policy is seeded, published and served like every other document', async () => {
+test('the document is served from code — no seeding, no publishing, on a database nobody prepared', async () => {
   const { db } = setup();
-  const admin = appAs(db, 'adm', 'admin');
-  const seeded = await json(await post(admin, '/api/policies/admin/seed-drafts', {}));
-  assert.ok(seeded.seeded.includes('extended_warranty'));
-  const published = await post(admin, '/api/policies/admin/publish', {
-    key: 'extended_warranty', version: 1, confirm: 'PUBLISH extended_warranty v1',
-  });
-  assert.equal(published.status, 200, JSON.stringify(await published.clone().json()));
-
   const customer = appAs(db, 'buyer');
+
   const en = await json(await get(customer, '/api/policies/extended_warranty?lang=en'));
-  assert.equal(en.policy.title, 'Extended Warranty Policy (Printers)');
-  assert.ok(en.policy.body.includes('36 months in total'));
+  assert.equal(en.policy.key, 'extended_warranty');
+  assert.equal(en.policy.lang, 'en');
+  assert.equal(en.policy.status, 'published');
+  assert.equal(en.policy.title, getPolicyDocument('extended_warranty')!.title.en);
+  assert.ok(en.policy.body.includes('thirty-six months in total') || en.policy.body.includes('thirty-six months'));
+  assert.match(en.policy.hash, /^[0-9a-f]{64}$/);
+
   const list = await json(await get(customer, '/api/policies'));
   const row = list.policies.find((p: { key: string }) => p.key === 'extended_warranty');
   assert.ok(row, 'listed for the storefront link /policies/extended_warranty');
   assert.equal(row.required_for_checkout, false, 'reading the terms is not a checkout gate');
+  assert.equal(row.section, 'warranty', 'it sits with the warranty documents on the library index');
 });
 
 // --------------------------------------------------------- the TXT template

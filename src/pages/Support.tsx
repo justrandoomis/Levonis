@@ -44,12 +44,19 @@ interface AsstCard {
   fields?: Array<{ label: string; value: string }>;
   link?: AsstLink;
 }
+/** The assistant's compact comparison. `winners` may be empty — a tie is a
+ *  tie, and marking a winner on every row would invent a verdict. */
+interface AsstTable {
+  columns: string[];
+  rows: Array<{ label: string; values: string[]; winners: number[] }>;
+}
 interface AsstReply {
   intent: string;
   text: string;
   cards?: AsstCard[];
   choices?: AsstChoice[];
   links?: AsstLink[];
+  table?: AsstTable;
   auth_required?: boolean;
   handoff?: boolean;
 }
@@ -105,6 +112,7 @@ const STRINGS = {
     thinking: 'جارٍ البحث...',
     netError: 'تعذر الاتصال بالخادم — حاول مرة أخرى.',
     openTicketCta: 'إنشاء تذكرة دعم',
+    bestCell: 'الأفضل في هذا الصف:',
     ticketFormTitle: 'تذكرة دعم جديدة',
     subject: 'الموضوع',
     message: 'الرسالة',
@@ -161,6 +169,7 @@ const STRINGS = {
     thinking: 'Looking that up...',
     netError: 'Could not reach the server — please try again.',
     openTicketCta: 'Create a support ticket',
+    bestCell: 'Best on this row:',
     ticketFormTitle: 'New support ticket',
     subject: 'Subject',
     message: 'Message',
@@ -217,6 +226,7 @@ const STRINGS = {
     thinking: 'گەڕان بەردەوامە...',
     netError: 'پەیوەندی بە ڕاژەکار نەکرا — دووبارە هەوڵ بدەرەوە.',
     openTicketCta: 'دروستکردنی تیکێتی پشتگیری',
+    bestCell: 'باشترین لەم ڕیزەدا:',
     ticketFormTitle: 'تیکێتی پشتگیری نوێ',
     subject: 'بابەت',
     message: 'پەیام',
@@ -289,6 +299,59 @@ function fmtDate(iso: string, lang: string): string {
 }
 
 // ------------------------------------------------------------- card render
+
+/**
+ * THE COMPACT COMPARISON, INSIDE THE CONVERSATION.
+ *
+ * A real table rather than one card per machine: putting two numbers beside
+ * each other is the whole job of a comparison, and stacked cards make the
+ * reader scroll between them. It stays small on purpose — the server sends at
+ * most six rows and the full page is one tap away underneath.
+ *
+ * `text-start` and the logical border properties, never `text-left`: this
+ * table is read right-to-left by almost everyone who will see it.
+ *
+ * The winning cell is marked in gold AND carries a screen-reader sentence,
+ * because colour alone is not an answer for a reader who cannot see it.
+ */
+function ReplyTable({ table, bestLabel }: { table: AsstTable; bestLabel: string }) {
+  return (
+    <div className="lv-surface overflow-x-auto">
+      <table className="w-full border-collapse text-[12px]">
+        <thead>
+          <tr className="border-b border-border-subtle">
+            <th scope="col" className="p-2 text-start font-bold text-text-muted" />
+            {table.columns.map((c, i) => (
+              <th key={i} scope="col" className="p-2 text-start font-bold text-text-primary">
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((r, i) => (
+            <tr key={i} className="border-b border-border-subtle last:border-b-0">
+              <th scope="row" className="p-2 text-start align-top font-normal text-text-muted">
+                {r.label}
+              </th>
+              {r.values.map((v, j) => (
+                <td
+                  key={j}
+                  className={`p-2 align-top ${
+                    r.winners.includes(j) ? 'font-bold text-gold' : 'text-text-secondary'
+                  }`}
+                >
+                  {r.winners.includes(j) && <span className="sr-only">{bestLabel} </span>}
+                  {v}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 function ReplyCard({ card, onNavigate }: { card: AsstCard; onNavigate: (to: string) => void }) {
   return (
@@ -916,6 +979,10 @@ export default function Support() {
                         <ReplyCard key={j} card={card} onNavigate={(to) => navigate(to)} />
                       ))}
                     </div>
+                  )}
+
+                  {m.reply?.table && m.reply.table.rows.length > 0 && (
+                    <ReplyTable table={m.reply.table} bestLabel={s.bestCell} />
                   )}
 
                   {m.reply?.links && m.reply.links.length > 0 && (

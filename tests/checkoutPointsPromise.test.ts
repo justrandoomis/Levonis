@@ -39,8 +39,17 @@ import { ROOT, SqliteD1 } from './fixtures/d1';
 import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
 import { orderRoutes } from '../worker/routes/orders';
+import { acceptedPolicies } from './lib/policies';
+import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 
 function setup() {
+  // A NEW DATABASE IS A NEW ARCHIVE. `ensurePolicyCorpus` memoises a COMPLETED
+  // mirror per isolate, and one test process is one isolate holding many
+  // databases: without this, the first database in the run gets the policy
+  // rows and every later one is skipped as already-synced, so checkout refuses
+  // consent it cannot bind to a row. tests/fixtures/app.ts#dbThrough does the
+  // same for the fixtures it builds; this file builds its own.
+  resetPolicyCorpusMemo();
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON;');
   const dir = join(ROOT, 'migrations');
@@ -110,6 +119,7 @@ async function checkout(db: D1Database, user: string, addressId: string) {
         usePoints: false,
         itemIds: [],
         idempotencyKey: `pts-${user}-${++seq}`,
+        policyAcceptance: acceptedPolicies(),
       }),
     },
     undefined,

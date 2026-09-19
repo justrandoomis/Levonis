@@ -100,11 +100,11 @@ const CANDIDATE_POOL = 120;
 
 /** The columns a comparison column is drawn from. Deliberately not `SELECT *`:
  *  this is a public route, and `product_cost_iqd` is one column away. */
-const PRODUCT_COLUMNS =
+export const PRODUCT_COLUMNS =
   'id, slug, status, name, name_ar, name_ku, images, price_iqd, spec_fields, ' +
   'template_family, category_id, sub_category_id, brand_id, condition_doc';
 
-interface ProductRow {
+export interface ProductRow {
   id: string;
   slug: string;
   status: string;
@@ -208,7 +208,7 @@ function specSheet(raw: unknown): Record<string, unknown> {
 
 /** Does this sheet say anything at all? An object full of empty strings is an
  *  empty sheet — the admin opened the form and saved it. */
-function hasAnySpec(specs: Record<string, unknown>): boolean {
+export function hasAnySpec(specs: Record<string, unknown>): boolean {
   for (const value of Object.values(specs)) {
     if (value === null || value === undefined) continue;
     if (typeof value === 'string' ? value.trim() !== '' : true) return true;
@@ -218,14 +218,14 @@ function hasAnySpec(specs: Record<string, unknown>): boolean {
 
 /** The whole taxonomy, once. A few dozen rows; the alternative is a recursive
  *  walk per product, which on D1 is a round trip per hop. */
-async function loadCatalogs(db: D1Database): Promise<CatalogRow[]> {
+export async function loadCatalogs(db: D1Database): Promise<CatalogRow[]> {
   const { results } = await db
     .prepare('SELECT id, parent_id, slug, name_ar, name_en, name_ckb, template_family FROM catalogs')
     .all<CatalogRow>();
   return results ?? [];
 }
 
-interface Taxonomy {
+export interface Taxonomy {
   branchOf(sectionId: string | null): CatalogRow[];
   familyOf(row: ProductRow, branch: CatalogRow[]): 'devices' | 'materials' | null;
 }
@@ -241,7 +241,7 @@ interface Taxonomy {
  * `CANDIDATE_POOL` products, and rebuilding the id index inside each one turns
  * a cheap lookup into a quadratic walk over the taxonomy.
  */
-function taxonomy(catalogs: CatalogRow[]): Taxonomy {
+export function taxonomy(catalogs: CatalogRow[]): Taxonomy {
   const byId = new Map(catalogs.map((r) => [r.id, r]));
 
   const branchOf = (sectionId: string | null): CatalogRow[] => {
@@ -267,7 +267,7 @@ function taxonomy(catalogs: CatalogRow[]): Taxonomy {
   return { branchOf, familyOf };
 }
 
-interface Placed {
+export interface Placed {
   row: ProductRow;
   specs: Record<string, unknown>;
   branch: CatalogRow[];
@@ -275,7 +275,7 @@ interface Placed {
 }
 
 /** Everything the comparison needs about one product, from rows already read. */
-function place(row: ProductRow, tax: Taxonomy): Placed {
+export function place(row: ProductRow, tax: Taxonomy): Placed {
   const branch = tax.branchOf(row.sub_category_id || row.category_id);
   const family = tax.familyOf(row, branch);
   const refs: SectionRef[] = branch.map((b) => ({ id: b.id, slug: b.slug }));
@@ -291,7 +291,7 @@ function place(row: ProductRow, tax: Taxonomy): Placed {
   };
 }
 
-function cardOf(p: Placed): CompareProductCard {
+export function cardOf(p: Placed): CompareProductCard {
   const leaf = p.branch[0];
   return {
     id: p.row.id,
@@ -451,27 +451,22 @@ compareRoutes.get('/', async (c) => {
  * be offering a tap that ends in `COMPARE_NO_SPECS` — the picker must only
  * show machines the comparison can actually draw.
  */
-compareRoutes.get('/candidates', async (c) => {
-  await rateLimit(c, 'compare-candidates', 120, 60);
-  const anchorId = str(c.req.query('for'), 'for', { min: 1, max: 60 });
-  // Bounded by CHARACTERS here and by BYTES inside likePattern. Both are
-  // needed: this cap stops a megabyte of query text reaching the pattern
-  // builder, and the byte cap is the one D1 actually enforces (50 bytes, which
-  // Arabic reaches in 25 letters — see worker/lib/sqlLike.ts).
-  const q = str(c.req.query('q'), 'q', { max: 120, required: false });
-
-  // `status = 'active'` is in the QUERY, not a check after it. The reply echoes
-  // the anchor's own card, so loading a draft first and refusing second would
-  // still have read an unpublished product's name and price into memory on a
-  // public route — and one `if` away from returning it.
-  const anchor = await c.env.DB
-    .prepare(`SELECT ${PRODUCT_COLUMNS} FROM products WHERE id = ? AND status = 'active'`)
-    .bind(anchorId)
-    .first<ProductRow>();
-  if (!anchor) throw notFound('Product not found');
-
-  const tax = taxonomy(await loadCatalogs(c.env.DB));
-  const anchorPlaced = place(anchor, tax);
+/**
+ * WHAT IS WORTH COMPARING WITH THIS ONE — the single ranking.
+ *
+ * Extracted from the /candidates route because it has a SECOND caller: the
+ * support assistant offers the same second-slot choices when someone names one
+ * printer and not the other. Two rankings would start agreeing and end
+ * disagreeing — the picker offering a machine the assistant never suggests —
+ * which is the same drift this file's header refuses for spec definitions.
+ */
+export async function rankCompareCandidates(
+  db: D1Database,
+  anchorPlaced: Placed,
+  tax: Taxonomy,
+  q: string,
+  limit: number
+): Promise<CompareProductCard[]> {
   const anchorSections = new Set(anchorPlaced.branch.map((b) => b.id));
   const anchorLeaf = anchorPlaced.branch[0]?.id ?? '';
 
@@ -499,10 +494,10 @@ compareRoutes.get('/candidates', async (c) => {
    * SQLite, and a NULL sort key makes the ordering depend on where the planner
    * happens to put it.
    */
-  const bindings: unknown[] = [anchorId, anchorLeaf, anchor.category_id ?? ''];
+  const bindings: unknown[] = [anchorPlaced.row.id, anchorLeaf, anchorPlaced.row.category_id ?? ''];
   if (pattern) bindings.push(pattern);
 
-  const { results } = await c.env.DB.prepare(
+  const { results } = await db.prepare(
     `SELECT ${PRODUCT_COLUMNS} FROM products
       WHERE status = 'active' AND id <> ?1 AND spec_fields <> '{}' AND spec_fields <> ''
       ${textClause}
@@ -539,10 +534,34 @@ compareRoutes.get('/candidates', async (c) => {
   }
 
   scored.sort((a, b) => b.score - a.score || a.card.price_iqd - b.card.price_iqd);
+  return scored.slice(0, limit).map((x) => x.card);
+}
+
+compareRoutes.get('/candidates', async (c) => {
+  await rateLimit(c, 'compare-candidates', 120, 60);
+  const anchorId = str(c.req.query('for'), 'for', { min: 1, max: 60 });
+  // Bounded by CHARACTERS here and by BYTES inside likePattern. Both are
+  // needed: this cap stops a megabyte of query text reaching the pattern
+  // builder, and the byte cap is the one D1 actually enforces (50 bytes, which
+  // Arabic reaches in 25 letters — see worker/lib/sqlLike.ts).
+  const q = str(c.req.query('q'), 'q', { max: 120, required: false });
+
+  // `status = 'active'` is in the QUERY, not a check after it. The reply echoes
+  // the anchor's own card, so loading a draft first and refusing second would
+  // still have read an unpublished product's name and price into memory on a
+  // public route — and one `if` away from returning it.
+  const anchor = await c.env.DB
+    .prepare(`SELECT ${PRODUCT_COLUMNS} FROM products WHERE id = ? AND status = 'active'`)
+    .bind(anchorId)
+    .first<ProductRow>();
+  if (!anchor) throw notFound('Product not found');
+
+  const tax = taxonomy(await loadCatalogs(c.env.DB));
+  const anchorPlaced = place(anchor, tax);
 
   return c.json({
     success: true,
     for: cardOf(anchorPlaced),
-    products: scored.slice(0, MAX_CANDIDATES).map((s) => s.card),
+    products: await rankCompareCandidates(c.env.DB, anchorPlaced, tax, q, MAX_CANDIDATES),
   });
 });

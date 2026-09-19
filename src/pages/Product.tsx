@@ -52,6 +52,7 @@ import { rememberViewed } from '../lib/recentlyViewed';
 import { useGoBack } from '../lib/useGoBack';
 import { setCartCount, countCartItems } from '../lib/cartCount';
 import ReviewSection from '../components/reviews/ReviewSection';
+import CheaperElsewhereSheet from '../components/product/CheaperElsewhereSheet';
 import SafeImage from '../components/ui/SafeImage';
 import Note from '../components/ui/Note';
 import { Overlay } from '../components/ui/Overlay';
@@ -68,6 +69,7 @@ import { conditionKindLabel, type ConditionEntry } from '../lib/condition';
 
 const STRINGS = {
   ar: {
+    compareCta: 'المقارنة', cheaperCta: 'وجدتها بمكان أرخص',
     back: 'رجوع', share: 'مشاركة', linkCopied: 'تم نسخ الرابط', favorite: 'إضافة للمفضلة',
     unfavorite: 'إزالة من المفضلة', gallery: 'صور المنتج', noImages: 'لا توجد صور لهذا المنتج',
     imageOf: 'صورة {n} من {total}', zoom: 'تكبير الصورة', close: 'إغلاق',
@@ -145,6 +147,7 @@ const STRINGS = {
     REGULAR_PRICE_INVALID: 'سعر هذا المنتج غير صالح — تواصل مع الدعم.',
   },
   en: {
+    compareCta: 'Compare', cheaperCta: 'Found it cheaper',
     back: 'Back', share: 'Share', linkCopied: 'Link copied', favorite: 'Add to favourites',
     unfavorite: 'Remove from favourites', gallery: 'Product images', noImages: 'This product has no images yet',
     imageOf: 'Image {n} of {total}', zoom: 'Zoom image', close: 'Close',
@@ -209,6 +212,7 @@ const STRINGS = {
     REGULAR_PRICE_INVALID: 'This product has an invalid price — please contact support.',
   },
   ckb: {
+    compareCta: 'بەراورد', cheaperCta: 'لە شوێنێکی هەرزانتر دۆزیمەوە',
     back: 'گەڕانەوە', share: 'هاوبەشکردن', linkCopied: 'بەستەرەکە کۆپی کرا', favorite: 'زیادکردن بۆ دڵخوازەکان',
     unfavorite: 'لابردن لە دڵخوازەکان', gallery: 'وێنەکانی بەرهەم', noImages: 'ئەم بەرهەمە هێشتا وێنەی نییە',
     imageOf: 'وێنەی {n} لە {total}', zoom: 'گەورەکردنی وێنە', close: 'داخستن',
@@ -729,6 +733,7 @@ export default function Product() {
   const goBack = useGoBack('/products');
   const { lang, dir } = useLanguage();
   const { isAuthenticated } = useAuth();
+  const [cheaperOpen, setCheaperOpen] = useState(false);
   const { settings: publicSettings } = useWallet();
   const s = STRINGS[lang as Lang];
   const pageRef = useRef<HTMLDivElement>(null);
@@ -3100,6 +3105,52 @@ export default function Product() {
                 </Section>
               ) : null}
 
+              {/*
+                THE TWO SOFT VERBS, at the end of the details and above the
+                reviews — the moment the customer has finished reading the
+                machine and is deciding, which is when «is there a better one»
+                and «is it cheaper elsewhere» are actually asked.
+
+                SIDE BY SIDE, not stacked: the owner asked for «زران ناعمان
+                بشكل افقي … واحده جنب الاخرى». `grid-cols-2` with no responsive
+                prefix stays two columns at 360px; the labels wrap inside their
+                own button rather than pushing the pair into one column.
+
+                SECONDARY ON PURPOSE. Neither is a second Add-to-cart, so both
+                take `.lv-button-secondary` — one weight below the buy button
+                that owns this page. `.press-scale` answers the finger on
+                pointer-DOWN through the base layer's `:active`, so there is no
+                JavaScript on the input path and nothing that depends on hover,
+                which never fires on the owner's own phone.
+              */}
+              <div className="pt-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/compare?ids=${encodeURIComponent(product.id)}`)}
+                  data-product-compare
+                  className="lv-button lv-button-secondary lv-button-sm press-scale w-full text-center"
+                >
+                  {s.compareCta}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // The page's own established signed-out answer — the one
+                    // `toggleFavorite` already gives — rather than a second
+                    // sign-in prompt invented for this one button.
+                    if (!isAuthenticated) {
+                      navigate(`/auth?next=${encodeURIComponent(`/product/${product.slug}`)}`);
+                      return;
+                    }
+                    setCheaperOpen(true);
+                  }}
+                  data-product-cheaper
+                  className="lv-button lv-button-secondary lv-button-sm press-scale w-full text-center"
+                >
+                  {s.cheaperCta}
+                </button>
+              </div>
+
               <div className="pt-2">
                 <ReviewSection productId={product.id} />
               </div>
@@ -3233,6 +3284,12 @@ export default function Product() {
         busy={addingToCart}
         onConfirm={() => void postAddToCart(true)}
         onCancel={() => setShippingConflict(null)}
+      />
+
+      <CheaperElsewhereSheet
+        open={cheaperOpen}
+        productId={product.id}
+        onClose={() => setCheaperOpen(false)}
       />
     </div>
   );

@@ -108,6 +108,9 @@ test('every code the table translates is one the server can actually emit', () =
     // undialable number or no governorate is a delivery that fails.
     'worker/routes/addresses.ts',
     'worker/routes/memberships.ts',
+    // «وجدتها بمكان أرخص» refuses in the customer's own sheet, so its codes are
+    // translated rather than rendered as the route's slash-joined ar/en pair.
+    'worker/routes/priceReports.ts',
     'worker/lib/bnpl.ts',
     'worker/lib/bundleCart.ts',
     'worker/lib/offers.ts',

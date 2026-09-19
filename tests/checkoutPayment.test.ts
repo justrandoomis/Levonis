@@ -44,12 +44,21 @@ import {
 } from '../worker/lib/paymentPolicy';
 import { printerProductIds, isPrinterProduct } from '../worker/lib/printerIdentity';
 import { SETTING_DEFAULTS, PUBLIC_SETTING_KEYS, printerNoteIqdFrom } from '../worker/lib/settings';
+import { acceptedPolicies } from './lib/policies';
+import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 
 // ------------------------------------------------------------------ fixture
 
 const SEA = JSON.stringify([{ method: 'sea', commission_iqd: 15_000, active: true }]);
 
 function setup() {
+  // A NEW DATABASE IS A NEW ARCHIVE. `ensurePolicyCorpus` memoises a COMPLETED
+  // mirror per isolate, and one test process is one isolate holding many
+  // databases: without this, the first database in the run gets the policy
+  // rows and every later one is skipped as already-synced, so checkout refuses
+  // consent it cannot bind to a row. tests/fixtures/app.ts#dbThrough does the
+  // same for the fixtures it builds; this file builds its own.
+  resetPolicyCorpusMemo();
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON;');
   const dir = join(ROOT, 'migrations');
@@ -160,6 +169,7 @@ let seq = 0;
 const orderBody = (addressId: string, paymentMethodId: string, over: Record<string, unknown> = {}) => ({
   ...quoteBody(addressId, paymentMethodId, over),
   idempotencyKey: `chk-${Date.now()}-${++seq}`,
+  policyAcceptance: acceptedPolicies(),
 });
 
 // -------------------------------------------------------------- the policy

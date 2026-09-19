@@ -17,6 +17,7 @@
  */
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb } from '../fixtures/app';
+import { acceptedPolicies } from './policies';
 
 export const FUTURE = '2099-01-01T00:00:00.000Z';
 export const PAST = '2020-01-01T00:00:00.000Z';
@@ -244,5 +245,6 @@ export const orderBody = (over: Record<string, unknown> = {}) => ({
   usePoints: false,
   itemIds: [],
   idempotencyKey: `bundle-buy-path-key-${++seq}`,
+  policyAcceptance: acceptedPolicies(),
   ...over,
 });
