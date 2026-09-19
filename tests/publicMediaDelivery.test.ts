@@ -80,10 +80,28 @@ test('only the public branch reads from or writes to the shared edge cache', () 
     src.includes("headers.set('Cache-Control', 'private, max-age=300');"),
     'the private branch lost its Cache-Control'
   );
-  // A public object is immutable because media keys are content-addressed.
+  // A public object is immutable ONLY where the key really is content-addressed.
+  //
+  // THIS ASSERTION USED TO PIN THE DEFECT. It required the single unconditional
+  // line `Cache-Control: public, max-age=31536000, immutable`, on the stated
+  // premise that "media keys are content-addressed" — true of every key the
+  // application mints, false of the brand folder, whose whole purpose is fixed
+  // names the owner replaces in place. So a replaced logo stayed old on every
+  // screen, and this test certified it: `cf-cache-status: HIT`, `age: 45821`,
+  // a cached body of 70,084 bytes against the 51,518 actually in R2.
+  //
+  // What is guarded now is that the public branch still sets its header
+  // EXPLICITLY here rather than inheriting R2's stored metadata (the original
+  // and still-correct point of this line), and that it does so through the
+  // rewritability branch. tests/mediaCachePolicy.test.ts owns which arm gets
+  // which policy, and that the arms are not swapped.
   assert.ok(
-    src.includes("headers.set('Cache-Control', 'public, max-age=31536000, immutable');"),
-    'the public branch does not set an explicit immutable Cache-Control'
+    src.includes("'public, max-age=31536000, immutable'"),
+    'the public branch no longer names an immutable policy for minted keys'
+  );
+  assert.ok(
+    src.includes('isRewritableMediaKey(key)'),
+    'the public branch promises immutable without asking whether the key can be rewritten'
   );
 });
 

@@ -537,6 +537,36 @@ export async function putMediaObject(
  * Anything ambiguous is private. `reviews/` is intentionally absent because
  * publication is decided by its authorized API route, not its prefix.
  */
+/**
+ * IS THIS KEY ONE A HUMAN REPLACES IN PLACE?
+ *
+ * Every key this application MINTS is unique to its upload — a content digest
+ * (`products/import/gallery/<sha>.webp`) or a request token
+ * (`mintSiteMediaObject`, which yields `logo-a1b2c3.webp`). For those, a URL's
+ * bytes genuinely never change and `immutable` is an honest promise.
+ *
+ * The brand folder is the exception, and it is the only one. `ui/`, `UIUx/`,
+ * `UiUx/` hold FIXED NAMES — `UiUx/Logo/Logo.webp`, `UiUx/MainPage/Bundle.webp`
+ * — that the owner replaces by hand in the R2 dashboard, keeping the name so
+ * every reference to it keeps working. The bytes at one URL therefore DO
+ * change, which is the whole point of the folder.
+ *
+ * THE FAILURE THIS EXISTS TO END. `/files/*` answered every public key with
+ * `max-age=31536000, immutable`, under a comment asserting that media keys are
+ * content-addressed. True for the minted ones, false for these — and
+ * `immutable` does not merely cache, it tells the browser and the edge never to
+ * ASK again. So the owner uploaded a new logo, and every visitor kept the old
+ * one: measured on the live site as `cf-cache-status: HIT`, `age: 45821`, with
+ * the cached body 70,084 bytes against the 51,518 actually in R2. A year of
+ * that, on the site's own mark, with nothing to do but rename the file.
+ *
+ * `brands/` and `services/` are here for the same reason: fixed names an admin
+ * curates, not per-upload keys.
+ */
+export function isRewritableMediaKey(key: string): boolean {
+  return /^ui(?:ux)?\//i.test(key) || key.startsWith('brands/') || key.startsWith('services/');
+}
+
 export function isAnonymousPublicMediaKey(key: string): boolean {
   if (!isSafeMediaKey(key)) return false;
   return (

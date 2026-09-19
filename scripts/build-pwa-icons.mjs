@@ -56,11 +56,21 @@ const SOURCE = process.env.LOGO_URL ?? 'https://levonis-iq.com/files/UiUx/Logo/L
 const OUT = 'public/icons';
 const BLACK = { r: 0, g: 0, b: 0, alpha: 1 };
 
-/** The mark, trimmed of its transparent margin, scaled to `fraction` of `size`, centred on black. */
+/**
+ * The mark, trimmed of its margin, scaled to `fraction` of `size`, centred on black.
+ *
+ * `trim()` WITHOUT ARGUMENTS TRIMS THE WRONG THING ON AN OPAQUE SOURCE. It
+ * removes a border matching the top-left pixel, which on a transparent PNG is
+ * the alpha margin and on a logo already composited onto black is the black —
+ * which is what we want, but only because the background happens to BE the
+ * brand colour. Stating the threshold makes that deliberate rather than
+ * accidental: a future logo on a white card would otherwise be trimmed to
+ * nothing, or not at all, depending on a pixel nobody looked at.
+ */
 async function icon(src, size, fraction, file) {
   const inner = Math.round(size * fraction);
   const mark = await sharp(src)
-    .trim()
+    .trim({ threshold: 10 })
     .resize(inner, inner, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toBuffer();

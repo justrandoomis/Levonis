@@ -9,6 +9,7 @@ import {
   buildMediaKey,
   getMediaObject,
   isAnonymousPublicMediaKey,
+  isRewritableMediaKey,
   isSafeMediaKey,
   putMediaObject,
   type MediaDomain,
@@ -454,11 +455,33 @@ fileRoutes.get('/*', async (c) => {
   obj.writeHttpMetadata(headers);
   headers.set('etag', obj.httpEtag);
   if (publicPrefix) {
-    // Media keys are content-addressed, so a given URL's bytes never change —
-    // a new upload is a new key. `immutable` is therefore honest, and it is
-    // set HERE rather than relying on stored R2 httpMetadata, which objects
-    // written before the media system carry nothing of.
-    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    /**
+     * `immutable` IS A PROMISE, AND IT WAS BEING MADE FOR KEYS THAT BREAK IT.
+     *
+     * The comment that stood here asserted that media keys are
+     * content-addressed, so a URL's bytes never change. That is true of every
+     * key this application MINTS — a digest, or `mintSiteMediaObject`'s
+     * per-upload token — and false of the brand folder, whose whole purpose is
+     * fixed names (`UiUx/Logo/Logo.webp`) that the owner replaces in place so
+     * every existing reference keeps working.
+     *
+     * `immutable` does not merely cache: it tells the browser and the edge not
+     * to ASK again. So a replaced logo stayed replaced-in-R2 and old-on-screen.
+     * Measured on the live site before this change: `cf-cache-status: HIT`,
+     * `age: 45821`, a cached body of 70,084 bytes against the 51,518 actually
+     * stored. For a year, with nothing wrong but a promise.
+     *
+     * Rewritable keys therefore revalidate. Five minutes of edge cache, then
+     * one conditional request — and the 304 below makes that cost a header
+     * rather than a body, because the ETag is R2's own. The minted keys keep
+     * `immutable`, where it is true.
+     */
+    headers.set(
+      'Cache-Control',
+      isRewritableMediaKey(key)
+        ? 'public, max-age=300, must-revalidate'
+        : 'public, max-age=31536000, immutable'
+    );
   } else {
     headers.set('Cache-Control', 'private, max-age=300');
   }
