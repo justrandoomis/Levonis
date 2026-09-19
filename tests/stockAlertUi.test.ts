@@ -176,7 +176,6 @@ test('the wish identity is the one the unique index uses', () => {
         armed_channel: 'telegram',
         armed_at: '',
         notified_at: '',
-        expires_at: '',
         dead_reason: '',
       })
     ),

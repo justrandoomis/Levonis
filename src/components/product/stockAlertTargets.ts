@@ -65,7 +65,14 @@ export interface StockAlertRow {
   armed_channel: string;
   armed_at: string;
   notified_at: string;
-  expires_at: string;
+  /* There is no `expires_at` here because the server no longer sends one. The
+     column survives in migration 0092 as a documented dead field (see the note
+     at the top of worker/routes/stockAlerts.ts): the owner ruled that an alert
+     has no time limit at all — it waits until the product returns, fires once,
+     and is then finished. Declaring the field client-side would be worse than
+     the old write was: TypeScript would promise a `string` that arrives
+     `undefined`, and the first thing anyone did with it would be to render a
+     lapse date for an alert that never lapses. */
   dead_reason: string;
 }
 

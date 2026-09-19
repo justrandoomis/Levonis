@@ -308,6 +308,29 @@ export default function StockAlertPanel({
    * empty sheet and, on Save, silently cancel the alert they came to check.
    * Live rows only ('armed'/'firing'): a cancelled or dead wish is history,
    * and pre-ticking from one would re-arm something they removed.
+   *
+   * AND THAT LIVE-ONLY FILTER IS ALSO WHAT PUTS THIS BUTTON BACK TO «نبّهني»
+   * AFTER THE ALERT HAS FIRED — the owner's rule, and it is satisfied here by
+   * the server's SELECT rather than by anything on this screen.
+   *
+   * «التنبيه ينتهي عندما يتوفر في المخزون ويرجع الزر لكي يفعله مرة ثانية».
+   * A fired alert is FINISHED: the sweep moves the row to `notified`, and
+   * `GET /api/stock-alerts/product/:id` (`armedForProduct`, which guards
+   * `state IN ('armed','firing')`) then stops returning it. `armed` comes back
+   * empty, `hasArmed` is false, the tick disappears and the trigger reads
+   * «خبرني لما يرجع» again — an honest offer, because the arm upsert really
+   * does re-arm a notified row (state back to 'armed', arm_seq + 1) and
+   * `armRefusal` judges the target, never the row's history.
+   *
+   * SO DO NOT WIDEN THIS READ TO INCLUDE 'notified'. It looks like showing the
+   * customer more of their own data; what it actually does is pre-tick a spent
+   * alert and light the armed tick on a product nobody is waiting for — the
+   * screen would say «راح نخبرك» about a message that was already sent and will
+   * never be sent again. A `dead` row must stay out for a different reason
+   * (see src/pages/StockAlerts.tsx: re-arming an invalidated wish is a button
+   * the server is guaranteed to refuse). Notified is not invalidated — it is
+   * satisfied — which is exactly why it gets the button back and `dead` does
+   * not.
    */
   const load = useCallback(async () => {
     if (!isAuthenticated) {

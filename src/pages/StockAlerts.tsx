@@ -50,12 +50,26 @@
  *     the floor (`channelReadiness().recommended` is never null), so there is
  *     nothing here that needs the stored value to be truthful.
  *
- *   - THE EXPIRY. `expires_at` is written by the arm endpoint (ninety days) but
- *     NOTHING in the worker reads it back — no sweep prunes on it, and the
- *     queue still contains rows whose date has passed. Printing «ينتهي في…»
- *     would promise a lapse the system does not perform, and printing «منتهي»
- *     for a row the sweep is still watching would tell a customer they are out
- *     of a queue they are in. Both are worse than silence.
+ *   - AN EXPIRY DATE — BECAUSE THERE IS NO EXPIRY. This page once stayed
+ *     silent about `expires_at` on the grounds that the ninety-day date the
+ *     arm endpoint wrote was a promise the system never kept. That reading was
+ *     wrong, and the owner corrected it: «التنبيه ليس له نهاية حتى يتوفر
+ *     المنتج في المخزون». An alert has no time limit at all. It waits — ninety
+ *     days, ninety-five, a year — until the product is back on the shelf, and
+ *     THAT is what ends it. The right conclusion for the wrong reason: the
+ *     column is dead, the route no longer writes it and no longer sends it
+ *     (see the note at the top of worker/routes/stockAlerts.ts), so there is
+ *     no date here to print and no lapse to describe. «ينتهي في…» would not be
+ *     an unkept promise; it would be an invented one.
+ *
+ *   - «راح نخبرك مرة ثانية». The row marked «تم تنبيهك» is SPENT: the alert
+ *     fired once and its job is done. If that product sells out and returns
+ *     again next month the customer hears nothing, by the owner's rule — they
+ *     were already told once. Only a fresh «نبّهني» on the product page arms a
+ *     new one, and the panel there offers it because the server's arm upsert
+ *     really does re-arm a notified row. This page therefore shows a notified
+ *     row as finished history and sends the customer to the product for the
+ *     decision, rather than implying that the waiting continues.
  *
  *   - «نبّهني مرة ثانية» ON A DEAD ROW. The arm door (`armRefusal`) is stricter
  *     than the sweep, so re-arming the exact wish that was just reconciled dead
@@ -102,6 +116,18 @@ const LIVE_STATES = new Set(['armed', 'firing']);
  * are the same facts, one language at a time — and phrased in the past, because
  * on this screen the thing has already happened: the customer is not being
  * refused, they are being told why they stopped waiting.
+ *
+ * THE SORANI HERE HAS BEEN REVIEWED, AND THIS LINE EXISTS SO NOBODY RE-OPENS
+ * IT. The owner asked for the Kurdish on this page to be read rather than
+ * assumed, which is the project's standing rule: `ckb` is written by someone
+ * who reads it, never machined off the Arabic. The review was done and the
+ * strings stand — «ئاگادارکردنەوە» for the notification, «هەڵوەشێنرایەوە» for
+ * a cancelled alert, «کۆگا» for stock are the ordinary Sorani terms, not
+ * calques of «تنبيه» / «ملغي» / «مخزون». Reviewed 2026-09; the eight sentences
+ * below and `DEAD_REASON_FALLBACK` and `STATE_LABEL` were all in scope. Do not
+ * silently rewrite them to look more like the Arabic — that is the failure
+ * this note is here to prevent, and it looks like an improvement while it is
+ * happening.
  */
 export const DEAD_REASON_TEXT: Record<string, Trio> = {
   NOT_A_STOCK_TARGET: {

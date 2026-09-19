@@ -65,10 +65,36 @@ import {
 export const stockAlertRoutes = new Hono<AppContext>();
 stockAlertRoutes.use('*', requireAuth);
 
-/** A standing request lapses after ninety days — the lifetime migration 0092's
- *  own header names. Re-arming renews it; `armed_at` deliberately does not
- *  move, so the list can still say how long this person has been waiting. */
-const ALERT_TTL_DAYS = 90;
+/**
+ * THE COLUMN THAT MEANS NOTHING: `product_stock_alerts.expires_at` IS DEAD.
+ *
+ * Migration 0092 declared `expires_at TEXT NOT NULL DEFAULT ''` and this file
+ * used to fill it with `armed_at + 90 days`, on the assumption that a standing
+ * request should lapse. It never did lapse: nothing in the worker ever read the
+ * value back — no sweep pruned on it, no query filtered on it — so the column
+ * was a date the system wrote, published through the API, and then ignored.
+ *
+ * THE OWNER RULED THAT THE IDEA ITSELF WAS WRONG, not the implementation:
+ *   «التنبيه ليس له نهاية حتى يتوفر المنتج في المخزون، وبعدها ينتهي وظيفة،
+ *    ويرجع إذا أراد الزبون مرة ثانية يضغط نبّهني»
+ * An alert has NO time limit. It waits until the product is back — ninety days,
+ * ninety-five, a year. Then it fires ONCE, and that is the end of its job: the
+ * row goes to `notified`, the product page's button returns to its un-armed
+ * face, and only a fresh «نبّهني» arms a new one. It never re-fires by itself,
+ * which is why the sweep fires on a transition and `notified` is terminal.
+ *
+ * So the write is gone, `ALERT_TTL_DAYS` is gone, and the field is gone from
+ * the API response — a client handed an `expires_at` is a client one commit
+ * away from rendering «ينتهي في…», which would be a promise nobody made.
+ *
+ * THE COLUMN ITSELF STAYS IN THE SCHEMA AND KEEPS ITS `DEFAULT ''` FOR EVER.
+ * Migrations in this repo are additive only (scripts/check-migrations-additive.mjs
+ * enforces it) and SQLite cannot drop a column without rebuilding the table —
+ * a rebuild of a live customer table to delete a field nobody reads is a far
+ * worse trade than a documented dead column. Existing rows keep whatever date
+ * they were stamped with in 2026; new rows get ''. Neither is read. Do not
+ * revive it, and do not write a migration for it.
+ */
 
 /** Far beyond what anyone needs, and low enough that one account cannot make
  *  the sweep scan the catalogue. See the module note. */
@@ -121,13 +147,12 @@ interface AlertRowOut {
   armed_channel: string;
   armed_at: string;
   notified_at: string;
-  expires_at: string;
   dead_reason: string;
 }
 
 const ALERT_COLUMNS =
   'id, product_id, kind, option_value_id, color_id, state, arm_seq, armed_channel, ' +
-  'armed_at, notified_at, expires_at, dead_reason';
+  'armed_at, notified_at, dead_reason';
 
 /**
  * THE WISH, VALIDATED STRICTLY RATHER THAN COERCED.
@@ -230,6 +255,32 @@ function assertArmable(ctx: AlertProductContext, wish: AlertWish): void {
  * is the one most worth looking at first. `armed_at` deliberately does NOT
  * move on a re-arm (0092), so «تنبيهاتي» can still say how long this person has
  * been waiting.
+ *
+ * ---------------------------------------------------------------------------
+ * THIS UPSERT IS THE ONLY DOOR BACK FROM `notified`, AND THAT IS THE WHOLE
+ * ONE-SHOT LIFECYCLE IN ONE STATEMENT.
+ *
+ * The owner's rule: an alert fires once and is then finished; it must never
+ * wake up on its own. «إذا توفر المنتج بعد مرور خمسة وتسعين يوما يرسل له
+ * إشعار، وبعد أسبوع خلص المنتج وبعد أسبوع توفر مرة ثانية فلا يرسل له، لأنه
+ * نبّهه أول مرة». Available on day 95 → one message. Sold out a week later,
+ * back a week after that → SILENCE, because they were already told.
+ *
+ * Nothing here needs adding to get that: `notified` is terminal for the sweep,
+ * and the ONLY thing that can put a row back to 'armed' is this DO UPDATE —
+ * which runs exclusively on the customer's own POST/PUT. So the second restock
+ * cannot notify anybody, because no code path re-arms the row but a human tap.
+ *
+ * And a tap DOES re-arm it. `state = 'armed'` is unconditional, `notified_at`
+ * and `dead_reason` are cleared, and `arm_seq` advances precisely because the
+ * previous state was not 'armed'. There is NO guard on the prior state here
+ * and none in `armRefusal` (worker/lib/stockAlertResolve.ts), which judges the
+ * TARGET — is this thing sold from stock, is the variant modelled — and never
+ * the row's history. So «نبّهني» offered again after a notification is an
+ * offer the server honours, which is the only reason the product page is
+ * allowed to show it. If a prior-state guard is ever added here, the panel's
+ * un-armed button becomes a button that can only fail, and tests/
+ * stockAlertLifecycle.test.ts is the thing that will say so.
  */
 function armStatement(
   c: Context<AppContext>,
@@ -240,13 +291,12 @@ function armStatement(
   channel: string,
   when: string
 ): D1PreparedStatement {
-  const expiresAt = new Date(Date.parse(when) + ALERT_TTL_DAYS * 86_400_000).toISOString();
   return c.env.DB.prepare(
     `INSERT INTO product_stock_alerts
        (id, user_id, product_id, kind, option_value_id, color_id, state, arm_seq,
         last_available, last_buyable, armed_channel, armed_at, last_checked_at,
-        notified_at, expires_at, dead_reason)
-     VALUES (?, ?, ?, ?, ?, ?, 'armed', 1, ?, ?, ?, ?, '', '', ?, '')
+        notified_at, dead_reason)
+     VALUES (?, ?, ?, ?, ?, ?, 'armed', 1, ?, ?, ?, ?, '', '', '')
      ON CONFLICT(user_id, product_id, kind, option_value_id, color_id) DO UPDATE SET
        state = 'armed',
        arm_seq = product_stock_alerts.arm_seq +
@@ -256,7 +306,6 @@ function armStatement(
        armed_channel = excluded.armed_channel,
        last_checked_at = '',
        notified_at = '',
-       expires_at = excluded.expires_at,
        dead_reason = ''`
   ).bind(
     newId('psa'),
@@ -268,8 +317,7 @@ function armStatement(
     seed.available,
     seed.buyable ? 1 : 0,
     channel,
-    when,
-    expiresAt
+    when
   );
 }
 
@@ -518,10 +566,16 @@ interface ListRow extends AlertRowOut {
  * `loadAlertContexts` because a list of forty alerts spanning forty products
  * would otherwise cost forty catalogue loads to render a name.
  *
- * LIVE ROWS SORT FIRST, AND THAT IS NOT COSMETIC. `notified` and `dead` rows
- * can never be removed — the DELETE below guards `state IN ('armed','firing')`
- * — so this list accumulates a customer's whole history against a hard LIMIT
- * 100, while the live cap is MAX_ARMED_PER_USER. Ordered by `armed_at` alone,
+ * LIVE ROWS SORT FIRST, AND THAT IS NOT COSMETIC. The customer cannot remove a
+ * `notified` or `dead` row — the DELETE below guards `state IN ('armed',
+ * 'firing')` — so what this list shows them is their recent history as well as
+ * their live requests, against a hard LIMIT 100 while the live cap is
+ * MAX_ARMED_PER_USER. The server does now erase a finished row for them, by
+ * the owner's ruling («الصفوف المنتهية... اجعل الخادم يمحيها تلقائيا»), but the
+ * sweep's prune keeps it for a retention window first, and a window is not an
+ * upper bound: a customer can still hold more finished rows inside it than the
+ * page can print. So this ordering carries the guarantee on its own and does
+ * not lean on the prune. Ordered by `armed_at` alone,
  * a customer past a hundred lifetime wishes loses their OLDEST armed rows off
  * the end of the page: «تنبيهاتي» then prints a live count lower than the one
  * the arm door enforces, offers no bin for the alert that is actually blocking
@@ -535,7 +589,7 @@ stockAlertRoutes.get('/', async (c) => {
   const user = c.get('user')!;
   const { results } = await c.env.DB.prepare(
     `SELECT a.id, a.product_id, a.kind, a.option_value_id, a.color_id, a.state, a.arm_seq,
-            a.armed_channel, a.armed_at, a.notified_at, a.expires_at, a.dead_reason,
+            a.armed_channel, a.armed_at, a.notified_at, a.dead_reason,
             a.last_available,
             p.slug, p.name, p.name_ar, p.name_ku, p.images,
             v.name_en AS value_en, v.name_ar AS value_ar, v.name_ckb AS value_ckb,
@@ -582,7 +636,6 @@ stockAlertRoutes.get('/', async (c) => {
         armed_channel: r.armed_channel,
         armed_at: r.armed_at,
         notified_at: r.notified_at || null,
-        expires_at: r.expires_at || null,
         dead_reason: r.dead_reason || null,
       };
     }),

@@ -19,7 +19,14 @@ import type { SupportGiftReconciliation } from './membershipOps';
 import { sweepBnplOverdue, type BnplOverdueReport } from './bnpl';
 import { sweepAutomaticReviews, type AutomaticReviewSweepReport } from './reviewAutoSweep';
 import { sweepCancelledOrders, type CancelledOrderSweepReport } from './orderDeletion';
-import { sweepStockAlerts, type StockAlertSweepReport } from './stockAlerts';
+import {
+  sweepStockAlerts,
+  pruneFinishedStockAlerts,
+  FINISHED_RETENTION_DAYS,
+  PRUNE_RUN_LIMIT,
+  type StockAlertSweepReport,
+  type StockAlertPruneReport,
+} from './stockAlerts';
 import { runGuardedMediaCleanup } from './mediaRefs';
 import { planSearchIndex, searchIndexInstalled } from './search/store';
 import { toSearchDoc } from './search/document';
@@ -107,6 +114,14 @@ export interface DurableJobsReport {
    */
   stock_alerts: StockAlertSweepReport;
   /**
+   * Finished alert rows erased («الصفوف المنتهية ... اجعل الخادم يمحيها
+   * تلقائيا»). An alert waits as long as it has to, fires once, and is then
+   * over — and the customer has no way to clear the rows it leaves behind,
+   * because DELETE /:id is guarded on the live states so that a re-arm finds
+   * the same row. This is the server doing it for them.
+   */
+  stock_alert_prune: StockAlertPruneReport;
+  /**
    * The SECOND outbox drain, at the very end of the run. Reported separately
    * from `outbox` above so an operator can see whether a match found this run
    * was also delivered this run, rather than having the two drains add up into
@@ -171,6 +186,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     bnpl_overdue: { scanned: 0, overdue: 0, suspended: 0 },
     automatic_reviews: { scanned: 0, created: 0, skipped: 0 },
     stock_alerts: { scanned: 0, matched: 0, notified: 0, dead: 0, deferred: 0 },
+    stock_alert_prune: { deleted: 0, bound_hit: false },
     outbox_final: { sent: 0, failed: 0 },
     media_cleanup: { attempted: 0, deleted: 0, still_referenced: 0, dead_lettered: 0, retrying: 0, refusals: [] },
     errors: [],
@@ -503,6 +519,41 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
    */
   await step('outbox_final', async () => {
     report.outbox_final = await processOutbox(env, 25);
+  });
+
+  /**
+   * 15b. ERASE THE ALERT ROWS WHOSE WORK IS OVER (0092).
+   *
+   * The owner's ruling: «الصفوف المنتهية ... اجعل الخادم يمحيها تلقائيا». An
+   * alert has no deadline — it waits until the product is back, ninety days or
+   * a year — but it does have an end: it fires once, and then it is finished.
+   * The customer cannot clear what it leaves behind, because DELETE /:id is
+   * guarded on the live states so a re-arm finds the SAME row, so «تنبيهاتي»
+   * accumulates `notified`, `cancelled` and `dead` rows against a hard LIMIT
+   * 100 with a bin button that does nothing on them. This step is the server
+   * doing the clearing instead.
+   *
+   * ITS OWN STEP, AND AFTER THE SWEEP — both on purpose.
+   *
+   * Notifying is the feature; pruning is housekeeping, and the two must never
+   * compete. Running as a separate `step()` means a prune that throws is
+   * caught, named `stock_alert_prune:` and left in `report.errors` while step
+   * 11d has ALREADY notified this tick's customers — a throw here cannot reach
+   * the sweep, because the sweep is behind it and separately contained. Folded
+   * into 11d it would have shared that step's fate in both directions.
+   *
+   * Placed late, beside `media_cleanup`, for the same reason that one is last:
+   * if a tick is going to run out of CPU budget, losing a day of row cleanup
+   * costs nothing anybody can see, and losing a customer's «رجع!» does not
+   * compare. A partial prune resumes on the next tick with no cursor to keep.
+   */
+  await step('stock_alert_prune', async () => {
+    report.stock_alert_prune = await pruneFinishedStockAlerts(
+      env.DB,
+      nowIso,
+      FINISHED_RETENTION_DAYS,
+      PRUNE_RUN_LIMIT
+    );
   });
 
   /**

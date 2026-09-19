@@ -1413,7 +1413,10 @@ export interface StockAlertRow {
   armed_channel: string;
   armed_at: string;
   notified_at: string;
-  expires_at: string;
+  /* No `expires_at`. The column exists in migration 0092 and is dead by the
+     owner's ruling — an alert has no time limit, it waits until the product
+     returns and then fires once. The route stopped writing and stopped sending
+     it; see the note at the top of worker/routes/stockAlerts.ts. */
   dead_reason: string;
 }
 
@@ -1468,7 +1471,7 @@ export interface StockAlertListEntry {
   armed_channel: string;
   armed_at: string;
   notified_at: string | null;
-  expires_at: string | null;
+  /* No `expires_at` — see StockAlertRow above. */
   /** Why a reconciled alert can never come true. Null while it is still
    *  waiting — the two must never render the same. */
   dead_reason: string | null;

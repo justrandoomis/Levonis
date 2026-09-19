@@ -144,6 +144,17 @@
  * option-value delete: that statement is guarded by `NOT EXISTS` clauses and
  * frequently deletes nothing, so an unconditional sibling would wipe a
  * customer's alerts off a live, sellable row with no notice to anybody.
+ *
+ * ---------------------------------------------------------------------------
+ * 9. AND WHEN IT IS OVER, THE SERVER ERASES THE ROW.
+ *
+ * An alert has no deadline — it waits until the product is buyable, however
+ * long that takes — but it does have an END: it fires once and its job is
+ * done. `notified`, `cancelled` and `dead` are rows with no future, and the
+ * customer cannot remove them (DELETE /:id is guarded on 'armed'/'firing', so
+ * that a re-arm finds the same row). `pruneFinishedStockAlerts` at the bottom
+ * of this file is what clears them, on the same cron as the sweep, after a
+ * retention window. It deletes NOTHING that is still working.
  */
 
 import type { Env } from './types';
@@ -864,4 +875,200 @@ function deadStatement(env: Env, row: AlertRow, reason: AlertDeadReason, now: st
         SET state = 'dead', dead_reason = ?, last_checked_at = ?
       WHERE id = ? AND state IN ('armed','firing')`
   ).bind(reason, now, row.id);
+}
+
+// ------------------------------------------------------------- the prune
+
+/**
+ * ===========================================================================
+ *  THE SERVER ERASES A FINISHED ROW. «الصفوف المنتهية ... اجعل الخادم يمحيها
+ *  تلقائيا» — the owner's ruling, and this is the whole of it.
+ * ===========================================================================
+ *
+ * WHAT A FINISHED ROW IS, AND WHY THE CUSTOMER CANNOT REMOVE ONE.
+ *
+ * An alert has no time limit: it waits until the product is buyable again —
+ * ninety days, ninety-five, a year — fires ONCE, and is then done. It does not
+ * re-arm itself; only a fresh «نبّهني» arms a new one. So `notified` is not a
+ * parked alert, it is a COMPLETED one, and the same is true of `cancelled` (the
+ * customer withdrew it) and `dead` (the target it named no longer exists and
+ * the customer has been told so).
+ *
+ * The customer cannot clear any of the three: DELETE /:id is guarded on
+ * `state IN ('armed','firing')` — deliberately, because a re-arm must find the
+ * SAME row (see `armStatement`) rather than start a second one beside it. The
+ * consequence is a list that only grows, against the route's hard LIMIT 100,
+ * with a bin button that does nothing on the rows that need it most.
+ *
+ * Nothing before this pruned it. `idx_stock_alerts_armed` is partial, so these
+ * rows cost the sweep nothing to carry — which is exactly why the table could
+ * grow for ever without anybody noticing: the feature keeps working while the
+ * customer's own screen fills with history they cannot clear.
+ *
+ * ---------------------------------------------------------------------------
+ * A DELETED ROW CANNOT CAUSE A SECOND MESSAGE. Worth stating plainly, because
+ * it is the first fear this raises. Nothing is armed on a finished row, and the
+ * sweep reads `state IN ('armed','firing')` only. The owner's own example holds
+ * identically whether the row is still here or gone: back in stock on day 95 →
+ * notified; sold out a week later; back again a week after that → SILENCE,
+ * because the wish was already answered and only a fresh tap makes a new one.
+ * Deleting the row is not what stops the second message; the lifecycle is.
+ *
+ * WHAT IS LOST is `arm_seq` and `armed_at` for that target — the count of how
+ * many times this person has waited for this exact thing and when they first
+ * did. Both are carried to the client (`GET /api/stock-alerts`), NOTHING reads
+ * `arm_seq` for behaviour — not the sweep, not the event key, which is built
+ * from (user, product, instant) — and no screen renders it. After a prune a
+ * re-arm INSERTs fresh at `arm_seq = 1` instead of resuming the old row's
+ * count. That is the price, it is paid in a statistic nothing consumes, and it
+ * buys the list the owner asked for.
+ */
+
+/**
+ * HOW LONG A FINISHED ROW SURVIVES. THE OWNER'S KNOB — one number, here.
+ *
+ * NOT ZERO, and the argument against zero is a real screen: the customer's
+ * phone buzzes «رجع للبيع», they tap it, «تنبيهاتي» opens — and with a
+ * delete-on-send prune the list would be empty. The message says the shop
+ * remembered them; the list says no such alert ever existed. That is a worse
+ * lie than the clutter this removes, and it costs one row for a few days to
+ * avoid.
+ *
+ * THIRTY DAYS, and the number is not invented here: it is the retention this
+ * codebase already applies to the other thing a customer finished with — a
+ * cancelled order stays visible for exactly thirty days (`sweepCancelledOrders`,
+ * jobs.ts step 11c). One retention the owner already knows beats a second one
+ * chosen to be clever. It is also comfortably longer than any plausible gap
+ * between a notification and the person opening the app, and comfortably
+ * shorter than the ninety-plus days a LIVE alert may wait — so the two can
+ * never be confused.
+ *
+ * To change it, change this number. It is read in exactly one place
+ * (worker/lib/jobs.ts, step 15b) and means the same thing for all three
+ * finished states.
+ */
+export const FINISHED_RETENTION_DAYS = 30;
+
+/**
+ * THE BOUND, and why an unbounded prune is a bug rather than an optimisation.
+ *
+ * A shop that has been running for a year reaches this with tens of thousands
+ * of finished rows on its first pruning tick. One DELETE over all of them can
+ * exceed the invocation's CPU budget and die part-way — and a cron step that
+ * dies is a cron step that dies EVERY tick, on the same backlog, for ever,
+ * while `step()` faithfully reports the same error.
+ *
+ * Two hundred per tick, at four ticks an hour, is ~19,000 rows a day. A partial
+ * prune is safe to resume because the rows it deleted are GONE: the next tick's
+ * identical query simply finds the next two hundred. There is no cursor to
+ * keep, no ordering to preserve and no row that can be starved — a candidate
+ * only ever leaves the set (deleted, or re-armed by its owner), never joins it
+ * ahead of another.
+ */
+export const PRUNE_RUN_LIMIT = 200;
+
+export interface StockAlertPruneReport {
+  /** Finished rows erased this run. */
+  deleted: number;
+  /** True when the run spent its whole budget — there is more backlog waiting
+   *  for the next tick. An operator watching this stay true for days is looking
+   *  at a bound that is too small, not at a failure. */
+  bound_hit: boolean;
+}
+
+/**
+ * ERASE THE ROWS WHOSE WORK IS OVER.
+ *
+ * THE WHERE CLAUSE NAMES THE THREE FINISHED STATES, ONE BY ONE, AND THAT IS
+ * NOT VERBOSITY. The tempting shorthand — `state NOT IN ('armed','firing')` —
+ * is a standing instruction to delete any state this schema gains in the
+ * future. `firing` exists precisely because a notification is IN FLIGHT: its
+ * outbox rows have not settled, `settleFiring` is the only thing that may judge
+ * it, and deleting one mid-flight destroys the alert while the message it
+ * belongs to is still being retried — the customer is then told «رجع للبيع» by
+ * a message whose alert is gone, or told nothing at all. A fourth working state
+ * added to 0092's CHECK constraint must be swept into this DELETE by somebody
+ * who decided it should be, not by the absence of a name in a negation.
+ *
+ * `last_checked_at` IS THE FINISH INSTANT, and it is the only column all three
+ * terminal transitions write: the fire and the settle (this module), the
+ * customer's cancel and the save that drops a wish (worker/routes/stockAlerts.ts),
+ * and `deadStatement`. `notified_at` would cover only one of the three, and a
+ * row that is cancelled or dead has none.
+ *
+ * A row whose `last_checked_at` is '' IS NEVER DELETED. No code path produces
+ * one — every transition into a finished state writes it — so such a row is
+ * hand-edited or half-migrated, and '' sorts BEFORE every ISO timestamp, which
+ * means a plain `< cutoff` would erase it instantly. We do not date a row we
+ * cannot date; it stays, visibly, for whoever made it.
+ *
+ * NO BAGHDAD CONVERSION HERE, deliberately, and it is worth saying because the
+ * house rule (worker/lib/baghdadTime.ts) exists for the opposite case: this
+ * compares two full UTC instants and the retention is a DURATION, not a
+ * calendar day. `date('now')` is nowhere in it. A thirty-day window is thirty
+ * days in every timezone; only "today" differs between UTC and UTC+3.
+ *
+ * ONE STATEMENT, NOT SELECT-THEN-DELETE. D1 refuses more than 100 bound
+ * parameters, so a two-step prune would have to chunk its ids at 90 and pay a
+ * round trip per chunk to delete rows nobody needs to see first. This binds
+ * exactly TWO parameters whatever the backlog, and the id subquery is what
+ * makes the LIMIT legal — SQLite does not accept LIMIT on a bare DELETE unless
+ * it was compiled with an option we cannot rely on in D1.
+ *
+ * THE COST, HONESTLY: no index serves this. `idx_stock_alerts_armed` is partial
+ * on ('armed','firing') and excludes every row here BY DESIGN, and
+ * `idx_stock_alerts_user` leads with `user_id`, which a shop-wide prune has no
+ * value to bind. So the selection is a scan — and that is exactly why it takes
+ * no ORDER BY: ordering by an unindexed column would force a FULL scan plus a
+ * sort on every single tick, including the overwhelmingly common tick where
+ * three rows qualify, whereas an unordered LIMIT lets SQLite stop as soon as it
+ * has found its budget. Which two hundred go first does not matter; they are
+ * all past the cutoff and they are all going.
+ */
+export async function pruneFinishedStockAlerts(
+  db: D1Database,
+  now: string,
+  retentionDays: number,
+  limit: number
+): Promise<StockAlertPruneReport> {
+  // Clamped the way `sweepStockAlerts` clamps its budgets. A NEGATIVE retention
+  // would put the cutoff in the FUTURE and erase rows finished seconds ago, so
+  // it floors at zero rather than being trusted; zero itself is left reachable
+  // because it is the owner's to choose, not ours to forbid.
+  const days = Math.max(0, Math.trunc(retentionDays) || 0);
+  const budget = Math.max(1, Math.min(1000, Math.trunc(limit) || 1));
+
+  // A caller with an unparseable `now` gets this instant rather than an
+  // `Invalid Date` that would throw inside toISOString and take the step down.
+  const at = Date.parse(now);
+  const cutoff = new Date((Number.isFinite(at) ? at : Date.now()) - days * 86_400_000).toISOString();
+
+  // Never throws for a missing migration, for the same reason the sweep does
+  // not: a Worker can be live one migration ahead of D1, and a housekeeping
+  // step that errors on every run until somebody applies 0092 is noise in the
+  // one place an operator looks for real failures. Anything else — a lock, a
+  // dropped connection — propagates to `step()` in jobs.ts, which logs it,
+  // names it and carries on. Pruning is housekeeping; it may fail loudly.
+  const res = await degradeIfSchemaMissing<D1Response | null>(
+    'stock alerts (migration 0092)',
+    () =>
+      db
+        .prepare(
+          `DELETE FROM product_stock_alerts
+             WHERE id IN (
+               SELECT id
+                 FROM product_stock_alerts
+                WHERE state IN ('notified','cancelled','dead')
+                  AND last_checked_at <> ''
+                  AND last_checked_at < ?
+                LIMIT ?
+             )`
+        )
+        .bind(cutoff, budget)
+        .run(),
+    null
+  );
+
+  const deleted = res?.meta.changes ?? 0;
+  return { deleted, bound_hit: deleted >= budget };
 }
