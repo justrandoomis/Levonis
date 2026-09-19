@@ -123,9 +123,9 @@ test('a name that is only whitespace is the platform, not an app called nothing'
 test('bidi overrides and zero-width characters never reach a home screen label', () => {
   // U+202E reorders everything after it. On a home screen there is no
   // surrounding page to notice, which is what makes it worth stripping.
-  const m = buildWebManifest({ name: 'Ali‮3D​ Shop' });
-  assert.ok(!/[​-‏‪-‮⁦-⁩]/.test(m.name));
-  assert.ok(!/[​-‏‪-‮⁦-⁩]/.test(m.short_name));
+  const m = buildWebManifest({ name: 'Ali\u202e3D\u200b Shop' });
+  assert.ok(!/[\u200b-\u200f\u202a-\u202e\u2066-\u2069]/.test(m.name));
+  assert.ok(!/[\u200b-\u200f\u202a-\u202e\u2066-\u2069]/.test(m.short_name));
   assert.ok(!/[\n\r\t]/.test(buildWebManifest({ name: 'Ali\n3D' }).name));
 });
 

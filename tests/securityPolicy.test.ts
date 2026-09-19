@@ -287,10 +287,25 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
       !routes.includes('/*') && !routes.includes('/'),
       'the whole SPA behind the Worker would make dist/_headers redundant — read the note above before doing it'
     );
-    // Named prefixes only. Every one of them is a deliberate decision.
+    // Named prefixes only. Every one of them is a deliberate decision, and
+    // this list is the tripwire that forces the next one to be argued for.
+    //
+    // REVISITED for `/manifest.webmanifest`, and it is the only entry here that
+    // is not a prefix but one exact path. It is also the only one that exists
+    // because the asset layer would answer it WRONGLY rather than merely
+    // blandly: `not_found_handling: single-page-application` serves index.html
+    // for any path not in dist/, so without this line every browser fetches the
+    // manifest, reads HTML, reports "the manifest is not valid JSON" and
+    // declares the site uninstallable. The Worker answers it instead because
+    // the manifest is per-HOST — a merchant subdomain must install as that
+    // shop, not as LEVONIS (worker/routes/manifest.ts).
+    //
+    // It does not weaken the reason this test exists: it adds ONE document,
+    // not a prefix, so dist/_headers still carries the policy for index.html
+    // and every SPA route.
     for (const route of routes) {
       assert.ok(
-        ['/api/*', '/files/*', '/product/*', '/bundles/*', '/p/*', '/community/store/*'].includes(route),
+        ['/api/*', '/files/*', '/product/*', '/bundles/*', '/p/*', '/community/store/*', '/manifest.webmanifest'].includes(route),
         `${route} was added to run_worker_first without revisiting this test`
       );
     }

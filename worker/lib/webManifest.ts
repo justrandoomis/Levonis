@@ -147,7 +147,11 @@ const DESCRIPTION_MAX = 200;
  * C0/C1 controls go too: a newline inside a manifest string is legal JSON and
  * an illegible app name.
  */
-const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩﻿]/g;
+// Every character below is written as a \u escape rather than pasted: the
+// pasted form is invisible in a diff, so an editor that silently dropped one
+// would leave a guard that reads as present and is not.
+// eslint-disable-next-line no-control-regex -- the C0/C1 range is the point.
+const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
 
 /**
  * Text as it may appear in a manifest, or `''`.
