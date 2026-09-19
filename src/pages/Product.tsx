@@ -1769,18 +1769,99 @@ export default function Product() {
     !!availability?.qty_ok &&
     priceIsAuthoritative;
 
+  /**
+   * WHICH WAYS OF BUYING ARE ACTUALLY OPEN, straight from the server.
+   *
+   * These three lines used to sit fifty lines further down, beside the
+   * «طريقة التوفر» chooser they gate. They are hoisted because the header chip
+   * needs them FIRST: a chip that follows the buyer's button press without
+   * asking whether that button still leads anywhere prints «بيع مباشر ·
+   * متوفر» over a product whose last unit sold while the page was open.
+   */
+  const modesArr = availability?.modes ?? [];
+  const directUsable = modesArr.some((m) => m.type === 'direct_sale' && m.usable);
+  const preUsable = modesArr.some((m) => m.type === 'pre_order' && m.usable);
+
+  /**
+   * THE ORDER TYPE IN FORCE — hoisted here so that ONE expression answers
+   * "how is this being bought right now" for the whole page.
+   *
+   * This line used to live three hundred lines further down, next to the
+   * «طريقة التوفر» chooser it drives, while the header chip and the stock note
+   * read the raw server default `mode` instead. That is two computations for
+   * one fact, and they drift the moment a buyer touches the chooser: on a
+   * product where BOTH ways are open the server defaults to direct sale, so a
+   * buyer who pressed «طلب مسبق» kept reading «بيع مباشر · متوفر» in the
+   * header while the panel below them was quoting a pre-order. The header was
+   * describing a purchase that was no longer the one on offer.
+   *
+   * The expression itself is unchanged, deliberately: what the buyer picked,
+   * or — before they pick — the server's own default.
+   */
+  const effectivePreorder = orderType ? wantPreorder : mode === 'preorder';
+
+  /**
+   * The same answer as a three-state, which is what the header chip renders.
+   *
+   * `mode === 'unavailable'` wins outright: when the server says there is no
+   * usable way to buy this selection, a buyer's stale button press must not
+   * repaint the chip as a live pre-order.
+   *
+   * AND THE BUYER'S PICK ONLY WINS WHILE IT IS STILL USABLE. This mirrors the
+   * server's own §6 resolution (worker/routes/products.ts), which reads
+   * `wants === 'direct_sale' && directUsable` — the `&& directUsable` half is
+   * the part a chip driven by the button press alone throws away. The failure
+   * it prevents, with no race beyond ordinary stock movement: the buyer opens
+   * a product while direct sale is in stock, so `orderType` is set to
+   * 'direct_sale'; the last unit then sells; the buyer picks a warranty plan,
+   * the quote refetches, and the server answers `mode: 'preorder'`. With the
+   * pick unchecked the header would repaint the GREEN «بيع مباشر» chip and the
+   * note «متوفر» beside a «بيع مباشر» button that is `disabled` and says «نفد
+   * المخزون». The header would be contradicting the control under the thumb.
+   *
+   * So an unusable pick falls back to `mode`, the server's own answer, which
+   * is stock-aware by construction. The chip and the chooser still share ONE
+   * computation; that computation is now also true.
+   *
+   * NOTE for the live catalogue: a product whose direct sale is sold out and
+   * whose pre-order is open resolves to 'preorder' on the SERVER — so the chip
+   * reads «طلب مسبق», which is the truth. It says neither "in stock" nor
+   * "unavailable", because neither is true.
+   */
+  const effectiveMode: 'direct_sale' | 'preorder' | 'unavailable' =
+    mode === 'unavailable'
+      ? 'unavailable'
+      : effectivePreorder
+        ? preUsable
+          ? 'preorder'
+          : mode
+        : directUsable
+          ? 'direct_sale'
+          : mode;
+
+  /**
+   * The shelf note beside the chip. Gated on `effectiveMode` and not on `mode`
+   * for the reason above: «متوفر» printed next to a «طلب مسبق» chip is a
+   * contradiction the shopper has to resolve for themselves, and they will
+   * resolve it wrongly.
+   */
   const stockNote = (() => {
-    if (!availability || mode !== 'direct_sale') return '';
+    if (!availability || effectiveMode !== 'direct_sale') return '';
     if (!availability.stock.tracked) return s.untracked;
     const left = availability.stock.available ?? 0;
     if (left > 0 && left <= 5) return s.lowStock.replace('{n}', String(left));
-    return s.inStock;
+    // A tracked shelf at zero is not «متوفر». This branch was unreachable
+    // while the note was gated on the raw server `mode` — the server never
+    // resolves direct_sale at zero stock — and widening the gate to
+    // `effectiveMode` is exactly what could reach it. Say nothing rather than
+    // print a word the shelf does not support.
+    return left > 0 ? s.inStock : '';
   })();
 
   const modeBadge =
-    mode === 'preorder'
+    effectiveMode === 'preorder'
       ? { label: s.preorderMode, cls: 'bg-amber-500/10 text-amber-300 border-amber-500/30', icon: <Clock className="w-3.5 h-3.5" /> }
-      : mode === 'direct_sale'
+      : effectiveMode === 'direct_sale'
         ? { label: s.directSale, cls: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30', icon: <Package className="w-3.5 h-3.5" /> }
         : { label: s.unavailable, cls: 'bg-red-500/10 text-red-300 border-red-500/30', icon: <AlertTriangle className="w-3.5 h-3.5" /> };
 
@@ -1792,9 +1873,9 @@ export default function Product() {
   // its waiver — judged in the same PRO purchase context the checkout uses,
   // so a PRO whose default address is not approved sees the surcharge here
   // too. The page adds nothing to anything.
-  const modesArr = availability?.modes ?? [];
-  const directUsable = modesArr.some((m) => m.type === 'direct_sale' && m.usable);
-  const preUsable = modesArr.some((m) => m.type === 'pre_order' && m.usable);
+  // `modesArr` / `directUsable` / `preUsable` are computed further up, because
+  // the header chip needs them before this section does — see the note above
+  // `effectiveMode`.
 
   /**
    * 0075 — THE SERVER'S ANSWER PER ROUTE, LOOKED UP AND NEVER RECOMPUTED.
@@ -1881,7 +1962,6 @@ export default function Product() {
    * button state, so a product whose only open route is pre-order still shows
    * its journeys on the first paint.
    */
-  const effectivePreorder = orderType ? wantPreorder : mode === 'preorder';
   const showTransports = effectivePreorder && (availability?.preorder.transports.length ?? 0) > 0;
   const pricingModes = quotedModes ?? detailModes;
   const directFinal: number | null = pricingModes?.direct?.unit_subtotal_iqd ?? null;
@@ -2890,8 +2970,37 @@ export default function Product() {
 
             {/* Title + store, shown once (the panel repeats no heading). */}
             <div className="mt-5">
+              <h1 className="text-xl sm:text-2xl font-bold text-white leading-snug">{name}</h1>
+              <p className="mt-2 text-[12px] text-zinc-500 flex items-center gap-1.5">
+                <Store aria-hidden="true" className="w-3.5 h-3.5" />
+                {source === 'community' && product.merchant ? (
+                  <>
+                    {s.communityStore} · {product.merchant.name}
+                    <Link to={`/community/store/${product.merchant.id}`} className="underline underline-offset-2 ms-1">
+                      {s.visitStore}
+                    </Link>
+                  </>
+                ) : (
+                  <>{s.officialStore} · Levonis</>
+                )}
+              </p>
               {/*
                 THE THREE SIGNALS A SHOPPER WEIGHS BEFORE THE PRICE.
+
+                WHY HERE, DIRECTLY UNDER «المتجر الرسمي». The owner asked for
+                this row to sit below the store line and above «وصف المنتج»,
+                and reported it as never applied. It had in fact shipped — but
+                ABOVE the <h1>, so the first thing on the page was a row of
+                badges and the header looked untouched. A shopper reads WHAT
+                this is and WHO sells it first; the signals qualify that
+                answer, so they follow it.
+
+                It goes ABOVE the ConditionPanel, not below it, for two
+                reasons. The «مستعمل / مفتوح العلبة» chip in this row is the
+                one-word version of the panel's whole argument, so the chip
+                must introduce the panel rather than repeat it after the fact.
+                And the panel is a paragraph of prose: dropping a badge row
+                after it would restart the header halfway down the page.
 
                 Availability, score and how many have sold. Only the first
                 carries a semantic tint: it is the one that changes what
@@ -2905,8 +3014,8 @@ export default function Product() {
                 "0 reviews" and no "0+ sold". A new product shows one chip,
                 which is correct: nothing has happened to it yet.
               */}
-              <div className="flex items-center gap-x-2 gap-y-1.5 flex-wrap mb-2">
-                <span className={`inline-flex items-center gap-1.5 border rounded-full px-2.5 py-1 text-[11px] font-bold ${modeBadge.cls}`}>
+              <div data-product-signals className="mt-3 flex items-center gap-x-2 gap-y-1.5 flex-wrap">
+                <span className={`inline-flex items-center gap-1.5 border rounded-full px-2.5 py-1 text-[11px] leading-normal font-bold ${modeBadge.cls}`}>
                   {modeBadge.icon}
                   {modeBadge.label}
                 </span>
@@ -2915,7 +3024,7 @@ export default function Product() {
                   <span
                     data-product-rating
                     aria-label={s.ratingAria(rating.average.toFixed(1), rating.count)}
-                    className="inline-flex items-center gap-1.5 border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] text-zinc-300"
+                    className="inline-flex items-center gap-1.5 border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] leading-normal text-zinc-300"
                   >
                     <Star aria-hidden="true" className="w-3.5 h-3.5 text-[#BAA369]" fill="currentColor" strokeWidth={0} />
                     {/* Tabular figures so a 4.0 and a 4.8 occupy the same
@@ -2931,7 +3040,7 @@ export default function Product() {
                   <span
                     data-product-sales={salesBadge}
                     aria-label={s.salesAria(salesBadge.toLocaleString('en-US'))}
-                    className="inline-flex items-center gap-1.5 border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] text-zinc-300"
+                    className="inline-flex items-center gap-1.5 border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] leading-normal text-zinc-300"
                   >
                     <TrendingUp aria-hidden="true" className="w-3.5 h-3.5 text-zinc-400" />
                     {/* `dir="ltr"` on the figure alone: «+200 مبيعات» has an
@@ -2948,31 +3057,17 @@ export default function Product() {
                 {productCondition ? (
                   <span
                     data-condition-chip={productCondition.kind}
-                    className="inline-flex items-center gap-1.5 border border-info/30 bg-info/10 rounded-full px-2.5 py-1 text-[11px] font-bold text-info"
+                    className="inline-flex items-center gap-1.5 border border-info/30 bg-info/10 rounded-full px-2.5 py-1 text-[11px] leading-normal font-bold text-info"
                   >
                     <PackageOpen aria-hidden="true" className="w-3.5 h-3.5" />
                     {conditionKindLabel(productCondition.kind, lang)}
                   </span>
                 ) : null}
                 {product.brand ? (
-                  <span className="border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] text-zinc-300">{product.brand}</span>
+                  <span className="border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] leading-normal text-zinc-300">{product.brand}</span>
                 ) : null}
-                {stockNote ? <span className="text-zinc-400 text-[12px]">{stockNote}</span> : null}
+                {stockNote ? <span className="text-zinc-400 text-[12px] leading-normal">{stockNote}</span> : null}
               </div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white leading-snug">{name}</h1>
-              <p className="mt-2 text-[12px] text-zinc-500 flex items-center gap-1.5">
-                <Store aria-hidden="true" className="w-3.5 h-3.5" />
-                {source === 'community' && product.merchant ? (
-                  <>
-                    {s.communityStore} · {product.merchant.name}
-                    <Link to={`/community/store/${product.merchant.id}`} className="underline underline-offset-2 ms-1">
-                      {s.visitStore}
-                    </Link>
-                  </>
-                ) : (
-                  <>{s.officialStore} · Levonis</>
-                )}
-              </p>
               {/* The frame the price below only makes sense inside: what this
                   unit is, what was wrong with it, what it is covered for, and
                   that it cannot be sent back for a change of mind. Above the

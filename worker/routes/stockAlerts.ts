@@ -517,6 +517,18 @@ interface ListRow extends AlertRowOut {
  * sentinel matches no row — and they are done in SQL rather than through
  * `loadAlertContexts` because a list of forty alerts spanning forty products
  * would otherwise cost forty catalogue loads to render a name.
+ *
+ * LIVE ROWS SORT FIRST, AND THAT IS NOT COSMETIC. `notified` and `dead` rows
+ * can never be removed — the DELETE below guards `state IN ('armed','firing')`
+ * — so this list accumulates a customer's whole history against a hard LIMIT
+ * 100, while the live cap is MAX_ARMED_PER_USER. Ordered by `armed_at` alone,
+ * a customer past a hundred lifetime wishes loses their OLDEST armed rows off
+ * the end of the page: «تنبيهاتي» then prints a live count lower than the one
+ * the arm door enforces, offers no bin for the alert that is actually blocking
+ * them, and the product page refuses with «وصلت للحد الأعلى» for a reason
+ * nothing on the screen can explain. That silence is the exact thing this
+ * screen was built to remove, so the cut falls on history instead: a row the
+ * customer can still act on is never the row that is dropped.
  */
 stockAlertRoutes.get('/', async (c) => {
   await rateLimit(c, 'stock-alert-read', 120, 60);
@@ -533,7 +545,7 @@ stockAlertRoutes.get('/', async (c) => {
        LEFT JOIN product_option_values v ON v.id = a.option_value_id
        LEFT JOIN product_colors k ON k.id = a.color_id
       WHERE a.user_id = ? AND a.state IN ('armed','firing','notified','dead')
-      ORDER BY a.armed_at DESC
+      ORDER BY (a.state IN ('armed','firing')) DESC, a.armed_at DESC
       LIMIT 100`
   )
     .bind(user.id)

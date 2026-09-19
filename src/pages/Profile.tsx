@@ -6,7 +6,7 @@ import {
   Headset, Settings, MapPin, QrCode, Store,
   Wallet, Package, Truck, MessageSquare, RefreshCcw,
   Star, Clock, Heart, Gamepad2, Coins, Zap, Shield,
-  ChevronRight, ChevronLeft, Gift, UserRound, UserPlus, Download
+  ChevronRight, ChevronLeft, Gift, UserRound, UserPlus, Download, BellRing
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
@@ -502,6 +502,42 @@ export default function Profile() {
                 {mine?.referral?.code
                   ? `${t('referralCode')}: ${mine.referral.code}`
                   : loc('شارك رابطك واكسب مكافآت', 'Share your link and earn rewards', 'لینکەکەت بەشدار بکە و خەڵات وەربگرە')}
+              </span>
+            </span>
+            {dir === 'rtl' ? (
+              <ChevronLeft className="w-4 h-4 shrink-0 text-zinc-400" aria-hidden="true" />
+            ) : (
+              <ChevronRight className="w-4 h-4 shrink-0 text-zinc-400" aria-hidden="true" />
+            )}
+          </button>
+        )}
+
+        {/* «تنبيهاتي» — the standing restock requests, which until now had no
+            screen at all: a customer could arm an alert on a product page and
+            then had no way on earth to see what they were waiting for, or to
+            read that one of them had been cancelled because the option was
+            deleted. One signpost, like the referral row above it; the page
+            itself is /stock-alerts and it is the only place that list lives.
+            Member-only, because a guest holds no alerts and the row would do
+            nothing but bounce them through /auth to an empty list. */}
+        {isAuthenticated && (
+          <button
+            type="button"
+            data-profile-stock-alerts
+            onClick={() => navigate('/stock-alerts')}
+            className="w-full bg-white dark:bg-[#1a1a1a] rounded-xl p-3 mb-3 shadow-sm text-black dark:text-white flex items-center gap-3 min-h-[56px] text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          >
+            <BellRing className="w-5 h-5 text-[#BAA369] shrink-0" strokeWidth={2} aria-hidden="true" />
+            <span className="flex-1 min-w-0">
+              <span className="block font-bold text-[14px] leading-5">
+                {loc('تنبيهاتي', 'My alerts', 'ئاگادارکردنەوەکانم')}
+              </span>
+              <span className="block text-[11px] leading-4 text-zinc-500 truncate">
+                {loc(
+                  'كل شي تنتظر رجوعه للمخزون',
+                  'Everything you are waiting to come back in stock',
+                  'هەرچی چاوەڕێی گەڕانەوەی بۆ کۆگا دەکەیت'
+                )}
               </span>
             </span>
             {dir === 'rtl' ? (

@@ -488,11 +488,110 @@ export default {
     return app.fetch(request, env, ctx);
   },
   // Durable jobs: the event pump (step 0), outbox delivery (email/telegram),
-  // stale-challenge expiry, gated BNPL overdue stub. Idempotent — safe under
-  // overlapping runs.
+  // stale-challenge expiry, gated BNPL overdue stub, and — last in the run —
+  // the R2 media-cleanup drain. Idempotent — safe under overlapping runs.
+  //
+  // THIS HANDLER IS THE ONLY THING THAT EMPTIES THE MEDIA CLEANUP QUEUE.
+  // Removing one picture from a saved product no longer abandons the object in
+  // R2: the save writes a `media_cleanup_jobs` row instead. But a row is not a
+  // deletion. The only other drain is an admin POSTing the maintenance
+  // endpoint by hand, and nothing in the product offers them a button that
+  // does it — so with this handler gone the owner would pay for exactly the
+  // same bytes as before AND carry a queue table that only grows.
+  // `runDurableJobs`'s last step (`media_cleanup`) calls
+  // `runGuardedMediaCleanup(env)`; tests/mediaCleanupSchedule.test.ts asserts
+  // the whole chain, because "the drain exists" and "the cron runs it" are two
+  // different facts and only the second one reclaims disk.
+  //
+  // HOW OFTEN, AND WHAT THAT COSTS. wrangler.jsonc's `triggers.crons` fires
+  // this every fifteen minutes, in production and in both of the other
+  // environments. So a detached image normally survives in the bucket for up
+  // to one tick — under fifteen minutes — and with a backlog of N queued jobs
+  // for about ceil(N / 50) ticks, because the drain takes fifty jobs per run.
+  // That delay is the deliberate trade the queue was chosen for: an image that
+  // is somehow still displayed can never be destroyed, where an inline delete
+  // would leave a broken picture on a live page the moment anything errored.
+  //
+  // FOUR THINGS THAT MUST NOT HAPPEN, AND WHERE EACH IS ACTUALLY PREVENTED.
+  // These are stated here because this is the line an operator reads when the
+  // cron misbehaves, and three of the four are enforced in files this comment
+  // does not own:
+  //
+  //  1. ONE STEP THROWING MUST NOT STARVE THE OTHERS. It cannot:
+  //     `runDurableJobs` runs every step through its own `step(name, fn)`
+  //     try/catch, which logs with console.error and pushes the message into
+  //     `report.errors` — so the media drain is contained exactly like the
+  //     fifteen steps before it, and a throw inside it costs one reported
+  //     error, not the run.
+  //
+  //     BUT DO NOT GO LOOKING FOR AN ERROR ON A MISSING TABLE. A Worker
+  //     deployed ahead of migration 0072 does NOT report one: the drain opens
+  //     with `tableExists`, which goes through `columnsOf`, which swallows its
+  //     own PRAGMA failure and answers "no such table", so the step returns
+  //     all-zeros and `report.errors` stays empty. The only visible symptom is
+  //     a queue that never shrinks — which is also the symptom of a coverage
+  //     refusal. `report.media_cleanup.refusals` is the field that tells the
+  //     two apart: non-empty means the guard refused, empty-with-zeros means
+  //     the queue was never read at all. The one place the `step` containment
+  //     did NOT reach was this call
+  //     site: a promise handed to `ctx.waitUntil` that rejects is an unhandled
+  //     rejection, and it would fail the whole scheduled invocation with
+  //     nothing this codebase logs to say which job did it. `runDurableJobs`
+  //     cannot reject today — every await inside it is already inside `step` —
+  //     so the `.catch` below is not fixing a live failure; it is making the
+  //     entrypoint honour the same rule as the steps, so that the first future
+  //     line added outside `step` degrades to a log line instead of silently
+  //     taking the outbox, the stage sweep and the restock alerts with it.
+  //
+  //  2. THE DRAIN MUST BE BOUNDED PER INVOCATION. It is, in
+  //     worker/lib/mediaRefs.ts: `MEDIA_CLEANUP_RUN_LIMIT` (50) caps the jobs
+  //     one run takes and `MEDIA_CLEANUP_VERIFY_CHUNK` (25) caps how many of
+  //     them one reference snapshot may cover. A queue of ten thousand rows is
+  //     therefore fifty bucket deletes and two coverage scans per tick, not
+  //     ten thousand sub-requests against a CPU limit the tick would never
+  //     survive. The rest stay `pending` and are re-read oldest-first next
+  //     tick, so a partially drained queue resumes rather than restarting: a
+  //     run that is cut off mid-way has still permanently finished the jobs it
+  //     closed, because a job leaves `pending` exactly once.
+  //
+  //  3. IT MUST NEVER DELETE A KEY IT CANNOT PROVE IS UNREFERENCED. That
+  //     guard is inside the drain, not here, and it is two guards.
+  //     `verifyMediaCoverage` first asks the LIVE schema whether every
+  //     key-bearing column is classified in `MEDIA_REFERENCE_SOURCES` or
+  //     `NON_MEDIA_COLUMNS`, and whether every source read succeeded; if not,
+  //     the run deletes NOTHING, returns the refusal sentences and leaves
+  //     every job pending — an incomplete reference set cannot tell a live
+  //     image from an orphan, and a delete made on one is a guess. When
+  //     coverage does hold, each key is re-checked against that
+  //     freshly-rebuilt reference set at the moment of deletion, and a key
+  //     that came back — the admin moved the picture to another product or
+  //     simply undid the edit — is closed `skipped_shared` and its bytes
+  //     survive.
+  //
+  //  4. TWO OVERLAPPING TICKS MUST NOT BOTH CLAIM THE SAME JOB. SAID
+  //     PLAINLY: THE CLAIM IS NOT ATOMIC. `pendingMediaCleanup` is a bare
+  //     `SELECT … WHERE state = 'pending' ORDER BY created_at LIMIT ?` with no
+  //     claiming UPDATE, unlike `processWalletNotifications`, which claims each
+  //     row with a compare-and-swap on `attempts`. Two overlapping runs would
+  //     read the same fifty rows. What keeps that survivable rather than
+  //     merely unlikely: an R2 delete of a key that is already gone is a
+  //     success, not an error, so the second run's delete is a no-op; and
+  //     every ledger write behind it (`closeJob`, `bumpAttempt`) carries
+  //     `AND state = 'pending'`, so exactly one run moves the job out of the
+  //     queue and neither can double-count `attempts`. The cost of an overlap
+  //     is therefore wasted sub-requests, not a wrong deletion or a corrupt
+  //     queue. Overlap needs a run to exceed the fifteen-minute gap, which a
+  //     fifty-job bound makes remote — but it is not impossible, and the right
+  //     fix if it ever matters is a claiming UPDATE in
+  //     worker/lib/productDeletion.ts, not a lock here.
   scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     configureEventBus(env);
-    ctx.waitUntil(runDurableJobs(env));
+    ctx.waitUntil(
+      // See (1) above: the entrypoint contains what the steps already contain.
+      runDurableJobs(env).catch((error) => {
+        console.error('scheduled durable jobs rejected outside any step:', error);
+      })
+    );
   },
 };
 

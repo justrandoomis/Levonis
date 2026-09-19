@@ -526,8 +526,21 @@ mediaRoutes.post('/migration/apply', requireAdmin, async (c) => {
       // The existing UIUx/Animation|Icons|Logo folders are copied into the
       // canonical public ui/levonis/* taxonomy. Settings are their source of
       // truth, so update exact references only; unrelated text is untouched.
+      //
+      // THE TABLE IS `admin_settings`, AND THERE HAS NEVER BEEN A BARE
+      // `settings`. migrations/0001_init.sql:332 creates `admin_settings(key,
+      // value)` and no migration in the repository creates anything else whose
+      // name ends in `settings`. These two statements said `settings`, which
+      // means this branch threw `no such table: settings` on every run — and
+      // unlike the swallowed read in mediaMigration.ts, this throw is caught by
+      // the handler below, which DELETES the object it has just copied and
+      // returns a 500. So the UIUx/* → ui/levonis/* rename never once
+      // completed: it copied, failed, rolled back, and reported nothing the
+      // admin could act on. The rename only reaches this branch when
+      // `targetKey !== key`, which is precisely the brand folder — the shop's
+      // own logo and its service icons.
       if (targetKey !== key) {
-        const { results: settings } = await c.env.DB.prepare('SELECT key, value FROM settings').all<{ key: string; value: string }>();
+        const { results: settings } = await c.env.DB.prepare('SELECT key, value FROM admin_settings').all<{ key: string; value: string }>();
         for (const setting of settings ?? []) {
           if (!setting.value.includes(key)) continue;
           let value: unknown = setting.value;
@@ -536,7 +549,7 @@ mediaRoutes.post('/migration/apply', requireAdmin, async (c) => {
           const nextValue = replaceExactMedia(value, key, targetKey);
           const serialized = typeof nextValue === 'string' ? nextValue : JSON.stringify(nextValue);
           if (serialized !== before) {
-            statements.push(c.env.DB.prepare('UPDATE settings SET value = ? WHERE key = ?').bind(serialized, setting.key));
+            statements.push(c.env.DB.prepare('UPDATE admin_settings SET value = ? WHERE key = ?').bind(serialized, setting.key));
           }
         }
       }

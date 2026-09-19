@@ -24,6 +24,7 @@ import {
   type MerchantPrinter,
 } from '../lib/printMatching';
 import { resolveModelLink, parseModelLink } from '../lib/externalModels';
+import { governorateName, normalizeGovernorate } from '../lib/iraqGovernorates';
 import { notifyStatement } from '../lib/notifications';
 import { getMediaObject, putMediaObject } from '../lib/mediaStorage';
 
@@ -315,6 +316,235 @@ printRequestRoutes.post('/quote', requireAuth, async (c) => {
   return c.json({ success: true, quote: publicQuote });
 });
 
+// ------------------------------------------- 4b. what a matched merchant reads
+
+/**
+ * The three languages a notification is read in, carried together so a caller
+ * cannot compose one of them and quietly forget the others.
+ *
+ * Declared here exactly as worker/lib/stockAlerts.ts declares its own: the
+ * shape is three strings, and importing it from a product-comparison module
+ * would be a dependency, not a saving.
+ */
+interface Trilingual {
+  ar: string;
+  en: string;
+  ckb: string;
+}
+
+/**
+ * Does this text use the ARABIC SCRIPT? — not "is this the Arabic language".
+ *
+ * Sorani Kurdish is written in the SAME Unicode block, so no regex can tell the
+ * two apart and this one does not pretend to. It answers the only question we
+ * can honestly ask of a sentence a customer typed: does it belong in an
+ * Arabic-script slot or a Latin one. Claiming more than that is precisely how
+ * Kurdish gets silently filed as Arabic — the class of bug this composer exists
+ * to remove, not to relocate.
+ */
+const ARABIC_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+/**
+ * Quality in the words the CUSTOMER pressed, not the pricing engine's enum.
+ *
+ * The ar/en wording is copied from the wizard's own QUALITY_COPY
+ * (src/components/print/PrintRequestWizard.tsx) on purpose: the merchant must
+ * read the same word the customer chose, or the two halves of one job are
+ * describing it differently and the offer that comes back answers a question
+ * nobody asked. 'draft' is «سريعة» / "Quick" and never "Draft", because the
+ * customer was never shown the word draft.
+ */
+const QUALITY_LABEL: Record<PrintQuality, Trilingual> = {
+  draft: { ar: 'سريعة', en: 'Quick', ckb: 'خێرا' },
+  standard: { ar: 'قياسية', en: 'Standard', ckb: 'ستاندارد' },
+  fine: { ar: 'دقيقة', en: 'Fine', ckb: 'ورد' },
+  ultra: { ar: 'دقيقة جدًا', en: 'Very fine', ckb: 'زۆر ورد' },
+};
+
+/** The same three strings worker/lib/compareSpecs.ts already uses for a
+ *  technology, so one process has ONE name across the site rather than a second
+ *  translation invented here and drifting from the first. */
+const PROCESS_LABEL: Record<PrintProcess, Trilingual> = {
+  fdm: { ar: 'FDM', en: 'FDM', ckb: 'FDM' },
+  resin: { ar: 'راتنج', en: 'Resin', ckb: 'ڕەزین' },
+};
+
+/** Western digits with thousands separators and the local currency word —
+ *  how worker/lib/orderNotify.ts, receipts.ts and routes/support.ts already
+ *  write money, so a merchant sees one format wherever a number reaches them. */
+function iqdText(n: number): Trilingual {
+  const num = Math.trunc(n).toLocaleString('en-US');
+  return { ar: `${num} د.ع`, en: `${num} IQD`, ckb: `${num} دینار` };
+}
+
+/**
+ * A value that is about to be written into an `_en` slot, or the fallback.
+ *
+ * THE CATALOGUE IS ADMIN-EDITABLE FREE TEXT. `printMaterials` is a setting the
+ * owner types into, and an owner who writes «بي إل إيه» into `name_en` would
+ * reopen this exact bug from the settings screen, with no code change and no
+ * warning. The material id ('pla') is normally Latin, so it is the thing to
+ * fall back to — an ugly English body beats an Arabic one.
+ *
+ * AND THE FALLBACK IS CHECKED TOO, because it is not a constant either.
+ * `readSpec` takes `material_id` as sixty characters of free text straight off
+ * the publish body and never matches it against the catalogue, so an
+ * off-catalogue id typed as «بي إل إيه» reaches here with `material` null and
+ * would have been written, unexamined, into `body_en` — the exact defect this
+ * composer exists to close, walking in through the door the composer left
+ * open. Returning '' instead is honest: the caller omits the material segment
+ * and the merchant opens the request to read it.
+ */
+const latinOr = (value: string, fallback: string): string => {
+  if (value && !ARABIC_SCRIPT.test(value)) return value;
+  if (fallback && !ARABIC_SCRIPT.test(fallback)) return fallback;
+  return '';
+};
+
+/** The facts a merchant actually decides on, read off the row rather than
+ *  asked for a second time in prose. */
+export interface PrintMatchFacts {
+  /** `community_requests.title` — free text, in whatever language it was typed. */
+  title: string;
+  process: PrintProcess;
+  quality: PrintQuality;
+  quantity: number;
+  /** The catalogue entry. Carries name_ar and name_en; there is no Kurdish one. */
+  material: { name_ar: string; name_en: string } | null;
+  /** The id, so a material missing from the catalogue still names itself. */
+  material_id: string;
+  /**
+   * '#rrggbb' or ''. The HEX and never `color_name`: the name is 60 characters
+   * of free text in an unknown language, and putting it in an `_en` body would
+   * walk straight back into the defect this function was written to close.
+   */
+  color_hex: string;
+  /** '120×80×40 mm' or ''. Digits and a unit — identical in all three. */
+  dimensions: string;
+  /** A governorate id from the closed list of eighteen, or anything at all: a
+   *  value that is not one of the eighteen is dropped, never printed. */
+  governorate: string;
+  /** ISO date or ''. */
+  deadline: string;
+  budget_iqd: number | null;
+}
+
+/**
+ * WHAT A MERCHANT IS TOLD WHEN A PUBLISHED REQUEST MATCHES THEIR SHOP.
+ *
+ * THE DEFECT THIS REPLACES. `body_ar` and `body_en` were both assigned the SAME
+ * variable — `request.title`, the sentence the customer typed, which on this
+ * site is almost always Arabic. A merchant reading in English therefore got an
+ * Arabic sentence inside an otherwise English notification, and so did a
+ * Kurdish merchant. migrations/0045_print_requests.sql writes down the promise
+ * that broke: titles and bodies are stored per language precisely so a
+ * notification read later "must still be in the language the reader is using
+ * NOW". One variable in two slots makes that promise unkeepable.
+ *
+ * WHY THE TITLE IS NOT TRANSLATED. The Worker's translation engine runs EN→ar
+ * and EN→ckb and refuses Arabic input by design, and reaching for an outside
+ * API is forbidden. There is no honest way to render that sentence in English,
+ * so this does not try. It composes the body from the request's STRUCTURED
+ * fields instead — material, process, quality, quantity, size, colour,
+ * governorate, deadline, budget. Every one of them is enum-like or numeric,
+ * which is exactly why every one of them CAN be said in three languages
+ * truthfully. They are also the facts a merchant opens a request to check.
+ *
+ * THE CUSTOMER'S OWN SENTENCE IS STILL WORTH READING, so it is appended — but
+ * only to the slots whose SCRIPT it actually is, and always behind «بكلمات
+ * العميل» / "In the customer's words". Marked that way it is a QUOTATION, which
+ * is true, instead of a translation, which it never was. An Arabic-script title
+ * therefore reaches `body_ar` and the Kurdish text and never `body_en`; a Latin
+ * title reaches `body_en` and neither of the others. Nothing is lost by the
+ * omission: the link opens the request, where the full title is the heading.
+ */
+export function printMatchNotification(f: PrintMatchFacts): { title: Trilingual; body: Trilingual } {
+  const parts: Trilingual[] = [];
+  const push = (t: Trilingual) => {
+    if (t.ar || t.en || t.ckb) parts.push(t);
+  };
+
+  // The material names itself. There is no `name_ckb` in the catalogue and
+  // inventing one would be a guess: PLA is PLA, so the Latin designation is the
+  // honest Kurdish reading rather than a placeholder for a missing translation.
+  const matEn = latinOr(f.material?.name_en ?? '', f.material_id);
+  if (matEn) push({ ar: f.material?.name_ar || matEn, en: matEn, ckb: matEn });
+
+  push(PROCESS_LABEL[f.process]);
+  push(QUALITY_LABEL[f.quality]);
+
+  // "1 piece" is what every request is unless it says otherwise, so saying it
+  // spends a line of a glanceable message on nothing.
+  if (f.quantity > 1) {
+    // «العدد ٤» and not «٤ قطعة»: Arabic takes the plural for 3–10 («٤ قطع»)
+    // and the dual for 2 («قطعتين»), and the singular only from 11 up — so the
+    // obvious interpolation is wrong for exactly the range a one-off print job
+    // lands in. The merchant needs the number, not the grammar, so the label
+    // goes in front and the agreement question disappears. This also matches
+    // the «التسليم …» / «الميزانية …» shape of the parts beside it.
+    push({ ar: `العدد ${f.quantity}`, en: `${f.quantity} pcs`, ckb: `${f.quantity} دانە` });
+  }
+  if (f.dimensions) push({ ar: f.dimensions, en: f.dimensions, ckb: f.dimensions });
+  if (f.color_hex) push({ ar: f.color_hex, en: f.color_hex, ckb: f.color_hex });
+
+  // ONLY one of the eighteen. `governorateName` deliberately echoes back an
+  // unknown id so an old free-text row still shows what it holds — which here
+  // would mean an Arabic place name landing in `body_en`. Normalising first is
+  // what keeps this function's promise instead of merely stating it.
+  const gov = normalizeGovernorate(f.governorate);
+  if (gov) {
+    push({
+      ar: governorateName(gov, 'ar'),
+      en: governorateName(gov, 'en'),
+      ckb: governorateName(gov, 'ckb'),
+    });
+  }
+
+  // The column takes 40 characters of whatever the client sent. The date picker
+  // sends an ISO day; anything else is a sentence we cannot read, and a
+  // sentence is not a deadline.
+  if (/^\d{4}-\d{2}-\d{2}/.test(f.deadline)) {
+    const day = f.deadline.slice(0, 10);
+    push({ ar: `موعد التسليم ${day}`, en: `due ${day}`, ckb: `گەیاندن ${day}` });
+  }
+  if (f.budget_iqd !== null && f.budget_iqd > 0) {
+    const m = iqdText(f.budget_iqd);
+    push({ ar: `الميزانية ${m.ar}`, en: `budget ${m.en}`, ckb: `بودجە ${m.ckb}` });
+  }
+
+  const body: Trilingual = {
+    ar: parts.map((p) => p.ar).join(' · '),
+    en: parts.map((p) => p.en).join(' · '),
+    ckb: parts.map((p) => p.ckb).join(' · '),
+  };
+
+  // Short on purpose. A notification body is read at a glance on a phone, and
+  // the full title is one tap away as the heading of the request itself.
+  const flat = f.title.replace(/\s+/g, ' ').trim();
+  const quoted = flat.length > 80 ? `${flat.slice(0, 80)}…` : flat;
+  const add = (base: string, line: string) => (base ? `${base}\n${line}` : line);
+  if (quoted) {
+    if (ARABIC_SCRIPT.test(quoted)) {
+      body.ar = add(body.ar, `بكلمات العميل: «${quoted}»`);
+      body.ckb = add(body.ckb, `بە وشەکانی کڕیار: «${quoted}»`);
+    } else {
+      body.en = add(body.en, `In the customer's words: “${quoted}”`);
+    }
+  }
+
+  return {
+    // The ar/en headline is left exactly as it has always read: merchants have
+    // been receiving these for months and a rewrite would be churn, not a fix.
+    // Only the Kurdish is new.
+    title: {
+      ar: 'يوجد طلب طباعة جديد مناسب لإمكانيات متجرك',
+      en: 'A new print request matches what your shop can make',
+      ckb: 'داواکاریەکی نوێی چاپکردن هەیە کە لەگەڵ توانای فرۆشگاکەت دەگونجێت',
+    },
+    body,
+  };
+}
+
 // -------------------------------------------------------------- 5. publishing
 
 /**
@@ -437,11 +667,22 @@ printRequestRoutes.post('/requests/:id/publish', requireAuth, async (c) => {
 
   // Re-read, so the matcher sees what was just written rather than what
   // `ownedRequest` loaded a few statements ago.
+  //
+  // `deadline` and `budget_iqd` join the re-read because the merchant's
+  // notification is composed from the ROW, not from this call's payload. A
+  // republish that does not resend them must still tell merchants the deadline
+  // and budget the customer set the first time round, rather than quietly
+  // dropping two of the facts an offer is priced against.
   const forMatching = await c.env.DB.prepare(
-    'SELECT governorate, delivery_pref FROM community_requests WHERE id = ?'
+    'SELECT governorate, delivery_pref, deadline, budget_iqd FROM community_requests WHERE id = ?'
   )
     .bind(requestId)
-    .first<{ governorate: string; delivery_pref: string }>();
+    .first<{
+      governorate: string;
+      delivery_pref: string;
+      deadline: string | null;
+      budget_iqd: number | null;
+    }>();
 
   await c.env.DB.prepare(
     `INSERT INTO community_print_requests
@@ -503,22 +744,58 @@ printRequestRoutes.post('/requests/:id/publish', requireAuth, async (c) => {
   );
 
   // ---- tell them. ONE notification each, and nothing else ------------------
-  const title = String(request.title ?? '');
+  //
+  // THE MESSAGE IS COMPOSED, NEVER COPIED. `request.title` used to be assigned
+  // to `body_ar` and `body_en` both, which handed an English-reading merchant
+  // the customer's Arabic sentence and called it English.
+  // `printMatchNotification` builds each language out of the structured fields
+  // instead and quotes the customer's own words only where their script fits;
+  // its comment explains why translating that sentence is not on the table.
+  const text = printMatchNotification({
+    title: String(request.title ?? ''),
+    process: spec.process,
+    quality: spec.quality,
+    quantity: spec.quantity,
+    material,
+    material_id: spec.material_id,
+    color_hex: spec.color_hex,
+    dimensions: dimsLabel,
+    governorate: matchReq.governorate,
+    deadline: String(forMatching?.deadline ?? ''),
+    budget_iqd: typeof forMatching?.budget_iqd === 'number' ? forMatching.budget_iqd : null,
+  });
   const stmts: D1PreparedStatement[] = [];
   const notified = new Map<string, string>();
   for (const d of notify) {
     const { id, stmt } = notifyStatement(c.env.DB, {
       userId: d.user_id,
       kind: 'print_request_match',
-      title_ar: 'يوجد طلب طباعة جديد مناسب لإمكانيات متجرك',
-      title_en: 'A new print request matches what your shop can make',
-      body_ar: title,
-      body_en: title,
+      title_ar: text.title.ar,
+      title_en: text.title.en,
+      body_ar: text.body.ar,
+      body_en: text.body.en,
       // The link is the request itself. There is nothing else to open.
       link: `/requests?request=${requestId}`,
       entity_type: 'request',
       entity_id: requestId,
-      meta: { score: d.score, printer_id: d.printer_id },
+      meta: {
+        score: d.score,
+        printer_id: d.printer_id,
+        /**
+         * THE KURDISH TEXT HAS NOWHERE ELSE TO GO. `user_notifications` (0045)
+         * has title_ar/title_en and body_ar/body_en and no ckb column at all,
+         * and adding one is a migration this change is not permitted to make.
+         * So the composed Sorani rides in `meta`, which is already free-form
+         * JSON and costs nothing. Nothing reads it yet — GET /api/notifications
+         * does not return `meta`, and NotificationBell.tsx still shows a
+         * Kurdish merchant the ARABIC row — but the text now EXISTS, so
+         * finishing the job is a read-path change rather than a second pass at
+         * translating everything. Composing it and throwing it away was the
+         * only worse option available.
+         */
+        title_ckb: text.title.ckb,
+        body_ckb: text.body.ckb,
+      },
       // Same merchant + same request = the same message. The unique index
       // makes a repeated publish a no-op instead of a second buzz.
       eventKey: `print_request_match:${requestId}`,

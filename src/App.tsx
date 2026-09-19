@@ -186,6 +186,7 @@ const Community = React.lazy(() => import('./pages/Community'));
 const CommunityStorePage = React.lazy(() => import('./pages/CommunityStorePage'));
 const FollowedStores = React.lazy(() => import('./pages/FollowedStores'));
 const SavedProducts = React.lazy(() => import('./pages/SavedProducts'));
+const StockAlerts = React.lazy(() => import('./pages/StockAlerts'));
 const EditProfile = React.lazy(() => import('./pages/EditProfile'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Subscription = React.lazy(() => import('./pages/Subscription'));
@@ -570,6 +571,12 @@ function AppContent() {
           <Route path="/merchant/*" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
           <Route path="/followed-stores" element={<ProtectedRoute><FollowedStores /></ProtectedRoute>} />
           <Route path="/saved-items" element={<ProtectedRoute><SavedProducts /></ProtectedRoute>} />
+          {/* «تنبيهاتي» — GATED, because /api/stock-alerts is behind requireAuth
+              and a signed-out visitor would otherwise reach a page whose only
+              possible content is a 401. ProtectedRoute carries the intended
+              path in `state.from`, so signing in lands back here rather than
+              on the home page. */}
+          <Route path="/stock-alerts" element={<ProtectedRoute><StockAlerts /></ProtectedRoute>} />
           {/* §8 — /chats is NOT gated: the two permanent support entries (the
               automated assistant and the real ticket flow) must be reachable
               before signing in. The page itself renders an honest signed-out
