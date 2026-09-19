@@ -18,6 +18,7 @@ import {
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
+import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { sniff } from './uploads';
 import { getMediaObject, headMediaObject, storeMedia } from '../lib/mediaStorage';
 import { notifyStatement } from '../lib/notifications';
@@ -488,6 +489,37 @@ reviewRoutes.post('/', requireAuth, async (c) => {
     console.error('review insert failed', e instanceof Error ? e.message : e);
     throw badRequest('Review could not be saved. Please try again.');
   }
+
+  /**
+   * «📢 Review» — THE TOPIC THE OWNER OPENED FOR EXACTLY THIS, AND WHICH WAS
+   * RECEIVING NOTHING.
+   *
+   * A review here is PUBLISHED THE MOMENT IT IS WRITTEN (see the route note
+   * above): publication never waits for the reward decision. So the first time
+   * anyone at the shop learned that a one-star review was live on a product
+   * page was when a customer mentioned it. The only admin signal that existed
+   * was `adminRewardNotifications` — an in-app row, and only for the minority
+   * of reviews that qualify for a gift level. A complaint is not a gift
+   * candidate, which means the reviews worth reacting to were precisely the
+   * ones nobody was told about.
+   *
+   * THE TEXT IS NOT IN THE MESSAGE and does not need to be: the review is
+   * public, the link is the product page, and a body of up to 4,000 characters
+   * pasted into a group turns the topic into the thing the topic replaced. The
+   * stars come first because they are what decides whether anyone opens it.
+   *
+   * After the batch has committed, and never able to throw: a review that was
+   * saved must not report failure because Telegram was unreachable.
+   */
+  announceAfterResponse(
+    c,
+    'review',
+    `📢 ${'★'.repeat(input.stars)}${'☆'.repeat(5 - input.stars)} (${input.stars}/5) review on ${input.productId}` +
+      `\nReview: ${reviewId}` +
+      `\nOrder: ${input.orderId}` +
+      `\nQuality: ${quality.score}/100` +
+      (quality.rewardEligible && quality.tier !== null ? `\nReward level ${quality.tier} — awaiting an admin decision` : '')
+  );
 
   return c.json({
     success: true,

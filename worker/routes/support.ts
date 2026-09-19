@@ -46,6 +46,7 @@ import {
 } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
+import { announceAfterResponse, ticketTopic } from '../lib/adminTopicRouting';
 import { rateLimit } from '../lib/ratelimit';
 import { getBalances } from '../lib/wallet';
 import { ENTITLEMENT_MINIMUM_TIER, benefits, getTierStatus, type MembershipEntitlement } from '../lib/entitlements';
@@ -1337,6 +1338,40 @@ supportRoutes.post('/tickets', requireAuth, async (c) => {
   ]);
 
   const ticket = (await c.env.DB.prepare('SELECT * FROM support_tickets WHERE id = ?').bind(ticketId).first<TicketRow>())!;
+
+  /**
+   * THE TICKET DESK IS TOLD A TICKET EXISTS.
+   *
+   * It was not, by anything. A ticket opened at 23:00 sat in the admin console
+   * until somebody happened to load the queue, and the customer — who had just
+   * been asked to confirm explicitly that they wanted to open it — heard
+   * nothing back until then. The owner's group has a «‼️ Support» topic and a
+   * «🔥 Warranty support» topic precisely so that does not happen; `unit_id`
+   * is what decides between them, because a ticket opened against a serialized
+   * device the customer owns IS the warranty conversation.
+   *
+   * WHAT IS IN THE MESSAGE, AND WHAT IS NOT. The id, the subject the customer
+   * typed, whether PRO priority applies (that is what reorders the queue), and
+   * the order or device it hangs off. No name, no email, no phone: this lands
+   * in a group chat, and whoever picks the ticket up opens it in the admin
+   * panel where the identity belongs. The subject is clipped because a lock
+   * screen shows one line and a 200-character subject would push the priority
+   * flag off it.
+   *
+   * It runs after the response and cannot throw — an unreachable Telegram must
+   * never turn a successfully opened ticket into an error the customer sees.
+   */
+  announceAfterResponse(
+    c,
+    ticketTopic(unitId),
+    `${unitId ? '🔥' : '‼️'} ${unitId ? 'Warranty ticket' : 'Support ticket'} ${ticketId}` +
+      `\nSubject: ${subject.slice(0, 120)}` +
+      (priority ? '\nPriority: PRO' : '') +
+      (orderId ? `\nOrder: ${orderId}` : '') +
+      (unitId ? `\nDevice: ${unitId}` : '') +
+      `\nSource: ${source}`
+  );
+
   return c.json({ success: true, ticket: ticketPublic(ticket) });
 });
 
@@ -1376,6 +1411,32 @@ supportRoutes.post('/tickets/:id/messages', requireAuth, async (c) => {
       "UPDATE support_tickets SET state = 'waiting_staff', updated_at = ?, last_customer_msg_at = ?, resolved_at = NULL, resolved_by = NULL WHERE id = ?"
     ).bind(now, now, ticket.id),
   ]);
+
+  /**
+   * A REPLY IS THE EVENT THAT MOVES THE TICKET BACK TO US.
+   *
+   * The write above puts the ticket in `waiting_staff` and, on a ticket that
+   * had been resolved, reopens it — a state change staff are supposed to act
+   * on and, until now, could learn about only by reloading the queue. A
+   * reopened ticket is the worst case of the two: it has already dropped off
+   * the "open tickets" view somebody was watching.
+   *
+   * THE BODY IS DELIBERATELY NOT HERE. The customer wrote it to support, not
+   * to a group chat, and it can contain anything — an address, a serial, a
+   * photo description, a complaint about a named person. The line says a reply
+   * arrived and on which ticket; the reply itself stays where the customer put
+   * it. The same topic rule as the opening message, from the ticket's own
+   * `unit_id`, so a conversation never changes topic halfway through.
+   */
+  announceAfterResponse(
+    c,
+    ticketTopic(ticket.unit_id),
+    `${ticket.unit_id ? '🔥' : '‼️'} Customer replied on ticket ${ticket.id}` +
+      `\nSubject: ${String(ticket.subject ?? '').slice(0, 120)}` +
+      (ticket.priority ? '\nPriority: PRO' : '') +
+      (ticket.state === 'resolved' ? '\nThis reopens a resolved ticket' : '')
+  );
+
   return c.json({ success: true });
 });
 

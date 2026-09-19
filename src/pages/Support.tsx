@@ -15,6 +15,13 @@ import {
   CheckCircle2,
   AlertTriangle,
 } from 'lucide-react';
+/**
+ * A TICKET IS A PROMISE OF A REPLY, and a reply that only reaches the in-app
+ * inbox is a reply the customer has to come back and hunt for. The window is
+ * offered once the ticket EXISTS — never while the form is open, where it
+ * would compete with the thing they are trying to send.
+ */
+import ChannelNudge from '../components/notify/ChannelNudge';
 
 /**
  * Guided, deterministic (non-AI) support assistant + real support tickets.
@@ -830,6 +837,13 @@ export default function Support() {
   const [busy, setBusy] = useState(false);
   const [showTicketForm, setShowTicketForm] = useState(false);
   const [ticketsRefresh, setTicketsRefresh] = useState(0);
+  /**
+   * A TICKET NOW EXISTS. Latched rather than derived from the ticket list: the
+   * offer belongs to the moment they opened one, not to the state of a list
+   * that reloads on every tab switch, and a person who merely browses their
+   * old tickets is not asked anything.
+   */
+  const [ticketJustOpened, setTicketJustOpened] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   // A preselected ticket is only useful if the form is on screen: open it as
@@ -902,6 +916,7 @@ export default function Support() {
       },
     ]);
     setTab('tickets');
+    setTicketJustOpened(true);
   };
 
   // Suggestions belong to the current turn, not to every historical message.
@@ -1065,6 +1080,13 @@ export default function Support() {
           </div>
         </div>
       )}
+
+      {/* Rendered at the page root, not inside the form: the form unmounts the
+          instant the ticket is created, and a window mounted inside it would
+          be destroyed before it could ever say anything. It portals out of
+          this tree anyway and blocks nothing — the new ticket is already
+          visible in the list behind it. */}
+      <ChannelNudge context="ticket" active={ticketJustOpened} />
     </div>
   );
 }

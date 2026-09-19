@@ -34,6 +34,13 @@ import PrintRequestWizard from '../components/print/PrintRequestWizard';
 import PrintSummary from '../components/print/PrintSummary';
 import MyRequestsList from '../components/print/MyRequestsList';
 import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
+/**
+ * A PUBLISHED REQUEST IS A PROMISE OF OFFERS, and offers arrive hours later
+ * from merchants the customer has never met. For an account with no outbound
+ * channel every one of them lands only in the in-app inbox, so the request the
+ * customer just wrote sits there collecting answers nobody tells them about.
+ */
+import ChannelNudge from '../components/notify/ChannelNudge';
 
 interface RequestRow {
   id: string;
@@ -85,6 +92,15 @@ export default function Requests() {
   const [open, setOpen] = useState<RequestRow | null>(null);
   const [params, setParams] = useSearchParams();
   const [deepLinkError, setDeepLinkError] = useState('');
+  /**
+   * A REQUEST WAS JUST PUBLISHED BY THIS PERSON, in this session. Latched
+   * rather than derived from the open request: the deep-link effect below
+   * opens any request whose id is in the URL — including one a MERCHANT was
+   * pointed at by a match notification — and offering a customer-notification
+   * window to a merchant reading somebody else's job would be the wrong window
+   * on the wrong screen.
+   */
+  const [requestJustCreated, setRequestJustCreated] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -155,7 +171,23 @@ export default function Requests() {
     setParams({}, { replace: true });
   }, [setParams]);
 
-  if (open) return <RequestDetail request={open} me={me} onBack={closeRequest} />;
+  /**
+   * The window follows the customer, not the view. Publishing a request moves
+   * the URL to that request, so the detail screen below replaces this one the
+   * moment it exists — and a window rendered only in the board branch would be
+   * unmounted before it could ever appear. It portals to document.body and
+   * carries no scrim, so the request's own page stays fully usable behind it,
+   * and it decides for itself whether there is anything worth offering.
+   */
+  const nudge = <ChannelNudge context="request" active={requestJustCreated} />;
+
+  if (open)
+    return (
+      <>
+        <RequestDetail request={open} me={me} onBack={closeRequest} />
+        {nudge}
+      </>
+    );
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 pb-28">
@@ -221,6 +253,7 @@ export default function Requests() {
             onCreated={(id) => {
               setView('mine');
               openRequestId(id);
+              setRequestJustCreated(true);
             }}
             onCancel={() => setView('board')}
           />
@@ -232,6 +265,7 @@ export default function Requests() {
           <RequestList onOpen={openRequest} />
         )}
       </div>
+      {nudge}
     </div>
   );
 }

@@ -3,8 +3,10 @@
  *
  * The whole setup the owner asked for is five lines typed into Telegram:
  *
- *     (in the Wallet topic)    /topic_here wallet
- *     (in the Orders topic)    /topic_here orders
+ *     (in the Wallet topic)          /topic_here wallet
+ *     (in «Orders direct»)           /topic_here orders_direct
+ *     (in «Orders pre-order»)        /topic_here orders_preorder
+ *     (in «Warranty support»)        /topic_here warranty
  *     …
  *                              /topics
  *
@@ -24,7 +26,7 @@
 import type { Env } from './types';
 import { sendMessageToChat, type TgSendResult } from './telegram';
 import {
-  TOPIC_KEYS,
+  BINDABLE_TOPIC_KEYS,
   auditAdminBot,
   bindAdminGroup,
   bindTopic,
@@ -32,7 +34,9 @@ import {
   readAdminGroup,
   readTopics,
   threadExtra,
+  topicFallbackChain,
   topicLabel,
+  type TopicBinding,
   type TopicKey,
 } from './telegramAdmin';
 import { resolveAdminActor } from './walletNotify';
@@ -91,15 +95,29 @@ const TXT_UNAUTHORIZED = 'غير مصرح باستخدام بوت الإدارة
 const TXT_START = [
   'مرحباً بك في بوت إدارة Levonis.',
   '',
-  '• متابعة الطلبات',
+  '• الطلبات المسبقة والمباشرة',
   '• تعبئة المحفظة',
   '• التقييمات',
   '• البلاغات',
   '• توثيق التجار',
   '• الدعم',
+  '• تذاكر الضمان',
   '',
   'استخدم /topics لعرض حالة ربط المواضيع.',
 ].join('\n');
+
+/**
+ * THE NAMES, ONE PER LINE, EACH BESIDE ITS ARABIC MEANING.
+ *
+ * They used to be one comma-joined line of English keys. With seven that was
+ * merely terse; with nine — and with `orders_preorder` and `orders_direct` a
+ * single underscore apart — it is a line nobody can copy from correctly on a
+ * phone. The key is what the command takes and the label is what the owner
+ * recognises, so both are shown and the whole command is spelled out ready to
+ * copy. `orders` is absent for the reason BINDABLE_TOPIC_KEYS gives: it still
+ * works, it is just not a topic anyone should go and create.
+ */
+const TXT_TOPIC_MENU = BINDABLE_TOPIC_KEYS.map((k) => `/topic_here ${k} — ${topicLabel(k)}`).join('\n');
 
 const TXT_HELP = [
   'أوامر بوت الإدارة:',
@@ -110,7 +128,8 @@ const TXT_HELP = [
   '/topics — حالة ربط المواضيع',
   '/topic_here <اسم> — يربط الموضوع الحالي',
   '',
-  `الأسماء المتاحة: ${TOPIC_KEYS.join('، ')}`,
+  'الأسماء المتاحة:',
+  TXT_TOPIC_MENU,
   '',
   'اكتب /topic_here داخل الموضوع المطلوب — لا حاجة لأي رقم.',
 ].join('\n');
@@ -183,7 +202,8 @@ async function bindHere(ctx: CommandContext, rawKey: string | undefined): Promis
         'اكتب اسم الموضوع بعد الأمر، مثال:',
         '/topic_here wallet',
         '',
-        `الأسماء المتاحة: ${TOPIC_KEYS.join('، ')}`,
+        'الأسماء المتاحة:',
+        TXT_TOPIC_MENU,
       ].join('\n')
     );
     return 'refused_unknown_topic';
@@ -251,6 +271,21 @@ async function bindHere(ctx: CommandContext, rawKey: string | undefined): Promis
     telegramUserId: ctx.telegramUserId,
   });
   if (!bound.ok) {
+    /**
+     * TWO REFUSALS, TWO SENTENCES. `not_a_group` means the chat id is not a
+     * group id at all — unreachable from here today (the forum checks above run
+     * first) and kept only so a future path cannot bind a private chat as the
+     * admin group. Telling the owner "another group is already bound" in that
+     * case would send them to reset a group that is not the problem.
+     */
+    if (bound.reason === 'not_a_group') {
+      await reply(ctx, '⚠️ لا يمكن اعتماد هذه المحادثة كمجموعة إدارة. استخدم مجموعة Forum.');
+      await auditAdminBot(env.DB, actor.userId, 'telegram_admin.group.refused', String(chatId), ctx.telegramUserId, {
+        reason: 'not_a_group',
+        attempted_topic: key,
+      });
+      return 'refused_not_forum';
+    }
     await reply(
       ctx,
       [
@@ -310,18 +345,67 @@ async function bindHere(ctx: CommandContext, rawKey: string | undefined): Promis
 
 // ----------------------------------------------------------------- /topics
 
+/**
+ * WHERE AN UNBOUND KEY'S MESSAGES ARE LANDING RIGHT NOW.
+ *
+ * `/topics` used to print «❌ غير مربوط» and stop there, which reads as "these
+ * notifications are lost". They are not — the router has always carried them on
+ * (a sibling topic, then General, then the legacy chat). Saying only "not bound"
+ * about a live destination is the kind of half-truth that makes an owner go
+ * looking for messages that were delivered all along, or worse, stop trusting
+ * the screen. So every unbound line also names where its traffic goes today.
+ *
+ * It reproduces the ladder in `resolveAdminDestination` deliberately and reads
+ * the SAME rows, so the two cannot disagree about a binding. It stops at the
+ * group, because `/topics` is only ever answered when the bot is running and
+ * the last lines below already say whether a group is bound at all.
+ */
+function landingNow(key: TopicKey, byKey: Map<string, TopicBinding>): string {
+  for (const sibling of topicFallbackChain(key)) {
+    if (byKey.get(sibling)?.enabled) return topicLabel(sibling);
+  }
+  if (byKey.get('general')?.enabled) return topicLabel('general');
+  return 'الموضوع العام (General)';
+}
+
 async function topicsText(ctx: CommandContext): Promise<string> {
   const group = await readAdminGroup(ctx.env.DB);
   const topics = await readTopics(ctx.env.DB);
   const byKey = new Map(topics.map((t) => [t.topicKey, t]));
-  const lines = ['إعداد مواضيع الإدارة:', ''];
-  for (const key of TOPIC_KEYS) {
+  const lines = [`إعداد مواضيع الإدارة (${BINDABLE_TOPIC_KEYS.length}):`, ''];
+  let missing = 0;
+  for (const key of BINDABLE_TOPIC_KEYS) {
     const t = byKey.get(key);
     if (!t || !t.enabled) {
+      missing += 1;
+      // The EXACT command, on its own line, ready to copy — the owner should
+      // never have to go back to /help to find out what to type next.
       lines.push(`❌ ${topicLabel(key)} — غير مربوط`);
+      lines.push(`     تصل حالياً إلى: ${landingNow(key, byKey)}`);
+      lines.push(`     للربط، اكتب داخل الموضوع: /topic_here ${key}`);
       continue;
     }
     lines.push(`✅ ${topicLabel(key)}${t.messageThreadId === null ? ' (الموضوع العام)' : ''}`);
+  }
+  lines.push('');
+  lines.push(
+    missing === 0
+      ? '🎉 كل المواضيع مربوطة.'
+      : `بقي ${missing} من ${BINDABLE_TOPIC_KEYS.length} — اكتب الأمر داخل الموضوع المطلوب.`
+  );
+  /**
+   * THE LEGACY `orders` ROW, SHOWN ONLY IF IT EXISTS.
+   *
+   * It is not one of the nine, so it gets no checklist line — but it is a real
+   * binding that is really carrying pre-orders and direct orders until those two
+   * are bound, and an owner who sees «الطلبات المسبقة — غير مربوط» with no
+   * further explanation would reasonably conclude the orders had stopped
+   * arriving. One line, only when the row is actually there.
+   */
+  const legacyOrders = byKey.get('orders');
+  if (legacyOrders?.enabled) {
+    lines.push('');
+    lines.push('ℹ️ يوجد ربط قديم باسم orders ما زال يستقبل الطلبات حتى تربط «الطلبات المسبقة» و«الطلبات المباشرة».');
   }
   lines.push('');
   // "Is this the configured group?" — §7 asks for it explicitly, and it is the
@@ -344,12 +428,18 @@ async function topicsText(ctx: CommandContext): Promise<string> {
 async function statusText(ctx: CommandContext): Promise<string> {
   const group = await readAdminGroup(ctx.env.DB);
   const topics = (await readTopics(ctx.env.DB)).filter((t) => t.enabled);
+  // COUNTED AGAINST THE NINE, not against every key that exists. The denominator
+  // is the number of topics in the owner's group; counting the legacy `orders`
+  // row in the numerator would let /status read «8 من 9» while a topic the owner
+  // can see on screen is still unbound.
+  const boundKeys = new Set(topics.map((t) => t.topicKey));
+  const done = BINDABLE_TOPIC_KEYS.filter((k) => boundKeys.has(k)).length;
   const legacy = (ctx.env.TELEGRAM_ADMIN_CHAT_ID || '').trim();
   return [
     'حالة بوت الإدارة:',
     '',
     `• المجموعة: ${group ? group.groupTitle || group.groupChatId : 'غير مربوطة'}`,
-    `• المواضيع المربوطة: ${topics.length} من ${TOPIC_KEYS.length}`,
+    `• المواضيع المربوطة: ${done} من ${BINDABLE_TOPIC_KEYS.length}`,
     `• الوجهة الاحتياطية القديمة: ${legacy ? 'مفعّلة' : 'غير مضبوطة'}`,
     '',
     group

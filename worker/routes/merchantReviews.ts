@@ -20,6 +20,7 @@ import { requireAuth, badRequest, conflict, notFound, str, int } from '../lib/ht
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
+import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { badgeFor } from '../lib/merchantOps';
 
 export const communityReviewRoutes = new Hono<AppContext>();
@@ -169,6 +170,31 @@ communityReviewRoutes.post('/', requireAuth, async (c) => {
 
   await refreshMerchantRating(c.env.DB, merchantId);
   await audit(c.env.DB, user.id, 'community.review_created', id, { merchant: merchantId, rating });
+
+  /**
+   * THE SAME «📢 Review» TOPIC, because a review is a review.
+   *
+   * A store review is not a catalogue review, but it is read by the same
+   * person for the same reason, and splitting them across two topics would ask
+   * the owner to watch two places for one job. What makes this one worth a
+   * message at all is the side effect two statements up: it has ALREADY moved
+   * the merchant's reputation (`merchant_reputation_events`, ±points by star)
+   * and already changed the rating shown on their storefront. A one-star that
+   * silently drops a merchant's public score is the exact event the shop needs
+   * to see the same day, not at the end of the month.
+   *
+   * The merchant id, not the merchant's name, and no customer identity: the
+   * id is what opens the record, and every name in a group message is a name
+   * that gets screenshotted.
+   */
+  announceAfterResponse(
+    c,
+    'review',
+    `📢 ${'★'.repeat(rating)}${'☆'.repeat(5 - rating)} (${rating}/5) store review` +
+      `\nMerchant: ${merchantId}` +
+      `\nReview: ${id}` +
+      `\nTransaction: ${orderId || communityOrderId}`
+  );
 
   return c.json({ success: true, review_id: id }, 201);
 });

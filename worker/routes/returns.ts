@@ -49,7 +49,7 @@ import { isRevealed, loadAllocations, paidOrderIds } from '../lib/mysteryReveal'
 import { mysteryRefusal } from '../lib/mystery/issues';
 import { typeForTransport } from '../lib/shippingType';
 import { pumpAfter, waitUntilFrom } from '../lib/eventBus';
-import { notifyAdminTopic } from '../lib/telegramAdmin';
+import { announceAfterResponse, orderTopic } from '../lib/adminTopicRouting';
 import { parseConditionDoc, returnRefusal } from '../lib/condition';
 import { CONDITION_DOC_DEFAULT_SQL, isConditionColumnMissing } from '../lib/conditionProjection';
 
@@ -467,8 +467,24 @@ returnRoutes.post('/', async (c) => {
   await c.env.DB.batch(cases.map((k) => k.statement));
 
   await audit(c.env.DB, user.id, 'return.request', id, { order_id: item.order_id, order_item_id: orderItemId, qty, reason });
-  c.executionCtx.waitUntil(
-    notifyAdminTopic(c.env, 'orders', `↩️ Return request ${id}\nOrder: ${item.order_id}\nItem: ${item.name_snapshot} × ${qty}\nReason: ${reason}`)
+  /**
+   * THE GROUP HEARS ABOUT IT IN THE QUEUE THE ORDER BELONGS TO.
+   *
+   * This said `'orders'`, a key the owner's group has no topic for: it has
+   * «Orders pre-order» and «Orders direct». A return against a pre-order is a
+   * supplier conversation weeks long; a return against a direct sale is a
+   * courier collection this week. `item.shipping_type` is the order's own
+   * column, already selected above for the open-box rules, so the split costs
+   * no extra read and cannot disagree with how the order was priced.
+   *
+   * `announceToAdmins` rather than the bare router: this is handed to
+   * `waitUntil`, and a D1 blip while resolving the topic would otherwise be an
+   * unhandled rejection on a return the customer successfully opened.
+   */
+  announceAfterResponse(
+    c,
+    orderTopic(item.shipping_type),
+    `↩️ Return request ${id}\nOrder: ${item.order_id}\nItem: ${item.name_snapshot} × ${qty}\nReason: ${reason}`
   );
 
   const row = await c.env.DB.prepare('SELECT * FROM return_cases WHERE id = ?').bind(id).first<ReturnCaseRow>();
@@ -864,7 +880,10 @@ priceProtectionRoutes.post('/claims', async (c) => {
   const orderItemId = str(body.orderItemId, 'orderItemId', { min: 1, max: 60 });
 
   const item = await c.env.DB.prepare(
-    `SELECT oi.*, o.user_id AS owner_id, o.status, o.delivered_at
+    // `o.shipping_type` is read for ONE reason: the admin notification below
+    // has to land in the pre-order queue or the direct queue, and it must use
+    // the order's own stored type rather than guess from the claim.
+    `SELECT oi.*, o.user_id AS owner_id, o.status, o.delivered_at, o.shipping_type
        FROM order_items oi JOIN orders o ON o.id = oi.order_id
       WHERE oi.id = ?`
   )
@@ -1072,8 +1091,13 @@ priceProtectionRoutes.post('/claims', async (c) => {
   await audit(c.env.DB, user.id, 'price_protection.claim', id, {
     order_item_id: orderItemId, original: originalUnit, observed: observedUnit, computed_iqd: computed,
   });
-  c.executionCtx.waitUntil(
-    notifyAdminTopic(c.env, 'orders', `🛡️ Price-protection claim ${id}\nItem: ${String(item.name_snapshot)}\nDrop: ${perUnitDrop.toLocaleString()} IQD × ${qty}`)
+  // Same split, same reason as the return above: a claim belongs beside the
+  // order it is about, not in a mixed feed the owner has already stopped
+  // reading. Contained, because it runs after the claim row has committed.
+  announceAfterResponse(
+    c,
+    orderTopic(item.shipping_type),
+    `🛡️ Price-protection claim ${id}\nItem: ${String(item.name_snapshot)}\nDrop: ${perUnitDrop.toLocaleString()} IQD × ${qty}`
   );
 
   const row = await c.env.DB.prepare('SELECT * FROM price_protection_claims WHERE id = ?').bind(id).first<ClaimRow>();

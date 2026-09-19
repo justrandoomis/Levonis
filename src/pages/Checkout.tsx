@@ -29,6 +29,16 @@ import PromoCodeField, { readStoredPromo, storePromo } from '../components/Promo
 import Note from '../components/ui/Note';
 import BundleContents, { type BundleContentLine } from '../components/bundles/BundleContents';
 import AddressForm from '../components/address/AddressForm';
+/**
+ * THE ORDER IS PLACED; THIS IS ABOUT WHAT HAPPENS NEXT.
+ *
+ * An order produces a stream of later messages — confirmed, in production, out
+ * for delivery — and for an account with no outbound channel every one of them
+ * lands only in the in-app inbox, a page the customer has to remember to open.
+ * The window is rendered on the SUCCESS screen alone and is non-blocking; it
+ * asks nothing before the payment and interrupts nothing after it.
+ */
+import ChannelNudge from '../components/notify/ChannelNudge';
 import { apiRefusal } from '../lib/refusalStrings';
 import { mascot } from '../lib/mascot';
 /**
@@ -1263,6 +1273,13 @@ export default function Checkout() {
             </button>
           </div>
         </div>
+
+        {/* Last in the tree and non-blocking by construction: it portals to
+            document.body, carries no scrim and takes no scroll lock, so the
+            order number above stays readable and copyable underneath it. It
+            decides for itself whether to appear at all — a customer who
+            already has Telegram linked never sees it. */}
+        <ChannelNudge context="order" active />
       </div>
     );
   }

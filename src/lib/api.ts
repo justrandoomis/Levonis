@@ -1610,3 +1610,72 @@ export function uploadTimeoutMs(bytes: number): number {
   const allowance = 30_000 + Math.ceil(Math.max(0, bytes) / 1024) * 31;
   return Math.min(300_000, allowance);
 }
+
+// ------------------------------------------- can we actually reach this person
+
+/**
+ * WHERE A MESSAGE CAN ACTUALLY GO — the server's own answer, never the
+ * client's guess.
+ *
+ * worker/lib/channelReadiness.ts computes readiness as the AND of two facts
+ * the browser cannot see on its own: whether this DEPLOYMENT can carry a
+ * channel (a Telegram token, a WhatsApp session that is not logged out, an
+ * email provider) and whether this ACCOUNT has somewhere for it to land. A UI
+ * that decided «you have no channels» from the profile alone would tell a
+ * customer to link Telegram on a deployment whose bot is not answering, and
+ * the tap would 503. So this type carries the server's verdict verbatim and
+ * every surface renders it rather than re-deriving it.
+ *
+ * `any_outbound_ready` IS THE WHOLE PREDICATE for the post-success nudge:
+ * 'inapp' is the FLOOR (a signed-in account is always reachable in the inbox)
+ * and is deliberately excluded from it, so `false` means exactly "we have no
+ * way to reach this person once they close the tab".
+ *
+ * These types are declared here rather than aliased onto the StockAlert*
+ * readiness types above even though the server sends one shape: the stock
+ * alert section belongs to that feature and is edited with it, and a rename
+ * there must not be able to break an unrelated checkout screen. The SHAPE is
+ * owned by the server; both copies are readers of it.
+ */
+export interface NotifyChannelState {
+  /** 'inapp' | 'telegram' | 'whatsapp' | 'email'. */
+  channel: string;
+  ready: boolean;
+  /** `ChannelBlocker` — why it is not ready. Null when it is. */
+  blocker: string | null;
+  /** MASKED or null. Never the address, the number or the chat id. */
+  destination_masked: string | null;
+  /** Would the activation route actually succeed if this were tapped now? */
+  can_activate: boolean;
+  /**
+   * Where the fix lives, PUBLISHED BY THE SERVER. Never hard-code the path:
+   * WhatsApp has no activation route of its own (a phone number is only ever
+   * written after Telegram contact verification), so its action deliberately
+   * points at Telegram linking, and only the server knows that.
+   */
+  action: { kind: 'link_telegram' | 'verify_email'; href: string } | null;
+}
+
+export interface NotifyChannelReadiness {
+  channels: NotifyChannelState[];
+  /** telegram/whatsapp/email only — the in-app inbox is not an outbound win. */
+  any_outbound_ready: boolean;
+  /** Never empty: the floor is 'inapp'. The only thing a sentence may name. */
+  recommended: string;
+  /** What the customer CHOSE, '' when they never chose. Not what is ready. */
+  primary_channel: string;
+  /** Where a message actually goes right now. */
+  delivery: string[];
+}
+
+/**
+ * GET /api/notifications/channels — the readiness answer for the signed-in
+ * customer. 401 for a guest, which callers treat as "say nothing" rather than
+ * as an error: a visitor who is not signed in has no channels to offer.
+ *
+ * The route answers `Cache-Control: no-store` on purpose — readiness flips the
+ * instant somebody finishes linking Telegram — so this is always a live read.
+ */
+export function fetchNotifyChannels(opts?: RequestOptions): Promise<NotifyChannelReadiness> {
+  return api.get<NotifyChannelReadiness & { success: boolean }>('/api/notifications/channels', opts);
+}

@@ -34,6 +34,30 @@
  *     financial transition. Passing door 1 only gets you the buttons.
  *
  * -------------------------------------------------------------------------
+ * THE TWO BOTS MUST NEVER CROSS — WHAT ACTUALLY ENFORCES IT
+ * -------------------------------------------------------------------------
+ * @alilevobot is the ADMIN bot; @Levonisiq_bot is the MEMBER bot that verifies
+ * identity and carries notifications to customers and merchants. Being honest
+ * about the seam, because "by convention" is not a guarantee:
+ *
+ *  • WHICH TOKEN IS SENT WITH is a plain argument — `sendMessageToChat(…, bot)`
+ *    in worker/lib/telegram.ts defaults to 'customer' and the caller opts in to
+ *    'admin'. Nothing in the type system stops a future customer-facing notifier
+ *    from passing 'admin'. THAT IS A REAL RISK and it is named here rather than
+ *    left implied; the defence is that the default is the safe one, so the
+ *    mistake has to be typed on purpose.
+ *  • WHERE THE ADMIN BOT MAY SEND, on the other hand, IS structural. Every
+ *    admin destination in this file comes out of `resolveAdminDestination`, and
+ *    it returns `bot: 'admin'` only with the bound GROUP's chat id — which
+ *    `isGroupChatId` now proves is a group id (negative) at the write AND at
+ *    the read. A customer's chat id is their own positive user id, so it cannot
+ *    come out of this function at all. The one place the admin bot answers a
+ *    private chat is a reply to an ADMIN who typed a command at it
+ *    (telegramAdminCommands.ts), which is the point of the bot, not a leak.
+ *  • The admin bot never touches linking or OTP: those conversations are keyed
+ *    by a chat id only the customer bot shares, and nothing here reads them.
+ *
+ * -------------------------------------------------------------------------
  * WHAT THIS FILE DOES NOT DO
  * -------------------------------------------------------------------------
  * It moves no money, decides no request and writes no ledger row. The wallet
@@ -55,6 +79,33 @@ import { botConfigured, scrubTokens, sendMessageToChat, type BotId, type TgSendR
  *
  * Extending this list is a one-line change here plus a label below: the table
  * carries no CHECK constraint precisely so the next topic is not a migration.
+ * RE-VERIFIED before the three keys below were added: migration 0080 declares
+ * `telegram_admin_topics (topic_key TEXT PRIMARY KEY CHECK (topic_key <> ''), …)`
+ * and `tg_admin_notifications.topic_key TEXT NOT NULL DEFAULT ''` — neither
+ * constrains the VALUE, so a new key is storable today and this change ships
+ * with no migration at all. If a CHECK is ever added there, this comment is the
+ * warning that adding a topic stops being free.
+ *
+ * WHY THE LIST GREW FROM SEVEN, AND TO EXACTLY THESE. The group the owner
+ * actually runs has NINE topics:
+ *
+ *   🔥 Warranty support · 📝 Orders pre-order · 📝 Orders direct · # General ·
+ *   💲 Wallet · 📢 Review · ❗ Report · ⚡ Merchants verification · ‼️ Support
+ *
+ * Two of them had no key at all. Warranty tickets — «تذاكر الضمان», the owner's
+ * own words — were landing in whatever general destination the ladder found,
+ * mixed in with everything else, which is precisely the pile the owner opened a
+ * dedicated topic to stop reading. And one `orders` key cannot address two
+ * topics: a PRE-ORDER (paid now, produced later, a queue watched for capacity
+ * and for promised dates) and a DIRECT order (printed and shipped today) are
+ * two different workflows the owner checks at different hours. One key would
+ * have forced both into one topic and made the owner's own split pointless.
+ *
+ * `orders` IS STILL A KEY — the tenth, against nine topics — and that is not an
+ * oversight. See TOPIC_FALLBACK: it is already bound in the owner's group and
+ * it is still the literal argument at live call sites (worker/routes/orders.ts,
+ * worker/routes/returns.ts). Deleting it would have turned a working binding
+ * into a type error and, worse, a silently re-routed notification.
  */
 export const TOPIC_KEYS = [
   'general',
@@ -63,7 +114,10 @@ export const TOPIC_KEYS = [
   'merchant_verification',
   'wallet',
   'orders',
+  'orders_preorder',
+  'orders_direct',
   'support',
+  'warranty',
 ] as const;
 export type TopicKey = (typeof TOPIC_KEYS)[number];
 
@@ -74,8 +128,64 @@ const TOPIC_LABELS: Record<TopicKey, string> = {
   merchant_verification: 'توثيق التجار',
   wallet: 'المحفظة',
   orders: 'الطلبات',
+  orders_preorder: 'الطلبات المسبقة',
+  orders_direct: 'الطلبات المباشرة',
   support: 'الدعم',
+  warranty: 'تذاكر الضمان',
 };
+
+/**
+ * THE NINE the owner is asked to bind, in the order `/topics` lists them —
+ * one line per topic that exists in their group, and no line for anything else.
+ *
+ * `orders` is deliberately NOT here. It still resolves, it still accepts
+ * `/topic_here orders`, and an existing binding of it still carries traffic;
+ * it is simply not advertised as a tenth topic to go and create, because the
+ * group has nine and a checklist that does not match what is on screen is a
+ * checklist the owner stops trusting.
+ */
+export const BINDABLE_TOPIC_KEYS: readonly TopicKey[] = TOPIC_KEYS.filter((k) => k !== 'orders');
+
+/**
+ * WHERE A NOTIFICATION GOES WHEN ITS OWN TOPIC IS NOT BOUND YET.
+ *
+ * The ladder that already existed is untouched and is still the floor: the
+ * topic → GENERAL → the legacy chat → a reported miss. Nothing is dropped and
+ * nothing throws; an unbound NEW key behaves exactly like an unbound OLD one.
+ *
+ * What is added is ONE optional step in front of General, for the keys that
+ * have a sibling which is plainly a better home than a mixed feed:
+ *
+ *  • orders_preorder / orders_direct → `orders`. THIS IS THE BACKWARD
+ *    COMPATIBILITY, and it is the reason the split costs the owner nothing.
+ *    A row that already says `orders` keeps carrying BOTH kinds of order the
+ *    moment this deploys, before anyone types anything in Telegram. Binding
+ *    «Orders pre-order» later takes the pre-orders out of it; binding neither
+ *    changes nothing. A binding the owner already made never stops working.
+ *  • orders → orders_direct → orders_preorder. The mirror image, for after the
+ *    owner has bound the two new topics and the old `orders` row is gone: the
+ *    call sites that still pass the literal 'orders' (orders.ts, returns.ts)
+ *    then land in an ORDERS topic instead of falling all the way to General.
+ *  • warranty → support. «Warranty support» is support; until its own topic is
+ *    bound, the Support topic is where the owner is already looking for it.
+ *
+ * THE LOOKUP IS FLAT AND NOT RECURSIVE — each chain is tried in order and then
+ * General, and a chain is never followed out of another chain. That is what
+ * makes `orders_preorder → orders` and `orders → orders_preorder` safe to state
+ * at the same time: two keys can name each other without any possibility of a
+ * cycle, and no notification can loop while a customer waits for it.
+ */
+const TOPIC_FALLBACK: Partial<Record<TopicKey, readonly TopicKey[]>> = {
+  orders_preorder: ['orders', 'orders_direct'],
+  orders_direct: ['orders', 'orders_preorder'],
+  orders: ['orders_direct', 'orders_preorder'],
+  warranty: ['support'],
+};
+
+/** The siblings tried before GENERAL for an unbound key. Empty for most keys. */
+export function topicFallbackChain(key: TopicKey): readonly TopicKey[] {
+  return TOPIC_FALLBACK[key] ?? [];
+}
 
 export function topicLabel(key: string): string {
   return TOPIC_LABELS[key as TopicKey] ?? key;
@@ -83,6 +193,24 @@ export function topicLabel(key: string): string {
 
 export function isTopicKey(v: unknown): v is TopicKey {
   return typeof v === 'string' && (TOPIC_KEYS as readonly string[]).includes(v);
+}
+
+/**
+ * A TELEGRAM GROUP ID IS NEGATIVE. A private chat's id is the user's own
+ * positive numeric id, and that difference is the only cheap STRUCTURAL line
+ * between the two bots — see the note at the head of this file.
+ *
+ * What it prevents: the admin bot is the one that carries wallet notifications,
+ * and a wallet notification carries the customer's payment-proof photo. If the
+ * group row ever held a POSITIVE id — a private chat with the bot, written by a
+ * future caller that does not repeat `/topic_here`'s forum checks — every one
+ * of those photos would be delivered into one person's DM by the bot that is
+ * documented as never DMing anyone but through this router. The id's sign is
+ * checked at the write AND at the read, because a row that predates the check
+ * is exactly the row that would slip through.
+ */
+export function isGroupChatId(chatId: string): boolean {
+  return /^-\d{1,19}$/.test(String(chatId).trim());
 }
 
 // --------------------------------------------------------------- authority
@@ -169,13 +297,27 @@ export async function readAdminGroup(db: D1Database): Promise<AdminGroup | null>
  * Moving to a genuinely new group is a deliberate admin act, not something a
  * message in the wrong chat can do by accident — `POST /api/telegram/admin/group/reset`
  * exists for it, behind a site admin session.
+ *
+ * REFUSES A NON-GROUP CHAT ID OUTRIGHT (`isGroupChatId`). `/topic_here` already
+ * refuses a private chat and a non-forum chat before it ever gets here, so today
+ * this is unreachable from Telegram — which is exactly why it is worth writing
+ * down: it is the guard that survives the NEXT caller of this function, one that
+ * will not repeat those checks. A private chat id stored here would make the
+ * admin bot deliver payment-proof photos into one person's DM, and the failure
+ * would look like normal operation. The refusal carries a REASON so the caller
+ * can say which of the two things went wrong instead of blaming the other.
  */
 export async function bindAdminGroup(
   db: D1Database,
   p: { chatId: string; title: string; userId: string; telegramUserId: number }
-): Promise<{ ok: true; created: boolean } | { ok: false; existing: AdminGroup }> {
+): Promise<
+  | { ok: true; created: boolean }
+  | { ok: false; reason: 'other_group'; existing: AdminGroup }
+  | { ok: false; reason: 'not_a_group'; existing: null }
+> {
+  if (!isGroupChatId(p.chatId)) return { ok: false, reason: 'not_a_group', existing: null };
   const existing = await readAdminGroup(db);
-  if (existing && existing.groupChatId !== p.chatId) return { ok: false, existing };
+  if (existing && existing.groupChatId !== p.chatId) return { ok: false, reason: 'other_group', existing };
   if (existing) {
     await db
       .prepare(
@@ -277,18 +419,26 @@ export async function bindTopic(
  * are operationally different and a report that conflated them would hide a
  * missing binding behind a working fallback:
  *
- *   'topic'   the topic asked for is bound — the normal case.
- *   'general' that topic is NOT bound, so GENERAL carried it (§9).
- *   'legacy'  no admin group is bound at all, so the pre-0080
- *             `TELEGRAM_ADMIN_CHAT_ID` chat carried it on the CUSTOMER bot.
- *             This is what keeps the platform working during the migration.
+ *   'topic'    the topic asked for is bound — the normal case.
+ *   'fallback' that topic is NOT bound, but a SIBLING topic is and carried it
+ *              (TOPIC_FALLBACK) — `topicKey` names the sibling that actually
+ *              took it. Kept distinct from 'general' on purpose: a pre-order
+ *              sitting in the `orders` topic is a WORKING deployment with one
+ *              binding left to make, while the same pre-order in General is the
+ *              mixed pile the owner is trying to get out of. Conflating them
+ *              would make the `/topics` checklist look finished when it is not.
+ *   'general'  neither the topic nor any sibling is bound, so GENERAL carried
+ *              it (§9).
+ *   'legacy'   no admin group is bound at all, so the pre-0080
+ *              `TELEGRAM_ADMIN_CHAT_ID` chat carried it on the CUSTOMER bot.
+ *              This is what keeps the platform working during the migration.
  */
 export interface AdminDestination {
   bot: BotId;
   chatId: string;
   messageThreadId: number | null;
   topicKey: string;
-  via: 'topic' | 'general' | 'legacy';
+  via: 'topic' | 'fallback' | 'general' | 'legacy';
 }
 
 /**
@@ -338,6 +488,28 @@ export async function resolveAdminDestination(env: Env, topicKey: TopicKey): Pro
   if (!adminBot) return legacy();
   const group = await readAdminGroup(env.DB);
   if (!group) return legacy();
+  /**
+   * THE BOT BOUNDARY, CHECKED AT THE READ AND NOT ONLY AT THE WRITE.
+   *
+   * Every destination this function hands back with `bot: 'admin'` is addressed
+   * with `group.groupChatId`, so this one line is the whole platform's guarantee
+   * that the admin bot's traffic — including the wallet messages that carry a
+   * customer's payment-proof photo — goes to a GROUP and never into somebody's
+   * private chat. `bindAdminGroup` already refuses to store a positive id, but a
+   * row written before that check existed, or by a future writer that forgets
+   * it, would otherwise be trusted here forever. A bad row now degrades to the
+   * legacy chat (or to a reported miss) instead of DMing a person.
+   */
+  if (!isGroupChatId(group.groupChatId)) {
+    console.error(
+      JSON.stringify({
+        event: 'telegram_admin_group_not_a_group',
+        topic: topicKey,
+        detail: 'the bound admin chat id is not a group id; refusing to send admin traffic to it',
+      })
+    );
+    return legacy();
+  }
 
   const topics = await readTopics(env.DB);
   const byKey = new Map(topics.filter((t) => t.enabled).map((t) => [t.topicKey, t]));
@@ -351,6 +523,31 @@ export async function resolveAdminDestination(env: Env, topicKey: TopicKey): Pro
         messageThreadId: wanted.messageThreadId,
         topicKey,
         via: 'topic',
+      },
+    };
+  }
+  /**
+   * THE SIBLING RUNG (TOPIC_FALLBACK). Tried before General, never instead of
+   * it: if no sibling is bound either, the code below is reached unchanged and
+   * an unbound key behaves exactly as it did before this rung existed.
+   *
+   * `topicKey` records the sibling that ACTUALLY took the message, not the one
+   * that was asked for, because `tg_admin_notifications.topic_key` is the
+   * routing audit — a row that claimed `orders_preorder` while the message sat
+   * in the `orders` thread would make the one question that audit exists to
+   * answer, "where did this go?", unanswerable.
+   */
+  for (const sibling of topicFallbackChain(topicKey)) {
+    const alt = byKey.get(sibling);
+    if (!alt) continue;
+    return {
+      ok: true,
+      destination: {
+        bot: 'admin',
+        chatId: group.groupChatId,
+        messageThreadId: alt.messageThreadId,
+        topicKey: sibling,
+        via: 'fallback',
       },
     };
   }
