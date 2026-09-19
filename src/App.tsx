@@ -5,6 +5,7 @@ import Storefront from './pages/Storefront';
 import MerchantStart from './pages/MerchantStart';
 import StorefrontProduct from './pages/StorefrontProduct';
 import UpdateReadyToast from './components/pwa/UpdateReadyToast';
+import HostAppleIdentity from './components/pwa/HostAppleIdentity';
 /**
  * SPLIT OUT ON PURPOSE. The viewer is the only screen in the application that
  * pulls in `ogl`, a WebGL renderer and a mesh parser, and it is reached from a
@@ -266,6 +267,12 @@ function StorefrontApp() {
   const { store } = useStore();
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-y-auto">
+      {/* iOS reads `apple-touch-icon` and `<title>` out of the live document
+          instead of the per-host manifest, and index.html is one shared file —
+          so without this a merchant's shop installed on an iPhone as "LEVONIS"
+          with the platform mark. It draws nothing and undoes itself on the way
+          out; the whole argument is in the component. */}
+      <HostAppleIdentity />
       <MotionCharacterFallbackHeader />
       <Suspense fallback={<RouteFallback />}>
       <Routes>

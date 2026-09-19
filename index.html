@@ -173,7 +173,28 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="LEVONIS" />
+    <!--
+      NO `apple-mobile-web-app-title`, AND IT MUST NOT COME BACK.
+
+      It was here, set to "LEVONIS", and it was the one tag that defeated the
+      whole per-host manifest. iOS prefers this tag over the manifest's
+      `short_name` for the home-screen label, and THIS DOCUMENT IS SHARED: the
+      asset layer serves the same bytes on levonis-iq.com and on every
+      merchant subdomain (only `/product/*` is rewritten, by assetWithPreview).
+      So a customer on ali3d.levonis-iq.com read «ثبّت متجر علي على جهازك» in
+      the install sheet, followed the steps, and got an icon labelled LEVONIS —
+      exactly the deception worker/routes/manifest.ts was built to prevent,
+      reintroduced here on the one platform with no one-tap install.
+
+      Without the tag, modern iOS falls back to the manifest's `short_name`,
+      which IS per host. Older iOS falls back to <title>, and
+      src/components/pwa/HostAppleIdentity.tsx owns that on a merchant host for
+      the same reason. Both fallbacks therefore name the shop.
+
+      The platform's own name is not lost: on the apex the manifest's
+      `short_name` is LEVONIS and <title> is LEVONIS, which is what this tag
+      was saying in the first place.
+    -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />

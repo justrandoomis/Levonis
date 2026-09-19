@@ -41,6 +41,7 @@ import {
 import { GOVERNORATE_LABELS } from '../lib/governorates';
 import { WidgetIcon } from '../components/merchant/profileIcons';
 import { useStore } from '../StoreContext';
+import InstallAppButton from '../components/pwa/InstallAppButton';
 
 /**
  * The accent presets. A NAME maps to classes chosen here — a merchant never
@@ -480,6 +481,51 @@ export default function Storefront({
           </div>
         )}
         </TabPanels>
+
+        {/*
+          «ثبّت هذا المتجر», AND IT ONLY BELONGS ON THIS HOST.
+
+          On `ali3d.levonis-iq.com` the whole application is `StorefrontApp`
+          (see App.tsx), whose route table declares no `/settings` at all — so
+          the install affordance, which lived only in the Settings row, was
+          literally unreachable on the one kind of host it was built for. The
+          per-host manifest `worker/routes/manifest.ts` goes to real trouble to
+          build — the merchant's name, their tagline as the description, their
+          logo as an extra icon, one D1 read per host — had no UI in front of
+          it, and `InstallAppSheet`'s merchant-naming branch was dead code.
+
+          This row is that UI, and it is deliberately in the page BODY rather
+          than in the header's «...» menu: that menu's open state owns its own
+          subtree, so closing it would unmount the sheet mid-animation, and it
+          is also absent from the storefront's other routes.
+
+          It sits below the tab panels, on every tab, and needs no account —
+          which matters more here than anywhere else in the app, because a
+          shopper arriving on a merchant link from a story is signed out.
+
+          `hostStore` gates it: reached as `/community/store/:slug` on the main
+          site this same component is a PREVIEW of someone else's shop inside
+          LEVONIS, and the manifest that origin serves is the platform's.
+          Offering to install «متجر علي» there would install LEVONIS under that
+          name, which is the exact deception the per-host manifest exists to
+          stop. On the merchant's own hostname the offer is honest.
+
+          `offered`, so «ليس الآن» buys a month of silence — nobody asked for
+          this row.
+        */}
+        {hostStore && (
+          <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <p className="text-white font-bold text-[13px]">{loc('تحميل التطبيق', 'Install the app', 'دابەزاندنی ئەپەکە')}</p>
+            <p className="mt-1 text-zinc-400 text-[11.5px] leading-relaxed">
+              {loc(
+                'أضف المتجر إلى شاشتك الرئيسية ليفتح مثل التطبيق.',
+                'Add the shop to your home screen so it opens like an app.',
+                'فرۆشگا زیاد بکە بۆ شاشەی سەرەکیت تا وەک ئەپ بکرێتەوە.'
+              )}
+            </p>
+            <InstallAppButton offered />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -131,8 +131,23 @@ export function startInstallPromptCapture(): void {
     // WITHOUT THIS, CHROME DECIDES WHEN TO ASK. The default action is the
     // browser's own mini-infobar, which appears over the shop at a moment
     // nobody chose, in English, and is dismissed for months by one stray tap.
-    // Preventing it is what moves the decision to «تحميل التطبيق» in
-    // Settings — the customer asks, and then the browser's real dialog opens.
+    // Preventing it moves the decision to «تحميل التطبيق» — the customer
+    // asks, and then the browser's real dialog opens.
+    //
+    // THIS LINE IS A TRADE, NOT A FREE WIN, AND IT IS ONLY PAID FOR BECAUSE
+    // THE REPLACEMENT IS REACHABLE. Suppressing the infobar removes Chrome's
+    // own promotion for every visitor on Android, which is the browser most of
+    // this shop's customers use. When the only surface that could act on the
+    // captured event was the Settings row, and `/settings` was a
+    // `<ProtectedRoute>`, that made the site strictly HARDER to install than
+    // before the feature existed: the browser's banner was gone and ours was
+    // behind a login wall.
+    //
+    // It is now offered in three places a shopper actually passes — the
+    // Profile card (`/profile`, unprotected, first item in BottomNav), the
+    // storefront row on a merchant's own host, and the Settings row — none of
+    // which needs an account except the last. If those are ever removed, this
+    // `preventDefault()` has to go with them.
     event.preventDefault();
     deferred = event as BeforeInstallPromptEvent;
     publish({ hasPrompt: true, installed: snapshot.installed });
@@ -259,6 +274,18 @@ export function useInstallApp(): InstallApp {
     platform,
     standalone,
     inAppWebView,
+    // READ BY `InstallAppButton` WHEREVER THE APP VOLUNTEERED ITSELF — the
+    // Profile card and the storefront row pass `offered` and disappear while
+    // this is true. It used to be computed here and consumed by nobody, so the
+    // «ليس الآن» write, the thirty-day window and the sheet's comment about it
+    // all described a silence that never happened.
+    //
+    // The comparison is written out rather than routed through
+    // `isInstallDismissed`: the expiry is component STATE here, so that the
+    // button re-renders the moment «ليس الآن» is tapped, and re-reading
+    // storage inside the predicate would not re-render anything. The exclusive
+    // boundary is the same one, and the argument for the number lives beside
+    // INSTALL_DISMISS_MS in src/lib/pwa.ts.
     dismissed: Date.now() < dismissedUntil,
     dismiss,
     guidance,

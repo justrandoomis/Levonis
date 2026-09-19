@@ -143,11 +143,32 @@ test('the WebP tab icon is kept, not replaced', () => {
 
 test('the legacy Apple meta tags are present — they are the only iOS install path', () => {
   // Safari on iOS fires no `beforeinstallprompt` and reads no `display` field
-  // from the manifest. Without these three, a home-screen entry opens in a
+  // from the manifest. Without these two, a home-screen entry opens in a
   // browser tab with a visible address bar, which is not an app.
   assert.equal(meta('mobile-web-app-capable'), 'yes');
   assert.equal(meta('apple-mobile-web-app-capable'), 'yes');
-  assert.equal(meta('apple-mobile-web-app-title'), 'LEVONIS');
+});
+
+test('NO apple-mobile-web-app-title — it would name every merchant shop LEVONIS', () => {
+  // THIS ASSERTION USED TO BE `assert.equal(meta(...), 'LEVONIS')`, and it was
+  // pinning the defect in place.
+  //
+  // iOS prefers this tag over the manifest's `short_name` for the home-screen
+  // label, and index.html is ONE SHARED DOCUMENT — the asset layer serves the
+  // same bytes on the apex and on every merchant subdomain (only `/product/*`
+  // is rewritten, by assetWithPreview). So the tag labelled every shop's
+  // installed icon "LEVONIS", which is precisely what worker/routes/manifest.ts
+  // builds a per-host manifest to prevent, and it did it on the one platform
+  // where the customer had just been walked through five manual steps.
+  //
+  // Absent, modern iOS falls back to the per-host `short_name`, and older iOS
+  // falls back to <title> — which src/components/pwa/HostAppleIdentity.tsx sets
+  // to the merchant's name while a storefront is on screen.
+  assert.equal(meta('apple-mobile-web-app-title'), null);
+  assert.ok(
+    !/apple-mobile-web-app-title/i.test(MARKUP.replace(/<!--[\s\S]*?-->/g, '')),
+    'apple-mobile-web-app-title is back; read the comment in index.html before restoring it'
+  );
 });
 
 test('the status bar is opaque black, and that is a decision rather than a default', () => {
