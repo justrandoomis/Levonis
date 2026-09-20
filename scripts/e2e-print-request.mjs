@@ -291,7 +291,7 @@ async function main() {
     const tq = await customer.post('/api/marketplace/print/quote', { ...spec, file_id: tinyUp.data.file.id });
     const cfg = cur.data?.settings?.printPricingConfig;
     check('a 4mm part is still quoted at or above the platform minimum',
-      tq.data.quote.price_iqd >= (cfg?.min_job_iqd ?? 5000),
+      tq.data.quote.price_iqd >= (cfg?.min_job_iqd ?? 0),
       `${tq.data.quote.price_iqd} vs ${cfg?.min_job_iqd}`);
   } else {
     check('a 4mm part is still quoted at or above the platform minimum', false, `upload ${tinyUp.status}`);

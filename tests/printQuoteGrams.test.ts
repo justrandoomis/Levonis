@@ -262,32 +262,34 @@ test('a zero, negative or missing gram count is refused with a real message', as
 
 // ----------------------------------------------------------- the floor applies
 
-test('the minimum charge applies, and it is the number the owner configured', async () => {
+test('no floor is charged by default, and the one the owner configures is', async () => {
   const { raw, app } = shopWithPricedPla();
 
-  // One gram of PLA is about 22 dinars of plastic. Nobody sets up a machine for
-  // 22 dinars, so the answer must be the configured floor rather than the
-  // arithmetic — a quote below it is a quote no merchant can honour.
+  /**
+   * THE FIRST HALF OF THIS TEST WAS REVERSED BY A DECISION, NOT BY A BUG.
+   *
+   * It used to assert that one gram of PLA — about 22 dinars of plastic —
+   * quoted at the seeded 5,000 د.ع floor, on the reasoning that nobody sets up
+   * a machine for 22 dinars. The owner has since ruled «لا يوجد حد أدنى لأي
+   * طلب طباعة», and the setup they were being charged for is still charged
+   * through `setup_minutes` and the labour rate; what went was the flat sum
+   * stacked on top. So a tiny job now quotes its own arithmetic.
+   */
   const tiny = await json(
     await gramsQuote(app, { printer_model_id: 'bbl-a1m', rows: [{ material_id: 'pla', grams: 1 }] })
   );
   assert.equal(tiny.success, true, JSON.stringify(tiny));
-  assert.equal(tiny.quote.price_iqd, 5_000, 'the seeded platform minimum job');
-
-  // AND THE RANGE IS FLOORED TOO. A grams quote is `inferred`, so its
-  // confidence is always 'estimated' and the range is always price ± 12%. That
-  // put «5,000 د.ع» on the screen over an expected range starting at 4,400 —
-  // a figure the floor exists to make impossible, rendered to the customer by
-  // both screens, which show the range whenever high > low. The high end is
-  // deliberately NOT capped: a job can cost more than the minimum.
+  assert.ok(tiny.quote.price_iqd > 0, 'a real job still costs something');
   assert.ok(
-    tiny.quote.range_iqd.low >= 5_000,
-    `the quoted range dips under the shop's own floor: ${JSON.stringify(tiny.quote.range_iqd)}`
+    tiny.quote.price_iqd < 5_000,
+    `one gram still quotes ${tiny.quote.price_iqd} — a flat floor is still being applied`
   );
   assert.ok(tiny.quote.range_iqd.high >= tiny.quote.price_iqd);
 
-  // And it is a SETTING, not a constant in the route: moving it in the admin
-  // moves the quote. If this ever stops holding, somebody has hardcoded a floor.
+  // And the floor is a SETTING, not a constant in the route: moving it in the
+  // admin moves the quote. This half is unchanged, and it is now the half that
+  // can fail — if it ever stops holding, somebody has hardcoded a floor, and
+  // the owner's control over it would be a field that does nothing.
   raw
     .prepare(`INSERT INTO admin_settings (key, value) VALUES ('printPricingConfig', ?)`)
     .run(JSON.stringify({ min_job_iqd: 9_000 }));
@@ -295,6 +297,12 @@ test('the minimum charge applies, and it is the number the owner configured', as
     await gramsQuote(app, { printer_model_id: 'bbl-a1m', rows: [{ material_id: 'pla', grams: 1 }] })
   );
   assert.equal(lifted.quote.price_iqd, 9_000);
+  // AND THE RANGE IS FLOORED TOO. A grams quote is `inferred`, so its
+  // confidence is always 'estimated' and the range is always price ± 12%. That
+  // put the floor on the screen over an expected range starting 12% under it —
+  // a figure the floor exists to make impossible, rendered to the customer by
+  // both screens, which show the range whenever high > low. The high end is
+  // deliberately NOT capped: a job can cost more than the minimum.
   assert.ok(lifted.quote.range_iqd.low >= 9_000, 'the floor moved and the range did not follow it');
 
   // The floor is a floor, not a price: a real job still costs what it costs.

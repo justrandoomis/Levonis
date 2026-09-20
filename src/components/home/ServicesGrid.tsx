@@ -60,43 +60,51 @@ const CARD_FEATURED =
  * deliberate design, so a card without an upload keeps drawing it rather than
  * showing a gap — and a card whose image FAILS TO LOAD falls back to the same
  * drawn icon instead of a broken-image box. That second path is not
- * hypothetical: the owner's list names `Community.webp`, and that one object
- * is not in the bucket yet while its ten neighbours are. Without `onError`
- * the community card would be a hole on the first screen of the shop; with it,
- * the card looks exactly as it did before the upload and starts working the
- * moment the file lands, with no deploy.
+ * hypothetical: `Community.webp` was missing from the bucket while its ten
+ * neighbours were there, and the community card kept its drawn icon instead of
+ * becoming a hole on the first screen of the shop. All eleven objects are
+ * uploaded now — that gap is closed — but the path stays, because the next
+ * one is an upload away and a slot whose object is renamed or replaced mid-way
+ * would otherwise 404 into a broken-image box on the shop's first screen.
  *
- * ─── WHY THE UPLOADED MARK IS BLENDED RATHER THAN BOXED ───
+ * ─── THE UPLOADED ICON IS COMPOSITED NORMALLY, AND THAT IS NOW THE WHOLE
+ * STORY ───
  *
  * The owner asked for «الأيقونة بدون الخلفية في الخدمات» — the icon with no
- * background behind it. The uploaded WebPs cannot give that on their own:
- * every one of the ten is a simple lossy VP8 with NO alpha channel at all,
- * exported as a 1254×1254 square whose margin is pure #000000. CSS cannot
- * delete pixels that are opaque, so there is nothing here to "make
- * transparent" and no honest way to pretend otherwise.
+ * background behind it — and the files now deliver that themselves. All eleven
+ * objects under `UiUx/MainPage/` were re-exported: 512×493 lossy WebP WITH A
+ * REAL ALPHA CHANNEL, fully transparent outside the artwork, 35–44 KB each
+ * against the 750–880 KB the first batch weighed. They are designed tiles — a
+ * gold mark on a dark rounded field inside a gold ring — so the dark IS the
+ * design, not a background waiting to be removed.
  *
- * What CSS can do is choose a compositing operation under which that exact
- * colour disappears. `screen` returns the backdrop unchanged wherever the
- * source is black — screen(0, b) = b, exactly, for every channel — so the
- * baked square composites to precisely the card's own surface and the mark is
- * left sitting on it. That is a real property of the blend and of these
- * files, not a trick: it was verified against the bytes actually served from
- * R2, whose margins measured 99.97% pure #000 with a maximum channel value of
- * 1. The tile therefore drops its own chip fill, border and padding for an
- * image, and keeps all three for the drawn icon, which needs the contrast.
+ * THIS PARAGRAPH REPLACES ONE THAT WAS TRUE AND STOPPED BEING TRUE, which is
+ * why it says so out loud. The first batch was opaque VP8 with no alpha at
+ * all, 1254×1254 squares on pure #000000, so this tile carried
+ * `mix-blend-screen`: screen(0, b) = b exactly, which made the baked black
+ * composite to precisely the card's own surface. That was a real property of
+ * those bytes — and the comment describing it outlived the upload that
+ * falsified it. A comment asserting a fact about files that have since been
+ * replaced is worse than no comment, because the next reader believes it.
  *
- * THE CONSTRAINT THIS PUTS ON FUTURE UPLOADS, because it is the failure this
- * comment exists to prevent: an icon exported on a WHITE or coloured
- * background will not quietly look slightly wrong under `screen` — white
- * screens to white, so the tile would turn into a solid white square. Service
- * icons must be exported on pure black (or with real transparency, which
- * behaves correctly here too). If that ever stops being true, the fix is to
- * put the chip background back for images, not to leave a white tile on the
- * first screen of the shop.
+ * `screen` is REMOVED rather than left as a harmless leftover. Against these
+ * files it lightens every dark pixel of the artwork toward the backdrop, and
+ * the Studio card's backdrop is not neutral — it is the olive gradient of
+ * CARD_FEATURED, which would tint the whole mark. On the ordinary near-black
+ * cards the difference is a few percent and easy to wave through in review, so
+ * the test is not «does it still look fine» but «what is this operation for»:
+ * with genuine transparency there is nothing left for it to erase.
  *
- * No `isolate` on the wrapper: the blend is SUPPOSED to see the card
- * underneath it. Isolating would give it an empty backdrop to composite
- * against and hand back the black square this is removing.
+ * The tile still drops its own chip fill, border and padding for an image and
+ * keeps all three for the drawn lucide icon, which needs the contrast. An
+ * uploaded icon arrives with its own frame; a stroked glyph does not.
+ *
+ * WHAT A FUTURE UPLOAD MUST NOT DO, since that is the failure this paragraph
+ * exists to prevent: an icon exported on an opaque background will now show
+ * that background as a square, because nothing removes it any more. Export
+ * with transparency. If a batch ever lands opaque, the answer is to re-export
+ * it — not to reintroduce a blend mode that only works against one exact
+ * colour and quietly lies about every other.
  */
 function CardBody({
   icon: Icon,
@@ -133,7 +141,7 @@ function CardBody({
             loading="lazy"
             decoding="async"
             onError={() => setImageFailed(true)}
-            className="w-full h-full object-contain mix-blend-screen"
+            className="w-full h-full object-contain"
           />
         ) : (
           <Icon aria-hidden="true" className={`w-5 h-5 ${featured ? 'text-olive-light' : 'text-zinc-300'}`} />

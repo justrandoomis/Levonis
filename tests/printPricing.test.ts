@@ -236,11 +236,16 @@ test('the whole model is settings — nothing is hardcoded into the answer', () 
     min_margin_percent: 0,
   };
   const q = quotePrint(base(), M, cheap);
-  // With every rate zeroed only the material and its waste survive, and the
-  // floor falls back to the material's own economic minimum.
+  // With every rate zeroed only the material and its waste survive.
   const keys = q.cost_lines.map((l) => l.key).sort();
   assert.deepEqual(keys, ['material', 'support_material', 'waste'].sort(), keys.join(','));
-  assert.equal(q.floor_iqd, M.find((m) => m.id === 'pla')!.min_economic_iqd);
+  // And with all three floors at zero the floor collapses to the cost itself —
+  // a zero minimum margin on a real cost is that cost. This line used to read
+  // the material's own economic minimum; the owner has since ruled that no
+  // print job has a minimum («لا يوجد حد أدنى لأي طلب طباعة») and every seeded
+  // material's floor is 0, so reading it here would assert 0 and prove nothing.
+  const step = cheap.round_to_iqd;
+  assert.equal(q.floor_iqd, Math.round(q.cost_iqd / step) * step);
 });
 
 // ------------------------------------------------------------- 5. the floor
@@ -251,7 +256,10 @@ test('the estimate never falls below cost plus the minimum margin', () => {
   const q = quotePrint(base({ analysis: cube(4), infill: 0.05 }), M, C);
   assert.ok(q.price_iqd >= q.floor_iqd, 'the point estimate clears the floor');
   assert.ok(q.price_low_iqd >= q.floor_iqd, 'and so does the bottom of the range');
-  assert.ok(q.price_iqd >= C.min_job_iqd, 'and the platform minimum');
+  // NOT `>= C.min_job_iqd`: that floor is 0 by the owner's decision, so the
+  // assertion would hold for any number at all. The platform floor is pinned
+  // where it can still fail — tests/printJobMinimum.test.ts.
+  assert.ok(q.price_iqd >= q.cost_iqd, 'and never under what the job costs');
   assert.ok(q.margin_percent >= C.min_margin_percent - 0.01, `margin was ${q.margin_percent}%`);
 });
 
@@ -267,11 +275,28 @@ test('a big quantity discount still cannot push the price under the floor', () =
   assert.ok(q.margin_percent >= greedy.min_margin_percent - 0.01);
 });
 
-test('the material minimum protects a job too small to be worth setting up', () => {
-  const q = quotePrint(base({ analysis: cube(3), materialId: 'resin-castable' }), M, C);
-  const material = M.find((m) => m.id === 'resin-castable')!;
-  assert.ok(q.floor_iqd >= material.min_economic_iqd);
-  assert.ok(q.price_iqd >= material.min_economic_iqd);
+test('no seeded material imposes a minimum, and one the admin sets still binds', () => {
+  /**
+   * THIS TEST WAS INVERTED BY A DECISION, NOT BY A BUG. It used to read "the
+   * material minimum protects a job too small to be worth setting up" and
+   * assert that a 3 mm castable-resin part was lifted to 12,000 د.ع. The owner
+   * ruled «لا يوجد حد أدنى لأي طلب طباعة», so the seeds are all 0 — and the old
+   * assertions (`>= 0`) would still have PASSED while testing nothing at all.
+   * A green test that cannot fail is worse than a deleted one.
+   *
+   * What is worth pinning now is both halves of the ruling: the seed charges
+   * nothing extra, and the FIELD still works, because the owner can put a floor
+   * back on one material from the admin without a deploy.
+   */
+  const tiny = base({ analysis: cube(3), materialId: 'resin-castable' });
+  const seeded = quotePrint(tiny, M, C);
+  assert.ok(seeded.price_iqd > 0, 'a real job still costs something');
+  assert.ok(seeded.price_iqd < 12_000, `${seeded.price_iqd} — a flat material floor is still applied`);
+
+  const withFloor = M.map((m) => (m.id === 'resin-castable' ? { ...m, min_economic_iqd: 12_000 } : m));
+  const enforced = quotePrint(tiny, withFloor, C);
+  assert.ok(enforced.floor_iqd >= 12_000, `${enforced.floor_iqd} ignored the configured material floor`);
+  assert.ok(enforced.price_iqd >= 12_000, `${enforced.price_iqd} ignored the configured material floor`);
 });
 
 test('quantity buys a real saving per part, but a bounded one', () => {

@@ -410,9 +410,13 @@ export function priceJob(input: PricingInputs): QuoteResult {
   const rushed = priced * Math.max(1, input.rushMultiplier ?? 1);
   // THE FLOOR IS A FLOOR FOR THE WHOLE QUOTE, NOT ONLY FOR ITS MIDPOINT.
   //
-  // `floor` is applied twice below — once to the price and once to the LOW end
-  // of the range — and that is not belt and braces. The range is built as
-  // price × (1 ± spread), so a tiny job lifted to the 5,000 د.ع minimum was
+  // It is 0 today — the owner ruled «لا يوجد حد أدنى لأي طلب طباعة» — and this
+  // code is written for the day they set one, which the admin lets them do
+  // without a deploy.
+  //
+  // `floor` is then applied twice below — once to the price and once to the
+  // LOW end of the range — and that is not belt and braces. The range is built
+  // as price × (1 ± spread), so a tiny job lifted to a 5,000 د.ع minimum was
   // being shown to the customer as «5,000 د.ع، المتوقع 4,400 – 5,600»: an
   // expected low end BELOW the very figure the floor exists to make
   // impossible. Both screens render the range whenever high > low, so the

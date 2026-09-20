@@ -104,22 +104,30 @@ const PLATFORM_LABOR_IQD_PER_HOUR = 6_000;
 const PLATFORM_TARGET_MARGIN_PERCENT = 35;
 
 /**
- * THE SMALLEST JOB ANYBODY WILL ACTUALLY TAKE, read from the owner's settings.
+ * THE OWNER'S MINIMUM JOB CHARGE — WHICH IS NOW ZERO, BY THEIR DECISION.
  *
- * Why it exists at all: setup, the spool change and the walk to the machine
- * cost the same whether the part weighs 2 g or 200 g. Without a floor, a
- * keychain quotes at a few hundred dinars, the customer believes it, and the
- * merchant either loses money or looks like a liar. `DEFAULT_PRICING.min_job_iqd`
- * is the number the print-request wizard has always applied; this makes the
- * calculator apply the SAME one.
+ * «لا يوجد حد أدنى لأي طلب طباعة». `DEFAULT_PRICING.min_job_iqd` is 0 and so is
+ * every seeded material's own floor, so a small part is now quoted at what it
+ * costs plus the margin and nothing rounds it up to a figure nobody computed.
  *
- * Why it is fetched rather than imported as a constant: the owner edits it in
- * the admin, and a floor that only moves on a deploy is not a setting.
+ * The cost this floor used to stand in for is still CHARGED, and that is the
+ * point the ruling turns on: setup, the spool change and the walk to the
+ * machine really do cost the same whether the part weighs 2 g or 200 g, and
+ * they reach the customer through `setup_minutes` and the labour rate like
+ * every other real cost. What the owner removed was the SECOND, flat charge
+ * stacked on top of them.
  *
- * Why BOTH the file path and the grams path get it: a floor on one and not the
- * other is two pricing rules wearing one name. The customer who uploads a tiny
- * model and the customer who types its weight must be told the same price, or
- * whichever screen they happened to open decides what the shop charges.
+ * So why does this function still exist? Because a decision is not the same as
+ * a capability. The floor is an admin setting: the owner can type one back in
+ * tomorrow without a deploy, and if this read were deleted the number they
+ * typed would do nothing. It is fetched rather than imported for exactly that
+ * reason — a floor that only moves on a deploy is not a setting.
+ *
+ * Why BOTH the file path and the grams path read it: a floor on one and not
+ * the other is two pricing rules wearing one name. The customer who uploads a
+ * tiny model and the customer who types its weight must be told the same
+ * price, or whichever screen they happened to open decides what the shop
+ * charges. That stays true at 0 and stays true at whatever the owner sets.
  */
 async function platformMinimumJobIqd(db: D1Database): Promise<number> {
   try {

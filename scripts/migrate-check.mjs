@@ -66,6 +66,33 @@ function applyAll(db, { quiet = false } = {}) {
   return count;
 }
 
+/**
+ * The tables whose ENTIRE CONTENTS are snapshotted and compared across the
+ * second pass (see the §12 block below). Named here rather than inline because
+ * `isIdempotent` now depends on the same list: a statement is admitted to the
+ * re-run on the strength of this snapshot being able to catch it if it lies.
+ *
+ * `admin_settings` earns its place the moment a migration edits a stored
+ * setting instead of only the schema — migrations/0097 is the first — because
+ * without it such a file's re-run would be compared against tables it never
+ * touches, and would pass by being invisible.
+ */
+const SNAPSHOT_TABLES = [
+  'catalogs',
+  'facets',
+  'membership_plans',
+  'product_option_groups',
+  'product_images',
+  'admin_settings',
+];
+
+/** True when the statement's only target table is one this harness snapshots,
+ *  so a re-run that changes anything will be SEEN rather than assumed away. */
+function targetsSnapshottedTable(stmt) {
+  const m = /^UPDATE\s+(\w+)\s+SET\s/i.exec(stmt);
+  return !!m && SNAPSHOT_TABLES.includes(m[1]);
+}
+
 /** Statements a re-run must tolerate: everything except ALTER TABLE ADD COLUMN
  *  and the one-shot table rebuild, which D1's bookkeeping guarantees never
  *  runs a second time. */
@@ -81,7 +108,24 @@ const isIdempotent = (s) =>
   // such UPDATEs, and before this every one of them was silently skipped, so
   // "0 idempotent statements re-ran with no row change" printed green while
   // testing nothing at all.
-  (/^UPDATE\s+\w+\s+SET\s/i.test(s) && isLiteralAssignment(s));
+  (/^UPDATE\s+\w+\s+SET\s/i.test(s) && isLiteralAssignment(s)) ||
+  /**
+   * AN UPDATE THAT REWRITES JSON, ON A TABLE THIS HARNESS SNAPSHOTS.
+   *
+   * `SET value = json_set(value, '$.min_job_iqd', 0)` assigns an EXPRESSION,
+   * so `isLiteralAssignment` refuses it and — before this rule — a settings
+   * migration was reported as having no re-runnable statement at all, which
+   * fails the build rather than proving anything.
+   *
+   * It is admitted only when its target table is in SNAPSHOT_TABLES, and that
+   * restriction is the whole safety argument: the claim is then not ASSUMED,
+   * it is MEASURED. The statement is re-run and every row of that table is
+   * compared byte for byte, so a genuinely non-idempotent rewrite — the
+   * `SET n = n + 1` case this file's older comment warns about — is admitted,
+   * re-run, and then FAILS the comparison. That is the correct outcome; the
+   * old rule's alternative was to refuse to look.
+   */
+  (/^UPDATE\s+\w+\s+SET\s/i.test(s) && /\bjson_(set|replace|remove|patch|group_array)\s*\(/i.test(s) && targetsSnapshottedTable(s));
 
 /**
  * An INSERT that cannot insert the same row twice, because it is guarded by a
@@ -193,7 +237,7 @@ if (twice) {
     // counts only answer the first. So the whole contents of each table are
     // snapshotted and compared, which also catches an UPDATE that rewrites a
     // value on the second pass without changing how many rows there are.
-    const countable = ['catalogs', 'facets', 'membership_plans', 'product_option_groups', 'product_images'];
+    const countable = SNAPSHOT_TABLES;
     const snapshot = () =>
       Object.fromEntries(
         countable.map((t) => [t, JSON.stringify(db.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all())])

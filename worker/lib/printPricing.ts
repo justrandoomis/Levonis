@@ -48,8 +48,25 @@ export interface PrintMaterial {
   /** How much support this material needs relative to the norm; bridging PLA
    *  needs less than drooping TPU. Multiplies the geometric support estimate. */
   support_factor: number;
-  /** No job in this material is worth quoting below this — the setup and the
-   *  spool change cost the same whether the part is 2g or 20g. */
+  /**
+   * A per-material floor in dinars, and it is ZERO IN EVERY SEEDED ROW.
+   *
+   * The owner ruled it: «لا يوجد حد أدنى لأي طلب طباعة» — no minimum for any
+   * print job, in any material. The argument the seeds used to carry (the
+   * setup and the spool change cost the same whether the part weighs 2 g or
+   * 20 g) is a real cost and it is still CHARGED: it arrives through
+   * `setup_minutes` and the labour rate, priced into the estimate like every
+   * other cost. What the owner removed is the second, flat charge stacked on
+   * top of that — a small part now quotes what it actually costs plus the
+   * margin, and nothing rounds it up to a number nobody computed.
+   *
+   * The FIELD stays, and stays editable per material in the admin, because a
+   * decision is not the same as a capability: the owner can put a floor back
+   * on resin-castable tomorrow without a deploy. A merchant can also set their
+   * own floor on their own printer (`min_job_iqd` in merchant preferences,
+   * worker/routes/merchantPrinters.ts) — which is where a floor belongs, since
+   * it is the merchant who walks to the machine.
+   */
   min_economic_iqd: number;
   /** 0..1. Warping, adhesion, moisture: how likely a run is to fail. Feeds the
    *  failure-risk provision, which is a real cost, not a markup. */
@@ -69,24 +86,24 @@ export interface PrintMaterial {
  * setting rather than in this file.
  */
 export const DEFAULT_MATERIALS: PrintMaterial[] = [
-  fdm('pla', 'PLA', 'PLA', 1.24, 18000, 0.05, 1.0, 3000, 0.1, false, false),
-  fdm('petg', 'PETG', 'PETG', 1.27, 22000, 0.06, 1.1, 3500, 0.2, false, false),
-  fdm('abs', 'ABS', 'ABS', 1.04, 20000, 0.08, 1.1, 4000, 0.45, true, false),
-  fdm('asa', 'ASA', 'ASA', 1.07, 26000, 0.08, 1.1, 4500, 0.45, true, false),
-  fdm('tpu', 'TPU', 'TPU مرن', 1.21, 32000, 0.08, 1.4, 5000, 0.35, false, false),
-  fdm('pa', 'PA (Nylon)', 'نايلون PA', 1.14, 45000, 0.10, 1.2, 7000, 0.5, true, false),
-  fdm('pc', 'PC', 'بولي كربونيت PC', 1.20, 48000, 0.10, 1.2, 7000, 0.55, true, false),
-  fdm('pla-cf', 'PLA-CF', 'PLA كربون', 1.30, 34000, 0.06, 1.0, 5000, 0.2, false, true),
-  fdm('petg-cf', 'PETG-CF', 'PETG كربون', 1.32, 38000, 0.07, 1.1, 5500, 0.3, false, true),
-  fdm('pa-cf', 'PA-CF', 'نايلون كربون', 1.18, 65000, 0.10, 1.2, 9000, 0.55, true, true),
-  resin('resin-standard', 'Standard Resin', 'ريزن قياسي', 1.10, 38000, 0.10, 1.0, 6000, 0.25),
-  resin('resin-abs-like', 'ABS-Like Resin', 'ريزن شبيه ABS', 1.10, 42000, 0.10, 1.0, 6500, 0.25),
-  resin('resin-tough', 'Tough Resin', 'ريزن متين', 1.12, 55000, 0.10, 1.0, 8000, 0.3),
-  resin('resin-flexible', 'Flexible Resin', 'ريزن مرن', 1.09, 60000, 0.12, 1.0, 8500, 0.35),
-  resin('resin-washable', 'Water Washable Resin', 'ريزن يغسل بالماء', 1.10, 40000, 0.10, 1.0, 6500, 0.25),
-  resin('resin-castable', 'Castable Resin', 'ريزن للصب', 1.05, 90000, 0.12, 1.0, 12000, 0.4),
-  resin('resin-high-temp', 'High Temp Resin', 'ريزن حراري', 1.15, 75000, 0.12, 1.0, 10000, 0.4),
-  resin('resin-clear', 'Clear Resin', 'ريزن شفاف', 1.10, 45000, 0.12, 1.0, 7000, 0.35),
+  fdm('pla', 'PLA', 'PLA', 1.24, 18000, 0.05, 1.0, 0, 0.1, false, false),
+  fdm('petg', 'PETG', 'PETG', 1.27, 22000, 0.06, 1.1, 0, 0.2, false, false),
+  fdm('abs', 'ABS', 'ABS', 1.04, 20000, 0.08, 1.1, 0, 0.45, true, false),
+  fdm('asa', 'ASA', 'ASA', 1.07, 26000, 0.08, 1.1, 0, 0.45, true, false),
+  fdm('tpu', 'TPU', 'TPU مرن', 1.21, 32000, 0.08, 1.4, 0, 0.35, false, false),
+  fdm('pa', 'PA (Nylon)', 'نايلون PA', 1.14, 45000, 0.10, 1.2, 0, 0.5, true, false),
+  fdm('pc', 'PC', 'بولي كربونيت PC', 1.20, 48000, 0.10, 1.2, 0, 0.55, true, false),
+  fdm('pla-cf', 'PLA-CF', 'PLA كربون', 1.30, 34000, 0.06, 1.0, 0, 0.2, false, true),
+  fdm('petg-cf', 'PETG-CF', 'PETG كربون', 1.32, 38000, 0.07, 1.1, 0, 0.3, false, true),
+  fdm('pa-cf', 'PA-CF', 'نايلون كربون', 1.18, 65000, 0.10, 1.2, 0, 0.55, true, true),
+  resin('resin-standard', 'Standard Resin', 'ريزن قياسي', 1.10, 38000, 0.10, 1.0, 0, 0.25),
+  resin('resin-abs-like', 'ABS-Like Resin', 'ريزن شبيه ABS', 1.10, 42000, 0.10, 1.0, 0, 0.25),
+  resin('resin-tough', 'Tough Resin', 'ريزن متين', 1.12, 55000, 0.10, 1.0, 0, 0.3),
+  resin('resin-flexible', 'Flexible Resin', 'ريزن مرن', 1.09, 60000, 0.12, 1.0, 0, 0.35),
+  resin('resin-washable', 'Water Washable Resin', 'ريزن يغسل بالماء', 1.10, 40000, 0.10, 1.0, 0, 0.25),
+  resin('resin-castable', 'Castable Resin', 'ريزن للصب', 1.05, 90000, 0.12, 1.0, 0, 0.4),
+  resin('resin-high-temp', 'High Temp Resin', 'ريزن حراري', 1.15, 75000, 0.12, 1.0, 0, 0.4),
+  resin('resin-clear', 'Clear Resin', 'ريزن شفاف', 1.10, 45000, 0.12, 1.0, 0, 0.35),
 ];
 
 function fdm(
@@ -181,7 +198,12 @@ export interface PrintPricingConfig {
   target_margin_percent: number;
   /** The floor the estimate may never cross, whatever else the numbers say. */
   min_margin_percent: number;
-  /** No job is quoted under this, whatever it weighs. */
+  /**
+   * The PLATFORM's floor, and it is 0 by the owner's decision — «لا يوجد حد
+   * أدنى لأي طلب طباعة». See `min_economic_iqd` above for why the setting
+   * survives its own value: the owner edits this in the admin, and a floor
+   * that only moves on a deploy is not a setting.
+   */
   min_job_iqd: number;
 
   /** Half-width of the published range, as a percent of the point estimate. */
@@ -222,7 +244,7 @@ export const DEFAULT_PRICING: PrintPricingConfig = {
   complexity_uplift_percent: 18,
   target_margin_percent: 35,
   min_margin_percent: 15,
-  min_job_iqd: 5000,
+  min_job_iqd: 0,
   range_spread_percent: 12,
   quantity_discount_percent: 6,
   quantity_discount_cap_percent: 30,
@@ -466,9 +488,17 @@ export function quotePrint(
   );
   const withMargin = priceForMargin(cost, cfg.target_margin_percent) * (1 - discountPercent / 100);
 
-  // THE FLOOR. The price that yields exactly the minimum margin, and never under
-  // the material's own economic minimum or the platform's minimum job. An
-  // estimate below this is an estimate no merchant can honour.
+  // THE FLOOR, AND WHAT IS LEFT OF IT.
+  //
+  // The price that yields exactly the minimum MARGIN is the part that always
+  // applies: an estimate under it is an estimate no merchant can honour, and a
+  // margin floor is not a minimum charge — it moves with the job's own cost.
+  //
+  // The two flat minimums beside it are now 0 in every seed, because the owner
+  // ruled that no print job has a minimum («لا يوجد حد أدنى لأي طلب طباعة»).
+  // They are still READ rather than deleted: both remain admin-editable, and
+  // dropping them from this Math.max would mean a floor the owner typed into
+  // the admin did nothing.
   const floor = Math.max(
     priceForMargin(cost, cfg.min_margin_percent),
     material.min_economic_iqd,

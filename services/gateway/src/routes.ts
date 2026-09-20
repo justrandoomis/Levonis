@@ -101,6 +101,22 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/home', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'none', rateClass: 'public-read', cacheable: true },
   { prefix: '/api/bundles', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'none', rateClass: 'public-read', cacheable: true, note: 'members-only body; an anonymous miss is success:false and is never stored' },
   { prefix: '/api/settings/public', hosts: 'root', owner: 'CONFIG', flipPhase: 4, requires: 'none', rateClass: 'public-read', cacheable: true },
+  // «المقارنة». Reads products, their spec sheets and the power advice derived
+  // from those sheets — catalogue data end to end, and nothing behind
+  // requireAuth (worker/routes/compare.ts). NOT marked cacheable: the response
+  // is keyed by an arbitrary set of ids, so an edge entry would be a near-miss
+  // for every visitor and earn nothing for the risk of getting the key wrong.
+  { prefix: '/api/compare', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'none', rateClass: 'public-read' },
+  // «خبرني لما يرجع». A standing request against ONE product's stock, armed
+  // and refused by what the catalogue knows about that product
+  // (worker/lib/stockAlertResolve.ts). It is delivered through Notifications
+  // like every other feature, which is a transport and not an owner.
+  { prefix: '/api/stock-alerts', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'auth', rateClass: 'write' },
+  // «لكيتها بمكان أرخص». Filed against a product and frozen against
+  // `products.price_iqd` at the instant it is filed; what it drives is a
+  // reprice. It is deliberately NOT with /api/price-protection, which is
+  // order-linked money owed to someone who already bought.
+  { prefix: '/api/price-reports', hosts: 'root', owner: 'CATALOG', flipPhase: 5, requires: 'auth', rateClass: 'write' },
 
   // -------------------------------------------------------- catalog (admin)
   { prefix: '/api/admin/bundles', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
@@ -115,6 +131,18 @@ export const ROUTES: readonly RouteRule[] = [
   // The composition and mystery read models: aggregates only, no order id and
   // no user id, so they belong to Analytics (§12).
   { prefix: '/api/admin/analytics', hosts: 'main', owner: 'ANALYTICS', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
+  // Profit, cost and operating expenses: an aggregate read model over orders
+  // that already carry their cost basis, plus the expense ledger the owner
+  // types in. It sits with Analytics for the same reason the row above does.
+  //
+  // `admin:full`, NOT `admin`, AND THAT IS THE POINT OF THE ROW. Mandate §11
+  // puts the assistant admin outside every financial figure, and both routes
+  // enforce it themselves with `canViewFinancials`. Declaring it here as well
+  // means the edge refuses an assistant's session before the request is ever
+  // forwarded — the gate stops being one service's discipline and becomes the
+  // door's. The longer prefix is listed first so it cannot be shadowed.
+  { prefix: '/api/admin/finance/report', hosts: 'main', owner: 'ANALYTICS', flipPhase: 5, requires: 'admin:full', rateClass: 'admin-write' },
+  { prefix: '/api/admin/finance', hosts: 'main', owner: 'ANALYTICS', flipPhase: 5, requires: 'admin:full', rateClass: 'admin-write' },
   { prefix: '/api/admin/products-v2', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/products', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/taxonomy', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
@@ -122,6 +150,7 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/admin/import', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'upload' },
   { prefix: '/api/admin/media/ingest', hosts: 'main', owner: 'FILES', flipPhase: 4, requires: 'admin', rateClass: 'upload' },
   { prefix: '/api/admin/media', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
+  { prefix: '/api/admin/price-reports', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
 
   // -------------------------------------------------------------- commerce
   { prefix: '/api/cart', hosts: 'root', owner: 'COMMERCE', flipPhase: 7, requires: 'auth', rateClass: 'write' },
