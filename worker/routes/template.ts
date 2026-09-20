@@ -2126,6 +2126,36 @@ templateRoutes.post('/parse', async (c) => {
 const APPLY_MODES = ['draft', 'update'] as const;
 const DUPLICATE_CHOICES = ['update_existing', 'create_hidden_draft_new_identity'] as const;
 
+/**
+ * Read-only recovery for a browser whose long-running /apply request was
+ * interrupted. Polling /apply itself would re-parse the complete template and
+ * consume the mutation rate limit; this endpoint only says whether the
+ * fingerprint owner is still running, completed verification, or released.
+ * The final result is still fetched by reposting /apply, which replays the
+ * authoritative product and relation counts through repeatSubmission().
+ */
+templateRoutes.get('/apply-status/:fingerprint', async (c) => {
+  await rateLimit(c, 'tpl_apply_status', 600, 3600);
+  const fingerprint = str(c.req.param('fingerprint'), 'fingerprint', { min: 32, max: 32 }).toLowerCase();
+  if (!/^[a-f0-9]{32}$/.test(fingerprint)) throw badRequest('Invalid apply fingerprint');
+
+  const adminUser = c.get('user')!;
+  if (await previousApply(c.env.DB, adminUser.id, fingerprint)) {
+    return c.json({ success: true, state: 'applied' as const, retry_after_ms: 0 });
+  }
+
+  const claim = await c.env.DB
+    .prepare('SELECT window_start FROM rate_limits WHERE key = ?')
+    .bind(`tplfp:${fingerprint}`)
+    .first<{ window_start: number }>();
+  const active = Number(claim?.window_start ?? 0) > Math.floor(Date.now() / 1000) - APPLY_FINGERPRINT_WINDOW_SECONDS;
+  return c.json({
+    success: true,
+    state: active ? ('applying' as const) : ('retry' as const),
+    retry_after_ms: active ? 1500 : 0,
+  });
+});
+
 /** The template keys the file actually wrote — the scope of the read-back
  *  comparison on an update (an omitted key was preserved, and comparing it
  *  would only echo the preservation). */
