@@ -29,6 +29,7 @@ import {
   STRICT_TRANSPORT_SECURITY,
   asDocument,
   assetHeadersFile,
+  ASSET_CACHE_CONTROL,
   documentCsp,
   spaCsp,
 } from '../worker/lib/securityPolicy';
@@ -212,6 +213,66 @@ test('a route that chose its own policy keeps it: print documents and the R2 fil
   assert.equal(file.headers.get('Content-Security-Policy'), "default-src 'none'; sandbox");
   // HSTS is not a per-route choice; it is on those too.
   assert.equal(file.headers.get('Strict-Transport-Security'), STRICT_TRANSPORT_SECURITY);
+});
+
+/**
+ * EVERY RULE IN `_headers` SHIPS EACH HEADER EXACTLY ONCE.
+ *
+ * Cloudflare's asset layer APPENDS when a later rule repeats a header an
+ * earlier one set, it does not replace. That cost the live site two real
+ * things, both measured before this test existed:
+ *
+ *   - `cache-control: no-cache, public, max-age=31536000, immutable` on every
+ *     content-hashed chunk. The leading `no-cache` is the catch-all's and wins,
+ *     so `immutable` had never once done anything and five files on the
+ *     critical path were revalidated on every repeat visit.
+ *   - A doubled `Strict-Transport-Security`. Its grammar has no comma, so the
+ *     doubled value is unparseable and the browser discards it WHOLE — no HSTS
+ *     at all on the paths carrying the application's code.
+ *
+ * Neither is visible by reading the rule; both are visible by counting. So
+ * this counts.
+ */
+test('THE HEADERS FILE: no rule but the first can inherit, and none ships a header twice', () => {
+  const file = assetHeadersFile();
+  const rules = new Map<string, string[]>();
+  let current: string | null = null;
+  for (const line of file.split('\n')) {
+    if (line.startsWith('#') || line.trim() === '') continue;
+    if (!line.startsWith(' ')) { current = line.trim(); rules.set(current, []); continue; }
+    if (current) rules.get(current)!.push(line.trim());
+  }
+
+  const names = [...rules.keys()];
+  assert.equal(names[0], '/*', 'the catch-all must be first, or every unset below is aimed at nothing');
+
+  for (const [path, body] of rules) {
+    const sets = body.filter((l) => !l.startsWith('! '));
+    const unsets = new Set(body.filter((l) => l.startsWith('! ')).map((l) => l.slice(2)));
+    const headerNames = sets.map((l) => l.slice(0, l.indexOf(':')));
+
+    // No rule sets the same header twice on its own.
+    assert.equal(new Set(headerNames).size, headerNames.length, `${path} sets a header twice in one rule`);
+
+    // And every rule after the first clears what it is about to set, so the
+    // catch-all's value cannot be appended to it.
+    if (path === '/*') continue;
+    for (const name of headerNames) {
+      assert.ok(unsets.has(name), `${path} sets ${name} without unsetting the catch-all's first`);
+    }
+  }
+
+  // The one that is worth naming, because it is the one that was wrong: a
+  // chunk must end up with the immutable policy and nothing prepended to it.
+  const assets = rules.get('/assets/*');
+  assert.ok(assets, 'the /assets/* rule disappeared');
+  assert.ok(assets!.includes('! Cache-Control'), '/assets/* no longer clears the inherited no-cache');
+  assert.ok(
+    assets!.includes(`Cache-Control: ${ASSET_CACHE_CONTROL}`),
+    '/assets/* no longer promises immutable'
+  );
+  assert.match(ASSET_CACHE_CONTROL, /immutable/);
+  assert.doesNotMatch(ASSET_CACHE_CONTROL, /no-cache/);
 });
 
 test('HSTS names every subdomain and lasts a year, without a preload claim', () => {

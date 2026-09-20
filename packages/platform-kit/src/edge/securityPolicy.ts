@@ -234,10 +234,45 @@ export const DOCUMENT_CACHE_CONTROL = 'no-cache';
  * ships exactly once, with the value written here — which is what the note
  * above always meant, and now is.
  *
- * `/*` and `/assets/*` ARE LEFT EXACTLY AS THEY WERE. Their duplication is
- * pre-existing and live; correcting it changes the headers on every page and
- * every chunk in the application, which is a decision of its own and is not
- * being smuggled in behind a service worker.
+ * `/assets/*` IS NOW CORRECTED TOO, AND THIS PARAGRAPH IS THE DECISION THAT
+ * PREVIOUSLY SAID IT WOULD NOT BE.
+ *
+ * It used to read: "`/*` and `/assets/*` ARE LEFT EXACTLY AS THEY WERE. Their
+ * duplication is pre-existing and live; correcting it changes the headers on
+ * every page and every chunk in the application, which is a decision of its
+ * own and is not being smuggled in behind a service worker." That was the
+ * right call at the time — the change belonged to somebody deciding about
+ * performance, not to a service-worker commit. The owner has since asked for
+ * exactly that decision: «اختبر الموقع لتحسين السرعة وخاصة الظهور الأولي …
+ * وخاصة على الأجهزة الضعيفة».
+ *
+ * WHAT IT WAS COSTING, measured on the live site before the change. Every
+ * content-hashed chunk came back as:
+ *
+ *     cache-control: no-cache, public, max-age=31536000, immutable
+ *     x-content-type-options: nosniff
+ *     x-content-type-options: nosniff
+ *
+ * The leading `no-cache` is the catch-all's, appended to rather than replaced,
+ * and it wins in every conformant client: the browser must ask the origin
+ * before reusing a file whose URL already guarantees its bytes. Five such
+ * files are on the critical path (`index`, `vendor-react`, `vendor-motion`,
+ * `vendor-i18n` and the stylesheet), so a repeat visit paid five conditional
+ * round trips — at the ~450 ms first-byte measured from Iraq — to be told
+ * nothing had changed. On a slow connection that is the difference between an
+ * app that opens and one that thinks about it.
+ *
+ * AND IT WAS A SECURITY HOLE, which is the part that decided it. HSTS's
+ * grammar has no room for a comma, so the doubled
+ * `max-age=31536000; includeSubDomains, max-age=31536000; includeSubDomains`
+ * is not a weaker HSTS — it is unparseable, and an unparseable STS header is
+ * discarded whole. Every `/assets/*` response was therefore shipping NO
+ * Strict-Transport-Security at all, on exactly the paths that carry the
+ * application's code.
+ *
+ * `/*` STAYS AS IT IS: it is the FIRST rule, nothing precedes it, so it has
+ * nothing to unset and no duplication to correct. `no-cache` on the document
+ * is not a defect there — it is the point (see DOCUMENT_CACHE_CONTROL).
  */
 export const SERVICE_WORKER_CACHE_CONTROL = 'no-cache';
 export const ICON_CACHE_CONTROL = 'public, max-age=604800';
@@ -261,9 +296,13 @@ export function assetHeadersFile(): string {
     `  Cache-Control: ${DOCUMENT_CACHE_CONTROL}`,
     '',
     '# Content-hashed by Vite: the URL changes whenever the bytes do, so these',
-    '# never need revalidating. The security headers are repeated because a',
-    '# later, more specific rule REPLACES the earlier one rather than merging.',
+    '# never need revalidating. The unsets are what make that true: without them',
+    '# the catch-all above contributes a leading `no-cache` that wins over the',
+    '# `immutable` below, and a doubled Strict-Transport-Security that no browser',
+    '# can parse. Measured live before this: five conditional round trips per',
+    '# repeat visit, and no HSTS on any chunk.',
     '/assets/*',
+    ...clear,
     ...security,
     `  Cache-Control: ${ASSET_CACHE_CONTROL}`,
     '',
