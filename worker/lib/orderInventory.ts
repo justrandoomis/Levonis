@@ -34,6 +34,7 @@
  */
 
 import { planInventory, planReservationFence, type InventoryPlan, type LedgerKind, type StockMove } from './inventory';
+import { planLotConsumption, planLotRestore } from './inventoryLots';
 
 interface LedgerRow {
   product_id: string;
@@ -136,6 +137,37 @@ export async function planOrderDeduction(
     reason: 'order confirmed',
   });
   plan.statements.push(await planReservationFence(db, orderId, 'deduct', plan.plannedLedgerRows));
+
+  /**
+   * THE COST LAYERS, IN THE SAME BATCH AS THE COUNTERS (0098).
+   *
+   * A sale eats the oldest lot first, and which lots it ate is the only record
+   * of what those units really cost. Appending the statements here rather than
+   * running them afterwards is the whole point: the caller commits the order,
+   * the counter decrement and the lot consumption together or not at all, so
+   * there is no window in which the shelf and its cost disagree.
+   *
+   * `plan.applied` is deliberately NOT changed — it counts stock movements, and
+   * the two routes that report it to an operator say "stock deducted for N
+   * rows". Lots are a second dimension of the same movement, not more of them.
+   *
+   * A SHORTFALL IS LOGGED AND NOT THROWN. It cannot happen while the counters
+   * and the lots move together, and if it somehow does, refusing a customer's
+   * paid confirmation over a bookkeeping gap is the worse failure: finance
+   * already reports a partly-unknown COGS honestly.
+   */
+  const lots = await planLotConsumption(db, orderId, moves);
+  if (lots.shortfall.length > 0) {
+    console.error(
+      JSON.stringify({
+        event: 'inventory_lot_shortfall',
+        order_id: orderId,
+        detail: 'stock was deducted but the FIFO queue could not cover it; COGS is partly unknown',
+        shortfall: lots.shortfall,
+      })
+    );
+  }
+  plan.statements.push(...lots.statements);
   return plan;
 }
 
@@ -204,6 +236,23 @@ export async function planOrderReturn(
       reason: 'order cancelled',
     });
     plan.statements.push(await planReservationFence(db, orderId, kind, plan.plannedLedgerRows));
+
+    /**
+     * ONLY A `restore` GIVES LOTS BACK, and the asymmetry is the point.
+     *
+     * A `release` un-holds units that were never deducted, so no lot was ever
+     * consumed and there is nothing to credit — crediting one would invent
+     * inventory out of a cancellation. A `restore` reverses a real deduction,
+     * and it goes back to the EXACT lots the sale took, at the cost it took
+     * them at (§36/§37): a unit bought at 450,000 and returned is still a unit
+     * that cost 450,000, and crediting it to today's 560,000 layer would create
+     * value out of a refund.
+     */
+    if (kind === 'restore') {
+      const lineIds = [...new Set(moves.map((m) => m.line_id))];
+      const lots = await planLotRestore(db, orderId, { lineIds, operation: 'restore' });
+      plan.statements.push(...lots.statements);
+    }
     parts.push({ kind, plan });
   }
   if (parts.length === 0) return { kind: 'none', plan: null, parts: [] };
