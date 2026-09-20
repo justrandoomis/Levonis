@@ -8,6 +8,7 @@ import { allCountries } from '../lib/phone';
 import { computeCompletion, nextPromptAt, shouldPromptCompletion } from '../lib/profileCompletion';
 import { rateLimit } from '../lib/ratelimit';
 import { isSafeMediaKey } from '../lib/mediaStorage';
+import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 
 export const profileRoutes = new Hono<AppContext>();
 profileRoutes.use('*', requireAuth);
@@ -224,12 +225,16 @@ profileRoutes.post('/onboarding', async (c) => {
 profileRoutes.get('/favorites', async (c) => {
   const user = c.get('user')!;
   const { results } = await c.env.DB.prepare(
-    `SELECT p.id, p.slug, p.name, p.name_ar, p.images, p.price_iqd
+    `SELECT p.id, p.slug, p.name, p.name_ar, p.price_iqd
        FROM favorites f JOIN products p ON p.id = f.product_id
       WHERE f.user_id = ? AND p.status = 'active' ORDER BY f.created_at DESC LIMIT 100`
   )
     .bind(user.id)
     .all<Record<string, unknown>>();
+  const images = await loadAuthoritativeProductImages(
+    c.env.DB,
+    results.map((product) => String(product.id))
+  );
   return c.json({
     success: true,
     favorites: results.map((p) => ({
@@ -237,7 +242,7 @@ profileRoutes.get('/favorites', async (c) => {
       slug: p.slug,
       name: p.name,
       name_ar: p.name_ar,
-      image: (() => { try { return (JSON.parse(String(p.images)) as string[])[0] ?? ''; } catch { return ''; } })(),
+      image: images.get(String(p.id)) ?? '',
       price_iqd: p.price_iqd,
     })),
   });

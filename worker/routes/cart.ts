@@ -24,7 +24,7 @@ import { newId } from '../lib/crypto';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
 import { AddToCartV1 } from '@levonis/contracts/events/v1/AddToCart';
 import { getSettings } from '../lib/settings';
-import { parseProductRow, primaryMedia, type ProductDoc } from '../lib/productModel';
+import { parseProductRow, type ProductDoc } from '../lib/productModel';
 import {
   applyRelations,
   capacityFrom,
@@ -602,7 +602,7 @@ function compositionCartItem(
     name: b.doc.name_en,
     name_ar: b.doc.name_ar,
     name_ku: b.doc.name_ckb,
-    image: primaryMedia(b.doc.media)?.url ?? '',
+    image: productImageForSelection(b.doc, { optionValueIds: [], colorId: null }, b.view),
     qty,
     // Line identity, echoed as it is stored. Nothing derives a selection from
     // it — `selectionFromCartRow` returns an empty selection for this row.

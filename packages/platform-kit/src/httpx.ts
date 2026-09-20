@@ -30,6 +30,10 @@ function ipIsPrivate(host: string): boolean {
     if (a === 172 && b >= 16 && b <= 31) return true;
     if (a === 192 && b === 168) return true;
     if (a === 169 && b === 254) return true;
+    // Carrier-grade NAT is not globally reachable and is frequently used by
+    // internal service networks. It must not become an SSRF route merely
+    // because it is outside the three RFC1918 blocks.
+    if (a === 100 && b >= 64 && b <= 127) return true;
     if (a >= 224) return true;
     return false;
   }
@@ -66,7 +70,13 @@ function ipIsPrivate(host: string): boolean {
       const lo = parseInt(loRaw, 16);
       return ipIsPrivate(`${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`);
     }
-    return h === '::1' || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80') || h === '::';
+    const firstRaw = h.split(':', 1)[0];
+    const first = firstRaw ? Number.parseInt(firstRaw, 16) : 0;
+    const uniqueLocal = (first & 0xfe00) === 0xfc00; // fc00::/7
+    const linkLocal = (first & 0xffc0) === 0xfe80;   // fe80::/10
+    const siteLocal = (first & 0xffc0) === 0xfec0;   // deprecated, still internal
+    const multicast = (first & 0xff00) === 0xff00;   // ff00::/8
+    return h === '::1' || h === '::' || uniqueLocal || linkLocal || siteLocal || multicast;
   }
   return false;
 }

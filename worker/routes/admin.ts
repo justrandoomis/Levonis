@@ -40,8 +40,9 @@ import { getBalances, walletTxPublic } from '../lib/wallet';
 // (charge positive, repayment negative, adjustment signed) lives in one place.
 // Re-deriving it here would give the owner a second, quietly different number.
 import { bnplOutstanding } from '../lib/bnpl';
-import { productPublic } from './products';
+import { productDocumentPublic } from './products';
 import { parseProductRow } from '../lib/productModel';
+import { applyRelations, loadRelationsViews, type ProductRelationsView } from '../lib/productOverlay';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
 import { langOf, mysteryViewFor, orderPublic, shippingConfigFrom, ORDER_ITEMS_SELECT } from './orders';
 import { baghdadDay, isDay } from '../lib/baghdadTime';
@@ -80,6 +81,11 @@ import { sendWhatsAppText, wasenderConfigured, wasenderStatus } from '../lib/was
 import { normalizePhone, maskPhone } from '../lib/phone';
 import { escapeHtml } from '../lib/emailTemplates';
 import { notifyOrderDelivered, notifyOrderStatus } from '../lib/orderNotify';
+import {
+  deleteProductPermanently,
+  invalidateMediaCache,
+} from '../lib/productDeletion';
+import { runGuardedMediaCleanupJobs } from '../lib/mediaRefs';
 
 export const adminRoutes = new Hono<AppContext>();
 adminRoutes.use('*', requireAdmin);
@@ -868,6 +874,71 @@ adminRoutes.patch('/users/:id', async (c) => {
 
 const SELLING_TYPES = ['direct_sale', 'pre_order', 'bundle'] as const;
 const PRODUCT_STATUS = ['draft', 'active', 'hidden'] as const;
+const LEGACY_ADMIN_PRODUCT_BATCH = 80;
+
+/**
+ * The legacy admin route still returns the old wire shape, but its catalogue
+ * document must be assembled from the same relational authority as every
+ * current product reader. Chunking stays below D1's historical 100-bind
+ * ceiling and avoids a relation query per product.
+ */
+async function legacyAdminProductProjection(
+  db: D1Database,
+  rows: Record<string, unknown>[]
+): Promise<Record<string, unknown>[]> {
+  const views = new Map<string, ProductRelationsView>();
+  for (let offset = 0; offset < rows.length; offset += LEGACY_ADMIN_PRODUCT_BATCH) {
+    const chunk = rows.slice(offset, offset + LEGACY_ADMIN_PRODUCT_BATCH);
+    const loaded = await loadRelationsViews(
+      db,
+      chunk.map((row) => ({ id: String(row.id), inventory_mode: row.inventory_mode }))
+    );
+    for (const [id, view] of loaded) views.set(id, view);
+  }
+
+  return rows.map((row) => {
+    const stored = parseProductRow(row);
+    const view = views.get(stored.id);
+    // `products.images` is only a rollout mirror. Start empty so zero rows, a
+    // quarantined-only gallery, or a soft relation-read failure cannot revive
+    // it; active relation rows below are the only way media enters the wire.
+    const authorityBase = { ...stored, media: [] };
+    const doc = view
+      ? applyRelations(authorityBase, view, { includeInactive: true, authoredNames: true })
+      : authorityBase;
+    return productDocumentPublic(doc, { includeInternal: true });
+  });
+}
+
+/**
+ * THIS ENDPOINT PREDATES THE RELATIONAL PRODUCT WRITER.
+ *
+ * It is deliberately still available for old, scalar-only integrations, but
+ * it must never accept a product shape that can contain a media reference.
+ * Such a shape would bypass the R2 existence/byte/WebP verifier, the
+ * content-addressed metadata normaliser, and the per-object cleanup guard.
+ * Unknown relation envelopes are included because silently ignoring them is
+ * no safer: a caller can receive 200 while believing its images were saved.
+ */
+const LEGACY_PRODUCT_STRUCTURE_FIELDS = [
+  'images',
+  'media',
+  'product_images',
+  'options',
+  'option_groups',
+  'option_values',
+  'groups',
+  'colors',
+  'variants',
+  'relations',
+  'description_images',
+  'description_videos',
+  'content_blocks',
+  'usage_guide',
+  'how_to_use',
+  'specifications',
+  'stores',
+] as const;
 
 function validateProductBody(body: Record<string, unknown>) {
   const name = str(body.name, 'name', { min: 1, max: 200 });
@@ -885,9 +956,6 @@ function validateProductBody(body: Record<string, unknown>) {
     description: str(body.description, 'description', { max: 20_000, required: false }),
     description_ar: str(body.description_ar, 'description_ar', { max: 20_000, required: false }),
     description_ku: str(body.description_ku, 'description_ku', { max: 20_000, required: false }),
-    images: jsonArray(body.images, 'images', 24),
-    options: jsonArray(body.options, 'options', 50),
-    colors: jsonArray(body.colors, 'colors', 50),
     selling_type: body.selling_type === undefined ? 'direct_sale' : oneOf(body.selling_type, 'selling_type', SELLING_TYPES),
     shipping_methods: jsonArray(body.shipping_methods, 'shipping_methods', 20),
     price_iqd: int(body.price_iqd, 'price_iqd', { min: 0, max: 2_000_000_000 }),
@@ -901,29 +969,37 @@ function validateProductBody(body: Record<string, unknown>) {
     categories: str(body.categories, 'categories', { max: 500, required: false }),
     display_order: int(body.display_order, 'display_order', { min: -100_000, max: 100_000, def: 0 }),
     is_featured: body.is_featured ? 1 : 0,
-    specifications: jsonArray(body.specifications, 'specifications', 100),
     brand: str(body.brand, 'brand', { max: 100, required: false }),
     labels: jsonArray(body.labels, 'labels', 30),
     hashtags: jsonArray(body.hashtags, 'hashtags', 30),
     algorithm_tags: jsonArray(body.algorithm_tags, 'algorithm_tags', 30),
     features: jsonArray(body.features, 'features', 50),
-    description_images: jsonArray(body.description_images, 'description_images', 30),
-    description_videos: jsonArray(body.description_videos, 'description_videos', 10),
-    stores: jsonArray(body.stores, 'stores', 20),
     warranty_plans: jsonArray(body.warranty_plans, 'warranty_plans', 10),
-    how_to_use: str(body.how_to_use, 'how_to_use', { max: 20_000, required: false }),
     stock: body.stock === undefined || body.stock === null || body.stock === '' ? null : int(body.stock, 'stock', { min: 0, max: 1_000_000 }),
   };
 }
 
 adminRoutes.get('/products', async (c) => {
-  const { results } = await c.env.DB.prepare('SELECT * FROM products ORDER BY created_at DESC').all();
-  return c.json({ success: true, products: results.map((p) => productPublic(p, { includeInternal: true })) });
+  const { results } = await c.env.DB.prepare('SELECT * FROM products ORDER BY created_at DESC').all<Record<string, unknown>>();
+  return c.json({ success: true, products: await legacyAdminProductProjection(c.env.DB, results) });
 });
 
 adminRoutes.post('/products', async (c) => {
   const adminUser = c.get('user')!;
-  const body = await c.req.json().catch(() => ({}));
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+
+  const structuralFields = LEGACY_PRODUCT_STRUCTURE_FIELDS.filter((field) => body[field] !== undefined);
+  if (structuralFields.length) {
+    throw new HttpError(
+      409,
+      'This legacy endpoint cannot save product structure or media. Use /api/admin/products-v2 so every image is verified and stored atomically.',
+      'LEGACY_PRODUCT_STRUCTURE_UNSUPPORTED',
+      { fields: structuralFields, route: '/api/admin/products-v2' }
+    );
+  }
+
+  // validateProductBody intentionally has no structural fields. A scalar-only
+  // UPDATE therefore retains every stored mirror exactly as it is.
   const p = validateProductBody(body);
   const id = typeof body.id === 'string' && body.id ? str(body.id, 'id', { max: 60 }) : newId('prd');
 
@@ -935,45 +1011,6 @@ adminRoutes.post('/products', async (c) => {
   // and a printer's plans must be the +12 / +24 extensions. The document is
   // built over the stored row so the stored ops_policy (serialized, base)
   // is what the rules judge.
-  /**
-   * THIS ROUTE MUST NOT OVERWRITE A PRODUCT THAT HAS RELATION ROWS.
-   *
-   * `product_images` (migration 0018) is the authoritative store for a
-   * product's media, and `products.images` is a DERIVED MIRROR of it —
-   * productPersistence.ts says so in as many words, and productOverlay.ts
-   * makes the rows win on read whenever the product has any
-   * (`view.images.length > 0 ? view.images : doc.media`).
-   *
-   * This legacy route writes the mirror column directly and has no statement
-   * touching `product_images` anywhere. So on a product that HAS rows, a save
-   * here rewrites the copy that nothing reads and leaves the rows that
-   * everything reads untouched. The admin sees their change accepted, the
-   * storefront keeps the old pictures, and the two stores stay apart for good
-   * — with no error at any point.
-   *
-   * The v2 route (`/api/admin/products-v2`) is what the admin UI actually
-   * uses, and it restates the mirror and the rows in one batch. This route is
-   * reached by nothing in src/ — only by tests, none of which send structure.
-   * So the fix is to refuse the case that would diverge rather than to teach a
-   * second writer how to keep two stores in step: a save that carries
-   * structure for a product that already has rows is answered 409, naming the
-   * route that can do it.
-   */
-  const STRUCTURE_FIELDS = ['images', 'options', 'colors'] as const;
-  const carriesStructure = STRUCTURE_FIELDS.some((field) => body[field] !== undefined);
-  if (carriesStructure) {
-    const rows = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM product_images WHERE product_id = ?')
-      .bind(id)
-      .first<{ n: number }>();
-    if (Number(rows?.n ?? 0) > 0) {
-      throw new HttpError(
-        409,
-        'This product stores its media as relation rows. Save it through /api/admin/products-v2, which writes both.',
-        'STRUCTURE_HAS_RELATIONS'
-      );
-    }
-  }
-
   const stored = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
   await applyPrinterWarrantyRules(
     c.env.DB,
@@ -995,16 +1032,68 @@ adminRoutes.post('/products', async (c) => {
   }
   await audit(c.env.DB, adminUser.id, 'product.save', id, { name: p.name, price_iqd: p.price_iqd, status: p.status });
   const row = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
-  return c.json({ success: true, product: productPublic(row!, { includeInternal: true }) });
+  const [product] = await legacyAdminProductProjection(c.env.DB, [row!]);
+  return c.json({ success: true, product });
 });
 
 adminRoutes.delete('/products/:id', async (c) => {
   const adminUser = c.get('user')!;
   const id = c.req.param('id');
-  const res = await c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
-  if (res.meta.changes === 0) throw notFound('Product not found');
-  await audit(c.env.DB, adminUser.id, 'product.delete', id);
-  return c.json({ success: true });
+  const result = await deleteProductPermanently(c.env.DB, id, { newId: () => newId('mcj') });
+  if (result.already_deleted) throw notFound('Product not found');
+  if (result.blocked) {
+    throw new HttpError(409, result.blocked.remedy, result.blocked.code, {
+      table: result.blocked.table,
+      count: result.blocked.count,
+    });
+  }
+
+  // D1 has committed at this point. R2 failure is recorded on the durable job
+  // and reported as pending; it must never turn a completed product deletion
+  // into an error that tempts the admin to repeat it.
+  let cleanup: Awaited<ReturnType<typeof runGuardedMediaCleanupJobs>>;
+  try {
+    cleanup = await runGuardedMediaCleanupJobs(c.env, result.media_jobs);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('legacy product media cleanup failed after committed delete:', message);
+    cleanup = {
+      deleted: [],
+      shared: [],
+      failed: result.media_jobs.map((job) => ({ key: job.key, error: message.slice(0, 400) })),
+      report: {
+        ran: false,
+        refusals: [message],
+        attempted: result.media_jobs.length,
+        deleted: [],
+        still_referenced: [],
+        dead_lettered: [],
+        retrying: [],
+        verified_at: [],
+        bookkeeping_failures: [],
+      },
+    };
+  }
+  const invalidated = await invalidateMediaCache(new URL(c.req.url).origin, cleanup.deleted);
+  const shared = [...new Set([...result.r2_objects_shared_skipped, ...cleanup.shared])];
+  await audit(c.env.DB, adminUser.id, 'product.delete', id, {
+    rows_deleted_by_table: result.rows_deleted_by_table,
+    rows_unlinked_by_table: result.rows_unlinked_by_table,
+    r2_objects_deleted: cleanup.deleted.length,
+    r2_objects_shared_skipped: shared.length,
+    r2_cleanup_pending: cleanup.failed.length,
+  });
+  return c.json({
+    success: true,
+    product_deleted: result.product_deleted,
+    rows_deleted_by_table: result.rows_deleted_by_table,
+    rows_unlinked_by_table: result.rows_unlinked_by_table,
+    r2_objects_deleted: cleanup.deleted,
+    r2_objects_shared_skipped: shared,
+    r2_cleanup_pending: cleanup.failed.length,
+    ...(cleanup.failed.length ? { r2_cleanup_errors: cleanup.failed } : {}),
+    cache_keys_invalidated: invalidated,
+  });
 });
 
 // ---------------------------------------------------------------- wallet review

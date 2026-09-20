@@ -21,6 +21,7 @@ import { isMixed } from './availability';
 import { normalizeCheapestBase } from './cheapestBase';
 import { splitUrlList } from './urlList';
 import { buildGrid, COLUMN_OF, FIELDS, type Field } from './priceGrid';
+import { isOwnedMediaUrl } from './mediaStorage';
 import type {
   ProductDoc,
   TranslationMeta,
@@ -81,6 +82,9 @@ export interface FieldSpec {
   max?: number;
   /** import-only convenience keys are parsed but never exported */
   exported?: boolean;
+  /** For measurements, __NULL__ is an explicit clear rather than an
+   *  inheriting value. This keeps omitted=preserve and NULL=clear distinct. */
+  nullClears?: boolean;
   /** A required subfield that may be omitted when THIS sibling is given —
    *  an option or colour authored in the (English-only) form has a name_en
    *  and no name_ar, and such a file must import. */
@@ -185,6 +189,44 @@ function f(
 }
 
 const IQD_MAX = 2_000_000_000;
+const DIMENSION_MAX = 100_000_000;
+const DIMENSION_KEYS = [
+  'net_weight_g',
+  'width_mm',
+  'depth_mm',
+  'height_mm',
+  'package_weight_g',
+  'package_width_mm',
+  'package_depth_mm',
+  'package_height_mm',
+] as const;
+
+type DimensionKey = (typeof DIMENSION_KEYS)[number];
+const DIMENSION_KEY_SET = new Set<string>(DIMENSION_KEYS);
+
+/** Measurements use the same eight names at product, option, colour and
+ * exact-combination level. They are always positive whole grams/mm; omission
+ * preserves and __NULL__ explicitly clears the override. */
+function dimensionFields(group: string): FieldSpec[] {
+  const notes: Record<DimensionKey, string> = {
+    net_weight_g: 'وزن المنتج نفسه بالغرام — grams, whole integer > 0',
+    width_mm: 'عرض المنتج بالمليمتر — millimetres, whole integer > 0',
+    depth_mm: 'عمق المنتج بالمليمتر — millimetres, whole integer > 0',
+    height_mm: 'ارتفاع المنتج بالمليمتر — millimetres, whole integer > 0',
+    package_weight_g: 'وزن الصندوق مع المنتج بالغرام — shipping weight, whole grams > 0',
+    package_width_mm: 'عرض صندوق الشحن بالمليمتر — whole millimetres > 0',
+    package_depth_mm: 'عمق صندوق الشحن بالمليمتر — whole millimetres > 0',
+    package_height_mm: 'ارتفاع صندوق الشحن بالمليمتر — whole millimetres > 0',
+  };
+  return DIMENSION_KEYS.map((key) =>
+    f(key, 'int', group, `${notes[key]}؛ ${NULL_TOKEN} = clear this measurement`, {
+      nullable: true,
+      nullClears: true,
+      min: 1,
+      max: DIMENSION_MAX,
+    })
+  );
+}
 
 /** The canonical editor groups (Arabic-first labels used in exports). */
 export const TEMPLATE_GROUPS: Array<{ id: string; titleAr: string; titleEn: string }> = [
@@ -308,14 +350,7 @@ const SCALAR_FIELDS: FieldSpec[] = [
   // it ships in. A courier charges for the second. Every one is nullable and
   // every one is empty until somebody measures it — a zero would be a claim
   // that the thing is weightless.
-  f('net_weight_g', 'int', 'dimensions', 'وزن المنتج نفسه بالغرام — grams, integer > 0؛ فارغ = غير مقاس', { nullable: true, min: 1, max: 100_000_000 }),
-  f('width_mm', 'int', 'dimensions', 'عرض المنتج بالمليمتر — millimetres, integer > 0', { nullable: true, min: 1, max: 100_000_000 }),
-  f('depth_mm', 'int', 'dimensions', 'عمق المنتج بالمليمتر — millimetres, integer > 0', { nullable: true, min: 1, max: 100_000_000 }),
-  f('height_mm', 'int', 'dimensions', 'ارتفاع المنتج بالمليمتر — millimetres, integer > 0', { nullable: true, min: 1, max: 100_000_000 }),
-  f('package_weight_g', 'int', 'dimensions', 'وزن الصندوق مع المنتج بالغرام — shipping weight in grams؛ عادةً أكبر من net_weight_g', { nullable: true, min: 1, max: 100_000_000 }),
-  f('package_width_mm', 'int', 'dimensions', 'عرض صندوق الشحن بالمليمتر — millimetres, integer > 0', { nullable: true, min: 1, max: 100_000_000 }),
-  f('package_depth_mm', 'int', 'dimensions', 'عمق صندوق الشحن بالمليمتر — millimetres, integer > 0', { nullable: true, min: 1, max: 100_000_000 }),
-  f('package_height_mm', 'int', 'dimensions', 'ارتفاع صندوق الشحن بالمليمتر — millimetres, integer > 0', { nullable: true, min: 1, max: 100_000_000 }),
+  ...dimensionFields('dimensions'),
   // usage guide — the steps are the `usage_steps` group below
   f('usage_official_url', 'string', 'usage', 'رابط الدليل الرسمي للمنتج (صفحة الشركة المصنّعة) — official documentation URL; فارغ = لا يوجد'),
 ];
@@ -338,7 +373,8 @@ const GROUP_SPECS: GroupSpec[] = [
     titleAr: 'الوسائط', titleEn: 'Media (gallery images)',
     fields: [
       f('id', 'string', 'media', 'معرف ثابت للدمج — stable id used for merge-by-id on update'),
-      f('url', 'string', 'media', 'رابط الصورة (/files/<key> أو رابط خارجي) — REQUIRED', { required: true }),
+      f('url', 'string', 'media', 'رابط التسليم المحلي فقط (/files/<key>) — local stored image URL; required unless fetch_url is supplied', { required: true, requiredUnless: 'fetch_url' }),
+      f('fetch_url', 'string', 'media', 'رابط خارجي للاستيراد فقط — fetched, converted and stored before apply; never exported', { required: true, requiredUnless: 'url', exported: false }),
       f('key', 'string', 'media', 'مفتاح R2 الداخلي إن وجد — internal R2 key when stored internally'),
       f('alt_ar', 'string', 'media', 'النص البديل بالعربية', { lang: 'ar' }),
       f('alt_en', 'string', 'media', 'Alt text (English)', { lang: 'en' }),
@@ -356,6 +392,8 @@ const GROUP_SPECS: GroupSpec[] = [
       f('variant_id', 'string', 'media', 'صورة تخص تركيبة محددة — bind to one modelled combination by its id'),
       f('width', 'int', 'media', 'عرض الصورة بالبكسل إن كان معروفًا — pixel width; فارغ = غير معروف', { nullable: true, min: 1, max: 100_000 }),
       f('height', 'int', 'media', 'ارتفاع الصورة بالبكسل إن كان معروفًا — pixel height', { nullable: true, min: 1, max: 100_000 }),
+      f('content_type', 'string', 'media', 'نوع الملف المحفوظ — stored MIME type (for example image/webp)'),
+      f('bytes', 'int', 'media', 'حجم الملف المحفوظ بالبايت — stored object size in bytes', { nullable: true, min: 1, max: 1_000_000_000 }),
     ],
   },
   {
@@ -371,7 +409,9 @@ const GROUP_SPECS: GroupSpec[] = [
       f('name_ar', 'string', 'options', 'اسم الخيار بالعربية — مطلوب ما لم يُعطَ name_en (0055: يُخزَّن في صف الخيار ويعرضه المتجر)', { required: true, requiredUnless: 'name_en', lang: 'ar' }),
       f('name_en', 'string', 'options', 'Option name (English)', { lang: 'en' }),
       f('name_ckb', 'string', 'options', 'ناوی هەڵبژاردە بە کوردی', { lang: 'ckb' }),
-      f('image', 'string', 'options', 'صورة الخيار — option image URL'),
+      // Legacy import compatibility only. Product images have one source of
+      // truth (`images.*`) and bind to this option with option_value_id.
+      f('image', 'string', 'options', 'قديم للاستيراد فقط — converted to a bound images row; never exported', { exported: false }),
       f('active', 'bool', 'options', 'فعال — active'),
       // THE OWNER'S MODEL: the base price is the cheapest item and an option
       // is an INCREASE over it. `+60000` here is that increase (it lands in
@@ -401,6 +441,7 @@ const GROUP_SPECS: GroupSpec[] = [
       f('variant_label', 'string', 'options', 'اسم النسخة كما يقرؤه الزبون — A1 / A1 Combo. فارغًا يُشتق من اسم الخيار بعد حذف لاحقة نوع التوفر.'),
       f('sku_part', 'string', 'options', 'الجزء الذي يضيفه هذا الخيار إلى رمز المنتج — SKU fragment'),
       f('low_stock_threshold', 'int', 'options', 'حد التنبيه لمخزون هذا الخيار — __NULL__ = بلا تنبيه', { nullable: true, min: 0, max: 1_000_000 }),
+      ...dimensionFields('options'),
     ],
     /**
      * 0073. WHAT THIS MODEL DOES — its order types, and the routes of its
@@ -512,7 +553,8 @@ const GROUP_SPECS: GroupSpec[] = [
       f('name_en', 'string', 'colors', 'Color name (English)', { lang: 'en' }),
       f('name_ckb', 'string', 'colors', 'ناوی ڕەنگ بە کوردی', { lang: 'ckb' }),
       f('hex', 'hex', 'colors', 'رمز اللون #RRGGBB أو فارغ'),
-      f('image', 'string', 'colors', 'صورة اللون — color image URL'),
+      // Legacy import compatibility only; canonical media uses color_id.
+      f('image', 'string', 'colors', 'قديم للاستيراد فقط — converted to a bound images row; never exported', { exported: false }),
       f('option_id', 'string', 'colors', 'ربط بخيار واحد عبر معرفه — link to ONE option by its id; __NULL__ = متاح لكل الخيارات', { nullable: true }),
       f('option_index', 'int', 'colors', 'بديل استيراد فقط: رقم الخيار في هذا القالب (colors.N.option_index=2 يربط بالخيار options.2) — import-only, never exported', { min: 1, max: 999, exported: false }),
       // option_id can only name ONE option, so a colour offered for two of
@@ -533,6 +575,23 @@ const GROUP_SPECS: GroupSpec[] = [
       f('prime_adjust_iqd', 'int', 'colors', 'فرق إضافي لسعر PRIME فوق ما ينتقل تلقائيًا — زيادة اللون تصل إلى سعر PRIME من تلقاء نفسها، فلا تكرّرها هنا. يُستخدم فقط عندما يكون prime_price_iqd فارغًا.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
       f('pro_adjust_iqd', 'int', 'colors', 'فرق إضافي لسعر PRO فوق ما ينتقل تلقائيًا — زيادة اللون تصل إلى سعر PRO من تلقاء نفسها، فلا تكرّرها هنا. يُستخدم فقط عندما يكون pro_price_iqd فارغًا.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
       f('cost_adjust_iqd', 'int', 'colors', 'فرق الكلفة عن المستوى الأعلى (داخلي) — يُستخدم فقط عندما يكون cost_iqd فارغًا، ولا يُخترع كلفة من سعر بيع.', { nullable: true, min: -IQD_MAX, max: IQD_MAX }),
+      ...dimensionFields('colors'),
+    ],
+  },
+  {
+    /**
+     * Existing exact combinations are editable by stable id. The selection
+     * fields are exported so the row remains understandable and a relations
+     * write can recompute its combo key; all price/stock columns not represented
+     * here are carried from the stored row by merge-by-id.
+     */
+    name: 'variants', bodyKey: 'variants', idPrefix: '', mergeKey: 'id', group: 'options',
+    titleAr: 'تركيبات الخيارات', titleEn: 'Exact option combinations',
+    fields: [
+      f('id', 'string', 'options', 'معرف التركيبة الثابت — required stable variant id', { required: true }),
+      f('option_value_ids', 'csv', 'options', 'معرفات قيم الخيارات في هذه التركيبة، مفصولة بفواصل'),
+      f('color_id', 'string', 'options', `معرف اللون في التركيبة؛ ${NULL_TOKEN} = بلا لون`, { nullable: true }),
+      ...dimensionFields('options'),
     ],
   },
   {
@@ -673,6 +732,26 @@ export interface ParsedGroupItem {
   /** 0073. `direct` / `preorder`, each with its own fields and optional list. */
   cells?: Record<string, ParsedCell>;
 }
+
+/** A pure parse-time fetch plan. No request or R2 operation happens while
+ * building it; /apply materializes every entry before it plans a DB write. */
+export interface TemplateMediaFetchIntent {
+  /** Exact template field that supplied the remote address. */
+  field: string;
+  line: number;
+  /** Human-readable binding target used by preview UIs. */
+  target: string;
+  target_type: 'product' | 'option' | 'color' | 'variant';
+  target_id: string | null;
+  primary: boolean;
+  source_url: string;
+  source_host: string;
+  /** Internal merge coordinates used to replace the intended row after all
+   * downloads succeed. They remain deterministic and contain no network data. */
+  group: 'images' | 'options' | 'colors';
+  index: number;
+  image_id: string | null;
+}
 export interface ParsedTemplate {
   header: {
     template_version: number | null;
@@ -690,6 +769,7 @@ export interface ParsedTemplate {
   unknown_keys: string[];
   errors: TemplateError[];
   warnings: string[];
+  media_to_fetch: TemplateMediaFetchIntent[];
 }
 
 const MAX_TEMPLATE_BYTES = 1_500_000;
@@ -732,7 +812,7 @@ function coerce(
   };
   if (raw === NULL_TOKEN) {
     if (!spec.nullable) return err(`${NULL_TOKEN} is not allowed here — the field is not nullable (use ${CLEAR_TOKEN} to empty it, or omit the line to keep the current value)`);
-    return { value: null, clear: false, line };
+    return { value: null, clear: spec.nullClears === true, line };
   }
   if (raw === CLEAR_TOKEN) {
     if (spec.type === 'iqd' || spec.type === 'int' || spec.type === 'percent') {
@@ -822,6 +902,249 @@ function coerce(
   }
 }
 
+function httpSource(raw: unknown): URL | null {
+  if (typeof raw !== 'string' || raw.trim() === '') return null;
+  try {
+    const url = new URL(raw.trim());
+    if ((url.protocol !== 'http:' && url.protocol !== 'https:') || !url.hostname || url.username || url.password) {
+      return null;
+    }
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+/** Stable id for a media row synthesized from a fetch/legacy selector. Kept
+ * in one helper so parse-time collision checks and materialization cannot
+ * disagree about truncation or sanitization. */
+export function generatedTemplateMediaId(
+  type: TemplateMediaFetchIntent['target_type'],
+  index: number,
+  targetId: string | null
+): string {
+  return `img_${type}_${index}_${String(targetId ?? 'product').replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 32)}`;
+}
+
+/**
+ * Convert every remote spelling into an explicit, side-effect-free fetch
+ * intent. This is deliberately a post-pass: `primary` and bindings may occur
+ * before or after the URL in the text, and the preview has to report the final
+ * target rather than whichever fields happened to have been read so far.
+ */
+function planTemplateMedia(out: ParsedTemplate): void {
+  const error = (line: number, key: string, message: string) => out.errors.push({ line, key, message });
+  const intent = (
+    group: TemplateMediaFetchIntent['group'],
+    item: ParsedGroupItem,
+    field: string,
+    source: URL,
+    targetType: TemplateMediaFetchIntent['target_type'],
+    targetId: string | null,
+    primary: boolean,
+    imageId: string | null,
+    line: number
+  ) => {
+    const target = targetType === 'product'
+      ? 'product'
+      : `${targetType}:${targetId || `${group}.${item.index}`}`;
+    out.media_to_fetch.push({
+      field,
+      line,
+      target,
+      target_type: targetType,
+      target_id: targetId,
+      primary,
+      source_url: source.toString(),
+      source_host: source.hostname.toLowerCase(),
+      group,
+      index: item.index,
+      image_id: imageId,
+    });
+  };
+
+  const seenImageIds = new Map<string, number>();
+  for (const item of out.groupClears.images ? [] : (out.groups.images ?? [])) {
+    const idField = item.fields.id;
+    const id = typeof idField?.value === 'string' ? idField.value.trim() : '';
+    if (!id) continue;
+    const first = seenImageIds.get(id);
+    if (first !== undefined) {
+      error(idField.line, `images.${item.index}.id`, `duplicate image id "${id}" (already used by images.${first}.id)`);
+    } else {
+      seenImageIds.set(id, item.index);
+    }
+  }
+
+  // A whole-group clear wins over indexed rows everywhere else in the
+  // template merge. It must also win here: ignored rows never authorize a
+  // network fetch and cannot be resurrected as materialized gallery media.
+  for (const item of out.groupClears.images ? [] : (out.groups.images ?? [])) {
+    const at = (name: string) => `images.${item.index}.${name}`;
+    const localField = item.fields.url;
+    const fetchField = item.fields.fetch_url;
+    const localRaw = typeof localField?.value === 'string' ? localField.value.trim() : '';
+    const fetchRaw = typeof fetchField?.value === 'string' ? fetchField.value.trim() : '';
+
+    if (localRaw && fetchRaw) {
+      const message = 'choose one media source: url for an existing local /files object, or fetch_url for a remote image to import';
+      error(localField.line, at('url'), message);
+      error(fetchField.line, at('fetch_url'), message);
+      continue;
+    }
+
+    if (localRaw && isOwnedMediaUrl(localRaw)) {
+      const expectedKey = localRaw.slice('/files/'.length);
+      if (!expectedKey.endsWith('.webp')) {
+        error(localField.line, at('url'), 'local product media must be a /files/<key>.webp URL');
+        continue;
+      }
+      const keyField = item.fields.key;
+      const statedKey = typeof keyField?.value === 'string' ? keyField.value.trim() : '';
+      if (statedKey && statedKey !== expectedKey) {
+        error(keyField!.line, at('key'), `must exactly match the key in ${at('url')} (${expectedKey})`);
+        continue;
+      }
+    }
+
+    // Binding validity is independent of where the bytes already live. A
+    // local `/files/...` row and a remote import obey the same single-target
+    // rule, and the parser reports the exact binding field in either case.
+    const bindings = (['option_value_id', 'color_id', 'variant_id'] as const)
+      .map((name) => ({ name, field: item.fields[name] }))
+      .filter((x) => typeof x.field?.value === 'string' && String(x.field!.value).trim() !== '');
+    if (bindings.length > 1) {
+      for (const binding of bindings.slice(1)) {
+        error(binding.field!.line, at(binding.name), 'an image may bind to only one of option_value_id, color_id, or variant_id');
+      }
+      continue;
+    }
+
+    let source: URL | null = null;
+    let sourceField = fetchField;
+    let sourceKey = at('fetch_url');
+    if (fetchRaw) {
+      source = httpSource(fetchRaw);
+      if (!source) {
+        error(fetchField.line, sourceKey, 'must be an absolute http(s) image URL without credentials');
+        continue;
+      }
+    } else if (localRaw && !isOwnedMediaUrl(localRaw)) {
+      source = httpSource(localRaw);
+      if (!source) {
+        error(localField.line, at('url'), 'must be a local /files/<key> URL; use images.N.fetch_url for an external http(s) source');
+        continue;
+      }
+      // Backward compatibility is visible and deterministic: the external
+      // value no longer reaches ProductDoc.url, but is materialized by apply.
+      sourceField = localField;
+      sourceKey = at('url');
+      item.fields.fetch_url = localField;
+      delete item.fields.url;
+      out.warnings.push(`${sourceKey}: external url is legacy; treated as import-only ${at('fetch_url')}`);
+    }
+
+    if (!source || !sourceField) continue;
+    const binding = bindings[0];
+    const type: TemplateMediaFetchIntent['target_type'] = binding?.name === 'option_value_id'
+      ? 'option'
+      : binding?.name === 'color_id'
+        ? 'color'
+        : binding?.name === 'variant_id'
+          ? 'variant'
+          : 'product';
+    const targetId = binding ? String(binding.field!.value).trim() : null;
+    const imageId = typeof item.fields.id?.value === 'string' && item.fields.id.value.trim()
+      ? item.fields.id.value.trim()
+      : generatedTemplateMediaId(type, item.index, targetId);
+    intent(
+      'images',
+      item,
+      sourceKey,
+      source,
+      type,
+      targetId,
+      item.fields.primary?.value === true,
+      imageId,
+      sourceField.line
+    );
+  }
+
+  for (const group of ['options', 'colors'] as const) {
+    if (out.groupClears[group]) continue;
+    for (const item of out.groups[group] ?? []) {
+      const image = item.fields.image;
+      if (!image || typeof image.value !== 'string' || image.value.trim() === '') continue;
+      const key = `${group}.${item.index}.image`;
+      const raw = image.value.trim();
+      const id = typeof item.fields.id?.value === 'string' && item.fields.id.value.trim()
+        ? item.fields.id.value.trim()
+        : null;
+      const type = group === 'options' ? 'option' : 'color';
+      if (isOwnedMediaUrl(raw)) {
+        if (!raw.endsWith('.webp')) {
+          error(image.line, key, 'local product media must be a /files/<key>.webp URL');
+          continue;
+        }
+        out.warnings.push(`${key}: legacy image field will be converted to one images row bound by ${type === 'option' ? 'option_value_id' : 'color_id'}`);
+        continue;
+      }
+      const source = httpSource(raw);
+      if (!source) {
+        error(image.line, key, 'must be a local /files/<key> URL or an absolute http(s) image URL');
+        continue;
+      }
+      delete item.fields.image;
+      out.warnings.push(`${key}: external legacy image was converted to an import intent and a bound images row`);
+      intent(group, item, key, source, type, id, false, id ? generatedTemplateMediaId(type, item.index, id) : null, image.line);
+    }
+  }
+
+  // Generated ids and authored ids share the same relation namespace. Catch
+  // a collision while parsing, before either source is fetched; otherwise the
+  // later candidate would overwrite the earlier row and orphan its new R2
+  // object on an otherwise successful apply.
+  if (!out.errors.some((issue) => issue.message.startsWith('duplicate image id '))) {
+    const candidates: Array<{ id: string; line: number; field: string }> = out.media_to_fetch
+      .filter((candidate) => !!candidate.image_id)
+      .map((candidate) => ({ id: candidate.image_id!, line: candidate.line, field: candidate.field }));
+    for (const item of out.groupClears.images ? [] : (out.groups.images ?? [])) {
+      if (out.media_to_fetch.some((candidate) => candidate.group === 'images' && candidate.index === item.index)) continue;
+      const url = typeof item.fields.url?.value === 'string' ? item.fields.url.value.trim() : '';
+      const id = typeof item.fields.id?.value === 'string' ? item.fields.id.value.trim() : '';
+      if (id && isOwnedMediaUrl(url)) candidates.push({ id, line: item.fields.id!.line, field: `images.${item.index}.id` });
+    }
+    for (const group of ['options', 'colors'] as const) {
+      if (out.groupClears[group]) continue;
+      for (const item of out.groups[group] ?? []) {
+        const url = typeof item.fields.image?.value === 'string' ? item.fields.image.value.trim() : '';
+        const targetId = typeof item.fields.id?.value === 'string' ? item.fields.id.value.trim() : '';
+        if (!targetId || !isOwnedMediaUrl(url)) continue;
+        const type = group === 'options' ? 'option' : 'color';
+        candidates.push({
+          id: generatedTemplateMediaId(type, item.index, targetId),
+          line: item.fields.image!.line,
+          field: `${group}.${item.index}.image`,
+        });
+      }
+    }
+
+    const ids = new Map<string, { id: string; line: number; field: string }>();
+    for (const candidate of candidates) {
+      const first = ids.get(candidate.id);
+      if (first) {
+        error(
+          candidate.line,
+          candidate.field,
+          `materialized image id "${candidate.id}" conflicts with ${first.field}`
+        );
+      } else {
+        ids.set(candidate.id, candidate);
+      }
+    }
+  }
+}
+
 /**
  * Parses template text into structured fields/groups with line-precise
  * errors. Strips a UTF-8 BOM, normalizes CRLF/CR line endings, handles
@@ -837,6 +1160,7 @@ export function parseTemplate(text: string): ParsedTemplate {
     unknown_keys: [],
     errors: [],
     warnings: [],
+    media_to_fetch: [],
   };
   const err = (line: number, key: string, message: string) => out.errors.push({ line, key, message });
 
@@ -1143,6 +1467,7 @@ export function parseTemplate(text: string): ParsedTemplate {
     }
     out.groups[name] = items;
   }
+  planTemplateMedia(out);
   for (const key of out.unknown_keys) {
     out.warnings.push(`unknown key "${key}" was ignored`);
   }
@@ -1202,6 +1527,14 @@ export interface ExportOpts {
    * means "inherit this", and without it the export cannot say what.
    */
   transportDefaults?: Array<{ method: string; commission_iqd: number | null }>;
+  /** Exact relational combinations. ProductDoc deliberately carries only the
+   * flat option/color projection, so the export route supplies these rows. */
+  variants?: Array<{
+    id: string;
+    option_value_ids: string[];
+    color_id: string | null;
+    [key: string]: unknown;
+  }>;
 }
 
 interface Entry { key: string; value: string | null }
@@ -1342,6 +1675,9 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   // re-import keeps the stored answer instead of turning silence into false.
   push('warranty_base_months', numStr(doc.warranty_base_months));
   if (doc.serialized !== null) push('serialized', boolStr(doc.serialized));
+  // Product measurements live in a nested document object but use flat TXT
+  // keys. Every null is exported as __NULL__, so round-trip clearing is exact.
+  for (const key of DIMENSION_KEYS) push(key, numStr(doc.dimensions[key]));
 
   const sorted = <T extends { order?: number; id?: string }>(items: T[]): T[] =>
     [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || String(a.id).localeCompare(String(b.id)));
@@ -1373,7 +1709,32 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.active`, boolStr(t.active));
   });
 
-  sorted(doc.media).forEach((mItem, i) => {
+  const canonicalMedia = [...doc.media];
+  const addLegacyBound = (type: 'option' | 'color', id: string, url: string) => {
+    if (!isOwnedMediaUrl(url)) return;
+    const binding = type === 'option' ? 'option_value_id' : 'color_id';
+    // A canonical binding wins even when an old relation column still points
+    // at a different file. Exporting both would resurrect two sources of
+    // truth and duplicate the row on re-import.
+    if (canonicalMedia.some((m) => m[binding] === id)) return;
+    canonicalMedia.push({
+      id: `img_${type}_${id.replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 42) || 'row'}`,
+      url,
+      key: url.slice('/files/'.length),
+      role: 'gallery',
+      alt_ar: '', alt_en: '', alt_ckb: '',
+      order: canonicalMedia.length,
+      primary: canonicalMedia.length === 0,
+      width: null, height: null, source_url: '',
+      option_value_id: type === 'option' ? id : '',
+      color_id: type === 'color' ? id : '',
+      variant_id: '',
+    });
+  };
+  for (const option of doc.options) if (option.image) addLegacyBound('option', option.id, option.image);
+  for (const color of doc.colors) if (color.image) addLegacyBound('color', color.id, color.image);
+
+  sorted(canonicalMedia).forEach((mItem, i) => {
     const p = `images.${i + 1}`;
     push(`${p}.id`, mItem.id);
     push(`${p}.url`, mItem.url);
@@ -1388,6 +1749,8 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.variant_id`, mItem.variant_id ?? '');
     push(`${p}.width`, numStr(mItem.width));
     push(`${p}.height`, numStr(mItem.height));
+    push(`${p}.content_type`, String((mItem as unknown as Record<string, unknown>).content_type ?? ''));
+    push(`${p}.bytes`, numStr(((mItem as unknown as Record<string, unknown>).bytes as number | null | undefined) ?? null));
   });
 
   orderedOptions(doc).forEach((o, i) => {
@@ -1397,7 +1760,6 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.name_ar`, o.name_ar);
     push(`${p}.name_en`, o.name_en);
     push(`${p}.name_ckb`, o.name_ckb);
-    push(`${p}.image`, o.image);
     push(`${p}.active`, boolStr(o.active));
     push(`${p}.regular_price_iqd`, numStr(o.regular_price_iqd));
     push(`${p}.pro_price_iqd`, numStr(o.pro_price_iqd));
@@ -1422,6 +1784,9 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.variant_label`, o.variant_label ?? '');
     push(`${p}.sku_part`, o.sku_part ?? '');
     push(`${p}.low_stock_threshold`, numStr(o.low_stock_threshold ?? null));
+    for (const key of DIMENSION_KEYS) {
+      push(`${p}.${key}`, numStr((o as unknown as Record<string, number | null | undefined>)[key] ?? null));
+    }
 
     /**
      * 0073. WHAT THIS MODEL DOES. A cell that does not exist is written as
@@ -1484,7 +1849,6 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.name_en`, cItem.name_en);
     push(`${p}.name_ckb`, cItem.name_ckb);
     push(`${p}.hex`, cItem.hex);
-    push(`${p}.image`, cItem.image);
     push(`${p}.option_id`, cItem.option_id ?? null);
     push(`${p}.option_ids`, (cItem.option_ids ?? []).join(','));
     push(`${p}.sku_part`, cItem.sku_part ?? '');
@@ -1499,6 +1863,21 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.prime_adjust_iqd`, numStr(cItem.prime_adjust_iqd ?? null));
     push(`${p}.pro_adjust_iqd`, numStr(cItem.pro_adjust_iqd ?? null));
     if (money) push(`${p}.cost_adjust_iqd`, numStr(cItem.cost_adjust_iqd ?? null));
+    for (const key of DIMENSION_KEYS) {
+      push(`${p}.${key}`, numStr((cItem as unknown as Record<string, number | null | undefined>)[key] ?? null));
+    }
+  });
+
+  const variantRows = opts.variants ??
+    (((doc as unknown as Record<string, unknown>).variants as ExportOpts['variants'] | undefined) ?? []);
+  variantRows.forEach((variant, i) => {
+    const p = `variants.${i + 1}`;
+    push(`${p}.id`, variant.id);
+    push(`${p}.option_value_ids`, variant.option_value_ids.join(','));
+    push(`${p}.color_id`, variant.color_id);
+    for (const key of DIMENSION_KEYS) {
+      push(`${p}.${key}`, numStr((variant as Record<string, unknown>)[key] as number | null));
+    }
   });
 
   /**
@@ -2013,6 +2392,12 @@ export interface ResolvedRefs {
   needs_review?: NeedsReviewEntry[];
 }
 
+/** Relational rows that are not part of ProductDoc but participate in a TXT
+ * round trip. Today that is the exact-combination table. */
+export interface TemplateMergeContext {
+  variants?: LooseItem[];
+}
+
 export interface ToDocResult {
   body: Record<string, unknown>;
   /** The file's `inventory_mode` line: a mode, '' = derive like the form,
@@ -2039,13 +2424,20 @@ type LooseItem = Record<string, unknown>;
  */
 function applyItemFields(target: LooseItem, specs: FieldSpec[], fields: Record<string, ParsedField>): void {
   const signed: Array<[FieldSpec, ParsedField]> = [];
+  const dimensions = new Set<string>(
+    Array.isArray(target.__template_dimension_fields)
+      ? (target.__template_dimension_fields as unknown[]).filter((x): x is string => typeof x === 'string')
+      : []
+  );
   for (const spec of specs) {
     const pf = fields[spec.key];
     if (!pf) continue;
+    if (DIMENSION_KEY_SET.has(spec.key)) dimensions.add(spec.key);
     if (pf.adjust && spec.adjustKey) signed.push([spec, pf]);
     else applyItemField(target, spec, pf);
   }
   for (const [spec, pf] of signed) applyItemField(target, spec, pf);
+  if (dimensions.size > 0) target.__template_dimension_fields = [...dimensions];
 }
 
 function applyItemField(target: LooseItem, spec: FieldSpec, pf: ParsedField): void {
@@ -2390,6 +2782,88 @@ function buildRows(
 }
 
 /**
+ * The old option/color image columns are accepted as input, then immediately
+ * projected into the canonical media list with one binding. External values
+ * were removed by `planTemplateMedia` and wait for /apply; local /files values
+ * can be represented in the pure preview without touching storage.
+ */
+function canonicalizeLegacyBoundMedia(
+  parsed: ParsedTemplate,
+  body: Record<string, unknown>
+): void {
+  const media = Array.isArray(body.media) ? (body.media as LooseItem[]) : [];
+
+  // fetch_url is working state, never a ProductDoc field. Every locator and
+  // byte-derived field beside it is storage-owned: a stale exported key or
+  // width must not turn a remote import into a fake local row before apply
+  // has fetched and verified the new bytes.
+  for (const row of media) {
+    const hasFetch = typeof row.fetch_url === 'string' && row.fetch_url.trim() !== '';
+    delete row.fetch_url;
+    if (hasFetch) {
+      row.url = '';
+      row.key = '';
+      row.width = null;
+      row.height = null;
+      row.source_url = '';
+      delete row.content_type;
+      row.bytes = null;
+      continue;
+    }
+    // A legacy hotlink being converted cannot survive in the preview merely
+    // because merge-by-id supplied it as the existing value. It is absent
+    // until apply materializes the local replacement; it is never written.
+    if (typeof row.url === 'string' && row.url && !isOwnedMediaUrl(row.url)) {
+      row.url = '';
+      row.key = '';
+    }
+  }
+
+  for (const group of ['options', 'colors'] as const) {
+    const rows = Array.isArray(body[group]) ? (body[group] as LooseItem[]) : [];
+    const parsedRows = parsed.groups[group] ?? [];
+    parsedRows.forEach((item, position) => {
+      const row = rows[position];
+      if (!row) return;
+      const local = item.fields.image;
+      const hasFetch = parsed.media_to_fetch.some((x) => x.group === group && x.index === item.index);
+      if (!local && !hasFetch) return;
+
+      // A template write never perpetuates the duplicate legacy source.
+      row.image = '';
+      if (!local || typeof local.value !== 'string' || !isOwnedMediaUrl(local.value.trim())) return;
+
+      const url = local.value.trim();
+      const targetId = typeof row.id === 'string' ? row.id : '';
+      if (!targetId) return;
+      const binding = group === 'options' ? 'option_value_id' : 'color_id';
+      const duplicate = media.some(
+        (m) => m.url === url && m[binding] === targetId && !m[group === 'options' ? 'color_id' : 'option_value_id']
+      );
+      if (duplicate) return;
+      media.push({
+        id: generatedTemplateMediaId(group === 'options' ? 'option' : 'color', item.index, targetId),
+        url,
+        key: url.slice('/files/'.length),
+        role: 'gallery',
+        alt_ar: '',
+        alt_en: '',
+        alt_ckb: '',
+        order: media.length,
+        primary: false,
+        width: null,
+        height: null,
+        source_url: '',
+        option_value_id: group === 'options' ? targetId : '',
+        color_id: group === 'colors' ? targetId : '',
+        variant_id: '',
+      });
+    });
+  }
+  body.media = media;
+}
+
+/**
  * Merges a parsed template onto an existing doc (or builds a create body).
  * - omitted fields PRESERVE existing values (recorded in preserved_fields)
  * - __CLEAR__ empties a field (cleared_fields)
@@ -2403,7 +2877,8 @@ function buildRows(
 export function toDocBody(
   parsed: ParsedTemplate,
   existing?: ProductDoc | null,
-  resolved?: ResolvedRefs
+  resolved?: ResolvedRefs,
+  context: TemplateMergeContext = {}
 ): ToDocResult {
   const result: ToDocResult = {
     body: {},
@@ -2455,6 +2930,7 @@ export function toDocBody(
         template_family: existing.template_family,
         sku: existing.sku,
         spec_fields: existing.spec_fields,
+        dimensions: { ...existing.dimensions },
         usage_guide: existing.usage_guide,
         brand_id: existing.brand_id,
         is_featured: existing.is_featured,
@@ -2478,6 +2954,7 @@ export function toDocBody(
         translation_meta: existing.translation_meta,
       }
     : {};
+  if (context.variants) body.variants = context.variants.map((variant) => ({ ...variant }));
   result.body = body;
 
   // ---- slug (protected: update requires allow_slug_change=true)
@@ -2544,7 +3021,15 @@ export function toDocBody(
         // Folded into body.delivery_options immediately after this loop.
         break;
       default:
-        body[spec.key] = pf.value;
+        if (DIMENSION_KEY_SET.has(spec.key)) {
+          const dimensions = body.dimensions && typeof body.dimensions === 'object'
+            ? { ...(body.dimensions as Record<string, unknown>) }
+            : {};
+          dimensions[spec.key] = pf.value;
+          body.dimensions = dimensions;
+        } else {
+          body[spec.key] = pf.value;
+        }
     }
   }
 
@@ -2745,6 +3230,8 @@ export function toDocBody(
     writeItems(items);
     result.applied_fields.push(g.name);
   }
+
+  canonicalizeLegacyBoundMedia(parsed, body);
 
   return result;
 }

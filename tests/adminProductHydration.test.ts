@@ -337,7 +337,9 @@ test('relationsToWire: what was read is sent back — the form never blanks a st
 
 test('relationsFromWire: an empty response is empty — no invented group, colour or image', () => {
   const rel = relationsFromWire({ success: true, product: { inventory_mode: 'BASE' } });
-  assert.deepEqual(rel, { inventory_mode: 'BASE', groups: [], colors: [], variants: [], images: [] });
+  assert.deepEqual(rel, {
+    inventory_mode: 'BASE', groups: [], colors: [], variants: [], images: [], quarantined_images: [],
+  });
   assert.equal(hasRelationStructure(rel), false);
 });
 

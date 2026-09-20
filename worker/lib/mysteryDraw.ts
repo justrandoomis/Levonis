@@ -68,15 +68,24 @@ import { resolveForOrderType, type OrderType, type StockResolution, type StockTa
 import { effectiveAvailability } from '@levonis/pricing/availability';
 import { typeForTransport, type ShippingType } from '@levonis/pricing/shippingType';
 import {
+  productImageForSelection as resolveProductImageForSelection,
+  productVariantIdForSelection,
+} from '@levonis/pricing/productSelectionMedia';
+import {
   capacityFrom,
   EMPTY_RELATIONS,
   loadRelationsViews,
   snapshotFrom,
   type ProductRelationsView,
 } from './productOverlay';
+import {
+  resolveSelectionPhysicalDimensions,
+  type PhysicalDimensions,
+} from './physicalDimensions';
 import { bundleAvailability, type CompositionAvailability, type ResolvedComponent } from './bundleComposition';
 import type { OfferCheck } from './offers';
 import { mysteryRefusal } from './mystery/issues';
+import { canonicalProductMedia, primaryMediaFirst, upgradeMedia } from './productModel';
 
 /** Every `IN (…)` list this feature adds is chunked to a documented safe size
  *  (§3.1): D1 caps bound parameters per query, and a filament pool is product ×
@@ -172,6 +181,12 @@ export interface MysteryCandidate {
   name_snapshot: string;
   image_snapshot: string;
   variant_snapshot: string;
+  /**
+   * Internal checkout fact for the exact candidate selection. `loadCandidates`
+   * always supplies it; pure draw fixtures and historical replay candidates may
+   * omit it because dimensions do not participate in the random draw.
+   */
+  physical_dimensions?: PhysicalDimensions;
 }
 
 export type ExclusionReason =
@@ -342,6 +357,14 @@ interface EntryJoinRow {
   images: string;
   category_id: string | null;
   sub_category_id: string | null;
+  net_weight_g: number | null;
+  width_mm: number | null;
+  depth_mm: number | null;
+  height_mm: number | null;
+  package_weight_g: number | null;
+  package_width_mm: number | null;
+  package_depth_mm: number | null;
+  package_height_mm: number | null;
 }
 
 /** §7.2's query, verbatim in shape. The `preview` variant keeps the excluded
@@ -352,7 +375,9 @@ const CANDIDATE_SQL = (preview: boolean) => `
          e.active AS entry_active,
          p.inventory_mode, p.stock, p.stock_reserved, p.low_stock_threshold,
          p.status, p.sale_types, p.composition, p.name, p.images,
-         p.category_id, p.sub_category_id
+         p.category_id, p.sub_category_id,
+         p.net_weight_g, p.width_mm, p.depth_mm, p.height_mm,
+         p.package_weight_g, p.package_width_mm, p.package_depth_mm, p.package_height_mm
     FROM mystery_pool_entries e
     JOIN products p ON p.id = e.product_id
    WHERE e.pool_id = ?1
@@ -363,15 +388,13 @@ const CANDIDATE_SQL = (preview: boolean) => `
    ORDER BY e.id`;
 
 const firstImage = (raw: unknown): string => {
-  const parsed = typeof raw === 'string' && raw.trim() ? (JSON.parse(raw) as unknown) : raw;
-  if (!Array.isArray(parsed)) return '';
-  for (const item of parsed) {
-    if (typeof item === 'string' && item) return item;
-    if (item && typeof item === 'object' && typeof (item as { url?: unknown }).url === 'string') {
-      return (item as { url: string }).url;
-    }
+  try {
+    return canonicalProductMedia(upgradeMedia(raw))[0]?.url ?? '';
+  } catch {
+    // A legacy JSON cell is untrusted storage. A malformed value removes the
+    // thumbnail; it never turns into an external request or blocks the draw.
+    return '';
   }
-  return '';
 };
 
 /** The structured taxonomy a pool may require. NEVER a product name. */
@@ -636,6 +659,16 @@ export async function loadCandidates(
 
     const valueLabels = namedValues.map((v) => v?.name_en ?? '').filter(Boolean);
     const colorLabel = namedColor?.name_en ?? '';
+    const mediaSelection = { optionValueIds: valueIds, colorId: r.color_id || null };
+    const selectedVariantId = productVariantIdForSelection(view.variants, mediaSelection);
+    const relationalImage = resolveProductImageForSelection(
+      primaryMediaFirst(view.images.map((image) => ({
+        ...image,
+        primary: truthy(image.is_primary),
+        order: Number(image.sort_order ?? 0),
+      }))),
+      { ...mediaSelection, variantId: selectedVariantId }
+    )?.url ?? '';
     candidates.push({
       entry_id: r.entry_id,
       product_id: r.product_id,
@@ -647,8 +680,17 @@ export async function loadCandidates(
       targets: resolution.targets,
       counter_key: counter,
       name_snapshot: r.name,
-      image_snapshot: namedColor?.image || namedValues.find((v) => v?.image)?.image || firstImage(r.images),
+      // Freeze the same authoritative selection image the product/cart/order
+      // resolver uses. Legacy JSON is a fallback only when this product has
+      // no relational image rows at all; selector scalar image columns are
+      // rollout-era compatibility fields, never a competing authority.
+      image_snapshot: view.has_image_rows ? relationalImage : firstImage(r.images),
       variant_snapshot: [...valueLabels, colorLabel].filter(Boolean).join(' · '),
+      // Keep the candidate's physical facts beside its other draw-time
+      // snapshots. They remain server-only, but future fulfilment/volumetric
+      // calculations can read the immutable order-item columns instead of the
+      // mutable catalogue or the mystery offer's generic carton.
+      physical_dimensions: resolveSelectionPhysicalDimensions(r, view, mediaSelection),
     });
   }
 

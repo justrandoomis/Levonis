@@ -61,6 +61,7 @@ import {
   type AlertProductContext,
   type AlertWish,
 } from '../lib/stockAlertResolve';
+import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 
 export const stockAlertRoutes = new Hono<AppContext>();
 stockAlertRoutes.use('*', requireAuth);
@@ -551,7 +552,6 @@ interface ListRow extends AlertRowOut {
   name: string;
   name_ar: string;
   name_ku: string;
-  images: string;
   value_en: string | null;
   value_ar: string | null;
   value_ckb: string | null;
@@ -603,7 +603,7 @@ stockAlertRoutes.get('/', async (c) => {
     `SELECT a.id, a.product_id, a.kind, a.option_value_id, a.color_id, a.state, a.arm_seq,
             a.armed_channel, a.armed_at, a.notified_at, a.dead_reason,
             a.last_available,
-            p.slug, p.name, p.name_ar, p.name_ku, p.images,
+            p.slug, p.name, p.name_ar, p.name_ku,
             v.name_en AS value_en, v.name_ar AS value_ar, v.name_ckb AS value_ckb,
             k.name_en AS color_en, k.name_ar AS color_ar, k.name_ckb AS color_ckb
        FROM product_stock_alerts a
@@ -617,17 +617,16 @@ stockAlertRoutes.get('/', async (c) => {
     .bind(user.id)
     .all<ListRow>();
 
+  const images = await loadAuthoritativeProductImages(
+    c.env.DB,
+    (results ?? []).map((alert) => alert.product_id)
+  );
+
   return c.json({
     success: true,
     limit: MAX_ARMED_PER_USER,
     alerts: (results ?? []).map((r) => {
-      let image: string | null = null;
-      try {
-        const imgs = JSON.parse(String(r.images ?? '[]'));
-        image = Array.isArray(imgs) && imgs.length ? String(imgs[0]) : null;
-      } catch {
-        image = null;
-      }
+      const image = images.get(r.product_id) || null;
       return {
         id: r.id,
         product_id: r.product_id,

@@ -22,8 +22,20 @@
  * neither options nor colours nor images.
  */
 
-import { primaryMediaFirst, type MediaV2, type ProductDoc } from './productModel';
-import type { ColorV2, OptionFulfillment, OptionV2 } from './pricing';
+import {
+  canonicalProductMedia,
+  canonicalProductMediaUrl,
+  isCanonicalProductMedia,
+  type MediaV2,
+  type ProductDoc,
+} from './productModel';
+import type {
+  ColorV2,
+  OptionFulfillment,
+  OptionV2,
+  PhysicalDimensionOverrides,
+} from './pricing';
+import { parsePhysicalDimensions } from './physicalDimensions';
 import {
   liveValues,
   loadProductRelations,
@@ -47,7 +59,7 @@ import {
   variantLabelFallback,
 } from './availability';
 
-export interface VariantRow {
+export interface VariantRow extends PhysicalDimensionOverrides {
   id: string;
   product_id: string;
   combo_key: string;
@@ -91,10 +103,35 @@ export interface ImageRow {
   /** Recorded by the uploader; carried so a text edit does not erase it. */
   content_type?: string | null;
   bytes?: number | null;
+  /** 0099. Quarantined rows are provenance, never display media. */
+  quarantined?: number | boolean | null;
+  quarantine_reason?: string | null;
+}
+
+/**
+ * Only a canonical, explicitly active row can enter a product projection.
+ * `quarantined` is an additional deny bit, never an allow bit: an old worker
+ * may have written a malformed row without it, so canonical URL/key checks
+ * still apply independently.
+ */
+export function isActiveProductImageRow(row: ImageRow | Record<string, unknown>): boolean {
+  const marked = row.quarantined === 1 || row.quarantined === true;
+  return !marked && isCanonicalProductMedia(row);
+}
+
+/** The cross-field invariant required before a quarantine row may be echoed
+ * through the admin repair protocol. */
+export function isValidProductImageQuarantine(row: ImageRow | Record<string, unknown>): boolean {
+  const marked = row.quarantined === 1 || row.quarantined === true;
+  return marked && String(row.url ?? '').trim() === '' &&
+    String(row.r2_key ?? '').trim() === '' && String(row.source_url ?? '').trim() !== '';
 }
 
 export interface ProductRelationsView {
   has_relations: boolean;
+  /** True even when every image row is quarantined. It suppresses fallback to
+   * stale `products.images` JSON without exposing the quarantined rows. */
+  has_image_rows?: boolean;
   inventory_mode: InventoryMode;
   groups: OptionGroupRow[];
   values: OptionValueRow[];
@@ -109,6 +146,7 @@ export interface ProductRelationsView {
 
 export const EMPTY_RELATIONS: ProductRelationsView = {
   has_relations: false,
+  has_image_rows: false,
   inventory_mode: 'BASE',
   groups: [],
   values: [],
@@ -186,10 +224,12 @@ export async function loadRelationsView(
         .all<ImageRow>()
     ),
   ]);
+  const activeImages = images.filter(isActiveProductImageRow);
   const has =
     rel.groups.length > 0 || rel.values.length > 0 || rel.colors.length > 0 || images.length > 0;
   return {
     has_relations: has,
+    has_image_rows: images.length > 0,
     inventory_mode: isInventoryMode(inventoryMode) ? inventoryMode : 'BASE',
     groups: rel.groups,
     // A row merged into another model by 0073 is history, not a model. It is
@@ -198,7 +238,7 @@ export async function loadRelationsView(
     colors: rel.colors,
     links: rel.links,
     variants,
-    images,
+    images: activeImages,
     fulfillments: rel.fulfillments,
     transports: rel.transports,
   };
@@ -287,9 +327,11 @@ export async function loadRelationsViews(
     const gs = g.get(row.id) ?? [];
     const vs = liveValues(v.get(row.id) ?? []);
     const cs = c.get(row.id) ?? [];
-    const ims = im.get(row.id) ?? [];
+    const storedImages = im.get(row.id) ?? [];
+    const ims = storedImages.filter(isActiveProductImageRow);
     out.set(row.id, {
-      has_relations: gs.length > 0 || vs.length > 0 || cs.length > 0 || ims.length > 0,
+      has_relations: gs.length > 0 || vs.length > 0 || cs.length > 0 || storedImages.length > 0,
+      has_image_rows: storedImages.length > 0,
       inventory_mode: isInventoryMode(row.inventory_mode) ? row.inventory_mode : 'BASE',
       groups: gs,
       values: vs,
@@ -457,9 +499,10 @@ export function applyRelations(
       name_ar: nameIn(v.name_ar, v.name_en),
       name_en: v.name_en,
       name_ckb: nameIn(v.name_ckb, v.name_en),
-      image: v.image,
+      image: canonicalProductMediaUrl(v.image),
       order: v.sort,
       active: showAll ? truthy(v.active) : true,
+      ...parsePhysicalDimensions(v as unknown as Record<string, unknown>),
       group_en: groupNameById.get(v.group_id) ?? '',
       sku_part: v.sku_part ?? '',
       low_stock_threshold: v.low_stock_threshold ?? null,
@@ -512,13 +555,14 @@ export function applyRelations(
         name_en: x.name_en,
         name_ckb: nameIn(x.name_ckb, x.name_en),
         hex: x.hex,
-        image: x.image,
+        image: canonicalProductMediaUrl(x.image),
         option_id: linked.length === 1 ? linked[0] : null,
         // The FULL link set, which `option_id` can only express when there is
         // exactly one. Admin readers restore the real constraint from this.
         option_ids: linked,
         order: x.sort,
         active: showAll ? truthy(x.active) : true,
+        ...parsePhysicalDimensions(x as unknown as Record<string, unknown>),
         stock: x.stock ?? null,
         low_stock_threshold: x.low_stock_threshold ?? null,
         sku_part: x.sku_part ?? '',
@@ -546,12 +590,12 @@ export function applyRelations(
    * 'includes')". The cast is gone so the next missing field is a build error
    * rather than a 500.
    *
-   * `width`/`height` come from the row; the rest are '' because the relational
-   * image table genuinely does not carry them, and an empty string is the
-   * honest answer for "no alt text was written", not a guess at one.
+   * Dimensions, verified object metadata and provenance come from the row.
+   * Empty strings remain the honest answer for alt text that was never
+   * written, rather than inventing one during the overlay.
    */
-  const media: MediaV2[] =
-    view.images.length > 0
+  const mediaCandidates: MediaV2[] =
+    (view.has_image_rows ?? view.images.length > 0)
       ? view.images.map((i) => ({
           id: i.id,
           url: i.url,
@@ -564,6 +608,8 @@ export function applyRelations(
           primary: i.is_primary === 1,
           width: i.width,
           height: i.height,
+          content_type: i.content_type ?? '',
+          bytes: i.bytes ?? null,
           source_url: i.source_url ?? '',
           // WHAT THE PICTURE IS OF. Dropped before 0048 existed, which is why
           // exporting and re-importing unbound every option and colour photo.
@@ -573,7 +619,7 @@ export function applyRelations(
         }))
       : doc.media;
 
-  return { ...doc, options, colors, media: primaryMediaFirst(media) };
+  return { ...doc, options, colors, media: canonicalProductMedia(mediaCandidates) };
 }
 
 /** The snapshot the inventory engine needs, from an already-loaded view. */
@@ -806,8 +852,9 @@ export function publicRelations(view: ProductRelationsView, coarse = false) {
           .map((v) => ({
             id: v.id,
             name_en: v.name_en,
-            image: v.image,
+            image: canonicalProductMediaUrl(v.image),
             sort: v.sort,
+            ...parsePhysicalDimensions(v as unknown as Record<string, unknown>),
             available: availableOf(v.stock, v.reserved),
             ...(coarse ? { stock_state: stateOf(v.stock, v.reserved, v.low_stock_threshold) } : {}),
             regular_price_iqd: v.regular_price_iqd,
@@ -821,8 +868,9 @@ export function publicRelations(view: ProductRelationsView, coarse = false) {
         id: x.id,
         name_en: x.name_en,
         hex: x.hex,
-        image: x.image,
+        image: canonicalProductMediaUrl(x.image),
         sort: x.sort,
+        ...parsePhysicalDimensions(x as unknown as Record<string, unknown>),
         // The real many-to-many links, grouped so the client can apply the
         // same OR-within / AND-across rule the server enforces.
         links: (linksByColor.get(x.id) ?? []).map((l) => ({
@@ -840,6 +888,7 @@ export function publicRelations(view: ProductRelationsView, coarse = false) {
       .map((v) => ({
         id: v.id,
         combo_key: v.combo_key,
+        ...parsePhysicalDimensions(v as unknown as Record<string, unknown>),
         // Exact option×colour stock is what a direct-sale colour chip needs.
         // As at the other levels, public readers receive only the sellable
         // remainder (or a coarse state for mystery products), never counters.
@@ -849,7 +898,7 @@ export function publicRelations(view: ProductRelationsView, coarse = false) {
         prime_price_iqd: v.prime_price_iqd,
         pro_price_iqd: v.pro_price_iqd,
       })),
-    images: view.images.map((i) => ({
+    images: view.images.filter(isCanonicalProductMedia).map((i) => ({
       id: i.id,
       url: i.url,
       alt_en: i.alt_en,

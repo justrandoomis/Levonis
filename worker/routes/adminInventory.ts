@@ -16,6 +16,7 @@ import {
 } from '../lib/inventoryReceiving';
 import { lotCostBreakdown } from '../lib/inventoryLots';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
+import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 
 /**
  * «إدارة المخزون» — THE OPERATIONAL LAYER, AS AN API.
@@ -181,7 +182,7 @@ adminInventoryRoutes.get('/lines', async (c) => {
 
   const { results } = await c.env.DB.prepare(
     `SELECT l.product_id, l.scope, l.scope_id,
-            p.name AS product_name, p.images AS product_images, p.sku AS product_sku,
+            p.name AS product_name, p.sku AS product_sku,
             p.inventory_mode,
             COUNT(*) AS lot_count,
             SUM(l.qty_remaining) AS on_hand,
@@ -199,6 +200,10 @@ adminInventoryRoutes.get('/lines', async (c) => {
     .all<Record<string, unknown>>();
 
   const rows = results ?? [];
+  const images = await loadAuthoritativeProductImages(
+    c.env.DB,
+    rows.map((line) => String(line.product_id))
+  );
 
   // The FIFO head and tail per identity: «Next FIFO cost» and the newest layer,
   // which §50 says must be visible so a single misleading "Product Cost" cannot
@@ -229,7 +234,7 @@ adminInventoryRoutes.get('/lines', async (c) => {
           product_id: r.product_id,
           product_name: r.product_name ?? null,
           product_sku: r.product_sku ?? null,
-          product_image: firstImage(r.product_images),
+          product_image: images.get(String(r.product_id)) || null,
           inventory_mode: r.inventory_mode ?? null,
           scope: r.scope,
           scope_id: r.scope_id,
@@ -247,15 +252,6 @@ adminInventoryRoutes.get('/lines', async (c) => {
     })
   );
 });
-
-function firstImage(raw: unknown): string | null {
-  try {
-    const list = JSON.parse(String(raw ?? '[]')) as unknown;
-    return Array.isArray(list) && typeof list[0] === 'string' ? list[0] : null;
-  } catch {
-    return null;
-  }
-}
 
 // ===========================================================================
 //  3. LOTS — §50
@@ -298,7 +294,7 @@ adminInventoryRoutes.get('/incoming', async (c) => {
   const args = status && where.includes('?') ? [status] : [];
 
   const { results } = await c.env.DB.prepare(
-    `SELECT i.*, p.name AS product_name, p.images AS product_images, s.name AS supplier_name
+    `SELECT i.*, p.name AS product_name, s.name AS supplier_name
        FROM incoming_inventory i
        LEFT JOIN products p ON p.id = i.product_id
        LEFT JOIN inventory_suppliers s ON s.id = i.supplier_id
@@ -309,14 +305,17 @@ adminInventoryRoutes.get('/incoming', async (c) => {
   )
     .bind(...args)
     .all<Record<string, unknown>>();
+  const images = await loadAuthoritativeProductImages(
+    c.env.DB,
+    (results ?? []).map((incoming) => String(incoming.product_id))
+  );
 
   return c.json(
     projectForAdmin(c.env, c.get('user'), {
       success: true,
       incoming: (results ?? []).map((r) => ({
         ...r,
-        product_image: firstImage(r.product_images),
-        product_images: undefined,
+        product_image: images.get(String(r.product_id)) || null,
         // DERIVED, NEVER STORED (§7). Two numbers that must agree are one
         // number and a copy of it.
         purchase_total_iqd: Number(r.qty_ordered) * Number(r.purchase_unit_iqd),

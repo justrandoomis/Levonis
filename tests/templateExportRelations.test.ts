@@ -72,7 +72,7 @@ function relationalView(): ProductRelationsView {
     links: [],
     variants: [],
     images: [
-      { id: 'im1', product_id: 'prd_x', url: '/files/products/a.jpg', alt_en: 'front',
+      { id: 'im1', product_id: 'prd_x', url: '/files/products/a.webp', r2_key: 'products/a.webp', alt_en: 'front',
         sort_order: 0, is_primary: 1, option_value_id: null, color_id: null, variant_id: null,
         width: 1200, height: 900 },
     ],
@@ -136,7 +136,7 @@ test('a relational image no longer crashes the whole export', () => {
     assert.notEqual(e.value, undefined, `${e.key} has an undefined value`);
   }
   const text = exportProduct(doc, { includeCost: true });
-  assert.ok(text.includes('images.1.url=/files/products/a.jpg'));
+  assert.ok(text.includes('images.1.url=/files/products/a.webp'));
   assert.ok(text.includes('images.1.primary='));
 });
 

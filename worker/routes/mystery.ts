@@ -47,9 +47,11 @@ import { parseProductRow, projectAdmin, validateProductDoc, type ProductDoc } fr
 import {
   localizeRespectingAuthored,
   planProductSave,
+  preflightProductSave,
   reloadForVerification,
   saveProductAtomic,
   verifyApplied,
+  type ProductWriteIntent,
   type ProductSavePlan,
 } from '../lib/productPersistence';
 import { MAX_PHYSICAL_LINES, type BundleIssue } from '../lib/bundleComposition';
@@ -74,6 +76,7 @@ import {
   type PoolEntryInput,
 } from '../lib/mystery/pools';
 import { mysteryIssue, staleEdit } from '../lib/mystery/issues';
+import { verifyAndNormalizeProductMedia } from '../lib/productMediaWrite';
 import { slugToken, uniqueSlugIn } from './adminProducts';
 
 export const adminMysteryRoutes = new Hono<AppContext>();
@@ -778,7 +781,7 @@ async function writeOffer(c: Context<AppContext>, mode: 'create' | 'update', pro
   }
 
   const localized = localizeRespectingAuthored(doc, prev);
-  const plan: ProductSavePlan = await planProductSave(c.env.DB, {
+  const saveIntent: ProductWriteIntent = {
     mode,
     doc,
     prev,
@@ -788,7 +791,15 @@ async function writeOffer(c: Context<AppContext>, mode: 'create' | 'update', pro
     // The bundles panel and this one are the only writers allowed to create a
     // composition row, and both supply the composition in the same plan.
     allowComposition: true,
-  });
+  };
+  await preflightProductSave(c.env.DB, saveIntent);
+
+  // Mystery offers use the ordinary product gallery. Resolve every claimed
+  // `/files` object only after both the mystery configuration and the product
+  // structure have passed read-only validation, then rebuild the product plan
+  // with the byte-authoritative metadata.
+  await verifyAndNormalizeProductMedia(c.env, doc);
+  const plan: ProductSavePlan = await planProductSave(c.env.DB, saveIntent);
   plan.statements.push(
     ...mysteryStatements(c.env.DB, id, input),
     // The secret is created once and never rotated by an ordinary save: a
@@ -1016,14 +1027,21 @@ adminMysteryRoutes.post('/offers/:productId/duplicate', async (c) => {
     max_qty_per_order: cfg?.max_qty_per_order ?? 5,
   };
 
-  const plan = await planProductSave(c.env.DB, {
+  const saveIntent: ProductWriteIntent = {
     mode: 'create',
     doc,
     prev: null,
     relations: null,
     actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
     allowComposition: true,
-  });
+  };
+  await preflightProductSave(c.env.DB, saveIntent);
+
+  // A duplicate is a new catalogue write, not permission to carry a missing
+  // or replaced source object into another product document. The structural
+  // plan has already succeeded, so normalize and rebuild only now.
+  await verifyAndNormalizeProductMedia(c.env, doc);
+  const plan = await planProductSave(c.env.DB, saveIntent);
   plan.statements.push(
     ...mysteryStatements(c.env.DB, newProductId, input),
     rotateOfferSecretStatement(c.env.DB, newProductId)

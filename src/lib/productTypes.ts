@@ -4,6 +4,15 @@
  * the template import UI so every surface agrees on field names.
  */
 
+import {
+  EMPTY_PHYSICAL_DIMENSIONS,
+  PHYSICAL_DIMENSION_FIELDS,
+  parsePhysicalDimensions,
+  resolvePhysicalDimensionChain,
+  type PhysicalDimensionOverrides,
+  type PhysicalDimensions,
+} from '../../packages/pricing/src/physicalDimensions';
+
 export type Lang = 'ar' | 'en' | 'ckb';
 
 export interface PriceFieldsV2 {
@@ -31,7 +40,7 @@ export interface PriceFieldsV2 {
  * document, the overlay copies them from the relational rows, and the editor
  * reads them when a product has a document but no relation rows yet.
  */
-export interface OptionV2 extends PriceFieldsV2 {
+export interface OptionV2 extends PriceFieldsV2, ProductDimensionOverridesV2 {
   id: string;
   name_ar: string;
   name_en: string;
@@ -54,7 +63,7 @@ export interface OptionV2 extends PriceFieldsV2 {
   low_stock_threshold?: number | null;
 }
 
-export interface ColorV2 extends PriceFieldsV2 {
+export interface ColorV2 extends PriceFieldsV2, ProductDimensionOverridesV2 {
   id: string;
   name_ar: string;
   name_en: string;
@@ -84,6 +93,9 @@ export interface MediaV2 {
   primary: boolean;
   width: number | null;
   height: number | null;
+  /** Storage metadata belongs to the canonical product_images row. */
+  bytes?: number | null;
+  content_type?: string;
   source_url: string;
   /** What the picture is of — at most one is set; '' = general gallery image.
    *  Carried by the server's MediaV2 since 0048. */
@@ -201,26 +213,32 @@ export interface TranslationMetaV2 {
 }
 
 /** The eight measurements, mirroring `ProductDimensions` on the server. */
-export interface ProductDimensionsV2 {
-  net_weight_g: number | null;
-  width_mm: number | null;
-  depth_mm: number | null;
-  height_mm: number | null;
-  package_weight_g: number | null;
-  package_width_mm: number | null;
-  package_depth_mm: number | null;
-  package_height_mm: number | null;
+export type ProductDimensionsV2 = PhysicalDimensions;
+
+/**
+ * Per-selection measurements use the same eight canonical units as the
+ * product, but every field is optional on legacy documents and nullable on
+ * current ones. `null` is an explicit "inherit the next rung" instruction;
+ * it must never be filled with the inherited number in editor state.
+ */
+export type ProductDimensionOverridesV2 = PhysicalDimensionOverrides;
+
+export const DIMENSION_KEYS = PHYSICAL_DIMENSION_FIELDS;
+
+export const emptyDimensions = EMPTY_PHYSICAL_DIMENSIONS;
+
+/** Fill an override-shaped value without treating absence as zero. */
+export function dimensionOverrides(value?: ProductDimensionOverridesV2 | null): ProductDimensionsV2 {
+  return parsePhysicalDimensions(value as Record<string, unknown> | null | undefined);
 }
 
-export const DIMENSION_KEYS = [
-  'net_weight_g', 'width_mm', 'depth_mm', 'height_mm',
-  'package_weight_g', 'package_width_mm', 'package_depth_mm', 'package_height_mm',
-] as const;
-
-export const emptyDimensions = (): ProductDimensionsV2 => ({
-  net_weight_g: null, width_mm: null, depth_mm: null, height_mm: null,
-  package_weight_g: null, package_width_mm: null, package_depth_mm: null, package_height_mm: null,
-});
+/** Resolve dimensions from least to most specific, one field at a time. */
+export function resolveDimensions(
+  base: ProductDimensionsV2,
+  ...overrides: Array<ProductDimensionOverridesV2 | null | undefined>
+): ProductDimensionsV2 {
+  return resolvePhysicalDimensionChain(base, ...overrides);
+}
 
 export interface ProductDocV2 {
   /**

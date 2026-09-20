@@ -129,6 +129,22 @@ test('printable document is standalone html with noindex and no scripts', () => 
   assert.ok(!/<script/i.test(doc));
 });
 
+test('printable invoice renders the immutable owned image while email stays image-free', () => {
+  const withImage = invoice({
+    lines: [{ ...invoice().lines[0], image: '/files/products/order-snapshot.webp' }],
+  });
+  const printable = renderInvoiceHtmlDocument('en', withImage);
+  assert.match(printable, /<img[^>]+src="\/files\/products\/order-snapshot\.webp"/);
+  assert.doesNotMatch(renderOrderInvoiceEmail('en', withImage, '').html, /<img/i);
+});
+
+test('printable invoice never renders an external snapshot URL', () => {
+  const unsafe = invoice({
+    lines: [{ ...invoice().lines[0], image: 'https://external.example/hotlink.jpg' }],
+  });
+  assert.doesNotMatch(renderInvoiceHtmlDocument('en', unsafe), /external\.example/);
+});
+
 test('invoiceEmailData maps the persisted snapshot faithfully', () => {
   const snapshot: InvoiceSnapshotV1 = {
     version: 1,
@@ -147,6 +163,7 @@ test('invoiceEmailData maps the persisted snapshot faithfully', () => {
         order_item_id: 'oi_1',
         product_id: 'p1',
         name: 'Filament PLA',
+        image: '/files/products/filament.webp',
         variant: 'Red',
         qty: 3,
         unit_price_iqd: 20_000,
@@ -176,6 +193,7 @@ test('invoiceEmailData maps the persisted snapshot faithfully', () => {
   assert.equal(data.points_applied_iqd, 10_000);
   assert.equal(data.payment_status, 'cod_due');
   assert.equal(data.lines[0].line_total_iqd, 60_000);
+  assert.equal(data.lines[0].image, '/files/products/filament.webp');
   // Revision > 1 shows up in the rendered document.
   const m = renderOrderInvoiceEmail('en', data, '');
   assert.ok(m.text.includes('Revision: 2'));

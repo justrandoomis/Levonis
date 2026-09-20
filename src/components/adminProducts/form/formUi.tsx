@@ -799,10 +799,20 @@ export function ImgSlot({
   url,
   label,
   onChange,
+  onUploaded,
 }: {
   url: string;
   label: string;
   onChange: (url: string | null) => void;
+  /** Canonical product-image callers keep the upload metadata with the URL. */
+  onUploaded?: (asset: {
+    url: string;
+    key: string;
+    width: number | null;
+    height: number | null;
+    bytes: number | null;
+    content_type: string;
+  }) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -816,7 +826,18 @@ export function ImgSlot({
     setBusy(true);
     try {
       const res = await uploadFile(file, 'product');
-      onChange(res.url);
+      if (onUploaded) {
+        onUploaded({
+          url: res.url,
+          key: res.key,
+          width: res.width ?? null,
+          height: res.height ?? null,
+          bytes: res.bytes ?? null,
+          content_type: res.mime ?? '',
+        });
+      } else {
+        onChange(res.url);
+      }
     } catch (e) {
       setErr(failureText(e, 'فشل الرفع / upload failed'));
     } finally {

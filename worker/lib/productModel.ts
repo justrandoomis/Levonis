@@ -35,6 +35,14 @@ import { specGroupsFromFields } from './templateFamilies';
 import { isValidFeePercent, mergeOpsPolicy, parseFeePercent, readOpsWarranty } from './warrantyPlans';
 import type { ProductDeliveryOptions, ProductDeliveryRule } from './shipping';
 import { parseConditionDoc, serializeConditionDoc, type ConditionDoc } from './condition';
+import {
+  DIMENSION_FIELDS,
+  parseDimensions,
+  type PhysicalDimensions as ProductDimensions,
+} from './physicalDimensions';
+
+export { DIMENSION_FIELDS, EMPTY_DIMENSIONS, parseDimensions } from './physicalDimensions';
+export type { PhysicalDimensions as ProductDimensions } from './physicalDimensions';
 
 export const DOC_VERSION = 2;
 
@@ -50,6 +58,9 @@ export interface MediaV2 {
   primary: boolean;
   width: number | null;
   height: number | null;
+  /** Verified R2 metadata. Optional only for pre-verifier legacy documents. */
+  bytes?: number | null;
+  content_type?: string;
   source_url: string; // original remote source when imported
   /**
    * WHAT THIS PICTURE IS OF.
@@ -187,51 +198,6 @@ export interface TranslationMeta {
  * THERE IS NO VOLUME FIELD, deliberately: it is length x width x height, and a
  * stored copy is a third number that can disagree with the two it came from.
  */
-export interface ProductDimensions {
-  net_weight_g: number | null;
-  width_mm: number | null;
-  depth_mm: number | null;
-  height_mm: number | null;
-  package_weight_g: number | null;
-  package_width_mm: number | null;
-  package_depth_mm: number | null;
-  package_height_mm: number | null;
-}
-
-/** The eight keys, in one place, so a reader, a writer and a column list
- *  cannot drift apart. */
-export const DIMENSION_FIELDS = [
-  'net_weight_g', 'width_mm', 'depth_mm', 'height_mm',
-  'package_weight_g', 'package_width_mm', 'package_depth_mm', 'package_height_mm',
-] as const;
-
-export const EMPTY_DIMENSIONS = (): ProductDimensions => ({
-  net_weight_g: null, width_mm: null, depth_mm: null, height_mm: null,
-  package_weight_g: null, package_width_mm: null, package_depth_mm: null, package_height_mm: null,
-});
-
-/**
- * A measurement, or NULL. Never 0 by coercion.
- *
- * Zero is not a weight and not a width, so a `0` arriving from an empty form
- * field is read as "not measured" rather than stored as a fact that would make
- * a freight estimate read as free. A negative or fractional value is refused
- * the same way: the columns are integers and half a millimetre is noise.
- */
-const dimension = (v: unknown): number | null => {
-  if (v === null || v === undefined || v === '') return null;
-  const n = typeof v === 'number' ? v : Number(v);
-  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return null;
-  return Math.min(n, 100_000_000);
-};
-
-export function parseDimensions(src: Record<string, unknown> | null | undefined): ProductDimensions {
-  const out = EMPTY_DIMENSIONS();
-  if (!src) return out;
-  for (const k of DIMENSION_FIELDS) out[k] = dimension(src[k]);
-  return out;
-}
-
 export interface ProductDoc {
   id: string;
   slug: string;
@@ -412,15 +378,23 @@ export function upgradeMedia(raw: unknown): MediaV2[] {
     } else if (item && typeof item === 'object') {
       const m = item as Partial<MediaV2>;
       if (!m.url && !m.key) return;
+      const rawUrl = s(m.url, 1000);
+      const rawKey = s(m.key, 400);
+      const url = rawUrl || (rawKey ? `/files/${rawKey}` : '');
+      // A local delivery URL already names its R2 key. Derive it when older
+      // clients omit the duplicate convenience field, while still validating
+      // an explicitly supplied key against the URL below.
+      const key = rawKey || (isOwnedMediaUrl(url) ? url.slice('/files/'.length) : '');
       out.push({
         id: ensureId(m.id, 'img'),
-        url: s(m.url, 1000) || (m.key ? `/files/${m.key}` : ''),
-        key: s(m.key, 400),
+        url,
+        key,
         role: 'gallery',
         alt_ar: s(m.alt_ar, 300), alt_en: s(m.alt_en, 300), alt_ckb: s(m.alt_ckb, 300),
         order: typeof m.order === 'number' ? m.order : i,
         primary: !!m.primary,
         width: num(m.width), height: num(m.height),
+        bytes: num(m.bytes), content_type: s(m.content_type, 100),
         source_url: s(m.source_url, 1000),
         option_value_id: s(m.option_value_id, 60),
         color_id: s(m.color_id, 60),
@@ -437,6 +411,45 @@ export function upgradeMedia(raw: unknown): MediaV2[] {
     if (m.primary) seen = true;
   }
   return out;
+}
+
+/** The two stored spellings used by ProductDoc and `product_images` rows. */
+export interface ProductMediaLocator {
+  url?: unknown;
+  key?: unknown;
+  r2_key?: unknown;
+}
+
+/**
+ * Return the key only when a row is safe to expose as active product media.
+ * Quarantined rows (empty URL), external hotlinks, traversal-ish keys,
+ * non-WebP legacy objects, and mismatched URL/key pairs all fail closed.
+ */
+export function canonicalProductMediaKey(media: ProductMediaLocator): string | null {
+  const key = typeof media.key === 'string'
+    ? media.key
+    : typeof media.r2_key === 'string'
+      ? media.r2_key
+      : '';
+  const url = typeof media.url === 'string' ? media.url : '';
+  if (!key || !isSafeMediaKey(key) || !key.endsWith('.webp')) return null;
+  return url === `/files/${key}` ? key : null;
+}
+
+export function isCanonicalProductMedia(media: ProductMediaLocator): boolean {
+  return canonicalProductMediaKey(media) !== null;
+}
+
+/** A selector scalar has no separate key column, so derive it from its URL. */
+export function canonicalProductMediaUrl(value: unknown): string {
+  if (typeof value !== 'string' || !isOwnedMediaUrl(value)) return '';
+  const key = value.slice('/files/'.length);
+  return key.endsWith('.webp') ? value : '';
+}
+
+/** The only gallery list any product projection should hand to a reader. */
+export function canonicalProductMedia(media: readonly MediaV2[]): MediaV2[] {
+  return primaryMediaFirst(media.filter(isCanonicalProductMedia));
 }
 
 /**
@@ -461,7 +474,7 @@ export function primaryMediaFirst<T extends Pick<MediaV2, 'primary' | 'order'>>(
 }
 
 export function primaryMedia(media: readonly MediaV2[]): MediaV2 | undefined {
-  return primaryMediaFirst(media)[0];
+  return canonicalProductMedia(media)[0];
 }
 
 // Compare-at is gone (mandate §4). A stored v2 option/color may still carry
@@ -549,6 +562,9 @@ export function upgradeOptions(raw: unknown): OptionV2[] {
       order: typeof o.order === 'number' ? (o.order as number) : i,
       active: o.active !== false,
       ...upgradePriceFields(o),
+      // Selection-specific physical facts use the same flat column names as
+      // their relation rows. NULL means inherit from the product.
+      ...parseDimensions(o),
       availability_type: normalizeAvailability(o.availability_type),
       stock: num(o.stock),
       lead_time_text: s(o.lead_time_text, 200),
@@ -611,6 +627,7 @@ export function upgradeColors(raw: unknown): ColorV2[] {
       order: typeof c.order === 'number' ? (c.order as number) : i,
       active: c.active !== false,
       ...upgradePriceFields(c),
+      ...parseDimensions(c),
       // The FULL link set. `option_id` above keeps the single-link legacy
       // meaning; this is what a colour offered for two of four options needs,
       // and it is what the relational writer actually stores. A comma string
@@ -937,12 +954,37 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     return v as number;
   };
 
+  /** Reads accept old numeric strings, but a stated measurement must still be
+   * a positive whole number. Invalid input is refused instead of silently
+   * becoming NULL (which would mean "inherit" and hide the typo). */
+  const validateDimensionObject = (raw: unknown, path: string) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+    const source = raw as Record<string, unknown>;
+    for (const field of DIMENSION_FIELDS) {
+      if (!Object.prototype.hasOwnProperty.call(source, field)) continue;
+      const value = source[field];
+      if (value === null || value === undefined || value === '') continue;
+      const n = typeof value === 'number' ? value : Number(value);
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0 || n > 100_000_000) {
+        fail(`${path}.${field}`, 'must be a positive whole number, or null to inherit');
+      }
+    }
+  };
+
+  const productDimensionSource =
+    body.dimensions && typeof body.dimensions === 'object' && !Array.isArray(body.dimensions)
+      ? body.dimensions
+      : body;
+  validateDimensionObject(productDimensionSource, 'dimensions');
+
   const sellingType = body.selling_type === 'pre_order' || body.selling_type === 'bundle' ? body.selling_type : 'direct_sale';
 
   // Repeatable groups run through the same upgraders (they accept v2 shapes),
   // then get structural checks.
   const options = upgradeOptions(body.options ?? []);
   const colors = upgradeColors(body.colors ?? []);
+  safeParseArr(body.options ?? []).forEach((row, i) => validateDimensionObject(row, `options[${i}]`));
+  safeParseArr(body.colors ?? []).forEach((row, i) => validateDimensionObject(row, `colors[${i}]`));
   const media = upgradeMedia(body.media ?? body.images ?? []);
 
   /**
@@ -964,14 +1006,13 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
    *
    * `source_url` is untouched and stays absolute on purpose: it records where
    * a picture came FROM. It is never what the page loads.
-   */
+  */
   media.forEach((m, i) => {
-    if (m.key && isSafeMediaKey(m.key) && (!m.url || isOwnedMediaUrl(m.url))) return;
-    if (isOwnedMediaUrl(m.url)) return;
+    if (isCanonicalProductMedia(m)) return;
     fail(
       `media[${i}].url`,
-      `رابط خارجي لا يُخزَّن كصورة منتج ("${m.url.slice(0, 120)}") — ارفع الصورة أو استعمل حقل جلب الصورة / ` +
-        'an external link is never stored as a product image — upload the file, or use the fetch-by-URL field which downloads and converts it / ' +
+      `صورة المنتج يجب أن تكون WebP محلية وأن يطابق url مفتاح R2 ("${m.url.slice(0, 120)}") — ارفع الصورة أو استعمل حقل جلب الصورة / ` +
+        'a product image must be an owned WebP whose url exactly matches its R2 key — upload the file, or use the fetch-by-URL field / ' +
         'بەستەری دەرەکی وەک وێنەی بەرهەم هەڵناگیرێت — وێنەکە بار بکە یان خانەی هێنانی وێنە بەکاربهێنە'
     );
   });
@@ -1332,11 +1373,7 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     condition: parseConditionDoc(body.condition),
     // The form sends a nested object; the import sends flat columns. Both are
     // accepted, so neither needs its own shape of this section.
-    dimensions: parseDimensions(
-      (body.dimensions && typeof body.dimensions === 'object'
-        ? (body.dimensions as Record<string, unknown>)
-        : (body as Record<string, unknown>))
-    ),
+    dimensions: parseDimensions(productDimensionSource as Record<string, unknown>),
     media,
     options,
     colors,
@@ -1446,7 +1483,12 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
 
 /** Admin projection: the full document (costs included). */
 export function projectAdmin(doc: ProductDoc) {
-  return doc;
+  return {
+    ...doc,
+    media: canonicalProductMedia(doc.media),
+    options: doc.options.map((option) => ({ ...option, image: canonicalProductMediaUrl(option.image) })),
+    colors: doc.colors.map((color) => ({ ...color, image: canonicalProductMediaUrl(color.image) })),
+  };
 }
 
 /**
@@ -1519,7 +1561,7 @@ const coarseLevel = <T extends Record<string, unknown>>(x: T): T =>
  * GETs around a confirmation still identified the drawn colour exactly.
  */
 export function projectPublic(doc: ProductDoc, coarse = false) {
-  const media = primaryMediaFirst(doc.media);
+  const media = canonicalProductMedia(doc.media);
   return {
     id: doc.id,
     slug: doc.slug,
@@ -1547,6 +1589,10 @@ export function projectPublic(doc: ProductDoc, coarse = false) {
     template_family: doc.template_family,
     sku: doc.sku,
     spec_fields: doc.spec_fields,
+    // Public physical facts are needed to resolve a selected model/colour
+    // field-by-field. Relation rows only carry overrides; without this base
+    // the storefront would turn an inherited dimension into an unknown one.
+    dimensions: doc.dimensions,
     // Shown, not hidden: the whole point of a graded listing is that the buyer
     // can see what they are accepting. Cost fields are stripped elsewhere in
     // this projection; nothing in the condition document is internal.
@@ -1556,10 +1602,12 @@ export function projectPublic(doc: ProductDoc, coarse = false) {
     options: doc.options
       .filter((o) => o.active)
       .map(stripCostFields)
+      .map((o) => ({ ...o, image: canonicalProductMediaUrl(o.image) }))
       .map((o) => (coarse ? coarseLevel(o) : o)),
     colors: doc.colors
       .filter((c) => c.active)
       .map(stripCostFields)
+      .map((c) => ({ ...c, image: canonicalProductMediaUrl(c.image) }))
       .map((c) => (coarse ? coarseLevel(c) : c)),
     /**
      * The hand-typed groups first, then the family's own filled-in fields

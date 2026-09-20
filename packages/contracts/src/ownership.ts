@@ -34,7 +34,10 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // (migration 0073). Catalogue shape and catalogue pricing, so they belong
     // to the same owner as the option rows they hang off.
     'product_option_fulfillment', 'product_option_transports',
-    'product_imports', 'price_history', 'inventory_ledger', 'catalogs', 'brands', 'facets', 'hashtags', 'bundles', 'bundle_items',
+    // The import header and its per-product crash-resume checkpoints are one
+    // Catalogue aggregate: the checkpoint commits in the same batch as the
+    // product rows it says were applied.
+    'product_imports', 'product_import_items', 'price_history', 'inventory_ledger', 'catalogs', 'brands', 'facets', 'hashtags', 'bundles', 'bundle_items',
     /**
      * 0098 — THE COST LAYERS UNDER THE STOCK COUNTERS.
      *
@@ -205,12 +208,12 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ]),
   ...owned('ads', ['ads_providers', 'ads_event_map', 'ads_deliveries', 'ads_consent_snapshots', 'ads_dead_letters']),
   ...owned('search', ['search_products', 'search_stores', 'search_index_state']),
-  // `media_cleanup_jobs` is a FILES table, not a catalogue one: it names an R2
-  // object key and a bucket, and the product that queued it is already gone by
-  // the time the row is read. Commerce writes a job the way it writes any
-  // cross-service intent — through the owner's delete path — and the Files
-  // service is what executes and retires it.
-  ...owned('files', ['file_objects', 'file_migration_log', 'media_cleanup_jobs']),
+  // `media_cleanup_jobs` and `media_object_guards` are FILES tables, not
+  // catalogue ones: both coordinate the lifetime of an R2 object key after
+  // the product write has finished. Commerce writes a job or briefly holds a
+  // guard the way it writes any cross-service intent — through the owner's
+  // media path — and the Files service executes and retires that state.
+  ...owned('files', ['file_objects', 'file_migration_log', 'media_cleanup_jobs', 'media_object_guards']),
 ];
 
 export const TABLE_OWNER: Readonly<Record<string, Owner>> = Object.fromEntries(TABLE_OWNER_ENTRIES);

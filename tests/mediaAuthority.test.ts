@@ -112,26 +112,24 @@ const slice = (p: string, from: string, to?: string) => {
 
 // --------------------------------------------------- the product mirror
 
-test('the legacy admin route refuses a structural save that would diverge', () => {
+test('the legacy admin route refuses every structural save before any write', () => {
   const admin = code('worker/routes/admin.ts');
   const handler = admin.slice(admin.indexOf("adminRoutes.post('/products'"));
   assert.ok(handler.length > 500, 'the legacy product handler should be findable');
 
-  // It asks whether the product has relation rows…
-  assert.match(handler, /SELECT COUNT\(\*\) AS n FROM product_images WHERE product_id = \?/);
-  // …only when the body actually carries structure — a price-only save on a
-  // product with rows is fine and must keep working.
-  assert.match(handler, /STRUCTURE_FIELDS = \['images', 'options', 'colors'\]/);
-  assert.match(handler, /STRUCTURE_FIELDS\.some\(\(field\) => body\[field\] !== undefined\)/);
-  // …and refuses with a code and a route that CAN do it, rather than a 500 or
-  // a silent success.
+  // No row-state exception: CREATE and pre-relational products are exactly the
+  // two cases the former "has product_images" check left open.
+  assert.doesNotMatch(handler, /SELECT COUNT\(\*\) AS n FROM product_images WHERE product_id = \?/);
+  assert.match(handler, /LEGACY_PRODUCT_STRUCTURE_FIELDS\.filter\(\(field\) => body\[field\] !== undefined\)/);
+  // It refuses with a stable code and names the route that verifies local R2
+  // bytes and writes both the document and relation stores.
   assert.match(handler, /409,/);
-  assert.match(handler, /STRUCTURE_HAS_RELATIONS/);
+  assert.match(handler, /LEGACY_PRODUCT_STRUCTURE_UNSUPPORTED/);
   assert.match(handler, /products-v2/, 'the refusal must name the route that writes both');
 
   // The check comes BEFORE the write, which is the only place it means anything.
   assert.ok(
-    handler.indexOf('STRUCTURE_HAS_RELATIONS') < handler.indexOf('INSERT INTO products'),
+    handler.indexOf('LEGACY_PRODUCT_STRUCTURE_UNSUPPORTED') < handler.indexOf('INSERT INTO products'),
     'the guard must precede the upsert'
   );
 });
@@ -149,12 +147,14 @@ test('this route still has no writer for the authoritative table', () => {
 
 test('the read side still prefers the rows over the mirror', () => {
   // The whole reason the divergence matters. If this inverted, a stale mirror
-  // would become the thing customers see.
+  // would become the thing customers see. `has_image_rows` remains true when
+  // every row is quarantined, so the mirror cannot resurrect media that the
+  // migration deliberately made inactive.
   const overlay = code('worker/lib/productOverlay.ts');
   assert.match(
     overlay,
-    /view\.images\.length > 0\s*\n?\s*\? view\.images/,
-    'relation rows must win whenever a product has any'
+    /view\.has_image_rows \?\? view\.images\.length > 0\)\s*\n?\s*\? view\.images/,
+    'relation authority must win even when its only stored rows are quarantined'
   );
 });
 

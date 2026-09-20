@@ -36,6 +36,12 @@ import type { ProductDoc } from './productModel';
 import type { ProductRelationsView } from './productOverlay';
 import { newId } from './crypto';
 import { isInventoryMode, type InventoryMode } from './inventory';
+import {
+  PHYSICAL_DIMENSION_FIELDS,
+  parsePhysicalDimensions,
+  presentPhysicalDimensions,
+  type PhysicalDimensionOverrides,
+} from './physicalDimensions';
 
 /** What the bridge decided on the file's behalf — surfaced by the route as
  *  warnings, never swallowed. */
@@ -109,6 +115,53 @@ export function selectionFromComboKey(key: string): { option_value_ids: string[]
   return { option_value_ids, color_id };
 }
 
+/** Relational variants in the shape the TXT merge/export can round-trip. */
+export interface TemplateVariantRow extends Record<string, unknown> {
+  id: string;
+  option_value_ids: string[];
+  color_id: string | null;
+}
+
+export function templateVariantsFromView(view: ProductRelationsView): TemplateVariantRow[] {
+  return view.variants.map((variant) => {
+    const selection = selectionFromComboKey(variant.combo_key);
+    return {
+      id: variant.id,
+      option_value_ids: selection.option_value_ids,
+      color_id: selection.color_id,
+      sku: variant.sku,
+      active: variant.active === 1,
+      stock: variant.stock,
+      low_stock_threshold: variant.low_stock_threshold,
+      ...priceBag(variant),
+      ...parsePhysicalDimensions(variant as unknown as Record<string, unknown>),
+    };
+  });
+}
+
+/** Only dimensions the TXT row actually stated are sent to the PATCH-aware
+ * relations planner. The validated ProductDoc contains all eight normalized
+ * keys, so presence has to come from the merge's internal marker. */
+function dimensionsWrittenByTemplate(
+  value: Record<string, unknown>,
+  raw: Record<string, unknown> | undefined,
+  hasTemplateBody: boolean
+): PhysicalDimensionOverrides {
+  if (!hasTemplateBody) return presentPhysicalDimensions(value);
+  const fields = Array.isArray(raw?.__template_dimension_fields)
+    ? raw.__template_dimension_fields.filter(
+        (field): field is (typeof PHYSICAL_DIMENSION_FIELDS)[number] =>
+          typeof field === 'string' && PHYSICAL_DIMENSION_FIELDS.includes(field as (typeof PHYSICAL_DIMENSION_FIELDS)[number])
+      )
+    : [];
+  const out: PhysicalDimensionOverrides = {};
+  for (const field of fields) {
+    const candidate = raw && Object.prototype.hasOwnProperty.call(raw, field) ? raw[field] : value[field];
+    out[field] = candidate === null ? null : (candidate as number);
+  }
+  return out;
+}
+
 /**
  * The wire body for `planRelationsWrite`, built from a template-parsed doc.
  *
@@ -119,9 +172,17 @@ export function selectionFromComboKey(key: string): { option_value_ids: string[]
 export function relationsBodyFromDoc(
   doc: ProductDoc,
   view: ProductRelationsView,
-  opts: { inventoryMode?: string; diag?: BridgeDiagnostics } = {}
+  opts: { inventoryMode?: string; diag?: BridgeDiagnostics; templateBody?: Record<string, unknown> } = {}
 ): Record<string, unknown> {
   const warn = (msg: string) => opts.diag?.warnings.push(msg);
+  const rawOptions = Array.isArray(opts.templateBody?.options)
+    ? (opts.templateBody!.options as Array<Record<string, unknown>>)
+    : [];
+  const rawColors = Array.isArray(opts.templateBody?.colors)
+    ? (opts.templateBody!.colors as Array<Record<string, unknown>>)
+    : [];
+  const rawOptionById = new Map(rawOptions.map((row) => [String(row.id ?? ''), row]));
+  const rawColorById = new Map(rawColors.map((row) => [String(row.id ?? ''), row]));
   // ---- groups, rebuilt from the flat rows --------------------------------
   // Rows that name the same group belong together, in first-appearance order.
   // A row that names none joins the first group, so a file written before this
@@ -195,7 +256,9 @@ export function relationsBodyFromDoc(
       name_ar: o.name_ar ?? '',
       name_ckb: o.name_ckb ?? '',
       sku_part: o.sku_part ?? '',
-      image: o.image ?? '',
+      // Bound product_images is the sole media source. The legacy per-option
+      // column is deliberately drained by every TXT structure write.
+      image: '',
       // Position WITHIN the group, exactly as the form numbers it: the doc's
       // `order` is the position in the whole file, and writing that as the
       // per-group sort renumbered every value on each round trip
@@ -220,6 +283,11 @@ export function relationsBodyFromDoc(
       // product already has — the same omission rule as every other field.
       ...(o.fulfillments ? { fulfillments: o.fulfillments } : {}),
       ...priceBag(o),
+      ...dimensionsWrittenByTemplate(
+        o as unknown as Record<string, unknown>,
+        rawOptionById.get(o.id),
+        opts.templateBody !== undefined
+      ),
     });
   });
 
@@ -243,7 +311,7 @@ export function relationsBodyFromDoc(
       name_ar: c.name_ar ?? '',
       name_ckb: c.name_ckb ?? '',
       hex: c.hex,
-      image: c.image ?? '',
+      image: '',
       sort: i,
       active: c.active !== false,
       stock: c.stock ?? null,
@@ -254,11 +322,59 @@ export function relationsBodyFromDoc(
       sku_part: c.sku_part ?? '',
       option_value_ids: declared,
       ...priceBag(c),
+      ...dimensionsWrittenByTemplate(
+        c as unknown as Record<string, unknown>,
+        rawColorById.get(c.id),
+        opts.templateBody !== undefined
+      ),
     };
   });
+  const colorIds = new Set(doc.colors.map((c) => c.id));
+
+  // ---- variants ---------------------------------------------------------
+  const rawVariants = Array.isArray(opts.templateBody?.variants)
+    ? (opts.templateBody!.variants as Array<Record<string, unknown>>)
+    : templateVariantsFromView(view);
+  const variants = rawVariants
+    .map((variant) => {
+      const stored = view.variants.find((row) => row.id === variant.id);
+      const selection = Array.isArray(variant.option_value_ids)
+        ? {
+            option_value_ids: variant.option_value_ids.filter((id): id is string => typeof id === 'string'),
+            color_id: typeof variant.color_id === 'string' && variant.color_id ? variant.color_id : null,
+          }
+        : selectionFromComboKey(stored?.combo_key ?? '');
+      const source = { ...(stored ?? {}), ...variant } as Record<string, unknown>;
+      return {
+        id: String(source.id ?? ''),
+        option_value_ids: selection.option_value_ids,
+        color_id: selection.color_id,
+        sku: typeof source.sku === 'string' ? source.sku : null,
+        active: source.active !== false && source.active !== 0,
+        stock: typeof source.stock === 'number' ? source.stock : null,
+        low_stock_threshold: typeof source.low_stock_threshold === 'number' ? source.low_stock_threshold : null,
+        ...priceBag({
+          regular_price_iqd: typeof source.regular_price_iqd === 'number' ? source.regular_price_iqd : null,
+          prime_price_iqd: typeof source.prime_price_iqd === 'number' ? source.prime_price_iqd : null,
+          pro_price_iqd: typeof source.pro_price_iqd === 'number' ? source.pro_price_iqd : null,
+          cost_iqd: typeof source.cost_iqd === 'number' ? source.cost_iqd : null,
+          regular_adjust_iqd: typeof source.regular_adjust_iqd === 'number' ? source.regular_adjust_iqd : null,
+          prime_adjust_iqd: typeof source.prime_adjust_iqd === 'number' ? source.prime_adjust_iqd : null,
+          pro_adjust_iqd: typeof source.pro_adjust_iqd === 'number' ? source.pro_adjust_iqd : null,
+          cost_adjust_iqd: typeof source.cost_adjust_iqd === 'number' ? source.cost_adjust_iqd : null,
+        }),
+        ...dimensionsWrittenByTemplate(source, variant, opts.templateBody !== undefined),
+      };
+    })
+    .filter(
+      (variant) =>
+        variant.id &&
+        variant.option_value_ids.every((id) => valueIds.has(id)) &&
+        (!variant.color_id || colorIds.has(variant.color_id))
+    );
+  const variantIds = new Set(variants.map((variant) => variant.id));
 
   // ---- images ------------------------------------------------------------
-  const colorIds = new Set(doc.colors.map((c) => c.id));
   const existingImageById = new Map(view.images.map((i) => [i.id, i]));
   const images = doc.media.map((m, i) => {
     // A binding to a row this file does not contain would be refused by the
@@ -266,7 +382,7 @@ export function relationsBodyFromDoc(
     // is what the owner sees on the page anyway.
     const ov = m.option_value_id && valueIds.has(m.option_value_id) ? m.option_value_id : null;
     const col = !ov && m.color_id && colorIds.has(m.color_id) ? m.color_id : null;
-    const va = !ov && !col && m.variant_id && view.variants.some((v) => v.id === m.variant_id) ? m.variant_id : null;
+    const va = !ov && !col && m.variant_id && variantIds.has(m.variant_id) ? m.variant_id : null;
     if (m.option_value_id && !ov) warn(`images.${i + 1}: option_value_id=${m.option_value_id} is not in this file — the picture is a gallery image`);
     if (m.color_id && !col && !ov) warn(`images.${i + 1}: color_id=${m.color_id} is not in this file — the picture is a gallery image`);
     if (m.variant_id && !va && !ov && !col) warn(`images.${i + 1}: variant_id=${m.variant_id} is not a combination of this product — the picture is a gallery image`);
@@ -292,39 +408,23 @@ export function relationsBodyFromDoc(
       // Carried for the same reason as sku_part above: the upsert writes both
       // columns unconditionally, so omitting them clears what the uploader
       // recorded about the file.
-      content_type: existingImageById.get(m.id)?.content_type ?? '',
-      bytes: existingImageById.get(m.id)?.bytes ?? null,
+      content_type:
+        ((m as unknown as Record<string, unknown>).content_type as string | undefined) ??
+        existingImageById.get(m.id)?.content_type ??
+        '',
+      bytes:
+        ((m as unknown as Record<string, unknown>).bytes as number | undefined) ??
+        existingImageById.get(m.id)?.bytes ??
+        null,
     };
   });
-
-  // ---- variants: carried, never rebuilt ----------------------------------
-  const variants = view.variants
-    .map((v) => {
-      const sel = selectionFromComboKey(v.combo_key);
-      return {
-        id: v.id,
-        option_value_ids: sel.option_value_ids,
-        color_id: sel.color_id,
-        sku: v.sku,
-        active: v.active === 1,
-        stock: v.stock,
-        low_stock_threshold: v.low_stock_threshold,
-        ...priceBag(v),
-      };
-    })
-    // A combination whose option or colour the file just deleted cannot be
-    // written back — the writer would refuse the whole save for it.
-    .filter(
-      (v) =>
-        v.option_value_ids.every((id) => valueIds.has(id)) && (!v.color_id || colorIds.has(v.color_id))
-    );
   if (view.variants.length > 0) {
     const dropped = view.variants.length - variants.length;
     warn(
       dropped > 0
         ? `${dropped} من التركيبات المسعّرة حُذفت لأن خيارها أو لونها لم يعد موجودًا في الملف` +
             (variants.length > 0 ? `، و${variants.length} نُقلت كما هي.` : '.')
-        : `التركيبات المسعّرة (${variants.length}) لا يعبّر عنها قالب TXT، فقد نُقلت كما هي دون تغيير.`
+        : `التركيبات المسعّرة (${variants.length}) نُقلت كما هي؛ لا تتغير إلا حقول variants.N التي يذكرها الملف.`
     );
   }
 

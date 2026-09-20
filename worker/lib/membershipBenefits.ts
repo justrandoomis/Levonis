@@ -38,6 +38,7 @@ import {
 import type { MemberFallback, Tier } from '@levonis/pricing/pricing';
 import { hasEntitlement, type MembershipEntitlement, type TierStatus } from './entitlements';
 import { auditStatements } from './audit';
+import { newId } from './crypto';
 
 /* ------------------------------ when the feature was never installed ------ */
 
@@ -672,6 +673,266 @@ export interface RuleWrite {
   valid_until: string | null;
   label: string | null;
   notes: string | null;
+}
+
+/** The product-scoped subset accepted by the CSV/TXT import formats. */
+export interface ProductMembershipMutation {
+  tier: 'pro' | 'prime';
+  remove: boolean;
+  discount_mode: 'percent' | 'fixed' | null;
+  percent: number | null;
+  fixed_iqd: number | null;
+  max_discount_iqd: number | null;
+  cap_scope: 'per_unit' | 'per_order' | null;
+  max_quantity: number | null;
+}
+
+export interface ProductMembershipWritePlan {
+  statements: D1PreparedStatement[];
+  changedRuleIds: string[];
+}
+
+const membershipRuleOrder = (a: BenefitRule, b: BenefitRule): number =>
+  a.tier.localeCompare(b.tier) ||
+  a.benefit_type.localeCompare(b.benefit_type) ||
+  a.scope.localeCompare(b.scope) ||
+  b.priority - a.priority ||
+  a.id.localeCompare(b.id);
+
+const plannedBenefitRule = (write: RuleWrite): BenefitRule => ({
+  id: write.id,
+  tier: write.tier,
+  benefit_type: write.benefit_type,
+  scope: write.scope,
+  category_id: write.category_id,
+  sub_category_id: write.sub_category_id,
+  product_id: write.product_id,
+  discount_mode: write.discount_mode,
+  percent: write.percent,
+  fixed_iqd: write.fixed_iqd,
+  max_discount_iqd: write.max_discount_iqd,
+  cap_scope: write.cap_scope,
+  max_quantity: write.max_quantity,
+  min_subtotal_iqd: write.min_subtotal_iqd,
+  free_shipping_threshold_iqd: write.free_shipping_threshold_iqd,
+  shipping_methods: write.shipping_methods,
+  max_shipping_subsidy_iqd: write.max_shipping_subsidy_iqd,
+  cod_tax_exempt: write.cod_tax_exempt,
+  enabled: write.enabled,
+  priority: write.priority,
+  valid_from: write.valid_from,
+  valid_until: write.valid_until,
+  label: write.label,
+});
+
+/**
+ * Plan product membership rules without committing them.
+ *
+ * The ordinary membership admin owns a complete atomic batch of rule +
+ * version + audit. An import has a larger transaction boundary: the rule must
+ * commit with the product row and relations too. Returning statements rather
+ * than invoking `saveBenefitRule` lets that caller append the exact same three
+ * records to its ProductSavePlan batch.
+ */
+export async function planProductMembershipRules(
+  db: D1Database,
+  actorId: string,
+  productId: string,
+  requested: readonly ProductMembershipMutation[]
+): Promise<ProductMembershipWritePlan> {
+  if (requested.length === 0) return { statements: [], changedRuleIds: [] };
+
+  const [allBefore, productResult] = await Promise.all([
+    allBenefitRules(db),
+    db
+      .prepare(
+        `SELECT ${RULE_COLUMNS}
+           FROM membership_benefit_rules
+          WHERE benefit_type = 'product_discount' AND scope = 'product' AND product_id = ?
+          ORDER BY tier, priority DESC, id`
+      )
+      .bind(productId)
+      .all<RuleRow>(),
+  ]);
+  let allRules = [...allBefore].sort(membershipRuleOrder);
+  let productRows = [...(productResult.results ?? [])];
+  const statements: D1PreparedStatement[] = [];
+  const changedRuleIds: string[] = [];
+
+  const appendVersionAndAudit = async (
+    action: 'create' | 'update' | 'delete',
+    ruleId: string,
+    before: RuleRow | null,
+    after: RuleWrite | null
+  ): Promise<void> => {
+    statements.push(
+      db
+        .prepare(
+          'INSERT INTO membership_benefit_versions (actor_user_id, action, rule_id, before_json, after_json, rules_json) VALUES (?,?,?,?,?,?)'
+        )
+        .bind(
+          actorId,
+          action,
+          ruleId,
+          before ? JSON.stringify(before) : null,
+          after ? JSON.stringify(after) : null,
+          JSON.stringify([...allRules].sort(membershipRuleOrder))
+        )
+    );
+    const audited = await auditStatements(db, actorId, `membership_benefit.${action}`, ruleId, {
+      before: before ? { ...before } : null,
+      after: after ? { ...after } : null,
+    });
+    statements.push(...audited.statements);
+  };
+
+  for (const item of requested) {
+    const matching = productRows
+      .filter((rule) => rule.tier === item.tier)
+      .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
+
+    if (item.remove) {
+      for (const before of matching) {
+        statements.push(db.prepare('DELETE FROM membership_benefit_rules WHERE id = ?').bind(before.id));
+        productRows = productRows.filter((row) => row.id !== before.id);
+        allRules = allRules.filter((row) => row.id !== before.id);
+        changedRuleIds.push(before.id);
+        await appendVersionAndAudit('delete', before.id, before, null);
+      }
+      continue;
+    }
+
+    const existing = matching[0] ?? null;
+    const kept = <T>(column: keyof RuleRow): T | null =>
+      existing ? ((existing[column] as T | null) ?? null) : null;
+    const write: RuleWrite = {
+      id: existing?.id ?? newId('mbr'),
+      tier: item.tier,
+      benefit_type: 'product_discount',
+      scope: 'product',
+      category_id: null,
+      sub_category_id: null,
+      product_id: productId,
+      discount_mode: item.discount_mode,
+      percent: item.percent,
+      fixed_iqd: item.fixed_iqd,
+      max_discount_iqd: item.max_discount_iqd,
+      cap_scope: item.cap_scope,
+      max_quantity: item.max_quantity,
+      min_subtotal_iqd: kept<number>('min_subtotal_iqd'),
+      free_shipping_threshold_iqd: null,
+      shipping_methods: null,
+      max_shipping_subsidy_iqd: null,
+      cod_tax_exempt: null,
+      enabled: existing ? existing.enabled === 1 : true,
+      priority: existing?.priority ?? 0,
+      valid_from: kept<string>('valid_from'),
+      valid_until: kept<string>('valid_until'),
+      label: kept<string>('label'),
+      notes: kept<string>('notes'),
+    };
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO membership_benefit_rules
+             (id, tier, benefit_type, scope, category_id, sub_category_id, product_id, discount_mode, percent,
+              fixed_iqd, max_discount_iqd, cap_scope, max_quantity, min_subtotal_iqd, free_shipping_threshold_iqd,
+              shipping_methods, max_shipping_subsidy_iqd, cod_tax_exempt, enabled, priority, valid_from, valid_until,
+              label, notes, updated_at, updated_by)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),?)
+           ON CONFLICT(id) DO UPDATE SET
+             tier=excluded.tier, benefit_type=excluded.benefit_type, scope=excluded.scope,
+             category_id=excluded.category_id, sub_category_id=excluded.sub_category_id, product_id=excluded.product_id,
+             discount_mode=excluded.discount_mode, percent=excluded.percent, fixed_iqd=excluded.fixed_iqd,
+             max_discount_iqd=excluded.max_discount_iqd, cap_scope=excluded.cap_scope, max_quantity=excluded.max_quantity,
+             min_subtotal_iqd=excluded.min_subtotal_iqd,
+             free_shipping_threshold_iqd=excluded.free_shipping_threshold_iqd,
+             shipping_methods=excluded.shipping_methods, max_shipping_subsidy_iqd=excluded.max_shipping_subsidy_iqd,
+             cod_tax_exempt=excluded.cod_tax_exempt, enabled=excluded.enabled, priority=excluded.priority,
+             valid_from=excluded.valid_from, valid_until=excluded.valid_until, label=excluded.label, notes=excluded.notes,
+             updated_at=datetime('now'), updated_by=excluded.updated_by`
+        )
+        .bind(
+          write.id,
+          write.tier,
+          write.benefit_type,
+          write.scope,
+          write.category_id,
+          write.sub_category_id,
+          write.product_id,
+          write.discount_mode,
+          write.percent,
+          write.fixed_iqd,
+          write.max_discount_iqd,
+          write.cap_scope,
+          write.max_quantity,
+          write.min_subtotal_iqd,
+          write.free_shipping_threshold_iqd,
+          null,
+          write.max_shipping_subsidy_iqd,
+          null,
+          write.enabled ? 1 : 0,
+          write.priority,
+          write.valid_from,
+          write.valid_until,
+          write.label,
+          write.notes,
+          actorId
+        )
+    );
+    const next = plannedBenefitRule(write);
+    allRules = allRules.some((rule) => rule.id === write.id)
+      ? allRules.map((rule) => (rule.id === write.id ? next : rule))
+      : [...allRules, next];
+    productRows = existing
+      ? productRows.map((rule) => (rule.id === existing.id ? {
+          ...rule,
+          tier: write.tier,
+          discount_mode: write.discount_mode,
+          percent: write.percent,
+          fixed_iqd: write.fixed_iqd,
+          max_discount_iqd: write.max_discount_iqd,
+          cap_scope: write.cap_scope,
+          max_quantity: write.max_quantity,
+          min_subtotal_iqd: write.min_subtotal_iqd,
+          enabled: write.enabled ? 1 : 0,
+          priority: write.priority,
+          valid_from: write.valid_from,
+          valid_until: write.valid_until,
+          label: write.label,
+          notes: write.notes,
+        } : rule))
+      : [...productRows, {
+          id: write.id,
+          tier: write.tier,
+          benefit_type: 'product_discount',
+          scope: 'product',
+          category_id: null,
+          sub_category_id: null,
+          product_id: productId,
+          discount_mode: write.discount_mode,
+          percent: write.percent,
+          fixed_iqd: write.fixed_iqd,
+          max_discount_iqd: write.max_discount_iqd,
+          cap_scope: write.cap_scope,
+          max_quantity: write.max_quantity,
+          min_subtotal_iqd: write.min_subtotal_iqd,
+          free_shipping_threshold_iqd: null,
+          shipping_methods: null,
+          max_shipping_subsidy_iqd: null,
+          cod_tax_exempt: null,
+          enabled: write.enabled ? 1 : 0,
+          priority: write.priority,
+          valid_from: write.valid_from,
+          valid_until: write.valid_until,
+          label: write.label,
+          notes: write.notes,
+        }];
+    changedRuleIds.push(write.id);
+    await appendVersionAndAudit(existing ? 'update' : 'create', write.id, existing, write);
+  }
+
+  return { statements, changedRuleIds };
 }
 
 /**

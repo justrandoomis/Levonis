@@ -39,11 +39,13 @@ import {
 } from './formUi';
 import {
   deriveInventoryMode,
+  cleanDanglingImageBindings,
   combinationKey,
   directStockCombinations,
   emptyFulfillment,
   emptyPrices,
   localId,
+  inheritedDimensionsForSelection,
   type FormColor,
   type FormGroup,
   type FormPrices,
@@ -65,11 +67,14 @@ import {
   type Field as GridField,
 } from '../../../../worker/lib/priceGrid';
 import { ADJUST_OF, type PriceFields } from '../../../../worker/lib/pricing';
+import { emptyDimensions, type ProductDimensionsV2 } from '../../../lib/productTypes';
+import { DimensionsSection } from './DimensionsSection';
 
 export function OptionsSection({
   rel,
   setRel,
   base,
+  baseDimensions,
   canSeeCost,
   errors,
 }: {
@@ -79,6 +84,8 @@ export function OptionsSection({
    *  none of its own. Without it every option row would read «inherit» with no
    *  number beside it, which is the defect this section's price cells fix. */
   base: Record<GridField, number | null>;
+  /** Product measurements inherited by every selection rung. */
+  baseDimensions: ProductDimensionsV2;
   canSeeCost: boolean;
   errors: Record<string, string>;
 }) {
@@ -86,7 +93,7 @@ export function OptionsSection({
   // the section summary and the saved wire all tell the same story.
   const setRelAuto = (fn: (r: RelationsState) => RelationsState) =>
     setRel((r) => {
-      const next = fn(r);
+      const next = cleanDanglingImageBindings(fn(r));
       return { ...next, inventory_mode: deriveInventoryMode(next) };
     });
 
@@ -149,6 +156,7 @@ export function OptionsSection({
                       emptyFulfillment('direct_sale', direct),
                       emptyFulfillment('pre_order', preorder),
                     ],
+                    dimensions: emptyDimensions(),
                   },
                 ],
               }
@@ -206,6 +214,7 @@ export function OptionsSection({
           reserved: 0,
           low_stock_threshold: null,
           option_value_ids: [],
+          dimensions: emptyDimensions(),
           ...emptyPrices(),
         },
       ],
@@ -213,6 +222,81 @@ export function OptionsSection({
 
   const patchColor = (id: string, patch: Partial<FormColor>) =>
     setRelAuto((r) => ({ ...r, colors: r.colors.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
+
+  /**
+   * The compact option/colour slots are views onto product_images. They do
+   * not own a second URL field: upload replaces/adds the bound media row and
+   * clearing the slot merely returns that row to the general gallery.
+   */
+  const boundImage = (kind: 'option' | 'color', id: string) =>
+    rel.images.find((image) =>
+      kind === 'option' ? image.option_value_id === id : image.color_id === id
+    );
+  const setBoundImage = (
+    kind: 'option' | 'color',
+    id: string,
+    asset: {
+      url: string;
+      key: string;
+      width: number | null;
+      height: number | null;
+      bytes: number | null;
+      content_type: string;
+    } | null
+  ) =>
+    setRelAuto((r) => {
+      const found = r.images.find((image) =>
+        kind === 'option' ? image.option_value_id === id : image.color_id === id
+      );
+      if (asset === null) {
+        if (!found) return r;
+        return {
+          ...r,
+          images: r.images.map((image) =>
+            image.id === found.id
+              ? {
+                  ...image,
+                  option_value_id: kind === 'option' ? null : image.option_value_id,
+                  color_id: kind === 'color' ? null : image.color_id,
+                }
+              : image
+          ),
+        };
+      }
+      const patch = {
+        url: asset.url,
+        r2_key: asset.key,
+        width: asset.width,
+        height: asset.height,
+        bytes: asset.bytes,
+        content_type: asset.content_type,
+        source_url: '',
+        option_value_id: kind === 'option' ? id : null,
+        color_id: kind === 'color' ? id : null,
+        variant_id: null,
+      };
+      if (found) {
+        return {
+          ...r,
+          images: r.images.map((image) => (image.id === found.id ? { ...image, ...patch } : image)),
+        };
+      }
+      return {
+        ...r,
+        images: [
+          ...r.images,
+          {
+            id: localId('pi'),
+            alt_en: '',
+            sort_order: r.images.length,
+            is_primary: r.images.length === 0,
+            alt_ar: '',
+            alt_ckb: '',
+            ...patch,
+          },
+        ],
+      };
+    });
 
   const removeColor = (id: string) =>
     setRelAuto((r) => ({
@@ -298,6 +382,7 @@ export function OptionsSection({
               stock: optionStock,
               reserved: 0,
               low_stock_threshold: null,
+              dimensions: emptyDimensions(),
               ...emptyPrices(),
             };
           }),
@@ -305,15 +390,13 @@ export function OptionsSection({
       };
     });
 
-  const setCombinationStock = (
+  const patchCombination = (
     combo: { option_value_ids: string[]; color_id: string | null },
-    stock: number | null,
-    low_stock_threshold?: number | null
+    patch: Partial<FormVariant>
   ) =>
     setRelAuto((r) => {
       const key = combinationKey(combo);
       const found = r.variants.find((v) => combinationKey(v) === key);
-      const patch = low_stock_threshold === undefined ? { stock } : { stock, low_stock_threshold };
       if (found) {
         return { ...r, variants: r.variants.map((v) => (v.id === found.id ? { ...v, ...patch } : v)) };
       }
@@ -323,13 +406,25 @@ export function OptionsSection({
         color_id: combo.color_id,
         sku: '',
         active: true,
-        stock,
+        stock: null,
         reserved: 0,
-        low_stock_threshold: low_stock_threshold ?? null,
+        low_stock_threshold: null,
+        dimensions: emptyDimensions(),
         ...emptyPrices(),
+        ...patch,
       };
       return { ...r, variants: [...r.variants, made] };
     });
+
+  const setCombinationStock = (
+    combo: { option_value_ids: string[]; color_id: string | null },
+    stock: number | null,
+    low_stock_threshold?: number | null
+  ) =>
+    patchCombination(
+      combo,
+      low_stock_threshold === undefined ? { stock } : { stock, low_stock_threshold }
+    );
 
   const directCombos = directStockCombinations(rel);
   const variantByKey = new Map(rel.variants.map((v) => [combinationKey(v), v] as const));
@@ -373,9 +468,12 @@ export function OptionsSection({
                 <div key={v.id} className="min-w-0 rounded-lg bg-zinc-800/30 border border-zinc-800 p-2.5">
                   <div className="flex items-center gap-2 min-w-0">
                     <ImgSlot
-                      url={v.image}
+                      url={boundImage('option', v.id)?.url ?? ''}
                       label={`صورة الخيار ${v.name_en || ''}`}
-                      onChange={(url) => patchValue(g.id, v.id, { image: url ?? '' })}
+                      onChange={(url) => {
+                        if (url === null) setBoundImage('option', v.id, null);
+                      }}
+                      onUploaded={(asset) => setBoundImage('option', v.id, asset)}
                     />
                     <div className="min-w-0 flex-1">
                       <TextInput
@@ -471,6 +569,13 @@ export function OptionsSection({
                       </Field>
                     </Grid>
                   </div>
+                  <DimensionsSection
+                    dimensions={v.dimensions ?? emptyDimensions()}
+                    inherited={baseDimensions}
+                    collapsible
+                    label={`أبعاد ${v.name_en || 'الخيار'} / Option dimensions`}
+                    onChange={(dimensions) => patchValue(g.id, v.id, { dimensions })}
+                  />
                 </div>
               ))}
               <button type="button" onClick={() => addValue(g.id)} className={`${btnGhost} h-8 px-2.5 text-[12px]`}>
@@ -519,9 +624,12 @@ export function OptionsSection({
                 className={`${fieldCls} max-w-[100px]`}
               />
               <ImgSlot
-                url={c.image}
+                url={boundImage('color', c.id)?.url ?? ''}
                 label={`صورة اللون ${c.name_en || ''}`}
-                onChange={(url) => patchColor(c.id, { image: url ?? '' })}
+                onChange={(url) => {
+                  if (url === null) setBoundImage('color', c.id, null);
+                }}
+                onUploaded={(asset) => setBoundImage('color', c.id, asset)}
               />
               <button type="button" onClick={() => removeColor(c.id)} className={iconBtn} aria-label="حذف اللون">
                 <Trash2 className="w-4 h-4" />
@@ -552,6 +660,15 @@ export function OptionsSection({
                 </Field>
               </Grid>
             </div>
+            <DimensionsSection
+              dimensions={c.dimensions ?? emptyDimensions()}
+              inherited={inheritedDimensionsForSelection(rel, baseDimensions, {
+                option_value_ids: c.option_value_ids,
+              })}
+              collapsible
+              label={`أبعاد ${c.name_en || 'اللون'} / Colour dimensions`}
+              onChange={(dimensions) => patchColor(c.id, { dimensions })}
+            />
 
             {/* ----------------------------------------------- link matrix */}
             {rel.groups.some((g) => g.values.length > 0) && (
@@ -623,22 +740,31 @@ export function OptionsSection({
                       const row = variantByKey.get(combinationKey(combo));
                       const label = combo.option_value_ids.map((id) => optionById.get(id)?.name_en || id).join(' / ');
                       return (
-                        <div key={combinationKey(combo)} className="grid grid-cols-[minmax(0,1fr)_7rem_7rem] gap-2 items-end">
-                          <div className="min-w-0 pb-2 text-[12px] text-zinc-300 truncate" title={label}>{label}</div>
-                          <Field ar="المخزون" en="Stock">
-                            <Qty
-                              value={row?.stock ?? null}
-                              onChange={(stock) => setCombinationStock(combo, stock)}
-                              placeholder="0 = نفد"
-                            />
-                          </Field>
-                          <Field ar="حد التنبيه" en="Low-stock">
-                            <Qty
-                              value={row?.low_stock_threshold ?? null}
-                              onChange={(low) => setCombinationStock(combo, row?.stock ?? null, low)}
-                              placeholder="بدون"
-                            />
-                          </Field>
+                        <div key={combinationKey(combo)} className="min-w-0 rounded-lg border border-zinc-800/80 bg-zinc-950/20 p-2">
+                          <div className="grid grid-cols-[minmax(0,1fr)_7rem_7rem] gap-2 items-end">
+                            <div className="min-w-0 pb-2 text-[12px] text-zinc-300 truncate" title={label}>{label}</div>
+                            <Field ar="المخزون" en="Stock">
+                              <Qty
+                                value={row?.stock ?? null}
+                                onChange={(stock) => setCombinationStock(combo, stock)}
+                                placeholder="0 = نفد"
+                              />
+                            </Field>
+                            <Field ar="حد التنبيه" en="Low-stock">
+                              <Qty
+                                value={row?.low_stock_threshold ?? null}
+                                onChange={(low) => setCombinationStock(combo, row?.stock ?? null, low)}
+                                placeholder="بدون"
+                              />
+                            </Field>
+                          </div>
+                          <DimensionsSection
+                            dimensions={row?.dimensions ?? emptyDimensions()}
+                            inherited={inheritedDimensionsForSelection(rel, baseDimensions, combo)}
+                            collapsible
+                            label={`أبعاد ${label || 'التركيبة'} / Variant dimensions`}
+                            onChange={(dimensions) => patchCombination(combo, { dimensions })}
+                          />
                         </div>
                       );
                     })}

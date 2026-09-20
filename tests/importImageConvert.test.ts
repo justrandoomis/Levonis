@@ -36,13 +36,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { zipSync, strToU8 } from 'fflate';
-import { freshDb, asD1, stubApp, ctx, row, type App } from './fixtures/app';
+import { freshDb, asD1, failingD1, stubApp, ctx, row, all, count, get, post, json, type App } from './fixtures/app';
 import { adminImportRoutes } from '../worker/routes/adminImport';
 import { HEIF_REFUSAL, isHeifBytes, sniff } from '../worker/routes/uploads';
 import { EXTERNAL_IMAGE_REFUSAL, isOwnedMediaUrl, resolveProduct, type ImportMaps } from '../worker/lib/importApply';
 import { parseImport, templateShape, toCsv } from '../worker/lib/importCsv';
 import { validateProductDoc } from '../worker/lib/productModel';
 import { declaresAvif } from '../worker/routes/uploads';
+import { MEDIA_DETACH_REASON, runGuardedMediaCleanup } from '../worker/lib/mediaRefs';
 
 // ------------------------------------------------------------ byte fixtures
 
@@ -227,7 +228,14 @@ class MemoryBucket {
   }
   async get(key: string) {
     const stored = this.objects.get(key);
-    return stored ? { body: null, size: stored.bytes.byteLength, httpMetadata: stored.metadata } : null;
+    if (!stored) return null;
+    const bytes = stored.bytes.slice();
+    return {
+      body: new Blob([bytes]).stream(),
+      size: bytes.byteLength,
+      httpMetadata: stored.metadata,
+      arrayBuffer: () => new Blob([bytes]).arrayBuffer(),
+    };
   }
   async head(key: string) {
     const stored = this.objects.get(key);
@@ -242,18 +250,24 @@ class MemoryBucket {
  * magic bytes, so the assertions below are made about bytes that genuinely ARE
  * WebP rather than about a promise that they are.
  */
-function imagesBinding(opts: { fail?: boolean } = {}) {
+function imagesBinding(opts: { fail?: boolean; distinct?: boolean; onInfo?: () => Promise<void> } = {}) {
   const calls: Array<{ format: string }> = [];
   return {
     calls,
     binding: {
+      async info(_stream: ReadableStream) {
+        await opts.onInfo?.();
+        return { format: 'image/webp', fileSize: 32, width: 320, height: 240 };
+      },
       input(stream: ReadableStream) {
         void stream;
         return {
           async output(o: { format: string }) {
             calls.push({ format: o.format });
             if (opts.fail) throw new Error('the converter refused this image');
-            return { response: () => new Response(webpBytes()) };
+            const bytes = webpBytes();
+            if (opts.distinct) bytes[bytes.length - 1] = calls.length;
+            return { response: () => new Response(bytes) };
           },
         };
       },
@@ -263,7 +277,10 @@ function imagesBinding(opts: { fail?: boolean } = {}) {
 
 const SECTION = 'tpl_printers';
 
-function setup(opts: { images?: unknown } = {}) {
+function setup(opts: {
+  images?: unknown;
+  dbFactory?: (raw: ReturnType<typeof freshDb>) => D1Database;
+} = {}) {
   const raw = freshDb();
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role)
@@ -272,8 +289,9 @@ function setup(opts: { images?: unknown } = {}) {
       VALUES ('${SECTION}',NULL,'tpl-printers','طابعات','Printers','devices',1,1);
   `);
   const bucket = new MemoryBucket();
+  const db = opts.dbFactory ? opts.dbFactory(raw) : asD1(raw);
   const app = stubApp(
-    asD1(raw),
+    db,
     { id: 'boss', role: 'admin', email: 'boss@x.co' },
     (a) => a.route('/api/admin/import', adminImportRoutes),
     { env: { R2_PUBLIC: bucket, R2_PRIVATE: new MemoryBucket(), BUCKET: new MemoryBucket(), IMAGES: opts.images } }
@@ -324,6 +342,36 @@ function bankedImages(raw: ReturnType<typeof freshDb>, importId: string): string
 }
 
 /**
+ * Every product-owned row the shared save planner can replace. `SELECT *` is
+ * deliberate: this is a rollback assertion, so a newly added scalar,
+ * dimension or relation column must automatically join the byte-for-byte
+ * comparison instead of escaping an old hand-written projection.
+ */
+function productSnapshot(raw: ReturnType<typeof freshDb>, productId: string) {
+  return {
+    product: row<Record<string, unknown>>(raw, 'SELECT * FROM products WHERE id = ?', productId),
+    groups: all(raw, 'SELECT * FROM product_option_groups WHERE product_id = ? ORDER BY id', productId),
+    values: all(raw, 'SELECT * FROM product_option_values WHERE product_id = ? ORDER BY id', productId),
+    colors: all(raw, 'SELECT * FROM product_colors WHERE product_id = ? ORDER BY id', productId),
+    links: all(
+      raw,
+      `SELECT l.* FROM product_color_option_links l
+        JOIN product_colors c ON c.id = l.color_id
+       WHERE c.product_id = ? ORDER BY l.color_id, l.group_id, l.option_value_id`,
+      productId
+    ),
+    variants: all(raw, 'SELECT * FROM product_variants WHERE product_id = ? ORDER BY id', productId),
+    images: all(raw, 'SELECT * FROM product_images WHERE product_id = ? ORDER BY id', productId),
+    fulfillments: all(raw, 'SELECT * FROM product_option_fulfillment WHERE product_id = ? ORDER BY id', productId),
+    transports: all(raw, 'SELECT * FROM product_option_transports WHERE product_id = ? ORDER BY id', productId),
+    catalogs: all(raw, 'SELECT * FROM product_catalogs WHERE product_id = ? ORDER BY catalog_id', productId),
+    translations: all(raw, 'SELECT * FROM product_translations WHERE product_id = ? ORDER BY field', productId),
+    search: all(raw, 'SELECT * FROM search_tokens WHERE product_id = ? ORDER BY token', productId),
+    priceHistory: all(raw, 'SELECT * FROM price_history WHERE product_id = ? ORDER BY id', productId),
+  };
+}
+
+/**
  * DEFECT 1, STATED AS A CONTRACT: a PNG inside the ZIP is WebP in the bucket.
  *
  * The key matters as much as the bytes. `products/import/gallery/<sha>.webp`
@@ -341,6 +389,15 @@ test('a PNG inside the ZIP is converted to WebP BEFORE it is stored', async () =
 
   assert.equal(res.status, 200, JSON.stringify(body));
   assert.deepEqual(body.rows[0].errors, [], 'the row must import');
+  assert.equal(
+    row<{ live: number }>(
+      raw,
+      "SELECT media_stage_until > strftime('%Y-%m-%dT%H:%M:%fZ','now') AS live FROM product_imports WHERE id = ?",
+      body.import_id
+    )?.live,
+    1,
+    'the preview durably owns staged media for the same 24-hour window as its cleanup job'
+  );
   assert.deepEqual(images.calls, [{ format: 'image/webp' }], 'the server did the converting');
 
   const keys = [...bucket.objects.keys()];
@@ -486,6 +543,560 @@ test('the same image used by two products is converted once', async () => {
   assert.equal(images.calls.length, 1, 'and the converter ran once, not twice');
 });
 
+test('confirm replaces spoofed relation image metadata with the stored WebP facts', async () => {
+  const images = imagesBinding();
+  const { raw, app } = setup({ images: images.binding });
+  const preview = await previewZip(app, {
+    'data.csv': strToU8(SHEET('images/a1.png')),
+    'images/a1.png': png(),
+  });
+  assert.equal(preview.res.status, 200, JSON.stringify(preview.body));
+  assert.deepEqual(preview.body.rows[0].errors, []);
+
+  const rec = row<{ payload: string }>(raw, 'SELECT payload FROM product_imports WHERE id = ?', preview.body.import_id)!;
+  const payload = JSON.parse(rec.payload) as { products: Array<{ relations: { images: Array<Record<string, unknown>> } }> };
+  Object.assign(payload.products[0].relations.images[0], {
+    r2_key: '',
+    width: 1,
+    height: 2,
+    bytes: 999_999,
+    content_type: 'image/png',
+  });
+  raw.prepare('UPDATE product_imports SET payload = ? WHERE id = ?')
+    .run(JSON.stringify(payload), preview.body.import_id);
+
+  const confirmRes = await post(app, '/api/admin/import/confirm', { import_id: preview.body.import_id });
+  const confirm = await json(confirmRes);
+  assert.equal(confirmRes.status, 200, JSON.stringify(confirm));
+  assert.deepEqual(confirm.summary, { created: 1, updated: 0, skipped: 0, failed: 0 });
+
+  const stored = row<Record<string, unknown>>(
+    raw,
+    'SELECT url, r2_key, width, height, bytes, content_type FROM product_images LIMIT 1'
+  )!;
+  const key = String(stored.url).slice('/files/'.length);
+  assert.deepEqual(stored, {
+    url: `/files/${key}`,
+    r2_key: key,
+    width: 320,
+    height: 240,
+    bytes: 32,
+    content_type: 'image/webp',
+  });
+});
+
+test('confirm reports a missing staged object and writes no product or relation row', async () => {
+  const images = imagesBinding();
+  const { raw, app, bucket } = setup({ images: images.binding });
+  const preview = await previewZip(app, {
+    'data.csv': strToU8(SHEET('images/a1.png')),
+    'images/a1.png': png(),
+  });
+  const url = bankedImages(raw, preview.body.import_id)[0];
+  bucket.objects.delete(url.slice('/files/'.length));
+
+  const confirmRes = await post(app, '/api/admin/import/confirm', { import_id: preview.body.import_id });
+  const confirm = await json(confirmRes);
+  assert.equal(confirmRes.status, 200, JSON.stringify(confirm));
+  assert.equal(confirm.summary.failed, 1);
+  assert.match(confirm.rows[0].reason, /does not exist in media storage/);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM products WHERE id = ?", confirm.rows[0].product_id), 0);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM product_images'), 0);
+});
+
+test('confirm rejects an explicit non-WebP R2 MIME before the catalogue write', async () => {
+  const images = imagesBinding();
+  const { raw, app, bucket } = setup({ images: images.binding });
+  const preview = await previewZip(app, {
+    'data.csv': strToU8(SHEET('images/a1.png')),
+    'images/a1.png': png(),
+  });
+  const url = bankedImages(raw, preview.body.import_id)[0];
+  bucket.objects.get(url.slice('/files/'.length))!.metadata.contentType = 'image/png';
+
+  const confirmRes = await post(app, '/api/admin/import/confirm', { import_id: preview.body.import_id });
+  const confirm = await json(confirmRes);
+  assert.equal(confirmRes.status, 200, JSON.stringify(confirm));
+  assert.equal(confirm.summary.failed, 1);
+  assert.match(confirm.rows[0].reason, /metadata is not image\/webp/);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM products WHERE id = ?", confirm.rows[0].product_id), 0);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM product_images'), 0);
+});
+
+test('CSV create relation-batch failure leaves no product, JSON mirror or product-owned row', async () => {
+  let failing: ReturnType<typeof failingD1>['failing'];
+  const images = imagesBinding();
+  const { raw, app } = setup({
+    images: images.binding,
+    dbFactory(database) {
+      const wrapped = failingD1(database);
+      failing = wrapped.failing;
+      return wrapped.db;
+    },
+  });
+  const preview = await previewZip(app, {
+    'data.csv': strToU8(SHEET('images/a1.png')),
+    'images/a1.png': png(),
+  });
+  assert.equal(preview.res.status, 200, JSON.stringify(preview.body));
+  assert.equal(preview.body.rows[0].action, 'create', JSON.stringify(preview.body));
+  assert.deepEqual(preview.body.rows[0].errors, []);
+
+  // This statement used to live in a second batch, after the products INSERT
+  // had already committed. Injecting the relation failure therefore proves
+  // the row and its derived JSON mirror now share that relation transaction.
+  failing!.failWhen = (statements) => statements.some((statement) =>
+    /INSERT\s+INTO\s+product_images/i.test(statement.sql)
+  );
+  const confirmRes = await post(app, '/api/admin/import/confirm', { import_id: preview.body.import_id });
+  const confirm = await json(confirmRes);
+  assert.equal(confirmRes.status, 200, JSON.stringify(confirm));
+  assert.equal(confirm.summary.failed, 1, JSON.stringify(confirm));
+  assert.match(String(confirm.rows[0].reason), /simulated D1 failure/);
+
+  const productId = String(confirm.rows[0].product_id);
+  const after = productSnapshot(raw, productId);
+  assert.equal(after.product, undefined, 'the CREATE row must roll back with its relation rows');
+  for (const [section, rows] of Object.entries(after).filter(([name]) => name !== 'product')) {
+    assert.deepEqual(rows, [], `${section} must have no orphaned row after the failed CREATE`);
+  }
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM products'), 0, 'no bare product or JSON mirror survives');
+});
+
+test('CSV confirm queues images its committed replacement detaches, while cleanup preserves a shared key', async () => {
+  const { raw, app, bucket } = setup();
+  const key = 'products/import/gallery/csv-detach-shared.webp';
+  const url = `/files/${key}`;
+
+  raw.exec(`
+    INSERT INTO products (id, name, slug, price_iqd, stock)
+      VALUES ('csv_owner', 'CSV owner', 'csv-owner', 1000000, 5);
+    INSERT INTO products (id, name, slug, price_iqd, stock)
+      VALUES ('shared_owner', 'Shared owner', 'shared-owner', 1000000, 5);
+  `);
+  raw.prepare(
+    `INSERT INTO product_images
+       (id, product_id, url, r2_key, sort_order, is_primary, width, height, bytes, content_type)
+     VALUES ('pi_csv', 'csv_owner', ?, ?, 0, 1, 320, 240, 32, 'image/webp')`
+  ).run(url, key);
+  raw.prepare(
+    `INSERT INTO product_images
+       (id, product_id, url, r2_key, sort_order, is_primary, width, height, bytes, content_type)
+     VALUES ('pi_shared', 'shared_owner', ?, ?, 0, 1, 320, 240, 32, 'image/webp')`
+  ).run(url, key);
+  await bucket.put(key, webpBytes(), { httpMetadata: { contentType: 'image/webp' } });
+
+  // A CSV product row with no image children is a full relation replacement;
+  // it removes csv_owner's existing product_images row on confirm.
+  const csv = toCsv([
+    ['row_type', 'key', 'name', 'status', 'category', 'price_iqd', 'stock'],
+    ['product', 'csv-owner', 'CSV owner updated', 'active', 'tpl-printers', '1000000', '5'],
+  ]);
+  const preview = await previewZip(app, { 'data.csv': strToU8(csv) });
+  assert.equal(preview.res.status, 200, JSON.stringify(preview.body));
+  assert.equal(preview.body.rows[0].action, 'update', JSON.stringify(preview.body));
+  assert.deepEqual(preview.body.rows[0].errors, []);
+
+  const confirmRes = await post(app, '/api/admin/import/confirm', { import_id: preview.body.import_id });
+  const confirm = await json(confirmRes);
+  assert.equal(confirmRes.status, 200, JSON.stringify(confirm));
+  assert.deepEqual(confirm.summary, { created: 0, updated: 1, skipped: 0, failed: 0 });
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM product_images WHERE product_id='csv_owner'"), 0);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM product_images WHERE product_id='shared_owner'"), 1);
+
+  const job = row<{ object_key: string; state: string; reason: string; source_product_id: string }>(
+    raw,
+    `SELECT object_key, state, reason, source_product_id
+       FROM media_cleanup_jobs WHERE object_key = ?`,
+    key
+  );
+  assert.deepEqual(job, {
+    object_key: key,
+    state: 'pending',
+    reason: MEDIA_DETACH_REASON,
+    source_product_id: 'csv_owner',
+  });
+
+  // The delayed worker re-reads all references. The second product still owns
+  // this content-addressed object, so it closes the job without deleting R2.
+  const cleanup = await runGuardedMediaCleanup({
+    DB: asD1(raw),
+    BUCKET: bucket,
+    R2_PUBLIC: bucket,
+    R2_PRIVATE: new MemoryBucket(),
+  } as never);
+  assert.deepEqual(cleanup.still_referenced, [key]);
+  assert.equal(bucket.objects.has(key), true, 'a key shared by another product must survive cleanup');
+  assert.equal(
+    row<{ state: string }>(raw, 'SELECT state FROM media_cleanup_jobs WHERE object_key = ?', key)?.state,
+    'skipped_shared'
+  );
+});
+
+test('CSV update relation failure preserves scalars, dimensions, mirrors and relations byte-for-byte', async () => {
+  let failing: ReturnType<typeof failingD1>['failing'];
+  const harness = setup({
+    dbFactory(raw) {
+      const wrapped = failingD1(raw);
+      failing = wrapped.failing;
+      return wrapped.db;
+    },
+  });
+  const { raw, app } = harness;
+  const key = 'products/import/gallery/csv-rollback.webp';
+  const url = `/files/${key}`;
+  raw.prepare(
+    `INSERT INTO products
+       (id, name, slug, price_iqd, stock, options, colors, images,
+        net_weight_g, width_mm, depth_mm, height_mm,
+        package_weight_g, package_width_mm, package_depth_mm, package_height_mm)
+     VALUES ('csv_rollback', 'CSV rollback', 'csv-rollback', 1000000, 5, ?, ?, ?,
+             4200, 380, 410, 430, 6100, 510, 520, 530)`
+  ).run(
+    JSON.stringify([{ id: 'ov_rollback', name: 'Original Model', image: '', active: true }]),
+    JSON.stringify([{ id: 'pc_rollback', name: 'Original Black', hex: '#101010', image: '', active: true }]),
+    JSON.stringify([url])
+  );
+  raw.exec(`
+    INSERT INTO product_option_groups (id, product_id, name_en, sort, active)
+      VALUES ('og_rollback', 'csv_rollback', 'Model', 0, 1);
+    INSERT INTO product_option_values
+      (id, product_id, group_id, name_en, stock, sort, active,
+       net_weight_g, width_mm, depth_mm, height_mm,
+       package_weight_g, package_width_mm, package_depth_mm, package_height_mm)
+      VALUES ('ov_rollback', 'csv_rollback', 'og_rollback', 'Original Model', 4, 0, 1,
+              4100, 370, 400, 420, 6000, 500, 510, 520);
+    INSERT INTO product_colors (id, product_id, name_en, hex, stock, sort, active)
+      VALUES ('pc_rollback', 'csv_rollback', 'Original Black', '#101010', NULL, 0, 1);
+    INSERT INTO product_color_option_links (color_id, option_value_id, group_id)
+      VALUES ('pc_rollback', 'ov_rollback', 'og_rollback');
+    INSERT INTO product_option_fulfillment
+      (id, product_id, option_id, fulfillment_type, enabled, capacity, capacity_reserved, sort)
+      VALUES ('pof_rollback', 'csv_rollback', 'ov_rollback', 'pre_order', 1, 7, 0, 0);
+    INSERT INTO product_option_transports
+      (id, product_id, fulfillment_id, method, enabled, capacity, capacity_reserved, sort)
+      VALUES ('pot_rollback', 'csv_rollback', 'pof_rollback', 'sea', 1, 5, 0, 0);
+    INSERT INTO product_catalogs (product_id, catalog_id, position)
+      VALUES ('csv_rollback', '${SECTION}', 1);
+    INSERT INTO product_translations
+      (product_id, field, source_en, source_hash, text_ar, text_ckb, status, translation_version)
+      VALUES ('csv_rollback', 'description', 'Old description', 'old-hash', 'قديم', 'کۆن', 'approved', 7);
+    INSERT INTO search_tokens (product_id, token, weight)
+      VALUES ('csv_rollback', 'rollback-old', 9);
+    INSERT INTO price_history (product_id, variant_key, field, old_iqd, new_iqd, changed_by)
+      VALUES ('csv_rollback', '', 'regular', 900000, 1000000, 'boss');
+  `);
+  raw.prepare(
+    `INSERT INTO product_images
+       (id, product_id, url, r2_key, sort_order, is_primary, width, height, bytes, content_type)
+     VALUES ('pi_rollback', 'csv_rollback', ?, ?, 0, 1, 320, 240, 32, 'image/webp')`
+  ).run(url, key);
+
+  const csv = toCsv([
+    [
+      'row_type', 'key', 'name', 'status', 'category', 'price_iqd', 'stock',
+      'net_weight_g', 'width_mm', 'depth_mm', 'height_mm',
+      'package_weight_g', 'package_width_mm', 'package_depth_mm', 'package_height_mm',
+    ],
+    [
+      'product', 'csv-rollback', 'CSV rollback edited', 'active', 'tpl-printers', '1200000', '8',
+      '5200', '480', '510', '530', '7100', '610', '620', '630',
+    ],
+  ]);
+  const preview = await previewZip(app, { 'data.csv': strToU8(csv) });
+  assert.equal(preview.res.status, 200, JSON.stringify(preview.body));
+  assert.equal(preview.body.rows[0].action, 'update', JSON.stringify(preview.body));
+  assert.deepEqual(preview.body.rows[0].errors, []);
+  const before = productSnapshot(raw, 'csv_rollback');
+
+  // The product UPDATE and relation DELETE now inhabit this same batch. Under
+  // the old two-batch flow this injected failure left the edited name, price,
+  // dimensions and empty JSON mirrors committed over the untouched rows.
+  failing!.failWhen = (statements) => statements.some((statement) =>
+    /DELETE\s+FROM\s+product_images/i.test(statement.sql)
+  );
+  const confirmRes = await post(app, '/api/admin/import/confirm', { import_id: preview.body.import_id });
+  const confirm = await json(confirmRes);
+  assert.equal(confirmRes.status, 200, JSON.stringify(confirm));
+  assert.equal(confirm.summary.failed, 1, JSON.stringify(confirm));
+  assert.match(String(confirm.rows[0].reason), /simulated D1 failure/);
+  const after = productSnapshot(raw, 'csv_rollback');
+  assert.deepEqual(after, before, 'every product-owned scalar, dimension and relation must roll back together');
+  assert.equal(after.product?.name, 'CSV rollback', 'the attempted rename must not leak out of a failed relation save');
+  assert.equal(after.product?.package_width_mm, 510, 'the attempted dimension edit must not leak either');
+  assert.equal(
+    count(raw, 'SELECT COUNT(*) AS n FROM media_cleanup_jobs WHERE object_key=?', key),
+    0,
+    'a failed relation batch may not enqueue deletion of its still-live image'
+  );
+});
+
+test('CSV membership failure rolls product, relation, rule, version and rule audit back together', async () => {
+  let failing: ReturnType<typeof failingD1>['failing'];
+  const { raw, app } = setup({
+    dbFactory(database) {
+      const wrapped = failingD1(database);
+      failing = wrapped.failing;
+      return wrapped.db;
+    },
+  });
+  raw.exec(`
+    INSERT INTO products
+      (id, name, slug, price_iqd, stock, net_weight_g, package_width_mm)
+      VALUES ('csv_membership_atomic', 'Membership original', 'membership-atomic', 1000000, 3, 4100, 500);
+  `);
+  const csv = toCsv([
+    [
+      'row_type', 'key', 'name', 'status', 'category', 'price_iqd', 'stock',
+      'net_weight_g', 'package_width_mm',
+      'membership.pro.discount_mode', 'membership.pro.percent',
+    ],
+    [
+      'product', 'membership-atomic', 'Membership edited', 'active', 'tpl-printers', '1200000', '8',
+      '5200', '610', 'percent', '10',
+    ],
+  ]);
+  const preview = await previewZip(app, { 'data.csv': strToU8(csv) });
+  assert.equal(preview.res.status, 200, JSON.stringify(preview.body));
+  assert.equal(preview.body.rows[0].action, 'update', JSON.stringify(preview.body));
+  assert.deepEqual(preview.body.rows[0].errors, []);
+  const before = productSnapshot(raw, 'csv_membership_atomic');
+  const beforeVersions = count(raw, 'SELECT COUNT(*) AS n FROM membership_benefit_versions');
+  const beforeRuleAudits = count(raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action LIKE 'membership_benefit.%'");
+
+  failing!.failWhen = (statements) => statements.some((statement) =>
+    /INSERT\s+INTO\s+membership_benefit_rules/i.test(statement.sql)
+  );
+  const confirmRes = await post(app, '/api/admin/import/confirm', { import_id: preview.body.import_id });
+  const confirm = await json(confirmRes);
+  assert.equal(confirmRes.status, 200, JSON.stringify(confirm));
+  assert.equal(confirm.summary.failed, 1, JSON.stringify(confirm));
+  assert.match(String(confirm.rows[0].reason), /simulated D1 failure/);
+  assert.deepEqual(
+    productSnapshot(raw, 'csv_membership_atomic'),
+    before,
+    'the attempted name, price, dimensions, mirrors and relations must all roll back'
+  );
+  assert.equal(row<Record<string, unknown>>(raw, "SELECT * FROM products WHERE id='csv_membership_atomic'")?.name, 'Membership original');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM membership_benefit_rules WHERE product_id='csv_membership_atomic'"), 0);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM membership_benefit_versions'), beforeVersions);
+  assert.equal(
+    count(raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action LIKE 'membership_benefit.%'"),
+    beforeRuleAudits
+  );
+  assert.equal(
+    row<{ action: string }>(raw, 'SELECT action FROM product_import_items WHERE import_id = ?', preview.body.import_id)?.action,
+    'failed',
+    'only the durable failed checkpoint may survive the rolled-back product batch'
+  );
+});
+
+test('overlapping CSV confirms have one executor, then replay the identical terminal report', async () => {
+  let releaseInfo!: () => void;
+  let enteredInfo!: () => void;
+  const infoEntered = new Promise<void>((resolve) => { enteredInfo = resolve; });
+  const infoGate = new Promise<void>((resolve) => { releaseInfo = resolve; });
+  let blocked = false;
+  const images = imagesBinding({
+    async onInfo() {
+      if (blocked) return;
+      blocked = true;
+      enteredInfo();
+      await infoGate;
+    },
+  });
+  const { raw, app } = setup({ images: images.binding });
+  const preview = await previewZip(app, {
+    'data.csv': strToU8(SHEET('images/a1.png')),
+    'images/a1.png': png(),
+  });
+  assert.equal(preview.res.status, 200, JSON.stringify(preview.body));
+  raw.prepare("UPDATE product_imports SET media_stage_until='2000-01-01T00:00:00.000Z' WHERE id=?")
+    .run(preview.body.import_id);
+
+  const firstPending = post(app, '/api/admin/import/confirm', { import_id: preview.body.import_id });
+  await infoEntered;
+  assert.deepEqual(
+    row<{ lease_live: number; stage_live: number }>(
+      raw,
+      `SELECT apply_lease_until > strftime('%Y-%m-%dT%H:%M:%fZ','now') AS lease_live,
+              media_stage_until > strftime('%Y-%m-%dT%H:%M:%fZ','now') AS stage_live
+         FROM product_imports WHERE id=?`,
+      preview.body.import_id
+    ),
+    { lease_live: 1, stage_live: 1 },
+    'acquiring a confirm lease must revive staging protection before media verification starts'
+  );
+  const competingRes = await post(app, '/api/admin/import/confirm', { import_id: preview.body.import_id });
+  const competing = await json(competingRes);
+  assert.equal(competingRes.status, 409, JSON.stringify(competing));
+  assert.equal(competing.code, 'IMPORT_APPLY_IN_PROGRESS');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM products'), 0, 'the losing caller writes nothing');
+
+  releaseInfo();
+  const firstRes = await firstPending;
+  const first = await json(firstRes);
+  assert.equal(firstRes.status, 200, JSON.stringify(first));
+  assert.deepEqual(first.summary, { created: 1, updated: 0, skipped: 0, failed: 0 });
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM products'), 1);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM product_import_items WHERE import_id = ?', preview.body.import_id), 1);
+
+  const replayRes = await post(app, '/api/admin/import/confirm', { import_id: preview.body.import_id });
+  const replayed = await json(replayRes);
+  assert.equal(replayRes.status, 200, JSON.stringify(replayed));
+  assert.equal(replayed.already_applied, true);
+  assert.deepEqual(replayed.summary, first.summary);
+  assert.deepEqual(replayed.rows, first.rows);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM products'), 1, 'replay never executes CREATE again');
+});
+
+test('an expired crashed confirm resumes from its atomic item checkpoint without replaying CREATE', async () => {
+  const { raw, app } = setup();
+  const csv = toCsv([
+    ['row_type', 'key', 'name', 'status', 'category', 'price_iqd', 'stock'],
+    ['product', 'A1', 'Bambu Lab A1', 'active', 'tpl-printers', '1000000', '5'],
+  ]);
+  const preview = await previewZip(app, { 'data.csv': strToU8(csv) });
+  assert.equal(preview.res.status, 200, JSON.stringify(preview.body));
+  const importRow = row<{ payload: string }>(raw, 'SELECT payload FROM product_imports WHERE id = ?', preview.body.import_id)!;
+  const payload = JSON.parse(importRow.payload) as { products: Array<{ productId: string }> };
+  const productId = payload.products[0].productId;
+
+  raw.prepare(
+    `UPDATE product_imports
+        SET apply_token='crashed-owner', apply_generation=1,
+            apply_lease_until=strftime('%Y-%m-%dT%H:%M:%fZ','now','+5 minutes')
+      WHERE id=?`
+  ).run(preview.body.import_id);
+  raw.prepare(
+    `INSERT INTO products (id, name, slug, price_iqd, stock)
+     VALUES (?, 'Bambu Lab A1', 'crash-checkpoint-a1', 1000000, 5)`
+  ).run(productId);
+  raw.prepare(
+    `INSERT INTO product_import_items
+       (import_id,item_index,item_key,line,product_id,action,name,reason,apply_token)
+     VALUES (?,0,'A1',2,?,'created','Bambu Lab A1','','crashed-owner')`
+  ).run(preview.body.import_id, productId);
+  raw.prepare(
+    `UPDATE product_imports SET apply_lease_until=strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 second') WHERE id=?`
+  ).run(preview.body.import_id);
+  const before = productSnapshot(raw, productId);
+
+  const confirmRes = await post(app, '/api/admin/import/confirm', { import_id: preview.body.import_id });
+  const confirm = await json(confirmRes);
+  assert.equal(confirmRes.status, 200, JSON.stringify(confirm));
+  assert.deepEqual(confirm.summary, { created: 1, updated: 0, skipped: 0, failed: 0 });
+  assert.equal(confirm.rows[0].action, 'created');
+  assert.deepEqual(productSnapshot(raw, productId), before, 'resume must not touch the already committed product');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM product_import_items WHERE import_id = ?', preview.body.import_id), 1);
+  assert.equal(row<{ apply_generation: number }>(raw, 'SELECT apply_generation FROM product_imports WHERE id=?', preview.body.import_id)?.apply_generation, 2);
+});
+
+test('the checkpoint trigger fences a stale import owner and rolls its product batch back', async () => {
+  const { raw } = setup();
+  raw.prepare(
+    `INSERT INTO product_imports
+       (id,actor_user_id,template_family,category_id,state,payload_hash,report,payload,source_name,
+        apply_token,apply_lease_until,apply_generation)
+     VALUES ('imp_fence','boss','devices',?,'preview','hash','[]','{}','fence.csv',
+             'new-owner',strftime('%Y-%m-%dT%H:%M:%fZ','now','+5 minutes'),2)`
+  ).run(SECTION);
+  const db = asD1(raw);
+  await assert.rejects(
+    db.batch([
+      db.prepare("INSERT INTO products (id,name,slug,price_iqd,stock) VALUES ('stale_product','Stale','stale-product',1,1)"),
+      db.prepare(
+        `INSERT INTO product_import_items
+           (import_id,item_index,item_key,line,product_id,action,name,reason,apply_token)
+         VALUES ('imp_fence',0,'stale',2,'stale_product','created','Stale','','old-owner')`
+      ),
+    ]),
+    /IMPORT_APPLY_LEASE_LOST/
+  );
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM products WHERE id='stale_product'"), 0);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM product_import_items WHERE import_id='imp_fence'"), 0);
+});
+
+test('CSV re-verifies each staged image at save time after an earlier preflight lease goes stale', async () => {
+  let failing: ReturnType<typeof failingD1>['failing'];
+  const images = imagesBinding({ distinct: true });
+  const harness = setup({
+    images: images.binding,
+    dbFactory(database) {
+      const wrapped = failingD1(database);
+      failing = wrapped.failing;
+      return wrapped.db;
+    },
+  });
+  const { raw, app, bucket } = harness;
+  const csv = toCsv([
+    ['row_type', 'key', 'name', 'status', 'category', 'price_iqd', 'stock', 'image', 'primary'],
+    ['product', 'A1', 'Bambu Lab A1', 'active', 'tpl-printers', '1000000', '5', '', ''],
+    ['image', 'A1', '', '', '', '', '', 'images/a1.png', 'yes'],
+    ['product', 'P1', 'Bambu Lab P1S', 'active', 'tpl-printers', '2000000', '3', '', ''],
+    ['image', 'P1', '', '', '', '', '', 'images/p1.png', 'yes'],
+  ]);
+  const preview = await previewZip(app, {
+    'data.csv': strToU8(csv),
+    'images/a1.png': png(),
+    'images/p1.png': png(65),
+  });
+  assert.equal(preview.res.status, 200, JSON.stringify(preview.body));
+  assert.deepEqual(preview.body.rows.flatMap((r: { errors: string[] }) => r.errors), []);
+  const urls = bankedImages(raw, preview.body.import_id);
+  assert.equal(new Set(urls).size, 2, JSON.stringify(urls));
+  const secondKey = urls[1].slice('/files/'.length);
+
+  let removed = false;
+  failing!.beforeBatch = (statements) => {
+    if (removed || !statements.some((statement) => /INSERT\s+INTO\s+product_import_items/i.test(statement.sql))) return;
+    removed = true;
+    // Both objects passed the whole-file preflight. Model cleanup winning
+    // after that old protection expires, immediately before product 1 commits.
+    raw.prepare("UPDATE media_object_guards SET protected_until='' WHERE object_key=?").run(secondKey);
+    bucket.objects.delete(secondKey);
+  };
+  const confirmRes = await post(app, '/api/admin/import/confirm', { import_id: preview.body.import_id });
+  const confirm = await json(confirmRes);
+  assert.equal(confirmRes.status, 200, JSON.stringify(confirm));
+  assert.deepEqual(confirm.summary, { created: 1, updated: 0, skipped: 0, failed: 1 });
+  const failed = confirm.rows.find((r: { action: string }) => r.action === 'failed');
+  assert.match(String(failed?.reason), /does not exist in media storage/);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM products'), 1, 'the first product keeps partial-import semantics');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM product_images'), 1);
+  assert.equal(
+    count(raw, 'SELECT COUNT(*) AS n FROM product_images WHERE r2_key=?', secondKey),
+    0,
+    'the second product never commits a dangling relation'
+  );
+});
+
+test('CSV export omits quarantined product_images so its own preview has no empty image row', async () => {
+  const { raw, app } = setup();
+  raw.exec(`
+    INSERT INTO products (id,name,slug,price_iqd,stock,category_id,template_family)
+      VALUES ('csv_quarantine_export','Quarantined export','quarantined-export',1000,1,'${SECTION}','devices');
+    INSERT INTO product_catalogs (product_id,catalog_id,position)
+      VALUES ('csv_quarantine_export','${SECTION}',1);
+    INSERT INTO product_images
+      (id,product_id,url,r2_key,source_url,sort_order,is_primary,quarantined,quarantine_reason)
+      VALUES ('pi_quarantined_export','csv_quarantine_export','','','https://vendor.example/old.jpg',0,0,1,'external_url');
+  `);
+
+  const exportRes = await get(app, '/api/admin/import/export?ids=csv_quarantine_export&format=csv');
+  const exported = await exportRes.text();
+  assert.equal(exportRes.status, 200, exported);
+  const parsed = parseImport(exported, templateShape('printer'));
+  assert.equal(parsed.products.length, 1, JSON.stringify(parsed.issues));
+  assert.equal(parsed.products[0].images.length, 0, 'provenance must not become an empty image child row');
+
+  const preview = await previewZip(app, { 'data.csv': strToU8(exported) });
+  assert.equal(preview.res.status, 200, JSON.stringify(preview.body));
+  assert.equal(preview.body.rows[0].action, 'update', JSON.stringify(preview.body));
+  assert.deepEqual(preview.body.rows[0].errors, []);
+  assert.equal(preview.body.rows[0].images, 0);
+});
+
 // ---------------------------------------------------------------------------
 //  THE OTHER DOOR
 // ---------------------------------------------------------------------------
@@ -512,7 +1123,7 @@ test('an external link cannot become a product image through the ordinary save e
         ...base,
         media: [{ id: 'img_x', url: 'https://static.insales-cdn.com/images/products/1/8093/x.png', key: '' }],
       }),
-    /VALIDATION|رابط خارجي|external link/,
+    /WebP محلية|owned WebP/,
     'a bare supplier URL must be refused by the save, not stored'
   );
 

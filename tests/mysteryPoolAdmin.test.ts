@@ -28,6 +28,7 @@ import { adminMysteryRoutes } from '../worker/routes/mystery';
 import { refusalIssues } from '../src/components/adminProducts/applyResult';
 import type { ApplyVerifyFailure } from '../src/components/adminProducts/types';
 import { MYSTERY_REFUSALS } from '../worker/lib/mystery/issues';
+import { fixtureWebp, productMediaFixtureEnv } from './fixtures/productMedia';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 const mount: Mount = (a) => a.route('/api/admin/mystery', adminMysteryRoutes);
@@ -36,7 +37,7 @@ const put = (a: App, path: string, b: unknown) =>
   a.request(path, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) });
 const del = (a: App, path: string) => a.request(path, { method: 'DELETE' });
 
-function setup() {
+function setup(env: Record<string, unknown> = {}) {
   const raw = freshDb();
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role,username) VALUES ('usr_owner','Admin','boss@x.co','h','admin','boss');
@@ -55,7 +56,7 @@ function setup() {
            ('ov_off','p_option','grp_size','Discontinued',9,0,0);
   `);
   const db = asD1(raw);
-  return { raw, db, app: stubApp(db, OWNER, mount) };
+  return { raw, db, app: stubApp(db, OWNER, mount, { env }) };
 }
 
 const makePool = async (app: App, over: Record<string, unknown> = {}) => {
@@ -309,6 +310,58 @@ const OFFER_BODY = {
   show_odds: true,
   max_qty_per_order: 3,
 };
+
+test('mystery create/update normalize stored media metadata, and duplicate refuses a vanished object', async () => {
+  const media = productMediaFixtureEnv({ supplyDeclaredWebp: false });
+  const key = 'products/mystery/gallery/offer-gate.webp';
+  const url = `/files/${key}`;
+  await media.publicBucket.put(key, fixtureWebp());
+  const claimed = [{
+    id: 'img_mystery_gate', url, key, primary: true, order: 0,
+    width: 7, height: 8, bytes: 123_456, content_type: 'image/jpeg',
+  }];
+  const { raw, app } = setup(media.env);
+
+  const createdRes = await post(app, '/api/admin/mystery/offers', { ...OFFER_BODY, direct_pool_id: null, media: claimed });
+  const created = await json(createdRes);
+  assert.equal(createdRes.status, 200, JSON.stringify(created));
+  const id = created.product.id as string;
+  const stored = JSON.parse(row<{ images: string }>(raw, 'SELECT images FROM products WHERE id = ?', id)!.images)[0];
+  assert.deepEqual(
+    { url: stored.url, key: stored.key, content_type: stored.content_type, bytes: stored.bytes, width: stored.width, height: stored.height },
+    { url, key, content_type: 'image/webp', bytes: 30, width: 640, height: 480 }
+  );
+
+  const updatedRes = await put(app, `/api/admin/mystery/offers/${id}`, {
+    ...OFFER_BODY,
+    name_en: 'Updated mystery filament',
+    direct_pool_id: null,
+    media: claimed,
+  });
+  assert.equal(updatedRes.status, 200, await updatedRes.text());
+
+  await media.publicBucket.delete(key);
+  const duplicateRes = await post(app, `/api/admin/mystery/offers/${id}/duplicate`, {});
+  const duplicate = await json(duplicateRes);
+  assert.equal(duplicateRes.status, 400, JSON.stringify(duplicate));
+  assert.equal(duplicate.code, 'IMAGE_REFERENCE_MISSING');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM products WHERE composition = 'mystery'"), 1);
+});
+
+test('mystery create rejects a missing local WebP before any catalogue row is written', async () => {
+  const media = productMediaFixtureEnv({ supplyDeclaredWebp: false });
+  const key = 'products/mystery/gallery/missing.webp';
+  const { raw, app } = setup(media.env);
+  const res = await post(app, '/api/admin/mystery/offers', {
+    ...OFFER_BODY,
+    direct_pool_id: null,
+    media: [{ id: 'img_missing', url: `/files/${key}`, key, primary: true }],
+  });
+  const body = await json(res);
+  assert.equal(res.status, 400, JSON.stringify(body));
+  assert.equal(body.code, 'IMAGE_REFERENCE_MISSING');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM products WHERE composition = 'mystery'"), 0);
+});
 
 test('a mystery offer is a pinned products row, and its secret is created but never returned', async () => {
   const { raw, app } = setup();

@@ -93,6 +93,7 @@ interface CheckoutQuoteLineDto {
   product_id: string;
   name: string;
   name_ar: string;
+  image?: string;
   variant: string;
   qty: number;
   unit_price_iqd: number;
@@ -107,7 +108,7 @@ interface CheckoutQuoteLineDto {
    * payment. `is_printer` is carried up onto the parent by the server so the
    * printer delivery note below still fires for a printer inside a bundle.
    */
-  included?: Array<{ product_id: string | null; name: string; name_ar: string; variant: string; qty: number; value_iqd: number }>;
+  included?: Array<{ product_id: string | null; name: string; name_ar: string; image?: string; variant: string; qty: number; value_iqd: number }>;
   /** The disclosure's struck total and saving badge, on THIS line's basis —
    *  so the review screen never mixes a cart-basis figure with a quote-basis
    *  one on a pre-order bundle the quote re-priced. */
@@ -776,7 +777,7 @@ export default function Checkout() {
           const cartLine = cartById.get(l.cart_item_id);
           return {
             key: l.cart_item_id,
-            image: cartLine?.image ?? '',
+            image: l.image ?? cartLine?.image ?? '',
             name: l.name,
             variant: l.variant,
             qty: l.qty,

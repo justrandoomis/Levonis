@@ -240,14 +240,21 @@ test('the R2 ingestion path refuses every address that could reach inside', () =
   assert.doesNotThrow(() => validateOutboundUrl('https://cdn.bambulab.com/a.jpg'));
 });
 
-test('the ingest route states, and keeps, its four limits', () => {
-  const src = readFileSync(new URL('../worker/routes/media.ts', import.meta.url), 'utf8');
-  assert.match(src, /validateOutboundUrl/, 'every hop is checked');
-  assert.match(src, /redirect: 'manual'/, 'redirects are followed by hand so each hop can be re-checked');
-  assert.match(src, /AbortSignal\.timeout\(/, 'a fetch cannot hang');
-  // Magic bytes, not the Content-Type header: a server can claim image/png for
+test('the centralized ingest pipeline states, and keeps, its four limits', () => {
+  const route = readFileSync(new URL('../worker/routes/media.ts', import.meta.url), 'utf8');
+  const guard = readFileSync(new URL('../worker/lib/fetchGuard.ts', import.meta.url), 'utf8');
+  const pipeline = readFileSync(new URL('../worker/lib/productMediaIngest.ts', import.meta.url), 'utf8');
+
+  assert.match(route, /guardedFetchBytes/, 'the route uses the one guarded network boundary');
+  assert.match(guard, /validateOutboundUrl\(target\.toString\(\)\)/, 'every hop is re-checked at point of use');
+  assert.match(guard, /redirect: 'manual'/, 'redirects are followed by hand so each hop can be checked');
+  assert.match(guard, /setTimeout\(/, 'one deadline bounds redirects and the response body');
+  assert.match(guard, /maxRedirects/, 'redirect count is explicitly bounded');
+  assert.match(guard, /maxBytes/, 'source bytes are explicitly bounded');
+  // Body bytes, not the Content-Type header: a server can claim image/png for
   // an HTML error page, and storing that would put a page in the R2 bucket.
-  assert.match(src, /magic bytes/i);
+  assert.match(pipeline, /sniffImageBytes\(input\.bytes\)/);
+  assert.match(pipeline, /looksLikeMarkup\(input\.bytes\)/);
 });
 
 

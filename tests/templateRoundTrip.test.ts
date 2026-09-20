@@ -78,7 +78,7 @@ function view(): ProductRelationsView {
     values: [
       {
         id: 'ov1', product_id: 'prd_x', group_id: 'og1', name_en: 'A1', sku_part: 'A1',
-        image: '/files/opt-a1.jpg', sort: 0, active: 1, stock: 5, low_stock_threshold: 2,
+        image: '/files/opt-a1.webp', sort: 0, active: 1, stock: 5, low_stock_threshold: 2,
         regular_price_iqd: 899_000, prime_price_iqd: 885_000, pro_price_iqd: 799_000, cost_iqd: 700_000,
         regular_adjust_iqd: null, prime_adjust_iqd: null, pro_adjust_iqd: null, cost_adjust_iqd: null,
         availability_type: 'direct_sale', lead_time_text: '', lead_time_min_days: null,
@@ -105,7 +105,7 @@ function view(): ProductRelationsView {
     ],
     colors: [
       {
-        id: 'pc1', product_id: 'prd_x', name_en: 'Black', hex: '#000000', image: '/files/col-black.jpg',
+        id: 'pc1', product_id: 'prd_x', name_en: 'Black', hex: '#000000', image: '/files/col-black.webp',
         sort: 0, active: 1, stock: 9, low_stock_threshold: 3,
         // +5,000 over whichever model is picked — the owner's surcharge form.
         regular_price_iqd: null, prime_price_iqd: null, pro_price_iqd: null, cost_iqd: 2_000,
@@ -125,16 +125,16 @@ function view(): ProductRelationsView {
       },
     ],
     images: [
-      { id: 'im1', product_id: 'prd_x', url: '/files/a.jpg', alt_en: 'front', alt_ar: 'أمام',
-        alt_ckb: '', r2_key: 'products/a.jpg', source_url: 'https://vendor.example/a.jpg',
+      { id: 'im1', product_id: 'prd_x', url: '/files/a.webp', alt_en: 'front', alt_ar: 'أمام',
+        alt_ckb: '', r2_key: 'a.webp', source_url: 'https://vendor.example/a.jpg',
         sort_order: 0, is_primary: 1, option_value_id: null, color_id: null, variant_id: null,
         width: 1200, height: 900 },
-      { id: 'im2', product_id: 'prd_x', url: '/files/b.jpg', alt_en: 'A1 only', alt_ar: '',
-        alt_ckb: '', r2_key: '', source_url: '',
+      { id: 'im2', product_id: 'prd_x', url: '/files/b.webp', alt_en: 'A1 only', alt_ar: '',
+        alt_ckb: '', r2_key: 'b.webp', source_url: '',
         sort_order: 1, is_primary: 0, option_value_id: 'ov1', color_id: null, variant_id: null,
         width: null, height: null },
-      { id: 'im3', product_id: 'prd_x', url: '/files/c.jpg', alt_en: 'black', alt_ar: '',
-        alt_ckb: '', r2_key: '', source_url: '',
+      { id: 'im3', product_id: 'prd_x', url: '/files/c.webp', alt_en: 'black', alt_ar: '',
+        alt_ckb: '', r2_key: 'c.webp', source_url: '',
         sort_order: 2, is_primary: 0, option_value_id: null, color_id: 'pc1', variant_id: null,
         width: null, height: null },
     ],
@@ -230,7 +230,7 @@ test('an image keeps its size, its R2 key, its source and its per-language alt t
   const im1 = (body.images as Array<Record<string, unknown>>).find((i) => i.id === 'im1')!;
   assert.equal(im1.width, 1200);
   assert.equal(im1.height, 900);
-  assert.equal(im1.r2_key, 'products/a.jpg');
+  assert.equal(im1.r2_key, 'a.webp');
   assert.equal(im1.source_url, 'https://vendor.example/a.jpg');
   assert.equal(im1.alt_ar, 'أمام', 'the Arabic alt is its own text, not a copy of the English one');
   assert.equal(im1.alt_en, 'front');
@@ -821,7 +821,7 @@ test("a colour's SKU fragment survives an ordinary edit", () => {
 test("an image's recorded type and size are carried, not cleared", () => {
   const v = view();
   const first = (v.images as unknown as Array<Record<string, unknown>>)[0];
-  first.content_type = 'image/jpeg';
+  first.content_type = 'image/webp';
   first.bytes = 204_800;
   const doc = applyRelations(parseProductRow(baseRow()), v, { includeInactive: true });
   const built = validateProductDoc(
@@ -829,7 +829,7 @@ test("an image's recorded type and size are carried, not cleared", () => {
   );
   const images = relationsBodyFromDoc(built, v).images as Array<Record<string, unknown>>;
   const im1 = images.find((i) => i.id === 'im1')!;
-  assert.equal(im1.content_type, 'image/jpeg');
+  assert.equal(im1.content_type, 'image/webp');
   assert.equal(im1.bytes, 204_800);
 });
 

@@ -37,16 +37,21 @@
 import { Hono } from 'hono';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
 import type { AppContext, Env } from '../lib/types';
-import { requireAdmin, badRequest, notFound, forbidden, str } from '../lib/http';
+import { requireAdmin, badRequest, conflict, notFound, forbidden, str } from '../lib/http';
 import { newId, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { canViewFinancials } from '../lib/adminScope';
 import { rateLimit } from '../lib/ratelimit';
 import { HEIF_REFUSAL, isHeifBytes, sniff } from './uploads';
-import { headMediaObject, storeMedia } from '../lib/mediaStorage';
-import { IMAGE_SOURCE_CAP, isConvertibleToWebp, webpConversionAvailable } from '../lib/imageConvert';
+import { IMAGE_SOURCE_CAP } from '../lib/imageConvert';
 import { ingestImageUrl } from './media';
-import { planRelationsWrite } from './adminProductRelations';
+import {
+  ingestProductMediaBytes,
+  PRODUCT_MEDIA_FORM_STAGING_GRACE_MINUTES,
+  ProductMediaIngestError,
+  verifyStoredProductMedia,
+} from '../lib/productMediaIngest';
+import { verifyAndNormalizeProductMedia } from '../lib/productMediaWrite';
 import {
   blankTemplate,
   labelRow,
@@ -80,16 +85,11 @@ import {
 } from '../lib/importApply';
 import {
   existingCellsFrom,
-  fulfillmentStatements,
   parseFulfillmentPayload,
   refuseStrandedCapacity,
   type ExistingCells,
 } from '../lib/optionFulfillment';
-import {
-  deleteBenefitRule,
-  saveBenefitRule,
-  type RuleWrite,
-} from '../lib/membershipBenefits';
+import { planProductMembershipRules } from '../lib/membershipBenefits';
 import {
   isProductType,
   isTemplateFamily,
@@ -98,17 +98,19 @@ import {
   type ProductTypeId,
 } from '../lib/templateFamilies';
 import { loadLookups } from '../lib/lookups';
-import { registerHashtags } from '../lib/hashtags';
 import {
-  PRODUCT_COLUMNS,
   parseProductRow,
-  serializeDoc,
   validateProductDoc,
+  type ProductDoc,
 } from '../lib/productModel';
-import { localizeRespectingAuthored } from '../lib/productPersistence';
-import { syncProductTranslations } from '../lib/translate/store';
+import {
+  localizeRespectingAuthored,
+  planProductSave,
+  saveProductAtomic,
+} from '../lib/productPersistence';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
 import { withClassificationPlacements } from '../lib/catalogMembership';
+import { isActiveProductImageRow } from '../lib/productOverlay';
 
 export const adminImportRoutes = new Hono<AppContext>();
 adminImportRoutes.use('*', requireAdmin);
@@ -117,6 +119,7 @@ const MAX_CSV_BYTES = 4 * 1024 * 1024;
 const MAX_ZIP_BYTES = 40 * 1024 * 1024;
 const MAX_ZIP_FILES = 400;
 const MAX_PRODUCTS = 500;
+const IMPORT_MEDIA_STAGE_MODIFIER = `+${PRODUCT_MEDIA_FORM_STAGING_GRACE_MINUTES} minutes`;
 /**
  * ONE CEILING FOR A PRODUCT PICTURE, AND IT IS THE FORM'S.
  *
@@ -619,7 +622,10 @@ async function exportProducts(
           links: linkNames.get(col.id as string) ?? [],
         })),
       images: images
-        .filter((im) => im.product_id === pid)
+        // Quarantine rows are provenance for repair, never an exportable
+        // image. Their URL is intentionally blank; serializing one produced an
+        // empty `image` child row that the next preview rejected.
+        .filter((im) => im.product_id === pid && isActiveProductImageRow(im))
         .map((im) => {
           const boundColor = colors.find((col) => col.id === im.color_id);
           const boundValue = im.option_value_id ? valueById.get(im.option_value_id as string) : undefined;
@@ -848,36 +854,24 @@ async function storeAsset(env: Env, bytes: Uint8Array): Promise<AssetOutcome> {
   if (!kind.mime.startsWith('image/')) return { ok: false, reason: NOT_AN_IMAGE_REASON };
   if (bytes.byteLength > IMAGE_CAP) return { ok: false, reason: tooLargeReason(bytes.byteLength) };
 
-  const convertible = isConvertibleToWebp(kind.mime);
-  /**
-   * ASKED BEFORE THE FIRST `put`, NOT AFTER IT.
-   *
-   * Without the binding `storeMedia` stores the original under its true
-   * extension and only LOGS — honest for a chat attachment, wrong for a
-   * catalogue that the owner was told converts everything. Checked here, the
-   * answer costs one boolean and no byte of a supplier's PNG reaches the
-   * bucket on a deployment that cannot convert it.
-   */
-  if (convertible && !webpConversionAvailable(env)) return { ok: false, reason: CONVERT_UNAVAILABLE_REASON };
-
-  const digest = await crypto.subtle.digest('SHA-256', bytes as unknown as BufferSource);
-  const sha = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
-  const probeKey = `products/import/gallery/${sha}.${convertible ? 'webp' : kind.ext}`;
-  if (await headMediaObject(env, 'public', probeKey)) return { ok: true, url: `/files/${probeKey}` };
-
   try {
-    const stored = await storeMedia(env, {
-      placement: { visibility: 'public', domain: 'products', entityId: 'import', kind: 'gallery', objectId: sha },
+    // The same final-WebP/content-addressed pipeline as uploads and TXT Apply.
+    // In particular, static AVIF is converted and animated GIF is refused;
+    // neither can escape under an extension chosen from caller metadata.
+    const stored = await ingestProductMediaBytes(env, {
       bytes,
-      mime: kind.mime,
-      cacheControl: 'public, max-age=31536000, immutable',
+      entity_id: 'import',
+      cleanup_grace_minutes: PRODUCT_MEDIA_FORM_STAGING_GRACE_MINUTES,
     });
-    return { ok: true, url: `/files/${stored.key}` };
+    return { ok: true, url: stored.url };
   } catch (e) {
-    // IMAGE_CONVERT_FAILED / IMAGE_TOO_LARGE_TO_CONVERT, or anything R2 itself
-    // threw. The detail goes to the log for whoever is debugging; the owner
-    // gets the sentence that tells them what to do with THIS file.
-    console.error(`adminImport: image "${probeKey}" was not stored: ${e instanceof Error ? e.message : String(e)}`);
+    if (e instanceof ProductMediaIngestError) {
+      if (e.code === 'IMAGE_CONVERT_UNAVAILABLE') return { ok: false, reason: CONVERT_UNAVAILABLE_REASON };
+      if (e.code === 'IMAGE_SOURCE_TOO_LARGE') return { ok: false, reason: tooLargeReason(bytes.byteLength) };
+      if (e.code === 'IMAGE_CONVERT_FAILED') return { ok: false, reason: CONVERT_FAILED_REASON };
+      return { ok: false, reason: e.message };
+    }
+    console.error(`adminImport: product image was not stored: ${e instanceof Error ? e.message : String(e)}`);
     return { ok: false, reason: CONVERT_FAILED_REASON };
   }
 }
@@ -909,6 +903,7 @@ async function resolveImages(
 ): Promise<{ map: Map<string, string>; issues: RowIssue[] }> {
   const map = new Map<string, string>();
   const issues: RowIssue[] = [];
+  const assetOutcomes = new Map<string, AssetOutcome>();
   const wanted = new Map<string, number>(); // cell -> first line that used it
   const want = (cell: string, line: number) => {
     if (cell && !wanted.has(cell)) wanted.set(cell, line);
@@ -930,8 +925,20 @@ async function resolveImages(
       // re-upload. `isOwnedMediaUrl` rather than the prefix alone, so a cell
       // that merely BEGINS with `/files/` and then walks somewhere else
       // (`/files/../…`) is refused here instead of being copied into a product.
-      if (isOwnedMediaUrl(cell)) map.set(cell, cell);
-      else issues.push({ line, severity: 'error', message: `image: "${cell}" — ${EXTERNAL_IMAGE_REFUSAL}` });
+      if (!isOwnedMediaUrl(cell)) {
+        issues.push({ line, severity: 'error', message: `image: "${cell}" — ${EXTERNAL_IMAGE_REFUSAL}` });
+        continue;
+      }
+      try {
+        const key = cell.slice('/files/'.length);
+        await verifyStoredProductMedia(env, [{ url: cell, key }]);
+        map.set(cell, cell);
+      } catch (error) {
+        const reason = error instanceof ProductMediaIngestError
+          ? error.message
+          : 'the stored image could not be verified';
+        issues.push({ line, severity: 'error', message: `image: "${cell}" — ${reason}` });
+      }
       continue;
     }
     const zipKey = cell.toLowerCase().replace(/^\.?\//, '');
@@ -940,7 +947,15 @@ async function resolveImages(
       assets.get(`images/${zipKey}`) ??
       [...assets.entries()].find(([k]) => k.endsWith(`/${zipKey}`))?.[1];
     if (bytes) {
-      const outcome = await storeAsset(env, bytes);
+      const digest = Array.from(
+        new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as unknown as BufferSource)),
+        (byte) => byte.toString(16).padStart(2, '0')
+      ).join('');
+      let outcome = assetOutcomes.get(digest);
+      if (!outcome) {
+        outcome = await storeAsset(env, bytes);
+        assetOutcomes.set(digest, outcome);
+      }
       if (outcome.ok) map.set(cell, outcome.url);
       else issues.push({ line, severity: 'error', message: `image: "${cell}" ${outcome.reason}` });
       continue;
@@ -1218,15 +1233,16 @@ function heldCellsOf(shape: ExistingShape | null): ExistingCells {
 /**
  * 0075 — THE PREVIEW ASKS ABOUT THE COUNTER THE CONFIRM WILL MOVE.
  *
- * The confirm writes the cells through `parseFulfillmentPayload` +
- * `refuseStrandedCapacity` (below). Both can refuse — a route the file drops
- * while it is holding units, a pool cut under what is already held, a quota
- * cleared to untracked with a live hold against it — and a preview that says
- * nothing about any of them promises an import the confirm then reports as
- * `failed`. So the preview runs the same two functions on the same resolved
- * cells and shows the refusal as this product's error, before anything is
- * written. The confirm still re-checks against the live rows, because the
- * preview's answer can be minutes old and the write is the write.
+ * The confirm reaches these checks through `planProductSave`, the shared
+ * writer that appends the cell statements to the product/relations batch.
+ * Both can refuse — a route the file drops while it is holding units, a pool
+ * cut under what is already held, a quota cleared to untracked with a live
+ * hold against it — and a preview that says nothing about any of them promises
+ * an import the confirm then reports as `failed`. So the preview runs the same
+ * two functions on the same resolved cells and shows the refusal as this
+ * product's error, before anything is written. The confirm still re-checks
+ * against the live rows, because the preview's answer can be minutes old and
+ * the write is the write.
  */
 function cellRefusal(relations: Record<string, unknown>, shape: ExistingShape | null): string | null {
   const values = relationValues(relations);
@@ -1366,8 +1382,10 @@ adminImportRoutes.post('/preview', async (c) => {
     .prepare(
       `INSERT INTO product_imports
          (id, actor_user_id, template_family, category_id, sub_category_id, state, payload_hash,
-          created_count, updated_count, skipped_count, failed_count, report, payload, source_name)
-       VALUES (?, ?, ?, ?, NULL, 'preview', ?, 0, 0, 0, ?, ?, ?, ?)`
+          created_count, updated_count, skipped_count, failed_count, report, payload, source_name,
+          media_stage_until)
+       VALUES (?, ?, ?, ?, NULL, 'preview', ?, 0, 0, 0, ?, ?, ?, ?,
+               strftime('%Y-%m-%dT%H:%M:%fZ','now', ?))`
     )
     .bind(
       importId,
@@ -1378,7 +1396,8 @@ adminImportRoutes.post('/preview', async (c) => {
       failed,
       JSON.stringify(rows),
       payloadJson,
-      file.name.slice(0, 200)
+      file.name.slice(0, 200),
+      IMPORT_MEDIA_STAGE_MODIFIER
     )
     .run();
 
@@ -1398,97 +1417,6 @@ adminImportRoutes.post('/preview', async (c) => {
 
 // ------------------------------------------------------------- confirm
 
-/**
- * §18 — the sheet's membership block, written the ONLY way a benefit rule may
- * be written: through `saveBenefitRule` / `deleteBenefitRule`, each of which
- * appends a `membership_benefit_versions` row and an audit entry in the same
- * batch as the rule itself. A spreadsheet is not a side door into pricing.
- *
- * WHAT THE SHEET DOES NOT SAY IS PRESERVED. Six columns describe a rule that
- * has sixteen; the date window, the priority, the on/off switch, the label,
- * the note and the minimum subtotal are read back off the stored row and
- * written again unchanged. Defaulting them instead would mean a bulk price
- * edit silently cancelled a scheduled promotion and re-enabled every rule an
- * owner had switched off — from a file that never mentioned either.
- *
- * An empty list is the ordinary case: the file said nothing, so nothing here
- * runs and no version row is appended.
- *
- * Exported because the TXT template (`worker/routes/template.ts`) writes the
- * same six values from the same `membership.<tier>.<field>` keys. One writer,
- * so the two file formats cannot drift into writing a rule differently.
- */
-export async function applyMembershipRules(
-  env: Env,
-  actorId: string,
-  productId: string,
-  rules: readonly ParsedMembershipRule[]
-): Promise<void> {
-  for (const r of rules) {
-    const { results: matching } = await env.DB
-      .prepare(
-        `SELECT * FROM membership_benefit_rules
-          WHERE benefit_type = 'product_discount' AND scope = 'product' AND product_id = ? AND tier = ?
-          ORDER BY priority DESC, id`
-      )
-      .bind(productId, r.tier)
-      .all<Record<string, unknown>>();
-    // The one an update edits is the one that WINS (`selectRule`'s order:
-    // priority first, then a stable id), so the sheet edits the rule the
-    // checkout actually applies and the export shows the same one.
-    const existing = (matching ?? [])[0] ?? null;
-
-    if (r.remove) {
-      /**
-       * EVERY rule of this tier, not only the winner. `__NULL__` says "this
-       * product has no PRO membership discount", and nothing in the door stops
-       * an owner from having created two. Deleting only the top one would
-       * leave the OTHER one pricing every PRO order while the file, the
-       * preview and the next export all said the override was gone — a silent
-       * discount nobody can see. Each deletion is its own versioned, audited
-       * write, so none of them is lost.
-       *
-       * Nothing to delete is not a failure: a file may legitimately say "this
-       * product has no PRO rule" about a product that already has none.
-       */
-      for (const row of matching ?? []) await deleteBenefitRule(env, actorId, String(row.id));
-      continue;
-    }
-
-    /** A field the sheet cannot express: kept as stored, null on a first write. */
-    const kept = <T>(column: string): T | null => (existing ? ((existing[column] as T | null) ?? null) : null);
-    const write: RuleWrite = {
-      id: existing ? String(existing.id) : newId('mbr'),
-      tier: r.tier,
-      benefit_type: 'product_discount',
-      scope: 'product',
-      category_id: null,
-      sub_category_id: null,
-      product_id: productId,
-      discount_mode: r.discount_mode,
-      percent: r.percent,
-      fixed_iqd: r.fixed_iqd,
-      max_discount_iqd: r.max_discount_iqd,
-      cap_scope: r.cap_scope,
-      max_quantity: r.max_quantity,
-      min_subtotal_iqd: kept<number>('min_subtotal_iqd'),
-      // A product discount carries no delivery or tax fields at all; the admin
-      // door nulls them for this benefit_type too.
-      free_shipping_threshold_iqd: null,
-      shipping_methods: null,
-      max_shipping_subsidy_iqd: null,
-      cod_tax_exempt: null,
-      enabled: existing ? Number(existing.enabled) === 1 : true,
-      priority: existing ? Number(existing.priority ?? 0) : 0,
-      valid_from: kept<string>('valid_from'),
-      valid_until: kept<string>('valid_until'),
-      label: kept<string>('label'),
-      notes: kept<string>('notes'),
-    };
-    await saveBenefitRule(env, actorId, write, existing ? 'update' : 'create');
-  }
-}
-
 interface ReportRow {
   key: string;
   line: number;
@@ -1498,13 +1426,180 @@ interface ReportRow {
   reason: string;
 }
 
+interface ImportApplyLease {
+  token: string;
+  generation: number;
+  leaseUntil: string;
+}
+
+interface ImportItemCheckpoint {
+  import_id: string;
+  item_index: number;
+  item_key: string;
+  line: number;
+  product_id: string;
+  action: 'created' | 'updated' | 'failed';
+  name: string;
+  reason: string;
+}
+
+const IMPORT_APPLY_LEASE_MINUTES = 5;
+const IMPORT_APPLY_LEASE_MODIFIER = `+${IMPORT_APPLY_LEASE_MINUTES} minutes`;
+
+class ImportApplyLeaseLost extends Error {
+  constructor() {
+    super('The import apply lease was lost; retry the same import id');
+    this.name = 'ImportApplyLeaseLost';
+  }
+}
+
+const checkpointReportRow = (row: ImportItemCheckpoint): ReportRow => ({
+  key: row.item_key,
+  line: Number(row.line),
+  action: row.action,
+  name: row.name,
+  product_id: row.product_id,
+  reason: row.reason,
+});
+
+function reportSummary(rows: readonly ReportRow[]) {
+  return {
+    created: rows.filter((row) => row.action === 'created').length,
+    updated: rows.filter((row) => row.action === 'updated').length,
+    skipped: rows.filter((row) => row.action === 'skipped').length,
+    failed: rows.filter((row) => row.action === 'failed').length,
+  };
+}
+
+function previewSkippedRows(raw: unknown): ReportRow[] {
+  let rows: PreviewRow[] = [];
+  try {
+    const parsed = JSON.parse(String(raw || '[]')) as unknown;
+    if (Array.isArray(parsed)) rows = parsed as PreviewRow[];
+  } catch {
+    return [];
+  }
+  return rows
+    .filter((row) => row.action === 'failed')
+    .map((row) => ({
+      key: row.key,
+      line: row.line,
+      action: 'skipped' as const,
+      name: row.name,
+      product_id: '',
+      reason: row.errors.join(' | '),
+    }));
+}
+
+async function acquireImportApplyLease(db: D1Database, importId: string): Promise<ImportApplyLease | null> {
+  const token = newId('impapply');
+  const row = await db
+    .prepare(
+      `UPDATE product_imports
+          SET apply_token = ?,
+              apply_lease_until = strftime('%Y-%m-%dT%H:%M:%fZ','now', ?),
+              media_stage_until = MAX(
+                media_stage_until,
+                strftime('%Y-%m-%dT%H:%M:%fZ','now', ?)
+              ),
+              apply_generation = apply_generation + 1
+        WHERE id = ? AND state = 'preview'
+          AND (apply_token = '' OR apply_lease_until <= strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+        RETURNING apply_token, apply_lease_until, apply_generation`
+    )
+    .bind(token, IMPORT_APPLY_LEASE_MODIFIER, IMPORT_APPLY_LEASE_MODIFIER, importId)
+    .first<{ apply_token: string; apply_lease_until: string; apply_generation: number }>();
+  return row
+    ? { token: row.apply_token, leaseUntil: row.apply_lease_until, generation: Number(row.apply_generation) }
+    : null;
+}
+
+async function renewImportApplyLease(db: D1Database, importId: string, token: string): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `UPDATE product_imports
+          SET apply_lease_until = strftime('%Y-%m-%dT%H:%M:%fZ','now', ?),
+              media_stage_until = MAX(
+                media_stage_until,
+                strftime('%Y-%m-%dT%H:%M:%fZ','now', ?)
+              )
+        WHERE id = ? AND state = 'preview' AND apply_token = ?
+          AND apply_lease_until > strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        RETURNING id`
+    )
+    .bind(IMPORT_APPLY_LEASE_MODIFIER, IMPORT_APPLY_LEASE_MODIFIER, importId, token)
+    .first<{ id: string }>();
+  return !!row;
+}
+
+async function ownsImportApplyLease(db: D1Database, importId: string, token: string): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT 1 AS owned FROM product_imports
+        WHERE id = ? AND state = 'preview' AND apply_token = ?
+          AND apply_lease_until > strftime('%Y-%m-%dT%H:%M:%fZ','now')`
+    )
+    .bind(importId, token)
+    .first<{ owned: number }>();
+  return !!row;
+}
+
+async function requireImportApplyLease(db: D1Database, importId: string, token: string): Promise<void> {
+  if (!(await renewImportApplyLease(db, importId, token))) throw new ImportApplyLeaseLost();
+}
+
+async function releaseImportApplyLease(db: D1Database, importId: string, token: string): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE product_imports SET apply_token = '', apply_lease_until = ''
+        WHERE id = ? AND state = 'preview' AND apply_token = ?`
+    )
+    .bind(importId, token)
+    .run();
+}
+
+async function loadImportItemCheckpoints(db: D1Database, importId: string): Promise<Map<number, ImportItemCheckpoint>> {
+  const { results } = await db
+    .prepare('SELECT * FROM product_import_items WHERE import_id = ? ORDER BY item_index')
+    .bind(importId)
+    .all<ImportItemCheckpoint>();
+  return new Map((results ?? []).map((row) => [Number(row.item_index), row]));
+}
+
+async function loadImportItemCheckpoint(
+  db: D1Database,
+  importId: string,
+  itemIndex: number
+): Promise<ImportItemCheckpoint | null> {
+  return db
+    .prepare('SELECT * FROM product_import_items WHERE import_id = ? AND item_index = ?')
+    .bind(importId, itemIndex)
+    .first<ImportItemCheckpoint>();
+}
+
+function importItemCheckpointStatement(
+  db: D1Database,
+  importId: string,
+  itemIndex: number,
+  token: string,
+  row: ReportRow
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT INTO product_import_items
+         (import_id, item_index, item_key, line, product_id, action, name, reason, apply_token)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(importId, itemIndex, row.key, row.line, row.product_id, row.action, row.name, row.reason, token);
+}
+
 adminImportRoutes.post('/confirm', async (c) => {
   const admin = c.get('user')!;
   const money = canViewFinancials(c.env, admin);
   const body = (await c.req.json().catch(() => ({}))) as { import_id?: unknown };
   const importId = str(body.import_id, 'import_id', { min: 1, max: 60 });
 
-  const rec = await c.env.DB
+  let rec = await c.env.DB
     .prepare('SELECT * FROM product_imports WHERE id = ?')
     .bind(importId)
     .first<Record<string, unknown>>();
@@ -1513,279 +1608,305 @@ adminImportRoutes.post('/confirm', async (c) => {
     throw forbidden('This import was prepared by another admin');
   }
 
-  // IDEMPOTENT: a retry after a timeout, a double click, or a repeated request
-  // finds the applied record and replays its report instead of writing twice.
-  if (rec.state === 'applied') {
-    return c.json({
+  const replay = (stored: Record<string, unknown>) =>
+    c.json({
       success: true,
       import_id: importId,
       already_applied: true,
       summary: {
-        created: rec.created_count,
-        updated: rec.updated_count,
-        skipped: rec.skipped_count,
-        failed: rec.failed_count,
+        created: stored.created_count,
+        updated: stored.updated_count,
+        skipped: stored.skipped_count,
+        failed: stored.failed_count,
       },
-      rows: JSON.parse(String(rec.report || '[]')),
+      rows: JSON.parse(String(stored.report || '[]')),
     });
+
+  // Terminal retries are pure reads. No lease is acquired and no audit,
+  // product or report row is written twice.
+  if (rec.state === 'applied') return replay(rec);
+
+  /**
+   * ONE EXECUTOR PER IMPORT, WITH CRASH RECOVERY.
+   *
+   * The token lives on the import domain row rather than in process memory.
+   * A second confirm cannot enter while it is live (409); after a Worker dies,
+   * its lease expires and the retry gets a new token/generation. Every product
+   * batch is fenced by the checkpoint trigger in migration 0099, so an old
+   * Worker waking after takeover aborts its whole batch rather than publishing
+   * a stale plan.
+   */
+  const lease = await acquireImportApplyLease(c.env.DB, importId);
+  if (!lease) {
+    const latest = await c.env.DB
+      .prepare('SELECT * FROM product_imports WHERE id = ?')
+      .bind(importId)
+      .first<Record<string, unknown>>();
+    if (latest?.state === 'applied') return replay(latest);
+    throw conflict(
+      'هذا الاستيراد قيد التطبيق الآن / this import is already being applied; retry the same import id shortly',
+      'IMPORT_APPLY_IN_PROGRESS'
+    );
   }
 
-  const payload = JSON.parse(String(rec.payload || '{}')) as {
-    products?: Array<Record<string, unknown>>;
-  };
-  const products = payload.products ?? [];
-  const report: ReportRow[] = [];
-  const importedTags: string[] = [];
-  let created = 0;
-  let updated = 0;
-  let failedCount = 0;
-  const reviewNeeded: string[] = [];
+  try {
+    // Re-read after acquiring: the record is now a stable payload owned by
+    // this token, and a winner that finalized between our first read and CAS
+    // is answered as a replay rather than re-executed.
+    rec = await c.env.DB
+      .prepare('SELECT * FROM product_imports WHERE id = ?')
+      .bind(importId)
+      .first<Record<string, unknown>>();
+    if (!rec) throw notFound('No import with that id');
+    if (rec.state === 'applied') return replay(rec);
 
-  for (const item of products) {
-    const key = String(item.key ?? '');
-    const line = Number(item.line ?? 0);
-    const productId = String(item.productId ?? '');
-    const isCreate = item.action === 'create';
-    try {
-      const doc = validateProductDoc(item.doc as Record<string, unknown>);
-      doc.id = productId;
-      // Extended warranty is for printers only: the catalogs this row lands
-      // in decide, against the database — the preview's answer came from the
-      // same flag, but the confirm is the write and re-checks for itself.
-      await applyPrinterWarrantyRules(c.env.DB, doc, ((item.catalogIds as string[]) ?? []));
-      if (isCreate) {
-        doc.slug = await uniqueProductSlug(c.env.DB, doc.name_en || key || productId);
-      }
-      /**
-       * §3: English in, Arabic and Kurdish generated locally. No network call
-       * — and, since the form save learned it, the copy a HUMAN wrote survives.
-       * `localizeProductDoc` regenerates every ar/ckb slot on every pass, so a
-       * CSV re-import of a TXT-imported product overwrote the Arabic and
-       * Kurdish the file had authored: the same loss root cause 10 removed
-       * from the form path (docs/TXT_IMPORT_PARITY.md). The importer reads the
-       * stored document for the same reason the form does.
-       */
-      const prevRow = isCreate
-        ? null
-        : await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>();
-      const prevDoc = prevRow ? parseProductRow(prevRow) : null;
-      /**
-       * 0058 — A BUNDLE OR MYSTERY OFFER IS NEVER IMPORTED
-       * (docs/BUNDLES_MYSTERY.md §16, code `COMPOSITION_NOT_ALLOWED`).
-       *
-       * The form and the TXT template inherit this refusal from
-       * `planProductSave`, which is the one writer they both go through. This
-       * importer still writes the product row itself, so it states the rule
-       * explicitly rather than inheriting it — and it must, because
-       * `composition` is part of `PRODUCT_COLUMNS`: an update that did not
-       * refuse would write '' over a bundle's own value and silently demote it
-       * into a stockless ordinary product, which `saleAvailability` would then
-       * read as "untracked → sell 99".
-       */
-      if (doc.composition !== '' || (prevDoc && prevDoc.composition !== '')) {
-        throw new Error(
-          'COMPOSITION_NOT_ALLOWED: a bundle or mystery offer is composed in the bundles panel and cannot be imported'
-        );
-      }
-      const localized = localizeRespectingAuthored(doc, prevDoc);
-      const record = serializeDoc(doc);
+    const payload = JSON.parse(String(rec.payload || '{}')) as {
+      products?: Array<Record<string, unknown>>;
+    };
+    const products = payload.products ?? [];
+    const previewSkipped = previewSkippedRows(rec.report);
+    const checkpoints = await loadImportItemCheckpoints(c.env.DB, importId);
+    const reviewNeeded: string[] = [];
 
-      const stmts: D1PreparedStatement[] = [];
-      if (isCreate) {
-        stmts.push(
-          c.env.DB.prepare(
-            `INSERT INTO products (${PRODUCT_COLUMNS.join(', ')})
-             VALUES (${PRODUCT_COLUMNS.map(() => '?').join(', ')})`
-          ).bind(...PRODUCT_COLUMNS.map((k) => record[k] ?? null))
-        );
-      } else {
-        const cols = PRODUCT_COLUMNS.filter((k) => k !== 'id');
-        stmts.push(
-          c.env.DB.prepare(
-            `UPDATE products SET ${cols.map((k) => `${k} = ?`).join(', ')},
-                    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-              WHERE id = ?`
-          ).bind(...cols.map((k) => record[k] ?? null), doc.id)
-        );
+    /**
+     * PRE-FLIGHT THE COMPLETE SET, THEN RE-VERIFY EACH ITEM JUST IN TIME.
+     *
+     * The first pass preserves the useful all-file diagnosis before catalogue
+     * writes begin. It cannot be the attachment lease: on a 500-row import,
+     * protection acquired for row 1 may expire while rows 2..500 decode. The
+     * second call immediately before that row's plan reacquires the global
+     * cleanup guard and re-reads R2. A cleanup that won in between therefore
+     * yields a failed checkpoint, never a dangling product_images reference.
+     */
+    const prepared = new Map<number, {
+      doc: ProductDoc | null;
+      relationsBody: Record<string, unknown> | null;
+      error: unknown | null;
+    }>();
+    for (const [index, item] of products.entries()) {
+      if (checkpoints.has(index)) continue;
+      await requireImportApplyLease(c.env.DB, importId, lease.token);
+      try {
+        const doc = validateProductDoc(item.doc as Record<string, unknown>);
+        doc.id = String(item.productId ?? '');
+        const relationsBody = item.relations && typeof item.relations === 'object'
+          ? (item.relations as Record<string, unknown>)
+          : {};
+        const relationImages = Array.isArray(relationsBody.images)
+          ? (relationsBody.images as Array<Record<string, unknown>>)
+          : [];
+        await verifyAndNormalizeProductMedia(c.env, doc, relationImages);
+        prepared.set(index, { doc, relationsBody, error: null });
+      } catch (error) {
+        prepared.set(index, { doc: null, relationsBody: null, error });
       }
-      // The product row has to exist before the relations planner reads it, so
-      // a creation runs its INSERT first and the structure follows in its own
-      // batch. Both are guarded by the same try: a failure in the second step
-      // is reported against this product, never as a silent success.
-      await c.env.DB.batch(stmts);
+    }
 
-      const plan = await planRelationsWrite(
-        c.env.DB,
-        productId,
-        item.relations as Record<string, unknown>,
-        { money }
-      );
-      if (!plan.stmts) {
-        report.push({
+    for (const [index, item] of products.entries()) {
+      if (checkpoints.has(index)) continue;
+      const key = String(item.key ?? '');
+      const line = Number(item.line ?? 0);
+      const productId = String(item.productId ?? '');
+      const isCreate = item.action === 'create';
+      let outcome: ReportRow | null = null;
+
+      try {
+        await requireImportApplyLease(c.env.DB, importId, lease.token);
+        const ready = prepared.get(index);
+        if (!ready || ready.error) throw ready?.error ?? new Error('Import item was not prepared');
+        const doc = ready.doc!;
+        const relationsBody = ready.relationsBody!;
+        const relationImages = Array.isArray(relationsBody.images)
+          ? (relationsBody.images as Array<Record<string, unknown>>)
+          : [];
+        // The preflight guard may be old by now. This is the protection whose
+        // lifetime covers the actual product batch.
+        await verifyAndNormalizeProductMedia(c.env, doc, relationImages);
+
+        const catalogIds = withClassificationPlacements((item.catalogIds as string[]) ?? [], doc);
+        await applyPrinterWarrantyRules(c.env.DB, doc, catalogIds);
+        if (isCreate) doc.slug = await uniqueProductSlug(c.env.DB, doc.name_en || key || productId);
+
+        const prevRow = isCreate
+          ? null
+          : await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>();
+        const prevDoc = prevRow ? parseProductRow(prevRow) : null;
+        const localized = localizeRespectingAuthored(doc, prevDoc);
+        const plan = await planProductSave(c.env.DB, {
+          mode: isCreate ? 'create' : 'update',
+          doc,
+          prev: prevDoc,
+          relations: relationsBody,
+          catalogIds,
+          actor: { adminId: admin.id, money },
+          translations: localized.fields,
+        });
+
+        // Membership is planned BEFORE the first write. Rule, version and
+        // audit statements follow the product INSERT/UPDATE in this SAME
+        // ProductSavePlan batch; there is no side-effect writer afterwards.
+        const membership = await planProductMembershipRules(
+          c.env.DB,
+          admin.id,
+          productId,
+          (item.membership as ParsedMembershipRule[]) ?? []
+        );
+        plan.statements.push(...membership.statements);
+
+        outcome = {
+          key,
+          line,
+          action: isCreate ? 'created' : 'updated',
+          name: doc.name_en,
+          product_id: productId,
+          reason: '',
+        };
+        // Last in the atomic batch. Its trigger checks the exact live token
+        // and lease; a stale executor aborts every preceding product/member
+        // statement. The row is also the crash-resume completion marker.
+        plan.statements.push(importItemCheckpointStatement(c.env.DB, importId, index, lease.token, outcome));
+        await requireImportApplyLease(c.env.DB, importId, lease.token);
+        await saveProductAtomic(c.env.DB, plan);
+        checkpoints.set(index, {
+          import_id: importId,
+          item_index: index,
+          item_key: key,
+          line,
+          product_id: productId,
+          action: outcome.action as 'created' | 'updated',
+          name: outcome.name,
+          reason: '',
+        });
+        if (localized.review_needed.length) reviewNeeded.push(`${key}: ${localized.review_needed.join(', ')}`);
+      } catch (error) {
+        // A transport can report an error after D1 committed. Never turn that
+        // uncertain outcome into a false failure or repeat a CREATE: the
+        // checkpoint shares the product transaction, so read it first.
+        const committed = await loadImportItemCheckpoint(c.env.DB, importId, index);
+        if (committed) {
+          checkpoints.set(index, committed);
+          continue;
+        }
+        if (
+          error instanceof ImportApplyLeaseLost ||
+          /IMPORT_APPLY_LEASE_LOST/.test(error instanceof Error ? error.message : String(error)) ||
+          !(await ownsImportApplyLease(c.env.DB, importId, lease.token))
+        ) {
+          throw new ImportApplyLeaseLost();
+        }
+
+        outcome = {
           key,
           line,
           action: 'failed',
-          name: doc.name_en,
+          name: key,
           product_id: productId,
-          reason: plan.errors.join(' | '),
+          reason: error instanceof Error ? error.message : String(error),
+        };
+        // Planning/verification failed before a product write, or D1 rolled
+        // the attempted product batch back. Persist that terminal result under
+        // the same lease fence so a later Worker resumes after it.
+        try {
+          await requireImportApplyLease(c.env.DB, importId, lease.token);
+          await c.env.DB.batch([
+            importItemCheckpointStatement(c.env.DB, importId, index, lease.token, outcome),
+          ]);
+        } catch (checkpointError) {
+          const recovered = await loadImportItemCheckpoint(c.env.DB, importId, index);
+          if (recovered) {
+            checkpoints.set(index, recovered);
+            continue;
+          }
+          if (!(await ownsImportApplyLease(c.env.DB, importId, lease.token))) {
+            throw new ImportApplyLeaseLost();
+          }
+          throw checkpointError;
+        }
+        checkpoints.set(index, {
+          import_id: importId,
+          item_index: index,
+          item_key: key,
+          line,
+          product_id: productId,
+          action: 'failed',
+          name: outcome.name,
+          reason: outcome.reason,
         });
-        failedCount++;
-        continue;
       }
-      /**
-       * The importer writes `product_catalogs` DIRECTLY rather than through
-       * `planCatalogs`, so it needs the same guarantee the save path gets: the
-       * main and sub section this row is being filed under are placements,
-       * whatever the sheet's catalog column said. Without it an import could
-       * leave a product classified but unshelved — invisible to the home
-       * page's category counts, and to `printerIdentity`, which is what
-       * decides whether the PLUS printer gift and the printer delivery advance
-       * apply at all. See worker/lib/catalogMembership.ts.
-       */
-      const catalogIds = withClassificationPlacements((item.catalogIds as string[]) ?? [], doc);
-      const relStmts = [...plan.stmts];
-      relStmts.push(c.env.DB.prepare('DELETE FROM product_catalogs WHERE product_id = ?').bind(productId));
-      for (const cid of catalogIds) {
-        relStmts.push(
-          c.env.DB
-            .prepare(
-              `INSERT INTO product_catalogs (product_id, catalog_id, position)
-               VALUES (?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM product_catalogs WHERE catalog_id = ?))`
-            )
-            .bind(productId, cid, cid)
-        );
-      }
-      /**
-       * 0075 — THE ORDER-TYPE CELLS, IN THE SAME BATCH AS THE MODELS THEY HANG
-       * OFF, AND THE DEFECT THAT MADE THIS NECESSARY.
-       *
-       * This door applies a sheet through `planRelationsWrite`, which writes
-       * MODELS and emits no cell statement at all — `fulfillmentStatements` is
-       * reached only from `planProductSave`, which the TXT door uses and this
-       * one does not. So every `fulfillment` row's capacity was parsed,
-       * validated, refused by name when it was typed on the wrong row, shown
-       * in a clean preview — and then DROPPED, on create and on update alike.
-       * A sheet that said "one unit may be pre-ordered" wrote no row at all,
-       * the resolver read no capacity, and the cell stayed UNTRACKED: every
-       * buyer after the first was sold a unit nobody had.
-       *
-       * Written from `plan.requested.values`, which is the model list this
-       * very batch is about to write, so a cell can only name a model that
-       * will exist. LAST in the batch for the reason `planProductSave` states:
-       * `product_option_fulfillment.option_id` REFERENCES
-       * `product_option_values(id)` (0073), and on a create those value rows
-       * are inserted by the statements above.
-       *
-       * `refuseStrandedCapacity` runs against the LIVE rows rather than the
-       * preview's copy: a file is the likeliest way to cut a quota below the
-       * units already held or to drop a cell that is holding some, and either
-       * one leaves a release aiming at a row that no longer exists. It throws,
-       * the outer catch reports this product as `failed` with the sentence,
-       * and — because it throws BEFORE the batch runs — nothing of this
-       * product's structure is written.
-       */
-      const requestedValues = plan.requested.values;
-      const cellPayload = fulfillmentPayloadFrom(requestedValues);
-      if (cellPayload) {
-        const [liveCells, liveRoutes] = await Promise.all([
-          c.env.DB
-            .prepare(
-              'SELECT id, option_id, fulfillment_type, capacity_reserved FROM product_option_fulfillment WHERE product_id = ?'
-            )
-            .bind(productId)
-            .all<{ id: string; option_id: string; fulfillment_type: string; capacity_reserved: number | null }>(),
-          c.env.DB
-            .prepare(
-              'SELECT id, fulfillment_id, method, capacity_reserved FROM product_option_transports WHERE product_id = ?'
-            )
-            .bind(productId)
-            .all<{ id: string; fulfillment_id: string; method: string; capacity_reserved: number | null }>(),
-        ]);
-        const held = existingCellsFrom(liveCells.results ?? [], liveRoutes.results ?? []);
-        const cells = parseFulfillmentPayload(cellPayload, new Set(requestedValues.map((v) => v.id)));
-        refuseStrandedCapacity(held, cells);
-        relStmts.push(...fulfillmentStatements(c.env.DB, productId, cells, undefined, held));
-      }
-      await c.env.DB.batch(relStmts);
+    }
 
-      // §18 — after the product row exists, because a product-scoped rule has
-      // to name a product. Inside the same try, so a failure is reported
-      // against this row rather than swallowed into a silent success.
-      await applyMembershipRules(c.env, admin.id, productId, (item.membership as ParsedMembershipRule[]) ?? []);
+    const completed = [...checkpoints.values()]
+      .sort((a, b) => Number(a.item_index) - Number(b.item_index))
+      .map(checkpointReportRow);
+    if (completed.length !== products.length) {
+      throw new Error(`Import checkpoint count ${completed.length} did not match payload count ${products.length}`);
+    }
+    const report = [...completed, ...previewSkipped];
+    const summary = reportSummary(report);
+    await requireImportApplyLease(c.env.DB, importId, lease.token);
 
-      try {
-        await syncProductTranslations(c.env.DB, productId, localized.fields);
-      } catch (e) {
-        console.error('import translation write failed', productId, e instanceof Error ? e.message : String(e));
-      }
-      if (localized.review_needed.length) reviewNeeded.push(`${key}: ${localized.review_needed.join(', ')}`);
-      // Collected here and registered ONCE after the loop: registration reads
-      // the vocabulary to fold tags itself, and doing that per product would
-      // be one extra read for every row of a 500-row import.
-      importedTags.push(...doc.hashtags);
+    let finalized: Record<string, unknown> | null = null;
+    try {
+      finalized = await c.env.DB
+        .prepare(
+          `UPDATE product_imports
+              SET state = 'applied', created_count = ?, updated_count = ?, skipped_count = ?,
+                  failed_count = ?, report = ?, applied_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+                  apply_token = '', apply_lease_until = '', media_stage_until = ''
+            WHERE id = ? AND state = 'preview' AND apply_token = ?
+              AND apply_lease_until > strftime('%Y-%m-%dT%H:%M:%fZ','now')
+            RETURNING *`
+        )
+        .bind(
+          summary.created,
+          summary.updated,
+          summary.skipped,
+          summary.failed,
+          JSON.stringify(report),
+          importId,
+          lease.token
+        )
+        .first<Record<string, unknown>>();
+    } catch (error) {
+      const latest = await c.env.DB.prepare('SELECT * FROM product_imports WHERE id = ?').bind(importId).first<Record<string, unknown>>();
+      if (latest?.state === 'applied') return replay(latest);
+      throw error;
+    }
+    if (!finalized) throw new ImportApplyLeaseLost();
 
-      report.push({
-        key,
-        line,
-        action: isCreate ? 'created' : 'updated',
-        name: doc.name_en,
-        product_id: productId,
-        reason: '',
-      });
-      if (isCreate) created++;
-      else updated++;
-    } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
-      report.push({ key, line, action: 'failed', name: String(item.key ?? ''), product_id: productId, reason });
-      failedCount++;
+    await audit(c.env.DB, admin.id, 'product.import.apply', importId, {
+      ...summary,
+      cost_written: money,
+      generation: lease.generation,
+    });
+
+    return c.json({
+      success: true,
+      import_id: importId,
+      summary,
+      rows: report,
+      translation_review_needed: reviewNeeded,
+    });
+  } catch (error) {
+    if (
+      error instanceof ImportApplyLeaseLost ||
+      /IMPORT_APPLY_LEASE_LOST/.test(error instanceof Error ? error.message : String(error))
+    ) {
+      const latest = await c.env.DB.prepare('SELECT * FROM product_imports WHERE id = ?').bind(importId).first<Record<string, unknown>>();
+      if (latest?.state === 'applied') return replay(latest);
+      throw conflict(
+        'انتهت ملكية تطبيق هذا الاستيراد؛ أعد المحاولة بنفس المعرّف / import apply ownership changed; retry the same import id',
+        'IMPORT_APPLY_LEASE_LOST'
+      );
+    }
+    throw error;
+  } finally {
+    try {
+      await releaseImportApplyLease(c.env.DB, importId, lease.token);
+    } catch (error) {
+      console.error('import apply lease release failed', importId, error);
     }
   }
-
-  // Every tag the file carried joins the vocabulary, so the next template
-  // download offers it. One call for the whole import, not one per product.
-  await registerHashtags(c.env.DB, importedTags, newId);
-
-  // Rows the preview already rejected are skipped, and say so by name.
-  const previewRows = JSON.parse(String(rec.report || '[]')) as PreviewRow[];
-  for (const pr of previewRows) {
-    if (pr.action === 'failed' && !report.some((r) => r.key === pr.key)) {
-      report.push({
-        key: pr.key,
-        line: pr.line,
-        action: 'skipped',
-        name: pr.name,
-        product_id: '',
-        reason: pr.errors.join(' | '),
-      });
-    }
-  }
-  const skipped = report.filter((r) => r.action === 'skipped').length;
-
-  await c.env.DB
-    .prepare(
-      `UPDATE product_imports
-          SET state = 'applied', created_count = ?, updated_count = ?, skipped_count = ?,
-              failed_count = ?, report = ?, applied_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-        WHERE id = ? AND state = 'preview'`
-    )
-    .bind(created, updated, skipped, failedCount, JSON.stringify(report), importId)
-    .run();
-
-  await audit(c.env.DB, admin.id, 'product.import.apply', importId, {
-    created,
-    updated,
-    skipped,
-    failed: failedCount,
-    cost_written: money,
-  });
-
-  return c.json({
-    success: true,
-    import_id: importId,
-    summary: { created, updated, skipped, failed: failedCount },
-    rows: report,
-    translation_review_needed: reviewNeeded,
-  });
 });
 
 /** A free slug for a new product; mirrors the form's own rule. */

@@ -32,6 +32,11 @@ class MemoryBucket {
     this.objects.set(key, value);
   }
 
+  async head(key: string) {
+    const value = this.objects.get(key);
+    return value ? ({ key, size: value.byteLength } as unknown as R2Object) : null;
+  }
+
   async get(key: string) {
     const v = this.objects.get(key);
     if (!v) return null;

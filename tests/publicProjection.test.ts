@@ -113,10 +113,11 @@ test('and it still carries the selling prices and adjustments it should', () => 
 });
 
 function media(id: string, order: number, primary = false): MediaV2 {
+  const key = `products/test/gallery/${id}.webp`;
   return {
     id,
-    url: `https://cdn.example.com/${id}.jpg`,
-    key: '',
+    url: `/files/${key}`,
+    key,
     role: 'gallery',
     alt_ar: '',
     alt_en: '',
@@ -131,6 +132,31 @@ function media(id: string, order: number, primary = false): MediaV2 {
     variant_id: '',
   };
 }
+
+test('product media projections fail closed for hotlinks, non-WebP, and mismatched keys', () => {
+  const doc = docWithCosts();
+  const valid = media('valid', 3, true);
+  doc.media = [
+    { ...valid, id: 'external', url: 'https://vendor.example/image.webp', key: '' },
+    { ...valid, id: 'jpeg', url: '/files/products/test/gallery/image.jpg', key: 'products/test/gallery/image.jpg' },
+    { ...valid, id: 'uppercase', url: '/files/products/test/gallery/image.WEBP', key: 'products/test/gallery/image.WEBP' },
+    { ...valid, id: 'mismatch', url: '/files/products/test/gallery/other.webp' },
+    valid,
+  ];
+  doc.options[0].image = 'https://vendor.example/model.jpg';
+  doc.colors[0].image = '/files/products/test/gallery/swatch.png';
+
+  const out = projectPublic(doc) as unknown as {
+    media: MediaV2[];
+    images: string[];
+    options: Array<{ image: string }>;
+    colors: Array<{ image: string }>;
+  };
+  assert.deepEqual(out.media.map((item) => item.id), ['valid']);
+  assert.deepEqual(out.images, [valid.url]);
+  assert.equal(out.options[0].image, '');
+  assert.equal(out.colors[0].image, '');
+});
 
 test('the explicit primary image leads every public image view without mutating admin order', () => {
   const doc = docWithCosts();

@@ -106,7 +106,21 @@ test('every legacy bundle lands as an UNPRICED DRAFT product with no stock', () 
   assert.equal(p.name, 'Starter kit');
   assert.equal(p.description, 'A printer and a spool');
   assert.equal(p.display_order, 2, 'the legacy sort becomes display_order');
-  assert.equal(p.images, '["https://cdn.example/kit.jpg"]');
+  assert.equal(p.images, '[]', '0099 drains the legacy mirror instead of leaving an external hotlink active');
+  assert.deepEqual(
+    row<Record<string, unknown>>(
+      db,
+      "SELECT url, r2_key, source_url, quarantined, quarantine_reason FROM product_images WHERE product_id='prd_bnd_bnd_live'"
+    ),
+    {
+      url: '',
+      r2_key: '',
+      source_url: 'https://cdn.example/kit.jpg',
+      quarantined: 1,
+      quarantine_reason: 'external_or_unsafe_url',
+    },
+    'the old address survives only as inert repair provenance'
+  );
   assert.equal(String(p.slug).startsWith('bundle-'), true);
 
   // An empty legacy image is an empty gallery, not a list holding ''.

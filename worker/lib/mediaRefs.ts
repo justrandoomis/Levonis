@@ -24,10 +24,12 @@
 
 import { deleteMediaObject, isSafeMediaKey, type MediaVisibility } from './mediaStorage';
 import {
+  claimMediaObjectForCleanup,
   mediaKeyFromRef,
   mediaKeysInJson,
   mediaVisibilityOf,
   pendingMediaCleanup,
+  releaseMediaObjectCleanupClaim,
   type MediaCleanupEnv,
 } from './productDeletion';
 import { MAIN_PAGE_PREFIX, isSiteMediaObject } from './siteMedia';
@@ -209,26 +211,33 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
    * the queue would find the key here, close the job `skipped_shared`, and no
    * admin action could ever reach those bytes again.
    *
-   * Once `state = 'applied'` the keys live in `product_images` like any other
-   * picture, and that is the row that should decide. A `failed` import keeps
-   * its payload scanned on purpose: its objects were stored and nothing else
-   * names them, so they are exactly the staging case, not a ledger.
+   * A preview owns its staged objects for one explicit, durable window. The
+   * apply lease renews that window while confirm is actively reading and
+   * writing; after both timestamps expire, an abandoned row is a ledger and
+   * must no longer defeat its staging cleanup job. Once `state = 'applied'`,
+   * `product_images` is the authority regardless of either old timestamp.
    */
   {
     table: 'product_imports',
     column: 'payload',
     kind: 'json',
     why: 'an import writes products/import/<sha> objects before any row names them — the staging window only',
-    where: "state <> 'applied'",
-    whereColumns: ['state'],
+    where:
+      "state = 'preview' AND (" +
+      "media_stage_until > strftime('%Y-%m-%dT%H:%M:%fZ','now') OR " +
+      "(apply_token <> '' AND apply_lease_until > strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
+    whereColumns: ['state', 'media_stage_until', 'apply_token', 'apply_lease_until'],
   },
   {
     table: 'product_imports',
     column: 'report',
     kind: 'json',
     why: 'the import report echoes the keys it stored, while the import is still staged',
-    where: "state <> 'applied'",
-    whereColumns: ['state'],
+    where:
+      "state = 'preview' AND (" +
+      "media_stage_until > strftime('%Y-%m-%dT%H:%M:%fZ','now') OR " +
+      "(apply_token <> '' AND apply_lease_until > strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
+    whereColumns: ['state', 'media_stage_until', 'apply_token', 'apply_lease_until'],
   },
   { table: 'bundles', column: 'image', kind: 'text', why: 'bundle cover art' },
   { table: 'investment_items', column: 'image', kind: 'text', why: 'investment listing art' },
@@ -350,6 +359,8 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'price_history.variant_key': "'' | option:<id> | color:<id>",
   'product_option_values.variant_key': 'the same variant addressing string',
   'product_variants.combo_key': 'the sorted option-id tuple that identifies a variant',
+  'product_import_items.item_key': 'the CSV row key (SKU or slug) used to resume one import item, not an R2 key',
+  'product_imports.media_stage_until': 'the UTC expiry of a staged import reference, not an object path',
   'model_view_tokens.file_id': 'a row id in community_request_files, not a key',
   'community_print_requests.primary_file_id': 'a row id in community_request_files, not a key',
   'printer_models.slicer_profile_id': 'a slicer profile identifier',
@@ -374,7 +385,7 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
 
   // -- OUR OWN BOOKKEEPING ABOUT OBJECTS ----------------------------------
   /**
-   * These three DO hold object keys, and they are excluded on purpose: they
+   * These bookkeeping rows DO hold object keys, and they are excluded on purpose: they
    * are the ledger that says an object exists or is being removed, not a page
    * that displays it. Counting `media_cleanup_jobs.object_key` as a reference
    * would make every queued deletion cancel itself, and counting
@@ -383,6 +394,7 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
    */
   'file_objects.object_key': 'the upload ledger — an inventory of objects, not a page that shows one',
   'media_cleanup_jobs.object_key': 'the deletion queue — treating it as a reference would cancel every delete',
+  'media_object_guards.object_key': 'the attach/delete lock — control state, not a page that shows the object',
   'file_migration_log.old_key': 'an append-only record of a move that already happened',
   'file_migration_log.new_key': 'the same record; the live pointer is in the table that was updated',
 
@@ -1050,7 +1062,22 @@ export const MEDIA_CLEANUP_RUN_LIMIT = 50;
  */
 export async function runGuardedMediaCleanup(
   env: MediaCleanupEnv,
-  options: { limit?: number; maxAttempts?: number } = {}
+  options: {
+    limit?: number;
+    maxAttempts?: number;
+    /**
+     * Post-commit delete paths already hold the exact jobs their D1 batch
+     * queued. Supplying them keeps the inline response about that deletion,
+     * while still running the same global reference scan and cleanup claim as
+     * the scheduled drain.
+     */
+    jobs?: ReadonlyArray<{
+      id: string;
+      key: string;
+      visibility: 'public' | 'private';
+      attempts?: number;
+    }>;
+  } = {}
 ): Promise<GuardedCleanupOutcome> {
   const maxAttempts = options.maxAttempts ?? MEDIA_CLEANUP_MAX_ATTEMPTS;
   const out: GuardedCleanupOutcome = {
@@ -1065,7 +1092,9 @@ export async function runGuardedMediaCleanup(
     bookkeeping_failures: [],
   };
 
-  const jobs = await pendingMediaCleanup(env.DB, options.limit ?? MEDIA_CLEANUP_RUN_LIMIT);
+  const jobs = options.jobs
+    ? options.jobs.map((job) => ({ ...job, attempts: job.attempts ?? 0 }))
+    : await pendingMediaCleanup(env.DB, options.limit ?? MEDIA_CLEANUP_RUN_LIMIT);
   out.attempted = jobs.length;
   if (!jobs.length) {
     out.ran = true;
@@ -1093,6 +1122,17 @@ export async function runGuardedMediaCleanup(
       out.bookkeeping_failures.push({ key, error: error instanceof Error ? error.message : String(error) });
     }
   };
+  const releaseClaim = async (key: string, token: string): Promise<boolean> => {
+    try {
+      const released = await releaseMediaObjectCleanupClaim(env.DB, key, token);
+      if (released) return true;
+      out.bookkeeping_failures.push({ key, error: 'media cleanup claim ownership was lost before release' });
+      return false;
+    } catch (error) {
+      out.bookkeeping_failures.push({ key, error: error instanceof Error ? error.message : String(error) });
+      return false;
+    }
+  };
 
   for (let from = 0; from < jobs.length; from += MEDIA_CLEANUP_VERIFY_CHUNK) {
     const chunk = jobs.slice(from, from + MEDIA_CLEANUP_VERIFY_CHUNK);
@@ -1106,22 +1146,47 @@ export async function runGuardedMediaCleanup(
       if (from === 0) return out;
       break;
     }
+    const claimed: Array<{ job: (typeof chunk)[number]; token: string }> = [];
+    for (const job of chunk) {
+      const token = await claimMediaObjectForCleanup(env.DB, job.key);
+      if (token) claimed.push({ job, token });
+    }
+    if (!claimed.length) {
+      out.ran = true;
+      continue;
+    }
+
+    // Claims block every cooperating attach before it can save a reference.
+    // Re-scan after acquiring them so the snapshot includes every attach that
+    // won the guard first; later attaches see the token and fail safely.
+    const claimedCoverage = await verifyMediaCoverage(env.DB);
+    if (!claimedCoverage.ok) {
+      for (const { job, token } of claimed) {
+        await releaseClaim(job.key, token);
+      }
+      out.refusals = claimedCoverage.refusals;
+      if (from === 0) return out;
+      break;
+    }
     out.ran = true;
     out.verified_at.push(new Date().toISOString());
 
-    for (const job of chunk) {
-      if (coverage.scan.keys.has(job.key)) {
+    for (const { job, token } of claimed) {
+      if (claimedCoverage.scan.keys.has(job.key)) {
         out.still_referenced.push(job.key);
+        if (!(await releaseClaim(job.key, token))) continue;
         await write(job.key, () => closeJob(env.DB, job.key, 'skipped_shared', 'still referenced when the cleanup ran'));
         continue;
       }
       try {
         await deleteMediaObject(env, job.visibility as MediaVisibility, job.key);
         out.deleted.push(job.key);
+        if (!(await releaseClaim(job.key, token))) continue;
         await write(job.key, () => closeJob(env.DB, job.key, 'done', ''));
         await write(job.key, () => stampFileObjectDeleted(env.DB, job.key));
       } catch (error) {
         const message = error instanceof Error ? error.message : 'unknown';
+        if (!(await releaseClaim(job.key, token))) continue;
         const attempts = job.attempts + 1;
         if (attempts >= maxAttempts) {
           out.dead_lettered.push({ key: job.key, attempts, error: message });
@@ -1134,6 +1199,62 @@ export async function runGuardedMediaCleanup(
     }
   }
   return out;
+}
+
+export interface ImmediateGuardedCleanupOutcome {
+  deleted: string[];
+  /** Candidate keys a surviving global reference still owns. */
+  shared: string[];
+  /** Work not safely completed; its durable job remains available to retry. */
+  failed: Array<{ key: string; error: string }>;
+  report: GuardedCleanupOutcome;
+}
+
+/**
+ * Run a permanent product deletion's exact post-commit jobs through the same
+ * global manifest guard as the scheduled cleanup worker.
+ *
+ * `partitionSharedMedia` intentionally knows only about product rows. That is
+ * useful before the transaction, but insufficient authority to delete bytes:
+ * a home banner, order snapshot, invoice or merchant page may still name the
+ * same key. This adapter preserves the small `{deleted, failed}` route
+ * contract while exposing globally shared keys for the response and audit.
+ */
+export async function runGuardedMediaCleanupJobs(
+  env: MediaCleanupEnv,
+  jobs: ReadonlyArray<{ id: string; key: string; visibility: 'public' | 'private' }>
+): Promise<ImmediateGuardedCleanupOutcome> {
+  if (jobs.length === 0) {
+    const report = await runGuardedMediaCleanup(env, { jobs: [] });
+    return { deleted: [], shared: [], failed: [], report };
+  }
+
+  const report = await runGuardedMediaCleanup(env, { jobs });
+  const deleted = new Set(report.deleted);
+  const shared = new Set(report.still_referenced);
+  const errors = new Map<string, string>();
+
+  for (const item of report.retrying) errors.set(item.key, item.error);
+  for (const item of report.dead_lettered) errors.set(item.key, item.error);
+  for (const item of report.bookkeeping_failures) errors.set(item.key, item.error);
+
+  const refusal = report.refusals.join('; ');
+  for (const job of jobs) {
+    if (deleted.has(job.key) || shared.has(job.key)) continue;
+    if (!errors.has(job.key)) {
+      errors.set(
+        job.key,
+        refusal || 'media cleanup could not acquire the global deletion guard; the durable job remains pending'
+      );
+    }
+  }
+
+  return {
+    deleted: [...deleted],
+    shared: [...shared],
+    failed: [...errors].map(([key, error]) => ({ key, error })),
+    report,
+  };
 }
 
 /** A job leaves `pending` exactly once; the partial unique index depends on it. */
@@ -1298,6 +1419,17 @@ export interface SweepDeletion {
   failed: Array<{ key: string; error: string }>;
 }
 
+const SWEEP_RECOVERY_REASON = 'orphan_sweep_recovery';
+
+/** Persist recovery ownership before an orphan sweep performs an external delete. */
+async function ensureSweepRecoveryJob(db: D1Database, key: string): Promise<void> {
+  await db.prepare(
+    `INSERT OR IGNORE INTO media_cleanup_jobs
+       (id, object_key, visibility, reason, source_product_id, state, attempts, last_error)
+     VALUES (?, ?, ?, ?, '', 'pending', 0, '')`
+  ).bind(newId('mcj'), key, mediaVisibilityOf(key), SWEEP_RECOVERY_REASON).run();
+}
+
 /**
  * Remove the objects the partition cleared, one at a time.
  *
@@ -1325,10 +1457,50 @@ export async function deleteSweptObjects(
   const out: SweepDeletion = { deleted: [], failed: [] };
   if (!env) return out;
   for (const object of objects) {
+    let token: string | null = null;
+    let objectDeleted = false;
     try {
+      // The bucket delete is external to D1. A pending row must exist first so
+      // a successful delete followed by a failed guard release still has a
+      // durable recovery path after the claim lease expires.
+      await ensureSweepRecoveryJob(env.DB, object.key);
+      token = await claimMediaObjectForCleanup(env.DB, object.key);
+      if (!token) continue;
+      const coverage = await verifyMediaCoverage(env.DB);
+      if (!coverage.ok) {
+        if (!(await releaseMediaObjectCleanupClaim(env.DB, object.key, token))) {
+          throw new Error('media cleanup claim ownership was lost before release');
+        }
+        token = null;
+        out.failed.push({ key: object.key, error: coverage.refusals.join('; ') });
+        continue;
+      }
+      if (coverage.scan.keys.has(object.key)) {
+        if (!(await releaseMediaObjectCleanupClaim(env.DB, object.key, token))) {
+          throw new Error('media cleanup claim ownership was lost before release');
+        }
+        token = null;
+        await closeJob(env.DB, object.key, 'skipped_shared', 'still referenced when the orphan sweep ran');
+        continue;
+      }
       await deleteMediaObject(env, mediaVisibilityOf(object.key), object.key);
       out.deleted.push(object.key);
+      objectDeleted = true;
+      if (!(await releaseMediaObjectCleanupClaim(env.DB, object.key, token))) {
+        throw new Error('media cleanup claim ownership was lost before release');
+      }
+      token = null;
+      await closeJob(env.DB, object.key, 'done', '');
     } catch (error) {
+      if (token && !objectDeleted) {
+        try {
+          await releaseMediaObjectCleanupClaim(env.DB, object.key, token);
+          token = null;
+        } catch {
+          // The pending recovery job remains. Cleanup reclaims the expired
+          // token rather than allowing an attachment to bypass ownership.
+        }
+      }
       out.failed.push({ key: object.key, error: error instanceof Error ? error.message : String(error) });
     }
   }

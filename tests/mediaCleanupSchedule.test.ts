@@ -53,7 +53,8 @@ import { join } from 'node:path';
 import { ROOT, SqliteD1, createTableIfNotExistsSql } from './fixtures/d1';
 import worker from '../worker/index';
 import { runDurableJobs } from '../worker/lib/jobs';
-import { MEDIA_CLEANUP_RUN_LIMIT } from '../worker/lib/mediaRefs';
+import { MEDIA_CLEANUP_RUN_LIMIT, runGuardedMediaCleanup } from '../worker/lib/mediaRefs';
+import { claimMediaObjectForCleanup, protectMediaObjectFromCleanup } from '../worker/lib/productDeletion';
 import type { Env } from '../worker/lib/types';
 
 // --------------------------------------------------------------- the fixture
@@ -98,6 +99,19 @@ function freshDb(): { env: Env; raw: DatabaseSync; bucket: FakeBucket } {
   // `product_option_values`, `product_colors` and `product_variants` as well.
   raw.exec('PRAGMA foreign_keys = OFF');
   raw.exec(createTableIfNotExistsSql('0072_product_deletion_integrity.sql', 'media_cleanup_jobs'));
+  // 0099 adds the due-time used by product-media rollback. This focused
+  // fixture creates 0072's table directly, so replay that one additive column.
+  raw.exec("ALTER TABLE media_cleanup_jobs ADD COLUMN not_before TEXT NOT NULL DEFAULT ''");
+  raw.exec(`
+    CREATE TABLE media_object_guards (
+      object_key TEXT PRIMARY KEY,
+      protected_until TEXT NOT NULL DEFAULT '',
+      claim_token TEXT NOT NULL DEFAULT '',
+      claim_until TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    )
+  `);
   raw.exec(createTableIfNotExistsSql('0068_media_objects.sql', 'file_objects'));
   raw.exec(createTableIfNotExistsSql('0018_prime_taxonomy_inventory.sql', 'product_images'));
   raw.exec(`
@@ -283,6 +297,83 @@ test('a key that came back is closed skipped_shared, and its bytes survive', asy
   assert.equal(report.media_cleanup.deleted, 0);
   assert.equal(report.media_cleanup.still_referenced, 1);
   assert.equal(jobState(raw, 'products/cccc3333.jpg')?.state, 'skipped_shared');
+});
+
+test('rollback grace closes the stage-to-commit race before cleanup rechecks references', async () => {
+  const { env, raw, bucket } = freshDb();
+  const key = 'products/import/gallery/race.webp';
+  enqueue(raw, key, 1);
+  raw.prepare("UPDATE media_cleanup_jobs SET reason = 'template_apply_rollback', not_before = '2999-01-01T00:00:00.000Z' WHERE object_key = ?")
+    .run(key);
+
+  const duringGrace = await runDurableJobs(env);
+  assert.equal(duringGrace.media_cleanup.attempted, 0, 'a staged object is not claimable during its commit grace');
+  assert.deepEqual(bucket.deleted, []);
+
+  // The successful concurrent apply commits after rollback queued the key but
+  // before the grace expires. Once due, the guarded scan sees that reference
+  // and closes the job without ever issuing an R2 delete.
+  raw
+    .prepare("INSERT INTO product_images (id, product_id, url, r2_key) VALUES ('img_race','prod_other',?,?)")
+    .run(`/files/${key}`, key);
+  raw.prepare("UPDATE media_cleanup_jobs SET not_before = '2000-01-01T00:00:00.000Z' WHERE object_key = ?").run(key);
+
+  const afterCommit = await runDurableJobs(env);
+  assert.equal(afterCommit.media_cleanup.still_referenced, 1);
+  assert.equal(jobState(raw, key)?.state, 'skipped_shared');
+  assert.deepEqual(bucket.deleted, [], 'the other product now owns the shared bytes');
+});
+
+test('an attach that starts inside R2 delete loses the durable claim and cannot save the key', async () => {
+  const { env, raw } = freshDb();
+  const key = 'products/import/gallery/renewed.webp';
+  enqueue(raw, key, 1);
+  let attachWon: boolean | null = null;
+  const racingBucket = {
+    deleted: [] as string[],
+    async delete(deletingKey: string) {
+      // This is the old SELECT -> R2 window reproduced exactly: an attach
+      // begins only after cleanup has entered bucket.delete(). The global CAS
+      // claim must make the attach fail before it can publish a DB reference.
+      attachWon = await protectMediaObjectFromCleanup(env.DB, deletingKey);
+      this.deleted.push(deletingKey);
+    },
+  };
+
+  const outcome = await runGuardedMediaCleanup({ ...env, BUCKET: racingBucket as unknown as R2Bucket });
+  assert.equal(outcome.attempted, 1);
+  assert.equal(attachWon, false, 'a cleanup claim already owns the key');
+  assert.deepEqual(racingBucket.deleted, [key]);
+  assert.equal(jobState(raw, key)?.state, 'done');
+});
+
+test('a cleanup whose expired claim is stolen cannot close the recovery job', async () => {
+  const { env, raw, bucket } = freshDb();
+  const key = 'products/import/gallery/stolen-claim.webp';
+  enqueue(raw, key, 1);
+  let newerToken: string | null = null;
+  const racingBucket = {
+    async delete(deletingKey: string) {
+      raw.prepare("UPDATE media_object_guards SET claim_until = '2000-01-01T00:00:00.000Z' WHERE object_key = ?")
+        .run(deletingKey);
+      newerToken = await claimMediaObjectForCleanup(env.DB, deletingKey);
+    },
+  };
+
+  const first = await runGuardedMediaCleanup({ ...env, BUCKET: racingBucket as unknown as R2Bucket });
+  assert.ok(newerToken, 'cleanup B steals A’s expired lease while A is inside R2');
+  assert.deepEqual(first.deleted, [key], 'A did finish the external delete');
+  assert.equal(jobState(raw, key)?.state, 'pending', 'A cannot terminal-close a job now owned by B');
+  assert.ok(first.bookkeeping_failures.some((failure) => /ownership was lost/.test(failure.error)));
+  assert.equal(
+    (raw.prepare('SELECT claim_token FROM media_object_guards WHERE object_key = ?').get(key) as { claim_token: string }).claim_token,
+    newerToken
+  );
+
+  raw.prepare("UPDATE media_object_guards SET claim_until = '2000-01-01T00:00:00.000Z' WHERE object_key = ?").run(key);
+  const recovered = await runGuardedMediaCleanup({ ...env, BUCKET: bucket as unknown as R2Bucket });
+  assert.deepEqual(recovered.deleted, [key]);
+  assert.equal(jobState(raw, key)?.state, 'done');
 });
 
 /**

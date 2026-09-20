@@ -1472,6 +1472,7 @@ export default function ProductForm({
             pro: doc.pro_price_iqd,
             cost: doc.product_cost_iqd,
           }}
+          baseDimensions={doc.dimensions ?? emptyDimensions()}
           canSeeCost={canSeeCost}
           errors={showErrors ? errors : {}}
         />

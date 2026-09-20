@@ -15,6 +15,11 @@ import {
   type MediaDomain,
   type MediaVisibility,
 } from '../lib/mediaStorage';
+import {
+  ingestProductMediaBytes,
+  PRODUCT_MEDIA_FORM_STAGING_GRACE_MINUTES,
+  ProductMediaIngestError,
+} from '../lib/productMediaIngest';
 
 /**
  * Uploads go to R2 under purpose-scoped, owner-scoped keys. Content type is
@@ -229,6 +234,55 @@ uploadRoutes.post('/', async (c) => {
   }
   if (kind.mime.startsWith('image/') && file.size > IMAGE_MAX) {
     throw badRequest(`Image is too large (max ${Math.round(IMAGE_MAX / 1024 / 1024)} MB)`);
+  }
+
+  /**
+   * Product stills use the strict shared pipeline. Unlike general attachments,
+   * their invariant is absolute: actual WebP bytes, verified dimensions and a
+   * SHA-256 key derived from the final WebP. Animated GIF is refused rather
+   * than flattened to a misleading single frame.
+   */
+  if (purpose === 'product' && kind.mime.startsWith('image/')) {
+    try {
+      const stored = await ingestProductMediaBytes(c.env, {
+        bytes: buf,
+        original_name: String(form.get('originalName') || file.name),
+        owner_id: user.id,
+        entity_id: 'catalog',
+        cleanup_grace_minutes: PRODUCT_MEDIA_FORM_STAGING_GRACE_MINUTES,
+      });
+      return c.json({
+        success: true,
+        ...stored,
+        visibility: 'public' as const,
+        // Compatibility for the existing upload consumer; content_type is the
+        // canonical field used by product_images and TXT apply.
+        mime: stored.content_type,
+      });
+    } catch (error) {
+      if (!(error instanceof ProductMediaIngestError)) throw error;
+      if (error.code === 'IMAGE_CONVERT_UNAVAILABLE') {
+        console.error('uploads: the Images binding is absent — server-side WebP conversion cannot run');
+        throw unavailable(
+          'تحويل الصور غير مفعّل على الخادم حالياً. راجع إعداد Cloudflare Images. / ' + error.message,
+          error.code
+        );
+      }
+      if (error.code === 'IMAGE_SOURCE_TOO_LARGE') {
+        throw badRequest(error.message, 'IMAGE_TOO_LARGE_TO_CONVERT');
+      }
+      if (error.code === 'IMAGE_ANIMATED_GIF') {
+        throw badRequest(
+          'صور GIF المتحركة غير مدعومة للمنتجات لأن التحويل سيفقد الحركة. / ' + error.message,
+          'IMAGE_ANIMATED_GIF_UNSUPPORTED'
+        );
+      }
+      console.error(`uploads: WebP conversion failed: ${error.message}`);
+      throw badRequest(
+        'تعذّر تحويل هذه الصورة. جرّب صورة أخرى. / This image could not be converted. Try another one.',
+        'IMAGE_CONVERT_FAILED'
+      );
+    }
   }
 
   /**

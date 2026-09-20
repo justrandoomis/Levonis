@@ -2111,13 +2111,28 @@ function publicShape(doc: ProductDoc, coarse = false): Record<string, unknown> {
 }
 
 function adminShape(doc: ProductDoc): Record<string, unknown> {
+  const projected = projectAdmin(doc);
   return {
-    ...projectAdmin(doc), // full document incl. cost fields + translation meta
+    ...projected, // full document incl. cost fields + translation meta
     ...legacyAliases(doc),
-    images: doc.media.map((m) => m.url), // legacy string[] view
+    images: projected.media.map((m) => m.url), // legacy string[] view
     algorithm_tags: doc.legacy.algorithm_tags,
     updated_at: doc.updated_at,
   };
+}
+
+/**
+ * Project an already parsed/overlaid product document without parsing it a
+ * second time as a database row. Relation-aware readers use this after
+ * `applyRelations`; feeding the document back through `parseProductRow` would
+ * reinterpret its in-memory arrays as legacy JSON columns and could silently
+ * discard the authoritative overlay.
+ */
+export function productDocumentPublic(
+  doc: ProductDoc,
+  opts: { includeInternal?: boolean } = {}
+): Record<string, unknown> {
+  return opts.includeInternal ? adminShape(doc) : publicShape(doc);
 }
 
 /**
@@ -2130,8 +2145,7 @@ export function productPublic(
   p: Record<string, unknown>,
   opts: { includeInternal?: boolean } = {}
 ): Record<string, unknown> {
-  const doc = parseProductRow(p);
-  return opts.includeInternal ? adminShape(doc) : publicShape(doc);
+  return productDocumentPublic(parseProductRow(p), opts);
 }
 
 /**
@@ -2602,7 +2616,7 @@ export function compositionDetailBody(
   ctx: PricingCtx,
   mystery?: MysteryContext
 ): Record<string, unknown> {
-  const publicRow = publicWithDisplayPrice(b.row, ctx, undefined, displayOverride(b));
+  const publicRow = publicWithDisplayPrice(b.row, ctx, b.view, displayOverride(b));
   if (b.locked) return { ...lockedCard(b, publicRow), viewer_tier: viewerTier(ctx) };
 
   // Bound to `doc` deliberately: `tests/bundleAvailability.test.ts` pins that
@@ -2778,7 +2792,7 @@ export function cardShape(out: Record<string, unknown>): Record<string, unknown>
 }
 
 export function compositionCard(b: ResolvedBundle, ctx: PricingCtx): Record<string, unknown> {
-  return bundleCard(b, publicWithDisplayPrice(b.row, ctx, undefined, displayOverride(b)));
+  return bundleCard(b, publicWithDisplayPrice(b.row, ctx, b.view, displayOverride(b)));
 }
 
 export { cover as compositionCover };

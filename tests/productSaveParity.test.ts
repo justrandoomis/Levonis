@@ -41,6 +41,7 @@ import {
   relationsToWire,
   type RelationsResponse,
 } from '../src/components/adminProducts/form/model';
+import { fixtureWebp, productMediaFixtureEnv } from './fixtures/productMedia';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 
@@ -56,7 +57,8 @@ function setup() {
   const raw = freshDb();
   raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en) VALUES ('brd_bambu','bambu','بامبو','Bambu Lab')").run();
   const db = asD1(raw);
-  return { raw, db, app: stubApp(db, OWNER, mount) };
+  const media = productMediaFixtureEnv();
+  return { raw, db, ...media, app: stubApp(db, OWNER, mount, { env: media.env }) };
 }
 
 const put = (a: App, path: string, body: unknown) =>
@@ -117,7 +119,7 @@ colors.1.name_ar=أسود
 colors.1.name_en=Black
 colors.1.hex=#000000
 images.1.id=img_a
-images.1.url=/files/products/catalog/gallery/aaa00001.jpg
+images.1.url=/files/products/catalog/gallery/aaa00001.webp
 images.1.primary=true
 `;
 
@@ -157,6 +159,187 @@ test('the JSON mirror never outlives the rows: emptying the structure empties `p
   const pub = await json(await get(app, '/api/products/mirror-parity'));
   assert.equal((pub.product?.options ?? []).length, 0, 'the storefront must not sell the deleted options');
   assert.equal((pub.product?.colors ?? []).length, 0);
+});
+
+test('a quarantined legacy image survives an unchanged form save, stays off the storefront, and repairs through its original id', async () => {
+  const { raw, app, publicBucket } = setup();
+  const made = await json(
+    await post(app, '/api/admin/products-v2', {
+      name_en: 'Quarantine Save',
+      name_ar: 'صورة معزولة',
+      price_iqd: 100000,
+      status: 'draft',
+    })
+  );
+  const id = made.product.id as string;
+  const source = 'https://vendor.example/legacy-front.jpg';
+  const staleKey = 'products/catalog/gallery/stale-doc.webp';
+  raw.prepare('UPDATE products SET images = ? WHERE id = ?').run(
+    JSON.stringify([{
+      id: 'stale_doc', url: `/files/${staleKey}`, key: staleKey, role: 'gallery',
+      alt_en: 'Stale', order: 0, primary: true,
+    }]),
+    id
+  );
+  raw.prepare(
+    `INSERT INTO product_images
+       (id, product_id, url, r2_key, source_url, alt_en, sort_order, is_primary, quarantined, quarantine_reason)
+     VALUES ('img_quarantine', ?, '', '', ?, 'Legacy front', 0, 0, 1, 'external_or_unsafe_url')`
+  ).run(id, source);
+
+  const before = await formState(app, id);
+  assert.equal(before.rel.images.length, 0, 'quarantine is not an active form/gallery image');
+  assert.deepEqual(before.rel.quarantined_images, [{
+    id: 'img_quarantine',
+    source_url: source,
+    quarantine_reason: 'external_or_unsafe_url',
+    alt_en: 'Legacy front',
+    sort_order: 0,
+    option_value_id: null,
+    color_id: null,
+    variant_id: null,
+  }]);
+  assert.equal(before.doc.media.length, 0, 'a quarantine row suppresses the stale document-image fallback');
+
+  const unchanged = await post(app, '/api/admin/products-v2', {
+    ...before.doc,
+    status: 'draft',
+    relations: relationsToWire(before.rel),
+    expected_updated_at: stamp(raw, id),
+  });
+  assert.equal(unchanged.status, 200, await unchanged.text());
+  assert.deepEqual(
+    row(raw, "SELECT url,r2_key,source_url,quarantined,quarantine_reason FROM product_images WHERE id='img_quarantine'"),
+    { url: '', r2_key: '', source_url: source, quarantined: 1, quarantine_reason: 'external_or_unsafe_url' },
+    'the full-replacement save preserves repair provenance'
+  );
+
+  raw.prepare("UPDATE products SET status='active' WHERE id = ?").run(id);
+  const publicRead = await json(await get(app, '/api/products/quarantine-save'));
+  assert.equal(publicRead.success, true, JSON.stringify(publicRead));
+  assert.deepEqual(publicRead.product.media, []);
+  assert.deepEqual(publicRead.product.images, []);
+
+  // This is the state the UI creates after its guarded re-ingest button
+  // succeeds: the quarantine entry is removed and verified local media reuses
+  // its id. The server verifier reads the bytes before clearing quarantine.
+  const repairedKey = 'products/catalog/gallery/repaired-quarantine.webp';
+  publicBucket.objects.set(repairedKey, fixtureWebp());
+  const repairState = await formState(app, id);
+  repairState.rel.quarantined_images = [];
+  repairState.rel.images = [{
+    id: 'img_quarantine',
+    url: `/files/${repairedKey}`,
+    r2_key: repairedKey,
+    source_url: source,
+    alt_en: 'Legacy front',
+    sort_order: 0,
+    is_primary: true,
+    option_value_id: null,
+    color_id: null,
+    variant_id: null,
+    width: null,
+    height: null,
+    bytes: null,
+    content_type: 'image/webp',
+  }];
+  const repaired = await post(app, '/api/admin/products-v2', {
+    ...repairState.doc,
+    status: 'draft',
+    relations: relationsToWire(repairState.rel),
+    expected_updated_at: stamp(raw, id),
+  });
+  assert.equal(repaired.status, 200, await repaired.text());
+  assert.deepEqual(
+    row(raw, "SELECT url,r2_key,source_url,quarantined,quarantine_reason FROM product_images WHERE id='img_quarantine'"),
+    {
+      url: `/files/${repairedKey}`,
+      r2_key: repairedKey,
+      source_url: source,
+      quarantined: 0,
+      quarantine_reason: '',
+    }
+  );
+});
+
+test('a rolling URL-only local row echoed by GET survives an unchanged form save', async () => {
+  const { raw, app } = setup();
+  const made = await json(await post(app, '/api/admin/products-v2', {
+    slug: 'legacy-url-only-keep',
+    name_en: 'Legacy URL Keep',
+    name_ar: 'صورة قديمة محفوظة',
+    price_iqd: 100000,
+    status: 'draft',
+  }));
+  const id = made.product.id as string;
+  const key = 'products/legacy/gallery/url-only-keep.webp';
+  raw.prepare(
+    `INSERT INTO product_images
+       (id, product_id, url, r2_key, source_url, sort_order, is_primary, quarantined, quarantine_reason)
+     VALUES ('img_url_only_keep', ?, ?, '', '', 0, 0, 0, '')`
+  ).run(id, `/files/${key}`);
+
+  const state = await formState(app, id);
+  assert.equal(state.rel.images.length, 0, 'a URL-only row is not display-safe without its canonical key');
+  assert.equal(state.rel.quarantined_images?.[0]?.id, 'img_url_only_keep');
+  assert.equal(state.rel.quarantined_images?.[0]?.source_url, `/files/${key}`);
+
+  const response = await post(app, '/api/admin/products-v2', {
+    ...state.doc,
+    status: 'draft',
+    relations: relationsToWire(state.rel),
+    expected_updated_at: stamp(raw, id),
+  });
+  assert.equal(response.status, 200, await response.text());
+  assert.deepEqual(
+    row(raw, "SELECT url,r2_key,quarantined FROM product_images WHERE id='img_url_only_keep'"),
+    { url: `/files/${key}`, r2_key: '', quarantined: 0 },
+    'the validated quarantine echo keeps the rolling legacy row unchanged'
+  );
+  assert.equal(
+    count(raw, 'SELECT COUNT(*) AS n FROM media_cleanup_jobs WHERE object_key = ?', key),
+    0,
+    'an unchanged form save must not enqueue the still-referenced object'
+  );
+});
+
+test('explicitly removing a rolling URL-only quarantine deletes its row and queues its owned object', async () => {
+  const { raw, app } = setup();
+  const made = await json(await post(app, '/api/admin/products-v2', {
+    slug: 'legacy-url-only-remove',
+    name_en: 'Legacy URL Remove',
+    name_ar: 'حذف صورة قديمة',
+    price_iqd: 100000,
+    status: 'draft',
+  }));
+  const id = made.product.id as string;
+  const key = 'products/legacy/gallery/url-only-remove.webp';
+  raw.prepare(
+    `INSERT INTO product_images
+       (id, product_id, url, r2_key, source_url, sort_order, is_primary, quarantined, quarantine_reason)
+     VALUES ('img_url_only_remove', ?, ?, '', '', 0, 0, 0, '')`
+  ).run(id, `/files/${key}`);
+
+  const state = await formState(app, id);
+  assert.equal(state.rel.quarantined_images?.[0]?.id, 'img_url_only_remove');
+  state.rel.quarantined_images = [];
+  const response = await post(app, '/api/admin/products-v2', {
+    ...state.doc,
+    status: 'draft',
+    relations: relationsToWire(state.rel),
+    expected_updated_at: stamp(raw, id),
+  });
+  assert.equal(response.status, 200, await response.text());
+  assert.equal(
+    count(raw, "SELECT COUNT(*) AS n FROM product_images WHERE id='img_url_only_remove'"),
+    0,
+    'absence from the explicit quarantine replacement is a real removal'
+  );
+  assert.equal(
+    count(raw, "SELECT COUNT(*) AS n FROM media_cleanup_jobs WHERE object_key = ? AND state = 'pending'", key),
+    1,
+    'the owned URL-only key reaches durable cleanup after the row commits'
+  );
 });
 
 test('a relations-only PUT owns the mirror too — the endpoint that deletes the rows rewrites the copy', async () => {
@@ -199,7 +382,7 @@ test('the same structure leaves the same `products` row whether it came from a T
         ],
         colors: [{ id: 'fc1', name_en: 'Black', name_ar: 'أسود', hex: '#000000', sort: 0, active: true, option_value_ids: [] }],
         variants: [],
-        images: [{ id: 'fi1', url: '/files/products/catalog/gallery/aaa00001.jpg', alt_en: '', sort_order: 0, is_primary: true }],
+        images: [{ id: 'fi1', url: '/files/products/catalog/gallery/aaa00001.webp', alt_en: '', sort_order: 0, is_primary: true }],
       },
     })
   );
@@ -486,7 +669,7 @@ test('a hundred option values and a hundred images save through D1s 100-paramete
   const values = Array.from({ length: 120 }, (_, i) => ({ id: `ov_${i}`, name_en: `V${i}`, sort: i, active: true }));
   const images = Array.from({ length: 120 }, (_, i) => ({
     id: `pi_${i}`,
-    url: `/files/products/catalog/gallery/img0000${i}.jpg`,
+    url: `/files/products/catalog/gallery/img0000${i}.webp`,
     alt_en: '',
     sort_order: i,
     is_primary: i === 0,
@@ -724,7 +907,7 @@ test('a legacy JSON-only product keeps an Arabic name equal to its English one t
       JSON.stringify([
         { id: 'ov_l', name_en: 'Alpha', name_ar: 'Alpha', name_ckb: 'Alpha', group_en: 'Model', order: 0, active: true, stock: 0 },
       ]),
-      JSON.stringify([{ id: 'md_l', url: '/files/products/catalog/gallery/aaa00001.jpg', alt_en: 'Pic', alt_ar: 'Pic', order: 0, primary: true }]),
+      JSON.stringify([{ id: 'md_l', url: '/files/products/catalog/gallery/aaa00001.webp', alt_en: 'Pic', alt_ar: 'Pic', order: 0, primary: true }]),
       id
     );
 

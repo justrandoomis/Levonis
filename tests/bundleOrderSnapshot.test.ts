@@ -91,6 +91,57 @@ test('case 7 — the order is unchanged after every component is repriced, renam
   assert.equal(before.items[0].unit_price_iqd, 400_000);
 });
 
+test('bundle cart, quote, order and invoice freeze the active relational primary, never stale or quarantined media', async () => {
+  const raw = seedCatalogue();
+  addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000 });
+  const image = '/files/products/prd_b1/gallery/primary.webp';
+  raw.exec(`
+    UPDATE products SET images='["https://stale.example/bundle.jpg"]' WHERE id='prd_b1';
+    INSERT INTO product_images
+      (id,product_id,url,r2_key,source_url,content_type,sort_order,is_primary,quarantined,quarantine_reason)
+    VALUES
+      ('img_bundle_primary','prd_b1','${image}','products/prd_b1/gallery/primary.webp','','image/webp',8,1,0,''),
+      ('img_bundle_quarantine','prd_b1','','','https://bad.example/bundle.jpg','',0,0,1,'external_or_unsafe_url');
+  `);
+  const db = asD1(raw);
+  const app = appFor(db);
+
+  const cart = await json(await post(app, '/api/cart/items', { productId: 'prd_b1', qty: 1 }));
+  assert.equal(cart.success, true, JSON.stringify(cart));
+  assert.equal(cart.items[0].image, image);
+
+  const quote = await json(await post(app, '/api/orders/quote', orderBody()));
+  assert.equal(quote.success, true, JSON.stringify(quote));
+  assert.equal(quote.quote.lines[0].image, image);
+
+  const placed = await json(await post(app, '/api/orders', orderBody()));
+  assert.equal(placed.success, true, JSON.stringify(placed));
+  const orderId = placed.order.id as string;
+  const parent = row<{ image_snapshot: string }>(
+    raw,
+    'SELECT image_snapshot FROM order_items WHERE order_id = ? AND bundle_parent_item_id IS NULL',
+    orderId
+  )!;
+  assert.equal(parent.image_snapshot, image);
+
+  raw.exec(`
+    DELETE FROM product_images WHERE id='img_bundle_primary';
+    UPDATE products SET images='["https://new-stale.example/bundle.jpg"]' WHERE id='prd_b1';
+  `);
+  const shown = await json(await get(app, `/api/orders/${orderId}`));
+  assert.equal(shown.order.items[0].image, image, 'the customer order is an immutable snapshot');
+
+  const env = { DB: db } as unknown as Parameters<typeof createInvoiceForOrder>[0];
+  assert.ok(await createInvoiceForOrder(env, orderId));
+  const invoice = JSON.parse(
+    String(row<{ snapshot: string }>(raw, 'SELECT snapshot FROM invoices WHERE order_id = ?', orderId)!.snapshot)
+  ) as { lines: Array<{ image?: string }> };
+  assert.equal(invoice.lines[0].image, image);
+  const wire = JSON.stringify({ cart, quote, order: shown.order, invoice });
+  assert.equal(wire.includes('stale.example'), false);
+  assert.equal(wire.includes('bad.example'), false);
+});
+
 test('case 7 — the invoice is unchanged too, and lists the parts under the priced line', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await buyOne(raw);

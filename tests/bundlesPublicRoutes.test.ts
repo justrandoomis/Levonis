@@ -118,7 +118,7 @@ function addBundle(raw: DatabaseSync, o: BundleOpts) {
     .prepare(
       `INSERT INTO products (id,slug,name,name_ar,name_ku,price_iqd,prime_price_iqd,pro_price_iqd,status,stock,
                              options,colors,selling_type,sale_types,images,inventory_mode,composition,is_featured,template_family)
-       VALUES (?,?,?,?,?,?,?,?,'active',NULL,'[]','[]','bundle','["bundle"]','["https://cdn/bundle.png"]','BASE','bundle',?,?)`
+       VALUES (?,?,?,?,?,?,?,?,'active',NULL,'[]','[]','bundle','["bundle"]','[]','BASE','bundle',?,?)`
     )
     .run(
       o.id,
@@ -132,6 +132,14 @@ function addBundle(raw: DatabaseSync, o: BundleOpts) {
       o.featured ? 1 : 0,
       o.family ?? null
     );
+  const coverKey = `products/${o.id}/gallery/cover.webp`;
+  raw
+    .prepare(
+      `INSERT INTO product_images
+        (id,product_id,url,r2_key,content_type,sort_order,is_primary,quarantined,quarantine_reason)
+       VALUES (?,?,?,?,'image/webp',0,1,0,'')`
+    )
+    .run(`img_${o.id}_cover`, o.id, `/files/${coverKey}`, coverKey);
   const cfg = {
     price_mode: 'fixed',
     discount_percent: null as number | null,
@@ -223,7 +231,7 @@ test('the listing carries the card facts of §10 and preserves the 0034 response
   assert.equal(card.name, 'Starter Bundle');
   assert.equal(card.name_ar, 'حزمة البداية');
   assert.equal(card.name_ku, 'پاکێجی دەستپێک');
-  assert.equal(card.image, 'https://cdn/bundle.png');
+  assert.equal(card.image, '/files/products/b1/gallery/cover.webp');
   assert.equal(card.locked, false);
   // printer 400,000 + 2 × PLA 25,000 + nozzle 5,000 = 455,000, sold at 400,000.
   assert.equal(card.display_price_iqd, 400_000);
@@ -240,6 +248,40 @@ test('the listing carries the card facts of §10 and preserves the 0034 response
     card.composition.main_items.map((m: { name: string; qty: number }) => [m.name, m.qty]),
     [['Printer X1', 1], ['PLA Basic', 2], ['Nozzle 0.4', 1]]
   );
+});
+
+test('bundle cards and details use active product_images and quarantine suppresses the stale JSON mirror', async () => {
+  const raw = seed();
+  addBundle(raw, { id: 'b1', slug: 'starter' });
+  addBundle(raw, { id: 'b2', slug: 'quarantined-only' });
+  raw.exec(`
+    DELETE FROM product_images WHERE product_id IN ('b1','b2');
+    UPDATE products SET images='["https://stale.example/bundle.jpg"]' WHERE id IN ('b1','b2');
+    INSERT INTO product_images
+      (id,product_id,url,r2_key,source_url,content_type,sort_order,is_primary,quarantined,quarantine_reason)
+    VALUES
+      ('img_bundle_primary','b1','/files/products/b1/gallery/primary.webp','products/b1/gallery/primary.webp','','image/webp',9,1,0,''),
+      ('img_bundle_bad','b1','','','https://bad.example/b1.jpg','',0,0,1,'external_or_unsafe_url'),
+      ('img_bundle_only_bad','b2','','','https://bad.example/b2.jpg','',0,0,1,'external_or_unsafe_url');
+  `);
+  const db = new SqliteD1(raw) as unknown as D1Database;
+
+  const list = await json(await get(appFor(db, null), '/api/bundles'));
+  const active = list.bundles.find((x: { id: string }) => x.id === 'b1');
+  const quarantinedOnly = list.bundles.find((x: { id: string }) => x.id === 'b2');
+  assert.equal(active.image, '/files/products/b1/gallery/primary.webp');
+  assert.equal(quarantinedOnly.image, '', 'a quarantine row owns the gallery and suppresses products.images');
+
+  const detail = (await json(await get(appFor(db, null), '/api/bundles/starter'))).bundle;
+  assert.equal(detail.image, '/files/products/b1/gallery/primary.webp');
+  assert.deepEqual(detail.images, ['/files/products/b1/gallery/primary.webp']);
+  const emptyDetail = (await json(await get(appFor(db, null), '/api/bundles/quarantined-only'))).bundle;
+  assert.equal(emptyDetail.image, '');
+  assert.deepEqual(emptyDetail.images, []);
+
+  const wire = JSON.stringify({ list, detail, emptyDetail });
+  assert.equal(wire.includes('stale.example'), false);
+  assert.equal(wire.includes('bad.example'), false, 'quarantine provenance is never public media');
 });
 
 test('the listing leaks no count, no component list, no pool and no weight — asserted on the serialized JSON', async () => {

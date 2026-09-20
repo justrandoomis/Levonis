@@ -16,7 +16,16 @@
  * server by the local translator, so this file has no field for them.
  */
 
-import type { ColorV2, MediaV2, OptionV2 } from '../../../lib/productTypes';
+import {
+  dimensionOverrides,
+  emptyDimensions,
+  resolveDimensions,
+  type ColorV2,
+  type MediaV2,
+  type OptionV2,
+  type ProductDimensionOverridesV2,
+  type ProductDimensionsV2,
+} from '../../../lib/productTypes';
 
 export type SaleType = 'direct_sale' | 'pre_order' | 'bundle';
 export type InventoryMode = 'BASE' | 'OPTION' | 'COLOR' | 'VARIANT_COMBINATION';
@@ -71,6 +80,8 @@ export interface FormValue extends FormPrices {
   variant_label: string;
   /** The two independent checkboxes shown on this model. */
   fulfillments: FormFulfillment[];
+  /** Null per field means inherit the product dimensions. */
+  dimensions?: ProductDimensionsV2;
 }
 
 export interface FormTransport extends FormPrices {
@@ -123,6 +134,8 @@ export interface FormColor extends FormPrices {
   low_stock_threshold: number | null;
   /** §7 many-to-many: OR inside a group, AND across groups. */
   option_value_ids: string[];
+  /** Null per field means inherit option, then product. */
+  dimensions?: ProductDimensionsV2;
 }
 
 export interface FormVariant extends FormPrices {
@@ -134,6 +147,8 @@ export interface FormVariant extends FormPrices {
   stock: number | null;
   reserved: number;
   low_stock_threshold: number | null;
+  /** Null per field means inherit color, option, then product. */
+  dimensions?: ProductDimensionsV2;
 }
 
 export interface FormImage {
@@ -147,6 +162,8 @@ export interface FormImage {
   variant_id: string | null;
   width: number | null;
   height: number | null;
+  bytes?: number | null;
+  content_type?: string;
   /**
    * Where this picture came from, when it was fetched from a vendor page.
    * Carried so the record reaches the database — the server preserves a
@@ -165,12 +182,27 @@ export interface FormImage {
   r2_key?: string;
 }
 
+/** 0099 provenance that is deliberately not an active gallery image. The
+ * form carries it through unchanged and can turn it into a FormImage only
+ * after the guarded ingest endpoint returns a local verified WebP. */
+export interface FormQuarantinedImage {
+  id: string;
+  source_url: string;
+  quarantine_reason: string;
+  alt_en: string;
+  sort_order: number;
+  option_value_id: string | null;
+  color_id: string | null;
+  variant_id: string | null;
+}
+
 export interface RelationsState {
   inventory_mode: InventoryMode;
   groups: FormGroup[];
   colors: FormColor[];
   variants: FormVariant[];
   images: FormImage[];
+  quarantined_images?: FormQuarantinedImage[];
   /**
    * What the loader had to do to show the stored data: an option value whose
    * group row is missing, or a structure read from the product document
@@ -258,12 +290,52 @@ export function directStockCombinations(
 export const combinationKey = (x: { option_value_ids: string[]; color_id: string | null }): string =>
   [...x.option_value_ids].sort().map((id) => `o:${id}`).concat(x.color_id ? [`c:${x.color_id}`] : []).join('|');
 
+/**
+ * Remove references to rows no longer present in the form. The image itself
+ * remains in the gallery; only its now-impossible selection binding clears.
+ */
+export function cleanDanglingImageBindings(rel: RelationsState): RelationsState {
+  const optionIds = new Set(rel.groups.flatMap((group) => group.values.map((value) => value.id)));
+  const colorIds = new Set(rel.colors.map((color) => color.id));
+  const variantIds = new Set(rel.variants.map((variant) => variant.id));
+  let changed = false;
+  const images = rel.images.map((image) => {
+    const option_value_id = image.option_value_id && optionIds.has(image.option_value_id) ? image.option_value_id : null;
+    const color_id = image.color_id && colorIds.has(image.color_id) ? image.color_id : null;
+    const variant_id = image.variant_id && variantIds.has(image.variant_id) ? image.variant_id : null;
+    if (
+      option_value_id === image.option_value_id &&
+      color_id === image.color_id &&
+      variant_id === image.variant_id
+    ) return image;
+    changed = true;
+    return { ...image, option_value_id, color_id, variant_id };
+  });
+  return changed ? { ...rel, images } : rel;
+}
+
+/** Product → first authored selected option → color; variant is edited above this result. */
+export function inheritedDimensionsForSelection(
+  rel: RelationsState,
+  product: ProductDimensionsV2,
+  selection: { option_value_ids?: readonly string[]; color_id?: string | null }
+): ProductDimensionsV2 {
+  const selected = new Set(selection.option_value_ids ?? []);
+  const option = rel.groups
+    .filter((group) => group.active)
+    .flatMap((group) => group.values.filter((value) => value.active))
+    .find((value) => selected.has(value.id));
+  const color = selection.color_id ? rel.colors.find((row) => row.id === selection.color_id && row.active) : undefined;
+  return resolveDimensions(product, option?.dimensions, color?.dimensions);
+}
+
 export const emptyRelations = (): RelationsState => ({
   inventory_mode: 'BASE',
   groups: [],
   colors: [],
   variants: [],
   images: [],
+  quarantined_images: [],
 });
 
 export const emptyPrices = (): FormPrices => ({
@@ -350,7 +422,7 @@ function warrantyRules(w: WarrantyFormInput, out: FormErrors): void {
 
 // ------------------------------------------------------------------ wire IO
 
-interface WireValue extends FormPrices {
+interface WireValue extends FormPrices, ProductDimensionOverridesV2 {
   id: string;
   group_id: string;
   name_en: string;
@@ -379,7 +451,7 @@ interface WireGroup {
   sort: number;
   active: number;
 }
-interface WireColor extends FormPrices {
+interface WireColor extends FormPrices, ProductDimensionOverridesV2 {
   id: string;
   name_en: string;
   name_ar?: string | null;
@@ -398,7 +470,7 @@ interface WireLink {
   option_value_id: string;
   group_id: string;
 }
-interface WireVariant extends FormPrices {
+interface WireVariant extends FormPrices, ProductDimensionOverridesV2 {
   id: string;
   combo_key: string;
   sku: string | null;
@@ -441,11 +513,15 @@ interface WireImage {
   variant_id: string | null;
   width: number | null;
   height: number | null;
+  bytes?: number | null;
+  content_type?: string | null;
   /** 0048 provenance — carried back so a re-save keeps it. */
   source_url?: string | null;
   alt_ar?: string | null;
   alt_ckb?: string | null;
   r2_key?: string | null;
+  quarantined?: number | boolean | null;
+  quarantine_reason?: string | null;
 }
 
 export interface RelationsResponse {
@@ -457,6 +533,7 @@ export interface RelationsResponse {
   links?: WireLink[];
   variants?: WireVariant[];
   images?: WireImage[];
+  quarantined_images?: WireImage[];
   fulfillments?: WireFulfillment[];
 }
 
@@ -558,6 +635,7 @@ const valueFromWire = (v: WireValue, fulfillments: FormFulfillment[] = []): Form
   variant_key: v.variant_key ?? '',
   variant_label: v.variant_label ?? '',
   fulfillments,
+  dimensions: dimensionOverrides(v),
 });
 
 /**
@@ -633,6 +711,7 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
       reserved: c.reserved ?? 0,
       low_stock_threshold: c.low_stock_threshold ?? null,
       option_value_ids: byColor.get(c.id) ?? [],
+      dimensions: dimensionOverrides(c),
       ...prices(c),
     })),
     variants: (r.variants ?? []).map((v) => ({
@@ -643,6 +722,7 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
       stock: v.stock ?? null,
       reserved: v.reserved ?? 0,
       low_stock_threshold: v.low_stock_threshold ?? null,
+      dimensions: dimensionOverrides(v),
       ...prices(v),
     })),
     images: (r.images ?? [])
@@ -659,10 +739,24 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
         variant_id: i.variant_id ?? null,
         width: i.width ?? null,
         height: i.height ?? null,
+        bytes: i.bytes ?? null,
+        content_type: i.content_type ?? '',
         source_url: i.source_url ?? '',
         ...(typeof i.alt_ar === 'string' && i.alt_ar !== '' ? { alt_ar: i.alt_ar } : {}),
         ...(typeof i.alt_ckb === 'string' && i.alt_ckb !== '' ? { alt_ckb: i.alt_ckb } : {}),
         ...(typeof i.r2_key === 'string' && i.r2_key !== '' ? { r2_key: i.r2_key } : {}),
+      })),
+    quarantined_images: (r.quarantined_images ?? [])
+      .filter((image) => String(image.source_url ?? '').trim() !== '')
+      .map((image) => ({
+        id: image.id,
+        source_url: String(image.source_url ?? '').trim(),
+        quarantine_reason: String(image.quarantine_reason ?? '').trim() || 'legacy_noncanonical_media',
+        alt_en: image.alt_en ?? '',
+        sort_order: image.sort_order,
+        option_value_id: image.option_value_id ?? null,
+        color_id: image.color_id ?? null,
+        variant_id: image.variant_id ?? null,
       })),
     ...(issues.length > 0 ? { hydration_issues: issues } : {}),
   };
@@ -670,7 +764,8 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
 
 /** Whether the relations view carries any structure at all (the storefront's `has_relations`). */
 export function hasRelationStructure(rel: RelationsState): boolean {
-  return rel.groups.length > 0 || rel.colors.length > 0 || rel.images.length > 0 || rel.variants.length > 0;
+  return rel.groups.length > 0 || rel.colors.length > 0 || rel.images.length > 0 ||
+    (rel.quarantined_images?.length ?? 0) > 0 || rel.variants.length > 0;
 }
 
 /** The product document's own copy of the structure, as the admin GET returns it. */
@@ -761,6 +856,7 @@ export function relationsFromDoc(doc: DocStructure): RelationsState {
       variant_key: o.variant_key ?? '',
       variant_label: o.variant_label ?? '',
       fulfillments: [],
+      dimensions: dimensionOverrides(o),
     });
   });
   for (const g of groups) g.values.forEach((v, i) => (v.sort = i));
@@ -787,6 +883,7 @@ export function relationsFromDoc(doc: DocStructure): RelationsState {
         reserved: 0,
         low_stock_threshold: c.low_stock_threshold ?? null,
         option_value_ids: linked,
+        dimensions: dimensionOverrides(c),
         ...docPrices(c),
       };
     });
@@ -805,13 +902,15 @@ export function relationsFromDoc(doc: DocStructure): RelationsState {
     variant_id: null,
     width: m.width ?? null,
     height: m.height ?? null,
+    bytes: m.bytes ?? null,
+    content_type: m.content_type ?? '',
     source_url: m.source_url ?? '',
     ...(m.alt_ar ? { alt_ar: m.alt_ar } : {}),
     ...(m.alt_ckb ? { alt_ckb: m.alt_ckb } : {}),
     ...(m.key ? { r2_key: m.key } : {}),
   }));
 
-  const rel: RelationsState = { inventory_mode: 'BASE', groups, colors, variants: [], images };
+  const rel: RelationsState = { inventory_mode: 'BASE', groups, colors, variants: [], images, quarantined_images: [] };
   rel.inventory_mode = deriveInventoryMode(rel);
   return rel;
 }
@@ -954,7 +1053,9 @@ export function relationsToWire(rel: RelationsState) {
         name_ar: v.name_ar ?? '',
         name_ckb: v.name_ckb ?? '',
         sku_part: v.sku_part,
-        image: v.image,
+        // product_images is the sole image source. The legacy scalar is
+        // deliberately cleared; public projections derive it from bindings.
+        image: '',
         sort: vi,
         active: v.active,
         stock: v.stock,
@@ -973,6 +1074,7 @@ export function relationsToWire(rel: RelationsState) {
         lead_time_max_days: v.fulfillments.find((f) => f.fulfillment_type === 'pre_order')?.lead_time_max_days ?? null,
         variant_key: v.variant_key,
         variant_label: v.variant_label,
+        ...(v.dimensions ?? emptyDimensions()),
         fulfillments: v.fulfillments.map(fulfillmentToWire),
       })),
     })),
@@ -982,13 +1084,14 @@ export function relationsToWire(rel: RelationsState) {
       name_ar: c.name_ar ?? '',
       name_ckb: c.name_ckb ?? '',
       hex: c.hex,
-      image: c.image,
+      image: '',
       sku_part: c.sku_part,
       sort: ci,
       active: c.active,
       stock: c.stock,
       low_stock_threshold: c.low_stock_threshold,
       option_value_ids: c.option_value_ids,
+      ...(c.dimensions ?? emptyDimensions()),
       ...prices(c),
     })),
     variants: rel.variants.map((v) => ({
@@ -999,6 +1102,7 @@ export function relationsToWire(rel: RelationsState) {
       active: v.active,
       stock: v.stock,
       low_stock_threshold: v.low_stock_threshold,
+      ...(v.dimensions ?? emptyDimensions()),
       ...prices(v),
     })),
     images: rel.images.map((i, ii) => ({
@@ -1012,10 +1116,30 @@ export function relationsToWire(rel: RelationsState) {
       variant_id: i.variant_id,
       width: i.width,
       height: i.height,
+      bytes: i.bytes ?? null,
+      content_type: i.content_type ?? '',
       source_url: i.source_url ?? '',
       alt_ar: i.alt_ar ?? '',
       alt_ckb: i.alt_ckb ?? '',
       r2_key: i.r2_key ?? '',
+    })),
+    quarantined_images: (rel.quarantined_images ?? []).map((image) => ({
+      id: image.id,
+      url: '',
+      r2_key: '',
+      source_url: image.source_url,
+      quarantined: true,
+      quarantine_reason: image.quarantine_reason,
+      alt_en: image.alt_en,
+      sort_order: image.sort_order,
+      is_primary: false,
+      option_value_id: image.option_value_id,
+      color_id: image.color_id,
+      variant_id: image.variant_id,
+      width: null,
+      height: null,
+      bytes: null,
+      content_type: '',
     })),
   };
 }

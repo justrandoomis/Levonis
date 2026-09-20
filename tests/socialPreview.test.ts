@@ -191,11 +191,8 @@ test('an image a crawler cannot fetch is refused, not shown broken', () => {
   assert.equal(absoluteImageUrl(null, 'https://levonis-iq.com'), '');
 });
 
-test('an imported vendor image already on https is passed through', () => {
-  assert.equal(
-    absoluteImageUrl('https://cdn.bambulab.com/a1.jpg', 'https://levonis-iq.com'),
-    'https://cdn.bambulab.com/a1.jpg'
-  );
+test('an imported vendor image is never hotlinked, even over https', () => {
+  assert.equal(absoluteImageUrl('https://bad.example/a1.jpg', 'https://levonis-iq.com'), '');
 });
 
 // -------------------------------------------------------------- the rewrite
@@ -273,16 +270,20 @@ test('a document with no tags of its own still gets them', () => {
 // ------------------------------------------------------------- the lookup
 
 /** A D1 stand-in that answers each prepared statement from a fixed table. */
-function fakeDb(tables: Record<string, Record<string, unknown> | null>) {
+function fakeDb(tables: Record<string, Record<string, unknown> | Record<string, unknown>[] | null>) {
   const asked: string[] = [];
   return {
     asked,
     prepare(sql: string) {
       const table = /FROM (\w+)/.exec(sql)![1];
       return {
-        bind(slug: string) {
-          asked.push(`${table}:${slug}`);
-          return { first: async () => tables[table] ?? null };
+        bind(...bindings: string[]) {
+          asked.push(`${table}:${bindings[0] ?? ''}`);
+          const answer = tables[table] ?? null;
+          return {
+            first: async () => Array.isArray(answer) ? (answer[0] ?? null) : answer,
+            all: async () => ({ results: Array.isArray(answer) ? answer : answer ? [answer] : [] }),
+          };
         },
       };
     },
@@ -291,12 +292,13 @@ function fakeDb(tables: Record<string, Record<string, unknown> | null>) {
 
 test('the catalogue is read first, exactly as the product API reads it', async () => {
   const db = fakeDb({
-    products: { name_ar: 'كتالوج', description_ar: 'وصف', images: '[]' },
+    products: { id: 'catalog', name_ar: 'كتالوج', description_ar: 'وصف', images: '[]' },
+    product_images: [],
     community_products: { name_ar: 'متجر', description_ar: 'آخر', images: '[]' },
   });
   const preview = await resolveProductPreview(db, 'slug', 'https://levonis-iq.com');
   assert.equal(preview?.title, 'كتالوج');
-  assert.deepEqual((db as unknown as { asked: string[] }).asked, ['products:slug']);
+  assert.deepEqual((db as unknown as { asked: string[] }).asked, ['products:slug', 'product_images:catalog']);
 });
 
 test('a merchant product falls through to community_products', async () => {
@@ -316,25 +318,54 @@ test('an unknown slug produces no card at all', async () => {
 });
 
 test('the lead image is the one the product page itself shows', async () => {
-  // Not images[0]: `primary` wins over order, which is the rule the page, the
-  // cards, the cart and the order snapshot all use. A card that disagreed with
-  // the page it links to is the same bug in a different place.
+  // Not the stale products.images mirror and not quarantine provenance:
+  // explicit relational primary wins, which is the rule the page, cards, cart
+  // and immutable order snapshot all use.
   const db = fakeDb({
     products: {
+      id: 'p1',
       name_ar: 'طابعة',
       description_ar: 'وصف قصير',
-      images: JSON.stringify([
-        { url: '/files/products/second.webp', order: 0 },
-        { url: '/files/products/lead.webp', order: 1, primary: true },
-      ]),
+      images: JSON.stringify(['https://bad.example/stale.jpg']),
     },
+    product_images: [
+      {
+        id: 'second', product_id: 'p1', url: '/files/products/second.webp',
+        r2_key: 'products/second.webp', sort_order: 0, is_primary: 0,
+      },
+      {
+        id: 'lead', product_id: 'p1', url: '/files/products/lead.webp',
+        r2_key: 'products/lead.webp', sort_order: 1, is_primary: 1,
+      },
+      {
+        id: 'bad', product_id: 'p1', url: '', r2_key: '', sort_order: 0, is_primary: 0,
+        quarantined: 1, source_url: 'https://bad.example/quarantine.jpg',
+      },
+    ],
   });
   const preview = await resolveProductPreview(db, 'p', 'https://levonis-iq.com');
   assert.equal(preview?.image, 'https://levonis-iq.com/files/products/lead.webp');
+  assert.equal(JSON.stringify(preview).includes('bad.example'), false);
+});
+
+test('a quarantined-only catalogue product keeps the shop OG image', async () => {
+  const db = fakeDb({
+    products: {
+      id: 'p2', name_ar: 'طابعة', description_ar: 'وصف',
+      images: JSON.stringify(['https://bad.example/stale.jpg']),
+    },
+    product_images: [{
+      id: 'bad', product_id: 'p2', url: '', r2_key: '', sort_order: 0, is_primary: 0,
+      quarantined: 1, source_url: 'https://bad.example/source.jpg',
+    }],
+  });
+  const preview = await resolveProductPreview(db, 'p2', 'https://levonis-iq.com');
+  assert.equal(preview?.image, '');
+  assert.equal(JSON.stringify(preview).includes('bad.example'), false);
 });
 
 test('a product with no description keeps the shop line instead of an invented one', async () => {
-  const db = fakeDb({ products: { name_ar: 'طابعة', description_ar: '', images: '[]' } });
+  const db = fakeDb({ products: { id: 'p1', name_ar: 'طابعة', description_ar: '', images: '[]' }, product_images: [] });
   const preview = await resolveProductPreview(db, 'p', 'https://levonis-iq.com');
   assert.equal(preview?.description, '');
   const html = injectSocialPreview(SHELL, { ...preview!, url: 'https://levonis-iq.com/product/p' });

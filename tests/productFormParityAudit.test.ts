@@ -46,6 +46,7 @@ import {
   type RelationsResponse,
   type RelationsState,
 } from '../src/components/adminProducts/form/model';
+import { productMediaFixtureEnv } from './fixtures/productMedia';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 
@@ -59,7 +60,8 @@ const mount = (a: Parameters<Parameters<typeof stubApp>[2]>[0]) => {
 function setup() {
   const raw = freshDb();
   raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en) VALUES ('brd_bambu','bambu','بامبو','Bambu Lab')").run();
-  return { raw, app: stubApp(asD1(raw), OWNER, mount) };
+  const media = productMediaFixtureEnv();
+  return { raw, app: stubApp(asD1(raw), OWNER, mount, { env: media.env }) };
 }
 
 const apply = async (a: App, text: string, extra: Record<string, unknown> = {}) => {
@@ -163,21 +165,21 @@ transports.2.method=sea
 transports.2.commission_iqd=9000
 transports.2.active=true
 images.1.id=img_front
-images.1.url=/files/products/catalog/gallery/front0001.jpg
+images.1.url=/files/products/catalog/gallery/front0001.webp
 images.1.alt_ar=الواجهة
 images.1.alt_en=Front
 images.1.alt_ckb=پێشەوە
 images.1.primary=true
-images.1.key=products/front.jpg
+images.1.key=products/catalog/gallery/front0001.webp
 images.1.source_url=https://vendor.example/front.jpg
 images.1.width=1200
 images.1.height=900
 images.2.id=img_combo
-images.2.url=/files/products/catalog/gallery/combo0001.jpg
+images.2.url=/files/products/catalog/gallery/combo0001.webp
 images.2.alt_en=Combo
 images.2.option_value_id=opt_combo
 images.3.id=img_black
-images.3.url=/files/products/catalog/gallery/black0001.jpg
+images.3.url=/files/products/catalog/gallery/black0001.webp
 images.3.alt_en=Black
 images.3.color_id=col_black
 options.1.id=opt_base

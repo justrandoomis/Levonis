@@ -47,7 +47,6 @@ import { newId } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
 import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import {
-  parseProductRow,
   primaryMedia,
   projectAdmin,
   validateProductDoc,
@@ -56,9 +55,11 @@ import {
 import {
   localizeRespectingAuthored,
   planProductSave,
+  preflightProductSave,
   reloadForVerification,
   saveProductAtomic,
   verifyApplied,
+  type ProductWriteIntent,
   type ProductSavePlan,
 } from '../lib/productPersistence';
 import {
@@ -77,6 +78,12 @@ import {
 import { loadOffers, offerWindowStatements, normalizeUtc, subjectOf, type OfferView } from '../lib/offers';
 import { pricingCtx } from './products';
 import { slugToken, uniqueSlugIn } from './adminProducts';
+import { verifyAndNormalizeProductMedia } from '../lib/productMediaWrite';
+import {
+  deleteProductPermanently,
+  invalidateMediaCache,
+} from '../lib/productDeletion';
+import { runGuardedMediaCleanupJobs } from '../lib/mediaRefs';
 
 export const adminBundlesRoutes = new Hono<AppContext>();
 adminBundlesRoutes.use('*', requireAdmin);
@@ -289,14 +296,21 @@ adminBundlesRoutes.get('/', async (c) => {
   const configById = new Map(configs.map((r) => [r.product_id, r]));
   const offers = await loadOffers(c.env.DB, ids.map((id) => subjectOf(id)));
   const memberIds = [...comps.byBundle.values()].flat().map((r) => r.member_product_id);
-  const members = await loadCompositionMembers(c.env.DB, memberIds);
+  // Composition parents ride in the same batch as their members so the panel
+  // preview/list reads the active `product_images` overlay, never the legacy
+  // `products.images` mirror when relational image rows exist.
+  const members = await loadCompositionMembers(c.env.DB, [...ids, ...memberIds]);
 
   const ctx = await ctxFor(c);
   const nowMs = Date.now();
   const bundles = [];
   for (const row of results) {
     const id = String(row.id);
-    const doc = parseProductRow(row);
+    const parent = members.get(id);
+    // The list query just returned this id, so absence here means it was
+    // concurrently removed. Never fall back to the stale JSON product row.
+    if (!parent) continue;
+    const doc = parent.doc;
     const components = storedComponents(comps, id);
     const offer = offerFromView(offers.get(`product:${id}`));
     const res = await resolveComposition(c.env.DB, {
@@ -352,9 +366,9 @@ adminBundlesRoutes.get('/', async (c) => {
 // ------------------------------------------------------------- one bundle
 
 async function loadOne(c: Context<AppContext>, id: string) {
-  const row = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
-  if (!row) throw notFound('bundle');
-  const doc = parseProductRow(row);
+  const parent = (await loadCompositionMembers(c.env.DB, [id])).get(id);
+  if (!parent) throw notFound('bundle');
+  const { row, doc } = parent;
   if (doc.composition === '') {
     // An ordinary product is edited in the product panel, and the bundles
     // panel says so rather than pretending to own it.
@@ -641,11 +655,10 @@ async function writeBundle(c: Context<AppContext>, mode: 'create' | 'update', pr
   let prev: ProductDoc | null = null;
   let prevRow: Record<string, unknown> | null = null;
   if (mode === 'update') {
-    prevRow =
-      (await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>()) ??
-      null;
-    if (!prevRow) throw notFound('bundle');
-    prev = parseProductRow(prevRow);
+    const parent = productId ? (await loadCompositionMembers(c.env.DB, [productId])).get(productId) : undefined;
+    if (!parent) throw notFound('bundle');
+    prevRow = parent.row;
+    prev = parent.doc;
     if (prev.composition === '') throw badRequest('this product is not a bundle', 'VALIDATION');
     // Stale-edit protection, the idiom the product editor already uses.
     if (typeof body.expected_updated_at === 'string' && body.expected_updated_at) {
@@ -678,6 +691,21 @@ async function writeBundle(c: Context<AppContext>, mode: 'create' | 'update', pr
     const base = slugToken(doc.name_en) || slugToken(doc.name_ar) || `bundle-${id.slice(-8)}`;
     doc.slug = await uniqueSlugIn(c.env.DB, 'products', base, null);
   }
+
+  // `planSave` is read-only until its returned statements are passed to
+  // `saveProductAtomic`. Run it on request-local clones first so neither a
+  // product refusal nor an invalid composition can leave media guards behind.
+  await planSave(c, {
+    doc: JSON.parse(JSON.stringify(doc)) as ProductDoc,
+    prev: prev ? (JSON.parse(JSON.stringify(prev)) as ProductDoc) : null,
+    body: JSON.parse(JSON.stringify(body)) as Record<string, unknown>,
+    kind,
+  });
+
+  // A composition still uses the ordinary product gallery. Prove and replace
+  // every client-supplied media fact only after the complete structural plan
+  // is known to be valid, then rebuild the committable plan with those facts.
+  await verifyAndNormalizeProductMedia(c.env, doc);
 
   const { plan, preview, warnings } = await planSave(c, { doc, prev, body, kind });
   await saveProductAtomic(c.env.DB, plan, [
@@ -752,14 +780,15 @@ adminBundlesRoutes.post('/:productId/duplicate', async (c) => {
   );
   const ctx = await ctxFor(c);
   const offer = source.offer ? { ...source.offer, max_per_user: null, max_global: null } : null;
-  const plan = await planProductSave(c.env.DB, {
+  const saveIntent: ProductWriteIntent = {
     mode: 'create',
     doc,
     prev: null,
     relations: null,
     actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
     allowComposition: true,
-  });
+  };
+  await preflightProductSave(c.env.DB, saveIntent);
   const comp = await planBundleComposition(
     c.env.DB,
     id,
@@ -773,6 +802,12 @@ adminBundlesRoutes.post('/:productId/duplicate', async (c) => {
       errors: comp.errors as unknown as Record<string, unknown>[],
     });
   }
+
+  // Duplicating must not launder a stale/missing source reference into a new
+  // product row. Both product and composition plans are already known valid,
+  // so the guard this verifier acquires cannot survive a structural refusal.
+  await verifyAndNormalizeProductMedia(c.env, doc);
+  const plan = await planProductSave(c.env.DB, saveIntent);
   plan.statements.push(...comp.statements, ...offerWindowStatements(c.env.DB, subjectOf(id), offer));
   await saveProductAtomic(c.env.DB, plan, [
     { action: 'bundle.create', detail: { duplicated_from: source.doc.id, slug: doc.slug } },
@@ -873,17 +908,72 @@ adminBundlesRoutes.delete('/:productId', async (c) => {
       reason: 'Referenced by past orders — archived instead of deleted.',
     });
   }
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      'DELETE FROM bundle_component_choices WHERE component_id IN (SELECT id FROM bundle_components WHERE bundle_product_id = ?)'
-    ).bind(id),
-    c.env.DB.prepare('DELETE FROM bundle_components WHERE bundle_product_id = ?').bind(id),
-    c.env.DB.prepare('DELETE FROM bundle_config WHERE product_id = ?').bind(id),
-    c.env.DB.prepare('DELETE FROM offer_windows WHERE subject_type = ? AND subject_id = ?').bind('product', id),
-    c.env.DB.prepare('DELETE FROM offer_limits WHERE subject_type = ? AND subject_id = ?').bind('product', id),
-    c.env.DB.prepare('DELETE FROM product_catalogs WHERE product_id = ?').bind(id),
-    c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id),
-  ]);
-  await audit(c.env.DB, admin.id, 'bundle.archive', id, { deleted: true, slug: loaded.doc.slug });
-  return c.json({ success: true, archived: false, deleted: true });
+  // Capture local media and persist its cleanup intent in the same transaction
+  // that removes the bundle. R2 runs only after that transaction commits.
+  const result = await deleteProductPermanently(c.env.DB, id, { newId: () => newId('mcj') });
+  if (result.blocked) {
+    throw new HttpError(409, result.blocked.remedy, result.blocked.code, {
+      table: result.blocked.table,
+      count: result.blocked.count,
+    });
+  }
+
+  const warnings: string[] = [];
+  let cleanup: { deleted: string[]; shared: string[]; failed: Array<{ key: string; error: string }> } = {
+    deleted: [],
+    shared: [],
+    failed: [],
+  };
+  try {
+    cleanup = await runGuardedMediaCleanupJobs(c.env, result.media_jobs);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`bundle media cleanup failed after committed delete for ${id}:`, message);
+    warnings.push(`media cleanup: ${message.slice(0, 200)}`);
+    cleanup.failed = result.media_jobs.map((job) => ({ key: job.key, error: message.slice(0, 400) }));
+  }
+
+  let invalidated: string[] = [];
+  try {
+    invalidated = await invalidateMediaCache(new URL(c.req.url).origin, cleanup.deleted);
+  } catch (error) {
+    console.error(
+      'bundle cache invalidation failed after committed delete:',
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+
+  const pending = cleanup.failed.length;
+  const shared = [...new Set([...result.r2_objects_shared_skipped, ...cleanup.shared])];
+  // Keep the established action and detail fields used by the bundle audit
+  // reader, and add the measured deferred-cleanup outcome.
+  try {
+    await audit(c.env.DB, admin.id, 'bundle.archive', id, {
+      deleted: true,
+      slug: loaded.doc.slug,
+      rows_deleted_by_table: result.rows_deleted_by_table,
+      r2_objects_deleted: cleanup.deleted.length,
+      r2_objects_shared_skipped: shared.length,
+      r2_cleanup_pending: pending,
+    });
+  } catch (error) {
+    console.error('bundle delete audit failed after committed delete:', error instanceof Error ? error.message : String(error));
+    warnings.push('audit row not written');
+  }
+
+  return c.json({
+    ...(warnings.length ? { warnings } : {}),
+    success: true,
+    archived: false,
+    deleted: true,
+    product_deleted: result.product_deleted,
+    rows_deleted_by_table: result.rows_deleted_by_table,
+    rows_unlinked_by_table: result.rows_unlinked_by_table,
+    media_keys_found: result.media_keys_found,
+    r2_objects_deleted: cleanup.deleted,
+    r2_objects_shared_skipped: shared,
+    r2_cleanup_pending: pending,
+    ...(cleanup.failed.length ? { r2_cleanup_errors: cleanup.failed } : {}),
+    cache_keys_invalidated: invalidated,
+  });
 });
