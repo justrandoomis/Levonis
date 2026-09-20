@@ -338,6 +338,12 @@ export async function planLotConsumption(
    * the last-resort guard for a genuine race, where two callers plan at once
    * and neither can see the other's row yet — there the loser's INSERT
    * violates it and D1 rolls that caller's whole batch back, lots included.
+   *
+   * WHICH IS WHY THAT INSERT IS HARD AND NOT `OR IGNORE`. `OR IGNORE` would
+   * make the loser's duplicate a silent no-op while the lot UPDATE beside it —
+   * which only asks whether the lot still holds enough — went ahead and
+   * decremented a second time. The sentence above would be a description of
+   * something the code did not do.
    */
   const applied = await appliedAllocationLines(db, orderId);
 
@@ -398,7 +404,7 @@ export async function planLotConsumption(
       statements.push(
         db
           .prepare(
-            `INSERT OR IGNORE INTO order_item_inventory_allocations
+            `INSERT INTO order_item_inventory_allocations
                (id, order_id, order_item_id, lot_id, scope, scope_id, qty, unit_cost_iqd, cogs_iqd, idempotency_key)
              SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
               WHERE EXISTS (SELECT 1 FROM inventory_lots WHERE id = ?4 AND qty_remaining >= ?7)`
@@ -474,6 +480,31 @@ export async function planLotRestore(
   if (rows.length === 0) return EMPTY;
 
   const operation = opts.operation ?? 'return';
+
+  /**
+   * THE RELEASES THIS ORDER HAS ALREADY RECORDED, so a second call plans none
+   * of them again.
+   *
+   * The consumption rows this walks are matched on `released_at IS NULL` and a
+   * release is a SEPARATE row, so the consumption row stays visible for ever —
+   * which means a repeated return read exactly the same rows and planned
+   * exactly the same restore. That was survivable only by accident, thanks to
+   * the `qty_remaining + ? <= qty_received` cap, and only while the lot had no
+   * room: a lot of 10 that had sold 4 to this order and 6 to another, then had
+   * this order returned, would take the replay's +4 as well and claim 8 units
+   * on a shelf holding 4.
+   *
+   * An equality read on `order_id`, not a LIKE over the key: D1 caps a LIKE
+   * pattern at 50 BYTES and these keys are longer than that with real ids.
+   */
+  const releasedKeys = await db
+    .prepare(
+      `SELECT idempotency_key FROM order_item_inventory_allocations
+        WHERE order_id = ? AND released_at IS NOT NULL`
+    )
+    .bind(orderId)
+    .all<{ idempotency_key: string }>();
+  const released = new Set((releasedKeys.results ?? []).map((r) => r.idempotency_key));
   const budget = new Map<string, number>();
   if (opts.qtyByLine) for (const [k, v] of Object.entries(opts.qtyByLine)) budget.set(k, Math.max(0, Math.floor(v)));
 
@@ -498,10 +529,15 @@ export async function planLotRestore(
     if (give <= 0) continue;
 
     const idem = `${operation}:${orderId}:${r.id}:${give}`;
+    // Already given back. Skipped whole — not re-planned and not re-guarded.
+    if (released.has(idem)) continue;
     statements.push(
       db
         .prepare(
-          `INSERT OR IGNORE INTO order_item_inventory_allocations
+          // Hard, for the reason `planLotConsumption` spells out: `OR IGNORE`
+          // plus a guard that asks whether the row EXISTS lets a racer's
+          // duplicate no-op while its UPDATE credits the lot a second time.
+          `INSERT INTO order_item_inventory_allocations
              (id, order_id, order_item_id, lot_id, scope, scope_id, qty, unit_cost_iqd, cogs_iqd, idempotency_key, released_at)
            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
         )
@@ -525,11 +561,13 @@ export async function planLotRestore(
     statements.push(
       db
         .prepare(
+          // The cap stays: a lot may never hold more than it received. The
+          // `EXISTS` that used to sit beside it is gone — it was the thing that
+          // made the replay possible, not the thing that prevented it.
           `UPDATE inventory_lots SET qty_remaining = qty_remaining + ?1
-            WHERE id = ?2 AND qty_remaining + ?1 <= qty_received
-              AND EXISTS (SELECT 1 FROM order_item_inventory_allocations WHERE idempotency_key = ?3)`
+            WHERE id = ?2 AND qty_remaining + ?1 <= qty_received`
         )
-        .bind(give, r.lot_id, idem)
+        .bind(give, r.lot_id)
     );
     allocations.push({
       order_item_id: r.order_item_id,

@@ -34,6 +34,7 @@ import { adminProductRelationsRoutes } from './routes/adminProductRelations';
 import { adminPriceGridRoutes } from './routes/adminPriceGrid';
 import { adminFinanceRoutes } from './routes/adminFinance';
 import { adminFinanceReportRoutes } from './routes/adminFinanceReport';
+import { adminInventoryRoutes } from './routes/adminInventory';
 import { printRequestRoutes } from './routes/printRequests';
 import { notificationRoutes } from './routes/notifications';
 import { stockAlertRoutes } from './routes/stockAlerts';
@@ -257,6 +258,13 @@ app.route('/api/admin/products-v2', adminProductsRoutes);
 app.route('/api/admin/template', templateRoutes);
 app.route('/api/admin/media', mediaRoutes);
 app.route('/api/admin/taxonomy', adminTaxonomyRoutes);
+// «إدارة المخزون». Mounted under /api/admin/* so the apex-only host guard far
+// above covers it, and declared `admin` rather than `admin:full` on purpose:
+// §52 puts the assistant admin IN the warehouse — they count units, receive
+// shipments and correct a miscount — and OUTSIDE every cost attached to them.
+// The split is per FIELD, not per route, so the door stays open and every
+// payload leaves through `projectForAdmin`.
+app.route('/api/admin/inventory', adminInventoryRoutes);
 // Every commercial value PRO and PREMIUM shopping benefits are made of (§6).
 app.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes);
 // The issued warranty document: public verification by receipt number or by

@@ -146,6 +146,19 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/admin/products-v2', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/products', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/taxonomy', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
+  // «إدارة المخزون»: cost layers, incoming purchases, receipts, adjustments
+  // and suppliers. CATALOG, because every counter it moves is a catalogue
+  // counter — `products.stock`, `product_option_values.stock`,
+  // `product_colors.stock`, `product_variants.stock`.
+  //
+  // `admin`, NOT `admin:full`, AND THE DIFFERENCE FROM THE FINANCE ROWS IS
+  // DELIBERATE. Finance is financial end to end, so the edge can shut the
+  // whole door. Inventory is not: §52 wants the assistant admin counting
+  // units and receiving shipments while never seeing what any of it cost.
+  // A door that is open or shut cannot express that, so the gate moves one
+  // level in — `projectForAdmin` strips FINANCIAL_FIELDS from every payload
+  // before it is serialised (worker/routes/adminInventory.ts).
+  { prefix: '/api/admin/inventory', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/template', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'upload' },
   { prefix: '/api/admin/import', hosts: 'main', owner: 'CATALOG', flipPhase: 5, requires: 'admin', rateClass: 'upload' },
   { prefix: '/api/admin/media/ingest', hosts: 'main', owner: 'FILES', flipPhase: 4, requires: 'admin', rateClass: 'upload' },

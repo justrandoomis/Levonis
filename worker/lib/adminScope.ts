@@ -75,6 +75,32 @@ export const FINANCIAL_FIELDS = [
   // detail §11 restricts — leaking either would defeat stripping the cost.
   'cost_adjust_iqd',
   'profit_iqd',
+  // 0098 — THE INVENTORY ACQUISITION COSTS. A lot's unit cost IS the cost of
+  // goods sold for the units in it, so §11 covers it exactly as it covers
+  // cost_iqd. The three components are the same fact broken into its parts,
+  // and the totals are it summed — leaking any one would defeat stripping the
+  // others.
+  //
+  // QUANTITIES ARE NOT HERE, and that is the line this list draws. An
+  // assistant admin needs to see that twenty units are on the shelf and four
+  // are reserved; §52 restricts what those units COST, not how many.
+  //
+  // Line comments and not a block: tests/edgeParity.test.ts extracts this
+  // declaration by scanning balanced brackets and skips // but not /* */, so a
+  // JSDoc here with a parenthesis in it reads as an unclosed declaration.
+  'unit_cost_iqd',
+  'purchase_unit_iqd',
+  'purchase_total_iqd',
+  'shipping_total_iqd',
+  'shipping_share_iqd',
+  'internal_delivery_total_iqd',
+  'internal_share_iqd',
+  'total_cost_iqd',
+  'cogs_iqd',
+  'inventory_value_iqd',
+  'oldest_unit_cost_iqd',
+  'newest_unit_cost_iqd',
+  'gross_profit_iqd',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

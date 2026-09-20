@@ -523,3 +523,70 @@ test('ACCEPTANCE §81 — 10 at 450,000 plus 10 at 560,000, sell 12, COGS is 5,6
   assert.notEqual(cogs.cogs_iqd, 12 * 560_000, 'it priced everything at the newest cost');
   assert.notEqual(cogs.cogs_iqd, 12 * 505_000, 'it used a weighted average');
 });
+
+// ---------------------------------------------------------------------------
+//  THE REPLAY THE GUARDS DID NOT CATCH
+// ---------------------------------------------------------------------------
+
+test('a replayed RESTORE does not credit the lot a second time', async () => {
+  /**
+   * The case the `qty_remaining + ? <= qty_received` cap alone does not cover,
+   * because the room exists: a lot of 10 sells 4 to this order and 6 to
+   * another, this order comes back, and the replay's +4 fits inside the lot's
+   * own ceiling. The shelf then claims 8 units while holding 4.
+   *
+   * The consumption row stays `released_at IS NULL` for ever — a release is a
+   * separate row — so a second call reads the same rows and plans the same
+   * restore. The fix is to skip the releases already recorded.
+   */
+  const raw = freshDb();
+  const pid = seedProduct(raw);
+  const a = seedLot(raw, { product: pid, qty: 10, unitCost: 450_000, received: '2026-08-10T00:00:00.000Z' });
+
+  const mine = seedOrder(raw, ['itm_1']);
+  await runPlan(raw, (await planLotConsumption(asD1(raw), mine, [move({ product: pid, line: 'itm_1', qty: 4 })])).statements);
+  const theirs = seedOrder(raw, ['itm_2']);
+  await runPlan(raw, (await planLotConsumption(asD1(raw), theirs, [move({ product: pid, line: 'itm_2', qty: 6 })])).statements);
+  assert.equal(lotQty(raw, a), 0);
+
+  await runPlan(raw, (await planLotRestore(asD1(raw), mine)).statements);
+  assert.equal(lotQty(raw, a), 4);
+
+  const replay = await planLotRestore(asD1(raw), mine);
+  assert.equal(replay.statements.length, 0, 'the replay planned work that was already done');
+  await runPlan(raw, replay.statements);
+  assert.equal(lotQty(raw, a), 4, 'the replay credited the lot units nobody returned');
+
+  // And the other order's six units are still sold, which is the whole point.
+  const released = raw.prepare(
+    `SELECT COUNT(*) AS n FROM order_item_inventory_allocations WHERE released_at IS NOT NULL`
+  ).get() as { n: number };
+  assert.equal(released.n, 1);
+});
+
+test('two callers racing on one line: the loser takes nothing with it', async () => {
+  /**
+   * Both planned before either committed, so neither could see the other's
+   * allocation row and the read-before-write skip cannot help. The allocation's
+   * UNIQUE key is the last lock, and it only works because that INSERT is hard:
+   * `INSERT OR IGNORE` would let the loser's duplicate pass silently while the
+   * lot UPDATE beside it — which only asks whether the lot still holds enough —
+   * took four more units.
+   */
+  const raw = freshDb();
+  const pid = seedProduct(raw);
+  const a = seedLot(raw, { product: pid, qty: 10, unitCost: 450_000, received: '2026-08-10T00:00:00.000Z' });
+  const oid = seedOrder(raw, ['itm_1']);
+  const moves = [move({ product: pid, line: 'itm_1', qty: 4 })];
+
+  const first = await planLotConsumption(asD1(raw), oid, moves);
+  const second = await planLotConsumption(asD1(raw), oid, moves);
+  assert.equal(second.statements.length, first.statements.length, 'both callers planned the same work');
+
+  await runPlan(raw, first.statements);
+  await assert.rejects(asD1(raw).batch(second.statements as never), 'the loser must lose its whole batch');
+
+  assert.equal(lotQty(raw, a), 6, 'the lot was consumed twice');
+  const n = raw.prepare(`SELECT COUNT(*) AS n FROM order_item_inventory_allocations`).get() as { n: number };
+  assert.equal(n.n, 1);
+});
