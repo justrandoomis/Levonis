@@ -41,6 +41,7 @@ import { normalizeHashtag } from './hashtags';
 import type { ParsedMembershipRule, ParsedProduct, RowIssue } from './importCsv';
 import { printerWarrantyRules, readOpsWarranty } from './warrantyPlans';
 import { parseConditionDoc, type ConditionDoc } from './condition';
+import { DIMENSION_FIELDS, parseDimensions } from './productModel';
 import { isOwnedMediaUrl } from './mediaStorage';
 
 export interface CatalogRef {
@@ -904,6 +905,28 @@ export function resolveProduct(
      * otherwise make a listing impossible to un-grade from a sheet.
      */
     condition,
+    /**
+     * «الأبعاد والوزن», MERGED PER KEY rather than replaced wholesale.
+     *
+     * A sheet written before these columns existed carries eight nulls, and
+     * overwriting a measured product with them would quietly wipe every
+     * dimension on the shop's catalogue the first time the owner re-imported
+     * an old file. So a null keeps what is stored and only a stated number
+     * changes anything — the same rule `delivery_options` below follows, and
+     * for the same reason.
+     *
+     * Clearing a measurement is therefore not expressible in a sheet, which is
+     * the right trade: a mis-measured box is corrected by measuring it again,
+     * and there is no reason to un-know a weight.
+     */
+    dimensions: (() => {
+      const stored = parseDimensions(
+        (existing?.doc.dimensions as Record<string, unknown> | undefined) ?? undefined
+      );
+      const out = { ...stored };
+      for (const k of DIMENSION_FIELDS) if (p.dimensions[k] !== null) out[k] = p.dimensions[k];
+      return out;
+    })(),
     delivery_options:
       p.delivery_options === null
         ? (existing?.doc.delivery_options ?? undefined)

@@ -200,6 +200,28 @@ export interface TranslationMetaV2 {
   };
 }
 
+/** The eight measurements, mirroring `ProductDimensions` on the server. */
+export interface ProductDimensionsV2 {
+  net_weight_g: number | null;
+  width_mm: number | null;
+  depth_mm: number | null;
+  height_mm: number | null;
+  package_weight_g: number | null;
+  package_width_mm: number | null;
+  package_depth_mm: number | null;
+  package_height_mm: number | null;
+}
+
+export const DIMENSION_KEYS = [
+  'net_weight_g', 'width_mm', 'depth_mm', 'height_mm',
+  'package_weight_g', 'package_width_mm', 'package_depth_mm', 'package_height_mm',
+] as const;
+
+export const emptyDimensions = (): ProductDimensionsV2 => ({
+  net_weight_g: null, width_mm: null, depth_mm: null, height_mm: null,
+  package_weight_g: null, package_width_mm: null, package_depth_mm: null, package_height_mm: null,
+});
+
 export interface ProductDocV2 {
   /**
    * Open box / used / refurbished; null for a NEW product, which is the
@@ -208,6 +230,14 @@ export interface ProductDocV2 {
    * only the shape the editor carries.
    */
   condition?: import('./condition').ConditionEntry | null;
+
+  /**
+   * «الأبعاد والوزن» (migration 0098). Two SEPARATE sets, and confusing them
+   * produces a freight quote wrong by half: the product itself, and the box it
+   * ships in. Grams and millimetres, whole numbers, `null` until measured —
+   * never 0, because zero is not a weight.
+   */
+  dimensions?: ProductDimensionsV2;
 
   id: string;
   slug: string;

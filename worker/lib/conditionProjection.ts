@@ -101,15 +101,28 @@ export async function isConditionColumnMissing(db: D1Database, e: unknown): Prom
  * what a product on a pre-0085 database can only be.
  */
 export async function productsHaveConditionDoc(db: D1Database): Promise<boolean> {
+  return productsHaveColumn(db, CONDITION_DOC_COLUMN);
+}
+
+/**
+ * Does `products` carry this column yet?
+ *
+ * The same question `productsHaveConditionDoc` has always asked, generalised
+ * once rather than copied — migration 0098 added eight more columns that a
+ * deployment can arrive ahead of, and a second PRAGMA walk beside this one
+ * would be a second place for the two failure answers below to drift.
+ *
+ * BOTH FAILURE ANSWERS ARE "YES", and deliberately. No rows at all means the
+ * table is absent; an exception means we could not ask. In either case letting
+ * the save NAME the column makes it fail loudly on the real problem, which
+ * beats silently dropping a value the owner just typed.
+ */
+export async function productsHaveColumn(db: D1Database, column: string): Promise<boolean> {
   try {
     const { results } = await db.prepare('PRAGMA table_info(products)').all<{ name: string }>();
-    // No rows at all means the table is absent. Answering "yes" lets the save
-    // name the column and fail loudly on the real problem, which is right.
     if (!results || results.length === 0) return true;
-    return results.some((c) => String(c.name) === CONDITION_DOC_COLUMN);
+    return results.some((c) => String(c.name) === column);
   } catch {
-    // Cannot ask — assume the column is there and let the save report the
-    // truth rather than silently dropping a grade the owner just chose.
     return true;
   }
 }

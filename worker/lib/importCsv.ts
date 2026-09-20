@@ -71,6 +71,7 @@ import { AVAILABILITY_TYPES, normalizeAvailability, variantKeyFrom, variantLabel
 import type { Lookups } from './lookups';
 import { parseFeePercent } from './warrantyPlans';
 import type { ProductDeliveryOptions } from './shipping';
+import { DIMENSION_FIELDS, EMPTY_DIMENSIONS, type ProductDimensions } from './productModel';
 
 export type RowType =
   | 'product'
@@ -268,6 +269,18 @@ export const BASE_COLUMNS = [
   'condition_notes_ar',
   'condition_notes_en',
   'condition_notes_ckb',
+  // ---- «الأبعاد والوزن» (migration 0098). Grams and millimetres, said in the
+  // column names, because a sheet is read by whoever is handed it and a unit
+  // inferred from context is a volume wrong by a thousand. Two SETS: the
+  // product, and the box a courier charges for.
+  'net_weight_g',
+  'width_mm',
+  'depth_mm',
+  'height_mm',
+  'package_weight_g',
+  'package_width_mm',
+  'package_depth_mm',
+  'package_height_mm',
   // ---- 0044: an ADJUSTMENT instead of a pin — "+60,000 above the base",
   // which keeps following the base instead of freezing away from it.
   'regular_adjust_iqd',
@@ -546,6 +559,14 @@ export function labelRow(shape: TemplateShape): string[] {
     condition_notes_ar: 'ملاحظات أخرى للمشتري (عربي)',
     condition_notes_en: 'Other notes for the buyer (English)',
     condition_notes_ckb: 'تێبینی تر بۆ کڕیار (کوردی)',
+    net_weight_g: 'وزن المنتج نفسه بالغرام (رقم صحيح؛ فارغ = غير مقاس)',
+    width_mm: 'عرض المنتج بالمليمتر',
+    depth_mm: 'عمق المنتج بالمليمتر',
+    height_mm: 'ارتفاع المنتج بالمليمتر',
+    package_weight_g: 'وزن الصندوق مع المنتج بالغرام — ما يحسب عليه الناقل',
+    package_width_mm: 'عرض صندوق الشحن بالمليمتر',
+    package_depth_mm: 'عمق صندوق الشحن بالمليمتر',
+    package_height_mm: 'ارتفاع صندوق الشحن بالمليمتر',
     serialized: 'جهاز مُرقَّم — وحدة لكل جهاز عند التسليم (yes/no؛ فارغ = كما هو محفوظ)',
     payment_options: 'طرق الدفع المسموحة (id|id)',
     how_to_use: 'طريقة الاستخدام (نص)',
@@ -638,6 +659,12 @@ export interface ParsedProduct {
    */
   warranty_base_months: number | null;
   serialized: boolean | null;
+  /**
+   * «الأبعاد والوزن». A per-key null means the column was absent or the cell
+   * empty — "nobody has measured this". Never a zero, and never a reason to
+   * blank a measurement an older sheet simply does not carry.
+   */
+  dimensions: ProductDimensions;
   /**
    * Open box / used / refurbished, as this SHEET states it.
    *
@@ -1390,6 +1417,11 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         ),
         stock: intCell(cell(r, 'stock'), line, 'stock', issues),
         low_stock_threshold: intCell(cell(r, 'low_stock_threshold'), line, 'low_stock_threshold', issues),
+        dimensions: (() => {
+          const d = EMPTY_DIMENSIONS();
+          for (const k of DIMENSION_FIELDS) d[k] = intCell(cell(r, k), line, k, issues);
+          return d;
+        })(),
         delivery_options: (() => {
           const names = [
             'standard_delivery_enabled',
@@ -2092,6 +2124,8 @@ export interface ExportProduct {
   /** Device coverage; null exports an empty cell ("keep what is stored"). */
   warranty_base_months: number | null;
   serialized: boolean | null;
+  /** «الأبعاد والوزن», so an export round-trips every measurement. */
+  dimensions: ProductDimensions;
   /** Open box / used / refurbished; null for a new product. */
   condition?: {
     kind: string; grade: string; usage_hours: number | null; warranty_months: number;
@@ -2169,6 +2203,13 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
       direct_surcharge_iqd: num(p.direct_surcharge_iqd),
       stock: num(p.stock),
       low_stock_threshold: num(p.low_stock_threshold),
+      // `?? EMPTY_DIMENSIONS()` and not `p.dimensions.x`: an export must not
+      // THROW on a record assembled before this field existed. A missing block
+      // is eight empty cells, which is the truth about an unmeasured product;
+      // a TypeError here would take the whole catalogue export down.
+      ...Object.fromEntries(
+        DIMENSION_FIELDS.map((k) => [k, num((p.dimensions ?? EMPTY_DIMENSIONS())[k])])
+      ),
       standard_delivery_enabled: p.delivery_options ? bool(p.delivery_options.standard.enabled) : '',
       standard_delivery_quantity_step: p.delivery_options ? num(p.delivery_options.standard.quantity_step) : '',
       standard_delivery_fee_iqd: p.delivery_options ? num(p.delivery_options.standard.fee_iqd) : '',

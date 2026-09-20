@@ -235,6 +235,8 @@ export default function AdminFinance() {
     switch (n.id) {
       case 'no_cost_snapshot':
         return s.noSnapshotColumn;
+      case 'fifo_measured':
+        return s.fifoMeasured(countText(n.values.lines, latin), money(n.values.cost), money(n.values.total));
       case 'estimated':
         return s.estimatedLines(countText(n.values.lines, latin), money(n.values.cost));
       case 'uncosted':

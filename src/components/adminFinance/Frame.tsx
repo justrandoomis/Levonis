@@ -236,17 +236,21 @@ export function EstimateBadge({ label, detail }: { label: string; detail: string
   );
 }
 
-/** One line of disclosure inside the honesty panel. */
-export function HonestyLine({ text, tone = 'warning' }: { text: string; tone?: 'warning' | 'info' }) {
+/** One line of disclosure inside the honesty panel. `good` is a disclosure too
+ *  — see the `fifo_measured` notice in honesty.ts. */
+const HONESTY_DOT: Record<'warning' | 'info' | 'good', string> = {
+  warning: 'bg-warning',
+  info: 'bg-info',
+  good: 'bg-emerald-400',
+};
+
+export function HonestyLine({ text, tone = 'warning' }: { text: string; tone?: 'warning' | 'info' | 'good' }) {
   return (
     <li
       data-finance-honesty={tone}
       className="flex items-start gap-2 text-[12px] leading-[1.7] text-text-secondary"
     >
-      <span
-        aria-hidden
-        className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${tone === 'warning' ? 'bg-warning' : 'bg-info'}`}
-      />
+      <span aria-hidden className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${HONESTY_DOT[tone]}`} />
       <span>{text}</span>
     </li>
   );

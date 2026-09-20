@@ -25,6 +25,7 @@ import {
   type ExportProduct,
 } from '../worker/lib/importCsv';
 import { blankDoc } from '../src/components/adminProducts/types';
+import { EMPTY_DIMENSIONS } from '../worker/lib/productModel';
 import { PRODUCT_TYPES, groupsForType, productTypeForSection } from '../worker/lib/templateFamilies';
 import { normKey, resolveProduct, splitComboKey } from '../worker/lib/importApply';
 import type { CatalogRef, ExistingShape, ImportMaps } from '../worker/lib/importApply';
@@ -200,6 +201,7 @@ test('an empty vocabulary still produces a valid template and an honest README',
 
 const sample: ExportProduct = {
   key: 'LEVO-A1-01',
+  dimensions: EMPTY_DIMENSIONS(),
   name: 'Bambu Lab A1 Combo',
   description: 'Nozzle diameter: 0.4 mm. Build volume: 256 mm.',
   status: 'active',
@@ -1141,6 +1143,9 @@ test('every field of the product form is expressible in the sheet', () => {
     // kind is the switch and the rest describe the unit; `condition_kind` is
     // the one the sheet is keyed on.
     condition: 'condition_kind',
+    // «الأبعاد والوزن». One doc field, a BLOCK of eight columns — the same
+    // shape as `condition` above; `net_weight_g` is the one it is keyed on.
+    dimensions: 'net_weight_g',
     // child row types
     options: 'row:option', colors: 'row:color', media: 'row:image',
     preorder_transports: 'row:transport', spec_groups: 'row:spec', labels: 'row:label',

@@ -479,6 +479,9 @@ async function exportProducts(
       delivery_options: doc.delivery_options,
       warranty_base_months: doc.warranty_base_months,
       serialized: doc.serialized,
+      // «الأبعاد والوزن» — carried so an export/edit/re-import round trip
+      // returns every measurement rather than silently blanking eight columns.
+      dimensions: doc.dimensions,
       payment_options: doc.payment_options,
       how_to_use: doc.how_to_use,
       usage_url: doc.usage_guide?.official_url ?? '',

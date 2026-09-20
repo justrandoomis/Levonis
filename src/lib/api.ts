@@ -1831,6 +1831,18 @@ export interface FinanceTotals {
   estimated_cogs_iqd: number;
   uncosted_lines: number;
   uncosted_units: number;
+  /**
+   * THE OTHER END OF THE CONFIDENCE SCALE FROM `estimated_*`.
+   *
+   * Lines whose COGS was measured against the cost LAYERS the sale actually
+   * consumed — «محسوبة حسب دفعات الشراء» — rather than against the unit cost
+   * the resolver believed at the till. `fifo_cogs_iqd` is a SUBSET of
+   * `cogs_iqd`, never something to add to it, so the screen can report what
+   * share of the cost basis is measured this way and leave the rest labelled
+   * as what it is.
+   */
+  fifo_lines: number;
+  fifo_cogs_iqd: number;
 }
 
 /**
@@ -1903,6 +1915,14 @@ export interface FinanceReportMeta {
   cost_snapshot_available: boolean;
   /** FALSE = there is no expense ledger, so net profit equals gross profit. */
   operating_expenses_available: boolean;
+  /**
+   * FALSE = migration 0098 has not landed, so no sale can be costed from the
+   * lots it ate. A statement about the MECHANISM: the screen may only claim a
+   * FIFO basis when this is true AND `totals.fifo_lines` is non-zero, because
+   * a shop whose stock all predates 0098 has the machinery and nothing for it
+   * to read.
+   */
+  fifo_available: boolean;
   /** Delivered orders carrying no delivery date — in NO period, at any range. */
   unrecognized_orders: number;
   unbucketed: FinanceUnbucketed;
@@ -2025,6 +2045,240 @@ export function fetchFinanceCategories(
     opts
   );
 }
+
+// ===========================================================================
+//  «إدارة المخزون» — INVENTORY
+// ===========================================================================
+
+/**
+ * THESE TYPES MIRROR THE ADMIN INVENTORY ROUTES, and they are OPTIONAL WHERE
+ * THE SERVER MAY REMOVE THEM.
+ *
+ * ###########################################################################
+ * #  EVERY `?`-MARKED FIELD BELOW IS A FIELD AN ASSISTANT ADMIN NEVER SEES. #
+ * ###########################################################################
+ *
+ * Unlike the finance endpoints — which refuse an assistant at the door,
+ * because there is no useful non-financial part of a profit report — the
+ * inventory endpoints are OPEN to an assistant and strip the money from the
+ * payload instead (mandate §52: they run the warehouse, they do not see what
+ * it cost). `projectForAdmin` deletes the cost keys server-side.
+ *
+ * So the honest TypeScript for a cost field here is `number | null |
+ * undefined`, and that is why they are marked optional: a component that
+ * renders `line.inventory_value_iqd` unconditionally will not compile, which
+ * is the point. `undefined` means "you are not allowed to know", `null` means
+ * "nobody knows" — the screen must not render them the same way.
+ */
+
+export type InventoryScope = 'base' | 'option' | 'color' | 'variant';
+export type IncomingStatus = 'draft' | 'incoming' | 'partial' | 'received' | 'cancelled';
+export type AdjustReason = 'count' | 'damaged' | 'lost' | 'supplier_shortage' | 'other';
+
+export const ADJUST_REASONS: readonly AdjustReason[] = ['count', 'damaged', 'lost', 'supplier_shortage', 'other'];
+
+export interface InventoryOverview {
+  on_hand_units: number;
+  active_lots: number;
+  /** Units on the shelf whose cost nobody knows. Reported so the value figure
+   *  below cannot be read as covering them. */
+  unpriced_units: number;
+  inventory_value_iqd?: number;
+  incoming_purchases: number;
+  incoming_units: number;
+  incoming_purchase_total_iqd?: number;
+  aging_units: { d0_30: number; d31_90: number; d91_180: number; d180_plus: number };
+}
+
+export interface InventoryLine {
+  product_id: string | null;
+  product_name: string | null;
+  product_sku: string | null;
+  product_image: string | null;
+  inventory_mode: string | null;
+  scope: InventoryScope;
+  scope_id: string;
+  on_hand: number;
+  lot_count: number;
+  oldest_received_at: string | null;
+  unpriced_units: number;
+  inventory_value_iqd?: number | null;
+  /** «التكلفة التالية» — what the NEXT unit sold will cost. */
+  oldest_unit_cost_iqd?: number | null;
+  newest_unit_cost_iqd?: number | null;
+}
+
+export interface InventoryLot {
+  id: string;
+  product_id: string | null;
+  scope: InventoryScope;
+  scope_id: string;
+  qty_received: number;
+  qty_remaining: number;
+  cost_basis: 'received' | 'opening' | 'opening_unpriced';
+  received_at: string;
+  purchase_date: string | null;
+  supplier_name: string | null;
+  consumed: number;
+  unit_cost_iqd?: number | null;
+  purchase_unit_iqd?: number | null;
+  shipping_share_iqd?: number | null;
+  internal_share_iqd?: number | null;
+  total_cost_iqd?: number | null;
+}
+
+export interface IncomingPurchase {
+  id: string;
+  product_id: string | null;
+  product_name: string | null;
+  product_image: string | null;
+  scope: InventoryScope;
+  scope_id: string;
+  qty_ordered: number;
+  qty_received: number;
+  qty_outstanding: number;
+  status: IncomingStatus;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  supplier_ref: string;
+  purchase_date: string | null;
+  expected_at: string | null;
+  tracking: string;
+  notes: string;
+  source_currency: string;
+  source_unit_amount: number | null;
+  exchange_rate_used: number | null;
+  created_at: string;
+  purchase_unit_iqd?: number;
+  shipping_total_iqd?: number | null;
+  internal_delivery_total_iqd?: number | null;
+  purchase_total_iqd?: number;
+}
+
+/** The server's own arithmetic for one receipt. The dialog NEVER recomputes
+ *  it — a preview that does its own sums is a preview that can disagree with
+ *  the thing it is confirming. */
+export interface LotCostBreakdown {
+  purchaseUnitIqd: number;
+  shippingShareIqd: number | null;
+  internalShareIqd: number | null;
+  unitCostIqd: number | null;
+  totalCostIqd: number | null;
+  /** False when a component was left blank. The receipt is refused. */
+  complete: boolean;
+}
+
+export type ReceiveRefusalCode =
+  | 'ALREADY_RECEIVED'
+  | 'CANCELLED'
+  | 'QTY_EXCEEDS_ORDER'
+  | 'QTY_INVALID'
+  | 'COST_NOT_STATED';
+
+export interface ReceivePreview {
+  ok: boolean;
+  qty?: number;
+  remaining?: number;
+  cost?: LotCostBreakdown;
+  code?: ReceiveRefusalCode;
+  message?: string;
+}
+
+export interface InventoryMovement {
+  id: string;
+  product_id: string | null;
+  product_name: string | null;
+  scope: InventoryScope | 'preorder' | 'preorder_transport';
+  scope_id: string;
+  kind: string;
+  qty: number;
+  order_id: string | null;
+  reason: string;
+  created_at: string;
+  actor_name: string | null;
+}
+
+export interface InventorySupplier {
+  id: string;
+  name: string;
+  contact: string;
+  notes: string;
+  active: number;
+}
+
+export interface ProfitPreview {
+  ready: boolean;
+  cost: LotCostBreakdown;
+  selling_price_iqd?: number;
+  gross_profit_iqd?: number;
+  margin_percent?: number;
+  total_gross_profit_iqd?: number;
+}
+
+const INV = '/api/admin/inventory';
+
+export const fetchInventoryOverview = (opts?: RequestOptions) =>
+  api.get<InventoryOverview & { success: boolean }>(`${INV}/overview`, opts);
+
+export const fetchInventoryLines = (
+  query: { q?: string; product_id?: string; limit?: number; offset?: number } = {},
+  opts?: RequestOptions
+) =>
+  api.get<{ success: boolean; lines: InventoryLine[]; limit: number; offset: number }>(
+    financePath(`${INV}/lines`, query),
+    opts
+  );
+
+export const fetchInventoryLots = (
+  query: { product_id?: string; scope?: InventoryScope; scope_id?: string },
+  opts?: RequestOptions
+) => api.get<{ success: boolean; lots: InventoryLot[] }>(financePath(`${INV}/lots`, query), opts);
+
+export const fetchIncoming = (query: { status?: IncomingStatus } = {}, opts?: RequestOptions) =>
+  api.get<{ success: boolean; incoming: IncomingPurchase[] }>(financePath(`${INV}/incoming`, query), opts);
+
+export const createIncoming = (body: Record<string, unknown>) =>
+  api.post<{ success: boolean; id: string }>(`${INV}/incoming`, body);
+
+export const updateIncoming = (id: string, body: Record<string, unknown>) =>
+  api.patch<{ success: boolean; changed: number }>(`${INV}/incoming/${id}`, body);
+
+export const fetchReceivePreview = (id: string, qty: number, opts?: RequestOptions) =>
+  api.get<ReceivePreview & { success: boolean }>(financePath(`${INV}/incoming/${id}/receive-preview`, { qty }), opts);
+
+/**
+ * `receiptId` IS THE CLIENT'S, ONE PER PRESS OF THE BUTTON, and that is the
+ * whole double-tap defence. A server-minted id would differ on every retry,
+ * which is exactly how one press becomes two receipts and ten units become
+ * twenty. The caller mints it BEFORE the first attempt and reuses it for
+ * every retry of that same press.
+ */
+export const receiveIncoming = (id: string, receiptId: string, qty: number) =>
+  api.post<{ success: boolean; already?: boolean; lot_id?: string; qty?: number; status?: IncomingStatus; cost?: LotCostBreakdown; message?: string }>(
+    `${INV}/incoming/${id}/receive`,
+    { receipt_id: receiptId, qty }
+  );
+
+export const fetchProfitPreview = (id: string, opts?: RequestOptions) =>
+  api.get<ProfitPreview & { success: boolean }>(`${INV}/incoming/${id}/profit-preview`, opts);
+
+export const fetchMovements = (query: { product_id?: string; limit?: number } = {}, opts?: RequestOptions) =>
+  api.get<{ success: boolean; movements: InventoryMovement[] }>(financePath(`${INV}/movements`, query), opts);
+
+export const createAdjustment = (body: {
+  product_id: string;
+  scope: InventoryScope;
+  scope_id?: string;
+  delta: number;
+  reason: AdjustReason;
+  note?: string;
+}) => api.post<{ success: boolean }>(`${INV}/adjustments`, body);
+
+export const fetchSuppliers = (opts?: RequestOptions) =>
+  api.get<{ success: boolean; suppliers: InventorySupplier[] }>(`${INV}/suppliers`, opts);
+
+export const createSupplier = (body: { name: string; contact?: string; notes?: string }) =>
+  api.post<{ success: boolean; id: string }>(`${INV}/suppliers`, body);
 
 // ------------------------------------------- the operating-expense ledger
 

@@ -23,6 +23,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
+import { EMPTY_DIMENSIONS } from '../worker/lib/productModel';
 import { freshDb, asD1, stubApp, ctx, all, count, type App } from './fixtures/app';
 import { adminImportRoutes } from '../worker/routes/adminImport';
 import {
@@ -386,6 +387,7 @@ const shape = templateShape('printer', ['tpl-printers'], { includeCost: true });
 test('serializeProducts and parseImport are inverses for the membership block', () => {
   const base: ExportProduct = {
     key: 'SER-1',
+    dimensions: EMPTY_DIMENSIONS(),
     name: 'Serializer',
     description: '',
     status: 'active',

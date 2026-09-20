@@ -43,6 +43,7 @@ import { api, ApiError, failureText, formatIqd } from '../../lib/api';
 import { refusalIssues } from './applyResult';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
+import { emptyDimensions } from '../../lib/productTypes';
 import type { BrandV2, CatalogV2 } from '../../lib/productTypes';
 import {
   blankDoc,
@@ -93,6 +94,8 @@ import { OptionsSection } from './form/OptionsSection';
 import { UsageGuideSection } from './form/UsageGuideSection';
 import { WarrantySection } from './form/WarrantySection';
 import { ConditionSection } from './form/ConditionSection';
+import { DimensionsSection } from './form/DimensionsSection';
+import { InventorySummary } from './form/InventorySummary';
 import PricePreview from './PricePreview';
 import MembershipDiscountSection from './form/MembershipDiscountSection';
 import { ImagesSection } from './form/ImagesSection';
@@ -1211,11 +1214,17 @@ export default function ProductForm({
             </Grid>
           </TierPriceDisclosure>
           {canSeeCost && (
-            <Field ar="التكلفة" en="Cost" tip="إداري فقط — لا تظهر للعميل ولا لمساعد الأدمن، ولا في أي تصدير.">
+            <Field ar="التكلفة" en="Cost" tip="إداري فقط — لا تظهر للعميل ولا لمساعد الأدمن، ولا في أي تصدير. تُستخدم للمنتجات التي لا دفعات شراء لها؛ ما على الرف قد يحمل تكاليف أخرى.">
               <Money value={doc.product_cost_iqd} onChange={(v) => setDoc((d) => ({ ...d, product_cost_iqd: v }))} />
             </Field>
           )}
         </Grid>
+
+        {/* The real cost layers behind the stock, directly under the one field
+            that invites the reader to believe there is only one of them.
+            Renders nothing for a product with no batches, or for an assistant
+            admin whose payload carries no costs. */}
+        {canSeeCost && doc.id && <InventorySummary productId={doc.id} />}
 
         {/* Stored by the template as `original_price_iqd` (the struck-through
             "was" price). No input here by design — but it is stored, it is
@@ -1416,6 +1425,20 @@ export default function ProductForm({
           <ConditionSection
             condition={doc.condition ?? null}
             onChange={(next) => setDoc((d) => ({ ...d, condition: next }))}
+          />
+        </div>
+
+        {/* «الأبعاد والوزن». Beside the warranty and the grade because all
+            three are facts about the physical thing rather than about its
+            price — and because a courier quote and a «هل يدخل على الطاولة؟»
+            are the two questions this block answers. */}
+        <div className="mt-5 pt-5 border-t border-zinc-800">
+          <h3 className="mb-3 text-sm font-bold text-white">
+            الأبعاد والوزن <span className="text-zinc-500 font-medium">/ Dimensions & weight</span>
+          </h3>
+          <DimensionsSection
+            dimensions={doc.dimensions ?? emptyDimensions()}
+            onChange={(next) => setDoc((d) => ({ ...d, dimensions: next }))}
           />
         </div>
 

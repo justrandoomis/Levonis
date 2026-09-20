@@ -4,6 +4,7 @@
  * All money is IQD integers; null = inherit, 0 = explicit (never truthiness).
  */
 
+import { emptyDimensions } from '../../lib/productTypes';
 import type {
   ProductDocV2,
   ResolvedPriceV2,
@@ -64,6 +65,7 @@ export function blankDoc(): EditorDoc {
     // null = NEW. Sent explicitly so the admin route can tell "this form
     // un-graded the listing" from "this client never had the field".
     condition: null,
+    dimensions: emptyDimensions(),
     delivery_options: defaultProductDeliveryOptions(),
     content_blocks: [],
     translation_meta: {},
@@ -126,6 +128,7 @@ export function toEditorDoc(p: Partial<ProductDocV2> & { catalog_ids?: string[] 
     warranty_base_months: p.warranty_base_months ?? null,
     serialized: p.serialized ?? null,
     condition: p.condition ?? null,
+    dimensions: { ...emptyDimensions(), ...(p.dimensions ?? {}) },
     delivery_options: p.delivery_options ?? null,
     content_blocks: list(p.content_blocks),
     translation_meta: p.translation_meta ?? {},

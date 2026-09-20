@@ -33,6 +33,7 @@ import type { FinancePeriodReport, FinanceTotals, FinanceReportMeta } from '../.
 
 export type NoticeId =
   | 'no_cost_snapshot'
+  | 'fifo_measured'
   | 'estimated'
   | 'uncosted'
   | 'no_expense_ledger'
@@ -42,8 +43,11 @@ export type NoticeId =
 
 export interface Notice {
   id: NoticeId;
-  /** `warning` = this number is less certain than it looks. `info` = context. */
-  tone: 'warning' | 'info';
+  /** `warning` = this number is less certain than it looks. `info` = context.
+   *  `good` = this number is MORE certain than the reader might assume, which
+   *  is a disclosure too: a panel that only ever admits doubt teaches the
+   *  reader to discount everything on the screen equally. */
+  tone: 'warning' | 'info' | 'good';
   /** The counts the sentence needs. Never pre-formatted — the UI owns digits. */
   values: Record<string, number>;
 }
@@ -69,6 +73,29 @@ export function honestyNotices(
 
   if (!meta.cost_snapshot_available) {
     out.push({ id: 'no_cost_snapshot', tone: 'warning', values: {} });
+  }
+  /**
+   * THE ONE NOTICE ON THIS PANEL THAT IS GOOD NEWS, and it earns its place for
+   * the same reason the warnings do: the reader is owed the BASIS, not just
+   * the number.
+   *
+   * «محسوبة حسب دفعات الشراء» means those lines were costed against the layers
+   * the sale actually consumed — the strongest cost basis this system has. An
+   * owner who cannot tell that from a snapshot estimate discounts both equally,
+   * which is exactly the reasoning the estimate warning exists to prevent, run
+   * backwards.
+   *
+   * BOTH CONDITIONS, and the second is the substantive one: `fifo_available`
+   * says the machinery exists, `fifo_lines` says it had something to read. A
+   * shop whose stock all predates migration 0098 has the first and not the
+   * second, and announcing a FIFO basis there would be a claim about nothing.
+   */
+  if (meta.fifo_available && t.fifo_lines > 0) {
+    out.push({
+      id: 'fifo_measured',
+      tone: 'good',
+      values: { lines: t.fifo_lines, cost: t.fifo_cogs_iqd, total: t.cogs_iqd },
+    });
   }
   if (t.estimated_lines > 0) {
     out.push({

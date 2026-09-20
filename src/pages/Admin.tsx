@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp } from 'lucide-react';
+import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { useAuth } from '../AuthContext';
 
@@ -63,6 +63,7 @@ const AdminOverview = React.lazy(() => import('../components/AdminOverview'));
  * screen only the owner can open.
  */
 const AdminFinance = React.lazy(() => import('../components/adminFinance/AdminFinance'));
+const AdminInventory = React.lazy(() => import('../components/adminInventory/AdminInventory'));
 const AdminUsers = React.lazy(() => import('../components/AdminUsers'));
 const AdminWalletRequests = React.lazy(() => import('../components/AdminWalletRequests'));
 const AdminWalletSettings = React.lazy(() => import('../components/AdminWalletSettings'));
@@ -97,6 +98,7 @@ function PanelFallback({ dir }: { dir: 'rtl' | 'ltr' }) {
 type AdminTab =
   | 'overview'
   | 'finance'
+  | 'inventory'
   | 'orders'
   | 'products'
   | 'bundles'
@@ -145,6 +147,12 @@ export default function Admin() {
     ...(canSeeFinance
       ? [{ id: 'finance', icon: TrendingUp, label: loc('الأرباح والتكاليف', 'Profit & costs', 'قازانج و تێچوون'), ...section('operations', 'التشغيل', 'Operations') }]
       : []),
+    // «إدارة المخزون». Under Operations rather than Catalog on purpose: the
+    // catalogue is what the shop SELLS, this is what it HOLDS, and the person
+    // receiving a shipment is doing operations work. Deliberately NOT gated on
+    // `canSeeFinance` — §52 has the assistant admin counting units all day and
+    // the server strips the costs out of what they are sent.
+    { id: 'inventory', icon: Warehouse, label: loc('إدارة المخزون', 'Inventory', 'بەڕێوەبردنی کۆگا'), ...section('operations', 'التشغيل', 'Operations') },
     { id: 'wallet_requests', icon: Bell, label: loc('طلبات المحفظة', 'Wallet requests'), ...section('operations', 'التشغيل', 'Operations') },
     { id: 'products', icon: Package, label: t('adminProducts'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') },
     { id: 'bundles', icon: Boxes, label: loc('الباقات', 'Bundles'), ...section('catalog', 'الكتالوج', 'Catalog') },
@@ -181,7 +189,7 @@ export default function Admin() {
       activeTab={activeTab}
       onTabChange={(id) => setActiveTab(id as AdminTab)}
     >
-      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'membership_benefits' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
+      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'inventory' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'membership_benefits' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
         <React.Suspense fallback={<PanelFallback dir={dir} />}>
 
         {activeTab === 'overview' && (
@@ -194,6 +202,10 @@ export default function Admin() {
 
         {activeTab === 'finance' && canSeeFinance && (
           <AdminFinance />
+        )}
+
+        {activeTab === 'inventory' && (
+          <AdminInventory />
         )}
 
         {activeTab === 'products' && (

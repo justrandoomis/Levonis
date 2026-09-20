@@ -69,10 +69,11 @@ import {
   serializeDoc,
   projectAdmin,
   PRODUCT_COLUMNS,
+  DIMENSION_FIELDS,
   type ProductDoc,
   type TranslationMeta,
 } from './productModel';
-import { productsHaveConditionDoc } from './conditionProjection';
+import { productsHaveColumn, productsHaveConditionDoc } from './conditionProjection';
 import { withClassificationPlacements } from './catalogMembership';
 import { planSearchIndex, searchIndexInstalled } from './search/store';
 import { toSearchDoc } from './search/document';
@@ -2310,9 +2311,21 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
      * See worker/lib/conditionProjection.ts for why this one asks first rather
      * than repairing on failure like the reads do.
      */
-    const writable = (await productsHaveConditionDoc(db))
-      ? PRODUCT_COLUMNS
-      : PRODUCT_COLUMNS.filter((k) => k !== 'condition_doc');
+    const [hasCondition, hasDimensions] = await Promise.all([
+      productsHaveConditionDoc(db),
+      productsHaveColumn(db, 'net_weight_g'),
+    ]);
+    /**
+     * The same deploy-ahead rule as `condition_doc`, for migration 0098's
+     * eight dimension columns: a database one migration behind the deployment
+     * can still have its prices and stock corrected, and the measurements are
+     * simply not stored until the migration lands. `net_weight_g` is the one
+     * witness because all eight arrive in one file.
+     */
+    const dropped = new Set<string>();
+    if (!hasCondition) dropped.add('condition_doc');
+    if (!hasDimensions) for (const k of DIMENSION_FIELDS) dropped.add(k);
+    const writable = dropped.size === 0 ? PRODUCT_COLUMNS : PRODUCT_COLUMNS.filter((k) => !dropped.has(k));
     if (intent.mode === 'create') {
       statements.push(
         db

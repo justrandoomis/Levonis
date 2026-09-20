@@ -202,6 +202,7 @@ export const TEMPLATE_GROUPS: Array<{ id: string; titleAr: string; titleEn: stri
   { id: 'labels',          titleAr: 'الشارات',               titleEn: 'Labels' },
   { id: 'warranty',        titleAr: 'خطط الضمان',            titleEn: 'Warranty plans' },
   { id: 'condition',       titleAr: 'الحالة (Open Box/مستعمل)', titleEn: 'Condition (Open Box/Used)' },
+  { id: 'dimensions',      titleAr: 'الأبعاد والوزن',        titleEn: 'Dimensions & weight' },
   { id: 'content',         titleAr: 'كتل المحتوى',           titleEn: 'Content blocks' },
   // The last form section the file could not say: the setup & usage guide
   // (official link + ordered steps with photos, a video and a doc link).
@@ -298,6 +299,23 @@ const SCALAR_FIELDS: FieldSpec[] = [
   f('condition_notes_ar', 'string', 'condition', 'ملاحظات أخرى للمشتري (عربي)'),
   f('condition_notes_en', 'string', 'condition', 'Other notes for the buyer (English)'),
   f('condition_notes_ckb', 'string', 'condition', 'تێبینی تر بۆ کڕیار (کوردی)'),
+  // «الأبعاد والوزن» (migration 0098). GRAMS AND MILLIMETRES, WHOLE NUMBERS,
+  // and the column names say so — the admin form shows kg and cm because that
+  // is how a person measures, but a sheet is read by whoever is handed it and
+  // a unit that has to be inferred is a volume out by a factor of a thousand.
+  //
+  // TWO SETS, and the notes insist on the difference: the product, and the box
+  // it ships in. A courier charges for the second. Every one is nullable and
+  // every one is empty until somebody measures it — a zero would be a claim
+  // that the thing is weightless.
+  f('net_weight_g', 'int', 'dimensions', 'وزن المنتج نفسه بالغرام — grams, integer > 0؛ فارغ = غير مقاس', { nullable: true, min: 1, max: 100_000_000 }),
+  f('width_mm', 'int', 'dimensions', 'عرض المنتج بالمليمتر — millimetres, integer > 0', { nullable: true, min: 1, max: 100_000_000 }),
+  f('depth_mm', 'int', 'dimensions', 'عمق المنتج بالمليمتر — millimetres, integer > 0', { nullable: true, min: 1, max: 100_000_000 }),
+  f('height_mm', 'int', 'dimensions', 'ارتفاع المنتج بالمليمتر — millimetres, integer > 0', { nullable: true, min: 1, max: 100_000_000 }),
+  f('package_weight_g', 'int', 'dimensions', 'وزن الصندوق مع المنتج بالغرام — shipping weight in grams؛ عادةً أكبر من net_weight_g', { nullable: true, min: 1, max: 100_000_000 }),
+  f('package_width_mm', 'int', 'dimensions', 'عرض صندوق الشحن بالمليمتر — millimetres, integer > 0', { nullable: true, min: 1, max: 100_000_000 }),
+  f('package_depth_mm', 'int', 'dimensions', 'عمق صندوق الشحن بالمليمتر — millimetres, integer > 0', { nullable: true, min: 1, max: 100_000_000 }),
+  f('package_height_mm', 'int', 'dimensions', 'ارتفاع صندوق الشحن بالمليمتر — millimetres, integer > 0', { nullable: true, min: 1, max: 100_000_000 }),
   // usage guide — the steps are the `usage_steps` group below
   f('usage_official_url', 'string', 'usage', 'رابط الدليل الرسمي للمنتج (صفحة الشركة المصنّعة) — official documentation URL; فارغ = لا يوجد'),
 ];

@@ -112,6 +112,18 @@ export function financeStrings(loc: Loc) {
         `Sale lines with no cost captured at the moment of sale: ${lines}. Their cost was computed from today's catalogue price (${cost}). Change a supplier price later and this figure moves — it is an estimate, not a measurement.`,
         `ژمارەی هێڵە فرۆشتنەکان بەبێ تێچووی تۆمارکراو لە کاتی فرۆشتن: ${lines}. تێچوویان بە نرخی ئێستای کەتەلۆگ حیسابکراوە (${cost}). ئەگەر دواتر نرخی تێچوو بگۆڕیت ئەم ژمارەیە دەگۆڕێت — خەمڵاندنە، پێوانە نییە.`
       ),
+    /**
+     * THE GOOD-NEWS DISCLOSURE. Written to say what was MEASURED and against
+     * what, because «محسوبة» on its own is a claim the reader cannot check.
+     * Same count-agreement dodge as `estimatedLines` above: «عدد أسطر البيع …»
+     * rather than a plural form that is wrong for two thirds of the counts.
+     */
+    fifoMeasured: (lines: string, cost: string, total: string) =>
+      loc(
+        `عدد أسطر البيع المحسوبة حسب دفعات الشراء الفعلية: ${lines}، بتكلفة ${cost} من أصل ${total}. هذه أدقّ أساس تكلفة في النظام: كل وحدة حُسبت بسعر الدفعة التي خرجت منها فعلًا، لا بمتوسط ولا بسعر اليوم.`,
+        `Sale lines costed against the purchase batches they actually came from: ${lines}, worth ${cost} of ${total}. This is the strongest cost basis in the system — every unit priced at what its own batch cost, not an average and not today's price.`,
+        `هێڵە فرۆشتنەکانی کە بەپێی ئەو کۆگایانەی بەڕاستی لێیان هاتوون حیسابکراون: ${lines}، بە تێچووی ${cost} لە کۆی ${total}. ئەمە بەهێزترین بنەمای تێچوویە لە سیستەمەکەدا — هەر یەکەیەک بە نرخی کۆگای خۆی حیسابکراوە، نە بە مامناوەند و نە بە نرخی ئەمڕۆ.`
+      ),
     noSnapshotColumn: loc(
       'عمود التكلفة لحظة البيع غير موجود في قاعدة البيانات بعد (ترحيل 0095). كل تكلفة على هذه الشاشة مقدَّرة بسعر الكلفة الحالي، وكل ربح هنا تقدير.',
       'The cost-at-sale column is not in the database yet (migration 0095). Every cost on this screen is estimated from today’s catalogue price, and every profit here is an estimate.',

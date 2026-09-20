@@ -172,6 +172,66 @@ export interface TranslationMeta {
   };
 }
 
+/**
+ * WHAT ONE UNIT WEIGHS AND HOW BIG ITS BOX IS.
+ *
+ * TWO SETS, AND CONFUSING THEM PRODUCES A FREIGHT QUOTE WRONG BY HALF. A
+ * printer is 430x400x450 mm and weighs 8 kg; the box it ships in is
+ * 500x550x600 mm and weighs 9.4 kg. The first set is what the customer wants
+ * to know («هل يدخل على الطاولة؟»), the second is what a courier charges for.
+ *
+ * ONE CANONICAL UNIT EACH — grams and millimetres, whole numbers. The form
+ * shows kg and cm where that reads better, but nothing is stored in a unit
+ * that has to be guessed from its context.
+ *
+ * THERE IS NO VOLUME FIELD, deliberately: it is length x width x height, and a
+ * stored copy is a third number that can disagree with the two it came from.
+ */
+export interface ProductDimensions {
+  net_weight_g: number | null;
+  width_mm: number | null;
+  depth_mm: number | null;
+  height_mm: number | null;
+  package_weight_g: number | null;
+  package_width_mm: number | null;
+  package_depth_mm: number | null;
+  package_height_mm: number | null;
+}
+
+/** The eight keys, in one place, so a reader, a writer and a column list
+ *  cannot drift apart. */
+export const DIMENSION_FIELDS = [
+  'net_weight_g', 'width_mm', 'depth_mm', 'height_mm',
+  'package_weight_g', 'package_width_mm', 'package_depth_mm', 'package_height_mm',
+] as const;
+
+export const EMPTY_DIMENSIONS = (): ProductDimensions => ({
+  net_weight_g: null, width_mm: null, depth_mm: null, height_mm: null,
+  package_weight_g: null, package_width_mm: null, package_depth_mm: null, package_height_mm: null,
+});
+
+/**
+ * A measurement, or NULL. Never 0 by coercion.
+ *
+ * Zero is not a weight and not a width, so a `0` arriving from an empty form
+ * field is read as "not measured" rather than stored as a fact that would make
+ * a freight estimate read as free. A negative or fractional value is refused
+ * the same way: the columns are integers and half a millimetre is noise.
+ */
+const dimension = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = typeof v === 'number' ? v : Number(v);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return null;
+  return Math.min(n, 100_000_000);
+};
+
+export function parseDimensions(src: Record<string, unknown> | null | undefined): ProductDimensions {
+  const out = EMPTY_DIMENSIONS();
+  if (!src) return out;
+  for (const k of DIMENSION_FIELDS) out[k] = dimension(src[k]);
+  return out;
+}
+
 export interface ProductDoc {
   id: string;
   slug: string;
@@ -248,6 +308,9 @@ export interface ProductDoc {
    * length, the blocked return reasons and the price comparison.
    */
   condition: ConditionDoc | null;
+  /** «الأبعاد والوزن» (migration 0098). Never `{}` — the eight keys always
+   *  exist and each is `null` until somebody measures it. */
+  dimensions: ProductDimensions;
   media: MediaV2[];
   options: OptionV2[];
   colors: ColorV2[];
@@ -810,6 +873,10 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     sku: typeof row.sku === 'string' && row.sku ? row.sku : null,
     spec_fields: safeParse<Record<string, string>>(String(row.spec_fields ?? '{}'), {}),
     condition: parseConditionDoc(row.condition_doc),
+    // Straight off the row: a database one migration behind simply has no such
+    // columns, `row[k]` is undefined and every field reads null — which is the
+    // truth about a product nobody has measured.
+    dimensions: parseDimensions(row),
     media: upgradeMedia(row.images),
     options: upgradeOptions(row.options),
     colors: upgradeColors(row.colors),
@@ -1263,6 +1330,13 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     // same guard `ops_policy` already has. Sending `condition: null`
     // explicitly is how a listing is deliberately returned to NEW.
     condition: parseConditionDoc(body.condition),
+    // The form sends a nested object; the import sends flat columns. Both are
+    // accepted, so neither needs its own shape of this section.
+    dimensions: parseDimensions(
+      (body.dimensions && typeof body.dimensions === 'object'
+        ? (body.dimensions as Record<string, unknown>)
+        : (body as Record<string, unknown>))
+    ),
     media,
     options,
     colors,
@@ -1344,6 +1418,7 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     sku: doc.sku,
     spec_fields: JSON.stringify(doc.spec_fields),
     condition_doc: serializeConditionDoc(doc.condition),
+    ...doc.dimensions,
     images: JSON.stringify(doc.media),
     options: JSON.stringify(doc.options),
     colors: JSON.stringify(doc.colors),
@@ -1535,4 +1610,9 @@ export const PRODUCT_COLUMNS = [
   // ordinary new product, with no error anywhere. Never NULL: the column is
   // NOT NULL and `serializeConditionDoc(null)` returns `'{}'`.
   'condition_doc',
+  // «الأبعاد والوزن» (migration 0098). Same lesson as `condition_doc` above:
+  // this list IS the write path, so a field `serializeDoc` emits but this line
+  // omits is produced, carried to the statement and silently dropped.
+  'net_weight_g', 'width_mm', 'depth_mm', 'height_mm',
+  'package_weight_g', 'package_width_mm', 'package_depth_mm', 'package_height_mm',
 ] as const;

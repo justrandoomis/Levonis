@@ -79,6 +79,8 @@ const zeroTotals = (): FinanceTotals => ({
   estimated_cogs_iqd: 0,
   uncosted_lines: 0,
   uncosted_units: 0,
+  fifo_lines: 0,
+  fifo_cogs_iqd: 0,
 });
 
 /** A healthy deployment: 0095 applied, a ledger installed, nothing missing. */
@@ -88,6 +90,7 @@ const cleanMeta = (): FinanceReportMeta => ({
   week_starts_on: 'saturday',
   currency: 'IQD',
   cost_snapshot_available: true,
+  fifo_available: true,
   operating_expenses_available: true,
   unrecognized_orders: 0,
   unbucketed: {
