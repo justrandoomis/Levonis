@@ -35,6 +35,13 @@ import { AlertCircle, Loader2, Plus, Scale, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { failureText, formatIqd } from '../../lib/api';
 import { quoteByGrams, type GramsQuoteResponse } from './gramsQuoteApi';
+import AccessoryPicker, {
+  AccessoryBreakdown,
+  accessoryPayload,
+  type AccessoryOption,
+  type AccessoryRow,
+} from './AccessoryPicker';
+import { api } from '../../lib/api';
 
 /** Only what this panel reads. Structural, so the page's richer catalogue
  *  objects pass straight in without this file importing their module. */
@@ -90,6 +97,15 @@ export default function GramsQuotePanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<GramsQuoteResponse | null>(null);
+  /**
+   * The hardware catalogue and the customer's picks. Fetched once, and a
+   * failure is SILENT on purpose: the accessories are an addition to this
+   * screen, not its subject, and a shop whose weight calculator refuses to
+   * open because a settings row would not load has been made worse by a
+   * feature. `AccessoryPicker` renders nothing when the list is empty.
+   */
+  const [accessoryOptions, setAccessoryOptions] = useState<AccessoryOption[]>([]);
+  const [accessoryRows, setAccessoryRows] = useState<AccessoryRow[]>([]);
 
   const printer = printers.find((p) => p.id === printerId) ?? printers[0] ?? null;
 
@@ -166,6 +182,15 @@ export default function GramsQuotePanel({
   const filled = effectiveRows.filter((r) => r.materialId && Number(r.grams) > 0);
   const canSubmit = !!printer && filled.length > 0 && !busy;
 
+  useEffect(() => {
+    const ctl = new AbortController();
+    api
+      .get<{ accessories: AccessoryOption[] }>('/api/print-quote/accessories', { signal: ctl.signal })
+      .then((r) => setAccessoryOptions(Array.isArray(r.accessories) ? r.accessories : []))
+      .catch(() => setAccessoryOptions([]));
+    return () => ctl.abort();
+  }, []);
+
   const submit = useCallback(async () => {
     if (!printer) return;
     const ready = effectiveRows.filter((r) => r.materialId && Number(r.grams) > 0);
@@ -191,6 +216,7 @@ export default function GramsQuotePanel({
         printer_model_id: printer.id,
         rows: ready.map((r) => ({ material_id: r.materialId, grams: Number(r.grams), color_hex: r.colorHex })),
         print_minutes: stated > 0 ? stated : 0,
+        accessories: accessoryPayload(accessoryRows),
       });
       setResult(answer);
     } catch (e) {
@@ -199,7 +225,7 @@ export default function GramsQuotePanel({
     } finally {
       setBusy(false);
     }
-  }, [printer, effectiveRows, knowsTime, hours, minutes, loc]);
+  }, [printer, effectiveRows, knowsTime, hours, minutes, accessoryRows, loc]);
 
   const t = {
     lead: loc(
@@ -453,6 +479,22 @@ export default function GramsQuotePanel({
         <p className="text-zinc-500 text-[11px] leading-relaxed">{t.timeWhy}</p>
       </section>
 
+      {/* AFTER the weight and the time, before the button. The hardware is an
+          addition to a job, not a property of it, so it must not stand between
+          the customer and the two questions this screen is actually about.
+          `invalidate()` on every change for the same reason the grams rows do
+          it: a price on screen that no longer matches the form is worse than
+          no price. */}
+      <AccessoryPicker
+        options={accessoryOptions}
+        rows={accessoryRows}
+        disabled={busy}
+        onChange={(next) => {
+          setAccessoryRows(next);
+          invalidate();
+        }}
+      />
+
       {error && (
         <p role="alert" className="text-[12px] leading-relaxed rounded-2xl p-3.5 border flex items-start gap-2 text-[#e4899a] bg-[#B03142]/10 border-[#B03142]/40">
           <AlertCircle className="w-4 h-4 shrink-0 mt-px" aria-hidden />
@@ -498,6 +540,14 @@ export default function GramsQuotePanel({
               {t.range}: {formatIqd(result.quote.range_iqd.low)} – {formatIqd(result.quote.range_iqd.high)}
             </p>
           )}
+
+          {/* What the hardware came to, itemised — rendered from the RESPONSE
+              and never from the form, because what was charged for is not
+              always what is currently typed. */}
+          <AccessoryBreakdown
+            lines={result.accessories ?? []}
+            unknown={result.accessories_unknown ?? []}
+          />
 
           <p className="inline-flex items-center gap-1.5 mt-3 text-[11px] leading-snug rounded-full px-2.5 py-1 border text-amber-300 border-amber-500/30 bg-amber-500/10">
             <AlertCircle className="w-3 h-3" aria-hidden />

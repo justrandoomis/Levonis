@@ -5,6 +5,11 @@ import { newId, randomToken, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { getSetting } from '../lib/settings';
+import {
+  MAX_ACCESSORY_QTY,
+  type AccessorySelection,
+  type PrintAccessory,
+} from '../lib/printAccessories';
 import { analyseModel, viewerMesh, FORMAT_CAPABILITIES, type ModelAnalysis } from '../lib/modelGeometry';
 import {
   quotePrint,
@@ -73,6 +78,13 @@ async function materials(env: Env): Promise<PrintMaterial[]> {
   const list = await getSetting(env.DB, 'printMaterials');
   return Array.isArray(list) && list.length ? list : [];
 }
+/** The hardware catalogue. Empty rather than seeded if the row is unreadable:
+ *  a quote with no accessories is right, a quote with prices the owner never
+ *  set is not. */
+async function accessories(env: Env): Promise<PrintAccessory[]> {
+  const list = await getSetting(env.DB, 'printAccessories');
+  return Array.isArray(list) ? (list as PrintAccessory[]).filter((a) => a && a.active !== false) : [];
+}
 
 /**
  * What a CUSTOMER may know about a material.
@@ -121,7 +133,7 @@ async function ownedRequest(c: { env: Env }, requestId: string, userId: string) 
  * formats with what each one can actually do for the customer.
  */
 printRequestRoutes.get('/catalog', async (c) => {
-  const [mats, cfg] = await Promise.all([materials(c.env), pricingConfig(c.env)]);
+  const [mats, cfg, accs] = await Promise.all([materials(c.env), pricingConfig(c.env), accessories(c.env)]);
   return c.json({
     success: true,
     materials: mats.filter((m) => m.active !== false).map(publicMaterial),
@@ -133,6 +145,23 @@ printRequestRoutes.get('/catalog', async (c) => {
       .map(([id, cap]) => ({ id, ...cap })),
     // The wizard shows this so a customer knows what "more detail" buys them.
     min_job_iqd: cfg.min_job_iqd,
+    /**
+     * «إكسسوارات ميكر وورد». The buying price IS shown here, unlike
+     * `publicMaterial`'s — and that is deliberate rather than an oversight.
+     * A magnet is a part the customer could buy themselves for the same money;
+     * what the shop sells is fitting it. Hiding the per-piece figure would
+     * make a bill of materials unreadable and invite the question the whole
+     * feature exists to answer.
+     */
+    accessories: accs.map((a) => ({
+      id: a.id,
+      name_ar: a.name_ar,
+      name_en: a.name_en,
+      name_ckb: a.name_ckb,
+      unit: a.unit,
+      category: a.category,
+      cost_iqd: a.cost_iqd,
+    })),
   });
 });
 
@@ -243,6 +272,29 @@ interface SpecBody {
   quantity: number;
   color_hex: string;
   color_name: string;
+  /** «6× مغناطيس، 1× ليد» — the hardware the model calls for, per part. */
+  accessories: AccessorySelection[];
+}
+
+/**
+ * The accessory rows off a request body, sanitised.
+ *
+ * CAPPED AT TWENTY DISTINCT ROWS, not because a model cannot want more but
+ * because a request that does is a client that is looping, and a quote assembled
+ * from a thousand rows is a quote nobody reads. `priceAccessories` caps each
+ * COUNT separately; this caps how many kinds.
+ */
+function readAccessories(raw: unknown): AccessorySelection[] {
+  if (!Array.isArray(raw)) return [];
+  const out: AccessorySelection[] = [];
+  for (const item of raw.slice(0, 20)) {
+    if (!item || typeof item !== 'object') continue;
+    const id = String((item as { id?: unknown }).id ?? '').slice(0, 40);
+    const qty = Math.floor(Number((item as { qty?: unknown }).qty));
+    if (!id || !Number.isFinite(qty) || qty <= 0) continue;
+    out.push({ id, qty: Math.min(MAX_ACCESSORY_QTY, qty) });
+  }
+  return out;
 }
 
 function readSpec(body: Record<string, unknown>): SpecBody {
@@ -260,6 +312,7 @@ function readSpec(body: Record<string, unknown>): SpecBody {
     quantity: int(body.quantity, 'quantity', { min: 1, max: 10000, def: 1 }),
     color_hex: /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toLowerCase() : '',
     color_name: str(body.color_name, 'color_name', { max: 60, required: false }) ?? '',
+    accessories: readAccessories(body.accessories),
   };
 }
 
@@ -272,7 +325,7 @@ function readSpec(body: Record<string, unknown>): SpecBody {
 printRequestRoutes.post('/quote', requireAuth, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const spec = readSpec(body);
-  const [mats, cfg] = await Promise.all([materials(c.env), pricingConfig(c.env)]);
+  const [mats, cfg, accs] = await Promise.all([materials(c.env), pricingConfig(c.env), accessories(c.env)]);
 
   // The geometry may come from an analysed file (the honest path) or from a
   // volume the customer typed because their link could not be measured.
@@ -304,6 +357,8 @@ printRequestRoutes.post('/quote', requireAuth, async (c) => {
     colors: spec.colors_count,
     supports: spec.supports,
     post_processing_minutes: spec.post_processing_minutes,
+    accessories: spec.accessories,
+    accessory_catalogue: accs,
     fallback_volume_cm3:
       typeof body.volume_cm3 === 'number' && body.volume_cm3 > 0 ? body.volume_cm3 : undefined,
   };
@@ -605,6 +660,8 @@ printRequestRoutes.post('/requests/:id/publish', requireAuth, async (c) => {
       colors: spec.colors_count,
       supports: spec.supports,
       post_processing_minutes: spec.post_processing_minutes,
+      accessories: spec.accessories,
+      accessory_catalogue: await accessories(c.env),
       fallback_volume_cm3:
         typeof body.volume_cm3 === 'number' && body.volume_cm3 > 0 ? body.volume_cm3 : undefined,
     },

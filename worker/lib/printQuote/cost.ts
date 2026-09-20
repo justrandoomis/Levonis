@@ -244,6 +244,16 @@ export interface PricingInputs {
 
   risk: { successRate: Sourced; averageFailureFraction?: number; restartMinutes?: number };
 
+  /**
+   * The hardware this model calls for, PER PART, already priced by
+   * worker/lib/printAccessories.ts — magnets, a motor, a keyring.
+   *
+   * Priced by the caller rather than here because the catalogue is a setting
+   * the owner edits and this function touches no database. It is added after
+   * the failure reserve on purpose: see VARIABLE_COMPONENTS in ./model.ts.
+   */
+  hardware?: { iqd: number; from: Provenance; detail?: string };
+
   /** Fraction of the PRICE, not of the cost — a margin, per §21. */
   targetMarginPercent: number;
   /** A floor the shop will not go under, whatever the margin works out to. */
@@ -382,6 +392,14 @@ export function priceJob(input: PricingInputs): QuoteResult {
   push(lines, 'PACKAGING', (input.packagingIqd ?? 0) * quantity, 'merchant');
   push(lines, 'OVERHEAD', input.overheadIqd ?? 0, 'merchant');
   push(lines, 'PLATFORM_FEES', input.platformFeeIqd ?? 0, 'platform');
+  // The magnets, the motor, the keyring. Already multiplied by the copy count
+  // by the caller, because `priceAccessories` takes the same quantity this
+  // function does and two multiplications would be a double charge nobody
+  // would notice until a customer did. It sits here, among the costs a retry
+  // does not repeat, for the reason VARIABLE_COMPONENTS spells out.
+  if (input.hardware && input.hardware.iqd > 0) {
+    push(lines, 'HARDWARE', input.hardware.iqd, input.hardware.from, input.hardware.detail);
+  }
 
   // ---- 5. risk ------------------------------------------------------------
   const variableCost = lines

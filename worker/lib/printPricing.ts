@@ -27,12 +27,18 @@
  * one formula is the most common way a print shop loses money, so they are two
  * code paths here.
  */
-
+import {
+  priceAccessories,
+  type AccessorySelection,
+  type PricedAccessory,
+  type PrintAccessory,
+} from './printAccessories';
 import type { ModelAnalysis } from './modelGeometry';
 
 // ------------------------------------------------------------- the catalogue
 
 export type PrintProcess = 'fdm' | 'resin';
+
 
 export interface PrintMaterial {
   id: string;
@@ -260,6 +266,15 @@ export interface QuoteInput {
   quality: PrintQuality;
   /** 0..1. 0.2 = 20% infill. Ignored for resin, which prints hollow or solid. */
   infill: number;
+  /**
+   * The hardware this model calls for, per part — «6× مغناطيس، 1× ليد».
+   * Counts come from the model's own instructions, never from its geometry:
+   * no measurement of an STL can say how many magnets the designer intended.
+   */
+  accessories?: ReadonlyArray<AccessorySelection>;
+  /** The catalogue those ids are priced from. Passed in rather than imported
+   *  so the quote stays pure and the owner's edited prices are what apply. */
+  accessory_catalogue?: readonly PrintAccessory[];
   quantity: number;
   colors: number;
   /** The customer asked for supports off — so no support cost, and the model's
@@ -277,7 +292,11 @@ export interface CostLine {
   key:
     | 'material' | 'waste' | 'support_material' | 'purge'
     | 'machine' | 'energy' | 'setup' | 'labor'
-    | 'support_removal' | 'post_processing' | 'failure_risk' | 'complexity';
+    | 'support_removal' | 'post_processing' | 'failure_risk' | 'complexity'
+    /** Magnets, motors, LEDs, a keyring — hardware the MODEL calls for, priced
+     *  per piece from `printAccessories`. See worker/lib/printAccessories.ts
+     *  for why it is not a material and why it carries no failure share. */
+    | 'accessories';
   iqd: number;
 }
 
@@ -310,6 +329,19 @@ export interface Quote {
   confidence_reasons: string[];
   /** Per-part, so a customer can see what the quantity bought them. */
   unit_price_iqd: number;
+
+  /**
+   * The hardware, itemised. The `accessories` COST LINE is one number; this is
+   * what it is made of, so the screen can print «٦× مغناطيس ٦×٣ ملم — ١٬٥٠٠
+   * د.ع» instead of asking the reader to trust a total.
+   */
+  accessory_lines: PricedAccessory[];
+  /**
+   * Ids the client asked for that the catalogue no longer has. Reported rather
+   * than swallowed: a customer whose menu is one version stale must be told
+   * their magnet was not counted, not quietly quoted without it.
+   */
+  accessories_unknown: string[];
 }
 
 const MIN = 1 / 60;
@@ -456,6 +488,29 @@ export function quotePrint(
 
   const complexityIqd = attemptIqd * ((complexity * cfg.complexity_uplift_percent) / 100) * 0.5;
 
+  /**
+   * THE HARDWARE, AND IT IS DELIBERATELY NOT IN `attemptIqd` ABOVE.
+   *
+   * Every line that IS in `attemptIqd` carries a share of the failure
+   * provision, because a run that fails really does spend its plastic, its
+   * electricity and its machine hours again. The magnets do not: they are
+   * pressed in after the part comes off the plate, so a failed print leaves
+   * them in the drawer. Charging a failure percentage on them would bill the
+   * customer for a loss nobody takes.
+   *
+   * It IS inside the margin, because the shop buys the magnet, stocks it and
+   * fits it — a part sold at exactly its hardware cost is sold at a loss on
+   * the fitting.
+   *
+   * `quantity` is passed so the count is per PART: ten keychains need ten
+   * rings. The caller never multiplies it a second time.
+   */
+  const accessories = priceAccessories(
+    input.accessory_catalogue ?? [],
+    input.accessories ?? [],
+    quantity
+  );
+
   const rawLines: CostLine[] = [
     { key: 'material', iqd: materialIqd - supportMaterialIqd },
     { key: 'support_material', iqd: supportMaterialIqd },
@@ -469,6 +524,7 @@ export function quotePrint(
     { key: 'post_processing', iqd: postIqd },
     { key: 'failure_risk', iqd: failureIqd },
     { key: 'complexity', iqd: complexityIqd },
+    { key: 'accessories', iqd: accessories.total_iqd },
   ];
   const lines: CostLine[] = rawLines
     .filter((l) => l.iqd > 0.5)
@@ -558,6 +614,8 @@ export function quotePrint(
     confidence,
     confidence_reasons: confidenceReasons,
     unit_price_iqd: Math.round(point / quantity),
+    accessory_lines: accessories.lines,
+    accessories_unknown: accessories.unknown,
   };
 }
 
@@ -581,6 +639,10 @@ function unpriced(reason: string, materialId: string): Quote {
     confidence: 'low',
     confidence_reasons: [reason],
     unit_price_iqd: 0,
+    // Empty, not omitted: a quote that could not be made has priced no
+    // hardware either, and a reader must not have to special-case the shape.
+    accessory_lines: [],
+    accessories_unknown: [],
   };
 }
 

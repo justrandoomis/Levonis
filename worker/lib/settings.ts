@@ -1,6 +1,7 @@
 import { safeParse } from './types';
 import { DEFAULT_WARRANTY_CONFIG, type WarrantyConfig } from './warrantyConfig';
 import { DEFAULT_PRICING, DEFAULT_MATERIALS, type PrintPricingConfig, type PrintMaterial } from './printPricing';
+import { DEFAULT_ACCESSORIES, type PrintAccessory } from './printAccessories';
 import { DEFAULT_MATCH_WEIGHTS, type MatchWeights } from './printMatching';
 import { DEFAULT_LINK_PROVIDERS, type LinkProviderConfig } from './externalModels';
 import { FARM_CONFIG_DEFAULTS, type FarmConfig } from './farm/config';
@@ -329,6 +330,13 @@ export const SETTING_DEFAULTS = {
    * only) from the print API instead.
    */
   printMaterials: DEFAULT_MATERIALS as PrintMaterial[],
+  /**
+   * «إكسسوارات ميكر وورد» — the magnets, motors, LEDs and keyrings a printed
+   * model calls for. A catalogue and not a material: priced per piece, and the
+   * count comes from the model's instructions rather than from its geometry.
+   * worker/lib/printAccessories.ts says why that distinction is load-bearing.
+   */
+  printAccessories: DEFAULT_ACCESSORIES as PrintAccessory[],
 
   /** What each matching signal is worth. Tuning these re-ranks who hears about
    *  a request; it can never make an incompatible merchant eligible. */

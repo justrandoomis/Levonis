@@ -86,6 +86,13 @@ import {
 // it here is what stops the calculator and the print-request wizard from
 // disagreeing about the smallest job a shop will take.
 import { getSetting } from '../lib/settings';
+import {
+  MAX_ACCESSORY_QTY,
+  priceAccessories,
+  type AccessorySelection,
+  type PricedAccessory,
+  type PrintAccessory,
+} from '../lib/printAccessories';
 import { DEFAULT_PRICING } from '../lib/printPricing';
 
 export const printQuoteRoutes = new Hono<AppContext>();
@@ -129,6 +136,53 @@ const PLATFORM_TARGET_MARGIN_PERCENT = 35;
  * price, or whichever screen they happened to open decides what the shop
  * charges. That stays true at 0 and stays true at whatever the owner sets.
  */
+/**
+ * «إكسسوارات ميكر وورد» — the hardware a model calls for, priced from the
+ * owner's catalogue.
+ *
+ * READ HERE AND NOT IN THE ENGINE, like every other setting on this path:
+ * `priceJob` is pure, and a quote that reached into a database would stop being
+ * reproducible from its stored snapshot.
+ *
+ * The result carries the ITEMISED lines as well as the total, so the screen can
+ * print «٦× مغناطيس ٦×٣ ملم» instead of one unexplained number — and so the
+ * snapshot records what was charged for, not just how much.
+ */
+async function pricedAccessories(
+  db: D1Database,
+  selections: readonly AccessorySelection[],
+  perPart: number
+): Promise<ReturnType<typeof priceAccessories>> {
+  if (selections.length === 0) return { lines: [], total_iqd: 0, unknown: [] };
+  let catalogue: PrintAccessory[] = [];
+  try {
+    const raw = await getSetting(db, 'printAccessories');
+    catalogue = Array.isArray(raw) ? (raw as PrintAccessory[]) : [];
+  } catch {
+    // A settings row that will not parse must not take the quote down with it.
+    // Every id then reads as unknown, which the response reports — a quote that
+    // silently drops the hardware is a quote that under-charges in secret.
+    catalogue = [];
+  }
+  return priceAccessories(catalogue, selections, perPart);
+}
+
+/** The accessory rows off a request body, sanitised. Capped at twenty kinds:
+ *  a body with more is a client looping, and `priceAccessories` caps each
+ *  count on its own. */
+function readAccessories(raw: unknown): AccessorySelection[] {
+  if (!Array.isArray(raw)) return [];
+  const out: AccessorySelection[] = [];
+  for (const item of raw.slice(0, 20)) {
+    if (!item || typeof item !== 'object') continue;
+    const id = String((item as { id?: unknown }).id ?? '').slice(0, 40);
+    const qty = Math.floor(Number((item as { qty?: unknown }).qty));
+    if (!id || !Number.isFinite(qty) || qty <= 0) continue;
+    out.push({ id, qty: Math.min(MAX_ACCESSORY_QTY, qty) });
+  }
+  return out;
+}
+
 async function platformMinimumJobIqd(db: D1Database): Promise<number> {
   try {
     const cfg = await getSetting(db, 'printPricingConfig');
@@ -196,6 +250,45 @@ printQuoteRoutes.get('/printers', async (c) => {
       change_seconds: MULTI_MATERIAL_DEFAULTS[m.multiMaterial].secondsPerChange,
       purge_mm3_per_change: MULTI_MATERIAL_DEFAULTS[m.multiMaterial].purgeMm3PerChange,
     })),
+  });
+});
+
+/**
+ * «إكسسوارات ميكر وورد» — the hardware catalogue the calculator offers.
+ *
+ * PUBLIC, and it shows the per-piece price, which the material list
+ * deliberately does not. The two are different kinds of secret: a filament's
+ * buying price per kilo is the shop's negotiated cost and telling a customer
+ * would hand a competitor the shop's margin. A magnet is a part the customer
+ * could buy themselves for the same money in the same market — what the shop
+ * sells is having it in a drawer and fitting it. Hiding the figure would make a
+ * bill of materials unreadable and invite the very question this feature was
+ * added to answer.
+ *
+ * Retired rows are filtered out here, so a picker never offers something the
+ * quote would then refuse to price.
+ */
+printQuoteRoutes.get('/accessories', async (c) => {
+  let rows: PrintAccessory[] = [];
+  try {
+    const raw = await getSetting(c.env.DB, 'printAccessories');
+    rows = Array.isArray(raw) ? (raw as PrintAccessory[]) : [];
+  } catch {
+    rows = [];
+  }
+  return c.json({
+    success: true,
+    accessories: rows
+      .filter((a) => a && a.active !== false)
+      .map((a) => ({
+        id: a.id,
+        name_ar: a.name_ar,
+        name_en: a.name_en,
+        name_ckb: a.name_ckb,
+        unit: a.unit,
+        category: a.category,
+        cost_iqd: a.cost_iqd,
+      })),
   });
 });
 
@@ -723,6 +816,10 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
     : null;
   if (!modelRow) throw badRequest('This analysis has no printer to price against', 'NO_PRINTER');
 
+  // PER PART on this path, where the grams path is per job: this route knows a
+  // copy count, so ten keychains need ten rings. The floor and the hardware are
+  // read the same way for the same reason — the file calculator and the grams
+  // calculator must never answer the same question with two numbers.
   const priced = await priceForPrinter(c, {
     analysis: loaded.analysis,
     printer: printerModelFromRow(modelRow),
@@ -731,6 +828,7 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
     quantity,
     targetMarginPercent: Number(body.target_margin_percent) || PLATFORM_TARGET_MARGIN_PERCENT,
     minimumJobIqd: await platformMinimumJobIqd(c.env.DB),
+    accessories: await pricedAccessories(c.env.DB, readAccessories(body.accessories), quantity),
   });
 
   const quoteId = newId('pq');
@@ -1044,6 +1142,10 @@ printQuoteRoutes.post('/grams-quote', async (c) => {
   const store = user ? await storeForUser(c.env.DB, user.id) : null;
   const merchantId = store?.merchant?.id ?? null;
 
+  // The stated grams already describe the whole job, so the accessory counts
+  // are taken as stated too — `perPart` of 1, matching the `quantity` below.
+  const accessories = await pricedAccessories(c.env.DB, readAccessories(body.accessories), 1);
+
   const priced = await priceForPrinter(c, {
     analysis: analysisFromGrams({ printer, rows, printMinutes }),
     printer,
@@ -1054,6 +1156,7 @@ printQuoteRoutes.post('/grams-quote', async (c) => {
     quantity: 1,
     targetMarginPercent: Number(body.target_margin_percent) || PLATFORM_TARGET_MARGIN_PERCENT,
     minimumJobIqd: await platformMinimumJobIqd(c.env.DB),
+    accessories,
   });
 
   return c.json({
@@ -1071,6 +1174,13 @@ printQuoteRoutes.post('/grams-quote', async (c) => {
       grams: Math.round(r.grams * 100) / 100,
     })),
     grams_total: Math.round(rows.reduce((sum, r) => sum + r.grams, 0) * 100) / 100,
+    // Echoed for the same reason `rows` is: the screen prints what the engine
+    // charged for rather than adding anything up itself. `unknown` names the
+    // ids the catalogue no longer has, so a stale menu is visible instead of
+    // quietly under-quoting.
+    accessories: accessories.lines,
+    accessories_unknown: accessories.unknown,
+    accessories_iqd: accessories.total_iqd,
     print_minutes: printMinutes,
     covers: gramsCoverage(rows, printMinutes),
   });
@@ -1178,6 +1288,11 @@ interface PriceForPrinterInput {
    *  rather than read here because this function touches no settings of its
    *  own and a comparison loop must not re-read the same row per printer. */
   minimumJobIqd: number;
+  /** Already priced against the catalogue and already multiplied by the copy
+   *  count, for the same reason the floor is: a comparison loop must not read
+   *  the same settings row once per printer, and two multiplications of one
+   *  quantity is a double charge nobody notices until a customer does. */
+  accessories?: { lines: PricedAccessory[]; total_iqd: number; unknown: string[] };
 }
 
 /** Assembles the frozen input set and hands it to the pure engine. Everything
@@ -1249,6 +1364,18 @@ async function priceForPrinter(
     },
     targetMarginPercent: input.targetMarginPercent,
     minimumJobIqd: input.minimumJobIqd,
+    hardware:
+      input.accessories && input.accessories.total_iqd > 0
+        ? {
+            iqd: input.accessories.total_iqd,
+            // 'merchant' would claim these prices came from this shop's own
+            // records. They come from the platform catalogue the owner edits,
+            // and the provenance badge the merchant panel renders must not say
+            // otherwise.
+            from: 'platform',
+            detail: input.accessories.lines.map((l) => `${l.qty}× ${l.name_en}`).join(', ').slice(0, 200),
+          }
+        : undefined,
     timeFactor: resolveFactor(calibration.timeFactor, calibration.samples),
     materialFactor: resolveFactor(calibration.materialFactor, calibration.samples),
     quantity: input.quantity,
@@ -1273,6 +1400,9 @@ async function priceForPrinter(
       // §30: the floor is an INPUT to the price, so a quote that was lifted to
       // it is only explainable afterwards if the row remembers what it was.
       minimum_job_iqd: input.minimumJobIqd,
+      // §30: what the hardware was, not just what it came to. A catalogue the
+      // owner reprices next month must not change what this quote meant.
+      accessories: input.accessories?.lines ?? [],
       quantity: input.quantity,
       analysis: input.analysis,
     },

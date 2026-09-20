@@ -35,6 +35,23 @@ export interface GramsQuoteRequest {
    * be a fabricated number wearing an estimate's clothes.
    */
   print_minutes?: number;
+  /**
+   * «إكسسوارات ميكر وورد» — the hardware the model calls for, per printed part.
+   * Counts only; the PRICE is the catalogue's and is applied server-side, so a
+   * browser that guessed a figure could never disagree with the one charged.
+   */
+  accessories?: Array<{ id: string; qty: number }>;
+}
+
+export interface PricedAccessoryLine {
+  id: string;
+  qty: number;
+  unit_iqd: number;
+  iqd: number;
+  name_ar: string;
+  name_en: string;
+  name_ckb: string;
+  unit: 'piece' | 'pair' | 'set' | 'cm' | 'gram';
 }
 
 /**
@@ -76,6 +93,12 @@ export interface GramsQuoteResponse {
   grams_total: number;
   print_minutes: number;
   covers: GramsCoverage;
+  /** Echoed like `rows`: what the engine actually PRICED, not what is typed. */
+  accessories: PricedAccessoryLine[];
+  /** Ids the catalogue no longer has. Shown, never swallowed — a customer
+   *  whose menu is stale must know their magnet was not counted. */
+  accessories_unknown: string[];
+  accessories_iqd: number;
 }
 
 export const quoteByGrams = (body: GramsQuoteRequest, signal?: AbortSignal) =>

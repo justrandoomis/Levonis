@@ -187,11 +187,26 @@ export type CostComponent =
   | 'PACKAGING'
   | 'OVERHEAD'
   | 'PLATFORM_FEES'
+  /**
+   * Magnets, motors, LEDs, a keyring — hardware the MODEL calls for, counted
+   * per part and priced per piece (worker/lib/printAccessories.ts). Not a
+   * material: no measurement of an STL can say the designer wanted six 6×3 mm
+   * magnets, so the count is asked for rather than derived.
+   */
+  | 'HARDWARE'
   | 'FAILURE_RESERVE';
 
-/** Everything that is consumed again on a retry. The failure reserve is built
- *  from exactly these, which is what stops a fixed setup fee from being charged
- *  twice for one job (§13). */
+/**
+ * Everything that is consumed again on a retry. The failure reserve is built
+ * from exactly these, which is what stops a fixed setup fee from being charged
+ * twice for one job (§13).
+ *
+ * `HARDWARE` IS DELIBERATELY ABSENT, and it is the one entry worth arguing
+ * about. A failed print really does spend its plastic and its machine hours
+ * again — but not its magnets: those are pressed in after the part comes off
+ * the plate, so a failure leaves them in the drawer. Putting HARDWARE here
+ * would bill the customer a failure provision on a loss nobody takes.
+ */
 export const VARIABLE_COMPONENTS: ReadonlySet<CostComponent> = new Set<CostComponent>([
   'MODEL_MATERIAL',
   'SUPPORT_MATERIAL',
