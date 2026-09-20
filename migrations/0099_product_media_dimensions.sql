@@ -699,9 +699,8 @@ CREATE INDEX IF NOT EXISTS idx_product_import_items_product
 CREATE TRIGGER IF NOT EXISTS trg_product_import_item_lease_fence
 BEFORE INSERT ON product_import_items
 BEGIN
-  -- Keep the trigger guard in SELECT ... WHERE form. D1's remote multi-
-  -- statement parser treats an inner `CASE ... END;` immediately before the
-  -- trigger's own `END;` as incomplete input, even though SQLite accepts it.
+  -- Keep the trigger guard in the same SELECT ... WHERE shape used by the
+  -- other D1-safe fencing triggers; it is equivalent to a CASE expression.
   SELECT RAISE(ABORT, 'IMPORT_APPLY_LEASE_LOST')
    WHERE NOT EXISTS (
     SELECT 1
