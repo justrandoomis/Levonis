@@ -56,7 +56,7 @@ test('the real 0049 migration splits into its three statements', () => {
   assert.match(parts[1], /^CREATE TRIGGER IF NOT EXISTS trg_coupon_redemption_limits[\s\S]*END$/);
 });
 
-test('the newest migration uses statement boundaries Wrangler can deploy to D1', () => {
+test('the newest migration matches Wrangler local D1 statement boundaries', () => {
   const newest = readdirSync('migrations').filter((file) => file.endsWith('.sql')).sort().at(-1);
   assert.ok(newest, 'no migration file found');
 
