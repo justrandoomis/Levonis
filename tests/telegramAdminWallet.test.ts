@@ -32,6 +32,13 @@ const SECOND_TG = 5550001111;
 const GROUP = -1002233445566;
 const WALLET_THREAD = 77;
 const SECRET = 'admin-hook-secret';
+/**
+ * The customer whose deposit this file is about. LONG ON PURPOSE: the SECURITY
+ * test below asserts that no callback token contains it, and a needle short
+ * enough to appear in a random 24-character token by chance is a test that
+ * fails for no reason about 1% of the time. See that test for the arithmetic.
+ */
+const CUSTOMER = 'usr_wallet_fixture';
 const ADMIN_TOKEN = '8888:ADMIN-BOT-TOKEN';
 const CUSTOMER_TOKEN = '1111:CUSTOMER-BOT-TOKEN';
 
@@ -96,18 +103,18 @@ function seed(raw: DatabaseSync, opts: { secondAdmin?: boolean } = {}) {
     INSERT INTO users (id,name,email,password_hash,role) VALUES
       ('boss','Ali','boss@x.co','h','admin'),
       ('boss2','Sara','sara@x.co','h','admin'),
-      ('u1','Customer','u1@x.co','h','customer');
-    UPDATE users SET email_verified_at = '2026-01-01T00:00:00.000Z' WHERE id = 'u1';
+      ('${CUSTOMER}','Customer','u1@x.co','h','customer');
+    UPDATE users SET email_verified_at = '2026-01-01T00:00:00.000Z' WHERE id = '${CUSTOMER}';
     -- Linked to the CUSTOMER bot: §18 says the customer is reached through the
     -- existing architecture, and @alilevobot never DMs them.
     INSERT INTO telegram_links (user_id,chat_id,telegram_user_id,phone_e164,verified_at)
-      VALUES ('u1',424242,424242,'+9647700000000','2026-01-01T00:00:00.000Z');
+      VALUES ('${CUSTOMER}',424242,424242,'+9647700000000','2026-01-01T00:00:00.000Z');
     INSERT INTO admin_tg_identities (telegram_user_id,user_id,created_by)
       VALUES (${ADMIN_TG},'boss','boss');
     INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status,note,created_by)
-      VALUES ('dep1','u1','deposit','USD',5000,'pending','bank transfer','user');
+      VALUES ('dep1','${CUSTOMER}','deposit','USD',5000,'pending','bank transfer','user');
     INSERT INTO wallet_deposit_meta (tx_id,user_id,provider,channel,reference,reference_norm,declared_amount_cents,review_state)
-      VALUES ('dep1','u1','zaincash','app','REF-9','ref9',5000,'awaiting_review');
+      VALUES ('dep1','${CUSTOMER}','zaincash','app','REF-9','ref9',5000,'awaiting_review');
     INSERT INTO telegram_admin_config (id,group_chat_id,group_title,configured_by,configured_by_tg)
       VALUES ('singleton','${GROUP}','Levonis Ops','boss',${ADMIN_TG});
     INSERT INTO telegram_admin_topics (topic_key,message_thread_id,configured_by,configured_by_tg)
@@ -191,7 +198,7 @@ const status = (raw: DatabaseSync) =>
 const approved = (raw: DatabaseSync) =>
   row<{ n: number }>(
     raw,
-    "SELECT COUNT(*) AS n FROM wallet_transactions WHERE user_id='u1' AND type='deposit' AND status='approved'"
+    `SELECT COUNT(*) AS n FROM wallet_transactions WHERE user_id='${CUSTOMER}' AND type='deposit' AND status='approved'`
   )!.n;
 
 // =========================================================================
@@ -377,10 +384,31 @@ test('SECURITY — the callback carries no amount, and a forged one changes noth
   const tg = stubTelegram();
   try {
     const buttons = await deliver(raw, tg.calls);
-    // Not one button leaks a number, a user id or a request id.
+    /**
+     * Not one button leaks the amount, the deposit id or the user id.
+     *
+     * THE FIXTURE USER ID IS `usr_wallet_fixture` AND NOT `u1`, AND THAT IS
+     * THIS ASSERTION STARTING TO WORK RATHER THAN A RENAME. A substring check
+     * against a RANDOM token only means anything when the needle is long
+     * enough that coincidence is impossible. The token is `randomToken(18)` —
+     * 24 base64url characters — so a two-character needle like `u1` turns up
+     * in it by pure chance 0.55% of the time (23 positions × 1/64², measured
+     * over 200,000 draws), and there are two buttons per run. That is a ~1.1%
+     * red on a test whose name begins with SECURITY: it cried wolf, and it had
+     * almost no power to catch what it was written for, because a token that
+     * literally WAS the user id is already caught by the charset-and-length
+     * assertion on the line above.
+     *
+     * At eighteen characters the needle is safe — a coincidence is about 1 in
+     * 10^32 — and the check now means what it says. `5000` and `dep1` were
+     * always long enough (about 1 in 1.7×10^7) and are unchanged.
+     */
     for (const [, token] of buttons) {
       assert.match(token, /^[A-Za-z0-9_-]{16,60}$/, 'an opaque token and nothing else');
-      assert.ok(!token.includes('5000') && !token.includes('dep1') && !token.includes('u1'));
+      assert.ok(
+        !token.includes('5000') && !token.includes('dep1') && !token.includes(CUSTOMER),
+        `${token} carries one of the values the button must never reveal`
+      );
     }
     const a = app(raw);
 

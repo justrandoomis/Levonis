@@ -79,11 +79,33 @@ export function newUserId() {
  * A handle that passes worker/lib/usernames.ts by construction: starts with a
  * letter, ends with an alphanumeric, one dash, 16 characters, never reserved
  * (no reserved handle carries a dash) — and recognisable as a probe's.
+ *
+ * THE SUFFIX IS DIGITS, AND THAT IS THE WHOLE POINT OF THIS COMMENT.
+ *
+ * It used to draw from `[a-z0-9]`, and "by construction" was then not true:
+ * twelve random letters and digits spell words, including the leetspeak the
+ * indecency filter is built to catch. Measured against the real
+ * `usernameRejection` over 300,000 draws, 0.019% came back `indecent` —
+ * `e2e-0hd884sh1tx9`, `e2e-fuqj2opwe9qc`, `e2e-zi7sh1tptyn4`. Small, and not
+ * harmless: this generator feeds a `wrangler d1 execute` INSERT against the
+ * LIVE database, so one run in five thousand would have written an account the
+ * Worker itself refuses — a row the app would not accept from a person. It was
+ * also a 3.7%-per-run flake in tests/liveAuthIdentity.test.ts, which draws 200
+ * handles, and a test that fails for a reason nobody can reproduce is a test
+ * people start re-running instead of reading.
+ *
+ * Digits cannot spell anything and leetspeak needs letters to obfuscate, so
+ * the property is now STRUCTURAL rather than probable: 500,000 draws, zero
+ * rejections, and tests/liveAuthIdentity.test.ts re-measures it on every run
+ * so that changing this alphabet back fails loudly instead of rarely.
+ *
+ * 10^12 suffixes is ample for a probe handle — collision, not guessability, is
+ * the only property that matters here.
  */
 export function randomUsername() {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const digits = '0123456789';
   const bytes = webcrypto.getRandomValues(new Uint8Array(12));
-  return `e2e-${Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('')}`;
+  return `e2e-${Array.from(bytes, (b) => digits[b % digits.length]).join('')}`;
 }
 
 const sqlString = (v) => `'${String(v).replace(/'/g, "''")}'`;

@@ -142,11 +142,37 @@ test('the INSERT fits the migrated schema: unverified, default role, lowercased 
 });
 
 test('the generated handle and id are ones the Worker itself would produce', () => {
-  for (let i = 0; i < 200; i++) {
+  /**
+   * 20,000 DRAWS, NOT 200, AND THE COUNT IS THE POINT.
+   *
+   * This test used to draw 200 and pass 96% of the time. The generator drew
+   * from `[a-z0-9]`, twelve random letters and digits spell words, and the
+   * indecency filter caught 0.019% of them — `e2e-0hd884sh1tx9`,
+   * `e2e-fuqj2opwe9qc`. At 200 draws that is a 3.7% chance of red per run:
+   * frequent enough to be seen, rare enough to be re-run and forgotten, which
+   * is the worst failure rate a test can have.
+   *
+   * The generator now draws DIGITS, so the property is structural rather than
+   * probable (scripts/live-auth-identity.mjs says why). A sample this size is
+   * what turns that claim into a measurement: if the alphabet ever goes back
+   * to letters, the old 0.019% becomes a ~98% chance of failing HERE, on the
+   * line that names the reason — instead of one run in twenty-seven somewhere
+   * downstream.
+   *
+   * It is not a slow test: 20,000 draws of a 16-character string and a regex
+   * pass take well under a second.
+   */
+  const rejected: string[] = [];
+  for (let i = 0; i < 20_000; i++) {
     const u = randomUsername();
-    assert.equal(usernameRejection(u), null, `${u} would be rejected by worker/lib/usernames.ts`);
+    if (usernameRejection(u) !== null) rejected.push(u);
     assert.match(newUserId(), /^usr_[0-9a-f]{20}$/, 'newId(\'usr\') shape');
   }
+  assert.deepEqual(
+    rejected.slice(0, 5),
+    [],
+    `${rejected.length} of 20,000 generated handles would be rejected by worker/lib/usernames.ts`
+  );
 });
 
 // ---------------------------------------------- the scenario, on the real routes
