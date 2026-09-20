@@ -195,7 +195,7 @@ SELECT
     ELSE 0
   -- Wrangler 4.127 only closes a CASE block when END is followed by
   -- whitespace or a semicolon. Keep the space before each comma in this file;
-  -- `END ,` makes its D1 splitter merge every remaining statement together.
+  -- `END,` makes its D1 splitter merge every remaining statement together.
   END ,
   CASE WHEN EXISTS (
     SELECT 1 FROM product_option_values v
