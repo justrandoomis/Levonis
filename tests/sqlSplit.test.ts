@@ -7,6 +7,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import { unstable_splitSqlQuery as splitWithWrangler } from 'wrangler';
 // @ts-expect-error — plain JS module shared with scripts/
 import { splitStatements } from '../scripts/lib/sql-split.mjs';
 
@@ -48,9 +50,24 @@ test('a CASE ending with a comma or parenthesis closes before the next statement
   assert.equal(parts[1], 'SELECT 4');
 });
 
-test('the real 0049 migration splits into its three statements', async () => {
-  const { readFileSync } = await import('node:fs');
+test('the real 0049 migration splits into its three statements', () => {
   const parts = splitStatements(readFileSync('migrations/0049_security_hardening.sql', 'utf8'));
   assert.equal(parts.length, 3, parts.map((p: string) => p.slice(0, 40)).join(' | '));
   assert.match(parts[1], /^CREATE TRIGGER IF NOT EXISTS trg_coupon_redemption_limits[\s\S]*END$/);
+});
+
+test('the newest migration uses statement boundaries Wrangler can deploy to D1', () => {
+  const newest = readdirSync('migrations').filter((file) => file.endsWith('.sql')).sort().at(-1);
+  assert.ok(newest, 'no migration file found');
+
+  const sql = readFileSync(`migrations/${newest}`, 'utf8');
+  const normalize = (statement: string) => statement.replace(/\s+/g, ' ').trim();
+  const local = splitStatements(sql).map(normalize);
+  const wrangler = splitWithWrangler(sql).map(normalize);
+
+  assert.deepEqual(
+    wrangler,
+    local,
+    `${newest} is valid SQLite, but Wrangler would merge or split its statements differently`
+  );
 });
