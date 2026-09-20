@@ -23,7 +23,12 @@
  * with `group_id` denormalized so the grouping is one indexed read.
  */
 
-import { derivedRung, type LadderRungs, type PriceFields } from './pricing';
+import {
+  derivedRung,
+  type LadderRungs,
+  type PhysicalDimensionOverrides,
+  type PriceFields,
+} from './pricing';
 
 export interface OptionGroupRow {
   id: string;
@@ -33,7 +38,7 @@ export interface OptionGroupRow {
   active: number | boolean;
 }
 
-export interface OptionValueRow {
+export interface OptionValueRow extends PhysicalDimensionOverrides {
   id: string;
   product_id: string;
   group_id: string;
@@ -155,7 +160,7 @@ export interface OptionTransportRow {
   capacity_reserved?: number | null;
 }
 
-export interface ColorRow {
+export interface ColorRow extends PhysicalDimensionOverrides {
   id: string;
   product_id: string;
   name_en: string;

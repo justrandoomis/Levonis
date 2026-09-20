@@ -14,9 +14,10 @@
  * 1. FOUR ROUND TRIPS FOR A WHOLE PAGE (§14). (1) the composition products —
  *    with `bundle_config` and `offer_windows` LEFT JOINed onto the same row,
  *    because a per-bundle read of either is the N+1 this design exists to
- *    avoid; (2) `bundle_components` with its allow-lists; (3) the member
- *    `products`; (4) one `loadRelationsViews` over those members. Nothing in
- *    this file reads the database once per card, per component or per choice.
+ *    avoid; (2) `bundle_components` with its allow-lists; (3) the product rows
+ *    needed by the composition parents and their members; (4) one
+ *    `loadRelationsViews` over that same set. Nothing in this file reads the
+ *    database once per card, per component or per choice.
  *
  * 2. THE CARD QUOTES THE NUMBER THE DOOR CHARGES (§4.3). In a derived price
  *    mode `products.price_iqd` is a cached copy the admin save wrote; the
@@ -65,8 +66,14 @@ import type { MemberFallback, PreorderPricing, ProPricingPolicy, ResolvedPrice, 
 import { tierInherits, type TierStatus } from './entitlements';
 import { effectiveAvailability } from '@levonis/pricing/availability';
 import { typeForTransport, type ShippingType } from '@levonis/pricing/shippingType';
-import { parseProductRow, primaryMedia, type ProductDoc } from './productModel';
-import { capacityFrom, snapshotFrom } from './productOverlay';
+import { parseProductRow, type ProductDoc } from './productModel';
+import { productImageForSelection } from './productSelectionImage';
+import {
+  applyRelations,
+  capacityFrom,
+  snapshotFrom,
+  type ProductRelationsView,
+} from './productOverlay';
 import { isMissingTable } from './membershipBenefits';
 
 // ---------------------------------------------------------------- the rows
@@ -228,6 +235,9 @@ export function windowFromJoin(row: Record<string, unknown>): OfferWindow | null
 export interface ResolvedComponentView extends ResolvedComponent {
   /** The member product, already overlaid with its relational rows. */
   doc: ProductDoc;
+  /** The same authoritative relation view used to resolve this member's
+   * selection. Images and physical dimensions must resolve against it too. */
+  view: ProductRelationsView | null;
   /** Whether the buyer picks this component's option / colour (§1.4). */
   editable: { option: boolean; color: boolean };
   /** The allow-list a customer-selectable component may be chosen from, with
@@ -278,6 +288,10 @@ export interface BundlePricingView {
 
 export interface ResolvedBundle {
   row: Record<string, unknown>;
+  /** The composition product's own authoritative relations. This is separate
+   *  from every member/component view below: its active `product_images` rows
+   *  own the bundle/mystery cover used by cards, cart and order snapshots. */
+  view: ProductRelationsView;
   doc: ProductDoc;
   config: BundleConfig;
   window: OfferWindow | null;
@@ -417,20 +431,48 @@ export async function resolveCompositionLines(
   const out = new Map<string, ResolvedBundle>();
   if (lines.length === 0) return out;
 
+  const parentRows = [
+    ...new Map(
+      lines.map((line) => [
+        String(line.row.id),
+        { id: String(line.row.id), inventory_mode: line.row.inventory_mode },
+      ])
+    ).values(),
+  ];
   const { byBundle, choicesByComponent } = await loadBundleComponents(
     db,
-    lines.map((l) => String(l.row.id))
+    parentRows.map((row) => row.id)
   );
+  // Include the composition rows in the same batched product/relations read
+  // already required for their members. That gives the cover one authoritative
+  // `product_images` view without adding a parent-by-parent query path.
   const members = await loadCompositionMembers(
     db,
-    [...byBundle.values()].flat().map((c) => c.member_product_id)
+    [
+      ...parentRows.map((row) => row.id),
+      ...[...byBundle.values()].flat().map((c) => c.member_product_id),
+    ]
   );
 
   for (const line of lines) {
     const id = String(line.row.id);
+    const parent = members.get(id);
+    // A parent disappearing between the joined page read and this batched
+    // authoritative read is no longer a sellable line. Do not resurrect its
+    // stale row (and especially its JSON gallery) for this response.
+    if (!parent) continue;
     out.set(
       line.key,
-      resolveOne(line.row, byBundle.get(id) ?? [], choicesByComponent, members, viewer, line.choices, line.transportMethod)
+      resolveOne(
+        line.row,
+        parent.view,
+        byBundle.get(id) ?? [],
+        choicesByComponent,
+        members,
+        viewer,
+        line.choices,
+        line.transportMethod
+      )
     );
   }
   return out;
@@ -438,6 +480,7 @@ export async function resolveCompositionLines(
 
 function resolveOne(
   row: Record<string, unknown>,
+  view: ProductRelationsView,
   componentRows: BundleComponentRow[],
   choicesByComponent: Map<string, BundleComponentChoiceRow[]>,
   members: Map<string, MemberRow>,
@@ -446,7 +489,11 @@ function resolveOne(
   /** The line's real route, or undefined for a card. See CompositionLineInput. */
   lineRoute?: string
 ): ResolvedBundle {
-  const doc = parseProductRow(row);
+  // A composition product has an ordinary product gallery of its own. Overlay
+  // it here, once, so every downstream surface reads active/canonical
+  // `product_images`; stale `products.images` JSON can never become a card,
+  // cart, checkout or immutable order image when relational rows exist.
+  const doc = applyRelations(parseProductRow(row), view);
   const config = configFromRow(row);
   const window = windowFromJoin(row);
   const offer = offerEligible(viewer.status, { window, limits: null }, viewer.nowMs);
@@ -461,6 +508,7 @@ function resolveOne(
     shipping_type: shipping[i],
     unit: p.priceWith(shipping[i]),
     doc: p.doc,
+    view: p.view,
     editable: p.editable,
     choices: p.choices,
     state: 'in_stock',
@@ -502,6 +550,7 @@ function resolveOne(
 
   return {
     row,
+    view,
     doc,
     config,
     window,
@@ -517,6 +566,7 @@ function resolveOne(
 interface PartialComponent {
   component: ResolvedComponent;
   doc: ProductDoc;
+  view: ProductRelationsView | null;
   editable: { option: boolean; color: boolean };
   choices: ResolvedComponentView['choices'];
   unavailable: boolean;
@@ -692,6 +742,7 @@ function resolveComponent(
       shipping_type: 'direct',
     },
     doc,
+    view: member?.view ?? null,
     editable: { option: c.customer_picks_option, color: c.customer_picks_color },
     choices: choiceViews(c, allowList, doc),
     unavailable,
@@ -1012,14 +1063,14 @@ export function offerBlock(b: ResolvedBundle) {
  * A locked card is a 200, never a 403: the page renders an honest lock
  * instead of an error path, and the purchase doors re-check independently.
  */
-export function lockedCard(b: ResolvedBundle, publicRow: Record<string, unknown>) {
+export function lockedCard(b: ResolvedBundle, _publicRow: Record<string, unknown>) {
   const card: Record<string, unknown> = {
     id: b.doc.id,
     product_slug: b.doc.slug,
     name: b.doc.name_en,
     name_ar: b.doc.name_ar,
     name_ku: b.doc.name_ckb,
-    image: cover(publicRow),
+    image: productImageForSelection(b.doc, { optionValueIds: [], colorId: null }, b.view),
     locked: true,
     availability_state: b.availability.state,
     offer: offerBlock(b),
@@ -1045,7 +1096,7 @@ export function bundleCard(b: ResolvedBundle, publicRow: Record<string, unknown>
     description: b.doc.description_en,
     description_ar: b.doc.description_ar,
     description_ku: b.doc.description_ckb,
-    image: cover(publicRow),
+    image: productImageForSelection(b.doc, { optionValueIds: [], colorId: null }, b.view),
     sort: b.doc.display_order,
     is_featured: b.doc.is_featured,
     locked: false,
@@ -1074,7 +1125,11 @@ function mainItems(b: ResolvedBundle) {
       product_id: c.member_product_id,
       slug: c.doc.slug,
       name: c.doc.name_en,
-      image: primaryMedia(c.doc.media)?.url ?? '',
+      image: productImageForSelection(
+        c.doc,
+        { optionValueIds: c.selection.option_value_ids, colorId: c.selection.color_id },
+        c.view
+      ),
       qty: c.qty_per_bundle,
     }));
 }
@@ -1091,7 +1146,11 @@ export function componentViews(b: ResolvedBundle) {
     product_id: c.member_product_id,
     slug: c.doc.slug,
     name: c.doc.name_en,
-    image: primaryMedia(c.doc.media)?.url ?? '',
+    image: productImageForSelection(
+      c.doc,
+      { optionValueIds: c.selection.option_value_ids, colorId: c.selection.color_id },
+      c.view
+    ),
     qty_per_bundle: c.qty_per_bundle,
     optional: c.optional,
     included: c.included,

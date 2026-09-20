@@ -5,8 +5,13 @@ import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, str, int, unavailable, HttpError } from '../lib/http';
 import { cartLineSelect } from '../lib/cartLineProjection';
 import { newId, newOrderId } from '../lib/crypto';
-import { primaryMedia, readProductDeliveryOptions } from '../lib/productModel';
+import { readProductDeliveryOptions } from '../lib/productModel';
 import { productImageForSelection } from '../lib/productSelectionImage';
+import {
+  EMPTY_PHYSICAL_DIMENSIONS,
+  resolveSelectionPhysicalDimensions,
+  type PhysicalDimensions,
+} from '../lib/physicalDimensions';
 import { deliversToHome, getSetting, getSettings, printerNoteIqdFrom } from '../lib/settings';
 import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig } from '../lib/settings';
 import { addDays, baghdadDay, baghdadDayOf, isDay } from '../lib/baghdadTime';
@@ -1088,7 +1093,7 @@ function priceCompositionLine(
       // receipt, the courier payload and every e-mail read this field.
       name: b.doc.name_en || b.doc.name_ar || b.doc.id,
       name_ar: b.doc.name_ar,
-      image: primaryMedia(b.doc.media)?.url ?? '',
+      image: productImageForSelection(b.doc, { optionValueIds: [], colorId: null }, b.view),
       variant: '',
       option_id: '',
       color_id: '',
@@ -1137,6 +1142,11 @@ function priceCompositionLine(
         option_value_ids: cand.option_value_ids,
         color_id: cand.color_id,
       },
+      // The order-item columns are internal and never enter quoteLines or
+      // orderPublic. Freeze the drawn candidate's exact option/colour/active
+      // variant facts here so fulfilment does not fall back to the offer's
+      // generic carton after the catalogue changes.
+      physical_dimensions: cand.physical_dimensions ?? EMPTY_PHYSICAL_DIMENSIONS(),
     });
     /**
      * A MYSTERY SPOOL SHIPS ON THE OFFER'S OWN FACTS, NOT THE PICK'S (§8.2).
@@ -1216,7 +1226,11 @@ function priceCompositionLine(
       stock_targets: counter.targets,
       name: k.doc.name_en || k.doc.name_ar || k.member_product_id,
       name_ar: k.doc.name_ar,
-      image: primaryMedia(k.doc.media)?.url ?? '',
+      image: productImageForSelection(
+        k.doc,
+        { optionValueIds: k.selection.option_value_ids, colorId: k.selection.color_id },
+        k.view
+      ),
       variant: componentVariantLabel(k),
       option_id: k.selection.option_value_ids[0] ?? '',
       color_id: k.selection.color_id ?? '',
@@ -1239,6 +1253,11 @@ function priceCompositionLine(
       bundle_component_id: k.component_id,
       component_value_iqd: Math.max(0, k.unit.applied_iqd),
       component_alloc_iqd: allocs[i] ?? 0,
+      physical_dimensions: resolveSelectionPhysicalDimensions(
+        k.doc,
+        k.view ?? EMPTY_RELATIONS,
+        { optionValueIds: k.selection.option_value_ids, colorId: k.selection.color_id }
+      ),
     });
     // The shipping quote reads the COMPONENTS' own facts, so a bundle holding
     // a printer reaches the printer freight branch and twelve spools reach the
@@ -1302,7 +1321,7 @@ function priceCompositionLine(
     stock_targets: [],
     name: b.doc.name_en || b.doc.name_ar || b.doc.id,
     name_ar: b.doc.name_ar,
-    image: primaryMedia(b.doc.media)?.url ?? '',
+    image: productImageForSelection(b.doc, { optionValueIds: [], colorId: null }, b.view),
     variant: compositionOptionSnapshot(b),
     /** The `bx_…` composition key, kept as provenance. Nothing derives a
      *  selection from it, and price protection refuses a parent claim by name
@@ -1379,6 +1398,9 @@ function priceCompositionLine(
      */
     composition_total_iqd: b.pricing.component_total_iqd,
     composition_saving_percent: b.pricing.saving_percent,
+    // The parent is a commercial grouping, not a second physical parcel. Its
+    // component rows below carry the resolved cartons that actually ship.
+    physical_dimensions: EMPTY_PHYSICAL_DIMENSIONS(),
   };
 
   return {
@@ -1537,6 +1559,8 @@ interface ComputedLine {
   is_printer: boolean;
   /** Which availability fee priced this line (worker/lib/pricing.ts). */
   pricing_basis: 'direct' | 'preorder';
+  /** Immutable physical facts resolved for this exact selection. */
+  physical_dimensions: PhysicalDimensions;
   /**
    * THE COST OF GOODS SOLD FOR THIS LINE, FROZEN (migration 0095) — and the
    * one field on this interface that must never reach a customer.
@@ -2382,6 +2406,11 @@ async function computeCheckout(
           regular_unit_iqd: resolved.regular_iqd,
           applied_rule_id: tierStatus.tier === 'pro' ? resolved.member_rule.pro : resolved.member_rule.prime,
         },
+        physical_dimensions: resolveSelectionPhysicalDimensions(
+          doc,
+          view ?? EMPTY_RELATIONS,
+          { optionValueIds: sel.optionValueIds ?? [], colorId: sel.colorId || null }
+        ),
       });
     }
     // THE PHYSICAL-LINE CEILING (§3.1) — a door refusal naming the limit, not a
@@ -3139,6 +3168,7 @@ function quoteLines(lines: ComputedLine[]) {
         ...(kids.some((k) => k.mystery_spool) ? { mystery: { revealed: false, spools: kids.length } } : {}),
         name: l.name,
         name_ar: l.name_ar,
+        image: l.image,
         variant: l.variant,
         qty: l.qty,
         unit_price_iqd: l.unit,
@@ -3162,6 +3192,7 @@ function quoteLines(lines: ComputedLine[]) {
                 product_id: k.mystery_spool ? null : k.product_id,
                 name: k.name,
                 name_ar: k.name_ar,
+                image: k.image,
                 variant: k.variant,
                 qty: k.qty,
                 value_iqd: k.component_value_iqd ?? 0,
@@ -3620,8 +3651,11 @@ orderRoutes.post('/', async (c) => {
            option_id, option_value_ids, color_id, shipping_method_id, qty, unit_price_iqd, line_total_iqd,
            pricing_snapshot, warranty_snapshot, transport_snapshot,
            bundle_parent_item_id, bundle_component_id, component_value_iqd, component_alloc_iqd,
-           membership_discount_iqd, membership_rule_id, cost_iqd, cost_basis)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           membership_discount_iqd, membership_rule_id, cost_iqd, cost_basis,
+           net_weight_g, width_mm, depth_mm, height_mm,
+           package_weight_g, package_width_mm, package_depth_mm, package_height_mm)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                 ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         it.id, orderId,
         // §7.7: a MYSTERY SPOOL binds NULL here on purpose. It is the single
@@ -3676,7 +3710,15 @@ orderRoutes.post('/', async (c) => {
          * against.
          */
         it.cost_iqd ?? null,
-        it.cost_basis ?? COST_BASIS.unrecorded
+        it.cost_basis ?? COST_BASIS.unrecorded,
+        it.physical_dimensions.net_weight_g,
+        it.physical_dimensions.width_mm,
+        it.physical_dimensions.depth_mm,
+        it.physical_dimensions.height_mm,
+        it.physical_dimensions.package_weight_g,
+        it.physical_dimensions.package_width_mm,
+        it.physical_dimensions.package_depth_mm,
+        it.physical_dimensions.package_height_mm
       )
     );
     // THE ALLOCATION, in the ORDER'S OWN BATCH — never a second batch and
@@ -4299,7 +4341,6 @@ interface OrderUnitRow extends Record<string, unknown> {
   slug: string | null;
   p_name: string | null;
   p_name_ar: string | null;
-  images: string | null;
 }
 
 /**
@@ -4327,7 +4368,7 @@ orderRoutes.get('/:id/units', async (c) => {
             u.warranty_end_at, u.replaced_by_unit_id,
             s.serial_raw, r.user_id AS reg_user_id, wr.receipt_no,
             oi.name_snapshot, oi.image_snapshot,
-            p.slug, p.name AS p_name, p.name_ar AS p_name_ar, p.images
+            p.slug, p.name AS p_name, p.name_ar AS p_name_ar
        FROM order_item_units u
        LEFT JOIN device_serials s ON s.unit_id = u.id
        LEFT JOIN device_registrations r ON r.unit_id = u.id AND r.revoked_at IS NULL
@@ -4342,8 +4383,6 @@ orderRoutes.get('/:id/units', async (c) => {
 
   const units = results.map((r) => {
     const cov = coverageState(r.delivered_at, r.warranty_end_at);
-    const images = safeParse<unknown[]>(r.images, []);
-    const firstImage = Array.isArray(images) ? images.find((x) => typeof x === 'string' && x) : undefined;
     return {
       unit_id: r.id,
       order_item_id: r.order_item_id,
@@ -4353,7 +4392,10 @@ orderRoutes.get('/:id/units', async (c) => {
         slug: r.slug ?? null,
         name: String(r.p_name ?? r.name_snapshot ?? ''),
         name_ar: String(r.p_name_ar ?? ''),
-        image: typeof firstImage === 'string' ? firstImage : String(r.image_snapshot ?? ''),
+        // `image_snapshot` has existed since the initial order schema. An empty
+        // string is therefore an authoritative "sold without an image" fact,
+        // not permission to read mutable catalogue media later.
+        image: String(r.image_snapshot ?? ''),
       },
       serial: r.serial_raw ? maskSerial(r.serial_raw) : null,
       delivered_at: r.delivered_at,

@@ -55,19 +55,83 @@ Do not enable an `r2.dev` public URL for `R2_PRIVATE`. Public files are served
 by the Worker's `/files/*` route so headers and the legacy fallback stay
 consistent. Create the `-dark` pair only when deploying the dark environment.
 
-## New uploads
+## Product-image ingestion
 
-- The browser detects PNG/JPEG by magic bytes and converts product raster images
-  to WebP through `src/lib/imagePreprocess.ts` before upload.
-- The image is never upscaled; its longest edge is capped at 3,000px, alpha is
-  retained, EXIF orientation is applied by the browser decoder, and WebP quality
-  is 0.87.
-- The Worker sniffs the result again, enforces the 8MB/dimension/pixel limits,
-  and refuses a raw product PNG/JPEG with `PRODUCT_IMAGE_REQUIRES_WEBP`.
-- GIF, AVIF, video, PDF and other attachments are not blindly converted.
-- `file_objects` records the object key, visibility, logical domain, MIME,
-  byte size, dimensions where known, owner/entity and audit filename. Private
-  objects never use a permanent public URL as their source of truth.
+All new product-image ingestion uses one server-side pipeline. A product image
+uploaded through the admin UI and a remote image requested by TXT
+`images.N.fetch_url` both arrive at the Worker as source bytes. The Worker:
+
+1. identifies the format from the bytes rather than trusting a filename or
+   request `Content-Type`, rejects HTML/XML masquerading as an image, and
+   applies source and output size limits;
+2. asks the Cloudflare Images binding to decode the source and return a
+   validated WebP, re-encoding supported non-WebP sources (JPEG, PNG, WebP,
+   AVIF and static GIF sources are accepted; animated GIF is rejected rather
+   than silently flattened);
+3. hashes the **final WebP bytes** with SHA-256 and builds a content-addressed
+   `products/<namespace>/gallery/<sha256>.webp` key;
+4. creates that R2 object conditionally, so an existing object at the same
+   canonical key is reused rather than overwritten; and
+5. returns the only delivery address the catalogue may store:
+   `url=/files/<key>`, with the same value in `key`/`r2_key` and with the
+   verified MIME, byte count and dimensions.
+
+Conversion is therefore not a browser-canvas contract. The browser may send a
+raw supported product image, including PNG or JPEG; the Worker is responsible
+for sniffing, conversion, validation, naming and persistence. If Cloudflare
+Images is unavailable or cannot decode/convert the bytes, the product-image
+write fails instead of storing an unverified source file.
+
+`file_objects` records the R2 key, visibility, logical domain, MIME, byte size,
+dimensions, owner/entity and audit filename. Video, PDF and other non-product
+attachments keep their own upload policy; the WebP invariant above applies to
+product images.
+
+### TXT remote fetch and provenance
+
+`fetch_url` is an instruction to the import operation, not stored media. Apply
+accepts an HTTP(S) URL, fetches each distinct source once for that Apply, and
+runs the returned bytes through the same server-side WebP pipeline. Remote
+fetches have redirect, timeout, byte-budget and address-safety checks; a
+redirect is validated before it is followed.
+
+| Field | Meaning after a successful Apply |
+|---|---|
+| `fetch_url` | One-shot remote import input. It is never stored and never exported. |
+| `source_url` | Provenance: the original supplier URL supplied to the import. It may be external, but it is never a delivery URL and never triggers a later fetch by itself. |
+| `url` | The local delivery URL, exactly `/files/<key>`. |
+| `key` / `r2_key` | The owned R2 object key, exactly matching the suffix of `url`. |
+
+An exported TXT therefore contains the local `url` and `key` plus
+`source_url`, but no `fetch_url`. Re-importing that export reuses and verifies
+the local object; it does not contact the supplier again. Legacy external
+values supplied in an image `url` field are treated as import-only fetch
+intent, with a warning, and are normalized to the same local fields.
+
+There are no product hotlinks. Catalogue and storefront projections only use
+canonical `/files/<key>` product media. An external `source_url` is retained
+solely as provenance and must never be rendered as the product image.
+
+### Deduplication and delayed cleanup
+
+Deduplication happens at two levels: one TXT Apply fetches a repeated
+`fetch_url` once, and the final WebP is addressed by its SHA-256 digest. R2
+creation is conditional, and the ingest result records whether that operation
+actually created the object (`created_new`) or reused the canonical key.
+
+R2 and D1 do not share a transaction. If Apply fails after staging media, only
+objects marked `created_new` by that operation are put into the durable
+`media_cleanup_jobs` queue; reused/pre-existing objects are never treated as
+rollback-owned. Rollback does not delete from R2 inline. Its jobs have a
+15-minute `not_before` grace period, and reuse of a key renews the grace on any
+pending cleanup job for that key.
+
+When a job becomes due, the guarded cleanup worker rebuilds the live media
+reference set before deletion. A referenced/shared key is preserved and the
+job closes as `skipped_shared`; incomplete reference coverage refuses the
+delete; transient R2 failures remain retryable until the queue's attempt limit.
+This delayed check is what makes deduplicated keys safe to share across
+multiple catalogue rows.
 
 ## Safe existing-data migration
 
@@ -83,9 +147,9 @@ Apply migration `0068_media_objects.sql` first. Then use the admin-only API:
 
 Referenced WebP/GIF/AVIF and private attachments are copied byte-for-byte to
 the correct bucket and read back for verification. Product PNG/JPEG migration
-uses Cloudflare Image Resizing to produce a validated WebP, uploads it, verifies
-it, and only then atomically updates `product_images` and the legacy product JSON
-mirrors. If Image Resizing is unavailable the endpoint returns
+uses the Cloudflare Images binding to produce a validated WebP, uploads it,
+verifies it, and only then atomically updates `product_images` and the legacy
+product JSON mirrors. If Cloudflare Images is unavailable the endpoint returns
 `MEDIA_TRANSFORM_UNAVAILABLE` without changing references.
 
 The pre-existing `UIUx/Animation`, `UIUx/Icons`, and `UIUx/Logo` folders are

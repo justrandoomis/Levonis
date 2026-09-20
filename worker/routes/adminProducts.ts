@@ -23,11 +23,10 @@ import { requireAdmin, badRequest, notFound, int, str, forbidden, pickFrom, Http
 import { audit } from '../lib/audit';
 import { newId } from '../lib/crypto';
 import {
+  DIMENSION_FIELDS,
   parseProductRow,
   validateProductDoc,
   projectAdmin,
-  primaryMedia,
-  upgradeMedia,
 } from '../lib/productModel';
 import type { ProductDoc, TranslationMeta } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
@@ -47,7 +46,6 @@ import { bundlesUsing, compositionConflict } from '../lib/bundleComposition';
 import {
   deleteProductPermanently,
   invalidateMediaCache,
-  runMediaCleanup,
   scanProductOrphans,
 } from '../lib/productDeletion';
 /**
@@ -62,10 +60,12 @@ import {
   markObjectsDeleted,
   partitionSweepCandidates,
   runGuardedMediaCleanup,
+  runGuardedMediaCleanupJobs,
   verifyMediaCoverage,
 } from '../lib/mediaRefs';
 import {
   localizeRespectingAuthored,
+  preflightProductSave,
   readTranslationOverrides,
   planProductSave,
   priceHistoryDeltas as sharedPriceHistoryDeltas,
@@ -74,7 +74,14 @@ import {
   saveProductAtomic,
   type HistoryField,
   type PriceDelta,
+  type ProductWriteIntent,
 } from '../lib/productPersistence';
+import {
+  ProductMediaIngestError,
+  verifyStoredProductMedia,
+  type ProductMediaReference,
+} from '../lib/productMediaIngest';
+import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 
 /** Kept under its old name: the diff is now the contract's (productPersistence). */
 export const priceHistoryDeltas = sharedPriceHistoryDeltas;
@@ -84,6 +91,51 @@ export const adminProductsRoutes = new Hono<AppContext>();
 adminProductsRoutes.use('*', requireAdmin);
 
 // ---------------------------------------------------------------- helpers
+
+/**
+ * R2 is authoritative for product-media metadata. The verifier returns those
+ * facts, rather than blessing the values a caller supplied, so copy them onto
+ * the request objects BEFORE `planProductSave` binds its D1 statements.
+ *
+ * Relation rows persist all five facts. ProductDoc media has no byte/MIME
+ * fields, so its canonical key and decoded dimensions are the applicable
+ * subset. The caller has already supplied JSON objects, hence mutating these
+ * request-local records cannot affect shared state.
+ */
+async function normalizeVerifiedProductMedia(
+  env: AppContext['Bindings'],
+  rows: Array<Record<string, unknown>>,
+  keyField: 'key' | 'r2_key'
+): Promise<void> {
+  if (rows.length === 0) return;
+  const verified = await verifyStoredProductMedia(env, rows as ProductMediaReference[]);
+  const byUrl = new Map(verified.map((media) => [media.url, media]));
+  for (const row of rows) {
+    const media = byUrl.get(typeof row.url === 'string' ? row.url : '');
+    if (!media) {
+      throw new ProductMediaIngestError(
+        'IMAGE_REFERENCE_INVALID',
+        'Product media verification did not return every requested reference'
+      );
+    }
+    row.url = media.url;
+    row[keyField] = media.key;
+    row.width = media.width;
+    row.height = media.height;
+    if (keyField === 'r2_key') {
+      row.bytes = media.bytes;
+      row.content_type = media.content_type;
+    }
+  }
+}
+
+function throwProductMediaVerificationError(error: unknown): never {
+  if (error instanceof ProductMediaIngestError) {
+    const unavailable = error.code === 'IMAGE_STORAGE_FAILED' || error.code === 'IMAGE_CONVERT_UNAVAILABLE';
+    throw new HttpError(unavailable ? 503 : 400, error.message, error.code);
+  }
+  throw error;
+}
 
 /** Same charset the v1 admin used: latin + digits + Arabic block, dash-joined.
  *  Exported so the bundles panel derives a slug through the SAME rule rather
@@ -571,7 +623,7 @@ adminProductsRoutes.get('/', async (c) => {
       `SELECT id, slug, sku, status, name, name_ar, price_iqd, pro_price_iqd,
               ${displayStockSql} AS display_stock, ${displayReservedSql} AS display_reserved,
               ${hasDirectSql} AS has_direct_sale,
-              low_stock_threshold, is_featured, brand_id, images, created_at, updated_at, doc_version,
+              low_stock_threshold, is_featured, brand_id, created_at, updated_at, doc_version,
               composition,
               COALESCE((SELECT SUM(i.qty) FROM order_items i
                          JOIN orders o ON o.id = i.order_id
@@ -585,6 +637,10 @@ adminProductsRoutes.get('/', async (c) => {
       .bind(...params)
       .first<{ n: number }>(),
   ]);
+  const images = await loadAuthoritativeProductImages(
+    c.env.DB,
+    list.results.map((product) => String(product.id))
+  );
 
   return c.json({
     success: true,
@@ -592,8 +648,6 @@ adminProductsRoutes.get('/', async (c) => {
     limit,
     offset,
     products: list.results.map((r) => {
-      const media = upgradeMedia(r.images);
-      const primary = primaryMedia(media) ?? null;
       return {
         id: r.id,
         slug: r.slug,
@@ -616,7 +670,7 @@ adminProductsRoutes.get('/', async (c) => {
         // instead of opening an editor that will refuse (COMPOSITION_PRODUCT).
         composition: String(r.composition ?? ''),
         brand_id: (r.brand_id as string | null) ?? null,
-        image: primary?.url ?? '',
+        image: images.get(String(r.id)) ?? '',
         created_at: (r.created_at as string | null) ?? null,
         updated_at: r.updated_at,
         doc_version: r.doc_version,
@@ -962,9 +1016,9 @@ adminProductsRoutes.post('/maintenance/orphans/cleanup', async (c) => {
  *      ever. Past `MEDIA_CLEANUP_MAX_ATTEMPTS` the job moves to `failed` with
  *      its last error, where a human can read it.
  *
- * The full-product delete path (below) still calls `runMediaCleanup` directly
- * and deliberately: its product is already gone, so there is nothing left to
- * re-check, and its jobs land in the same queue for this endpoint to finish.
+ * Full-product deletion now uses the same global gate: the product may be
+ * gone while a banner, receipt or immutable order snapshot still owns its
+ * bytes.
  */
 adminProductsRoutes.post('/maintenance/media-cleanup/retry', async (c) => {
   const admin = c.get('user')!;
@@ -1126,6 +1180,25 @@ adminProductsRoutes.post('/', async (c) => {
 
   const doc = validateProductDoc(body);
 
+  // Product-level dimensions follow the same partial-update contract as the
+  // selector rows: an omitted field preserves the stored measurement, while
+  // an explicit null clears only that field. `validateProductDoc` accepts both
+  // the form's nested `dimensions` object and the import/API flat shape, but
+  // necessarily parses an absent value as null; carry omissions forward here
+  // where the previous document is available.
+  if (prev) {
+    const nested = body.dimensions;
+    const dimensionSource =
+      nested && typeof nested === 'object' && !Array.isArray(nested)
+        ? (nested as Record<string, unknown>)
+        : body;
+    for (const field of DIMENSION_FIELDS) {
+      if (!Object.prototype.hasOwnProperty.call(dimensionSource, field)) {
+        doc.dimensions[field] = prev.dimensions[field];
+      }
+    }
+  }
+
   // §11 is an authorization rule in BOTH directions: an assistant admin can
   // neither read cost nor write it. Rather than silently dropping the field
   // (which would let a stale panel wipe a real cost), the request is refused
@@ -1224,19 +1297,26 @@ adminProductsRoutes.post('/', async (c) => {
     body.relations && typeof body.relations === 'object' && !Array.isArray(body.relations)
       ? (body.relations as Record<string, unknown>)
       : null;
-  let plan;
+
+  const saveIntent: ProductWriteIntent = {
+    mode: prev ? 'update' : 'create',
+    doc,
+    prev,
+    relations,
+    catalogIds: Array.isArray(body.catalog_ids)
+      ? (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string')
+      : undefined,
+    actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
+    translations: localized.fields,
+  };
+
+  // The media verifier protects every accepted object in D1. Reject the
+  // complete product/relations shape while this request is still read-only,
+  // so an invalid binding cannot leave a guard behind for a product that was
+  // never saved. The authoritative media metadata below changes bound values,
+  // therefore the disposable preflight plan is rebuilt afterwards.
   try {
-    plan = await planProductSave(c.env.DB, {
-      mode: prev ? 'update' : 'create',
-      doc,
-      prev,
-      relations,
-      catalogIds: Array.isArray(body.catalog_ids)
-        ? (body.catalog_ids as unknown[]).filter((x): x is string => typeof x === 'string')
-        : undefined,
-      actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
-      translations: localized.fields,
-    });
+    await preflightProductSave(c.env.DB, saveIntent);
   } catch (e) {
     if (e instanceof HttpError && e.code === 'RELATIONS_VALIDATION') {
       const errors = Array.isArray(e.details?.errors) ? (e.details!.errors as string[]) : [e.message];
@@ -1244,6 +1324,48 @@ adminProductsRoutes.post('/', async (c) => {
     }
     throw e;
   }
+
+  // A `/files/<key>.webp` string is only an address-shaped claim. Prove every
+  // caller-supplied object and replace its duplicate metadata with the facts
+  // read from R2/decoded bytes BEFORE the planner binds INSERT/UPDATE values.
+  // Malformed/non-array relation collections are left to the planner so they
+  // keep returning the ordinary RELATIONS_VALIDATION response.
+  try {
+    if (relations) {
+      const images = relations.images;
+      if (
+        Array.isArray(images) &&
+        images.length <= 400 &&
+        images.every((image) => !!image && typeof image === 'object' && !Array.isArray(image))
+      ) {
+        await normalizeVerifiedProductMedia(
+          c.env,
+          images as Array<Record<string, unknown>>,
+          'r2_key'
+        );
+      }
+    } else {
+      await normalizeVerifiedProductMedia(
+        c.env,
+        doc.media as unknown as Array<Record<string, unknown>>,
+        'key'
+      );
+    }
+  } catch (error) {
+    throwProductMediaVerificationError(error);
+  }
+
+  let plan;
+  try {
+    plan = await planProductSave(c.env.DB, saveIntent);
+  } catch (e) {
+    if (e instanceof HttpError && e.code === 'RELATIONS_VALIDATION') {
+      const errors = Array.isArray(e.details?.errors) ? (e.details!.errors as string[]) : [e.message];
+      return c.json({ success: false, code: 'VALIDATION', errors }, 400);
+    }
+    throw e;
+  }
+
   try {
     await saveProductAtomic(c.env.DB, plan, [
       {
@@ -1526,8 +1648,9 @@ async function deleteOrExplain(
  * that is already deleted — the worst possible answer, because the owner then
  * presses the button again on an id that no longer exists.
  *
- * `runMediaCleanup` already records rather than throws; this closes the other
- * two, and reports what did not finish instead of pretending it did.
+ * The exact jobs run through the global guarded cleanup, so a non-product
+ * reference (banner, immutable order snapshot, invoice, merchant page, …)
+ * can veto the R2 delete after the product transaction commits.
  */
 async function afterCommit(
   c: Context<AppContext>,
@@ -1535,15 +1658,26 @@ async function afterCommit(
   id: string,
   result: Awaited<ReturnType<typeof deleteProductPermanently>>,
   action: string
-): Promise<{ deleted: string[]; pending: number; invalidated: string[]; warnings: string[] }> {
+): Promise<{
+  deleted: string[];
+  shared: string[];
+  failed: Array<{ key: string; error: string }>;
+  invalidated: string[];
+  warnings: string[];
+}> {
   const warnings: string[] = [];
-  let cleanup: { deleted: string[]; failed: Array<{ key: string; error: string }> } = { deleted: [], failed: [] };
+  let cleanup: { deleted: string[]; shared: string[]; failed: Array<{ key: string; error: string }> } = {
+    deleted: [],
+    shared: [],
+    failed: [],
+  };
   try {
-    cleanup = await runMediaCleanup(c.env, result.media_jobs);
+    cleanup = await runGuardedMediaCleanupJobs(c.env, result.media_jobs);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('media cleanup threw after a committed delete:', msg);
     warnings.push(`media cleanup: ${msg.slice(0, 200)}`);
+    cleanup.failed = result.media_jobs.map((job) => ({ key: job.key, error: msg.slice(0, 400) }));
   }
   let invalidated: string[] = [];
   try {
@@ -1556,7 +1690,7 @@ async function afterCommit(
       rows_deleted_by_table: result.rows_deleted_by_table,
       rows_unlinked_by_table: result.rows_unlinked_by_table,
       r2_objects_deleted: cleanup.deleted.length,
-      r2_objects_shared_skipped: result.r2_objects_shared_skipped.length,
+      r2_objects_shared_skipped: result.r2_objects_shared_skipped.length + cleanup.shared.length,
       r2_cleanup_pending: cleanup.failed.length,
     });
   } catch (e) {
@@ -1567,7 +1701,8 @@ async function afterCommit(
   }
   return {
     deleted: cleanup.deleted,
-    pending: cleanup.failed.length,
+    shared: cleanup.shared,
+    failed: cleanup.failed,
     invalidated,
     warnings,
   };
@@ -1632,8 +1767,8 @@ adminProductsRoutes.delete('/:id', async (c) => {
     // pending job, not a half-deleted product — and never a failed response for
     // a delete that already happened.
     const after = await afterCommit(c, admin.id, id, result, 'product_v2.delete_permanent');
-    const cleanup = { deleted: after.deleted, failed: { length: after.pending } };
     const invalidated = after.invalidated;
+    const shared = [...new Set([...result.r2_objects_shared_skipped, ...after.shared])];
 
     return c.json({
       ...(after.warnings.length ? { warnings: after.warnings } : {}),
@@ -1644,10 +1779,10 @@ adminProductsRoutes.delete('/:id', async (c) => {
       rows_deleted_by_table: result.rows_deleted_by_table,
       rows_unlinked_by_table: result.rows_unlinked_by_table,
       media_keys_found: result.media_keys_found,
-      r2_objects_deleted: cleanup.deleted,
-      r2_objects_shared_skipped: result.r2_objects_shared_skipped,
-      r2_cleanup_pending: cleanup.failed.length,
-      ...(cleanup.failed.length ? { r2_cleanup_errors: cleanup.failed } : {}),
+      r2_objects_deleted: after.deleted,
+      r2_objects_shared_skipped: shared,
+      r2_cleanup_pending: after.failed.length,
+      ...(after.failed.length ? { r2_cleanup_errors: after.failed } : {}),
       cache_keys_invalidated: invalidated,
     });
   }
@@ -1683,8 +1818,8 @@ adminProductsRoutes.delete('/:id', async (c) => {
     });
   }
   const after = await afterCommit(c, admin.id, id, result, 'product_v2.delete');
-  const cleanup = { deleted: after.deleted, failed: { length: after.pending } };
   const invalidated = after.invalidated;
+  const shared = [...new Set([...result.r2_objects_shared_skipped, ...after.shared])];
   return c.json({
     ...(after.warnings.length ? { warnings: after.warnings } : {}),
     success: true,
@@ -1693,9 +1828,10 @@ adminProductsRoutes.delete('/:id', async (c) => {
     product_deleted: result.product_deleted,
     rows_deleted_by_table: result.rows_deleted_by_table,
     rows_unlinked_by_table: result.rows_unlinked_by_table,
-    r2_objects_deleted: cleanup.deleted,
-    r2_objects_shared_skipped: result.r2_objects_shared_skipped,
-    r2_cleanup_pending: cleanup.failed.length,
+    r2_objects_deleted: after.deleted,
+    r2_objects_shared_skipped: shared,
+    r2_cleanup_pending: after.failed.length,
+    ...(after.failed.length ? { r2_cleanup_errors: after.failed } : {}),
     cache_keys_invalidated: invalidated,
   });
 });

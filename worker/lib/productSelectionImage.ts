@@ -1,49 +1,133 @@
-import { comboKey } from './inventory';
-import { primaryMedia, primaryMediaFirst, type ProductDoc } from './productModel';
-import type { ProductRelationsView } from './productOverlay';
+import {
+  productImageForSelection as resolveProductImageForSelection,
+  productVariantIdForSelection,
+} from '@levonis/pricing/productSelectionMedia';
+import { primaryMediaFirst, type ProductDoc } from './productModel';
+import {
+  isActiveProductImageRow,
+  type ImageRow,
+  type ProductRelationsView,
+  type VariantRow,
+} from './productOverlay';
 
 export interface ProductImageSelection {
   optionValueIds: string[];
   colorId: string | null;
 }
 
+/** D1 deployments have historically used a 100-bound-parameter ceiling. */
+const PRODUCT_IMAGE_BATCH = 80;
+
+/**
+ * Resolve directly from the authoritative relation rows.
+ *
+ * This is intentionally separate from the legacy ProductDoc adapter below:
+ * list/card readers must never resurrect `products.images` merely because all
+ * relation rows were quarantined (or because no safe row survived). The
+ * canonical-row predicate rejects external URLs, URL/key mismatches and
+ * quarantine provenance before the shared selection resolver sees them.
+ */
+export function productImageFromRelations(
+  images: readonly ImageRow[],
+  selection: ProductImageSelection = { optionValueIds: [], colorId: null },
+  variants: readonly VariantRow[] = []
+): string {
+  const media = primaryMediaFirst(
+    images
+      .filter(isActiveProductImageRow)
+      .map((image) => ({
+        url: image.url,
+        primary: image.is_primary === 1,
+        order: image.sort_order,
+        option_value_id: image.option_value_id,
+        color_id: image.color_id,
+        variant_id: image.variant_id,
+      }))
+  );
+  const variantId = productVariantIdForSelection(variants, {
+    optionValueIds: selection.optionValueIds,
+    colorId: selection.colorId,
+  });
+  return resolveProductImageForSelection(media, {
+    optionValueIds: selection.optionValueIds,
+    colorId: selection.colorId,
+    variantId,
+  })?.url ?? '';
+}
+
+/**
+ * One bounded relation read for product cards, chunked below D1's parameter
+ * ceiling. Missing/rolling relation schema fails closed to an empty image;
+ * the stale JSON mirror is never a fallback or a hotlink source.
+ */
+export async function loadAuthoritativeProductImages(
+  db: D1Database,
+  productIds: readonly string[]
+): Promise<Map<string, string>> {
+  const ids = [...new Set(productIds.map(String).filter(Boolean))];
+  const result = new Map(ids.map((id) => [id, '']));
+
+  for (let offset = 0; offset < ids.length; offset += PRODUCT_IMAGE_BATCH) {
+    const chunk = ids.slice(offset, offset + PRODUCT_IMAGE_BATCH);
+    try {
+      const { results } = await db
+        .prepare(
+          `SELECT * FROM product_images
+            WHERE product_id IN (${chunk.map(() => '?').join(', ')})
+            ORDER BY product_id, sort_order, id`
+        )
+        .bind(...chunk)
+        .all<ImageRow>();
+      const byProduct = new Map<string, ImageRow[]>();
+      for (const image of results ?? []) {
+        const rows = byProduct.get(image.product_id);
+        if (rows) rows.push(image);
+        else byProduct.set(image.product_id, [image]);
+      }
+      for (const id of chunk) result.set(id, productImageFromRelations(byProduct.get(id) ?? []));
+    } catch (error) {
+      // Authority being unavailable is not permission to use an unverified
+      // mirror. Cards remain useful without a thumbnail and recover after the
+      // migration/read outage does.
+      console.error(
+        `product image authority unavailable: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  return result;
+}
+
 /**
  * One image precedence rule for cart, checkout and immutable order snapshots:
- * selected colour → modelled combination → selected option → product primary.
- * Bound relational media wins over legacy option/color image strings, while
- * those strings remain backward-compatible fallbacks for old products.
+ * exact modelled combination → selected colour → selected option →
+ * product primary. `product_images`/`doc.media` is the only authoritative
+ * image source; the legacy option/color image columns are intentionally not
+ * consulted here.
  */
 export function productImageForSelection(
   doc: ProductDoc,
   selection: ProductImageSelection,
   view?: ProductRelationsView | null
 ): string {
+  // A real loaded view always carries `images`, including an empty array. In
+  // that case the rows are authoritative and an empty/quarantined gallery is
+  // genuinely empty. The fallback only supports callers with no relation
+  // view (and old partial fixtures that predate the images member).
+  if (view && Array.isArray(view.images)) {
+    return productImageFromRelations(view.images, selection, view.variants ?? []);
+  }
   const media = primaryMediaFirst(doc.media);
-  const bound = (predicate: (m: ProductDoc['media'][number]) => boolean) => media.find(predicate)?.url || '';
+  const variantId = view
+    ? productVariantIdForSelection(view.variants, {
+        optionValueIds: selection.optionValueIds,
+        colorId: selection.colorId,
+      })
+    : null;
 
-  if (selection.colorId) {
-    const colorBound = bound((m) => m.color_id === selection.colorId);
-    if (colorBound) return colorBound;
-    const colorImage = doc.colors.find((c) => c.id === selection.colorId)?.image;
-    if (colorImage) return colorImage;
-  }
-
-  if (view) {
-    const key = comboKey({ option_value_ids: selection.optionValueIds, color_id: selection.colorId });
-    const variantId = view.variants.find((v) => v.active !== 0 && v.combo_key === key)?.id;
-    if (variantId) {
-      const variantBound = bound((m) => m.variant_id === variantId);
-      if (variantBound) return variantBound;
-    }
-  }
-
-  for (const optionId of selection.optionValueIds) {
-    const optionBound = bound((m) => m.option_value_id === optionId);
-    if (optionBound) return optionBound;
-    const optionImage = doc.options.find((o) => o.id === optionId)?.image;
-    if (optionImage) return optionImage;
-  }
-
-  return primaryMedia(doc.media)?.url ?? '';
+  return resolveProductImageForSelection(media, {
+    optionValueIds: selection.optionValueIds,
+    colorId: selection.colorId,
+    variantId,
+  })?.url ?? '';
 }
-

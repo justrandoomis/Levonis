@@ -57,6 +57,7 @@ function setup() {
             ('oi5','ORD-4','p2','PLA White','',1,25000,25000,'','[]','',NULL,NULL),
             ('oi6','ORD-5','p2','PLA White','',1,25000,25000,'','[]','',NULL,NULL),
             ('oiX','ORD-X','p2','PLA White','',1,25000,25000,'','[]','',NULL,NULL);
+    UPDATE order_items SET image_snapshot='/files/products/p1/sold.webp' WHERE id='oi1';
     INSERT INTO order_item_units (id, order_id, order_item_id, product_id, owner_user_id, unit_index, delivered_at, warranty_base_months, warranty_start_at, warranty_end_at)
      VALUES ('u1','ORD-1','oi1','p1','buyer',1,'2026-01-04T10:00:00.000Z',12,'2026-01-04T10:00:00.000Z','2099-01-04T10:00:00.000Z'),
             ('u2','ORD-1','oi1','p1','buyer',2,'2026-01-04T10:00:00.000Z',12,'2026-01-04T10:00:00.000Z','2099-01-04T10:00:00.000Z');
@@ -226,7 +227,7 @@ test('units mask the serial, report linked as mine/other/none and never name the
   assert.equal(u1.warranty.state, 'active');
   assert.ok(u1.warranty.remaining_days > 0);
   assert.equal(u1.product.slug, 'bambu-a1');
-  assert.equal(u1.product.image, 'https://img/a1.jpg');
+  assert.equal(u1.product.image, '/files/products/p1/sold.webp');
   assert.equal(u1.replaced, false);
 
   assert.equal(u2.serial, '****ZZZZ');
@@ -244,6 +245,23 @@ test('units mask the serial, report linked as mine/other/none and never name the
   // An order with no serialized items answers with an empty list, not a 404.
   const none = await json(await appAs(db, buyer).request('/api/orders/ORD-2/units'));
   assert.deepEqual(none.units, []);
+});
+
+test('units keep an empty image snapshot after the catalogue gains an image', async () => {
+  const { db, raw } = setup();
+  raw.exec(`
+    UPDATE order_items SET image_snapshot='' WHERE id='oi1';
+    UPDATE products SET images='[]' WHERE id='p1';
+  `);
+  const app = appAs(db, buyer);
+
+  const before = await json(await app.request('/api/orders/ORD-1/units'));
+  assert.equal(before.units[0].product.image, '');
+
+  raw.prepare('UPDATE products SET images = ? WHERE id = ?')
+    .run('["/files/products/p1/added-after-order.webp"]', 'p1');
+  const after = await json(await app.request('/api/orders/ORD-1/units'));
+  assert.equal(after.units[0].product.image, '', 'live catalogue media cannot rewrite an empty order snapshot');
 });
 
 // --------------------------------------------------------------------- cancel

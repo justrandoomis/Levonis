@@ -68,6 +68,7 @@ import {
 } from '../lib/templateFamilies';
 import { compareProducts, type CompareResult } from '../lib/compareSpecs';
 import { adviseFromSpecs, type PowerAdvice } from '../lib/powerAdvice';
+import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 
 export const compareRoutes = new Hono<AppContext>();
 
@@ -102,7 +103,7 @@ const CANDIDATE_POOL = 120;
 /** The columns a comparison column is drawn from. Deliberately not `SELECT *`:
  *  this is a public route, and `product_cost_iqd` is one column away. */
 export const PRODUCT_COLUMNS =
-  'id, slug, status, name, name_ar, name_ku, images, price_iqd, spec_fields, ' +
+  'id, slug, status, name, name_ar, name_ku, price_iqd, spec_fields, ' +
   'template_family, category_id, sub_category_id, brand_id, condition_doc';
 
 export interface ProductRow {
@@ -112,7 +113,6 @@ export interface ProductRow {
   name: string;
   name_ar: string;
   name_ku: string;
-  images: string;
   price_iqd: number;
   spec_fields: string;
   template_family: string | null;
@@ -173,21 +173,6 @@ const tri = (ar: string, en: string, ckb: string): Trilingual => ({
   en: en || ar || ckb,
   ckb: ckb || ar || en,
 });
-
-/** The first published image, or nothing. Same shape `products.ts` stores and
- *  the same tolerance for a malformed list: a broken picture must never be the
- *  reason a comparison refuses to open. */
-function firstImage(raw: unknown): string | null {
-  const list = safeParse<unknown>(String(raw ?? '[]'), []);
-  if (!Array.isArray(list) || list.length === 0) return null;
-  const first = list[0];
-  if (typeof first === 'string' && first) return first;
-  // 0018's richer media entries are objects carrying a url.
-  if (first && typeof first === 'object' && typeof (first as { url?: unknown }).url === 'string') {
-    return (first as { url: string }).url || null;
-  }
-  return null;
-}
 
 /**
  * The stored spec sheet as an object, whatever is actually in the column.
@@ -321,13 +306,13 @@ export function powerOf(p: Placed): PowerAdvice {
   return adviseFromSpecs(p.specs);
 }
 
-export function cardOf(p: Placed): CompareProductCard {
+export function cardOf(p: Placed, image: string | null = null): CompareProductCard {
   const leaf = p.branch[0];
   return {
     id: p.row.id,
     slug: p.row.slug,
     name: tri(p.row.name_ar, p.row.name, p.row.name_ku),
-    image: firstImage(p.row.images),
+    image,
     price_iqd: Number(p.row.price_iqd) || 0,
     product_type: p.productType,
     section: leaf
@@ -438,7 +423,11 @@ compareRoutes.get('/', async (c) => {
     );
   }
 
-  const tax = taxonomy(await loadCatalogs(c.env.DB));
+  const [catalogRows, images] = await Promise.all([
+    loadCatalogs(c.env.DB),
+    loadAuthoritativeProductImages(c.env.DB, rows.map((row) => row.id)),
+  ]);
+  const tax = taxonomy(catalogRows);
   const placed = rows.map((row) => place(row, tax));
 
   const blank = placed.find((p) => !hasAnySpec(p.specs));
@@ -451,7 +440,7 @@ compareRoutes.get('/', async (c) => {
     );
   }
 
-  const cards = placed.map(cardOf);
+  const cards = placed.map((product) => cardOf(product, images.get(product.row.id) || null));
   /**
    * ALIGNED WITH `products`, INDEX FOR INDEX, and emitted for a single column
    * too. The product page opens «قارن» with one machine already in place and
@@ -553,7 +542,7 @@ export async function rankCompareCandidates(
     .bind(...bindings)
     .all<ProductRow>();
 
-  const scored: Array<{ card: CompareProductCard; score: number }> = [];
+  const scored: Array<{ placed: Placed; score: number }> = [];
   for (const row of results ?? []) {
     const placed = place(row, tax);
     // A sheet that parses to nothing usable is not a candidate, whatever the
@@ -574,11 +563,20 @@ export async function rankCompareCandidates(
     // rather than leading, so a search for «بامبو» inside the printers still
     // puts printers first.
     if (pattern) score += 1;
-    scored.push({ card: cardOf(placed), score });
+    scored.push({ placed, score });
   }
 
-  scored.sort((a, b) => b.score - a.score || a.card.price_iqd - b.card.price_iqd);
-  return scored.slice(0, limit).map((x) => x.card);
+  scored.sort(
+    (a, b) =>
+      b.score - a.score ||
+      (Number(a.placed.row.price_iqd) || 0) - (Number(b.placed.row.price_iqd) || 0)
+  );
+  const selected = scored.slice(0, limit).map((candidate) => candidate.placed);
+  const images = await loadAuthoritativeProductImages(
+    db,
+    selected.map((candidate) => candidate.row.id)
+  );
+  return selected.map((candidate) => cardOf(candidate, images.get(candidate.row.id) || null));
 }
 
 compareRoutes.get('/candidates', async (c) => {
@@ -600,12 +598,16 @@ compareRoutes.get('/candidates', async (c) => {
     .first<ProductRow>();
   if (!anchor) throw notFound('Product not found');
 
-  const tax = taxonomy(await loadCatalogs(c.env.DB));
+  const [catalogRows, images] = await Promise.all([
+    loadCatalogs(c.env.DB),
+    loadAuthoritativeProductImages(c.env.DB, [anchor.id]),
+  ]);
+  const tax = taxonomy(catalogRows);
   const anchorPlaced = place(anchor, tax);
 
   return c.json({
     success: true,
-    for: cardOf(anchorPlaced),
+    for: cardOf(anchorPlaced, images.get(anchor.id) || null),
     products: await rankCompareCandidates(c.env.DB, anchorPlaced, tax, q, MAX_CANDIDATES),
   });
 });

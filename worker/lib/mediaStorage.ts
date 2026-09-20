@@ -88,8 +88,7 @@ export function buildMediaKey(input: MediaKeyInput): string {
  */
 export function isOwnedMediaUrl(url: string): boolean {
   if (!url.startsWith('/files/')) return false;
-  if (url.includes('..')) return false;
-  return /^\/files\/[A-Za-z0-9][A-Za-z0-9._\-/]*$/.test(url);
+  return isSafeMediaKey(url.slice('/files/'.length));
 }
 
 /** Strict validation for stored/requested keys; percent escapes are refused. */
@@ -318,10 +317,14 @@ export interface StoredMediaMetadata {
 
 async function recordMediaObject(db: D1Database | undefined, meta: StoredMediaMetadata): Promise<void> {
   if (!db) return;
-  const originalName = meta.originalName
-    ? meta.originalName.split(/[\\/]/).pop()?.replace(/[^\p{L}\p{N}._ -]/gu, '').slice(0, 180) || null
-    : null;
+  // Metadata is an index over an already-successful R2 write, never part of
+  // its commit. This function is deliberately total: a rolling migration or
+  // transient D1 failure cannot turn a created object into an unreported
+  // orphan by throwing before the writer returns `created_new` to its caller.
   try {
+    const originalName = meta.originalName
+      ? meta.originalName.split(/[\\/]/).pop()?.replace(/[^\p{L}\p{N}._ -]/gu, '').slice(0, 180) || null
+      : null;
     await db
       .prepare(
         `INSERT INTO file_objects
@@ -432,6 +435,8 @@ export interface StoreMediaResult {
   key: string;
   mime: string;
   bytes: number;
+  /** False when the key existed before this storage call. */
+  created_new: boolean;
   /** True when these bytes were re-encoded here rather than stored as they arrived. */
   converted: boolean;
 }
@@ -478,7 +483,7 @@ export async function storeMedia(
     extension: extensionFor(mime),
   });
 
-  await putMediaObject(
+  const write = await putMediaObject(
     env,
     {
       key,
@@ -505,7 +510,12 @@ export async function storeMedia(
     }
   );
 
-  return { key, mime, bytes: bytes.byteLength, converted };
+  return { key, mime, bytes: bytes.byteLength, created_new: write.created_new, converted };
+}
+
+export interface MediaWriteResult {
+  /** True only when this call created a key which did not exist beforehand. */
+  created_new: boolean;
 }
 
 export async function putMediaObject(
@@ -513,11 +523,15 @@ export async function putMediaObject(
   meta: StoredMediaMetadata,
   value: ArrayBuffer | ArrayBufferView | ReadableStream,
   options?: R2PutOptions
-): Promise<void> {
+): Promise<MediaWriteResult> {
   if (!isSafeMediaKey(meta.key)) throw new Error('Unsafe media key');
   const binding = mediaBindingName(env, meta.visibility);
+  const bucket = mediaBucket(env, meta.visibility);
   try {
-    await mediaBucket(env, meta.visibility).put(meta.key, value, options);
+    const existed = (await bucket.head(meta.key)) !== null;
+    await bucket.put(meta.key, value, options);
+    await recordMediaObject(env.DB, meta);
+    return { created_new: !existed };
   } catch (error) {
     reportMediaFallback({
       reason: 'primary_unavailable',
@@ -529,7 +543,67 @@ export async function putMediaObject(
     });
     throw new MediaBucketUnavailableError(binding, error);
   }
-  await recordMediaObject(env.DB, meta);
+}
+
+/**
+ * Content-addressed write: never replaces bytes already stored under `key`.
+ * R2's conditional put closes the HEAD/PUT race; `null` means another writer
+ * won and therefore this caller must not delete the shared object on rollback.
+ */
+export async function putMediaObjectIfAbsent(
+  env: Pick<Env, 'DB' | 'BUCKET' | 'R2_PUBLIC' | 'R2_PRIVATE'>,
+  meta: StoredMediaMetadata,
+  value: ArrayBuffer | ArrayBufferView | ReadableStream,
+  options?: Omit<R2PutOptions, 'onlyIf'>
+): Promise<MediaWriteResult> {
+  if (!isSafeMediaKey(meta.key)) throw new Error('Unsafe media key');
+
+  // Include legacy during the migration: an object already reachable by this
+  // stable key is preexisting even if it has not yet moved buckets.
+  const existing = await headMediaObject(env, meta.visibility, meta.key);
+  if (existing) {
+    // `meta` describes the bytes the caller hoped to create, not the object
+    // HEAD found. Recording it here could bless a corrupted/pre-seeded key as
+    // valid WebP without ever reading the stored body. The product pipeline
+    // verifies existing bytes separately; generic callers leave existing
+    // ledger metadata untouched.
+    return { created_new: false };
+  }
+
+  const binding = mediaBindingName(env, meta.visibility);
+  try {
+    const created = await mediaBucket(env, meta.visibility).put(meta.key, value, {
+      ...options,
+      onlyIf: { etagDoesNotMatch: '*' },
+    });
+    // Real R2 returns null when the precondition lost. Lightweight test
+    // buckets often return void after a successful put, which is still a
+    // successful create and must not be mistaken for the null sentinel.
+    const createdNew = created !== null;
+    if (createdNew) await recordMediaObject(env.DB, meta);
+    return { created_new: createdNew };
+  } catch (error) {
+    reportMediaFallback({
+      reason: 'primary_unavailable',
+      operation: 'put',
+      visibility: meta.visibility,
+      binding,
+      key: meta.key,
+      error: describeError(error),
+    });
+    throw new MediaBucketUnavailableError(binding, error);
+  }
+}
+
+/** Rollback helper whose type forces callers to carry creation provenance. */
+export async function deleteMediaObjectIfCreated(
+  env: MediaEnv,
+  visibility: MediaVisibility,
+  object: { key: string; created_new: boolean }
+): Promise<boolean> {
+  if (!object.created_new) return false;
+  await deleteMediaObject(env, visibility, object.key);
+  return true;
 }
 
 /**

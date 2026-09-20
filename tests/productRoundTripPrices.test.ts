@@ -24,6 +24,7 @@ import { productRoutes } from '../worker/routes/products';
 import { hydrateRelations, type RelationsResponse } from '../src/components/adminProducts/form/model';
 import { toEditorDoc } from '../src/components/adminProducts/types';
 import { resolveUnitPrice, type PricingProduct } from '../worker/lib/pricing';
+import { productMediaFixtureEnv } from './fixtures/productMedia';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 
@@ -37,7 +38,8 @@ const mount = (a: Parameters<Parameters<typeof stubApp>[2]>[0]) => {
 function setup() {
   const raw = freshDb();
   raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en) VALUES ('brd_bambu','bambu','بامبو','Bambu Lab')").run();
-  return { raw, app: stubApp(asD1(raw), OWNER, mount) };
+  const media = productMediaFixtureEnv();
+  return { raw, app: stubApp(asD1(raw), OWNER, mount, { env: media.env }) };
 }
 
 const apply = async (a: App, text: string, extra: Record<string, unknown> = {}) => {
@@ -57,15 +59,15 @@ prime_price_iqd=711000
 pro_price_iqd=625000
 brand=bambu
 images.1.id=img_hero
-images.1.url=/files/products/catalog/gallery/hero00001.jpg
+images.1.url=/files/products/catalog/gallery/hero00001.webp
 images.1.alt_en=Hero
 images.1.primary=true
 images.2.id=img_combo
-images.2.url=/files/products/catalog/gallery/combo0002.jpg
+images.2.url=/files/products/catalog/gallery/combo0002.webp
 images.2.alt_en=Combo shot
 images.2.option_value_id=opt_combo
 images.3.id=img_black
-images.3.url=/files/products/catalog/gallery/black0003.jpg
+images.3.url=/files/products/catalog/gallery/black0003.webp
 images.3.alt_en=Black
 images.3.color_id=col_black
 options.1.id=opt_base

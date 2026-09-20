@@ -60,6 +60,13 @@ export const OWNED_TABLES: OwnedTable[] = [
     table: 'product_color_option_links',
     by: { sql: 'color_id IN (SELECT id FROM product_colors WHERE product_id = ?1)' },
   },
+  // A bundle owns its selector allow-list and component rows. Keep these
+  // explicit instead of trusting ON DELETE CASCADE: D1 does not promise that
+  // every request has foreign-key enforcement enabled.
+  {
+    table: 'bundle_component_choices',
+    by: { sql: 'component_id IN (SELECT id FROM bundle_components WHERE bundle_product_id = ?1)' },
+  },
   // A back-in-stock alert (0092) belongs with the link rows and not down in the
   // customer-state section below, for the reason stated at the top of this list:
   // it names an option value AND a colour, so it has to be gone before
@@ -146,9 +153,13 @@ export const OWNED_TABLES: OwnedTable[] = [
     by: {
       sql:
         'color_id IN (SELECT id FROM product_colors WHERE product_id = ?1) ' +
-        'OR cart_item_id IN (SELECT id FROM cart_items WHERE product_id = ?1)',
+        'OR cart_item_id IN (SELECT id FROM cart_items WHERE product_id = ?1) ' +
+        'OR component_id IN (SELECT id FROM bundle_components WHERE bundle_product_id = ?1)',
     },
   },
+  // Both tables that reference a component are already gone by this point,
+  // so this remains valid with foreign keys either enabled or disabled.
+  { table: 'bundle_components', by: { sql: 'bundle_product_id = ?1' } },
   { table: 'cart_items', by: { column: 'product_id' } },
   // ---- reviews describe THIS product and nothing else --------------------
   { table: 'reviews', by: { column: 'product_id' } },
@@ -157,6 +168,11 @@ export const OWNED_TABLES: OwnedTable[] = [
   //  BLOCKING, not owned — they belong to a different product's offer.)
   { table: 'bundle_config', by: { column: 'product_id' } },
   { table: 'bundle_items', by: { column: 'product_id' } },
+  // Promotion configuration is polymorphic, so it has no product_id column
+  // for the registry scanner to discover. Product-scoped rows still belong to
+  // the product and must not survive deletion or later id reuse.
+  { table: 'offer_limits', by: { sql: "subject_type = 'product' AND subject_id = ?1" } },
+  { table: 'offer_windows', by: { sql: "subject_type = 'product' AND subject_id = ?1" } },
   { table: 'mystery_offer_secrets', by: { column: 'product_id' } },
   { table: 'mystery_offers', by: { column: 'product_id' } },
   // ---- the product row itself is deleted last, by the caller ------------
@@ -236,6 +252,13 @@ export interface FrozenTable {
 }
 
 export const FROZEN_HISTORY: FrozenTable[] = [
+  {
+    table: 'product_import_items',
+    columns: ['product_id'],
+    why:
+      '0099. A terminal per-item import checkpoint that carries its own key, name, action and reason; it lives ' +
+      'and dies with the import report, and must remain available for idempotent replay after catalogue deletion.',
+  },
   {
     table: 'order_items',
     columns: ['option_id', 'color_id'],
@@ -839,6 +862,104 @@ export interface MediaCleanupOutcome {
   failed: Array<{ key: string; error: string }>;
 }
 
+/** Product saves get enough time to commit after validating/staging a key. */
+export const MEDIA_OBJECT_PROTECTION_MINUTES = 15;
+/** R2 deletes are short; a longer lease only bounds recovery after a crash. */
+export const MEDIA_OBJECT_CLAIM_MINUTES = 5;
+
+const mediaGuardColumns = async (db: DeletionDb): Promise<Set<string>> =>
+  columnsOf(db, 'media_object_guards');
+
+/**
+ * Linearize a product-media attachment against every destructive media path.
+ *
+ * The guard row exists independently of a cleanup job, which matters when an
+ * attach starts first and a detach queues the same key a moment later. The
+ * UPSERT and cleanup's claim UPDATE are mutually exclusive SQLite writes: the
+ * winner either publishes a future protection or a non-empty claim token.
+ */
+export async function protectMediaObjectFromCleanup(
+  db: DeletionDb,
+  key: string,
+  minutes = MEDIA_OBJECT_PROTECTION_MINUTES
+): Promise<boolean> {
+  if (!isSafeMediaKey(key)) return false;
+  const columns = await mediaGuardColumns(db);
+  if (!columns.has('protected_until') || !columns.has('claim_token') || !columns.has('claim_until')) {
+    throw new Error('media_object_guards is not installed');
+  }
+  const modifier = `+${Math.max(1, Math.trunc(minutes))} minutes`;
+  // A cleanup may finish between our first no-op UPSERT and read-back. One
+  // retry then acquires protection after the claim was released.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await db.prepare(
+      `INSERT INTO media_object_guards
+         (object_key, protected_until, claim_token, claim_until, updated_at)
+       VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ','now', ?), '', '', strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+       ON CONFLICT(object_key) DO UPDATE SET
+         protected_until = max(media_object_guards.protected_until, excluded.protected_until),
+         updated_at = excluded.updated_at
+       WHERE media_object_guards.claim_token = ''`
+    ).bind(key, modifier).run();
+    const row = await db.prepare(
+      `SELECT claim_token,
+              CASE WHEN protected_until > strftime('%Y-%m-%dT%H:%M:%fZ','now') THEN 1 ELSE 0 END AS protected
+         FROM media_object_guards WHERE object_key = ? LIMIT 1`
+    ).bind(key).first<{ claim_token: string; protected: number }>();
+    if (!row) throw new Error('media object guard could not be persisted');
+    if (String(row.claim_token ?? '') !== '') return false;
+    if (Number(row.protected ?? 0) === 1) return true;
+  }
+  return false;
+}
+
+/**
+ * Atomically claim a key only when no attachment currently protects it.
+ * Expired claims are recoverable by another cleanup; attachments themselves
+ * never ignore a stale-looking token because its owner may still be deleting.
+ */
+export async function claimMediaObjectForCleanup(db: DeletionDb, key: string): Promise<string | null> {
+  if (!isSafeMediaKey(key)) return null;
+  const columns = await mediaGuardColumns(db);
+  if (!columns.has('protected_until') || !columns.has('claim_token') || !columns.has('claim_until')) return null;
+  await db.prepare(
+    `INSERT OR IGNORE INTO media_object_guards
+       (object_key, protected_until, claim_token, claim_until)
+     VALUES (?, '', '', '')`
+  ).bind(key).run();
+  const token = `cleanup_${crypto.randomUUID()}`;
+  const result = await db.prepare(
+    `UPDATE media_object_guards
+        SET claim_token = ?,
+            claim_until = strftime('%Y-%m-%dT%H:%M:%fZ','now', ?),
+            updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      WHERE object_key = ?
+        AND (protected_until = '' OR protected_until <= strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+        AND (
+          claim_token = ''
+          OR claim_until = ''
+          OR claim_until <= strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        )`
+  ).bind(token, `+${MEDIA_OBJECT_CLAIM_MINUTES} minutes`, key).run();
+  const changes = Number((result as { meta?: { changes?: number } }).meta?.changes ?? 0);
+  return changes > 0 ? token : null;
+}
+
+/** Release only the lease this cleanup invocation owns. */
+export async function releaseMediaObjectCleanupClaim(
+  db: DeletionDb,
+  key: string,
+  token: string
+): Promise<boolean> {
+  const result = await db.prepare(
+    `UPDATE media_object_guards
+        SET claim_token = '', claim_until = '',
+            updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      WHERE object_key = ? AND claim_token = ?`
+  ).bind(key, token).run();
+  return Number((result as { meta?: { changes?: number } }).meta?.changes ?? 0) === 1;
+}
+
 /**
  * RUN THE QUEUED BUCKET DELETIONS AND CLOSE THE JOBS.
  *
@@ -868,9 +989,19 @@ export async function runMediaCleanup(
     }
   };
   for (const job of jobs) {
+    let claim: string | null = null;
     try {
+      claim = await claimMediaObjectForCleanup(env.DB, job.key);
+      if (!claim) {
+        out.failed.push({ key: job.key, error: 'media object is protected by an attach or another cleanup' });
+        continue;
+      }
       await deleteMediaObject(env, job.visibility, job.key);
       out.deleted.push(job.key);
+      if (!(await releaseMediaObjectCleanupClaim(env.DB, job.key, claim))) {
+        throw new Error('media cleanup claim ownership was lost before release');
+      }
+      claim = null;
       await mark(
         `UPDATE media_cleanup_jobs
             SET state = 'done', attempts = attempts + 1, last_error = '',
@@ -881,6 +1012,15 @@ export async function runMediaCleanup(
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown';
       out.failed.push({ key: job.key, error: message });
+      if (claim) {
+        try {
+          await releaseMediaObjectCleanupClaim(env.DB, job.key, claim);
+          claim = null;
+        } catch {
+          // Keep the job pending. Cleanup can recover this claim after expiry;
+          // an attach must remain blocked while ownership is uncertain.
+        }
+      }
       await mark(
         `UPDATE media_cleanup_jobs
             SET attempts = attempts + 1, last_error = ?,
@@ -893,16 +1033,42 @@ export async function runMediaCleanup(
   return out;
 }
 
+const mediaCleanupDueSql = (columns: Set<string>): string =>
+  columns.has('not_before')
+    ? `(not_before = '' OR not_before <= strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
+    // Rolling-deploy fallback before 0099: ingest renews `created_at` on any
+    // preexisting job for its content key, so every cron job observes the same
+    // short claim grace even without the new column. Product-delete's inline
+    // cleanup receives its jobs directly and is not delayed by this reader.
+    : `created_at <= strftime('%Y-%m-%dT%H:%M:%fZ','now','-15 minutes')`;
+
+/**
+ * Re-check a selected job immediately before R2 deletion. Ingest can renew an
+ * old pending job after a cleanup run selected its page; honoring that renewal
+ * here closes the page-read -> delete window and also makes overlapping drains
+ * stop after the first one closes a row.
+ */
+export async function mediaCleanupJobStillDue(db: DeletionDb, key: string): Promise<boolean> {
+  const columns = await columnsOf(db, 'media_cleanup_jobs');
+  if (columns.size === 0) return false;
+  const row = await db.prepare(
+    `SELECT 1 AS x FROM media_cleanup_jobs
+      WHERE object_key = ? AND state = 'pending' AND ${mediaCleanupDueSql(columns)} LIMIT 1`
+  ).bind(key).first<{ x: number }>();
+  return !!row;
+}
+
 /** Pending jobs, oldest first — what the retry sweep and the report both read. */
 export async function pendingMediaCleanup(
   db: DeletionDb,
   limit = 200
 ): Promise<Array<{ id: string; key: string; visibility: 'public' | 'private'; attempts: number }>> {
-  if (!(await tableExists(db, 'media_cleanup_jobs'))) return [];
+  const columns = await columnsOf(db, 'media_cleanup_jobs');
+  if (columns.size === 0) return [];
   const rows = await db
     .prepare(
       `SELECT id, object_key, visibility, attempts FROM media_cleanup_jobs
-        WHERE state = 'pending' ORDER BY created_at LIMIT ?`
+        WHERE state = 'pending' AND ${mediaCleanupDueSql(columns)} ORDER BY created_at LIMIT ?`
     )
     .bind(limit)
     .all<{ id: string; object_key: string; visibility: string; attempts: number }>();

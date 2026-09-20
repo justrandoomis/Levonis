@@ -5,6 +5,12 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hono } from 'hono';
 import type { AppContext } from '../worker/lib/types';
+import { runGuardedMediaCleanup } from '../worker/lib/mediaRefs';
+import {
+  ingestProductMediaBytes,
+  PRODUCT_MEDIA_FORM_STAGING_GRACE_MINUTES,
+  verifyStoredProductMedia,
+} from '../worker/lib/productMediaIngest';
 import { fileRoutes, uploadRoutes } from '../worker/routes/uploads';
 import { HttpError } from '../worker/lib/http';
 import { ROOT, SqliteD1 } from './fixtures/d1';
@@ -39,7 +45,7 @@ class MemoryBucket {
   async delete(key: string) { this.objects.delete(key); }
 }
 
-function database(): D1Database {
+function database(): { raw: DatabaseSync; db: D1Database } {
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON;');
   for (const file of readdirSync(join(ROOT, 'migrations')).filter((name) => name.endsWith('.sql')).sort()) {
@@ -53,7 +59,7 @@ function database(): D1Database {
    */
   raw.exec("INSERT INTO chats (id) VALUES ('chat_1')");
   raw.exec("INSERT INTO chat_participants (chat_id,user_id) VALUES ('chat_1','admin')");
-  return new SqliteD1(raw) as unknown as D1Database;
+  return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
 
 /**
@@ -64,9 +70,16 @@ function database(): D1Database {
  * sniffer, the dimension reader, the stored contentType — is exercised on bytes
  * that genuinely ARE WebP rather than on a promise that they are.
  */
-function imagesBinding(opts: { fail?: boolean } = {}) {
+function imagesBinding(opts: { fail?: boolean; infoFail?: boolean } = {}) {
   const calls: Array<{ format: string }> = [];
+  let infoCalls = 0;
   const binding = {
+    async info(stream: ReadableStream) {
+      void stream;
+      infoCalls += 1;
+      if (opts.infoFail) throw new Error('the decoder refused this WebP');
+      return { format: 'image/webp', fileSize: 30, width: 640, height: 480 };
+    },
     input(stream: ReadableStream) {
       void stream;
       return {
@@ -82,16 +95,23 @@ function imagesBinding(opts: { fail?: boolean } = {}) {
       };
     },
   };
-  return { binding, calls };
+  return { binding, calls, get infoCalls() { return infoCalls; } };
 }
 
 function app(session: boolean, images?: ReturnType<typeof imagesBinding>['binding']) {
+  const databaseState = database();
   const publicBucket = new MemoryBucket();
   const privateBucket = new MemoryBucket();
   const legacyBucket = new MemoryBucket();
   const hono = new Hono<AppContext>();
   hono.use('*', async (c, next) => {
-    c.env = { DB: database(), BUCKET: legacyBucket, R2_PUBLIC: publicBucket, R2_PRIVATE: privateBucket, IMAGES: images } as never;
+    c.env = {
+      DB: databaseState.db,
+      BUCKET: legacyBucket,
+      R2_PUBLIC: publicBucket,
+      R2_PRIVATE: privateBucket,
+      IMAGES: images,
+    } as never;
     c.set('user', session ? ({ id: 'admin', role: 'admin' } as never) : null);
     await next();
   });
@@ -100,7 +120,14 @@ function app(session: boolean, images?: ReturnType<typeof imagesBinding>['bindin
   hono.onError((error, c) => error instanceof HttpError
     ? c.json({ success: false, code: error.code, error: error.message }, error.status as 400)
     : Promise.reject(error));
-  return { hono, publicBucket, privateBucket, legacyBucket };
+  return {
+    hono,
+    publicBucket,
+    privateBucket,
+    legacyBucket,
+    raw: databaseState.raw,
+    db: databaseState.db,
+  };
 }
 
 function webp(width = 640, height = 480): Uint8Array {
@@ -115,8 +142,28 @@ function webp(width = 640, height = 480): Uint8Array {
   return b;
 }
 
+function gif(frameCount: number): Uint8Array {
+  const out: number[] = [
+    ...new TextEncoder().encode('GIF89a'),
+    1, 0, 1, 0, // logical width/height
+    0, 0, 0, // no global colour table
+  ];
+  const frame = [
+    0x2c,
+    0, 0, 0, 0, // left/top
+    1, 0, 1, 0, // width/height
+    0, // no local colour table
+    2, // LZW minimum code size
+    2, 0x4c, 0x01, 0, // image data and terminator
+  ];
+  for (let i = 0; i < frameCount; i++) out.push(...frame);
+  out.push(0x3b);
+  return new Uint8Array(out);
+}
+
 test('an admin WebP product upload lands only in the public bucket with verified metadata', async () => {
-  const { hono, publicBucket, privateBucket, legacyBucket } = app(true);
+  const images = imagesBinding();
+  const { hono, publicBucket, privateBucket, legacyBucket } = app(true, images.binding);
   const form = new FormData();
   form.set('purpose', 'product');
   form.set('file', new File([webp()], 'printer.webp', { type: 'image/png' }));
@@ -130,6 +177,98 @@ test('an admin WebP product upload lands only in the public bucket with verified
   assert.equal(publicBucket.objects.size, 1);
   assert.equal(privateBucket.objects.size, 0);
   assert.equal(legacyBucket.objects.size, 0);
+  assert.equal(images.infoCalls, 1, 'existing WebP is decoded before its bytes are trusted');
+  assert.deepEqual(images.calls, [], 'a decoded WebP does not need re-encoding');
+});
+
+test('a ProductForm upload survives cleanup while the admin edits, then verifies and saves safely', async () => {
+  const images = imagesBinding();
+  const { hono, publicBucket, privateBucket, legacyBucket, raw, db } = app(true, images.binding);
+  const form = new FormData();
+  form.set('purpose', 'product');
+  form.set('file', new File([webp()], 'slow-editor.webp', { type: 'image/webp' }));
+  const response = await hono.request('/api/uploads', { method: 'POST', body: form });
+  const body = await response.json() as {
+    key: string;
+    url: string;
+    width: number;
+    height: number;
+    bytes: number;
+  };
+  assert.equal(response.status, 200, JSON.stringify(body));
+
+  const job = raw.prepare(
+    `SELECT state,
+            ROUND((julianday(not_before) - julianday(created_at)) * 1440) AS grace_minutes
+       FROM media_cleanup_jobs WHERE object_key = ?`
+  ).get(body.key) as { state: string; grace_minutes: number };
+  assert.equal(job.state, 'pending');
+  assert.equal(
+    Number(job.grace_minutes),
+    PRODUCT_MEDIA_FORM_STAGING_GRACE_MINUTES,
+    'a human-paced ProductForm upload gets a full 24-hour durable lease'
+  );
+
+  const mediaEnv = {
+    DB: db,
+    BUCKET: legacyBucket as never,
+    R2_PUBLIC: publicBucket as never,
+    R2_PRIVATE: privateBucket as never,
+    IMAGES: images.binding as never,
+  };
+  await ingestProductMediaBytes(mediaEnv, {
+    bytes: webp(),
+    entity_id: 'catalog',
+    // An internal/default 15-minute claimant of the same content key must
+    // never shorten the editor's already-durable 24-hour lease.
+  });
+  const afterShortClaim = raw.prepare(
+    `SELECT ROUND((julianday(not_before) - julianday(created_at)) * 1440) AS grace_minutes
+       FROM media_cleanup_jobs WHERE object_key = ?`
+  ).get(body.key) as { grace_minutes: number };
+  assert.equal(Number(afterShortClaim.grace_minutes), PRODUCT_MEDIA_FORM_STAGING_GRACE_MINUTES);
+
+  // The old 15-minute attachment guard can expire while the admin is still
+  // editing. The queue deadline remains authoritative, so the cron drain does
+  // not even attempt this object and cannot delete it before Save.
+  raw.prepare("UPDATE media_object_guards SET protected_until = '' WHERE object_key = ?").run(body.key);
+  const premature = await runGuardedMediaCleanup({
+    DB: db,
+    BUCKET: legacyBucket as never,
+    R2_PUBLIC: publicBucket as never,
+    R2_PRIVATE: privateBucket as never,
+  });
+  assert.equal(premature.attempted, 0);
+  assert.equal(publicBucket.objects.has(body.key), true);
+
+  const [verified] = await verifyStoredProductMedia(mediaEnv, [{ url: body.url, key: body.key }]);
+  assert.ok(verified, 'the same bytes remain available when ProductForm finally saves');
+  raw.prepare(
+    `INSERT INTO products (id, name, slug, price_iqd, stock)
+     VALUES ('slow_editor_product', 'Slow editor product', 'slow-editor-product', 1000, 1)`
+  ).run();
+  raw.prepare(
+    `INSERT INTO product_images
+       (id, product_id, url, r2_key, sort_order, is_primary, width, height, bytes, content_type)
+     VALUES ('slow_editor_image', 'slow_editor_product', ?, ?, 0, 1, ?, ?, ?, 'image/webp')`
+  ).run(verified.url, verified.key, verified.width, verified.height, verified.bytes);
+
+  // Once due, the same global worker observes the committed reference and
+  // closes the staging intent without touching R2.
+  raw.prepare("UPDATE media_cleanup_jobs SET not_before = '' WHERE object_key = ?").run(body.key);
+  raw.prepare("UPDATE media_object_guards SET protected_until = '' WHERE object_key = ?").run(body.key);
+  const attached = await runGuardedMediaCleanup({
+    DB: db,
+    BUCKET: legacyBucket as never,
+    R2_PUBLIC: publicBucket as never,
+    R2_PRIVATE: privateBucket as never,
+  });
+  assert.deepEqual(attached.still_referenced, [body.key]);
+  assert.equal(publicBucket.objects.has(body.key), true);
+  assert.equal(
+    (raw.prepare('SELECT state FROM media_cleanup_jobs WHERE object_key = ?').get(body.key) as { state: string }).state,
+    'skipped_shared'
+  );
 });
 
 /**
@@ -254,17 +393,22 @@ test('a conversation carries video too — it used to answer «Videos are not al
  * tells the operator what to do.
  */
 test('with NO Images binding the upload is refused, never silently stored as-is', async () => {
-  const { hono, publicBucket } = app(true); // no binding
   const png = new Uint8Array(32);
   png.set([0x89, 0x50, 0x4e, 0x47], 0);
-  const form = new FormData();
-  form.set('purpose', 'product');
-  form.set('file', new File([png], 'catalog.png', { type: 'image/png' }));
-  const response = await hono.request('/api/uploads', { method: 'POST', body: form });
-  const body = await response.json() as { code?: string };
-  assert.equal(response.status, 503);
-  assert.equal(body.code, 'IMAGE_CONVERT_UNAVAILABLE');
-  assert.equal(publicBucket.objects.size, 0, 'and nothing reached the bucket');
+  for (const [name, bytes, type] of [
+    ['catalog.png', png, 'image/png'],
+    ['catalog.webp', webp(), 'image/webp'],
+  ] as const) {
+    const { hono, publicBucket } = app(true); // no binding
+    const form = new FormData();
+    form.set('purpose', 'product');
+    form.set('file', new File([bytes], name, { type }));
+    const response = await hono.request('/api/uploads', { method: 'POST', body: form });
+    const body = await response.json() as { code?: string };
+    assert.equal(response.status, 503, name);
+    assert.equal(body.code, 'IMAGE_CONVERT_UNAVAILABLE', name);
+    assert.equal(publicBucket.objects.size, 0, `${name}: nothing reached the bucket`);
+  }
 });
 
 test('a converter that throws is reported, not swallowed', async () => {
@@ -290,26 +434,34 @@ test('an image ALREADY WebP is stored untouched — no pointless re-encode', asy
   const response = await hono.request('/api/uploads', { method: 'POST', body: form });
   assert.equal(response.status, 200);
   assert.equal((await response.json() as { mime: string }).mime, 'image/webp');
+  assert.equal(images.infoCalls, 1, 'magic bytes alone are not enough; the binding must decode it');
   assert.deepEqual(images.calls, [], 'the converter was never called');
 });
 
-test('a GIF is still accepted, and that exception is deliberate', async () => {
-  // A transform keeps ONE frame, so re-encoding an animated GIF would throw the
-  // animation away — the same quiet damage as the fake conversion, pointing the
-  // other way. It is stored honestly under its own type, and the converter is
-  // never even asked.
-  const images = imagesBinding();
+test('a WebP signature whose pixels do not decode is refused before R2', async () => {
+  const images = imagesBinding({ infoFail: true });
   const { hono, publicBucket } = app(true, images.binding);
-  const gif = new Uint8Array(32);
-  gif.set([0x47, 0x49, 0x46, 0x38], 0);
   const form = new FormData();
   form.set('purpose', 'product');
-  form.set('file', new File([gif], 'spin.gif', { type: 'image/gif' }));
+  form.set('file', new File([webp()], 'fake.webp', { type: 'image/webp' }));
   const response = await hono.request('/api/uploads', { method: 'POST', body: form });
-  assert.equal(response.status, 200);
-  assert.equal((await response.json() as { mime: string }).mime, 'image/gif');
-  assert.equal(publicBucket.objects.size, 1);
-  assert.deepEqual(images.calls, [], 'an animated format is never re-encoded');
+  assert.equal(response.status, 400);
+  assert.equal((await response.json() as { code?: string }).code, 'IMAGE_CONVERT_FAILED');
+  assert.equal(publicBucket.objects.size, 0);
+  assert.deepEqual(images.calls, [], 'a failed decode is not offered to storage or another transform');
+});
+
+test('an animated product GIF is refused rather than flattened to one WebP frame', async () => {
+  const images = imagesBinding();
+  const { hono, publicBucket } = app(true, images.binding);
+  const form = new FormData();
+  form.set('purpose', 'product');
+  form.set('file', new File([gif(2)], 'spin.gif', { type: 'image/gif' }));
+  const response = await hono.request('/api/uploads', { method: 'POST', body: form });
+  assert.equal(response.status, 400);
+  assert.equal((await response.json() as { code?: string }).code, 'IMAGE_ANIMATED_GIF_UNSUPPORTED');
+  assert.equal(publicBucket.objects.size, 0);
+  assert.deepEqual(images.calls, [], 'the converter never receives animation it would flatten');
 });
 
 test('public media resolves anonymously while a private namespace never does', async () => {
@@ -319,4 +471,3 @@ test('public media resolves anonymously while a private namespace never does', a
   assert.equal((await hono.request('/files/products/p1/gallery/a.webp')).status, 200);
   assert.equal((await hono.request('/files/receipts/u1/evidence/a.webp')).status, 403);
 });
-

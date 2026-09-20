@@ -19,6 +19,7 @@ import { adminProductsRoutes } from '../worker/routes/adminProducts';
 import { adminProductRelationsRoutes } from '../worker/routes/adminProductRelations';
 import { adminTaxonomyRoutes } from '../worker/routes/adminTaxonomy';
 import { productRoutes } from '../worker/routes/products';
+import { productMediaFixtureEnv } from './fixtures/productMedia';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 const ASSISTANT = { id: 'usr_assist', role: 'admin' as const, email: 'helper@x.co', admin_scope: 'assistant' };
@@ -35,7 +36,12 @@ function setup(db?: unknown) {
   const raw = freshDb();
   raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en) VALUES ('brd_bambu','bambu','بامبو','Bambu Lab')").run();
   const handle = db ?? asD1(raw);
-  return { raw, db: handle, app: stubApp(handle, OWNER, mount), assistant: stubApp(handle, ASSISTANT, mount) };
+  return {
+    raw,
+    db: handle,
+    app: stubApp(handle, OWNER, mount, { env: productMediaFixtureEnv().env }),
+    assistant: stubApp(handle, ASSISTANT, mount, { env: productMediaFixtureEnv().env }),
+  };
 }
 
 const put = (a: App, path: string, body: unknown) =>
@@ -108,21 +114,21 @@ low_stock_threshold=2
 direct_surcharge_iqd=15000
 payment_options=cod,card
 images.1.id=img_front
-images.1.url=/files/products/catalog/gallery/a1front01.jpg
+images.1.url=/files/products/a1-front.webp
 images.1.alt_ar=الواجهة
 images.1.alt_en=Front
 images.1.alt_ckb=پێشەوە
 images.1.primary=true
-images.1.key=products/a1-front.jpg
+images.1.key=products/a1-front.webp
 images.1.source_url=https://vendor.example/a1-front.jpg
 images.1.width=1200
 images.1.height=900
 images.2.id=img_combo
-images.2.url=/files/products/catalog/gallery/a1combo01.jpg
+images.2.url=/files/products/catalog/gallery/a1combo01.webp
 images.2.alt_en=Combo
 images.2.option_value_id=opt_combo
 images.3.id=img_black
-images.3.url=/files/products/catalog/gallery/a1black01.jpg
+images.3.url=/files/products/catalog/gallery/a1black01.webp
 images.3.alt_en=Black
 images.3.color_id=col_black
 options.1.id=opt_base
@@ -283,10 +289,10 @@ colors.1.name_en=Black
 colors.1.hex=#101010
 colors.1.option_ids=ov_a
 images.1.id=pi_1
-images.1.url=/files/one.jpg
+images.1.url=/files/one.webp
 images.1.primary=true
 images.2.id=pi_2
-images.2.url=/files/two.jpg
+images.2.url=/files/two.webp
 `;
   const { status, body } = await apply(app, upd, 'update');
   assert.equal(status, 200, JSON.stringify(body));
@@ -414,13 +420,13 @@ test('root cause 7: __CLEAR__ empties image alt_ar/alt_ckb/key/source_url on a p
     raw, 'SELECT alt_ar, alt_ckb, r2_key, source_url FROM product_images WHERE id = ?', 'img_front'
   )!;
   assert.deepEqual(before, {
-    alt_ar: 'الواجهة', alt_ckb: 'پێشەوە', r2_key: 'products/a1-front.jpg', source_url: 'https://vendor.example/a1-front.jpg',
+    alt_ar: 'الواجهة', alt_ckb: 'پێشەوە', r2_key: 'products/a1-front.webp', source_url: 'https://vendor.example/a1-front.jpg',
   });
 
   const upd = `template_version=2
 product_id=${id}
 images.1.id=img_front
-images.1.url=/files/products/catalog/gallery/a1front01.jpg
+images.1.url=/files/products/a1-front.webp
 images.1.alt_ar=__CLEAR__
 images.1.alt_ckb=__CLEAR__
 images.1.key=__CLEAR__
@@ -432,7 +438,7 @@ images.1.primary=true
   assert.deepEqual(body.mismatches, []);
   assert.deepEqual(
     row(raw, 'SELECT alt_ar, alt_ckb, r2_key, source_url FROM product_images WHERE id = ?', 'img_front'),
-    { alt_ar: '', alt_ckb: '', r2_key: '', source_url: '' }
+    { alt_ar: '', alt_ckb: '', r2_key: 'products/a1-front.webp', source_url: '' }
   );
 });
 
@@ -616,7 +622,7 @@ test('root cause 13: export → parse → apply is order-stable for groups, valu
     ],
     colors: [{ id: 'pc_black', name_en: 'Black', name_ar: 'أسود', hex: '#000000', sort: 0, active: true, option_value_ids: ['ov_a1', 'ov_combo'] }],
     variants: [],
-    images: [{ id: 'pi_front', url: '/files/a.jpg', alt_en: 'front', sort_order: 0, is_primary: true }],
+    images: [{ id: 'pi_front', url: '/files/a.webp', r2_key: 'a.webp', alt_en: 'front', sort_order: 0, is_primary: true }],
   };
   assert.equal((await put(app, `/api/admin/products/${id}/relations`, relBody)).status, 200);
 
@@ -649,7 +655,7 @@ test('root cause 14: when the batch fails NOTHING lands — no product row, no r
   const raw = freshDb();
   raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en) VALUES ('brd_bambu','bambu','بامبو','Bambu Lab')").run();
   const { failing, db } = failingD1(raw);
-  const app = stubApp(db, OWNER, mount);
+  const app = stubApp(db, OWNER, mount, { env: productMediaFixtureEnv().env });
 
   failing.failWhen = (stmts) => stmts.some((s) => /INSERT INTO products/i.test(s.sql));
   const res = await post(app, '/api/admin/template/apply', { text: FULL, mode: 'draft', confirm: true });
@@ -704,7 +710,7 @@ test('a verification mismatch answers 5xx naming the section and the field, and 
   const raw = freshDb();
   raw.prepare("INSERT INTO brands (id, slug, name_ar, name_en) VALUES ('brd_bambu','bambu','بامبو','Bambu Lab')").run();
   const { failing, db } = failingD1(raw);
-  const app = stubApp(db, OWNER, mount);
+  const app = stubApp(db, OWNER, mount, { env: productMediaFixtureEnv().env });
 
   // A batch that quietly drops the image statements: the write "succeeds",
   // the read-back does not match, and the route must say so rather than
@@ -886,7 +892,7 @@ test('the storefront and the admin form read the same structure after a TXT crea
 test('the form save is the same one batch: a failure leaves no product, no relations and no catalogs', async () => {
   const raw = freshDb();
   const { failing, db } = failingD1(raw);
-  const app = stubApp(db, OWNER, mount);
+  const app = stubApp(db, OWNER, mount, { env: productMediaFixtureEnv().env });
 
   failing.failWhen = (stmts) => stmts.some((s) => /product_option_values/i.test(s.sql));
   const res = await post(app, '/api/admin/products-v2', {
@@ -895,7 +901,7 @@ test('the form save is the same one batch: a failure leaves no product, no relat
     relations: {
       inventory_mode: 'OPTION',
       groups: [{ id: 'og_x', name_en: 'Model', sort: 0, active: true, values: [{ id: 'ov_x', name_en: 'A', sort: 0, active: true, stock: 2 }] }],
-      colors: [], variants: [], images: [{ id: 'pi_x', url: '/files/x.jpg', sort_order: 0, is_primary: true }],
+      colors: [], variants: [], images: [{ id: 'pi_x', url: '/files/x.webp', r2_key: 'x.webp', sort_order: 0, is_primary: true }],
     },
   });
   assert.equal(res.status, 500);

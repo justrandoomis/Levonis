@@ -67,6 +67,7 @@ interface OrderItemRow {
   /** Set on a bundle COMPONENT row: the priced parent it belongs under. */
   bundle_parent_item_id?: string | null;
   name_snapshot: string;
+  image_snapshot: string | null;
   option_snapshot: string;
   qty: number;
   unit_price_iqd: number;
@@ -143,6 +144,7 @@ function invoiceLines(items: OrderItemRow[]): InvoiceSnapshotV1['lines'] {
             ...line,
             included: kids.map((k) => ({
               name: k.name_snapshot,
+              image: k.image_snapshot || undefined,
               variant: k.option_snapshot || '',
               qty: Number(k.qty) || 0,
             })),
@@ -175,6 +177,7 @@ function lineFromItem(it: OrderItemRow): InvoiceSnapshotV1['lines'][number] {
     order_item_id: it.id,
     product_id: it.product_id,
     name: it.name_snapshot,
+    image: it.image_snapshot || undefined,
     variant: it.option_snapshot || '',
     qty: Number(it.qty) || 0,
     unit_price_iqd: Number(it.unit_price_iqd) || 0,
@@ -213,7 +216,7 @@ async function loadOrderData(
   const order = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first<OrderRow>();
   if (!order) return null;
   const { results: items } = await env.DB.prepare(
-    'SELECT id, product_id, name_snapshot, option_snapshot, qty, unit_price_iqd, line_total_iqd, pricing_snapshot, warranty_snapshot, transport_snapshot, bundle_parent_item_id FROM order_items WHERE order_id = ?'
+    'SELECT id, product_id, name_snapshot, image_snapshot, option_snapshot, qty, unit_price_iqd, line_total_iqd, pricing_snapshot, warranty_snapshot, transport_snapshot, bundle_parent_item_id FROM order_items WHERE order_id = ?'
   )
     .bind(orderId)
     .all<OrderItemRow>();

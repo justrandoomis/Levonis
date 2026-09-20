@@ -230,6 +230,93 @@ test('the allocation is written once and is identical on every re-read', async (
   }
 });
 
+test('a mystery pick freezes the exact variant image instead of legacy selector images', async () => {
+  const raw = freshDb();
+  seed(raw);
+  raw.exec(`
+    DELETE FROM mystery_pool_entries WHERE id <> 'mpe_a';
+    UPDATE mystery_pool_entries
+       SET option_value_ids='["opt_a"]', color_id='clr_a'
+     WHERE id='mpe_a';
+    INSERT INTO product_option_groups (id,product_id,name_en,sort,active)
+      VALUES ('grp_a','p_a','Model',0,1);
+    INSERT INTO product_option_values (id,product_id,group_id,name_en,image,sort,active)
+      VALUES ('opt_a','p_a','grp_a','A','/files/legacy-option.webp',0,1);
+    INSERT INTO product_colors (id,product_id,name_en,hex,image,sort,active)
+      VALUES ('clr_a','p_a','Black','#000000','/files/legacy-color.webp',0,1);
+    INSERT INTO product_variants (id,product_id,combo_key,active)
+      VALUES ('var_a','p_a','o:opt_a|c:clr_a',1);
+    INSERT INTO product_images
+      (id,product_id,url,r2_key,content_type,sort_order,is_primary,option_value_id,color_id,variant_id)
+    VALUES
+      ('img_primary','p_a','/files/products/p_a/gallery/primary.webp','products/p_a/gallery/primary.webp','image/webp',0,1,NULL,NULL,NULL),
+      ('img_option','p_a','/files/products/p_a/gallery/option.webp','products/p_a/gallery/option.webp','image/webp',1,0,'opt_a',NULL,NULL),
+      ('img_color','p_a','/files/products/p_a/gallery/color.webp','products/p_a/gallery/color.webp','image/webp',2,0,NULL,'clr_a',NULL),
+      ('img_variant','p_a','/files/products/p_a/gallery/exact.webp','products/p_a/gallery/exact.webp','image/webp',3,0,NULL,NULL,'var_a');
+  `);
+  const db = asD1(raw);
+  await db.batch([ensureOfferSecretStatement(db, 'p_offer')]);
+
+  const candidate = (await loadCandidates(db, (await loadPool(db, 'mpl_1'))!)).candidates[0];
+  assert.equal(candidate.image_snapshot, '/files/products/p_a/gallery/exact.webp');
+
+  const placed = await place(db, {
+    orderId: 'ORD-IMAGE',
+    key: 'image-snapshot-key',
+    seed: 'c'.repeat(64),
+  });
+  raw.exec(`UPDATE product_images
+               SET url='/files/products/p_a/gallery/replaced.webp',
+                   r2_key='products/p_a/gallery/replaced.webp'
+             WHERE id='img_variant'`);
+  assert.equal(
+    row<{ image_snapshot: string }>(
+      raw,
+      'SELECT image_snapshot FROM mystery_allocations WHERE order_item_id = ?',
+      placed.itemId
+    )!.image_snapshot,
+    '/files/products/p_a/gallery/exact.webp',
+    'catalogue edits cannot rewrite the image frozen on the allocation'
+  );
+});
+
+test('a base mystery pick freezes the product primary even when gallery order puts it later', async () => {
+  const raw = freshDb();
+  seed(raw);
+  raw.exec(`
+    DELETE FROM mystery_pool_entries WHERE id <> 'mpe_a';
+    INSERT INTO product_images
+      (id,product_id,url,r2_key,content_type,sort_order,is_primary)
+    VALUES
+      ('img_side','p_a','/files/products/p_a/gallery/side.webp','products/p_a/gallery/side.webp','image/webp',0,0),
+      ('img_primary','p_a','/files/products/p_a/gallery/primary.webp','products/p_a/gallery/primary.webp','image/webp',5,1);
+  `);
+  const db = asD1(raw);
+  await db.batch([ensureOfferSecretStatement(db, 'p_offer')]);
+
+  const candidate = (await loadCandidates(db, (await loadPool(db, 'mpl_1'))!)).candidates[0];
+  assert.equal(candidate.image_snapshot, '/files/products/p_a/gallery/primary.webp');
+
+  const placed = await place(db, {
+    orderId: 'ORD-BASE-IMAGE',
+    key: 'base-image-snapshot-key',
+    seed: 'd'.repeat(64),
+  });
+  raw.exec(`UPDATE product_images
+               SET url='/files/products/p_a/gallery/replaced.webp',
+                   r2_key='products/p_a/gallery/replaced.webp'
+             WHERE id='img_primary'`);
+  assert.equal(
+    row<{ image_snapshot: string }>(
+      raw,
+      'SELECT image_snapshot FROM mystery_allocations WHERE order_item_id = ?',
+      placed.itemId
+    )!.image_snapshot,
+    '/files/products/p_a/gallery/primary.webp',
+    'later catalogue edits cannot rewrite a base mystery allocation snapshot'
+  );
+});
+
 test('a replay that re-enters the write path collides on the primary key and aborts the whole batch', async () => {
   const raw = freshDb();
   seed(raw);

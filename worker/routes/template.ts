@@ -32,10 +32,23 @@
 
 import { Hono, type Context } from 'hono';
 import { unzipSync } from 'fflate';
-import type { AppContext } from '../lib/types';
+import type { AppContext, Env } from '../lib/types';
 import { requireAdmin, badRequest, notFound, oneOf, str, HttpError } from '../lib/http';
 import { applyRelations, loadRelationsView, EMPTY_RELATIONS, type ProductRelationsView } from '../lib/productOverlay';
-import { relationsBodyFromDoc, deriveInventoryModeFromDoc, type BridgeDiagnostics } from '../lib/templateRelations';
+import {
+  relationsBodyFromDoc,
+  deriveInventoryModeFromDoc,
+  templateVariantsFromView,
+  type BridgeDiagnostics,
+} from '../lib/templateRelations';
+import {
+  cleanupCreatedProductMedia,
+  ingestProductMediaUrl,
+  PRODUCT_MEDIA_CLEANUP_GRACE_MINUTES,
+  ProductMediaIngestError,
+  verifyStoredProductMedia,
+  type ProductMediaIngestResult,
+} from '../lib/productMediaIngest';
 import {
   planProductSave,
   saveProductAtomic,
@@ -51,7 +64,9 @@ import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import { getSetting } from '../lib/settings';
 import { rateLimit } from '../lib/ratelimit';
 import { newId, sha256Hex } from '../lib/crypto';
-import { audit } from '../lib/audit';
+import { audit, auditStatements } from '../lib/audit';
+import { allBenefitRules, type RuleWrite } from '../lib/membershipBenefits';
+import type { BenefitRule } from '@levonis/pricing/membershipBenefits';
 import {
   parseTemplate,
   exportProduct,
@@ -61,12 +76,14 @@ import {
   docToEntries,
   translationBookkeeping,
   deriveSlug,
+  generatedTemplateMediaId,
   NULL_TOKEN,
   TEMPLATE_VERSION,
   type ParsedTemplate,
   type ResolvedRefs,
   type TemplateError,
   type ToDocResult,
+  type TemplateMediaFetchIntent,
 } from '../lib/template';
 import { normalizeCheapestBase } from '../lib/cheapestBase';
 import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
@@ -108,7 +125,6 @@ import {
   type ParsedMembershipRule,
   type RowIssue,
 } from '../lib/importCsv';
-import { applyMembershipRules } from './adminImport';
 
 export const templateRoutes = new Hono<AppContext>();
 templateRoutes.use('*', requireAdmin);
@@ -207,10 +223,11 @@ function disableUnparsableLines(text: string): { text: string; disabled: Disable
  *
  * WHY THESE KEYS ARE NOT IN THE FIELD REGISTRY. A membership discount is a row
  * in `membership_benefit_rules`, not a field of a product: it carries a tier,
- * a scope, a date window, a version history and an audit trail of its own, and
- * it must be written through `saveBenefitRule` so those go with it. Merging it
- * into the ProductDoc would make it a product column that the checkout does
- * not read and the benefit engine does not see. So the lines are lifted out of
+ * a scope, a date window, a version history and an audit trail of its own. The
+ * /apply planner below puts the rule, version and audit statements in the same
+ * batch as the product. Merging it into the ProductDoc would make it a product
+ * column that the checkout does not read and the benefit engine does not see.
+ * So the lines are lifted out of
  * the file BEFORE the product parser runs — replaced with blanks, which keeps
  * every other line's number truthful — and applied beside the product.
  *
@@ -357,6 +374,368 @@ async function loadMembershipRules(db: D1Database, productId: string): Promise<M
     });
   }
   return out;
+}
+
+const TEMPLATE_MEMBERSHIP_RULE_COLUMNS =
+  'id, tier, benefit_type, scope, category_id, sub_category_id, product_id, discount_mode, percent, ' +
+  'fixed_iqd, max_discount_iqd, cap_scope, max_quantity, min_subtotal_iqd, free_shipping_threshold_iqd, ' +
+  'shipping_methods, max_shipping_subsidy_iqd, cod_tax_exempt, enabled, priority, valid_from, valid_until, label, notes';
+
+interface TemplateMembershipRuleRow {
+  id: string;
+  tier: 'pro' | 'prime';
+  benefit_type: 'product_discount';
+  scope: 'product';
+  category_id: null;
+  sub_category_id: null;
+  product_id: string;
+  discount_mode: 'percent' | 'fixed' | null;
+  percent: number | null;
+  fixed_iqd: number | null;
+  max_discount_iqd: number | null;
+  cap_scope: 'per_unit' | 'per_order' | null;
+  max_quantity: number | null;
+  min_subtotal_iqd: number | null;
+  free_shipping_threshold_iqd: null;
+  shipping_methods: null;
+  max_shipping_subsidy_iqd: null;
+  cod_tax_exempt: null;
+  enabled: number;
+  priority: number;
+  valid_from: string | null;
+  valid_until: string | null;
+  label: string | null;
+  notes: string | null;
+}
+
+interface TemplateMembershipExpectedRow {
+  id: string;
+  tier: 'pro' | 'prime';
+  discount_mode: 'percent' | 'fixed' | null;
+  percent: number | null;
+  fixed_iqd: number | null;
+  max_discount_iqd: number | null;
+  cap_scope: 'per_unit' | 'per_order' | null;
+  max_quantity: number | null;
+}
+
+interface TemplateMembershipPlan {
+  statements: D1PreparedStatement[];
+  expected: TemplateMembershipExpectedRow[];
+  changedRuleIds: string[];
+}
+
+const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+function sortBenefitRules(rules: readonly BenefitRule[]): BenefitRule[] {
+  return [...rules].sort(
+    (a, b) =>
+      compareText(a.tier, b.tier) ||
+      compareText(a.benefit_type, b.benefit_type) ||
+      compareText(a.scope, b.scope) ||
+      b.priority - a.priority ||
+      compareText(a.id, b.id)
+  );
+}
+
+function benefitRuleFromWrite(write: RuleWrite): BenefitRule {
+  return {
+    id: write.id,
+    tier: write.tier,
+    benefit_type: write.benefit_type,
+    scope: write.scope,
+    category_id: write.category_id,
+    sub_category_id: write.sub_category_id,
+    product_id: write.product_id,
+    discount_mode: write.discount_mode,
+    percent: write.percent,
+    fixed_iqd: write.fixed_iqd,
+    max_discount_iqd: write.max_discount_iqd,
+    cap_scope: write.cap_scope,
+    max_quantity: write.max_quantity,
+    min_subtotal_iqd: write.min_subtotal_iqd,
+    free_shipping_threshold_iqd: write.free_shipping_threshold_iqd,
+    shipping_methods: write.shipping_methods,
+    max_shipping_subsidy_iqd: write.max_shipping_subsidy_iqd,
+    cod_tax_exempt: write.cod_tax_exempt,
+    enabled: write.enabled,
+    priority: write.priority,
+    valid_from: write.valid_from,
+    valid_until: write.valid_until,
+    label: write.label,
+  };
+}
+
+function membershipRowFromWrite(write: RuleWrite): TemplateMembershipRuleRow {
+  return {
+    ...write,
+    tier: write.tier as 'pro' | 'prime',
+    benefit_type: 'product_discount',
+    scope: 'product',
+    category_id: null,
+    sub_category_id: null,
+    product_id: String(write.product_id),
+    free_shipping_threshold_iqd: null,
+    shipping_methods: null,
+    max_shipping_subsidy_iqd: null,
+    cod_tax_exempt: null,
+    enabled: write.enabled ? 1 : 0,
+  };
+}
+
+function expectedMembershipRows(rows: readonly TemplateMembershipRuleRow[]): TemplateMembershipExpectedRow[] {
+  return [...rows]
+    .sort((a, b) => compareText(a.tier, b.tier) || b.priority - a.priority || compareText(a.id, b.id))
+    .map((row) => ({
+      id: row.id,
+      tier: row.tier,
+      discount_mode: row.discount_mode,
+      percent: row.percent,
+      fixed_iqd: row.fixed_iqd,
+      max_discount_iqd: row.max_discount_iqd,
+      cap_scope: row.cap_scope,
+      max_quantity: row.max_quantity,
+    }));
+}
+
+/**
+ * Plans every membership mutation into the SAME D1 batch as the product.
+ * `applyMembershipRules` is intentionally not called from /apply: it commits
+ * one tier at a time, so a failure on tier two used to leave the product and
+ * tier one live with no verified completion marker. Here the rule, its version
+ * snapshot, its audit row, and the whole product plan succeed or roll back as
+ * one unit.
+ */
+async function planTemplateMembership(
+  db: D1Database,
+  actorId: string,
+  productId: string,
+  requested: readonly ParsedMembershipRule[]
+): Promise<TemplateMembershipPlan | null> {
+  if (requested.length === 0) return null;
+
+  const [allRulesBefore, productResult] = await Promise.all([
+    allBenefitRules(db),
+    db
+      .prepare(
+        `SELECT ${TEMPLATE_MEMBERSHIP_RULE_COLUMNS}
+           FROM membership_benefit_rules
+          WHERE benefit_type = 'product_discount' AND scope = 'product' AND product_id = ?
+          ORDER BY tier, priority DESC, id`
+      )
+      .bind(productId)
+      .all<TemplateMembershipRuleRow>(),
+  ]);
+  let allRules = sortBenefitRules(allRulesBefore);
+  let productRows = [...(productResult.results ?? [])];
+  const statements: D1PreparedStatement[] = [];
+  const changedRuleIds: string[] = [];
+
+  const appendVersionAndAudit = async (
+    action: 'create' | 'update' | 'delete',
+    ruleId: string,
+    before: TemplateMembershipRuleRow | null,
+    after: RuleWrite | null
+  ) => {
+    statements.push(
+      db
+        .prepare(
+          'INSERT INTO membership_benefit_versions (actor_user_id, action, rule_id, before_json, after_json, rules_json) VALUES (?,?,?,?,?,?)'
+        )
+        .bind(
+          actorId,
+          action,
+          ruleId,
+          before ? JSON.stringify(before) : null,
+          after ? JSON.stringify(after) : null,
+          JSON.stringify(sortBenefitRules(allRules))
+        )
+    );
+    const audited = await auditStatements(db, actorId, `membership_benefit.${action}`, ruleId, {
+      before: before ? { ...before } : null,
+      after: after ? { ...after } : null,
+    });
+    statements.push(...audited.statements);
+  };
+
+  for (const item of requested) {
+    const matching = productRows
+      .filter((row) => row.tier === item.tier)
+      .sort((a, b) => b.priority - a.priority || compareText(a.id, b.id));
+
+    if (item.remove) {
+      for (const before of matching) {
+        statements.push(db.prepare('DELETE FROM membership_benefit_rules WHERE id = ?').bind(before.id));
+        productRows = productRows.filter((row) => row.id !== before.id);
+        allRules = allRules.filter((row) => row.id !== before.id);
+        changedRuleIds.push(before.id);
+        await appendVersionAndAudit('delete', before.id, before, null);
+      }
+      continue;
+    }
+
+    const existing = matching[0] ?? null;
+    const kept = <T>(column: keyof TemplateMembershipRuleRow): T | null =>
+      existing ? ((existing[column] as T | null) ?? null) : null;
+    const write: RuleWrite = {
+      id: existing?.id ?? newId('mbr'),
+      tier: item.tier,
+      benefit_type: 'product_discount',
+      scope: 'product',
+      category_id: null,
+      sub_category_id: null,
+      product_id: productId,
+      discount_mode: item.discount_mode,
+      percent: item.percent,
+      fixed_iqd: item.fixed_iqd,
+      max_discount_iqd: item.max_discount_iqd,
+      cap_scope: item.cap_scope,
+      max_quantity: item.max_quantity,
+      min_subtotal_iqd: kept<number>('min_subtotal_iqd'),
+      free_shipping_threshold_iqd: null,
+      shipping_methods: null,
+      max_shipping_subsidy_iqd: null,
+      cod_tax_exempt: null,
+      enabled: existing ? existing.enabled === 1 : true,
+      priority: existing?.priority ?? 0,
+      valid_from: kept<string>('valid_from'),
+      valid_until: kept<string>('valid_until'),
+      label: kept<string>('label'),
+      notes: kept<string>('notes'),
+    };
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO membership_benefit_rules
+             (id, tier, benefit_type, scope, category_id, sub_category_id, product_id, discount_mode, percent,
+              fixed_iqd, max_discount_iqd, cap_scope, max_quantity, min_subtotal_iqd, free_shipping_threshold_iqd,
+              shipping_methods, max_shipping_subsidy_iqd, cod_tax_exempt, enabled, priority, valid_from, valid_until,
+              label, notes, updated_at, updated_by)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),?)
+           ON CONFLICT(id) DO UPDATE SET
+             tier=excluded.tier, benefit_type=excluded.benefit_type, scope=excluded.scope,
+             category_id=excluded.category_id, sub_category_id=excluded.sub_category_id, product_id=excluded.product_id,
+             discount_mode=excluded.discount_mode, percent=excluded.percent, fixed_iqd=excluded.fixed_iqd,
+             max_discount_iqd=excluded.max_discount_iqd, cap_scope=excluded.cap_scope, max_quantity=excluded.max_quantity,
+             min_subtotal_iqd=excluded.min_subtotal_iqd,
+             free_shipping_threshold_iqd=excluded.free_shipping_threshold_iqd,
+             shipping_methods=excluded.shipping_methods, max_shipping_subsidy_iqd=excluded.max_shipping_subsidy_iqd,
+             cod_tax_exempt=excluded.cod_tax_exempt, enabled=excluded.enabled, priority=excluded.priority,
+             valid_from=excluded.valid_from, valid_until=excluded.valid_until, label=excluded.label, notes=excluded.notes,
+             updated_at=datetime('now'), updated_by=excluded.updated_by`
+        )
+        .bind(
+          write.id,
+          write.tier,
+          write.benefit_type,
+          write.scope,
+          write.category_id,
+          write.sub_category_id,
+          write.product_id,
+          write.discount_mode,
+          write.percent,
+          write.fixed_iqd,
+          write.max_discount_iqd,
+          write.cap_scope,
+          write.max_quantity,
+          write.min_subtotal_iqd,
+          write.free_shipping_threshold_iqd,
+          null,
+          write.max_shipping_subsidy_iqd,
+          null,
+          write.enabled ? 1 : 0,
+          write.priority,
+          write.valid_from,
+          write.valid_until,
+          write.label,
+          write.notes,
+          actorId
+        )
+    );
+    const nextRow = membershipRowFromWrite(write);
+    productRows = existing
+      ? productRows.map((row) => (row.id === existing.id ? nextRow : row))
+      : [...productRows, nextRow];
+    const nextBenefit = benefitRuleFromWrite(write);
+    allRules = allRules.some((row) => row.id === write.id)
+      ? allRules.map((row) => (row.id === write.id ? nextBenefit : row))
+      : [...allRules, nextBenefit];
+    changedRuleIds.push(write.id);
+    await appendVersionAndAudit(existing ? 'update' : 'create', write.id, existing, write);
+  }
+
+  return {
+    statements,
+    expected: expectedMembershipRows(productRows),
+    changedRuleIds,
+  };
+}
+
+async function verifyTemplateMembership(
+  db: D1Database,
+  productId: string,
+  plan: TemplateMembershipPlan | null
+): Promise<Mismatch[]> {
+  if (!plan) return [];
+  const { results } = await db
+    .prepare(
+      `SELECT id, tier, discount_mode, percent, fixed_iqd, max_discount_iqd, cap_scope, max_quantity, priority
+         FROM membership_benefit_rules
+        WHERE benefit_type = 'product_discount' AND scope = 'product' AND product_id = ?
+        ORDER BY tier, priority DESC, id`
+    )
+    .bind(productId)
+    .all<TemplateMembershipRuleRow>();
+  const stored = expectedMembershipRows(results ?? []);
+  return JSON.stringify(stored) === JSON.stringify(plan.expected)
+    ? []
+    : [{ section: 'scalars', key: 'membership', requested: plan.expected, stored }];
+}
+
+async function membershipCreateRollbackStatements(
+  db: D1Database,
+  actorId: string,
+  productId: string,
+  plan: TemplateMembershipPlan | null,
+  _reason: string
+): Promise<D1PreparedStatement[]> {
+  if (!plan || plan.changedRuleIds.length === 0) return [];
+  // Refresh both the rows being removed and the complete version snapshot at
+  // rollback time. Each compensation is an ordinary, UI-readable `delete`
+  // version (one rule-shaped before_json, a real rule_id, null after_json),
+  // using the same history contract as the membership panel. This also keeps
+  // an unrelated rule changed concurrently after planning in every snapshot.
+  const [allCurrent, productResult] = await Promise.all([
+    allBenefitRules(db),
+    db
+      .prepare(
+        `SELECT ${TEMPLATE_MEMBERSHIP_RULE_COLUMNS}
+           FROM membership_benefit_rules
+          WHERE benefit_type = 'product_discount' AND scope = 'product' AND product_id = ?
+          ORDER BY tier, priority DESC, id`
+      )
+      .bind(productId)
+      .all<TemplateMembershipRuleRow>(),
+  ]);
+  let remaining = sortBenefitRules(allCurrent);
+  const statements: D1PreparedStatement[] = [];
+  for (const before of productResult.results ?? []) {
+    statements.push(db.prepare('DELETE FROM membership_benefit_rules WHERE id = ?').bind(before.id));
+    remaining = remaining.filter((rule) => rule.id !== before.id);
+    statements.push(
+      db
+        .prepare(
+          'INSERT INTO membership_benefit_versions (actor_user_id, action, rule_id, before_json, after_json, rules_json) VALUES (?,?,?,?,?,?)'
+        )
+        .bind(actorId, 'delete', before.id, JSON.stringify(before), null, JSON.stringify(sortBenefitRules(remaining)))
+    );
+    const audited = await auditStatements(db, actorId, 'membership_benefit.delete', before.id, {
+      before: { ...before },
+      after: null,
+    });
+    statements.push(...audited.statements);
+  }
+  return statements;
 }
 
 const GROUP_ITEM_LINE_RE = /^([a-z_]+)\.(\d+)\./;
@@ -514,10 +893,14 @@ condition_notes_en=
 condition_notes_ckb=
 
 # ------------------------------ الوسائط / media
-# معطّلة عمداً: ضع رابطاً حقيقياً (/files/<key> أو https://…) قبل التفعيل،
-# فالمثال يجب ألا يُنشئ منتجاً بصورة مكسورة.
+# معطّلة عمداً حتى لا يُنشئ المثال منتجاً بصورة مكسورة.
+# للاستيراد من المورّد استخدم fetch_url الخارجي؛ يحوّله الخادم إلى WebP محلي.
+# بعد الحفظ يظهر url=/files/<key> فقط، وتبقى source_url لإثبات المصدر.
 # images.1.id=img_example_1
-# images.1.url=
+# images.1.fetch_url=https://vendor.example/product.jpg
+# images.1.url=/files/products/import/gallery/<sha256>.webp
+# images.1.key=products/import/gallery/<sha256>.webp
+# images.1.source_url=https://vendor.example/product.jpg
 # images.1.primary=true
 # images.1.alt_ar=صورة المنتج
 
@@ -715,7 +1098,7 @@ async function loadProductDocWithView(
 }
 
 /** The template groups whose rows live in the relation tables. */
-const STRUCTURE_GROUPS = ['options', 'colors', 'images'] as const;
+const STRUCTURE_GROUPS = ['options', 'colors', 'variants', 'images'] as const;
 
 /** Does this file WRITE structure — items or a whole-group clear? */
 function touchesStructure(parsed: ParsedTemplate): boolean {
@@ -872,7 +1255,13 @@ interface Analysis {
   existingView: ProductRelationsView | null;
   merge: ToDocResult | null;
   doc: ProductDoc | null;
-  validation_error: { message: string; code?: string } | null;
+  validation_error: {
+    message: string;
+    code?: string;
+    section?: string;
+    field?: string | null;
+    errors?: TemplateError[];
+  } | null;
   spec: SpecSheetReport | null;
   /** §18 — the product-scoped membership rules the file states, lifted out of
    *  the text before the product parser ran (see `extractMembership`). */
@@ -912,6 +1301,92 @@ function reattachCells(doc: ProductDoc, body: Record<string, unknown>): void {
   }
 }
 
+/** Exact combinations live beside ProductDoc in relational rows. Keep the
+ * template-normalized rows attached as transient write state so the bridge can
+ * round-trip dimension overrides without teaching every ProductDoc consumer a
+ * second variant collection. */
+function reattachTemplateVariants(doc: ProductDoc, body: Record<string, unknown>): void {
+  if (!Array.isArray(body.variants)) return;
+  (doc as unknown as Record<string, unknown>).variants = body.variants.map((row) =>
+    row && typeof row === 'object' ? { ...(row as Record<string, unknown>) } : row
+  );
+}
+
+/** MediaV2's validator intentionally projects only storefront fields, while
+ * the relation row also owns verified storage metadata. Keep those two
+ * import/export fields as transient write state, matched by stable image id. */
+function reattachTemplateMediaMetadata(doc: ProductDoc, body: Record<string, unknown>): void {
+  if (!Array.isArray(body.media)) return;
+  const byId = new Map(
+    (body.media as Array<Record<string, unknown>>).map((row) => [String(row.id ?? ''), row])
+  );
+  for (const image of doc.media) {
+    const raw = byId.get(image.id);
+    if (!raw) continue;
+    const target = image as unknown as Record<string, unknown>;
+    if (typeof raw.content_type === 'string') target.content_type = raw.content_type;
+    if (typeof raw.bytes === 'number' || raw.bytes === null) target.bytes = raw.bytes;
+  }
+}
+
+/** Validate authored relation references against the fully merged product.
+ * The bridge must never "help" a typo by turning a bound image into a gallery
+ * row or filtering a combination out of the replacement set. */
+function templateBindingValidation(
+  parsed: ParsedTemplate,
+  body: Record<string, unknown>,
+  doc: ProductDoc
+): Analysis['validation_error'] {
+  const optionIds = new Set(doc.options.map((row) => row.id));
+  const colorIds = new Set(doc.colors.map((row) => row.id));
+  const variantRows = Array.isArray(body.variants) ? (body.variants as Array<Record<string, unknown>>) : [];
+  const variantIds = new Set(variantRows.map((row) => String(row.id ?? '')).filter(Boolean));
+  const invalid = (issue: TemplateError, section: 'images' | 'variants'): Analysis['validation_error'] => ({
+    message: issue.message,
+    code: 'TEMPLATE_BINDING_INVALID',
+    section,
+    field: issue.key,
+    errors: [issue],
+  });
+
+  if (!parsed.groupClears.images) {
+    for (const item of parsed.groups.images ?? []) {
+      for (const [name, ids] of [
+        ['option_value_id', optionIds],
+        ['color_id', colorIds],
+        ['variant_id', variantIds],
+      ] as const) {
+        const field = item.fields[name];
+        const id = typeof field?.value === 'string' ? field.value.trim() : '';
+        if (!id || ids.has(id)) continue;
+        const key = `images.${item.index}.${name}`;
+        return invalid({ line: field.line, key, message: `${key}: "${id}" does not exist in the merged product` }, 'images');
+      }
+    }
+  }
+
+  if (!parsed.groupClears.variants) {
+    for (const item of parsed.groups.variants ?? []) {
+      const selections = item.fields.option_value_ids;
+      const ids = Array.isArray(selections?.value)
+        ? selections.value.filter((id): id is string => typeof id === 'string')
+        : [];
+      const missing = ids.find((id) => !optionIds.has(id));
+      if (missing && selections) {
+        const key = `variants.${item.index}.option_value_ids`;
+        return invalid({ line: selections.line, key, message: `${key}: option "${missing}" does not exist in the merged product` }, 'variants');
+      }
+      const color = item.fields.color_id;
+      const colorId = typeof color?.value === 'string' ? color.value.trim() : '';
+      if (colorId && !colorIds.has(colorId)) {
+        const key = `variants.${item.index}.color_id`;
+        return invalid({ line: color!.line, key, message: `${key}: color "${colorId}" does not exist in the merged product` }, 'variants');
+      }
+    }
+  }
+  return null;
+}
+
 /** Shared dry-run pipeline: parse → resolve refs → merge → validate.
  *  Never writes. `target` retargets the merge: undefined = follow the
  *  template's product_id header; null = force a create merge (ignore the
@@ -947,7 +1422,9 @@ async function analyzeTemplate(
     a.existingView = loaded.view;
   }
 
-  const merge = toDocBody(parsed, a.existing, a.refs);
+  const merge = toDocBody(parsed, a.existing, a.refs, {
+    variants: a.existingView ? templateVariantsFromView(a.existingView) : [],
+  });
   a.merge = merge;
   const body = { ...merge.body };
   const bookkeeping = translationBookkeeping(body, a.existing);
@@ -968,6 +1445,8 @@ async function analyzeTemplate(
     );
     a.doc = validated;
     reattachCells(a.doc, body);
+    reattachTemplateVariants(a.doc, body);
+    reattachTemplateMediaMetadata(a.doc, body);
     /**
      * THE OWNER'S FORM IS WHAT GETS STORED: cheapest sellable price as the
      * base, every option and colour an increase over it (cheapestBase.ts). A
@@ -1001,6 +1480,8 @@ async function analyzeTemplate(
             warranty_base_months: validated.warranty_base_months,
           });
           reattachCells(a.doc, body);
+          reattachTemplateVariants(a.doc, body);
+          reattachTemplateMediaMetadata(a.doc, body);
           merge.warnings.push(...norm.warnings);
         } catch (e) {
           if (!(e instanceof HttpError)) throw e;
@@ -1013,10 +1494,19 @@ async function analyzeTemplate(
       }
     }
   } catch (e) {
-    if (e instanceof HttpError) a.validation_error = { message: e.message, code: e.code };
+    if (e instanceof HttpError) {
+      a.validation_error = {
+        message: e.message,
+        code: e.code,
+        section: typeof e.details?.section === 'string' ? e.details.section : undefined,
+        field: typeof e.details?.field === 'string' ? e.details.field : undefined,
+        errors: Array.isArray(e.details?.errors) ? (e.details.errors as TemplateError[]) : undefined,
+      };
+    }
     else throw e;
   }
   if (a.doc) {
+    a.validation_error ??= templateBindingValidation(parsed, body, a.doc);
     a.spec = await specSheetReport(db, a.doc, parsed);
     merge.warnings.push(...a.spec.warnings);
   }
@@ -1188,8 +1678,17 @@ export async function applyFingerprint(
   return hash.slice(0, 32);
 }
 
-/** Atomic claim. Returns true only for the FIRST caller inside the window. */
-export async function claimApplyFingerprint(db: D1Database, fingerprint: string): Promise<boolean> {
+export interface ApplyFingerprintClaim {
+  /** Ownership generation. A stale request may release only this window. */
+  window_start: number;
+}
+
+/** Atomic claim. Returns an ownership token only for the FIRST caller inside
+ * the window; a duplicate gets null and cannot release somebody else's row. */
+export async function claimApplyFingerprint(
+  db: D1Database,
+  fingerprint: string
+): Promise<ApplyFingerprintClaim | null> {
   const now = Math.floor(Date.now() / 1000);
   const cutoff = now - APPLY_FINGERPRINT_WINDOW_SECONDS;
   const row = await db
@@ -1198,24 +1697,36 @@ export async function claimApplyFingerprint(db: D1Database, fingerprint: string)
        ON CONFLICT(key) DO UPDATE SET
          count = CASE WHEN window_start > ?3 THEN count + 1 ELSE 1 END,
          window_start = CASE WHEN window_start > ?3 THEN window_start ELSE ?2 END
-       RETURNING count`
+       RETURNING count, window_start`
     )
     .bind(`tplfp:${fingerprint}`, now, cutoff)
-    .first<{ count: number }>();
-  return (row?.count ?? 0) <= 1;
+    .first<{ count: number; window_start: number }>();
+  return row?.count === 1 ? { window_start: row.window_start } : null;
 }
 
 /** Releases a claim whose write did not happen, so the admin can retry. */
-export async function releaseApplyFingerprint(db: D1Database, fingerprint: string): Promise<void> {
+export async function releaseApplyFingerprint(
+  db: D1Database,
+  fingerprint: string,
+  claim: ApplyFingerprintClaim
+): Promise<void> {
   try {
-    await db.prepare('DELETE FROM rate_limits WHERE key = ? AND count <= 1').bind(`tplfp:${fingerprint}`).run();
+    // The window_start is the generation token written by the atomic claim.
+    // If this request stalls past the lease and a retry acquires a newer
+    // generation, the old request cannot delete that new owner's row.
+    await db
+      .prepare('DELETE FROM rate_limits WHERE key = ? AND window_start = ?')
+      .bind(`tplfp:${fingerprint}`, claim.window_start)
+      .run();
   } catch (e) {
     console.error('template apply fingerprint release failed', e);
   }
 }
 
-/** The product a previous apply of this exact fingerprint produced, read back
- *  from the audit trail (written in the same request as the write). */
+/** The product a previous apply of this exact fingerprint VERIFIED, read back
+ * from a marker written only after catalog commit + membership + readback.
+ * The earlier template.apply audit is not completion: a create can still be
+ * rolled back when verification detects a mismatch. */
 async function previousApply(
   db: D1Database,
   adminUserId: string,
@@ -1224,7 +1735,7 @@ async function previousApply(
   const row = await db
     .prepare(
       `SELECT target, detail FROM audit_log
-        WHERE action = 'template.apply' AND actor_id = ? AND detail LIKE ?
+        WHERE action = 'template.apply.verified' AND actor_id = ? AND detail LIKE ?
         ORDER BY id DESC LIMIT 1`
     )
     .bind(adminUserId, `%"fingerprint":"${fingerprint}"%`)
@@ -1429,6 +1940,10 @@ templateRoutes.get('/export/:productId', async (c) => {
   const loaded = await loadProductDocWithView(c.env.DB, id);
   if (!loaded) throw notFound('Product not found');
   const doc = loaded.doc;
+  // The ProductDoc projection intentionally omits storage-only metadata;
+  // exports are lossless relation snapshots, so restore it from the same
+  // image rows that supplied url/key/source/bindings.
+  reattachTemplateMediaMetadata(doc, { media: loaded.view.images });
   const opts = await exportOptsFor(c.env.DB, doc);
   // §18 — the membership block travels with the product, live. A tier with no
   // rule exports EMPTY keys, so editing and re-applying this very file changes
@@ -1437,6 +1952,7 @@ templateRoutes.get('/export/:productId', async (c) => {
   return attachment(
     `${exportProduct(doc, {
       ...opts,
+      variants: templateVariantsFromView(loaded.view),
       // Symmetric with the parser: the file says which level counts the stock.
       inventoryMode: loaded.view.inventory_mode,
       // §11, the same gate the CSV export has always applied: an assistant
@@ -1483,7 +1999,13 @@ async function plannedRefusal(
   db: D1Database,
   a: Analysis,
   actor: { adminId: string; money: boolean }
-): Promise<{ message: string; code: string } | null> {
+): Promise<{
+  message: string;
+  code: string;
+  section: string;
+  field: string | null;
+  errors: string[];
+} | null> {
   if (!a.doc || !a.merge || a.validation_error) return null;
   const isUpdate = !!a.existing;
   const doc = JSON.parse(JSON.stringify(a.doc)) as ProductDoc;
@@ -1496,7 +2018,10 @@ async function plannedRefusal(
       doc,
       prev: isUpdate ? a.existing : null,
       relations: relationsWanted
-        ? relationsBodyFromDoc(doc, a.existingView ?? EMPTY_RELATIONS, { inventoryMode: a.merge.inventory_mode })
+        ? relationsBodyFromDoc(doc, a.existingView ?? EMPTY_RELATIONS, {
+            inventoryMode: a.merge.inventory_mode,
+            templateBody: a.merge.body,
+          })
         : null,
       catalogIds: a.refs.catalog_ids,
       actor,
@@ -1505,7 +2030,14 @@ async function plannedRefusal(
     return null;
   } catch (e) {
     if (!(e instanceof HttpError)) throw e;
-    return { message: e.message, code: e.code ?? 'VALIDATION' };
+    const errors = Array.isArray(e.details?.errors) ? (e.details!.errors as string[]) : [e.message];
+    return {
+      message: e.message,
+      code: e.code ?? 'VALIDATION',
+      section: typeof e.details?.section === 'string' ? e.details.section : 'relations',
+      field: typeof e.details?.field === 'string' ? e.details.field : (errors[0] ?? null),
+      errors,
+    };
   }
 }
 
@@ -1542,6 +2074,14 @@ templateRoutes.post('/parse', async (c) => {
     errors: a.parsed.errors,
     warnings: [...(a.merge?.warnings ?? a.parsed.warnings), ...(a.doc ? priceWarnings(a.doc) : [])],
     unknown_keys: a.parsed.unknown_keys,
+    media_to_fetch: a.parsed.media_to_fetch.map(({ field, line, target, primary, source_url, source_host }) => ({
+      field,
+      line,
+      target,
+      primary,
+      source_url,
+      source_host,
+    })),
     needs_review: needsReview,
     // A plan the apply will refuse is a validation error of this file, in the
     // field the check step already shows. `a.validation_error` wins when both
@@ -1608,6 +2148,243 @@ function readBackBlock(stored: NonNullable<Awaited<ReturnType<typeof reloadForVe
   };
 }
 
+interface StagedTemplateMedia {
+  results: ProductMediaIngestResult[];
+  warnings: string[];
+  errors: TemplateError[];
+}
+
+const mediaFailureMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error || 'image fetch failed');
+
+/**
+ * Fetch every unique source before planning the product write, then project
+ * the verified local metadata into ProductDoc. Unique sources are ingested
+ * serially because the shared byte/request budget is mutable: parallel reads
+ * could each observe the old allowance and jointly exceed it. A failure does
+ * not stop later sources; every success is exposed to the caller immediately
+ * so all created objects remain rollback-visible. Repeated URLs fetch once;
+ * equal final WebP bytes share one content-addressed object in the ingestion
+ * layer.
+ */
+async function stageTemplateMedia(
+  env: Env,
+  a: Analysis,
+  resultSink: ProductMediaIngestResult[] = []
+): Promise<StagedTemplateMedia> {
+  const intents = a.parsed.media_to_fetch;
+  if (!intents.length || !a.doc || !a.merge) return { results: [], warnings: [], errors: [] };
+
+  const sourceKeys = [...new Set(intents.map((intent) => intent.source_url))];
+  const budget = { fetches: 40, bytes: 64 * 1024 * 1024 };
+  const bySource = new Map<string, ProductMediaIngestResult>();
+  const failed = new Map<string, unknown>();
+  for (const source of sourceKeys) {
+    try {
+      const stored = await ingestProductMediaUrl(env, source, {
+        budget,
+        cleanup_grace_minutes: PRODUCT_MEDIA_CLEANUP_GRACE_MINUTES,
+      });
+      bySource.set(source, stored);
+      resultSink.push(stored);
+    } catch (error) {
+      failed.set(source, error);
+    }
+  }
+  const results = [...bySource.values()];
+  if (failed.size > 0) {
+    return {
+      results,
+      warnings: [],
+      errors: intents
+        .filter((intent) => failed.has(intent.source_url))
+        .map((intent) => ({
+          line: intent.line,
+          key: intent.field,
+          message: `could not import image from ${intent.source_host}: ${mediaFailureMessage(failed.get(intent.source_url))}`,
+        })),
+    };
+  }
+
+  const rawMedia = Array.isArray(a.merge.body.media)
+    ? (a.merge.body.media as Array<Record<string, unknown>>)
+    : [];
+  const rawOptions = Array.isArray(a.merge.body.options)
+    ? (a.merge.body.options as Array<Record<string, unknown>>)
+    : [];
+  const rawColors = Array.isArray(a.merge.body.colors)
+    ? (a.merge.body.colors as Array<Record<string, unknown>>)
+    : [];
+  const media = a.doc.media.map((item) => ({ ...item } as Record<string, unknown>));
+  const warnings: string[] = [];
+
+  const atTemplatePosition = (
+    group: 'images' | 'options' | 'colors',
+    index: number,
+    rows: Array<Record<string, unknown>>
+  ) => {
+    const position = (a.parsed.groups[group] ?? []).findIndex((item) => item.index === index);
+    return position >= 0 ? rows[position] : undefined;
+  };
+
+  const boundId = (intent: TemplateMediaFetchIntent, raw: Record<string, unknown> | undefined) => {
+    if (intent.target_type === 'product') return null;
+    if (intent.target_id) return intent.target_id;
+    return typeof raw?.id === 'string' && raw.id ? raw.id : null;
+  };
+
+  for (const intent of intents) {
+    const stored = bySource.get(intent.source_url)!;
+    const raw = intent.group === 'images'
+      ? atTemplatePosition('images', intent.index, rawMedia)
+      : intent.group === 'options'
+        ? atTemplatePosition('options', intent.index, rawOptions)
+        : atTemplatePosition('colors', intent.index, rawColors);
+    const targetId = boundId(intent, raw);
+    if (intent.target_type !== 'product' && !targetId) {
+      return {
+        results,
+        warnings,
+        errors: [{
+          line: intent.line,
+          key: intent.field,
+          message: `cannot bind the imported image: ${intent.target} has no stable id`,
+        }],
+      };
+    }
+
+    const imageId = intent.image_id || (intent.group === 'images' && typeof raw?.id === 'string' && raw.id
+      ? raw.id
+      : generatedTemplateMediaId(intent.target_type, intent.index, targetId));
+    const candidate: Record<string, unknown> = {
+      id: imageId,
+      url: stored.url,
+      key: stored.key,
+      role: 'gallery',
+      alt_ar: intent.group === 'images' && typeof raw?.alt_ar === 'string' ? raw.alt_ar : '',
+      alt_en: intent.group === 'images' && typeof raw?.alt_en === 'string' ? raw.alt_en : '',
+      alt_ckb: intent.group === 'images' && typeof raw?.alt_ckb === 'string' ? raw.alt_ckb : '',
+      order: intent.group === 'images' && typeof raw?.order === 'number' ? raw.order : media.length,
+      primary: intent.group === 'images' ? raw?.primary === true : false,
+      width: stored.width,
+      height: stored.height,
+      source_url: stored.source_url || intent.source_url,
+      option_value_id: intent.target_type === 'option' ? targetId : '',
+      color_id: intent.target_type === 'color' ? targetId : '',
+      variant_id: intent.target_type === 'variant' ? targetId : '',
+      content_type: stored.content_type,
+      bytes: stored.bytes,
+    };
+    const current = media.findIndex((item) => item.id === imageId);
+    if (current >= 0) media[current] = candidate;
+    else media.push(candidate);
+  }
+
+  // One relation row per content+binding. Different bindings may share the
+  // same content-addressed object; identical repeated rows collapse.
+  const deduped: Array<Record<string, unknown>> = [];
+  const signature = new Map<string, number>();
+  for (const item of media) {
+    const key = [item.key || item.url, item.option_value_id || '', item.color_id || '', item.variant_id || ''].join('|');
+    const prior = signature.get(key);
+    if (prior === undefined) {
+      signature.set(key, deduped.length);
+      deduped.push(item);
+      continue;
+    }
+    if (item.primary === true) deduped[prior].primary = true;
+    warnings.push(`images: duplicate imported content for the same binding was stored once (${String(item.key || item.url)})`);
+  }
+
+  let next: ProductDoc;
+  try {
+    next = validateProductDoc({ ...a.doc, media: deduped });
+  } catch (error) {
+    const first = intents[0];
+    return {
+      results,
+      warnings,
+      errors: [{
+        line: first?.line ?? 0,
+        key: first?.field ?? 'images',
+        message: `imported image could not be applied: ${mediaFailureMessage(error)}`,
+      }],
+    };
+  }
+  // upgradeMedia intentionally keeps only public fields; persistence also
+  // needs the verified byte metadata, so restore it by stable image id.
+  const metadata = new Map(deduped.map((item) => [String(item.id), item]));
+  for (const item of next.media) {
+    const extra = metadata.get(item.id);
+    if (!extra) continue;
+    (item as unknown as Record<string, unknown>).content_type = extra.content_type;
+    (item as unknown as Record<string, unknown>).bytes = extra.bytes;
+  }
+  reattachCells(next, a.merge.body);
+  reattachTemplateVariants(next, a.merge.body);
+  a.doc = next;
+  return { results, warnings, errors: [] };
+}
+
+async function cleanupStagedMedia(env: Env, results: ProductMediaIngestResult[]): Promise<string | null> {
+  if (!results.length) return null;
+  try {
+    await cleanupCreatedProductMedia(env, results);
+    return null;
+  } catch (error) {
+    const detail = mediaFailureMessage(error);
+    console.error('template media rollback degraded', detail);
+    return detail;
+  }
+}
+
+/** Name the TXT field which supplied one final media row. Remote rows keep
+ *  their fetch_url; local/exported rows point at images.N.url. The legacy
+ *  option/color spellings remain identifiable too, so a storage verification
+ *  failure never falls back to an unhelpful product-level error. */
+function templateMediaField(
+  a: Analysis,
+  media: ProductDoc['media'][number] | undefined,
+  fallbackIndex: number
+): { line: number; key: string } {
+  if (media) {
+    const intent = a.parsed.media_to_fetch.find((candidate) => {
+      if (candidate.source_url !== media.source_url) return false;
+      if (candidate.target_type === 'product') return !media.option_value_id && !media.color_id && !media.variant_id;
+      if (candidate.target_type === 'option') return candidate.target_id === media.option_value_id;
+      if (candidate.target_type === 'color') return candidate.target_id === media.color_id;
+      return candidate.target_id === media.variant_id;
+    });
+    if (intent) return { line: intent.line, key: intent.field };
+
+    const imageRow = (a.parsed.groups.images ?? []).find((row) => {
+      const id = typeof row.fields.id?.value === 'string' ? row.fields.id.value : '';
+      const url = typeof row.fields.url?.value === 'string' ? row.fields.url.value : '';
+      return (id && id === media.id) || (url && url === media.url);
+    });
+    if (imageRow) {
+      return {
+        line: imageRow.fields.url?.line ?? imageRow.line,
+        key: `images.${imageRow.index}.url`,
+      };
+    }
+
+    for (const group of ['options', 'colors'] as const) {
+      const binding = group === 'options' ? media.option_value_id : media.color_id;
+      if (!binding) continue;
+      const rows = Array.isArray(a.merge?.body[group])
+        ? (a.merge!.body[group] as Array<Record<string, unknown>>)
+        : [];
+      const position = rows.findIndex((row) => row.id === binding);
+      const parsedRow = position >= 0 ? (a.parsed.groups[group] ?? [])[position] : undefined;
+      if (parsedRow?.fields.image) {
+        return { line: parsedRow.fields.image.line, key: `${group}.${parsedRow.index}.image` };
+      }
+    }
+  }
+  return { line: 0, key: `images.${fallbackIndex + 1}.url` };
+}
+
 templateRoutes.post('/apply', async (c) => {
   await rateLimit(c, 'tpl_apply', 120, 3600);
   const adminUser = c.get('user')!;
@@ -1648,6 +2425,19 @@ templateRoutes.post('/apply', async (c) => {
 
   let isUpdate = mode === 'update';
   const warnings: string[] = [];
+  const analysisValidationResponse = (analysis: Analysis) => {
+    const error = analysis.validation_error!;
+    return c.json({
+      success: false,
+      error: error.message,
+      code: error.code ?? 'VALIDATION',
+      section: error.section ?? 'product',
+      field: error.field ?? null,
+      errors: error.errors ?? [error.message],
+      unknown_keys: analysis.parsed.unknown_keys,
+      warnings: analysis.merge?.warnings ?? analysis.parsed.warnings,
+    }, 400);
+  };
 
   if (mode === 'update') {
     if (!a.parsed.header.product_id) {
@@ -1659,7 +2449,7 @@ templateRoutes.post('/apply', async (c) => {
 
   // Duplicate detection happens on the create path before any write.
   if (!isUpdate) {
-    if (a.validation_error) throw new HttpError(400, a.validation_error.message, a.validation_error.code);
+    if (a.validation_error) return analysisValidationResponse(a);
     const draft = a.doc!;
     const baseSlug = deriveSlug(draft.slug || draft.name_en || draft.name_ar);
     if (!baseSlug) throw badRequest('slug could not be derived — give the product a latin name or an explicit slug');
@@ -1700,8 +2490,8 @@ templateRoutes.post('/apply', async (c) => {
       400
     );
   }
-  if (a.validation_error) throw new HttpError(400, a.validation_error.message, a.validation_error.code);
-  const doc = a.doc!;
+  if (a.validation_error) return analysisValidationResponse(a);
+  let doc = a.doc!;
   const merge = a.merge!;
   warnings.push(...merge.warnings);
   warnings.push(...priceWarnings(doc));
@@ -1741,26 +2531,26 @@ templateRoutes.post('/apply', async (c) => {
     doc.slug = baseSlug;
   }
 
-  /**
-   * THE STRUCTURE GOES WHERE THE PRODUCT ACTUALLY KEEPS IT — ALWAYS.
-   *
-   * The parsed document is translated into the SAME wire body the admin form
-   * PUTs and handed to the shared persistence contract, which plans the
-   * option groups, values, colours, links, variants and images beside the
-   * product row. On a create the plan always runs; on an update it runs
-   * whenever the file writes structure or names the stock level — a product
-   * with no rows receiving its first option gets rows (docs/TXT_IMPORT_PARITY.md,
-   * root causes 1 and 2). The old `hasRelationalStructure` gate is gone.
-   */
-  const relationsWanted = !isUpdate || touchesStructure(a.parsed) || merge.inventory_mode !== undefined;
-  const bridge: BridgeDiagnostics = { warnings: [] };
-  const relations = relationsWanted
-    ? relationsBodyFromDoc(doc, a.existingView ?? EMPTY_RELATIONS, { inventoryMode: merge.inventory_mode, diag: bridge })
-    : null;
-  warnings.push(...bridge.warnings);
+  // Run every planner refusal that does not depend on downloaded bytes before
+  // claiming the fingerprint or touching R2. The final plan is rebuilt after
+  // materialization (with the real image rows), but an invalid stock/capacity,
+  // SKU, relation, or pricing change must not download anything first.
+  const preflight = await plannedRefusal(c.env.DB, a, { adminId: adminUser.id, money });
+  if (preflight) {
+    return c.json({
+      success: false,
+      error: preflight.message,
+      code: preflight.code,
+      section: preflight.section,
+      field: preflight.field,
+      errors: preflight.errors,
+      unknown_keys: a.parsed.unknown_keys,
+      warnings,
+    }, 400);
+  }
 
-  const claimed = await claimApplyFingerprint(c.env.DB, fingerprint);
-  if (!claimed) {
+  const fingerprintClaim = await claimApplyFingerprint(c.env.DB, fingerprint);
+  if (!fingerprintClaim) {
     return repeatSubmission(c, adminUser.id, fingerprint, {
       unknown_keys: a.parsed.unknown_keys,
       applied_fields: merge.applied_fields,
@@ -1769,13 +2559,123 @@ templateRoutes.post('/apply', async (c) => {
     });
   }
 
-  const refused = async (status: 400 | 409 | 500, payload: Record<string, unknown>) => {
-    await releaseApplyFingerprint(c.env.DB, fingerprint);
-    return c.json({ success: false, unknown_keys: a.parsed.unknown_keys, warnings, ...payload }, status);
+  const stagedMedia: ProductMediaIngestResult[] = [];
+  let productCommitted = false;
+  const refused = async (status: 400 | 409 | 500 | 503, payload: Record<string, unknown>) => {
+    // After the catalog batch commits, these objects may be referenced by the
+    // saved product. They are eligible for cleanup only before that boundary,
+    // or after a create rollback has definitely removed the product again.
+    const mediaCleanupError = productCommitted ? null : await cleanupStagedMedia(c.env, stagedMedia);
+    await releaseApplyFingerprint(c.env.DB, fingerprint, fingerprintClaim);
+    return c.json({
+      success: false,
+      unknown_keys: a.parsed.unknown_keys,
+      warnings,
+      ...(mediaCleanupError ? { media_cleanup_error: mediaCleanupError } : {}),
+      ...payload,
+    }, status);
   };
+
+  // Every remote source is fetched and converted BEFORE the product planner
+  // creates a single D1 statement. A failed source cleans every new object
+  // from the successful sources and leaves the catalogue untouched.
+  try {
+    const staged = await stageTemplateMedia(c.env, a, stagedMedia);
+    warnings.push(...staged.warnings);
+    if (staged.errors.length > 0) {
+      return refused(400, {
+        code: 'TEMPLATE_MEDIA_FETCH_FAILED',
+        error: 'One or more template images could not be imported — nothing was written',
+        section: 'images',
+        field: staged.errors[0]?.key ?? null,
+        errors: staged.errors,
+        media_to_fetch: a.parsed.media_to_fetch.map(({ field, target, primary, source_url, source_host }) => ({
+          field, target, primary, source_url, source_host,
+        })),
+      });
+    }
+    doc = a.doc!;
+  } catch (error) {
+    const cleanupError = await cleanupStagedMedia(c.env, stagedMedia);
+    await releaseApplyFingerprint(c.env.DB, fingerprint, fingerprintClaim);
+    if (cleanupError) console.error('template media staging cleanup failed', cleanupError);
+    throw error;
+  }
+
+  // A local-looking URL is not proof that the object exists or contains a
+  // WebP. Re-read and decode every final active row from R2 before building a
+  // single catalogue statement. This does no outbound HTTP fetch, so an
+  // export can be safely re-imported without contacting its source vendor.
+  try {
+    const verified = await verifyStoredProductMedia(c.env, doc.media);
+    const metadata = new Map(verified.map((item) => [item.key, item]));
+    for (const item of doc.media) {
+      const stored = metadata.get(item.key);
+      if (!stored) continue;
+      item.width = stored.width;
+      item.height = stored.height;
+      (item as unknown as Record<string, unknown>).content_type = stored.content_type;
+      (item as unknown as Record<string, unknown>).bytes = stored.bytes;
+    }
+  } catch (error) {
+    if (error instanceof ProductMediaIngestError) {
+      const failedIndex = doc.media.findIndex((item) => error.message.includes(item.url));
+      const position = failedIndex >= 0 ? failedIndex : 0;
+      const field = templateMediaField(a, doc.media[position], position);
+      const status = error.code === 'IMAGE_STORAGE_FAILED' || error.code === 'IMAGE_CONVERT_UNAVAILABLE' ? 503 : 400;
+      return refused(status, {
+        code: error.code,
+        error: error.message,
+        section: 'images',
+        field: field.key,
+        errors: [{ line: field.line, key: field.key, message: error.message }],
+      });
+    }
+    await cleanupStagedMedia(c.env, stagedMedia);
+    await releaseApplyFingerprint(c.env.DB, fingerprint, fingerprintClaim);
+    throw error;
+  }
+
+  /**
+   * THE STRUCTURE GOES WHERE THE PRODUCT ACTUALLY KEEPS IT — ALWAYS.
+   * Remote images have already become verified local rows at this point.
+   */
+  const relationsWanted = !isUpdate || touchesStructure(a.parsed) || merge.inventory_mode !== undefined;
+  const bridge: BridgeDiagnostics = { warnings: [] };
+  let relations: ReturnType<typeof relationsBodyFromDoc> | null;
+  try {
+    relations = relationsWanted
+      ? relationsBodyFromDoc(doc, a.existingView ?? EMPTY_RELATIONS, {
+          inventoryMode: merge.inventory_mode,
+          diag: bridge,
+          templateBody: merge.body,
+        })
+      : null;
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return refused(error.status === 404 ? 400 : (error.status as 400), {
+        code: error.code ?? 'VALIDATION',
+        error: error.message,
+        section: typeof error.details?.section === 'string' ? error.details.section : 'relations',
+        field: typeof error.details?.field === 'string' ? error.details.field : null,
+        errors: Array.isArray(error.details?.errors) ? error.details.errors : [error.message],
+      });
+    }
+    await cleanupStagedMedia(c.env, stagedMedia);
+    await releaseApplyFingerprint(c.env.DB, fingerprint, fingerprintClaim);
+    throw error;
+  }
+  warnings.push(...bridge.warnings);
+  // Variants are relation rows, not ProductDoc fields. They were attached
+  // transiently only so the bridge above could consume template edits; if
+  // left on the document, scalar verification would compare them against a
+  // reloaded ProductDoc (which correctly has no variant collection) and
+  // report a false post-commit mismatch.
+  delete (doc as unknown as Record<string, unknown>).variants;
 
   // ---- plan: row + relations + catalogs + price history + hashtags + translations
   let plan: ProductSavePlan;
+  let membershipPlan: TemplateMembershipPlan | null = null;
   try {
     plan = await planProductSave(c.env.DB, {
       mode: isUpdate ? 'update' : 'create',
@@ -1791,6 +2691,8 @@ templateRoutes.post('/apply', async (c) => {
       // still gets the English-sourced rows the form path writes.
       translations: translationInputsOf(doc),
     });
+    membershipPlan = await planTemplateMembership(c.env.DB, adminUser.id, doc.id, a.membership);
+    if (membershipPlan) plan.statements.push(...membershipPlan.statements);
   } catch (e) {
     if (e instanceof HttpError) {
       const errors = Array.isArray(e.details?.errors) ? (e.details!.errors as string[]) : [e.message];
@@ -1805,6 +2707,8 @@ templateRoutes.post('/apply', async (c) => {
         errors,
       });
     }
+    await cleanupStagedMedia(c.env, stagedMedia);
+    await releaseApplyFingerprint(c.env.DB, fingerprint, fingerprintClaim);
     throw e;
   }
   warnings.push(...plan.warnings);
@@ -1840,6 +2744,7 @@ templateRoutes.post('/apply', async (c) => {
         },
       },
     ]);
+    productCommitted = true;
   } catch (e) {
     // The write did not happen — free the fingerprint so a corrected retry
     // is not mistaken for a double submission.
@@ -1866,49 +2771,54 @@ templateRoutes.post('/apply', async (c) => {
         choices: DUPLICATE_CHOICES,
       });
     }
-    await releaseApplyFingerprint(c.env.DB, fingerprint);
+    await cleanupStagedMedia(c.env, stagedMedia);
+    await releaseApplyFingerprint(c.env.DB, fingerprint, fingerprintClaim);
     throw e;
-  }
-
-  /**
-   * §18 — the membership rule, written beside the product and only after it
-   * exists (a product-scoped rule has to name a product). It goes through
-   * `saveBenefitRule` / `deleteBenefitRule`, so the version row and the audit
-   * entry are appended in the same batch as the rule, exactly as they are for
-   * a change made in the admin panel.
-   *
-   * The product row is already committed at this point, so a failure here is
-   * reported as itself — naming the product that WAS saved — rather than as a
-   * generic 500 that would leave the owner unsure what landed.
-   */
-  if (a.membership.length > 0) {
-    try {
-      await applyMembershipRules(c.env, adminUser.id, doc.id, a.membership);
-    } catch (e) {
-      return c.json(
-        {
-          success: false,
-          code: 'MEMBERSHIP_WRITE_FAILED',
-          error: 'The product was saved, but its membership discount was not written — try the membership panel',
-          product_id: doc.id,
-          created: !isUpdate,
-          detail: e instanceof Error ? e.message : String(e),
-          warnings,
-        },
-        500
-      );
-    }
   }
 
   // ---- read back through the form's own endpoints and compare -----------
   const stored = await reloadForVerification(c.env.DB, doc.id);
   if (!stored) {
-    return refused(500, { code: 'APPLY_VERIFY_FAILED', error: 'the product could not be read back after the write', section: 'product', field: 'id' });
+    let rollbackFailed: string | null = null;
+    if (!isUpdate) {
+      try {
+        const membershipRollback = await membershipCreateRollbackStatements(
+          c.env.DB,
+          adminUser.id,
+          doc.id,
+          membershipPlan,
+          'template_apply_readback_missing'
+        );
+        await c.env.DB.batch([
+          ...membershipRollback,
+          ...plan.hashtagsAdded.map((tag) => c.env.DB.prepare('DELETE FROM hashtags WHERE tag = ?').bind(tag)),
+          c.env.DB.prepare('DELETE FROM product_catalogs WHERE product_id = ?').bind(doc.id),
+          c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(doc.id),
+        ]);
+        productCommitted = false;
+      } catch (error) {
+        rollbackFailed = error instanceof Error ? error.message : String(error);
+        console.error('template apply unreadable-create rollback failed', rollbackFailed);
+      }
+    }
+    return refused(500, {
+      code: 'APPLY_VERIFY_FAILED',
+      error: rollbackFailed
+        ? 'the new product could not be read back or removed — delete it by hand / تعذّرت قراءة المنتج الجديد أو إزالته، احذفه يدويًا'
+        : isUpdate
+          ? 'the saved product could not be read back — the update may have committed'
+          : 'the new product could not be read back and was removed again; nothing was left half-applied',
+      section: 'product',
+      field: 'id',
+      product_id: isUpdate || rollbackFailed ? doc.id : null,
+      ...(rollbackFailed ? { rollback_error: rollbackFailed } : {}),
+    });
   }
   const mismatches: Mismatch[] = verifyApplied(plan, stored, {
     documentKeys: isUpdate ? touchedKeys(merge) : null,
     inventoryMode: plan.relations?.mode,
   });
+  mismatches.push(...await verifyTemplateMembership(c.env.DB, doc.id, membershipPlan));
   const spec = a.spec ? { ...a.spec, stored: Object.keys(stored.row.spec_fields).length } : null;
   if (mismatches.length > 0) {
     // Parser success is not import success. The batch is committed, so the
@@ -1928,11 +2838,22 @@ templateRoutes.post('/apply', async (c) => {
       // it, migrations 0018/0048); the hashtag vocabulary rows do not, so the
       // ones THIS apply registered are named explicitly.
       try {
+        const membershipRollback = await membershipCreateRollbackStatements(
+          c.env.DB,
+          adminUser.id,
+          doc.id,
+          membershipPlan,
+          'template_apply_verification_mismatch'
+        );
         await c.env.DB.batch([
+          ...membershipRollback,
           ...plan.hashtagsAdded.map((tag) => c.env.DB.prepare('DELETE FROM hashtags WHERE tag = ?').bind(tag)),
           c.env.DB.prepare('DELETE FROM product_catalogs WHERE product_id = ?').bind(doc.id),
           c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(doc.id),
         ]);
+        // Product and relation rows are gone, so created_new media is no
+        // longer live and may be reclaimed by the ordinary refusal path.
+        productCommitted = false;
       } catch (e) {
         rollbackFailed = e instanceof Error ? e.message : String(e);
         console.error('template apply rollback failed', rollbackFailed);
@@ -1970,6 +2891,20 @@ templateRoutes.post('/apply', async (c) => {
       ...(isUpdate ? readBackBlock(stored, spec, plan) : {}),
     });
   }
+
+  // This is the completion marker used by a concurrent/retried submission.
+  // The catalog batch's earlier `template.apply` audit is intentionally not
+  // sufficient: until readback succeeds a fresh create may still be removed
+  // by the verification rollback above.
+  await audit(c.env.DB, adminUser.id, 'template.apply.verified', doc.id, {
+    created: !isUpdate,
+    fingerprint,
+  }).catch((error) => {
+    // The product is already committed and verified. A missing marker merely
+    // makes a duplicate answer 409 until the fingerprint lease expires; it
+    // must not turn success into a false rollback or delete live media.
+    console.error('template apply verified marker failed', error);
+  });
 
   // §11: the same gate as the export and /parse — the applied product is the
   // whole document, cost included, and an assistant admin must not read it.

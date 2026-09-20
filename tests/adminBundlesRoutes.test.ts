@@ -31,6 +31,8 @@ import { adminBundlesRoutes } from '../worker/routes/adminBundles';
 import { adminProductsRoutes } from '../worker/routes/adminProducts';
 import { refusalIssues } from '../src/components/adminProducts/applyResult';
 import type { ApplyVerifyFailure } from '../src/components/adminProducts/types';
+import { fixtureWebp, productMediaFixtureEnv } from './fixtures/productMedia';
+import { pendingMediaCleanup, runMediaCleanup } from '../worker/lib/productDeletion';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 const ASSISTANT = { id: 'usr_asst', role: 'admin' as const, email: 'asst@x.co', admin_scope: 'assistant' };
@@ -80,7 +82,7 @@ function seedProduct(raw: DatabaseSync, p: SeedProduct) {
 
 /** The owner's worked example: a printer, a spool bought two at a time, and a
  *  nozzle. printer 5 · spool 6 needing 2 · nozzle 20 → max_bundles 3. */
-function setup(user: typeof OWNER | typeof ASSISTANT = OWNER) {
+function setup(user: typeof OWNER | typeof ASSISTANT = OWNER, env: Record<string, unknown> = {}) {
   const raw = freshDb();
   raw
     .prepare("INSERT INTO users (id,name,email,password_hash,role,username) VALUES (?,?,?,?,?,?)")
@@ -89,7 +91,7 @@ function setup(user: typeof OWNER | typeof ASSISTANT = OWNER) {
   seedProduct(raw, { id: 'prd_spool', slug: 'spool', name: 'Spool', price: 20000, stock: 6, cost: 12000 });
   seedProduct(raw, { id: 'prd_nozzle', slug: 'nozzle', name: 'Nozzle', price: 5000, stock: 20, cost: 2000 });
   const db = asD1(raw);
-  return { raw, db, app: stubApp(db, user, mount) };
+  return { raw, db, app: stubApp(db, user, mount, { env }) };
 }
 
 const KIT = {
@@ -141,6 +143,92 @@ test('a bundle is a products row: stock NULL, selling_type bundle, no options of
   assert.equal(cfg.price_mode, 'fixed');
   assert.equal(cfg.max_qty_per_order, 5);
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action = 'bundle.create'"), 1);
+});
+
+test('bundle create/update normalize stored media metadata, and duplicate refuses a vanished source object', async () => {
+  const media = productMediaFixtureEnv({ supplyDeclaredWebp: false });
+  const key = 'products/bundles/gallery/bundle-gate.webp';
+  const url = `/files/${key}`;
+  await media.publicBucket.put(key, fixtureWebp());
+  const claimed = [{
+    id: 'img_bundle_gate', url, key, primary: true, order: 0,
+    width: 1, height: 2, bytes: 999_999, content_type: 'image/png',
+  }];
+  const { raw, app } = setup(OWNER, media.env);
+
+  const made = await create(app, { media: claimed });
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  const id = made.body.product.id as string;
+  const stored = JSON.parse(row<{ images: string }>(raw, 'SELECT images FROM products WHERE id = ?', id)!.images)[0];
+  assert.deepEqual(
+    { url: stored.url, key: stored.key, content_type: stored.content_type, bytes: stored.bytes, width: stored.width, height: stored.height },
+    { url, key, content_type: 'image/webp', bytes: 30, width: 640, height: 480 },
+    'R2 bytes and decoder output, never client metadata, describe the saved image'
+  );
+
+  const updated = await put(app, `/api/admin/bundles/${id}`, { ...KIT, name_en: 'Updated kit', media: claimed });
+  assert.equal(updated.status, 200, await updated.text());
+
+  await media.publicBucket.delete(key);
+  const copied = await post(app, `/api/admin/bundles/${id}/duplicate`, {});
+  const copiedBody = await json(copied);
+  assert.equal(copied.status, 400, JSON.stringify(copiedBody));
+  assert.equal(copiedBody.code, 'IMAGE_REFERENCE_MISSING');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM products WHERE composition = 'bundle'"), 1, 'no duplicate product row landed');
+});
+
+test('admin bundle reads and duplicate use the active product_images cover, never the stale or quarantined mirror', async () => {
+  const media = productMediaFixtureEnv({ supplyDeclaredWebp: false });
+  const key = 'products/bundles/gallery/authoritative.webp';
+  const url = `/files/${key}`;
+  await media.publicBucket.put(key, fixtureWebp());
+  const { raw, app } = setup(OWNER, media.env);
+  const made = await create(app);
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  const id = made.body.product.id as string;
+
+  raw.prepare('UPDATE products SET images = ? WHERE id = ?').run(
+    JSON.stringify(['https://stale.example/bundle.jpg']),
+    id
+  );
+  raw.prepare(
+    `INSERT INTO product_images
+       (id,product_id,url,r2_key,source_url,content_type,sort_order,is_primary,quarantined,quarantine_reason)
+     VALUES
+       ('img_bundle_authority',?,?,?,'','image/webp',7,1,0,''),
+       ('img_bundle_quarantine',?,'','','https://bad.example/bundle.jpg','',0,0,1,'external_or_unsafe_url')`
+  ).run(id, url, key, id);
+
+  const listing = await json(await get(app, '/api/admin/bundles'));
+  const listed = listing.bundles.find((x: { id: string }) => x.id === id);
+  assert.equal(listed.image, url);
+
+  const detail = await json(await get(app, `/api/admin/bundles/${id}`));
+  assert.equal(detail.product.media[0].url, url);
+  assert.equal(JSON.stringify(detail).includes('stale.example'), false);
+  assert.equal(JSON.stringify(detail).includes('bad.example'), false);
+
+  const copied = await json(await post(app, `/api/admin/bundles/${id}/duplicate`, {}));
+  assert.equal(copied.success, true, JSON.stringify(copied));
+  assert.equal(copied.product.media[0].url, url);
+  const copyImages = row<{ images: string }>(
+    raw,
+    'SELECT images FROM products WHERE id = ?',
+    copied.product.id as string
+  )!.images;
+  assert.equal(copyImages.includes(url), true);
+  assert.equal(copyImages.includes('stale.example'), false, 'the builder cannot freeze the stale JSON mirror');
+  assert.equal(copyImages.includes('bad.example'), false, 'quarantine provenance is not duplicated as media');
+});
+
+test('bundle create rejects a missing local WebP before any catalogue row is written', async () => {
+  const media = productMediaFixtureEnv({ supplyDeclaredWebp: false });
+  const key = 'products/bundles/gallery/missing.webp';
+  const { raw, app } = setup(OWNER, media.env);
+  const out = await create(app, { media: [{ id: 'img_missing', url: `/files/${key}`, key, primary: true }] });
+  assert.equal(out.status, 400, JSON.stringify(out.body));
+  assert.equal(out.body.code, 'IMAGE_REFERENCE_MISSING');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM products WHERE composition = 'bundle'"), 0);
 });
 
 test("the preview is the scarcest component, computed by the storefront's own function", async () => {
@@ -494,6 +582,152 @@ test('publish, duplicate, reorder and archive', async () => {
   assert.equal(archived.status, 200, await archived.text());
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM products WHERE id = ?', copyId), 0, 'an unsold bundle is deleted');
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM bundle_components WHERE bundle_product_id = ?', copyId), 0);
+});
+
+test('deleting an unsold bundle queues its unique image and completes guarded R2 cleanup', async () => {
+  const media = productMediaFixtureEnv({ supplyDeclaredWebp: false });
+  const key = 'products/bundles/gallery/delete-unique.webp';
+  await media.publicBucket.put(key, fixtureWebp());
+  const { raw, app } = setup(OWNER, media.env);
+  const made = await create(app, {
+    media: [{ id: 'img_bundle_delete_unique', url: `/files/${key}`, key, primary: true, order: 0 }],
+  });
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  const id = made.body.product.id as string;
+  // The save gate protects a freshly attached key for a short commit window.
+  // This test models an established image so the inline cleanup may claim it.
+  raw.prepare("UPDATE media_object_guards SET protected_until = '' WHERE object_key = ?").run(key);
+
+  const response = await del(app, `/api/admin/bundles/${id}`);
+  const body = await json(response);
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.equal(body.deleted, true);
+  assert.equal(body.product_deleted, true);
+  assert.deepEqual(body.r2_objects_deleted, [key]);
+  assert.equal(body.r2_cleanup_pending, 0);
+  assert.equal(media.publicBucket.objects.has(key), false);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM products WHERE id = ?', id), 0);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM bundle_components WHERE bundle_product_id = ?', id), 0);
+  const job = row<{ state: string; attempts: number; reason: string; source_product_id: string }>(
+    raw,
+    'SELECT state, attempts, reason, source_product_id FROM media_cleanup_jobs WHERE object_key = ?',
+    key
+  )!;
+  assert.deepEqual(job, { state: 'done', attempts: 1, reason: 'product_delete', source_product_id: id });
+});
+
+test('deleting a bundle preserves an image still referenced by another product', async () => {
+  const media = productMediaFixtureEnv({ supplyDeclaredWebp: false });
+  const key = 'products/bundles/gallery/delete-shared.webp';
+  await media.publicBucket.put(key, fixtureWebp());
+  const { raw, app } = setup(OWNER, media.env);
+  const made = await create(app, {
+    media: [{ id: 'img_bundle_delete_shared', url: `/files/${key}`, key, primary: true, order: 0 }],
+  });
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  const id = made.body.product.id as string;
+  raw.prepare(
+    `INSERT INTO product_images (id, product_id, url, r2_key, content_type, sort_order, is_primary)
+     VALUES ('img_shared_survivor', 'prd_spool', ?, ?, 'image/webp', 0, 1)`
+  ).run(`/files/${key}`, key);
+
+  const response = await del(app, `/api/admin/bundles/${id}`);
+  const body = await json(response);
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.ok((body.r2_objects_shared_skipped as string[]).includes(key));
+  assert.equal(
+    count(raw, 'SELECT COUNT(*) AS n FROM media_cleanup_jobs WHERE object_key = ?', key),
+    0,
+    'a shared key is never placed in the destructive queue'
+  );
+  assert.equal(media.publicBucket.objects.has(key), true, 'the surviving product must keep resolving the object');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM product_images WHERE product_id = ? AND r2_key = ?', 'prd_spool', key), 1);
+});
+
+test('deleting an unsold bundle preserves bytes held by an immutable order image snapshot', async () => {
+  const media = productMediaFixtureEnv({ supplyDeclaredWebp: false });
+  const key = 'products/bundles/gallery/delete-order-snapshot.webp';
+  await media.publicBucket.put(key, fixtureWebp());
+  const { raw, app } = setup(OWNER, media.env);
+  const made = await create(app, {
+    media: [{ id: 'img_bundle_order_snapshot', url: `/files/${key}`, key, primary: true, order: 0 }],
+  });
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  const id = made.body.product.id as string;
+  raw.exec(`
+    INSERT INTO orders
+      (id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,
+       subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd)
+    VALUES ('ORD-MEDIA-SNAPSHOT','usr_owner','delivered','{}','standard','{}','cash',1000,1500,1000,0);
+  `);
+  raw.prepare(
+    `INSERT INTO order_items
+       (id,order_id,product_id,name_snapshot,image_snapshot,qty,unit_price_iqd,line_total_iqd)
+     VALUES ('oi-media-snapshot','ORD-MEDIA-SNAPSHOT',NULL,'Historical item',?,1,1000,1000)`
+  ).run(`/files/${key}`);
+  // Model an established object rather than the save gate's short attachment grace.
+  raw.prepare("UPDATE media_object_guards SET protected_until = '' WHERE object_key = ?").run(key);
+
+  const response = await del(app, `/api/admin/bundles/${id}`);
+  const body = await json(response);
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.equal(body.product_deleted, true);
+  assert.deepEqual(body.r2_objects_deleted, []);
+  assert.ok((body.r2_objects_shared_skipped as string[]).includes(key));
+  assert.equal(body.r2_cleanup_pending, 0);
+  assert.equal(media.publicBucket.objects.has(key), true, 'past orders must keep rendering their frozen thumbnail');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM products WHERE id = ?', id), 0);
+  assert.deepEqual(
+    row<{ state: string; attempts: number }>(
+      raw,
+      'SELECT state, attempts FROM media_cleanup_jobs WHERE object_key = ?',
+      key
+    ),
+    { state: 'skipped_shared', attempts: 1 }
+  );
+});
+
+test('a bundle R2 failure stays pending and a later retry finishes it', async () => {
+  const media = productMediaFixtureEnv({ supplyDeclaredWebp: false });
+  const key = 'products/bundles/gallery/delete-retry.webp';
+  await media.publicBucket.put(key, fixtureWebp());
+  const originalDelete = media.publicBucket.delete.bind(media.publicBucket);
+  let unavailable = true;
+  media.publicBucket.delete = async (objectKey: string) => {
+    if (unavailable && objectKey === key) throw new Error('simulated R2 outage');
+    await originalDelete(objectKey);
+  };
+  const { raw, db, app } = setup(OWNER, media.env);
+  const made = await create(app, {
+    media: [{ id: 'img_bundle_delete_retry', url: `/files/${key}`, key, primary: true, order: 0 }],
+  });
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  const id = made.body.product.id as string;
+  raw.prepare("UPDATE media_object_guards SET protected_until = '' WHERE object_key = ?").run(key);
+
+  const response = await del(app, `/api/admin/bundles/${id}`);
+  const body = await json(response);
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.equal(body.product_deleted, true, 'an R2 outage cannot roll back or misreport the committed D1 delete');
+  assert.equal(body.r2_cleanup_pending, 1);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM products WHERE id = ?', id), 0);
+  const pending = row<{ state: string; attempts: number; last_error: string }>(
+    raw,
+    'SELECT state, attempts, last_error FROM media_cleanup_jobs WHERE object_key = ?',
+    key
+  )!;
+  assert.equal(pending.state, 'pending');
+  assert.equal(pending.attempts, 1);
+  assert.match(pending.last_error, /simulated R2 outage/);
+  assert.equal(media.publicBucket.objects.has(key), true);
+
+  unavailable = false;
+  const jobs = await pendingMediaCleanup(db as never);
+  const retried = await runMediaCleanup({ ...media.env, DB: db } as never, jobs);
+  assert.deepEqual(retried.failed, []);
+  assert.deepEqual(retried.deleted, [key]);
+  assert.equal(media.publicBucket.objects.has(key), false);
+  assert.equal(row<{ state: string }>(raw, 'SELECT state FROM media_cleanup_jobs WHERE object_key = ?', key)!.state, 'done');
 });
 
 test('an edit keeps its component ids, its slug and its stale-edit guard', async () => {

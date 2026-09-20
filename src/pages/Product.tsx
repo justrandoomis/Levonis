@@ -60,7 +60,16 @@ import { ProductDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 import { monthsLabel } from '../components/orders/format';
 import { captureSupportRefFromSearch } from '../lib/supportRef';
-import { productGalleryForSelection } from '../lib/productImage';
+import { productGalleryForSelection, productVariantIdForSelection } from '../lib/productImage';
+import {
+  formatPhysicalMeasurement,
+  hasProductDimensions,
+  resolveProductSelectionDimensions,
+} from '../lib/productDimensions';
+import type {
+  ProductDimensionOverridesV2,
+  ProductDimensionsV2,
+} from '../lib/productTypes';
 import { tierLabel } from '../components/subscription/tierMeta';
 import ConditionPanel from '../components/product/ConditionPanel';
 import StockAlertPanel from '../components/product/StockAlertPanel';
@@ -310,9 +319,10 @@ type ProductSource = 'catalog' | 'community';
 interface MediaItem {
   id?: string; url: string; alt_ar?: string; alt_en?: string; alt_ckb?: string;
   order?: number; primary?: boolean;
+  option_value_id?: string | null; color_id?: string | null; variant_id?: string | null;
 }
-interface OptionItem {
-  id: string; name_ar?: string; name_en?: string; name_ckb?: string; name?: string; image?: string;
+interface OptionItem extends ProductDimensionOverridesV2 {
+  id: string; name_ar?: string; name_en?: string; name_ckb?: string; name?: string;
   /** 0043. Absent on every product written before per-option availability,
    *  which is exactly why the two-step chooser below is opt-in. */
   availability_type?: '' | 'direct_sale' | 'pre_order';
@@ -327,9 +337,9 @@ interface OptionItem {
   lead_time_min_days?: number | null;
   lead_time_max_days?: number | null;
 }
-interface ColorItem {
+interface ColorItem extends ProductDimensionOverridesV2 {
   id: string; name_ar?: string; name_en?: string; name_ckb?: string; name?: string;
-  hex?: string; image?: string; option_id?: string | null;
+  hex?: string; option_id?: string | null;
 }
 /** A plan as the server prices it for a selection (worker/lib/warrantyPlans.ts
  *  pricedPlans): `fee_iqd` is already the resolved dinar, `total_months` the
@@ -356,6 +366,7 @@ interface ProductDetail {
   /** The owner's catalog flag; the printer home-delivery note keys off it. */
   is_printer?: boolean;
   media?: MediaItem[]; images?: string[];
+  dimensions?: ProductDimensionsV2;
   options?: OptionItem[]; colors?: ColorItem[];
   warranty_plans?: WarrantyPlanItem[];
   /** Base coverage in months from delivery (printers: 12); null = not configured. */
@@ -399,13 +410,17 @@ interface RelationsPayload {
   inventory_mode: 'BASE' | 'OPTION' | 'COLOR' | 'VARIANT_COMBINATION' | string;
   option_groups: Array<{
     id: string; name_en: string; sort: number;
-    values: Array<{ id: string; name_en: string; image: string; sort: number; available: number | null }>;
+    values: Array<{
+      id: string; name_en: string; image: string; sort: number; available: number | null;
+    } & ProductDimensionOverridesV2>;
   }>;
   colors: Array<{
     id: string; name_en: string; hex: string; image: string; sort: number; available: number | null;
     links?: Array<{ group_id: string; option_value_id: string }>;
-  }>;
-  variants?: Array<{ id: string; combo_key: string; available: number | null }>;
+  } & ProductDimensionOverridesV2>;
+  variants?: Array<{
+    id: string; combo_key: string; available: number | null;
+  } & ProductDimensionOverridesV2>;
   images: Array<{
     id: string; url: string; alt_en: string; sort_order: number; is_primary: boolean;
     option_value_id: string | null; color_id: string | null; variant_id: string | null;
@@ -1509,22 +1524,58 @@ export default function Product() {
   const description = pick(
     lang as Lang, product.description_ar, product.description_en, product.description_ckb, product.description
   );
-  // Selection-aware gallery: the images bound to the CHOSEN colour lead,
-  // then the chosen option's, then the general product images; images bound
-  // to OTHER choices sink to the end. The value/colour's own `image` field
-  // joins the gallery too — «كل الصوره ترتبط بالخيار او اللون عند اختياره».
+  // Selection-aware gallery from ONE source: product_images/media. Exact
+  // variant beats colour, colour beats any selected option (multi-group
+  // aware), and the explicit primary is the fallback.
+  const mediaBindings = (relations?.images?.length ? relations.images : product.media ?? []);
+  const selectedVariantId = productVariantIdForSelection(relations?.variants ?? [], {
+    optionValueIds,
+    colorId,
+  });
+  const physicalDimensions = resolveProductSelectionDimensions(product, relations, {
+    optionValueIds,
+    colorId,
+  });
+  const showPhysicalDimensions = hasProductDimensions(physicalDimensions);
+  const dimensionGroups: Array<{
+    id: 'product' | 'package';
+    title: string;
+    rows: Array<{ key: keyof ProductDimensionsV2; label: string; kind: 'weight' | 'length' }>;
+  }> = [
+    {
+      id: 'product',
+      title: tr('المنتج', 'Product', 'بەرهەم'),
+      rows: [
+        { key: 'net_weight_g', label: tr('الوزن الصافي', 'Net weight', 'کێشی خاوێن'), kind: 'weight' },
+        { key: 'width_mm', label: tr('العرض', 'Width', 'پانی'), kind: 'length' },
+        { key: 'depth_mm', label: tr('العمق', 'Depth', 'قووڵایی'), kind: 'length' },
+        { key: 'height_mm', label: tr('الارتفاع', 'Height', 'بەرزی'), kind: 'length' },
+      ],
+    },
+    {
+      id: 'package',
+      title: tr('العبوة', 'Package', 'پاکەت'),
+      rows: [
+        { key: 'package_weight_g', label: tr('الوزن', 'Weight', 'کێش'), kind: 'weight' },
+        { key: 'package_width_mm', label: tr('العرض', 'Width', 'پانی'), kind: 'length' },
+        { key: 'package_depth_mm', label: tr('العمق', 'Depth', 'قووڵایی'), kind: 'length' },
+        { key: 'package_height_mm', label: tr('الارتفاع', 'Height', 'بەرزی'), kind: 'length' },
+      ],
+    },
+  ];
   const gallery = (() => {
     const base = galleryOf(product);
-    const rImages = relations?.images ?? [];
-    const optionObj = optionId ? (product.options ?? []).find((o) => o.id === optionId) : null;
-    const colorObj = colorId ? (product.colors ?? []).find((c) => c.id === colorId) : null;
-    return productGalleryForSelection(base, rImages, {
+    return productGalleryForSelection(base, mediaBindings, {
       optionId,
+      optionValueIds,
       colorId,
-      optionImage: optionObj?.image,
-      colorImage: colorObj?.image,
+      variantId: selectedVariantId,
     });
   })();
+  const optionImage = (id: string): string =>
+    mediaBindings.find((image) => image.option_value_id === id)?.url ?? '';
+  const colorImage = (id: string): string =>
+    mediaBindings.find((image) => image.color_id === id)?.url ?? '';
   const activeMedia = gallery[Math.min(galleryIndex, Math.max(0, gallery.length - 1))];
   const options = storefrontOptions;
 
@@ -2156,9 +2207,9 @@ export default function Product() {
                         }}
                         className="lv-choice flex min-h-[48px] items-center gap-2 px-3 py-1.5 text-sm font-bold"
                       >
-                        {value.image ? (
+                        {optionImage(value.id) ? (
                           <SafeImage
-                            src={value.image}
+                            src={optionImage(value.id)}
                             alt={label}
                             aspect="square"
                             fit="cover"
@@ -2209,9 +2260,9 @@ export default function Product() {
                   }}
                   className="lv-choice flex min-h-[50px] max-w-full items-center gap-2 px-2.5 py-1.5 text-sm font-bold"
                 >
-                  {m.options[0]?.image ? (
+                  {m.options[0] && optionImage(m.options[0].id) ? (
                     <SafeImage
-                      src={m.options[0].image}
+                      src={optionImage(m.options[0].id)}
                       alt={m.label}
                       aspect="square"
                       fit="cover"
@@ -2321,9 +2372,9 @@ export default function Product() {
                   }}
                   className="lv-choice flex items-center gap-2 px-3 py-1.5 text-sm font-bold"
                 >
-                  {opt.image ? (
+                  {optionImage(opt.id) ? (
                     <SafeImage
-                      src={opt.image}
+                      src={optionImage(opt.id)}
                       alt={label}
                       aspect="square"
                       fit="cover"
@@ -2375,9 +2426,9 @@ export default function Product() {
                   }}
                   className="lv-choice flex items-center gap-2 px-3 py-1.5 text-sm font-bold"
                 >
-                  {col.image ? (
+                  {colorImage(col.id) ? (
                     <SafeImage
-                      src={col.image}
+                      src={colorImage(col.id)}
                       alt={label}
                       aspect="square"
                       fit="cover"
@@ -3240,6 +3291,43 @@ export default function Product() {
                   ) : (
                     <p dir="auto" className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">{howToUse}</p>
                   )}
+                </Section>
+              ) : null}
+
+              {showPhysicalDimensions ? (
+                <Section
+                  title={tr('الأبعاد والوزن', 'Dimensions & weight', 'ڕەهەندەکان و کێش')}
+                  icon={<PackageOpen aria-hidden="true" className="w-5 h-5 text-zinc-400" />}
+                  defaultOpen
+                >
+                  <div
+                    className="grid gap-3 sm:grid-cols-2"
+                    data-resolved-physical-dimensions
+                    data-variant-id={selectedVariantId ?? ''}
+                  >
+                    {dimensionGroups.map((group) => (
+                      <div key={group.id} className="rounded-xl border border-zinc-800/70 bg-black/20 p-3">
+                        <h4 className="mb-1 text-[12px] font-bold text-zinc-300">{group.title}</h4>
+                        <dl className="text-[12px]">
+                          {group.rows.map((row) => {
+                            const value = physicalDimensions[row.key];
+                            return (
+                              <div
+                                key={row.key}
+                                className="flex items-baseline justify-between gap-3 border-b border-zinc-800/60 py-1.5 last:border-0"
+                                data-dimension-field={row.key}
+                              >
+                                <dt className="text-zinc-500">{row.label}</dt>
+                                <dd className="tabular-nums text-zinc-200" dir="ltr">
+                                  {formatPhysicalMeasurement(value, row.kind)}
+                                </dd>
+                              </div>
+                            );
+                          })}
+                        </dl>
+                      </div>
+                    ))}
+                  </div>
                 </Section>
               ) : null}
 

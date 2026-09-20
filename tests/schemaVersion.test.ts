@@ -114,7 +114,7 @@ test('a database AHEAD of the code is reported, not treated as an error', async 
   // The ordinary state during a rollback: the database has run something this
   // Worker has never heard of. The reader wants to know; it is not a fault.
   const raw = freshDb();
-  recordApplied(raw, [...migrations(), '0099_from_the_future.sql']);
+  recordApplied(raw, [...migrations(), '0100_from_the_future.sql']);
   const s = await readSchemaStatus(asD1(raw));
   assert.equal(s.state, 'ahead');
   assert.equal(s.behind, 0);

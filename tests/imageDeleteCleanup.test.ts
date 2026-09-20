@@ -298,6 +298,45 @@ test('saveProductAtomic queues the detached keys once the batch has committed', 
   assert.equal(jobs[0]?.reason, MEDIA_DETACH_REASON);
 });
 
+test('post-commit audit failures never turn a committed product save into a rejection', async () => {
+  const db = freshSchema();
+  const real = new SqliteD1(db);
+  db.prepare("INSERT INTO products (id, name, slug, price_iqd) VALUES ('p1','before','s',1000)").run();
+
+  let refusedAudits = 0;
+  const auditFailingDb = {
+    prepare(sql: string) {
+      if (/INSERT\s+INTO\s+audit_log/i.test(sql)) {
+        refusedAudits += 1;
+        throw new Error('audit storage unavailable');
+      }
+      return real.prepare(sql);
+    },
+    batch(statements: D1PreparedStatement[]) {
+      return real.batch(statements as never);
+    },
+  } as unknown as D1Database;
+
+  const plan = planOf(
+    [real.prepare("UPDATE products SET name = 'committed' WHERE id = 'p1'") as unknown as D1PreparedStatement],
+    []
+  );
+  // Exercise both caller-supplied audit rows and the automatic relations row.
+  plan.relations = {
+    mode: 'BASE',
+    summary: {
+      inventory_mode: 'BASE', groups: 0, values: 0, colors: 0, links: 0,
+      variants: 0, images: 0, primary_image: null, facets: 'preserved', cost_written: false,
+    },
+    requested: {} as never,
+  };
+
+  await saveProductAtomic(auditFailingDb, plan, [{ action: 'product.test', detail: { source: 'test' } }]);
+
+  assert.equal((db.prepare("SELECT name FROM products WHERE id='p1'").get() as { name: string }).name, 'committed');
+  assert.equal(refusedAudits, 2, 'both post-commit audit attempts were best-effort');
+});
+
 test('a save that rolls back queues nothing', async () => {
   const db = freshSchema();
   const dbx = d1(db) as unknown as D1Database;
@@ -381,4 +420,91 @@ test('an image the payload KEEPS is never queued for deletion', async () => {
   );
   assert.deepEqual(plan.errors, [], 'the plan must be valid');
   assert.deepEqual(plan.stmts ? plan.detachedMedia : ['unplanned'], [KEY_B], 'only the dropped row\'s key');
+});
+
+test('replacing an image object under the same relation id detaches and queues the old key', async () => {
+  const db = freshSchema();
+  const dbx = d1(db) as unknown as D1Database;
+
+  db.prepare("INSERT INTO products (id, slug, name, price_iqd) VALUES ('p1', 'p1', 'P', 1000)").run();
+  db.prepare("INSERT INTO product_images (id, product_id, r2_key, url, sort_order) VALUES ('pi_one', 'p1', ?, ?, 0)")
+    .run(KEY_A, `/files/${KEY_A}`);
+
+  const snap = await loadRelationsSnapshot(dbx, 'p1');
+  const relationPlan = await planRelationsWriteFrom(
+    dbx,
+    snap,
+    { images: [{ id: 'pi_one', url: `/files/${KEY_B}`, r2_key: KEY_B, is_primary: 1 }] },
+    { money: true }
+  );
+  assert.deepEqual(relationPlan.errors, [], 'the replacement must be valid');
+  assert.deepEqual(
+    relationPlan.stmts ? relationPlan.detachedMedia : ['unplanned'],
+    [KEY_A],
+    'preserving the row id must not hide the object it stopped referencing'
+  );
+
+  if (!relationPlan.stmts) assert.fail('the replacement was not planned');
+  await saveProductAtomic(dbx, planOf(relationPlan.stmts, relationPlan.detachedMedia));
+
+  assert.deepEqual(jobsOf(db).map((job) => job.object_key), [KEY_A]);
+  const stored = db.prepare("SELECT r2_key, url FROM product_images WHERE id = 'pi_one'").get() as {
+    r2_key: string;
+    url: string;
+  };
+  assert.equal(stored.r2_key, KEY_B);
+  assert.equal(stored.url, `/files/${KEY_B}`);
+});
+
+test('saving the same canonical image key under the same id detaches nothing', async () => {
+  const db = freshSchema();
+  const dbx = d1(db) as unknown as D1Database;
+
+  db.prepare("INSERT INTO products (id, slug, name, price_iqd) VALUES ('p1', 'p1', 'P', 1000)").run();
+  db.prepare("INSERT INTO product_images (id, product_id, r2_key, url, sort_order) VALUES ('pi_one', 'p1', ?, ?, 0)")
+    .run(KEY_A, `/files/${KEY_A}`);
+
+  const snap = await loadRelationsSnapshot(dbx, 'p1');
+  const relationPlan = await planRelationsWriteFrom(
+    dbx,
+    snap,
+    { images: [{ id: 'pi_one', url: `/files/${KEY_A}`, r2_key: KEY_A, is_primary: 1 }] },
+    { money: true }
+  );
+  assert.deepEqual(relationPlan.errors, []);
+  assert.deepEqual(relationPlan.stmts ? relationPlan.detachedMedia : ['unplanned'], []);
+
+  if (!relationPlan.stmts) assert.fail('the unchanged image was not planned');
+  await saveProductAtomic(dbx, planOf(relationPlan.stmts, relationPlan.detachedMedia));
+  assert.deepEqual(jobsOf(db), [], 'an unchanged object must never enter the cleanup queue');
+});
+
+test('a replaced key shared by another product survives the guarded drain', async () => {
+  const db = freshSchema();
+  const dbx = d1(db) as unknown as D1Database;
+  const bucket = new FakeBucket();
+  bucket.put(KEY_A);
+
+  db.prepare("INSERT INTO products (id, slug, name, price_iqd) VALUES ('p1', 'p1', 'P1', 1000)").run();
+  db.prepare("INSERT INTO products (id, slug, name, price_iqd) VALUES ('p2', 'p2', 'P2', 1000)").run();
+  db.prepare("INSERT INTO product_images (id, product_id, r2_key, url, sort_order) VALUES ('pi_one', 'p1', ?, ?, 0)")
+    .run(KEY_A, `/files/${KEY_A}`);
+  db.prepare("INSERT INTO product_images (id, product_id, r2_key, url, sort_order) VALUES ('pi_shared', 'p2', ?, ?, 0)")
+    .run(KEY_A, `/files/${KEY_A}`);
+
+  const snap = await loadRelationsSnapshot(dbx, 'p1');
+  const relationPlan = await planRelationsWriteFrom(
+    dbx,
+    snap,
+    { images: [{ id: 'pi_one', url: `/files/${KEY_B}`, r2_key: KEY_B, is_primary: 1 }] },
+    { money: true }
+  );
+  if (!relationPlan.stmts) assert.fail(relationPlan.errors.join(' | '));
+  await saveProductAtomic(dbx, planOf(relationPlan.stmts, relationPlan.detachedMedia));
+
+  const out = await runGuardedMediaCleanup(envOf(db, bucket));
+  assert.deepEqual(out.still_referenced, [KEY_A]);
+  assert.deepEqual(out.deleted, []);
+  assert.ok(bucket.objects.has(KEY_A), 'the other product still displays KEY_A');
+  assert.equal(jobsOf(db)[0]?.state, 'skipped_shared');
 });

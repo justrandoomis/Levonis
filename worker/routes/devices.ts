@@ -139,14 +139,6 @@ function isoOrBad(v: unknown, name: string): string {
   return new Date(ms).toISOString();
 }
 
-function firstImage(imagesJson: unknown, imageSnapshot: unknown): string {
-  const snap = typeof imageSnapshot === 'string' ? imageSnapshot : '';
-  if (snap) return snap;
-  const arr = safeParse<unknown[]>(imagesJson, []);
-  const first = arr.find((x) => typeof x === 'string' && x !== '');
-  return typeof first === 'string' ? first : '';
-}
-
 interface DeviceRow extends UnitRow {
   registered_at?: string | null;
   revoked_at?: string | null;
@@ -161,7 +153,6 @@ interface DeviceRow extends UnitRow {
   p_name?: string | null;
   p_name_ar?: string | null;
   p_name_ku?: string | null;
-  images?: string | null;
 }
 
 function devicePublic(row: DeviceRow, opts: { admin?: boolean; viewerId?: string } = {}) {
@@ -182,7 +173,10 @@ function devicePublic(row: DeviceRow, opts: { admin?: boolean; viewerId?: string
       name: String(row.p_name ?? row.name_snapshot ?? ''),
       name_ar: String(row.p_name_ar ?? ''),
       name_ckb: String(row.p_name_ku ?? ''),
-      image: firstImage(row.images, row.image_snapshot),
+      // The snapshot column exists on every order since migration 0001. Empty
+      // means the sold unit had no image; a later catalogue edit must not fill
+      // that historical blank on the warranty/device screens.
+      image: String(row.image_snapshot ?? ''),
     },
     serial: row.serial_raw ? (opts.admin ? row.serial_raw : maskSerial(row.serial_raw)) : null,
     delivered_at: row.delivered_at,
@@ -211,7 +205,7 @@ const DEVICE_SELECT = `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u
             wr.receipt_no, wr.status AS receipt_status,
             (SELECT COUNT(*) FROM warranty_claims wc WHERE wc.unit_id = u.id AND NOT (${CLOSED_CLAIM_SQL})) AS open_claims,
             oi.name_snapshot, oi.image_snapshot,
-            p.slug, p.name AS p_name, p.name_ar AS p_name_ar, p.name_ku AS p_name_ku, p.images
+            p.slug, p.name AS p_name, p.name_ar AS p_name_ar, p.name_ku AS p_name_ku
        FROM order_item_units u
        LEFT JOIN device_registrations r ON r.unit_id = u.id
        LEFT JOIN device_serials s ON s.unit_id = u.id

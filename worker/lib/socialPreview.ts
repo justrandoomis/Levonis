@@ -51,6 +51,7 @@
  */
 import { primaryMedia, upgradeMedia } from './productModel';
 import { isAnonymousPublicMediaKey } from './mediaStorage';
+import { loadAuthoritativeProductImages } from './productSelectionImage';
 
 /** The four things a chat app reads off a link, already absolute and escaped. */
 export interface SocialPreview {
@@ -155,9 +156,9 @@ export function shortDescription(raw: unknown, limit = 160): string {
  * and the card would fall back to showing nothing at all, so anything this
  * function is not sure of returns '' and the shop's own logo stays.
  *
- * A remote absolute address (an imported vendor image that was never mirrored
- * into R2) is passed through as-is over https only: a crawler will not load a
- * plaintext image into a page it serves over TLS.
+ * Remote addresses are never passed through. Product imagery is an object the
+ * shop owns and verifies in R2, not permission to make every crawler hotlink a
+ * vendor. Returning '' keeps the shop's own default card image.
  */
 export function absoluteImageUrl(url: unknown, origin: string): string {
   const raw = String(url ?? '').trim();
@@ -167,9 +168,8 @@ export function absoluteImageUrl(url: unknown, origin: string): string {
     if (!isAnonymousPublicMediaKey(key)) return '';
     return `${origin}${raw}`;
   }
-  if (raw.startsWith('https://')) return raw;
-  // Relative to the app but not a media route, http://, data:, or anything
-  // else a crawler may refuse: not worth risking an empty card over.
+  // Relative to the app but not a media route, remote http(s), data:, or
+  // anything else a crawler may refuse: keep the shop card instead.
   return '';
 }
 
@@ -232,6 +232,7 @@ export function injectSocialPreview(html: string, preview: SocialPreview): strin
 
 /** The two shapes a slug can resolve to. Only the columns the card needs. */
 interface PreviewRow {
+  id?: unknown;
   name?: unknown;
   name_ar?: unknown;
   name_en?: unknown;
@@ -274,11 +275,13 @@ export async function resolveProductPreview(
   slug: string,
   origin: string
 ): Promise<Pick<SocialPreview, 'title' | 'description' | 'image'> | null> {
-  const row =
-    (await db
-      .prepare("SELECT name, name_ar, name_en, description, description_ar, description_en, images FROM products WHERE slug = ? AND status = 'active'")
-      .bind(slug)
-      .first<PreviewRow>()) ??
+  const product = await db
+    .prepare(
+      "SELECT id, name, name_ar, name_en, description, description_ar, description_en FROM products WHERE slug = ? AND status = 'active'"
+    )
+    .bind(slug)
+    .first<PreviewRow>();
+  const row = product ??
     (await db
       .prepare("SELECT name, name_ar, description, description_ar, images FROM community_products WHERE slug = ? AND status = 'active'")
       .bind(slug)
@@ -288,9 +291,16 @@ export async function resolveProductPreview(
   const title = pickText(row.name_ar, row.name, row.name_en);
   if (!title) return null; // nothing to identify it by; keep the shop's card
 
+  const productImages = product
+    ? await loadAuthoritativeProductImages(db, [String(product.id ?? '')])
+    : null;
+  const image = product
+    ? productImages?.get(String(product.id ?? '')) ?? ''
+    : primaryMedia(upgradeMedia(row.images))?.url ?? '';
+
   return {
     title,
     description: shortDescription(pickText(row.description_ar, row.description, row.description_en)),
-    image: absoluteImageUrl(primaryMedia(upgradeMedia(row.images))?.url, origin),
+    image: absoluteImageUrl(image, origin),
   };
 }

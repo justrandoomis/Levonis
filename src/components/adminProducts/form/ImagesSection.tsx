@@ -20,7 +20,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Star, Trash2, Upload, ArrowUp, ArrowDown, Link2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { uploadFile, api, failureText } from '../../../lib/api';
 import { Banner, Field, Select, TextInput, btnGhost, btnPrimary, iconBtn } from './formUi';
-import { localId, type FormImage, type RelationsState } from './model';
+import { localId, type FormImage, type FormQuarantinedImage, type RelationsState } from './model';
 import SafeImage from '../../ui/SafeImage';
 import { classifyImageUrl, primaryRepair } from '../../../lib/imageUrl';
 import { splitUrlList } from '../../../../worker/lib/urlList';
@@ -49,6 +49,25 @@ interface Upload {
   file: File;
 }
 
+interface StoredImageAsset {
+  url: string;
+  key?: string;
+  source_url?: string;
+  alt?: string;
+  width?: number | null;
+  height?: number | null;
+  bytes?: number | null;
+  content_type?: string;
+}
+
+interface IngestResult extends Omit<StoredImageAsset, 'url'> {
+  source_url: string;
+  status: string;
+  url?: string;
+  reason?: string;
+  from_page?: string;
+}
+
 export function ImagesSection({
   rel,
   setRel,
@@ -61,6 +80,7 @@ export function ImagesSection({
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [urlText, setUrlText] = useState('');
   const [urlBusy, setUrlBusy] = useState(false);
+  const [replaceBusy, setReplaceBusy] = useState<string | null>(null);
   const [urlNote, setUrlNote] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dragFrom = useRef<number | null>(null);
@@ -93,7 +113,7 @@ export function ImagesSection({
   }, []);
 
   const addImage = useCallback(
-    (url: string, extra?: { alt?: string; source_url?: string; width?: number | null; height?: number | null; r2_key?: string }) =>
+    (url: string, extra?: Omit<StoredImageAsset, 'url'>) =>
       setRel((r) => ({
         ...r,
         images: [
@@ -115,7 +135,9 @@ export function ImagesSection({
             variant_id: null,
             width: extra?.width ?? null,
             height: extra?.height ?? null,
-            r2_key: extra?.r2_key ?? '',
+            bytes: extra?.bytes ?? null,
+            content_type: extra?.content_type ?? '',
+            r2_key: extra?.key ?? '',
           },
         ],
       })),
@@ -126,7 +148,13 @@ export function ImagesSection({
     async (file: File, key: string) => {
       try {
         const res = await uploadFile(file, 'product');
-        addImage(res.url, { width: res.width, height: res.height, r2_key: res.key });
+        addImage(res.url, {
+          width: res.width,
+          height: res.height,
+          bytes: res.bytes,
+          content_type: res.mime,
+          key: res.key,
+        });
         setUploads((u) => u.filter((x) => x.key !== key));
       } catch (e) {
         // The REASON, never the category — see `failureText`. Everything that
@@ -202,17 +230,10 @@ export function ImagesSection({
     setUrlBusy(true);
     setUrlNote(null);
     try {
-      const res = await api.post<{
-        success: boolean;
-        results: Array<{
-          source_url: string;
-          status: string;
-          url?: string;
-          reason?: string;
-          from_page?: string;
-          alt?: string;
-        }>;
-      }>('/api/admin/media/ingest', { urls });
+      const res = await api.post<{ success: boolean; results: IngestResult[] }>(
+        '/api/admin/media/ingest',
+        { urls }
+      );
       let ok = 0;
       let fromPages = 0;
       // NOT named `failed`: that is the set of image ids whose <img> broke, and
@@ -220,7 +241,15 @@ export function ImagesSection({
       const rejected: string[] = [];
       for (const r of res.results) {
         if (r.status === 'stored' && r.url) {
-          addImage(r.url, { alt: r.alt, source_url: r.from_page ? r.source_url : undefined });
+          addImage(r.url, {
+            alt: r.alt,
+            source_url: r.source_url,
+            key: r.key,
+            width: r.width,
+            height: r.height,
+            bytes: r.bytes,
+            content_type: r.content_type,
+          });
           ok += 1;
           if (r.from_page) fromPages += 1;
         } else {
@@ -249,6 +278,102 @@ export function ImagesSection({
   const patch = (id: string, p: Partial<FormImage>) =>
     setRel((r) => ({ ...r, images: r.images.map((i) => (i.id === id ? { ...i, ...p } : i)) }));
 
+  /**
+   * A pasted address never becomes a hotlink in product_images. The server
+   * fetches, verifies and stores it first; the form then swaps every piece of
+   * canonical storage metadata as one update.
+   */
+  const replaceFromExternalUrl = async (img: FormImage, raw: string) => {
+    const source = raw.trim();
+    const verdict = classifyImageUrl(source);
+    if (!verdict.ok || verdict.kind !== 'absolute') {
+      setUrlNote(verdict.reason ?? 'يلزم رابط كامل يبدأ بـ https://');
+      return;
+    }
+    setReplaceBusy(img.id);
+    setUrlNote(null);
+    try {
+      const res = await api.post<{ success: boolean; results: IngestResult[] }>(
+        '/api/admin/media/ingest',
+        { urls: [source] }
+      );
+      const stored = res.results.find((result) => result.status === 'stored' && result.url);
+      if (!stored?.url) {
+        throw new Error(res.results[0]?.reason ?? 'تعذّر جلب الصورة');
+      }
+      patch(img.id, {
+        url: stored.url,
+        r2_key: stored.key ?? '',
+        source_url: stored.source_url,
+        width: stored.width ?? null,
+        height: stored.height ?? null,
+        bytes: stored.bytes ?? null,
+        content_type: stored.content_type ?? '',
+        ...(stored.alt ? { alt_en: stored.alt } : {}),
+      });
+      noteStatus(img.id, 'loading');
+      setEditingUrl(null);
+    } catch (error) {
+      setUrlNote(failureText(error, 'تعذّر جلب الصورة'));
+    } finally {
+      setReplaceBusy(null);
+    }
+  };
+
+  /**
+   * A migration quarantine is provenance, not a broken gallery card. Repair
+   * fetches the stored source through the same SSRF/byte-sniff/WebP ingest as
+   * a newly pasted URL, then reuses the quarantine id. The atomic product
+   * upsert clears its quarantine bit only after the verified local object is
+   * ready; until Save, the database provenance remains untouched.
+   */
+  const repairQuarantine = async (quarantine: FormQuarantinedImage) => {
+    const source = quarantine.source_url.trim();
+    const verdict = classifyImageUrl(source);
+    if (!verdict.ok || verdict.kind !== 'absolute') {
+      setUrlNote('هذا المصدر ليس رابط HTTPS قابلاً للجلب. ارفع الملف الأصلي يدويًا ثم احفظ.');
+      return;
+    }
+    setReplaceBusy(quarantine.id);
+    setUrlNote(null);
+    try {
+      const res = await api.post<{ success: boolean; results: IngestResult[] }>(
+        '/api/admin/media/ingest',
+        { urls: [source] }
+      );
+      const stored = res.results.find((result) => result.status === 'stored' && result.url);
+      if (!stored?.url) throw new Error(res.results[0]?.reason ?? 'تعذّر جلب الصورة');
+      setRel((state) => ({
+        ...state,
+        quarantined_images: (state.quarantined_images ?? []).filter((item) => item.id !== quarantine.id),
+        images: [
+          ...state.images,
+          {
+            id: quarantine.id,
+            url: stored.url!,
+            r2_key: stored.key ?? '',
+            source_url: stored.source_url || source,
+            alt_en: stored.alt || quarantine.alt_en,
+            sort_order: state.images.length,
+            is_primary: state.images.length === 0,
+            option_value_id: quarantine.option_value_id,
+            color_id: quarantine.color_id,
+            variant_id: quarantine.variant_id,
+            width: stored.width ?? null,
+            height: stored.height ?? null,
+            bytes: stored.bytes ?? null,
+            content_type: stored.content_type ?? '',
+          },
+        ],
+      }));
+      setUrlNote('تم جلب المصدر وتحويله إلى WebP محلي. احفظ المنتج لإتمام الإصلاح.');
+    } catch (error) {
+      setUrlNote(failureText(error, 'تعذّر إصلاح الصورة المعزولة'));
+    } finally {
+      setReplaceBusy(null);
+    }
+  };
+
   /** Choosing a primary clears every other one in the SAME update — there is
    *  no window in which two are primary. */
   const setPrimary = (id: string) =>
@@ -275,14 +400,21 @@ export function ImagesSection({
     rel.groups.flatMap((g) => g.values.map((v) => [v.id, `${g.name_en || 'Group'} / ${v.name_en || v.id}`] as const))
   );
   const colorNames = new Map(rel.colors.map((c) => [c.id, c.name_en || c.id] as const));
-  const hasTargets = valueNames.size > 0 || colorNames.size > 0;
+  const variantNames = new Map(
+    rel.variants.map((variant) => {
+      const parts = variant.option_value_ids.map((id) => valueNames.get(id) ?? id);
+      if (variant.color_id) parts.push(`Colour / ${colorNames.get(variant.color_id) ?? variant.color_id}`);
+      return [variant.id, parts.join(' + ') || variant.sku || variant.id] as const;
+    })
+  );
+  const hasTargets = valueNames.size > 0 || colorNames.size > 0 || variantNames.size > 0;
 
   // The owner's display order — general product images first, then the
   // option-linked ones, then the colour-linked ones — partitions the ONE
   // underlying array; relative order inside each part is preserved and
   // sort_order follows the array, so the storefront receives the same story
   // this section shows.
-  const scopeOf = (i: FormImage) => (i.option_value_id ? 1 : i.color_id ? 2 : 0);
+  const scopeOf = (i: FormImage) => (i.option_value_id ? 1 : i.color_id ? 2 : i.variant_id ? 3 : 0);
   const regroup = (list: FormImage[]) =>
     [...list]
       .sort((a, b) => scopeOf(a) - scopeOf(b) || list.indexOf(a) - list.indexOf(b))
@@ -298,7 +430,7 @@ export function ImagesSection({
                 ...i,
                 option_value_id: v.startsWith('o:') ? v.slice(2) : null,
                 color_id: v.startsWith('c:') ? v.slice(2) : null,
-                variant_id: null,
+                variant_id: v.startsWith('v:') ? v.slice(2) : null,
               }
             : i
         )
@@ -320,6 +452,35 @@ export function ImagesSection({
   return (
     <div className="min-w-0">
       {errors.images && <Banner kind="error">{errors.images}</Banner>}
+
+      {(rel.quarantined_images?.length ?? 0) > 0 && (
+        <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 space-y-2" data-image-quarantine>
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-400 shrink-0" aria-hidden="true" />
+            <p className="text-[11px] text-amber-100 leading-snug">
+              صور قديمة معزولة لا تظهر للزبائن. بقي رابط المصدر محفوظًا؛ أعد جلبه ثم احفظ لتفعيل WebP محلي آمن.
+              <span className="text-zinc-500"> Quarantined legacy media is provenance only.</span>
+            </p>
+          </div>
+          {(rel.quarantined_images ?? []).map((image) => (
+            <div key={image.id} className="flex flex-wrap items-center gap-2 rounded border border-zinc-800 bg-black/20 px-2 py-1.5">
+              <code dir="ltr" className="min-w-0 flex-1 truncate text-[10px] text-zinc-400" title={image.source_url}>
+                {image.source_url}
+              </code>
+              <span className="text-[9px] text-zinc-600">{image.quarantine_reason}</span>
+              <button
+                type="button"
+                className={`${btnGhost} h-8 px-2 text-[11px]`}
+                disabled={replaceBusy === image.id}
+                onClick={() => void repairQuarantine(image)}
+              >
+                {replaceBusy === image.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                إعادة جلب
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {repair.needed && (
         <div
@@ -426,6 +587,7 @@ export function ImagesSection({
           { scope: 0, ar: 'صور المنتج العامة', en: 'General', hint: 'تظهر دائمًا في معرض المنتج' },
           { scope: 1, ar: 'صور الخيارات', en: 'Option images', hint: 'تتقدم المعرض عند اختيار الخيار المرتبط' },
           { scope: 2, ar: 'صور الألوان', en: 'Colour images', hint: 'تتقدم المعرض عند اختيار اللون المرتبط' },
+          { scope: 3, ar: 'صور التركيبات', en: 'Variant images', hint: 'الأعلى أولوية عند اكتمال الخيار واللون' },
         ] as const
       ).map((grp) => {
         const members = rel.images.filter((i) => scopeOf(i) === grp.scope);
@@ -482,11 +644,13 @@ export function ImagesSection({
                     رئيسية
                   </span>
                 )}
-                {(img.option_value_id || img.color_id) && (
+                {(img.option_value_id || img.color_id || img.variant_id) && (
                   <span className="absolute top-1 end-1 max-w-[70%] truncate bg-zinc-950/85 border border-zinc-700 text-zinc-200 text-[9px] font-bold px-1.5 py-0.5 rounded">
                     {img.option_value_id
                       ? `خيار: ${valueNames.get(img.option_value_id) ?? ''}`
-                      : `لون: ${colorNames.get(img.color_id!) ?? ''}`}
+                      : img.color_id
+                        ? `لون: ${colorNames.get(img.color_id) ?? ''}`
+                        : `تركيبة: ${variantNames.get(img.variant_id!) ?? ''}`}
                   </span>
                 )}
               </div>
@@ -550,30 +714,26 @@ export function ImagesSection({
                               <button
                                 type="button"
                                 className={btnPrimary}
-                                disabled={!verdict.ok}
-                                  onClick={() => {
+                                disabled={!verdict.ok || verdict.kind !== 'absolute' || replaceBusy === img.id}
+                                onClick={() => {
                                   const next = editingUrl.text.trim();
-                                  // ONLY A DIFFERENT ADDRESS IS A NEW LOAD.
-                                  // Confirming the pre-filled URL unchanged
-                                  // used to clear the failed flag while
-                                  // SafeImage's own status stayed 'error': the
-                                  // card kept showing «تعذر تحميل الصورة»
-                                  // while the warning and the broken-primary
-                                  // banner quietly disappeared.
                                   if (next !== img.url) {
-                                    patch(img.id, { url: next });
-                                    noteStatus(img.id, 'loading');
+                                    void replaceFromExternalUrl(img, next);
+                                  } else {
+                                    setEditingUrl(null);
                                   }
-                                  setEditingUrl(null);
                                 }}
                               >
-                                استبدال
+                                {replaceBusy === img.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : null}
+                                استبدال عبر الحفظ
                               </button>
                               <button type="button" className={btnGhost} onClick={() => setEditingUrl(null)}>
                                 إلغاء
                               </button>
-                              {!verdict.ok && editingUrl.text.trim() !== '' && (
-                                <span className="text-[9px] text-red-400 truncate">{verdict.reason}</span>
+                              {(!verdict.ok || verdict.kind !== 'absolute') && editingUrl.text.trim() !== '' && (
+                                <span className="text-[9px] text-red-400 truncate">
+                                  {verdict.kind === 'absolute' ? verdict.reason : 'ألصق رابطًا خارجيًا كاملًا ليُحفَظ أولًا'}
+                                </span>
                               )}
                             </div>
                           );
@@ -615,7 +775,13 @@ export function ImagesSection({
                   <Select
                     aria-label="تظهر مع"
                     value={
-                      img.option_value_id ? `o:${img.option_value_id}` : img.color_id ? `c:${img.color_id}` : ''
+                      img.option_value_id
+                        ? `o:${img.option_value_id}`
+                        : img.color_id
+                          ? `c:${img.color_id}`
+                          : img.variant_id
+                            ? `v:${img.variant_id}`
+                            : ''
                     }
                     onChange={(e) => setLink(img.id, e.target.value)}
                   >
@@ -637,6 +803,15 @@ export function ImagesSection({
                         {[...colorNames].map(([id, label]) => (
                           <option key={id} value={`c:${id}`}>
                             لون: {label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {variantNames.size > 0 && (
+                      <optgroup label="تخص تركيبة كاملة — الخيار واللون معًا">
+                        {[...variantNames].map(([id, label]) => (
+                          <option key={id} value={`v:${id}`}>
+                            تركيبة: {label}
                           </option>
                         ))}
                       </optgroup>

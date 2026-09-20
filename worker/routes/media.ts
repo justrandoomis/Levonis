@@ -3,14 +3,28 @@ import type { AppContext, Env } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, unavailable } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
-import { validateOutboundUrl } from '../lib/fetchGuard';
+import { GuardedFetchError, guardedFetchBytes, type GuardedFetchBudget } from '../lib/fetchGuard';
 import { sniff } from './uploads';
 import { extractPageImages, imageCandidates, isVendorHost } from '../lib/pageImages';
-import { buildMediaKey, headMediaObject, isSafeMediaKey, mediaBucket, probeMediaBucket, putMediaObject, storeMedia } from '../lib/mediaStorage';
-import { IMAGE_SOURCE_CAP, IMAGE_SOURCE_CAP_MB, isConvertibleToWebp } from '../lib/imageConvert';
+import {
+  buildMediaKey,
+  isSafeMediaKey,
+  mediaBucket,
+  probeMediaBucket,
+  putMediaObject,
+} from '../lib/mediaStorage';
+import { IMAGE_SOURCE_CAP, IMAGE_SOURCE_CAP_MB, productImageToWebp } from '../lib/imageConvert';
 import { currentMediaReferences, hasDedicatedBucket, inventoryLegacyMedia, planLegacyMediaKey } from '../lib/mediaMigration';
-import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { newId } from '../lib/crypto';
+import {
+  cleanupCreatedProductMedia,
+  ingestProductMediaBytes,
+  PRODUCT_MEDIA_CLEANUP_GRACE_MINUTES,
+  PRODUCT_MEDIA_FORM_STAGING_GRACE_MINUTES,
+  putStagedProductWebp,
+  ProductMediaIngestError,
+  verifyStoredProductMedia,
+} from '../lib/productMediaIngest';
 
 /**
  * Image ingestion — POST /api/admin/media/ingest.
@@ -69,6 +83,11 @@ export interface IngestResult {
   status: 'stored' | 'failed';
   key?: string;
   url?: string;
+  width?: number;
+  height?: number;
+  bytes?: number;
+  content_type?: 'image/webp';
+  created_new?: boolean;
   reason?: string;
   /** Set when this image was found ON a page rather than requested directly. */
   from_page?: string;
@@ -85,28 +104,6 @@ export interface IngestResult {
  * `ingestUrlOrPage` swaps it for the images the page named.
  */
 const PAGE_MARKER = '__LEVONIS_VENDOR_PAGE__';
-
-/** Read a response body up to `cap` bytes, then stop. */
-async function readCapped(res: Response, cap: number): Promise<Uint8Array> {
-  const reader = res.body?.getReader();
-  if (!reader) return new Uint8Array(0);
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  while (total < cap) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    total += value.length;
-  }
-  await reader.cancel().catch(() => {});
-  const out = new Uint8Array(total);
-  let off = 0;
-  for (const ch of chunks) {
-    out.set(ch, off);
-    off += ch.length;
-  }
-  return out;
-}
 
 /**
  * Fetch one address and store it if the bytes are an image.
@@ -131,39 +128,15 @@ export async function ingestImageUrl(
     };
   }
   try {
-    let target = validateOutboundUrl(rawUrl);
-    sourceUrl = target.toString();
-
-    let res: Response | null = null;
-    for (let hop = 0; hop < 4; hop++) {
-      if (budget) {
-        if (budget.fetches <= 0) {
-          return { source_url: sourceUrl, status: 'failed', reason: 'تجاوز هذا الطلب حدّ التنزيل' };
-        }
-        budget.fetches -= 1;
-      }
-      res = await fetch(target.toString(), {
-        redirect: 'manual',
-        signal: AbortSignal.timeout(10_000),
-        headers: { 'User-Agent': USER_AGENT },
-      });
-      if (res.status >= 300 && res.status < 400) {
-        const loc = res.headers.get('Location');
-        if (!loc) break;
-        target = validateOutboundUrl(new URL(loc, target).toString());
-        continue;
-      }
-      break;
-    }
-    if (!res || !res.ok) {
-      return { source_url: sourceUrl, status: 'failed', reason: `HTTP ${res ? res.status : 'error'}` };
-    }
-
-    const buf = await readCapped(res, Math.min(IMAGE_CAP + 1, budget ? budget.bytes : IMAGE_CAP + 1));
-    if (budget) budget.bytes -= buf.length;
-    if (buf.length > IMAGE_CAP) {
-      return { source_url: sourceUrl, status: 'failed', reason: `Image exceeds the ${IMAGE_SOURCE_CAP_MB} MB limit` };
-    }
+    const fetched = await guardedFetchBytes(rawUrl, {
+      maxBytes: IMAGE_CAP,
+      maxRedirects: 3,
+      timeoutMs: 10_000,
+      budget,
+      headers: { 'User-Agent': USER_AGENT },
+    });
+    sourceUrl = fetched.url;
+    const buf = fetched.bytes;
     // Magic bytes decide, not the extension and not the remote Content-Type.
     const kind = sniff(buf);
     if (!kind || !kind.mime.startsWith('image/')) {
@@ -172,11 +145,12 @@ export async function ingestImageUrl(
        * owner asked to be able to paste. Anywhere else the answer is the same
        * refusal it has always been.
        */
-      if (opts.allowPage && isVendorHost(target.hostname)) {
+      const finalHost = new URL(fetched.url).hostname;
+      if (opts.allowPage && isVendorHost(finalHost)) {
         // Signals the caller to run the extractor; the page bytes are already
         // in hand, so it is handed back rather than fetched a second time.
         return {
-          source_url: target.toString(),
+          source_url: fetched.url,
           status: 'failed',
           reason: PAGE_MARKER,
           page_body: new TextDecoder().decode(buf),
@@ -185,7 +159,7 @@ export async function ingestImageUrl(
       return {
         source_url: sourceUrl,
         status: 'failed',
-        reason: isVendorHost(target.hostname)
+        reason: isVendorHost(finalHost)
           ? 'The URL must point directly at an image file (JPEG/PNG/WebP/GIF/AVIF)'
           : 'The URL must point directly at an image file (JPEG/PNG/WebP/GIF/AVIF). ' +
             'Product PAGES can be read only for the supported vendors — ' +
@@ -193,48 +167,19 @@ export async function ingestImageUrl(
       };
     }
 
-    /**
-     * THE BIGGEST SOURCE OF UNCONVERTED IMAGES ON THE WHOLE SITE.
-     *
-     * This stored a vendor's PNG or JPEG byte-for-byte under
-     * `products/import/<sha>.<ext>` — three segments where the layout is four,
-     * and no conversion at all, because `imageConvert` was never imported
-     * here. An import of one vendor page can pull in forty pictures, so a
-     * single admin action wrote forty unconverted files.
-     *
-     * THE HASH STILL NAMES THE OBJECT, and that is worth keeping: it is the
-     * digest of the bytes as they ARRIVED, so fetching the same vendor image
-     * twice still recognises it and skips the second write. Hashing the
-     * CONVERTED bytes instead would look tidier and would defeat the
-     * deduplication, because a conversion is not guaranteed to be
-     * byte-identical between runs.
-     *
-     * The `head` probe cannot know the stored extension before conversion, so
-     * it asks for the WebP first — the shape every convertible image now takes
-     * — and falls back to the arrival extension for the formats that pass
-     * through (GIF, AVIF). Two cheap HEADs against forty avoided downloads.
-     */
-    const digest = await crypto.subtle.digest('SHA-256', buf as unknown as BufferSource);
-    const sha = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
-    const converted = isConvertibleToWebp(kind.mime);
-    const probeExt = converted ? 'webp' : kind.ext;
-    const probeKey = `products/import/gallery/${sha}.${probeExt}`;
-
-    const existing = await headMediaObject(env, 'public', probeKey);
-    if (existing) return { source_url: sourceUrl, key: probeKey, url: `/files/${probeKey}`, status: 'stored' };
-
-    const stored = await storeMedia(env, {
-      placement: { visibility: 'public', domain: 'products', entityId: 'import', kind: 'gallery', objectId: sha },
+    const stored = await ingestProductMediaBytes(env, {
       bytes: buf,
-      mime: kind.mime,
-      originalName: new URL(sourceUrl).pathname.split('/').pop() ?? null,
-      cacheControl: 'public, max-age=31536000, immutable',
+      source_url: sourceUrl,
+      original_name: new URL(sourceUrl).pathname.split('/').pop() ?? null,
+      cleanup_grace_minutes: PRODUCT_MEDIA_FORM_STAGING_GRACE_MINUTES,
     });
-    return { source_url: sourceUrl, key: stored.key, url: `/files/${stored.key}`, status: 'stored' };
+    return { status: 'stored', ...stored };
   } catch (e) {
     const reason =
-      e instanceof DOMException && e.name === 'TimeoutError'
-        ? 'Timed out'
+      e instanceof GuardedFetchError && e.code === 'SOURCE_TOO_LARGE'
+        ? `Image exceeds the ${IMAGE_SOURCE_CAP_MB} MB limit`
+        : e instanceof GuardedFetchError && e.code === 'FETCH_BUDGET_EXCEEDED'
+          ? 'تجاوز هذا الطلب حدّ التنزيل — أعد المحاولة بعدد أقل من الروابط'
         : e && typeof e === 'object' && 'message' in e && typeof (e as Error).message === 'string'
           ? (e as Error).message.slice(0, 200)
           : 'Fetch failed';
@@ -250,12 +195,7 @@ export async function ingestImageUrl(
  * which went through the same fetch, the same SSRF check and the same
  * magic-byte test, because extraction only decides which addresses to TRY.
  */
-export interface IngestBudget {
-  /** Outbound fetches left for this request, across every URL in it. */
-  fetches: number;
-  /** Bytes left to download for this request. */
-  bytes: number;
-}
+export type IngestBudget = GuardedFetchBudget;
 
 /**
  * ONE REQUEST, ONE BUDGET.
@@ -456,26 +396,20 @@ function replaceExactMedia(value: unknown, oldKey: string, newKey: string): unkn
   return value;
 }
 
-async function convertedWebp(env: Env, oldKey: string): Promise<{ bytes: Uint8Array; width: number; height: number }> {
-  if (!env.APP_ORIGIN) throw unavailable('APP_ORIGIN is required for Cloudflare image conversion', 'MEDIA_TRANSFORM_NOT_CONFIGURED');
-  const origin = new URL(env.APP_ORIGIN).origin;
-  const encoded = oldKey.split('/').map(encodeURIComponent).join('/');
-  const init = {
-    redirect: 'error',
-    cf: { image: { format: 'webp', quality: 87, fit: 'scale-down', width: 3000 } },
-  } as RequestInit & { cf: { image: Record<string, string | number> } };
-  const response = await fetch(`${origin}/files/${encoded}`, init);
-  if (!response.ok) throw unavailable(`Image transform failed with HTTP ${response.status}`, 'MEDIA_TRANSFORM_UNAVAILABLE');
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength > IMAGE_CAP) throw badRequest(`Converted image exceeds the ${IMAGE_SOURCE_CAP_MB} MB migration limit`);
+async function convertedWebp(env: Env, bytes: Uint8Array): Promise<{ bytes: Uint8Array; width: number; height: number }> {
   const kind = sniff(bytes);
-  const dimensions = kind?.mime === 'image/webp' ? rasterDimensions(bytes, kind.mime) : null;
-  if (kind?.mime !== 'image/webp' || !validRasterDimensions(dimensions)) {
-    // If Image Resizing is not enabled Cloudflare may return the original PNG.
-    // Nothing is written and references remain untouched.
-    throw unavailable('Cloudflare returned no valid WebP; enable Image Resizing before applying conversion', 'MEDIA_TRANSFORM_UNAVAILABLE');
+  if (!kind?.mime.startsWith('image/')) throw badRequest('Legacy object is not an image');
+  const converted = await productImageToWebp(env, bytes, kind.mime);
+  if (!converted.ok) {
+    if (converted.reason === 'unavailable') {
+      throw unavailable('Cloudflare Images binding is required for migration conversion', 'MEDIA_TRANSFORM_NOT_CONFIGURED');
+    }
+    if (converted.reason === 'too_large') {
+      throw badRequest(`Converted image exceeds the ${IMAGE_SOURCE_CAP_MB} MB migration limit`);
+    }
+    throw unavailable(converted.detail ?? 'Cloudflare returned no valid WebP', 'MEDIA_TRANSFORM_UNAVAILABLE');
   }
-  return { bytes, width: dimensions.width, height: dimensions.height };
+  return { bytes: converted.bytes, width: converted.width, height: converted.height };
 }
 
 /**
@@ -578,7 +512,7 @@ mediaRoutes.post('/migration/apply', requireAdmin, async (c) => {
   const productIds = [...new Set((rows.results ?? []).map((row) => row.product_id).filter(Boolean))];
   if (productIds.length === 0) throw badRequest('No product image row references this object; manual review required');
 
-  const converted = await convertedWebp(c.env, key);
+  const converted = await convertedWebp(c.env, new Uint8Array(await oldObject.arrayBuffer()));
   const digest = await crypto.subtle.digest('SHA-256', converted.bytes as unknown as BufferSource);
   const objectId = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('').slice(0, 24);
   const entityId = productIds.length === 1 ? productIds[0] : 'shared';
@@ -590,34 +524,46 @@ mediaRoutes.post('/migration/apply', requireAdmin, async (c) => {
     extension: 'webp',
     objectId,
   });
-  await putMediaObject(
+  const write = await putStagedProductWebp(
     c.env,
     {
       key: newKey,
-      visibility: 'public',
-      domain: 'products',
-      mime: 'image/webp',
-      bytes: converted.bytes.byteLength,
-      entityId,
+      bytes: converted.bytes,
+      entity_id: entityId,
       width: converted.width,
       height: converted.height,
-    },
-    converted.bytes,
-    { httpMetadata: { contentType: 'image/webp', cacheControl: 'public, max-age=31536000, immutable' } }
+      cleanup_grace_minutes: PRODUCT_MEDIA_CLEANUP_GRACE_MINUTES,
+    }
   );
-  const verified = await mediaBucket(c.env, 'public').head(newKey);
-  if (!verified || verified.size !== converted.bytes.byteLength) {
-    await mediaBucket(c.env, 'public').delete(newKey).catch(() => {});
-    throw unavailable('Converted object verification failed', 'MEDIA_VERIFY_FAILED');
+  let verified;
+  try {
+    [verified] = await verifyStoredProductMedia(c.env, [{ url: `/files/${newKey}`, key: newKey }]);
+    if (!verified) throw new Error('Converted object verification returned no result');
+  } catch (error) {
+    await cleanupCreatedProductMedia(c.env, [{ key: newKey, created_new: write.created_new }]);
+    if (error instanceof ProductMediaIngestError) {
+      throw unavailable(error.message, 'MEDIA_VERIFY_FAILED');
+    }
+    throw error;
   }
 
   try {
     const statements: D1PreparedStatement[] = [
       c.env.DB.prepare(
         `UPDATE product_images
-            SET url = ?, r2_key = ?, content_type = 'image/webp', bytes = ?, width = ?, height = ?
+            SET url = ?, r2_key = ?, content_type = ?, bytes = ?, width = ?, height = ?,
+                quarantined = 0, quarantine_reason = ''
           WHERE r2_key = ? OR url = ?`
-      ).bind(`/files/${newKey}`, newKey, converted.bytes.byteLength, converted.width, converted.height, key, `/files/${key}`),
+      ).bind(
+        verified.url,
+        verified.key,
+        verified.content_type,
+        verified.bytes,
+        verified.width,
+        verified.height,
+        key,
+        `/files/${key}`
+      ),
     ];
     for (const productId of productIds) {
       const product = await c.env.DB.prepare(
@@ -644,14 +590,14 @@ mediaRoutes.post('/migration/apply', requireAdmin, async (c) => {
     );
     await c.env.DB.batch(statements);
   } catch (error) {
-    await mediaBucket(c.env, 'public').delete(newKey).catch(() => {});
+    await cleanupCreatedProductMedia(c.env, [{ key: newKey, created_new: write.created_new }]);
     throw error;
   }
 
   await audit(c.env.DB, actor.id, 'media.migration.convert_webp', key, {
     new_key: newKey,
     products: productIds,
-    bytes: converted.bytes.byteLength,
+    bytes: verified.bytes,
   });
   return c.json({ success: true, dry_run: false, applied: true, old_key: key, new_key: newKey, old_deleted: false });
 });

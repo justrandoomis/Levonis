@@ -163,6 +163,22 @@ test('"from my previous orders": only delivered, unlinked, unreplaced units of t
   assert.equal((await post(b, '/api/devices/units/u2/register', {})).status, 400, 'not delivered yet');
 });
 
+test('device and warranty views keep an empty order image after the catalogue gains one', async () => {
+  const { db, raw } = setup();
+  const b = appAs(db, buyer);
+
+  const before = await json(await b.request('/api/devices/eligible'));
+  assert.equal(before.units[0].product.image, '');
+
+  raw.prepare('UPDATE products SET images = ? WHERE id = ?')
+    .run('["/files/products/p1/added-after-order.webp"]', 'p1');
+  const linked = await json(await post(b, '/api/devices/units/u1/register', {}));
+  assert.equal(linked.device.product.image, '');
+
+  const mine = await json(await b.request('/api/devices/mine'));
+  assert.equal(mine.devices[0].product.image, '', 'live catalogue media cannot rewrite the warranty snapshot');
+});
+
 test('an open claim keeps the device with its holder; a closed one frees it', async () => {
   const { db, raw } = setup();
   const b = appAs(db, buyer);

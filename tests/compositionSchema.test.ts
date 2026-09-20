@@ -454,10 +454,11 @@ test('a composition row is refused option groups, colours and variants of its ow
   );
 });
 
-test('the CSV importer states the same refusal, because it writes the product row itself', () => {
-  // `composition` is part of PRODUCT_COLUMNS, so an importer update that did
-  // not refuse would write '' over a bundle's own value and demote it.
+test('the CSV importer inherits the same refusal from the canonical product writer', () => {
+  // The importer must not grow a second composition rule. Delegating the
+  // complete row + relations write to planProductSave makes the refusal above
+  // apply automatically; omitting allowComposition is the fail-closed choice.
   const src = readFileSync(join(ROOT, 'worker/routes/adminImport.ts'), 'utf8');
-  assert.match(src, /COMPOSITION_NOT_ALLOWED/);
-  assert.match(src, /doc\.composition !== ''/);
+  assert.match(src, /await planProductSave\(c\.env\.DB/);
+  assert.doesNotMatch(src, /allowComposition\s*:/);
 });

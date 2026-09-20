@@ -62,6 +62,17 @@ direct_surcharge_iqd=51000
 # مخزون البيع المباشر يُتتبع على الخيار (أدناه)؛ الطلب المسبق بلا مخزون.
 stock=__NULL__
 
+# ------------------------------ الأبعاد الفعلية للجهاز
+net_weight_g=8300
+width_mm=385
+depth_mm=410
+height_mm=430
+
+# ------------------------------ صورة اختيارية من المورّد
+# fetch_url للاستيراد فقط؛ بعد الحفظ يصدّر النظام url/key محليين وsource_url للمصدر.
+# images.1.fetch_url=https://vendor.example/bambu-a1.jpg
+# images.1.primary=true
+
 # طرق الطلب المسبق وزيادتها فوق سعر الخيار. __NULL__ = القيمة الافتراضية من الإعدادات.
 transports.1.method=air
 transports.1.commission_iqd=25000
@@ -90,6 +101,10 @@ options.1.stock=4
 options.1.regular_price_iqd=__NULL__
 options.1.cost_iqd=700000
 options.1.active=true
+options.1.package_weight_g=13000
+options.1.package_width_mm=596
+options.1.package_depth_mm=536
+options.1.package_height_mm=325
 
 options.2.id=a1-combo
 options.2.group=Model
@@ -108,6 +123,10 @@ options.2.stock=2
 options.2.regular_price_iqd=+200000
 options.2.cost_iqd=900000
 options.2.active=true
+options.2.package_weight_g=13500
+options.2.package_width_mm=560
+options.2.package_depth_mm=540
+options.2.package_height_mm=430
 
 # ------------------------------ الضمان الممدد — للطابعات فقط
 # يُقبل هذا القسم فقط لمنتج في كتالوج طابعات (is_printer_catalog) — وإلا يُرفض الملف

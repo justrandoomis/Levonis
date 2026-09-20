@@ -29,7 +29,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, SqliteD1 } from './fixtures/d1';
-import { mediaKeyFromRef } from '../worker/lib/productDeletion';
+import { mediaKeyFromRef, protectMediaObjectFromCleanup } from '../worker/lib/productDeletion';
 import {
   MEDIA_REFERENCE_SOURCES,
   NON_MEDIA_COLUMNS,
@@ -40,6 +40,7 @@ import {
   mediaColumnCandidates,
   partitionSweepCandidates,
   readLiveSchema,
+  runGuardedMediaCleanup,
   verifyMediaCoverage,
   type MediaRefDb,
 } from '../worker/lib/mediaRefs';
@@ -333,16 +334,69 @@ test('an object uploaded minutes ago is too young to be called an orphan', () =>
  * both, which is why this function takes an env and not one bucket.
  */
 test('a swept object is removed from the legacy bucket too, not just the primary', async () => {
+  const db = freshSchema();
   const primary = new Map<string, number>([['products/catalog/gallery/twinobject1.webp', 1]]);
   const legacy = new Map<string, number>([['products/catalog/gallery/twinobject1.webp', 1]]);
   const bucketOf = (m: Map<string, number>) => ({ delete: async (k: string) => void m.delete(k) });
 
-  const env = { R2_PUBLIC: bucketOf(primary), BUCKET: bucketOf(legacy), DB: null } as never;
+  const env = { R2_PUBLIC: bucketOf(primary), BUCKET: bucketOf(legacy), DB: d1(db) } as never;
   const out = await deleteSweptObjects(env, [{ key: 'products/catalog/gallery/twinobject1.webp', bytes: 1 }]);
 
   assert.deepEqual(out.deleted, ['products/catalog/gallery/twinobject1.webp']);
   assert.equal(primary.size, 0, 'the primary copy is gone');
   assert.equal(legacy.size, 0, 'and so is the copy readThroughLegacy would have served back');
+});
+
+test('a sweep delete whose guard release fails is recovered durably before the key can attach again', async () => {
+  const db = freshSchema();
+  const key = 'products/catalog/gallery/releasefailure.webp';
+  const objects = new Set([key]);
+  const bucket = {
+    async delete(deleting: string) {
+      objects.delete(deleting);
+    },
+  };
+  const env = { DB: d1(db), BUCKET: bucket as unknown as R2Bucket } as never;
+
+  // Fault injection at the exact post-R2 boundary: bytes disappear, but D1
+  // refuses to clear the cleanup claim.
+  db.exec(`
+    CREATE TRIGGER fail_media_guard_release
+    BEFORE UPDATE OF claim_token ON media_object_guards
+    WHEN OLD.claim_token <> '' AND NEW.claim_token = ''
+    BEGIN SELECT RAISE(FAIL, 'injected guard release failure'); END
+  `);
+  const swept = await deleteSweptObjects(env, [{ key, bytes: 1 }]);
+  assert.deepEqual(swept.deleted, [key]);
+  assert.match(swept.failed[0]?.error ?? '', /injected guard release failure/);
+  assert.equal(objects.has(key), false);
+  assert.equal(
+    (db.prepare('SELECT state FROM media_cleanup_jobs WHERE object_key = ?').get(key) as { state: string }).state,
+    'pending',
+    'the external delete always has a durable recovery row'
+  );
+  assert.notEqual(
+    (db.prepare('SELECT claim_token FROM media_object_guards WHERE object_key = ?').get(key) as { claim_token: string }).claim_token,
+    ''
+  );
+
+  db.exec('DROP TRIGGER fail_media_guard_release');
+  db.prepare("UPDATE media_object_guards SET claim_until = '2000-01-01T00:00:00.000Z' WHERE object_key = ?").run(key);
+  const recovered = await runGuardedMediaCleanup(env);
+  assert.deepEqual(recovered.deleted, [key], 'missing R2 bytes are an idempotent recovery success');
+  assert.equal(
+    (db.prepare('SELECT state FROM media_cleanup_jobs WHERE object_key = ?').get(key) as { state: string }).state,
+    'done'
+  );
+  assert.equal(
+    (db.prepare('SELECT claim_token FROM media_object_guards WHERE object_key = ?').get(key) as { claim_token: string }).claim_token,
+    ''
+  );
+  assert.equal(
+    await protectMediaObjectFromCleanup(new SqliteD1(db) as unknown as D1Database, key),
+    true,
+    'the same key can be re-uploaded/attached after durable recovery'
+  );
 });
 
 /**
@@ -382,26 +436,81 @@ test('the event log and the message outbox are classified, not invisible', async
  * While the import is still STAGED the payload is the only thing naming those
  * objects, and that is a real reference. The window, and only the window.
  */
-test('a staged import protects its objects; an applied one does not', async () => {
-  const staged = 'products/import/gallery/aaaa1111bbbb2222.webp';
-  const applied = 'products/import/gallery/cccc3333dddd4444.webp';
+test('only a fresh or actively applying preview protects staged import objects', async () => {
+  const fresh = 'products/import/gallery/aaaa1111bbbb2222.webp';
+  const expired = 'products/import/gallery/bbbb2222cccc3333.webp';
+  const leased = 'products/import/gallery/cccc3333dddd4444.webp';
+  const appliedPayload = 'products/import/gallery/dddd4444eeee5555.webp';
+  const appliedRelation = 'products/import/gallery/eeee5555ffff6666.webp';
 
   const db = freshSchema();
   insert(db, 'product_imports', {
-    id: 'imp_staged', template_family: 'devices', state: 'preview',
-    payload: JSON.stringify([{ images: [`/files/${staged}`] }]),
+    id: 'imp_fresh', template_family: 'devices', state: 'preview',
+    media_stage_until: '2999-01-01T00:00:00.000Z',
+    payload: JSON.stringify([{ images: [`/files/${fresh}`] }]),
+  });
+  insert(db, 'product_imports', {
+    id: 'imp_expired', template_family: 'devices', state: 'preview',
+    media_stage_until: '2000-01-01T00:00:00.000Z',
+    payload: JSON.stringify([{ images: [`/files/${expired}`] }]),
+  });
+  insert(db, 'product_imports', {
+    id: 'imp_leased', template_family: 'devices', state: 'preview',
+    media_stage_until: '2000-01-01T00:00:00.000Z',
+    apply_token: 'live-owner',
+    apply_lease_until: '2999-01-01T00:00:00.000Z',
+    report: JSON.stringify([{ image: `/files/${leased}` }]),
   });
   insert(db, 'product_imports', {
     id: 'imp_applied', template_family: 'devices', state: 'applied',
-    payload: JSON.stringify([{ images: [`/files/${applied}`] }]),
+    media_stage_until: '2999-01-01T00:00:00.000Z',
+    apply_token: 'stale-owner',
+    apply_lease_until: '2999-01-01T00:00:00.000Z',
+    payload: JSON.stringify([{ images: [`/files/${appliedPayload}`] }]),
+  });
+  insert(db, 'products', { id: 'p_applied', slug: 'applied-import', name: 'Applied import' });
+  insert(db, 'product_images', {
+    id: 'pi_applied', product_id: 'p_applied',
+    url: `/files/${appliedRelation}`, r2_key: appliedRelation,
   });
 
   const coverage = await verifyMediaCoverage(d1(db));
   assert.equal(coverage.ok, true, coverage.refusals.join(' | '));
-  assert.ok(coverage.scan.keys.has(staged), 'a preview’s objects have nothing else naming them yet');
+  assert.ok(coverage.scan.keys.has(fresh), 'a fresh preview owns its staged objects for its durable window');
+  assert.ok(!coverage.scan.keys.has(expired), 'an abandoned preview stops defeating cleanup after its window');
+  assert.ok(coverage.scan.keys.has(leased), 'an active apply lease protects a preview even after its staging window');
   assert.ok(
-    !coverage.scan.keys.has(applied),
-    'an applied import must not keep its images alive for ever — product_images is what decides now'
+    !coverage.scan.keys.has(appliedPayload),
+    'an applied import payload is a ledger even if stale timestamps claim otherwise'
+  );
+  assert.ok(coverage.scan.keys.has(appliedRelation), 'the applied product_images relation is the authority now');
+});
+
+test('an expired abandoned import staging job deletes its object and completes', async () => {
+  const key = 'products/import/gallery/expiredstage01.webp';
+  const db = freshSchema();
+  insert(db, 'product_imports', {
+    id: 'imp_abandoned', template_family: 'devices', state: 'preview',
+    media_stage_until: '2000-01-01T00:00:00.000Z',
+    payload: JSON.stringify([{ images: [`/files/${key}`] }]),
+  });
+  insert(db, 'media_cleanup_jobs', {
+    id: 'mcj_abandoned', object_key: key, visibility: 'public',
+    reason: 'product_media_staging', state: 'pending',
+    not_before: '2000-01-01T00:00:00.000Z',
+  });
+  const objects = new Set([key]);
+  const bucket = { async delete(deleting: string) { objects.delete(deleting); } };
+
+  const outcome = await runGuardedMediaCleanup({ DB: d1(db), BUCKET: bucket as unknown as R2Bucket } as never);
+
+  assert.deepEqual(outcome.deleted, [key]);
+  assert.deepEqual(outcome.still_referenced, []);
+  assert.equal(objects.has(key), false);
+  assert.equal(
+    (db.prepare('SELECT state FROM media_cleanup_jobs WHERE id = ?').get('mcj_abandoned') as { state: string }).state,
+    'done',
+    'the due job must complete, not become permanently skipped_shared'
   );
 });
 

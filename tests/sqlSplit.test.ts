@@ -36,6 +36,18 @@ test('a CASE expression inside an ordinary statement does not swallow the next o
   assert.deepEqual(splitStatements(sql), ['UPDATE t SET v = CASE WHEN a THEN 1 ELSE 0 END', 'SELECT 2']);
 });
 
+test('a CASE ending with a comma or parenthesis closes before the next statement', () => {
+  const sql = [
+    'INSERT INTO t(a,b) SELECT CASE WHEN x THEN 1 ELSE 0 END,',
+    'coalesce(CASE WHEN y THEN 2 ELSE 3 END) FROM s;',
+    'SELECT 4;',
+  ].join('\n');
+  const parts = splitStatements(sql);
+  assert.equal(parts.length, 2);
+  assert.match(parts[0], /END,\s*coalesce\([\s\S]*END\) FROM s$/);
+  assert.equal(parts[1], 'SELECT 4');
+});
+
 test('the real 0049 migration splits into its three statements', async () => {
   const { readFileSync } = await import('node:fs');
   const parts = splitStatements(readFileSync('migrations/0049_security_hardening.sql', 'utf8'));

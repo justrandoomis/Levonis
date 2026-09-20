@@ -12,7 +12,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateOutboundUrl } from '../worker/lib/fetchGuard';
+import { guardedFetchBytes, validateOutboundUrl } from '../worker/lib/fetchGuard';
 
 const refuses = (url: string, why: string) =>
   assert.throws(() => validateOutboundUrl(url), /not allowed|Invalid|Only http/i, `${url} — ${why}`);
@@ -34,6 +34,8 @@ test('loopback and private ranges are refused, in every spelling', () => {
   refuses('http://172.31.255.254/', 'the top of 172.16/12');
   refuses('http://192.168.1.1/', 'RFC1918 192.168/16');
   refuses('http://169.254.169.254/', 'the cloud metadata address');
+  refuses('http://100.64.0.1/', 'carrier-grade NAT lower boundary');
+  refuses('http://100.127.255.254/', 'carrier-grade NAT upper boundary');
   refuses('http://0.0.0.0/', 'the unspecified address');
   refuses('http://239.1.1.1/', 'multicast');
 });
@@ -48,6 +50,10 @@ test('IPv6 loopback and unique-local are refused', () => {
   refuses('http://[fc00::1]/', 'unique local');
   refuses('http://[fd12:3456::1]/', 'unique local');
   refuses('http://[fe80::1]/', 'link local');
+  refuses('http://[fe9f::1]/', 'the full fe80::/10 link-local range');
+  refuses('http://[febf::1]/', 'the top of the fe80::/10 link-local range');
+  refuses('http://[fec0::1]/', 'deprecated site-local internal range');
+  refuses('http://[ff02::1]/', 'IPv6 multicast');
   refuses('http://[::]/', 'unspecified');
 });
 
@@ -67,6 +73,43 @@ test('non-http schemes and embedded credentials are refused', () => {
   refuses('ftp://example.com/a.jpg', 'ftp');
   refuses('https://user:pass@example.com/a.jpg', 'credentials');
   refuses('not a url', 'unparseable');
+});
+
+test('parallel readers reserve the shared byte budget before buffering', async () => {
+  const budget = { fetches: 2, bytes: 4 };
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let firstPull!: () => void;
+  const pulling = new Promise<void>((resolve) => { firstPull = resolve; });
+  let calls = 0;
+  const fetcher = (async () => {
+    calls += 1;
+    if (calls === 1) {
+      return new Response(new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          firstPull();
+          await gate;
+          controller.enqueue(new Uint8Array([1, 2, 3, 4]));
+          controller.close();
+        },
+      }));
+    }
+    return new Response(new Uint8Array([5, 6, 7, 8]));
+  }) as unknown as typeof fetch;
+
+  const first = guardedFetchBytes('https://vendor.example/one.webp', {
+    maxBytes: 4,
+    budget,
+    fetcher,
+  });
+  await pulling;
+  await assert.rejects(
+    () => guardedFetchBytes('https://vendor.example/two.webp', { maxBytes: 4, budget, fetcher }),
+    /byte budget exhausted/i
+  );
+  release();
+  assert.deepEqual((await first).bytes, new Uint8Array([1, 2, 3, 4]));
+  assert.equal(budget.bytes, 0, 'only the one reserved body fits the aggregate cap');
 });
 
 // ============================================================ review round 2

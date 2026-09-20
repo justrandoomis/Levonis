@@ -60,6 +60,9 @@ import { safeParse } from './json';
 import { effectiveAvailability } from './availability';
 import { unitDiscountIqd, type BenefitRule } from './membershipBenefits';
 import { effectiveBaseMonths, planFee, planTotalMonths } from './warrantyPlanMath';
+import type { PhysicalDimensionOverrides } from './physicalDimensions';
+
+export type { PhysicalDimensionOverrides, PhysicalDimensions } from './physicalDimensions';
 
 export type Tier = 'free' | 'plus' | 'pro' | 'prime';
 
@@ -231,7 +234,7 @@ export interface OptionTransport extends PriceFields {
   lead_time_max_days?: number | null;
 }
 
-export interface OptionV2 extends PriceFields {
+export interface OptionV2 extends PriceFields, PhysicalDimensionOverrides {
   id: string;
   name_ar: string;
   name_en: string;
@@ -291,7 +294,7 @@ export interface OptionV2 extends PriceFields {
   low_stock_threshold?: number | null;
 }
 
-export interface ColorV2 extends PriceFields {
+export interface ColorV2 extends PriceFields, PhysicalDimensionOverrides {
   id: string;
   name_ar: string;
   name_en: string;

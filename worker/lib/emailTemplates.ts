@@ -517,6 +517,9 @@ export type InvoicePaymentStatus = 'unpaid' | 'partial' | 'paid' | 'cod_due' | '
 
 export interface InvoiceEmailLine {
   name: string;
+  /** Immutable order-item image. Printable invoices may render only owned
+   *  `/files/` paths; the email intentionally remains image-free. */
+  image?: string;
   variant: string; // human-readable option/color label ('' when none)
   qty: number;
   unit_price_iqd: number; // includes per-unit availability fee (commission OR direct premium) + warranty fee
@@ -534,7 +537,7 @@ export interface InvoiceEmailLine {
    * listing them as invoice lines of their own would make `Σ lines` disagree
    * with the invoice's own subtotal. Absent on an ordinary line.
    */
-  included?: Array<{ name: string; variant: string; qty: number }>;
+  included?: Array<{ name: string; image?: string; variant: string; qty: number }>;
 }
 
 export interface InvoiceEmailData {
@@ -757,11 +760,14 @@ export function renderInvoiceHtmlDocument(lang: EmailLang, inv: InvoiceEmailData
         details.push(
           `${escapeHtml(t.warrantyFeeLabel)}${l.warranty_label ? ` (${escapeHtml(l.warranty_label)})` : ''}: <span class="ltr">${escapeHtml(iqd(l.warranty_fee_iqd))}</span>`
         );
+      const image = typeof l.image === 'string' && l.image.startsWith('/files/') ? l.image : '';
       return (
         `<tr>` +
-        `<td class="it"><span class="it-name">${escapeHtml(l.name)}</span>` +
+        `<td class="it"><div class="it-main">` +
+        (image ? `<img class="it-image" src="${escapeHtml(image)}" alt="">` : '') +
+        `<div><span class="it-name">${escapeHtml(l.name)}</span>` +
         (details.length ? `<span class="it-sub">${details.join('<br>')}</span>` : '') +
-        `</td>` +
+        `</div></div></td>` +
         `<td class="qty num">${l.qty}</td>` +
         `<td class="money ltr num">${escapeHtml(iqd(l.unit_price_iqd))}</td>` +
         `<td class="money ltr num">${escapeHtml(iqd(l.line_total_iqd))}</td>` +
@@ -813,6 +819,8 @@ export function renderInvoiceHtmlDocument(lang: EmailLang, inv: InvoiceEmailData
   .lines thead th.money { text-align: end; }
   .lines td { border-bottom: 1px solid #e6e8ec; padding: 2.5mm 3mm; font-size: 10pt; vertical-align: top; }
   .it-name { font-weight: 600; }
+  .it-main { display: flex; align-items: flex-start; gap: 2.5mm; }
+  .it-image { width: 13mm; height: 13mm; flex: 0 0 13mm; object-fit: cover; border-radius: 2mm; background: #f3f4f6; }
   .it-sub { display: block; font-size: 8.5pt; color: #6b7280; margin-top: .8mm; }
   .qty { text-align: center; white-space: nowrap; }
   .money { text-align: end; white-space: nowrap; }

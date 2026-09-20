@@ -6,6 +6,10 @@
  * prevents a card from regressing to array order while an old response is in
  * memory. This helper chooses; it never invents or rewrites product data.
  */
+import { productMediaForSelection } from '../../packages/pricing/src/productSelectionMedia';
+
+export { productSelectionComboKey, productVariantIdForSelection } from '../../packages/pricing/src/productSelectionMedia';
+
 export interface PrimaryImageProduct {
   images?: readonly string[] | null;
   media?: readonly {
@@ -23,12 +27,23 @@ export interface ProductGalleryMedia {
   alt_ckb?: string;
   order?: number;
   primary?: boolean;
+  option_value_id?: string | null;
+  color_id?: string | null;
+  variant_id?: string | null;
 }
 
 export interface ProductGalleryBinding {
+  id?: string;
   url: string;
   option_value_id?: string | null;
   color_id?: string | null;
+  variant_id?: string | null;
+}
+
+export interface ProductImageVariant {
+  id: string;
+  combo_key: string;
+  active?: boolean | number | null;
 }
 
 /**
@@ -43,32 +58,38 @@ export function productGalleryForSelection<T extends ProductGalleryMedia>(
   bindings: readonly ProductGalleryBinding[],
   selection: {
     optionId?: string | null;
+    optionValueIds?: readonly string[] | null;
     colorId?: string | null;
-    optionImage?: string | null;
-    colorImage?: string | null;
+    variantId?: string | null;
   }
 ): ProductGalleryMedia[] {
-  const { optionId, colorId, optionImage, colorImage } = selection;
-  if (!optionId && !colorId) return [...base];
-  if (!bindings.length && !optionImage && !colorImage) return [...base];
+  const { colorId, variantId } = selection;
+  const optionValueIds = selection.optionValueIds?.length
+    ? [...new Set(selection.optionValueIds.filter(Boolean))]
+    : selection.optionId
+      ? [selection.optionId]
+      : [];
+  if (!variantId && !colorId && optionValueIds.length === 0) return [...base];
 
-  const linkOf = new Map(bindings.map((image) => [image.url, image]));
-  const extras: ProductGalleryMedia[] = [];
-  if (colorImage && !base.some((image) => image.url === colorImage)) extras.push({ url: colorImage });
-  if (optionImage && !base.some((image) => image.url === optionImage)) extras.push({ url: optionImage });
+  const byId = new Map(bindings.filter((image) => image.id).map((image) => [image.id!, image]));
+  const byUrl = new Map(bindings.map((image) => [image.url, image]));
+  const candidates = base.map((image) => {
+    const binding = (image.id ? byId.get(image.id) : undefined) ?? byUrl.get(image.url) ?? image;
+    return {
+      image,
+      url: image.url,
+      primary: image.primary,
+      variant_id: binding.variant_id,
+      color_id: binding.color_id,
+      option_value_id: binding.option_value_id,
+    };
+  });
 
-  const score = (image: ProductGalleryMedia): number => {
-    const binding = linkOf.get(image.url);
-    if (colorId && (binding?.color_id === colorId || image.url === colorImage)) return 0;
-    if (optionId && (binding?.option_value_id === optionId || image.url === optionImage)) return 1;
-    if (binding?.color_id || binding?.option_value_id) return 3;
-    return 2;
-  };
-
-  return [...extras, ...base]
-    .map((image, index) => ({ image, index, score: score(image) }))
-    .sort((a, b) => a.score - b.score || a.index - b.index)
-    .map(({ image }) => image);
+  return productMediaForSelection(candidates, {
+    optionValueIds,
+    colorId,
+    variantId,
+  }).map(({ image }) => image);
 }
 
 export function productPrimaryImage(product: PrimaryImageProduct): string {

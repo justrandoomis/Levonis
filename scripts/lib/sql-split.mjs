@@ -11,8 +11,12 @@ export function splitStatements(sql) {
   let buf = '';
   let depth = 0; // open BEGIN/CASE blocks
   let i = 0;
-  const opens = (s) => /\s(BEGIN|CASE)\s$/i.test(s);
-  const closes = (s) => /\sEND[;\s]$/i.test(s);
+  const opens = (s) => /\b(BEGIN|CASE)\s$/i.test(s);
+  // CASE expressions commonly appear in SELECT lists as `END,` and inside
+  // function arguments as `END)`. Both close CASE just as `END ` and `END;`
+  // do; missing them keeps depth above zero and swallows every later
+  // semicolon into the same statement.
+  const closes = (s) => /\bEND[;,\s)]$/i.test(s);
   while (i < sql.length) {
     const ch = sql[i];
     if (ch === "'" || ch === '"') {

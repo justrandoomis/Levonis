@@ -86,13 +86,21 @@ import {
   type ProductRelations,
 } from './productRelations';
 import { comboKey, isInventoryMode, type InventoryMode } from './inventory';
-import { applyRelations, loadRelationsView, type ImageRow, type ProductRelationsView } from './productOverlay';
+import {
+  applyRelations,
+  isActiveProductImageRow,
+  isValidProductImageQuarantine,
+  loadRelationsView,
+  type ImageRow,
+  type ProductRelationsView,
+} from './productOverlay';
 import { localizeProductDoc, type LocalizeResult } from './translate/localizeProduct';
 import { planProductTranslations, type TranslationInput } from './translate/store';
 import { dedupeHashtags, hashtagKey } from './hashtags';
 import { detachedMediaKey, enqueueMediaDetach } from './mediaRefs';
 import { docToEntries } from './template';
 import { localizableSlots } from './translationSlots';
+import type { PhysicalDimensionOverrides } from './physicalDimensions';
 
 // =========================================================================
 // 1. The relations planner (groups, values, colours, links, variants, images)
@@ -117,6 +125,57 @@ const nullableInt = (v: unknown, field: string, max = 1_000_000_000): number | n
   }
   return v;
 };
+
+/**
+ * Relation dimensions have PATCH semantics inside an otherwise replacement
+ * payload: omitted preserves the stored override; explicit NULL clears it and
+ * therefore inherits; a stated value must be a positive whole number.
+ */
+function readPhysicalDimensionOverrides(
+  value: Record<string, unknown>,
+  where: string
+): PhysicalDimensionOverrides {
+  const out: PhysicalDimensionOverrides = {};
+  for (const field of DIMENSION_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(value, field)) continue;
+    const candidate = value[field];
+    if (candidate === null) {
+      out[field] = null;
+      continue;
+    }
+    if (
+      typeof candidate !== 'number' ||
+      !Number.isFinite(candidate) ||
+      !Number.isInteger(candidate) ||
+      candidate <= 0 ||
+      candidate > 100_000_000
+    ) {
+      throw badRequest(`${where}.${field}: must be a positive whole number, or null to inherit`);
+    }
+    out[field] = candidate;
+  }
+  return out;
+}
+
+function hasPhysicalDimensionInput(value: Record<string, unknown>): boolean {
+  return DIMENSION_FIELDS.some((field) => Object.prototype.hasOwnProperty.call(value, field));
+}
+
+/**
+ * Rolling deploy probe. A missing table or an unreadable PRAGMA returns true
+ * so the ordinary statement reports the underlying schema failure. Only an
+ * existing relation table that lacks 0099's witness returns false.
+ */
+async function relationDimensionsInstalled(db: D1Database, table: string): Promise<boolean> {
+  try {
+    const { results } = await db.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>();
+    if (!results || results.length === 0) return true;
+    const names = new Set(results.map((column) => String(column.name)));
+    return DIMENSION_FIELDS.every((field) => names.has(field));
+  } catch {
+    return true;
+  }
+}
 
 /** A 0044 adjustment may be negative — a discount below the inherited value is
  *  the ordinary case — so it cannot share `nullableInt`, which floors at zero. */
@@ -238,7 +297,10 @@ export interface RelationsSnapshot {
   saleTypes: string[];
   baseReserved: number;
   existing: ProductRelations;
-  existingVariants: Array<{ id: string; combo_key: string; reserved: number; stock: number | null; active: number }>;
+  existingVariants: Array<
+    { id: string; combo_key: string; reserved: number; stock: number | null; active: number } &
+      PhysicalDimensionOverrides
+  >;
   /** Full rows: the planner needs their id to decide deletions, and the JSON
    *  mirror needs the provenance fields a payload may omit (0048 preserve). */
   existingImages: ImageRow[];
@@ -277,9 +339,12 @@ export async function loadRelationsSnapshot(
   const [existing, variants, images, lines] = await Promise.all([
     loadProductRelations(db, productId),
     db
-      .prepare('SELECT id, combo_key, reserved, stock, active FROM product_variants WHERE product_id = ?')
+      .prepare('SELECT * FROM product_variants WHERE product_id = ?')
       .bind(productId)
-      .all<{ id: string; combo_key: string; reserved: number; stock: number | null; active: number }>(),
+      .all<
+        { id: string; combo_key: string; reserved: number; stock: number | null; active: number } &
+          PhysicalDimensionOverrides
+      >(),
     db.prepare('SELECT * FROM product_images WHERE product_id = ?').bind(productId).all<ImageRow>(),
     loadLiveLines(db, productId),
   ]);
@@ -406,7 +471,7 @@ export interface RequestedRelations {
      * The form never sets it; the TXT document does.
      */
     fulfillments?: unknown[];
-  }>;
+  } & PhysicalDimensionOverrides>;
   colors: Array<{
     id: string;
     name_en: string;
@@ -421,7 +486,7 @@ export interface RequestedRelations {
     low_stock_threshold: number | null;
     prices: PriceInput;
     linked: string[];
-  }>;
+  } & PhysicalDimensionOverrides>;
   variants: Array<{
     id: string;
     combo_key: string;
@@ -430,7 +495,7 @@ export interface RequestedRelations {
     stock: number | null;
     low_stock_threshold: number | null;
     prices: PriceInput;
-  }>;
+  } & PhysicalDimensionOverrides>;
   images: Array<{
     id: string;
     url: string;
@@ -465,7 +530,7 @@ export type RelationsPlan =
       warnings: string[];
       /**
        * R2 KEYS THIS SAVE STOPS REFERENCING — the objects behind the
-       * `product_images` rows the payload dropped.
+       * `product_images` rows the payload dropped or replaced.
        *
        * PLANNED, NOT ACTED ON, and that is the point: these statements have
        * not run yet, and a batch that rolls back leaves every one of these
@@ -491,14 +556,31 @@ export async function planRelationsWriteFrom(
   db: D1Database,
   snap: RelationsSnapshot,
   body: Record<string, unknown>,
-  opts: { money: boolean }
+  opts: { money: boolean; mediaMetadata?: 'authoritative' | 'deferred' }
 ): Promise<RelationsPlan> {
   const money = opts.money;
+  const mediaMetadataDeferred = opts.mediaMetadata === 'deferred';
   const productId = snap.productId;
   const baseLadder = snap.baseLadder;
   const existing = snap.existing;
   const errors: string[] = [];
   const warnings: string[] = [];
+
+  const [valueDimensionsInstalled, colorDimensionsInstalled, variantDimensionsInstalled] =
+    await Promise.all([
+      relationDimensionsInstalled(db, 'product_option_values'),
+      relationDimensionsInstalled(db, 'product_colors'),
+      relationDimensionsInstalled(db, 'product_variants'),
+    ]);
+  const requireDimensionSchema = (installed: boolean, row: Record<string, unknown>, where: string) => {
+    if (installed || !hasPhysicalDimensionInput(row)) return;
+    throw new HttpError(
+      503,
+      'تعذّر حفظ الأبعاد قبل تطبيق ترحيل قاعدة البيانات 0099 / physical dimensions require database migration 0099',
+      'PHYSICAL_DIMENSIONS_MIGRATION_REQUIRED',
+      { errors: [`${where}: physical-dimension columns are not installed`] }
+    );
+  };
 
   // The inventory mode is decided once the rows are parsed — see below.
 
@@ -518,7 +600,9 @@ export async function planRelationsWriteFrom(
   for (const g of groupInputs) {
     g.values.forEach((v, i) => {
       const where = `${g.name_en}[${i}]`;
+      requireDimensionSchema(valueDimensionsInstalled, v, where);
       const prices = readPrices(v, where);
+      const dimensions = readPhysicalDimensionOverrides(v, where);
       errors.push(...validatePriceLadder(prices, where, baseLadder));
       const name = str(v.name_en, `${where}.name_en`, { max: 80 });
       // 0043. Unknown words become '' (inherit) rather than an error: this
@@ -542,8 +626,15 @@ export async function planRelationsWriteFrom(
       // suffix removed, and the key to that label's slug — so a product saved
       // by a client that does not know these fields still groups correctly.
       const effectiveLabel = label.trim() || variantLabelFallback(name);
+      const id = typeof v.id === 'string' && v.id ? v.id : newId('ov');
+      const legacyImage = str(v.image, `${where}.image`, { max: 500, required: false }) ?? '';
+      if (legacyImage.trim()) {
+        errors.push(
+          `${where}.image: selector scalar images are retired; add the verified local WebP to relations.images with option_value_id="${id}"`
+        );
+      }
       valueInputs.push({
-        id: typeof v.id === 'string' && v.id ? v.id : newId('ov'),
+        id,
         group_id: g.id,
         name_en: name,
         // 0055 — absent means PRESERVE (the form never sends them), a string
@@ -551,7 +642,9 @@ export async function planRelationsWriteFrom(
         name_ar: optionalText(v.name_ar, `${where}.name_ar`, 200),
         name_ckb: optionalText(v.name_ckb, `${where}.name_ckb`, 200),
         sku_part: str(v.sku_part, `${where}.sku_part`, { max: 40, required: false }) ?? '',
-        image: str(v.image, `${where}.image`, { max: 500, required: false }) ?? '',
+        // 0099 retired the scalar selector source. `product_images` is the
+        // only authoritative media store, including option-bound media.
+        image: '',
         sort: int(v.sort, `${where}.sort`, { min: 0, max: 10000, def: i }),
         active: v.active === false ? 0 : 1,
         stock: nullableInt(v.stock, `${where}.stock`, 10_000_000),
@@ -576,6 +669,7 @@ export async function planRelationsWriteFrom(
          * separate without needing a second code path.
          */
         fulfillments: Array.isArray(v.fulfillments) ? v.fulfillments : undefined,
+        ...dimensions,
       });
     });
   }
@@ -614,11 +708,14 @@ export async function planRelationsWriteFrom(
   // ---- colours and their links -------------------------------------------
   const colorInputs: RequestedRelations['colors'] = asArray(body.colors, 'colors').map((col, i) => {
     const where = `colors[${i}]`;
+    const id = typeof col.id === 'string' && col.id ? col.id : newId('pc');
+    requireDimensionSchema(colorDimensionsInstalled, col, where);
     const hexRaw = str(col.hex, `${where}.hex`, { max: 9 });
     if (!isValidHex(hexRaw)) {
       errors.push(`${where}.hex: must be #RGB or #RRGGBB`);
     }
     const prices = readPrices(col, where);
+    const dimensions = readPhysicalDimensionOverrides(col, where);
     const linkedRaw = Array.isArray(col.option_value_ids) ? col.option_value_ids : [];
     const linked = linkedRaw.filter((x): x is string => typeof x === 'string');
     // A colour is sold under an option, so its member ladder is judged under
@@ -639,13 +736,21 @@ export async function planRelationsWriteFrom(
     for (const l of linked) {
       if (!valueIds.has(l)) errors.push(`${where}: linked option value ${l} does not exist in this product`);
     }
+    const legacyImage = str(col.image, `${where}.image`, { max: 500, required: false }) ?? '';
+    if (legacyImage.trim()) {
+      errors.push(
+        `${where}.image: selector scalar images are retired; add the verified local WebP to relations.images with color_id="${id}"`
+      );
+    }
     return {
-      id: typeof col.id === 'string' && col.id ? col.id : newId('pc'),
+      id,
       name_en: str(col.name_en, `${where}.name_en`, { max: 80 }),
       name_ar: optionalText(col.name_ar, `${where}.name_ar`, 200),
       name_ckb: optionalText(col.name_ckb, `${where}.name_ckb`, 200),
       hex: isValidHex(hexRaw) ? normalizeHex(hexRaw) : '#000000',
-      image: str(col.image, `${where}.image`, { max: 500, required: false }) ?? '',
+      // 0099 retired the scalar selector source. Bound product_images rows
+      // carry colour media and are verified before this planner runs.
+      image: '',
       sku_part: str(col.sku_part, `${where}.sku_part`, { max: 40, required: false }) ?? '',
       sort: int(col.sort, `${where}.sort`, { min: 0, max: 10000, def: i }),
       active: col.active === false ? 0 : 1,
@@ -653,6 +758,7 @@ export async function planRelationsWriteFrom(
       low_stock_threshold: nullableInt(col.low_stock_threshold, `${where}.low_stock_threshold`, 10_000_000),
       prices,
       linked: [...new Set(linked)],
+      ...dimensions,
     };
   });
   const colorIds = new Set(colorInputs.map((x) => x.id));
@@ -662,6 +768,7 @@ export async function planRelationsWriteFrom(
   const groupOfValue = new Map(valueInputs.map((v) => [v.id, v.group_id]));
   const variantInputs: RequestedRelations['variants'] = asArray(body.variants, 'variants').map((v, i) => {
     const where = `variants[${i}]`;
+    requireDimensionSchema(variantDimensionsInstalled, v, where);
     const optionIds = (Array.isArray(v.option_value_ids) ? v.option_value_ids : []).filter(
       (x): x is string => typeof x === 'string'
     );
@@ -677,6 +784,7 @@ export async function planRelationsWriteFrom(
       if (g) seenGroups.add(g);
     }
     const prices = readPrices(v, where);
+    const dimensions = readPhysicalDimensionOverrides(v, where);
     errors.push(...validatePriceLadder(prices, where));
     // The key is computed here, never taken from the client (§11: "لا تثق في
     // سعر أو عضوية أو شحن مرسل من الواجهة").
@@ -690,6 +798,7 @@ export async function planRelationsWriteFrom(
       stock: nullableInt(v.stock, `${where}.stock`, 10_000_000),
       low_stock_threshold: nullableInt(v.low_stock_threshold, `${where}.low_stock_threshold`, 10_000_000),
       prices,
+      ...dimensions,
     };
   });
   const variantKeys = new Set(variantInputs.map((v) => v.combo_key));
@@ -700,6 +809,21 @@ export async function planRelationsWriteFrom(
   // ---- images ------------------------------------------------------------
   const imageInputs: RequestedRelations['images'] = asArray(body.images, 'images').map((img, i) => {
     const where = `images[${i}]`;
+    const url = str(img.url, `${where}.url`, { max: 1000 });
+    const canonicalKey = url.startsWith('/files/') && url.endsWith('.webp')
+      ? url.slice('/files/'.length)
+      : '';
+    // During the read-only structural preflight these fields are deliberately
+    // ignored: the byte verifier is their authority and overwrites every one
+    // before the committable plan is built. Rejecting a spoofed value here
+    // would prevent the verifier from replacing it. URL/id/bindings remain
+    // fully parsed because those are structural claims, not byte metadata.
+    const statedContentType = mediaMetadataDeferred
+      ? ''
+      : (str(img.content_type, `${where}.content_type`, { max: 100, required: false }) ?? '');
+    if (!mediaMetadataDeferred && statedContentType && statedContentType.toLowerCase() !== 'image/webp') {
+      errors.push(`${where}.content_type: product media must be image/webp`);
+    }
     const optionValueId = typeof img.option_value_id === 'string' && img.option_value_id ? img.option_value_id : null;
     const colorId = typeof img.color_id === 'string' && img.color_id ? img.color_id : null;
     const variantId = typeof img.variant_id === 'string' && img.variant_id ? img.variant_id : null;
@@ -716,14 +840,18 @@ export async function planRelationsWriteFrom(
     }
     return {
       id: typeof img.id === 'string' && img.id ? img.id : newId('pi'),
-      url: str(img.url, `${where}.url`, { max: 1000 }),
+      url,
       alt_en: str(img.alt_en, `${where}.alt_en`, { max: 300, required: false }) ?? '',
       sort_order: int(img.sort_order, `${where}.sort_order`, { min: 0, max: 10000, def: i }),
       is_primary: img.is_primary === true ? 1 : 0,
       option_value_id: optionValueId,
       color_id: colorId,
       variant_id: variantId,
-      content_type: str(img.content_type, `${where}.content_type`, { max: 100, required: false }) ?? '',
+      // The async route verifier proves the body and R2 metadata agree. The
+      // relation wire historically omitted this duplicate label, so canonical
+      // local WebP media gets the proven type rather than an empty value that
+      // would quarantine a valid row on read.
+      content_type: statedContentType || (canonicalKey ? 'image/webp' : ''),
       // ---- 0048 -----------------------------------------------------------
       // Absent = PRESERVE what is stored (the form's relations PUT and the CSV
       // importer never send these four); present = write it, and '' clears —
@@ -731,11 +859,15 @@ export async function planRelationsWriteFrom(
       // (docs/TXT_IMPORT_PARITY.md, root cause 7).
       alt_ar: optionalText(img.alt_ar, `${where}.alt_ar`, 300),
       alt_ckb: optionalText(img.alt_ckb, `${where}.alt_ckb`, 300),
-      r2_key: optionalText(img.r2_key, `${where}.r2_key`, 400),
+      // Likewise, a URL already names its key. Omitted means derive; explicit
+      // '' remains an intentional provenance clear for TXT round trips.
+      r2_key: mediaMetadataDeferred
+        ? (canonicalKey || undefined)
+        : (optionalText(img.r2_key, `${where}.r2_key`, 400) ?? (canonicalKey || undefined)),
       source_url: optionalText(img.source_url, `${where}.source_url`, 1000),
-      width: nullableInt(img.width, `${where}.width`, 100000),
-      height: nullableInt(img.height, `${where}.height`, 100000),
-      bytes: nullableInt(img.bytes, `${where}.bytes`, 1_000_000_000),
+      width: mediaMetadataDeferred ? null : nullableInt(img.width, `${where}.width`, 100000),
+      height: mediaMetadataDeferred ? null : nullableInt(img.height, `${where}.height`, 100000),
+      bytes: mediaMetadataDeferred ? null : nullableInt(img.bytes, `${where}.bytes`, 1_000_000_000),
     };
   });
   const primaries = imageInputs.filter((i) => i.is_primary === 1);
@@ -746,6 +878,55 @@ export async function planRelationsWriteFrom(
     // Rather than refusing the save, the first image becomes primary — the
     // storefront needs one and silently having none is worse than choosing.
     imageInputs[0].is_primary = 1;
+  }
+
+  // Quarantine is a separate, inert repair channel. The form carries these
+  // rows back so an unchanged full save proves it did not forget them, but
+  // they are never fed to the byte verifier, never counted for primary image
+  // selection, and never become INSERT values from client claims. The stored
+  // row remains authoritative until a repaired, verified active image reuses
+  // its id (the active upsert then clears the quarantine bit).
+  const echoedQuarantineImageIds = new Set<string>();
+  if (Object.prototype.hasOwnProperty.call(body, 'quarantined_images')) {
+    const quarantineRows = asArray(body.quarantined_images, 'quarantined_images');
+    if (quarantineRows.length > MAX_ROWS_PER_COLLECTION) {
+      errors.push(`quarantined_images: more than ${MAX_ROWS_PER_COLLECTION} rows`);
+    }
+    const seen = new Set<string>();
+    const activeIds = new Set(imageInputs.map((image) => image.id));
+    const storedById = new Map(snap.existingImages.map((image) => [image.id, image]));
+    quarantineRows.forEach((image, index) => {
+      const where = `quarantined_images[${index}]`;
+      const id = typeof image.id === 'string' ? image.id.trim() : '';
+      const url = typeof image.url === 'string' ? image.url.trim() : '';
+      const key = typeof image.r2_key === 'string' ? image.r2_key.trim() : '';
+      const source = typeof image.source_url === 'string' ? image.source_url.trim() : '';
+      const marked = image.quarantined === true || image.quarantined === 1;
+      if (!id || seen.has(id)) errors.push(`${where}: missing or duplicate quarantine id`);
+      if (id) seen.add(id);
+      if (id && activeIds.has(id)) errors.push(`${where}: the same id cannot be active and quarantined`);
+      if (!marked || url || key || !source) {
+        errors.push(`${where}: quarantine requires quarantined=true, empty url/key, and a non-empty source_url`);
+        return;
+      }
+      const stored = storedById.get(id);
+      if (!stored || isActiveProductImageRow(stored)) {
+        errors.push(`${where}: quarantine row is not stored for this product`);
+        return;
+      }
+      const storedSource = String(stored.source_url ?? '').trim() || String(stored.url ?? '').trim();
+      if (source !== storedSource) {
+        errors.push(`${where}.source_url: stored quarantine provenance cannot be changed`);
+        return;
+      }
+      // This id came from the server's inert projection and passed the whole
+      // cross-field/stored-source check. It is therefore part of this full
+      // replacement just as an active image id is. This matters for rolling
+      // legacy rows that still carry only `/files/<key>` in `url`: they are
+      // unsafe to display, but an unchanged form save must not interpret the
+      // active-images omission as an explicit delete.
+      echoedQuarantineImageIds.add(id);
+    });
   }
 
   // ---- facets ------------------------------------------------------------
@@ -1080,16 +1261,32 @@ export async function planRelationsWriteFrom(
       if (!keep.has(r.id)) stmts.push(db.prepare(`DELETE FROM ${table} WHERE id = ?`).bind(r.id));
     }
   };
-  const keptImageIds = new Set(imageInputs.map((i) => i.id));
-  del('product_images', keptImageIds, snap.existingImages);
+  const keptImageIds = new Set([
+    ...imageInputs.map((i) => i.id),
+    ...echoedQuarantineImageIds,
+  ]);
+  // Quarantined rows are provenance, not members of the active replacement
+  // set. A form GET exposes them through its repair channel, but an ordinary
+  // save whose active `images` array omits them must not erase their source.
+  // Re-using the same id with verified active media still works: it is kept
+  // here and the upsert below clears the quarantine state atomically.
+  // A pre-0048 row can also be ours while carrying only `/files/<key>` and no
+  // `r2_key`. It is not display-safe, but dropping it still has to remove the
+  // relation and enqueue its owned object. External legacy URLs remain inert
+  // provenance because `detachedMediaKey` deliberately returns null for them.
+  const replaceableImageRows = snap.existingImages.filter((row) => {
+    const quarantined = row.quarantined === 1 || row.quarantined === true;
+    return !quarantined && (isActiveProductImageRow(row) || detachedMediaKey(row) !== null);
+  });
+  del('product_images', keptImageIds, replaceableImageRows);
 
   /**
-   * THE OBJECT BEHIND EVERY IMAGE ROW THIS SAVE DROPS.
+   * THE OLD OBJECT BEHIND EVERY IMAGE ROW THIS SAVE DROPS OR REPLACES.
    *
    * Deleting the row was the whole of the old behaviour, and the bytes stayed
    * in R2 for ever — nothing in this file had ever heard of the bucket. The
-   * keys are collected HERE, where the decision to drop the row is actually
-   * made, rather than re-derived later from a diff that could disagree with
+   * keys are collected HERE, where the replacement/deletion is actually
+   * planned, rather than re-derived later from a diff that could disagree with
    * it.
    *
    * `detachedMediaKey` returns null for an image that is not ours: the live
@@ -1103,12 +1300,31 @@ export async function planRelationsWriteFrom(
    * touches the bucket, so a key that is still named anywhere is closed as
    * `skipped_shared` instead of deleted. Deciding it now would only be
    * deciding it too early.
-   */
+  */
+  const requestedImageById = new Map(imageInputs.map((image) => [image.id, image]));
   const detachedMedia: string[] = [];
-  for (const row of snap.existingImages) {
-    if (keptImageIds.has(row.id)) continue;
+  for (const row of replaceableImageRows) {
     const key = detachedMediaKey(row);
-    if (key && !detachedMedia.includes(key)) detachedMedia.push(key);
+    if (!key) continue;
+
+    const replacement = requestedImageById.get(row.id);
+    if (replacement) {
+      // Keeping a relation id does not necessarily keep the object behind it:
+      // ImagesSection deliberately preserves the id when replacing a broken
+      // image. Compare canonical keys using the exact PATCH semantics of the
+      // upsert below — an omitted r2_key preserves the stored value, while an
+      // explicit value (including '') replaces it and lets the URL be the
+      // canonical fallback.
+      const replacementKey = detachedMediaKey({
+        r2_key: replacement.r2_key === undefined ? row.r2_key : replacement.r2_key,
+        url: replacement.url,
+      });
+      if (replacementKey === key) continue;
+    } else if (keptImageIds.has(row.id)) {
+      continue;
+    }
+
+    if (!detachedMedia.includes(key)) detachedMedia.push(key);
   }
   const retainedVariantIds = new Set(retainedVariants.map((v) => v.id));
   for (const v of snap.existingVariants) {
@@ -1147,6 +1363,26 @@ export async function planRelationsWriteFrom(
     );
   }
 
+  const dimensionColumnSql = (enabled: boolean) =>
+    enabled ? `, ${DIMENSION_FIELDS.join(', ')}` : '';
+  const dimensionValueSql = (enabled: boolean) =>
+    enabled ? `, ${DIMENSION_FIELDS.map(() => '?').join(', ')}` : '';
+  const dimensionUpdateSql = (enabled: boolean, table: string) =>
+    enabled
+      ? DIMENSION_FIELDS.map(
+          (field) =>
+            `, ${field} = CASE WHEN ? THEN excluded.${field} ELSE ${table}.${field} END`
+        ).join('')
+      : '';
+  const dimensionValues = (row: PhysicalDimensionOverrides, enabled: boolean): Array<number | null> =>
+    enabled ? DIMENSION_FIELDS.map((field) => row[field] ?? null) : [];
+  const dimensionFlags = (row: PhysicalDimensionOverrides, enabled: boolean): number[] =>
+    enabled
+      ? DIMENSION_FIELDS.map((field) =>
+          Object.prototype.hasOwnProperty.call(row, field) ? 1 : 0
+        )
+      : [];
+
   for (const v of valueInputs) {
     stmts.push(
       db
@@ -1157,8 +1393,8 @@ export async function planRelationsWriteFrom(
               regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd,
               availability_type, lead_time_text, lead_time_min_days, lead_time_max_days,
               variant_key, variant_label, name_ar, name_ckb,
-              lead_time_text_ar, lead_time_text_ckb)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              lead_time_text_ar, lead_time_text_ckb${dimensionColumnSql(valueDimensionsInstalled)})
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${dimensionValueSql(valueDimensionsInstalled)})
            ON CONFLICT (id) DO UPDATE SET
              group_id = excluded.group_id, name_en = excluded.name_en, sku_part = excluded.sku_part,
              image = excluded.image, sort = excluded.sort, active = excluded.active,
@@ -1179,7 +1415,7 @@ export async function planRelationsWriteFrom(
              name_ckb = CASE WHEN ? THEN excluded.name_ckb ELSE product_option_values.name_ckb END,
              -- 0079: same contract — a client that never heard of them keeps them.
              lead_time_text_ar = CASE WHEN ? THEN excluded.lead_time_text_ar ELSE product_option_values.lead_time_text_ar END,
-             lead_time_text_ckb = CASE WHEN ? THEN excluded.lead_time_text_ckb ELSE product_option_values.lead_time_text_ckb END${money ? ', cost_iqd = excluded.cost_iqd, cost_adjust_iqd = excluded.cost_adjust_iqd' : ''}`
+             lead_time_text_ckb = CASE WHEN ? THEN excluded.lead_time_text_ckb ELSE product_option_values.lead_time_text_ckb END${dimensionUpdateSql(valueDimensionsInstalled, 'product_option_values')}${money ? ', cost_iqd = excluded.cost_iqd, cost_adjust_iqd = excluded.cost_adjust_iqd' : ''}`
         )
         .bind(
           v.id, productId, v.group_id, v.name_en, v.sku_part, v.image, v.sort, v.active,
@@ -1192,8 +1428,10 @@ export async function planRelationsWriteFrom(
           v.variant_key, v.variant_label,
           v.name_ar ?? '', v.name_ckb ?? '',
           v.lead_time_text_ar ?? '', v.lead_time_text_ckb ?? '',
+          ...dimensionValues(v, valueDimensionsInstalled),
           v.name_ar === undefined ? 0 : 1, v.name_ckb === undefined ? 0 : 1,
-          v.lead_time_text_ar === undefined ? 0 : 1, v.lead_time_text_ckb === undefined ? 0 : 1
+          v.lead_time_text_ar === undefined ? 0 : 1, v.lead_time_text_ckb === undefined ? 0 : 1,
+          ...dimensionFlags(v, valueDimensionsInstalled)
         )
     );
   }
@@ -1205,7 +1443,7 @@ export async function planRelationsWriteFrom(
   for (const v of existing.values) {
     if (keptValues.has(v.id)) continue;
     if (retainedValueIds.has(v.id)) {
-      stmts.push(db.prepare('UPDATE product_option_values SET active = 0 WHERE id = ?').bind(v.id));
+      stmts.push(db.prepare("UPDATE product_option_values SET active = 0, image = '' WHERE id = ?").bind(v.id));
     } else {
       /**
        * 0075. THE DELETE ASKS THE ROW, because the CASCADE does not.
@@ -1243,7 +1481,7 @@ export async function planRelationsWriteFrom(
   for (const col of existing.colors) {
     if (keptColors.has(col.id)) continue;
     if (retainedColorIds.has(col.id)) {
-      stmts.push(db.prepare('UPDATE product_colors SET active = 0 WHERE id = ?').bind(col.id));
+      stmts.push(db.prepare("UPDATE product_colors SET active = 0, image = '' WHERE id = ?").bind(col.id));
     } else {
       stmts.push(db.prepare('DELETE FROM product_colors WHERE id = ?').bind(col.id));
     }
@@ -1266,8 +1504,8 @@ export async function planRelationsWriteFrom(
           `INSERT INTO product_colors
              (id, product_id, name_en, hex, image, sku_part, sort, active, stock, low_stock_threshold,
               regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd,
-              regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd, name_ar, name_ckb)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd, name_ar, name_ckb${dimensionColumnSql(colorDimensionsInstalled)})
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${dimensionValueSql(colorDimensionsInstalled)})
            ON CONFLICT (id) DO UPDATE SET
              name_en = excluded.name_en, hex = excluded.hex, image = excluded.image,
              sku_part = excluded.sku_part, sort = excluded.sort, active = excluded.active,
@@ -1278,7 +1516,7 @@ export async function planRelationsWriteFrom(
              prime_adjust_iqd = excluded.prime_adjust_iqd,
              pro_adjust_iqd = excluded.pro_adjust_iqd,
              name_ar = CASE WHEN ? THEN excluded.name_ar ELSE product_colors.name_ar END,
-             name_ckb = CASE WHEN ? THEN excluded.name_ckb ELSE product_colors.name_ckb END${money ? ', cost_iqd = excluded.cost_iqd, cost_adjust_iqd = excluded.cost_adjust_iqd' : ''}`
+             name_ckb = CASE WHEN ? THEN excluded.name_ckb ELSE product_colors.name_ckb END${dimensionUpdateSql(colorDimensionsInstalled, 'product_colors')}${money ? ', cost_iqd = excluded.cost_iqd, cost_adjust_iqd = excluded.cost_adjust_iqd' : ''}`
         )
         .bind(
           col.id, productId, col.name_en, col.hex, col.image, col.sku_part, col.sort, col.active,
@@ -1288,7 +1526,9 @@ export async function planRelationsWriteFrom(
           col.prices.regular_adjust_iqd, col.prices.prime_adjust_iqd, col.prices.pro_adjust_iqd,
           money ? col.prices.cost_adjust_iqd : null,
           col.name_ar ?? '', col.name_ckb ?? '',
-          col.name_ar === undefined ? 0 : 1, col.name_ckb === undefined ? 0 : 1
+          ...dimensionValues(col, colorDimensionsInstalled),
+          col.name_ar === undefined ? 0 : 1, col.name_ckb === undefined ? 0 : 1,
+          ...dimensionFlags(col, colorDimensionsInstalled)
         )
     );
     for (const valueId of col.linked) {
@@ -1311,18 +1551,20 @@ export async function planRelationsWriteFrom(
         .prepare(
           `INSERT INTO product_variants
              (id, product_id, combo_key, sku, active, stock, low_stock_threshold,
-              regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd${dimensionColumnSql(variantDimensionsInstalled)})
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${dimensionValueSql(variantDimensionsInstalled)})
            ON CONFLICT (id) DO UPDATE SET
              combo_key = excluded.combo_key, sku = excluded.sku, active = excluded.active,
              stock = excluded.stock, low_stock_threshold = excluded.low_stock_threshold,
              regular_price_iqd = excluded.regular_price_iqd, prime_price_iqd = excluded.prime_price_iqd,
-             pro_price_iqd = excluded.pro_price_iqd${money ? ', cost_iqd = excluded.cost_iqd' : ''}`
+             pro_price_iqd = excluded.pro_price_iqd${dimensionUpdateSql(variantDimensionsInstalled, 'product_variants')}${money ? ', cost_iqd = excluded.cost_iqd' : ''}`
         )
         .bind(
           v.id, productId, v.combo_key, v.sku, v.active, v.stock, v.low_stock_threshold,
           v.prices.regular_price_iqd, v.prices.prime_price_iqd, v.prices.pro_price_iqd,
-          money ? v.prices.cost_iqd : null
+          money ? v.prices.cost_iqd : null,
+          ...dimensionValues(v, variantDimensionsInstalled),
+          ...dimensionFlags(v, variantDimensionsInstalled)
         )
     );
   }
@@ -1336,14 +1578,16 @@ export async function planRelationsWriteFrom(
         .prepare(
           `INSERT INTO product_images
              (id, product_id, url, alt_en, sort_order, is_primary, option_value_id, color_id, variant_id,
-              width, height, bytes, content_type, alt_ar, alt_ckb, r2_key, source_url)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              width, height, bytes, content_type, alt_ar, alt_ckb, r2_key, source_url,
+              quarantined, quarantine_reason)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '')
            ON CONFLICT (id) DO UPDATE SET
              url = excluded.url, alt_en = excluded.alt_en, sort_order = excluded.sort_order,
              is_primary = excluded.is_primary, option_value_id = excluded.option_value_id,
              color_id = excluded.color_id, variant_id = excluded.variant_id,
              width = excluded.width, height = excluded.height, bytes = excluded.bytes,
              content_type = excluded.content_type,
+             quarantined = 0, quarantine_reason = '',
              -- 0048: written only when the client SENT the field (an explicit
              -- flag per field, so '' can clear); preserved otherwise.
              alt_ar = CASE WHEN ? THEN excluded.alt_ar ELSE product_images.alt_ar END,
@@ -1501,9 +1745,23 @@ function plannedRelationsView(
     given !== undefined ? given : stored ?? '';
   const cost = (given: number | null, stored: number | null | undefined): number | null =>
     money ? given : stored ?? null;
+  const dimensions = (
+    given: PhysicalDimensionOverrides,
+    stored: PhysicalDimensionOverrides | undefined
+  ): Record<(typeof DIMENSION_FIELDS)[number], number | null> =>
+    Object.fromEntries(
+      DIMENSION_FIELDS.map((field) => [
+        field,
+        Object.prototype.hasOwnProperty.call(given, field) ? given[field] ?? null : stored?.[field] ?? null,
+      ])
+    ) as Record<(typeof DIMENSION_FIELDS)[number], number | null>;
 
   return {
     has_relations: req.groups.length > 0 || req.values.length > 0 || req.colors.length > 0 || req.images.length > 0,
+    // A relation payload explicitly owns the image collection even when it
+    // clears it. This prevents stale products.images JSON from becoming a
+    // fallback during mirror construction.
+    has_image_rows: true,
     inventory_mode: req.inventory_mode,
     groups: req.groups.map((g) => ({ ...g, product_id: productId })),
     values: req.values.map((v) => {
@@ -1538,6 +1796,7 @@ function plannedRelationsView(
         lead_time_max_days: v.lead_time_max_days,
         variant_key: v.variant_key,
         variant_label: v.variant_label,
+        ...dimensions(v, stored),
       };
     }),
     colors: req.colors.map((c) => {
@@ -1564,6 +1823,7 @@ function plannedRelationsView(
         prime_adjust_iqd: c.prices.prime_adjust_iqd,
         pro_adjust_iqd: c.prices.pro_adjust_iqd,
         cost_adjust_iqd: cost(c.prices.cost_adjust_iqd, stored?.cost_adjust_iqd),
+        ...dimensions(c, stored),
       };
     }),
     links: req.colors.flatMap((c) =>
@@ -2010,6 +2270,38 @@ export interface ProductSavePlan {
   actorId: string;
 }
 
+/**
+ * Run the complete product/relations planner as a read-only preflight.
+ *
+ * Product media verification deliberately acquires a durable D1 guard before
+ * it returns.  A writer must therefore reject malformed relation structure
+ * before it asks the verifier to protect an object, otherwise a request that
+ * never commits a product can still leave catalogue-adjacent state behind.
+ *
+ * `planProductSave` only reads D1 and prepares (but does not execute)
+ * statements.  It does mutate its request-local document while deriving the
+ * relational mirror and applying write gates, so preflight it on a JSON clone
+ * and discard the resulting statements.  The caller plans again after media
+ * metadata has been replaced with the byte-authoritative values; that second
+ * plan is the only one that may be passed to `saveProductAtomic`.
+ */
+export async function preflightProductSave(db: D1Database, intent: ProductWriteIntent): Promise<void> {
+  const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+  await planProductSave(
+    db,
+    {
+      ...intent,
+      doc: intent.doc ? clone(intent.doc) : null,
+      prev: intent.prev ? clone(intent.prev) : null,
+      relations: intent.relations ? clone(intent.relations) : null,
+      catalogIds: intent.catalogIds ? [...intent.catalogIds] : undefined,
+      translations: intent.translations ? clone(intent.translations) : undefined,
+      actor: { ...intent.actor },
+    },
+    { relationMediaMetadata: 'deferred' }
+  );
+}
+
 /** Costs an actor without financial scope tried to change — reported, never
  *  written. Adjustments count too: a signed cost move is a cost. */
 function costAttempts(doc: ProductDoc, prev: ProductDoc | null): string[] {
@@ -2122,7 +2414,11 @@ export function bridgeLeadTimeTranslations(
   }
 }
 
-export async function planProductSave(db: D1Database, intent: ProductWriteIntent): Promise<ProductSavePlan> {
+export async function planProductSave(
+  db: D1Database,
+  intent: ProductWriteIntent,
+  options: { relationMediaMetadata?: 'authoritative' | 'deferred' } = {}
+): Promise<ProductSavePlan> {
   const { doc, prev, actor } = intent;
   const productId = doc?.id ?? prev?.id;
   if (!productId) throw badRequest('a product id is required');
@@ -2246,7 +2542,10 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
         'RELATIONS_VALIDATION'
       );
     }
-    const plan = await planRelationsWriteFrom(db, snap, intent.relations, { money: actor.money });
+    const plan = await planRelationsWriteFrom(db, snap, intent.relations, {
+      money: actor.money,
+      mediaMetadata: options.relationMediaMetadata,
+    });
     if (!plan.stmts) {
       throw new HttpError(400, `تعذّر حفظ الخيارات/الألوان/الصور: ${plan.errors.join(' — ')}`, 'RELATIONS_VALIDATION', {
         errors: plan.errors,
@@ -2311,20 +2610,32 @@ export async function planProductSave(db: D1Database, intent: ProductWriteIntent
      * See worker/lib/conditionProjection.ts for why this one asks first rather
      * than repairing on failure like the reads do.
      */
-    const [hasCondition, hasDimensions] = await Promise.all([
+    const [hasCondition, dimensionPresence] = await Promise.all([
       productsHaveConditionDoc(db),
-      productsHaveColumn(db, 'net_weight_g'),
+      Promise.all(DIMENSION_FIELDS.map((field) => productsHaveColumn(db, field))),
     ]);
     /**
-     * The same deploy-ahead rule as `condition_doc`, for migration 0098's
-     * eight dimension columns: a database one migration behind the deployment
-     * can still have its prices and stock corrected, and the measurements are
-     * simply not stored until the migration lands. `net_weight_g` is the one
-     * witness because all eight arrive in one file.
+     * A price-only save may cross the minute before 0098 reaches the database,
+     * but a STATED measurement may not be acknowledged and dropped. Probe all
+     * eight (not one witness): if a non-null value targets a missing column,
+     * report the migration explicitly. Null targets can be omitted safely —
+     * there is no override to lose yet.
      */
     const dropped = new Set<string>();
     if (!hasCondition) dropped.add('condition_doc');
-    if (!hasDimensions) for (const k of DIMENSION_FIELDS) dropped.add(k);
+    const missingDimensions = DIMENSION_FIELDS.filter((_field, i) => !dimensionPresence[i]);
+    const dimensionsThatWouldBeLost = missingDimensions.filter(
+      (field) => doc.dimensions[field] !== null
+    );
+    if (dimensionsThatWouldBeLost.length > 0) {
+      throw new HttpError(
+        503,
+        'تعذّر حفظ الأبعاد قبل تطبيق ترحيل قاعدة البيانات 0098 / product dimensions require database migration 0098',
+        'PHYSICAL_DIMENSIONS_MIGRATION_REQUIRED',
+        { errors: dimensionsThatWouldBeLost.map((field) => `${field}: column is not installed`) }
+      );
+    }
+    for (const field of missingDimensions) dropped.add(field);
     const writable = dropped.size === 0 ? PRODUCT_COLUMNS : PRODUCT_COLUMNS.filter((k) => !dropped.has(k));
     if (intent.mode === 'create') {
       statements.push(
@@ -2684,6 +2995,69 @@ async function anyPrinterCatalog(db: D1Database, ids: string[]): Promise<boolean
   return !!row;
 }
 
+type ProductPostCommitAudit = (
+  action: string,
+  detail: Record<string, unknown>
+) => Promise<void>;
+
+/**
+ * QUEUE MEDIA DETACHED BY AN ALREADY-COMMITTED PRODUCT WRITE.
+ *
+ * This is deliberately shared by the ordinary/TXT save and the CSV import
+ * door. `planRelationsWrite` tells both callers which owned objects their
+ * replacement stopped referencing; neither caller may delete those objects
+ * inline. The durable queue is de-duplicated by `enqueueMediaDetach`, and the
+ * cleanup worker re-checks every live reference immediately before touching
+ * R2, so a key shared by another product is preserved.
+ *
+ * Call this only after the batch containing the relation replacement has
+ * returned successfully. Its bookkeeping is best-effort because the product
+ * change is already a committed fact: a queue/audit outage must not turn that
+ * successful save into a response which invites the admin to retry it.
+ */
+export async function queueDetachedProductMediaAfterCommit(
+  db: D1Database,
+  productId: string,
+  actorId: string,
+  detachedMedia: readonly string[],
+  auditAfterCommit?: ProductPostCommitAudit
+): Promise<void> {
+  if (!detachedMedia.length) return;
+
+  const record = async (action: string, detail: Record<string, unknown>): Promise<void> => {
+    try {
+      if (auditAfterCommit) await auditAfterCommit(action, detail);
+      else await audit(db, actorId, action, productId, detail);
+    } catch (error) {
+      console.error('product_post_commit_audit_failed', JSON.stringify({
+        product_id: productId,
+        action,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    }
+  };
+
+  try {
+    const queued = await enqueueMediaDetach(db, detachedMedia, productId);
+    if (queued.length) {
+      await record('product.media.detach_queued', {
+        keys: queued.slice(0, 50),
+        count: queued.length,
+      });
+    }
+  } catch (error) {
+    /**
+     * The relation replacement has already committed. Leaving an
+     * unreferenced object behind is recoverable through the orphan scan;
+     * throwing here would falsely report that the catalogue edit rolled back.
+     */
+    await record('product.media.detach_queue_failed', {
+      keys: detachedMedia.slice(0, 50),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 /**
  * Runs the plan as ONE batch (D1 batches are atomic — the row and its option
  * tree either both land or neither does), then writes the audit rows named
@@ -2712,34 +3086,40 @@ export async function saveProductAtomic(
   auditRows: Array<{ action: string; detail: Record<string, unknown> }> = []
 ): Promise<void> {
   if (plan.statements.length) await db.batch(plan.statements);
-  for (const row of auditRows) await audit(db, plan.actorId, row.action, plan.productId, row.detail);
-  if (plan.relations) await audit(db, plan.actorId, 'product.relations.save', plan.productId, { ...plan.relations.summary });
-
-  if (plan.detachedMedia.length) {
+  /**
+   * Everything below this point is post-commit bookkeeping. An audit outage
+   * must never make a caller believe the atomic batch rolled back: import
+   * callers may otherwise delete newly uploaded media which the committed
+   * product now references. Keep the save successful and leave an observable
+   * runtime error for operations instead.
+   */
+  const auditAfterCommit = async (
+    action: string,
+    detail: Record<string, unknown>
+  ): Promise<void> => {
     try {
-      const queued = await enqueueMediaDetach(db, plan.detachedMedia, plan.productId);
-      if (queued.length) {
-        await audit(db, plan.actorId, 'product.media.detach_queued', plan.productId, {
-          keys: queued.slice(0, 50),
-          count: queued.length,
-        });
-      }
+      await audit(db, plan.actorId, action, plan.productId, detail);
     } catch (error) {
-      /**
-       * THE SAVE HAS ALREADY COMMITTED. Reporting a failure now would tell the
-       * admin their edit did not land when it did, and a thrown error here
-       * would do exactly that. A queue row that could not be written — most
-       * likely a deployment running ahead of migration 0072 — leaves the
-       * object merely unreferenced, which is precisely the condition
-       * `GET /maintenance/orphans` exists to find and report. So it is
-       * recorded in the audit trail and swallowed, and nowhere else.
-       */
-      await audit(db, plan.actorId, 'product.media.detach_queue_failed', plan.productId, {
-        keys: plan.detachedMedia.slice(0, 50),
+      console.error('product_post_commit_audit_failed', JSON.stringify({
+        product_id: plan.productId,
+        action,
         error: error instanceof Error ? error.message : String(error),
-      }).catch(() => {});
+      }));
     }
+  };
+
+  for (const row of auditRows) await auditAfterCommit(row.action, row.detail);
+  if (plan.relations) {
+    await auditAfterCommit('product.relations.save', { ...plan.relations.summary });
   }
+
+  await queueDetachedProductMediaAfterCommit(
+    db,
+    plan.productId,
+    plan.actorId,
+    plan.detachedMedia,
+    auditAfterCommit
+  );
 }
 
 // =========================================================================
@@ -2760,6 +3140,7 @@ export interface RelationsResponse {
   links: ProductRelations['links'];
   variants: Record<string, unknown>[];
   images: Record<string, unknown>[];
+  quarantined_images: Record<string, unknown>[];
   facet_ids: string[];
 }
 
@@ -2790,7 +3171,19 @@ export async function loadRelationsResponse(db: D1Database, productId: string): 
     colors: rel.colors,
     links: rel.links,
     variants: variants.results,
-    images: images.results,
+    images: images.results.filter(isActiveProductImageRow),
+    quarantined_images: images.results
+      .filter((image) => !isActiveProductImageRow(image))
+      .map((image) => ({
+        ...image,
+        url: '',
+        r2_key: '',
+        is_primary: 0,
+        quarantined: 1,
+        source_url: String(image.source_url ?? '').trim() || String(image.url ?? '').trim(),
+        quarantine_reason: String(image.quarantine_reason ?? '').trim() || 'legacy_noncanonical_media',
+      }))
+      .filter(isValidProductImageQuarantine),
     facet_ids: facets.results.map((f) => f.facet_id),
   };
 }
@@ -2960,6 +3353,11 @@ export function verifyApplied(
       check('options', v.id, 'lead_time_max_days', v.lead_time_max_days, n(s.lead_time_max_days));
       check('options', v.id, 'variant_key', v.variant_key, s.variant_key ?? '');
       check('options', v.id, 'variant_label', v.variant_label, s.variant_label ?? '');
+      for (const field of DIMENSION_FIELDS) {
+        if (Object.prototype.hasOwnProperty.call(v, field)) {
+          check('options', v.id, field, v[field] ?? null, n(s[field]));
+        }
+      }
     }
     const colors = byId(rel.colors);
     const linksOf = new Map<string, string[]>();
@@ -2992,6 +3390,11 @@ export function verifyApplied(
         check('colors', c.id, 'cost_adjust_iqd', c.prices.cost_adjust_iqd, n(s.cost_adjust_iqd));
       }
       check('colors', c.id, 'option_ids', [...c.linked].sort(), [...(linksOf.get(c.id) ?? [])].sort());
+      for (const field of DIMENSION_FIELDS) {
+        if (Object.prototype.hasOwnProperty.call(c, field)) {
+          check('colors', c.id, field, c[field] ?? null, n(s[field]));
+        }
+      }
     }
     const variants = byId(rel.variants);
     for (const v of req.variants) {
@@ -3007,6 +3410,11 @@ export function verifyApplied(
       check('variants', v.id, 'prime_price_iqd', v.prices.prime_price_iqd, n(s.prime_price_iqd));
       check('variants', v.id, 'pro_price_iqd', v.prices.pro_price_iqd, n(s.pro_price_iqd));
       if (money) check('variants', v.id, 'cost_iqd', v.prices.cost_iqd, n(s.cost_iqd));
+      for (const field of DIMENSION_FIELDS) {
+        if (Object.prototype.hasOwnProperty.call(v, field)) {
+          check('variants', v.id, field, v[field] ?? null, n(s[field]));
+        }
+      }
     }
     const images = byId(rel.images);
     for (const i of req.images) {

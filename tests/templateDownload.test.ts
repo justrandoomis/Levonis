@@ -307,18 +307,17 @@ function fakeDb(nowSeconds: number) {
               const existing = rows.get(key);
               if (!existing) {
                 rows.set(key, { window_start: now, count: 1 });
-                return { count: 1 } as T;
+                return { count: 1, window_start: now } as T;
               }
               const fresh = existing.window_start > cutoff;
               const next = { window_start: fresh ? existing.window_start : now, count: fresh ? existing.count + 1 : 1 };
               rows.set(key, next);
-              return { count: next.count } as T;
+              return { count: next.count, window_start: next.window_start } as T;
             },
             async run() {
               if (sql.startsWith('DELETE FROM rate_limits')) {
-                const key = args[0] as string;
-                const existing = rows.get(key);
-                if (existing && existing.count <= 1) rows.delete(key);
+                const [key, generation] = args as [string, number];
+                if (rows.get(key)?.window_start === generation) rows.delete(key);
               }
               return { success: true };
             },
@@ -335,23 +334,54 @@ function fakeDb(nowSeconds: number) {
 test('only the first confirm of a batch claims the write', async () => {
   const db = fakeDb(Math.floor(Date.now() / 1000));
   const fp = await applyFingerprint('usr_1', 'draft', null, 'name_ar=س');
-  assert.equal(await claimApplyFingerprint(db, fp), true, 'first confirm writes');
-  assert.equal(await claimApplyFingerprint(db, fp), false, 'double-click writes nothing');
-  assert.equal(await claimApplyFingerprint(db, fp), false, 'a timed-out retry writes nothing');
+  assert.ok(await claimApplyFingerprint(db, fp), 'first confirm writes');
+  assert.equal(await claimApplyFingerprint(db, fp), null, 'double-click writes nothing');
+  assert.equal(await claimApplyFingerprint(db, fp), null, 'a timed-out retry writes nothing');
 });
 
 test('a different batch is never blocked by another batch claim', async () => {
   const db = fakeDb(Math.floor(Date.now() / 1000));
   const a = await applyFingerprint('usr_1', 'draft', null, 'name_ar=أ');
   const b = await applyFingerprint('usr_1', 'draft', null, 'name_ar=ب');
-  assert.equal(await claimApplyFingerprint(db, a), true);
-  assert.equal(await claimApplyFingerprint(db, b), true);
+  assert.ok(await claimApplyFingerprint(db, a));
+  assert.ok(await claimApplyFingerprint(db, b));
 });
 
 test('a claim released after a failed write lets the corrected retry through', async () => {
   const db = fakeDb(Math.floor(Date.now() / 1000));
   const fp = await applyFingerprint('usr_1', 'draft', null, 'name_ar=س');
-  assert.equal(await claimApplyFingerprint(db, fp), true);
-  await releaseApplyFingerprint(db, fp); // the INSERT threw — nothing was written
-  assert.equal(await claimApplyFingerprint(db, fp), true, 'retry after a failed write is allowed');
+  const claim = await claimApplyFingerprint(db, fp);
+  assert.ok(claim);
+  await releaseApplyFingerprint(db, fp, claim!); // the INSERT threw — nothing was written
+  assert.ok(await claimApplyFingerprint(db, fp), 'retry after a failed write is allowed');
+});
+
+test('a losing double-click cannot strand the winner fingerprint after the winner fails', async () => {
+  const db = fakeDb(Math.floor(Date.now() / 1000));
+  const fp = await applyFingerprint('usr_1', 'draft', null, 'name_ar=س');
+  const claim = await claimApplyFingerprint(db, fp);
+  assert.ok(claim);
+  assert.equal(await claimApplyFingerprint(db, fp), null, 'the concurrent duplicate does not own the claim');
+  await releaseApplyFingerprint(db, fp, claim!);
+  assert.ok(await claimApplyFingerprint(db, fp), 'failure releases the owned claim even after a duplicate arrived');
+});
+
+test('an expired owner cannot release a newer fingerprint generation', async () => {
+  const db = fakeDb(1_000_000);
+  const fp = await applyFingerprint('usr_1', 'draft', null, 'name_ar=س');
+  const realNow = Date.now;
+  let nowMs = 1_000_000_000;
+  Date.now = () => nowMs;
+  try {
+    const oldClaim = await claimApplyFingerprint(db, fp);
+    assert.ok(oldClaim);
+    nowMs += 901_000;
+    const newClaim = await claimApplyFingerprint(db, fp);
+    assert.ok(newClaim, 'the expired lease has a new owner');
+    assert.notEqual(newClaim!.window_start, oldClaim!.window_start);
+    await releaseApplyFingerprint(db, fp, oldClaim!);
+    assert.equal(await claimApplyFingerprint(db, fp), null, 'the stale owner did not delete the new generation');
+  } finally {
+    Date.now = realNow;
+  }
 });

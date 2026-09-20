@@ -20,10 +20,18 @@ import {
 import {
   loadRelationsSnapshot,
   planRelationsWriteFrom,
+  preflightProductSave,
   planProductSave,
   saveProductAtomic,
+  type ProductWriteIntent,
   type RelationsPlan,
 } from '../lib/productPersistence';
+import { isActiveProductImageRow, isValidProductImageQuarantine } from '../lib/productOverlay';
+import {
+  ProductMediaIngestError,
+  verifyStoredProductMedia,
+  type ProductMediaReference,
+} from '../lib/productMediaIngest';
 import {
   applyInventory,
   assertMovesApplied,
@@ -57,6 +65,39 @@ import {
 
 export const adminProductRelationsRoutes = new Hono<AppContext>();
 adminProductRelationsRoutes.use('*', requireAdmin);
+
+/** Replace caller-claimed metadata with facts proved from the stored bytes. */
+async function normalizeVerifiedRelationMedia(
+  env: AppContext['Bindings'],
+  rows: Array<Record<string, unknown>>
+): Promise<void> {
+  if (rows.length === 0) return;
+  const verified = await verifyStoredProductMedia(env, rows as ProductMediaReference[]);
+  const byUrl = new Map(verified.map((media) => [media.url, media]));
+  for (const row of rows) {
+    const media = byUrl.get(typeof row.url === 'string' ? row.url : '');
+    if (!media) {
+      throw new ProductMediaIngestError(
+        'IMAGE_REFERENCE_INVALID',
+        'Product media verification did not return every requested reference'
+      );
+    }
+    row.url = media.url;
+    row.r2_key = media.key;
+    row.width = media.width;
+    row.height = media.height;
+    row.bytes = media.bytes;
+    row.content_type = media.content_type;
+  }
+}
+
+function throwProductMediaVerificationError(error: unknown): never {
+  if (error instanceof ProductMediaIngestError) {
+    const unavailable = error.code === 'IMAGE_STORAGE_FAILED' || error.code === 'IMAGE_CONVERT_UNAVAILABLE';
+    throw new HttpError(unavailable ? 503 : 400, error.message, error.code);
+  }
+  throw error;
+}
 
 // ------------------------------------------------------------------- reading
 
@@ -145,6 +186,29 @@ adminProductRelationsRoutes.get('/:id/relations', async (c) => {
       .all(),
     c.env.DB.prepare('SELECT facet_id FROM product_facets WHERE product_id = ?').bind(productId).all<{ facet_id: string }>(),
   ]);
+  const activeImages: Record<string, unknown>[] = [];
+  const quarantinedImages: Record<string, unknown>[] = [];
+  for (const raw of images.results) {
+    const image = raw as Record<string, unknown>;
+    if (isActiveProductImageRow(image)) {
+      activeImages.push(image);
+      continue;
+    }
+    // The admin can see and repair provenance, but this projection never
+    // echoes an unsafe address in the active `url` field. The migration writes
+    // this exact invariant; the fallback also makes a rolling-deploy legacy
+    // row repairable without trusting it as media.
+    const quarantine = {
+      ...image,
+      source_url: String(image.source_url ?? '').trim() || String(image.url ?? '').trim(),
+      url: '',
+      r2_key: '',
+      is_primary: 0,
+      quarantined: 1,
+      quarantine_reason: String(image.quarantine_reason ?? '').trim() || 'legacy_noncanonical_media',
+    };
+    if (isValidProductImageQuarantine(quarantine)) quarantinedImages.push(quarantine);
+  }
 
   return c.json(
     projectForAdmin(c.env, c.get('user'), {
@@ -168,7 +232,8 @@ adminProductRelationsRoutes.get('/:id/relations', async (c) => {
         transports: transportsByFulfillment.get(f.id) ?? [],
       })),
       variants: variants.results,
-      images: images.results,
+      images: activeImages,
+      quarantined_images: quarantinedImages,
       facet_ids: facets.results.map((f) => f.facet_id),
     })
   );
@@ -261,15 +326,47 @@ adminProductRelationsRoutes.put('/:id/relations', async (c) => {
   const existingRow = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>();
   if (!existingRow) throw notFound('Product not found');
 
+  const saveIntent: ProductWriteIntent = {
+    mode: 'update',
+    doc: null,
+    prev: parseProductRow(existingRow),
+    relations: body,
+    actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
+  };
+
+  // Verification acquires a durable object guard. Run the shared planner on
+  // a disposable clone first so malformed/foreign relation bindings are
+  // rejected without changing any D1 table, then rebuild the real plan after
+  // byte-authoritative metadata has been copied onto the image rows.
+  try {
+    await preflightProductSave(c.env.DB, saveIntent);
+  } catch (e) {
+    if (e instanceof HttpError && e.code === 'RELATIONS_VALIDATION') {
+      const errors = Array.isArray(e.details?.errors) ? (e.details!.errors as string[]) : [e.message];
+      return c.json({ success: false, code: 'VALIDATION', errors }, 400);
+    }
+    throw e;
+  }
+
+  // D1 statements capture bound values at plan time, so the final (committable)
+  // plan still has to be built after normalization. Invalid collection shapes
+  // never reach this side-effecting verifier because preflight rejected them.
+  try {
+    const images = body.images;
+    if (
+      Array.isArray(images) &&
+      images.length <= 400 &&
+      images.every((image) => !!image && typeof image === 'object' && !Array.isArray(image))
+    ) {
+      await normalizeVerifiedRelationMedia(c.env, images as Array<Record<string, unknown>>);
+    }
+  } catch (error) {
+    throwProductMediaVerificationError(error);
+  }
+
   let plan;
   try {
-    plan = await planProductSave(c.env.DB, {
-      mode: 'update',
-      doc: null,
-      prev: parseProductRow(existingRow),
-      relations: body,
-      actor: { adminId: admin.id, money: canViewFinancials(c.env, admin) },
-    });
+    plan = await planProductSave(c.env.DB, saveIntent);
   } catch (e) {
     if (e instanceof HttpError && e.code === 'RELATIONS_VALIDATION') {
       const errors = Array.isArray(e.details?.errors) ? (e.details!.errors as string[]) : [e.message];

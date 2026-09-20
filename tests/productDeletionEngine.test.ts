@@ -598,6 +598,55 @@ test('a bucket that throws after the commit does not turn a finished delete into
   assert.equal((raw.prepare("SELECT COUNT(*) AS n FROM products WHERE id='p1'").get() as { n: number }).n, 0);
 });
 
+test('legacy product deletion preserves bytes still referenced by a home banner', async () => {
+  const { adminRoutes } = await import('../worker/routes/admin');
+  const raw = freshDb();
+  const key = 'products/catalog/gallery/legacy-home-banner.webp';
+  raw.exec("INSERT INTO users (id,name,email,password_hash,role) VALUES ('adm','A','a@x.co','h','admin')");
+  raw.prepare(
+    "INSERT INTO products (id, slug, name, name_ar, price_iqd, status, images) VALUES ('p_banner','banner-product','Banner product','صورة',1000,'active',?)"
+  ).run(JSON.stringify([`/files/${key}`]));
+  raw.prepare(
+    `INSERT INTO product_images (id, product_id, url, r2_key, content_type, sort_order, is_primary)
+     VALUES ('pi_banner','p_banner',?,?,'image/webp',0,1)`
+  ).run(`/files/${key}`, key);
+  raw.prepare("INSERT INTO admin_settings (key, value) VALUES ('homeBanners', ?)")
+    .run(JSON.stringify({ hero: [{ id: 'home-1', image: `/files/${key}`, link: '' }] }));
+
+  const bucket = new FakeBucket();
+  bucket.put(key);
+  const db = asD1(raw);
+  const app = stubApp(
+    db,
+    { id: 'adm', role: 'admin', email: 'a@x.co', admin_scope: 'full' },
+    (router) => router.route('/api/admin', adminRoutes),
+    { host: APEX, env: { BUCKET: bucket, R2_PUBLIC: bucket, R2_PRIVATE: bucket } }
+  );
+
+  const response = await app.request(
+    '/api/admin/products/p_banner',
+    { method: 'DELETE', headers: { 'CF-Connecting-IP': '1.2.3.4' } },
+    undefined,
+    ctx
+  );
+  const body = await json(response);
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.equal(body.product_deleted, true);
+  assert.deepEqual(body.r2_objects_deleted, []);
+  assert.ok((body.r2_objects_shared_skipped as string[]).includes(key));
+  assert.equal(bucket.objects.has(key), true, 'the homepage still resolves this object');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM products WHERE id='p_banner'"), 0);
+  const cleanupJob = raw
+    .prepare('SELECT state, attempts FROM media_cleanup_jobs WHERE object_key = ?')
+    .get(key) as { state: string; attempts: number };
+  assert.equal(
+    cleanupJob.state,
+    'skipped_shared',
+    'the globally referenced job is terminally skipped, not left to a later unsafe retry'
+  );
+  assert.equal(cleanupJob.attempts, 1);
+});
+
 /**
  * THE DELETE THAT COULD NOT RUN ON D1, AND THE WILDCARD BUG UNDERNEATH IT.
  *
