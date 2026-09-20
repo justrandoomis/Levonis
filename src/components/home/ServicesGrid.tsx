@@ -47,11 +47,34 @@ import type { SiteMediaEntry } from '../../lib/api';
  * embedding.
  */
 
-const CARD_BASE =
-  'group flex w-[124px] min-h-[112px] shrink-0 snap-start flex-col items-center justify-center gap-2.5 rounded-xl border px-3 py-3.5 text-center transition-colors min-w-0';
-const CARD_PLAIN = 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600';
-const CARD_FEATURED =
-  'bg-gradient-to-br from-olive/20 to-zinc-900/60 border-olive/40 hover:border-olive/70';
+/**
+ * ─── THE ICON *IS* THE TILE, AND THE NAME SITS UNDER IT ───
+ *
+ * The owner: «يجب أن تملأ الأيقونة المربع الأسود كاملًا … والاسم يكون تحت
+ * المربع الأسود وليس فيه». Before this, every card was a bordered box holding a
+ * 44px chip and a caption, so the artwork they had commissioned — a gold mark
+ * on its own rounded field, inside its own gold ring — was shown at about a
+ * sixth of the area it was drawn for, boxed inside a second frame that repeated
+ * what the file already had.
+ *
+ * So the card stops being a box. It is now a COLUMN: a square tile and a label
+ * beneath it, with the tile drawn entirely by the uploaded file. That is why
+ * `TILE_PLAIN`/`TILE_FEATURED` apply only when there is no image — a chip fill
+ * and a border under an icon that brings its own would be the doubled frame
+ * again, one pixel further out.
+ *
+ * `object-contain` AND NOT `object-cover`. The icons are 512×493 — a hair wider
+ * than tall — so in a square tile `contain` letterboxes by about 1%, invisible,
+ * while `cover` would crop 1% off each side and the first thing to go would be
+ * the gold ring that defines the whole shape. A border cropped on two sides
+ * reads as a mistake at any size.
+ */
+const ITEM_BASE = 'group flex w-[104px] shrink-0 snap-start flex-col items-center gap-2 min-w-0';
+const TILE_BASE =
+  'w-[104px] h-[104px] rounded-2xl flex items-center justify-center shrink-0 transition-colors';
+const TILE_PLAIN = 'bg-zinc-900/50 border border-zinc-800 group-hover:border-zinc-600';
+const TILE_FEATURED =
+  'bg-gradient-to-br from-olive/20 to-zinc-900/60 border border-olive/40 group-hover:border-olive/70';
 
 /**
  * `image` is the owner's uploaded icon for this card, or '' for none.
@@ -90,14 +113,14 @@ const CARD_FEATURED =
  * `screen` is REMOVED rather than left as a harmless leftover. Against these
  * files it lightens every dark pixel of the artwork toward the backdrop, and
  * the Studio card's backdrop is not neutral — it is the olive gradient of
- * CARD_FEATURED, which would tint the whole mark. On the ordinary near-black
+ * TILE_FEATURED, which would tint the whole mark. On the ordinary near-black
  * cards the difference is a few percent and easy to wave through in review, so
  * the test is not «does it still look fine» but «what is this operation for»:
  * with genuine transparency there is nothing left for it to erase.
  *
- * The tile still drops its own chip fill, border and padding for an image and
- * keeps all three for the drawn lucide icon, which needs the contrast. An
- * uploaded icon arrives with its own frame; a stroked glyph does not.
+ * The tile drops its own fill and border for an image and keeps both for the
+ * drawn lucide icon, which needs the contrast. An uploaded icon arrives with
+ * its own frame; a stroked glyph does not.
  *
  * WHAT A FUTURE UPLOAD MUST NOT DO, since that is the failure this paragraph
  * exists to prevent: an icon exported on an opaque background will now show
@@ -124,30 +147,35 @@ function CardBody({
 
   return (
     <>
-      <div
-        className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 overflow-hidden ${
-          showImage
-            ? ''
-            : `border ${featured ? 'bg-olive/25 border-olive/50' : 'bg-zinc-800/70 border-zinc-700/60'}`
-        }`}
-      >
+      <div className={`${TILE_BASE} ${showImage ? '' : featured ? TILE_FEATURED : TILE_PLAIN}`}>
         {showImage ? (
           <img
             src={image}
             alt=""
             aria-hidden="true"
-            width={44}
-            height={44}
+            /* The intrinsic box the browser reserves BEFORE the bytes arrive.
+               It must match the rendered tile or the whole rail reflows as
+               eleven lazy images land one by one — the layout shift a rail of
+               placeholders is most prone to, and the cheapest to prevent. */
+            width={104}
+            height={104}
             loading="lazy"
             decoding="async"
             onError={() => setImageFailed(true)}
             className="w-full h-full object-contain"
           />
         ) : (
-          <Icon aria-hidden="true" className={`w-5 h-5 ${featured ? 'text-olive-light' : 'text-zinc-300'}`} />
+          <Icon aria-hidden="true" className={`w-9 h-9 ${featured ? 'text-olive-light' : 'text-zinc-300'}`} />
         )}
       </div>
-      <h3 className="w-full text-[12px] font-bold leading-snug text-white line-clamp-2">{title}</h3>
+      {/* UNDER the tile, never inside it. `min-h` reserves the second line on
+          every card so the tiles stay on one baseline whether a name wraps or
+          not — «الضمان والصيانة» is one line and «مستعمل ومجدّد و Open Box» is
+          two, and a rail whose squares sit at different heights reads as
+          broken rather than as varied. */}
+      <h3 className="w-full min-h-[2.25rem] text-[12px] font-bold leading-snug text-center text-zinc-200 line-clamp-2">
+        {title}
+      </h3>
     </>
   );
 }
@@ -213,12 +241,18 @@ export default function ServicesGrid({ siteMedia = [] }: { siteMedia?: SiteMedia
     <section data-home-section="services" className="mb-10 sm:mb-12">
       <SectionHeader title={t('services')} accent="bg-olive" />
 
-      {/* One swipe rail at every width; the small cards fit a desktop row
-          outright, so the rail only actually scrolls where it should — on a
-          phone. min-w-0 so a long Kurdish title wraps inside its card. */}
+      {/* One swipe rail at every width. Eleven 104px tiles are wider than a
+          desktop row, so unlike the old 124px cards this one really does
+          scroll everywhere — which is why it keeps `snap-x` and the momentum
+          hook rather than degrading to a static row on a large screen.
+
+          `items-start` so every column hangs from the same top edge: the tiles
+          are what the eye lines up on, and stretching a short-titled column to
+          match a two-line neighbour would push its square down. min-w-0 so a
+          long Kurdish title wraps instead of widening its column. */}
       <div
         ref={rail.ref}
-        className="flex gap-2.5 overflow-x-auto overscroll-x-contain hide-scrollbar snap-x pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 sm:gap-3"
+        className="flex items-start gap-2.5 overflow-x-auto overscroll-x-contain hide-scrollbar snap-x pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 sm:gap-3"
       >
         {/* Opens in its OWN tab. The Studio is a separate application on a
             separate subdomain, and replacing the store with it costs the
@@ -230,13 +264,13 @@ export default function ServicesGrid({ siteMedia = [] }: { siteMedia?: SiteMedia
           target="_blank"
           rel="noopener noreferrer"
           data-service="studio"
-          className={`${CARD_BASE} ${CARD_FEATURED}`}
+          className={ITEM_BASE}
         >
           <CardBody icon={Layers} title={t('studioCardTitle')} featured image={iconFor('studio')} />
         </a>
 
         {inApp.map((s) => (
-          <Link key={s.id} to={s.to} data-service={s.id} className={`${CARD_BASE} ${CARD_PLAIN}`}>
+          <Link key={s.id} to={s.to} data-service={s.id} className={ITEM_BASE}>
             <CardBody icon={s.icon} title={s.title} image={iconFor(s.id)} />
           </Link>
         ))}
