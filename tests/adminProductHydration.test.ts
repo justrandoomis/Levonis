@@ -754,6 +754,16 @@ test('ImportPanel: the result row is the server read-back — never the file tex
   assert.match(read('src/components/AdminProducts.tsx'), /onOpenProduct=\{\(id\) => \{\s*closeImport\(\);\s*setEditing\(\{ open: true, id \}\);/);
 });
 
+test('ImportPanel: a slow or already-running TXT apply waits for the verified replay instead of reporting failure', () => {
+  const src = read('src/components/adminProducts/ImportPanel.tsx');
+  const recovery = src.slice(src.indexOf('async function applyTxtItem'), src.indexOf('function mergeResults'));
+  assert.match(recovery, /timeoutMs: 0/, 'image ingest is not cut off by the ordinary 20-second API deadline');
+  assert.match(recovery, /error\.code !== 'APPLY_IN_PROGRESS'/);
+  assert.match(recovery, /\/api\/admin\/template\/apply-status\//);
+  assert.match(recovery, /status\.state !== 'applying'/);
+  assert.match(recovery, /api\.post<ApplyResponse>/, 'completion is read back through the idempotent apply replay');
+});
+
 test('ProductForm: loads through hydrateRelations, keeps a stored section/family, gates warranty on catalog_ids too, and renders the stored groups', () => {
   const src = read('src/components/adminProducts/ProductForm.tsx');
   assert.match(src, /const rs = hydrateRelations\(r, p\.product\)/);

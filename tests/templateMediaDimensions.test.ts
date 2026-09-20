@@ -602,6 +602,7 @@ membership.pro.percent=10
 
   const winnerPromise = post(app, '/api/admin/template/apply', payload);
   await barrier.reached;
+  let fingerprint = '';
   try {
     assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM products'), 1, 'the winner catalog batch committed');
     const committedId = String(row<{ id: string }>(raw, 'SELECT id FROM products')?.id);
@@ -620,6 +621,14 @@ membership.pro.percent=10
     const duplicateBody = await json(duplicate);
     assert.equal(duplicate.status, 409);
     assert.equal(duplicateBody.code, 'APPLY_IN_PROGRESS');
+    fingerprint = String(duplicateBody.fingerprint);
+    const activeStatusResponse = await get(
+      app,
+      `/api/admin/template/apply-status/${encodeURIComponent(fingerprint)}`
+    );
+    const activeStatus = await json(activeStatusResponse);
+    assert.equal(activeStatusResponse.status, 200);
+    assert.equal(activeStatus.state, 'applying', 'the browser can wait without reposting the mutation');
     assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM products'), 1, 'the losing confirm creates no twin');
     assert.equal(
       count(raw, `SELECT COUNT(*) AS n FROM audit_log WHERE action = 'template.apply.verified'`),
@@ -655,6 +664,13 @@ membership.pro.percent=10
   assert.deepEqual(versionIds, liveIds, 'the rollback version snapshot describes the rule set that remains');
   assert.equal(count(raw, `SELECT COUNT(*) AS n FROM audit_log WHERE action = 'template.apply.verified'`), 0);
   assert.equal(count(raw, `SELECT COUNT(*) AS n FROM rate_limits WHERE key LIKE 'tplfp:%'`), 0, 'the failed winner releases its owned claim');
+  const retryStatusResponse = await get(
+    app,
+    `/api/admin/template/apply-status/${encodeURIComponent(fingerprint)}`
+  );
+  const retryStatus = await json(retryStatusResponse);
+  assert.equal(retryStatusResponse.status, 200);
+  assert.equal(retryStatus.state, 'retry', 'a released failed owner lets the browser retry the same file');
 });
 
 test('TXT media materializes before save and A1 dimensions survive reload, export, and zero-fetch re-import', async () => {
@@ -709,6 +725,10 @@ test('TXT media materializes before save and A1 dimensions survive reload, expor
 
     const created = await apply(app, FULL);
     assert.equal(created.response.status, 200, JSON.stringify(created.body));
+    const appliedStatus = await json(
+      await get(app, `/api/admin/template/apply-status/${encodeURIComponent(String(created.body.fingerprint))}`)
+    );
+    assert.equal(appliedStatus.state, 'applied', 'the recovery poll observes the verified completion marker');
     const productId = String(created.body.product_id);
     assert.ok(productId);
     assert.equal(
