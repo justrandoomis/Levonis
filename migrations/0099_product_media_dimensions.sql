@@ -193,19 +193,22 @@ SELECT
          AND candidate.is_primary = 1
     ) THEN 1
     ELSE 0
-  END,
+  -- Wrangler 4.127 only closes a CASE block when END is followed by
+  -- whitespace or a semicolon. Keep the space before each comma in this file;
+  -- `END ,` makes its D1 splitter merge every remaining statement together.
+  END ,
   CASE WHEN EXISTS (
     SELECT 1 FROM product_option_values v
      WHERE v.id = m.option_value_id AND v.product_id = m.product_id
-  ) THEN m.option_value_id ELSE NULL END,
+  ) THEN m.option_value_id ELSE NULL END ,
   CASE WHEN EXISTS (
     SELECT 1 FROM product_colors c
      WHERE c.id = m.color_id AND c.product_id = m.product_id
-  ) THEN m.color_id ELSE NULL END,
+  ) THEN m.color_id ELSE NULL END ,
   CASE WHEN EXISTS (
     SELECT 1 FROM product_variants v
      WHERE v.id = m.variant_id AND v.product_id = m.product_id
-  ) THEN m.variant_id ELSE NULL END,
+  ) THEN m.variant_id ELSE NULL END ,
   m.width,
   m.height,
   m.bytes,
@@ -448,7 +451,7 @@ UPDATE product_images
    SET source_url = CASE
          WHEN trim(COALESCE(source_url, '')) = '' THEN url
          ELSE source_url
-       END,
+       END ,
        url = '',
        r2_key = '',
        is_primary = 0,
@@ -468,7 +471,7 @@ UPDATE product_images
    SET source_url = CASE
          WHEN trim(COALESCE(source_url, '')) = '' THEN url
          ELSE source_url
-       END,
+       END ,
        url = '',
        r2_key = '',
        is_primary = 0,
@@ -496,7 +499,7 @@ UPDATE product_images
    SET source_url = CASE
          WHEN trim(COALESCE(source_url, '')) = '' THEN url
          ELSE source_url
-       END,
+       END ,
        url = '',
        r2_key = '',
        is_primary = 0,
@@ -534,7 +537,7 @@ UPDATE product_images
          WHEN trim(COALESCE(source_url, '')) = '' AND trim(COALESCE(url, '')) <> '' THEN url
          WHEN trim(COALESCE(source_url, '')) = '' AND trim(COALESCE(r2_key, '')) <> '' THEN '/files/' || r2_key
          ELSE source_url
-       END,
+       END ,
        url = '',
        r2_key = '',
        is_primary = 0,
