@@ -518,6 +518,10 @@ export interface SaleFact {
   estimated_lines: number;
   estimated_units: number;
   estimated_cogs_iqd: number;
+  /** Lines whose COGS came from the lots the sale ate, not from a snapshot. */
+  fifo_lines: number;
+  /** The part of `cogs_iqd` those lines account for. */
+  fifo_cogs_iqd: number;
 }
 
 /** One day's worth of resolved refunds, in the period they were decided in. */
@@ -549,6 +553,10 @@ export interface RefundFact {
   estimated_lines: number;
   estimated_units: number;
   estimated_cogs_iqd: number;
+  /** Lines whose COGS came from the lots the sale ate, not from a snapshot. */
+  fifo_lines: number;
+  /** The part of `cogs_iqd` those lines account for. */
+  fifo_cogs_iqd: number;
 }
 
 /** One day's order-level collections — the money that belongs to no product. */
@@ -593,6 +601,8 @@ export const saleFactOf = (r: Record<string, unknown>): SaleFact => ({
   estimated_lines: num(r.estimated_lines),
   estimated_units: num(r.estimated_units),
   estimated_cogs_iqd: num(r.estimated_cogs_iqd),
+  fifo_lines: num(r.fifo_lines),
+  fifo_cogs_iqd: num(r.fifo_cogs_iqd),
 });
 
 export const refundFactOf = (r: Record<string, unknown>): RefundFact => ({
@@ -608,6 +618,8 @@ export const refundFactOf = (r: Record<string, unknown>): RefundFact => ({
   estimated_lines: num(r.estimated_lines),
   estimated_units: num(r.estimated_units),
   estimated_cogs_iqd: num(r.estimated_cogs_iqd),
+  fifo_lines: num(r.fifo_lines),
+  fifo_cogs_iqd: num(r.fifo_cogs_iqd),
 });
 
 export const orderFactOf = (r: Record<string, unknown>): OrderFact => ({
@@ -676,6 +688,17 @@ export const expenseCategoryTotalOf = (r: Record<string, unknown>): ExpenseCateg
 export interface SchemaFacts {
   /** Migration 0095 has been applied. */
   has0095: boolean;
+  /**
+   * Migration 0098 has been applied, so `order_item_inventory_allocations`
+   * exists and a sale can be costed from THE LOTS IT ACTUALLY ATE.
+   *
+   * A SEPARATE FLAG FROM `has0095`, because the two are years apart and a
+   * database can legitimately have the first and not the second — every
+   * database did, until 0098 ran. False here does not degrade anything: the
+   * snapshot ladder answers exactly as it did before, and the report says
+   * `fifo_available: false` rather than reporting a FIFO COGS of zero.
+   */
+  hasFifo: boolean;
 }
 
 /**
@@ -696,7 +719,61 @@ const lineJoins = (schema: SchemaFacts): string => `
        LEFT JOIN products p ON p.id = i.product_id
        LEFT JOIN (${KIDS_SQL(schema)}) kids ON kids.pid = i.id
        LEFT JOIN (${MYSTERY_SPOOL_SQL}) mys ON mys.oiid = i.id
-       LEFT JOIN products mp ON mp.id = mys.offer_product_id`;
+       LEFT JOIN products mp ON mp.id = mys.offer_product_id${schema.hasFifo ? FIFO_JOIN : ''}`;
+
+/**
+ * WHAT THIS SALE ACTUALLY ATE — the cost layers, summed per order line.
+ *
+ * `released_at IS NULL` selects the CONSUMPTION rows only. A return is written
+ * as a SEPARATE row carrying `released_at`, never as an update to the row it
+ * reverses, so this sums the sale as it happened and leaves the reversal to the
+ * refund query. Filtering released consumption out here instead would subtract
+ * the return twice — once by shrinking the sale, once by the refund that is
+ * already subtracted from it.
+ *
+ * `unpriced` counts the allocations whose lot has no known cost. One is enough
+ * to make FIFO's total an understatement rather than an answer, which is why it
+ * is counted rather than coalesced to zero: §21 says unknown stays unknown, and
+ * a sum that quietly treats a 450,000-dinar unit as free is the exact shape of
+ * the 100%-margin lie this codebase keeps refusing to tell.
+ *
+ * Grouped, not correlated: one pass over an indexed column, the same shape as
+ * `KIDS_SQL` beside it.
+ */
+const FIFO_JOIN = `
+       LEFT JOIN (
+         SELECT order_item_id,
+                SUM(qty) AS qty,
+                SUM(CASE WHEN unit_cost_iqd IS NULL THEN 1 ELSE 0 END) AS unpriced,
+                SUM(COALESCE(cogs_iqd, 0)) AS cogs
+           FROM order_item_inventory_allocations
+          WHERE released_at IS NULL
+          GROUP BY order_item_id
+       ) fifo ON fifo.order_item_id = i.id`;
+
+/**
+ * THE EXACT COST OF ONE LINE, or NULL when FIFO cannot answer for it.
+ *
+ * A TOTAL, NEVER A UNIT COST, and that is the point of the whole expression.
+ * The owner's own example (§81) is ten units at 450,000 and ten at 560,000 with
+ * twelve sold: the answer is 5,620,000, and there is NO unit cost that produces
+ * it — 5,620,000 / 12 is 468,333.33, and twelve of anything whole is 5,619,996
+ * or 5,620,008. So the total is carried whole and never divided, which is also
+ * why it cannot be folded into `costValueSql`'s unit-cost ladder.
+ *
+ * THREE CONDITIONS, ALL REQUIRED:
+ *   - allocations exist for this line at all;
+ *   - they cover the WHOLE line (`fifo.qty = i.qty`) — a partial allocation
+ *     prices part of a sale, and half a cost reported as the cost is worse than
+ *     the snapshot it would replace;
+ *   - every lot they touched has a known cost.
+ *
+ * Any of them failing falls back to the snapshot ladder, which is the behaviour
+ * every order placed before 0098 needs and will keep needing for ever.
+ */
+const FIFO_COGS = `CASE
+      WHEN fifo.qty IS NOT NULL AND fifo.qty = i.qty AND fifo.unpriced = 0
+      THEN fifo.cogs END`;
 
 /**
  * WHICH MYSTERY OFFER A SPOOL ROW BELONGS TO — the one fact that stops a
@@ -850,16 +927,52 @@ const costProjection = (schema: SchemaFacts): string => {
         value: 'p.product_cost_iqd',
         confidence: `CASE WHEN p.product_cost_iqd IS NULL THEN 'unknown' ELSE 'estimated' END`,
       };
+  /**
+   * FIFO SITS ABOVE THE SNAPSHOT AND BELOW THE PARENT RULE, and the order of
+   * those three is the whole design.
+   *
+   * A composition PARENT is tested FIRST and never costed from lots: its goods
+   * are its component rows, which carry their own allocations, so a parent
+   * priced from anything at all charges the same goods twice (§4).
+   *
+   * FIFO then beats the snapshot because it is a better measurement of the same
+   * thing. The snapshot is what the resolver believed a unit cost at the moment
+   * of sale; the allocations are which cost layers the sale actually consumed.
+   * When the shop holds two layers, those differ — and the second is the answer
+   * the owner asked for.
+   *
+   * It also costs lines the snapshot could not: `cost_basis = 'unpriced'` means
+   * the resolver found no cost, and if the units came out of a lot that was
+   * bought for a known price, we DO know. That is not the forbidden estimate —
+   * §45's «لا تُقدّر» is about applying TODAY's catalogue backwards, and this is
+   * a fact recorded at the time about the very units that shipped.
+   */
+  const fifo = schema.hasFifo ? FIFO_COGS : 'NULL';
   return `
     CASE WHEN (${isParentSql(schema)})
          THEN CASE WHEN COALESCE(kids.worst, 0) = 0 THEN NULL ELSE 0 END
          ELSE ${own.value} END AS unit_cost_iqd,
+    CASE WHEN (${isParentSql(schema)}) THEN NULL ELSE ${fifo} END AS fifo_cogs_iqd,
     CASE WHEN (${isParentSql(schema)})
          THEN CASE WHEN COALESCE(kids.worst, 0) = 0 THEN 'unknown'
                    WHEN kids.worst = 1 THEN 'estimated'
                    ELSE 'recorded' END
+         WHEN (${fifo}) IS NOT NULL THEN 'recorded'
          ELSE ${own.confidence} END AS cost_confidence`;
 };
+
+/**
+ * The COGS of one line, FIFO first. `x` is the CTE alias.
+ *
+ * Written once and used by every aggregate, because "what did this line cost"
+ * must have exactly one answer on this screen: a per-product total that reached
+ * for FIFO while the day total reached for the snapshot would make the two
+ * columns of one report disagree about the same sale.
+ */
+const lineCogs = (x: string): string =>
+  `CASE WHEN ${x}.fifo_cogs_iqd IS NOT NULL THEN ${x}.fifo_cogs_iqd
+        WHEN ${x}.unit_cost_iqd IS NULL THEN NULL
+        ELSE ${x}.unit_cost_iqd * ${x}.qty END`;
 
 /**
  * Is this line a composition PARENT — money here, goods on other rows (§4)?
@@ -941,21 +1054,32 @@ const lineSelect = (schema: SchemaFacts): string => `
  * number of BUNDLES and its components' are pieces, and adding both counts the
  * same goods twice in a figure the owner reads as "how many things did we sell".
  */
+const COGS_L = lineCogs('l');
+/** Uncosted means NEITHER source could answer — FIFO nor the snapshot ladder.
+ *  Written against the COGS expression itself so the "is it costed" test and
+ *  the number can never come apart. */
+const UNCOSTED_L = `(${COGS_L}) IS NULL`;
+
 const LINE_AGGREGATES = `
        COUNT(DISTINCT l.order_id) AS orders,
        COUNT(*) AS lines,
        SUM(CASE WHEN l.is_parent THEN 0 ELSE l.qty END) AS units,
        SUM(l.net_iqd) AS revenue_iqd,
-       SUM(CASE WHEN l.unit_cost_iqd IS NULL THEN 0 ELSE l.net_iqd END) AS costed_revenue_iqd,
-       SUM(CASE WHEN l.unit_cost_iqd IS NULL THEN l.net_iqd ELSE 0 END) AS uncosted_revenue_iqd,
-       SUM(CASE WHEN l.unit_cost_iqd IS NULL THEN 0 ELSE l.unit_cost_iqd * l.qty END) AS cogs_iqd,
-       SUM(CASE WHEN l.unit_cost_iqd IS NULL OR l.is_parent THEN 0 ELSE l.qty END) AS costed_units,
-       SUM(CASE WHEN l.unit_cost_iqd IS NULL THEN l.qty ELSE 0 END) AS uncosted_units,
-       SUM(CASE WHEN l.unit_cost_iqd IS NULL THEN 1 ELSE 0 END) AS uncosted_lines,
+       SUM(CASE WHEN ${UNCOSTED_L} THEN 0 ELSE l.net_iqd END) AS costed_revenue_iqd,
+       SUM(CASE WHEN ${UNCOSTED_L} THEN l.net_iqd ELSE 0 END) AS uncosted_revenue_iqd,
+       SUM(COALESCE(${COGS_L}, 0)) AS cogs_iqd,
+       SUM(CASE WHEN ${UNCOSTED_L} OR l.is_parent THEN 0 ELSE l.qty END) AS costed_units,
+       SUM(CASE WHEN ${UNCOSTED_L} THEN l.qty ELSE 0 END) AS uncosted_units,
+       SUM(CASE WHEN ${UNCOSTED_L} THEN 1 ELSE 0 END) AS uncosted_lines,
        SUM(CASE WHEN l.cost_confidence = 'estimated' THEN 1 ELSE 0 END) AS estimated_lines,
        SUM(CASE WHEN l.cost_confidence = 'estimated' THEN l.qty ELSE 0 END) AS estimated_units,
        SUM(CASE WHEN l.cost_confidence = 'estimated'
-                THEN l.unit_cost_iqd * l.qty ELSE 0 END) AS estimated_cogs_iqd`;
+                THEN COALESCE(${COGS_L}, 0) ELSE 0 END) AS estimated_cogs_iqd,
+       -- HOW MUCH OF THIS COGS IS MEASURED AGAINST REAL COST LAYERS. Reported
+       -- rather than assumed, so the screen can say «محسوبة حسب دفعات الشراء»
+       -- for the part that is and stay quiet about the part that is not.
+       SUM(CASE WHEN l.fifo_cogs_iqd IS NULL THEN 0 ELSE 1 END) AS fifo_lines,
+       SUM(COALESCE(l.fifo_cogs_iqd, 0)) AS fifo_cogs_iqd`;
 
 /**
  * THE RECOGNITION FILTER, written once (§1). Every sales query in this feature
@@ -1025,22 +1149,50 @@ export const refundsByDaySql = (schema: SchemaFacts): string => `
     FROM r GROUP BY r.day`;
 
 /** The refund aggregates, on the same basis as the sale they reverse. */
+/**
+ * THE COGS A REFUND REVERSES, which is not simply "the line's cost" when only
+ * part of the line came back.
+ *
+ * A FULL return gives back the exact total the sale consumed — 5,620,000 for
+ * the twelve units of §81, to the dinar, with no division anywhere.
+ *
+ * A PARTIAL return has to apportion, and it apportions the same way the refund
+ * REVENUE beside it already does (`net_iqd * ref_qty / line_qty`): it is the
+ * only answer available, because a return case names a QUANTITY and not which
+ * units. Three of twelve units costing 450,000, 450,000 and 560,000 came back —
+ * nobody knows which three. So the honest figure is a share, stated as a share,
+ * and it is deliberately NOT the FIFO order: pretending to know which three
+ * would be a more precise-looking lie than the average.
+ *
+ * `line_qty` is the divisor and it is already `MAX(1, i.qty)`, so this cannot
+ * divide by zero. Integer division truncates, matching the revenue line above —
+ * one convention, so the two columns round the same way.
+ */
+const REFUND_COGS = `CASE
+        WHEN r.fifo_cogs_iqd IS NOT NULL AND r.ref_qty >= r.line_qty THEN r.fifo_cogs_iqd
+        WHEN r.fifo_cogs_iqd IS NOT NULL THEN r.fifo_cogs_iqd * r.ref_qty / r.line_qty
+        WHEN r.unit_cost_iqd IS NULL THEN NULL
+        ELSE r.unit_cost_iqd * r.ref_qty END`;
+const UNCOSTED_R = `(${REFUND_COGS}) IS NULL`;
+
 const REFUND_AGGREGATES = `
          COUNT(*) AS cases,
          SUM(r.ref_qty) AS units,
          SUM(r.net_iqd * r.ref_qty / r.line_qty) AS revenue_iqd,
-         SUM(CASE WHEN r.unit_cost_iqd IS NULL THEN 0
+         SUM(CASE WHEN ${UNCOSTED_R} THEN 0
                   ELSE r.net_iqd * r.ref_qty / r.line_qty END) AS costed_revenue_iqd,
-         SUM(CASE WHEN r.unit_cost_iqd IS NULL THEN 0
-                  ELSE r.unit_cost_iqd * r.ref_qty END) AS cogs_iqd,
-         SUM(CASE WHEN r.unit_cost_iqd IS NULL
+         SUM(COALESCE(${REFUND_COGS}, 0)) AS cogs_iqd,
+         SUM(CASE WHEN ${UNCOSTED_R}
                   THEN r.net_iqd * r.ref_qty / r.line_qty ELSE 0 END) AS uncosted_revenue_iqd,
-         SUM(CASE WHEN r.unit_cost_iqd IS NULL THEN r.ref_qty ELSE 0 END) AS uncosted_units,
-         SUM(CASE WHEN r.unit_cost_iqd IS NULL AND r.ref_qty >= r.line_qty THEN 1 ELSE 0 END) AS uncosted_lines,
+         SUM(CASE WHEN ${UNCOSTED_R} THEN r.ref_qty ELSE 0 END) AS uncosted_units,
+         SUM(CASE WHEN ${UNCOSTED_R} AND r.ref_qty >= r.line_qty THEN 1 ELSE 0 END) AS uncosted_lines,
          SUM(CASE WHEN r.cost_confidence = 'estimated' AND r.ref_qty >= r.line_qty THEN 1 ELSE 0 END) AS estimated_lines,
          SUM(CASE WHEN r.cost_confidence = 'estimated' THEN r.ref_qty ELSE 0 END) AS estimated_units,
          SUM(CASE WHEN r.cost_confidence = 'estimated'
-                  THEN r.unit_cost_iqd * r.ref_qty ELSE 0 END) AS estimated_cogs_iqd`;
+                  THEN COALESCE(${REFUND_COGS}, 0) ELSE 0 END) AS estimated_cogs_iqd,
+         SUM(CASE WHEN r.fifo_cogs_iqd IS NULL THEN 0 ELSE 1 END) AS fifo_lines,
+         SUM(CASE WHEN r.fifo_cogs_iqd IS NULL THEN 0
+                  ELSE COALESCE(${REFUND_COGS}, 0) END) AS fifo_cogs_iqd`;
 
 /**
  * Order-level collections, on the SAME recognition rule as the lines so the
@@ -1281,6 +1433,19 @@ export interface Totals {
   /** Lines and units whose cost is unknown, excluded from the margin base. */
   uncosted_lines: number;
   uncosted_units: number;
+  /**
+   * HOW MUCH OF THIS COGS IS MEASURED AGAINST THE COST LAYERS THE SALE ATE.
+   *
+   * The counterpart of `estimated_*`, and reported for the same reason: the
+   * owner is owed the basis, not just the number. `fifo_cogs_iqd` is a SUBSET
+   * of `cogs_iqd` — never added to it — so a screen can say «٨٤٪ منها محسوبة
+   * حسب دفعات الشراء» and leave the rest labelled as the snapshot it is.
+   *
+   * Reversed by refunds on the same basis as everything else, and floored at
+   * zero afterwards for the same reason the other counts are.
+   */
+  fifo_lines: number;
+  fifo_cogs_iqd: number;
 }
 
 const zeroTotals = (): Totals => ({
@@ -1312,6 +1477,8 @@ const zeroTotals = (): Totals => ({
   estimated_cogs_iqd: 0,
   uncosted_lines: 0,
   uncosted_units: 0,
+  fifo_lines: 0,
+  fifo_cogs_iqd: 0,
 });
 
 /**
@@ -1369,6 +1536,8 @@ function seal(t: Totals): Totals {
   t.estimated_lines = Math.max(0, t.estimated_lines);
   t.estimated_units = Math.max(0, t.estimated_units);
   t.estimated_cogs_iqd = Math.max(0, t.estimated_cogs_iqd);
+  t.fifo_lines = Math.max(0, t.fifo_lines);
+  t.fifo_cogs_iqd = Math.max(0, t.fifo_cogs_iqd);
   t.estimated = t.estimated_lines > 0;
   return t;
 }
@@ -1386,6 +1555,8 @@ function addSale(t: Totals, f: SaleFact): void {
   t.estimated_cogs_iqd += f.estimated_cogs_iqd;
   t.uncosted_lines += f.uncosted_lines;
   t.uncosted_units += f.uncosted_units;
+  t.fifo_lines += f.fifo_lines;
+  t.fifo_cogs_iqd += f.fifo_cogs_iqd;
 }
 
 /**
@@ -1412,6 +1583,8 @@ function addRefund(t: Totals, f: RefundFact): void {
   t.estimated_lines -= f.estimated_lines;
   t.estimated_units -= f.estimated_units;
   t.estimated_cogs_iqd -= f.estimated_cogs_iqd;
+  t.fifo_lines -= f.fifo_lines;
+  t.fifo_cogs_iqd -= f.fifo_cogs_iqd;
 }
 
 // ------------------------------------------------------------- the reports
@@ -1518,6 +1691,14 @@ export interface ReportMeta {
   scope: 'levonis_own_sales';
   /** False when migration 0095 has not landed: every cost is an estimate. */
   cost_snapshot_available: boolean;
+  /**
+   * False when migration 0098 has not landed, so no sale can be costed from
+   * the lots it ate. It is a statement about the MECHANISM: the screen may
+   * only claim a FIFO basis when this is true AND `totals.fifo_lines` is
+   * non-zero, because a shop whose stock all predates 0098 has the machinery
+   * and nothing for it to read.
+   */
+  fifo_available: boolean;
   /** False when there is no expense ledger: net profit equals gross profit. */
   operating_expenses_available: boolean;
   /** Delivered orders in no bucket at all, whatever the range (§1). */
@@ -1651,6 +1832,7 @@ export function buildPeriodReport(input: ReportInput): PeriodReport {
       currency: 'IQD',
       scope: 'levonis_own_sales',
       cost_snapshot_available: input.schema.has0095,
+      fifo_available: input.schema.hasFifo,
       operating_expenses_available: input.schema.has0095,
       unrecognized_orders: input.unrecognizedOrders,
       unbucketed,

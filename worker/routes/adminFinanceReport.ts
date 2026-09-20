@@ -166,9 +166,22 @@ async function columnsOf(db: D1Database, table: string): Promise<Set<string>> {
  */
 export async function probeSchema(db: D1Database): Promise<SchemaFacts> {
   if (schemaMemo) return schemaMemo;
-  const items = await columnsOf(db, 'order_items');
-  const facts: SchemaFacts = { has0095: items.has('cost_basis') && items.has('cost_iqd') };
-  if (facts.has0095) schemaMemo = facts;
+  // 0098's witness is its own, read in parallel: a database can have 0095 and
+  // not 0098 (every database did, until 0098 ran), so one flag cannot stand in
+  // for the other. `columnsOf` answers an empty set for a table that is not
+  // there, which is exactly the signal wanted.
+  const [items, allocations] = await Promise.all([
+    columnsOf(db, 'order_items'),
+    columnsOf(db, 'order_item_inventory_allocations'),
+  ]);
+  const facts: SchemaFacts = {
+    has0095: items.has('cost_basis') && items.has('cost_iqd'),
+    hasFifo: allocations.has('cogs_iqd') && allocations.has('released_at'),
+  };
+  // MEMOISED ONLY WHEN BOTH ARE TRUE. Caching a `hasFifo: false` taken during
+  // the minute between the deploy and its migration would keep this isolate
+  // reporting snapshot costs long after the lots were there to read.
+  if (facts.has0095 && facts.hasFifo) schemaMemo = facts;
   return facts;
 }
 
@@ -433,6 +446,10 @@ const metaFor = (schema: SchemaFacts) => ({
   currency: 'IQD' as const,
   scope: 'levonis_own_sales' as const,
   cost_snapshot_available: schema.has0095,
+  // «محسوبة حسب دفعات الشراء». The screen may only claim a FIFO basis when
+  // this is true AND `fifo_lines` is non-zero — the flag says the mechanism
+  // exists, the count says it answered.
+  fifo_available: schema.hasFifo,
   /** Stated even though a breakdown has no net profit, so a client cannot
    *  infer that the absent net figure means the expenses were zero. */
   net_profit_is_period_only: true,
