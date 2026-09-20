@@ -303,3 +303,99 @@ Stated so that a future reader does not "fix" their absence:
 - **No inventory in the operating-expense ledger** (§70). Buying ten printers is
   an asset movement; it becomes COGS as units sell. Mixing the two would
   misstate a month's profit by the size of a shipment.
+
+---
+
+## 13. DECISIONS MADE WHILE BUILDING, AND WHY
+
+The twelve above were written before any schema. These were forced by the code
+itself, and are recorded here because each one is a place where the obvious
+implementation is wrong.
+
+**DECISION 13 — an idempotency anchor is inserted HARD, never `OR IGNORE`.**
+
+Four places wrote the same shape, and it looks safe:
+
+```sql
+INSERT OR IGNORE INTO <anchor> ...          -- silently no-ops on a repeat
+UPDATE <counter> SET n = n + ?
+ WHERE ... AND EXISTS (SELECT 1 FROM <anchor> WHERE ...)
+```
+
+On a replay that `EXISTS` is TRUE — because the FIRST run wrote the row — so
+the counter moves a second time. `EXISTS (the row)` cannot distinguish "I
+inserted it just now" from "it was already there", which is the one question it
+is being asked. A hard `INSERT` can: the duplicate raises, D1 discards the whole
+batch, and nothing happens.
+
+So `planReceive` (the receipt), `planAdjustmentLedger` (the ledger row),
+`planLotConsumption` (the allocation) and `planLotRestore` (the release row) all
+insert their anchor hard. Read-before-write stays where it already existed, as a
+courtesy that avoids a needless exception on an ordinary retry — never as the
+guard, because two callers can both read "not yet" before either writes.
+
+**DECISION 14 — a guard that can silently no-op is replaced by a constraint
+that aborts.**
+
+`AND qty_received + ? <= qty_ordered` and `AND stock >= ?` each turned an
+over-large write into a statement that changed nothing while its neighbours
+changed everything: one event, three records, three different stories. Both are
+gone. `CHECK (qty_received <= qty_ordered)` and
+`CHECK (stock IS NULL OR stock >= 0)` — already on the tables — take the batch
+down instead, and the routes read first so the admin gets a sentence
+(`INSUFFICIENT_STOCK`, with the number they are arguing with) rather than a 500.
+
+**DECISION 15 — FIFO COGS is a LINE TOTAL and is never divided.**
+
+§81: ten at 450,000, ten at 560,000, twelve sold → 5,620,000. There is no unit
+cost that produces it. 5,620,000 / 12 is 468,333.33, and twelve of any whole
+dinar figure is 5,619,996 or 5,620,008. So the finance report carries the total
+whole, which is also why it could not be folded into `costValueSql`'s unit-cost
+ladder and needed its own expression beside it.
+
+**DECISION 16 — FIFO declines to answer rather than answer partly.**
+
+Three conditions, all required: allocations exist, they cover the WHOLE line,
+and every lot they touched has a known cost. Any one failing falls back to the
+snapshot ladder. A partial allocation prices part of a sale, and half a cost
+reported as the cost is worse than the snapshot it would replace.
+
+**DECISION 17 — a PARTIAL refund apportions, and says so.**
+
+A full return reverses the exact total. A partial one cannot: a return case
+names a QUANTITY, not which units. Three of twelve came back and nobody knows
+which three, so the figure is a stated share — computed the same way the refund
+REVENUE beside it already is. Walking the FIFO queue for those three would be a
+more precise-looking lie.
+
+**DECISION 18 — the assistant-admin gate is per FIELD, so the DOOR stays open.**
+
+Unlike finance, which refuses an assistant outright because there is no useful
+non-financial part of a profit report, §52 has them running the warehouse all
+day. So `/api/admin/inventory` is declared `admin` at the edge and
+`projectForAdmin` strips `FINANCIAL_FIELDS` from every payload. The tables
+respond by dropping whole COLUMNS rather than printing dashes that advertise
+what is behind them. The one exception is the profit preview, which has no
+content left once the money is removed and is refused outright.
+
+**DECISION 19 — three states of a cost, rendered as three different things.**
+
+`undefined` = the server removed it (render nothing). `null` = nobody knows
+(render «غير معروفة», because the owner must see how much of the valuation is
+missing). `0` = it was free. One component, `Money`, gets this right and every
+cost on every screen goes through it.
+
+**DECISION 20 — the receipt id is the CLIENT's, one per press of the button.**
+
+Minted in the browser when the confirm dialog opens and reused for every retry
+of that press. A server-minted id differs on every attempt, which is exactly how
+one press becomes two receipts.
+
+**DECISION 21 — an import sheet merges dimensions PER KEY.**
+
+Eight nulls from a sheet written before those columns existed would wipe every
+measurement in the catalogue the first time an old file was re-imported. So a
+null keeps what is stored and only a stated number changes anything. Clearing a
+measurement is therefore not expressible in a sheet, which is the right trade:
+a mis-measured box is corrected by measuring it again, and there is no reason to
+un-know a weight.
