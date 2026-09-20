@@ -43,7 +43,9 @@ name: 51 - Auto-apply migrations on push (live database)
 on:
   push:
     branches: [claude/kind-bardeen-20sn98]
-    paths: ['migrations/**']
+    paths:
+      - 'migrations/**'
+      - '.github/workflows/auto-migrate-on-push.yml'
   # So the mechanism can be exercised without inventing a migration, and so a
   # run that failed can be retried without an empty commit.
   workflow_dispatch:
@@ -110,8 +112,24 @@ jobs:
             | jq -r '.[0].results[].name' | tee /tmp/before.txt
           echo "count=$(wc -l < /tmp/before.txt)" >> "$GITHUB_OUTPUT"
 
+      # `d1 migrations apply --remote` sends the whole migration through the
+      # synchronous /query endpoint. D1 parses 0099 as incomplete input there,
+      # even though Wrangler's local D1 engine and SQLite both accept it. The
+      # file-ingest endpoint is the supported atomic path for a SQL file: the
+      # schema and its bookkeeping row commit together, or D1 restores the
+      # database to its pre-import state. Once 0099 is recorded, the ordinary
+      # migrations command remains responsible for every later file.
       - name: Apply
-        run: npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
+        run: |
+          set -euo pipefail
+          MIGRATION_NAME=0099_product_media_dimensions.sql
+          if ! grep -Fxq "$MIGRATION_NAME" /tmp/before.txt; then
+            BUNDLE_PATH=$(mktemp /tmp/levonis-0099-apply.XXXXXX.sql)
+            cp "migrations/$MIGRATION_NAME" "$BUNDLE_PATH"
+            printf "\nINSERT INTO d1_migrations (name) VALUES ('%s');\n" "$MIGRATION_NAME" >> "$BUNDLE_PATH"
+            npx wrangler d1 execute levonis-db-staging --remote --env staging --file "$BUNDLE_PATH"
+          fi
+          npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
 
       - name: What is applied, after — and is the data still there
         id: after
