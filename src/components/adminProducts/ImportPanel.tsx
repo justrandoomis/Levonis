@@ -1174,7 +1174,7 @@ async function applyTxt(ready: CheckedItem[], t: Strings, choice: DuplicateChoic
     // server stated 0.
     let outcome: ApplyOutcome;
     try {
-      const out = await api.post<ApplyResponse>('/api/admin/template/apply', {
+      const out = await applyTxtItem({
         text: item.text,
         mode: item.action === 'update' ? 'update' : 'draft',
         confirm: true,
@@ -1189,6 +1189,57 @@ async function applyTxt(ready: CheckedItem[], t: Strings, choice: DuplicateChoic
     summary[outcome.action] += 1;
   }
   return { summary, rows, duplicates, review: undefined as string[] | undefined, importId: undefined as string | undefined };
+}
+
+interface ApplyStatusResponse {
+  success: true;
+  state: 'applying' | 'applied' | 'retry';
+  retry_after_ms?: number;
+}
+
+const APPLY_STATUS_FALLBACK_MS = 1500;
+
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * A TXT apply can legitimately outlive the API client's ordinary 20-second
+ * interaction deadline while remote images are fetched and converted. Keep
+ * that request alive, and if this browser is recovering a request that was
+ * already accepted, follow the server's read-only status until the same POST
+ * can return its verified result. The fingerprint fence still owns all write
+ * safety; the browser never guesses that a timed-out write failed.
+ */
+async function applyTxtItem(payload: {
+  text: string;
+  mode: 'draft' | 'update';
+  confirm: true;
+  duplicate_choice: DuplicateChoice | undefined;
+}): Promise<ApplyResponse> {
+  for (;;) {
+    try {
+      return await api.post<ApplyResponse>('/api/admin/template/apply', payload, { timeoutMs: 0 });
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.code !== 'APPLY_IN_PROGRESS') throw error;
+      const fingerprint = typeof error.body?.fingerprint === 'string' ? error.body.fingerprint : '';
+      if (!/^[a-f0-9]{32}$/.test(fingerprint)) throw error;
+
+      for (;;) {
+        const status = await api.get<ApplyStatusResponse>(
+          `/api/admin/template/apply-status/${encodeURIComponent(fingerprint)}`,
+          { mascot: 'silent' }
+        );
+        if (status.state !== 'applying') break;
+        const retryAfter =
+          typeof status.retry_after_ms === 'number' && Number.isFinite(status.retry_after_ms)
+            ? Math.max(500, Math.min(5000, status.retry_after_ms))
+            : APPLY_STATUS_FALLBACK_MS;
+        await wait(retryAfter);
+      }
+      // `applied` is replayed by /apply with the authoritative read-back;
+      // `retry` means the previous owner released/expired without a result.
+      // Both safely converge by posting the identical fingerprint once more.
+    }
+  }
 }
 
 /**
