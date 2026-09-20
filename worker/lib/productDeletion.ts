@@ -113,6 +113,13 @@ export const OWNED_TABLES: OwnedTable[] = [
   { table: 'product_translations', by: { column: 'product_id' } },
   // ---- stock and pricing history owned by the product --------------------
   { table: 'inventory_ledger', by: { column: 'product_id' } },
+  /**
+   * 0098 — a reorder threshold and a supplier lead time. Pure configuration:
+   * it describes how to RESTOCK a product, so a deleted product's row is
+   * advice about nothing. It has no financial content, which is what separates
+   * it from the lots below.
+   */
+  { table: 'inventory_reorder_settings', by: { column: 'product_id' } },
   { table: 'price_history', by: { column: 'product_id' } },
   // A competitor-price report (0093) is OWNED and not HISTORY, and the choice
   // is forced twice over. `product_id` is NOT NULL, so there is nothing to
@@ -189,6 +196,22 @@ export const HISTORY_TABLES: HistoryTable[] = [
    * (`ON DELETE SET NULL`).
    */
   { table: 'print_materials', columns: ['product_id'] },
+  /**
+   * 0098 — THE COST HISTORY OF UNITS THAT WERE REALLY SOLD.
+   *
+   * §56: "Historical financial allocations must not disappear merely because
+   * the product is later removed from the catalogue." A lot is pointed at by
+   * `order_item_inventory_allocations`, and each of those rows is the only
+   * record of what one sold unit actually cost. Cascading the lot away would
+   * take the meaning of last quarter's gross profit with it — the report would
+   * still render, and its COGS would silently become unknown.
+   *
+   * So the pointer is cleared and the row stays, exactly like a warranty
+   * receipt. `product_id` is nullable on both tables for this reason, and the
+   * schema says so rather than relying on this list alone.
+   */
+  { table: 'inventory_lots', columns: ['product_id'] },
+  { table: 'incoming_inventory', columns: ['product_id'] },
 ];
 
 /**
@@ -222,6 +245,21 @@ export const FROZEN_HISTORY: FrozenTable[] = [
     table: 'mystery_draw_audits',
     columns: ['offer_product_id'],
     why: 'A tamper-evident draw record keyed to an order; it lives and dies with that order, not with the product.',
+  },
+  {
+    table: 'order_item_inventory_allocations',
+    columns: ['order_item_id', 'lot_id', 'scope', 'scope_id'],
+    why:
+      '0098. Part of the ORDER record, like pricing_snapshot: it states which cost layers one sold line ate and ' +
+      'what each unit cost at that moment. Every column is NOT NULL, it carries its own unit_cost_iqd rather than ' +
+      'joining the lot for it, and it is deleted only with its order — never with the product.',
+  },
+  {
+    table: 'incoming_inventory_receipts',
+    columns: ['incoming_id', 'lot_id'],
+    why:
+      '0098. The audit trail of a physical receipt, keyed to the purchase and the lot it created and to neither of ' +
+      'them a product. §55: once a purchase has received stock its history is not hard-deleted.',
   },
   {
     table: 'mystery_allocations',

@@ -35,6 +35,23 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // to the same owner as the option rows they hang off.
     'product_option_fulfillment', 'product_option_transports',
     'product_imports', 'price_history', 'inventory_ledger', 'catalogs', 'brands', 'facets', 'hashtags', 'bundles', 'bundle_items',
+    /**
+     * 0098 — THE COST LAYERS UNDER THE STOCK COUNTERS.
+     *
+     * `inventory_ledger` is already Catalogue's, and these are the same
+     * question one level down: the ledger records that four units moved, and a
+     * lot records what those four units cost to acquire. They hang off exactly
+     * the identity the ledger names — (scope, scope_id) — so splitting them
+     * from it would put one shelf under two owners.
+     *
+     * `incoming_inventory` is a PURCHASE and could argue for an owner of its
+     * own. It does not get one, because this file's tie-break is ownership
+     * follows THE WRITER: the only thing that ever writes it is the act of
+     * receiving stock, which is a catalogue-stock write, and the only thing
+     * that reads it is the same admin screen that reads the lots.
+     */
+    'inventory_lots', 'incoming_inventory', 'incoming_inventory_receipts',
+    'inventory_suppliers', 'inventory_reorder_settings',
     // 0093 — «لكيتها بمكان أرخص». A customer's report that a competitor sells
     // this product for less, with OUR price frozen into the row at the moment
     // it was filed.
@@ -68,6 +85,17 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // The buyer's choices behind one bundle cart line, and the fence that makes a
     // partial inventory movement impossible inside the order's own batch (§1.5, §1.7).
     'cart_bundle_choices', 'order_reservation_fence',
+    /**
+     * 0098 — WHICH COST LAYERS ONE SOLD LINE ACTUALLY ATE.
+     *
+     * Commerce's and not Catalogue's, although it points at `inventory_lots`.
+     * The row is part of the ORDER RECORD: it sits beside `pricing_snapshot`
+     * and `option_snapshot` as a frozen fact about what was sold, it is written
+     * once by the deduction inside the order's own batch, and it is never
+     * rewritten when the catalogue changes. That is the same reason
+     * `order_items` is here while `products` is not.
+     */
+    'order_item_inventory_allocations',
     // The one promotion model (§1.8): entity-attached windows, limits and
     // redemptions, beside the code-entry mechanism `coupons` already here.
     'offer_windows', 'offer_limits', 'offer_redemptions',

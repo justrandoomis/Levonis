@@ -326,6 +326,11 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'farm_ledger.idempotency_key': 'request de-duplication token',
   'farm_requests.idempotency_key': 'request de-duplication token',
   'inventory_ledger.idempotency_key': 'request de-duplication token',
+  // 0098 — the same token shape, on the two tables the FIFO inventory layer
+  // makes idempotent: a receipt (a double-tapped Receive) and a lot allocation
+  // (a replayed deduction).
+  'incoming_inventory_receipts.idempotency_key': 'request de-duplication token',
+  'order_item_inventory_allocations.idempotency_key': 'request de-duplication token',
   'merchant_payout_ledger.idempotency_key': 'request de-duplication token',
   'orders.idempotency_key': 'request de-duplication token',
   'orders.client_idempotency_key': 'request de-duplication token',
