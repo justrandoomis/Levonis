@@ -1,0 +1,181 @@
+# Applies new migrations to levonis-db-staging — the database behind
+# levonis-iq.com — AUTOMATICALLY, on every push that adds one.
+#
+# ---------------------------------------------------------------------------
+# THE FAULT THIS CLOSES, WHICH HAS TAKEN THE SITE DOWN TWICE.
+#
+# Code and schema ship by two different mechanisms. A push to the live branch
+# redeploys the Worker on its own; the migrations did NOT follow it — workflow
+# 6 applied them, and only when a human remembered to run it. So every feature
+# with a new table reached the live site as code reading tables that did not
+# exist, and stayed that way until somebody noticed a broken screen. Measured
+# on 2026-09-20: `/api/health` reported `behind: 2` with 0095 and 0096 sitting
+# unapplied while the Worker already expected them.
+#
+# WHY THIS IS SAFE TO AUTOMATE, stated as the three properties it rests on:
+#
+#   1. THE MIGRATIONS ARE ADDITIVE. Nothing in migrations/ drops a table or a
+#      column; the schema only grows. Applying one early is a no-op for the
+#      code that has not shipped yet.
+#   2. IT IS PROVEN ON A THROWAWAY DATABASE FIRST, in this job, before the live
+#      one is opened at all — `scripts/migrate-check.mjs --twice` applies every
+#      file to a fresh SQLite, applies the newest a second time, and compares
+#      the affected tables row by row. A migration that is wrong fails here.
+#   3. IT IS REVERSIBLE FOR 30 DAYS. A D1 Time Travel bookmark is recorded
+#      before anything is applied and printed in the job summary.
+#
+# WHY IT IS `paths: migrations/**`. Most pushes add no migration, and a job
+# that opens the live database on every commit is a job whose failures stop
+# meaning anything. On a push with no new file this workflow does not run at
+# all; `migrations apply` on an up-to-date database would be a no-op anyway.
+#
+# WHAT IT DELIBERATELY DOES NOT DO: deploy, set vars, write test data, or touch
+# R2 or DNS — the same boundary workflow 6 draws, and for the same reasons
+# (wrangler replaces a Worker's plain-text vars wholesale on every deploy).
+#
+# WORKFLOW 6 STAYS. This is the automatic path; that one is the hand crank, for
+# a database that drifted for any reason this never saw — including this
+# workflow failing. And when it does fail, the Worker's own cron says so:
+# worker/lib/schemaDriftAlarm.ts messages the admin Telegram group, on a path
+# that shares no infrastructure with GitHub Actions.
+name: 51 - Auto-apply migrations on push (live database)
+
+on:
+  push:
+    branches: [claude/kind-bardeen-20sn98]
+    paths: ['migrations/**']
+  # So the mechanism can be exercised without inventing a migration, and so a
+  # run that failed can be retried without an empty commit.
+  workflow_dispatch:
+
+# The same group workflow 6 and the deploy workflows use: two runs must never
+# open `migrations apply` on the same database at once.
+concurrency: staging-deploy
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      # Property 2. Before the live database is opened at all.
+      - name: Prove the migrations on a throwaway database first
+        run: node scripts/migrate-check.mjs --twice
+
+      # The code's own idea of the newest migration must match the files, or
+      # the drift alarm this workflow is paired with would read a stale
+      # constant and report a healthy database as behind — or worse, a behind
+      # one as healthy. It is one assertion and it costs a second.
+      - name: The schema-version constants match the files
+        run: npx tsx --test tests/schemaVersion.test.ts
+
+      # wrangler.jsonc ships `STAGING-DB-ID-PLACEHOLDER`; the real uuid is never
+      # committed, and `migrations apply --env staging` reads that binding.
+      - name: Resolve the live database id into wrangler.jsonc
+        id: db
+        run: |
+          set -e
+          ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="levonis-db-staging") | .uuid')
+          [ -n "$ID" ] || { echo "::error::levonis-db-staging not found in this account"; exit 1; }
+          echo "::add-mask::$ID"
+          echo "staging_db_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Fill it in
+        env:
+          STAGING_DB_ID: ${{ steps.db.outputs.staging_db_id }}
+        run: node scripts/set-deploy-ids.mjs --env staging
+
+      # Property 3. Recorded BEFORE anything is applied.
+      - name: Record a Time Travel bookmark (restore point)
+        id: bookmark
+        run: |
+          set -e
+          npx wrangler d1 time-travel info levonis-db-staging 2>&1 | tee /tmp/tt.txt
+          BM=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}' /tmp/tt.txt | head -1 || true)
+          echo "bookmark=${BM:-see-log}" >> "$GITHUB_OUTPUT"
+
+      - name: What is applied, before
+        id: before
+        run: |
+          npx wrangler d1 execute levonis-db-staging --remote --json \
+            --command "SELECT name FROM d1_migrations ORDER BY name" \
+            | jq -r '.[0].results[].name' | tee /tmp/before.txt
+          echo "count=$(wc -l < /tmp/before.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Apply
+        run: npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
+
+      - name: What is applied, after — and is the data still there
+        id: after
+        run: |
+          set -e
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
+          q "SELECT name FROM d1_migrations ORDER BY name" | jq -r '.[0].results[].name' > /tmp/after.txt
+          echo "count=$(wc -l < /tmp/after.txt)" >> "$GITHUB_OUTPUT"
+          echo "── newly applied"
+          comm -13 /tmp/before.txt /tmp/after.txt
+          echo "── rows still there"
+          for t in users products orders memberships; do
+            echo "$t: $(q "SELECT COUNT(*) AS n FROM $t" | jq -r '.[0].results[0].n')"
+          done
+          echo "── integrity"
+          q "PRAGMA foreign_key_check" | jq -r '.[0].results | length | "foreign_key_check rows: \(.)"'
+
+      # THE ONLY CHECK THAT ACTUALLY ANSWERS THE QUESTION. Everything above
+      # proves the migration ran; this proves the site the migration was for is
+      # serving. `/api/health` reports the drift in the Worker's own words, so a
+      # state that is not `current` here means the job succeeded and the fault
+      # it exists to prevent is still present.
+      - name: The live site agrees it is current
+        id: probe
+        run: |
+          set -e
+          state=unreachable
+          for i in $(seq 1 10); do
+            body=$(curl -s --max-time 25 "https://levonis-iq.com/api/health" || true)
+            state=$(echo "$body" | jq -r '.schema.state // "unreachable"' 2>/dev/null || echo unreachable)
+            echo "attempt $i: $state"
+            [ "$state" = "current" ] && break
+            sleep 15
+          done
+          echo "$body" | jq -c '.schema' || true
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+          # `ahead` is a pass: the database may legitimately carry a migration
+          # the DEPLOYED Worker does not know about yet, because Cloudflare's
+          # build of this same push can land after this job. It is `behind`
+          # that is the fault, and `unknown`/`unreachable` that hide it.
+          case "$state" in
+            current|ahead) ;;
+            *) echo "::error::/api/health reports schema state '$state' after applying"; exit 1 ;;
+          esac
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 "https://levonis-iq.com/api/products?limit=3")
+          echo "/api/products -> $code"
+          [ "$code" = "200" ] || { echo "::error::/api/products answered $code"; exit 1; }
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Live database migration"
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Trigger | ${{ github.event_name }} |"
+            echo "| Restore bookmark (30-day Time Travel) | \`${{ steps.bookmark.outputs.bookmark }}\` |"
+            echo "| Applied before | ${{ steps.before.outputs.count }} |"
+            echo "| Applied after | ${{ steps.after.outputs.count }} |"
+            echo "| /api/health schema.state | ${{ steps.probe.outputs.state }} |"
+            echo ""
+            echo "Restore command if ever needed:"
+            echo '```'
+            echo "wrangler d1 time-travel restore levonis-db-staging --bookmark ${{ steps.bookmark.outputs.bookmark }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

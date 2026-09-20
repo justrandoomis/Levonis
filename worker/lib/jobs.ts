@@ -28,6 +28,7 @@ import {
   type StockAlertPruneReport,
 } from './stockAlerts';
 import { runGuardedMediaCleanup } from './mediaRefs';
+import { checkSchemaDrift, type DriftAlarmReport } from './schemaDriftAlarm';
 import { planSearchIndex, searchIndexInstalled } from './search/store';
 import { toSearchDoc } from './search/document';
 
@@ -153,6 +154,12 @@ export interface DurableJobsReport {
     retrying: number;
     refusals: string[];
   };
+  /**
+   * The watchdog on code-versus-schema drift. `null` only if the step threw,
+   * which `step()` also records in `errors` — a report that says nothing about
+   * the watchdog is a report that cannot tell "no drift" from "never ran".
+   */
+  schema_drift: DriftAlarmReport | null;
   errors: string[];
 }
 
@@ -189,6 +196,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     stock_alert_prune: { deleted: 0, bound_hit: false },
     outbox_final: { sent: 0, failed: 0 },
     media_cleanup: { attempted: 0, deleted: 0, still_referenced: 0, dead_lettered: 0, retrying: 0, refusals: [] },
+    schema_drift: null,
     errors: [],
   };
 
@@ -577,6 +585,23 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
       retrying: outcome.retrying.length,
       refusals: outcome.refusals,
     };
+  });
+
+  /**
+   * THE WATCHDOG, LAST AND ON PURPOSE.
+   *
+   * Last because it must not consume budget a customer's notification needs,
+   * and because it depends on nothing above it. Its own step, because a
+   * watchdog that can take the outbox down with it has made the reliability
+   * worse than the fault it watches for.
+   *
+   * It reads `d1_migrations` and `admin_settings` — D1's own table and one that
+   * has existed since migration 0001 — so it still works in precisely the
+   * condition it reports, a database behind the code. See
+   * worker/lib/schemaDriftAlarm.ts.
+   */
+  await step('schema_drift', async () => {
+    report.schema_drift = await checkSchemaDrift(env);
   });
 
   return report;
