@@ -206,7 +206,13 @@
           "/bundles/*",
           "/p/*",
           "/community/store/*",
-          "/manifest.webmanifest"
+          "/manifest.webmanifest",
+          // Per-host robots.txt and sitemap.xml — worker/routes/seo.ts. These
+          // MUST be repeated here: `run_worker_first` is not inherited, and
+          // levonis-iq.com is served by env.staging, so the top-level copy
+          // alone left both routes as dead code in production.
+          "/robots.txt",
+          "/sitemap.xml"
         ]
       },
       "d1_databases": [
@@ -282,7 +288,13 @@
           "/bundles/*",
           "/p/*",
           "/community/store/*",
-          "/manifest.webmanifest"
+          "/manifest.webmanifest",
+          // Per-host robots.txt and sitemap.xml — worker/routes/seo.ts. These
+          // MUST be repeated here: `run_worker_first` is not inherited, and
+          // levonis-iq.com is served by env.staging, so the top-level copy
+          // alone left both routes as dead code in production.
+          "/robots.txt",
+          "/sitemap.xml"
         ]
       },
       "workers_dev": false,

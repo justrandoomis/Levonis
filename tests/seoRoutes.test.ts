@@ -131,7 +131,7 @@ test('a merchant subdomain names ITSELF, never the platform', async () => {
   const a = app(asD1(raw), merchant);
 
   const { body } = await fetchText(a, '/sitemap.xml', merchant);
-  assert.match(body, new RegExp(`<loc>https://${merchant}/product/pla-matte</loc>`));
+  assert.match(body, new RegExp(`<loc>https://${merchant}/</loc>`));
   assert.doesNotMatch(
     body,
     new RegExp(`<loc>${ORIGIN}/`),
@@ -140,6 +140,65 @@ test('a merchant subdomain names ITSELF, never the platform', async () => {
 
   const robots = await fetchText(a, '/robots.txt', merchant);
   assert.match(robots.body, new RegExp(`^Sitemap: https://${merchant}/sitemap\\.xml$`, 'm'));
+});
+
+/**
+ * THE FIRST VERSION OF THIS FILE SHIPPED THIS BUG. It listed the PLATFORM's
+ * whole `products` catalogue on every host, so `ali3d.levonis-iq.com/sitemap
+ * .xml` advertised hundreds of `/product/<slug>` URLs that are neither that
+ * merchant's products nor even routes on that host.
+ */
+test('a merchant advertises its OWN catalogue, not the platform\'s', async () => {
+  const raw = freshDb();
+  seedProducts(raw);
+  const merchant = `ali3d.${APEX}`;
+  const a = app(asD1(raw), merchant);
+  const { body } = await fetchText(a, '/sitemap.xml', merchant);
+
+  assert.doesNotMatch(body, /\/product\//, 'the platform product route does not exist on a merchant host');
+  assert.doesNotMatch(body, /pla-matte|bambu-a1/, 'and the platform catalogue is not theirs to advertise');
+  for (const path of ['/compare', '/tools', '/bundles', '/used-printers', '/support', '/community']) {
+    assert.doesNotMatch(
+      body,
+      new RegExp(`<loc>https://${merchant}${path}</loc>`),
+      `${path} is not a route on a merchant host — listing it advertises a duplicate of their home page`
+    );
+  }
+});
+
+/**
+ * `/warranty` sits behind ProtectedRoute in src/App.tsx. The first version of
+ * this file listed it, breaking the rule its own comment states.
+ */
+test('no path behind a session is advertised to a crawler', async () => {
+  const a = app(asD1(freshDb()), APEX);
+  const { body } = await fetchText(a, '/sitemap.xml', APEX);
+  assert.doesNotMatch(body, /<loc>[^<]*\/warranty<\/loc>/);
+});
+
+/**
+ * THE MISS THAT MADE THE WHOLE FEATURE DEAD CODE, and the reason this test
+ * exists rather than the one in securityPolicy.test.ts alone.
+ *
+ * `run_worker_first` is declared three times — top level, env.staging and
+ * env.production — and it is NOT inherited. levonis-iq.com is served by
+ * `levonis-staging`, deployed with `--env staging`. Updating only the
+ * top-level copy left the asset layer answering both files with the SPA shell
+ * in production, and the existing allowlist test could not see it: it asserts
+ * that every route present IS allowed, never that the three blocks AGREE.
+ */
+test('every environment routes these two files through the Worker, or they are dead code', () => {
+  const wrangler = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+  const blocks = wrangler.match(/"run_worker_first"\s*:\s*\[[^\]]*\]/g) ?? [];
+  assert.equal(blocks.length, 3, 'top-level, staging and production each declare it');
+  for (const [i, block] of blocks.entries()) {
+    for (const path of ['/robots.txt', '/sitemap.xml']) {
+      assert.ok(
+        block.includes(`"${path}"`),
+        `block ${i} does not route ${path} through the Worker — the asset layer will answer it with index.html`
+      );
+    }
+  }
 });
 
 /**

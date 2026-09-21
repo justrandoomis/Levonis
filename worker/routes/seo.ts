@@ -75,22 +75,44 @@ const DISALLOWED: readonly string[] = [
 ];
 
 /**
- * The public, indexable surfaces of the storefront. Only paths a signed-out
- * visitor can actually read — a sitemap that lists a page requiring a session
- * teaches the crawler to distrust the rest of it.
+ * The public, indexable surfaces OF THE PLATFORM — the apex only.
+ *
+ * Only paths a signed-out visitor can actually read. A sitemap that lists a
+ * page requiring a session teaches the crawler to distrust the rest of it, and
+ * `/warranty` is exactly that trap: it is behind `ProtectedRoute` in
+ * src/App.tsx, so it was removed from this list rather than advertised.
  */
-const STATIC_PATHS: readonly string[] = [
+const PLATFORM_PATHS: readonly string[] = [
   '/',
   '/products',
   '/bundles',
   '/compare',
   '/tools',
   '/used-printers',
-  '/warranty',
   '/community',
   '/support',
-  '/points',
 ];
+
+/**
+ * A MERCHANT SUBDOMAIN IS A DIFFERENT SITE, AND IT HAS A DIFFERENT MAP.
+ *
+ * The first version of this file listed `PLATFORM_PATHS` and the whole
+ * `products` catalogue on EVERY host, which was wrong twice over and would
+ * have been actively harmful:
+ *
+ *   `/compare`, `/tools`, `/bundles` and the rest are not routes on a merchant
+ *   subdomain — src/App.tsx serves the storefront shell there — so each one
+ *   would have been a 200 DUPLICATE of the merchant's home page, which is how
+ *   a site teaches Google that its pages are interchangeable.
+ *
+ *   `/product/<slug>` is the PLATFORM's product route. Listing the platform's
+ *   entire catalogue under `ali3d.levonis-iq.com` advertises hundreds of URLs
+ *   that are not that merchant's, on a hostname that is.
+ *
+ * A merchant's own storefront is its home page and its own published products
+ * at `/p/<slug>`, and nothing else.
+ */
+const MERCHANT_PATHS: readonly string[] = ['/'];
 
 function xmlEscape(value: string): string {
   return value
@@ -220,33 +242,60 @@ export async function sitemapRoute(c: Context<AppContext>): Promise<Response> {
   // listed.
   if (!origin || (host.kind !== 'main' && host.kind !== 'merchant')) return answer();
 
-  for (const path of STATIC_PATHS) {
+  const merchant = host.kind === 'merchant' && host.slug ? host.slug : '';
+  for (const path of merchant ? MERCHANT_PATHS : PLATFORM_PATHS) {
     urls.push({ loc: `${origin}${path}`, lastmod: '', priority: path === '/' ? '1.0' : '0.7' });
   }
 
   /**
-   * THE CATALOGUE. Active, non-composition products, newest first, capped.
+   * THE CATALOGUE — this host's own, and never the other one's.
    *
    * Contained on purpose: a sitemap that 500s is a Search Console error, and a
    * sitemap missing its products is still a valid sitemap that lists the
-   * shop's main pages. So a D1 failure degrades to the static list above
-   * rather than taking the document down.
+   * shop's main pages. So a D1 failure degrades to the paths above rather than
+   * taking the document down.
    */
   try {
-    const { results } = await c.env.DB.prepare(
-      `SELECT slug, updated_at FROM products
-        WHERE status = 'active' AND slug <> ''
-        ORDER BY updated_at DESC
-        LIMIT ${MAX_SITEMAP_URLS}`
-    ).all<SitemapRow>();
-    for (const row of results ?? []) {
-      const slug = String(row.slug ?? '').trim();
-      if (!slug) continue;
-      urls.push({
-        loc: `${origin}/product/${encodeURIComponent(slug)}`,
-        lastmod: lastmodOf(row.updated_at),
-        priority: '0.8',
-      });
+    if (merchant) {
+      // Scoped through `merchant_stores.slug`, and narrowed by the SAME
+      // `lifecycle = 'active' AND status = 'active'` pair the storefront's own
+      // listing uses (worker/routes/storefront.ts) — a sitemap that advertises
+      // a draft is a sitemap that advertises a 404.
+      const { results } = await c.env.DB.prepare(
+        `SELECT p.slug AS slug, p.updated_at AS updated_at
+           FROM community_products p
+           JOIN merchant_stores s ON s.id = p.store_id
+          WHERE s.slug = ? AND p.lifecycle = 'active' AND p.status = 'active' AND p.slug <> ''
+          ORDER BY p.updated_at DESC
+          LIMIT ${MAX_SITEMAP_URLS}`
+      )
+        .bind(merchant)
+        .all<SitemapRow>();
+      for (const row of results ?? []) {
+        const slug = String(row.slug ?? '').trim();
+        if (!slug) continue;
+        urls.push({
+          loc: `${origin}/p/${encodeURIComponent(slug)}`,
+          lastmod: lastmodOf(row.updated_at),
+          priority: '0.8',
+        });
+      }
+    } else {
+      const { results } = await c.env.DB.prepare(
+        `SELECT slug, updated_at FROM products
+          WHERE status = 'active' AND slug <> ''
+          ORDER BY updated_at DESC
+          LIMIT ${MAX_SITEMAP_URLS}`
+      ).all<SitemapRow>();
+      for (const row of results ?? []) {
+        const slug = String(row.slug ?? '').trim();
+        if (!slug) continue;
+        urls.push({
+          loc: `${origin}/product/${encodeURIComponent(slug)}`,
+          lastmod: lastmodOf(row.updated_at),
+          priority: '0.8',
+        });
+      }
     }
   } catch (e) {
     console.error('sitemap: product read failed', e instanceof Error ? e.message : e);
