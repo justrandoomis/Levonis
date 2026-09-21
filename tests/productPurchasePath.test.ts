@@ -65,7 +65,7 @@ test('the colours in stock come first, and only where stock means anything', () 
 
   // The sort key is the SAME number the chip prints, so the row can never
   // claim one thing and order by another…
-  const key = /const colorHasStock = \(id: string\): boolean => \{([\s\S]*?)\n  \};/.exec(page);
+  const key = /const colorHasStock = \(id: string\): boolean => \{([\s\S]*?)\n {2}\};/.exec(page);
   assert.ok(key, 'the availability predicate still exists');
   assert.match(key![1], /invMode === 'COLOR'[\s\S]{0,120}availByColor\.get\(id\)/);
   assert.match(key![1], /invMode === 'VARIANT_COMBINATION'[\s\S]{0,140}variantAvailable\.get\(comboKey\)/);
