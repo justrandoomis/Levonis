@@ -1595,8 +1595,32 @@ cartRoutes.post('/items', async (c) => {
   // both `GET /api/cart` and `POST /api/orders` then type `pre_order`: admitted
   // against one counter and described by another in the same response.
   // `lineOrderType` is the read model's own rule and the checkout's own rule.
-  const statedAdd = unusableOrderType(availability, lineOrderType(availability, fulfillmentType, transportMethod));
+  const addLineType = lineOrderType(availability, fulfillmentType, transportMethod);
+  const statedAdd = unusableOrderType(availability, addLineType);
   if (statedAdd) throw badRequest(statedAdd.message, statedAdd.code);
+  // A PRE-ORDER WITHOUT A ROUTE IS A LINE NO PART OF THIS SHOP AGREES ABOUT.
+  //
+  // The pricing resolver only raises TRANSPORT_REQUIRED when the order type is
+  // narrowed to pre-order — either stated outright or because the product
+  // sells exactly one way (packages/pricing/src/pricing.ts). A DUAL-MODE
+  // product whose direct shelf is empty falls through both tests when the body
+  // carries neither field, and the row was then stored with an empty type and
+  // an empty route: the money resolved it to a direct sale, `GET /api/cart`
+  // and the checkout resolved the same row to a pre-order. One row, two
+  // answers, and the customer read «بيع مباشر» under a pre-order they had
+  // chosen.
+  //
+  // Keyed on `lineOrderType` — the read model's rule and the checkout's rule —
+  // so the door refuses exactly the lines the rest of the stack calls
+  // pre-orders. It cannot fire when no route is offered at all: `preorderUsable`
+  // is false for an empty transport list, so `mode` is 'unavailable' and the
+  // refusal below wins first with NO_TRANSPORT_OFFERED. The offered routes ride
+  // along in `details` so a caller can render a chooser instead of a dead end.
+  if (addLineType === 'pre_order' && !transportMethod) {
+    throw new HttpError(400, 'Choose a shipping method for this pre-order', 'TRANSPORT_REQUIRED', {
+      transport_methods: availability.preorder.transports.filter((t) => t.configured).map((t) => t.method),
+    });
+  }
   if (availability.mode === 'unavailable') {
     throw badRequest(
       availability.reason === 'OUT_OF_STOCK'

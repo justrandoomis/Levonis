@@ -40,13 +40,60 @@ test('the cart line has a column for the order type, and it is constrained to no
 
 test('the product page sends the order type it was told, and never one it guessed', () => {
   const page = read('src/pages/Product.tsx');
+  // The BUTTON's own state is still the three-valued answer, and it still
+  // starts unanswered: the page must not invent a press.
   assert.match(page, /const \[orderType, setOrderType\] = useState<'' \| 'direct_sale' \| 'pre_order'>\(''\)/);
-  assert.match(page, /fulfillmentType: orderType \|\| undefined/, 'the quote carries it');
-  assert.match(page, /if \(orderType\) body\.fulfillmentType = orderType/, 'and so does the add');
-  // '' must stay possible: a product that sells one way never asks, and the
-  // page inventing 'direct_sale' there would be a guess.
-  assert.match(page, /setOrderType\(''\)/, 'a fresh product resets to unanswered');
+  assert.match(page, /setOrderType\(''\)/, 'a fresh selection resets to unanswered');
+
+  // WHAT THE REQUEST CARRIES IS NOT THAT STATE. Sending '' was itself the
+  // guess: the page draws «طلب مسبق» pressed from the SERVER's mode, so a
+  // buyer looking at a ticked pre-order sent no `fulfillmentType` at all, and
+  // the pricing resolver then inferred `direct_sale` from the missing
+  // transport — a direct-sale price and a direct-sale cart row under a
+  // pre-order checkmark. `requestedOrderType` sends the server's own answer
+  // instead, resolved in `lineOrderType`'s order, so the client and the cart
+  // door agree by construction.
+  const derived = /const requestedOrderType: '' \| 'direct_sale' \| 'pre_order' =([\s\S]*?);\n/.exec(page);
+  assert.ok(derived, 'the page derives ONE type for its requests');
+  assert.match(derived![1], /orderType === 'pre_order' \|\| orderType === 'direct_sale'/, "the buyer's press wins");
+  assert.match(derived![1], /availability\?\.mode === 'preorder'[\s\S]{0,120}'pre_order'/);
+  assert.match(derived![1], /availability\?\.mode === 'direct_sale'[\s\S]{0,120}'direct_sale'/);
+  assert.match(derived![1], /: '';?\s*$/, "'' survives: no usable mode is still no answer");
+
+  // BOTH request builders carry that same value — a quote priced under one
+  // type and a row written under another is the defect itself.
+  assert.match(page, /fulfillmentType: requestedOrderType \|\| undefined/, 'the quote carries it');
+  assert.match(page, /if \(requestedOrderType\) body\.fulfillmentType = requestedOrderType/, 'and so does the add');
+  // …and the chosen ROUTE travels with the type that needs it, not with the
+  // server's default mode: gating it on `mode === 'preorder'` dropped the
+  // route whenever the direct shelf still had units.
+  assert.match(page, /requestedOrderType === 'pre_order' && transportMethod\) body\.transportMethod/);
   assert.ok(!/setOrderType\('direct_sale'\)[\s\S]{0,200}useEffect/.test(page), 'no effect defaults it');
+});
+
+test('a pre-order needs a route — at the button and again at the door', () => {
+  // THE CLIENT HALF. `selection.complete` is built from option and colour
+  // codes only, so it could never see a missing transport; that is why «أضف
+  // إلى السلة» stayed live with «شحن بري» untouched.
+  const page = read('src/pages/Product.tsx');
+  assert.match(page, /const routeReady = !\(requestedOrderType === 'pre_order' && !transportMethod\);/);
+  const buy = /const canBuy =([\s\S]*?);\n/.exec(page);
+  assert.ok(buy, 'canBuy still exists');
+  assert.match(buy![1], /routeReady/, 'and the button honours it');
+
+  // THE SERVER HALF, which is the one that matters: the client is never
+  // trusted. Keyed on `lineOrderType` so the door refuses exactly the lines
+  // the read model and the checkout call pre-orders.
+  const cart = read('worker/routes/cart.ts');
+  assert.match(cart, /const addLineType = lineOrderType\(availability, fulfillmentType, transportMethod\);/);
+  assert.match(
+    cart,
+    /if \(addLineType === 'pre_order' && !transportMethod\) \{[\s\S]{0,400}'TRANSPORT_REQUIRED'/,
+    'the door refuses a routeless pre-order'
+  );
+  // The refusal names the routes on offer so a caller can show a chooser
+  // rather than a dead end.
+  assert.match(cart, /transport_methods: availability\.preorder\.transports/);
 });
 
 test('the cart stores it, reads it back, and prefers it over the old inference', () => {

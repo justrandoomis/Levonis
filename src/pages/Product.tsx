@@ -861,7 +861,6 @@ export default function Product() {
    * infers it exactly as it did before. The page never guesses on their behalf.
    */
   const [orderType, setOrderType] = useState<'' | 'direct_sale' | 'pre_order'>('');
-  const wantPreorder = orderType === 'pre_order';
 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [liveAvailability, setLiveAvailability] = useState<Availability | null>(null);
@@ -1063,7 +1062,41 @@ export default function Product() {
    * the old gate hid the price for the whole of that window, the figure the
    * customer was reading vanished each time they asked for one more.
    */
-  const priceKey = `${optionValueIds.join(',')}|${colorId}|${orderType}|${transportMethod}|${warrantyPlanId}`;
+  const availability = liveAvailability ?? baseAvailability;
+
+  /**
+   * THE ORDER TYPE EVERY REQUEST CARRIES — and it is never '' while the page
+   * is drawing one of the two «طريقة التوفر» cards as already chosen.
+   *
+   * WHAT WAS WRONG. `orderType` starts '' and only becomes 'direct_sale' when
+   * the detail response carried an `initial_selection`; a product whose direct
+   * shelf is empty has none, so it stayed '' for the whole session unless the
+   * buyer tapped a card — and every option tap resets it to '' again. But the
+   * «طلب مسبق» card is drawn pressed from the SERVER's default mode, not from
+   * `orderType`, so the page showed a pre-order ticked while holding nothing.
+   * Both request builders below then send the field only `if (orderType)`, so
+   * the quote and the add-to-cart left `fulfillmentType` out entirely. The
+   * server's own rule for an absent type is `statedOrderType`
+   * (worker/routes/products.ts) → '' → the pricing resolver infers
+   * `direct_sale` from the missing transport (packages/pricing/src/pricing.ts),
+   * so a dual-mode product was PRICED as a direct sale and the cart row was
+   * TYPED as one — under a pre-order checkmark. That is the owner's «بالرغم من
+   * اختيار طلب مسبق … ويظهر في السلة بيع مباشر».
+   *
+   * The fallback here is `lineOrderType`'s own fallback, written out in the
+   * same order, so the client and the cart door resolve an untouched selection
+   * to the SAME type by construction rather than by coincidence.
+   */
+  const requestedOrderType: '' | 'direct_sale' | 'pre_order' =
+    orderType === 'pre_order' || orderType === 'direct_sale'
+      ? orderType
+      : availability?.mode === 'preorder'
+        ? 'pre_order'
+        : availability?.mode === 'direct_sale'
+          ? 'direct_sale'
+          : '';
+
+  const priceKey = `${optionValueIds.join(',')}|${colorId}|${requestedOrderType}|${transportMethod}|${warrantyPlanId}`;
   const productSlug = product?.slug ?? '';
   useEffect(() => {
     if (!productSlug || source !== 'catalog') return;
@@ -1083,7 +1116,7 @@ export default function Product() {
             optionValueIds: optionValueIds.length ? optionValueIds : undefined,
             colorId: colorId || undefined,
             transportMethod: transportMethod || undefined,
-            fulfillmentType: orderType || undefined,
+            fulfillmentType: requestedOrderType || undefined,
             warrantyPlanId: warrantyPlanId || undefined,
           },
           // A superseded or abandoned quote is dropped at the socket instead of
@@ -1120,7 +1153,7 @@ export default function Product() {
       clearTimeout(timer);
       ac.abort();
     };
-  }, [productSlug, source, priceKey, optionId, optionValueIds, colorId, orderType, transportMethod, warrantyPlanId, quoteToken]);
+  }, [productSlug, source, priceKey, optionId, optionValueIds, colorId, requestedOrderType, transportMethod, warrantyPlanId, quoteToken]);
 
   /**
    * A CONFIRMATION IS A MOMENT, NOT A STATE. The "added to cart" notice used
@@ -1134,8 +1167,6 @@ export default function Product() {
     const t = setTimeout(() => setNotice(''), 3000);
     return () => clearTimeout(t);
   }, [notice]);
-
-  const availability = liveAvailability ?? baseAvailability;
 
   // Keep a valid selection, drop an invalid one (mandate §7.2: the user's
   // choice survives as long as it is valid).
@@ -1380,10 +1411,15 @@ export default function Product() {
         if (optionId) body.optionId = optionId;
         if (optionValueIds.length) body.optionValueIds = optionValueIds;
         if (colorId) body.colorId = colorId;
-        if (availability?.mode === 'preorder' && transportMethod) body.transportMethod = transportMethod;
+        // THE ROUTE TRAVELS WITH THE TYPE THAT NEEDS IT, not with the
+        // server's default mode. Gating on `availability.mode === 'preorder'`
+        // dropped the chosen route whenever the direct shelf still had units:
+        // a buyer who pressed «طلب مسبق» and picked «شحن بري» on such a
+        // product sent neither field, and the line landed as a direct sale.
+        if (requestedOrderType === 'pre_order' && transportMethod) body.transportMethod = transportMethod;
         // The ORDER TYPE travels on its own, so the cart line records what the
         // customer chose rather than what a transport implies.
-        if (orderType) body.fulfillmentType = orderType;
+        if (requestedOrderType) body.fulfillmentType = requestedOrderType;
         if (warrantyPlanId) body.warrantyPlanId = warrantyPlanId;
         if (replaceCart) body.replaceCart = true;
         const data = await api.post<{ items: CartItem[] }>('/api/cart/items', body);
@@ -1439,7 +1475,7 @@ export default function Product() {
         setAddingToCart(false);
       }
     },
-    [product, qty, optionId, optionValueIds, colorId, orderType, transportMethod, warrantyPlanId, availability, isAuthenticated, navigate, s]
+    [product, qty, optionId, optionValueIds, colorId, requestedOrderType, transportMethod, warrantyPlanId, isAuthenticated, navigate, s]
   );
 
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
@@ -1630,6 +1666,50 @@ export default function Product() {
     if (rows.length === 0 || rows.some((v) => v.available === null)) return null;
     return rows.reduce((sum, v) => sum + (v.available ?? 0), 0);
   };
+  /**
+   * THE COLOURS IN STOCK COME FIRST — «أريد أن الألوان المتوفرة تظهر أولا
+   * والألوان التي لا تتوفر تظهر آخرا».
+   *
+   * Nothing anywhere ordered colours by availability: the one ordering in the
+   * whole request is `ORDER BY sort, name_en` (worker/lib/productRelations.ts),
+   * the admin's own order, and every projection between there and here maps in
+   * place. A sold-out swatch therefore sat wherever the admin had put it, with
+   * a red «نفد» chip as the only signal, and the buyer had to read the row to
+   * find what they could actually have.
+   *
+   * IT ONLY APPLIES TO A DIRECT SALE, which is what the owner asked for and is
+   * also the only case where the number means anything: `available` is the
+   * SHELF, and a pre-order has no shelf — it draws on an import quota that the
+   * colour rows do not carry. Sorting a pre-order's colours by a shelf count
+   * would push a colour to the back for being out of something the buyer was
+   * never going to be given from stock.
+   *
+   * THE KEY IS THE SAME NUMBER THE CHIP SHOWS (`levelChip`, below), so the row
+   * can never claim one thing and order by another. `null` is UNTRACKED and
+   * is emphatically not zero — those sort as available, with the configured
+   * colours that have stock, because nothing says otherwise.
+   *
+   * STABLE, and deliberately so: the sort is by the availability BUCKET only,
+   * and ties keep the admin's order because `Array.prototype.sort` is required
+   * to be stable. Two colours that are both in stock never swap places under
+   * the buyer's thumb.
+   */
+  const colorHasStock = (id: string): boolean => {
+    const comboKey = optionValueIds.length
+      ? [...optionValueIds].sort().map((v) => `o:${v}`).concat(`c:${id}`).join('|')
+      : '';
+    const n = invMode === 'COLOR'
+      ? availByColor.get(id)
+      : invMode === 'VARIANT_COMBINATION' && comboKey
+        ? variantAvailable.get(comboKey)
+        : null;
+    return n === null || n === undefined ? true : n > 0;
+  };
+  const orderedColors =
+    requestedOrderType === 'direct_sale'
+      ? [...colorsForOption].sort((a, b) => Number(colorHasStock(b.id)) - Number(colorHasStock(a.id)))
+      : colorsForOption;
+
   const levelChip = (n: number | null | undefined): { text: string; cls: string } | null => {
     if (n === null || n === undefined) return null;
     if (n <= 0) return { text: s.levelOut, cls: 'text-red-300' };
@@ -1845,10 +1925,23 @@ export default function Product() {
     ...(availability?.selection.errors ?? []),
     ...quoteErrors.filter((e) => !(availability?.selection.errors ?? []).includes(e)),
   ];
+  /**
+   * A PRE-ORDER WITH NO ROUTE IS NOT A LINE THE DOOR ACCEPTS, so the button
+   * must not offer it. This is the client half of the cart's own refusal
+   * (worker/routes/cart.ts, TRANSPORT_REQUIRED) written in the same shape:
+   * the type the request will carry, and whether it names a route.
+   *
+   * `selection.complete` could never cover this — it is built from option and
+   * colour codes only (worker/routes/products.ts) and a missing transport has
+   * never been one of its errors. That is why «أضف إلى السلة» stayed live
+   * with «شحن بري» untouched.
+   */
+  const routeReady = !(requestedOrderType === 'pre_order' && !transportMethod);
   const canBuy =
     source === 'catalog' &&
     mode !== 'unavailable' &&
     selectionComplete &&
+    routeReady &&
     quoteErrors.length === 0 &&
     !!availability?.qty_ok &&
     priceIsAuthoritative;
@@ -1879,10 +1972,12 @@ export default function Product() {
    * header while the panel below them was quoting a pre-order. The header was
    * describing a purchase that was no longer the one on offer.
    *
-   * The expression itself is unchanged, deliberately: what the buyer picked,
-   * or — before they pick — the server's own default.
+   * It now reads the SAME `requestedOrderType` the quote body and the
+   * add-to-cart body send. That is the point: the card drawn with the
+   * checkmark, the price being quoted and the row the cart door writes are one
+   * answer, so the page can no longer paint a pre-order it does not hold.
    */
-  const effectivePreorder = orderType ? wantPreorder : mode === 'preorder';
+  const effectivePreorder = requestedOrderType === 'pre_order';
 
   /**
    * The same answer as a three-state, which is what the header chip renders.
@@ -2198,6 +2293,200 @@ export default function Product() {
 
   const selectionBlocks = (
     <>
+      {/*
+        THE ORDER OF THESE PANELS IS THE ORDER OF THE DECISION, stated by the
+        owner: «أولا يختار طريقة التوفر بيع مباشر أو طلب مسبق، إذا كان طلب مسبق
+        ثانيا يختار وسيلة النقل للطلب المسبق، ثم ثالثا يختار النسخة/الخيار،
+        ورابعا يختار اللون».
+
+        HOW IT IS BUILT — availability · [notify-me] · transport · option ·
+        colour · warranty. It used to run option · colour · availability ·
+        notify-me · transport · warranty, which asked the buyer to pick a
+        version and a colour before telling them WHICH WAY the thing is sold,
+        and then moved the price under them once they answered. The first three
+        move as ONE welded unit: the notify-me panel documents its own
+        placement beside the disabled «بيع مباشر» card (see its comment), and
+        the transport chooser only exists for a pre-order, so it belongs
+        directly under the card that chose one.
+
+        Nothing else changed. Every block below is the same JSX it was, with
+        the same gate, the same handlers and the same state — this is a move.
+      */}
+      {offersBoth ? (
+        <fieldset className="lv-section" data-fulfilment-chooser>
+          <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
+            <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+            {s.fulfilment}
+          </legend>
+          <div className="mt-2 flex flex-col gap-2">
+            <button
+              type="button"
+              disabled={!directUsable}
+              aria-pressed={directUsable && !effectivePreorder}
+              data-order-type="direct_sale"
+              data-usable={directUsable ? 'yes' : 'no'}
+              onClick={() => {
+                setOrderType('direct_sale');
+                setTransportMethod('');
+              }}
+              className="lv-choice flex min-h-[52px] items-start gap-3 px-3 py-2.5 text-sm text-start disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block">{s.directSale}</span>
+                <span className="block text-[11px] text-zinc-400 font-medium leading-snug">{s.fulfilDirectSub}</span>
+                {directUsable && directFinal !== null ? (
+                  <span className="block tabular-nums text-[14px] font-bold mt-1" data-direct-final>{formatIqd(directFinal)}</span>
+                ) : null}
+                {/* CLOSED, AND IT SAYS WHY. Never a dead chip with no sentence. */}
+                {!directUsable ? (
+                  <span className="block text-[11px] font-medium text-warning leading-snug mt-1" data-mode-closed>
+                    {reasonText(s, modeOf('direct_sale')?.reason)}
+                  </span>
+                ) : null}
+              </span>
+              <span className="lv-choice-mark mt-0.5"><Check aria-hidden="true" className="h-3 w-3" /></span>
+            </button>
+            <button
+              type="button"
+              disabled={!preUsable}
+              aria-pressed={preUsable && effectivePreorder}
+              data-order-type="pre_order"
+              data-usable={preUsable ? 'yes' : 'no'}
+              onClick={() => {
+                setOrderType('pre_order');
+                const usable = (availability?.preorder.transports ?? []).filter((t) => t.configured);
+                if (usable.length === 1) setTransportMethod(usable[0].method);
+              }}
+              className="lv-choice flex min-h-[52px] items-start gap-3 px-3 py-2.5 text-sm text-start disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block">{s.preorderMode}</span>
+                <span className="block text-[11px] text-zinc-400 font-medium leading-snug">{s.fulfilPreorderSub}</span>
+                {preUsable && preorderFromFinal !== null ? (
+                  <span className="block tabular-nums text-[14px] font-bold mt-1">
+                    <span className="text-[10px] font-medium text-zinc-400 me-1">{s.from}</span>
+                    {formatIqd(preorderFromFinal)}
+                  </span>
+                ) : null}
+                {!preUsable ? (
+                  <span className="block text-[11px] font-medium text-warning leading-snug mt-1" data-mode-closed>
+                    {reasonText(s, modeOf('pre_order')?.reason)}
+                  </span>
+                ) : null}
+              </span>
+              <span className="lv-choice-mark mt-0.5"><Check aria-hidden="true" className="h-3 w-3" /></span>
+            </button>
+          </div>
+          {/* The pre-order price above is the PREPAID one. Paying cash on
+              delivery re-prices the line as a direct sale at checkout (owner
+              mandate) — said here so the number never surprises later, and
+              ONLY when the server says the number would actually move. */}
+          {codReprices ? (
+            <p className="mt-2 text-[11px] text-zinc-500 leading-relaxed" data-preorder-cod-hint>
+              {s.preorderCodHint}
+            </p>
+          ) : null}
+        </fieldset>
+      ) : null}
+
+      {/*
+        «خبرني لما يرجع» — DIRECTLY UNDER «طريقة التوفر», BESIDE THE DISABLED CARD.
+
+        The disabled «بيع مباشر / نفد المخزون حاليًا» card above is where the
+        customer learns the cheap route is empty, so the answer to «and then
+        what?» belongs in the same block and not at the bottom of the page. It
+        sits AFTER the chooser rather than inside it on purpose: the two cards
+        in there are a choice between ways to BUY, and a third card that arms a
+        notification would read as a third way to buy — «طلب مسبق» would then be
+        competing with something that is not an alternative to it.
+      */}
+      {stockAlertOffered ? (
+        <StockAlertPanel
+          productId={product.id}
+          productSlug={product.slug}
+          productLabel={name}
+          models={alertModels}
+          optionGroupCount={relationOptionGroups.length}
+          colors={alertColors}
+          selectedColorId={colorId}
+          preorderOpen={preUsable}
+          isAuthenticated={isAuthenticated}
+          intent={alertIntent}
+          onIntentConsumed={consumeAlertIntent}
+        />
+      ) : null}
+
+      {showTransports ? (
+        <fieldset className="lv-section">
+          <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
+            <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+            {s.transport}
+            {/* THE PANEL SAYS IT IS REQUIRED, beside the choice itself — the
+                same shape the colour fieldset uses for `color_required`. The
+                button below is disabled until a route is named (`routeReady`),
+                and a disabled button with no sentence anywhere is the dead end
+                this replaces. */}
+            {!routeReady ? (
+              <span className="ms-1 text-amber-300 font-medium text-[12px]" data-transport-required>
+                {reasonText(s, 'TRANSPORT_REQUIRED')}
+              </span>
+            ) : null}
+          </legend>
+          <div className="mt-2 flex flex-col gap-2">
+            {availability!.preorder.transports.map((t) => {
+              const selected = transportMethod === t.method;
+              const final = transportFinal(t);
+              /**
+               * 0075 — A FULL ROUTE IS NOT OFFERED, AND THE OTHERS STILL ARE.
+               * The route that ran out is the one that closes: a sea quota of
+               * zero must not take air and land down with it, and the customer
+               * is told which fact stopped them — "nobody priced this route"
+               * and "this route's quota is full" are different problems with
+               * different answers.
+               */
+              const cap = routeCapacity(t.method);
+              const usable = routeUsable(t);
+              return (
+                <button
+                  key={t.method}
+                  type="button"
+                  disabled={!usable}
+                  aria-pressed={selected}
+                  data-route-usable={usable ? 'true' : 'false'}
+                  data-route-reason={cap?.reason ?? (t.configured ? '' : 'TRANSPORT_COMMISSION_UNCONFIGURED')}
+                  onClick={() => setTransportMethod(selected ? '' : t.method)}
+                  className="lv-choice flex min-h-[48px] items-center justify-between gap-3 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
+                    <span className="min-w-0 text-start">{transportLabel(s, t.method)}</span>
+                  </span>
+                  {/* The FINAL unit price for this journey — never "+X". */}
+                  <span className="tabular-nums text-[13px] font-bold">
+                    {!t.configured
+                      ? s.transportUnset
+                      : !usable
+                        ? s.routeQuotaFull
+                        : final !== null
+                          ? formatIqd(final)
+                          : s.transportUnset}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {/* A pre-order-only product has no fulfilment pill to carry the
+              hint, so it sits under the journeys instead — once, not twice,
+              and only when cash on delivery would change the price (a
+              product with no direct premium keeps its commission either way). */}
+          {!offersBoth && codReprices ? (
+            <p className="mt-2 text-[11px] text-zinc-500 leading-relaxed" data-preorder-cod-hint>
+              {s.preorderCodHint}
+            </p>
+          ) : null}
+        </fieldset>
+      ) : null}
+
       {hasMultipleOptionGroups ? (
         <div className="space-y-3" data-option-groups>
           {relationOptionGroups.map((group) => {
@@ -2427,7 +2716,7 @@ export default function Product() {
         </fieldset>
       ) : null}
 
-      {colorsForOption.length > 0 ? (
+      {orderedColors.length > 0 ? (
         <fieldset className="lv-section">
           <legend className="px-1 text-white font-bold text-[14px]">
             {s.colors}
@@ -2436,7 +2725,7 @@ export default function Product() {
             ) : null}
           </legend>
           <div className="mt-2 flex flex-wrap gap-2">
-            {colorsForOption.map((col) => {
+            {orderedColors.map((col) => {
               const selected = colorId === col.id;
               const label = pickName(col.name_en, col.name, col.name_ar) || col.id;
               const comboKey = optionValueIds.length
@@ -2453,9 +2742,13 @@ export default function Product() {
                   type="button"
                   aria-pressed={selected}
                   onClick={() => {
+                    // THE COLOUR DOES NOT DECIDE HOW THE PRODUCT IS SOLD, so it
+                    // must not clear the two panels ABOVE it. `option_availability`
+                    // is per OPTION (packages/pricing/src/pricing.ts) — no colour
+                    // carries one — and since the owner's order puts «طريقة
+                    // التوفر» and «وسيلة النقل» first, clearing them here sent the
+                    // buyer back two steps for picking a colour.
                     setColorId(selected ? '' : col.id);
-                    setOrderType('');
-                    setTransportMethod('');
                   }}
                   className="lv-choice flex items-center gap-2 px-3 py-1.5 text-sm font-bold"
                 >
@@ -2487,170 +2780,6 @@ export default function Product() {
         </fieldset>
       ) : null}
 
-      {offersBoth ? (
-        <fieldset className="lv-section" data-fulfilment-chooser>
-          <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
-            <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
-            {s.fulfilment}
-          </legend>
-          <div className="mt-2 flex flex-col gap-2">
-            <button
-              type="button"
-              disabled={!directUsable}
-              aria-pressed={directUsable && !effectivePreorder}
-              data-order-type="direct_sale"
-              data-usable={directUsable ? 'yes' : 'no'}
-              onClick={() => {
-                setOrderType('direct_sale');
-                setTransportMethod('');
-              }}
-              className="lv-choice flex min-h-[52px] items-start gap-3 px-3 py-2.5 text-sm text-start disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block">{s.directSale}</span>
-                <span className="block text-[11px] text-zinc-400 font-medium leading-snug">{s.fulfilDirectSub}</span>
-                {directUsable && directFinal !== null ? (
-                  <span className="block tabular-nums text-[14px] font-bold mt-1" data-direct-final>{formatIqd(directFinal)}</span>
-                ) : null}
-                {/* CLOSED, AND IT SAYS WHY. Never a dead chip with no sentence. */}
-                {!directUsable ? (
-                  <span className="block text-[11px] font-medium text-warning leading-snug mt-1" data-mode-closed>
-                    {reasonText(s, modeOf('direct_sale')?.reason)}
-                  </span>
-                ) : null}
-              </span>
-              <span className="lv-choice-mark mt-0.5"><Check aria-hidden="true" className="h-3 w-3" /></span>
-            </button>
-            <button
-              type="button"
-              disabled={!preUsable}
-              aria-pressed={preUsable && effectivePreorder}
-              data-order-type="pre_order"
-              data-usable={preUsable ? 'yes' : 'no'}
-              onClick={() => {
-                setOrderType('pre_order');
-                const usable = (availability?.preorder.transports ?? []).filter((t) => t.configured);
-                if (usable.length === 1) setTransportMethod(usable[0].method);
-              }}
-              className="lv-choice flex min-h-[52px] items-start gap-3 px-3 py-2.5 text-sm text-start disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block">{s.preorderMode}</span>
-                <span className="block text-[11px] text-zinc-400 font-medium leading-snug">{s.fulfilPreorderSub}</span>
-                {preUsable && preorderFromFinal !== null ? (
-                  <span className="block tabular-nums text-[14px] font-bold mt-1">
-                    <span className="text-[10px] font-medium text-zinc-400 me-1">{s.from}</span>
-                    {formatIqd(preorderFromFinal)}
-                  </span>
-                ) : null}
-                {!preUsable ? (
-                  <span className="block text-[11px] font-medium text-warning leading-snug mt-1" data-mode-closed>
-                    {reasonText(s, modeOf('pre_order')?.reason)}
-                  </span>
-                ) : null}
-              </span>
-              <span className="lv-choice-mark mt-0.5"><Check aria-hidden="true" className="h-3 w-3" /></span>
-            </button>
-          </div>
-          {/* The pre-order price above is the PREPAID one. Paying cash on
-              delivery re-prices the line as a direct sale at checkout (owner
-              mandate) — said here so the number never surprises later, and
-              ONLY when the server says the number would actually move. */}
-          {codReprices ? (
-            <p className="mt-2 text-[11px] text-zinc-500 leading-relaxed" data-preorder-cod-hint>
-              {s.preorderCodHint}
-            </p>
-          ) : null}
-        </fieldset>
-      ) : null}
-
-      {/*
-        «خبرني لما يرجع» — DIRECTLY UNDER «طريقة التوفر», BESIDE THE DISABLED CARD.
-
-        The disabled «بيع مباشر / نفد المخزون حاليًا» card above is where the
-        customer learns the cheap route is empty, so the answer to «and then
-        what?» belongs in the same block and not at the bottom of the page. It
-        sits AFTER the chooser rather than inside it on purpose: the two cards
-        in there are a choice between ways to BUY, and a third card that arms a
-        notification would read as a third way to buy — «طلب مسبق» would then be
-        competing with something that is not an alternative to it.
-      */}
-      {stockAlertOffered ? (
-        <StockAlertPanel
-          productId={product.id}
-          productSlug={product.slug}
-          productLabel={name}
-          models={alertModels}
-          optionGroupCount={relationOptionGroups.length}
-          colors={alertColors}
-          selectedColorId={colorId}
-          preorderOpen={preUsable}
-          isAuthenticated={isAuthenticated}
-          intent={alertIntent}
-          onIntentConsumed={consumeAlertIntent}
-        />
-      ) : null}
-
-      {showTransports ? (
-        <fieldset className="lv-section">
-          <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
-            <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
-            {s.transport}
-          </legend>
-          <div className="mt-2 flex flex-col gap-2">
-            {availability!.preorder.transports.map((t) => {
-              const selected = transportMethod === t.method;
-              const final = transportFinal(t);
-              /**
-               * 0075 — A FULL ROUTE IS NOT OFFERED, AND THE OTHERS STILL ARE.
-               * The route that ran out is the one that closes: a sea quota of
-               * zero must not take air and land down with it, and the customer
-               * is told which fact stopped them — "nobody priced this route"
-               * and "this route's quota is full" are different problems with
-               * different answers.
-               */
-              const cap = routeCapacity(t.method);
-              const usable = routeUsable(t);
-              return (
-                <button
-                  key={t.method}
-                  type="button"
-                  disabled={!usable}
-                  aria-pressed={selected}
-                  data-route-usable={usable ? 'true' : 'false'}
-                  data-route-reason={cap?.reason ?? (t.configured ? '' : 'TRANSPORT_COMMISSION_UNCONFIGURED')}
-                  onClick={() => setTransportMethod(selected ? '' : t.method)}
-                  className="lv-choice flex min-h-[48px] items-center justify-between gap-3 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
-                    <span className="min-w-0 text-start">{transportLabel(s, t.method)}</span>
-                  </span>
-                  {/* The FINAL unit price for this journey — never "+X". */}
-                  <span className="tabular-nums text-[13px] font-bold">
-                    {!t.configured
-                      ? s.transportUnset
-                      : !usable
-                        ? s.routeQuotaFull
-                        : final !== null
-                          ? formatIqd(final)
-                          : s.transportUnset}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {/* A pre-order-only product has no fulfilment pill to carry the
-              hint, so it sits under the journeys instead — once, not twice,
-              and only when cash on delivery would change the price (a
-              product with no direct premium keeps its commission either way). */}
-          {!offersBoth && codReprices ? (
-            <p className="mt-2 text-[11px] text-zinc-500 leading-relaxed" data-preorder-cod-hint>
-              {s.preorderCodHint}
-            </p>
-          ) : null}
-        </fieldset>
-      ) : null}
 
       {/* EXTENDED WARRANTY — printers only (owner mandate). The server sends
           the plans it will actually sell for this selection, each with its fee
@@ -2870,6 +2999,15 @@ export default function Product() {
             </p>
           ))
         : null}
+      {/* …and again beside the button it disables, because that is where a
+          buyer who scrolled past the panel is standing. `selection.errors`
+          could never carry this: it is built from option and colour codes
+          only (worker/routes/products.ts). */}
+      {!routeReady && mode !== 'unavailable' ? (
+        <p className="lv-alert lv-alert-warning text-amber-100 text-[13px]" data-transport-required-note>
+          {reasonText(s, 'TRANSPORT_REQUIRED')}
+        </p>
+      ) : null}
       {availability && !availability.qty_ok && mode !== 'unavailable' ? (
         <p className="lv-alert lv-alert-warning text-amber-100 text-[13px]">
           {s.qtyCapped.replace('{n}', String(availability.stock.max_qty))}

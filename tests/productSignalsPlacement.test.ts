@@ -113,7 +113,10 @@ test('the availability chip and the «طريقة التوفر» chooser share ON
   // `effectivePreorder` is the chooser's own boolean. The chip is derived from
   // it rather than from a parallel reading of the raw server default, so the
   // header cannot say «بيع مباشر» while the panel below quotes a pre-order.
-  assert.match(product, /const effectivePreorder = orderType \? wantPreorder : mode === 'preorder';/);
+  assert.match(product, /const effectivePreorder = requestedOrderType === 'pre_order';/);
+  // The ONE computation is now the one the requests carry, so the chip cannot
+  // describe a purchase the quote is not pricing.
+  assert.match(product, /fulfillmentType: requestedOrderType \|\| undefined/);
   // …and the derived three-state honours USABILITY, not just the button press.
   // Sharing one computation is worth nothing if the shared answer can be a
   // mode the server has already closed: a buyer holding a stale

@@ -195,6 +195,12 @@ test('the page draws the chooser from `modes`, and explains a closed half', () =
   assert.match(page, /data-mode-closed[\s\S]{0,200}reasonText\(s, modeOf\('pre_order'\)\?\.reason\)/);
   // The transports follow the order type in force, not the button state, so a
   // pre-order-only product shows its journeys before anything is clicked.
-  assert.match(page, /const effectivePreorder = orderType \? wantPreorder : mode === 'preorder'/);
+  assert.match(page, /const effectivePreorder = requestedOrderType === 'pre_order'/);
   assert.match(page, /const showTransports = effectivePreorder &&/);
+  // …and «في القوة» now means the type the REQUESTS carry, not a second
+  // reading beside them. `requestedOrderType` falls back to the server's own
+  // mode in `lineOrderType`'s order, so the card drawn with the checkmark, the
+  // quote and the cart row are one answer.
+  assert.match(page, /const requestedOrderType: '' \| 'direct_sale' \| 'pre_order' =/);
+  assert.match(page, /availability\?\.mode === 'preorder'[\s\S]{0,120}'pre_order'/);
 });
