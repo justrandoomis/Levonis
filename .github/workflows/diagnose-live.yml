@@ -304,6 +304,76 @@ jobs:
           check_site "https://$HOST"
           check_site "https://studio.levonis-iq.com"
 
+      # WHY A PRODUCT PAGE SHOWS NO «الألوان» SECTION.
+      #
+      # Two very different things produce that screen — the CODE dropping
+      # colours that exist, or the DATABASE having no active colour rows — and
+      # no amount of reading source can tell them apart. This asks both ends
+      # the same question and prints the answers side by side.
+      #
+      # SELECT only, GET only. Nothing here writes.
+      - name: Colours — what the database holds vs what the live site publishes
+        continue-on-error: true
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
+
+          echo "── products that have colour rows at all"
+          q "SELECT p.id AS id, p.slug AS slug,
+                    COUNT(c.id) AS total,
+                    SUM(CASE WHEN c.active IN (1,'1','true') THEN 1 ELSE 0 END) AS active_rows,
+                    SUM(CASE WHEN c.active IS NULL THEN 1 ELSE 0 END) AS null_active
+               FROM products p JOIN product_colors c ON c.product_id = p.id
+              WHERE p.status = 'active'
+              GROUP BY p.id, p.slug
+              ORDER BY total DESC LIMIT 15" \
+            | jq -r '.[0].results[] | "\(.slug)  total=\(.total)  active=\(.active_rows)  active_is_null=\(.null_active)"' \
+            || echo "   (query failed — product_colors may not exist on this database)"
+
+          echo
+          echo "── products with option groups but ZERO colour rows"
+          q "SELECT p.slug AS slug, COUNT(DISTINCT v.id) AS values_n
+               FROM products p JOIN product_option_values v ON v.product_id = p.id
+              WHERE p.status = 'active'
+                AND NOT EXISTS (SELECT 1 FROM product_colors c WHERE c.product_id = p.id)
+              GROUP BY p.slug ORDER BY values_n DESC LIMIT 15" \
+            | jq -r '.[0].results[] | "\(.slug)  option_values=\(.values_n)  colours=0"' || true
+
+          echo
+          echo "── and what the LIVE site publishes for the top colour-carrying product"
+          SLUG=$(q "SELECT p.slug AS slug FROM products p JOIN product_colors c ON c.product_id = p.id
+                     WHERE p.status = 'active' GROUP BY p.slug
+                     ORDER BY COUNT(c.id) DESC LIMIT 1" | jq -r '.[0].results[0].slug // empty')
+          if [ -n "$SLUG" ]; then
+            echo "GET https://$HOST/api/products/$SLUG"
+            curl -s --max-time 25 "https://$HOST/api/products/$SLUG" -o /tmp/pc.json
+            jq -r '{
+              product_colors:   (.product.colors   | length? // "MISSING"),
+              relations_colors: (.relations.colors | length? // "MISSING"),
+              product_options:  (.product.options  | length? // "MISSING"),
+              inventory_mode:   (.relations.inventory_mode // "n/a"),
+              color_required:   (.availability.selection.color_required // "n/a"),
+              mode:             (.availability.mode // "n/a")
+            } | to_entries[] | "\(.key): \(.value)"' /tmp/pc.json || head -c 600 /tmp/pc.json
+            echo "-- product keys --"
+            jq -r '.product | [keys[]] | join(", ")' /tmp/pc.json || true
+          else
+            echo "   NO PRODUCT ANYWHERE HAS A COLOUR ROW — the colours were never saved."
+          fi
+
+      - name: How to read the colour step
+        if: always()
+        run: |
+          {
+            echo "### Colours: database vs live site"
+            echo ""
+            echo "| colour rows in D1 | live \`product.colors\` | verdict |"
+            echo "|---|---|---|"
+            echo "| 0 | 0 | the colours were never saved — admin/data, not code |"
+            echo "| >0 active | 0 | the code is dropping them — a real defect |"
+            echo "| >0, none active | 0 | the rows exist but are switched off |"
+            echo "| >0 active | >0 | the server is fine; the defect is in the page |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Summary
         if: always()
         run: echo "Read the step logs above — nothing was changed." >> "$GITHUB_STEP_SUMMARY"
