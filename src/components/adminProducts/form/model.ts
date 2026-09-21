@@ -623,7 +623,7 @@ const valueFromWire = (v: WireValue, fulfillments: FormFulfillment[] = []): Form
   sku_part: v.sku_part ?? '',
   image: v.image ?? '',
   sort: v.sort,
-  active: v.active !== 0,
+  active: isShown(v.active),
   stock: v.stock ?? null,
   reserved: v.reserved ?? 0,
   low_stock_threshold: v.low_stock_threshold ?? null,
@@ -645,6 +645,24 @@ const valueFromWire = (v: WireValue, fulfillments: FormFulfillment[] = []): Form
  * it is placed in a synthesized group with an empty name so the admin sees it,
  * is asked to name it, and the next save writes the missing group row.
  */
+/**
+ * IS THIS ROW SHOWN? — the SERVER's own rule, written out once.
+ *
+ * `truthy` in worker/lib/productOverlay.ts is `v !== 0 && v !== false`, and
+ * that is what decides whether a colour, an option value or a variant reaches
+ * the storefront. This form used to ask `x.active !== 0` instead, which is the
+ * same test with the BOOLEAN half missing — and the admin wire carries a
+ * boolean, because every admin path calls `applyRelations(..., {
+ * includeInactive: true })` and the overlay then emits `active: truthy(...)`.
+ *
+ * `false !== 0` is true, so a HIDDEN row hydrated as shown. The «مفعّل» toggle
+ * therefore read «معروض» for a row the shop was hiding, and saving asserted it
+ * back on. That is how a product came to hold twenty-five colours that the
+ * admin saw as visible and no customer could see at all: the state existed,
+ * and nothing on screen could express it.
+ */
+const isShown = (v: unknown): boolean => v !== 0 && v !== false;
+
 export function relationsFromWire(r: RelationsResponse): RelationsState {
   const values = r.values ?? [];
   const links = r.links ?? [];
@@ -670,7 +688,7 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
     id: g.id,
     name_en: g.name_en,
     sort: g.sort,
-    active: g.active !== 0,
+    active: isShown(g.active),
     values: values
       .filter((v) => v.group_id === g.id)
       .sort((a, b) => a.sort - b.sort)
@@ -706,7 +724,7 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
       image: c.image ?? '',
       sku_part: c.sku_part ?? '',
       sort: c.sort,
-      active: c.active !== 0,
+      active: isShown(c.active),
       stock: c.stock ?? null,
       reserved: c.reserved ?? 0,
       low_stock_threshold: c.low_stock_threshold ?? null,
@@ -718,7 +736,7 @@ export function relationsFromWire(r: RelationsResponse): RelationsState {
       id: v.id,
       ...parseComboKey(v.combo_key),
       sku: v.sku ?? '',
-      active: v.active !== 0,
+      active: isShown(v.active),
       stock: v.stock ?? null,
       reserved: v.reserved ?? 0,
       low_stock_threshold: v.low_stock_threshold ?? null,

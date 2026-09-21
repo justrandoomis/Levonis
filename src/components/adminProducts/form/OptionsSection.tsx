@@ -224,6 +224,22 @@ export function OptionsSection({
     setRelAuto((r) => ({ ...r, colors: r.colors.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
 
   /**
+   * HIDDEN IS A STATE THE ADMIN CAN SEE, AND UNDO IN ONE TAP.
+   *
+   * A colour with `active = 0` is invisible on the product page and, until the
+   * hydration was corrected, invisible HERE too — the toggle read «معروض» for
+   * every one of them. A live product reached twenty-five hidden colours that
+   * way, and the only cure the form offered was twenty-five taps.
+   *
+   * The banner states the count and the consequence in the same sentence, and
+   * «إظهار الكل» is the whole repair. Shown only when something IS hidden, so
+   * an ordinary product carries no extra furniture.
+   */
+  const hiddenColors = rel.colors.filter((c) => !c.active).length;
+  const showAllColors = () =>
+    setRelAuto((r) => ({ ...r, colors: r.colors.map((c) => ({ ...c, active: true })) }));
+
+  /**
    * The compact option/colour slots are views onto product_images. They do
    * not own a second URL field: upload replaces/adds the bound media row and
    * clearing the slot merely returns that row to the general gallery.
@@ -587,6 +603,25 @@ export function OptionsSection({
       </Repeater>
 
       {/* ---------------------------------------------------------- colours */}
+      {hiddenColors > 0 ? (
+        <div
+          data-colors-hidden-notice
+          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2"
+        >
+          <span className="text-[13px] leading-snug text-amber-100">
+            {hiddenColors === rel.colors.length
+              ? `كل الألوان (${hiddenColors}) مخفية — لا يظهر أي لون في صفحة المنتج.`
+              : `${hiddenColors} من ${rel.colors.length} ألوان مخفية — لا تظهر في صفحة المنتج.`}
+          </span>
+          <button
+            type="button"
+            onClick={showAllColors}
+            className="shrink-0 rounded-md border border-amber-400/60 px-3 py-1.5 text-[13px] font-bold text-amber-100 hover:bg-amber-500/20"
+          >
+            إظهار الكل
+          </button>
+        </div>
+      ) : null}
       <Repeater title="الألوان / Colours" addLabel="لون" onAdd={addColor} empty="لا توجد ألوان.">
         {rel.colors.map((c) => (
           <div key={c.id} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-2.5">
