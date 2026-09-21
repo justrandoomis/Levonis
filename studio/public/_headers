@@ -1,0 +1,42 @@
+# WHY THIS FILE EXISTS, and it is not about caching.
+#
+# `wrangler.jsonc` sets `run_worker_first: ["/api/*", "/auth/*"]`, so /assets/*
+# is served by Cloudflare's static-asset path and NEVER reaches worker/index.ts.
+# `withSecurityHeaders` — which sets COOP/COEP — therefore never runs on an
+# asset. The comment beside that config reasoned about the DOCUMENT ("HTML is
+# always rendered by the worker, so every document response carries the
+# COOP/COEP headers") and it is correct about documents. It missed the WORKER
+# SCRIPT.
+#
+# A dedicated worker started from a cross-origin-isolated document must itself
+# be delivered with `Cross-Origin-Embedder-Policy: require-corp`, or it fails
+# to start. The slicer kernel is loaded exactly that way, from /assets/. So the
+# document was isolated, the kernel chunk was not, and the worker never booted.
+#
+# The browser reports that failure as a bare `Event` with NO message, and
+# three-slicer's own handler falls back to `ne.message || "worker error"` and
+# prints «Worker terminated (likely out of memory): worker error». It is not a
+# memory problem and never was — measured: 3 ms to the banner with nothing
+# loaded, versus a 343 ms kernel boot once this header is present.
+#
+# It is inert where it is not needed. COEP on a script, stylesheet or wasm
+# subresource is only consulted when the response creates a new environment;
+# for everything else the browser ignores it. And when the owning document is
+# NOT isolated — which is the case on the iPad, where worker/index.ts
+# deliberately withholds isolation so the engine takes its single-threaded
+# core — a worker script that asserts require-corp is still allowed. The check
+# only fails in the other direction. So this file does not disturb that
+# mitigation.
+#
+# CORP is `same-site` rather than `same-origin` on purpose: it satisfies COEP
+# just as well, and it leaves levonis-iq.com able to load a studio asset if it
+# ever needs to. `same-origin` would have broken that silently.
+#
+# vinext writes this file itself ONLY when it does not already exist
+# (node_modules/vinext/dist/index.js, the `_headers` block), so committing it
+# here replaces the generated one — which means the Cache-Control line below
+# must stay. Dropping it would un-cache every hashed asset.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-site

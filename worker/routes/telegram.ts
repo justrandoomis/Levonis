@@ -340,6 +340,46 @@ telegramRoutes.post('/link/confirm', requireAuth, async (c) => {
   });
 
   /**
+   * THE ACCOUNT'S OWN PHONE, STAMPED HERE — because linking is the only place
+   * a customer can prove one from inside the shop, and until now it did not.
+   *
+   * This route wrote `telegram_links.phone_e164` and stopped. Every OTHER
+   * reader in the codebase asks `users.phone_e164`: `publicUser` (`phone`,
+   * `has_phone`), the WhatsApp pill on the settings screen, and the account
+   * lookup WhatsApp OTP sign-in performs (`SELECT … FROM users WHERE
+   * phone_e164 = ?`). So a person who linked Telegram from Settings saw their
+   * verified number inside the Telegram card — read from `telegram_links` —
+   * while the account itself reported no phone, for ever.
+   *
+   * Two of the owner's reports are that one gap. «لا يوجد خيار لربط الواتساب»:
+   * `channelReadiness` answered WhatsApp with `ACCOUNT_NO_DESTINATION`,
+   * `can_activate: false`, `action: null` — a dead end with no button to
+   * offer, because the account held no number to send to. And «الرقم موجود في
+   * الإعدادات ولا يظهر في تعديل الملف الشخصي»: two screens, two different
+   * tables, one of them empty.
+   *
+   * The statement is copied from the Telegram LOGIN path (worker/routes/auth.ts),
+   * which has always self-healed this way — the LINK path simply never did.
+   * Its guards are why it is safe: `phone_e164 IS NULL` never overwrites a
+   * number the account already holds, and `NOT EXISTS` means it can never take
+   * one another account holds. A lost race on the UNIQUE index is swallowed,
+   * for the same reason as the primary-channel write below: the link is
+   * already committed, and undoing a verified link because a stamp would not
+   * write is not a trade worth making.
+   */
+  try {
+    await c.env.DB.prepare(
+      `UPDATE users SET phone_e164 = ?1
+        WHERE id = ?2 AND phone_e164 IS NULL
+          AND NOT EXISTS (SELECT 1 FROM users WHERE phone_e164 = ?1)`
+    )
+      .bind(ch.phone_entered, user.id)
+      .run();
+  } catch (e) {
+    console.error('phone_e164 self-heal failed for user', user.id, e instanceof Error ? e.message : String(e));
+  }
+
+  /**
    * LINKING TELEGRAM IS AN EXPLICIT ACTIVATION, AND EXPLICIT ACTIVATION IS THE
    * ONLY THING ALLOWED TO CHOOSE A PRIMARY CHANNEL.
    *
