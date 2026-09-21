@@ -3643,9 +3643,33 @@ export default function Product() {
           </div>
 
           {/* ------------------------------------------------- right column */}
+          {/*
+            THE BUY COLUMN SCROLLS ITSELF WHEN IT IS TALLER THAN THE SCREEN.
+
+            It was `lg:sticky` with a `top` offset and nothing else. A sticky
+            box taller than the viewport sticks at `top` and hangs its bottom
+            BELOW the fold, where no scroll can reach it: the page scroll no
+            longer moves it, and it only comes up once the page has scrolled
+            past the whole left column and the element un-sticks. That is
+            exactly what the owner described — «التمرير للأسفل في الخيارات لا
+            يعمل إلا عند النزول لأسفل تفاصيل المنتج» — and the owner's own
+            reorder is what made it reachable: availability, notify-me,
+            transport, version, colour and warranty now stack in one column,
+            and on a 1024-high screen that runs past the bottom long before the
+            «أضف إلى السلة» button.
+
+            Bounding the height and letting it scroll internally is the same
+            answer src/components/policies/PolicyOutline.tsx already gives for
+            the same shape, down to `100dvh`, the header-height variable and
+            `custom-scrollbar`. A panel that FITS is unaffected: `max-height`
+            does not bite and `overflow-y: auto` shows no scrollbar.
+          */}
           <aside
-            className="hidden lg:block lg:sticky space-y-3"
-            style={{ top: 'calc(var(--app-header-height, 68px) + 0.75rem)' }}
+            className="hidden lg:block lg:sticky space-y-3 lg:overflow-y-auto custom-scrollbar"
+            style={{
+              top: 'calc(var(--app-header-height, 68px) + 0.75rem)',
+              maxHeight: 'calc(100dvh - var(--app-header-height, 68px) - 1.5rem)',
+            }}
           >
             {priceBlock}
             {selectionBlocks}

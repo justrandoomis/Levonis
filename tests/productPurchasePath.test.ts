@@ -124,3 +124,27 @@ test('a new option drops the previous option\u2019s ANSWER, not just the press',
   const stray = page.match(/setOrderType\(''\);/g) ?? [];
   assert.equal(stray.length, resets.length, 'no reset left half-done');
 });
+
+test('the buy column can be scrolled on its own when it outgrows the screen', () => {
+  // A `position: sticky` box taller than the viewport sticks at `top` and
+  // hangs its bottom below the fold, unreachable: page scroll no longer moves
+  // it, and it only rises once the page has passed the whole other column.
+  // The owner's own panel reorder is what made this reachable — six panels
+  // now stack in one column.
+  const aside = /<aside\n\s+className="([^"]*lg:sticky[^"]*)"\n\s+style=\{\{([\s\S]*?)\}\}/.exec(page);
+  assert.ok(aside, 'the desktop buy column still exists');
+  assert.match(aside![1], /lg:overflow-y-auto/, 'it scrolls itself');
+  assert.match(aside![2], /maxHeight:[\s\S]*?100dvh/, 'and its height is bounded by the viewport');
+  // Bounded against the SAME header variable the `top` offset uses, or the
+  // panel is either clipped early or runs past the bottom by the header's
+  // height.
+  const top = /top: '([^']*)'/.exec(aside![2]);
+  const max = /maxHeight: '([^']*)'/.exec(aside![2]);
+  assert.ok(top && max, 'both offsets are stated');
+  assert.match(top![1], /var\(--app-header-height, 68px\)/);
+  assert.match(max![1], /var\(--app-header-height, 68px\)/);
+
+  // Same answer as the other sticky sidebar in this app, not a second one.
+  const outline = readFileSync(join(ROOT, 'src/components/policies/PolicyOutline.tsx'), 'utf8');
+  assert.match(outline, /max-h-\[calc\(100dvh-var\(--app-header-height,68px\)-3rem\)\][\s\S]{0,40}overflow-y-auto/);
+});
