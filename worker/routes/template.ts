@@ -867,6 +867,8 @@ display_order=0
 
 # ------------------------------ البيع والمخزون / selling & stock
 selling_type=mixed
+# يوجد لون مرتبط بخيار، لذلك مخزون البيع المباشر يُحفظ على التوليفة الدقيقة خيار×لون.
+inventory_mode=VARIANT_COMBINATION
 payment_options=
 
 # ------------------------------ الحالة (Open Box / مستعمل / مجدّد)
@@ -915,7 +917,8 @@ options.1.regular_price_iqd=__NULL__
 options.1.availability_type=
 options.1.direct.enabled=true
 options.1.direct.price_iqd=+2000
-options.1.stock=5
+# عند وجود ألوان مرتبطة لا يُكتب مخزون مباشر على الخيار نفسه؛ انظر variants أدناه.
+options.1.stock=__NULL__
 options.1.preorder.enabled=true
 options.1.preorder.transports.1.method=sea
 options.1.preorder.transports.1.enabled=true
@@ -929,8 +932,8 @@ options.2.regular_price_iqd=+20000
 options.2.availability_type=
 options.2.direct.enabled=true
 options.2.direct.price_iqd=+3000
-# البيع المباشر يوجب رقماً: 0 = منتهي، وأي رقم موجب = الكمية المتاحة.
-options.2.stock=0
+# مخزون Large موزع على تركيبات الألوان أدناه.
+options.2.stock=__NULL__
 options.2.low_stock_threshold=__NULL__
 # الطلب المسبق لا يملك مخزونًا أو سعة؛ هو متوفر أو غير متوفر، ولكل طريق زيادة.
 options.2.preorder.enabled=true
@@ -956,6 +959,30 @@ colors.2.option_index=2
 # +15000 فوق سعر الخيار الكبير (120000) = 135000 للزبون
 colors.2.regular_price_iqd=+15000
 colors.2.active=true
+
+# ------------------------------ التوليفات الدقيقة / exact combinations
+# Black متاح لكل الخيارات، وGold مربوط بـ Large فقط.
+# مخزون البيع المباشر مصدره الوحيد هنا عند وجود لون مرتبط.
+variants.1.id=var_example_small_black
+variants.1.option_value_ids=opt_example_small
+variants.1.color_id=col_example_black
+variants.1.active=true
+variants.1.stock=5
+variants.1.low_stock_threshold=__NULL__
+
+variants.2.id=var_example_large_black
+variants.2.option_value_ids=opt_example_large
+variants.2.color_id=col_example_black
+variants.2.active=true
+variants.2.stock=0
+variants.2.low_stock_threshold=__NULL__
+
+variants.3.id=var_example_large_gold
+variants.3.option_value_ids=opt_example_large
+variants.3.color_id=col_example_gold
+variants.3.active=true
+variants.3.stock=0
+variants.3.low_stock_threshold=__NULL__
 
 # ------------------------------ المواصفات / specifications
 spec_groups.1.id=sg_example_general
