@@ -1,0 +1,165 @@
+# READ-ONLY diagnosis of ONE product's colours, on whatever is serving
+# levonis-iq.com right now.
+#
+# Makes NO changes: every D1 statement is a SELECT, every HTTP call is a GET.
+# No deploy, no migration, no write to any database, bucket or DNS record.
+#
+# Why this exists: the owner reports that a product page shows no «الألوان»
+# section although the product plainly has ten colours. Two very different
+# things produce that screen — the CODE dropping colours that exist, or the
+# DATABASE having no active colour rows — and they cannot be told apart by
+# reading source. This asks both ends the same question and prints the two
+# answers side by side.
+name: 47 - Diagnose one product's colours (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: "Product slug, e.g. bambu-lab-pla-matte-filament-1-kg. Leave empty to search by name instead."
+        required: false
+        default: ''
+      name_like:
+        description: "Name fragment to search for when no slug is given"
+        required: false
+        default: 'PLA Matte'
+      host:
+        description: 'Host to probe (no scheme)'
+        required: false
+        default: 'levonis-iq.com'
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      HOST: ${{ github.event.inputs.host || 'levonis-iq.com' }}
+      SLUG: ${{ github.event.inputs.slug }}
+      NAME_LIKE: ${{ github.event.inputs.name_like || 'PLA Matte' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      # ---------------------------------------------------------------- D1
+      # The slug is resolved from the database rather than guessed, so a
+      # mistyped input reports "no such product" instead of silently
+      # diagnosing the wrong one.
+      - name: Find the product, and count its colour rows
+        id: find
+        continue-on-error: true
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
+          esc() { printf '%s' "$1" | sed "s/'/''/g"; }
+
+          if [ -n "$SLUG" ]; then
+            WHERE="slug = '$(esc "$SLUG")'"
+          else
+            WHERE="(name LIKE '%$(esc "$NAME_LIKE")%' OR name_ar LIKE '%$(esc "$NAME_LIKE")%')"
+          fi
+
+          echo "── candidate products ($WHERE)"
+          q "SELECT id, slug, status, lifecycle FROM products WHERE $WHERE LIMIT 10" \
+            | jq -r '.[0].results[] | "\(.id)  \(.slug)  status=\(.status)  lifecycle=\(.lifecycle)"' || true
+
+          PID=$(q "SELECT id FROM products WHERE $WHERE LIMIT 1" | jq -r '.[0].results[0].id // empty')
+          if [ -z "$PID" ]; then
+            echo "::error::no product matched — pass an exact slug"
+            exit 1
+          fi
+          echo "product_id=$PID" >> "$GITHUB_OUTPUT"
+          echo "resolved product id: $PID"
+
+          echo
+          echo "── THE ANSWER: colour rows in product_colors"
+          q "SELECT COUNT(*) AS total,
+                    SUM(CASE WHEN active IN (1,'1','true') THEN 1 ELSE 0 END) AS active_rows,
+                    SUM(CASE WHEN active IS NULL THEN 1 ELSE 0 END) AS null_active
+               FROM product_colors WHERE product_id = '$PID'" \
+            | jq -r '.[0].results[0] | "total=\(.total)  active=\(.active_rows)  active_is_null=\(.null_active)"' || true
+
+          echo
+          echo "── each colour row (name, active, sort, stock)"
+          q "SELECT id, name_en, active, sort, stock FROM product_colors
+              WHERE product_id = '$PID' ORDER BY sort, name_en LIMIT 40" \
+            | jq -r '.[0].results[] | "\(.id)  \(.name_en)  active=\(.active)  sort=\(.sort)  stock=\(.stock)"' || true
+
+          echo
+          echo "── colour→option links"
+          q "SELECT COUNT(*) AS n FROM product_color_links WHERE color_id IN
+               (SELECT id FROM product_colors WHERE product_id = '$PID')" \
+            | jq -r '.[0].results[0] | "links=\(.n)"' || true
+
+          echo
+          echo "── does the row claim relations, and what is in the legacy JSON column"
+          q "SELECT has_relations,
+                    LENGTH(COALESCE(colors,'')) AS legacy_colors_len,
+                    COALESCE(inventory_mode,'') AS inventory_mode,
+                    COALESCE(sale_types,'') AS sale_types
+               FROM products WHERE id = '$PID'" \
+            | jq -r '.[0].results[0] | "has_relations=\(.has_relations)  legacy_colors_len=\(.legacy_colors_len)  inventory_mode=\(.inventory_mode)  sale_types=\(.sale_types)"' || true
+
+          echo
+          echo "── option values (for comparison: these DO render on the page)"
+          q "SELECT COUNT(*) AS n,
+                    SUM(CASE WHEN active IN (1,'1','true') THEN 1 ELSE 0 END) AS active_rows
+               FROM product_option_values WHERE product_id = '$PID'" \
+            | jq -r '.[0].results[0] | "option_values total=\(.n)  active=\(.active_rows)"' || true
+
+      # ---------------------------------------------------------------- HTTP
+      # What the LIVE worker actually publishes for the same product. If the
+      # rows above are present and active while these counts are zero, the
+      # defect is in the code; if both are zero, the colours were never saved.
+      - name: What the live site publishes for that product
+        continue-on-error: true
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
+          S="$SLUG"
+          if [ -z "$S" ]; then
+            S=$(q "SELECT slug FROM products WHERE id = '${{ steps.find.outputs.product_id }}'" \
+                 | jq -r '.[0].results[0].slug // empty')
+          fi
+          echo "GET https://$HOST/api/products/$S"
+          curl -s --max-time 25 "https://$HOST/api/products/$S" -o /tmp/p.json
+          echo "status: $(curl -s -o /dev/null -w '%{http_code}' --max-time 25 "https://$HOST/api/products/$S")"
+
+          echo
+          echo "── counts the PAGE depends on"
+          jq -r '{
+            product_colors:    (.product.colors    | length? // "MISSING"),
+            product_options:   (.product.options   | length? // "MISSING"),
+            relations_colors:  (.relations.colors  | length? // "MISSING"),
+            relations_groups:  (.relations.option_groups | length? // "MISSING"),
+            inventory_mode:    (.relations.inventory_mode // "n/a"),
+            color_required:    (.availability.selection.color_required // "n/a"),
+            option_required:   (.availability.selection.option_required // "n/a"),
+            mode:              (.availability.mode // "n/a"),
+            images:            (.product.images | length? // "MISSING")
+          } | to_entries[] | "\(.key): \(.value)"' /tmp/p.json || head -c 800 /tmp/p.json
+
+          echo
+          echo "── the colours the live site published, if any"
+          jq -r '(.product.colors // [])[] | "\(.id)  \(.name_en)  active=\(.active)  option_id=\(.option_id)"' /tmp/p.json || true
+
+          echo
+          echo "── top-level keys of the response (so a renamed field is visible)"
+          jq -r '[keys[]] | join(", ")' /tmp/p.json || true
+          jq -r '.product | [keys[]] | join(", ")' /tmp/p.json || true
+
+      - name: How to read this
+        if: always()
+        run: |
+          {
+            echo "### How to read this run"
+            echo ""
+            echo "| product_colors rows (D1) | live \`product.colors\` | verdict |"
+            echo "|---|---|---|"
+            echo "| 0 | 0 | the colours were never saved — an admin/data issue, not code |"
+            echo "| >0 active | 0 | the CODE is dropping them — a real defect |"
+            echo "| >0 but none active | 0 | the rows exist but are switched off |"
+            echo "| >0 active | >0 | the server is fine; the defect is in the page |"
+          } >> "$GITHUB_STEP_SUMMARY"
