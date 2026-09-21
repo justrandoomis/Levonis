@@ -78,6 +78,7 @@ import type { ShippingType } from '../lib/shippingType';
 import { notifyAdminTopic } from '../lib/telegramAdmin';
 import { emailConfigured, sendEmailNow } from '../lib/emailSend';
 import { sendWhatsAppText, wasenderConfigured, wasenderStatus } from '../lib/wasender';
+import { clearSessionOutage, recordSessionOutage } from '../lib/channelReadiness';
 import { normalizePhone, maskPhone } from '../lib/phone';
 import { escapeHtml } from '../lib/emailTemplates';
 import { notifyOrderDelivered, notifyOrderStatus } from '../lib/orderNotify';
@@ -160,8 +161,43 @@ adminRoutes.get('/providers', async (c) => {
           return { sessionStatus: null, canSend: false, error: 'NOT_CONFIGURED' as const };
         }
         const st = await wasenderStatus(c.env).catch(() => null);
-        if (!st) return { sessionStatus: null, canSend: false, error: 'PROVIDER_DOWN' as const };
-        if (!st.ok) return { sessionStatus: null, canSend: false, error: st.error, detail: st.detail ?? null };
+        /**
+         * WHAT THIS PROBE LEARNS, THE SHOPPER'S PAGE ALSO GETS TO KNOW.
+         *
+         * `channelsLive()` reads the session state from a cache that, until
+         * now, only a FAILED SEND ever wrote (worker/lib/channelReadiness.ts).
+         * So a shop whose WhatsApp phone had logged out went on advertising
+         * WhatsApp — on the sign-in screen, in the notification preferences,
+         * in every "we will message you" sentence — until some customer
+         * happened to be the one who found out. On 2026-09-21 that state had
+         * been live and unrecorded: `whatsappOtp: true` with the session
+         * reading `logged_out`.
+         *
+         * This is the one place in the system that asks the provider outright.
+         * Recording the answer costs nothing (the debounce in
+         * `writeSessionState` collapses repeats) and turns opening this panel —
+         * or the read-only verification workflow — into the thing that stops
+         * the shop promising a channel it cannot use.
+         *
+         * Contained: a bookkeeping write must never fail a diagnostics read.
+         */
+        const remember = async (connected: boolean, reason: string) => {
+          try {
+            if (connected) await clearSessionOutage(c.env);
+            else await recordSessionOutage(c.env, reason);
+          } catch {
+            /* the panel still answers */
+          }
+        };
+        if (!st) {
+          await remember(false, 'PROVIDER_DOWN');
+          return { sessionStatus: null, canSend: false, error: 'PROVIDER_DOWN' as const };
+        }
+        if (!st.ok) {
+          await remember(false, st.error);
+          return { sessionStatus: null, canSend: false, error: st.error, detail: st.detail ?? null };
+        }
+        await remember(st.can_send, st.can_send ? '' : st.status || 'SESSION_NOT_CONNECTED');
         return { sessionStatus: st.status, canSend: st.can_send, error: null };
       })()),
       note: 'Sign-in codes send directly; notifications go through the outbox because the provider allows as few as one message every five seconds.',

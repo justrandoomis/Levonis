@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, MessageCircle, AlertCircle } from 'lucide-react';
-import { api, ApiError, isNotConfigured } from '../../lib/api';
+import { api, ApiError, isNotConfigured, isServiceOutage } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
 import OtpBoxes from './OtpBoxes';
@@ -83,6 +83,8 @@ const STRINGS = {
     wrongCode: 'الرمز غير صحيح أو انتهت صلاحيته. اطلب رمزاً جديداً.',
     notConfiguredEmail: 'الدخول برمز عبر البريد غير مُفعّل بعد — لم يهيّئه المسؤول.',
     notConfiguredWhatsapp: 'الدخول برمز عبر واتساب غير مُفعّل بعد — لم يهيّئه المسؤول.',
+    outageWhatsapp: 'واتساب متوقف مؤقتًا الآن. جرّب تيليغرام أو البريد.',
+    outageTelegram: 'تيليغرام لا يستجيب الآن. جرّب البريد أو أعد المحاولة بعد قليل.',
     sendFailed: 'تعذّر إرسال الرمز الآن. حاول بعد قليل.',
     tooMany: 'محاولات كثيرة. انتظر قليلاً ثم أعد المحاولة.',
     loadFailed: 'حدث خطأ. أعد المحاولة.',
@@ -134,6 +136,8 @@ const STRINGS = {
     wrongCode: 'That code is wrong or has expired. Request a new one.',
     notConfiguredEmail: 'Sign-in codes by email are not enabled yet — the administrator has not configured it.',
     notConfiguredWhatsapp: 'Sign-in codes by WhatsApp are not enabled yet — the administrator has not configured it.',
+    outageWhatsapp: 'WhatsApp is down right now. Try Telegram or email instead.',
+    outageTelegram: 'Telegram is not answering right now. Try email, or again shortly.',
     sendFailed: 'The code could not be sent right now. Try again shortly.',
     tooMany: 'Too many attempts. Wait a moment and try again.',
     loadFailed: 'Something went wrong. Try again.',
@@ -185,6 +189,8 @@ const STRINGS = {
     wrongCode: 'کۆدەکە هەڵەیە یان بەسەرچووە. کۆدێکی نوێ داوا بکە.',
     notConfiguredEmail: 'چوونەژوورەوە بە کۆدی ئیمەیڵ هێشتا چالاک نەکراوە.',
     notConfiguredWhatsapp: 'چوونەژوورەوە بە کۆدی واتساپ هێشتا چالاک نەکراوە.',
+    outageWhatsapp: 'واتساپ ئێستا لەکارکەوتووە. تیلێگرام یان ئیمەیڵ تاقی بکەرەوە.',
+    outageTelegram: 'تیلێگرام وەڵام ناداتەوە. ئیمەیڵ تاقی بکەرەوە یان دواتر.',
     sendFailed: 'کۆدەکە ئێستا نەنێردرا. کەمێک دواتر هەوڵ بدەرەوە.',
     tooMany: 'هەوڵی زۆر. کەمێک چاوەڕێ بکە.',
     loadFailed: 'هەڵەیەک ڕوویدا. هەوڵ بدەرەوە.',
@@ -265,6 +271,24 @@ export default function CodeAuth({
 
   const describeError = useCallback(
     (e: unknown): string => {
+      /**
+       * A CHANNEL THAT IS DOWN IS NOT A CHANNEL NOBODY SET UP, and the screen
+       * must not react to them the same way.
+       *
+       * `setNotConfigured(true)` replaces this whole component with a warning
+       * (below), which is right when the deployment has no provider: there is
+       * nothing here to try. It is wrong — and was what the owner reported —
+       * when the provider IS configured and merely down, because it also
+       * removes the channel switcher, the retry, and the alternative road the
+       * server just named in its own sentence. An outage keeps the screen.
+       */
+      if (isServiceOutage(e)) {
+        return channel === 'email'
+          ? s.sendFailed
+          : (e as ApiError).code === 'TELEGRAM_UNAVAILABLE'
+            ? s.outageTelegram
+            : s.outageWhatsapp;
+      }
       if (isNotConfigured(e)) {
         setNotConfigured(true);
         return channel === 'email' ? s.notConfiguredEmail : s.notConfiguredWhatsapp;

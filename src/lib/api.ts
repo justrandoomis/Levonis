@@ -31,8 +31,46 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * «غير مهيَّأ» AND «معطّل مؤقتًا» ARE NOT THE SAME REFUSAL, AND 503 CANNOT TELL
+ * THEM APART.
+ *
+ * WHAT THIS COST, measured on the live shop on 2026-09-21. The owner reported
+ * WhatsApp sign-in and sign-up showing «الدخول برمز عبر واتساب غير مُفعّل بعد —
+ * لم يهيّئه المسؤول» while every part of it was configured. It was: the live
+ * site answered `whatsappOtp: true`, WasenderAPI answered HTTP 200 for the
+ * key, and the session behind it read `logged_out` — the shop's WhatsApp PHONE
+ * had been unlinked. The server said exactly that, with the road that still
+ * worked: 503 `WHATSAPP_UNAVAILABLE`, «واتساب غير متاح حالياً — استخدم تيليغرام
+ * أو البريد».
+ *
+ * This predicate answered `true` for it, because it read only the STATUS. So
+ * the correct sentence was thrown away, the screen was replaced by a warning
+ * blaming the administrator for a setting that was already set, and the
+ * alternative the server had named disappeared with it. The owner spent the
+ * day looking for a missing key that was never missing.
+ *
+ * SO THE CODE DECIDES, NOT THE STATUS. Everything the server raises through
+ * `unavailable()` is a 503; what separates the two families is the name:
+ *
+ *   …_NOT_CONFIGURED   an operator has never set this up. Nothing the visitor
+ *                      does helps, and hiding the control is right.
+ *   …_UNAVAILABLE      it IS set up and is down right now — a logged-out
+ *                      WhatsApp session, a Telegram API that did not answer.
+ *                      The visitor should see the server's sentence, keep the
+ *                      screen, and be able to take the other road.
+ *
+ * A 503 WITH NO CODE KEEPS THE OLD ANSWER on purpose: two Telegram refusals
+ * (worker/routes/auth.ts:1298, :1450) are genuinely "not configured" and carry
+ * no code, and narrowing this by default would have turned a correct hidden
+ * control into a dead button. Only a name that says OUTAGE opts out.
+ */
+export function isServiceOutage(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 503 && /_UNAVAILABLE$/.test(e.code ?? '');
+}
+
 export function isNotConfigured(e: unknown): boolean {
-  return e instanceof ApiError && e.status === 503;
+  return e instanceof ApiError && e.status === 503 && !isServiceOutage(e);
 }
 
 /**
