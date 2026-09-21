@@ -21,6 +21,7 @@ import { chatRoutes } from './routes/chats';
 import { profileRoutes } from './routes/profile';
 import { uploadRoutes, fileRoutes } from './routes/uploads';
 import { webManifestRoute } from './routes/manifest';
+import { robotsRoute, sitemapRoute } from './routes/seo';
 import { miscRoutes } from './routes/misc';
 import { adminRoutes } from './routes/admin';
 import { adminProductsRoutes } from './routes/adminProducts';
@@ -169,6 +170,19 @@ app.use('*', async (c, next) => {
    * cannot depend on the result.
    */
   if (path === '/manifest.webmanifest') {
+    await next();
+    return;
+  }
+  /**
+   * NOR DO THE TWO FILES CRAWLERS ASK FOR, and for the same reason twice over.
+   *
+   * `/robots.txt` and `/sitemap.xml` are answered from the Host header and, for
+   * the sitemap, one products read. Neither can depend on who is signed in — a
+   * crawler arrives with no cookie at all — so loading a session here would buy
+   * a `sessions` x `users` JOIN for an answer that cannot use it, on requests
+   * that arrive in bursts from every bot on the internet.
+   */
+  if (path === '/robots.txt' || path === '/sitemap.xml') {
     await next();
     return;
   }
@@ -369,6 +383,27 @@ app.route('/files', fileRoutes);
 // Top-level and on every host, deliberately: this is not admin surface, and a
 // storefront that cannot be installed is the defect, not the risk.
 app.get('/manifest.webmanifest', webManifestRoute);
+
+// GET /robots.txt and GET /sitemap.xml — see worker/routes/seo.ts for why
+// these are routes rather than files in `public/`: one bundle serves the apex
+// and every merchant subdomain, and a static copy of either would name the
+// platform's URLs on a merchant's host.
+//
+// LINE COMMENTS, NOT A BLOCK, and the note beside `assetWithPreview` below
+// explains why at length: the comment stripper in
+// tests/storefrontIsolation.test.ts reads the slash-star inside the
+// '/api/admin/*' mount string far above as a comment opener, so the FIRST
+// star-slash under it deletes every route mount in between — including the
+// apex-only admin host guard that test exists to assert on.
+//
+// AND NOT THE CHARACTERS EITHER, EVEN INSIDE A LINE COMMENT. The stripper
+// runs on the raw text and does not know what a line comment is, so writing
+// the terminator here — to explain the rule — closed the fake comment and
+// took the same five tests down a second time. It is spelled out in words
+// above for that reason. Do not put the two characters anywhere below the
+// admin mount.
+app.get('/robots.txt', robotsRoute);
+app.get('/sitemap.xml', sitemapRoute);
 
 // The previous architecture exposed raw SQL and schema management over HTTP.
 // Those endpoints are gone; explicit 410s make the removal visible to any

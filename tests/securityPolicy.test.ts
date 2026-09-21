@@ -364,9 +364,34 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
     // It does not weaken the reason this test exists: it adds ONE document,
     // not a prefix, so dist/_headers still carries the policy for index.html
     // and every SPA route.
+    //
+    // REVISITED AGAIN for `/robots.txt` and `/sitemap.xml`, for the manifest's
+    // reason exactly. `not_found_handling: single-page-application` answers
+    // any path not in dist/ with index.html and a 200, so before these two
+    // lines a crawler asking for robots.txt was handed an HTML document —
+    // which several crawlers read as "everything is allowed" and some read as
+    // a malformed file — and there was no sitemap at all. And like the
+    // manifest they are per-HOST: one bundle serves the apex and every
+    // merchant subdomain, so a static copy of either would name the PLATFORM's
+    // sitemap and the platform's URLs on a merchant's own domain
+    // (worker/routes/seo.ts).
+    //
+    // Still two exact documents rather than a prefix, so index.html and every
+    // SPA route keep taking their policy from dist/_headers, which is the
+    // property this test exists to protect.
     for (const route of routes) {
       assert.ok(
-        ['/api/*', '/files/*', '/product/*', '/bundles/*', '/p/*', '/community/store/*', '/manifest.webmanifest'].includes(route),
+        [
+          '/api/*',
+          '/files/*',
+          '/product/*',
+          '/bundles/*',
+          '/p/*',
+          '/community/store/*',
+          '/manifest.webmanifest',
+          '/robots.txt',
+          '/sitemap.xml',
+        ].includes(route),
         `${route} was added to run_worker_first without revisiting this test`
       );
     }

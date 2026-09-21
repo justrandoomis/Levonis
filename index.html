@@ -41,7 +41,36 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#000000" />
-    <title>LEVONIS</title>
+    <title>LEVONIS — متجر الطباعة ثلاثية الأبعاد في العراق</title>
+
+    <!--
+      THE SNIPPET GOOGLE PRINTS UNDER THE LINK.
+
+      This document carried `og:description` and `twitter:description` — which
+      are what a CHAT CARD unfurls from — and no `name="description"` at all.
+      Those are different tags read by different things: PageSpeed's SEO
+      section reports «Document does not have a meta description», and a search
+      engine with nothing to read writes the snippet from whatever scrap of the
+      page it can find. On a SPA whose `#root` is empty, that scrap is nothing.
+
+      A PRODUCT PAGE OVERWRITES THIS before the HTML ever reaches a crawler —
+      `worker/lib/socialPreview.ts` rewrites `description` alongside the two
+      Open Graph tags, for the four `/product/*`-shaped paths that
+      `run_worker_first` sends through the Worker. What stays here is what a
+      search for the SHOP ITSELF should show.
+
+      NO `<link rel="canonical">`, AND THAT IS DELIBERATE. One document is
+      served on the apex AND on every merchant subdomain AND on every SPA
+      route, so a static canonical would tell Google that every page of every
+      shop is this one page — which is worse than having none. A canonical has
+      to be written per request, from the Host and the path, and that belongs
+      with the per-product injection rather than in a file that cannot see
+      either.
+    -->
+    <meta
+      name="description"
+      content="متجر ليفونيس للطباعة ثلاثية الأبعاد في العراق: طابعات FDM وراتنج، خيوط فلامنت، قطع غيار وملحقات، وخدمة طباعة حسب الطلب مع توصيل داخل العراق."
+    />
 
     <!--
       THE SHOP'S OWN FACE, IN THE TAB AND IN THE SHARE CARD.

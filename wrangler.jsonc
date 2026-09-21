@@ -80,7 +80,13 @@
       "/bundles/*",
       "/p/*",
       "/community/store/*",
-      "/manifest.webmanifest"
+      "/manifest.webmanifest",
+      // The two files every crawler asks for. Without these the asset layer
+      // answers both with the SPA shell and a 200 — a crawler reading HTML
+      // where robots.txt should be, and no sitemap at all. Per-host, so a
+      // merchant subdomain names its own URLs (worker/routes/seo.ts).
+      "/robots.txt",
+      "/sitemap.xml"
     ]
   },
 

@@ -219,6 +219,23 @@ export function injectSocialPreview(html: string, preview: SocialPreview): strin
     out = setMeta(out, 'name', 'twitter:title', preview.title);
   }
   if (preview.description) {
+    /**
+     * `name="description"` IS NOT AN OPEN GRAPH TAG, AND IT IS THE ONE SEARCH
+     * ENGINES READ.
+     *
+     * The three lines below used to be two. Open Graph is what a CHAT CARD
+     * unfurls from — Telegram, WhatsApp, Instagram — and every one of the
+     * shop's product pages had it. What none of them had was the ordinary
+     * meta description, because `index.html` carried no such tag for this
+     * function to rewrite: PageSpeed's SEO section reports «Document does not
+     * have a meta description», and Google writes the search snippet from
+     * whatever scrap of the page it can find instead of from the product's
+     * own words.
+     *
+     * `setMeta` adds a tag the document does not have, so this works for both
+     * the shell's new default and any older cached copy without it.
+     */
+    out = setMeta(out, 'name', 'description', preview.description);
     out = setMeta(out, 'property', 'og:description', preview.description);
     out = setMeta(out, 'name', 'twitter:description', preview.description);
   }
