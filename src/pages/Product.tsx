@@ -1065,6 +1065,21 @@ export default function Product() {
   const availability = liveAvailability ?? baseAvailability;
 
   /**
+   * WHICH WAYS OF BUYING ARE ACTUALLY OPEN, straight from the server.
+   *
+   * These three lines used to sit five hundred lines further down, beside the
+   * «طريقة التوفر» chooser they gate. They are hoisted because the header chip
+   * needs them FIRST: a chip that follows the buyer's button press without
+   * asking whether that button still leads anywhere prints «بيع مباشر ·
+   * متوفر» over a product whose last unit sold while the page was open. They
+   * are now hoisted again, above `requestedOrderType`, which needs the same
+   * answer for the same reason — see below.
+   */
+  const modesArr = availability?.modes ?? [];
+  const directUsable = modesArr.some((m) => m.type === 'direct_sale' && m.usable);
+  const preUsable = modesArr.some((m) => m.type === 'pre_order' && m.usable);
+
+  /**
    * THE ORDER TYPE EVERY REQUEST CARRIES — and it is never '' while the page
    * is drawing one of the two «طريقة التوفر» cards as already chosen.
    *
@@ -1086,15 +1101,25 @@ export default function Product() {
    * The fallback here is `lineOrderType`'s own fallback, written out in the
    * same order, so the client and the cart door resolve an untouched selection
    * to the SAME type by construction rather than by coincidence.
+   *
+   * AND THE BUYER'S PRESS ONLY WINS WHILE IT STILL LEADS SOMEWHERE — the same
+   * rule `effectiveMode` states below, for the same reason. Without it, a
+   * buyer who pressed «بيع مباشر» and then chose a colour whose shelf is empty
+   * would keep SENDING `direct_sale`: the quote carries a type the server has
+   * closed, nothing raises a pricing error, and «أضف إلى السلة» stays live for
+   * an add the door refuses with OUT_OF_STOCK. The press is remembered in
+   * `orderType`, so it wins again the moment that shelf refills.
    */
   const requestedOrderType: '' | 'direct_sale' | 'pre_order' =
-    orderType === 'pre_order' || orderType === 'direct_sale'
-      ? orderType
-      : availability?.mode === 'preorder'
-        ? 'pre_order'
-        : availability?.mode === 'direct_sale'
-          ? 'direct_sale'
-          : '';
+    orderType === 'pre_order' && preUsable
+      ? 'pre_order'
+      : orderType === 'direct_sale' && directUsable
+        ? 'direct_sale'
+        : availability?.mode === 'preorder'
+          ? 'pre_order'
+          : availability?.mode === 'direct_sale'
+            ? 'direct_sale'
+            : '';
 
   const priceKey = `${optionValueIds.join(',')}|${colorId}|${requestedOrderType}|${transportMethod}|${warrantyPlanId}`;
   const productSlug = product?.slug ?? '';
@@ -1947,19 +1972,6 @@ export default function Product() {
     priceIsAuthoritative;
 
   /**
-   * WHICH WAYS OF BUYING ARE ACTUALLY OPEN, straight from the server.
-   *
-   * These three lines used to sit fifty lines further down, beside the
-   * «طريقة التوفر» chooser they gate. They are hoisted because the header chip
-   * needs them FIRST: a chip that follows the buyer's button press without
-   * asking whether that button still leads anywhere prints «بيع مباشر ·
-   * متوفر» over a product whose last unit sold while the page was open.
-   */
-  const modesArr = availability?.modes ?? [];
-  const directUsable = modesArr.some((m) => m.type === 'direct_sale' && m.usable);
-  const preUsable = modesArr.some((m) => m.type === 'pre_order' && m.usable);
-
-  /**
    * THE ORDER TYPE IN FORCE — hoisted here so that ONE expression answers
    * "how is this being bought right now" for the whole page.
    *
@@ -2524,8 +2536,17 @@ export default function Product() {
                           );
                           // Any changed dimension asks the server afresh which
                           // fulfilment modes this complete combination offers.
+                          // …AND THE PREVIOUS ANSWER GOES WITH IT. Clearing
+                          // `orderType` alone stopped working the moment the
+                          // page began sending a DERIVED type: the fallback
+                          // reads `availability`, `liveAvailability` is never
+                          // cleared, and the server honours the `preferredType`
+                          // it is handed — so the last option's answer fed the
+                          // next request and re-latched itself. The reset above
+                          // would have been dead code.
                           setOrderType('');
                           setTransportMethod('');
+                          setLiveAvailability(null);
                         }}
                         className="lv-choice flex min-h-[48px] items-center gap-2 px-3 py-1.5 text-sm font-bold"
                       >
@@ -2576,9 +2597,12 @@ export default function Product() {
                     setOptionValueIds(selected ? [] : m.options.length === 1 ? [m.options[0].id] : []);
                     // A new model is a new fulfilment question. Let the server
                     // default it to direct only when that model/colour really
-                    // has stock; do not carry the previous model's answer.
+                    // has stock; do not carry the previous model's answer —
+                    // which now means dropping the previous ANSWER too, not
+                    // just the press. See the option-group handler above.
                     setOrderType('');
                     setTransportMethod('');
+                    setLiveAvailability(null);
                   }}
                   className="lv-choice flex min-h-[50px] max-w-full items-center gap-2 px-2.5 py-1.5 text-sm font-bold"
                 >
@@ -2689,8 +2713,11 @@ export default function Product() {
                   aria-pressed={selected}
                   onClick={() => {
                     setOptionValueIds(selected ? [] : [opt.id]);
+                    // The previous answer goes with the press — see the
+                    // option-group handler above.
                     setOrderType('');
                     setTransportMethod('');
+                    setLiveAvailability(null);
                   }}
                   className="lv-choice flex items-center gap-2 px-3 py-1.5 text-sm font-bold"
                 >
@@ -2999,15 +3026,13 @@ export default function Product() {
             </p>
           ))
         : null}
-      {/* …and again beside the button it disables, because that is where a
-          buyer who scrolled past the panel is standing. `selection.errors`
-          could never carry this: it is built from option and colour codes
-          only (worker/routes/products.ts). */}
-      {!routeReady && mode !== 'unavailable' ? (
-        <p className="lv-alert lv-alert-warning text-amber-100 text-[13px]" data-transport-required-note>
-          {reasonText(s, 'TRANSPORT_REQUIRED')}
-        </p>
-      ) : null}
+      {/* NO SECOND COPY BESIDE THE BUTTON. Now that the page always states the
+          type, a routeless pre-order makes the resolver raise
+          TRANSPORT_REQUIRED (packages/pricing/src/pricing.ts), so
+          `blockingCodes` above already prints that sentence here, in this same
+          stack, immediately over the CTA. The legend chip on the transport
+          panel points at the control that answers it; a third copy between
+          them was just noise. */}
       {availability && !availability.qty_ok && mode !== 'unavailable' ? (
         <p className="lv-alert lv-alert-warning text-amber-100 text-[13px]">
           {s.qtyCapped.replace('{n}', String(availability.stock.max_qty))}

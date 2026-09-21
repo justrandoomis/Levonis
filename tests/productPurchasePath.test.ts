@@ -87,14 +87,40 @@ test('picking a colour does not undo the two panels above it', () => {
   assert.ok(!/setTransportMethod\(''\)/.test(tap![1]), 'nor the chosen route');
 });
 
-test('a disabled button always has a sentence beside it', () => {
-  // The route refusal is the one gate `selection.errors` cannot carry, so it
-  // needs its own two sentences: one at the panel that answers it, and one
-  // beside the button it disables.
-  assert.match(page, /data-transport-required[\s\S]{0,160}reasonText\(s, 'TRANSPORT_REQUIRED'\)/);
-  assert.match(page, /data-transport-required-note[\s\S]{0,160}reasonText\(s, 'TRANSPORT_REQUIRED'\)/);
-  // …and the code it prints is translated in all three languages, not shown raw.
+test('a disabled button always has a sentence beside it — and only one', () => {
+  // The panel that ANSWERS the refusal carries the hint, beside the control.
+  assert.match(page, /data-transport-required[\s\S]{0,200}reasonText\(s, 'TRANSPORT_REQUIRED'\)/);
+  // Beside the BUTTON there must be exactly one copy, and it is the quote's
+  // own: the page always states the order type now, so a routeless pre-order
+  // makes the resolver raise TRANSPORT_REQUIRED and `blockingCodes` prints it
+  // in the alert stack over the CTA. A second hand-written copy there put the
+  // same sentence on screen twice, adjacent.
+  assert.ok(!page.includes('data-transport-required-note'), 'no second copy in the alert stack');
+  assert.match(page, /blockingCodes\.map\(\(code\) => \(/);
+
+  // …and the code is translated in all three languages, never shown raw.
   for (const lang of ["'اختر وسيلة النقل.'", "'Choose a transport method.'", "'شێوازی گواستنەوە هەڵبژێرە.'"]) {
     assert.ok(page.includes(`TRANSPORT_REQUIRED: ${lang}`), `TRANSPORT_REQUIRED is missing ${lang}`);
   }
+  // The cart door keeps that code rather than flattening it into 'VALIDATION',
+  // so the refusal reaches the customer in their own language.
+  const cart = readFileSync(join(ROOT, 'worker/routes/cart.ts'), 'utf8');
+  assert.match(
+    cart,
+    /resolved\.errors\.length === 1 && resolved\.errors\[0\] === 'TRANSPORT_REQUIRED'/,
+  );
+});
+
+test('a new option drops the previous option\u2019s ANSWER, not just the press', () => {
+  // The reset is `setOrderType('')`, and the request type falls back to
+  // `availability` — which is `liveAvailability ?? baseAvailability` and is
+  // never cleared. The server honours the `preferredType` it is handed, so
+  // without this the last option's answer fed the next request and re-latched
+  // itself: the reset would have been dead code, and a buyer who had already
+  // picked a route would find it cleared with the pre-order card still ticked.
+  const resets = page.match(/setOrderType\(''\);\n\s*setTransportMethod\(''\);\n\s*setLiveAvailability\(null\);/g) ?? [];
+  assert.equal(resets.length, 3, 'all three option handlers drop the cached answer');
+  // No handler clears the press without clearing the answer with it.
+  const stray = page.match(/setOrderType\(''\);/g) ?? [];
+  assert.equal(stray.length, resets.length, 'no reset left half-done');
 });

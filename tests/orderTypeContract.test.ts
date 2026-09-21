@@ -55,7 +55,15 @@ test('the product page sends the order type it was told, and never one it guesse
   // door agree by construction.
   const derived = /const requestedOrderType: '' \| 'direct_sale' \| 'pre_order' =([\s\S]*?);\n/.exec(page);
   assert.ok(derived, 'the page derives ONE type for its requests');
-  assert.match(derived![1], /orderType === 'pre_order' \|\| orderType === 'direct_sale'/, "the buyer's press wins");
+  // The buyer's press wins — but only while it still leads somewhere, the same
+  // rule `effectiveMode` applies to the header chip. A press the server has
+  // since closed must not keep being SENT: nothing raises a pricing error for
+  // it, so the button would stay live for an add the door refuses.
+  assert.match(derived![1], /orderType === 'pre_order' && preUsable/);
+  assert.match(derived![1], /orderType === 'direct_sale' && directUsable/);
+  // …and the two booleans it needs are declared ABOVE it.
+  const usableAt = page.indexOf('const directUsable =');
+  assert.ok(usableAt > 0 && usableAt < page.indexOf('const requestedOrderType:'));
   assert.match(derived![1], /availability\?\.mode === 'preorder'[\s\S]{0,120}'pre_order'/);
   assert.match(derived![1], /availability\?\.mode === 'direct_sale'[\s\S]{0,120}'direct_sale'/);
   assert.match(derived![1], /: '';?\s*$/, "'' survives: no usable mode is still no answer");

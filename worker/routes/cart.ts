@@ -1525,6 +1525,18 @@ cartRoutes.post('/items', async (c) => {
   if (offerPriceRefusal(resolved.errors)) {
     throw badRequest('This offer is not available right now', 'OFFER_INACTIVE');
   }
+  // A MISSING ROUTE KEEPS ITS OWN CODE. Now that the product page always
+  // states the order type, the resolver narrows `saleTypes` to the stated one
+  // and raises TRANSPORT_REQUIRED here (packages/pricing/src/pricing.ts) —
+  // ninety lines before the door's own guard below can be reached. Flattening
+  // it to 'VALIDATION' handed the customer an untranslated code inside an
+  // English sentence, when the page already speaks this one in all three
+  // languages. The guard below still answers the legacy shape: a body with
+  // NEITHER field on a product that sells both ways, which the resolver cannot
+  // narrow and therefore never flags.
+  if (resolved.errors.length === 1 && resolved.errors[0] === 'TRANSPORT_REQUIRED') {
+    throw badRequest('Choose a shipping method for this pre-order', 'TRANSPORT_REQUIRED');
+  }
   if (resolved.errors.length > 0) {
     throw badRequest(`Invalid selection: ${resolved.errors.join(', ')}`, 'VALIDATION');
   }
