@@ -178,6 +178,17 @@ export interface MediaRefSource {
  */
 export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   // ---- the catalogue ----------------------------------------------------
+  /**
+   * A SECTION'S OWN COVER — the one picture on the home page that an admin
+   * CHOSE rather than the storefront borrowing one (migration 0100).
+   *
+   * It is not narrowed by `active`. A deactivated section still holds its
+   * artwork and the owner reactivates sections routinely, so letting the
+   * sweeper take the file the moment a section is switched off would make
+   * "deactivate, then activate again" silently lose the picture. The object is
+   * two kilobytes; the re-upload is the expensive thing.
+   */
+  { table: 'catalogs', column: 'image_key', kind: 'text', why: 'the cover an admin set for a section on the home page (0100)' },
   { table: 'product_images', column: 'r2_key', kind: 'text', why: 'the canonical product image key (0048)' },
   { table: 'product_images', column: 'url', kind: 'text', why: 'the delivery path for the same image; older rows have only this' },
   { table: 'product_option_values', column: 'image', kind: 'text', why: 'per-option swatch' },

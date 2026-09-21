@@ -58,6 +58,22 @@ export const UPLOAD_CLASSES: readonly BodyClass[] = [
   // the route refuses anything else by magic bytes — so the gateway's ceiling
   // is the route's own limit rather than the generic 40 MB upload class.
   { prefix: '/api/admin/site-media', methods: ['POST'], kind: 'multipart', maxBytes: 2 * MB, source: 'worker/lib/siteMedia.ts#SITE_MEDIA_MAX_BYTES', routeFile: 'admin.ts' },
+  /**
+   * The picture an admin puts on a section's home-page card (migration 0100).
+   *
+   * The SAME ceiling and the same constant as the brand marks beside it, and
+   * deliberately not a second number: both are main-page artwork, both are
+   * refused unless the magic bytes say WebP, and both land in
+   * `UiUx/MainPage/`. A separate limit here would be a second answer to one
+   * question, and the one that drifted would be found by an owner whose upload
+   * was refused for a reason the panel could not explain.
+   *
+   * The prefix carries `/catalogs` rather than being the whole taxonomy mount:
+   * everything else under `/api/admin/taxonomy` is JSON and must stay on the
+   * 4 MB admin class, and the suffix `/image` cannot be expressed here because
+   * a class matches a prefix, not a pattern.
+   */
+  { prefix: '/api/admin/taxonomy/catalogs', methods: ['POST'], kind: 'multipart', maxBytes: 2 * MB, source: 'worker/lib/siteMedia.ts#SITE_MEDIA_MAX_BYTES', routeFile: 'adminTaxonomy.ts' },
 ];
 
 export const JSON_CLASSES: readonly BodyClass[] = [

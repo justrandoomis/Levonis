@@ -113,8 +113,15 @@ test('a database with NO d1_migrations table is UNKNOWN, not behind', async () =
 test('a database AHEAD of the code is reported, not treated as an error', async () => {
   // The ordinary state during a rollback: the database has run something this
   // Worker has never heard of. The reader wants to know; it is not a fault.
+  //
+  // `9999_`, not the next real number. This line used to read
+  // `0100_from_the_future.sql`, which stopped being fictional the day
+  // migration 0100 was written — the fabricated file collided with the real
+  // newest one and the test failed for a reason that had nothing to do with
+  // what it checks. A number no migration will ever reach cannot collide
+  // again.
   const raw = freshDb();
-  recordApplied(raw, [...migrations(), '0100_from_the_future.sql']);
+  recordApplied(raw, [...migrations(), '9999_from_the_future.sql']);
   const s = await readSchemaStatus(asD1(raw));
   assert.equal(s.state, 'ahead');
   assert.equal(s.behind, 0);

@@ -28,6 +28,13 @@ export interface CatalogNode {
   template_family: TemplateFamily | null;
   effective_template_family: TemplateFamily | null;
   product_count: number;
+  /**
+   * The `/files/...` path of the picture this section shows on the home page,
+   * or '' when none has been uploaded (migration 0100). A URL and never the
+   * stored key — the worker resolves it so this panel and the storefront
+   * cannot disagree about what `UiUx/MainPage/` means.
+   */
+  image_url: string;
 }
 
 export interface BrandRow {

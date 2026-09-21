@@ -14,6 +14,16 @@ import {
 } from '../lib/templateFamilies';
 import { findHashtagRow, hashtagKey, hashtagUsage, normalizeHashtag, rewriteHashtag, type HashtagUsage } from '../lib/hashtags';
 import { catalogTreeWithCounts } from '../lib/catalogMembership';
+import { putMediaObject } from '../lib/mediaStorage';
+import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
+import { sniff } from './uploads';
+import {
+  SITE_MEDIA_MAX_BYTES,
+  SITE_MEDIA_MIME,
+  catalogImageUrl,
+  mintCatalogImageObject,
+  siteMediaKey,
+} from '../lib/siteMedia';
 import { normalizeText } from '../lib/search/normalize';
 import { degradeIfSchemaMissing } from '../lib/membershipBenefits';
 
@@ -53,6 +63,12 @@ export interface CatalogRow {
   is_printer_catalog: number;
   active: number;
   template_family: string | null;
+  /**
+   * The FULL media key of the cover an admin set for this section, or ''.
+   * Migration 0100; see worker/lib/siteMedia.ts for why it is a whole key
+   * rather than the bare object name the brand and service slots store.
+   */
+  image_key: string;
 }
 
 /** URL-safe slug from an English name; Arabic/Kurdish names fall back to the
@@ -236,6 +252,10 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
         ...r,
         is_printer_catalog: !!r.is_printer_catalog,
         active: !!r.active,
+        // The panel gets the URL, not the key, for the same reason the
+        // storefront does: one place turns a stored key into something that
+        // can be put in an `src`, and it re-validates while it is there.
+        image_url: catalogImageUrl(r.image_key),
         effective_template_family: family,
         product_type: type,
         product_count: countById.get(r.id) ?? 0,
@@ -387,6 +407,115 @@ adminTaxonomyRoutes.delete('/catalogs/:id', async (c) => {
   await c.env.DB.prepare('DELETE FROM catalogs WHERE id = ?').bind(id).run();
   await audit(c.env.DB, admin.id, 'catalog.delete', id, { slug: row.slug });
   return c.json({ success: true, deleted: true, deactivated: false });
+});
+
+// --------------------------------------------------------- a section's cover
+//
+// THE PICTURE A SUB-SECTION SHOWS ON THE HOME PAGE.
+//
+// Until now `CategoryBoard` BORROWED one — the first photo among the products
+// the first screen happened to have fetched, filed under that section. Nobody
+// chose it: which of eight filaments represented «خيوط PLA» depended on query
+// order, and a section whose products were not among the thirty on screen drew
+// its monogram no matter what artwork existed. This is the door that lets the
+// owner decide.
+//
+// WHY NOT `/api/admin/site-media/:slot`. That route's slots are a FIXED LIST
+// IN CODE (worker/lib/siteMedia.ts) — one per brand mark, one per service
+// card — and `findSiteMediaSlot` refuses anything not in it. Sections are
+// rows: the owner creates and deletes them from this very screen, so there is
+// no slot to name and the pointer belongs on the row. The rules are the same
+// though — WebP only, two megabytes, `UiUx/MainPage/`, a new object name every
+// time — and they are shared rather than re-stated: the constants and the mint
+// come from that module.
+
+const CATALOG_IMAGE_MB = Math.round(SITE_MEDIA_MAX_BYTES / 1024 / 1024);
+
+/** The row, or a 404 — both routes below start the same way. */
+async function catalogOr404(db: D1Database, id: string): Promise<CatalogRow> {
+  const row = await db.prepare('SELECT * FROM catalogs WHERE id = ?').bind(id).first<CatalogRow>();
+  if (!row) throw notFound('Section not found');
+  return row;
+}
+
+adminTaxonomyRoutes.post('/catalogs/:id/image', async (c) => {
+  const admin = c.get('user')!;
+  const id = c.req.param('id');
+  const row = await catalogOr404(c.env.DB, id);
+
+  const form = await c.req.formData().catch(() => null);
+  if (!form) throw badRequest('Expected multipart form data');
+  const file = form.get('file');
+  if (!(file instanceof File)) throw badRequest('No file uploaded');
+  if (file.size > SITE_MEDIA_MAX_BYTES) {
+    throw badRequest(
+      `الصورة أكبر من الحد (${CATALOG_IMAGE_MB} ميغابايت) / Image is larger than ${CATALOG_IMAGE_MB} MB`,
+      'SITE_MEDIA_TOO_LARGE'
+    );
+  }
+
+  // MAGIC BYTES, NOT THE FILENAME AND NOT THE BROWSER'S CONTENT-TYPE. The
+  // owner's rule is that site artwork is WebP; a `.webp` extension on a PNG
+  // would satisfy a name check and then be served with the wrong type for a
+  // year under an `immutable` header.
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const kind = sniff(buf);
+  if (!kind || kind.mime !== SITE_MEDIA_MIME) {
+    throw badRequest(
+      'صورة القسم يجب أن تكون WebP فقط / A section image must be a WebP',
+      'SITE_MEDIA_NOT_WEBP'
+    );
+  }
+  const dimensions = rasterDimensions(buf, kind.mime);
+  if (!validRasterDimensions(dimensions)) {
+    throw badRequest('The image has invalid or unsupported dimensions', 'BAD_IMAGE_DIMENSIONS');
+  }
+
+  const object = mintCatalogImageObject(id, newId());
+  const key = siteMediaKey(object);
+  // The R2 write happens BEFORE the pointer moves. The other order would let a
+  // failed upload leave `image_key` naming an object that was never stored —
+  // a broken picture on the first screen, which is worse than the monogram
+  // this replaces. A write that succeeds and is then orphaned by a D1 failure
+  // costs two kilobytes the sweeper can reclaim.
+  await putMediaObject(
+    c.env,
+    {
+      key,
+      visibility: 'public',
+      domain: 'ui',
+      mime: kind.mime,
+      bytes: buf.byteLength,
+      ownerId: admin.id,
+      entityId: id,
+      width: dimensions?.width ?? null,
+      height: dimensions?.height ?? null,
+      originalName: String(form.get('originalName') || file.name),
+    },
+    buf,
+    { httpMetadata: { contentType: kind.mime, cacheControl: 'public, max-age=31536000, immutable' } }
+  );
+
+  const previous = String(row.image_key ?? '');
+  await c.env.DB.prepare('UPDATE catalogs SET image_key = ? WHERE id = ?').bind(key, id).run();
+  await audit(c.env.DB, admin.id, 'catalog.image_set', id, { key, previous, bytes: buf.byteLength });
+
+  return c.json({ success: true, image_key: key, image_url: catalogImageUrl(key) });
+});
+
+/**
+ * Take the picture off the section. The OBJECT is left in R2 — the media
+ * sweeper owns deletion, and it is the only thing that can see whether some
+ * other row still points at the same bytes.
+ */
+adminTaxonomyRoutes.delete('/catalogs/:id/image', async (c) => {
+  const admin = c.get('user')!;
+  const id = c.req.param('id');
+  const row = await catalogOr404(c.env.DB, id);
+  const previous = String(row.image_key ?? '');
+  await c.env.DB.prepare("UPDATE catalogs SET image_key = '' WHERE id = ?").bind(id).run();
+  await audit(c.env.DB, admin.id, 'catalog.image_cleared', id, { previous });
+  return c.json({ success: true, image_key: '', image_url: '' });
 });
 
 // -------------------------------------------------------------------- facets

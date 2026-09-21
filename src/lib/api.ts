@@ -1309,6 +1309,18 @@ export interface HomeTaxon {
   /** Active products in this catalog OR anywhere below it. */
   product_count: number;
   /**
+   * The `/files/...` path of the picture an ADMIN chose for this section, or
+   * '' when they have not chosen one (migration 0100).
+   *
+   * Empty is the ordinary case and not a failure: CategoryBoard then borrows a
+   * photo from a product already on the page, and draws the section's monogram
+   * when there is not even one of those. The three states are ranked in that
+   * order deliberately — an authored picture is a decision, a borrowed one is
+   * a guess, and the monogram is the designed state for a section with no
+   * artwork at all.
+   */
+  image_url?: string;
+  /**
    * The sub-sections that actually hold products — «الأقسام الفرعية التي فيها
    * المنتجات». Present on a main section, absent on a brand and on a child.
    * An empty array means the section's products are all filed at its own

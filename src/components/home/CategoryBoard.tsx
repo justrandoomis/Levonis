@@ -96,42 +96,57 @@ function tintOf(id: string): string {
 }
 
 /**
- * The picture, or the monogram when there is not one — and when there is one
- * that does not load.
+ * The best picture that actually loads, or the monogram when none does.
  *
  * THIS IS NOT SafeImage, and that is the point. SafeImage's failure state
  * renders a RETRY BUTTON (src/components/ui/SafeImage.tsx:128-136), and these
  * plates live inside a `<Link>`: a button inside an anchor is interactive
  * content nested in interactive content, which no browser agrees on and no
  * keyboard user can escape cleanly. A broken cover here has a better answer
- * anyway — the monogram, which is already the designed state for a section
- * with no photo at all. A shopper cannot tell the two apart, and should not
- * have to.
+ * anyway — the next candidate, and failing that the monogram, which is already
+ * the designed state for a section with no photo at all. A shopper cannot tell
+ * the three apart, and should not have to.
+ *
+ * WHY IT TAKES A LIST AND NOT A URL. Since migration 0100 a section can have a
+ * picture its OWNER chose as well as one BORROWED from a product on the page,
+ * and they rank in that order. A single `cover` prop would force the caller to
+ * pick before it knows whether the winner loads, so an authored cover whose
+ * object is missing from R2 would drop straight past a perfectly good product
+ * photo to the monogram. The candidates arrive ranked and this walks them.
+ *
+ * Failures are tracked BY URL rather than by index: `sources` is rebuilt on
+ * every render of the board, and an index would silently point at a different
+ * picture the moment the borrowed photo changed.
  */
 function CoverPlate({
-  cover,
+  sources,
   tint,
   monogram,
   className,
   imgClassName = '',
 }: {
-  cover?: string;
+  /** Candidate URLs, best first. Empty and `undefined` entries are ignored. */
+  sources: Array<string | undefined>;
   tint: string;
   monogram: string;
   className: string;
   imgClassName?: string;
 }) {
-  const [broken, setBroken] = useState(false);
-  const usable = cover && !broken;
+  const [failed, setFailed] = useState<readonly string[]>([]);
+  const cover = sources.find((s): s is string => !!s && !failed.includes(s));
   return (
     <span className={`block overflow-hidden bg-black ${className}`}>
-      {usable ? (
+      {cover ? (
         <img
+          // `key` remounts the element when the candidate changes, so the new
+          // src gets a fresh load cycle rather than inheriting the error state
+          // of the one it replaced.
+          key={cover}
           src={cover}
           alt=""
           loading="lazy"
           decoding="async"
-          onError={() => setBroken(true)}
+          onError={() => setFailed((f) => (f.includes(cover) ? f : [...f, cover]))}
           className={`w-full h-full object-cover ${imgClassName}`}
         />
       ) : (
@@ -151,7 +166,7 @@ function CoverPlate({
  * narrow enough that a phone shows two and a half of them — the half is the
  * affordance that says the rail scrolls.
  */
-function SubCard({ node, cover }: { node: HomeTaxon; cover?: string }) {
+function SubCard({ node, covers }: { node: HomeTaxon; covers: Array<string | undefined> }) {
   const { loc, lang } = useLanguage();
   const name = loc(node.name_ar, node.name_en || node.name_ar, node.name_ckb);
   return (
@@ -162,7 +177,7 @@ function SubCard({ node, cover }: { node: HomeTaxon; cover?: string }) {
       className="group snap-start shrink-0 flex w-[132px] sm:w-[150px] flex-col overflow-hidden rounded-xl border border-border-subtle bg-surface hover:bg-surface-raised hover:border-gold/40 transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
       <CoverPlate
-        cover={cover}
+        sources={covers}
         tint={`text-2xl ${tintOf(node.id)}`}
         monogram={monogramOf(name)}
         className="aspect-[4/3]"
@@ -188,7 +203,7 @@ function SubCard({ node, cover }: { node: HomeTaxon; cover?: string }) {
  * of. Its accessible name carries the department, because «عرض الكل» on its
  * own is not a destination.
  */
-function DoorCard({ category, cover }: { category: HomeTaxon; cover?: string }) {
+function DoorCard({ category, covers }: { category: HomeTaxon; covers: Array<string | undefined> }) {
   const { loc, t } = useLanguage();
   const name = loc(category.name_ar, category.name_en || category.name_ar, category.name_ckb);
   return (
@@ -200,7 +215,7 @@ function DoorCard({ category, cover }: { category: HomeTaxon; cover?: string }) 
       className="group flex items-center gap-3 rounded-xl border border-border-subtle bg-surface hover:bg-surface-raised hover:border-gold/40 transition-colors p-2.5 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
       <CoverPlate
-        cover={cover}
+        sources={covers}
         tint={`text-xl ${tintOf(category.id)}`}
         monogram={monogramOf(name)}
         className="w-16 h-16 shrink-0 rounded-lg"
@@ -218,7 +233,8 @@ function CategoryShelf({
   coverOf,
 }: {
   category: HomeTaxon;
-  coverOf: (id: string) => string | undefined;
+  /** Takes the NODE, not its id: the authored picture rides on the node. */
+  coverOf: (node: HomeTaxon) => Array<string | undefined>;
 }) {
   const { loc } = useLanguage();
   // `useRail` owns the RTL scroll conventions, the snap padding and the
@@ -266,11 +282,11 @@ function CategoryShelf({
           className="flex gap-2.5 sm:gap-3 overflow-x-auto overscroll-x-contain hide-scrollbar pt-1 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x"
         >
           {children.map((child) => (
-            <SubCard key={child.id} node={child} cover={coverOf(child.id)} />
+            <SubCard key={child.id} node={child} covers={coverOf(child)} />
           ))}
         </div>
       ) : (
-        <DoorCard category={category} cover={coverOf(category.id)} />
+        <DoorCard category={category} covers={coverOf(category)} />
       )}
     </div>
   );
@@ -305,6 +321,23 @@ export default function CategoryBoard({
     return map;
   }, [products]);
 
+  /**
+   * THE THREE ANSWERS, IN THE ORDER A HUMAN WOULD RANK THEM.
+   *
+   * 1. The picture the OWNER set on this section from the admin panel
+   *    («صورة القسم»). A decision, so nothing may overrule it.
+   * 2. A photo borrowed from a product already filed under the section. A
+   *    guess, and the only answer this component had before migration 0100 —
+   *    kept, because it still dresses the sections nobody has got to yet.
+   * 3. The monogram, drawn by CoverPlate when it receives no cover at all.
+   *
+   * Written as a preference and not as a merge into `covers`: a section whose
+   * authored picture 404s must fall through to the borrowed photo rather than
+   * to nothing, and CoverPlate's `onError` latch can only do that if the two
+   * are still distinguishable at the moment it is asked.
+   */
+  const coverOf = (node: HomeTaxon): Array<string | undefined> => [node.image_url, covers.get(node.id)];
+
   if (categories.length === 0) return null;
 
   return (
@@ -315,7 +348,7 @@ export default function CategoryBoard({
           replacing the thing they were meant to sit beside. */}
       <SectionHeader title={t('browseCategories')} accent="bg-olive" to="/products" />
       {categories.map((category) => (
-        <CategoryShelf key={category.id} category={category} coverOf={(id) => covers.get(id)} />
+        <CategoryShelf key={category.id} category={category} coverOf={coverOf} />
       ))}
     </section>
   );

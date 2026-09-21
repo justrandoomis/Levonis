@@ -270,3 +270,63 @@ export function resolveSiteMedia(stored: unknown): ResolvedSiteMedia[] {
     };
   });
 }
+
+// ===========================================================================
+//  A SECTION'S OWN PICTURE
+// ===========================================================================
+
+/**
+ * THE SAME PREFIX, A DIFFERENT KIND OF OWNER.
+ *
+ * Everything above is a SLOT: a fixed position in code, one per brand mark and
+ * one per service card, whose id the storefront hard-codes. A section is a
+ * ROW — the owner creates, renames and deletes them from the admin panel —
+ * so its picture cannot be a slot and is stored on the row itself
+ * (`catalogs.image_key`, migration 0100).
+ *
+ * It shares `UiUx/MainPage/` because it is the same kind of file and it hangs
+ * on the same screen: artwork the shop owns, that every signed-out visitor
+ * loads on the first paint, and that `isAnonymousPublicMediaKey` already
+ * serves without a session. A key under any other prefix would ask a
+ * first-time visitor to sign in to see a category card.
+ *
+ * WHAT IS STORED IS THE WHOLE KEY, not the bare object name the slots use:
+ * `catalogs.image_key` is walked by the media sweeper as an ordinary text
+ * column, and a filename with no prefix matches nothing in the bucket. See
+ * migration 0100 and worker/lib/mediaRefs.ts.
+ */
+
+/**
+ * The object a fresh catalog cover is written under.
+ *
+ * NEVER a stable name derived from the catalog alone. `/files/*` stamps public
+ * keys `immutable` for a year, so a second upload for the same section must
+ * land on a different key or the browsers that already hold the first one keep
+ * drawing it. `token` is supplied by the caller for the same reason it is in
+ * `mintSiteMediaObject` — so this stays pure and the tests need no stub.
+ */
+export function mintCatalogImageObject(catalogId: string, token: string): string {
+  const stem = String(catalogId).replace(/[^A-Za-z0-9-]/g, '').slice(0, 40) || 'section';
+  const suffix = String(token).replace(/[^A-Za-z0-9]/g, '').slice(0, 16).toLowerCase() || 'v';
+  return `catalog-${stem}-${suffix}.webp`;
+}
+
+/**
+ * Is this a key a section cover may actually be stored at?
+ *
+ * The column round-trips through D1 and is read back by the storefront, so it
+ * is re-checked on the way OUT rather than trusted: it must sit inside
+ * `UiUx/MainPage/`, be a WebP (the owner's standing rule for site artwork),
+ * and survive `isSafeMediaKey` — which is what rejects a traversal, an
+ * absolute URL, or a key pointed at somebody's private upload.
+ */
+export function isCatalogImageKey(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.startsWith(MAIN_PAGE_PREFIX)) return false;
+  const object = value.slice(MAIN_PAGE_PREFIX.length);
+  return isSiteMediaObject(object);
+}
+
+/** The `/files/...` path for a stored cover, or '' when there is no usable one. */
+export function catalogImageUrl(key: unknown): string {
+  return isCatalogImageKey(key) ? `/files/${key}` : '';
+}

@@ -82,6 +82,9 @@ export const MEMBERSHIP_CTE = `
      WHERE p.status = 'active' AND p.sub_category_id IS NOT NULL AND p.sub_category_id <> ''
   )`;
 
+import { catalogImageUrl } from './siteMedia';
+import { isSchemaMissing } from './membershipBenefits';
+
 /**
  * Each catalog paired with itself and every ancestor above it, so a count
  * grouped by `ancestor_id` is descendant-inclusive.
@@ -113,6 +116,17 @@ export interface CatalogNode {
   sort: number;
   /** Active products in this catalog OR anywhere below it. */
   product_count: number;
+  /**
+   * The `/files/...` path of the cover an ADMIN set for this section, or ''.
+   *
+   * A URL and not the stored key, because this shape is serialised straight
+   * into `/api/home`: the storefront draws category cards and has no business
+   * knowing what `UiUx/MainPage/` is or how a media key is turned into a
+   * request. Empty means the section has no authored picture, which is not an
+   * error — CategoryBoard then borrows a product photo, and failing that draws
+   * the monogram, exactly as it did before 0100 existed.
+   */
+  image_url: string;
   /** Sub-catalogs that hold at least one product. Only set on a root. */
   children?: CatalogNode[];
 }
@@ -126,20 +140,15 @@ interface CatalogCountRow {
   name_ckb: string;
   sort: number;
   product_count: number;
+  image_url: string;
 }
 
 /**
- * The whole active catalog tree with descendant-inclusive counts, in ONE read.
- *
- * One query rather than one per catalog: a taxonomy is tens of rows, and the
- * home page is the shop's first screen. Inactive catalogs are excluded from
- * the OUTPUT but not from the ancestor walk — deactivating a middle branch
- * must not detach its children's products from the root they belong to.
+ * The tree query. `cover` is spliced in rather than fixed, because the first
+ * screen must still render on a database that has not had migration 0100 yet
+ * — see `catalogTreeWithCounts` below.
  */
-export async function catalogTreeWithCounts(db: D1Database): Promise<CatalogCountRow[]> {
-  const { results } = await db
-    .prepare(
-      `WITH RECURSIVE ${ANCESTORS_CTE},
+const treeSql = (cover: string) => `WITH RECURSIVE ${ANCESTORS_CTE},
        ${MEMBERSHIP_CTE},
        counted AS (
          SELECT a.ancestor_id AS id, COUNT(DISTINCT m.product_id) AS n
@@ -149,14 +158,91 @@ export async function catalogTreeWithCounts(db: D1Database): Promise<CatalogCoun
           GROUP BY a.ancestor_id
        )
        SELECT c.id, c.parent_id, c.slug, c.name_ar, c.name_en, c.name_ckb, c.sort,
-              COALESCE(k.n, 0) AS product_count
+              COALESCE(k.n, 0) AS product_count,
+              ${cover} AS image_key
          FROM catalogs c
          LEFT JOIN counted k ON k.id = c.id
         WHERE c.active = 1
-        ORDER BY c.sort, COALESCE(NULLIF(c.name_en, ''), c.name_ar)`
-    )
-    .all<CatalogCountRow>();
-  return (results ?? []).map((r) => ({ ...r, product_count: Number(r.product_count) || 0 }));
+        ORDER BY c.sort, COALESCE(NULLIF(c.name_en, ''), c.name_ar)`;
+
+/**
+ * Is `e` the absence of `catalogs.image_key`, and nothing else?
+ *
+ * THE SAME SHAPE, AND THE SAME NARROWNESS, AS `isConditionColumnMissing`
+ * (worker/lib/conditionProjection.ts), which exists because a Worker carrying
+ * migration 0085 once reached production over a database still at 0083 and
+ * `/api/home` answered HTTP 500 for the WHOLE first screen — products,
+ * categories and brands included — over one unreadable optional shelf.
+ * Migration 0100 creates exactly that window again, and this is what closes
+ * it: the code and the migration are deployed by two different workflow steps
+ * and there is no ordering that removes the gap entirely.
+ *
+ * SUBSTITUTION, NOT DEGRADE, and the distinction is arithmetic rather than
+ * judgement. `image_key` is declared `TEXT NOT NULL DEFAULT ''` and `''` means
+ * "no authored picture", so a column that does not exist yet can hold nothing
+ * else: the instant 0100 runs, every pre-existing row carries `''`. A section
+ * drawn with a borrowed product photo on a pre-0100 database is not a guess
+ * about what the owner chose — it is what they had chosen, one migration
+ * early.
+ *
+ * Everything else re-throws. A missing `catalogs` TABLE must not render as a
+ * shop with no departments, and any OTHER absent column could be hiding real
+ * rows behind an empty answer.
+ */
+async function isCatalogImageColumnMissing(db: D1Database, e: unknown): Promise<boolean> {
+  if (!isSchemaMissing(e)) return false;
+  let cols: { name: string }[];
+  try {
+    const { results } = await db.prepare('PRAGMA table_info(catalogs)').all<{ name: string }>();
+    cols = results ?? [];
+  } catch {
+    // If we cannot even ask, we do not get to assume. Re-throw.
+    return false;
+  }
+  if (cols.length === 0) return false; // the TABLE is gone, not the column
+  if (cols.some((c) => String(c.name) === 'image_key')) return false; // something else failed
+  console.error(
+    'catalogs.image_key is behind the deployment (migration 0100 has not been applied); ' +
+      'section covers fall back to a product photo until it is'
+  );
+  return true;
+}
+
+/**
+ * The whole active catalog tree with descendant-inclusive counts, in ONE read.
+ *
+ * One query rather than one per catalog: a taxonomy is tens of rows, and the
+ * home page is the shop's first screen. Inactive catalogs are excluded from
+ * the OUTPUT but not from the ancestor walk — deactivating a middle branch
+ * must not detach its children's products from the root they belong to.
+ *
+ * The retry costs a correctly migrated database nothing: the second statement
+ * is only ever prepared after the first has already refused for missing
+ * schema, which on a migrated database never happens.
+ */
+export async function catalogTreeWithCounts(db: D1Database): Promise<CatalogCountRow[]> {
+  const read = async (cover: string) =>
+    (await db.prepare(treeSql(cover)).all<CatalogCountRow & { image_key?: unknown }>()).results ?? [];
+
+  let rows: Array<CatalogCountRow & { image_key?: unknown }>;
+  try {
+    rows = await read("COALESCE(c.image_key, '')");
+  } catch (e) {
+    if (!(await isCatalogImageColumnMissing(db, e))) throw e;
+    rows = await read("''");
+  }
+
+  // `image_key` is turned into a URL HERE and the key itself is dropped, so
+  // the only representation that ever leaves the worker is the one the
+  // storefront can use. `catalogImageUrl` re-validates on the way out: the
+  // column is written by one admin route but it is still a text column in a
+  // database a future import could touch, and a bad value must degrade to "no
+  // picture" rather than to a broken <img> on the first screen.
+  return rows.map(({ image_key, ...r }) => ({
+    ...r,
+    product_count: Number(r.product_count) || 0,
+    image_url: catalogImageUrl(image_key),
+  }));
 }
 
 /**

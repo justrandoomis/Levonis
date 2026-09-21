@@ -207,13 +207,39 @@ test('small counts clear the contrast floor — zinc-500 does not', () => {
   assert.doesNotMatch(header, /text-\[12px\][^"`]*text-zinc-500/);
 });
 
-test('a broken cover falls back to the monogram, and never nests a button inside a link', () => {
+test('a broken cover falls back rather than staying broken, and never nests a button inside a link', () => {
   const src = read('src/components/home/CategoryBoard.tsx');
   // SafeImage's failure state renders a retry BUTTON, and these plates live
   // inside a <Link>. Interactive content inside interactive content is
   // something no browser agrees on and no keyboard user escapes cleanly.
   assert.doesNotMatch(src, /SafeImage/, 'the card draws its own image');
-  assert.match(src, /onError=\{\(\) => setBroken\(true\)\}/, 'and a dead URL becomes the monogram');
+  // The BEHAVIOUR, not the state variable that implements it. This assertion
+  // used to pin `onError={() => setBroken(true)}` character for character,
+  // which fixed the fallback at exactly one step — and migration 0100 gave a
+  // section two candidate pictures (the one its owner chose and the one
+  // borrowed from a product), so the single latch had to become a walk. A test
+  // that spells out the implementation makes the correct version of the code
+  // unwritable; what matters is that a dead URL leads somewhere.
+  assert.match(src, /onError=/, 'a dead URL must lead somewhere');
+  assert.match(src, /setFailed/, 'and the plate must remember which candidates died');
+});
+
+test('the picture an ADMIN chose outranks the one borrowed from a product', () => {
+  const src = read('src/components/home/CategoryBoard.tsx');
+  // Migration 0100. The order is the whole feature: an authored cover is a
+  // decision and a borrowed product photo is a guess, so `image_url` must come
+  // FIRST in the candidate list. Reversed, the owner could upload artwork and
+  // watch the page keep drawing whichever product the shelf query happened to
+  // return first — which is the complaint 0100 answers.
+  assert.match(
+    src,
+    /\[node\.image_url,\s*covers\.get\(node\.id\)\]/,
+    'authored first, borrowed second'
+  );
+  // And the two must stay DISTINGUISHABLE at the plate, or an authored cover
+  // whose object is missing from R2 would drop past a perfectly good product
+  // photo straight to the monogram.
+  assert.match(src, /sources:\s*Array<string \| undefined>/, 'the plate takes the ranked list, not a winner');
 });
 
 test('the department heading does not print the count its own cards already carry', () => {
@@ -231,7 +257,11 @@ test('the 11px chips are gone — they were a third of the 44px this app holds f
 
 test('no artwork is invented, and a section with no photo is a designed state rather than a hole', () => {
   const src = read('src/components/home/CategoryBoard.tsx');
-  assert.match(src, /monogramOf/, 'the monogram is the honest stand-in — `catalogs` has no image column');
+  // The monogram is the last of three answers, not the only stand-in: since
+  // migration 0100 a section can carry a picture its owner uploaded, and
+  // failing that it still borrows one from a product already on the page.
+  // Whichever of the three is reached, nothing is fetched for it.
+  assert.match(src, /monogramOf/, 'the monogram is the honest last resort');
   assert.match(src, /sub_category_id/, 'a real photo is borrowed from a product already on the page');
   assert.doesNotMatch(src, /api\.get|fetch\(/, 'and nothing is re-fetched for it');
 });

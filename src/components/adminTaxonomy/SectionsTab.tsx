@@ -6,9 +6,10 @@
  * or sub-sections still use it, and says so).
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Plus, Pencil, Trash2, Power, CornerDownRight, Printer } from 'lucide-react';
+import { Plus, Pencil, Trash2, Power, CornerDownRight, Printer, Image as ImageIcon, Upload, RefreshCw } from 'lucide-react';
 import * as T from '../adminProducts/theme';
-import { api } from '../../lib/api';
+import { ApiError, api } from '../../lib/api';
+import { Modal } from '../adminProducts/ui';
 import {
   Actions,
   ActiveBadge,
@@ -50,6 +51,7 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
   const [q, setQ] = useState('');
   const [edit, setEdit] = useState<EditState | null>(null);
   const [del, setDel] = useState<CatalogNode | null>(null);
+  const [picture, setPicture] = useState<CatalogNode | null>(null);
   const [busyId, setBusyId] = useState('');
   // The button a dialog would restore focus to is inside the row it deletes,
   // so focus would land on <body>. It goes to the tab's own action instead.
@@ -102,6 +104,20 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
       <td className={cell}>
         <div className="flex items-center gap-2 min-w-0" style={depth ? { paddingInlineStart: depth * 20 } : undefined}>
           {depth ? <CornerDownRight className="w-3.5 h-3.5 text-[var(--ap-text-3)] shrink-0" aria-hidden /> : null}
+          {/* THE PICTURE SITS BESIDE THE NAME, NOT IN A COLUMN OF ITS OWN.
+              It is an attribute of the section the way its name is, and a
+              seventh column on a table that is already six wide would push the
+              actions off a laptop screen. A DARK plate, because the home page
+              is dark: a preview on white would hide exactly the mistake — an
+              image exported on a white matte — that this screen exists to let
+              the owner catch. */}
+          <span className="w-9 h-9 shrink-0 rounded-lg bg-black border border-[var(--ap-border)] grid place-items-center overflow-hidden">
+            {c.image_url ? (
+              <img src={c.image_url} alt="" width={36} height={36} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+            ) : (
+              <ImageIcon className="w-4 h-4 text-[var(--ap-text-3)]" aria-hidden />
+            )}
+          </span>
           <div className="min-w-0">
             <div className={`truncate ${depth ? 'text-[var(--ap-text-1)]' : 'font-semibold text-[var(--ap-text-1)]'}`}>
               {nameOf(c, lang)}
@@ -132,6 +148,16 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
           )}
           <button type="button" className={T.btnIcon} onClick={() => setEdit({ node: c, parentId: c.parent_id })} aria-label={loc('تعديل', 'Edit')} title={loc('تعديل', 'Edit')} data-tax-action="edit">
             <Pencil className="w-4 h-4" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={T.btnIcon}
+            onClick={() => setPicture(c)}
+            aria-label={loc('صورة القسم', 'Section image', 'وێنەی بەش')}
+            title={loc('صورة القسم في الواجهة الرئيسية', 'The section’s picture on the home page')}
+            data-tax-action="image"
+          >
+            <ImageIcon className="w-4 h-4" aria-hidden />
           </button>
           <button type="button" className={T.btnIcon} onClick={() => void toggle(c)} disabled={busyId === c.id} aria-label={c.active ? loc('تعطيل', 'Deactivate') : loc('تفعيل', 'Activate')} title={c.active ? loc('تعطيل', 'Deactivate') : loc('تفعيل', 'Activate')} data-tax-action="toggle">
             <Power className="w-4 h-4" aria-hidden />
@@ -188,6 +214,25 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
             setEdit(null);
             await reload();
             notify('ok', created ? loc(`أُضيف القسم «${name}».`, `Section "${name}" added.`) : loc(`حُفظ القسم «${name}».`, `Section "${name}" saved.`));
+          }}
+        />
+      )}
+
+      {picture && (
+        <SectionImageDialog
+          node={picture}
+          onClose={() => {
+            setPicture(null);
+            restoreFocus();
+          }}
+          onChanged={async (removed) => {
+            await reload();
+            notify(
+              'ok',
+              removed
+                ? loc(`أُزيلت صورة «${nameOf(picture, lang)}».`, `The picture on "${nameOf(picture, lang)}" was removed.`)
+                : loc(`حُفظت صورة «${nameOf(picture, lang)}».`, `The picture on "${nameOf(picture, lang)}" was saved.`)
+            );
           }}
         />
       )}
@@ -380,5 +425,166 @@ function SectionDialog({
         </div>
       </div>
     </Dialog>
+  );
+}
+
+/**
+ * THE PICTURE A SECTION SHOWS ON THE HOME PAGE.
+ *
+ * WHAT IT REPLACES. Until migration 0100 the storefront BORROWED a cover: it
+ * used the first photo among the products the first screen happened to have
+ * fetched, filed under that section. Nobody chose it — which of eight
+ * filaments stood for «خيوط PLA» depended on the order a query returned — and
+ * a section whose products were not among the thirty on screen drew its
+ * monogram however good its artwork was. That fallback is still there and
+ * still useful; this dialog is how the owner overrules it.
+ *
+ * WHY IT IS NOT PART OF THE EDIT DIALOG. That one posts JSON and saves on a
+ * button; a file is multipart and there is nothing to defer — the moment a
+ * WebP is picked there is exactly one sensible thing to do with it. Folding
+ * the two together would mean either a create that cannot carry a picture (a
+ * new section has no id to upload against yet) or a Save button that means
+ * two different things. So this acts immediately and has no Save at all, which
+ * is also why it uses `Modal` rather than the taxonomy `Dialog`.
+ */
+function SectionImageDialog({
+  node,
+  onClose,
+  onChanged,
+}: {
+  node: CatalogNode;
+  onClose: () => void;
+  /** `removed` distinguishes a cleared picture from a newly uploaded one. */
+  onChanged: (removed: boolean) => Promise<void>;
+}) {
+  const { loc, lang } = useLoc();
+  // The dialog owns what it is SHOWING. `node` is a snapshot from the table
+  // and the table only re-reads after the parent's reload resolves, so
+  // rendering `node.image_url` would leave the old picture on screen for as
+  // long as that round trip takes — directly under the words "saved".
+  const [url, setUrl] = useState(node.image_url || '');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+  const base = `/api/admin/taxonomy/catalogs/${encodeURIComponent(node.id)}/image`;
+
+  const upload = async (file: File) => {
+    setBusy(true);
+    setErr('');
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('originalName', file.name);
+      const res = await api.post<{ image_url: string }>(base, form);
+      setUrl(res.image_url || '');
+      await onChanged(false);
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : errMsg(e));
+    } finally {
+      setBusy(false);
+      // A failed upload must not leave the same file "already chosen": the
+      // input fires no change event for an identical selection, so retrying
+      // the very same file would do nothing at all.
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    setErr('');
+    try {
+      await api.delete(base);
+      setUrl('');
+      await onChanged(true);
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      titleAr={`صورة «${nameOf(node, lang)}»`}
+      titleEn={`Picture for "${nameOf(node, lang)}"`}
+      onClose={onClose}
+      footer={
+        <div className={`${T.AP} flex items-center justify-end gap-2`} data-tax-dialog="section-image">
+          {err && (
+            <span className="me-auto text-[12px] text-[var(--ap-danger)] break-words min-w-0" role="alert">
+              {err}
+            </span>
+          )}
+          <button type="button" className={T.btnSecondary} onClick={onClose} disabled={busy}>
+            {loc('إغلاق', 'Close', 'داخستن')}
+          </button>
+        </div>
+      }
+    >
+      <div className={`${T.AP} grid gap-3.5`} data-tax-dialog-body="section-image">
+        <div className="flex items-start gap-3">
+          {/* 4:3, the shape SubCard actually draws — a square preview would
+              promise a framing the home page does not use, and the owner
+              would only find out after uploading. */}
+          <span className="w-28 aspect-[4/3] shrink-0 rounded-xl bg-black border border-[var(--ap-border)] grid place-items-center overflow-hidden">
+            {url ? (
+              <img src={url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <ImageIcon className="w-6 h-6 text-[var(--ap-text-3)]" aria-hidden />
+            )}
+          </span>
+          <div className="min-w-0 grid gap-2">
+            <p className="text-[12px] text-[var(--ap-text-3)] leading-relaxed">
+              {loc(
+                'تظهر هذه الصورة على بطاقة القسم في الصفحة الرئيسية. الصيغة WebP فقط، وبحد أقصى ٢ ميغابايت. الأفضل صورة عرضية بنسبة ٤:٣.',
+                'This picture is shown on the section’s card on the home page. WebP only, 2 MB at most. A landscape 4:3 image fits best.',
+                'ئەم وێنەیە لە کارتی بەش لە پەڕەی سەرەکی دەردەکەوێت. تەنها WebP، زۆرترین ٢ مێگابایت. وێنەی ٤:٣ باشترینە.'
+              )}
+            </p>
+            <p className="text-[12px] text-[var(--ap-text-3)] leading-relaxed">
+              {url
+                ? loc(
+                    'بدون صورة، يأخذ القسم صورة أحد منتجاته تلقائيًا.',
+                    'With no picture the section borrows a photo from one of its products.',
+                    'بێ وێنە، بەشەکە وێنەی یەکێک لە بەرهەمەکانی دەبات.'
+                  )
+                : loc(
+                    'لا توجد صورة بعد — القسم يأخذ الآن صورة أحد منتجاته تلقائيًا.',
+                    'No picture yet — the section is currently borrowing a photo from one of its products.',
+                    'هێشتا وێنە نییە — ئێستا وێنەی یەکێک لە بەرهەمەکانی دەبات.'
+                  )}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* `sr-only`, NOT `hidden`. `display: none` takes a file input out of
+              the focus order, and a <label> is not focusable either, so the
+              whole control would be unreachable by keyboard. */}
+          <label className={`${T.btnPrimary} cursor-pointer`}>
+            {busy ? <RefreshCw className="w-4 h-4 animate-spin" aria-hidden /> : <Upload className="w-4 h-4" aria-hidden />}
+            {url ? loc('استبدال الصورة', 'Replace image', 'وێنە بگۆڕە') : loc('رفع صورة WebP', 'Upload a WebP', 'وێنەی WebP باربکە')}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/webp"
+              className="sr-only"
+              disabled={busy}
+              data-tax-image-input={node.id}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void upload(file);
+              }}
+            />
+          </label>
+          {url && (
+            <button type="button" className={T.btnDanger} onClick={() => void remove()} disabled={busy} data-tax-image-remove={node.id}>
+              <Trash2 className="w-4 h-4" aria-hidden />
+              {loc('إزالة الصورة', 'Remove image', 'وێنە لاببە')}
+            </button>
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 }

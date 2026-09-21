@@ -1,0 +1,39 @@
+-- ---------------------------------------------------------------------------
+--  0100 — A SECTION MAY NOW CARRY ITS OWN PICTURE.
+-- ---------------------------------------------------------------------------
+-- THE OWNER'S REQUEST. «قم في الاقسام الرئيسية في الاقسام الفرعية اجعل
+-- بالامكان للادمن وضع صورة للاقسام الفرعية في الواجهة الرئيسية» — the admin
+-- must be able to put a PICTURE on a sub-section as it appears on the home
+-- page.
+--
+-- WHAT THE HOME PAGE DID BEFORE. `catalogs` has never had an image column
+-- (migration 0002 created the table; the only later ALTER is `template_family`
+-- in 0018), so src/components/home/CategoryBoard.tsx BORROWED one: it walked
+-- the products the page had already fetched and used the first photo filed
+-- under that section. That is a reasonable fallback and it stays — but it is
+-- not a decision anyone made. Which of eight filaments represents «خيوط PLA»
+-- depended on the order the shelf queries happened to return, and a section
+-- whose products were not among the thirty on the first screen showed its
+-- monogram no matter how good its artwork was.
+--
+-- WHY A FULL KEY AND NOT A BARE FILENAME. `mainPageMedia` (the brand and
+-- service slots) stores a bare object name and prepends `UiUx/MainPage/` on
+-- the way out, which works there because the slots are a fixed list in code.
+-- A catalog is a ROW, there can be any number of them, and the media sweeper
+-- walks columns generically: worker/lib/mediaRefs.ts needed a one-line
+-- `{ table: 'catalogs', column: 'image_key', kind: 'text' }` to see this, and
+-- a bare filename would have matched nothing in the bucket — precisely the
+-- trap `resolveSiteMediaKeys` exists to work around for the settings row. A
+-- full key is what `product_images.r2_key` stores, for the same reason.
+--
+-- WHY THE STORED NAME IS NEVER REUSED. `/files/*` serves public keys with
+-- `Cache-Control: public, max-age=31536000, immutable`. Writing replacement
+-- bytes under a key a browser already holds would keep the OLD picture on
+-- screen for up to a year with nothing here able to purge it, so every upload
+-- mints `catalog-<id>-<token>.webp` and this column moves to the new name.
+--
+-- NOT NULL DEFAULT '' rather than NULL: every read in this codebase tests a
+-- media column for emptiness (`IS NOT NULL AND <> ''`), and one column that
+-- says "no picture" with NULL while its neighbours say it with '' is how a
+-- sweeper narrowing comes to miss a row.
+ALTER TABLE catalogs ADD COLUMN image_key TEXT NOT NULL DEFAULT '';
