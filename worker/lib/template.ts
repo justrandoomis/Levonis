@@ -591,6 +591,12 @@ const GROUP_SPECS: GroupSpec[] = [
       f('id', 'string', 'options', 'معرف التركيبة الثابت — required stable variant id', { required: true }),
       f('option_value_ids', 'csv', 'options', 'معرفات قيم الخيارات في هذه التركيبة، مفصولة بفواصل'),
       f('color_id', 'string', 'options', `معرف اللون في التركيبة؛ ${NULL_TOKEN} = بلا لون`, { nullable: true }),
+      // Direct-sale stock for a linked option×colour selection lives here.
+      // Without these fields TXT could describe the combination but could not
+      // create its shelf, so a valid-looking file failed only at save time.
+      f('active', 'bool', 'options', 'هل هذه التوليفة فعالة — exact combination enabled'),
+      f('stock', 'int', 'options', 'مخزون البيع المباشر لهذه التوليفة الدقيقة؛ __NULL__ = غير متتبع، 0 = منتهي', { nullable: true, min: 0, max: 1_000_000 }),
+      f('low_stock_threshold', 'int', 'options', 'حد تنبيه المخزون لهذه التوليفة؛ __NULL__ = بلا تنبيه', { nullable: true, min: 0, max: 1_000_000 }),
       ...dimensionFields('options'),
     ],
   },
@@ -1875,6 +1881,9 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     push(`${p}.id`, variant.id);
     push(`${p}.option_value_ids`, variant.option_value_ids.join(','));
     push(`${p}.color_id`, variant.color_id);
+    push(`${p}.active`, boolStr((variant.active as boolean | undefined) !== false));
+    push(`${p}.stock`, numStr((variant.stock as number | null | undefined) ?? null));
+    push(`${p}.low_stock_threshold`, numStr((variant.low_stock_threshold as number | null | undefined) ?? null));
     for (const key of DIMENSION_KEYS) {
       push(`${p}.${key}`, numStr((variant as Record<string, unknown>)[key] as number | null));
     }
