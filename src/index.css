@@ -1,3 +1,54 @@
+/**
+ * THE FIVE KURDISH LETTERS CAIRO DOES NOT HAVE.
+ *
+ * MEASURED, not assumed. Google serves Cairo as three woff2 subsets; the
+ * Arabic one (SLXVc1nY…QyyS8p4_RHH1.woff2, 30,712 B) carries 302 glyphs, and
+ * `fontTools` reports that NONE of these is among them:
+ *
+ *     ە  U+06D5  the commonest letter in Sorani — it ends a great many words
+ *     ێ  U+06CE
+ *     ۆ  U+06C6
+ *     ڕ  U+0695
+ *     ڵ  U+06B5
+ *
+ * Cairo DOES have چ پ گ ژ, which is why this was never obvious: Kurdish text
+ * renders, and renders legibly. What happens is subtler and worse to look at —
+ * the browser drops to a per-glyph SYSTEM fallback for those five characters
+ * only, so a single Kurdish word is set in two different typefaces, with
+ * different weights and a different baseline, on whatever font the phone
+ * happens to own. It is not broken text; it is a typographic defect inside
+ * every Kurdish sentence in the shop.
+ *
+ * WHY A PATCH FACE AND NOT A DIFFERENT FONT. Replacing Cairo would change the
+ * look of the entire Arabic storefront to fix five letters. This adds 4,832
+ * bytes covering exactly those codepoints, so the family is Cairo everywhere
+ * it has a glyph and Vazirmatn only where it does not.
+ *
+ * `unicode-range` IS WHAT MAKES IT FREE FOR EVERYONE ELSE. A browser fetches a
+ * face only when the page actually uses a character in its range, so an Arabic
+ * or English visitor never downloads a byte of this. Only a Kurdish page pays,
+ * and it pays 4.8 KB.
+ *
+ * VARIABLE, AND THAT IS THE REASON THIS FONT AND NOT THE SMALLER CANDIDATE.
+ * An IBM Plex patch was 1,736 B but STATIC: it has one weight, so a bold
+ * Kurdish heading would have rendered ە at regular weight beside bold Cairo
+ * letters — trading one visible defect for another. Vazirmatn's `wght` axis
+ * spans 100–900 and covers Cairo's whole 300–900 range.
+ *
+ * SELF-HOSTED, so `font-src 'self'` already allows it and no new origin joins
+ * the CSP. It is declared AFTER the Google stylesheet in document order (that
+ * link is in index.html; this file is injected after it), which is what makes
+ * this face win for its range.
+ */
+@font-face {
+  font-family: "Cairo";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/cairo-kurdish-patch.woff2") format("woff2");
+  unicode-range: U+0693, U+0695, U+06B5, U+06C6, U+06CE, U+06D5;
+}
+
 
 /* THE FONT IS LINKED FROM index.html, NOT IMPORTED HERE.
 

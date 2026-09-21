@@ -139,11 +139,51 @@ test('inactive relational groups never fall back to legacy product options', () 
   assert.doesNotMatch(page, /relationIds\.size > 0|visibleOptionIds\.size > 0/);
 });
 
-test('linked colours stay hidden until their option-group constraints are selected', () => {
+/**
+ * THE OWNER'S COLOUR RULE, in their own words:
+ *
+ *   «إذا لم يحدد اللون لأي خيار يكون تحديد لكل الخيارات، إذا حدد لخيار واحد
+ *    فيظهر فقط في هذا الخيار»
+ *
+ * A colour that names NO option belongs to every option; a colour that names
+ * one belongs only to that one.
+ *
+ * THIS TEST USED TO PIN THE OPPOSITE OF HALF OF IT. It asserted the exact
+ * expression `!c.option_id || chosen.has(c.option_id)`, which asks whether the
+ * CHOSEN value is the colour's — and before the buyer has chosen anything
+ * `chosen` is empty, so every option-linked colour was hidden. On a product
+ * whose direct sale is sold out there is no `initial_selection` to pre-select
+ * an option with, so the page opened with NO colours at all. That is the
+ * defect the owner reported as «الألوان لا تظهر في صفحة تفاصيل المنتج»,
+ * written down here as a requirement.
+ *
+ * What the test protects is unchanged and is the half that matters: once an
+ * option IS chosen, a colour belonging to a different one must not be
+ * offered. Only the not-yet-chosen case moved.
+ */
+test('a colour with no option belongs to every option, and a linked one narrows once a choice exists', () => {
   const page = read(PRODUCT);
+  // The old wholesale bypass must not come back: it returned EVERY colour
+  // regardless of links, which would offer a colour for an option it is not
+  // sold in the moment the buyer chose that option.
   assert.doesNotMatch(page, /if \(optionValueIds\.length === 0\) return all;/);
-  assert.match(page, /if \(links\.length === 0\) return !c\.option_id \|\| chosen\.has\(c\.option_id\);/);
+
+  // The owner's default, per colour rather than for the whole list.
+  assert.match(page, /const nothingChosen = chosen\.size === 0;/);
+  assert.match(
+    page,
+    /if \(links\.length === 0\) return !c\.option_id \|\| nothingChosen \|\| chosen\.has\(c\.option_id\);/,
+    'an unassigned colour is on every option; an assigned one narrows once a choice exists'
+  );
+  assert.match(page, /if \(nothingChosen\) return true;/, 'and a linked colour is visible before any choice too');
+
+  // The narrowing itself — per-group AND, per-link OR — is what keeps a colour
+  // off an option it does not belong to, and it is untouched.
   assert.match(page, /\[\.\.\.byGroup\.values\(\)\]\.every\(\(ids\) => ids\.some\(\(id\) => chosen\.has\(id\)\)\)/);
+
+  // The effect that drops a now-invalid colour is what stops a stale pick
+  // surviving a change of option.
+  assert.match(page, /if \(colorId && !colorsForOption\.some\(\(c\) => c\.id === colorId\)\) setColorId\(''\)/);
 });
 
 test('the direct-stock card edge overlays every product-card surface without changing layout', () => {

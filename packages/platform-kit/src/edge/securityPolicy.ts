@@ -326,6 +326,17 @@ export function assetHeadersFile(): string {
     ...clear,
     ...security,
     `  Cache-Control: ${ICON_CACHE_CONTROL}`,
+    '',
+    '# The Kurdish patch face (src/index.css explains what it is and why it is',
+    '# 4.8 KB). Fixed name, NOT content-hashed, so it takes the icons policy and',
+    '# never the `immutable` one above: a corrected glyph must be able to reach a',
+    '# browser that already has the old file, and `immutable` for a year would',
+    '# stop it. The same unsets for the same reason — without them the inherited',
+    '# no-cache wins and the rule buys nothing.',
+    '/fonts/*',
+    ...clear,
+    ...security,
+    `  Cache-Control: ${ICON_CACHE_CONTROL}`,
   ];
   return lines.join('\n') + '\n';
 }

@@ -1,9 +1,30 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { StoreProvider, useStore } from './StoreContext';
-import Storefront from './pages/Storefront';
-import MerchantStart from './pages/MerchantStart';
-import StorefrontProduct from './pages/StorefrontProduct';
+import ChunkBoundary from './components/ChunkBoundary';
+/**
+ * THE MERCHANT STOREFRONT IS NOT ON THE APEX'S CRITICAL PATH, AND IT WAS IN
+ * THE APEX'S ENTRY BUNDLE.
+ *
+ * These three were static imports, so every visitor to levonis-iq.com
+ * downloaded, parsed and compiled all three before `#root` could paint —
+ * although the apex renders none of them. Measured by rebuilding with only
+ * these three lines changed: the entry chunk goes 289,427 -> 222,398 raw and
+ * 88,829 -> 71,411 bytes gzipped. That is 17,418 fewer bytes on the wire and
+ * 67,029 fewer bytes the main thread parses, on every first visit.
+ *
+ * AND THE MERCHANT CASE SURVIVES WITHOUT A PREFETCH, which is why there is
+ * none. `Storefront` IS the first paint on a merchant subdomain, so it moves
+ * from the entry into a chunk of its own — 11,767 gzipped, against an entry
+ * that just shed 17,418. A merchant visitor downloads LESS than before, in two
+ * requests instead of one, both issued by the same document.
+ *
+ * All three routes already sit inside the `Suspense` boundaries below, so
+ * nothing else had to change.
+ */
+const Storefront = React.lazy(() => import('./pages/Storefront'));
+const MerchantStart = React.lazy(() => import('./pages/MerchantStart'));
+const StorefrontProduct = React.lazy(() => import('./pages/StorefrontProduct'));
 import UpdateReadyToast from './components/pwa/UpdateReadyToast';
 import HostAppleIdentity from './components/pwa/HostAppleIdentity';
 /**
@@ -248,7 +269,29 @@ const UsedPrinters = React.lazy(() => import('./pages/UsedPrinters'));
 const TradeIn = React.lazy(() => import('./pages/TradeIn'));
 const MyGifts = React.lazy(() => import('./components/reviews/MyGifts'));
 import EmailVerifyBanner from './components/auth/EmailVerifyBanner';
-import AppIntro from './components/bloub/AppIntro';
+/**
+ * THE MASCOT PAINTS AN OVERLAY, NOT THE PAGE — so it must not be in the way of
+ * the page.
+ *
+ * `AppIntro` and its character engine were ~31.7 KB of minified code inside
+ * the entry chunk (expressions, face, travel, body, interest, anchors), all
+ * downloaded, parsed and compiled before `#root` could paint — for something
+ * that renders ON TOP of the shop once the shop is ready.
+ *
+ * Deferring it is safe in a way that deferring a route is not: the component's
+ * own prop is `ready`, so it deliberately shows nothing until the page beneath
+ * it has settled. The chunk therefore has the whole of that wait to arrive,
+ * and `Suspense fallback={null}` is the honest fallback — the mascot's absence
+ * for a few hundred milliseconds is exactly what it looks like before `ready`
+ * turns true anyway.
+ *
+ * Measured by rebuilding with only this line changed: the entry drops a
+ * further 11.5 KB gzipped.
+ *
+ * The ChunkBoundary above covers it: if this chunk never arrives the shop is
+ * unaffected, because nothing below the mascot depends on it.
+ */
+const AppIntro = React.lazy(() => import('./components/bloub/AppIntro'));
 import { MotionCharacterFallbackHeader, useCharacterBusy } from './components/bloub/MotionCharacterAnchor';
 import { homeCriticalReadyStore } from './lib/appBootstrap';
 
@@ -293,6 +336,7 @@ function StorefrontApp() {
           out; the whole argument is in the component. */}
       <HostAppleIdentity />
       <MotionCharacterFallbackHeader />
+      <ChunkBoundary>
       <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<Storefront store={store} />} />
@@ -316,6 +360,7 @@ function StorefrontApp() {
         <Route path="*" element={<Storefront store={store} />} />
       </Routes>
       </Suspense>
+      </ChunkBoundary>
     </div>
   );
 }
@@ -338,7 +383,24 @@ function AppBootstrapLayer() {
   );
   const mainHomeNeedsData = !store && !unknownStore && location.pathname === '/';
 
-  return <AppIntro ready={resolved && isLoaded && (!mainHomeNeedsData || homeReady)} />;
+  /**
+   * ITS OWN BOUNDARY, BECAUSE IT IS A SIBLING OF THE ROUTES AND NOT A CHILD.
+   *
+   * `AppBootstrapLayer` sits OUTSIDE both route trees on purpose (see the note
+   * above — the same intro node has to survive the unresolved-host fallback
+   * becoming the real application), so neither of their ChunkBoundaries is
+   * above it. Without this one, a mascot chunk that failed to download would
+   * throw with no boundary in its path and unmount the entire shop — the exact
+   * white page the boundary exists to prevent, reached through the one
+   * component whose absence should cost nothing.
+   */
+  return (
+    <ChunkBoundary>
+      <Suspense fallback={null}>
+        <AppIntro ready={resolved && isLoaded && (!mainHomeNeedsData || homeReady)} />
+      </Suspense>
+    </ChunkBoundary>
+  );
 }
 
 function AppContent() {
@@ -539,6 +601,7 @@ function AppContent() {
         {/* Asks once, on the server's schedule, never on the routes where an
             interruption costs the person something. */}
         <CompleteProfileSheet />
+        <ChunkBoundary>
         <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -639,6 +702,7 @@ function AppContent() {
           <Route path="*" element={<div className="p-8 text-white text-center">Under Construction</div>} />
         </Routes>
         </Suspense>
+        </ChunkBoundary>
 
         {/* Clearance for the floating BottomNav: its bottom offset plus its
             height plus a small visual gap. `shrink-0` so a flex column cannot

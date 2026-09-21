@@ -1139,13 +1139,46 @@ export default function Product() {
 
   // Keep a valid selection, drop an invalid one (mandate §7.2: the user's
   // choice survives as long as it is valid).
+  /**
+   * WHICH COLOURS THIS SELECTION MAY HAVE — «إذا لم يحدد اللون لأي خيار يكون
+   * تحديد لكل الخيارات، إذا حدد لخيار واحد فيظهر فقط في هذا الخيار».
+   *
+   * The owner's rule, stated exactly: a colour that names NO option belongs to
+   * every option; a colour that names one belongs only to that one.
+   *
+   * WHAT WAS WRONG, and it is why the owner reported «الألوان لا تظهر في صفحة
+   * تفاصيل المنتج». Both branches below asked whether the chosen value is
+   * among the colour's own — and before the buyer has chosen anything,
+   * `chosen` is EMPTY, so every answer is false. On a product whose direct
+   * sale is sold out there is no `initial_selection` to pre-select an option
+   * with (worker/routes/products.ts), so the page opened with nothing chosen
+   * and every option-linked colour hidden. Not «no colours configured»: the
+   * colours were there and the page was asking a question that could not yet
+   * be answered.
+   *
+   * BEFORE A CHOICE, SHOW WHAT THE PRODUCT HAS. `nothingChosen` makes the
+   * filter a no-op until the buyer picks an option, so the shopper sees the
+   * range on the first paint and the list NARROWS as they choose — which is
+   * also the order the owner asked the panels to run in (availability →
+   * transport → version → colour).
+   *
+   * A colour whose option is then excluded is dropped by the effect below,
+   * exactly as before, so nothing unbuyable can survive into the cart — and
+   * the server refuses the pair independently (`COLOR_OPTION_MISMATCH`), so
+   * this widening is a display decision and never an authorisation one.
+   */
   const colorsForOption = useMemo(() => {
     const all = product?.colors ?? [];
     const chosen = new Set(optionValueIds);
+    const nothingChosen = chosen.size === 0;
     const relational = new Map((relations?.colors ?? []).map((c) => [c.id, c] as const));
     return all.filter((c) => {
       const links = relational.get(c.id)?.links ?? [];
-      if (links.length === 0) return !c.option_id || chosen.has(c.option_id);
+      // No link and no option_id — the colour names no option, so it is on
+      // every one of them. This is the owner's default and it needs no choice
+      // to be made first.
+      if (links.length === 0) return !c.option_id || nothingChosen || chosen.has(c.option_id);
+      if (nothingChosen) return true;
       // A colour linked to several groups is visible only when every linked
       // group accepts the selected value; several links inside one group are
       // alternatives (OR), exactly like the server's colorVisibility helper.
