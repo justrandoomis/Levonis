@@ -263,6 +263,26 @@ test('example demonstrates the owner\'s form: the base is the cheapest, options 
   assert.equal(doc.usage_guide.steps[0].kind, 'setup');
 });
 
+test('example writes linked-colour direct stock as exact combinations', () => {
+  const text = buildExampleTemplate();
+  const parsed = parseTemplate(text);
+  assert.deepEqual(parsed.errors, []);
+  assert.deepEqual(parsed.unknown_keys, []);
+  assert.equal(parsed.fields.inventory_mode?.value, 'VARIANT_COMBINATION');
+
+  const variants = parsed.groups.variants ?? [];
+  assert.equal(variants.length, 3);
+  assert.deepEqual(
+    variants.map((row) => row.fields.stock?.value),
+    [5, 0, 0],
+    'Small×Black, Large×Black and Large×Gold each carry their own direct stock'
+  );
+  assert.deepEqual(
+    variants.map((row) => row.fields.color_id?.value),
+    ['col_example_black', 'col_example_black', 'col_example_gold']
+  );
+});
+
 test('example never ships an active image URL (no broken-image product)', () => {
   const { doc } = pipeline(buildExampleTemplate());
   assert.deepEqual(doc.media, []);
