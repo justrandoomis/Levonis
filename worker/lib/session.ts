@@ -77,7 +77,30 @@ export async function loadSessionUser(c: Context<AppContext>): Promise<void> {
     await c.env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(id).run();
     return;
   }
-  const { session_id, session_expires, session_created, password_hash, google_sub, ...user } = row;
+  /**
+   * `google_sub` STAYS ON THE SERVER-SIDE USER, and removing it from this list
+   * is the whole fix for «يظهر في الربط أن جوجل غير مرتبط».
+   *
+   * This destructure was written in the first worker commit as password_hash
+   * hygiene, long before anything reported a Google link. `has_google` was
+   * added to `publicUser` later (worker/lib/types.ts) and derived as
+   * `!!u.google_sub` — from a column this line had already deleted.
+   *
+   * The result was a fact with two answers. Every route that RE-READS the row
+   * — login, /auth/google, /auth/google/link, PATCH /profile — passes the real
+   * column to `publicUser` and answers correctly. `GET /api/auth/me`
+   * serializes THIS object, so it answered `has_google: false` for every
+   * account that has ever existed. And `/auth/me` is the only one the Settings
+   * page sees after a page load, so the badge could never read «مرتبط» no
+   * matter who was signed in.
+   *
+   * Keeping the column here does not expose it. `publicUser` is the single
+   * place a user becomes JSON and it emits only the boolean; no route spreads
+   * this object into a response, and the signed-principal path builds from an
+   * explicit column list, so the rule that a Google subject never leaves the
+   * server is unchanged.
+   */
+  const { session_id, session_expires, session_created, password_hash, ...user } = row;
   c.set('user', user as unknown as SessionUser);
   c.set('sessionId', String(session_id));
   c.set('sessionCreatedAt', session_created ? String(session_created) : null);

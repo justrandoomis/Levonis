@@ -1,50 +1,88 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLanguage } from '../../LanguageContext';
+import { readPos, writePos } from '../../lib/useRail';
 
 /**
  * Marquee — one endless belt for the home page (the ads strip and the brands
  * belt ride the same mechanics).
  *
- * THE BELT IS A SCROLL CONTAINER THAT DRIFTS, NOT AN ANIMATION THAT PAUSES.
+ * «الشريط الإعلاني وشريط أبرز العلامات يجب أن يستمر في الحركة لكنه قابل
+ *  للتحريك اليدوي — لا تحذف التحريك التلقائي.»
  *
- * «في ابرز العلامات ( البراندات ) اجعل المستخدم يسحب البراندات scroll
- * horizontal ليس فقط ان يتوقف — حركه سلسه جدا تكون عند السحب.»
+ * BOTH, ALWAYS. The belt drifts on its own AND a finger can move it. The
+ * previous version delivered the second and quietly lost the first, and this
+ * file is written around the three separate reasons it did.
  *
- * It used to be a CSS `translateX` animation inside an `overflow: hidden`
- * box. A finger on it could only PAUSE it: there was no scrollable overflow
- * to drag, so the belt stopped dead under the thumb and went nowhere. The
- * owner asked to be able to move it, and smoothly — and the smoothest
- * horizontal drag on a phone is not one this file can write. It is the one
- * the browser already has: native touch scrolling, with the platform's own
- * momentum, rubber-banding and interruption.
+ * ── 1. NOTHING THAT STOPS THE DRIFT MAY LATCH ──────────────────────────────
  *
- * So the container scrolls (`overflow-x: auto`, scrollbar hidden), and the
- * drift is `scrollLeft` advanced by a rAF loop instead of a transform. The
- * two are then the same axis rather than two things fighting over the same
- * pixels: a drag interrupts the drift because it moves the very value the
- * drift is writing, a wheel or a trackpad works for free, and the belt
- * resumes from wherever the finger left it rather than snapping back.
+ * The drift used to be gated on `!held && !hovered && !focused`, three pieces
+ * of React state. Two of them are traps on a touch screen:
  *
- * ENDLESS IS MEASURED, NOT ASSUMED. A fixed copy count broke on the owner's
- * iPad: one brand × 4 copies ≈ 380px of content on a ~2000px screen, so the
- * belt sat in a corner and visibly restarted. The container and one set are
- * measured (and re-measured on resize); enough copies are rendered to cover
- * the widest viewport PLUS one full set, which is what lets the wrap below
- * happen off-screen.
+ *   * `hovered` was set by `onMouseEnter` and cleared ONLY by `onMouseLeave`.
+ *     iPadOS Safari synthesises a mouse-enter for a tap and does not send the
+ *     matching leave until the customer taps something ELSE. So the very first
+ *     touch — the gesture this belt was rebuilt for — stopped it for good.
+ *   * `focused` was set by `onFocusCapture`. Every mark is a link, so a tap
+ *     focuses one, and the belt stopped for that reason too.
  *
- * THE SEAM IS HIDDEN BY THE STRIDE, exactly as before. Each set supplies its
- * own internal spacing and its own trailing space, so set N+1 begins
- * precisely one measured stride after set N; the track carries no gap of its
- * own. Scrolling past one stride is therefore pixel-identical to being back
- * at zero, and `wrap()` subtracts a whole stride at a moment nothing on
- * screen changes.
+ * And because `drifting` sat in the effect's dependency array, a latch did not
+ * merely pause the loop: it tore the loop down and rebuilt it in a stopped
+ * state.
  *
- * Speed is pixels per second, not a duration: a two-item belt and a
- * twenty-item belt drift at the same calm pace. Hover, a held finger and
- * focus inside the belt all stop the drift — focus especially, because a
- * keyboard user who lands on a mark that then slides away cannot recover it
- * by moving a finger. `prefers-reduced-motion` stops the drift entirely and
- * leaves a plain, fully usable swipeable rail. Copies after the first are
+ * So the loop is now mounted ONCE, with an empty dependency array, and reads
+ * everything it needs from refs. Hover is honoured only for a real mouse
+ * (`pointerType === 'mouse'`). Keyboard focus is read per frame from
+ * `:focus-visible` on the active element — a tap does not match it, a Tab
+ * does. And "a finger is on it" is not a latch at all but a TIMESTAMP that
+ * expires: whatever moves the belt that we did not move ourselves — a drag, a
+ * wheel, an iOS momentum fling — refreshes it, and 140 ms after the last such
+ * movement the drift simply resumes. A stuck pointer cannot exist because
+ * there is no flag to get stuck.
+ *
+ * ── 2. THE POSITION IS A FLOAT WE KEEP, NOT ONE WE READ BACK ───────────────
+ *
+ * The drift used to be `el.scrollLeft += speed * dt` — a read-modify-write
+ * against the DOM. At 34 px/s that is 0.57 px per frame at 60 Hz and 0.28 px
+ * on an iPad's 120 Hz display. An engine that hands `scrollLeft` back
+ * quantised to a physical pixel rounds every one of those increments away, the
+ * next read returns the same number, and the belt sits still while
+ * `requestAnimationFrame` runs happily forever.
+ *
+ * `posRef` is the real position, in floating point, and it is only ever
+ * replaced when something OTHER than us moved the element by more than a
+ * pixel. The sub-pixel remainder survives every frame, so the belt moves at
+ * the speed it was asked for on any refresh rate.
+ *
+ * ── 3. DIRECTION IS MEASURED, NOT ASSERTED ─────────────────────────────────
+ *
+ * This file used to claim "`scrollLeft` IS NEGATIVE IN RTL in every browser
+ * this ships to" and derive a sign from the UI language. src/lib/useRail.ts
+ * had already disproved that in this same repository: there are THREE
+ * incompatible conventions, and it detects which one an engine uses by shoving
+ * the real element and watching where it lands, because a synthetic probe
+ * lied. `readPos`/`writePos` are that answer, so the drift is written once, in
+ * a direction-free space where 0 is the start in both languages, and the
+ * Arabic belt cannot silently clamp at zero.
+ *
+ * ── HOW ENDLESS IS BUILT ───────────────────────────────────────────────────
+ *
+ * The container and one set are measured (and re-measured on resize). Enough
+ * copies are rendered to cover the widest viewport PLUS THREE strides, and the
+ * belt parks in the band one stride in. That is what gives a finger a full set
+ * of runway in EITHER direction before it can reach a hard edge — and the
+ * recentre that recycles it happens only once the gesture is over, never
+ * during it, because writing `scrollLeft` mid-fling cancels the fling on iOS.
+ *
+ * Each set supplies its own internal spacing and its own trailing space, so
+ * set N+1 begins precisely one measured stride after set N and the track
+ * carries no gap of its own. Moving by a whole stride is therefore
+ * pixel-identical to not moving at all, which is what makes the recycle
+ * invisible.
+ *
+ * Speed is pixels per second, not a duration, so a two-item belt and a
+ * twenty-item belt drift at the same calm pace. `prefers-reduced-motion` stops
+ * the drift entirely and leaves a plain, fully swipeable rail — that is the
+ * honest answer and it is not overridden. Copies after the first are
  * aria-hidden and unfocusable: tests and screen readers meet each real item
  * exactly once.
  */
@@ -65,64 +103,75 @@ export default function Marquee({
   className?: string;
 }) {
   const { dir } = useLanguage();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const firstSetRef = useRef<HTMLDivElement>(null);
-  const [copies, setCopies] = useState(2);
-  const strideRef = useRef(0);
-  const [stride, setStride] = useState(0);
-  const [held, setHeld] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const [focused, setFocused] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const firstSetRef = useRef<HTMLDivElement | null>(null);
+  const [copies, setCopies] = useState(3);
 
-  useLayoutEffect(() => {
+  /** One set's width — the stride, and the unit the recycle moves by. */
+  const strideRef = useRef(0);
+  /** The furthest the scroller can go, cached so the loop reads no layout. */
+  const maxRef = useRef(0);
+  const rtlRef = useRef(false);
+  const speedRef = useRef(speed);
+  /** THE position. Float, ours, never replaced by a quantised read-back. */
+  const posRef = useRef(0);
+  /** What the engine actually took last time we wrote — the baseline that
+   *  tells a customer's gesture apart from our own rounding. */
+  const wroteRef = useRef(0);
+  /** When something we did not cause last moved the belt. */
+  const userAtRef = useRef(0);
+  const hoverRef = useRef(false);
+  const reducedRef = useRef(false);
+  const measureRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    speedRef.current = speed;
+  }, [speed]);
+
+  const measure = useCallback(() => {
     const container = containerRef.current;
     const firstSet = firstSetRef.current;
     if (!container || !firstSet) return;
-    const measure = () => {
-      const cw = container.clientWidth;
-      const sw = firstSet.getBoundingClientRect().width;
-      if (cw <= 0 || sw <= 0) return;
-      strideRef.current = sw;
-      setStride(sw);
-      // Cover the viewport plus one whole set: the spare set is the runway
-      // the wrap below consumes, so the jump never happens on screen.
-      setCopies(Math.min(60, Math.max(2, Math.ceil(cw / sw) + 1)));
-    };
+    const cw = container.clientWidth;
+    const sw = firstSet.getBoundingClientRect().width;
+    if (cw <= 0 || sw <= 0) return;
+    strideRef.current = sw;
+    maxRef.current = Math.max(0, container.scrollWidth - cw);
+    // The container's OWN direction, not the app language: this is the
+    // element `readPos`/`writePos` will be asked about.
+    rtlRef.current = getComputedStyle(container).direction === 'rtl';
+    // Cover the viewport plus THREE whole sets. One of the spare strides is
+    // the runway the recycle consumes off-screen; the other two are what let
+    // a finger drag a full set in either direction before meeting an edge.
+    setCopies(Math.min(60, Math.max(3, Math.ceil(cw / sw) + 3)));
+  }, []);
+
+  useEffect(() => {
+    measureRef.current = measure;
+  }, [measure]);
+
+  useLayoutEffect(() => {
     measure();
-    const ro = new ResizeObserver(measure);
+    const container = containerRef.current;
+    const firstSet = firstSetRef.current;
+    if (!container || !firstSet) return;
+    const ro = new ResizeObserver(() => measure());
     ro.observe(container);
     ro.observe(firstSet);
     return () => ro.disconnect();
-  }, []);
+    // `copies` is a dependency because adding sets changes `scrollWidth`, and
+    // `maxRef` has to learn the new one. `setCopies` to the same number does
+    // not re-render, so this settles after one extra pass rather than looping.
+  }, [measure, copies, dir]);
 
   /**
-   * ONE STRIDE IS THE WHOLE LOOP.
+   * ONE LOOP, MOUNTED ONCE.
    *
-   * Past a full stride the belt is showing set N+1 where it was showing set
-   * N — identical pixels — so subtracting a stride from `scrollLeft` changes
-   * nothing visible. That is the seam, and it is why the stride has to be the
-   * exact measured width of one set rather than a rounded number.
-   *
-   * `scrollLeft` IS NEGATIVE IN RTL in every browser this ships to, and it is
-   * read back through `Math.abs` for that reason alone. Writing it back with
-   * the same sign is what keeps the Arabic belt drifting the way the Arabic
-   * page reads, rather than mirroring into the English direction.
+   * Empty dependencies on purpose: every value it needs lives in a ref, so
+   * nothing a customer does can tear it down and rebuild it stopped. See the
+   * header — that teardown was half of why the belt died on the first touch.
    */
-  const wrap = useCallback((el: HTMLDivElement) => {
-    const s = strideRef.current;
-    if (s <= 0) return;
-    const at = el.scrollLeft;
-    if (Math.abs(at) >= s) el.scrollLeft = at - Math.sign(at) * s;
-  }, []);
-
-  const drifting = !held && !hovered && !focused;
-
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el || stride <= 0) return;
-    // The system preference, read once per mount and then watched: a customer
-    // can turn it on while the page is open, and a belt that keeps drifting
-    // after they did is the setting not working.
     const mq =
       typeof window !== 'undefined' && typeof window.matchMedia === 'function'
         ? (() => {
@@ -133,59 +182,120 @@ export default function Marquee({
             }
           })()
         : null;
-    let reduced = mq?.matches ?? false;
+    reducedRef.current = mq?.matches ?? false;
     const onPref = () => {
-      reduced = mq?.matches ?? false;
+      reducedRef.current = mq?.matches ?? false;
     };
     mq?.addEventListener?.('change', onPref);
+    // A window that loses focus cannot still be hovered, and leaving a stale
+    // hover behind is exactly the class of bug this rewrite exists to end.
+    const onBlur = () => {
+      hoverRef.current = false;
+    };
+    window.addEventListener('blur', onBlur);
 
-    // RTL scrolls toward negative, LTR toward positive. One sign, used for
-    // both the drift and the wrap, so the two can never disagree.
-    const sign = dir === 'rtl' ? -1 : 1;
     let frame = 0;
     let last = 0;
     const tick = (now: number) => {
       frame = requestAnimationFrame(tick);
-      const dt = last === 0 ? 0 : Math.min(0.1, (now - last) / 1000);
+      const el = containerRef.current;
+      const dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
       last = now;
-      // `dt` is clamped because a backgrounded tab hands back one enormous
-      // delta on return, and an unclamped one would teleport the belt.
-      if (drifting && !reduced && dt > 0) el.scrollLeft += sign * speed * dt;
-      wrap(el);
+      if (!el) return;
+
+      // A stride of zero is a measurement that has not landed yet — an image
+      // still loading, a parent still hidden. RETRY from here rather than
+      // give up: the old code gated the loop's existence on it, so one early
+      // zero left the belt dead with nothing to wake it.
+      let stride = strideRef.current;
+      if (stride <= 0) {
+        measureRef.current();
+        stride = strideRef.current;
+        if (stride <= 0) return;
+      }
+      const rtl = rtlRef.current;
+      const max = maxRef.current;
+      // The band the belt rests in: one stride in, so there is a set of
+      // runway on BOTH sides for a finger.
+      const lo = Math.min(stride, Math.max(0, (max - stride) / 2));
+
+      const at = readPos(el, rtl);
+      // MORE THAN A PIXEL MEANS A HUMAN. Our own write can come back up to one
+      // physical pixel away from what we asked for; a drag, a wheel or a fling
+      // moves many pixels in a frame. Adopting the position AND the baseline
+      // together is what lets the drift resume once they stop — leaving the
+      // baseline stale would refresh the timestamp forever.
+      if (Math.abs(at - wroteRef.current) > 1) {
+        posRef.current = at;
+        wroteRef.current = at;
+        userAtRef.current = now;
+      }
+
+      // The belt belongs to whoever is touching it, and for a breath after —
+      // long enough to cover an iOS momentum fling handing back control.
+      if (now - userAtRef.current < 140) return;
+
+      const active = document.activeElement;
+      const keyboard =
+        !!active &&
+        el.contains(active) &&
+        typeof active.matches === 'function' &&
+        active.matches(':focus-visible');
+
+      if (hoverRef.current || keyboard || reducedRef.current) {
+        // Parked, not lost: stay where the belt actually is so resuming does
+        // not jump.
+        posRef.current = at;
+        wroteRef.current = at;
+        return;
+      }
+      if (dt <= 0) return;
+
+      let next = posRef.current + speedRef.current * dt;
+      // The recycle, in one expression and off-screen: a whole stride further
+      // along is pixel-identical, so folding back into the band changes
+      // nothing visible. Modulo rather than a subtraction because an adopted
+      // position can be several strides away after a hard fling.
+      next = lo + (((next - lo) % stride) + stride) % stride;
+      posRef.current = next;
+      writePos(el, next, rtl);
+      // Record what the engine TOOK, not what we asked for.
+      wroteRef.current = readPos(el, rtl);
     };
     frame = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(frame);
       mq?.removeEventListener?.('change', onPref);
+      window.removeEventListener('blur', onBlur);
     };
-  }, [dir, speed, stride, drifting, wrap]);
-
-  const release = () => setHeld(false);
+  }, []);
 
   return (
     <div
       ref={containerRef}
       // `overflow-x-auto` is the feature, not a detail: it is what gives the
-      // finger something to pull. `touch-action: pan-x` tells the compositor
-      // to own the gesture, which is what keeps the drag at 60fps instead of
-      // waiting on a main thread doing anything else.
+      // finger something to pull.
       className={`lv-mq overflow-x-auto overflow-y-hidden hide-scrollbar ${className}`}
-      style={{ touchAction: 'pan-x', overscrollBehaviorX: 'contain' }}
-      onPointerDown={() => setHeld(true)}
-      onPointerUp={release}
-      onPointerLeave={release}
-      onPointerCancel={release}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => {
-        setHovered(false);
-        release();
+      // `manipulation` is pan-x AND pan-y. This used to be `pan-x` alone,
+      // which told the compositor that a touch starting anywhere on the belt
+      // could never scroll the PAGE — and the ads strip is a full-width band
+      // near the top of the home page, so a customer swiping up from there
+      // found it frozen. Horizontal dragging is unaffected.
+      style={{ touchAction: 'manipulation', overscrollBehaviorX: 'contain' }}
+      onPointerEnter={(e) => {
+        // A REAL MOUSE ONLY. A touch cannot set this, so it cannot leave it
+        // set — which is the defect this whole file was rewritten for.
+        if (e.pointerType === 'mouse') hoverRef.current = true;
       }}
-      onFocusCapture={() => setFocused(true)}
-      onBlurCapture={() => setFocused(false)}
-      // Scrolled by a wheel, a trackpad or a momentum fling the loop is not
-      // driving: the wrap has to run on those too, or a hard flick reaches
-      // the end of the copies and stops at a hard edge.
-      onScroll={(e) => wrap(e.currentTarget)}
+      onPointerLeave={(e) => {
+        if (e.pointerType === 'mouse') hoverRef.current = false;
+      }}
+      // NO `onScroll` HANDLER, DELIBERATELY. The recycle used to run from one,
+      // writing `scrollLeft` from inside the scroll event — which on iOS
+      // cancels a momentum fling, so a hard swipe stopped dead at every stride
+      // boundary. The loop notices a customer's scroll by comparing the live
+      // position with what it last wrote, which costs nothing and cannot
+      // interrupt them.
     >
       <div className="lv-mq__track flex w-max">
         {Array.from({ length: copies }, (_, c) =>

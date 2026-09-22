@@ -363,37 +363,102 @@ test('the focus ring is INSET, because the belt clips everything outside itself'
   assert.doesNotMatch(src, /outline-offset-2/);
 });
 
+/**
+ * A SOURCE PIN CANNOT PROVE THAT A BELT MOVES, and the three tests this block
+ * replaces are the proof of that.
+ *
+ * They asserted the SOURCE TEXT of the drift — `el.scrollLeft += sign * speed
+ * * dt`, `const drifting = !held && !hovered && !focused;` — and every one of
+ * them passed on a belt that had not moved a pixel on the owner's iPad. Three
+ * separate stoppers were live at once (a hover flag a touch screen sets and
+ * never clears, a focus flag a tapped link sets, and a per-frame increment too
+ * small to survive being rounded to a pixel), and reading the code could not
+ * see any of them.
+ *
+ * So the behaviour is proved in a real engine by scripts/e2e-marquee-drift.mjs
+ * against tests/browser/marquee.html, which measures the actual scroll
+ * position across actual animation frames — it fails on the implementation
+ * this replaces. What is left HERE is only what a source pin can honestly
+ * assert: that the structures the browser proof depends on still exist, and
+ * that the specific mistakes are not back.
+ */
 test('the belt is a SCROLL container the finger can drag, not a paused animation', () => {
   const src = read('src/components/home/Marquee.tsx');
-  /**
-   * «اجعل المستخدم يسحب البراندات scroll horizontal ليس فقط ان يتوقف». The
-   * belt was a `translateX` animation inside `overflow: hidden`: a finger on
-   * it could only pause it, because there was no scrollable overflow to pull.
-   * The drift is now `scrollLeft`, which is the same axis the finger moves —
-   * so a drag interrupts it by moving the value it writes, and the gesture
-   * itself is the platform's own, with its momentum.
-   */
   assert.match(src, /overflow-x-auto/, 'there is something to drag');
-  assert.match(src, /touchAction: 'pan-x'/, 'and the compositor owns the gesture');
-  assert.match(src, /el\.scrollLeft \+= sign \* speed \* dt/, 'the drift moves the scroll, not a transform');
   assert.doesNotMatch(src, /animation-play-state/, 'nothing is left to pause');
-  // The stride is still the whole loop, and the wrap still happens off-screen.
-  assert.match(src, /Math\.abs\(at\) >= s/, 'one stride is the seam');
-  assert.match(src, /Math\.ceil\(cw \/ sw\) \+ 1/, 'a spare set is the runway the wrap consumes');
+  // `pan-x` ALONE told the compositor a touch starting on the belt could never
+  // scroll the page — and the ads strip is a full-width band near the top, so
+  // a customer swiping up from it found the page frozen.
+  assert.doesNotMatch(src, /touchAction: 'pan-x'/, 'a vertical swipe must still scroll the page');
+  assert.match(src, /touchAction: 'manipulation'/);
+  // The drift keeps its own float position. A read-modify-write against the
+  // DOM loses 0.28–0.57px per frame to rounding, which is the whole budget.
+  assert.match(
+    src,
+    /let next = posRef\.current \+ speedRef\.current \* dt;/,
+    'the position is a float we keep, advanced from our own value'
+  );
+  assert.match(src, /const posRef = useRef\(0\);/);
+  assert.doesNotMatch(src, /el\.scrollLeft \+=/, 'never read-modify-write against the DOM');
+  // Direction is measured by useRail, not asserted from the UI language.
+  assert.match(src, /import \{ readPos, writePos \} from '\.\.\/\.\.\/lib\/useRail'/);
+  assert.doesNotMatch(src, /sign = dir === 'rtl'/, 'three conventions exist; a sign is a guess');
+  // Runway on BOTH sides, so a drag meets a recycle rather than a wall.
+  assert.match(src, /Math\.ceil\(cw \/ sw\) \+ 3/);
+  // The recycle must not run from a scroll handler: writing scrollLeft during
+  // an iOS momentum fling cancels the fling.
+  assert.doesNotMatch(src, /onScroll=\{/, 'no write inside the scroll event');
 });
 
-test('the belt stops when focus lands in it, and when a finger or a pointer is on it', () => {
+test('nothing that stops the belt can latch, and the browser proof says so', () => {
   const src = read('src/components/home/Marquee.tsx');
-  // Hover and press-hold were handled; focus was not, so a keyboard user
-  // landed on a mark that immediately slid out from under the ring — the one
-  // case that cannot be recovered by moving a finger.
-  assert.match(src, /const drifting = !held && !hovered && !focused;/);
-  assert.match(src, /onFocusCapture=\{\(\) => setFocused\(true\)\}/);
-  assert.match(src, /onBlurCapture=\{\(\) => setFocused\(false\)\}/);
-  // And the system preference still parks it, watched rather than read once:
-  // a customer can turn it on while the page is open.
+  // HOVER IS A MOUSE FACT. iPadOS synthesises a mouse-enter for a tap and
+  // withholds the matching leave until the customer taps something else, so
+  // `onMouseEnter` was a one-way switch on the device this shop is run from.
+  assert.doesNotMatch(src, /onMouseEnter=/, 'a touch must not be able to set hover');
+  assert.match(src, /e\.pointerType === 'mouse'/);
+  // FOCUS IS READ, NOT REMEMBERED: `:focus-visible` on the active element is
+  // true for a Tab and false for a tap, so a tapped link no longer parks the
+  // belt for the rest of the session.
+  assert.doesNotMatch(src, /setFocused\(/, 'no focus latch');
+  assert.match(src, /:focus-visible/);
+  // A HUMAN'S GRIP IS A TIMESTAMP THAT EXPIRES, so a pointer event that never
+  // arrives cannot strand the belt.
+  assert.match(src, /userAtRef\.current/);
+  assert.match(src, /now - userAtRef\.current < 140/);
+  // And the loop is mounted once, so no stopper can tear it down and rebuild
+  // it in a stopped state — which is what the dependency array used to do.
+  assert.doesNotMatch(src, /\}, \[dir, speed, stride, drifting, wrap\]\);/);
+  // The system preference still parks it, watched rather than read once.
   assert.match(src, /prefers-reduced-motion: reduce/);
-  assert.match(src, /if \(drifting && !reduced && dt > 0\)/);
+  assert.match(src, /reducedRef\.current/);
+});
+
+test('the belt has a real browser proof, and it drives the real component', () => {
+  // The point of this test is that the proof EXISTS and is wired to the
+  // shipped component. A source pin that guards a source pin would be the
+  // same mistake one level up.
+  const e2e = read('scripts/e2e-marquee-drift.mjs');
+  const fixture = read('tests/browser/marquee-fixture.tsx');
+  assert.match(fixture, /from '\.\.\/\.\.\/src\/components\/home\/Marquee'/, 'the production component');
+  assert.doesNotMatch(fixture, /function Marquee\(/, 'and not a copy of it');
+  // Both real call-site shapes: plain children (the ads strip) and renderSet
+  // (the brands belt). A zero-width measurement in either used to leave the
+  // loop permanently un-started.
+  assert.match(fixture, /data-belt="ads"/);
+  assert.match(fixture, /data-belt="brands"/);
+  assert.match(fixture, /data-belt="ltr"/);
+  // The measurements that matter, each named in the runner.
+  for (const claim of [
+    'the belt must drift on its own',
+    'a tap must not latch the belt off',
+    'the drift must resume once the pointer leaves',
+    'the belt must recycle, not park at the end',
+    'the belt must drift in LTR as well',
+    'prefers-reduced-motion must stop the drift',
+  ]) {
+    assert.ok(e2e.includes(claim), `the browser proof still asserts: ${claim}`);
+  }
 });
 
 test('the resting logo is at full opacity — `hover:` never fires on a phone', () => {

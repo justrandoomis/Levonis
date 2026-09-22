@@ -26,12 +26,21 @@
  *  - Policies / Support → /policies, /support
  *  - Sign out           → POST /api/auth/logout
  *
+ * FIXED, AND THE ENTRY IS KEPT SO IT IS NOT RE-BROKEN: the Google row's
+ * «مرتبط / غير مرتبط» state used to be listed below as unavailable, and it was
+ * — but for a reason nobody had noticed. `publicUser` derives `has_google`
+ * from `google_sub`, and `loadSessionUser` deleted that column before the
+ * object reached the request context, so GET /api/auth/me answered false for
+ * every account in existence while login and /auth/google answered true. See
+ * worker/lib/session.ts and tests/googleLinkSurvivesSession.test.ts.
+ *
  * HONESTLY DISABLED (no backend exists today — stated, not simulated):
  *  - Session/device list and "sign out other devices" as a standalone action:
  *    no endpoint enumerates or revokes sessions on demand.
- *  - Google link status: the API's public user object exposes no google_sub,
- *    so this page cannot claim linked/unlinked. (Linking itself exists at
- *    POST /api/auth/google/link but needs a Google credential flow.)
+ *  - Google LINKING from inside this page: the row reports the state (see
+ *    below) but cannot change it. POST /api/auth/google/link exists and needs
+ *    a Google credential flow plus the current password, and the copy for that
+ *    button and its refusals is not written yet.
  *  - Unlinking any sign-in method: no endpoint — so the "never lock yourself
  *    out by removing the last method" rule cannot be violated from here.
  *  - Per-account display currency: none is stored; the ledger is IQD.

@@ -1,0 +1,86 @@
+name: 52 - Home belts really move (no deployment)
+
+# «الشريط الإعلاني وشريط أبرز العلامات يجب أن يستمر في الحركة لكنه قابل
+#  للتحريك اليدوي — لا تحذف التحريك التلقائي.»
+#
+# THIS EXISTS BECAUSE A GREEN SUITE SHIPPED A DEAD BELT. The drift used to be
+# pinned by matching the SOURCE TEXT of `el.scrollLeft += sign * speed * dt`,
+# and that assertion passes just as happily on a belt that has not moved a
+# pixel — which is exactly what the owner then met on an iPad. Three stoppers
+# were live at once and none of them was visible to a test that reads code.
+#
+# So this drives the real component in a real engine and measures the real
+# scroll position across real animation frames. It reads nothing and deploys
+# nothing.
+
+on:
+  pull_request:
+    branches: [Main]
+    paths:
+      - 'src/components/home/Marquee.tsx'
+      - 'src/components/home/Strips.tsx'
+      - 'src/lib/useRail.ts'
+      - 'src/index.css'
+      - 'tests/browser/marquee*'
+      - 'scripts/e2e-marquee-drift.mjs'
+      - '.github/workflows/verify-home-belts.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: home-belts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  belts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: The source contract the proof depends on
+        run: node --import tsx --test tests/homeSectionsLayout.test.ts
+
+      - name: Install isolated browser engines
+        run: |
+          npm install --prefix /tmp/levonis-browser --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
+          /tmp/levonis-browser/node_modules/.bin/playwright install --with-deps chromium webkit
+
+      # WebKit is the engine the shop is actually run from, and it is the one
+      # that synthesises the mouse-enter a tap used to latch the belt off with.
+      # Chromium alone would not have caught that half.
+      - name: Measure the real belts in a real engine
+        env:
+          PLAYWRIGHT_MODULE: /tmp/levonis-browser/node_modules/playwright
+          OUT_DIR: /tmp/levonis-diagnostics/marquee
+        run: |
+          mkdir -p /tmp/levonis-diagnostics/marquee
+          node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4175 > /tmp/levonis-diagnostics/marquee/vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4175/tests/browser/marquee.html >/dev/null; then break; fi
+            sleep 1
+          done
+          set +e
+          node scripts/e2e-marquee-drift.mjs > /tmp/levonis-diagnostics/marquee/proof.log 2>&1
+          result=$?
+          tail -60 /tmp/levonis-diagnostics/marquee/proof.log
+          exit "$result"
+
+      - name: Keep the measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-belt-measurements
+          path: /tmp/levonis-diagnostics/marquee
+          if-no-files-found: warn
