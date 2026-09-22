@@ -29,6 +29,16 @@
  */
 
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
+import {
+  compileLexicon,
+  decideIntent,
+  extractOrderId,
+  isLikelyCatalogueLookup,
+  scoreIntents,
+  stripWords,
+  type IntentDecision,
+  type LexEntry,
+} from '../lib/assistantNlu';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
@@ -146,6 +156,36 @@ const INTENTS = [
   'policy_question',
   'open_ticket',
   'human_handoff',
+  /**
+   * ─────────────────────────────── the fifteen this round added ───────────
+   *
+   * «هو غبي جدا … يفهم كل شي». The scorer below made the assistant read
+   * Arabic properly; these are the things it now has an ANSWER for. Every one
+   * of them was a sentence a customer of a printer shop types on the first
+   * screen, and every one of them used to come back «لم أفهم طلبك تمامًا».
+   *
+   * Three of them are not questions at all — a greeting, a thank-you, and
+   * "are you a robot". Meeting «هلو» with a fourteen-item menu is the single
+   * cheapest way to feel like a machine, and answering the third one honestly
+   * matters more than answering it cleverly: this is not a person, and
+   * somebody who needs a person should be told how to get one.
+   */
+  'greeting',
+  'thanks',
+  'bot_identity',
+  /** «ساعدني باختيار طابعه» — the sentence in the owner's screenshot. */
+  'choose_printer',
+  'price_question',
+  'stock_question',
+  'materials_help',
+  'shipping_cost',
+  'payment_methods',
+  'offers_help',
+  'wallet_help',
+  'studio_help',
+  'account_help',
+  'cancel_order',
+  'contact_info',
 ] as const;
 type Intent = (typeof INTENTS)[number];
 
@@ -159,59 +199,235 @@ const ACCOUNT_INTENTS = new Set<Intent>([
   'membership_status',
   'open_ticket',
   'human_handoff',
+  'wallet_help',
+  'cancel_order',
 ]);
 
 type Locale = 'ar' | 'en' | 'ckb';
 
 /**
- * Deterministic keyword dictionaries (ar/en/ckb merged per intent — a user
- * may type Arabic while the UI is English). Plain lowercase substring match;
- * no scoring model, no inference.
+ * THE LEXICON — evidence, not rules.
+ *
+ * Every entry is fed through `normalizeText` at module load, so an Arabic
+ * `phrase` written here with a ة matches a message typed with a ه, and a
+ * Kurdish ک matches an Arabic ك. Nothing in this table has to enumerate
+ * inflections: worker/lib/assistantNlu.ts matches an Arabic stem inside its
+ * token, which is what carries the definite article and the possessive
+ * suffixes — «ضمان» reaches «الضمان» and «ضماني» on its own.
+ *
+ * PHRASES ARE STRONG, STEMS ARE ORDINARY. «كم سعر» is a question about a
+ * price and almost nothing else; «سعر» alone is in half the sentences in a
+ * shop. The scorer weights a phrase by its length for exactly that reason, so
+ * a sentence naming a price AND a comparison is answered with both as
+ * choices rather than with whichever was listed first.
+ *
+ * NO GENERATED TEXT REACHES THIS FILE. The Arabic and the Sorani here are
+ * written by hand, like every other string in this codebase — «ممنوع استخدام
+ * AI أو Gemini أو OpenAI أو أي API توليدي للترجمة».
  */
-const KEYWORDS: Record<Intent, string[]> = {
-  order_status: ['order', 'حالة الطلب', 'طلبي', 'طلباتي', 'وين طلبي', 'داواکاری', 'داواکاریەکەم', 'ord-'],
-  delivery_estimate: ['delivery', 'arrive', 'shipping time', 'توصيل', 'يوصل', 'يصل', 'متى', 'وصول', 'گەیاندن', 'کەی دەگات'],
-  my_devices: ['device', 'my printer', 'serial', 'جهاز', 'اجهزتي', 'أجهزتي', 'سيريال', 'ئامێر', 'ئامێرەکانم'],
-  warranty_status: ['warranty', 'ضمان', 'الضمان', 'گەرەنتی', 'کفالة'],
-  points_balance: ['point', 'نقاط', 'نقاطي', 'خاڵ', 'خاڵەکانم'],
-  membership_status: ['membership', 'subscription', 'عضوية', 'اشتراك', 'اشتراكي', 'ئەندامێتی', 'بەشداری'],
-  return_help: ['return', 'refund', 'ارجاع', 'إرجاع', 'استرجاع', 'استبدال', 'گەڕاندنەوە'],
-  password_help: ['password', 'forgot', 'كلمة المرور', 'كلمة السر', 'نسيت', 'وشەی نهێنی', 'تێپەڕەوشە'],
-  product_search: ['search', 'find product', 'بحث', 'ابحث', 'أبحث', 'منتج', 'گەڕان', 'بەرهەم'],
+const LEXICON: Record<Intent, LexEntry> = {
+  order_status: {
+    phrases: ['حالة الطلب', 'وين طلبي', 'وين وصل طلبي', 'order status', 'where is my order', 'track my order', 'داواکاریەکەم لە کوێیە'],
+    stems: ['order', 'ord', 'طلبي', 'طلباتي', 'الطلبية', 'داواکاری', 'داواکاریەکەم'],
+  },
+  delivery_estimate: {
+    phrases: ['شنو موعد التوصيل', 'متى يوصل', 'متى يصل', 'وقت التوصيل', 'shipping time', 'when will it arrive', 'delivery date', 'کەی دەگات'],
+    stems: ['delivery', 'arrive', 'توصيل', 'يوصل', 'يصل', 'وصول', 'گەیاندن'],
+  },
+  my_devices: {
+    phrases: ['my printer', 'my devices', 'الأجهزة المسجلة', 'ئامێرەکانم'],
+    stems: ['device', 'devices', 'serial', 'جهاز', 'اجهزتي', 'الاجهزه', 'سيريال', 'ئامێر'],
+  },
+  warranty_status: {
+    phrases: ['حالة الضمان', 'warranty status', 'گەرەنتی چۆنە'],
+    stems: ['warranty', 'ضمان', 'كفالة', 'گەرەنتی'],
+  },
+  points_balance: {
+    phrases: ['رصيد النقاط', 'كم نقاطي', 'my points', 'خاڵەکانم'],
+    stems: ['point', 'points', 'نقاط', 'نقاطي', 'خاڵ'],
+  },
+  membership_status: {
+    phrases: ['حالة العضوية', 'my membership', 'ئەندامێتی'],
+    stems: ['membership', 'subscription', 'عضوية', 'اشتراك', 'اشتراكي', 'بەشداری', 'prime', 'pro'],
+  },
+  return_help: {
+    phrases: ['ارجاع المنتج', 'استرجاع المبلغ', 'how do i return', 'گەڕاندنەوەی کاڵا'],
+    stems: ['return', 'refund', 'ارجاع', 'استرجاع', 'استبدال', 'گەڕاندنەوە'],
+  },
+  password_help: {
+    phrases: ['كلمة المرور', 'كلمة السر', 'نسيت كلمة', 'forgot my password', 'reset password', 'وشەی نهێنی'],
+    stems: ['password', 'نسيت', 'تێپەڕەوشە'],
+  },
+  product_search: {
+    phrases: ['ابحث عن', 'دور على', 'find product', 'do you have', 'گەڕان بۆ'],
+    // «بضاعة» is deliberately absent: it is the generic word for goods and
+    // names no search. tests/support.test.ts pins the pair it would blur —
+    // «اريد استرجاع البضاعة» is a return and nothing else, while «اريد
+    // استرجاع المنتج» genuinely touches two topics and must ask.
+    stems: ['search', 'بحث', 'ابحث', 'منتج', 'عندكم', 'گەڕان', 'بەرهەم'],
+  },
   /**
-   * ` vs ` carries its spaces on purpose: a bare 'vs' is a substring of
-   * ordinary words and would drag unrelated sentences into a comparison.
-   * «قارن» is the stem, so «قارنلي» and «نقارن» reach it without a list of
-   * inflections.
+   * `vs` is a STEM, not a phrase with spaces glued around it.
+   *
+   * The old dictionary carried `' vs '` and a comment explaining that a bare
+   * `vs` would fire inside ordinary words. It was right about the danger and
+   * wrong about the cure: normalisation turns every punctuation mark into a
+   * gap, so a Latin stem is matched as a whole token and `vsync` cannot hit
+   * it. The spaces were doing the tokenizer's job by hand.
    */
-  compare_products: ['compare', 'comparison', ' vs ', 'مقارنة', 'قارن', 'الفرق بين', 'أيهما أفضل', 'ايهما افضل', 'بەراورد', 'جیاوازی نێوان'],
+  compare_products: {
+    phrases: ['الفرق بين', 'أيهما أفضل', 'ايهما افضل', 'شنو الفرق', 'جیاوازی نێوان'],
+    stems: ['compare', 'comparison', 'vs', 'مقارنة', 'قارن', 'بەراورد'],
+  },
   /**
    * Deliberately NARROW. «كهرباء» alone would swallow every sentence about a
-   * power cut, a bill or a plug; the phrases here all name CONSUMPTION or a
-   * UPS. 'ups' carries no spaces because it is a word nobody types by
-   * accident in this shop, and «واط» / «امبير» are the units a customer
-   * actually asks in.
+   * power cut, a bill or a plug; the entries here all name CONSUMPTION or a
+   * UPS, and the units a customer actually asks in.
    */
-  power_usage: [
-    'power consumption', 'how much power', 'watt', 'wattage', 'ups', 'kva', 'amps', 'amperage',
-    'كم تستهلك', 'شكد تستهلك', 'استهلاك الكهرباء', 'استهلاك الطاقة', 'كم واط', 'واط', 'امبير', 'أمبير',
-    'يو بي اس', 'الكهرباء تنقطع',
-    'چەند وزە', 'خەرجکردنی وزە', 'وات',
-  ],
-  policy_question: ['policy', 'policies', 'terms', 'privacy', 'سياسة', 'سياسات', 'شروط', 'خصوصية', 'سیاسەت', 'مەرج'],
-  open_ticket: ['ticket', 'complaint', 'تذكرة', 'شكوى', 'مشكلة', 'تیکێت', 'سکاڵا'],
-  human_handoff: ['human', 'agent', 'staff', 'talk to', 'موظف', 'انسان', 'إنسان', 'تحدث', 'اتواصل', 'کارمەند', 'مرۆڤ'],
+  power_usage: {
+    phrases: [
+      'power consumption', 'how much power', 'كم تستهلك', 'شكد تستهلك', 'استهلاك الكهرباء',
+      'استهلاك الطاقة', 'كم واط', 'الكهرباء تنقطع', 'يو بي اس', 'چەند وزە', 'خەرجکردنی وزە',
+    ],
+    stems: ['watt', 'wattage', 'ups', 'kva', 'amps', 'amperage', 'واط', 'امبير', 'وات'],
+  },
+  policy_question: {
+    phrases: ['سياسة الموقع', 'الشروط والاحكام', 'terms and conditions', 'privacy policy'],
+    stems: ['policy', 'policies', 'terms', 'privacy', 'سياسة', 'سياسات', 'شروط', 'خصوصية', 'سیاسەت', 'مەرج'],
+  },
+  open_ticket: {
+    phrases: ['فتح تذكرة', 'عندي مشكلة', 'open a ticket', 'file a complaint'],
+    stems: ['ticket', 'complaint', 'تذكرة', 'شكوى', 'مشكلة', 'تیکێت', 'سکاڵا'],
+  },
+  human_handoff: {
+    phrases: ['اريد اتكلم مع موظف', 'talk to a human', 'real person', 'customer service', 'کارمەندێک'],
+    stems: ['human', 'agent', 'staff', 'موظف', 'انسان', 'اتواصل', 'کارمەند', 'مرۆڤ'],
+  },
+
+  // ───────────────────────────────────────── the fifteen added this round
+
+  greeting: {
+    phrases: ['السلام عليكم', 'صباح الخير', 'مساء الخير', 'شلونك', 'good morning', 'good evening', 'بەخێربێیت'],
+    stems: ['hi', 'hello', 'hey', 'مرحبا', 'هلو', 'اهلا', 'سلام', 'سڵاو'],
+  },
+  thanks: {
+    phrases: ['شكرا جزيلا', 'تسلم ايدك', 'thank you', 'زۆر سوپاس'],
+    stems: ['thanks', 'thx', 'شكرا', 'مشكور', 'ممنون', 'سوپاس'],
+  },
+  bot_identity: {
+    phrases: ['هل انت روبوت', 'انت بوت', 'انت انسان', 'are you a bot', 'are you human', 'are you real', 'من انت', 'شنو انت'],
+    stems: ['bot', 'robot', 'روبوت', 'بوت', 'ذكاء'],
+  },
+  /**
+   * «ساعدني باختيار طابعه» — THE SENTENCE IN THE SCREENSHOT.
+   *
+   * It is not a search («ابحث»), it is not a comparison («قارن»), and it had
+   * no intent at all, so the most ordinary request in the shop produced «لم
+   * أفهم طلبك تمامًا» twice in a row.
+   */
+  choose_printer: {
+    phrases: [
+      'ساعدني باختيار', 'ساعدني في اختيار', 'اي طابعة', 'أي طابعة', 'شنو افضل طابعة', 'ما هي افضل طابعة',
+      'انصحني بطابعة', 'اريد اشتري طابعة', 'طابعة للمبتدئين', 'help me choose', 'which printer',
+      'best printer', 'recommend a printer', 'printer for beginners', 'کام پرینتەر',
+    ],
+    stems: ['انصحني', 'اختيار', 'للمبتدئين', 'recommend', 'beginner', 'ئامۆژگاری'],
+  },
+  price_question: {
+    phrases: ['كم سعر', 'شكد سعر', 'شكد سعرها', 'بكم', 'ما هو السعر', 'how much is', 'what is the price', 'نرخی چەندە'],
+    stems: ['price', 'cost', 'سعر', 'السعر', 'اسعار', 'نرخ'],
+  },
+  stock_question: {
+    phrases: ['هل متوفر', 'شنو المتوفر', 'موجود عندكم', 'in stock', 'do you have it', 'out of stock', 'بەردەستە'],
+    stems: ['stock', 'available', 'متوفر', 'متوفرة', 'موجود', 'نفذ', 'بەردەست'],
+  },
+  materials_help: {
+    phrases: ['الفرق بين المواد', 'اي فلامنت', 'أي خيط', 'which filament', 'what material', 'کام فیلامێنت'],
+    stems: ['filament', 'pla', 'petg', 'abs', 'tpu', 'asa', 'resin', 'فلامنت', 'خيوط', 'راتنج', 'ريزن', 'مواد', 'فیلامێنت'],
+  },
+  shipping_cost: {
+    phrases: ['كم اجور التوصيل', 'شكد التوصيل', 'اجرة التوصيل', 'كلفة التوصيل', 'shipping cost', 'delivery fee', 'نرخی گەیاندن'],
+    stems: ['اجور', 'اجرة', 'كلفة'],
+  },
+  payment_methods: {
+    phrases: ['طرق الدفع', 'كيف ادفع', 'الدفع عند الاستلام', 'payment methods', 'how do i pay', 'cash on delivery', 'شێوازی پارەدان'],
+    stems: ['payment', 'pay', 'دفع', 'ادفع', 'زين كاش', 'zaincash', 'fastpay', 'پارەدان'],
+  },
+  offers_help: {
+    phrases: ['كود خصم', 'كود الخصم', 'هل يوجد عرض', 'العروض الحالية', 'promo code', 'discount code', 'any offers', 'داشکاندن'],
+    stems: ['خصم', 'عرض', 'عروض', 'تخفيض', 'كوبون', 'coupon', 'promo', 'discount'],
+  },
+  wallet_help: {
+    phrases: ['رصيد المحفظة', 'شحن المحفظة', 'تعبئة المحفظة', 'my wallet', 'top up', 'جزدانەکەم'],
+    stems: ['wallet', 'balance', 'محفظة', 'محفظتي', 'رصيدي', 'جزدان'],
+  },
+  studio_help: {
+    phrases: ['ليفو استوديو', 'levo studio', 'تقطيع الملف', 'ملف stl', 'slice a file', 'ستوديۆ'],
+    stems: ['studio', 'slicer', 'استوديو', 'سلايسر', 'stl', 'gcode', '3mf'],
+  },
+  account_help: {
+    phrases: ['انشاء حساب', 'تسجيل الدخول', 'تفعيل الحساب', 'create an account', 'sign in', 'log in', 'verify my email', 'هەژمار'],
+    stems: ['account', 'register', 'signup', 'حساب', 'حسابي', 'تسجيل'],
+  },
+  cancel_order: {
+    phrases: ['الغاء الطلب', 'إلغاء الطلب', 'اريد الغي طلبي', 'cancel my order', 'هەڵوەشاندنەوەی داواکاری'],
+    stems: ['cancel', 'الغاء', 'الغي', 'هەڵوەشاندنەوە'],
+  },
+  contact_info: {
+    phrases: [
+      'وين موقعكم', 'اين تقعون', 'عنوان المحل', 'رقم الهاتف', 'اوقات الدوام', 'متى تفتحون',
+      'where are you located', 'your address', 'phone number', 'opening hours', 'ناونیشان',
+    ],
+    stems: ['العنوان', 'الدوام', 'موقعكم', 'محلكم', 'فرعكم'],
+  },
 };
 
-/** Returns every intent with a keyword hit (deterministic, order-stable).
- *  Exported for unit tests only. */
+const COMPILED_LEXICON = compileLexicon(LEXICON);
+
+/**
+ * THE QUESTION TAKEN OUT, SO THE SUBJECT IS LEFT.
+ *
+ * «قارن الطابعة بامبو» must search for «الطابعة بامبو», and «شكد سعر A1
+ * combo» for «a1 combo» — searching the whole sentence matches nothing and
+ * answers "no such product" about a product the shop sells.
+ *
+ * The removal is by WHOLE TOKEN. The old version spliced each keyword out as
+ * a substring, which quietly ate the middle of any model name that happened
+ * to contain one; `stripWords` cannot, and that is the only reason a model
+ * called «Pro» survives «كم سعر Pro».
+ *
+ * `FILLER` goes with it — the words that are in every question and name
+ * nothing. Without them «شنو سعر الطابعة هاي» searches for «الطابعة هاي».
+ */
+const FILLER = [
+  'شنو', 'شكد', 'كم', 'هل', 'هاي', 'هذه', 'هذا', 'ال', 'من', 'في', 'على', 'عن', 'يا', 'لو', 'سمحت',
+  'اريد', 'أريد', 'ابغى', 'ممكن', 'رجاء', 'رجاءا', 'مال', 'حق', 'و', 'او', 'أو', 'بين',
+  'what', 'whats', 'is', 'the', 'a', 'an', 'of', 'for', 'me', 'my', 'i', 'you', 'please', 'do', 'does',
+  'can', 'much', 'how', 'and', 'or', 'between', 'about', 'with',
+  'چی', 'چەند', 'بۆ', 'لە',
+] as const;
+
+function stripQuestionWords(text: string, intent: Intent): string {
+  const entry = LEXICON[intent];
+  return stripWords(text, [...(entry.phrases ?? []), ...(entry.stems ?? []), ...FILLER]);
+}
+
+/**
+ * Every intent with any evidence, best first.
+ *
+ * Kept as the module's exported surface — and as the name three test files
+ * already gate — because the ROUTE's contract has not changed: one match
+ * resolves, several mean the route asks, none means it looks elsewhere. What
+ * changed is that this can now read «شنو حالة الضمان» and «A1 vs P1S», which
+ * a lowercase substring scan could not.
+ */
 export function matchIntents(text: string): Intent[] {
-  const q = text.toLowerCase();
-  const out: Intent[] = [];
-  for (const intent of INTENTS) {
-    if (KEYWORDS[intent].some((k) => q.includes(k))) out.push(intent);
-  }
-  return out;
+  return scoreIntents(text, COMPILED_LEXICON).map((s) => s.intent);
+}
+
+/** The one decision, with its shortlist when it declines to make one. */
+function readIntent(text: string): IntentDecision<Intent> {
+  return decideIntent(scoreIntents(text, COMPILED_LEXICON));
 }
 
 // --------------------------------------------------------------- dictionary
@@ -307,6 +523,41 @@ const T: Record<Locale, Record<string, string>> = {
     human_prompt:
       'سيجيبك موظف من فريق ليفونيس داخل تذكرة دعم — هذه هي قناة التواصل البشري المباشرة. ستراجع وتؤكد قبل إنشائها.',
     pro_priority_note: 'تذاكر أعضاء PRO الفعالين تحصل على أولوية حقيقية في قائمة الانتظار.',
+    // ───────────────────────────── ما أضافته هذه الجولة
+    greeting_reply: 'هلا بيك في ليفونيس. شنو تحتاج؟',
+    thanks_reply: 'العفو. إذا تحتاج شي ثاني آني هنا.',
+    bot_identity_reply:
+      'آني المساعد الآلي لليفونيس — برنامج، مو شخص. أجاوب من بيانات الموقع نفسه: طلباتك، أجهزتك، الأسعار، السياسات المنشورة. إذا تريد تحچي وية موظف من الفريق، اضغط الزر تحت.',
+    c_greeting: 'شلون أبدأ؟',
+    c_choose_printer: 'ساعدني باختيار طابعة',
+    c_price: 'سعر منتج',
+    c_stock: 'هل المنتج متوفر؟',
+    c_materials: 'أي فلامنت أختار؟',
+    c_shipping_cost: 'أجور التوصيل',
+    c_payment: 'طرق الدفع',
+    c_offers: 'العروض وأكواد الخصم',
+    c_wallet: 'محفظتي',
+    c_studio: 'استوديو ليفو',
+    c_account: 'حسابي وتسجيل الدخول',
+    c_cancel_order: 'إلغاء طلب',
+    c_contact: 'العنوان وأوقات الدوام',
+    choose_printer_intro: 'هاي الطابعات المتوفرة حالياً. اختار وحدة تشوف تفاصيلها، أو قارن ثنتين:',
+    choose_printer_none: 'ما عندي طابعات معروضة بورقة مواصفات هسه. راجع فريقنا وينطيك الجواب المضبوط.',
+    price_which: 'أي منتج تقصد؟ اكتب اسمه وأنطيك سعره الحالي.',
+    stock_which: 'أي منتج تقصد؟ اكتب اسمه وأشوفلك إذا متوفر.',
+    materials_which: 'أي مادة تقصد؟ اكتب اسمها — مثلاً PLA أو PETG أو TPU — وأعرضلك المتوفر منها.',
+    wallet_reply: 'رصيد محفظتك وكل عمليات الشحن والسحب موجودة بصفحة المحفظة.',
+    wallet_open: 'فتح المحفظة',
+    studio_reply:
+      'استوديو ليفو هو السلايسر مالتنا، يشتغل من المتصفح مباشرة: تحمّل ملف STL أو 3MF، تختار طابعتك، وتطلع G-code. حسابك بالموقع نفسه يفتح بيه.',
+    studio_open: 'فتح استوديو ليفو',
+    account_reply: 'من صفحة الدخول تقدر تسوي حساب جديد، تسجل دخول، أو تفعّل بريدك.',
+    account_open: 'صفحة الدخول',
+    account_profile: 'إعدادات الحساب',
+    cancel_order_reply:
+      'إلغاء الطلب يتم من فريق الدعم حتى نتأكد من حالة الطلب قبل ما ينشحن. اختار طلبك من صفحة طلباتي، أو افتح تذكرة وننجزلك ياها.',
+    orders_open: 'فتح طلباتي',
+    no_printers_yet: 'ما عندنا طابعات معروضة حالياً.',
   },
   en: {
     sign_in_needed: 'This information is private to your account. Please sign in to continue.',
@@ -399,6 +650,41 @@ const T: Record<Locale, Record<string, string>> = {
     human_prompt:
       'A LEVONIS staff member will answer you inside a support ticket — that is the direct human channel. You will review and confirm before it is created.',
     pro_priority_note: 'Tickets from active PRO members get real queue priority.',
+    // ───────────────────────────── added this round
+    greeting_reply: 'Welcome to LEVONIS. What do you need?',
+    thanks_reply: 'Any time. I am here if you need anything else.',
+    bot_identity_reply:
+      'I am the LEVONIS automated assistant — a program, not a person. I answer from the site’s own data: your orders, your devices, prices and the published policies. If you want a member of the team, use the button below.',
+    c_greeting: 'Where do I start?',
+    c_choose_printer: 'Help me choose a printer',
+    c_price: 'Price of a product',
+    c_stock: 'Is it in stock?',
+    c_materials: 'Which filament should I pick?',
+    c_shipping_cost: 'Delivery charge',
+    c_payment: 'Payment methods',
+    c_offers: 'Offers and promo codes',
+    c_wallet: 'My wallet',
+    c_studio: 'LEVO Studio',
+    c_account: 'My account and sign-in',
+    c_cancel_order: 'Cancel an order',
+    c_contact: 'Address and opening hours',
+    choose_printer_intro: 'These are the printers available now. Open one for its details, or compare two:',
+    choose_printer_none: 'I have no printers with a specification sheet to show right now. Our team can answer this properly.',
+    price_which: 'Which product? Type its name and I will give you its current price.',
+    stock_which: 'Which product? Type its name and I will check whether it is in stock.',
+    materials_which: 'Which material? Type its name — PLA, PETG, TPU — and I will show what we have.',
+    wallet_reply: 'Your balance and every top-up and withdrawal are on the wallet page.',
+    wallet_open: 'Open my wallet',
+    studio_reply:
+      'LEVO Studio is our slicer, and it runs in the browser: load an STL or 3MF, pick your printer, get G-code. Your LEVONIS account signs you in.',
+    studio_open: 'Open LEVO Studio',
+    account_reply: 'From the sign-in page you can create an account, sign in, or verify your email.',
+    account_open: 'Sign-in page',
+    account_profile: 'Account settings',
+    cancel_order_reply:
+      'Cancelling is handled by the support team, so we can check the order has not shipped first. Pick the order on My Orders, or open a ticket and we will do it.',
+    orders_open: 'Open my orders',
+    no_printers_yet: 'We have no printers listed at the moment.',
   },
   ckb: {
     sign_in_needed: 'ئەم زانیارییە تایبەتە بە هەژمارەکەت. بۆ بەردەوامبوون بچۆ ژوورەوە.',
@@ -490,6 +776,41 @@ const T: Record<Locale, Record<string, string>> = {
     human_prompt:
       'کارمەندێکی ليڤۆنیس لە ناو تیکێتی پشتگیریدا وەڵامت دەداتەوە — ئەمە کەناڵی مرۆیی ڕاستەوخۆیە. پێش دروستکردنی پێداچوونەوە و پشتڕاستکردنەوە دەکەیت.',
     pro_priority_note: 'تیکێتی ئەندامە چالاکەکانی PRO پێشینەیی ڕاستەقینەیان هەیە لە ڕیزەکەدا.',
+    // ───────────────────────────── ئەمانە لەم خولەدا زیادکران
+    greeting_reply: 'بەخێربێیت بۆ ليڤۆنیس. چی دەخوازیت؟',
+    thanks_reply: 'شایانی نییە. ئەگەر شتێکی تریت پێویست بوو، لێرەم.',
+    bot_identity_reply:
+      'من یاریدەدەری ئۆتۆماتیکی ليڤۆنیسم — بەرنامەیەکم، نەک کەسێک. لە داتای ماڵپەڕەکەوە وەڵام دەدەمەوە: داواکاریەکانت، ئامێرەکانت، نرخەکان و سیاسەتە بڵاوکراوەکان. ئەگەر دەتەوێت لەگەڵ کارمەندێک قسە بکەیت، دوگمەی خوارەوە بەکاربهێنە.',
+    c_greeting: 'لە کوێوە دەست پێ بکەم؟',
+    c_choose_printer: 'یارمەتیم بدە پرینتەر هەڵبژێرم',
+    c_price: 'نرخی بەرهەمێک',
+    c_stock: 'بەردەستە؟',
+    c_materials: 'کام فیلامێنت هەڵبژێرم؟',
+    c_shipping_cost: 'کرێی گەیاندن',
+    c_payment: 'شێوازەکانی پارەدان',
+    c_offers: 'پێشکەشکراوەکان و کۆدی داشکاندن',
+    c_wallet: 'جزدانەکەم',
+    c_studio: 'ستوودیۆی ليڤۆ',
+    c_account: 'هەژمارەکەم و چوونەژوورەوە',
+    c_cancel_order: 'هەڵوەشاندنەوەی داواکاری',
+    c_contact: 'ناونیشان و کاتی کارکردن',
+    choose_printer_intro: 'ئەمانە ئەو پرینتەرانەن کە ئێستا بەردەستن. یەکێکیان بکەرەوە بۆ وردەکاری، یان دووانیان بەراورد بکە:',
+    choose_printer_none: 'ئێستا هیچ پرینتەرێکم نییە بە پەڕەی تایبەتمەندی نیشانی بدەم. تیمەکەمان وەڵامی دروستت دەداتەوە.',
+    price_which: 'کام بەرهەم؟ ناوەکەی بنووسە و نرخی ئێستای پێ دەڵێم.',
+    stock_which: 'کام بەرهەم؟ ناوەکەی بنووسە و بۆت دەپشکنم بەردەستە یان نا.',
+    materials_which: 'کام ماددە؟ ناوەکەی بنووسە — PLA، PETG، TPU — و ئەوەی هەمانە نیشانت دەدەم.',
+    wallet_reply: 'باڵانسەکەت و هەموو پڕکردنەوە و دەرهێنانێک لە پەڕەی جزداندان.',
+    wallet_open: 'کردنەوەی جزدان',
+    studio_reply:
+      'ستوودیۆی ليڤۆ سلایسەری ئێمەیە و لە وێبگەڕدا کاردەکات: فایلی STL یان 3MF باربکە، پرینتەرەکەت هەڵبژێرە، G-code وەربگرە. هەژماری ليڤۆنیست چوونەژوورەوەت بۆ دەکات.',
+    studio_open: 'کردنەوەی ستوودیۆی ليڤۆ',
+    account_reply: 'لە پەڕەی چوونەژوورەوە دەتوانیت هەژمارێکی نوێ دروست بکەیت، بچیتە ژوورەوە، یان ئیمەیڵەکەت پشتڕاست بکەیتەوە.',
+    account_open: 'پەڕەی چوونەژوورەوە',
+    account_profile: 'ڕێکخستنی هەژمار',
+    cancel_order_reply:
+      'هەڵوەشاندنەوە لەلایەن تیمی پشتگیرییەوە دەکرێت، تاکو سەرەتا دڵنیا بین داواکارییەکە نەنێردراوە. داواکارییەکەت لە پەڕەی داواکاریەکانم هەڵبژێرە، یان تیکێتێک بکەرەوە و بۆت دەکەین.',
+    orders_open: 'کردنەوەی داواکاریەکانم',
+    no_printers_yet: 'ئێستا هیچ پرینتەرێکمان لیست نەکراوە.',
   },
 };
 
@@ -535,6 +856,14 @@ function resolveLocale(c: Context<AppContext>, requested: unknown): Locale {
 interface AssistantLink {
   label: string;
   to: string;
+  /**
+   * ANOTHER ORIGIN, so the client opens it rather than routing to it.
+   *
+   * LEVO Studio is studio.levonis-iq.com. `navigate('https://…')` in a SPA
+   * produces a route that does not exist and a blank screen, which is how a
+   * working answer turns into a bug report.
+   */
+  external?: boolean;
 }
 interface AssistantChoice {
   label: string;
@@ -575,6 +904,31 @@ interface AssistantReply {
   table?: AssistantTable;
   auth_required?: boolean;
   handoff?: boolean;
+  /**
+   * THE ASSISTANT REMEMBERS THAT IT ASKED A QUESTION.
+   *
+   * This is the fix for the exact exchange in the owner's screenshot. The
+   * assistant said «أي منتج تريد تقارنه؟ اكتب اسم الطابعة», the customer
+   * typed «A1 combo», and the reply was «لم أفهم طلبك تمامًا» — because the
+   * next request carried nothing but that text and the route had no idea a
+   * comparison was in mid-air. It asked a question and forgot it had.
+   *
+   * The reply now names what it is waiting for; the client hands it back with
+   * the next message; the route fills the slot. That is the whole mechanism,
+   * and it is deliberately the smallest one that works:
+   *
+   *   · ONE turn of memory, not a transcript. Nothing accumulates, nothing is
+   *     stored server-side, and a stale tab cannot resurrect a conversation
+   *     from last week.
+   *   · A NEW INTENT ALWAYS WINS. Somebody who answers «وين طلبي» to "which
+   *     printer?" has changed the subject, and a bot that holds them to the
+   *     old question is the kind that gets sworn at.
+   *   · IT CARRIES NO AUTHORITY. `slot` fills one query string. Every handler
+   *     still validates its own input and every account answer is still
+   *     ownership-checked against the session — a client that invents an
+   *     `expects` gains nothing it could not have asked for directly.
+   */
+  expects?: { intent: Intent; slot: 'q' | 'ids'; params?: Record<string, string> };
 }
 
 const MENU_ITEMS: Array<{ intent: Intent; labelKey: string }> = [
@@ -587,6 +941,10 @@ const MENU_ITEMS: Array<{ intent: Intent; labelKey: string }> = [
   { intent: 'return_help', labelKey: 'c_returns' },
   { intent: 'password_help', labelKey: 'c_password' },
   { intent: 'product_search', labelKey: 'c_search' },
+  // The sentence in the owner's screenshot, promoted to the opening menu:
+  // «ساعدني باختيار طابعه» is what somebody who has never bought a printer
+  // actually wants, and it was not on offer anywhere.
+  { intent: 'choose_printer', labelKey: 'c_choose_printer' },
   { intent: 'compare_products', labelKey: 'c_compare' },
   { intent: 'power_usage', labelKey: 'c_power' },
   { intent: 'policy_question', labelKey: 'c_policies' },
@@ -594,11 +952,69 @@ const MENU_ITEMS: Array<{ intent: Intent; labelKey: string }> = [
   { intent: 'human_handoff', labelKey: 'c_human' },
 ];
 
+/**
+ * EVERY intent that can be offered as a chip, including the ones that are not
+ * on the opening menu.
+ *
+ * The two lists are different on purpose. `MENU_ITEMS` is what somebody sees
+ * when they have said nothing yet, and twenty-nine chips is not a menu, it is
+ * a wall. This map is what a SHORTLIST is rendered from — «waranty check»
+ * offering one chip reading «حالة الضمان» — and a shortlist may name anything
+ * the scorer knows about. Without it, `menuChoices(loc, ['choose_printer'])`
+ * filtered an array that had no such row and silently returned NOTHING, which
+ * is a clarifying question with no answers on it.
+ */
+const CHOICE_LABELS: Record<Intent, string> = {
+  order_status: 'c_order_status',
+  delivery_estimate: 'c_delivery',
+  my_devices: 'c_devices',
+  warranty_status: 'c_warranty',
+  points_balance: 'c_points',
+  membership_status: 'c_membership',
+  return_help: 'c_returns',
+  password_help: 'c_password',
+  product_search: 'c_search',
+  compare_products: 'c_compare',
+  power_usage: 'c_power',
+  policy_question: 'c_policies',
+  open_ticket: 'c_ticket',
+  human_handoff: 'c_human',
+  greeting: 'c_greeting',
+  thanks: 'c_greeting',
+  bot_identity: 'c_human',
+  choose_printer: 'c_choose_printer',
+  price_question: 'c_price',
+  stock_question: 'c_stock',
+  materials_help: 'c_materials',
+  shipping_cost: 'c_shipping_cost',
+  payment_methods: 'c_payment',
+  offers_help: 'c_offers',
+  wallet_help: 'c_wallet',
+  studio_help: 'c_studio',
+  account_help: 'c_account',
+  cancel_order: 'c_cancel_order',
+  contact_info: 'c_contact',
+};
+
+/**
+ * `only` given → those intents, in the order asked for, whatever they are.
+ * `only` omitted → the opening menu.
+ *
+ * A greeting and a thank-you are never offered as chips: neither is a thing
+ * somebody wants to TAP, and both would push a real topic off a phone screen.
+ */
+const UNCHIPPABLE = new Set<Intent>(['greeting', 'thanks']);
+
 function menuChoices(loc: Locale, only?: Intent[]): AssistantChoice[] {
-  return MENU_ITEMS.filter((m) => !only || only.includes(m.intent)).map((m) => ({
-    label: tr(loc, m.labelKey),
-    intent: m.intent,
-  }));
+  if (!only) return MENU_ITEMS.map((m) => ({ label: tr(loc, m.labelKey), intent: m.intent }));
+  const seen = new Set<Intent>();
+  const out: AssistantChoice[] = [];
+  for (const intent of only) {
+    if (UNCHIPPABLE.has(intent) || seen.has(intent)) continue;
+    seen.add(intent);
+    out.push({ label: tr(loc, CHOICE_LABELS[intent]), intent });
+  }
+  return out;
 }
 
 function signInReply(intent: string, loc: Locale): AssistantReply {
@@ -958,9 +1374,7 @@ function compareIdsParam(params: Record<string, unknown>): string[] {
  * product the shop sells.
  */
 function stripCompareWords(text: string): string {
-  let out = text.toLowerCase();
-  for (const word of KEYWORDS.compare_products) out = out.split(word).join(' ');
-  return out.replace(/\s+/g, ' ').trim();
+  return stripQuestionWords(text, 'compare_products');
 }
 
 const compareName = (p: Placed, loc: Locale): string => cardOf(p).name[loc];
@@ -1020,9 +1434,15 @@ async function handlePowerUsage(
 
   if (!target) {
     const q = str(params.q, 'q', { max: 100, required: false }) || stripPowerWords(freeText);
-    if (q.length < 2) return { intent: 'power_usage', text: tr(loc, 'power_need_product') };
+    // Waiting for a printer name, and saying so — the same mechanism the
+    // comparison uses, for the same question asked a different way.
+    if (q.length < 2) {
+      return { intent: 'power_usage', text: tr(loc, 'power_need_product'), expects: { intent: 'power_usage', slot: 'q' } };
+    }
     const matches = await findComparable(db, q, tax, 6);
-    if (matches.length === 0) return { intent: 'power_usage', text: tr(loc, 'power_none') };
+    if (matches.length === 0) {
+      return { intent: 'power_usage', text: tr(loc, 'power_none'), expects: { intent: 'power_usage', slot: 'q' } };
+    }
     // ONE MACHINE NAMED OR NONE. The same rule the comparison follows: an
     // ambiguous match becomes choices, never a guess — and a guess here is a
     // UPS recommendation for a printer the customer did not ask about.
@@ -1063,9 +1483,7 @@ async function handlePowerUsage(
 /** The same shape as `stripCompareWords`, for the same reason: «كم تستهلك
  *  الطابعة بامبو» must search for «الطابعة بامبو» and not for the question. */
 function stripPowerWords(text: string): string {
-  let out = text.toLowerCase();
-  for (const word of KEYWORDS.power_usage) out = out.split(word).join(' ');
-  return out.replace(/\s+/g, ' ').trim();
+  return stripQuestionWords(text, 'power_usage');
 }
 
 async function handleCompareProducts(
@@ -1098,9 +1516,23 @@ async function handleCompareProducts(
   // Nothing identified yet — read the first machine out of what they typed.
   if (placed.length === 0) {
     const q = str(params.q, 'q', { max: 100, required: false }) || stripCompareWords(freeText);
-    if (q.length < 2) return { intent: 'compare_products', text: tr(loc, 'compare_need_first') };
+    /**
+     * «أي منتج تريد تقارنه؟ اكتب اسم الطابعة» — AND THE ASSISTANT REMEMBERS
+     * THAT IT ASKED.
+     *
+     * This exact question, followed by «A1 combo», followed by «لم أفهم طلبك
+     * تمامًا», is the owner's screenshot. The question was always right; what
+     * was missing was `expects`, which tells the client to hand the answer
+     * back as the `q` this handler is standing here waiting for.
+     */
+    if (q.length < 2) {
+      return { intent: 'compare_products', text: tr(loc, 'compare_need_first'), expects: { intent: 'compare_products', slot: 'q' } };
+    }
     const matches = await findComparable(db, q, tax, 6);
-    if (matches.length === 0) return { intent: 'compare_products', text: tr(loc, 'compare_none') };
+    // Still asking, so still waiting: a typo must not dead-end the comparison.
+    if (matches.length === 0) {
+      return { intent: 'compare_products', text: tr(loc, 'compare_none'), expects: { intent: 'compare_products', slot: 'q' } };
+    }
     if (matches.length > 1) {
       return {
         intent: 'compare_products',
@@ -1261,6 +1693,167 @@ async function handlePolicyQuestion(c: Context<AppContext>, params: Record<strin
   };
 }
 
+/**
+ * THE STUDIO IS ANOTHER ORIGIN, and the answer says so by linking out.
+ *
+ * Kept next to the handler that uses it rather than imported from the client
+ * bundle: worker/ and src/ are separate programs (check:boundaries enforces
+ * it), and a Worker reaching into src/translations.ts for a constant is the
+ * kind of shortcut that makes one of them impossible to deploy without the
+ * other.
+ */
+const STUDIO_ORIGIN = 'https://studio.levonis-iq.com';
+
+/**
+ * «ساعدني باختيار طابعه» — WHAT THE SHOP ACTUALLY HAS, not an opinion.
+ *
+ * This is the one new intent that had to be careful. The temptation is to
+ * recommend: "get the A1 if you are starting out". That would be this route
+ * inventing a judgement about somebody's money, and it would go stale the
+ * week the catalogue changed. So the answer is the printers we are selling
+ * right now, with their real prices, and one tap into the comparison — which
+ * is the screen that DOES rank machines, from the spec engine, the same way
+ * the compare page does.
+ *
+ * Only printers with a specification sheet are offered, for the reason
+ * `findComparable` gives: a card that cannot be compared is a tap that ends
+ * in a refusal.
+ */
+async function handleChoosePrinter(c: Context<AppContext>, loc: Locale): Promise<AssistantReply> {
+  const db = c.env.DB;
+  const tax = taxonomy(await loadCatalogs(db));
+  const { results } = await db.prepare(
+    `SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products
+      WHERE status = 'active' AND spec_fields <> '{}' AND spec_fields <> ''
+      ORDER BY is_featured DESC, created_at DESC
+      LIMIT 40`
+  ).all<CompareProductRow>();
+  const printers = (results ?? [])
+    .map((row) => place(row, tax))
+    .filter((p) => hasAnySpec(p.specs) && p.productType === 'printer')
+    .slice(0, 5);
+  if (printers.length === 0) return { intent: 'choose_printer', text: tr(loc, 'choose_printer_none') };
+  return {
+    intent: 'choose_printer',
+    text: tr(loc, 'choose_printer_intro'),
+    cards: printers.map((p) => ({
+      title: compareName(p, loc),
+      subtitle: `${tr(loc, 'f_price')}: ${fmtIqd(loc, Number(p.row.price_iqd) || 0)}`,
+      link: { label: tr(loc, 'open_product'), to: `/product/${p.row.slug}` },
+    })),
+    choices: printers.map((p) => ({
+      label: compareName(p, loc),
+      intent: 'compare_products' as const,
+      params: { ids: p.row.id },
+    })),
+  };
+}
+
+/**
+ * A price, a stock check and a material question are all ONE question —
+ * "which product?" — and they all end in the same place: the product search,
+ * which already quotes the price the storefront quotes and the stock badge
+ * the card shows. Three intents exist rather than one because the SENTENCES
+ * are different, and because an empty subject needs a different prompt for
+ * each: «أي منتج تقصد؟» is the wrong question to ask somebody who said
+ * «أي فلامنت أختار؟».
+ *
+ * `expects` is what makes the follow-up work. The reply says "I am waiting
+ * for a product name", the client hands that back with the next message, and
+ * «A1 combo» typed on its own is finally an answer to something.
+ */
+async function handleSubjectSearch(
+  c: Context<AppContext>,
+  intent: 'price_question' | 'stock_question' | 'materials_help',
+  params: Record<string, unknown>,
+  freeText: string,
+  loc: Locale
+): Promise<AssistantReply> {
+  const given = str(params.q, 'q', { max: 100, required: false });
+  const subject = given || stripQuestionWords(freeText, intent);
+  if (subject.length < 2) {
+    const promptKey =
+      intent === 'price_question' ? 'price_which' : intent === 'stock_question' ? 'stock_which' : 'materials_which';
+    return { intent, text: tr(loc, promptKey), expects: { intent, slot: 'q' } };
+  }
+  const found = await handleProductSearch(c, { q: subject }, subject, loc);
+  // The search's own «ما لقيت» keeps asking, so a typo does not dead-end.
+  return found.cards?.length
+    ? { ...found, intent }
+    : { ...found, intent, expects: { intent, slot: 'q' } };
+}
+
+/** A published policy, answered directly instead of listing twenty of them. */
+function handleTopicPolicy(
+  c: Context<AppContext>,
+  intent: Intent,
+  key: string,
+  loc: Locale
+): Promise<AssistantReply> {
+  return handlePolicyQuestion(c, { key }, loc).then((reply) => ({ ...reply, intent }));
+}
+
+/** A link is the whole answer for these three — the page is the feature. */
+function handleWallet(loc: Locale): AssistantReply {
+  return {
+    intent: 'wallet_help',
+    text: tr(loc, 'wallet_reply'),
+    links: [{ label: tr(loc, 'wallet_open'), to: '/wallet' }],
+  };
+}
+
+function handleStudio(loc: Locale): AssistantReply {
+  return {
+    intent: 'studio_help',
+    text: tr(loc, 'studio_reply'),
+    links: [{ label: tr(loc, 'studio_open'), to: STUDIO_ORIGIN, external: true }],
+  };
+}
+
+function handleAccount(loc: Locale, signedIn: boolean): AssistantReply {
+  return {
+    intent: 'account_help',
+    text: tr(loc, 'account_reply'),
+    links: signedIn
+      ? [{ label: tr(loc, 'account_profile'), to: '/settings' }]
+      : [{ label: tr(loc, 'account_open'), to: '/auth' }],
+  };
+}
+
+/**
+ * CANCELLING IS NOT SOMETHING THIS ROUTE DOES.
+ *
+ * It would be one UPDATE, and that is exactly why it is not here: whether an
+ * order can still be cancelled depends on whether it has shipped, whether a
+ * wallet hold has settled and whether a pre-order slot has to be returned —
+ * and every one of those is decided elsewhere, by code that was written for
+ * it. An assistant that cancelled orders itself would be a second opinion
+ * about somebody's money. It says who does it, and opens the door.
+ */
+function handleCancelOrder(loc: Locale): AssistantReply {
+  return {
+    intent: 'cancel_order',
+    text: tr(loc, 'cancel_order_reply'),
+    links: [{ label: tr(loc, 'orders_open'), to: '/orders' }],
+    choices: menuChoices(loc, ['open_ticket', 'human_handoff']),
+  };
+}
+
+/**
+ * «هل انت روبوت» — ANSWERED HONESTLY, and that is the point.
+ *
+ * A support assistant that dodges this question, or answers it cutely, is
+ * lying to somebody who is trying to work out whether they are being heard.
+ * It says what it is, what it reads from, and how to reach a person.
+ */
+function handleIdentity(loc: Locale): AssistantReply {
+  return {
+    intent: 'bot_identity',
+    text: tr(loc, 'bot_identity_reply'),
+    choices: menuChoices(loc, ['human_handoff', 'open_ticket']),
+  };
+}
+
 function handleHandoff(intent: 'open_ticket' | 'human_handoff', loc: Locale): AssistantReply {
   return {
     intent,
@@ -1284,9 +1877,80 @@ export function contextualChoices(loc: Locale, intent: string): AssistantChoice[
     product_search: ['compare_products', 'human_handoff'],
     compare_products: ['product_search', 'human_handoff'],
     policy_question: ['human_handoff'],
+    // ─────────────────── the fifteen added this round
+    choose_printer: ['compare_products', 'price_question', 'human_handoff'],
+    price_question: ['stock_question', 'compare_products'],
+    stock_question: ['price_question', 'delivery_estimate'],
+    materials_help: ['price_question', 'human_handoff'],
+    shipping_cost: ['delivery_estimate', 'payment_methods'],
+    payment_methods: ['shipping_cost', 'wallet_help'],
+    offers_help: ['membership_status', 'product_search'],
+    wallet_help: ['payment_methods', 'human_handoff'],
+    studio_help: ['choose_printer', 'human_handoff'],
+    account_help: ['password_help', 'human_handoff'],
+    cancel_order: ['order_status', 'human_handoff'],
+    contact_info: ['human_handoff', 'open_ticket'],
+    bot_identity: ['human_handoff'],
   };
   const next = followups[intent as Intent] ?? [];
   return menuChoices(loc, next);
+}
+
+/**
+ * Next steps, added only after an answer that did not already offer any.
+ *
+ * Lifted out of the route body so the catalogue-search fallback gets them
+ * too: a product found by typing its bare name deserves the same «قارن» chip
+ * as one found by asking for it.
+ */
+function withFollowups(reply: AssistantReply, loc: Locale): AssistantReply {
+  if (reply.choices?.length || reply.auth_required || reply.handoff) return reply;
+  const choices = contextualChoices(loc, reply.intent);
+  return choices.length > 0 ? { ...reply, choices } : reply;
+}
+
+/** The two slots a question may be waiting on, and nothing else. */
+const PENDING_SLOTS = new Set(['q', 'ids']);
+/** A carried bag is a handful of short strings or it is not carried at all. */
+const PENDING_PARAM_KEYS = 6;
+const PENDING_PARAM_LENGTH = 120;
+
+interface Pending {
+  intent: Intent;
+  slot: 'q' | 'ids';
+  params: Record<string, string>;
+}
+
+/**
+ * THE CLIENT'S ECHO OF THE LAST QUESTION, TREATED AS INPUT.
+ *
+ * It arrives from a browser, so it is not evidence of anything: a caller can
+ * put any intent in it. That is fine, and worth saying plainly — the worst it
+ * can do is route a message to a handler the caller could have named
+ * directly with `intent`, and every account handler behind it reads the
+ * SESSION for whose data to fetch, never this. What this function is actually
+ * for is keeping a malformed or oversized bag out of the query builders:
+ * anything unexpected makes the whole thing null, and a null pending simply
+ * means the assistant does not remember, which is where it started.
+ */
+function readPending(raw: unknown): Pending | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const candidate = raw as Record<string, unknown>;
+  const intent = candidate.intent;
+  const slot = candidate.slot;
+  if (typeof intent !== 'string' || !(INTENTS as readonly string[]).includes(intent)) return null;
+  if (typeof slot !== 'string' || !PENDING_SLOTS.has(slot)) return null;
+  const params: Record<string, string> = {};
+  const carried = candidate.params;
+  if (typeof carried === 'object' && carried !== null) {
+    const entries = Object.entries(carried as Record<string, unknown>);
+    if (entries.length > PENDING_PARAM_KEYS) return null;
+    for (const [key, value] of entries) {
+      if (typeof value !== 'string' || value.length > PENDING_PARAM_LENGTH) return null;
+      params[key] = value;
+    }
+  }
+  return { intent: intent as Intent, slot: slot as 'q' | 'ids', params };
 }
 
 // ------------------------------------------------------------------- route
@@ -1299,16 +1963,62 @@ supportRoutes.post('/assistant', async (c) => {
   const params = (typeof body.params === 'object' && body.params !== null ? body.params : {}) as Record<string, unknown>;
   const freeText = str(body.text, 'text', { max: 500, required: false });
 
+  /**
+   * THE QUESTION THE ASSISTANT ASKED LAST TURN, handed back by the client.
+   *
+   * Validated as strictly as anything else that arrives in a body: the intent
+   * must be one this route knows, the slot must be one of the two the reply
+   * shape allows, and the carried params are capped in count and length. It
+   * grants nothing — `pending.params` ends up in the same `params` bag that a
+   * caller could have sent directly, and every handler behind it still does
+   * its own validation and its own ownership check.
+   */
+  const pending = readPending(body.expects);
+
   let intent: Intent | null = null;
+  /** Filled from `pending` only, and only when the text answers its question. */
+  let slotParams: Record<string, unknown> = {};
+
   if (typeof body.intent === 'string' && (INTENTS as readonly string[]).includes(body.intent)) {
+    // An explicit tap on a chip. Always wins — it is not a guess at all.
     intent = body.intent as Intent;
   } else if (freeText) {
-    const matches = matchIntents(freeText);
-    if (matches.length === 1) {
-      intent = matches[0];
+    const decision = readIntent(freeText);
+    if (decision.intent) {
+      /**
+       * A NEW INTENT BEATS A PENDING QUESTION. Somebody who answers «وين
+       * طلبي» to "which printer?" has changed the subject, and holding them
+       * to the old question is what makes a bot infuriating.
+       */
+      intent = decision.intent;
+    } else if (pending) {
+      /**
+       * ═══ THE SCREENSHOT ═══
+       *
+       * «أي منتج تريد تقارنه؟ اكتب اسم الطابعة» → «A1 combo» → «لم أفهم طلبك
+       * تمامًا». The text matches no intent BECAUSE IT IS NOT ONE — it is the
+       * answer to the question just asked. So it fills the slot the question
+       * named, and the comparison carries on.
+       */
+      intent = pending.intent;
+      slotParams = { ...pending.params, [pending.slot]: freeText.trim() };
     } else {
-      // Ambiguous or unknown → clarifying choices, never a guess.
-      const subset = matches.length > 1 ? matches : undefined;
+      /**
+       * NOTHING MATCHED, SO LOOK BEFORE SHRUGGING.
+       *
+       * «A1 combo» typed cold is not a question, it is a product, and the
+       * catalogue is the only thing that can say so. One indexed LIKE — the
+       * same query the product-search intent runs — turns the commonest
+       * "stupid" answer on this screen into the right one. If the catalogue
+       * has never heard of it either, THEN the menu.
+       */
+      if (isLikelyCatalogueLookup(freeText)) {
+        const found = await handleProductSearch(c, {}, freeText, loc);
+        if (found.cards?.length) {
+          return c.json({ success: true, reply: withFollowups(found, loc) });
+        }
+      }
+      const subset = decision.shortlist.length ? decision.shortlist : undefined;
       return c.json({
         success: true,
         reply: {
@@ -1325,6 +2035,25 @@ supportRoutes.post('/assistant', async (c) => {
     });
   }
 
+  /**
+   * AN ORDER ID IN THE SENTENCE IS THE ANSWER TO "WHICH ORDER?".
+   *
+   * «وين طلبي ORD-8F21» named the order and still got a picker listing every
+   * order on the account, because the id was sitting in the free text and
+   * nothing looked for it. It is read from the RAW message, so the hyphen
+   * survives, and it is a WEAK default: a chip that carries its own
+   * `order_id`, or a pending slot that filled one, both win over it.
+   *
+   * It grants nothing. `ownOrder` reads `WHERE id = ? AND user_id = ?`, so an
+   * id belonging to somebody else answers «لم أجد هذا الطلب في حسابك»,
+   * exactly as it did before.
+   */
+  const spotted = freeText ? extractOrderId(freeText) : null;
+  const inferred: Record<string, unknown> = spotted ? { order_id: spotted } : {};
+
+  // A tapped chip's own params win over anything inferred or carried.
+  const resolved: Record<string, unknown> = { ...inferred, ...slotParams, ...params };
+
   if (ACCOUNT_INTENTS.has(intent) && !user) {
     return c.json({ success: true, reply: signInReply(intent, loc) });
   }
@@ -1332,10 +2061,10 @@ supportRoutes.post('/assistant', async (c) => {
   let reply: AssistantReply;
   switch (intent) {
     case 'order_status':
-      reply = await handleOrderStatus(c, user!, params, loc);
+      reply = await handleOrderStatus(c, user!, resolved, loc);
       break;
     case 'delivery_estimate':
-      reply = await handleDeliveryEstimate(c, user!, params, loc);
+      reply = await handleDeliveryEstimate(c, user!, resolved, loc);
       break;
     case 'my_devices':
     case 'warranty_status':
@@ -1354,27 +2083,66 @@ supportRoutes.post('/assistant', async (c) => {
       reply = handlePasswordHelp(loc, !!user);
       break;
     case 'product_search':
-      reply = await handleProductSearch(c, params, freeText, loc);
+      reply = await handleProductSearch(c, resolved, freeText, loc);
       break;
     case 'compare_products':
-      reply = await handleCompareProducts(c, params, freeText, loc);
+      reply = await handleCompareProducts(c, resolved, freeText, loc);
       break;
     case 'power_usage':
-      reply = await handlePowerUsage(c, params, freeText, loc);
+      reply = await handlePowerUsage(c, resolved, freeText, loc);
       break;
     case 'policy_question':
-      reply = await handlePolicyQuestion(c, params, loc);
+      reply = await handlePolicyQuestion(c, resolved, loc);
       break;
     case 'open_ticket':
     case 'human_handoff':
       reply = handleHandoff(intent, loc);
       break;
+    case 'greeting':
+      reply = { intent, text: tr(loc, 'greeting_reply'), choices: menuChoices(loc) };
+      break;
+    case 'thanks':
+      reply = { intent, text: tr(loc, 'thanks_reply'), choices: menuChoices(loc) };
+      break;
+    case 'bot_identity':
+      reply = handleIdentity(loc);
+      break;
+    case 'choose_printer':
+      reply = await handleChoosePrinter(c, loc);
+      break;
+    case 'price_question':
+    case 'stock_question':
+    case 'materials_help':
+      reply = await handleSubjectSearch(c, intent, resolved, freeText, loc);
+      break;
+    // The shop's own published documents answer these three, so the answer
+    // cannot drift from what the policy pages say.
+    case 'shipping_cost':
+      reply = await handleTopicPolicy(c, intent, 'delivery', loc);
+      break;
+    case 'payment_methods':
+      reply = await handleTopicPolicy(c, intent, 'payment', loc);
+      break;
+    case 'offers_help':
+      reply = await handleTopicPolicy(c, intent, 'rewards', loc);
+      break;
+    case 'contact_info':
+      reply = await handleTopicPolicy(c, intent, 'support', loc);
+      break;
+    case 'wallet_help':
+      reply = handleWallet(loc);
+      break;
+    case 'studio_help':
+      reply = handleStudio(loc);
+      break;
+    case 'account_help':
+      reply = handleAccount(loc, !!user);
+      break;
+    case 'cancel_order':
+      reply = handleCancelOrder(loc);
+      break;
   }
-  if (!reply.choices?.length && !reply.auth_required && !reply.handoff) {
-    const choices = contextualChoices(loc, reply.intent);
-    if (choices.length > 0) reply = { ...reply, choices };
-  }
-  return c.json({ success: true, reply });
+  return c.json({ success: true, reply: withFollowups(reply, loc) });
 });
 
 // ================================================================== tickets

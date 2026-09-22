@@ -22,6 +22,7 @@ import {
  * would compete with the thing they are trying to send.
  */
 import ChannelNudge from '../components/notify/ChannelNudge';
+import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 
 /**
  * Guided, deterministic (non-AI) support assistant + real support tickets.
@@ -37,6 +38,8 @@ import ChannelNudge from '../components/notify/ChannelNudge';
 interface AsstLink {
   label: string;
   to: string;
+  /** Another origin — LEVO Studio. `navigate()` would produce a blank route. */
+  external?: boolean;
 }
 interface AsstChoice {
   label: string;
@@ -66,6 +69,15 @@ interface AsstReply {
   table?: AsstTable;
   auth_required?: boolean;
   handoff?: boolean;
+  /**
+   * WHAT THE ASSISTANT IS WAITING FOR, to be handed straight back with the
+   * next free-text message. The server's own comment explains the mechanism;
+   * on this side the rule is simply that it is OPAQUE — the page never reads
+   * it, never edits it, and never acts on it, it only returns it. Treating it
+   * as a token rather than as data is what keeps one turn of memory from
+   * becoming a second, client-side idea of what the conversation is about.
+   */
+  expects?: { intent: string; slot: string; params?: Record<string, string> };
 }
 
 interface ChatMsg {
@@ -874,18 +886,36 @@ export default function Support() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, showTicketForm]);
 
+  /**
+   * ONE TURN OF MEMORY, HELD IN A REF.
+   *
+   * A ref and not state: nothing renders from it, and putting it in state
+   * would re-run the conversation effect on every reply for no visible
+   * change. It is overwritten by each answer — including with `undefined`,
+   * which is the important half. An answer that asks nothing CLEARS the
+   * question, so a stale «اكتب اسم الطابعة» cannot capture a message three
+   * turns later.
+   */
+  const pendingRef = useRef<AsstReply['expects']>(undefined);
+
   const send = useCallback(
     async (payload: { intent?: string; params?: Record<string, unknown>; text?: string }, label: string) => {
       if (busy) return;
       setMessages((prev) => [...prev, { role: 'user', text: label }]);
       setBusy(true);
+      // A tapped chip names its own intent, so the pending question is moot —
+      // and sending it anyway would let a stale slot override a clear answer.
+      const expects = payload.intent ? undefined : pendingRef.current;
       try {
-        const d = await api.post<{ reply: AsstReply }>('/api/support/assistant', { ...payload, locale: lang });
+        const d = await api.post<{ reply: AsstReply }>('/api/support/assistant', { ...payload, expects, locale: lang });
+        pendingRef.current = d.reply.expects;
         setMessages((prev) => [...prev, { role: 'assistant', text: d.reply.text, reply: d.reply }]);
         if (d.reply.handoff) {
           if (isAuthenticated) setShowTicketForm(true);
         }
       } catch (e) {
+        // The turn failed, so the question was never answered: KEEP it, and a
+        // retry after a dropped connection still lands where it was going.
         setMessages((prev) => [
           ...prev,
           { role: 'assistant', text: e instanceof ApiError ? e.message : s.netError, error: true },
@@ -937,8 +967,22 @@ export default function Support() {
         >
           {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
         </button>
-        <LifeBuoy className="w-5 h-5 text-gold" aria-hidden="true" />
-        <h1 className="text-text-primary font-bold text-lg flex-1">{s.title}</h1>
+        <LifeBuoy className="w-5 h-5 shrink-0 text-gold" aria-hidden="true" />
+        <h1 className="text-text-primary font-bold text-lg">{s.title}</h1>
+        {/* ONE BAR, NOT TWO.
+            The shell reserves `lv-character-fallback-header` — a full 60-72px
+            strip of its own — for any route that registers no character
+            anchor, and this page registered none. So the character arrived in
+            a bar ABOVE this one and the whole conversation started a header
+            lower on a phone, which is what the owner photographed.
+            `characterLayout.hasPageAnchor()` goes true the moment a page owns
+            a slot and the shell's strip returns null, so claiming the slot
+            HERE is what removes the second bar. It sits immediately after the
+            title rather than at the trailing edge because it was asked for
+            «بجانب كلمه المساعده والدعم» — beside the words, not across the
+            bar from them. */}
+        <MotionCharacterHome kind="top-header" compact busy={busy} />
+        <span className="flex-1" aria-hidden="true" />
       </div>
 
       {/* tabs */}
@@ -1002,15 +1046,41 @@ export default function Support() {
 
                   {m.reply?.links && m.reply.links.length > 0 && (
                     <div className="flex flex-wrap gap-2">
-                      {m.reply.links.map((l, j) => (
-                        <button
-                          key={j}
-                          onClick={() => navigate(l.to)}
-                          className="lv-button lv-button-ghost min-h-9 rounded-full px-3 py-1.5 text-xs text-gold"
-                        >
-                          {l.label}
-                        </button>
-                      ))}
+                      {/* AN EXTERNAL LINK IS AN ANCHOR, NOT A ROUTE.
+                          LEVO Studio is served from its own subdomain, and
+                          `navigate('https://…')` inside a SPA produces a route
+                          that does not exist and a blank screen — which is how
+                          a working answer turns into a bug report. It opens in
+                          a new tab so the conversation is still there to come
+                          back to, with the rel the target demands.
+
+                          The origin itself is never written here: it arrives
+                          on the reply, from the one constant the Worker owns.
+                          tests/store-isolation.test.ts forbids the literal
+                          anywhere in src/ outside translations.ts, and that
+                          rule is right — a second copy of a URL is a URL that
+                          gets moved once. */}
+                      {m.reply.links.map((l, j) =>
+                        l.external ? (
+                          <a
+                            key={j}
+                            href={l.to}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="lv-button lv-button-ghost min-h-9 rounded-full px-3 py-1.5 text-xs text-gold"
+                          >
+                            {l.label}
+                          </a>
+                        ) : (
+                          <button
+                            key={j}
+                            onClick={() => navigate(l.to)}
+                            className="lv-button lv-button-ghost min-h-9 rounded-full px-3 py-1.5 text-xs text-gold"
+                          >
+                            {l.label}
+                          </button>
+                        )
+                      )}
                     </div>
                   )}
 
