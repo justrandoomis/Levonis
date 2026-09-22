@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
 import { api, ApiUser } from './lib/api';
+import { clearPageCache } from './lib/pageCache';
 
 /**
  * Authentication state. The session lives in a Secure HttpOnly cookie managed
@@ -39,6 +40,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  /**
+   * THE BACK-NAVIGATION SNAPSHOTS ARE IDENTITY-SCOPED.
+   *
+   * src/lib/pageCache.ts holds what a list page last showed so `back` paints
+   * instantly instead of running its skeleton again. Catalogue prices are
+   * membership-dependent — a PRIME member and a signed-out visitor are quoted
+   * different numbers for the same product — so a snapshot taken as one
+   * identity must never be painted for another.
+   *
+   * The ref starts at `null` because that is what the app IS until
+   * `/api/auth/me` answers: a visitor. So the boot case is covered by the same
+   * line as sign-in and sign-out — the moment the answer arrives and it is a
+   * user, the identity changed and anything cached while the page was still
+   * anonymous goes with it. Deciding which of those rows were
+   * identity-dependent would be guesswork; dropping the lot is cheap and
+   * cannot be wrong.
+   */
+  const lastIdentityRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = user?.id ?? null;
+    if (lastIdentityRef.current === id) return;
+    lastIdentityRef.current = id;
+    clearPageCache();
+  }, [user?.id]);
 
   const refreshUser = useCallback(async () => {
     try {

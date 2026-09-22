@@ -11,6 +11,7 @@ import CardPrice from '../components/CardPrice';
 import OfferBadge from '../components/ui/OfferBadge';
 import Countdown from '../components/ui/Countdown';
 import { productPrimaryImage } from '../lib/productImage';
+import { readPageCache, writePageCache } from '../lib/pageCache';
 import DirectStockEdge from '../components/DirectStockEdge';
 
 export default function Products() {
@@ -20,6 +21,9 @@ export default function Products() {
   const queryParams = new URLSearchParams(location.search);
   const search = queryParams.get('search') || '';
   const category = queryParams.get('category') || '';
+
+  /** What this page needs to paint: the grid and the resolved section name. */
+  type ProductsSnapshot = { products: ApiProduct[]; category: ResolvedCategory | null };
 
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,11 +49,25 @@ export default function Products() {
 
   const fetchProducts = useCallback(async () => {
     const reqId = ++reqIdRef.current;
-    setLoading(true);
+    /**
+     * THE SAME QUERY, PAINTED FROM THE LAST ANSWER. «يرجع للوراء خلال ثواني
+     * معدودة يضطر إلى تحميل الصفحة من جديد.» The key carries both parameters,
+     * so coming back to «طابعات» shows «طابعات» and never the previous
+     * section's grid. The request still goes out; the snapshot only decides
+     * whether a skeleton is shown while it is in flight. src/lib/pageCache.ts.
+     */
+    const cacheKey = `products:${search}|${category}`;
+    const snapshot = readPageCache<ProductsSnapshot>(cacheKey);
+    if (snapshot) {
+      setProducts(snapshot.products);
+      setCategoryRef(snapshot.category);
+    } else {
+      // Reset on every query change, so a previous section's name can never sit
+      // above a new section's grid.
+      setCategoryRef(undefined);
+    }
+    setLoading(!snapshot);
     setError(null);
-    // Reset on every query change, so a previous section's name can never sit
-    // above a new section's grid.
-    setCategoryRef(undefined);
     try {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
@@ -57,11 +75,16 @@ export default function Products() {
       params.set('limit', '50');
       const data = await api.get<ProductsListResponse>(`/api/products?${params.toString()}`);
       if (reqIdRef.current !== reqId) return;
+      const resolved = category ? data.category ?? null : null;
       setProducts(data.products || []);
-      setCategoryRef(category ? data.category ?? null : null);
+      setCategoryRef(resolved);
+      writePageCache(cacheKey, { products: data.products || [], category: resolved });
     } catch (err) {
       console.error(err);
       if (reqIdRef.current !== reqId) return;
+      // A snapshot already on screen is a real answer the server gave for this
+      // exact query; an error card that replaces it is a worse one.
+      if (snapshot) return;
       setError(err);
       // A failed request must not leave the heading pulsing for ever behind
       // the error card.

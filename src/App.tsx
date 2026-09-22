@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigationType } from 'react-router-dom';
 import { StoreProvider, useStore } from './StoreContext';
 import ChunkBoundary from './components/ChunkBoundary';
 /**
@@ -407,7 +407,8 @@ function AppContent() {
   const location = useLocation();
 
   /**
-   * A NEW PAGE STARTS AT ITS TOP.
+   * A NEW PAGE STARTS AT ITS TOP. A PAGE YOU CAME BACK TO STARTS WHERE YOU
+   * LEFT IT.
    *
    * The app scrolls inside `#main-scroll-container`, not the window, and
    * nothing in the app ever reset it — so a route change kept the previous
@@ -418,13 +419,56 @@ function AppContent() {
    * at the very bottom" was. The one `window.scrollTo` in the codebase
    * (Policies.tsx) targets the window and has always been a no-op here.
    *
-   * A hash link is the one navigation that legitimately wants an offset, so
-   * it is left alone.
+   * THE SECOND HALF OF «الرجوع للوراء». Resetting to the top on EVERY
+   * navigation included `back`, so returning to the shelf you were reading put
+   * you at the start of it — the other half of what reads as "the page loaded
+   * again", next to the skeleton that src/lib/pageCache.ts removes. The
+   * distinction is the navigation TYPE, which the router already knows: POP is
+   * back or forward and wants the offset that entry had; PUSH and REPLACE are
+   * a new page and want its top.
+   *
+   * KEYED ON `location.key`, NOT ON THE PATH. Two visits to the same list at
+   * different depths are two history entries and must not share an offset, and
+   * the key is what the router hands out per entry. The map is capped because
+   * a long session is an unbounded number of entries.
+   *
+   * A hash link is the one navigation that legitimately wants an offset of its
+   * own, so it is left alone.
    */
+  const offsetsRef = React.useRef(new Map<string, number>());
+  const navigationType = useNavigationType();
   React.useEffect(() => {
     if (location.hash) return;
-    document.getElementById('main-scroll-container')?.scrollTo({ top: 0 });
-  }, [location.pathname, location.hash]);
+    const el = document.getElementById('main-scroll-container');
+    if (!el) return;
+    const key = location.key;
+    const target = navigationType === 'POP' ? offsetsRef.current.get(key) ?? 0 : 0;
+
+    // TWICE, ONE FRAME APART. The restore runs after this route's first commit,
+    // and on a page whose rows are still arriving the container may not yet be
+    // tall enough to hold the offset — the browser clamps it and the customer
+    // lands at the top anyway. One re-apply after layout covers the pages that
+    // grow by a row or two; nothing loops, so a page that never gets that tall
+    // simply stays where it is.
+    el.scrollTo({ top: target });
+    const frame = requestAnimationFrame(() => el.scrollTo({ top: target }));
+
+    const onScroll = () => {
+      const offsets = offsetsRef.current;
+      offsets.set(key, el.scrollTop);
+      if (offsets.size > 40) {
+        // Insertion order is oldest first, so the first key is the entry the
+        // customer is least likely to walk back to.
+        const oldest = offsets.keys().next().value;
+        if (oldest !== undefined) offsets.delete(oldest);
+      }
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      el.removeEventListener('scroll', onScroll);
+    };
+  }, [location.key, location.hash, navigationType]);
 
   const { store, resolved, unknownStore } = useStore();
   // Fetch the catalogue, the product page, the cart and the address book once

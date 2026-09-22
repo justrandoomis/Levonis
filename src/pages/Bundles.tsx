@@ -9,6 +9,7 @@ import SectionHeader from '../components/home/SectionHeader';
 import BundleTile, { type BundleCard } from '../components/bundles/BundleTile';
 import { BundleGridSkeleton } from '../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../components/ui/AsyncStates';
+import { readPageCache, writePageCache } from '../lib/pageCache';
 
 /**
  * الباقات — bundles and mystery offers (docs/BUNDLES_MYSTERY.md §13).
@@ -152,20 +153,38 @@ export default function Bundles() {
 
   const load = useCallback(async () => {
     const reqId = ++reqIdRef.current;
-    setLoading(true);
+    /**
+     * THE FIRST PAGE, AS IT WAS LEFT. `back` from a bundle lands here, and the
+     * three facets are in the key so returning to «فلامنت / بحث / قسم» shows
+     * that list rather than the previous one. Only the first page is kept: a
+     * customer who had paged to 60 bundles gets the first 20 painted and the
+     * rest on the same scroll they used the first time, which is honest about
+     * what was actually stored. src/lib/pageCache.ts.
+     */
+    const cacheKey = `bundles:${kind}|${search}|${category}`;
+    const snapshot = readPageCache<BundlesResponse>(cacheKey);
+    if (snapshot) {
+      setData(snapshot);
+      setMore((snapshot.bundles ?? []).length >= PAGE);
+    }
+    setLoading(!snapshot);
     setError(null);
     try {
       const res = await fetchPage(0);
       if (reqIdRef.current !== reqId) return;
       setData(res);
       setMore((res.bundles ?? []).length >= PAGE);
+      writePageCache(cacheKey, res);
     } catch (err) {
       if (reqIdRef.current !== reqId) return;
+      // A snapshot on screen is the server's own last answer for this exact
+      // query; it stays rather than being replaced by an error card.
+      if (snapshot) return;
       setError(err);
     } finally {
       if (reqIdRef.current === reqId) setLoading(false);
     }
-  }, [fetchPage]);
+  }, [fetchPage, kind, search, category]);
 
   const loadMore = useCallback(async () => {
     const reqId = reqIdRef.current;

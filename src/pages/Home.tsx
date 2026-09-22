@@ -41,6 +41,11 @@ import Spinner from '../components/ui/Spinner';
 import { Skeleton, SkeletonGroup, ProductCardSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { markHomeCriticalReady } from '../lib/appBootstrap';
+import { readPageCache, writePageCache } from '../lib/pageCache';
+
+/** One key: the home shelves are the same request for everybody signed in
+ *  the same way, and AuthContext drops the lot when that changes. */
+const HOME_CACHE_KEY = 'home';
 
 export default function Home() {
   const { t, loc } = useLanguage();
@@ -85,43 +90,67 @@ export default function Home() {
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<unknown>(null);
+  /** The whole of what `GET /api/home` answers — one snapshot, one apply. */
+  type HomePayload = {
+    settings: PublicSettings;
+    discounted: ApiProduct[];
+    latest: ApiProduct[];
+    categories?: HomeTaxon[];
+    brands?: HomeTaxon[];
+    siteMedia?: SiteMediaEntry[];
+    open_box?: ApiProduct[];
+  };
+
   const observerTarget = useRef<HTMLDivElement | null>(null);
   // Monotonic request id so a retried /api/home fetch ignores stale responses.
   const homeReqRef = useRef(0);
 
+  /**
+   * PAINTED FROM THE LAST ANSWER, THEN CORRECTED.
+   *
+   * «عند الرجوع للوراء لا يضطر أن يحمل الصفحة مرة ثانية.» Home is what `back`
+   * lands on from a product page, and it used to start at `initialLoading =
+   * true` every single time — full skeleton, full round trip — for a shelf the
+   * customer was reading four seconds earlier. The request still goes out
+   * immediately; what the snapshot changes is whether they watch grey boxes
+   * while it does. See src/lib/pageCache.ts.
+   */
+  const applyHome = useCallback((data: HomePayload) => {
+    setSettings(data.settings);
+    setDiscountedProducts(data.discounted || []);
+    setNewProducts(data.latest || []);
+    setCategories(data.categories || []);
+    setBrands(data.brands || []);
+    setSiteMedia(data.siteMedia || []);
+    setOpenBox(data.open_box || []);
+    setHasMore((data.latest || []).length >= 20);
+  }, []);
+
   const fetchHome = useCallback(async () => {
     const reqId = ++homeReqRef.current;
-    setInitialLoading(true);
+    const snapshot = readPageCache<HomePayload>(HOME_CACHE_KEY);
+    if (snapshot) applyHome(snapshot);
+    setInitialLoading(!snapshot);
     setLoadError(null);
     try {
-      const data = await api.get<{
-        settings: PublicSettings;
-        discounted: ApiProduct[];
-        latest: ApiProduct[];
-        categories?: HomeTaxon[];
-        brands?: HomeTaxon[];
-        siteMedia?: SiteMediaEntry[];
-        open_box?: ApiProduct[];
-      }>('/api/home');
+      const data = await api.get<HomePayload>('/api/home');
       if (homeReqRef.current !== reqId) return;
-      setSettings(data.settings);
-      setDiscountedProducts(data.discounted || []);
-      setNewProducts(data.latest || []);
-      setCategories(data.categories || []);
-      setBrands(data.brands || []);
-      setSiteMedia(data.siteMedia || []);
-      setOpenBox(data.open_box || []);
-      setHasMore((data.latest || []).length >= 20);
+      applyHome(data);
+      writePageCache(HOME_CACHE_KEY, data);
     } catch (err) {
       console.error('Failed to fetch home products', err);
       if (homeReqRef.current !== reqId) return;
       // A failed fetch is an ERROR with retry — never rendered as "no products".
+      // UNLESS a snapshot is already on screen: replacing shelves the server
+      // really did send with an error card is a worse answer than leaving the
+      // last good one up, and the next wake asks again within the minute.
+      if (snapshot) return;
       setLoadError(err);
       setHasMore(false);
     } finally {
       if (homeReqRef.current === reqId) setInitialLoading(false);
     }
-  }, []);
+  }, [applyHome]);
 
   useEffect(() => {
     fetchHome();

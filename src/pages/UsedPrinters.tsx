@@ -51,11 +51,15 @@ import SafeImage from '../components/ui/SafeImage';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { ProductGridSkeleton } from '../components/ui/Skeleton';
 import { productPrimaryImage } from '../lib/productImage';
+import { readPageCache, writePageCache } from '../lib/pageCache';
 
 /** 'all' plus the three kinds the server can actually store. */
 type KindFilter = 'all' | ConditionKind;
 
 const FILTERS: readonly KindFilter[] = ['all', 'used', 'refurbished', 'open_box'];
+
+/** One shelf, one key — the request takes no parameters. */
+const USED_CACHE_KEY = 'used-printers';
 
 export default function UsedPrinters() {
   const { loc, lang, dir } = useLanguage();
@@ -66,14 +70,23 @@ export default function UsedPrinters() {
   const [kind, setKind] = useState<KindFilter>('all');
 
   const load = useCallback(async () => {
-    setLoading(true);
+    // The shelf this page last showed, so `back` from a printer paints at once
+    // instead of running the skeleton again — src/lib/pageCache.ts. The request
+    // below still goes out every time.
+    const snapshot = readPageCache<GradedProduct[]>(USED_CACHE_KEY);
+    if (snapshot) setRows(snapshot);
+    setLoading(!snapshot);
     setError(null);
     try {
-      setRows(await fetchGradedStock());
+      const fresh = await fetchGradedStock();
+      setRows(fresh);
+      writePageCache(USED_CACHE_KEY, fresh);
     } catch (e) {
       // A failed fetch is an ERROR with a retry — never rendered as "no stock".
       // The two states look identical to a customer and mean opposite things.
-      setError(e);
+      // With a snapshot already painted neither is true: the shelf on screen is
+      // what the server last said, and it stays until the next read succeeds.
+      if (!snapshot) setError(e);
     } finally {
       setLoading(false);
     }
