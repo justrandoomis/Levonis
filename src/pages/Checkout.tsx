@@ -212,6 +212,10 @@ interface CheckoutQuoteDto {
   /** Cash on delivery changes a line's price on this cart (a pre-order line
    *  with a direct premium this customer pays). False → nothing to explain. */
   cod_reprices?: boolean;
+  /** How much MORE the LINES cost paid cash at the door than prepaid from the
+   *  wallet. The number the cash option prints, so «الفرق» is readable before
+   *  it is chosen rather than after it is re-quoted. 0 = the two cost the same. */
+  cod_surcharge_iqd?: number;
   /** A cash order the wallet settled in full was priced as the PREPAID
    *  pre-order it is — nothing is collected at the door. */
   prepaid_by_wallet?: boolean;
@@ -303,6 +307,8 @@ const STRINGS = {
       cash: 'تدفع المبلغ نقدًا عند الاستلام',
       bnpl: 'حصري لـ PRO المؤهل — يُسجّل المبلغ والموعد في حسابك',
     } as Record<string, string>,
+    payCheapest: 'الأرخص',
+    payCodMore: (v: string) => `+${v} د.ع عند الدفع عند الاستلام`,
     codDirectPricing: 'اختيار الدفع عند الاستلام يُسعَّر كبيع مباشر؛ يبقى طلبك طلبًا مسبقًا بمراحله ووسيلة نقله كما هي.',
     prepaidPreorder: 'الدفع مقدمًا يُبقي تسعير الطلب المسبق كما هو مُعدّ.',
     prepaidByWallet: 'مدفوع بالكامل من محفظتك — يُطبَّق تسعير الطلب المسبق.',
@@ -336,6 +342,8 @@ const STRINGS = {
       cash: 'Pay in cash when the order is delivered',
       bnpl: 'For eligible PRO members — amount and due date are recorded on your account',
     } as Record<string, string>,
+    payCheapest: 'Cheapest',
+    payCodMore: (v: string) => `+${v} IQD when paid cash on delivery`,
     codDirectPricing: 'Cash on delivery is priced as a direct sale; your order stays a pre-order, on its journey and its stages.',
     prepaidPreorder: 'Paying in advance keeps the configured pre-order pricing.',
     prepaidByWallet: 'Paid in full from your wallet — pre-order pricing applies.',
@@ -369,6 +377,8 @@ const STRINGS = {
       cash: 'پارەکە بە کاش لە کاتی گەیاندن بدە',
       bnpl: 'تایبەت بە ئەندامی PRO ی شیاو — بڕ و بەرواری دانەوە تۆمار دەکرێت',
     } as Record<string, string>,
+    payCheapest: 'هەرزانترین',
+    payCodMore: (v: string) => `+${v} د.ع لە پارەدان لە کاتی گەیاندن`,
     codDirectPricing: 'پارەدان لە کاتی گەیاندن وەک فرۆشتنی ڕاستەوخۆ نرخ دەکرێت؛ داواکارییەکەت وەک پێش-داواکاری دەمێنێتەوە بە قۆناغەکانی و شێوازی گواستنەوەی خۆی.',
     prepaidPreorder: 'پارەدانی پێشوەخت نرخی پێش-داواکاری وەک ڕێکخراوە دەهێڵێتەوە.',
     prepaidByWallet: 'بە تەواوی لە جزدانەکەتەوە دراوە — نرخی پێش-داواکاری جێبەجێ دەبێت.',
@@ -536,6 +546,12 @@ export default function Checkout() {
   const [consentResetNote, setConsentResetNote] = useState(false);
   const quoteSignatureRef = useRef('');
   const quoteSeqRef = useRef(0);
+  /**
+   * Whether the BUYER chose the payment method, as opposed to this screen
+   * resting on a default. The wallet-first rule below moves the selection
+   * exactly once, and never over an answer the buyer has already given.
+   */
+  const paymentPickedRef = useRef(false);
   const [placedInvoiceNo, setPlacedInvoiceNo] = useState<string | null>(null);
 
   const S = STRINGS[lang as keyof typeof STRINGS] ?? STRINGS.ar;
@@ -732,6 +748,39 @@ export default function Checkout() {
 
   const walletBalanceIQD = usdCentsToIqd(balanceUsdCents, exchangeRate);
 
+  /**
+   * THE WALLET IS THE DEFAULT AS SOON AS IT IS A REAL ONE.
+   *
+   * The owner's rule for a pre-order is that the wallet is the cheaper door
+   * and the one to land on. The paragraph above explains why the resting
+   * default is still cash: the wallet method requires the WHOLE total to be
+   * covered, and a screen that opens on a refusal is a poor first impression.
+   * Both are true, so the choice is made from a fact instead of a preference —
+   * once a quote has priced this cart, the wallet is selected if and only if
+   * the balance covers that total.
+   *
+   * Read against the total the screen is CURRENTLY quoting, which is the cash
+   * one while cash is selected and therefore the higher of the two: a balance
+   * that covers the cash total certainly covers the wallet total, so this can
+   * move the selection but can never oscillate. It is deliberately
+   * conservative the other way — a balance that covers only the cheaper
+   * wallet total leaves the selection alone, and the buyer is told about it by
+   * the «الأرخص» badge and the `+N` on cash rather than by a refusal.
+   *
+   * `paymentPickedRef` makes it a DEFAULT and not an override: the moment the
+   * buyer touches the radios this stops having an opinion, including if they
+   * deliberately move back to cash.
+   */
+  useEffect(() => {
+    if (paymentPickedRef.current) return;
+    if (quoteLoading || !quote) return;
+    if (paymentMethod === 'wallet') return;
+    if (!filteredPaymentMethods.some((m) => m.id === 'wallet')) return;
+    if (walletBalanceIQD < quote.total_iqd) return;
+    setPaymentMethod('wallet');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quote, quoteLoading, offeredKey, paymentMethod, walletBalanceIQD]);
+
   const getMethodIcon = (iconName: string, className: string = "w-5 h-5") => {
     switch (iconName) {
       case 'Truck': return <Truck className={className} strokeWidth={1.5} />;
@@ -904,6 +953,9 @@ export default function Checkout() {
 
   const deliveryPrice = selectedDelivery?.price_iqd || 0;
   const shippingIqd = quote ? quote.shipping.total_iqd : deliveryPrice;
+  /** What the cash door costs over the wallet one, straight from the server.
+   *  0 (and so nothing drawn) on a direct cart, or when the two are equal. */
+  const codSurchargeIqd = quote?.cod_surcharge_iqd ?? 0;
   const codTaxIqd = quote?.cod_tax_iqd ?? 0;
   /**
    * §14 — THE CASH-ON-DELIVERY TAX IS CALCULATED, THEN EXEMPTED, AND BOTH
@@ -1541,17 +1593,51 @@ export default function Checkout() {
             <div className="grid grid-cols-1 gap-3">
               {filteredPaymentMethods.map(method => (
                 <label key={method.id} data-selected={paymentMethod === method.id} className="lv-choice relative flex cursor-pointer items-center gap-4 p-4">
-                  <input type="radio" name="payment" className="sr-only" checked={paymentMethod === method.id} onChange={() => setPaymentMethod(method.id)} />
+                  <input
+                    type="radio"
+                    name="payment"
+                    className="sr-only"
+                    checked={paymentMethod === method.id}
+                    onChange={() => {
+                      // From here on the wallet-first default has no opinion:
+                      // the buyer has one.
+                      paymentPickedRef.current = true;
+                      setPaymentMethod(method.id);
+                    }}
+                  />
                   <div className="flex-1 flex items-center gap-4">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black/35 text-text-secondary">
                       {getMethodIcon(method.icon || '', 'w-5 h-5')}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h3 className={`font-normal text-base ${paymentMethod === method.id ? 'text-white' : 'text-zinc-300'}`}>
                           {dir === 'rtl' ? method.titleAr : method.titleEn}
                       </h3>
                       {S.paymentHint[method.id] && (
                         <p className="text-xs text-zinc-500 mt-0.5 font-light">{S.paymentHint[method.id]}</p>
+                      )}
+                      {/*
+                        «يجب توضيح هذا الفرق قبل أن يختار» — the difference, on
+                        the two doors it is a difference between, before either
+                        is opened. Drawn only when the server says the cart
+                        actually prices differently, so a cart where the two
+                        cost the same stays quiet instead of carrying a 0.
+
+                        One cue per option and no second one: the amount on
+                        cash, the word on the wallet. Both are quiet type
+                        rather than a tinted block — the price of the order is
+                        what this screen is for, and a badge that outshouts it
+                        would be the wrong hierarchy.
+                      */}
+                      {codSurchargeIqd > 0 && method.id === 'cash' && (
+                        <p data-cod-surcharge className="text-xs text-[#e8c97a] mt-1 font-normal tabular-nums">
+                          {S.payCodMore(codSurchargeIqd.toLocaleString('en-US'))}
+                        </p>
+                      )}
+                      {codSurchargeIqd > 0 && method.id === 'wallet' && (
+                        <p data-cod-cheapest className="text-xs text-emerald-300/90 mt-1 font-normal">
+                          {S.payCheapest}
+                        </p>
                       )}
                     </div>
                   </div>

@@ -1707,6 +1707,11 @@ interface CheckoutComputation {
    *  premium or whose customer is exempt from it. The screens explain the
    *  cash rule only when this is true. */
   codReprices: boolean;
+  /** How much MORE this cart costs paid cash at the door than prepaid from
+   *  the wallet, over the lines only — the number the screens show on the cash
+   *  option so the difference is readable BEFORE it is chosen. 0 on a direct
+   *  cart, and whenever `codReprices` is false. */
+  codSurchargeIqd: number;
   /** A cash order the wallet settled in full: nothing is left to collect at
    *  the door, so it was priced as a PREPAID pre-order (H2) — whatever button
    *  was pressed. payment_method_id stays as sent. */
@@ -2447,6 +2452,31 @@ async function computeCheckout(
   const codPriced = isPreorderCart ? (requestedPricing === 'cod' ? priced : priceLines('cod')) : priced;
   const codReprices =
     isPreorderCart && prepaidPriced.lines.some((l, i) => l.unit !== codPriced.lines[i].unit);
+  /**
+   * «كما أنه يجب توضيح هذا الفرق قبل أن يختار» — BY HOW MUCH, not just whether.
+   *
+   * `codReprices` is a boolean, so the screen could only ever say "cash is
+   * priced as a direct sale" in the abstract, and only AFTER cash had already
+   * been picked and re-quoted. The buyer has to be able to read the price of
+   * each door before opening one, so the difference is published as a number
+   * and both screens put it on the cash option itself.
+   *
+   * It is the LINES' difference alone, which is the whole of what the pricing
+   * basis decides. The cash tax and the delivery fee are their own rows,
+   * already itemised under the total, and folding them in here would make one
+   * number mean three things.
+   *
+   * Always >= 0: the door is never cheaper than the wallet (pricing.ts pairs
+   * the commission waiver with the direct ladder actually having supplied the
+   * price). `Math.max` is a floor against a misconfiguration, not a hope —
+   * a negative shown as a discount on cash would be the wrong way round.
+   */
+  const codSurchargeIqd = isPreorderCart
+    ? Math.max(
+        0,
+        codPriced.lines.reduce((sum, l, i) => sum + (l.unit - prepaidPriced.lines[i].unit) * l.qty, 0)
+      )
+    : 0;
 
   // Independent promo path: referral free delivery — a SEPARATE policy from
   // the PRO waiver, passed into the quote so it is never doubled. The same
@@ -2983,6 +3013,7 @@ async function computeCheckout(
     priorityDelivery,
     pricingBasis: priced.pricingBasis,
     codReprices,
+    codSurchargeIqd,
     prepaidByWallet,
     printerNoteIqd: printerNoteIqdFrom(settings.printerHomeDeliveryNoteIqd),
     // Already clamped to 1..30 by `normalizedSetting` → `resolveDeliveryDayPolicy`.
@@ -3294,6 +3325,7 @@ orderRoutes.post('/quote', async (c) => {
        * premium. The screen explains the cash rule only when this is true.
        */
       cod_reprices: comp.codReprices,
+      cod_surcharge_iqd: comp.codSurchargeIqd,
       /**
        * A cash order the wallet settled in full was re-priced as the PREPAID
        * pre-order it is (nothing is collected at the door), so the lines
