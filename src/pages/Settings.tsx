@@ -59,10 +59,10 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, User, MapPin, Bell, Globe, LogOut, ShieldCheck, Mail, KeyRound, Link2, FileText, LifeBuoy, Loader2, Check, AlertTriangle, Coins, CheckCircle2, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, User, MapPin, Bell, Globe, LogOut, ShieldCheck, Mail, KeyRound, Link2, FileText, LifeBuoy, Loader2, Check, Coins, CheckCircle2, Download } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, listSessions, revokeSession, revokeOtherSessions, type ApiSession } from '../lib/api';
 import TelegramLink from '../components/security/TelegramLink';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { useCapabilities } from '../hooks/useCapabilities';
@@ -105,7 +105,17 @@ const STRINGS = {
     pwOtherSessions: 'تغيير كلمة المرور يُنهي جلسات كل الأجهزة الأخرى — وهذا هو المسار المدعوم لإخراج جهاز آخر.',
     forgotPassword: 'نسيت كلمة المرور؟ استخدم الاستعادة من صفحة الدخول.',
     sessionsRow: 'قائمة الجلسات والأجهزة',
-    sessionsDisabled: 'لا يوفّر الخادم واجهة لعرض الجلسات أو إنهائها فرديًا بعد. المتاح فعليًا هو إنهاء الجلسات الأخرى عبر تغيير كلمة المرور.',
+    sessionsIntro: 'الأجهزة التي سجّلت الدخول إلى حسابك. إن رأيت جهازًا لا تعرفه، أنهِ جلسته وغيّر كلمة المرور.',
+    sessionsThisDevice: 'هذا الجهاز',
+    sessionsSince: 'منذ',
+    sessionsUntil: 'تنتهي',
+    sessionsEnd: 'إنهاء',
+    sessionsEndOthers: 'إنهاء كل الجلسات الأخرى',
+    sessionsOnlyThis: 'لا توجد جلسات أخرى — هذا هو الجهاز الوحيد الداخل على حسابك.',
+    sessionsEnded: 'تم إنهاء الجلسة.',
+    sessionsEndedOthers: 'تم إنهاء الجلسات الأخرى.',
+    sessionsFailed: 'تعذّر تحميل الجلسات.',
+    sessionsUnknownDevice: 'جهاز غير معروف',
     telegram: 'تيليغرام', google: 'Google',
     googleConnected: 'مرتبط',
     googleNotConnected: 'غير مرتبط',
@@ -170,7 +180,17 @@ const STRINGS = {
     pwOtherSessions: 'Changing your password ends every other device session — that is the supported way to sign another device out.',
     forgotPassword: 'Forgot your password? Use recovery on the sign-in page.',
     sessionsRow: 'Sessions & devices list',
-    sessionsDisabled: 'The server offers no endpoint to list or revoke individual sessions yet. What really works is ending other sessions by changing your password.',
+    sessionsIntro: 'Devices signed in to your account. If you see one you do not recognise, end its session and change your password.',
+    sessionsThisDevice: 'This device',
+    sessionsSince: 'Since',
+    sessionsUntil: 'Until',
+    sessionsEnd: 'End',
+    sessionsEndOthers: 'End every other session',
+    sessionsOnlyThis: 'No other sessions — this is the only device signed in.',
+    sessionsEnded: 'Session ended.',
+    sessionsEndedOthers: 'The other sessions were ended.',
+    sessionsFailed: 'Could not load your sessions.',
+    sessionsUnknownDevice: 'Unknown device',
     telegram: 'Telegram', google: 'Google',
     googleConnected: 'Connected',
     googleNotConnected: 'Not connected',
@@ -235,7 +255,20 @@ const STRINGS = {
     pwOtherSessions: 'گۆڕینی وشەی تێپەڕ هەموو دانیشتنەکانی ئامێرەکانی تر کۆتایی پێدەهێنێت — ئەمە ڕێگای پشتگیریکراوە بۆ دەرکردنی ئامێرێکی تر.',
     forgotPassword: 'وشەی تێپەڕت لەبیرچووە؟ لە پەڕەی چوونەژوورەوە گەڕاندنەوە بەکاربهێنە.',
     sessionsRow: 'لیستی دانیشتن و ئامێرەکان',
-    sessionsDisabled: 'ڕاژەکار هێشتا ڕێگەیەک بۆ پیشاندان یان بەتاڵکردنی دانیشتنی تاک دابین ناکات. ئەوەی کاردەکات کۆتاییهێنانە بە دانیشتنەکانی تر بە گۆڕینی وشەی تێپەڕ.',
+    /* The Sorani below is the store's own: «ئامێر» (device) and «دانیشتن»
+       (session) are already in this file's Kurdish, and the sentences are
+       built from words a Kurdish speaker wrote here. Nothing is generated. */
+    sessionsIntro: 'ئەو ئامێرانەی چوونەتە ژوورەوە بۆ هەژمارەکەت.',
+    sessionsThisDevice: 'ئەم ئامێرە',
+    sessionsSince: 'لە',
+    sessionsUntil: 'تا',
+    sessionsEnd: 'کۆتایی',
+    sessionsEndOthers: 'کۆتایی بە هەموو دانیشتنەکانی تر',
+    sessionsOnlyThis: 'هیچ دانیشتنێکی تر نییە.',
+    sessionsEnded: 'دانیشتنەکە کۆتایی هات.',
+    sessionsEndedOthers: 'دانیشتنەکانی تر کۆتاییان هات.',
+    sessionsFailed: 'نەتوانرا دانیشتنەکان باربکرێن.',
+    sessionsUnknownDevice: 'ئامێری نەناسراو',
     telegram: 'تێلێگرام', google: 'Google',
     googleConnected: 'بەستراوە',
     googleNotConnected: 'نەبەستراوە',
@@ -384,6 +417,192 @@ function DisabledRow({ label, reason, icon, note }: { label: string; reason: str
         <span className="text-[12px] text-zinc-500 shrink-0">{note}</span>
       </div>
       <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{reason}</p>
+    </div>
+  );
+}
+
+/**
+ * «بعض الإعدادات لا تعمل مثل تحقق من الجلسات» — IT WORKS NOW.
+ *
+ * The row here said «لا يوفّر الخادم واجهة لعرض الجلسات أو إنهائها فرديًا بعد»
+ * and offered, as the real alternative, CHANGING YOUR PASSWORD. That sentence
+ * was honest and it had been true since the first commit — while the
+ * `sessions` table has held one row per sign-in the whole time, carrying
+ * `created_at`, `expires_at` and a `user_agent` nothing had ever read. The
+ * data to answer «مَن داخل على حسابي؟» was there; only the endpoint was not.
+ * It is `GET /api/auth/sessions` now, with a per-row revoke.
+ *
+ * THE DEVICE NAME IS DERIVED HERE, NOT ON THE SERVER. A user-agent string is
+ * an implementation detail of whatever browser shipped last month, and
+ * matching on it is guesswork that goes stale; doing that guessing in the
+ * client keeps the server a plain record of what was sent, and keeps a bad
+ * guess from being written anywhere. When the guess fails the row says «جهاز
+ * غير معروف» and still shows the dates — an honest unknown beats a confident
+ * wrong name on a screen whose entire job is «do I recognise this?».
+ */
+function deviceName(ua: string): string {
+  const s = ua || '';
+  const os =
+    /iPad/i.test(s) ? 'iPad'
+    : /iPhone/i.test(s) ? 'iPhone'
+    : /Android/i.test(s) ? 'Android'
+    : /Macintosh|Mac OS X/i.test(s) ? 'Mac'
+    : /Windows/i.test(s) ? 'Windows'
+    : /Linux/i.test(s) ? 'Linux'
+    : '';
+  // Order matters: Edge and Chrome both say "Chrome", Chrome says "Safari".
+  const browser =
+    /Edg\//i.test(s) ? 'Edge'
+    : /OPR\/|Opera/i.test(s) ? 'Opera'
+    : /Firefox\//i.test(s) ? 'Firefox'
+    : /Chrome\//i.test(s) ? 'Chrome'
+    : /Safari\//i.test(s) ? 'Safari'
+    : '';
+  return [os, browser].filter(Boolean).join(' · ');
+}
+
+function SessionsPanel({
+  s,
+  lang,
+}: {
+  s: { sessionsIntro: string; sessionsThisDevice: string; sessionsSince: string; sessionsUntil: string;
+       sessionsEnd: string; sessionsEndOthers: string; sessionsOnlyThis: string; sessionsEnded: string;
+       sessionsEndedOthers: string; sessionsFailed: string; sessionsUnknownDevice: string };
+  lang: string;
+}) {
+  const [sessions, setSessions] = useState<ApiSession[] | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const res = await listSessions();
+      setSessions(res.sessions);
+      setError('');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : s.sessionsFailed);
+    }
+  }, [s.sessionsFailed]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const when = (iso: string) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime())
+      ? '—'
+      : d.toLocaleDateString(lang === 'ar' ? 'ar-IQ' : lang === 'ckb' ? 'ar-IQ' : 'en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        });
+  };
+
+  const others = (sessions ?? []).filter((x) => !x.current).length;
+
+  return (
+    <div className="px-4 py-3" data-settings-sessions>
+      <p className="text-[12px] text-zinc-500 leading-relaxed">{s.sessionsIntro}</p>
+
+      {error ? (
+        <p role="alert" className="lv-alert lv-alert-warning mt-2 text-xs">{error || s.sessionsFailed}</p>
+      ) : null}
+      {msg ? (
+        <p className="mt-2 text-[12px] text-success">{msg}</p>
+      ) : null}
+
+      {sessions === null && !error ? (
+        <div className="mt-3 space-y-2" aria-hidden="true">
+          <div className="h-12 rounded-lg bg-surface-raised animate-pulse" />
+          <div className="h-12 rounded-lg bg-surface-raised animate-pulse" />
+        </div>
+      ) : null}
+
+      {sessions ? (
+        <ul className="mt-3 space-y-2">
+          {sessions.map((row) => {
+            const name = deviceName(row.user_agent) || s.sessionsUnknownDevice;
+            return (
+              <li
+                key={row.id}
+                data-session-row
+                data-session-current={row.current ? 'true' : 'false'}
+                className="flex items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-3 py-2.5"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="text-[13px] font-bold text-text-primary truncate">{name}</span>
+                    {row.current ? (
+                      <span className="shrink-0 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-bold text-success">
+                        {s.sessionsThisDevice}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="mt-0.5 block text-[11.5px] text-text-muted tabular-nums">
+                    {s.sessionsSince} {when(row.created_at)} · {s.sessionsUntil} {when(row.expires_at)}
+                  </span>
+                </span>
+                {/* The CURRENT session has no End button, and that is not an
+                    omission: ending it here would leave this page holding a
+                    dead cookie with no sign-out having happened. «تسجيل
+                    الخروج» at the foot of the page is that control. */}
+                {row.current ? null : (
+                  <button
+                    type="button"
+                    disabled={busy !== ''}
+                    onClick={async () => {
+                      setBusy(row.id);
+                      setMsg('');
+                      try {
+                        await revokeSession(row.id);
+                        setMsg(s.sessionsEnded);
+                        await load();
+                      } catch (err) {
+                        setError(err instanceof ApiError ? err.message : s.sessionsFailed);
+                      } finally {
+                        setBusy('');
+                      }
+                    }}
+                    className="lv-button lv-button-secondary lv-button-sm shrink-0 disabled:opacity-50"
+                  >
+                    {s.sessionsEnd}
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+
+      {sessions && others === 0 ? (
+        <p className="mt-2 text-[12px] text-zinc-500">{s.sessionsOnlyThis}</p>
+      ) : null}
+
+      {sessions && others > 0 ? (
+        <button
+          type="button"
+          disabled={busy !== ''}
+          data-sessions-revoke-others
+          onClick={async () => {
+            setBusy('all');
+            setMsg('');
+            try {
+              await revokeOtherSessions();
+              setMsg(s.sessionsEndedOthers);
+              await load();
+            } catch (err) {
+              setError(err instanceof ApiError ? err.message : s.sessionsFailed);
+            } finally {
+              setBusy('');
+            }
+          }}
+          className="lv-button lv-button-secondary lv-button-sm mt-3 disabled:opacity-50"
+        >
+          {s.sessionsEndOthers}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -960,13 +1179,11 @@ export default function Settings() {
                 {dirty ? <p className="mt-1 text-[12px] text-amber-300">{s.unsaved}</p> : null}
               </div>
 
-              {/* Sessions — honestly unavailable */}
-              <DisabledRow
-                label={s.sessionsRow}
-                reason={s.sessionsDisabled}
-                note={s.notAvailable}
-                icon={<AlertTriangle aria-hidden="true" className="w-5 h-5" />}
-              />
+              {/* Sessions — a real list, with a real revoke. */}
+              <div className="px-4 pt-3">
+                <p className="font-bold text-[15px]">{s.sessionsRow}</p>
+              </div>
+              <SessionsPanel s={s} lang={lang} />
             </SectionCard>
 
             {/* -------------------------------------------- 5. Linking */}

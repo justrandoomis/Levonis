@@ -1073,6 +1073,115 @@ authRoutes.post('/logout', async (c) => {
   return c.json({ success: true });
 });
 
+/**
+ * «بعض الإعدادات لا تعمل مثل تحقق من الجلسات» — SO HERE IS THE ENDPOINT IT
+ * NEEDED.
+ *
+ * The Settings page carried a row reading «لا يوفّر الخادم واجهة لعرض الجلسات
+ * أو إنهائها فرديًا بعد». That was true, and it had been true since the first
+ * commit — while `sessions` has held one row per sign-in the whole time, with
+ * `created_at`, `expires_at` and a `user_agent` nothing has ever read. The
+ * data to answer «مَن داخل على حسابي؟» was already in the table; only the door
+ * was missing.
+ *
+ * THE PUBLIC ID IS A HASH OF THE STORED ID, and that is the one design
+ * decision worth stating. `sessions.id` IS sha256(cookie token) — the value
+ * the session lookup matches on. It cannot be reversed into a usable cookie,
+ * but it is still the shape of a credential, and handing a list of them to a
+ * browser means an XSS walks away with the exact strings the session table is
+ * keyed by. Publishing sha256 of it instead costs one hash per row and gives
+ * a stable handle that is useless for anything but naming a row to this
+ * account's own revoke — which recomputes it over that account's rows and can
+ * therefore never touch anyone else's.
+ */
+async function publicSessionId(storedId: string): Promise<string> {
+  return sha256Hex(storedId);
+}
+
+type SessionRow = { id: string; created_at: string; expires_at: string; user_agent: string };
+
+/** The caller's own live sessions, newest first. Expired rows are not listed:
+ *  a session that can no longer sign anybody in is not a device to worry
+ *  about, and `loadSessionUser` deletes them as they are met. */
+async function liveSessions(c: Context<AppContext>, userId: string): Promise<SessionRow[]> {
+  const rows = await c.env.DB.prepare(
+    `SELECT id, created_at, expires_at, user_agent
+       FROM sessions
+      WHERE user_id = ? AND expires_at > ?
+      ORDER BY created_at DESC
+      LIMIT 100`
+  )
+    .bind(userId, new Date().toISOString())
+    .all<SessionRow>();
+  return rows.results ?? [];
+}
+
+authRoutes.get('/sessions', requireMainHost, requireAuth, async (c) => {
+  const user = c.get('user')!;
+  const currentId = c.get('sessionId');
+  const rows = await liveSessions(c, user.id);
+  const sessions = await Promise.all(
+    rows.map(async (r) => ({
+      id: await publicSessionId(r.id),
+      created_at: r.created_at,
+      expires_at: r.expires_at,
+      // THE USER AGENT IS ECHOED, NEVER PARSED HERE. Naming a device is a
+      // presentation decision that changes with every browser release; the
+      // client owns it, and the server stays a record of what was sent.
+      user_agent: r.user_agent,
+      current: currentId !== null && r.id === currentId,
+    }))
+  );
+  return c.json({ success: true, sessions });
+});
+
+/**
+ * END ONE DEVICE. Scoped to the caller's own rows by construction: the public
+ * id is only ever computed over sessions this account owns, so an id from
+ * somebody else's account matches nothing and the route answers 404 rather
+ * than telling the caller a session exists that they may not touch.
+ *
+ * The CURRENT session is refused. Ending it here would leave the page holding
+ * a dead cookie with no sign-out having happened — «تسجيل الخروج» is the
+ * control for that, and it clears the cookie as well as the row.
+ */
+authRoutes.delete('/sessions/:id', requireMainHost, requireAuth, async (c) => {
+  await rateLimit(c, 'session-revoke', 30, 900);
+  const user = c.get('user')!;
+  const currentId = c.get('sessionId');
+  const wanted = c.req.param('id');
+  const rows = await liveSessions(c, user.id);
+  let target: string | null = null;
+  for (const r of rows) {
+    if ((await publicSessionId(r.id)) === wanted) {
+      target = r.id;
+      break;
+    }
+  }
+  if (!target) return c.json({ success: false, error: 'SESSION_NOT_FOUND' }, 404);
+  if (currentId !== null && target === currentId) {
+    return c.json({ success: false, error: 'CANNOT_REVOKE_CURRENT' }, 400);
+  }
+  await c.env.DB.prepare('DELETE FROM sessions WHERE id = ? AND user_id = ?').bind(target, user.id).run();
+  await audit(c.env.DB, user.id, 'auth.session.revoked', user.id, {});
+  return c.json({ success: true });
+});
+
+/** END EVERY OTHER DEVICE, and stay signed in here. This is what the old row
+ *  told people to get by CHANGING THEIR PASSWORD — a real answer, but an
+ *  absurd price for "sign my old phone out". */
+authRoutes.post('/sessions/revoke-others', requireMainHost, requireAuth, async (c) => {
+  await rateLimit(c, 'session-revoke-others', 10, 900);
+  const user = c.get('user')!;
+  const currentId = c.get('sessionId');
+  const res = currentId
+    ? await c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?').bind(user.id, currentId).run()
+    : await c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id).run();
+  const revoked = Number(res.meta?.changes ?? 0);
+  await audit(c.env.DB, user.id, 'auth.sessions.revoked_others', user.id, { revoked });
+  return c.json({ success: true, revoked });
+});
+
 authRoutes.post('/change-password', requireMainHost, requireAuth, async (c) => {
   await rateLimit(c, 'change-password', 10, 900);
   const user = c.get('user')!;

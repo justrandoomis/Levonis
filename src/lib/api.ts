@@ -1783,6 +1783,40 @@ export interface NotifyChannelReadiness {
 }
 
 /**
+ * THE DEVICES SIGNED IN TO THIS ACCOUNT — «تحقق من الجلسات».
+ *
+ * `id` is NOT `sessions.id`. That column is sha256 of the cookie token, the
+ * value the session lookup matches on, and handing a list of them to a browser
+ * would mean an XSS walking away with the exact strings the session table is
+ * keyed by. The server publishes sha256 of it instead: a stable handle that
+ * names a row for revoke and is useless for anything else.
+ */
+export interface ApiSession {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  /** Echoed verbatim; naming the device is the client's job, not the server's. */
+  user_agent: string;
+  current: boolean;
+}
+
+export function listSessions(opts?: RequestOptions): Promise<{ success: boolean; sessions: ApiSession[] }> {
+  return api.get<{ success: boolean; sessions: ApiSession[] }>('/api/auth/sessions', opts);
+}
+
+/** End one other device. The CURRENT session is refused by the server — signing
+ *  out is what ends this one, and it clears the cookie too. */
+export function revokeSession(id: string): Promise<{ success: boolean }> {
+  return api.delete<{ success: boolean }>(`/api/auth/sessions/${encodeURIComponent(id)}`);
+}
+
+/** End every other device and stay signed in here. This is what the settings
+ *  page used to tell people to achieve by CHANGING THEIR PASSWORD. */
+export function revokeOtherSessions(): Promise<{ success: boolean; revoked: number }> {
+  return api.post<{ success: boolean; revoked: number }>('/api/auth/sessions/revoke-others', {});
+}
+
+/**
  * GET /api/notifications/channels — the readiness answer for the signed-in
  * customer. 401 for a guest, which callers treat as "say nothing" rather than
  * as an error: a visitor who is not signed in has no channels to offer.

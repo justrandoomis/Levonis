@@ -199,7 +199,25 @@ export default function Rewards() {
         return;
       }
       const res = await api.post<AwardReply>('/api/rewards/push');
-      say('good', awardMessage(res, loc('تم تفعيل الإشعارات', 'Notifications enabled')));
+      /*
+        «تم منح الإذن», NOT «تم تفعيل الإشعارات».
+        
+        This said «تم تفعيل الإشعارات» — the exact sentence the settings page
+        promises never to show, in as many words: «لا توجد خدمة إرسال Web Push
+        على الخادم بعد، فلا نعرض «تم التفعيل»». Two screens of this app made
+        opposite claims about the same thing, and the one that claimed success
+        was the one handing out points for it.
+        
+        The mission is real and the reward stands — granting permission is the
+        one step only the customer can take, and it is what a delivery service
+        will need the day there is one. What was false was the word
+        «مُفعّل» for a channel that cannot yet send. The sentence now says what
+        actually happened.
+        
+        Two arguments, so Sorani reads the Arabic by the documented fallback
+        (LanguageContext) exactly as it did before. No Kurdish is invented.
+      */
+      say('good', awardMessage(res, loc('تم منح إذن الإشعارات في هذا المتصفح', 'Notification permission granted in this browser')));
       await Promise.all([loadRewards(), refreshWallet()]);
     } catch (err) {
       say('bad', failureText(err));
