@@ -1642,6 +1642,28 @@ export function usdCentsToIqd(cents: number, exchangeRate: number): number {
   return Math.floor((cents * exchangeRate) / 100);
 }
 
+/**
+ * A WALLET AMOUNT AS AN ADMIN SHOULD READ IT: dinars.
+ *
+ * «في لوحة الإدارة عند طلب تعبئة محفظة اجعله يكون العملة هي العملة العراقية
+ *  بالافتراضي وليس الدولار — المشكلة يظهر العملة بالدولار.»
+ *
+ * The «$35.72» the owner saw is not a dinar figure wearing a dollar sign. The
+ * LEDGER IS GENUINELY USD CENTS — migrations/0001_init.sql says so in its
+ * header, and 0015_wallet_holds.sql states in writing that the stored unit
+ * stays USD cents because changing it would be a destructive rewrite of live
+ * balances rather than a migration. A customer who types 50,000 د.ع has it
+ * stored as 3,572 cents, and the admin screens were printing that raw number.
+ *
+ * So this is a presentation fix, and the conversion already existed on both
+ * sides — the customer's own wallet page and the Telegram review card have
+ * been converting all along. This helper exists so the four admin screens
+ * cannot drift apart from each other again.
+ */
+export function formatWalletIqd(cents: number, exchangeRate: number): string {
+  return formatIqd(usdCentsToIqd(cents, exchangeRate));
+}
+
 export function iqdToUsdCents(iqd: number, exchangeRate: number): number {
   return Math.ceil((iqd * 100) / exchangeRate);
 }

@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, ApiError, WalletTx, formatUsdCents } from '../lib/api';
+import { api, ApiError, WalletTx, formatUsdCents, formatWalletIqd } from '../lib/api';
+import { useWallet } from '../WalletContext';
 import { Check, X, Wallet, FileImage, RefreshCw } from 'lucide-react';
 
 type AdminWalletTx = WalletTx & { email?: string; username?: string; userId?: string };
 
 export default function AdminWalletRequests() {
+  /** Dinars are the headline here too — this is the screen where a human
+   *  approves money, so it also carries the rate it was converted at. */
+  const { exchangeRate } = useWallet();
   const [transactions, setTransactions] = useState<AdminWalletTx[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -248,8 +252,17 @@ export default function AdminWalletRequests() {
               </div>
 
               <div className="flex flex-col md:items-end gap-2 border-t md:border-t-0 md:border-l border-zinc-800 pt-4 md:pt-0 md:pl-6">
-                <div className="text-xl font-black text-white">
-                  {formatUsdCents(t.amount)}
+                <div className="text-xl font-black text-white tabular-nums">
+                  {formatWalletIqd(t.amount, exchangeRate)}
+                </div>
+                {/* The ledger value AND the rate. A reviewer approving a
+                    deposit is reconciling a bank transfer against a stored
+                    balance, so both numbers and the rate between them belong
+                    on this card — the Telegram review card already says
+                    «المبلغ: X د.ع (الدفتر: $Y — سعر الصرف Z)» for the same
+                    reason. */}
+                <div className="text-[11px] text-zinc-500 tabular-nums" dir="ltr">
+                  {formatUsdCents(t.amount)} · {exchangeRate.toLocaleString()} IQD/USD
                 </div>
                 {stepsFor(t).length > 0 && decision?.id !== t.id && (
                   <div className="flex gap-2">

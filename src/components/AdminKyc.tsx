@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   IdCard, MapPin, Phone, RefreshCw, Eye, EyeOff, ShieldCheck, AlertTriangle, Clock,
 } from 'lucide-react';
@@ -220,6 +220,40 @@ export default function AdminKyc() {
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [detail, setDetail] = useState<CaseDetail | null>(null);
+
+  /**
+   * WHY THE WINDOW DOES NOT READ `detail` DIRECTLY — and why this panel has
+   * been a black screen for every admin who ever opened it.
+   *
+   * «في التحقق والعناوين في لوحة الإدارة عند الضغط عليها يصبح الموقع بالكامل
+   *  أسود شاشة سوداء.»
+   *
+   * The children of `<Overlay>` are an ORDINARY JSX ARGUMENT. They are built
+   * while the props object is constructed — before `Overlay` is called, and
+   * long before it decides whether it is open. So `{detail.user_email}` inside
+   * them ran on the FIRST render, with `detail` still null, and threw
+   * `Cannot read properties of null`. No data, no click and no API response
+   * were needed: mounting the tab was enough. `ChunkBoundary` caught the throw
+   * and painted its full-viewport black fallback, which is the screen the
+   * owner met — and because the throw is deterministic, its «إعادة التحميل»
+   * could never clear it.
+   *
+   * It arrived with the migration to the `Overlay` primitive, which replaced
+   * an outer `{detail && (…)}` with `open={!!detail}` and left the body
+   * reading `detail.` unguarded. The author even wrote `detail?.user_email`
+   * one line above, on the `label` prop.
+   *
+   * THE LATCH, not merely a `?.` on each read. `detail` going null IS the
+   * close, but the panel is still on screen for the length of its exit spring;
+   * reading the state directly would blank a decrypted identity document out
+   * from under the animation. The last opened case is held for exactly as long
+   * as the window is still being drawn — the same pattern, for the same
+   * reason, as `AdminUsers.tsx`.
+   */
+  const lastDetailRef = useRef<CaseDetail | null>(null);
+  if (detail) lastDetailRef.current = detail;
+  const shownCase = detail ?? lastDetailRef.current;
+
   const [showEvidence, setShowEvidence] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -482,6 +516,7 @@ export default function AdminKyc() {
           wrong case matters. `solid` keeps its own near-black ground, because
           a decrypted document read through tinted glass is a document read
           badly. */}
+      {shownCase && (
       <Overlay
         open={!!detail}
         onClose={() => setDetail(null)}
@@ -490,28 +525,28 @@ export default function AdminKyc() {
         z={60}
         solid
         testId="kyc-case-detail"
-        panelClassName="w-full max-w-xl max-h-[88dvh] overflow-y-auto bg-[#0a0a0a] border border-zinc-800 !rounded-t-[28px] sm:!rounded-[28px]"
+        panelClassName={`w-full max-w-xl max-h-[88dvh] overflow-y-auto bg-[#0a0a0a] border border-zinc-800 !rounded-t-[28px] sm:!rounded-[28px]${detail ? '' : ' pointer-events-none'}`}
       >
           <div className="p-5">
             <div className="flex items-center justify-between mb-1">
-              <p className="font-bold">{detail.user_email}</p>
-              {stateChip(detail.state)}
+              <p className="font-bold">{shownCase.user_email}</p>
+              {stateChip(shownCase.state)}
             </div>
             <p className="text-[11px] text-amber-400 flex items-center gap-1.5 mb-4">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {t.auditWarn}
             </p>
 
-            {detail.case_type === 'identity' ? (
+            {shownCase.case_type === 'identity' ? (
               <div className="space-y-2 text-[13px]">
-                {!detail.fields_readable && (
+                {!shownCase.fields_readable && (
                   <p className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-[12px]">
                     {t.unreadable}
                   </p>
                 )}
-                <p><span className="text-zinc-500">{t.fullName}:</span> <span className="font-bold">{detail.full_name ?? '—'}</span></p>
-                <p><span className="text-zinc-500">{t.dob}:</span> <span dir="ltr">{detail.dob ?? '—'}</span></p>
-                <p><span className="text-zinc-500">{t.docType}:</span> {detail.doc_type ?? '—'}</p>
-                <p><span className="text-zinc-500">{t.docNumber}:</span> <span dir="ltr" className="font-mono">{detail.doc_number ?? '—'}</span></p>
+                <p><span className="text-zinc-500">{t.fullName}:</span> <span className="font-bold">{shownCase.full_name ?? '—'}</span></p>
+                <p><span className="text-zinc-500">{t.dob}:</span> <span dir="ltr">{shownCase.dob ?? '—'}</span></p>
+                <p><span className="text-zinc-500">{t.docType}:</span> {shownCase.doc_type ?? '—'}</p>
+                <p><span className="text-zinc-500">{t.docNumber}:</span> <span dir="ltr" className="font-mono">{shownCase.doc_number ?? '—'}</span></p>
 
                 <div className="pt-2">
                   <div className="flex items-center justify-between mb-2">
@@ -526,10 +561,10 @@ export default function AdminKyc() {
                   </div>
                   {showEvidence && (
                     <div className="grid grid-cols-2 gap-2">
-                      {detail.evidence_indexes.map((i) => (
+                      {shownCase.evidence_indexes.map((i) => (
                         <img
                           key={i}
-                          src={`/api/kyc/admin/cases/${detail.id}/evidence/${i}`}
+                          src={`/api/kyc/admin/cases/${shownCase.id}/evidence/${i}`}
                           alt={`evidence ${i + 1}`}
                           className="w-full rounded-xl border border-zinc-800 max-w-full"
                           loading="lazy"
@@ -543,23 +578,23 @@ export default function AdminKyc() {
               <div className="space-y-2 text-[13px]">
                 <p>
                   <span className="text-zinc-500">{t.newPhone}:</span>{' '}
-                  <span dir="ltr" className="font-bold">{detail.payload?.new_phone_e164 || '—'}</span>
+                  <span dir="ltr" className="font-bold">{shownCase.payload?.new_phone_e164 || '—'}</span>
                 </p>
-                <p><span className="text-zinc-500">{t.proof}:</span> {detail.payload?.proof || '—'}</p>
+                <p><span className="text-zinc-500">{t.proof}:</span> {shownCase.payload?.proof || '—'}</p>
               </div>
             )}
 
-            {detail.reason && (
-              <p className="text-[12px] text-orange-300 mt-3">{detail.reason}</p>
+            {shownCase.reason && (
+              <p className="text-[12px] text-orange-300 mt-3">{shownCase.reason}</p>
             )}
 
-            {(detail.state === 'submitted' || detail.state === 'reviewing') && (
+            {(shownCase.state === 'submitted' || shownCase.state === 'reviewing') && (
               <div className="mt-5 border-t border-zinc-800 pt-4">
                 <p className="text-[12px] font-bold text-zinc-400 mb-2">{t.decisions}</p>
                 <div className="flex gap-2 flex-wrap">
-                  {detail.state === 'submitted' && (
+                  {shownCase.state === 'submitted' && (
                     <button
-                      onClick={() => decide(detail.id, 'reviewing')}
+                      onClick={() => decide(shownCase.id, 'reviewing')}
                       disabled={busy}
                       className="px-3.5 py-2 rounded-xl bg-amber-500/15 text-amber-300 text-[13px] font-bold hover:bg-amber-500/25 disabled:opacity-40 inline-flex items-center gap-1.5"
                     >
@@ -567,21 +602,21 @@ export default function AdminKyc() {
                     </button>
                   )}
                   <button
-                    onClick={() => decide(detail.id, 'changes_requested')}
+                    onClick={() => decide(shownCase.id, 'changes_requested')}
                     disabled={busy}
                     className="px-3.5 py-2 rounded-xl bg-orange-500/15 text-orange-300 text-[13px] font-bold hover:bg-orange-500/25 disabled:opacity-40"
                   >
                     {t.reqChanges}
                   </button>
                   <button
-                    onClick={() => decide(detail.id, 'rejected')}
+                    onClick={() => decide(shownCase.id, 'rejected')}
                     disabled={busy}
                     className="px-3.5 py-2 rounded-xl bg-red-500/10 text-red-400 text-[13px] font-bold hover:bg-red-500/20 disabled:opacity-40"
                   >
                     {t.reject}
                   </button>
                   <button
-                    onClick={() => decide(detail.id, 'verified')}
+                    onClick={() => decide(shownCase.id, 'verified')}
                     disabled={busy}
                     className="px-3.5 py-2 rounded-xl bg-emerald-500/15 text-emerald-400 text-[13px] font-bold hover:bg-emerald-500/25 disabled:opacity-40 inline-flex items-center gap-1.5"
                   >
@@ -599,6 +634,7 @@ export default function AdminKyc() {
             </button>
           </div>
       </Overlay>
+      )}
     </div>
   );
 }

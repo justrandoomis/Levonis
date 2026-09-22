@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useLanguage } from '../LanguageContext';
-import { api, ApiError, WalletTx, formatIqd, formatUsdCents } from '../lib/api';
+import { api, ApiError, WalletTx, formatIqd, formatUsdCents, formatWalletIqd } from '../lib/api';
+import { useWallet } from '../WalletContext';
 import {
   Users,
   ShoppingCart,
@@ -68,6 +69,16 @@ const ORDER_STATUS_COLORS: Record<string, string> = {
 
 export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab: string) => void }) {
   const { dir } = useLanguage();
+  /**
+   * THE ADMIN READS DINARS — «اجعله يكون العملة هي العملة العراقية بالافتراضي».
+   *
+   * `exchangeRate` is the admin's own setting (IQD per 1 USD, default 1400,
+   * edited in Wallet settings) and it is already public and already on this
+   * context, because the customer's wallet page has been converting with it
+   * all along. These cards were the only place left printing the ledger's raw
+   * cents.
+   */
+  const { exchangeRate } = useWallet();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -250,13 +261,13 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         )}
         {statCard(
           dir === 'rtl' ? 'تعبئة المحفظة (الموافق عليها)' : 'Wallet Top-ups (approved)',
-          formatUsdCents(stats.incoming_usd_cents),
+          formatWalletIqd(stats.incoming_usd_cents, exchangeRate),
           <ArrowUpRight className="w-5 h-5 text-[#2CE59B]" />,
           'bg-[#2CE59B]/10'
         )}
         {statCard(
           dir === 'rtl' ? 'السحوبات (الموافق عليها)' : 'Wallet Payouts (approved)',
-          formatUsdCents(stats.outgoing_usd_cents),
+          formatWalletIqd(stats.outgoing_usd_cents, exchangeRate),
           <ArrowDownRight className="w-5 h-5 text-[#FF6B9E]" />,
           'bg-[#FF6B9E]/10'
         )}
@@ -313,7 +324,15 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                     <div className="min-w-0">
                       <div className="font-bold text-white text-sm truncate flex items-center gap-2">
                         <span className="capitalize">{req.type}</span>
-                        <span className="text-[#c5a059]">{formatUsdCents(req.amount)}</span>
+                        <span className="text-[#c5a059]">{formatWalletIqd(req.amount, exchangeRate)}</span>
+                        {/* THE LEDGER'S OWN VALUE, kept small and named. The stored unit
+                        really is USD cents (migrations/0001_init.sql), so hiding it
+                        entirely would make the dinars look like the stored number and
+                        a reconciliation against the ledger impossible. This is the
+                        shape the Telegram review card already uses. */}
+                        <span className="text-[10px] font-normal text-zinc-600" dir="ltr">
+                          {formatUsdCents(req.amount)}
+                        </span>
                       </div>
                       <div className="text-[11px] text-zinc-500 truncate">
                         {req.email || req.username || '—'}

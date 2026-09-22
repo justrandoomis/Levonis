@@ -67,7 +67,8 @@ import {
   X,
 } from 'lucide-react';
 import { Overlay } from '../ui/Overlay';
-import { api, ApiError, formatIqd, formatUsdCents } from '../../lib/api';
+import { api, ApiError, formatIqd, formatUsdCents, formatWalletIqd } from '../../lib/api';
+import { useWallet } from '../../WalletContext';
 import { useUsersStrings } from './strings';
 import { useModalFocus } from './useModalFocus';
 import { Pill, Row, Section, Stat, dayLabelOf, whenLabel } from './ui';
@@ -90,6 +91,10 @@ const ROLE_ICON: Record<string, React.ReactNode> = {
 };
 
 export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }: MemberDetailModalProps) {
+  /** Dinars beside the ledger's own dollars — the wallet is stored in USD
+   *  cents and an admin reading a member's balance needs the figure their
+   *  customer sees. */
+  const { exchangeRate } = useWallet();
   const s = useUsersStrings();
   const open = userId !== null;
   const { setPanel } = useModalFocus(open, anchorRef);
@@ -236,7 +241,7 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
                 <Stat label={s.fLifetime} value={<Lock className="h-4 w-4 text-zinc-600" />} sub={s.fScope} />
               )}
               {view.financial ? (
-                <Stat label={s.fWalletUsd} value={formatUsdCents(view.financial.wallet_usd_cents)} tone="money" sub={`${s.fWalletPoints}: ${view.financial.wallet_points.toLocaleString()}`} />
+                <Stat label={s.fWalletUsd} value={formatWalletIqd(view.financial.wallet_usd_cents, exchangeRate)} tone="money" sub={`${formatUsdCents(view.financial.wallet_usd_cents)} · ${s.fWalletPoints}: ${view.financial.wallet_points.toLocaleString()}`} />
               ) : (
                 <Stat label={s.fWalletUsd} value={<Lock className="h-4 w-4 text-zinc-600" />} sub={s.fScope} />
               )}
@@ -310,7 +315,11 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
                 >
                   <Row label={s.fLifetime} value={formatIqd(view.financial.lifetime_value_iqd)} mono />
                   <Row label={s.fDeliveredValue} value={formatIqd(view.financial.delivered_value_iqd)} mono />
-                  <Row label={s.fWalletUsd} value={formatUsdCents(view.financial.wallet_usd_cents)} mono />
+                  <Row
+                    label={s.fWalletUsd}
+                    value={`${formatWalletIqd(view.financial.wallet_usd_cents, exchangeRate)} · ${formatUsdCents(view.financial.wallet_usd_cents)}`}
+                    mono
+                  />
                   <Row
                     label={s.fWalletPoints}
                     value={

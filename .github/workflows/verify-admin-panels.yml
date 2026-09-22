@@ -1,0 +1,87 @@
+name: 54 - Admin panels really mount (no deployment)
+
+# «في التحقق والعناوين في لوحة الإدارة عند الضغط عليها يصبح الموقع بالكامل
+#  أسود شاشة سوداء.»
+#
+# THIS EXISTS BECAUSE A GREEN SUITE SHIPPED A PANEL THAT THREW ON MOUNT.
+# AdminKyc read `detail.user_email` inside the children of an <Overlay>, and
+# JSX children are an eager argument — built before the Overlay is ever called.
+# So it ran on the first render with `detail` null and threw, and the error
+# boundary painted a full-viewport black screen. No data, no click and no API
+# response were needed: opening the tab was enough.
+#
+# `npm run check` passed the whole time, because tsconfig sets no
+# strictNullChecks and a null dereference is not a type error here. And no test
+# had ever rendered the component. A source assertion that a guard exists
+# proves the guard is written; only a MOUNT proves the panel opens.
+#
+# It reads nothing and deploys nothing.
+
+on:
+  pull_request:
+    branches: [Main]
+    paths:
+      - 'src/components/AdminKyc.tsx'
+      - 'src/components/ui/Overlay.tsx'
+      - 'src/components/ChunkBoundary.tsx'
+      - 'tests/browser/admin-panels*'
+      - 'scripts/e2e-admin-panels.mjs'
+      - 'tests/adminMoneyAndCrash.test.ts'
+      - '.github/workflows/verify-admin-panels.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-panels-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  panels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: The source contract the proof depends on
+        run: node --import tsx --test tests/adminMoneyAndCrash.test.ts
+
+      - name: Install an isolated browser engine
+        run: |
+          npm install --prefix /tmp/levonis-browser --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
+          /tmp/levonis-browser/node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Mount the admin panels in a real engine
+        env:
+          PLAYWRIGHT_MODULE: /tmp/levonis-browser/node_modules/playwright
+          OUT_DIR: /tmp/levonis-diagnostics/admin-panels
+        run: |
+          mkdir -p /tmp/levonis-diagnostics/admin-panels
+          node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4177 > /tmp/levonis-diagnostics/admin-panels/vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4177/tests/browser/admin-panels.html >/dev/null; then break; fi
+            sleep 1
+          done
+          set +e
+          node scripts/e2e-admin-panels.mjs > /tmp/levonis-diagnostics/admin-panels/proof.log 2>&1
+          result=$?
+          tail -60 /tmp/levonis-diagnostics/admin-panels/proof.log
+          exit "$result"
+
+      - name: Keep the screenshot and the notes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-panel-proof
+          path: /tmp/levonis-diagnostics/admin-panels
+          if-no-files-found: warn
