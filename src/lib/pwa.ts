@@ -505,6 +505,62 @@ export function recordInstallDismissal(
   return until;
 }
 
+/**
+ * THE CUSTOMER'S OWN "I ADDED IT", AND WHY IT HAS TO EXIST.
+ *
+ * «وبالرغم من تحميل التطبيق والضغط على تثبيت الآن إلا أنه يعود الظهور مرة أخرى».
+ *
+ * On every Apple browser, and on Firefox, there IS no `beforeinstallprompt`
+ * and there IS no `appinstalled`. The customer follows the steps, the icon
+ * appears on their home screen — and Safari, the browser they are still
+ * standing in, is not standalone and never will be. `isStandalone` is right
+ * to say so: it is a fact about THIS window, not about the device. So the
+ * offer came back on the next visit, correctly and uselessly, and the only
+ * button that silenced it was labelled «ليس الآن» — which is not what
+ * somebody who has just installed it wants to say.
+ *
+ * There is no API to ask iOS whether an icon exists. The only truthful source
+ * is the customer, so the sheet asks them, in the branch where the platform
+ * cannot answer: a button carrying `pwaInstallDone` — "the app is installed
+ * on this device" — which is a statement they are making, not a dismissal.
+ *
+ * It is a SEPARATE key from the dismissal, not a very large `until`:
+ *
+ *   * it has no expiry. Thirty days is the right answer to "not now" and the
+ *     wrong answer to "I already have it" — re-offering an app the customer
+ *     installed is the same defect in a slower form.
+ *   * `appinstalled` clears the dismissal (a real install answers the
+ *     question), and it must NOT clear this one. The two facts are different
+ *     and a device can hold either without the other.
+ *
+ * The way back is the Settings row, which is not an `offered` surface and so
+ * renders regardless: a customer who taps it gets the sheet and the steps
+ * again, which is the escape hatch for having answered too soon.
+ */
+export const INSTALL_CONFIRMED_KEY = 'lv.pwa.install.confirmed.v1';
+
+/** Wrapped for the same reason every read here is: the access itself throws
+ *  in a Safari private window, and an unreadable preference must still draw. */
+export function readInstallConfirmed(storage: StorageLike | null | undefined): boolean {
+  if (!storage) return false;
+  try {
+    return storage.getItem(INSTALL_CONFIRMED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Records it. A write that throws costs the memory on this one device and
+ *  nothing else, so it is not reported. */
+export function recordInstallConfirmed(storage: StorageLike | null | undefined): void {
+  if (!storage) return;
+  try {
+    storage.setItem(INSTALL_CONFIRMED_KEY, '1');
+  } catch {
+    // Same reasoning as recordInstallDismissal.
+  }
+}
+
 /** Forgets the dismissal — used when the app is actually installed, so a
  *  device that later uninstalls it starts from a clean answer. */
 export function clearInstallDismissal(storage: StorageLike | null | undefined): void {

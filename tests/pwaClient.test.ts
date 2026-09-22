@@ -26,6 +26,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { translations } from '../src/translations';
 import {
+  INSTALL_CONFIRMED_KEY,
   INSTALL_DISMISS_KEY,
   INSTALL_DISMISS_MS,
   clearInstallDismissal,
@@ -37,6 +38,8 @@ import {
   isStandalone,
   isInstallDismissed,
   readDismissedUntil,
+  readInstallConfirmed,
+  recordInstallConfirmed,
   recordInstallDismissal,
   stepsFor,
   type Platform,
@@ -539,4 +542,104 @@ test('iOS home-screen identity is per host, not the shared index.html', () => {
   // it uses a SCREENSHOT OF THE PAGE, which is the bug the PNG replaced.
   assert.match(identity, /APPLE_ICON_EXTENSIONS = \['\.png', '\.jpg', '\.jpeg'\]/);
   assert.ok(!/webp/i.test(identity.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '')));
+});
+
+// ---------------------------------------------------------------------------
+// «تحميل التطبيق ... يعود الظهور مرة أخرى» — the offer that came back forever
+// ---------------------------------------------------------------------------
+
+test('the customer can say the app IS installed, on the platforms that cannot tell us', () => {
+  /**
+   * On every Apple browser and on Firefox there is no `beforeinstallprompt`
+   * and no `appinstalled`. The customer follows the steps, the icon lands on
+   * their home screen — and Safari, the window they are still standing in, is
+   * not standalone and never will be. `isStandalone` is right about that: it
+   * is a fact about THIS window, not about the device. So the offer came back
+   * on the next visit, correctly and uselessly, and the only button that
+   * silenced it said «ليس الآن» — which is not what somebody who has just
+   * installed it wants to say.
+   *
+   * There is no API that can ask iOS whether an icon exists, so this is not a
+   * detection being skipped. The customer is the only source, and the sheet
+   * asks them in exactly the branch where the platform has no answer.
+   */
+  const storage = memoryStorage();
+  assert.equal(readInstallConfirmed(storage), false);
+  recordInstallConfirmed(storage);
+  assert.equal(readInstallConfirmed(storage), true);
+  assert.equal(storage.map.get(INSTALL_CONFIRMED_KEY), '1');
+
+  // A SEPARATE key from the dismissal, and that is the point of it.
+  assert.notEqual(INSTALL_CONFIRMED_KEY, INSTALL_DISMISS_KEY);
+  assert.equal(readDismissedUntil(storage), 0, 'confirming is not a thirty-day silence');
+
+  // `appinstalled` clears the dismissal so a later uninstall starts clean. It
+  // must NOT clear this: the two are different facts about different things.
+  clearInstallDismissal(storage);
+  assert.equal(readInstallConfirmed(storage), true);
+});
+
+test('an unreadable or unwritable storage never takes the page down', () => {
+  // The access itself throws in a Safari private window — not the read, the
+  // property. Same rule as every other preference in this file: a surface that
+  // cannot read a preference still draws.
+  const hostile: StorageLike = {
+    getItem() { throw new Error('blocked'); },
+    setItem() { throw new Error('blocked'); },
+    removeItem() { throw new Error('blocked'); },
+  };
+  assert.equal(readInstallConfirmed(hostile), false);
+  assert.doesNotThrow(() => recordInstallConfirmed(hostile));
+  assert.equal(readInstallConfirmed(null), false);
+  assert.doesNotThrow(() => recordInstallConfirmed(null));
+});
+
+test('the confirmation silences the OFFERED surfaces and nothing else', () => {
+  const hook = SRC('hooks/useInstallApp.ts');
+  // Folded into `dismissed` in the hook, not in each component, so every
+  // volunteered surface agrees about when to be quiet.
+  assert.match(hook, /dismissed: confirmed \|\| Date\.now\(\) < dismissedUntil/);
+  assert.match(hook, /confirmedInstalled: confirmed/);
+  // And the button still only honours `dismissed` when the app volunteered it.
+  const button = SRC('components/pwa/InstallAppButton.tsx');
+  assert.match(button, /if \(offered && dismissed && !everOpened\) return null;/);
+  // The Settings row passes no `offered`, so it stays — that is the way back
+  // for a customer who answered too soon.
+  assert.ok(!/<InstallAppButton[^/>]*offered/.test(SRC('pages/Settings.tsx')));
+});
+
+test('the answer is offered in the steps branch, where there is no install button', () => {
+  const sheet = SRC('components/pwa/InstallAppSheet.tsx');
+  const at = sheet.indexOf('data-install-already-added');
+  assert.ok(at > 0, 'the steps branch carries the confirmation');
+  const stepsBranch = sheet.slice(sheet.indexOf("guidance.kind === 'steps'"), at + 1200);
+  assert.ok(stepsBranch.includes("t('pwaInstallDone')"), 'labelled with the statement it makes');
+  assert.ok(stepsBranch.includes('onClick={alreadyAdded}'));
+  assert.ok(stepsBranch.includes("t('pwaInstallLater')"), '«ليس الآن» stays, for the other answer');
+  // It reuses an existing string rather than inventing one, so no locale is
+  // missing the label — `translations` already carries all three.
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.ok(translations[lang].pwaInstallDone, `${lang} has pwaInstallDone`);
+  }
+});
+
+test('the install offer is at the BOTTOM of /profile, not above the membership centre', () => {
+  /**
+   * «تحميل التطبيق في مكانه غير مناسب في /profile». It was the first card on
+   * the page. A customer opening their profile wants their orders, their
+   * wallet or their plan; an install promo above all three pushes the reason
+   * they came below the fold.
+   */
+  const profile = SRC('pages/Profile.tsx');
+  const install = profile.indexOf('<InstallAppButton offered />');
+  const membership = profile.indexOf('First Card: Membership Center');
+  const reviewsTab = profile.indexOf("activeTab === 'reviews'");
+  assert.ok(install > 0 && membership > 0 && reviewsTab > 0);
+  assert.ok(membership < install, 'the membership centre comes first');
+  assert.ok(reviewsTab < install, 'and the tabs do too — the offer is last');
+  // Still `offered`, and still on /profile rather than only in Settings:
+  // `preventDefault()` on `beforeinstallprompt` takes Chrome's own banner
+  // away from every Android visitor, and /settings is a ProtectedRoute.
+  assert.match(profile, /<InstallAppButton offered \/>/);
+  assert.match(SRC('App.tsx'), /path="\/profile"/);
 });

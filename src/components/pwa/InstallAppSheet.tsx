@@ -69,7 +69,7 @@ export interface InstallAppSheetProps {
 export default function InstallAppSheet({ open, onClose }: InstallAppSheetProps) {
   const { t } = useLanguage();
   const { store } = useStore();
-  const { guidance, promptInstall, dismiss } = useInstallApp();
+  const { guidance, promptInstall, dismiss, confirmInstalled } = useInstallApp();
 
   const name = store?.name || 'LEVONIS';
   // The merchant's own logo where there is one, the platform mark otherwise.
@@ -92,6 +92,31 @@ export default function InstallAppSheet({ open, onClose }: InstallAppSheetProps)
   // window", not "stop asking".
   const later = () => {
     dismiss();
+    onClose();
+  };
+
+  /**
+   * «التطبيق مثبّت على هذا الجهاز» — THE CUSTOMER'S OWN ANSWER, in the branch
+   * where the platform has none.
+   *
+   * On Apple browsers there is no `beforeinstallprompt` and no `appinstalled`.
+   * The customer follows the steps, the icon lands on their home screen, and
+   * Safari — the window they are still in — is not standalone and never will
+   * be. So the offer came back on the next visit, correctly and uselessly, and
+   * the only button that silenced it said «ليس الآن».
+   *
+   * There is no API that can ask iOS whether an icon exists, so this is not a
+   * detection we are skipping: the customer is the only source. The label is
+   * the existing `pwaInstallDone` string — "the app is installed on this
+   * device" — because that is exactly the statement they are making, and it
+   * already exists in all three languages.
+   *
+   * It does not expire. See INSTALL_CONFIRMED_KEY in src/lib/pwa.ts for why
+   * that is a different key from the thirty-day «ليس الآن», and for the way
+   * back (the Settings row, which is not an offered surface).
+   */
+  const alreadyAdded = () => {
+    confirmInstalled();
     onClose();
   };
 
@@ -180,10 +205,24 @@ export default function InstallAppSheet({ open, onClose }: InstallAppSheetProps)
                 </li>
               ))}
             </ol>
+            {/* The primary action in this branch is the customer telling us
+                they are done, because nothing else can. «ليس الآن» stays,
+                quieter, for the person who is not going to do it now — the two
+                are different answers and the thirty-day silence belongs only
+                to the second one. */}
+            <button
+              type="button"
+              data-install-already-added
+              onClick={alreadyAdded}
+              className="mt-5 min-h-[48px] w-full rounded-xl bg-white/10 px-5 text-[13px] font-bold text-white transition-colors duration-200 hover:bg-white/15 inline-flex items-center justify-center gap-2"
+            >
+              <Check aria-hidden="true" className="w-4 h-4" />
+              {t('pwaInstallDone')}
+            </button>
             <button
               type="button"
               onClick={later}
-              className="mt-5 min-h-[44px] w-full rounded-xl px-5 text-[13px] font-medium text-zinc-400 transition-colors duration-200 hover:text-white"
+              className="mt-2 min-h-[44px] w-full rounded-xl px-5 text-[13px] font-medium text-zinc-400 transition-colors duration-200 hover:text-white"
             >
               {t('pwaInstallLater')}
             </button>

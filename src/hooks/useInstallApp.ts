@@ -31,6 +31,8 @@ import {
   isMobilePlatform,
   isStandalone,
   readDismissedUntil,
+  readInstallConfirmed,
+  recordInstallConfirmed,
   recordInstallDismissal,
   type InstallGuidance,
   type Platform,
@@ -205,6 +207,13 @@ export interface InstallApp {
   /** The customer said «ليس الآن» and the quiet period has not expired. */
   dismissed: boolean;
   dismiss: () => void;
+  /**
+   * The customer said the app IS on this device, on a platform that cannot
+   * tell us. See INSTALL_CONFIRMED_KEY in src/lib/pwa.ts — there is no API to
+   * ask iOS, so the only truthful source is them.
+   */
+  confirmedInstalled: boolean;
+  confirmInstalled: () => void;
   /** Exactly one of five states for the sheet to render. */
   guidance: InstallGuidance;
 }
@@ -229,6 +238,9 @@ export function useInstallApp(): InstallApp {
   // own menu while this page is open, and the display mode flips under it.
   const [displayStandalone, setDisplayStandalone] = useState<boolean>(standaloneNow);
   const [dismissedUntil, setDismissedUntil] = useState<number>(() => readDismissedUntil(safeStorage()));
+  // Component state, not a storage read per render, for the same reason
+  // `dismissedUntil` is: the button has to re-render the moment it is tapped.
+  const [confirmed, setConfirmed] = useState<boolean>(() => readInstallConfirmed(safeStorage()));
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -259,6 +271,11 @@ export function useInstallApp(): InstallApp {
     setDismissedUntil(recordInstallDismissal(safeStorage(), Date.now()));
   }, []);
 
+  const confirmInstalled = useCallback(() => {
+    recordInstallConfirmed(safeStorage());
+    setConfirmed(true);
+  }, []);
+
   const standalone = displayStandalone || store.installed;
   const guidance = installGuidance({
     platform,
@@ -286,8 +303,16 @@ export function useInstallApp(): InstallApp {
     // storage inside the predicate would not re-render anything. The exclusive
     // boundary is the same one, and the argument for the number lives beside
     // INSTALL_DISMISS_MS in src/lib/pwa.ts.
-    dismissed: Date.now() < dismissedUntil,
+    // «ليس الآن» OR «التطبيق مثبّت على هذا الجهاز». Both silence the surfaces
+    // the app volunteered, and they are two different sentences: the first
+    // expires after thirty days, the second does not expire at all. Folding
+    // them together HERE rather than in the component is what keeps every
+    // `offered` surface — the Profile row, the storefront row — agreeing
+    // about when to be quiet.
+    dismissed: confirmed || Date.now() < dismissedUntil,
     dismiss,
+    confirmedInstalled: confirmed,
+    confirmInstalled,
     guidance,
   };
 }

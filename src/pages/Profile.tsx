@@ -391,46 +391,6 @@ export default function Profile() {
         {/* Guest: honest signed-out card, no member fabrications below. */}
         {!isAuthenticated && <GuestCard />}
 
-        {/*
-          «تحميل التطبيق», WHERE A SIGNED-OUT SHOPPER CAN ACTUALLY REACH IT.
-
-          This card is not decoration; it is the fix for a feature that did not
-          work. The install affordance was mounted in exactly one place —
-          Settings §5 — and `/settings` is a `<ProtectedRoute>`, so it
-          redirected a signed-out visitor to `/auth`. Most first-time visitors
-          are signed out, and every visitor arriving from an Instagram or
-          Telegram link certainly is.
-
-          That alone would only have been hard to find. What made it a defect
-          is `src/hooks/useInstallApp.ts` calling `preventDefault()` on
-          `beforeinstallprompt`: that call suppresses Chrome's own install
-          banner for 100% of visitors, so on Android — the browser most of this
-          shop's customers use — the browser's promotion was taken away and the
-          replacement was behind a login wall. Net cost of the feature was
-          negative until this card existed.
-
-          `/profile` is the first item in BottomNav and is NOT protected (see
-          the route table in App.tsx), which is the whole reason it is here and
-          not on another page.
-
-          `offered` because nobody asked for this card: it goes quiet for a
-          month if the customer says «ليس الآن». The Settings row does not,
-          because that one the customer went looking for.
-
-          The card renders for members and guests alike — an installed app is
-          not a member benefit — and `InstallAppButton` returns null on its own
-          once the shop IS installed, so this whole block disappears inside the
-          app rather than offering to install what the customer is standing in.
-        */}
-        <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-4 mb-3 shadow-sm text-black dark:text-white">
-          <p className="font-bold text-[14px] flex items-center gap-2">
-            <Download aria-hidden="true" className="w-4 h-4 text-zinc-400" />
-            {t('pwaInstallTitle')}
-          </p>
-          <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{t('pwaSettingsNote')}</p>
-          <InstallAppButton offered />
-        </div>
-
         {/* First Card: Membership Center — members only (real ledger data). */}
         {isAuthenticated && (
         <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-3 mb-3 shadow-sm">
@@ -845,6 +805,47 @@ export default function Profile() {
             <MyReviewsTab isAuthenticated={isAuthenticated} />
           </div>
         )}
+
+        {/*
+          «تحميل التطبيق», AT THE BOTTOM, AND WHY IT MOVED THERE.
+
+          «تحميل التطبيق في مكانه غير مناسب في /profile». It was the FIRST
+          card on this page, above the membership centre — the most valuable
+          slot on the screen, spent on a promotion nobody asked for. A
+          customer opening their profile is looking for their orders, their
+          wallet or their plan; an install offer at the top pushes all three
+          below the fold to advertise something they may already have done.
+
+          It still has to be HERE and not only in Settings, and that part is
+          not a preference. `src/hooks/useInstallApp.ts` calls
+          `preventDefault()` on `beforeinstallprompt`, which suppresses
+          Chrome's own install banner for every visitor on Android — the
+          browser most of this shop's customers use. `/settings` is a
+          `<ProtectedRoute>`, so before this row existed the feature was
+          strictly negative: the browser's promotion was gone and ours was
+          behind a login wall. `/profile` is the first item in BottomNav and is
+          NOT protected, which is the whole reason the offer lives on this
+          page. Moving it down keeps that reachability and stops it competing
+          with the reason people came.
+
+          `offered`, because nobody asked for it: it goes quiet for a month
+          after «ليس الآن», and for good after «التطبيق مثبّت على هذا الجهاز».
+          The Settings row does not, because that one the customer went looking
+          for — and it is the way back if they answer here too soon.
+
+          It renders for members and guests alike (an installed app is not a
+          member benefit) and `InstallAppButton` returns null on its own once
+          the shop IS installed, so this whole block disappears inside the app
+          rather than offering to install what the customer is standing in.
+        */}
+        <div className="mb-6 rounded-xl border border-black/5 dark:border-white/5 px-4 py-3 text-black dark:text-white">
+          <p className="text-[13px] font-bold flex items-center gap-2">
+            <Download aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+            {t('pwaInstallTitle')}
+          </p>
+          <p className="mt-0.5 text-[12px] text-zinc-500 leading-relaxed">{t('pwaSettingsNote')}</p>
+          <InstallAppButton offered />
+        </div>
 
       </div>
 
