@@ -2772,22 +2772,64 @@ async function computeCheckout(
       walletApplied = Math.min(walletBalanceIqd, requiredAdvance);
     }
     if (walletApplied < requiredAdvance) {
-      // Name the rule that is asking. "Insufficient balance" on a printer
-      // order reads as a bug when the customer was never told an advance was
-      // due; saying the amount and the reason turns it into an instruction.
-      throw badRequest(
-        printerAdvance > 0 && printerAdvance >= requiredAdvance
-          ? `توصيل الطابعة إلى المنزل يتطلب دفع ${printerAdvance.toLocaleString('en-US')} د.ع مقدماً من المحفظة قبل إتمام الطلب. / Home delivery of a printer requires ${printerAdvance.toLocaleString('en-US')} IQD paid in advance from your wallet before the order can be placed.`
-          : 'Insufficient wallet balance for the required advance payment',
-        'INSUFFICIENT_BALANCE',
-        { required_advance_iqd: requiredAdvance, printer_advance_iqd: printerAdvance, wallet_available_iqd: walletBalanceIqd }
-      );
+      /**
+       * A QUOTE IS A PREVIEW. IT PRICES; IT DOES NOT REFUSE.
+       *
+       * `computeCheckout` is shared by `POST /api/orders/quote` and
+       * `POST /api/orders`, and `options.allocate` is the only thing that
+       * separates them. Every other refusal in here is about whether the order
+       * may EXIST — a sold-out line, a closed offer, a quota. This one is not:
+       * it is about whether the customer has PAID YET, which is the one
+       * question a preview must be allowed to answer with a number instead of
+       * an error.
+       *
+       * Throwing it on the quote took the whole screen down, and four separate
+       * reports were this one line:
+       *   - «سعر التوصيل لا يظهر للخيارات» — every delivery card reads from
+       *     the quote; with no quote all three render «—».
+       *   - «الضريبة لا تعمل» — the COD tax row reads `quote.cod_tax_iqd`.
+       *     No quote, no row. The rule was never broken.
+       *   - «تعذر حساب عرض السعر» — the catch nulls the quote and shows that
+       *     sentence.
+       *   - «لا يوضح بأن الرصيد غير كافي» — and this is the cruel part. The
+       *     client decides sufficiency from `quote.wallet.applied_iqd >=
+       *     quote.wallet.required_advance_iqd`, and the panel that EXPLAINS a
+       *     printer advance is gated on `quote !== null`. The condition that
+       *     caused the refusal destroyed the quote that would have explained
+       *     it, so the button stayed enabled and the customer learned only by
+       *     pressing it.
+       *
+       * Store pickup hid all of it: `printerHomeDeliveryAdvanceIqd` returns 0
+       * for a pickup, so that one configuration quoted fine — which is why the
+       * screenshot with three real prices and the report of no prices are the
+       * same cart.
+       *
+       * Not a new rule and not a relaxed one: the ORDER door still refuses on
+       * exactly the same condition, one line below. The quote now returns
+       * `requiredAdvance` and `walletApplied` as the data they always were,
+       * and the screen it feeds already knows what to do with them.
+       */
+      if (options.allocate) {
+        // Name the rule that is asking. "Insufficient balance" on a printer
+        // order reads as a bug when the customer was never told an advance was
+        // due; saying the amount and the reason turns it into an instruction.
+        throw badRequest(
+          printerAdvance > 0 && printerAdvance >= requiredAdvance
+            ? `توصيل الطابعة إلى المنزل يتطلب دفع ${printerAdvance.toLocaleString('en-US')} د.ع مقدماً من المحفظة قبل إتمام الطلب. / Home delivery of a printer requires ${printerAdvance.toLocaleString('en-US')} IQD paid in advance from your wallet before the order can be placed.`
+            : 'Insufficient wallet balance for the required advance payment',
+          'INSUFFICIENT_BALANCE',
+          { required_advance_iqd: requiredAdvance, printer_advance_iqd: printerAdvance, wallet_available_iqd: walletBalanceIqd }
+        );
+      }
     }
     const walletUsdCents = walletApplied > 0 ? iqdToUsdCents(walletApplied, exchangeRate) : 0;
     if (walletUsdCents > available.usd_cents_available) {
       // Rounding pushed us past the balance; scale back to what the balance covers.
       walletApplied = Math.floor((available.usd_cents_available * exchangeRate) / 100);
-      if (walletApplied < requiredAdvance) throw badRequest('Insufficient wallet balance', 'INSUFFICIENT_BALANCE');
+      // Same door as above: the preview reports the shortfall, the order refuses it.
+      if (options.allocate && walletApplied < requiredAdvance) {
+        throw badRequest('Insufficient wallet balance', 'INSUFFICIENT_BALANCE');
+      }
     }
     const finalWalletUsdCents =
       walletApplied > 0 ? Math.min(iqdToUsdCents(walletApplied, exchangeRate), available.usd_cents_available) : 0;

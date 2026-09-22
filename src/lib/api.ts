@@ -1,4 +1,5 @@
 import { beginRequestFeedback, type MascotFeedback } from './mascotRequest';
+import { noteCartResponse } from './cartCount';
 /**
  * Typed API client. All requests go to the Worker backend with cookie
  * credentials; the browser never builds SQL and never holds tokens.
@@ -176,6 +177,10 @@ async function requestRaw<T>(method: string, path: string, body?: unknown, opts?
         data as unknown as Record<string, unknown>
       );
     }
+    // THE CART BADGE IS DERIVED FROM THE SERVER'S ANSWER, not maintained by
+    // each caller. See `noteCartResponse` for which ten paths used to have to
+    // remember, and which one actually did.
+    noteCartResponse(path, data);
     return data;
   } catch (err) {
     // Everything this function decided to throw is already the right error.

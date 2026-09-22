@@ -1876,10 +1876,20 @@ export default function Checkout() {
                 <p className="text-xs leading-relaxed font-light">{S.needsConfig}</p>
               </div>
             )}
+            {/* THE SERVER'S OWN SENTENCE, not a constant about it.
+                `setQuoteError(refusalWithCounter(err, lang, 'quote failed'))`
+                already computes the reason the server gave — and this line
+                then rendered `S.quoteError` instead, a fixed «تعذّر حساب عرض
+                السعر — سيُعاد التحقق عند تأكيد الطلب». The real reason was
+                fetched, stored and thrown away, so a customer whose cart was
+                refused for a nameable cause was told only that something went
+                wrong and invited to confirm an order whose price nobody had
+                computed. The constant stays as the fallback for a failure with
+                no sentence of its own (a dropped connection). */}
             {quoteError && !quoteLoading && (
               <p className="text-xs text-zinc-500 font-light flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
-                {S.quoteError}
+                {typeof quoteError === 'string' && quoteError.trim() ? quoteError : S.quoteError}
               </p>
             )}
 
