@@ -80,6 +80,7 @@ import {
   type StockAlertWish,
 } from '../components/product/stockAlertTargets';
 import { conditionKindLabel, type ConditionEntry } from '../lib/condition';
+import { resolveOrderType, resolveTransport, routeIsUsable } from '../lib/productSelection';
 
 // ------------------------------------------------------------------ strings
 
@@ -1029,10 +1030,18 @@ export default function Product() {
             ? (initial.color_id ?? '')
             : (cols.length === 1 && (data.product.colors ?? []).length === 1 ? cols[0].id : '')
         );
+        // A product that only pre-orders, by exactly one route, has already
+        // answered the route question — so it is answered for the buyer.
+        //
+        // This read the response's `mode`, which is the same field the derived
+        // type stopped reading: harmless on a FIRST load, since that request
+        // carries no preference for the server to echo, but the same
+        // expression, and a later reader has no way to tell the safe use from
+        // the unsafe one. It asks `resolveOrderType` instead — one rule, one
+        // place, and no `.mode` left in this file to copy by accident.
         const usable = (data.availability?.preorder.transports ?? []).filter((t) => t.configured);
-        setTransportMethod(
-          !initial && data.availability?.mode === 'preorder' && usable.length === 1 ? usable[0].method : ''
-        );
+        const opensAsPreorder = resolveOrderType('', data.availability?.modes ?? []) === 'pre_order';
+        setTransportMethod(!initial && opensAsPreorder && usable.length === 1 ? usable[0].method : '');
         setOrderType(initial ? 'direct_sale' : '');
       } catch (err) {
         console.error(err);
@@ -1113,18 +1122,24 @@ export default function Product() {
    * an add the door refuses with OUT_OF_STOCK. The press is remembered in
    * `orderType`, so it wins again the moment that shelf refills.
    */
-  const requestedOrderType: '' | 'direct_sale' | 'pre_order' =
-    orderType === 'pre_order' && preUsable
-      ? 'pre_order'
-      : orderType === 'direct_sale' && directUsable
-        ? 'direct_sale'
-        : availability?.mode === 'preorder'
-          ? 'pre_order'
-          : availability?.mode === 'direct_sale'
-            ? 'direct_sale'
-            : '';
+  const requestedOrderType: '' | 'direct_sale' | 'pre_order' = resolveOrderType(orderType, modesArr);
 
-  const priceKey = `${optionValueIds.join(',')}|${colorId}|${requestedOrderType}|${transportMethod}|${warrantyPlanId}`;
+  /** The routes this combination really offers, as the server stated them. */
+  const transportUsable = (method: string): boolean => routeIsUsable(availability?.preorder, method);
+
+  /**
+   * THE TRANSPORT EVERY REQUEST CARRIES — remembered across a version change,
+   * and honoured only while this combination still offers it.
+   *
+   * «عند اختيار طلب مسبق وتحديد شحن بحري ثم اختيار النسخة … يختفي خيار الشحن
+   *  ويجب النقر عليه مرة ثانية، وعند تغيير الخيار يرجع يختفي.» Nothing
+   * downstream may read the raw press; `src/lib/productSelection.ts` carries
+   * both rules and the reasoning, and the owner's scenario runs as a test
+   * there rather than being asserted about this file's punctuation.
+   */
+  const effectiveTransport = resolveTransport(transportMethod, requestedOrderType, availability?.preorder);
+
+  const priceKey = `${optionValueIds.join(',')}|${colorId}|${requestedOrderType}|${effectiveTransport}|${warrantyPlanId}`;
   const productSlug = product?.slug ?? '';
   useEffect(() => {
     if (!productSlug || source !== 'catalog') return;
@@ -1143,7 +1158,7 @@ export default function Product() {
             optionId: optionId || undefined,
             optionValueIds: optionValueIds.length ? optionValueIds : undefined,
             colorId: colorId || undefined,
-            transportMethod: transportMethod || undefined,
+            transportMethod: effectiveTransport || undefined,
             fulfillmentType: requestedOrderType || undefined,
             warrantyPlanId: warrantyPlanId || undefined,
           },
@@ -1181,7 +1196,7 @@ export default function Product() {
       clearTimeout(timer);
       ac.abort();
     };
-  }, [productSlug, source, priceKey, optionId, optionValueIds, colorId, requestedOrderType, transportMethod, warrantyPlanId, quoteToken]);
+  }, [productSlug, source, priceKey, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, quoteToken]);
 
   /**
    * A CONFIRMATION IS A MOMENT, NOT A STATE. The "added to cart" notice used
@@ -1500,7 +1515,7 @@ export default function Product() {
         // dropped the chosen route whenever the direct shelf still had units:
         // a buyer who pressed «طلب مسبق» and picked «شحن بري» on such a
         // product sent neither field, and the line landed as a direct sale.
-        if (requestedOrderType === 'pre_order' && transportMethod) body.transportMethod = transportMethod;
+        if (requestedOrderType === 'pre_order' && effectiveTransport) body.transportMethod = effectiveTransport;
         // The ORDER TYPE travels on its own, so the cart line records what the
         // customer chose rather than what a transport implies.
         if (requestedOrderType) body.fulfillmentType = requestedOrderType;
@@ -1563,7 +1578,7 @@ export default function Product() {
         setAddingToCart(false);
       }
     },
-    [product, qty, optionId, optionValueIds, colorId, requestedOrderType, transportMethod, warrantyPlanId, isAuthenticated, navigate, s]
+    [product, qty, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, isAuthenticated, navigate, s]
   );
 
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
@@ -1883,7 +1898,7 @@ export default function Product() {
     if (colorId) return L.color[colorId] ?? null;
     return L.base;
   })();
-  const levelIsFinal = !transportMethod && !warrantyPlanId;
+  const levelIsFinal = !effectiveTransport && !warrantyPlanId;
 
   /**
    * WHAT THE PAGE PAINTS — and it never paints nothing when it knows something.
@@ -1958,7 +1973,7 @@ export default function Product() {
    * server refuses to quote (out of stock, transport unconfigured), until the
    * customer changes it. The line simply waits for the quote instead.
    */
-  const detailPreviewAnswersSelection = !optionId && !colorId && !transportMethod && !orderType;
+  const detailPreviewAnswersSelection = !optionId && !colorId && !effectiveTransport && !orderType;
   const membershipPreview =
     quoteFresh && quoteErrors.length === 0 ? quotedPreview : detailPreviewAnswersSelection ? detailPreview : null;
   const proPreview = membershipPreview?.pro ?? null;
@@ -2024,7 +2039,7 @@ export default function Product() {
    * never been one of its errors. That is why «أضف إلى السلة» stayed live
    * with «شحن بري» untouched.
    */
-  const routeReady = !(requestedOrderType === 'pre_order' && !transportMethod);
+  const routeReady = !(requestedOrderType === 'pre_order' && !effectiveTransport);
   const canBuy =
     source === 'catalog' &&
     mode !== 'unavailable' &&
@@ -2141,10 +2156,8 @@ export default function Product() {
    */
   const routeCapacity = (method: string): PreorderRouteView | null =>
     availability?.preorder.routes?.find((r) => r.method === method) ?? null;
-  const routeUsable = (t: TransportView): boolean => {
-    const cap = routeCapacity(t.method);
-    return t.configured && (cap === null || cap.usable);
-  };
+  /** The same two facts as `transportUsable` above, by the same name. */
+  const routeUsable = (t: TransportView): boolean => transportUsable(t.method);
   /**
    * SOLD OUT ON THE SHELF IS NOT "UNAVAILABLE" WHEN IT CAN STILL BE ORDERED.
    * `modes` is the server's own per-type verdict, so this sentence appears
@@ -2394,16 +2407,18 @@ export default function Product() {
             {s.fulfilment}
           </legend>
           <div className="mt-2 flex flex-col gap-2">
+            {/* Choosing direct sale does NOT forget the route: a buyer who
+                looks at the direct price and goes back to «طلب مسبق» finds
+                their sea freight still chosen. `resolveTransport` already
+                drops the route from every request while this is the pressed
+                card, so nothing direct can carry a transport. */}
             <button
               type="button"
               disabled={!directUsable}
               aria-pressed={directUsable && !effectivePreorder}
               data-order-type="direct_sale"
               data-usable={directUsable ? 'yes' : 'no'}
-              onClick={() => {
-                setOrderType('direct_sale');
-                setTransportMethod('');
-              }}
+              onClick={() => setOrderType('direct_sale')}
               className="lv-choice flex min-h-[52px] items-start gap-3 px-3 py-2.5 text-sm text-start disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="min-w-0 flex-1">
@@ -2509,7 +2524,7 @@ export default function Product() {
           </legend>
           <div className="mt-2 flex flex-col gap-2">
             {availability!.preorder.transports.map((t) => {
-              const selected = transportMethod === t.method;
+              const selected = effectiveTransport === t.method;
               const final = transportFinal(t);
               /**
                * 0075 — A FULL ROUTE IS NOT OFFERED, AND THE OTHERS STILL ARE.
@@ -2597,18 +2612,30 @@ export default function Product() {
                               return kept ? [kept.id] : [];
                             })
                           );
-                          // Any changed dimension asks the server afresh which
-                          // fulfilment modes this complete combination offers.
-                          // …AND THE PREVIOUS ANSWER GOES WITH IT. Clearing
-                          // `orderType` alone stopped working the moment the
-                          // page began sending a DERIVED type: the fallback
-                          // reads `availability`, `liveAvailability` is never
-                          // cleared, and the server honours the `preferredType`
-                          // it is handed — so the last option's answer fed the
-                          // next request and re-latched itself. The reset above
-                          // would have been dead code.
-                          setOrderType('');
-                          setTransportMethod('');
+                          /*
+                            Any changed dimension asks the server afresh which
+                            fulfilment modes this complete combination offers —
+                            and that is ALL it does now.
+
+                            IT USED TO CLEAR THE BUYER'S TWO ANSWERS TOO, and
+                            the owner met the result: «عند الضغط على النسخة
+                            يذهب خيار طريق الشحن … وعند تغيير الخيار يرجع
+                            يختفي». Both presses are now remembered and
+                            filtered instead — `requestedOrderType` and
+                            `effectiveTransport` each honour the press only
+                            while this combination still offers it.
+
+                            The clearing existed for a real reason that is
+                            fixed at its source. The derived type's fallback
+                            used to read `availability.mode`, which is the
+                            SERVER ECHOING BACK the `preferredType` this page
+                            handed it — so an answer fed the next request and
+                            re-latched itself, and dropping the press was the
+                            only way to break the loop. The fallback reads
+                            `modes[]` now, which the server computes before it
+                            looks at `preferredType` at all, so there is no
+                            loop left to break.
+                          */
                           setLiveAvailability(null);
                         }}
                         className="lv-choice flex min-h-[48px] items-center gap-2 px-3 py-1.5 text-sm font-bold"
@@ -2658,13 +2685,11 @@ export default function Product() {
                     // option immediately. Multiple rows are legacy data and
                     // still need the compatibility chooser below.
                     setOptionValueIds(selected ? [] : m.options.length === 1 ? [m.options[0].id] : []);
-                    // A new model is a new fulfilment question. Let the server
-                    // default it to direct only when that model/colour really
-                    // has stock; do not carry the previous model's answer —
-                    // which now means dropping the previous ANSWER too, not
-                    // just the press. See the option-group handler above.
-                    setOrderType('');
-                    setTransportMethod('');
+                    // A new model is a new fulfilment question, and the
+                    // server answers it afresh. The buyer's own two presses
+                    // survive it when the new model still offers them — see
+                    // the option-group handler above for why they used to be
+                    // thrown away and why they no longer need to be.
                     setLiveAvailability(null);
                   }}
                   className="lv-choice flex min-h-[50px] max-w-full items-center gap-2 px-2.5 py-1.5 text-sm font-bold"
@@ -2712,10 +2737,12 @@ export default function Product() {
                         const next = selected ? '' : opt.id;
                         setOptionValueIds(next ? [next] : []);
                         // The option now decides the route, so the page stops
-                        // asking the fulfilment question separately: a direct
-                        // option clears any transport, a pre-order one keeps
-                        // the transport picker below for the journey.
-                        if (next && opt.availability_type === 'direct_sale') setTransportMethod('');
+                        // asking the fulfilment question separately. A direct
+                        // option needs no explicit forgetting of the transport:
+                        // `effectiveTransport` is empty for anything that is
+                        // not a pre-order, and keeping the press means a buyer
+                        // who moves back to a pre-order option finds their
+                        // journey still chosen.
                         // A LEGACY option that declares its own route answers the
                         // order-type question by being chosen — so the page sends
                         // that answer rather than leaving the server to infer it
@@ -2776,10 +2803,8 @@ export default function Product() {
                   aria-pressed={selected}
                   onClick={() => {
                     setOptionValueIds(selected ? [] : [opt.id]);
-                    // The previous answer goes with the press — see the
-                    // option-group handler above.
-                    setOrderType('');
-                    setTransportMethod('');
+                    // The buyer's presses are kept and filtered, not dropped —
+                    // see the option-group handler above.
                     setLiveAvailability(null);
                   }}
                   className="lv-choice flex items-center gap-2 px-3 py-1.5 text-sm font-bold"

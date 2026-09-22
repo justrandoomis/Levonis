@@ -43,7 +43,11 @@ test('the product page sends the order type it was told, and never one it guesse
   // The BUTTON's own state is still the three-valued answer, and it still
   // starts unanswered: the page must not invent a press.
   assert.match(page, /const \[orderType, setOrderType\] = useState<'' \| 'direct_sale' \| 'pre_order'>\(''\)/);
-  assert.match(page, /setOrderType\(''\)/, 'a fresh selection resets to unanswered');
+  // A FRESH PRODUCT starts unanswered — but a fresh OPTION does not reset it
+  // any more. Clearing the press on every option tap is what threw the owner's
+  // «شحن بحري» away each time they changed version; the press is kept and
+  // filtered instead (productPurchasePath.test.ts pins that half).
+  assert.match(page, /setOrderType\(initial \? 'direct_sale' : ''\)/, 'a fresh product starts unanswered');
 
   // WHAT THE REQUEST CARRIES IS NOT THAT STATE. Sending '' was itself the
   // guess: the page draws «طلب مسبق» pressed from the SERVER's mode, so a
@@ -55,18 +59,52 @@ test('the product page sends the order type it was told, and never one it guesse
   // door agree by construction.
   const derived = /const requestedOrderType: '' \| 'direct_sale' \| 'pre_order' =([\s\S]*?);\n/.exec(page);
   assert.ok(derived, 'the page derives ONE type for its requests');
-  // The buyer's press wins — but only while it still leads somewhere, the same
-  // rule `effectiveMode` applies to the header chip. A press the server has
-  // since closed must not keep being SENT: nothing raises a pricing error for
-  // it, so the button would stay live for an add the door refuses.
-  assert.match(derived![1], /orderType === 'pre_order' && preUsable/);
-  assert.match(derived![1], /orderType === 'direct_sale' && directUsable/);
-  // …and the two booleans it needs are declared ABOVE it.
-  const usableAt = page.indexOf('const directUsable =');
+  // THE RULE ITSELF LIVES IN A MODULE, AND THAT IS THE POINT.
+  //
+  // It was a nine-line ternary inside a 3,000-line page, and the only way to
+  // test it was to assert the shape of its punctuation — which confirms that
+  // the code is the code and nothing else. It is `resolveOrderType` now, a
+  // total function of (press, the server's per-type verdict), and the owner's
+  // own sequence of presses runs against it in productSelectionMemory.test.ts.
+  // This file's job is the WIRING: that the page calls it, with the buyer's
+  // press and with the neutral facts.
+  assert.match(derived![1], /resolveOrderType\(orderType, modesArr\)/);
+  assert.match(
+    page,
+    /import \{ resolveOrderType, resolveTransport, routeIsUsable \} from '\.\.\/lib\/productSelection'/
+  );
+  // …and the facts it needs are declared ABOVE it.
+  const usableAt = page.indexOf('const modesArr =');
   assert.ok(usableAt > 0 && usableAt < page.indexOf('const requestedOrderType:'));
-  assert.match(derived![1], /availability\?\.mode === 'preorder'[\s\S]{0,120}'pre_order'/);
-  assert.match(derived![1], /availability\?\.mode === 'direct_sale'[\s\S]{0,120}'direct_sale'/);
-  assert.match(derived![1], /: '';?\s*$/, "'' survives: no usable mode is still no answer");
+
+  // THE TAIL READS THE NEUTRAL FACTS, NOT THE SERVER'S ECHO.
+  //
+  // It used to read `availability.mode` — and `saleAvailability` computes that
+  // as «the `preferredType` I was handed, if it is usable, otherwise the
+  // default». The `preferredType` this page hands it is derived from this very
+  // rule, so an untouched answer fed the next request and re-latched itself.
+  // That loop is the whole reason every option handler had to clear the press,
+  // which is what the owner experienced as «يرجع يختفي».
+  //
+  // `modes[]` is computed BEFORE the server looks at `preferredType` at all,
+  // so reading it breaks the loop at its source — and it is the same fallback,
+  // in the same order, that `lineOrderType` applies at the cart door with
+  // nothing stated. Client and door still agree by construction.
+  const rule = read('src/lib/productSelection.ts');
+  // Comments stripped: the module EXPLAINS the echo at length, and must never
+  // read it. Its whole parameter list is the neutral facts, so there is
+  // nothing for a later edit to reach for — which is the strongest form this
+  // assertion can take.
+  const ruleCode = rule.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  assert.ok(!/\bavailability\b|\.mode\b/.test(ruleCode), 'the rule can reach the server echo again');
+  assert.match(rule, /if \(directUsable\) return 'direct_sale';\n\s*if \(preUsable\) return 'pre_order';/);
+  const door = read('worker/routes/products.ts');
+  assert.match(
+    door,
+    /} else if \(directUsable\) \{\n\s*mode = 'direct_sale';\n\s*} else if \(preorderUsable\) \{\n\s*mode = 'preorder';/,
+    'the door still falls back direct-then-preorder, which is the order above'
+  );
+  assert.match(rule, /return '';\n\}/, "'' survives: no usable mode is still no answer");
 
   // BOTH request builders carry that same value — a quote priced under one
   // type and a row written under another is the defect itself.
@@ -75,7 +113,7 @@ test('the product page sends the order type it was told, and never one it guesse
   // …and the chosen ROUTE travels with the type that needs it, not with the
   // server's default mode: gating it on `mode === 'preorder'` dropped the
   // route whenever the direct shelf still had units.
-  assert.match(page, /requestedOrderType === 'pre_order' && transportMethod\) body\.transportMethod/);
+  assert.match(page, /requestedOrderType === 'pre_order' && effectiveTransport\) body\.transportMethod/);
   assert.ok(!/setOrderType\('direct_sale'\)[\s\S]{0,200}useEffect/.test(page), 'no effect defaults it');
 });
 
@@ -84,7 +122,7 @@ test('a pre-order needs a route — at the button and again at the door', () => 
   // codes only, so it could never see a missing transport; that is why «أضف
   // إلى السلة» stayed live with «شحن بري» untouched.
   const page = read('src/pages/Product.tsx');
-  assert.match(page, /const routeReady = !\(requestedOrderType === 'pre_order' && !transportMethod\);/);
+  assert.match(page, /const routeReady = !\(requestedOrderType === 'pre_order' && !effectiveTransport\);/);
   const buy = /const canBuy =([\s\S]*?);\n/.exec(page);
   assert.ok(buy, 'canBuy still exists');
   assert.match(buy![1], /routeReady/, 'and the button honours it');

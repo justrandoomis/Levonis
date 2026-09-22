@@ -111,18 +111,55 @@ test('a disabled button always has a sentence beside it — and only one', () =>
   );
 });
 
-test('a new option drops the previous option\u2019s ANSWER, not just the press', () => {
-  // The reset is `setOrderType('')`, and the request type falls back to
-  // `availability` — which is `liveAvailability ?? baseAvailability` and is
-  // never cleared. The server honours the `preferredType` it is handed, so
-  // without this the last option's answer fed the next request and re-latched
-  // itself: the reset would have been dead code, and a buyer who had already
-  // picked a route would find it cleared with the pre-order card still ticked.
-  const resets = page.match(/setOrderType\(''\);\n\s*setTransportMethod\(''\);\n\s*setLiveAvailability\(null\);/g) ?? [];
-  assert.equal(resets.length, 3, 'all three option handlers drop the cached answer');
-  // No handler clears the press without clearing the answer with it.
-  const stray = page.match(/setOrderType\(''\);/g) ?? [];
-  assert.equal(stray.length, resets.length, 'no reset left half-done');
+test('a new option keeps the buyer\u2019s two answers and re-checks them', () => {
+  // «عند اختيار طلب مسبق وتحديد شحن بحري ثم اختيار النسخة عند الضغط على النسخة
+  //  يذهب خيار طريق الشحن … وعند تغيير الخيار يرجع يختفي.»
+  //
+  // THIS TEST USED TO PIN THE OPPOSITE, and the owner met the result. Each of
+  // the three option handlers called `setOrderType('')` and
+  // `setTransportMethod('')`, so answering «طلب مسبق» and «شحن بحري» and then
+  // tapping a version threw both answers away — and tapping the next version
+  // threw them away again.
+  //
+  // The clearing was standing in for a validity check that did not exist: a
+  // new version may genuinely not offer sea freight. «Forget everything» is a
+  // blunt instrument for «check it is still true», and it charged every
+  // correct selection the price of the rare invalid one. Both presses are kept
+  // and FILTERED now, which is the check the clearing was imitating.
+  // Scoped to the render tree: the fourth `setLiveAvailability(null)` is the
+  // loader's, which clears a previous PRODUCT's answer and is not a handler.
+  const tree = page.slice(page.indexOf('data-fulfilment-chooser'));
+  const handlers = tree.match(/setLiveAvailability\(null\);/g) ?? [];
+  assert.equal(handlers.length, 3, 'all three option handlers still re-ask the server');
+  assert.ok(
+    !/setTransportMethod\(''\);\n\s*setLiveAvailability\(null\);/.test(page),
+    'an option handler is dropping the route again'
+  );
+
+  // THE FILTER IS WHAT MAKES KEEPING THEM SAFE. A remembered route that this
+  // combination does not offer, or whose quota has since filled, must never
+  // reach the cart door — so nothing downstream may read the raw state.
+  assert.match(
+    page,
+    /const effectiveTransport = resolveTransport\(transportMethod, requestedOrderType, availability\?\.preorder\);/,
+    'the route is honoured only while this combination offers it'
+  );
+  // Below the filter, the raw press is not readable at all: every consumer —
+  // the price key, the quote body, the add body, `routeReady`, the chip's own
+  // pressed state — reads `effectiveTransport`. One read of the raw state down
+  // here is a request that can carry a route this combination does not offer.
+  // (`transportMethod:` and `body.transportMethod` are wire field names, not
+  // this variable, so they are excluded by position rather than by name.)
+  const derivedAt = page.indexOf('const effectiveTransport =');
+  const afterDerivation = page.slice(page.indexOf(": '';", derivedAt));
+  const rawReads = afterDerivation.match(/(?<![.\w])transportMethod(?!\s*:)/g) ?? [];
+  assert.deepEqual(rawReads, [], 'the raw press is read below the filter that is supposed to replace it');
+
+  // The chips read the SAME predicate the filter reads — one fact, not two
+  // copies of it that can drift into showing a route pressed that no request
+  // is allowed to carry.
+  assert.match(page, /const transportUsable = \(method: string\): boolean => routeIsUsable\(availability\?\.preorder, method\);/);
+  assert.match(page, /const routeUsable = \(t: TransportView\): boolean => transportUsable\(t\.method\);/);
 });
 
 test('the buy column can be scrolled on its own when it outgrows the screen', () => {

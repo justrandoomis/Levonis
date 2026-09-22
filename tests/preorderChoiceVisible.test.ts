@@ -198,9 +198,13 @@ test('the page draws the chooser from `modes`, and explains a closed half', () =
   assert.match(page, /const effectivePreorder = requestedOrderType === 'pre_order'/);
   assert.match(page, /const showTransports = effectivePreorder &&/);
   // …and «في القوة» now means the type the REQUESTS carry, not a second
-  // reading beside them. `requestedOrderType` falls back to the server's own
-  // mode in `lineOrderType`'s order, so the card drawn with the checkmark, the
-  // quote and the cart row are one answer.
-  assert.match(page, /const requestedOrderType: '' \| 'direct_sale' \| 'pre_order' =/);
-  assert.match(page, /availability\?\.mode === 'preorder'[\s\S]{0,120}'pre_order'/);
+  // reading beside them, so the card drawn with the checkmark, the quote and
+  // the cart row are one answer.
+  assert.match(page, /const requestedOrderType: '' \| 'direct_sale' \| 'pre_order' = resolveOrderType\(/);
+  // The fallback used to read `availability.mode`, which is the server echoing
+  // back the preference this page handed it — see orderTypeContract.test.ts
+  // for the loop that created and productSelectionMemory.test.ts for the rule
+  // that replaced it. The neutral per-type verdict is what the page passes in.
+  assert.match(page, /resolveOrderType\(orderType, modesArr\)/);
+  assert.ok(!/availability\?\.mode ===/.test(page), 'the page reads the server echo of its own preference again');
 });
