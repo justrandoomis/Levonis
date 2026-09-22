@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Edit2, Printer, Store } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit2, Store } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import MerchantDashboard from '../components/MerchantDashboard';
 import { api, uploadFile } from '../lib/api';
@@ -51,10 +51,6 @@ export default function EditProfile() {
   const [fullName, setFullName] = useState(user?.name || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [website, setWebsite] = useState(user?.website || '');
-  const [printer1, setPrinter1] = useState(profileStr(user?.profile, 'printer1'));
-  const [printer2, setPrinter2] = useState(profileStr(user?.profile, 'printer2'));
-  const [printer3, setPrinter3] = useState(profileStr(user?.profile, 'printer3'));
-  const [printer4, setPrinter4] = useState(profileStr(user?.profile, 'printer4'));
 
   const [instagram, setInstagram] = useState(profileStr(user?.profile, 'instagram'));
   const [xAccount, setXAccount] = useState(profileStr(user?.profile, 'xAccount'));
@@ -81,10 +77,6 @@ export default function EditProfile() {
     setFullName(user.name || '');
     setBio(user.bio || '');
     setWebsite(user.website || '');
-    setPrinter1(profileStr(user.profile, 'printer1'));
-    setPrinter2(profileStr(user.profile, 'printer2'));
-    setPrinter3(profileStr(user.profile, 'printer3'));
-    setPrinter4(profileStr(user.profile, 'printer4'));
     setInstagram(profileStr(user.profile, 'instagram'));
     setXAccount(profileStr(user.profile, 'xAccount'));
     setTiktok(profileStr(user.profile, 'tiktok'));
@@ -138,7 +130,9 @@ export default function EditProfile() {
         website,
         profile: {
           ...user.profile,
-          printer1, printer2, printer3, printer4,
+          // printer1..4 are NOT sent any more, and are NOT lost: the spread
+          // above carries whatever this account already had straight back.
+          // See the note where the four boxes used to be.
           instagram, xAccount, tiktok, facebook,
         },
       };
@@ -341,55 +335,32 @@ export default function EditProfile() {
           </div>
         </div>
 
-        {/* Printers */}
-        <div>
-          <div className="flex justify-between items-end mb-2 ml-1">
-            <h3 className="text-gold text-[13px] font-bold">My Workshop Printers</h3>
-            <span className="text-zinc-300 text-[13px] font-medium">Add your 3D printers</span>
-          </div>
-          <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-            <div className="flex items-center p-4 border-b border-zinc-800">
-              <Printer className="w-5 h-5 text-zinc-300 mr-4 shrink-0" />
-              <input
-                type="text"
-                value={printer1}
-                onChange={(e) => setPrinter1(e.target.value)}
-                className="bg-transparent font-bold text-[16px] text-white w-full outline-none placeholder:font-medium placeholder:text-zinc-600"
-                placeholder="e.g. Creality Ender 3"
-              />
-            </div>
-            <div className="flex items-center p-4 border-b border-zinc-800">
-              <Printer className="w-5 h-5 text-zinc-300 mr-4 shrink-0 ml-0.5" />
-              <input
-                type="text"
-                value={printer2}
-                onChange={(e) => setPrinter2(e.target.value)}
-                className="bg-transparent font-bold text-[16px] text-white w-full outline-none placeholder:font-medium placeholder:text-zinc-600 ml-0.5"
-                placeholder="e.g. Prusa MK4"
-              />
-            </div>
-            <div className="flex items-center p-4 border-b border-zinc-800">
-              <Printer className="w-5 h-5 text-zinc-300 mr-4 shrink-0" />
-              <input
-                type="text"
-                value={printer3}
-                onChange={(e) => setPrinter3(e.target.value)}
-                className="bg-transparent font-bold text-[16px] text-white w-full outline-none placeholder:font-medium placeholder:text-zinc-600"
-                placeholder="e.g. Bambu Lab X1C"
-              />
-            </div>
-            <div className="flex items-center p-4">
-              <Printer className="w-5 h-5 text-zinc-300 mr-4 shrink-0" />
-              <input
-                type="text"
-                value={printer4}
-                onChange={(e) => setPrinter4(e.target.value)}
-                className="bg-transparent font-bold text-[16px] text-white w-full outline-none placeholder:font-medium placeholder:text-zinc-600"
-                placeholder="e.g. Anycubic Kobra"
-              />
-            </div>
-          </div>
-        </div>
+        {/*
+          «طابعاتي» IS A MERCHANT FEATURE NOW, AND IT LIVES WHERE THE FACTS DO.
+
+          «الشخص عنده اكثر من طابعه يظهر له خيار فقط أربعة، وهذه المشكلة يجب
+           جعل زر طابعاتي لدى التاجر وليس في تعديل الملف الشخصي للشخص العادي،
+           وفي تاجر يجب أن يكون عبارة عنصر يستطيع وضع أكثر من طابعه».
+
+          What stood here was four fixed text boxes holding four free-form
+          strings — «e.g. Creality Ender 3» — in the `profile` JSON blob. A
+          printer shop with six machines could name four of them, and naming
+          them bought nothing: the strings decide no eligibility, match no
+          print request and are read by nothing.
+
+          The merchant dashboard's Printers tab already holds the real thing,
+          unlimited, and as FACTS rather than free text — technology, build
+          volume, nozzle, materials, colours, enclosure — because that is what
+          the request matcher reads to decide which jobs a shop is eligible
+          for. Adding a fifth text box here would have been a fifth string
+          nothing consults.
+
+          NOTHING STORED IS DELETED. `handleSave` spreads `...user.profile`
+          before writing, so `printer1`–`printer4` survive every save made from
+          this screen untouched. A visitor who becomes a merchant tomorrow
+          still has what they typed, and the fields can be read back into the
+          real printer records whenever that migration is written.
+        */}
 
         {/* Socials */}
         <div>
