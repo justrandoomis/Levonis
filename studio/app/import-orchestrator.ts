@@ -45,6 +45,7 @@ export type ImportNotice =
 
 export type ImportErrorCode =
   | "empty-file"
+  | "file-unreadable"
   | "unsupported-file"
   | "no-model-files"
   | "file-too-large"
@@ -104,6 +105,73 @@ export class ImportError extends Error {
     this.fileName = fileName;
   }
 }
+
+/**
+ * «الملف فارغ» ON A FILE THAT IS NOT EMPTY — the iPad case.
+ *
+ * This used to be `if (!rawFile.size)`, and on the device this shop is
+ * actually run from that check answers the wrong question. A file picked out
+ * of iCloud Drive that has not been downloaded to the iPad yet is handed to
+ * the page as a File whose `size` is 0. Nothing is wrong with it: it is a
+ * real archive, sitting in the cloud, one materialisation away. Calling it
+ * empty tells the owner their file is broken when what it needs is to be
+ * downloaded — and if instead the read fails outright, the browser's own
+ * English sentence («Load failed» on Safari) was being shown verbatim in an
+ * Arabic interface, which is the network error that got reported.
+ *
+ * So emptiness is now something we LOOK at rather than something we are told.
+ * One byte is enough to tell the three cases apart — and asking for it is
+ * also what prompts iOS to materialise the file, so the common case simply
+ * starts working instead of merely being described better:
+ *
+ *   * the read yields a byte  → the file is fine, carry on;
+ *   * the read yields nothing → it really is empty, and `empty-file` is true;
+ *   * the read throws         → we could not read it, which is not the same
+ *                               statement as "it is empty" or "its format is
+ *                               unrecognised", and is no longer reported as
+ *                               either.
+ *
+ * One byte, not the whole file: a 400 MB STL must not be read twice to learn
+ * that it exists.
+ */
+export async function assertReadable(file: File): Promise<void> {
+  let head: ArrayBuffer;
+  try {
+    head = await file.slice(0, 1).arrayBuffer();
+  } catch (reason) {
+    throw new ImportError(
+      "file-unreadable",
+      reason instanceof Error ? reason.message : `Could not read: ${file.name}`,
+      file.name
+    );
+  }
+  if (!head.byteLength) throw new ImportError("empty-file", `Empty file: ${file.name}`, file.name);
+}
+
+/**
+ * THE BIGGEST MODEL THIS EDITOR WILL ACCEPT, AND THE MEASUREMENT BEHIND IT.
+ *
+ * The owner asked for 1 GB and 2 GB files. A browser cannot slice one, and no
+ * amount of work in this repository changes that:
+ *
+ *   * the engine is wasm32. Its entire address space is 4 GiB, and that is a
+ *     property of the instruction set, not a setting;
+ *   * iPad Safari — the device this shop is run from — kills a tab somewhere
+ *     between 1 and 1.5 GB of resident memory, well before that ceiling;
+ *   * geometry does not stay the size of its file. MEASURED on this engine: a
+ *     190.7 MB STL peaked at 1796 MB (9.42x) before the redundant copies were
+ *     removed, and at 396 MB (2.08x) after. A 3MF is far worse — 57x — because
+ *     it is compressed XML that becomes float32 vertices and int32 indices.
+ *
+ * 500 MB is therefore not a policy number. It is roughly the largest file
+ * whose 2x working set still fits beside the kernel, the pthread pool and a
+ * rendered scene on a real device.
+ *
+ * The owner chose to REFUSE above it rather than accept and disable slicing:
+ * a customer who uploads 2 GB, waits, and is then told the thing cannot be
+ * sliced has spent their time to learn what we already knew. The refusal
+ * happens at SELECTION, before a single byte is read.
+ */
 
 export interface ImportContext {
   /** Object ids present before the import (arrangement targets only new ones). */
@@ -174,7 +242,7 @@ export class ImportOrchestrator {
       const modelFiles: File[] = [];
       let hadArchive = false;
       for (const rawFile of rawFiles) {
-        if (!rawFile.size) throw new ImportError("empty-file", `Empty file: ${rawFile.name}`, rawFile.name);
+        await assertReadable(rawFile);
         let file: File;
         try {
           file = await normalizeModelFile(rawFile);

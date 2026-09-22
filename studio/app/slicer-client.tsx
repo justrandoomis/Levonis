@@ -797,9 +797,28 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       if (reason.code === "entry-count") return t.zipEntryLimit;
       if (reason.code === "expansion-budget") return t.zipBudgetExceeded;
       if (reason.code === "expansion-ratio") return t.zipRatioLimit;
+      // `file-unreadable` is a file we could not READ — an iCloud file that
+      // has not come down to the iPad, a revoked handle, a disconnected
+      // drive — and it is named here so the owner knows WHICH one. It borrows
+      // `importFailed`, whose first half («تعذر استيراد الملف») is true of it,
+      // rather than inventing a sentence: the Sorani copy in this app is
+      // hand-written and never generated, so a new string is the owner's to
+      // word. The name is the part that makes it actionable either way.
+      if (reason.code === "file-unreadable") return `${t.importFailed} ${reason.fileName ?? ""}`.trim();
+      if (reason.fileName) return `${t.importFailed} ${reason.fileName}`;
       return t.importFailed;
     }
-    return reason instanceof Error ? reason.message : t.importFailed;
+    /**
+     * NEVER THE BROWSER'S OWN SENTENCE. This used to return `reason.message`,
+     * and on Safari that is «Load failed» — untranslated English, in an Arabic
+     * right-to-left interface, describing a network condition the customer
+     * cannot act on. It reads as the site being broken, and it is what got
+     * reported as a network error on a ZIP import. The raw text still goes to
+     * the console, where it is useful, and the screen gets a sentence that
+     * exists in all three languages.
+     */
+    if (reason instanceof Error) console.warn("[import]", reason);
+    return t.importFailed;
   }, [t.emptyFile, t.engineUnavailable, t.importFailed, t.zipBudgetExceeded, t.zipEntryLimit, t.zipRatioLimit]);
 
   const importSelectedFiles = useCallback(async (rawFiles: File[]) => {

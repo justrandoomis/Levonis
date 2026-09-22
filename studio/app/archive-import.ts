@@ -12,6 +12,8 @@ export interface ArchiveProgress {
   expandedBytes?: number;
   /** Entries skipped because their stored path was unsafe (traversal/absolute). */
   skippedUnsafeEntries?: number;
+  /** Model-shaped entries that held no bytes, and so were not loaded. */
+  emptyEntries?: number;
 }
 
 /**
@@ -156,6 +158,7 @@ export async function extractModelArchive(
   let expandedBytes = 0;
   let entryCount = 0;
   let skippedUnsafeEntries = 0;
+  let emptyEntries = 0;
   let budgetConfirmed = false;
   let budgetPromptNeeded = false;
 
@@ -166,6 +169,7 @@ export async function extractModelArchive(
       extractedFiles: files.length,
       expandedBytes,
       skippedUnsafeEntries,
+      emptyEntries,
     });
   };
 
@@ -174,9 +178,13 @@ export async function extractModelArchive(
       if (settled || !archiveEnded || pending) return;
       settled = true;
       if (!files.length) {
-        reject(new Error(skippedUnsafeEntries
-          ? "The ZIP archive only contains entries with unsafe paths (absolute or traversal); nothing was extracted."
-          : "The ZIP archive does not contain a supported 3D model."));
+        reject(new Error(
+          skippedUnsafeEntries
+            ? "The ZIP archive only contains entries with unsafe paths (absolute or traversal); nothing was extracted."
+            : emptyEntries
+              ? `The ZIP archive's ${emptyEntries} model entr${emptyEntries === 1 ? "y holds" : "ies hold"} no data.`
+              : "The ZIP archive does not contain a supported 3D model."
+        ));
       } else {
         resolve(files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })));
       }
@@ -258,6 +266,24 @@ export async function extractModelArchive(
         expandedBytes += data.length;
         if (!withinHardLimits()) return;
         if (!final) return;
+        // A ZERO-BYTE ENTRY IS NOT A MODEL. The importer's own emptiness check
+        // runs on the files the customer PICKED, and a ZIP is one file however
+        // many entries it carries — so an empty `part.stl` inside it was never
+        // looked at. `normalizeModelFile` then waves it straight through,
+        // because `.stl` is a known extension and it only sniffs the ones that
+        // are not, and the engine was handed an empty mesh to load.
+        //
+        // Dropped rather than refused: the archive's other parts are real, and
+        // failing forty good models over one empty entry is a worse answer
+        // than importing the forty. The count travels out on the progress
+        // report either way, so it is not a silent loss.
+        if (!expandedSize) {
+          emptyEntries += 1;
+          pending -= 1;
+          reportProgress();
+          finish();
+          return;
+        }
         const extracted = new File([mergeChunks(chunks, expandedSize)], safeArchiveName(entry.name, usedNames), {
           type: "application/octet-stream",
           lastModified: file.lastModified,
@@ -268,6 +294,15 @@ export async function extractModelArchive(
           reportProgress();
           finish();
         }).catch(() => {
+          // AN ENTRY THAT FAILS HERE IS NOT A LOST MODEL, and this catch is
+          // deliberate rather than an oversight. `normalizeModelFile` returns
+          // immediately for every known model extension, so the only entries
+          // that can reach it — and therefore the only ones that can fail —
+          // are the ones with NO extension whose first 4 KB do not look like
+          // any geometry format. A ZIP from any model site carries several:
+          // LICENSE, README, a `.thumbnails` stub. Refusing the archive over
+          // one of those, or reporting it as a dropped model, would both be
+          // wrong.
           pending -= 1;
           finish();
         });
