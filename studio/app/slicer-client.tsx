@@ -39,7 +39,7 @@ import {
   type CutKeep, type EngineTestId,
 } from "./engine-adapter";
 import { currentDeviceProfile } from "./device-profile";
-import { createImportOrchestrator, ImportError, type ImportNotice, type ImportProgressUpdate } from "./import-orchestrator";
+import { createImportOrchestrator, ImportError, MODEL_FILE_BYTES_CEILING, oversizedModelFiles, type ImportNotice, type ImportProgressUpdate } from "./import-orchestrator";
 import { useSlicingState, type SlicePayload, type SlicingViewportEvent } from "./hooks/use-slicing-state";
 import { EDITOR_SHADOW_CSS } from "./editor-theme";
 import { fallbackMachineSettings, loadPrinterProfile, type MissingPreset } from "./profile-loader";
@@ -807,6 +807,35 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     setError("");
     setNotice("");
     setToolTrayOpen(false);
+    /**
+     * REFUSED AT SELECTION, NOT AFTER THE WAIT.
+     *
+     * A browser cannot slice a 1 GB model — see MODEL_FILE_BYTES_CEILING in
+     * import-orchestrator.ts for the measurement and the wasm32 ceiling behind
+     * it. The choice made here is WHERE the customer learns that: before a
+     * byte is read, or after uploading two gigabytes and watching a progress
+     * bar. This is the first, and it names the file and both numbers so the
+     * answer is actionable rather than a wall.
+     *
+     * The whole selection is refused rather than the oversized member dropped
+     * silently: a ZIP of parts plus one enormous STL is one intent, and
+     * importing "most of it" without saying so is the quiet data loss this
+     * codebase keeps refusing to commit.
+     */
+    const tooLarge = oversizedModelFiles(rawFiles);
+    if (tooLarge.length) {
+      setError(
+        tooLarge
+          .map((file) => templateText(t.fileTooLarge, {
+            name: file.name,
+            size: Math.ceil(file.size / MB),
+            limit: Math.round(MODEL_FILE_BYTES_CEILING / MB),
+          }))
+          .join(" ")
+      );
+      setStatus("error");
+      return;
+    }
     // A 3MF is a PROJECT: it carries the author's own plate layout, and the
     // engine restores those positions itself as it parses. Re-seating them
     // would throw that layout away. The orchestrator is already finished by
@@ -849,7 +878,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       setError(localizeImportError(reason));
       setStatus("error");
     }
-  }, [localizeImportError, localizeImportNotice, objects, orchestrator, profile.bedDepth, profile.bedWidth, selectedPlate, t.importing, t.zipAnalyzing, t.zipBudgetConfirm]);
+  }, [localizeImportError, localizeImportNotice, objects, orchestrator, profile.bedDepth, profile.bedWidth, selectedPlate, t.fileTooLarge, t.importing, t.zipAnalyzing, t.zipBudgetConfirm]);
 
   const handlePickedFiles = useCallback((files: File[]) => {
     setNotice("");
@@ -1954,7 +1983,22 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
 
         {importProgress && <div className="import-progress" role="status" aria-live="polite">
           <span className="import-spinner" />
+          {/*
+            «وتحميل من ١ ل١٠٠ اثناء تحميل الملف للبرنامج» — the bar alone
+            answers "is it moving", not "how far". On a 400 MB file those are
+            different questions, and the second is the one somebody watching a
+            phone for thirty seconds is actually asking.
+
+            Floored, never rounded: 99.7% must not read «100» while the file is
+            still being parsed, and clamped at 99 for the same reason — the
+            hundred belongs to the finished import, which is the moment this
+            whole row disappears. Latin digits and `dir="ltr"`, so «٪100» does
+            not reorder into nonsense in an Arabic or Kurdish layout.
+          */}
           <div><strong>{importProgress.label}</strong><small>{importProgress.extracted ? `${importProgress.extracted} ${t.objects}` : t.formatsShort}</small></div>
+          <span className="import-progress-percent" dir="ltr">
+            {Math.min(99, Math.max(1, Math.floor(Math.max(0, Math.min(1, importProgress.ratio)) * 100)))}%
+          </span>
           <progress max="1" value={Math.max(0, Math.min(1, importProgress.ratio))} />
         </div>}
 

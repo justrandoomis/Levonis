@@ -125,6 +125,7 @@ export const en = {
   zipEntryLimit: "Extraction stopped: the archive declares more entries than the allowed limit.",
   zipRatioLimit: "Extraction stopped: the archive's expansion ratio looks like a zip bomb.",
   emptyFile: "Empty file:",
+  fileTooLarge: "{name} ({size} MB) is larger than the {limit} MB limit. A browser cannot prepare a file this size for printing — reduce the model or split it.",
   importFailed: "The file could not be imported or its format is unrecognized.",
   engineUnavailable: "The editing engine is not ready yet. Try again in a moment.",
   fileLimit: "LEVO sets no fixed file-size or count cap; files stay on your device, while actual capacity depends on browser and device memory.",

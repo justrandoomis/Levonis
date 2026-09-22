@@ -47,8 +47,52 @@ export type ImportErrorCode =
   | "empty-file"
   | "unsupported-file"
   | "no-model-files"
+  | "file-too-large"
   | "engine-unavailable"
   | ArchiveLimitError["code"];
+
+/**
+ * THE BIGGEST MODEL THIS EDITOR WILL ACCEPT, AND THE MEASUREMENT BEHIND IT.
+ *
+ * The owner asked for 1 GB and 2 GB files. A browser cannot slice one, and no
+ * amount of work in this repository changes that:
+ *
+ *   * the engine is wasm32. Its entire address space is 4 GiB, and that is a
+ *     property of the instruction set, not a setting;
+ *   * iPad Safari — the device this shop is run from — kills a tab somewhere
+ *     between 1 and 1.5 GB of resident memory, well before that ceiling;
+ *   * geometry does not stay the size of its file. MEASURED on this engine: a
+ *     190.7 MB STL peaked at 1796 MB (9.42x) before the redundant copies were
+ *     removed, and at 396 MB (2.08x) after. A 3MF is far worse — 57x — because
+ *     it is compressed XML that becomes float32 vertices and int32 indices.
+ *
+ * 500 MB is therefore not a policy number. It is roughly the largest file
+ * whose 2x working set still fits beside the kernel, the pthread pool and a
+ * rendered scene on a real device.
+ *
+ * The owner chose to REFUSE above it rather than accept and disable slicing:
+ * a customer who uploads 2 GB, waits, and is then told the thing cannot be
+ * sliced has spent their time to learn what we already knew. The refusal
+ * happens at SELECTION, before a single byte is read.
+ */
+export const MODEL_FILE_BYTES_CEILING = 500 * 1024 * 1024;
+
+/**
+ * The files too big to accept, named. Returns an empty array for a selection
+ * that is entirely fine, so the caller's normal path costs one length check.
+ *
+ * An ARCHIVE is not measured here: a ZIP's danger is what it EXPANDS to, and
+ * `archive-import.ts` already owns that with its own budget, confirmation and
+ * zip-bomb ratio test. Measuring its compressed size as if it were geometry
+ * would refuse a legitimate 600 MB archive of small parts and let a 40 MB one
+ * that expands to 3 GB straight through.
+ */
+export function oversizedModelFiles(
+  files: readonly File[],
+  ceiling: number = MODEL_FILE_BYTES_CEILING
+): File[] {
+  return files.filter((file) => !/\.zip$/i.test(file.name) && file.size > ceiling);
+}
 
 export class ImportError extends Error {
   readonly code: ImportErrorCode;
