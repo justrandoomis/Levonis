@@ -1,0 +1,154 @@
+{
+  "target": "http://127.0.0.1:8799/",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "failures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "m": "a sheet is open on the very first visit"
+    },
+    {
+      "ok": true,
+      "m": "the chooser lists the printers",
+      "detail": "14 cards"
+    },
+    {
+      "ok": true,
+      "m": "NOTHING is pre-selected — «اختارلي x2d مباشرة» is the bug",
+      "detail": "0 active"
+    },
+    {
+      "ok": true,
+      "m": "the confirm cannot be pressed before a choice exists"
+    },
+    {
+      "ok": true,
+      "m": "and nothing has been stored yet"
+    },
+    {
+      "ok": true,
+      "m": "the A1 mini is offered",
+      "detail": "index 12"
+    },
+    {
+      "ok": true,
+      "m": "the tapped card becomes the only active one"
+    },
+    {
+      "ok": true,
+      "m": "and the confirm is now pressable"
+    },
+    {
+      "ok": true,
+      "m": "confirming closes the chooser"
+    },
+    {
+      "ok": true,
+      "m": "the choice is what was stored",
+      "detail": "bbl-a1m-04"
+    },
+    {
+      "ok": true,
+      "m": "a second visit is not asked again"
+    },
+    {
+      "ok": true,
+      "m": "and the printer is still the chosen one"
+    },
+    {
+      "ok": true,
+      "m": "the header's setup control is reachable"
+    },
+    {
+      "ok": true,
+      "m": "and it already shows the printer that was chosen, not the seed",
+      "detail": "A1 mini 0.20"
+    },
+    {
+      "ok": true,
+      "m": "the setup sheet has printer / quality / strength / infill",
+      "detail": "الطابعة | الجودة | القوة | نوع الحشو"
+    },
+    {
+      "ok": true,
+      "m": "the last group offers exactly three patterns",
+      "detail": "3 buttons"
+    },
+    {
+      "ok": true,
+      "m": "three distinct pattern names",
+      "detail": "Zigzag / Gyroid / 3D Honeycomb"
+    },
+    {
+      "ok": true,
+      "m": "«تظيف قائمة اسفل قائمة القوة» — under Strength",
+      "detail": "1015 -> 1122"
+    },
+    {
+      "ok": true,
+      "m": "the chosen pattern is the only active one"
+    },
+    {
+      "ok": true,
+      "m": "and it is the one that was tapped",
+      "detail": "3D Honeycomb"
+    },
+    {
+      "ok": true,
+      "m": "the chooser opens on a clean first visit"
+    },
+    {
+      "ok": true,
+      "m": "closing it works"
+    },
+    {
+      "ok": true,
+      "m": "the decline is recorded",
+      "detail": "-"
+    },
+    {
+      "ok": true,
+      "m": "and it is NOT recorded as a printer the person never chose",
+      "detail": "-"
+    },
+    {
+      "ok": true,
+      "m": "and the sheet does not greet them again"
+    },
+    {
+      "ok": true,
+      "m": "the Tools button opens the tray"
+    },
+    {
+      "ok": true,
+      "m": "the tray is on screen"
+    },
+    {
+      "ok": true,
+      "m": "shortening really shortens it",
+      "detail": "440px -> 190px"
+    },
+    {
+      "ok": true,
+      "m": "and removes nothing — the tray still scrolls",
+      "detail": "22 tools either way"
+    },
+    {
+      "ok": true,
+      "m": "the header stays put, so the control can be pressed again"
+    },
+    {
+      "ok": true,
+      "m": "and it grows back",
+      "detail": "190px -> 440px"
+    },
+    {
+      "ok": true,
+      "m": "more of the print bed shows behind it",
+      "detail": "250px of bed recovered"
+    }
+  ]
+}

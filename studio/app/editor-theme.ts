@@ -177,7 +177,24 @@ export const EDITOR_SHADOW_CSS = `
     .vp-status { bottom: ${ABOVE_BAR_TIGHT}; left: 9px; right: 58px; font-size: 11px; }
     .bed-warn, .stats-card { left: 8px; bottom: calc(${ABOVE_BAR} + 44px); max-width: calc(100% - 68px); }
     .brush-panel { top: 8px; left: 8px; width: min(280px, calc(100vw - 16px)); }
-    .sidebar { position: absolute; z-index: 14; top: 0; right: 0; bottom: ${ABOVE_BAR_TIGHT}; width: min(94vw, 420px); flex-basis: auto; box-shadow: -16px 0 34px ${T.shadowCast}; }
+    /* z-index 33, not 14 — «عندما اضغط على زر الاعدادات قائمة اختار الملف
+       تصير امام الاعدادات».
+
+       NO BACKTICKS IN THIS COMMENT: it lives inside a template literal, and a
+       stray one silently ends the stylesheet.
+
+       The engine lives in a shadow root, and a shadow host creates NO stacking
+       context of its own. So this panel's z-index has never been scoped to the
+       engine — it competes directly with the shell's own layers in the root
+       stacking context, where .empty-upload-card sits at 18. That card is a
+       hint on an empty bed, not a modal and never meant to be one, and at 14
+       this panel lost to it: the Files card painted over the settings the
+       person had just opened.
+
+       33 puts the panel above that card and above the mobile tool tray (31),
+       and still below the import progress row (46) — which must stay visible
+       over everything, because it is the only sign that a file is loading. */
+    .sidebar { position: absolute; z-index: 33; top: 0; right: 0; bottom: ${ABOVE_BAR_TIGHT}; width: min(94vw, 420px); flex-basis: auto; box-shadow: -16px 0 34px ${T.shadowCast}; }
     :host([data-levo-sidebar="closed"]) .sidebar { display: none; }
     :host([data-levo-sidebar="open"]) .sidebar { display: flex; }
     .sidebar-scroll { padding: 8px 8px 82px; }

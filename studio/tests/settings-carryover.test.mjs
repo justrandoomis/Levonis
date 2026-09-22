@@ -3,8 +3,8 @@
  *
  * The second way the owner's settings disappeared. `machine-lock.ts` covers
  * the loud one (every edit re-applied the printer preset over itself). This
- * covers the quiet one: the four coarse selectors — printer, quality,
- * strength, support — rebuilt the whole settings map from scratch, so turning
+ * covers the quiet one: the coarse selectors — printer, quality, strength,
+ * support, infill pattern — rebuilt the whole settings map from scratch, so turning
  * Support on discarded a hand-tuned infill density, every changed filament
  * temperature, and anything else, and then cleared the message line.
  *
@@ -15,9 +15,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { loadAppModule } from "./lib/load-app-module.mjs";
 
-const { carryUserEdits, changedKeys, STRENGTH_KEYS, SUPPORT_KEYS } = await loadAppModule("settings-carryover");
+const { carryUserEdits, changedKeys, INFILL_KEYS, STRENGTH_KEYS, SUPPORT_KEYS } = await loadAppModule("settings-carryover");
 
-const SELECTION = { printerId: "bbl-x2d-04", quality: "fine", strength: "standard", support: false };
+const SELECTION = { printerId: "bbl-x2d-04", quality: "fine", strength: "standard", support: false, infill: "balanced" };
 
 /** What `profile-loader.ts` builds: machine + process + filament + tiers. */
 const loadedFor = (over = {}) => ({
@@ -25,6 +25,7 @@ const loadedFor = (over = {}) => ({
   layer_height: 0.12,
   initial_layer_height: 0.2,
   sparse_infill_density: 15,
+  sparse_infill_pattern: "gyroid",
   wall_loops: 2,
   enable_support: false,
   support_type: "normal(auto)",
@@ -68,6 +69,37 @@ test("CHANGING STRENGTH takes back its own two keys and leaves the rest alone", 
   assert.deepEqual(out.settings.nozzle_temperature, [235], "the temperature was not part of that choice");
   assert.deepEqual(out.overwritten, ["sparse_infill_density", "wall_loops"]);
   assert.deepEqual(STRENGTH_KEYS, ["sparse_infill_density", "wall_loops"], "the owned set is the one profile-loader writes");
+});
+
+test("CHANGING THE INFILL PATTERN takes the pattern and nothing else", () => {
+  // Strength is HOW MUCH goes inside; the pattern is WHAT SHAPE it takes.
+  // Picking a new shape must not undo a density the owner tuned by hand.
+  const out = carryUserEdits({
+    loaded: loadedFor({ sparse_infill_pattern: "3dhoneycomb" }),
+    previous: loadedFor({ sparse_infill_pattern: "gyroid", sparse_infill_density: 40, nozzle_temperature: [235] }),
+    editedKeys: new Set(["sparse_infill_pattern", "sparse_infill_density", "nozzle_temperature"]),
+    previousSelection: SELECTION,
+    nextSelection: { ...SELECTION, infill: "strong" },
+    processKeys: ["layer_height"],
+  });
+  assert.equal(out.settings.sparse_infill_pattern, "3dhoneycomb", "choosing a pattern IS choosing that pattern");
+  assert.equal(out.settings.sparse_infill_density, 40, "the density the owner tuned is not part of that choice");
+  assert.deepEqual(out.settings.nozzle_temperature, [235]);
+  assert.deepEqual(out.overwritten, ["sparse_infill_pattern"]);
+  assert.deepEqual(INFILL_KEYS, ["sparse_infill_pattern"], "the owned set is the one profile-loader writes");
+});
+
+test("CHANGING STRENGTH leaves the infill PATTERN alone", () => {
+  const out = carryUserEdits({
+    loaded: loadedFor({ sparse_infill_density: 25, wall_loops: 3, sparse_infill_pattern: "gyroid" }),
+    previous: loadedFor({ sparse_infill_pattern: "3dhoneycomb" }),
+    editedKeys: new Set(["sparse_infill_pattern"]),
+    previousSelection: SELECTION,
+    nextSelection: { ...SELECTION, strength: "strong" },
+    processKeys: ["layer_height"],
+  });
+  assert.equal(out.settings.sparse_infill_pattern, "3dhoneycomb", "the amount changed, not the shape");
+  assert.deepEqual(out.kept, ["sparse_infill_pattern"]);
 });
 
 test("CHANGING QUALITY takes every key its new process preset carries", () => {

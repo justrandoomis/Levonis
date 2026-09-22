@@ -1,0 +1,73 @@
+# The owner's Studio items, proved in a real browser against a real origin.
+#
+# WHY THIS IS A WORKFLOW AND NOT A LOCAL SCRIPT. The agent container's egress
+# proxy refuses CONNECT to studio.levonis-iq.com (organization policy, 403), so
+# a GitHub runner is the only place the owner's own Studio can be driven.
+#
+# What it proves, item by item (batch D):
+#
+#   9a  a first visit is ASKED which printer, with NOTHING pre-selected and a
+#       confirm that cannot be pressed — «من دخلت اختارلي x2d مباشرة»;
+#   9a  the answer survives a reload, and so does a DECLINE, so the sheet does
+#       not greet the same person every time;
+#   9b  the infill control sits under Strength and offers three patterns;
+#   10  the tool tray really gets shorter, hides nothing, and grows back —
+#       «زر تقصير وتطويل قائمة الادوات ... رؤية ما خلف القائمة».
+#
+# It changes nothing on the server. Everything it writes is this browser's own
+# localStorage in a throw-away context — no account, no upload, no revision.
+name: 55 - Verify Studio editor (batch D, browser, read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Studio origin to verify'
+        required: true
+        default: 'https://studio.levonis-iq.com'
+
+concurrency: studio-editor-batch-d
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: studio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Chromium
+        run: |
+          npm i --no-save playwright-core >/dev/null
+          npx --yes playwright@1 install --with-deps chromium
+
+      - name: Drive the Studio at ${{ inputs.url }}
+        id: verify
+        timeout-minutes: 15
+        run: node tests/browser-batch-d.mjs "${{ inputs.url }}" | tee /tmp/batch-d.txt
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-editor-batch-d
+          path: studio/tests/browser-batch-d.latest.json
+          if-no-files-found: warn
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Studio editor — batch D, at ${{ inputs.url }}"
+            echo '```'
+            cat /tmp/batch-d.txt 2>/dev/null || echo "(the run produced no output)"
+            echo '```'
+            echo ""
+            echo "- Guest only: nothing was signed in, uploaded, or written to any"
+            echo "  production database or bucket. The only writes were to the"
+            echo "  throw-away browser context's own localStorage."
+          } >> "$GITHUB_STEP_SUMMARY"

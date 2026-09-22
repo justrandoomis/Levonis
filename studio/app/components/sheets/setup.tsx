@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Setup sheet (slice S6): printer / quality / strength / support selection.
+ * Setup sheet (slice S6): printer / quality / strength / infill / support.
  *
  * Honesty: the preset row reports the REAL outcome of the S4 profile loader —
  * "verified" appears only when machine+process+filament presets all came from
@@ -9,7 +9,7 @@
  * an explicit warning (no silent fallback presented as a documented profile).
  */
 
-import { PROFILES, PROFILE_IDS, QUALITY, STRENGTH, type ProfileId, type QualityId, type StrengthId } from "../../printer-profiles";
+import { INFILL, PROFILES, PROFILE_IDS, QUALITY, STRENGTH, type InfillId, type ProfileId, type QualityId, type StrengthId } from "../../printer-profiles";
 import type { MissingPreset } from "../../profile-loader";
 import { templateText, type StudioDictionary } from "../../i18n";
 import { Icon } from "../header";
@@ -19,6 +19,7 @@ export interface SetupSheetProps {
   profileId: ProfileId;
   quality: QualityId;
   strength: StrengthId;
+  infill: InfillId;
   support: boolean;
   /** Null while the profile is still loading. */
   profileVerified: boolean | null;
@@ -26,6 +27,7 @@ export interface SetupSheetProps {
   onProfile: (id: ProfileId) => void;
   onQuality: (id: QualityId) => void;
   onStrength: (id: StrengthId) => void;
+  onInfill: (id: InfillId) => void;
   onSupport: (value: boolean) => void;
   onOpenAdvanced: () => void;
   onClose: () => void;
@@ -107,6 +109,31 @@ export default function SetupSheet(props: SetupSheetProps) {
           ))}
         </div>
       </fieldset>
+      {/*
+        INFILL PATTERN — THE SHAPE, DIRECTLY UNDER THE AMOUNT.
+
+        «تظيف قائمة اسفل قائمة "القوة" بيها انواع الحشو.» It belongs here and
+        nowhere else: Strength above sets how much material goes inside, this
+        sets what shape that material takes, and the two are read together.
+
+        Each button carries the engine's own pattern name in bold and the
+        purpose underneath — the same two-line shape the Quality and Strength
+        controls already use, so the three read as one stack rather than as a
+        new kind of control. The names that reach the kernel are pinned in
+        printer-profiles.ts; the two the owner named that this engine cannot
+        actually print are documented there rather than offered here.
+      */}
+      <fieldset>
+        <legend>{t.infillPattern}</legend>
+        <div className="segmented-control">
+          {(Object.keys(INFILL) as InfillId[]).map((id) => (
+            <button key={id} className={props.infill === id ? "active" : ""} onClick={() => props.onInfill(id)}>
+              <strong>{INFILL[id].label}</strong>
+              <span>{id === "light" ? t.infillLight : id === "balanced" ? t.infillBalanced : t.infillStrong}</span>
+            </button>
+          ))}
+        </div>
+      </fieldset>
       <div className="support-row">
         <span><strong>{t.support}</strong><small>{props.support ? t.auto : t.off}</small></span>
         <button className={`switch ${props.support ? "on" : ""}`} role="switch" aria-checked={props.support} onClick={() => props.onSupport(!props.support)}><i /></button>
@@ -116,6 +143,7 @@ export default function SetupSheet(props: SetupSheetProps) {
         <Icon name="layers" />
       </button>
       <p className="file-limit">{t.fileLimit}</p>
+      <p className="file-limit">{t.webLimitsNotice}</p>
       <button className="sheet-done" onClick={props.onClose}>{t.apply}</button>
     </div>
   );

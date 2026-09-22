@@ -101,6 +101,7 @@ export interface ProjectManifest {
     quality?: string;
     strength?: string;
     support?: boolean;
+    infill?: string;
     global?: Record<string, unknown>;
     perObject?: Record<string, Record<string, unknown>>;
   };

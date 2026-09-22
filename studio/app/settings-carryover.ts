@@ -6,8 +6,9 @@
  * so the layer height snapped back on every keystroke. This is the other way
  * the owner's edits disappeared, and it is quieter.
  *
- * The editor has four coarse selectors — printer, quality, strength, support —
- * and changing any of them rebuilt the settings map FROM SCRATCH:
+ * The editor has five coarse selectors — printer, quality, strength, support
+ * and infill pattern — and changing any of them rebuilt the settings map FROM
+ * SCRATCH:
  *
  *     setSettings(restored ?? loaded.settings);   // then setNotice("")
  *
@@ -22,6 +23,7 @@
  *
  *   support   → `enable_support`, `support_type`
  *   strength  → `sparse_infill_density`, `wall_loops`
+ *   infill    → `sparse_infill_pattern`
  *   quality   → every key the newly chosen PROCESS preset carries, because
  *               choosing "Draft" after "Fine" is asking for that whole preset;
  *               a hand-edited layer height must not survive it.
@@ -39,16 +41,27 @@
 
 import type { SlicerSettings } from "three-slicer";
 
-/** The four selectors, as the shell holds them. */
+/** The five selectors, as the shell holds them. */
 export interface PresetSelection {
   printerId: string;
   quality: string;
   strength: string;
   support: boolean;
+  infill: string;
 }
 
 /** Keys the Strength tier writes — `profile-loader.ts` sets exactly these. */
 export const STRENGTH_KEYS: readonly string[] = ["sparse_infill_density", "wall_loops"];
+
+/**
+ * Keys the Infill pattern control writes.
+ *
+ * Separate from STRENGTH_KEYS on purpose: strength is HOW MUCH material goes
+ * inside (density and wall count) and the pattern is WHAT SHAPE it takes.
+ * Changing one must not discard a hand-tuned value belonging to the other —
+ * which is the whole rule this module exists to enforce.
+ */
+export const INFILL_KEYS: readonly string[] = ["sparse_infill_pattern"];
 
 /** Keys the Support switch writes. */
 export const SUPPORT_KEYS: readonly string[] = ["enable_support", "support_type"];
@@ -95,6 +108,7 @@ export function carryUserEdits(input: CarryOverInput): CarryOverResult {
     if (previousSelection.quality !== nextSelection.quality) for (const key of processKeys) owned.add(key);
     if (previousSelection.strength !== nextSelection.strength) for (const key of STRENGTH_KEYS) owned.add(key);
     if (previousSelection.support !== nextSelection.support) for (const key of SUPPORT_KEYS) owned.add(key);
+    if (previousSelection.infill !== nextSelection.infill) for (const key of INFILL_KEYS) owned.add(key);
   }
 
   const overwritten: string[] = [];

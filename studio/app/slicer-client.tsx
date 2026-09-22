@@ -46,11 +46,19 @@ import { fallbackMachineSettings, loadPrinterProfile, type MissingPreset } from 
 import { applyMachineLock } from "./machine-lock";
 import { carryUserEdits, changedKeys, type PresetSelection } from "./settings-carryover";
 import {
+  DEFAULT_INFILL_ID,
   DEFAULT_PROFILE_ID,
+  INFILL,
   PROFILES,
   QUALITY,
   STRENGTH,
+  isInfillId,
   isProfileId,
+  printerChoiceAnswered,
+  readStoredProfileId,
+  storePrinterChoiceDeclined,
+  storeProfileId,
+  type InfillId,
   type ProfileId,
   type QualityId,
   type StrengthId,
@@ -87,6 +95,13 @@ import { captureEngineThumbnail } from "./thumbnail";
  */
 const LEVO_VERSION = "1.0.0";
 const LEVO_APPLICATION = `LEVO Studio-${LEVO_VERSION}`;
+
+/**
+ * How long the "loading into the editor" row may stay up with no objects
+ * event. A backstop against a lost event, not a deadline for the import.
+ */
+const IMPORT_WAIT_CEILING_MS = 120_000;
+
 import type {
   OpenedRemoteProject,
   ProjectManifest,
@@ -107,12 +122,13 @@ import {
 } from "./i18n";
 import StudioHeader, { FileSelectControl, Icon, SIGN_IN_HREF } from "./components/header";
 import SetupSheet from "./components/sheets/setup";
+import PrinterChoiceSheet from "./components/sheets/printer-choice";
 import PrintSheet from "./components/sheets/print";
 import ConnectSheet, { type LanAction } from "./components/sheets/connect";
 import AboutSheet from "./components/sheets/about";
 import CutSheet from "./components/sheets/cut";
 
-type Sheet = "setup" | "projects" | "print" | "connect" | "about" | "cut" | null;
+type Sheet = "setup" | "printer" | "projects" | "print" | "connect" | "about" | "cut" | null;
 type EditorStatus = "loading" | "editing" | "slicing" | "ready" | "error";
 type CanvasMode = "prepare" | "preview";
 
@@ -120,6 +136,13 @@ interface ImportProgressState {
   label: string;
   ratio: number;
   extracted: number;
+  /**
+   * True for the stretch that has no measurable progress: the engine is
+   * building the mesh and does not report how far along it is. The row still
+   * shows, with a bar that says "working" rather than a percentage that would
+   * have to be invented.
+   */
+  indeterminate?: boolean;
 }
 
 interface ProfileLoadState {
@@ -260,7 +283,17 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const [profileId, setProfileId] = useState<ProfileId>(DEFAULT_PROFILE_ID);
   const [quality, setQuality] = useState<QualityId>("standard");
   const [strength, setStrength] = useState<StrengthId>("standard");
+  const [infill, setInfill] = useState<InfillId>(DEFAULT_INFILL_ID);
   const [support, setSupport] = useState(false);
+  /**
+   * THE FIRST-RUN PRINTER QUESTION.
+   *
+   * `printerAsk` is true only while the question is open and unanswered; the
+   * draft is what has been tapped so far, and is deliberately null to start —
+   * see components/sheets/printer-choice.tsx for why nothing is pre-selected.
+   */
+  const [printerAsk, setPrinterAsk] = useState(false);
+  const [printerDraft, setPrinterDraft] = useState<ProfileId | null>(null);
   // Fallback machine numbers until the async preset load resolves; the honest
   // verified/missing state comes from profileLoadState, never from this seed.
   const [settings, setSettings] = useState<SlicerSettings>(() => fallbackMachineSettings(PROFILES[DEFAULT_PROFILE_ID]));
@@ -276,6 +309,19 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const [importProgress, setImportProgress] = useState<ImportProgressState | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toolTrayOpen, setToolTrayOpen] = useState(false);
+  /**
+   * THE TOOL TRAY, SHORTENED SO THE BED IS VISIBLE BEHIND IT.
+   *
+   * «اضافة زر تقصير وتطويل قائمة الادوات لكي يتمكن المستخدم من استخدام الادوات
+   *  و رؤية النتيجة على سرير الطباعة بصورة اوضح رؤية ما خلف القائمة.»
+   *
+   * The tray is up to 62dvh of the screen, which is most of the bed on a
+   * phone: you tap Rotate, the object turns, and you cannot see it turn. This
+   * is the state behind the header's shrink/grow button. Shortened it keeps
+   * every group — the tray already scrolls — so nothing becomes unreachable;
+   * it only stops standing in front of the thing being edited.
+   */
+  const [trayCompact, setTrayCompact] = useState(false);
   const [handyProjectReady, setHandyProjectReady] = useState(false);
   const [arrangeUndoAvailable, setArrangeUndoAvailable] = useState(false);
   const [orientUndoAvailable, setOrientUndoAvailable] = useState(false);
@@ -340,6 +386,22 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const arrangeUndoRef = useRef<(() => boolean) | null>(null);
   const orientUndoRef = useRef<(() => boolean) | null>(null);
   const cutUndoRef = useRef<(() => boolean) | null>(null);
+  /**
+   * THE STRETCH THE PROGRESS ROW USED TO SKIP.
+   *
+   * `EngineAdapter#dispatchFiles` fires the engine's file-input change event
+   * and returns — the engine STARTS reading the mesh there, it does not finish
+   * there — and the orchestrator clears its progress as soon as that call
+   * resolves. So for a plain STL the row appeared and vanished within a frame,
+   * and the entire real wait (parse, upload to the GPU, first objects event)
+   * happened over an empty bed with nothing on screen to say why.
+   *
+   * This holds the object count the editor had when the files went in. The
+   * indicator stays up until the count grows past it — the first honest sign
+   * the engine actually has the model — or until the timer below gives up.
+   */
+  const importWaitRef = useRef<{ baselineObjects: number } | null>(null);
+  const importWaitTimerRef = useRef<number | null>(null);
   const plateCountRef = useRef(1);
   const selectedPlateRef = useRef(0);
   /** Object ids currently in the scene, so the shell can tell a spawn from a split. */
@@ -439,7 +501,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
 
   const profile = PROFILES[profileId];
   const t = DICTIONARIES[locale];
-  const requestedPresetKey = `${profileId}:${quality}:${strength}:${support}`;
+  const requestedPresetKey = `${profileId}:${quality}:${strength}:${support}:${infill}`;
   const profileLoading = loadedPresetKey !== requestedPresetKey;
   /**
    * The dictionary, for the preset effect's async continuation.
@@ -519,13 +581,13 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     const namesPart = objects.map((object) => `${object.id}:${object.name}`).sort().join(",");
     return [
       projectName.trim(),
-      `${profileId}:${quality}:${strength}:${support}`,
+      `${profileId}:${quality}:${strength}:${support}:${infill}`,
       `plates=${plateCount}`,
       namesPart,
       adapter.sceneFingerprint(),
       settingsPart,
     ].join("|");
-  }, [adapter, objects, plateCount, profileId, projectName, quality, settings, strength, support]);
+  }, [adapter, infill, objects, plateCount, profileId, projectName, quality, settings, strength, support]);
 
   const persistence = useProjectPersistence({
     user: user?.id ? { id: user.id } : null,
@@ -540,7 +602,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       project: { name: projectName.trim() || "LEVO Project" },
       engine: { name: "three-slicer", version: "0.2.2" },
       printer: { profileId, model: profile.model, nozzle: profile.nozzle },
-      settings: { quality, strength, support, global: settings as unknown as Record<string, unknown> },
+      settings: { quality, strength, support, infill, global: settings as unknown as Record<string, unknown> },
       objects: objects.map((object) => ({ id: object.id, name: object.name, extruder: object.extruder })),
       plates: { count: plateCount },
       painting: { extruderAssignments: objects.some((object) => object.extruder > 1) },
@@ -555,6 +617,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       quality,
       strength,
       support,
+      infill,
       settings,
       objectCount: objects.length,
       plateCount,
@@ -632,6 +695,49 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     storeLocale(next);
   }, []);
 
+  // -- printer (asked for on the first visit, remembered after) --------------
+  /**
+   * Every path that names a printer goes through here: the first-run chooser,
+   * the Setup sheet, and opening a saved project. One function, so "the
+   * printer is remembered" and "the question is answered" can never drift
+   * apart — the bug being fixed is precisely a printer that was in force
+   * without ever having been chosen.
+   */
+  const chooseProfile = useCallback((id: ProfileId) => {
+    setProfileId(id);
+    storeProfileId(id);
+    setPrinterAsk(false);
+  }, []);
+
+  useEffect(() => {
+    const stored = readStoredProfileId();
+    if (stored) {
+      setProfileId(stored);
+      return;
+    }
+    if (printerChoiceAnswered()) return;
+    // Both in one effect body so they land in the same render: the dismissal
+    // watcher below reads "asked, and the sheet is not open" as a dismissal.
+    setPrinterAsk(true);
+    setSheet("printer");
+  }, []);
+
+  /**
+   * A dismissal is an answer too.
+   *
+   * The sheet closes by four paths — the X, the backdrop, Escape, and a drag
+   * down — and all four funnel into `setSheet(null)` without passing through
+   * the chooser's own button. Watching for the sheet leaving while the
+   * question is still open catches every one of them, and records "asked,
+   * declined" so the person is not met by the same sheet on every visit. The
+   * seed profile stays in force and Settings is still there.
+   */
+  useEffect(() => {
+    if (!printerAsk || sheet === "printer") return;
+    storePrinterChoiceDeclined();
+    setPrinterAsk(false);
+  }, [printerAsk, sheet]);
+
   // -- native environment (capability-gated; everything false on the web) ----
   useEffect(() => {
     let active = true;
@@ -661,15 +767,16 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
 
   useEffect(() => () => {
     if (exportIntentTimerRef.current !== null) window.clearTimeout(exportIntentTimerRef.current);
+    if (importWaitTimerRef.current !== null) window.clearTimeout(importWaitTimerRef.current);
   }, []);
 
   // -- profile / preset loading (honest missing-preset reporting) ------------
   useEffect(() => {
     const requestId = profileRequestRef.current + 1;
     profileRequestRef.current = requestId;
-    const nextSelection: PresetSelection = { printerId: profileId, quality, strength, support };
+    const nextSelection: PresetSelection = { printerId: profileId, quality, strength, support, infill };
     setProfileLoadState(null);
-    loadPrinterProfile(profile, quality, strength, support)
+    loadPrinterProfile(profile, quality, strength, support, infill)
       .then((loaded) => {
         if (profileRequestRef.current !== requestId) return;
         machineRef.current = loaded.machine;
@@ -729,7 +836,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       });
     // slicing.clearResults is identity-stable per hook instance.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, quality, requestedPresetKey, strength, support]);
+  }, [infill, profile, quality, requestedPresetKey, strength, support]);
 
   // -- settings (engine SettingsPanel binding stays; machine keys locked) ----
   const setEditorSettings: Dispatch<SetStateAction<SlicerSettings>> = useCallback((next) => {
@@ -821,6 +928,37 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     return t.importFailed;
   }, [t.emptyFile, t.engineUnavailable, t.importFailed, t.zipBudgetExceeded, t.zipEntryLimit, t.zipRatioLimit]);
 
+  /** Stops the post-dispatch wait, whatever ended it. */
+  const endImportWait = useCallback(() => {
+    if (importWaitTimerRef.current !== null) {
+      window.clearTimeout(importWaitTimerRef.current);
+      importWaitTimerRef.current = null;
+    }
+    if (!importWaitRef.current) return;
+    importWaitRef.current = null;
+    setImportProgress(null);
+  }, []);
+
+  /**
+   * Starts it: the files are with the engine and the mesh is being built.
+   *
+   * The cap is a backstop, not a guess at how long a model takes — it exists
+   * so a browser that drops the objects event entirely cannot leave a spinner
+   * on the screen for the rest of the session. Reaching it clears the row and
+   * nothing else: the import is not cancelled, and if the engine is simply
+   * slow the objects still land when they land.
+   */
+  const beginImportWait = useCallback((baselineObjects: number, label: string) => {
+    if (importWaitTimerRef.current !== null) window.clearTimeout(importWaitTimerRef.current);
+    importWaitRef.current = { baselineObjects };
+    setImportProgress({ label, ratio: 0, extracted: 0, indeterminate: true });
+    importWaitTimerRef.current = window.setTimeout(() => {
+      importWaitTimerRef.current = null;
+      importWaitRef.current = null;
+      setImportProgress(null);
+    }, IMPORT_WAIT_CEILING_MS);
+  }, []);
+
   const importSelectedFiles = useCallback(async (rawFiles: File[]) => {
     if (!rawFiles.length || orchestrator.busy) return;
     setError("");
@@ -871,7 +1009,11 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         bedDepth: profile.bedDepth,
       }, {
         onProgress: (progress: ImportProgressUpdate | null) => {
-          if (!progress) { setImportProgress(null); return; }
+          // A null from the orchestrator means ITS work is done — extraction,
+          // or the arrangement of an archive. It does not mean the engine has
+          // finished reading the mesh, so while the post-dispatch wait is
+          // running the row it owns stays exactly as it is.
+          if (!progress) { if (!importWaitRef.current) setImportProgress(null); return; }
           setImportProgress({
             label: progress.stage === "analyzing" ? t.importing : t.zipAnalyzing,
             ratio: progress.ratio,
@@ -890,14 +1032,20 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
         })),
       });
       projectFilesRef.current = [...projectFilesRef.current, ...result.importedFiles];
+      // The engine has the files and is building the mesh. Nothing reports on
+      // that stretch, so the row stays up — indeterminate — until the objects
+      // arrive. For an archive the orchestrator's own arranging progress
+      // replaces this a moment later and clears it the same way.
+      beginImportWait(objects.length, textRef.current.importBuilding);
     } catch (reason: unknown) {
       // Nothing was restored, so nothing is coming to absorb the latch.
       restoreInFlightRef.current = false;
+      endImportWait();
       setImportProgress(null);
       setError(localizeImportError(reason));
       setStatus("error");
     }
-  }, [localizeImportError, localizeImportNotice, objects, orchestrator, profile.bedDepth, profile.bedWidth, selectedPlate, t.fileTooLarge, t.importing, t.zipAnalyzing, t.zipBudgetConfirm]);
+  }, [beginImportWait, endImportWait, localizeImportError, localizeImportNotice, objects, orchestrator, profile.bedDepth, profile.bedWidth, selectedPlate, t.fileTooLarge, t.importing, t.zipAnalyzing, t.zipBudgetConfirm]);
 
   const handlePickedFiles = useCallback((files: File[]) => {
     setNotice("");
@@ -1201,7 +1349,10 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     const restoredQuality = saved.quality in QUALITY ? saved.quality as QualityId : "standard";
     const restoredStrength = saved.strength in STRENGTH ? saved.strength as StrengthId : "standard";
     const restoredSupport = Boolean(saved.support);
-    const restoredKey = `${restoredProfile}:${restoredQuality}:${restoredStrength}:${restoredSupport}`;
+    // Drafts and manifests written before the infill control existed carry no
+    // pattern at all; they get the default rather than a guess.
+    const restoredInfill = typeof saved.infill === "string" && isInfillId(saved.infill) ? saved.infill : DEFAULT_INFILL_ID;
+    const restoredKey = `${restoredProfile}:${restoredQuality}:${restoredStrength}:${restoredSupport}:${restoredInfill}`;
     profileRequestRef.current += 1;
     restoredSettingsRef.current = saved.settings && restoredKey !== requestedPresetKey
       ? { key: restoredKey, settings: saved.settings }
@@ -1214,10 +1365,14 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     projectFilesRef.current = saved.files;
     setProjectId(saved.id);
     setProjectName(saved.name);
-    setProfileId(restoredProfile);
+    // Through chooseProfile, not setProfileId: opening a project IS naming a
+    // printer, so the first-run question is answered by it and must not come
+    // back on the next visit.
+    chooseProfile(restoredProfile);
     setQuality(restoredQuality);
     setStrength(restoredStrength);
     setSupport(restoredSupport);
+    setInfill(restoredInfill);
     if (saved.settings) setSettings(saved.settings);
     setObjects([]);
     setWorkspaceKey((value) => value + 1);
@@ -1247,7 +1402,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adapter, orchestrator, requestedPresetKey, t.engineUnavailable, t.savedLocalFull, t.savedLocalSourceOnly]);
+  }, [adapter, chooseProfile, orchestrator, requestedPresetKey, t.engineUnavailable, t.savedLocalFull, t.savedLocalSourceOnly]);
 
   // Open an account project: download the head revision (ownership enforced
   // server-side), restore files + manifest settings, and surface a degraded
@@ -1271,6 +1426,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       quality: typeof manifest?.settings?.quality === "string" ? manifest.settings.quality : "standard",
       strength: typeof manifest?.settings?.strength === "string" ? manifest.settings.strength : "standard",
       support: Boolean(manifest?.settings?.support),
+      infill: typeof manifest?.settings?.infill === "string" ? manifest.settings.infill : undefined,
       settings: manifest?.settings?.global as SlicerSettings | undefined,
       objectCount: manifest?.objects?.length,
       plateCount: manifest?.plates?.count,
@@ -1800,14 +1956,38 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   const handleEvent = useCallback((event: ViewportEvent) => {
     slicing.handleViewportEvent(event as SlicingViewportEvent);
     if (event.type === "objects") {
+      // The engine has the model. This is the only honest end to the wait the
+      // import row is holding — see importWaitRef above.
+      if (importWaitRef.current && event.value.length > importWaitRef.current.baselineObjects) endImportWait();
       setObjects(event.value);
       const ids = event.value.map((object) => object.id);
       orchestrator.notifyObjects(ids);
       seatNewObjectsIfNeeded(ids);
       if (event.value.length) setStatus((current) => current === "slicing" ? current : "editing");
     } else if (event.type === "plateCount") {
+      /*
+        «عند اضافة سرير طباعة جديد يبقيني على السرير الاول بدل ان ينقلني للسرير
+         الذي انشأته (كما في بامبو سلايسر).»
+
+        The engine's add-plate handler only increments the plate count; it
+        never calls its own selectPlate. So a new plate appeared in the bar and
+        the camera stayed on the first one, which is not what any slicer does.
+
+        THE FOLLOW IS DONE HERE, NOT ON THE BUTTON, because there are two ways
+        to add a plate and only one of them is ours: the Studio's tool-tray
+        button is mobile-only, and on desktop the engine's own `+` in the plate
+        bar is the ONLY control. Reacting to the COUNT means both paths are
+        covered by one rule.
+
+        Gated on a rise of exactly one from a non-zero count. An interactive
+        add is always +1; a first load or a restored draft sets the count from
+        0 or jumps by several at once, and jumping the selection to the last
+        plate there would fight the restore for the camera.
+      */
+      const before = plateCountRef.current;
       plateCountRef.current = event.value;
       setPlateCount(event.value);
+      if (before > 0 && event.value === before + 1) adapter.selectPlate(event.value - 1);
     } else if (event.type === "selectedPlate") {
       selectedPlateRef.current = event.value;
       setSelectedPlate(event.value);
@@ -1828,11 +2008,14 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
       }
       setNotice(event.value);
     } else if (event.type === "error") {
+      // An engine error is the other honest end to the wait: no objects are
+      // coming, so the row must not sit there until its ceiling runs out.
+      endImportWait();
       setError(event.value);
       setStatus("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orchestrator, seatNewObjectsIfNeeded, slicing.handleViewportEvent]);
+  }, [endImportWait, orchestrator, seatNewObjectsIfNeeded, slicing.handleViewportEvent]);
 
   const handleSliced = useCallback((payload: SlicePayload) => {
     const outcome = slicing.handleSliced(payload);
@@ -1878,6 +2061,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     setCanvasMode("prepare");
     setNotice("");
     setError("");
+    endImportWait();
     setImportProgress(null);
     setSidebarOpen(false);
     setToolTrayOpen(false);
@@ -1893,7 +2077,7 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     setStatus("editing");
     setWorkspaceKey((value) => value + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [objects.length, orchestrator, slicing.clearResults, t.newConfirm]);
+  }, [endImportWait, objects.length, orchestrator, slicing.clearResults, t.newConfirm]);
 
   const deleteAll = useCallback(() => {
     if (!objects.length || !window.confirm(t.deleteAllConfirm)) return;
@@ -2037,7 +2221,8 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     && (printerStatus.state === undefined || printerStatus.state === "idle")
     && printReady;
 
-  const sheetTitle = sheet === "about" ? t.about
+  const sheetTitle = sheet === "printer" ? t.choosePrinter
+    : sheet === "about" ? t.about
     : sheet === "projects" ? t.projects
       : sheet === "print" ? t.printExport
         : sheet === "connect" ? t.connectTitle
@@ -2116,11 +2301,25 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
             whole row disappears. Latin digits and `dir="ltr"`, so «٪100» does
             not reorder into nonsense in an Arabic or Kurdish layout.
           */}
+          {/*
+            AND WHERE THERE IS NO NUMBER, THERE IS NO NUMBER.
+
+            The engine does not report how far through a mesh it is, so the
+            post-dispatch wait has nothing to floor — and a percentage invented
+            to fill the space would be the one thing this row must never do.
+            The percent is dropped and the bar runs without a value, which is
+            what `<progress>` with no `value` means natively: working, length
+            unknown.
+          */}
           <div><strong>{importProgress.label}</strong><small>{importProgress.extracted ? `${importProgress.extracted} ${t.objects}` : t.formatsShort}</small></div>
-          <span className="import-progress-percent" dir="ltr">
-            {Math.min(99, Math.max(1, Math.floor(Math.max(0, Math.min(1, importProgress.ratio)) * 100)))}%
-          </span>
-          <progress max="1" value={Math.max(0, Math.min(1, importProgress.ratio))} />
+          {!importProgress.indeterminate && (
+            <span className="import-progress-percent" dir="ltr">
+              {Math.min(99, Math.max(1, Math.floor(Math.max(0, Math.min(1, importProgress.ratio)) * 100)))}%
+            </span>
+          )}
+          {importProgress.indeterminate
+            ? <progress max="1" />
+            : <progress max="1" value={Math.max(0, Math.min(1, importProgress.ratio))} />}
         </div>}
 
         {(error || notice) && <div className={`editor-message ${error ? "error" : "notice"}`} role={error ? "alert" : "status"}>
@@ -2182,8 +2381,33 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
           below 350px, which locked a small phone to whatever locale happened
           to be stored).
         */}
-        {toolTrayOpen && <section className="mobile-tooltray" aria-label={t.editTools}>
-          <header><span><strong>{t.editTools}</strong><small>{t.editToolsHelp}</small></span><button onClick={() => setToolTrayOpen(false)} aria-label={t.close}><Icon name="close" /></button></header>
+        {toolTrayOpen && <section className={`mobile-tooltray${trayCompact ? " compact" : ""}`} aria-label={t.editTools}>
+          {/*
+            SHRINK / GROW, BESIDE CLOSE.
+
+            «اضافة زر تقصير وتطويل قائمة الادوات ... رؤية ما خلف القائمة.»
+
+            Shrinking does NOT remove anything: the tray already scrolls, so
+            every group stays reachable at either height — it just stops being
+            two thirds of the screen while you watch an object rotate. The
+            header stays pinned, so the control that grows it back is always
+            under the same thumb that shrank it.
+
+            The chevron is the whole state cue (skill §3): it points down when
+            the tray is tall (press to shorten) and up when it is short.
+          */}
+          <header>
+            <span><strong>{t.editTools}</strong><small>{t.editToolsHelp}</small></span>
+            <button
+              onClick={() => setTrayCompact((value) => !value)}
+              aria-label={trayCompact ? t.expand : t.collapse}
+              aria-expanded={!trayCompact}
+              data-levo-action="tray-height"
+            >
+              <Icon name={trayCompact ? "chevronUp" : "chevronDown"} />
+            </button>
+            <button onClick={() => setToolTrayOpen(false)} aria-label={t.close}><Icon name="close" /></button>
+          </header>
 
           <div className="toolgroup" role="group" aria-label={t.files}>
             <p className="toolgroup-label">{t.files}</p>
@@ -2329,18 +2553,27 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
               busy={cutting}
               onCut={applyCut}
             />
+          ) : sheet === "printer" ? (
+            <PrinterChoiceSheet
+              t={t}
+              draft={printerDraft}
+              onDraft={setPrinterDraft}
+              onConfirm={(id) => { chooseProfile(id); setSheet(null); }}
+            />
           ) : sheet === "setup" ? (
             <SetupSheet
               t={t}
               profileId={profileId}
               quality={quality}
               strength={strength}
+              infill={infill}
               support={support}
               profileVerified={profileLoading ? null : (profileLoadState?.verified ?? null)}
               missingPresets={profileLoadState?.missingPresets ?? []}
-              onProfile={setProfileId}
+              onProfile={chooseProfile}
               onQuality={setQuality}
               onStrength={setStrength}
+              onInfill={setInfill}
               onSupport={setSupport}
               onOpenAdvanced={() => { setSheet(null); setSidebarOpen(true); }}
               onClose={() => setSheet(null)}

@@ -19,7 +19,7 @@
  */
 
 import type { SlicerSettings } from "three-slicer";
-import { STRENGTH, type PrinterProfile, type QualityId, type StrengthId } from "./printer-profiles";
+import { INFILL, STRENGTH, type InfillId, type PrinterProfile, type QualityId, type StrengthId } from "./printer-profiles";
 
 /** Where each of the three preset layers actually came from. */
 export type PresetSource = "engine" | "fallback";
@@ -104,6 +104,7 @@ export async function loadPrinterProfile(
   quality: QualityId,
   strength: StrengthId,
   support: boolean,
+  infill: InfillId,
 ): Promise<LoadedProfileResult> {
   const api = await import("three-slicer/settings");
   const missingPresets: MissingPreset[] = [];
@@ -151,6 +152,9 @@ export async function loadPrinterProfile(
     ...identity,
     sparse_infill_density: STRENGTH[strength].infill,
     wall_loops: STRENGTH[strength].walls,
+    // The kernel rewrites an unknown pattern to rectilinear in silence, so
+    // INFILL only ever holds names it declares — see printer-profiles.ts.
+    sparse_infill_pattern: INFILL[infill].pattern,
     enable_support: support,
     support_type: "normal(auto)",
   };

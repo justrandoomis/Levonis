@@ -116,6 +116,16 @@ export const en = {
   imported: "Files were added to the project.",
   formatsShort: "STL · 3MF · STEP · GLB · FBX · ZIP +",
   importing: "Analyzing files…",
+  /*
+   * THE WAIT NOBODY WAS SHOWN.
+   *
+   * «اضافه انتظار لتحميل الملف للاستوديو.» The import row used to clear the
+   * moment the files were handed to the engine — which is when the engine
+   * STARTS building the mesh, not when it finishes. On a large STL that left
+   * an empty bed and no indicator for as long as the parse took, so the
+   * obvious reading was that the file had simply not loaded.
+   */
+  importBuilding: "Loading the model into the editor…",
   zipAnalyzing: "Analyzing ZIP and arranging models…",
   zipArranged: "Automatically arranged {models} models across {plates} plates.",
   zipOverflow: "{count} models could not be distributed because the editor supports up to 9 plates; they remain at their imported positions for manual review.",
@@ -128,7 +138,17 @@ export const en = {
   fileTooLarge: "{name} ({size} MB) is larger than the {limit} MB limit. A browser cannot prepare a file this size for printing — reduce the model or split it.",
   importFailed: "The file could not be imported or its format is unrecognized.",
   engineUnavailable: "The editing engine is not ready yet. Try again in a moment.",
-  fileLimit: "LEVO sets no fixed file-size or count cap; files stay on your device, while actual capacity depends on browser and device memory.",
+  /**
+   * «توضيح بالحد الأقصى لرفع الملف.»
+   *
+   * This said LEVO sets NO fixed cap. That was false in three places at once:
+   * the editor refuses a model over 500 MB at selection
+   * (MODEL_FILE_BYTES_CEILING, import-orchestrator.ts), and a saved project is
+   * held to 64 MiB per file and 200 MiB per account by the worker
+   * (studio/worker/api/quota.ts). A person hitting any of those met a refusal
+   * the copy had promised could not happen.
+   */
+  fileLimit: "Up to 500 MB per file in the editor; a saved project allows 64 MB per file and 200 MB in total. Files stay on your device, and real capacity still depends on browser and device memory.",
   actionUnavailable: "This tool is unavailable in the current mode.",
   newConfirm: "Start a new project? Unsaved edits will be lost.",
 
@@ -142,6 +162,40 @@ export const en = {
   advanced: "All settings, colors and objects",
   advancedHelp: "Shown inside the complete editor panel.",
   close: "Close",
+  collapse: "Shrink the panel",
+  expand: "Grow the panel",
+
+  /*
+   * INFILL PATTERN.
+   *
+   * The names Zigzag / Gyroid / 3D Honeycomb are NOT here: they are the
+   * engine's own pattern names and stay Latin in all three locales, exactly as
+   * the Quality and Strength tiers already do. Only the purpose is translated.
+   */
+  infillPattern: "Infill pattern",
+  infillLight: "Light and fast",
+  infillBalanced: "Balanced",
+  infillStrong: "Strong",
+
+  /*
+   * FIRST RUN: THE PRINTER IS ASKED FOR.
+   *
+   * «خلي الشخص يختار طابعته اول ما يدخل، لان حاليا من دخلت اختارلي x2d مباشرة.»
+   * Nothing is pre-selected in this sheet and the confirm button stays
+   * disabled until a card is tapped — a chooser that arrives with an answer
+   * already filled in is the behaviour being fixed, not a convenience.
+   */
+  choosePrinter: "Choose your printer",
+  choosePrinterHelp: "Every bed size, nozzle and preset in the editor comes from this choice. You can change it any time under Settings.",
+
+  /*
+   * WHAT THIS IS. Plainly, where a first-time user meets it.
+   *
+   * «توضيح بان هذا ليس تطبيق وانما موقع الإمكانيات محدوده وسوف ينزل تطبيق قريبا.»
+   * The platform-status sheet already carries the long version; this is the
+   * one-line version, on the first screen, before anyone hits a limit.
+   */
+  webLimitsNotice: "LEVO Studio is a website, not an app: it runs inside your browser, so file size and speed are limited by this device. A full LEVONIS app is coming.",
 
   // Print / export sheet — MakerWorld is the primary output path
   printExport: "Print & export",

@@ -419,6 +419,11 @@ button:disabled { cursor: not-allowed; }
 .import-progress progress { width: 100%; height: 4px; grid-column: 2 / -1; border: 0; border-radius: 99px; overflow: hidden; accent-color: var(--accent); background: var(--surface); }
 .import-progress progress::-webkit-progress-bar { background: var(--surface); }
 .import-progress progress::-webkit-progress-value { background: var(--accent); }
+/* No value means the engine is working and cannot say how far along it is.
+   The browser's own indeterminate animation carries that; these two rules only
+   keep its track on the Studio's dark ladder instead of the platform default. */
+.import-progress progress:indeterminate { background: var(--surface); }
+.import-progress progress:indeterminate::-webkit-progress-bar { background: var(--surface); }
 
 .editor-message {
   position: absolute;
@@ -664,6 +669,23 @@ button:disabled { cursor: not-allowed; }
 .advanced-button > svg { width: 19px; height: 19px; color: var(--muted); }
 .file-limit { margin: -4px 2px 0; color: var(--muted); font-size: var(--text-caption); line-height: 1.45; }
 .sheet-done { width: 100%; min-height: 50px; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-ink); font-weight: 850; cursor: pointer; }
+/*
+ * A confirm with nothing chosen yet is not a button you should be able to
+ * press — that is the whole point of the first-run chooser. Disabled reads as
+ * disabled (surface, not accent) rather than as a gold button that ignores
+ * taps, which would be the same silence in a different colour.
+ */
+.sheet-done:disabled { background: var(--surface); color: var(--muted); cursor: not-allowed; }
+
+/*
+ * FIRST-RUN PRINTER CHOOSER.
+ *
+ * It borrows .setup-body wholesale — same grid, same cards, same spacing — and
+ * adds only the lead-in line, because a first screen that looks like a
+ * different app than the one behind it is a first screen that has to be
+ * learned twice.
+ */
+.printer-choice-lede { margin: 0 2px; color: var(--muted); font-size: var(--text-caption); line-height: 1.5; }
 
 .projects-body { display: flex; flex-direction: column; gap: 9px; }
 .project-name-editor { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); }
@@ -891,11 +913,23 @@ button:disabled { cursor: not-allowed; }
     background: var(--header);
     box-shadow: 0 -12px 30px var(--shadow-cast);
   }
-  .mobile-tooltray > header { min-height: 58px; padding: 9px 11px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line-soft); }
-  .mobile-tooltray > header > span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  /*
+   * SHORTENED — «زر تقصير وتطويل قائمة الادوات ... رؤية ما خلف القائمة».
+   *
+   * Only the height changes. The tray already scrolls (overflow-y: auto
+   * above), so every group is still reachable at this height; it simply stops
+   * covering two thirds of the bed while a tool is being used. One number,
+   * one transition, nothing hidden.
+   */
+  .mobile-tooltray { transition: max-height .22s ease; }
+  .mobile-tooltray.compact { max-height: min(28dvh, 190px); }
+  /* The header must not scroll away with the groups: the control that grows
+     the tray back has to stay under the thumb that shrank it. */
+  .mobile-tooltray > header { position: sticky; top: 0; z-index: 1; min-height: 58px; padding: 9px 11px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line-soft); background: var(--header); }
+  .mobile-tooltray > header > span { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; }
   .mobile-tooltray > header strong { font-size: 13px; }
   .mobile-tooltray > header small { color: var(--muted); font-size: var(--text-caption); }
-  .mobile-tooltray > header button { width: 44px; height: 44px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: var(--radius-sm); display: grid; place-items: center; background: var(--surface); cursor: pointer; }
+  .mobile-tooltray > header button { width: 44px; height: 44px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: var(--radius-sm); display: grid; place-items: center; background: var(--surface); color: var(--text); cursor: pointer; }
   .mobile-tooltray > header svg { width: 18px; height: 18px; }
   /*
    * GROUPS, NOT A GRID OF TWENTY.

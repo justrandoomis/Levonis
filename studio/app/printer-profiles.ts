@@ -15,6 +15,7 @@
 
 export type QualityId = "fine" | "standard" | "draft";
 export type StrengthId = "light" | "standard" | "strong";
+export type InfillId = "light" | "balanced" | "strong";
 
 export interface PrinterProfile {
   id: string;
@@ -47,6 +48,57 @@ export const STRENGTH: Record<StrengthId, { label: string; infill: number; walls
   standard: { label: "Standard", infill: 15, walls: 2 },
   strong: { label: "Strong", infill: 25, walls: 3 },
 };
+
+/**
+ * THE INFILL PATTERN, AS THREE CHOICES THE ENGINE CAN ACTUALLY PRINT.
+ *
+ * «تظيف قائمة اسفل قائمة "القوة" بيها انواع الحشو، وتخلي اشهر ثلاث مثل gyroid
+ *  Cubic Lightning او غيرها ... كل واحد يغطي هدف من الثلاث "خفيف - متوسط - قوي".»
+ *
+ * Two of the three names the owner reached for do not survive this engine —
+ * and, worse, they LOOK supported. `types/settings-keys.d.ts` lists both
+ * `cubic` and `lightning` in the schema union, so TypeScript accepts either
+ * one without a murmur. The kernel is where the truth is:
+ * `engine/src/settings.js` declares the patterns it can actually fill with:
+ *
+ *   rectilinear, grid, triangles, zigzag, gyroid, gyroid_approx,
+ *   honeycomb, 3dhoneycomb, crosshatch, concentric
+ *
+ * and anything outside that list is rewritten to `rectilinear` WITHOUT a word
+ * to the user. So offering "Cubic" and "Lightning" would have shipped a menu
+ * whose two outer choices quietly printed the same plain zig-zag as each
+ * other — a UI that lies about what the machine is doing, which is the one
+ * thing this codebase does not do.
+ *
+ * These three are real, and they are genuinely the light / balanced / strong
+ * ends of what the kernel offers:
+ *
+ *   zigzag       one continuous back-and-forth line per layer. The least
+ *                material and the least travel of anything here, and the
+ *                weakest — the honest "light and fast".
+ *   gyroid       the TPMS surface. Equal strength in every direction and no
+ *                self-crossing, which is why it is the modern default. The
+ *                owner named this one and it is kept exactly as named.
+ *   3dhoneycomb  a honeycomb that also varies with height, so the walls carry
+ *                load across layers instead of only within one. The stiffest
+ *                of the set, and the most material and time.
+ *
+ * `label` is the pattern's own technical name and stays Latin in all three
+ * locales — the same precedent the Quality and Strength tiers already follow.
+ * The purpose word beside it ("light and fast" and so on) IS translated; those
+ * are the `infill*` keys in the dictionaries.
+ */
+export const INFILL = {
+  light: { label: "Zigzag", pattern: "zigzag" },
+  balanced: { label: "Gyroid", pattern: "gyroid" },
+  strong: { label: "3D Honeycomb", pattern: "3dhoneycomb" },
+} as const satisfies Record<InfillId, { label: string; pattern: string }>;
+
+export const DEFAULT_INFILL_ID: InfillId = "balanced";
+
+export function isInfillId(value: string): value is InfillId {
+  return Object.prototype.hasOwnProperty.call(INFILL, value);
+}
 
 export const PROFILES = {
   "bbl-x2d-04": {
@@ -179,4 +231,68 @@ export const DEFAULT_PROFILE_ID: ProfileId = "bbl-x2d-04";
 
 export function isProfileId(value: string): value is ProfileId {
   return Object.prototype.hasOwnProperty.call(PROFILES, value);
+}
+
+/**
+ * THE PRINTER IS ASKED FOR, NOT ASSUMED.
+ *
+ * «خلي الشخص يختار طابعته اول ما يدخل، لان حاليا من دخلت اختارلي x2d مباشرة.»
+ *
+ * DEFAULT_PROFILE_ID above is a seed for the very first render — the shell
+ * needs SOME machine to size the bed with before anything is chosen — and it
+ * was also, silently, the answer. A person who owns an A1 mini got an X2D's
+ * bed, an X2D's presets and an X2D's printable height without being asked.
+ *
+ * So the choice is stored, and the absence of a stored choice is what opens
+ * the first-run chooser. The value is one of two things:
+ *
+ *   a ProfileId   the person picked that printer.
+ *   DECLINED      the person was asked and closed the sheet without picking.
+ *                 The seed stays in force, but the question is not asked
+ *                 again on every visit; the Setup sheet is always there.
+ *
+ * A printer is not a secret, so localStorage is the right place; storage
+ * failures (private browsing, storage-denied) are non-fatal exactly as they
+ * are for the locale, and simply mean the question is asked again.
+ */
+export const PRINTER_STORAGE_KEY = "levo-studio-printer";
+
+/** Written when the chooser is dismissed without a pick. Never a ProfileId. */
+const PRINTER_CHOICE_DECLINED = "-";
+
+function readPrinterChoice(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(PRINTER_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** The stored printer, when one was actually picked; null otherwise. */
+export function readStoredProfileId(): ProfileId | null {
+  const stored = readPrinterChoice();
+  return stored && isProfileId(stored) ? stored : null;
+}
+
+/** True once the first-run question has been answered — by a pick OR a dismissal. */
+export function printerChoiceAnswered(): boolean {
+  return readPrinterChoice() !== null;
+}
+
+export function storeProfileId(id: ProfileId): void {
+  writePrinterChoice(id);
+}
+
+export function storePrinterChoiceDeclined(): void {
+  writePrinterChoice(PRINTER_CHOICE_DECLINED);
+}
+
+function writePrinterChoice(value: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PRINTER_STORAGE_KEY, value);
+  } catch {
+    // Storage-denied environments keep the in-memory choice for this session.
+  }
 }

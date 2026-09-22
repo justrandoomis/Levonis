@@ -40,6 +40,8 @@ export interface StoredLevoProject {
   quality: string;
   strength: string;
   support: boolean;
+  /** Infill pattern tier. Absent in drafts written before the control existed. */
+  infill?: string;
   settings?: SlicerSettings;
   objectCount?: number;
   plateCount?: number;

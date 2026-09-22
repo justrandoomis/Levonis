@@ -24,7 +24,7 @@ export type IconName =
   | "plus" | "file" | "move" | "rotate" | "scale" | "copy" | "trash" | "fit"
   | "bed" | "layers" | "slice" | "print" | "save" | "share" | "undo" | "redo"
   | "split" | "paint" | "info" | "settings" | "close" | "check" | "external"
-  | "arrange" | "orient" | "cut" | "warning";
+  | "arrange" | "orient" | "cut" | "warning" | "chevronUp" | "chevronDown";
 
 export function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
@@ -57,6 +57,10 @@ export function Icon({ name }: { name: IconName }) {
     // A dashed line through a body: where the cut goes.
     cut: <><path d="M6 4h12v16H6z"/><path d="M3 12h3M9 12h2M14 12h2M19 12h2" strokeDasharray="0"/></>,
     warning: <><path d="m12 3 10 18H2z"/><path d="M12 10v5M12 18h.01"/></>,
+    // The tool tray's shrink/grow control. Down means "this panel is tall,
+    // press to shorten it"; up means the opposite. No second cue is needed.
+    chevronUp: <><path d="m6 15 6-6 6 6"/></>,
+    chevronDown: <><path d="m6 9 6 6 6-6"/></>,
   };
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
