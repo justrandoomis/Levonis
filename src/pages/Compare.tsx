@@ -83,6 +83,13 @@ function blamedIds(error: unknown): string[] {
   if (error.code === 'COMPARE_NO_SPECS' && typeof details.product_id === 'string') {
     return [details.product_id];
   }
+  // «الفيلمنت مقابل الفيلمنت، الطابعة مقابل الطابعة». The server names the
+  // column that is not the same kind as the rest, in the same shape, so the
+  // page offers to drop it rather than showing a dead end with a perfectly
+  // good comparison one tap away behind it.
+  if (error.code === 'COMPARE_TYPE_MISMATCH' && typeof details.product_id === 'string') {
+    return [details.product_id];
+  }
   if (error.code === 'COMPARE_MERCHANT_PRODUCT' && Array.isArray(details.ids)) {
     return details.ids.filter((id): id is string => typeof id === 'string');
   }

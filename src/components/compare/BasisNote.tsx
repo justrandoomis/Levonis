@@ -21,6 +21,19 @@ import { compareStrings } from './strings';
  * when the technologies differ. Composing that label here from the product
  * cards would be a second opinion about what these things are, and it would
  * disagree with the groups below the first time a product's section moves.
+ *
+ * WHAT `mixed` MEANS NOW, AND WHY THE SENTENCE IS DUE A REWRITE.
+ *
+ * It used to mean "these are different kinds of thing", and the comparison
+ * was drawn anyway. GET /api/compare now REFUSES a set whose products state
+ * different types (`COMPARE_TYPE_MISMATCH`), so this branch is only reachable
+ * when NO product states a type at all — an unclassified corner of the
+ * taxonomy, not a filament against a printer. The reading the sentence gives
+ * («المنتجات مو من نوع واحد») is therefore narrower than it was and closer to
+ * "we cannot tell what kind these are". It is left as written here rather
+ * than paraphrased: the Kurdish copy in this shop is hand-written and never
+ * generated, so a replacement is the owner's to word. It is on the open
+ * decisions list.
  */
 export default function BasisNote({ result }: { result: CompareResult }) {
   const { lang } = useLanguage();

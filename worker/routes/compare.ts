@@ -430,6 +430,62 @@ compareRoutes.get('/', async (c) => {
   const tax = taxonomy(catalogRows);
   const placed = rows.map((row) => place(row, tax));
 
+  /**
+   * «في المقارنة … يجب أن يكون الفيلمنت مقابل الفيلمنت الطابعة مقابل الطابعة».
+   *
+   * A RULE, NOT A LABEL. The engine already NOTICED a mixed set —
+   * `basisOf` answers `basis: 'mixed'` and the page printed «مقارنة مختلطة:
+   * المنتجات مو من نوع واحد» over it — and then drew the comparison anyway.
+   * Two things with almost no field in common produce a table of «غير مذكور»
+   * and a score built out of whatever three attributes happen to overlap,
+   * which is worse than no answer: it looks like a verdict.
+   *
+   * Only a KNOWN, DIFFERENT type is a contradiction. A product whose branch
+   * does not name a type resolves to `null`, and refusing on that would make
+   * an unclassified product uncomparable with anything — a taxonomy gap
+   * turned into a dead page. So `null` is "not stated", never "different".
+   *
+   * It is refused BEFORE the spec-sheet check, because a filament next to a
+   * printer is not a product the right sheet would fix, and it blames one
+   * `product_id` in the shape `COMPARE_NO_SPECS` already uses — that is what
+   * lets the page offer to drop that column and carry on rather than showing
+   * a dead end.
+   */
+  const typed = placed.filter((p) => p.productType !== null);
+  if (typed.length > 1) {
+    /**
+     * THE COLUMN TO BLAME IS THE MINORITY ONE, not whichever type happens to
+     * be first in the URL.
+     *
+     * The refusal exists to be ACTED ON — the page reads `product_id` and
+     * offers to drop that column. On «spool, printer, printer» a
+     * first-wins rule blames a printer, and dropping it leaves «spool,
+     * printer», still refused: the affordance would be wrong on its first tap
+     * and would take two. Counting instead means the one tap always resolves
+     * it, and on a tie of two it is the second column that goes, which is the
+     * one the visitor added last.
+     */
+    const counts = new Map<string, number>();
+    for (const p of typed) counts.set(p.productType as string, (counts.get(p.productType as string) ?? 0) + 1);
+    let majority = typed[0].productType as string;
+    for (const [type, n] of counts) {
+      if (n > (counts.get(majority) ?? 0)) majority = type;
+    }
+    const odd = typed.find((p) => p.productType !== majority);
+    const keeper = typed.find((p) => p.productType === majority)!;
+    if (odd) {
+      throw badRequest(
+        `المقارنة تصير بين أشياء من نفس النوع — فيلمنت مقابل فيلمنت وطابعة مقابل طابعة. ` +
+          `«${label(odd.row)}» مو من نفس نوع «${label(keeper.row)}». / ` +
+          `A comparison is between things of the same kind — filament against filament, ` +
+          `printer against printer. “${odd.row.name || odd.row.slug}” is not the same kind as ` +
+          `“${keeper.row.name || keeper.row.slug}”.`,
+        'COMPARE_TYPE_MISMATCH',
+        { product_id: odd.row.id, expected_type: majority, got_type: odd.productType }
+      );
+    }
+  }
+
   const blank = placed.find((p) => !hasAnySpec(p.specs));
   if (blank) {
     throw badRequest(
@@ -550,10 +606,27 @@ export async function rankCompareCandidates(
     // or all-empty document.
     if (!hasAnySpec(placed.specs)) continue;
 
+    /**
+     * SAME TYPE IS NOT A PREFERENCE ANY MORE, IT IS THE GATE.
+     *
+     * It used to be the strongest SCORE (+8), which meant a printer's picker
+     * still listed spools once the printers ran out — and GET /api/compare
+     * now refuses that pair by name, so every one of those rows was a tap
+     * that ends in a refusal. The picker must only show what the comparison
+     * will actually draw, which is the same rule that keeps a product with no
+     * spec sheet out of this list.
+     *
+     * Gated on the ANCHOR having a known type: a product whose branch names
+     * none would otherwise have an empty picker, and an unclassified product
+     * that can be compared with nothing is a taxonomy gap turned into a dead
+     * feature. There the old ranking still applies and the refusal above
+     * cannot fire either, because `null` is "not stated", never "different".
+     */
+    if (anchorPlaced.productType !== null && placed.productType !== anchorPlaced.productType) continue;
+
     let score = 0;
-    // SAME TYPE IS THE STRONGEST SIGNAL. A printer compared with a spool of
-    // filament shares almost no field, and a picker that offers it is a picker
-    // people stop trusting on the first tap.
+    // Kept as a score as well as a gate: with no anchor type, this is still
+    // the strongest signal among a mixed pool.
     if (placed.productType && placed.productType === anchorPlaced.productType) score += 8;
     // Same shelf, then anywhere in the same branch — «طابعات FDM» beats
     // «الطابعات», which still beats an unrelated section.
