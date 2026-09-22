@@ -37,8 +37,8 @@ export default function GuestCard() {
   const s = STRINGS[lang] ?? STRINGS.ar;
 
   return (
-    <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-5 mb-3 shadow-sm text-black dark:text-white text-center">
-      <div className="w-14 h-14 rounded-full bg-black/5 dark:bg-white/10 mx-auto flex items-center justify-center mb-3" aria-hidden="true">
+    <div className="rounded-xl p-5 mb-3 shadow-sm text-center bg-[#1a1a1a] text-white">
+      <div className="w-14 h-14 rounded-full mx-auto flex items-center justify-center mb-3 bg-white/10" aria-hidden="true">
         <UserRound className="w-7 h-7 text-zinc-500" strokeWidth={1.5} />
       </div>
       <h2 className="font-bold text-[15px] mb-1">{s.title}</h2>
@@ -54,7 +54,7 @@ export default function GuestCard() {
       <button
         type="button"
         onClick={() => navigate('/support')}
-        className="mt-2 w-full min-h-[44px] flex items-center justify-center gap-2 rounded-xl border border-black/10 dark:border-white/15 text-[13px] font-bold text-zinc-700 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5 active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-colors"
+        className="mt-2 w-full min-h-[44px] flex items-center justify-center gap-2 rounded-xl border text-[13px] font-bold active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-colors border-white/15 text-zinc-300 hover:bg-white/5"
       >
         <Headset className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
         {s.support}

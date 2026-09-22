@@ -75,7 +75,7 @@ export default function QrCodeModal({
      contrast and the code simply does not read; a translucent panel would put
      whatever the profile page is showing behind the quiet zone. So the material
      is opted out of and the panel brings its own ground — the same
-     `bg-white dark:bg-[#1a1a1a]` it always had. Everything else about the
+     `bg-[#1a1a1a]` it always had. Everything else about the
      window (the spring arrival, the symmetric exit, the scrim, Escape, the
      reduced-motion cross-fade) is unchanged by that.
 
@@ -149,7 +149,7 @@ export default function QrCodeModal({
       // Geometry and the opaque ground the QR needs; the padding that used to
       // sit on this box has moved inside, where the primitive's rounding and
       // shadow cannot be fought over.
-      panelClassName="w-full max-w-xs bg-white dark:bg-[#1a1a1a] text-black dark:text-white"
+      panelClassName="w-full max-w-xs bg-[#1a1a1a] text-white"
     >
       <div className="p-5">
         <div className="flex items-center justify-between mb-3">
@@ -162,7 +162,7 @@ export default function QrCodeModal({
             type="button"
             onClick={close}
             aria-label={s.close}
-            className="w-11 h-11 -me-2 flex items-center justify-center rounded-full text-zinc-500 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-colors"
+            className="w-11 h-11 -me-2 flex items-center justify-center rounded-full text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-colors hover:text-white hover:bg-white/10"
           >
             <X className="w-5 h-5" />
           </button>
@@ -183,7 +183,7 @@ export default function QrCodeModal({
               </svg>
             </div>
             <p className="text-[11px] text-zinc-500 text-center mt-3 leading-snug">{s.subtitle}</p>
-            <p dir="ltr" className="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 text-center mt-1.5 break-all select-all">
+            <p dir="ltr" className="text-[10px] font-mono text-center mt-1.5 break-all select-all text-zinc-400">
               {link}
             </p>
             <button

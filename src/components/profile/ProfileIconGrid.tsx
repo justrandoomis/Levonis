@@ -30,7 +30,7 @@ export default function ProfileIconGrid({
             type="button"
             onClick={item.onClick}
             aria-label={item.label}
-            className="w-11 h-11 flex items-center justify-center rounded-full text-black dark:text-white hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-transform"
+            className="w-11 h-11 flex items-center justify-center rounded-full active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] transition-transform text-white hover:bg-white/10"
           >
             <item.icon className="h-[18px] w-[18px]" strokeWidth={1.7} aria-hidden="true" />
           </button>
@@ -47,7 +47,7 @@ export default function ProfileIconGrid({
           type="button"
           onClick={item.onClick}
           aria-label={item.label}
-          className="flex min-h-[44px] min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-1 text-zinc-700 hover:bg-black/5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus dark:text-zinc-300 dark:hover:bg-white/[0.06]"
+          className="flex min-h-[44px] min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 py-1 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus text-zinc-300 hover:bg-white/[0.06]"
         >
           <span className="flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
             <item.icon className="h-[18px] w-[18px]" strokeWidth={1.7} />

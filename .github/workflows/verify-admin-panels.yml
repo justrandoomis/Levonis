@@ -1,4 +1,4 @@
-name: 54 - Admin panels really mount (no deployment)
+name: 54 - Panels mount, and pages stay dark (no deployment)
 
 # «في التحقق والعناوين في لوحة الإدارة عند الضغط عليها يصبح الموقع بالكامل
 #  أسود شاشة سوداء.»
@@ -27,6 +27,12 @@ on:
       - 'tests/browser/admin-panels*'
       - 'scripts/e2e-admin-panels.mjs'
       - 'tests/adminMoneyAndCrash.test.ts'
+      - 'tests/darkOnlyTheme.test.ts'
+      - 'src/pages/Chats.tsx'
+      - 'src/pages/Profile.tsx'
+      - 'src/components/profile/**'
+      - 'tests/browser/light-mode*'
+      - 'scripts/e2e-light-mode.mjs'
       - '.github/workflows/verify-admin-panels.yml'
   workflow_dispatch: {}
 
@@ -52,7 +58,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
 
       - name: The source contract the proof depends on
-        run: node --import tsx --test tests/adminMoneyAndCrash.test.ts
+        run: node --import tsx --test tests/adminMoneyAndCrash.test.ts tests/darkOnlyTheme.test.ts
 
       - name: Install an isolated browser engine
         run: |
@@ -84,4 +90,38 @@ jobs:
         with:
           name: admin-panel-proof
           path: /tmp/levonis-diagnostics/admin-panels
+          if-no-files-found: warn
+
+      # «صفحة المحادثات + صفحة الحساب بال light mode حل المشكلة.» There is no
+      # light theme in this app; two pages had been written as a hand-rolled
+      # light/dark pair, and `dark:` compiles to the OS media query, so on a
+      # light-set phone they repainted themselves cream inside a black app. A
+      # source test can prove no `dark:` class survives. Only a render under an
+      # EMULATED light preference proves the page is dark for the person
+      # holding the phone — and that emulation IS the defect.
+      - name: The pages stay dark when the phone is set to light
+        env:
+          PLAYWRIGHT_MODULE: /tmp/levonis-browser/node_modules/playwright
+          OUT_DIR: /tmp/levonis-diagnostics/light-mode
+        run: |
+          mkdir -p /tmp/levonis-diagnostics/light-mode
+          node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4178 > /tmp/levonis-diagnostics/light-mode/vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4178/tests/browser/light-mode.html >/dev/null; then break; fi
+            sleep 1
+          done
+          set +e
+          node scripts/e2e-light-mode.mjs > /tmp/levonis-diagnostics/light-mode/proof.log 2>&1
+          result=$?
+          tail -40 /tmp/levonis-diagnostics/light-mode/proof.log
+          exit "$result"
+
+      - name: Keep the light-mode screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: light-mode-proof
+          path: /tmp/levonis-diagnostics/light-mode
           if-no-files-found: warn

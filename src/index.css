@@ -1071,3 +1071,62 @@ html[data-overlay-open='true'] .lv-app-intro__character {
 /* Transparent: it reserves a landing area, it is not a bar. Painting it made
    a solid strip appear and vanish around a slot the viewer never sees used. */
 .lv-character-fallback-header { display: grid; place-items: center; flex: 0 0 auto; min-height: var(--lv-header-hit); padding-top: env(safe-area-inset-top); }
+
+/* ---------------------------------------------------------------------------
+   THE LANGUAGE ARRIVING — «عند تغيّر اللغة … تخلي حركة خفيفة سلسلة انميشن ناعم
+   عند تنقل الكلام من اليمنة لليسرة (حسب اللغة المراد اختيارها) بدل الوضع
+   الحالي (انتقال لحظي وبدون تأثيرات)».
+
+   A language change was one `useState` flip: every consumer re-rendered in a
+   single commit and the whole page repainted instantly in the new script and
+   the new direction. There was no transition of any kind — no class, no
+   attribute, no View Transition.
+
+   ONE ENTER ANIMATION, NOT A FADE-OUT/FADE-IN PAIR. The language commits
+   exactly as it does today and the new paint is then played in. Nothing is
+   delayed behind a fade-out, no extra render is added, and what the person
+   sees is the new text settling into place along its own reading direction —
+   which is what was asked for.
+
+   WHY `main` AND NOT THE ROOT. A `transform` on an ancestor makes that
+   ancestor the containing block for every `position: fixed` descendant. The
+   header, the bottom nav and the intro character are all fixed, and the
+   character writes PHYSICAL viewport coordinates measured with
+   getBoundingClientRect() every frame — an ancestor transform would make the
+   measured rect and the containing block shift together and the written
+   transform double-count. `#main-scroll-container` and its full-screen-route
+   sibling hold the routed content and none of that chrome, so they are the
+   correct element. The header is deliberately left alone for a second reason:
+   it holds the language switcher itself, and moving the control someone has
+   just pressed is worse than not moving it.
+
+   DIRECTION. The content settles toward the side the NEW language starts
+   reading from — in from the right for Arabic and Kurdish, in from the left
+   for English. 8px, which is a settle rather than a slide.
+
+   REDUCED MOTION is already answered above: that block neuters
+   `animation-duration` for every element, and `both` fill means the animation
+   lands on its `to` state, so the page simply appears with no travel. The
+   explicit rule below states the intent rather than relying on the sweep.
+   --------------------------------------------------------------------------- */
+@keyframes lv-lang-in-rtl {
+  from { opacity: 0; transform: translate3d(8px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes lv-lang-in-ltr {
+  from { opacity: 0; transform: translate3d(-8px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+html[data-lang-swap='rtl'] main {
+  animation: lv-lang-in-rtl 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+html[data-lang-swap='ltr'] main {
+  animation: lv-lang-in-ltr 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-lang-swap] main {
+    animation: none !important;
+  }
+}

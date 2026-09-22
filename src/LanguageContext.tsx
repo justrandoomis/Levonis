@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { Language, translations } from './translations';
 
 interface LanguageContextType {
@@ -88,6 +88,52 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     document.documentElement.dir = dir;
     document.documentElement.lang = lang;
   }, [dir, lang]);
+
+  /**
+   * THE NEW LANGUAGE ARRIVES INSTEAD OF APPEARING.
+   *
+   * «عند تغيّر اللغة من العربي للانقليزي … تخلي حركة خفيفة سلسلة انميشن ناعم
+   *  عند تنقل الكلام من اليمنة لليسرة (حسب اللغة المراد اختيارها) بدل الوضع
+   *  الحالي (انتقال لحظي وبدون تأثيرات).»
+   *
+   * This is deliberately ONE line of state and no render of its own. The
+   * language still commits exactly as it did — the tree re-renders, the new
+   * strings paint — and this marks the document so CSS can play that paint in.
+   * There is no fade-out to wait behind, no second commit, and no component
+   * anywhere needs to know it happened, which matters because there are six
+   * language switchers in the shop and the animation must not belong to any
+   * one of them.
+   *
+   * It runs AFTER the effect above by declaration order, so
+   * `document.documentElement.dir` already holds the NEW direction and the
+   * content settles toward the side the new language reads from.
+   *
+   * THE FIRST RUN IS SKIPPED. A page load is not a language change, and
+   * animating it would put a flicker on every cold start.
+   *
+   * THE ATTRIBUTE ALWAYS COMES OFF. `animationend` is the normal path; the
+   * timer is the one that matters — a hidden tab does not run animations, so
+   * without it a language changed in the background would leave the marker on
+   * and the next paint would replay it.
+   */
+  const firstLangRun = useRef(true);
+  useEffect(() => {
+    if (firstLangRun.current) {
+      firstLangRun.current = false;
+      return;
+    }
+    const root = document.documentElement;
+    root.setAttribute('data-lang-swap', dir);
+    const clear = () => root.removeAttribute('data-lang-swap');
+    const timer = window.setTimeout(clear, 400);
+    const main = document.querySelector('main');
+    main?.addEventListener('animationend', clear, { once: true });
+    return () => {
+      window.clearTimeout(timer);
+      main?.removeEventListener('animationend', clear);
+      clear();
+    };
+  }, [lang, dir]);
 
   return (
     <LanguageContext.Provider value={{ lang, setLang, t, loc: locBound, dir }}>

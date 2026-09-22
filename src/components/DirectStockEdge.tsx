@@ -25,7 +25,7 @@ export default function DirectStockEdge({ product }: { product: ApiProduct }) {
     <span
       data-direct-stock-edge
       aria-label={label}
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex h-3 items-center justify-center overflow-hidden border-t border-white/[0.035] bg-[linear-gradient(90deg,rgba(82,82,91,0.035),rgba(161,161,170,0.11),rgba(82,82,91,0.035))] px-1.5 text-[8px] font-medium leading-none text-zinc-500 shadow-[0_-4px_14px_rgba(161,161,170,0.05)] backdrop-blur-[2px] dark:text-zinc-300/75"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex h-3 items-center justify-center overflow-hidden border-t border-white/[0.035] bg-[linear-gradient(90deg,rgba(82,82,91,0.035),rgba(161,161,170,0.11),rgba(82,82,91,0.035))] px-1.5 text-[8px] font-medium leading-none shadow-[0_-4px_14px_rgba(161,161,170,0.05)] backdrop-blur-[2px] text-zinc-300/75"
     >
       <span className="max-w-full truncate [text-shadow:0_1px_5px_rgba(0,0,0,0.35)]">{label}</span>
     </span>

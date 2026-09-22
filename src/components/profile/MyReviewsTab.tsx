@@ -71,9 +71,9 @@ const STRINGS = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  published: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  pending: 'bg-amber-900/30 text-amber-400',
+  published: 'bg-emerald-900/30 text-emerald-400',
+  rejected: 'bg-red-900/30 text-red-400',
 };
 
 export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boolean }) {
@@ -149,7 +149,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
         <button
           type="button"
           onClick={load}
-          className="min-h-[44px] px-6 inline-flex items-center gap-1.5 rounded-xl border border-black/10 dark:border-white/15 text-[13px] font-bold text-zinc-700 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+          className="min-h-[44px] px-6 inline-flex items-center gap-1.5 rounded-xl border text-[13px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] border-white/15 text-zinc-300 hover:bg-white/5"
         >
           <RefreshCw className="w-4 h-4" aria-hidden="true" />
           {s.retry}
@@ -172,7 +172,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
       {reviews.map((r) => {
         // §3/§12: the product name is English in every language and is never translated.
         const name = r.product_name || '';
-        const statusCls = STATUS_STYLES[r.status] ?? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400';
+        const statusCls = STATUS_STYLES[r.status] ?? 'bg-zinc-800 text-zinc-400';
         return (
           <button
             key={r.id}
@@ -180,7 +180,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
             onClick={() => {
               if (r.product_slug) navigate(`/product/${r.product_slug}`);
             }}
-            className="bg-white dark:bg-[#1a1a1a] rounded-[10px] p-3 text-start shadow-sm border border-black/5 dark:border-white/5 text-black dark:text-white hover:bg-black/[0.02] dark:hover:bg-white/[0.03] active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            className="rounded-[10px] p-3 text-start shadow-sm border active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] bg-[#1a1a1a] border-white/5 text-white hover:bg-white/[0.03]"
           >
             <div className="flex items-center justify-between gap-2 mb-1">
               <span className="font-bold text-[13px] truncate">{name}</span>
@@ -192,27 +192,27 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
               {[1, 2, 3, 4, 5].map((i) => (
                 <Star
                   key={i}
-                  className={`w-3.5 h-3.5 ${i <= r.stars ? 'text-[#BAA369] fill-[#BAA369]' : 'text-zinc-300 dark:text-zinc-700'}`}
+                  className={`w-3.5 h-3.5 ${i <= r.stars ? 'text-[#BAA369] fill-[#BAA369]' : 'text-zinc-700'}`}
                   aria-hidden="true"
                 />
               ))}
             </div>
-            <p className="text-[12px] text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-snug mb-1.5">
+            <p className="text-[12px] line-clamp-2 leading-snug mb-1.5 text-zinc-400">
               {r.system_generated || r.source === 'system' ? s.systemGenerated : r.body}
             </p>
             <div className="flex items-center justify-between text-[10px] text-zinc-500">
               <span>{fmtDate(r.created_at)}</span>
               <span className="flex items-center gap-1">
                 {r.reward?.state === 'approved' && r.reward.kind === 'points' && r.reward.points_awarded > 0 && (
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  <span className="font-bold text-emerald-400">
                     {s.pointsAwarded(r.reward.points_awarded)}
                   </span>
                 )}
                 {r.reward?.state === 'approved' && r.reward.kind === 'printer_gift' && (
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">{s.giftReward}</span>
+                  <span className="font-bold text-emerald-400">{s.giftReward}</span>
                 )}
                 {!r.reward && Number(r.fallback_points_awarded) > 0 && (
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  <span className="font-bold text-emerald-400">
                     {s.pointsAwarded(Number(r.fallback_points_awarded))}
                   </span>
                 )}

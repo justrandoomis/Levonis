@@ -368,24 +368,24 @@ export default function Chats() {
             <button
               key={chat.id}
               onClick={() => navigate(`/chat/${chat.id}`)}
-              className="flex items-center gap-4 px-4 py-3 min-h-[64px] hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5 text-start w-full"
+              className="flex items-center gap-4 px-4 py-3 min-h-[64px] transition-colors border-b text-start w-full hover:bg-white/5 border-white/5"
             >
               <div className="relative">
-                <div className="w-14 h-14 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center shrink-0 overflow-hidden border border-black/5 dark:border-white/5">
-                  <span className="text-lg font-bold text-black dark:text-white">{name.charAt(0).toUpperCase()}</span>
+                <div className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 overflow-hidden border bg-zinc-800 border-white/5">
+                  <span className="text-lg font-bold text-white">{name.charAt(0).toUpperCase()}</span>
                 </div>
                 {chat.unread > 0 && (
-                  <span className="absolute top-0 end-0 bg-[#ff5000] text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-[#f2f2f2] dark:border-[#000000]">
+                  <span className="absolute top-0 end-0 bg-[#ff5000] text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-canvas">
                     {chat.unread > 99 ? '99+' : chat.unread}
                   </span>
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-center mb-1">
-                  <h3 className="text-[16px] font-bold text-black dark:text-white truncate">{name}</h3>
+                  <h3 className="text-[16px] font-bold truncate text-white">{name}</h3>
                   <span className="text-[12px] text-zinc-500 whitespace-nowrap ms-2">{formatChatTime(chat.last_at, lang)}</span>
                 </div>
-                <p className="text-[14px] text-[#666] dark:text-zinc-400 truncate">{chat.last_message || s.noMessages}</p>
+                <p className="text-[14px] truncate text-zinc-400">{chat.last_message || s.noMessages}</p>
               </div>
             </button>
           );
@@ -394,14 +394,33 @@ export default function Chats() {
     );
   }
 
+  /*
+    THIS PAGE IS DARK, FULL STOP — «صفحة المحادثات + صفحة الحساب بال light
+    mode حل المشكلة».
+
+    The app has no light theme and no theme switch: `html` is pinned
+    `color-scheme: dark` and `#0b0c0f`, and every shared component is
+    tokenised for that one ground. But this page and /profile were written
+    as a hand-rolled light/dark PAIR — `bg-[#f2f2f2] dark:bg-[#000000]` —
+    and Tailwind v4 with no config compiles `dark:` to
+    `@media (prefers-color-scheme: dark)`. On a phone set to LIGHT the dark
+    half simply evaporated: these two pages repainted themselves cream
+    inside a permanently black app, with every shared component still
+    painting dark on top. That is the grey-on-grey the owner photographed.
+
+    The light half is gone rather than completed. There is no light theme
+    to complete it into, and inventing one would be a new feature rather
+    than a fix — so these pages now use the same tokens as the shell they
+    live in, and read identically at every OS setting.
+  */
   return (
     <div
-      className="w-full bg-[#f2f2f2] dark:bg-[#000000] min-h-screen flex flex-col font-sans text-[#333] dark:text-[#ccc]"
+      className="w-full min-h-screen flex flex-col font-sans bg-canvas text-text-secondary"
       dir={dir}
     >
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-[#f2f2f2] dark:bg-[#000000] px-4 py-3 flex items-center justify-between border-b border-black/5 dark:border-white/5">
-        <h1 className="font-bold text-2xl text-black dark:text-white">{t('webCenter') || s.title}</h1>
+      <div className="sticky top-0 z-40 px-4 py-3 flex items-center justify-between border-b bg-canvas/95 backdrop-blur border-border-subtle/60">
+        <h1 className="font-bold text-2xl text-white">{t('webCenter') || s.title}</h1>
         <button
           onClick={() => {
             setShowSearch((v) => !v);
@@ -409,14 +428,14 @@ export default function Chats() {
           }}
           aria-label={showSearch ? s.searchClose : s.searchOpen}
           aria-expanded={showSearch}
-          className="w-11 h-11 -me-2 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-black dark:text-white"
+          className="w-11 h-11 -me-2 flex items-center justify-center rounded-full transition-colors hover:bg-white/10 text-white"
         >
           {showSearch ? <X aria-hidden="true" className="w-6 h-6" /> : <Search aria-hidden="true" className="w-6 h-6" />}
         </button>
       </div>
 
       {showSearch && (
-        <div className="px-4 py-2 bg-[#f2f2f2] dark:bg-[#000000] border-b border-black/5 dark:border-white/5">
+        <div className="px-4 py-2 border-b bg-canvas border-white/5">
           <input
             type="text"
             autoFocus
@@ -424,7 +443,7 @@ export default function Chats() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder={s.search}
             aria-label={s.search}
-            className="w-full min-h-[44px] bg-white dark:bg-[#1a1a1a] border border-black/10 dark:border-white/10 rounded-full py-2 px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-gold text-black dark:text-white"
+            className="w-full min-h-[44px] border rounded-full py-2 px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-gold bg-[#1a1a1a] border-white/10 text-white"
           />
         </div>
       )}
@@ -436,14 +455,14 @@ export default function Chats() {
           type="button"
           data-testid="chats-assistant"
           onClick={() => navigate('/support')}
-          className="w-full min-h-[64px] flex items-center gap-3 rounded-2xl border border-zinc-300 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-4 py-3 text-start hover:border-gold/60 transition-colors"
+          className="w-full min-h-[64px] flex items-center gap-3 rounded-2xl border px-4 py-3 text-start hover:border-gold/60 transition-colors border-zinc-800 bg-zinc-900/60"
         >
           <span className="w-11 h-11 rounded-xl bg-gold/15 border border-gold/30 flex items-center justify-center shrink-0">
             <Bot aria-hidden="true" className="w-5 h-5 text-gold" />
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block font-bold text-[15px] text-black dark:text-white">{s.assistant}</span>
-            <span className="block text-[12px] text-zinc-500 dark:text-zinc-400 truncate">{s.assistantDesc}</span>
+            <span className="block font-bold text-[15px] text-white">{s.assistant}</span>
+            <span className="block text-[12px] truncate text-zinc-400">{s.assistantDesc}</span>
           </span>
           <Chevron aria-hidden="true" className="w-5 h-5 text-zinc-400 shrink-0" />
         </button>
@@ -452,14 +471,14 @@ export default function Chats() {
           type="button"
           data-testid="chats-contact"
           onClick={openSupportSheet}
-          className="w-full min-h-[64px] flex items-center gap-3 rounded-2xl border border-zinc-300 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-4 py-3 text-start hover:border-gold/60 transition-colors"
+          className="w-full min-h-[64px] flex items-center gap-3 rounded-2xl border px-4 py-3 text-start hover:border-gold/60 transition-colors border-zinc-800 bg-zinc-900/60"
         >
           <span className="w-11 h-11 rounded-xl bg-olive/20 border border-olive/40 flex items-center justify-center shrink-0">
             <LifeBuoy aria-hidden="true" className="w-5 h-5 text-olive" />
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block font-bold text-[15px] text-black dark:text-white">{s.contact}</span>
-            <span className="block text-[12px] text-zinc-500 dark:text-zinc-400 truncate">{s.contactDesc}</span>
+            <span className="block font-bold text-[15px] text-white">{s.contact}</span>
+            <span className="block text-[12px] truncate text-zinc-400">{s.contactDesc}</span>
           </span>
           <Chevron aria-hidden="true" className="w-5 h-5 text-zinc-400 shrink-0" />
         </button>
