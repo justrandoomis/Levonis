@@ -43,7 +43,7 @@ import {
   type TopicBinding,
   type TopicKey,
 } from './telegramAdmin';
-import { resolveAdminActor } from './walletNotify';
+import { actorLabel, resolveAdminActor } from './walletNotify';
 
 // ------------------------------------------------------------------- types
 
@@ -128,6 +128,7 @@ const TXT_HELP = [
   '',
   '/start — البداية',
   '/help — هذه القائمة',
+  '/whoami — رقمك ومستوى صلاحيتك',
   '/status — حالة البوت والمجموعة',
   '/topics — حالة ربط المواضيع',
   '/topic_here <اسم> — يربط الموضوع الحالي',
@@ -166,6 +167,9 @@ export async function handleAdminCommand(ctx: CommandContext): Promise<CommandOu
     case 'status':
       await reply(ctx, await statusText(ctx));
       return 'replied';
+    case 'whoami':
+      await reply(ctx, await whoamiText(ctx));
+      return 'replied';
     case 'topics':
       await reply(ctx, await topicsText(ctx));
       return 'replied';
@@ -186,6 +190,70 @@ export async function refuseUnauthorized(env: Env, msg: AdminMessage): Promise<v
   // this bot exists and is listening. Only a private chat gets the sentence.
   if (msg.chat?.type !== 'private') return;
   await sendMessageToChat(env, chatId, TXT_UNAUTHORIZED, {}, 'admin');
+}
+
+// ----------------------------------------------------------------- /whoami
+
+/**
+ * «اجعل 6404042791 الادمن حتى يتمكن من اضافه وربط topic» — AND THE REASON IT
+ * IS NOT, IN ONE MESSAGE.
+ *
+ * `/topic_here` needs BOTH doors, and until now failing either one produced a
+ * message that did not say WHICH:
+ *
+ *   DOOR 1 — the bot allow-list, `TELEGRAM_ADMIN_USER_IDS`, a Worker secret.
+ *            Failing it means the webhook refuses before any command runs, and
+ *            §20 says an unauthorized sender learns nothing about the platform
+ *            — so in a GROUP the bot says nothing at all. Correct, and
+ *            indistinguishable from a bot that is down.
+ *   DOOR 2 — a row in `admin_tg_identities` joined to a site account whose
+ *            role is 'admin'. This is the door that authorises money, and it
+ *            is NOT granted by being on the allow-list.
+ *
+ * So somebody told "you are an admin now" tries `/topic_here`, gets silence or
+ * a sentence about a door they thought they were through, and has no way to
+ * find out which half is missing — or even what their own numeric id is, which
+ * is the one fact needed to fix door 1.
+ *
+ * This answers all of it: the id to paste into the secret, and a tick or a
+ * cross per door with the exact remedy under whichever one failed.
+ *
+ * IT REVEALS NOTHING. The reader's own Telegram id is already theirs — every
+ * Telegram client will show it — and the two lines say only whether THEY pass.
+ * No other admin, no group, no topic and no customer is named. Door 1 still
+ * gates reaching this command at all, so it is not a probe for outsiders.
+ */
+async function whoamiText(ctx: CommandContext): Promise<string> {
+  const { env, telegramUserId } = ctx;
+  // Door 1 is already proven — the webhook refuses before dispatch — but it is
+  // printed anyway, because a checklist that only ever shows the failing half
+  // leaves the reader unsure the other half was even looked at.
+  const actor = await resolveAdminActor(env, telegramUserId);
+  const lines = [
+    '🆔 رقمك في تيليغرام:',
+    // Alone on its line, with nothing around it: this gets copied on a phone
+    // and pasted into a secret, and a stray character there is a silent
+    // failure that looks exactly like this one.
+    String(telegramUserId),
+    '',
+    '✅ الباب الأول — قائمة أوامر البوت: مسموح.',
+  ];
+  if (actor) {
+    lines.push(
+      `✅ الباب الثاني — هوية إدارية على الموقع: ${actorLabel(actor)}.`,
+      '',
+      'تقدر تربط المواضيع: اكتب /topic_here داخل الموضوع المطلوب.'
+    );
+  } else {
+    lines.push(
+      '❌ الباب الثاني — هوية إدارية على الموقع: غير مربوطة.',
+      '',
+      'ربط المواضيع وأزرار اعتماد المحفظة يتطلبان هذا الباب.',
+      'الحل: لوحة الإدارة ← المستخدمون ← تيليغرام ← هويات المسؤولين،',
+      'واربط الرقم أعلاه بحساب دوره «admin».'
+    );
+  }
+  return lines.join('\n');
 }
 
 // ------------------------------------------------------------- /topic_here

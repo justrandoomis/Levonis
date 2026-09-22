@@ -1,5 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+// The compiled default, used ONLY as the fallback when the server has not
+// sent a configured rate. packages/shipping/src/codTax is a pure leaf with no
+// imports, so nothing of the Worker runtime enters the bundle.
+import { COD_TAX_BLOCK_IQD, COD_TAX_PER_BLOCK_IQD } from '../packages/shipping/src/codTax';
+
+/** A configured positive integer, or the compiled default. */
+function positiveOr(value: unknown, fallback: number): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : fallback;
+}
 import {
   api,
   WalletTx,
@@ -33,6 +43,14 @@ interface WalletContextType {
   checkoutPaymentMethods: CheckoutPaymentMethod[];
   cartShippingMethods: CartShippingMethod[];
   exchangeRate: number;
+  /**
+   * THE DOOR CHARGE, as two numbers: what one block costs and how big a block
+   * is. Read from the same public settings the exchange rate comes from, and
+   * falling back to the shipping module's compiled default so a client talking
+   * to an older server still prints a real rate rather than «undefined».
+   */
+  codTaxPerBlockIqd: number;
+  codTaxBlockIqd: number;
   currency: 'IQD' | 'USD';
   adVideoUrl: string;
   settings: PublicSettings | null;
@@ -47,6 +65,7 @@ interface WalletContextType {
   updateCheckoutPaymentMethods: (methods: CheckoutPaymentMethod[]) => Promise<void>;
   updateCartShippingMethods: (methods: CartShippingMethod[]) => Promise<void>;
   setExchangeRate: (rate: number) => Promise<void>;
+  setCodTaxRate: (rate: { perBlockIqd: number; blockIqd: number }) => Promise<void>;
   setCurrency: (currency: 'IQD' | 'USD') => Promise<void>;
   setAdVideoUrl: (url: string) => Promise<void>;
 }
@@ -138,6 +157,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     checkoutPaymentMethods: settings?.checkoutPaymentMethods ?? [],
     cartShippingMethods: settings?.cartShippingMethods ?? [],
     exchangeRate: settings?.exchangeRate ?? 1400,
+    codTaxPerBlockIqd: positiveOr(settings?.codTaxPerBlockIqd, COD_TAX_PER_BLOCK_IQD),
+    codTaxBlockIqd: positiveOr(settings?.codTaxBlockIqd, COD_TAX_BLOCK_IQD),
     currency: settings?.currency ?? 'IQD',
     adVideoUrl: settings?.adVideoUrl ?? '',
     settings,
@@ -151,6 +172,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     updateCheckoutPaymentMethods: (m) => saveSetting('checkoutPaymentMethods', m),
     updateCartShippingMethods: (m) => saveSetting('cartShippingMethods', m),
     setExchangeRate: (rate) => saveSetting('exchangeRate', rate),
+    // TWO WRITES, NOT ONE ROUND TRIP EACH: the pair is a single rate and a
+    // half-applied change would charge «3,000 عن كل 1,000,000» until the
+    // second save landed. They are awaited in order and the second is not
+    // attempted if the first is refused.
+    setCodTaxRate: async ({ perBlockIqd, blockIqd }) => {
+      await saveSetting('codTaxBlockIqd', blockIqd);
+      await saveSetting('codTaxPerBlockIqd', perBlockIqd);
+    },
     setCurrency: (c) => saveSetting('currency', c),
     setAdVideoUrl: (url) => saveSetting('adVideoUrl', url),
   };

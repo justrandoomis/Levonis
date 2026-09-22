@@ -147,16 +147,37 @@ test('the tax is named after WHO takes it, and the «!» quotes the policy modul
     CHECKOUT.includes("codTax: 'باجی پارەدان لە کاتی گەیاندن',"),
     'the Sorani name is hand-written and must not be machine-renamed'
   );
+  /**
+   * THE RATE IS THE ADMINISTRATOR'S NOW, so the sentence must quote the
+   * CONFIGURED pair rather than the compiled constants.
+   *
+   * The old assertion — that the sentence interpolates the constants — was
+   * right when the rate could only change by a deploy, and became exactly
+   * wrong when it could change from a form: a screen quoting 3,000 beside a
+   * charge of 10,000 is the drift this whole test exists to prevent, just in
+   * the other direction. The constants are still imported, because a client
+   * talking to a server older than the setting needs a real number to fall
+   * back to, and that fallback is asserted too.
+   */
   assert.ok(
     CHECKOUT.includes("import { COD_TAX_BLOCK_IQD, COD_TAX_PER_BLOCK_IQD } from '../../packages/shipping/src/codTax'"),
-    'the explanation must read the rate the server charges by, not a sentence typed beside it'
+    'the compiled default must still be imported as the fallback'
   );
   assert.ok(
-    CHECKOUT.includes('${formatIqd(COD_TAX_PER_BLOCK_IQD)} عن كل ${formatIqd(COD_TAX_BLOCK_IQD)}'),
-    'the «!» must state the rate from the constants'
+    CHECKOUT.includes('${formatIqd(codTaxPerBlockIqd)} عن كل ${formatIqd(codTaxBlockIqd)}'),
+    'the «!» must state the rate the server was configured with'
   );
-  // The owner stated the rate from memory; this is the rate in force.
-  assert.equal(COD_TAX_PER_BLOCK_IQD, 6_000);
+  assert.ok(
+    CHECKOUT.includes("const codTaxPerBlockIqd = settingRate(settings?.codTaxPerBlockIqd, COD_TAX_PER_BLOCK_IQD);"),
+    'and that rate must come from the public settings, falling back to the constant'
+  );
+  assert.ok(
+    CHECKOUT.includes("const codTaxBlockIqd = settingRate(settings?.codTaxBlockIqd, COD_TAX_BLOCK_IQD);"),
+    'both halves of the rate, or the sentence divides by the wrong block'
+  );
+  // The owner halved it: «اجعلها 3 الف لكل 500 الف». This is the DEFAULT an
+  // unconfigured shop charges, not a ceiling.
+  assert.equal(COD_TAX_PER_BLOCK_IQD, 3_000);
   assert.equal(COD_TAX_BLOCK_IQD, 500_000);
   // WHERE `data-checkout-cod-tax` WENT. The row is a <SummaryInfo> now, and
   // the component stamps `data-summary-row` on every row it owns — so the hook

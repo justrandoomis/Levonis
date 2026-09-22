@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useWallet, PaymentMethod } from '../WalletContext';
 import { ApiError } from '../lib/api';
-import { Check, Edit2, Plus, Trash2, Video, DollarSign, CreditCard, Save, AlertTriangle } from 'lucide-react';
+import { Check, Edit2, Plus, Trash2, Video, DollarSign, CreditCard, Save, AlertTriangle, Truck } from 'lucide-react';
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -32,6 +32,7 @@ function SaveStatus({ state, error }: { state: SaveState; error?: string | null 
 export default function AdminWalletSettings() {
   const {
     exchangeRate, setExchangeRate,
+    codTaxPerBlockIqd, codTaxBlockIqd, setCodTaxRate,
     adVideoUrl, setAdVideoUrl,
     paymentMethods, updatePaymentMethods,
     isLoaded,
@@ -41,6 +42,11 @@ export default function AdminWalletSettings() {
   const [rateInput, setRateInput] = useState<string>('');
   const [rateState, setRateState] = useState<SaveState>('idle');
   const [rateError, setRateError] = useState<string | null>(null);
+
+  const [codPerInput, setCodPerInput] = useState<string>('');
+  const [codBlockInput, setCodBlockInput] = useState<string>('');
+  const [codState, setCodState] = useState<SaveState>('idle');
+  const [codError, setCodError] = useState<string | null>(null);
 
   const [urlInput, setUrlInput] = useState<string>('');
   const [urlState, setUrlState] = useState<SaveState>('idle');
@@ -58,6 +64,8 @@ export default function AdminWalletSettings() {
     if (!isLoaded || hydratedRef.current) return;
     hydratedRef.current = true;
     setRateInput(String(exchangeRate));
+    setCodPerInput(String(codTaxPerBlockIqd));
+    setCodBlockInput(String(codTaxBlockIqd));
     setUrlInput(adVideoUrl);
     setMethods(paymentMethods);
   }, [isLoaded, exchangeRate, adVideoUrl, paymentMethods]);
@@ -67,6 +75,13 @@ export default function AdminWalletSettings() {
     if (!hydratedRef.current) return;
     if (rateState === 'idle' || rateState === 'saved') setRateInput(String(exchangeRate));
   }, [exchangeRate]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (codState === 'idle' || codState === 'saved') {
+      setCodPerInput(String(codTaxPerBlockIqd));
+      setCodBlockInput(String(codTaxBlockIqd));
+    }
+  }, [codTaxPerBlockIqd, codTaxBlockIqd]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!hydratedRef.current) return;
     if (urlState === 'idle' || urlState === 'saved') setUrlInput(adVideoUrl);
@@ -91,6 +106,37 @@ export default function AdminWalletSettings() {
     } catch (e) {
       setRateState('error');
       setRateError(e instanceof ApiError ? e.message : 'Save failed');
+    }
+  };
+
+  /**
+   * THE BLOCK IS WHAT GETS DIVIDED BY, so it is the one that is guarded
+   * hardest: a zero would make the charge Infinity, and a fractional one
+   * would make «عن كل 500000.5» a sentence nobody can act on. A per-block of
+   * exactly 0 is allowed and means the charge is switched off — a thing an
+   * owner may genuinely want and should not have to delete a row to get.
+   */
+  const handleSaveCodTax = async () => {
+    const per = parseInt(codPerInput, 10);
+    const block = parseInt(codBlockInput, 10);
+    if (!Number.isFinite(per) || per < 0) {
+      setCodState('error');
+      setCodError('Enter a whole number of IQD per block (0 disables the charge)');
+      return;
+    }
+    if (!Number.isFinite(block) || block < 1) {
+      setCodState('error');
+      setCodError('The block must be a whole number of IQD, at least 1');
+      return;
+    }
+    setCodState('saving');
+    setCodError(null);
+    try {
+      await setCodTaxRate({ perBlockIqd: per, blockIqd: block });
+      setCodState('saved');
+    } catch (e) {
+      setCodState('error');
+      setCodError(e instanceof ApiError ? e.message : 'Save failed');
     }
   };
 
@@ -177,6 +223,65 @@ export default function AdminWalletSettings() {
               Product prices are stored in IQD and are not affected by rate changes; the rate only converts wallet USD at checkout.
             </p>
             <SaveStatus state={rateState} error={rateError} />
+          </div>
+        </div>
+
+        {/* THE DELIVERY COMPANY'S CASH-HANDLING CHARGE — «قابله للتغير من قبل
+            الادارة». It was compiled into packages/shipping until the owner
+            halved it and asked for it to be theirs.
+
+            IT IS NOT RETROACTIVE, and the note says so: every order stores the
+            figure it was charged in `orders.cod_tax_iqd` at placement, so
+            lowering this today cannot rewrite last month's invoices. */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+              <Truck className="w-5 h-5 text-amber-500" />
+            </div>
+            <h3 className="text-lg font-bold text-white">Cash-on-Delivery Charge</h3>
+          </div>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-zinc-400">Charge</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={codPerInput}
+                    onChange={(e) => { setCodPerInput(e.target.value); setCodState('dirty'); }}
+                    disabled={!isLoaded}
+                    className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-[#6B46FF]/50 disabled:opacity-50"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">IQD</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-zinc-400">For every</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={codBlockInput}
+                    onChange={(e) => { setCodBlockInput(e.target.value); setCodState('dirty'); }}
+                    disabled={!isLoaded}
+                    className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-[#6B46FF]/50 disabled:opacity-50"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">IQD</span>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleSaveCodTax}
+              disabled={codState === 'saving' || !isLoaded}
+              className="w-full flex items-center justify-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-black px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" /> Save
+            </button>
+            <p className="text-[11px] text-zinc-500">
+              Charged only on cash-on-delivery orders sent to an address — never on store pickup,
+              wallet or advance payment. Orders already placed keep the charge they were quoted;
+              changing this affects new orders only. Set the charge to 0 to switch it off.
+            </p>
+            <SaveStatus state={codState} error={codError} />
           </div>
         </div>
 

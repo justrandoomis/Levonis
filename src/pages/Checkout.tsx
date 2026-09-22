@@ -32,13 +32,16 @@ import SummaryInfo from '../components/ui/SummaryInfo';
  * THE TAX RATE THE «!» QUOTES IS THE RATE THE SERVER CHARGES.
  *
  * The delivery-company tax is explained to the customer in two numbers, and
- * those two numbers are the policy module's own — the same constants
- * `calculateCodTaxIqd` divides by. Typing «6,000 لكل 500,000» into a sentence
- * here would make this screen a second, silent copy of the rate that nobody
- * would remember to change. The module is a pure leaf with no imports at all,
- * so nothing of the Worker runtime enters the bundle; the precedent is
- * `src/lib/productImage.ts`, which reaches into `packages/pricing` for exactly
- * this reason.
+ * those two numbers have to be the ones the server divides by. Typing «3,000
+ * لكل 500,000» into a sentence here would make this screen a second, silent
+ * copy of a rate nobody would remember to change.
+ *
+ * THE RATE IS THE ADMINISTRATOR'S NOW, so the constants are no longer the
+ * answer — they are the FALLBACK, for a client talking to a server older than
+ * the setting. The live pair comes from `/api/settings/public`, which is also
+ * where the printer note and the exchange rate come from. The module stays
+ * imported for that fallback and for nothing else; it is a pure leaf with no
+ * imports at all, so nothing of the Worker runtime enters the bundle.
  */
 import { COD_TAX_BLOCK_IQD, COD_TAX_PER_BLOCK_IQD } from '../../packages/shipping/src/codTax';
 import BundleContents, { type BundleContentLine } from '../components/bundles/BundleContents';
@@ -307,6 +310,13 @@ const STRINGS = {
     policyTitle: 'الموافقة على السياسات',
     policyAgree: 'قرأتُ وأوافق على:',
     policyRequired: 'الموافقة على السياسات المنشورة مطلوبة لإتمام الطلب.',
+    blockEmpty: 'سلتك فارغة.',
+    blockAddress: 'اختر عنوان التوصيل أولاً.',
+    blockDelivery: 'اختر طريقة التوصيل.',
+    blockPayment: 'اختر طريقة الدفع.',
+    blockAdvance: 'الرصيد غير كافٍ للدفعة المقدمة المطلوبة — اشحن محفظتك أو اختر الاستلام من المخزن.',
+    blockQuote: 'تعذّر تسعير هذا الطلب الآن. راجع التنبيه أعلاه — قد يكون أحد المنتجات غير متوفر.',
+    blockedLabel: 'لا يمكن إتمام الطلب:',
     policyReset: 'تغيّر ملخص الطلب — يرجى تأكيد الموافقة مجدداً.',
     policyNames: { terms: 'شروط الاستخدام والبيع', privacy: 'سياسة الخصوصية' } as Record<string, string>,
     version: 'نسخة',
@@ -342,6 +352,13 @@ const STRINGS = {
     policyTitle: 'Policy consent',
     policyAgree: 'I have read and agree to:',
     policyRequired: 'Accepting the published policies is required to place the order.',
+    blockEmpty: 'Your cart is empty.',
+    blockAddress: 'Choose a delivery address first.',
+    blockDelivery: 'Choose a delivery method.',
+    blockPayment: 'Choose a payment method.',
+    blockAdvance: 'Your balance does not cover the required advance — top up your wallet or choose store pickup.',
+    blockQuote: 'This order could not be priced right now. See the notice above — an item may be out of stock.',
+    blockedLabel: 'Cannot place the order:',
     policyReset: 'The order summary changed — please confirm your agreement again.',
     policyNames: { terms: 'Terms of Use & Sale', privacy: 'Privacy Policy' } as Record<string, string>,
     version: 'v',
@@ -381,6 +398,13 @@ const STRINGS = {
     policyTitle: 'ڕەزامەندی لەسەر سیاسەتەکان',
     policyAgree: 'خوێندمەوە و ڕازیم بە:',
     policyRequired: 'ڕەزامەندی لەسەر سیاسەتە بڵاوکراوەکان پێویستە بۆ تەواوکردنی داواکاری.',
+    blockEmpty: 'سەبەتەکەت بەتاڵە.',
+    blockAddress: 'سەرەتا ناونیشانی گەیاندن هەڵبژێرە.',
+    blockDelivery: 'شێوازی گەیاندن هەڵبژێرە.',
+    blockPayment: 'شێوازی پارەدان هەڵبژێرە.',
+    blockAdvance: 'باڵانست پارەدانی پێشەکی پێویست ناگرێتەوە — جزدانەکەت پڕ بکەرەوە یان وەرگرتن لە فرۆشگا هەڵبژێرە.',
+    blockQuote: 'ئێستا نرخی ئەم داواکارییە دیاری نەکرا. سەیری ئاگاداری سەرەوە بکە — لەوانەیە بەرهەمێک بەردەست نەبێت.',
+    blockedLabel: 'داواکاری تەواو ناکرێت:',
     policyReset: 'پوختەی داواکارییەکە گۆڕا — تکایە دووبارە ڕەزامەندی دەربڕە.',
     policyNames: { terms: 'مەرجەکانی بەکارهێنان و فرۆشتن', privacy: 'سیاسەتی تایبەتمەندی' } as Record<string, string>,
     version: 'وەشان',
@@ -495,6 +519,22 @@ export default function Checkout() {
     refreshWallet,
     settings,
   } = useWallet();
+
+  /**
+   * THE RATE THE SENTENCE QUOTES — the administrator's, or the compiled
+   * default when the server has not sent one.
+   *
+   * A positive integer or nothing: a zero block would make the explanation
+   * «عن كل 0» and a negative one is not a rate. The server normalises the
+   * same way before it charges, so the two cannot disagree about a value
+   * either of them would refuse.
+   */
+  const settingRate = (value: unknown, fallback: number): number => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.trunc(n) : fallback;
+  };
+  const codTaxPerBlockIqd = settingRate(settings?.codTaxPerBlockIqd, COD_TAX_PER_BLOCK_IQD);
+  const codTaxBlockIqd = settingRate(settings?.codTaxBlockIqd, COD_TAX_BLOCK_IQD);
 
   // Selected cart line ids and points choice arrive from the Cart page via
   // router state; with no state we fall back to the whole cart.
@@ -1123,9 +1163,75 @@ export default function Checkout() {
    * but the server's answer is the last word.
    */
   const serverAllows = quote ? quote.can_checkout !== false : true;
-  const canCompleteOrder =
-    isBalanceSufficient && !submitting && items.length > 0 && !!selectedAddressId && !!deliveryMethod && !!paymentMethod &&
-    !quoteLoading && !shippingNeedsConfig && consentSatisfied && serverAllows;
+
+  /**
+   * ═══ «عند الضغط على تأكيد الطلب لا يحدث شيء» ═══
+   *
+   * THE BUTTON AND THE REASON ARE NOW ONE EXPRESSION, and that is the whole
+   * fix. There were eight conjuncts deciding whether the order could be
+   * placed, the button was `disabled` on their conjunction, and `placeOrder`
+   * ALSO early-returned on it — so any one of them going false produced a
+   * grey button that did nothing and said nothing.
+   *
+   * The commonest way in was the printer advance. A cart with a printer going
+   * to a home address folds 50,000 IQD into `required_advance_iqd`
+   * (worker/routes/orders.ts, `printerHomeDeliveryAdvanceIqd`), so a customer
+   * whose Levo wallet holds less than that fails `isBalanceSufficient` and can
+   * never place the order. There WAS a sentence for it — in the document flow,
+   * on a wide screen. On a phone the button lives in a fixed bottom bar and
+   * the explanation was somewhere above the fold, which is indistinguishable
+   * from a broken button.
+   *
+   * ORDER MATTERS: the list runs from what the customer can fix soonest to
+   * what they can fix last, so the sentence names the NEXT thing to do rather
+   * than the last thing that happens to be wrong.
+   *
+   * `quoteLoading` deliberately returns null: it disables the button (below)
+   * but it is not a refusal, it is a wait, and the button already says
+   * «جارٍ…» for it.
+   */
+  const blockReason: string | null = (() => {
+    if (submitting || quoteLoading) return null;
+    if (items.length === 0) return S.blockEmpty;
+    if (!selectedAddressId) return S.blockAddress;
+    if (!deliveryMethod) return S.blockDelivery;
+    if (!paymentMethod) return S.blockPayment;
+    if (shippingNeedsConfig) return S.needsConfig;
+    if (!consentSatisfied) return S.policyRequired;
+    if (!isBalanceSufficient) return S.blockAdvance;
+    if (!serverAllows) return S.blockQuote;
+    /**
+     * A QUOTE THAT NEVER ARRIVED IS A REFUSAL, NOT A PERMISSION.
+     *
+     * `serverAllows` read `quote ? … : true` — open by default — so a quote
+     * the server had REFUSED (an out-of-stock line makes it 400 rather than
+     * price) left `quote === null` and the guard waved the order through to a
+     * door that would throw. Closed by default is the honest direction: the
+     * screen cannot claim an order is placeable when the only authority on
+     * that question failed to answer.
+     */
+    if (!quote) return S.blockQuote;
+    return null;
+  })();
+
+  const canCompleteOrder = blockReason === null && !submitting && !quoteLoading;
+
+  /** One sentence, rendered wherever the button is — including the phone's
+   *  fixed bar, which is the screen the owner reported this from. */
+  const blockNotice =
+    blockReason && !submitError ? (
+      <p
+        role="alert"
+        data-checkout-block-reason
+        className="text-[12px] leading-snug text-danger font-medium flex items-start gap-1.5"
+      >
+        <AlertCircle aria-hidden="true" className="w-3.5 h-3.5 shrink-0 mt-px" />
+        <span>
+          <span className="sr-only">{S.blockedLabel} </span>
+          {blockReason}
+        </span>
+      </p>
+    ) : null;
 
   const amountRemainingOnDelivery = quote ? quote.due_on_delivery_iqd : orderTotal - walletDiscount;
   const bnplFinancedIqd = isBnplMethod
@@ -2133,8 +2239,8 @@ export default function Checkout() {
                      sentence cannot drift from what the server actually
                      charges. Converting a definition would make the explanation
                      depend on a rate the shop can change tomorrow. */
-                  `وقدرها ${formatIqd(COD_TAX_PER_BLOCK_IQD)} عن كل ${formatIqd(COD_TAX_BLOCK_IQD)} من المبلغ المدفوع عند الاستلام.`,
-                  `It is ${formatIqd(COD_TAX_PER_BLOCK_IQD)} for every ${formatIqd(COD_TAX_BLOCK_IQD)} collected at the door.`
+                  `وقدرها ${formatIqd(codTaxPerBlockIqd)} عن كل ${formatIqd(codTaxBlockIqd)} من المبلغ المدفوع عند الاستلام.`,
+                  `It is ${formatIqd(codTaxPerBlockIqd)} for every ${formatIqd(codTaxBlockIqd)} collected at the door.`
                 )}</p>
                 <p>{loc(
                   'اختيار الدفع من المحفظة أو الدفع المسبق يُلغيها بالكامل.',
@@ -2556,19 +2662,18 @@ export default function Checkout() {
               </p>
             )}
 
-            {/* The wide-screen button sits here, at the end of the rail. */}
-            <div className="hidden lg:block">{orderButton}</div>
+            {/* The wide-screen button sits here, at the end of the rail, with
+                the reason DIRECTLY above it — above, because a warning printed
+                underneath the control it warns about is read after the tap. */}
+            <div className="hidden lg:block space-y-2">
+              {blockNotice}
+              {orderButton}
+            </div>
 
             {submitError && (
               <p role="alert" className="text-center text-sm text-danger mt-4 font-medium flex items-center justify-center gap-2">
                 <AlertCircle aria-hidden="true" className="w-4 h-4 shrink-0" />
                 {submitError}
-              </p>
-            )}
-            {!submitError && !isBalanceSufficient && (
-              <p role="alert" className="text-center text-sm text-danger mt-4 font-medium flex items-center justify-center gap-2">
-                <AlertCircle aria-hidden="true" className="w-4 h-4" />
-                {loc('الرصيد غير كافٍ لإتمام الدفع', 'Your balance does not cover the advance', 'باڵانست بەشی پارەدانی پێشەکی ناکات')}
               </p>
             )}
             {requiredPolicies.length === 0 && (
@@ -2587,12 +2692,19 @@ export default function Checkout() {
         agreeing. The summary column reserves its height below.
       */}
       <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-canvas/95 backdrop-blur-xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <div className="mx-auto w-full max-w-[640px] flex items-center gap-3">
-          <div className="min-w-0 basis-[8.5rem] shrink-0">
-            <div className="text-[11px] text-text-muted">{loc('إجمالي الطلب', 'Order total', 'کۆی داواکاری')}</div>
-            <div className="text-text-primary font-black text-[15px] tabular-nums truncate">{money(orderTotal)}</div>
+        <div className="mx-auto w-full max-w-[640px] space-y-2">
+          {/* THE REASON TRAVELS WITH THE BUTTON. On a phone this bar is fixed
+              and outside the document order, so a message left in the flow
+              above is a message the customer never scrolls back to — which is
+              exactly how a refusal reads as «لا يحدث شيء». */}
+          {blockNotice}
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 basis-[8.5rem] shrink-0">
+              <div className="text-[11px] text-text-muted">{loc('إجمالي الطلب', 'Order total', 'کۆی داواکاری')}</div>
+              <div className="text-text-primary font-black text-[15px] tabular-nums truncate">{money(orderTotal)}</div>
+            </div>
+            <div className="flex-1 min-w-0">{orderButton}</div>
           </div>
-          <div className="flex-1 min-w-0">{orderButton}</div>
         </div>
       </div>
     </div>

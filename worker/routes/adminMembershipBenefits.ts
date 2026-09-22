@@ -418,7 +418,7 @@ adminMembershipBenefitRoutes.post('/simulate', async (c: Context<AppContext>) =>
       .all<Record<string, unknown>>(),
     allBenefitRules(c.env.DB),
     catalogAncestry(c.env.DB),
-    getSettings(c.env.DB, ['proPricingPolicy', 'shippingPolicy', 'checkoutDeliveryMethods']),
+    getSettings(c.env.DB, ['proPricingPolicy', 'shippingPolicy', 'checkoutDeliveryMethods', 'codTaxPerBlockIqd', 'codTaxBlockIqd']),
   ]);
   const byId = new Map((rows ?? []).map((r) => [String(r.id), r]));
   const missing = ids.filter((id) => !byId.has(id));
@@ -505,11 +505,16 @@ adminMembershipBenefitRoutes.post('/simulate', async (c: Context<AppContext>) =>
   });
 
   const payable = Math.max(0, merchandiseAfter + shipping.total_iqd);
-  const codTaxBefore = codDeliveryTaxIqd({
-    paymentMethodId,
-    deliveryMethodId,
-    payableBeforeTaxIqd: payable,
-  });
+  // The SIMULATOR must quote the same rate the checkout charges, or an owner
+  // tuning a benefit is reading a number no customer will ever see.
+  const codTaxBefore = codDeliveryTaxIqd(
+    {
+      paymentMethodId,
+      deliveryMethodId,
+      payableBeforeTaxIqd: payable,
+    },
+    { blockIqd: Number(settings.codTaxBlockIqd), perBlockIqd: Number(settings.codTaxPerBlockIqd) }
+  );
   const codTaxExemption = benefits.tax.cod_exempt ? codTaxBefore : 0;
 
   return c.json({

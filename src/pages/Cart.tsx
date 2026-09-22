@@ -728,13 +728,36 @@ export default function Cart() {
     return st && st.tracked && st.available !== null ? { left: st.available, preorder: false } : null;
   };
 
-  /** A composition line the server will refuse at the door — `sold_out`,
-   *  `ended`, `upcoming` or `locked`. It used to sit in the cart looking
-   *  completely normal with the checkout button enabled, because the only
-   *  blocker check read `availability.selection.complete`, a key the
-   *  composition availability block does not carry. */
-  const lineBlocked = (item: CartItem): boolean =>
-    !!item.composition && BLOCKING_STATES.has(item.composition.availability_state);
+  /**
+   * A LINE THE DOOR WILL REFUSE — and it is no longer only a bundle.
+   *
+   * «عندما يضع المنتج في السله ويتركه فتره اذا نفذ المخزون يجب ان يظهر نفذ
+   *  المخزون ولا يمكنه طلبه.»
+   *
+   * This test was `!!item.composition && …` — a BUNDLES-ONLY check, written
+   * when a composition line was the thing that could look normal and be
+   * refused. An ordinary line could do exactly the same and nothing read it:
+   * the server has been publishing `mode: 'unavailable'` and `qty_ok: false`
+   * on the availability block all along, and `qty_ok` appeared nowhere in this
+   * file. So a filament that sold out while the cart rested still carried an
+   * enabled «إتمام الشراء», and the customer learned at the door.
+   *
+   * THE TWO ORDINARY CASES, and they are different sentences:
+   *   · `mode === 'unavailable'` — nothing left at all. «نفد المخزون».
+   *   · `qty_ok === false` — some left, but fewer than this line asks for.
+   *     «بقي N فقط», and the customer fixes it by lowering the quantity.
+   *
+   * `qty_ok === false` is tested explicitly rather than `!qty_ok`, because the
+   * key is absent on a response from a Worker that predates it and absent must
+   * mean "no opinion", not "blocked". strictNullChecks is off here, so that
+   * distinction is this comparison's job and not the compiler's.
+   */
+  const lineBlocked = (item: CartItem): boolean => {
+    if (item.composition) return BLOCKING_STATES.has(item.composition.availability_state);
+    const a = item.availability;
+    if (!a) return false;
+    return a.mode === 'unavailable' || a.qty_ok === false;
+  };
 
   const clampQty = (item: CartItem, q: number) =>
     // A composition line is bounded by the server's own `max_qty` — the
@@ -1633,6 +1656,36 @@ export default function Cart() {
                              the wrong level entirely. Both numbers now come
                              from the server's resolution for this line. */
                           const rem = lineRemaining(item);
+                          const cap = lineCap(item);
+                          /**
+                           * SOLD OUT IS NOT «متبقي 0 فقط».
+                           *
+                           * A line the door will refuse says so in red and
+                           * names the fix, instead of quietly counting down to
+                           * zero in amber beside an enabled checkout button.
+                           * The two cases read differently because the
+                           * remedies are different: nothing left is a line to
+                           * remove, fewer left than asked for is a quantity to
+                           * lower — so that one prints the number to lower it
+                           * TO, which is the whole of what the customer has to
+                           * do next.
+                           */
+                          if (lineBlocked(item) && !item.composition) {
+                            const soldOut = item.availability?.mode === 'unavailable' || rem?.left === 0;
+                            return (
+                              <span className="text-danger text-[12px] font-medium" data-line-blocked={item.id}>
+                                {soldOut
+                                  ? loc('نفد المخزون', 'Out of stock', 'کۆگا بەتاڵە')
+                                  : typeof cap === 'number'
+                                    ? loc(
+                                        `بقي ${cap} فقط — قلّل الكمية`,
+                                        `Only ${cap} left — lower the quantity`,
+                                        `تەنها ${cap} ماوە — بڕەکە کەم بکەرەوە`
+                                      )
+                                    : loc('الكمية المطلوبة غير متوفرة', 'That quantity is not available', 'ئەو بڕە بەردەست نییە')}
+                              </span>
+                            );
+                          }
                           if (!rem || rem.left >= 10) return null;
                           return (
                             <span className="text-amber-300/90 text-[12px]" data-line-remaining={item.id}>
@@ -2125,9 +2178,12 @@ export default function Cart() {
                 // The server refuses an incomplete line at checkout; say so here
                 // instead of letting the button fail a page later.
                 items.some((i) => selectedIds.has(i.id) && i.availability?.selection && !i.availability.selection.complete) ||
-                // A composition line whose server-sent state says it cannot be
-                // sold blocks the button too — a `sold_out` or `ended` bundle
-                // used to look completely normal here.
+                // ANY selected line the door would refuse blocks the button —
+                // a `sold_out` or `ended` BUNDLE, and now also an ordinary line
+                // that went out of stock, or that asks for more than is left,
+                // while the cart rested. `lineBlocked` is the one place that
+                // decides, so the button and the line's own red sentence can
+                // never disagree about whether this cart can be bought.
                 items.some((i) => selectedIds.has(i.id) && lineBlocked(i))
               }
             >

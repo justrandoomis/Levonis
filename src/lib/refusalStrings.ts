@@ -209,6 +209,30 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ckb: 'داواکارییەک کە ناوەڕۆکی ئاشکرا بووە هەڵناوەشێتەوە — پەیوەندی بە پشتگیری بکە.',
   },
 
+  /**
+   * SOLD OUT, IN THE CUSTOMER'S OWN LANGUAGE.
+   *
+   * «يجب التاكد بان المخزون يتحدث ويعطيه اشعارا بان المتبقي فقط 2.»
+   *
+   * This code was deliberately absent from this table, on the premise stated
+   * at the bottom of this file: a reused code "already has a sentence
+   * elsewhere". For OUT_OF_STOCK that premise was FALSE in Arabic — the
+   * server's sentence is English with the product name interpolated into it
+   * (`Only 2 of "بي إل إيه" left in stock`), so an Arabic customer racing
+   * another buyer for the last unit read English at the moment they lost.
+   *
+   * THIS ENTRY IS THE COUNT-FREE ONE. When the server sends a remainder,
+   * `stockRefusal` below builds the counted sentence instead; this is what a
+   * mystery-pool member gets, where naming the count would be an oracle on the
+   * draw (docs/BUNDLES_MYSTERY.md §8.2 row 18), and what any caller with no
+   * details to read gets.
+   */
+  OUT_OF_STOCK: {
+    ar: 'الكمية المتاحة لا تكفي لهذا الطلب. قلّل الكمية أو أزل المنتج من السلة.',
+    en: 'There is not enough stock for this order. Lower the quantity or remove the item.',
+    ckb: 'بڕی بەردەست بۆ ئەم داواکارییە بەس نییە. بڕەکە کەم بکەرەوە یان بەرهەمەکە لاببە.',
+  },
+
   // ---- the two counters behind one basket (migration 0075) ----------------
   /**
    * THE ONE REFUSAL A CUSTOMER MUST NOT READ AS "SOLD OUT".
@@ -307,5 +331,65 @@ export function apiRefusal(err: unknown, lang: Lang, fallback = ''): string {
   const e = err as { code?: unknown; message?: unknown } | null;
   const code = e && typeof e.code === 'string' ? e.code : '';
   const message = e && typeof e.message === 'string' && e.message ? e.message : fallback;
+  const counted = stockRefusal(err, lang);
+  if (counted) return counted;
   return refusalText(code, lang, message || fallback);
+}
+
+/** The codes whose refusal can carry a remainder worth naming. */
+const COUNTED_STOCK_CODES = new Set(['OUT_OF_STOCK', 'PREORDER_CAPACITY_EXHAUSTED']);
+
+/**
+ * «بقي 2 فقط» — THE NUMBER, IN THE CUSTOMER'S LANGUAGE.
+ *
+ * The owner's scenario: stock is 3, one customer takes 1, and the second —
+ * who put 3 in their basket — presses confirm. The door refuses, and it must
+ * say how many are actually left so the customer can lower the quantity
+ * rather than guess.
+ *
+ * The server sends that number as DATA (`details.available`), because a count
+ * baked into an English sentence cannot be translated. Returns null whenever
+ * there is no number to name — a different code, a `coarse` refusal where
+ * naming it would leak a mystery pool's contents, or an older server that
+ * sends no details at all — and the caller falls back to the table entry
+ * above, which says the same thing without a figure.
+ *
+ * ZERO IS A REAL ANSWER and reads differently from two: nothing left is an
+ * item to remove, some left is a quantity to lower. `available` is checked
+ * with `typeof` rather than truthiness for exactly that reason.
+ */
+export function stockRefusal(err: unknown, lang: Lang): string | null {
+  const e = err as { code?: unknown; details?: unknown } | null;
+  const code = e && typeof e.code === 'string' ? e.code : '';
+  if (!COUNTED_STOCK_CODES.has(code)) return null;
+  const details = e && typeof e.details === 'object' && e.details !== null
+    ? (e.details as Record<string, unknown>)
+    : null;
+  if (!details || details.coarse === true) return null;
+  const available = details.available;
+  if (typeof available !== 'number' || !Number.isFinite(available) || available < 0) return null;
+  const n = Math.trunc(available);
+  const preorder = code === 'PREORDER_CAPACITY_EXHAUSTED';
+  if (n === 0) {
+    if (preorder) {
+      return lang === 'en'
+        ? 'The pre-order quota for this selection is full — this is not a sold-out shelf.'
+        : 'اكتملت حصة الطلب المسبق لهذا الاختيار — وهذا ليس نفادًا للمخزون.';
+    }
+    return lang === 'en'
+      ? 'This item is out of stock. Remove it from the cart to continue.'
+      : lang === 'ckb'
+        ? 'ئەم بەرهەمە لە کۆگا نەماوە. لە سەبەتەکە لایببە بۆ بەردەوامبوون.'
+        : 'نفد مخزون هذا المنتج. أزله من السلة للمتابعة.';
+  }
+  if (preorder) {
+    return lang === 'en'
+      ? `Only ${n} pre-order place(s) left — lower the quantity to ${n}.`
+      : `بقي ${n} فقط من حصة الطلب المسبق — قلّل الكمية إلى ${n}.`;
+  }
+  return lang === 'en'
+    ? `Only ${n} left in stock — lower the quantity to ${n}.`
+    : lang === 'ckb'
+      ? `تەنها ${n} لە کۆگا ماوە — بڕەکە بکە بە ${n}.`
+      : `لم يبقَ سوى ${n} من هذا المنتج — قلّل الكمية إلى ${n}.`;
 }

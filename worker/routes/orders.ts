@@ -1813,6 +1813,13 @@ async function computeCheckout(
     'printerHomeDeliveryNoteIqd',
     'bnplPolicy',
     'proPriorityDelivery',
+    // THE DOOR CHARGE'S RATE, in the same batch as the fees it is charged on
+    // top of. Omitting it here would not fail: `normalizeCodTaxRate` falls
+    // back to the compiled default, so the quote would keep working and would
+    // quietly ignore whatever the owner had set — a silent wrong number on an
+    // invoice, which is the worst shape a bug can take here.
+    'codTaxPerBlockIqd',
+    'codTaxBlockIqd',
     // Read in the SAME batch as the other eleven: checkout has to freeze the
     // day ceiling onto the row, and a second round trip for one small object
     // would be one more thing between the customer and a placed order.
@@ -2297,24 +2304,57 @@ async function computeCheckout(
         // A PRE-ORDER IS NOT "OUT OF STOCK". There is no shelf; the import
         // quota is full, which is a different fact and a different wait, and
         // the existing code would have named the wrong one.
+        /**
+         * THE REMAINDER TRAVELS AS DATA, NOT ONLY AS ENGLISH PROSE.
+         *
+         * «المستخدم الثاني يريد التاكيد … يجب التاكد بان المخزون يتحدث ويعطيه
+         *  اشعارا بان المتبقي فقط 2.»
+         *
+         * The sentence here has always carried the number — in English, with
+         * the product name interpolated into it. An Arabic customer read
+         * `Only 2 of "بي إل إيه" left in stock`, because the client can only
+         * translate a CODE and this refusal's only machine-readable part was
+         * the code. `details` is the existing channel for exactly this
+         * (worker/lib/http.ts), so the count goes there and the client builds
+         * «لم يبقَ سوى 2» in the customer's own language.
+         *
+         * `coarse` IS THE MYSTERY-POOL RULE, carried into the data.
+         * docs/BUNDLES_MYSTERY.md §8.2 row 18: a pool member's refusal must
+         * name no count, because "only 2 left" is a before/after oracle on the
+         * draw. So the count is OMITTED rather than sent-and-hidden — a client
+         * cannot leak a number it was never given.
+         */
+        const coarse = poolMemberIds.has(String(row.id));
+        const stockDetails: Record<string, unknown> = {
+          // The PRODUCT, not the cart line: `CartSelection` carries no line id,
+          // and the product is what the customer recognises anyway — it is
+          // already named in the sentence.
+          product_id: String(row.id),
+          requested: qty,
+          coarse,
+          ...(coarse ? {} : { available: stockRes.available }),
+        };
         if (orderType === 'pre_order') {
-          // Count-free for a mystery-pool member here as well: a pre-order
-          // pool is bounded by these same capacity rows, so the number would
-          // be an oracle on the pick (§8.2 row 18).
+          // A PRE-ORDER IS NOT "OUT OF STOCK": there is no shelf, the import
+          // quota is full, and that is a different fact and a different wait.
           throw badRequest(
-            poolMemberIds.has(String(row.id))
+            coarse
               ? `The pre-order quota for "${displayName}" cannot cover this order`
               : stockRes.available === 0
                 ? `The pre-order quota for "${displayName}" is full`
                 : `Only ${stockRes.available} pre-order place(s) left for "${displayName}"`,
-            'PREORDER_CAPACITY_EXHAUSTED'
+            'PREORDER_CAPACITY_EXHAUSTED',
+            stockDetails
           );
         }
-        // Count-free for a mystery-pool member (§8.2 row 18).
-        if (poolMemberIds.has(String(row.id))) {
-          throw badRequest(`"${displayName}" does not have enough stock for this order`, 'OUT_OF_STOCK');
+        if (coarse) {
+          throw badRequest(`"${displayName}" does not have enough stock for this order`, 'OUT_OF_STOCK', stockDetails);
         }
-        throw badRequest(`Only ${stockRes.available} of "${displayName}" left in stock`, 'OUT_OF_STOCK');
+        throw badRequest(
+          `Only ${stockRes.available} of "${displayName}" left in stock`,
+          'OUT_OF_STOCK',
+          stockDetails
+        );
       }
       const unit = resolved.unit_subtotal_iqd;
       const line = unit * qty;
@@ -2877,11 +2917,18 @@ async function computeCheckout(
      * an owner who switches the PRO exemption off in the admin switches it off
      * here, and one who switches PREMIUM's on switches it on.
      */
-    const codTaxBeforeExemptionIqd = codDeliveryTaxIqd({
-      paymentMethodId: input.paymentMethodId,
-      deliveryMethodId: delivery.id,
-      payableBeforeTaxIqd: payableBeforeCodTax,
-    });
+    const codTaxBeforeExemptionIqd = codDeliveryTaxIqd(
+      {
+        paymentMethodId: input.paymentMethodId,
+        deliveryMethodId: delivery.id,
+        payableBeforeTaxIqd: payableBeforeCodTax,
+      },
+      // THE ADMINISTRATOR'S RATE, read with the rest of the settings this
+      // quote is already built from. `settings` is the same object the
+      // delivery methods and the printer note come out of, so the rate cannot
+      // be read from a different snapshot than the fees beside it.
+      { blockIqd: Number(settings.codTaxBlockIqd), perBlockIqd: Number(settings.codTaxPerBlockIqd) }
+    );
     const taxBenefit = orderBenefitsAt(shipping.waiver_basis_iqd).tax;
     const codTaxExemptionIqd = taxBenefit.cod_exempt ? codTaxBeforeExemptionIqd : 0;
     const codTaxIqd = Math.max(0, codTaxBeforeExemptionIqd - codTaxExemptionIqd);

@@ -104,6 +104,23 @@ export const SETTING_DEFAULTS = {
    */
   warrantyConfig: DEFAULT_WARRANTY_CONFIG as WarrantyConfig,
   exchangeRate: 1400, // IQD per 1 USD
+  /**
+   * THE COURIER'S CASH-HANDLING CHARGE, «قابله للتغير من قبل الادارة».
+   *
+   * 3,000 IQD for every complete 500,000 IQD collected at the door. It was two
+   * constants compiled into packages/shipping until the owner halved the rate
+   * and asked for it to be theirs; it is a setting so the next change is a
+   * form field rather than a deploy.
+   *
+   * CHANGING IT IS NOT RETROACTIVE. `orders.cod_tax_iqd` is written at
+   * placement and every read of a past order takes that stored figure, so
+   * lowering the rate today cannot rewrite what somebody was charged last
+   * month. Both halves are PUBLIC because the checkout has to print the rate
+   * in a sentence before any quote exists — and a sentence quoting a
+   * different number from the charge is the defect this replaces.
+   */
+  codTaxPerBlockIqd: 3_000,
+  codTaxBlockIqd: 500_000,
   currency: 'IQD' as 'IQD' | 'USD',
   adVideoUrl: '',
   paymentMethods: [] as ManualPaymentMethod[],
@@ -428,6 +445,10 @@ export const SETTING_KEYS = Object.keys(SETTING_DEFAULTS) as SettingKey[];
 // Settings a signed-out storefront visitor may read.
 export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   'exchangeRate',
+  // The checkout explains the door charge before it can quote one, so the
+  // rate the sentence quotes has to be readable without an order.
+  'codTaxPerBlockIqd',
+  'codTaxBlockIqd',
   'currency',
   'adVideoUrl',
   'paymentMethods',

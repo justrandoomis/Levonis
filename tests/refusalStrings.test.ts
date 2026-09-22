@@ -90,9 +90,15 @@ test('the Arabic and Sorani sentences carry no latin identifier fragments', () =
 test('refusalText answers in the asked language and NEVER returns the bare code', () => {
   assert.equal(refusalText('MEMBERSHIP_REQUIRED', 'ar'), REFUSAL_STRINGS.MEMBERSHIP_REQUIRED.ar);
   assert.equal(refusalText('MEMBERSHIP_REQUIRED', 'ckb'), REFUSAL_STRINGS.MEMBERSHIP_REQUIRED.ckb);
-  // A code this table does not own keeps the server's own sentence — every
-  // reused code (`OUT_OF_STOCK`, `CART_SHIPPING_CONFLICT`, …) already has one.
-  assert.equal(refusalText('OUT_OF_STOCK', 'ar', 'نفد المخزون'), 'نفد المخزون');
+  // A code this table does not own keeps the server's own sentence.
+  //
+  // OUT_OF_STOCK USED TO BE THE EXAMPLE HERE, on the premise that a reused
+  // code already has a sentence elsewhere. That premise was false for it: the
+  // server's sentence is English with the product name inside it, so an Arabic
+  // customer read English at the moment they lost a race for the last unit. It
+  // is in the table now, so the example moved to a code that genuinely is not.
+  assert.equal(refusalText('CART_SHIPPING_CONFLICT', 'ar', 'تعارض'), 'تعارض');
+  assert.equal(refusalText('OUT_OF_STOCK', 'ar', 'ignored'), REFUSAL_STRINGS.OUT_OF_STOCK.ar);
   assert.equal(refusalText(null, 'en', 'fallback'), 'fallback');
   assert.equal(refusalText('UNKNOWN_CODE', 'en', ''), '', 'an unknown code never becomes its own identifier');
 });
@@ -200,7 +206,34 @@ test('apiRefusal decodes the code and falls back to the server sentence, never t
   assert.equal(apiRefusal(err, 'ar'), REFUSAL_STRINGS.OFFER_WINDOW_EXPIRED.ar);
   assert.equal(apiRefusal(err, 'ckb'), REFUSAL_STRINGS.OFFER_WINDOW_EXPIRED.ckb);
   // A code this table does not own keeps the server's own sentence.
-  assert.equal(apiRefusal({ code: 'OUT_OF_STOCK', message: 'نفد المخزون' }, 'ar', 'x'), 'نفد المخزون');
+  assert.equal(apiRefusal({ code: 'CART_SHIPPING_CONFLICT', message: 'تعارض' }, 'ar', 'x'), 'تعارض');
+
+  /**
+   * THE COUNT, WHEN THE SERVER SENT ONE.
+   *
+   * «يعطيه اشعارا بان المتبقي فقط 2» — the second customer in a race for the
+   * last units is told how many are actually left, in their own language, so
+   * they can lower the quantity instead of guessing.
+   */
+  const short = { code: 'OUT_OF_STOCK', details: { available: 2, requested: 3, coarse: false }, message: 'Only 2 left' };
+  assert.match(apiRefusal(short, 'ar', 'x'), /2/);
+  assert.match(apiRefusal(short, 'ar', 'x'), /قلّل الكمية/);
+  assert.match(apiRefusal(short, 'en', 'x'), /Only 2 left in stock/);
+  assert.match(apiRefusal(short, 'ckb', 'x'), /2/);
+  // Zero is a different remedy — remove it, not lower it.
+  const none = { code: 'OUT_OF_STOCK', details: { available: 0, coarse: false }, message: 'x' };
+  assert.match(apiRefusal(none, 'ar', 'x'), /نفد مخزون/);
+  assert.ok(!/قلّل الكمية/.test(apiRefusal(none, 'ar', 'x')));
+  // A MYSTERY-POOL MEMBER NAMES NO COUNT — docs/BUNDLES_MYSTERY.md §8.2 row 18:
+  // "only 2 left" there is a before/after oracle on the draw. The server omits
+  // the number and flags `coarse`; the client must fall back to the count-free
+  // sentence even if a number somehow arrives.
+  const coarse = { code: 'OUT_OF_STOCK', details: { coarse: true, available: 2 }, message: 'x' };
+  assert.equal(apiRefusal(coarse, 'ar', 'x'), REFUSAL_STRINGS.OUT_OF_STOCK.ar);
+  assert.ok(!/2/.test(apiRefusal(coarse, 'ar', 'x')));
+  // An older server sends no details at all: the count-free sentence, never a
+  // sentence with `undefined` in it.
+  assert.equal(apiRefusal({ code: 'OUT_OF_STOCK', message: 'x' }, 'ar', 'y'), REFUSAL_STRINGS.OUT_OF_STOCK.ar);
   // No code at all, and no message: the caller's own fallback, never ''.
   assert.equal(apiRefusal({}, 'en', 'fallback'), 'fallback');
   assert.equal(apiRefusal(null, 'en', 'fallback'), 'fallback');

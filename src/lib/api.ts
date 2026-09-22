@@ -1318,6 +1318,16 @@ export interface PublicSettings {
    *  rendered only when the server sent a positive integer. */
   printerHomeDeliveryNoteIqd?: number | null;
   /**
+   * THE DOOR CHARGE'S RATE, as the administrator set it.
+   *
+   * Public because checkout explains the charge in a sentence BEFORE it can
+   * quote one, so there is no order to read the rate off. Optional because a
+   * client that reaches a server older than this field must fall back to the
+   * compiled default rather than printing «undefined» in the sentence.
+   */
+  codTaxPerBlockIqd?: number | null;
+  codTaxBlockIqd?: number | null;
+  /**
    * The delivery-day offer itself — «بحد أقصى أسبوع» as three values.
    *
    * It is public (`PUBLIC_SETTING_KEYS`) for one screen: checkout has to draw
