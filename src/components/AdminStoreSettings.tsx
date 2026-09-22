@@ -214,7 +214,13 @@ export default function AdminStoreSettings() {
     setDeliveryState('saving');
     setDeliveryError(null);
     try {
-      const value = deliveryRows.map(r => ({ ...r.value, price_iqd: Math.round(Number(r.value.price_iqd)) || 0 }));
+      const value = deliveryRows.map(r => ({
+        ...r.value,
+        price_iqd: Math.round(Number(r.value.price_iqd)) || 0,
+        // Trimmed, so whitespace is not stored as a "configured" map link and
+        // drawn as an empty one at checkout.
+        map_url: (r.value.map_url || '').trim(),
+      }));
       await updateCheckoutDeliveryMethods(value);
       // Once saved, every id becomes referenced data → lock it.
       setDeliveryRows(rows => rows.map(r => ({ ...r, key: r.value.id, existing: true })));
@@ -341,6 +347,20 @@ export default function AdminStoreSettings() {
                   <option key={icon} value={icon}>{icon}</option>
                 ))}
               </select>
+              {/* WHERE THE CUSTOMER IS BEING ASKED TO COME. A pickup method
+                  sends somebody to an address, and nothing in this repository
+                  knows the shop's — guessing a pin would point customers at a
+                  place that does not exist. Paste the map link you already
+                  use; the checkout draws it only on methods that have one, so
+                  leaving it empty changes nothing. */}
+              <input
+                type="url"
+                inputMode="url"
+                value={row.value.map_url || ''}
+                onChange={e => { setDeliveryRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, map_url: e.target.value } } : r)); setDeliveryState('idle'); }}
+                placeholder="Map link (pickup only, optional)"
+                className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2 md:col-span-2"
+              />
               <div className="flex gap-2">
                 <input
                   type="number"

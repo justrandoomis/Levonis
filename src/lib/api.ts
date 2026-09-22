@@ -1286,6 +1286,14 @@ export interface DeliveryMethod {
    * start being asked which day to drive to them.
    */
   home_delivery?: boolean;
+  /**
+   * WHERE THE CUSTOMER IS BEING ASKED TO COME, for a method that asks them to
+   * come somewhere. Absent (the normal case, and every home delivery) means no
+   * link is drawn — the shop's address is the owner's to state, in the admin,
+   * and a guessed map pin would point customers at a place that does not
+   * exist. See the field's note in worker/lib/settings.ts.
+   */
+  map_url?: string;
 }
 export interface CheckoutPaymentMethod { id: string; titleAr: string; titleEn: string; icon: string }
 export interface CartShippingMethod { id: string; titleAr: string; titleEn: string; descAr: string; descEn: string }

@@ -328,7 +328,12 @@ export default function GramsQuotePanel({
                   >
                     {usable.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {loc(m.name_ar || m.name, m.name, m.name_ar || m.name) || m.material_type}
+                        {/* English in every language: a material name is an
+                            identifier («PLA Matte», «PETG-CF»), the same
+                            string on the spool, in the slicer profile and in
+                            the shop. See the note on the same list in
+                            src/pages/Tools.tsx. */}
+                        {m.name || m.material_type}
                       </option>
                     ))}
                   </select>

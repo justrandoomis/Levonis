@@ -363,11 +363,37 @@ test('the focus ring is INSET, because the belt clips everything outside itself'
   assert.doesNotMatch(src, /outline-offset-2/);
 });
 
-test('the belt stops when focus lands in it', () => {
+test('the belt is a SCROLL container the finger can drag, not a paused animation', () => {
+  const src = read('src/components/home/Marquee.tsx');
+  /**
+   * «اجعل المستخدم يسحب البراندات scroll horizontal ليس فقط ان يتوقف». The
+   * belt was a `translateX` animation inside `overflow: hidden`: a finger on
+   * it could only pause it, because there was no scrollable overflow to pull.
+   * The drift is now `scrollLeft`, which is the same axis the finger moves —
+   * so a drag interrupts it by moving the value it writes, and the gesture
+   * itself is the platform's own, with its momentum.
+   */
+  assert.match(src, /overflow-x-auto/, 'there is something to drag');
+  assert.match(src, /touchAction: 'pan-x'/, 'and the compositor owns the gesture');
+  assert.match(src, /el\.scrollLeft \+= sign \* speed \* dt/, 'the drift moves the scroll, not a transform');
+  assert.doesNotMatch(src, /animation-play-state/, 'nothing is left to pause');
+  // The stride is still the whole loop, and the wrap still happens off-screen.
+  assert.match(src, /Math\.abs\(at\) >= s/, 'one stride is the seam');
+  assert.match(src, /Math\.ceil\(cw \/ sw\) \+ 1/, 'a spare set is the runway the wrap consumes');
+});
+
+test('the belt stops when focus lands in it, and when a finger or a pointer is on it', () => {
   const src = read('src/components/home/Marquee.tsx');
   // Hover and press-hold were handled; focus was not, so a keyboard user
-  // landed on a mark that immediately slid out from under the ring.
-  assert.match(src, /:focus-within > \.lv-mq__track \{ animation-play-state: paused; \}/);
+  // landed on a mark that immediately slid out from under the ring — the one
+  // case that cannot be recovered by moving a finger.
+  assert.match(src, /const drifting = !held && !hovered && !focused;/);
+  assert.match(src, /onFocusCapture=\{\(\) => setFocused\(true\)\}/);
+  assert.match(src, /onBlurCapture=\{\(\) => setFocused\(false\)\}/);
+  // And the system preference still parks it, watched rather than read once:
+  // a customer can turn it on while the page is open.
+  assert.match(src, /prefers-reduced-motion: reduce/);
+  assert.match(src, /if \(drifting && !reduced && dt > 0\)/);
 });
 
 test('the resting logo is at full opacity — `hover:` never fires on a phone', () => {

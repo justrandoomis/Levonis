@@ -118,6 +118,7 @@ const STRINGS = {
     qty: 'الكمية', increase: 'زيادة الكمية', decrease: 'إنقاص الكمية',
     addToCart: 'أضف إلى السلة', adding: 'جارٍ الإضافة…', added: 'تمت الإضافة إلى السلة',
     viewCart: 'عرض السلة', signInToBuy: 'سجّل الدخول للشراء',
+    inCart: (n: number) => `في السلة: ${n}`,
     directSale: 'بيع مباشر', preorderMode: 'طلب مسبق', unavailable: 'غير متوفر',
     salesSold: 'مبيعات',
     reviewsCount: (n: number): string => (n === 1 ? 'تقييم' : n === 2 ? 'تقييمان' : n <= 10 ? 'تقييمات' : 'تقييماً'),
@@ -189,6 +190,7 @@ const STRINGS = {
     qty: 'Quantity', increase: 'Increase quantity', decrease: 'Decrease quantity',
     addToCart: 'Add to cart', adding: 'Adding…', added: 'Added to your cart',
     viewCart: 'View cart', signInToBuy: 'Sign in to buy',
+    inCart: (n: number) => `In your cart: ${n}`,
     directSale: 'Direct sale', preorderMode: 'Pre-order', unavailable: 'Unavailable',
     salesSold: 'sold',
     reviewsCount: (n: number): string => (n === 1 ? 'review' : 'reviews'),
@@ -262,6 +264,7 @@ const STRINGS = {
     qty: 'بڕ', increase: 'زیادکردنی بڕ', decrease: 'کەمکردنی بڕ',
     addToCart: 'زیادکردن بۆ سەبەتە', adding: 'زیاد دەکرێت…', added: 'زیادکرا بۆ سەبەتەکەت',
     viewCart: 'بینینی سەبەتە', signInToBuy: 'بچۆ ژوورەوە بۆ کڕین',
+    inCart: (n: number) => `لە سەبەتەکەتدا: ${n}`,
     directSale: 'فرۆشتنی ڕاستەوخۆ', preorderMode: 'پێشداواکاری', unavailable: 'بەردەست نییە',
     salesSold: 'فرۆشراو',
     reviewsCount: (n: number): string => (n === 1 ? 'هەڵسەنگاندن' : 'هەڵسەنگاندن'),
@@ -1349,6 +1352,62 @@ export default function Product() {
     return () => { cancelled = true; };
   }, [isAuthenticated, slug]);
 
+  /**
+   * «عند إضافة منتج إلى السلة وعند وجود هذا المنتج وهذا الخيار أو هذا اللون
+   *  في السلة يجب أن يظهر هناك العدد في السلة مع زر عرض السلة».
+   *
+   * WHY THE LINES ARE HELD AND NOT JUST A NUMBER. The note is about THIS
+   * selection, not this product: the same printer in black and in white are
+   * two different lines, and telling a customer choosing white that they
+   * already have two would be wrong about the only thing the note claims.
+   * Matching needs the option values and the colour off each line, so the
+   * lines are what is kept.
+   *
+   * One request, only for somebody who can have a cart, and a failure is
+   * silent: an absent note is merely absent, while a wrong count is a lie
+   * about the customer's basket — the same rule the nav badge follows.
+   */
+  const [cartLines, setCartLines] = useState<CartItem[]>([]);
+  useEffect(() => {
+    setCartLines([]);
+    if (!isAuthenticated || !product?.id) return;
+    let cancelled = false;
+    void api
+      .get<{ items: CartItem[] }>('/api/cart')
+      .then((data) => {
+        if (!cancelled) setCartLines(Array.isArray(data.items) ? data.items : []);
+      })
+      .catch(() => {
+        /* no note rather than a made-up one */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, product?.id]);
+
+  /**
+   * How many of EXACTLY what is selected are already in the cart.
+   *
+   * The comparison is the same identity the server upserts a line on: the
+   * product, the full multi-group selection and the colour. `option_value_ids`
+   * is sorted on both sides because group order is the admin's, not the
+   * customer's, and two identical selections must not read as different
+   * because one arrived from a different screen. It falls back to the legacy
+   * `option_id` for lines written before that column existed.
+   */
+  const inCartQty = useMemo(() => {
+    if (!product?.id || cartLines.length === 0) return 0;
+    const key = (ids: string[] | undefined, legacy: string) =>
+      (ids && ids.length ? [...ids].sort().join(',') : legacy) || '';
+    const mine = key(optionValueIds, optionId);
+    return cartLines.reduce((n, line) => {
+      if (line.productId !== product.id) return n;
+      if (key(line.option_value_ids, line.option_id) !== mine) return n;
+      if ((line.color_id || '') !== (colorId || '')) return n;
+      return n + (Number(line.qty) || 0);
+    }, 0);
+  }, [cartLines, product?.id, optionValueIds, optionId, colorId]);
+
   const handleShare = () => {
     const name = product ? pickName(product.name_en, product.name, product.name_ar) : '';
     const url = supportUrlRef.current ?? window.location.href;
@@ -1450,6 +1509,10 @@ export default function Product() {
         const data = await api.post<{ items: CartItem[] }>('/api/cart/items', body);
         // Success is claimed ONLY after the server returns the saved cart.
         const count = countCartItems(data.items);
+        // The response is the saved cart, so the note below the price updates
+        // from the same answer that proved the add worked — no second request,
+        // and no window in which the badge and the note disagree.
+        setCartLines(Array.isArray(data.items) ? data.items : []);
         setShippingConflict(null);
         setNotice(`${s.added} (${count})`);
         // The nav badge is the one piece of confirmation visible from anywhere
@@ -2927,7 +2990,38 @@ export default function Product() {
     </>
   );
 
+  /**
+   * «يجب أن يظهر هناك العدد في السلة مع زر عرض السلة».
+   *
+   * ABOVE the quantity stepper, because that is the control it is about: the
+   * customer is deciding how many MORE to add, and the number they already
+   * have is the fact that decision needs. It is drawn only for the exact
+   * selection on screen — this option, this colour — so a customer switching
+   * to a colour they have none of sees nothing rather than a count belonging
+   * to a different line.
+   *
+   * Quiet type and a text link, not a card: the price and the buy button are
+   * what this column is for, and a boxed notice here would outrank both.
+   */
+  const inCartNote =
+    inCartQty > 0 ? (
+      <div
+        data-in-cart-note
+        className="mb-2 flex items-center justify-between gap-3 text-[12px] text-zinc-400"
+      >
+        <span className="tabular-nums">{s.inCart(inCartQty)}</span>
+        <Link
+          to="/cart"
+          className="shrink-0 font-medium text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+        >
+          {s.viewCart}
+        </Link>
+      </div>
+    ) : null;
+
   const qtyControl = (
+    <div>
+      {inCartNote}
     <div className="flex items-center justify-between gap-3">
       <span className="text-zinc-300 text-sm font-bold">{s.qty}</span>
       <div className="flex items-center gap-1 rounded-lg bg-surface-raised p-1">
@@ -2953,6 +3047,7 @@ export default function Product() {
           <Plus aria-hidden="true" className="w-4 h-4" />
         </button>
       </div>
+    </div>
     </div>
   );
 
@@ -3705,6 +3800,17 @@ export default function Product() {
             </Link>
           </div>
         ) : null}
+        {/*
+          The same note, on the surface a phone actually has. `qtyControl` and
+          its note are the DESKTOP panel's — below `lg` this bar is the only
+          place a quantity decision is made, so the count belongs here too.
+
+          Suppressed while `notice` is up: that banner is the answer to the tap
+          the customer just made and already carries «عرض السلة». Two rows
+          saying almost the same thing, one above the other, is the crowding
+          this bar is kept clear of.
+        */}
+        {!notice ? <div className="mx-auto w-full max-w-[640px]">{inCartNote}</div> : null}
         <div className="mx-auto grid w-full max-w-[640px] grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:gap-2.5">
           {/*
             A FIXED FOOTPRINT. This cell used to be auto-sized, so its width

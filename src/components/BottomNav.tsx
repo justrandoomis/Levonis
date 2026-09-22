@@ -1,7 +1,7 @@
 import React from 'react';
 import { Users, MessageCircle, ShoppingCart, User } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { api } from '../lib/api';
 import { cartCountStore, setCartCount, countCartItems } from '../lib/cartCount';
@@ -43,6 +43,43 @@ const PROTECTED_PATHS = new Set(['/cart']);
 export default function BottomNav() {
   const { t, dir } = useLanguage();
   const location = useLocation();
+
+  const navigate = useNavigate();
+
+  /**
+   * «في bloub اجعل عند الضغط ٣ مرات او اكثر يفتح الدعم الالي /support —
+   *  مره او مرتين واجهه رئيسيه، ٣ مرات او اكثر يفتح /support».
+   *
+   * A shortcut, not a replacement: one tap and two taps are still Home,
+   * which is what the button says it is and what every visitor who has
+   * never heard of this will get. The third rapid tap is the only one that
+   * changes the destination.
+   *
+   * RAPID is the whole distinction, and it is why this is a gap between
+   * taps rather than a count since mount. Without the window, three
+   * separate visits to Home over an afternoon would land the customer in
+   * the support chat, and they would have no idea why.
+   */
+  const bloubTapsRef = React.useRef({ count: 0, at: 0 });
+  const BLOUB_MULTI_TAP_MS = 700;
+  const BLOUB_TAPS_FOR_SUPPORT = 3;
+  const onBloubTap = (e: React.MouseEvent) => {
+    const now = Date.now();
+    const run = bloubTapsRef.current;
+    run.count = now - run.at <= BLOUB_MULTI_TAP_MS ? run.count + 1 : 1;
+    run.at = now;
+    if (run.count >= BLOUB_TAPS_FOR_SUPPORT) {
+      // The run ends here. Without the reset a fourth and fifth tap would
+      // each re-navigate to a page the customer is already standing on.
+      run.count = 0;
+      run.at = 0;
+      e.preventDefault();
+      signalBloub('tap', 210);
+      navigate('/support');
+      return;
+    }
+    signalBloub('tap', 210);
+  };
   const { isAuthenticated } = useAuth();
   /**
    * THE CART BADGE. Adding a product used to change nothing anywhere in the
@@ -197,8 +234,9 @@ export default function BottomNav() {
         dir={dir}
         aria-label={t('home')}
         aria-current={location.pathname === '/' ? 'page' : undefined}
-        onClick={() => signalBloub('tap', 210)}
+        onClick={onBloubTap}
         data-bloub-home-button
+        data-bloub-support-taps={BLOUB_TAPS_FOR_SUPPORT}
         className="lv-character-bottom-home relative shrink-0 rounded-xl pointer-events-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
         <MotionCharacterAnchor kind="bottom-home" />

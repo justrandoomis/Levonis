@@ -36,6 +36,30 @@ export interface DeliveryMethod {
    * this field existed changes meaning. Read it through `deliversToHome`.
    */
   home_delivery?: boolean;
+  /**
+   * WHERE THE CUSTOMER IS BEING ASKED TO COME.
+   *
+   * «عند الضغط على الاستلام من المخزن … اجعل هناك ملاحظة يظهر فيها عرض مكان
+   *  المخزن على الخريطة».
+   *
+   * A pickup method asks somebody to drive somewhere, and the checkout could
+   * not say where: the card said «محسوب حسب القطع والكمية», which is a
+   * sentence about a FEE and is meaningless on a method that has none.
+   *
+   * OPTIONAL, AND ABSENT MEANS NO LINK IS DRAWN. The shop's address is not
+   * something this repository knows or may guess — inventing a map pin for a
+   * warehouse would send customers to a place that does not exist. The owner
+   * pastes the link they already use (Google Maps, OpenStreetMap, anything
+   * with an https URL) into the admin's delivery-method row, and only then
+   * does the card offer it. `checkoutDeliveryMethods` is admin-editable, so
+   * this belongs to the METHOD rather than to a single global setting: a shop
+   * with two pickup points gives each its own.
+   *
+   * It is rendered as an ordinary external link and never embedded: an iframe
+   * would put a third party's script inside the checkout, which the CSP
+   * refuses and which nothing here needs.
+   */
+  map_url?: string;
 }
 export interface CheckoutPaymentMethod {
   id: string;

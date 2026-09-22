@@ -1506,6 +1506,16 @@ export default function Checkout() {
                 const unavailable = serverFee ? !serverFee.available : false;
                 const displayedPrice = serverFee?.fee_iqd ?? selectedQuote?.total_iqd ?? null;
                 const memberWaiver = selectedQuote?.waiver_source === 'pro' || selectedQuote?.waiver_source === 'prime';
+                /**
+                 * A method that does NOT end at the customer's door — read
+                 * through the method's own `home_delivery` flag, with the
+                 * legacy `id !== 'pickup'` only as the fallback for rows
+                 * written before the flag existed. A bare id test is what
+                 * breaks the day the owner adds «استلام من الفرع الثاني».
+                 */
+                const isPickupMethod =
+                  typeof method.home_delivery === 'boolean' ? !method.home_delivery : method.id === 'pickup';
+                const pickupMapUrl = isPickupMethod ? (method.map_url || '').trim() : '';
                 return (
                 <React.Fragment key={method.id}>
                 <label data-selected={selected} className="lv-choice relative flex cursor-pointer items-center gap-3 p-4 sm:gap-4">
@@ -1520,13 +1530,48 @@ export default function Checkout() {
                           {dir === 'rtl' ? method.titleAr : method.titleEn}
                         </h3>
                         <p className="text-xs text-zinc-500 mt-0.5 font-light">{dir === 'rtl' ? method.descAr : method.descEn}</p>
-                        {selectedQuote && (
+                        {/*
+                          «بدل عرض كلمة محسوب حسب القطع بالكمية اجعل هناك
+                           ملاحظة يظهر فيها عرض مكان المخزن على الخريطة».
+
+                          «محسوب حسب القطع والكمية» explains a FEE, and a
+                          pickup has none — on that card it was a sentence
+                          about arithmetic that never happened. What the
+                          customer needs from a method that asks them to drive
+                          somewhere is WHERE, so the fee line gives way to the
+                          address.
+
+                          The link is drawn only when the owner has configured
+                          one on this method (`map_url`, admin). Nothing here
+                          knows the shop's address, and a guessed pin would
+                          send customers to a place that does not exist — so
+                          an unconfigured pickup card simply says nothing,
+                          which is the honest version of not knowing.
+
+                          `stopPropagation` because this sits inside the
+                          <label> for the radio: without it, tapping the map
+                          link would also select the method, which is a
+                          delivery choice the customer did not make.
+                        */}
+                        {pickupMapUrl ? (
+                          <a
+                            href={pickupMapUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            data-pickup-map
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+                          >
+                            <MapPin aria-hidden="true" className="w-3.5 h-3.5" />
+                            {loc('عرض مكان المخزن على الخريطة', 'See the pickup location on the map', 'شوێنی وەرگرتن لەسەر نەخشە ببینە')}
+                          </a>
+                        ) : selectedQuote && !isPickupMethod ? (
                           <p className={`mt-1 text-[11px] font-medium ${memberWaiver ? 'text-emerald-400' : 'text-zinc-400'}`}>
                             {memberWaiver
                               ? loc('ميزة توصيل الأعضاء مطبّقة', 'Member delivery benefit applied', 'سوودی گەیاندنی ئەندام جێبەجێ کرا')
                               : loc('محسوب حسب القطع والكمية', 'Calculated for items and quantity', 'بەپێی پارچە و بڕ هەژمار کراوە')}
                           </p>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                     {/* A fee we do not have yet is shown as a placeholder, never

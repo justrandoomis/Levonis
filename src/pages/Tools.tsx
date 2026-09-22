@@ -558,9 +558,22 @@ export default function Tools() {
                   invalidate();
                 }}
                 disabled={busy}
+                /**
+                 * «اختيار الماده اجعلها بالانجليزي».
+                 *
+                 * A material name is an identifier, not prose: "PLA Matte",
+                 * "PETG-CF", "ASA". It is what is printed on the spool, what
+                 * the merchant searches for and what the slicer profile is
+                 * named after, and it is the same string in every language —
+                 * the rule this codebase already applies to product names
+                 * («the product name is English in every language and is never
+                 * translated»). An Arabic rendering of it is a second name for
+                 * one thing, and the customer then cannot match what they
+                 * chose here against what they are buying.
+                 */
                 options={usableMaterials.map((m) => ({
                   value: m.id,
-                  label: (L === 'ar' && m.name_ar ? m.name_ar : m.name) || m.material_type,
+                  label: m.name || m.material_type,
                 }))}
               />
             </Field>
