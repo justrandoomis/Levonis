@@ -1090,6 +1090,108 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     markDirty();
   }, [markDirty, objects, orchestrator, profileId, projectName, quality, settings, status, strength, support]);
 
+  /**
+   * The same guard the effect above applies, readable from a listener that is
+   * registered once. A subscription that re-ran on every render would
+   * unsubscribe and resubscribe on every frame of a drag, which is the one
+   * moment it must not.
+   */
+  const canAutosaveRef = useRef(false);
+  const autosaveAllowed =
+    objects.length > 0 && !orchestrator.busy && status !== "slicing";
+  useEffect(() => {
+    canAutosaveRef.current = autosaveAllowed;
+  }, [autosaveAllowed]);
+
+  /**
+   * MOVING A MODEL IS AN EDIT, AND AUTOSAVE COULD NOT SEE IT.
+   *
+   * The effect above is the only thing that marked the session dirty, and it
+   * watches `objects`, the settings, the preset and the project name. A
+   * transform is in none of them: the engine does not re-emit its objects
+   * event when a model is dragged, rotated or scaled, so an hour spent
+   * arranging forty parts on the plate scheduled exactly zero saves. Nothing
+   * was written until the author happened to add or delete a part — and on an
+   * iPad, «the tab came back empty» is what that looks like from the outside.
+   *
+   * `onSceneEdit` is the adapter's own signal for precisely this, and it
+   * already exists: `use-slicing-state` subscribes to it to know a slice
+   * result has gone stale. The same gesture that invalidates a slice is the
+   * gesture that changes what a save would write, so autosave listens to it
+   * too rather than to a second, parallel notion of "edited".
+   *
+   * Cost is not a worry at this layer even though a drag fires continuously.
+   * `notifySceneEdited` already coalesces to one notification per microtask;
+   * `markDirty` only re-arms a timer (nine seconds on a constrained device);
+   * and when that timer finally fires, `contentSignature` — which reads the
+   * adapter's transform fingerprint — skips the whole capture if the scene
+   * ended up where it started. A drag that goes out and back costs nothing.
+   */
+  useEffect(() => {
+    return adapter.onSceneEdit(() => {
+      // `projectFilesRef` is a ref the import path writes, so it is read at
+      // notification time rather than mirrored: a scene edit cannot arrive
+      // before the files that produced it.
+      if (!canAutosaveRef.current || !projectFilesRef.current.length) return;
+      markDirty();
+    });
+  }, [adapter, markDirty]);
+
+  /**
+   * THE LAST MOMENT WE ARE STILL RUNNING.
+   *
+   * `whenIdle()` in project-sync.ts is documented as the flush "before
+   * navigation/unload", and nothing in the shell ever called it. On an iPad
+   * that omission is the whole bug: Safari discards a backgrounded tab
+   * whenever it wants, and on the way back the page is a fresh load. With a
+   * nine-second debounce on a constrained device, everything edited in the
+   * last nine seconds — and, before the subscription above, everything ever
+   * arranged — was simply gone.
+   *
+   * `visibilitychange → hidden` and `pagehide` are the two events iOS
+   * actually delivers; `beforeunload` is not reliable there and is
+   * deliberately not used. Both fire for an ordinary tab switch, so the save
+   * is gated on `dirty`: a clean session must not pay for a full 3MF export
+   * every time the owner glances at another tab.
+   *
+   * IT RUNS BEFORE THE WORKER IS RELEASED, and the ordering is not luck. The
+   * constrained-device effect further down this file hands the WASM heap back
+   * on the same `hidden` event; effects register their listeners in
+   * declaration order and the DOM calls them in that order, so this one is
+   * registered first and runs first. It must stay above that effect.
+   *
+   * Best-effort by nature: the OS may not give us the milliseconds, and
+   * nothing here pretends otherwise — it is not awaited and it blocks
+   * nothing. What it buys is the local draft, which is the cheap half and the
+   * half that matters.
+   */
+  const { saveNow } = persistence;
+  const syncDirtyRef = useRef(false);
+  const syncDirty = persistence.state.dirty;
+  useEffect(() => {
+    syncDirtyRef.current = syncDirty;
+  }, [syncDirty]);
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const flush = () => {
+      if (!syncDirtyRef.current) return;
+      void saveNow().catch(() => {
+        // A failed flush is already reflected in the sync status; there is no
+        // screen left to show anything on.
+      });
+    };
+    const onHide = () => {
+      if (document.visibilityState !== "hidden") return;
+      flush();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [saveNow]);
+
   const openProjects = useCallback(async () => {
     setSheet("projects");
   }, []);
