@@ -298,6 +298,11 @@ export const BASE_COLUMNS = [
   // ---- section 7: how it is used
   'how_to_use',
   'usage_url',
+  // 0104 — the product's page in the Qi Card instalments app. A shop that
+  // manages its catalogue by spreadsheet has to be able to set it there too;
+  // the TXT template already carries it, and a column in one importer and not
+  // the other is how the two drift.
+  'gini_url',
   // ---- child-row columns
   'group',
   'value',
@@ -321,7 +326,7 @@ export const BASE_COLUMNS = [
 
 export const SPEC_PREFIX = 'spec.';
 
-/** The four product types the panel offers, with the column count each one
+/** The product types the panel offers, with the column count each one
  *  produces so an admin can see the narrowing before downloading. */
 export function templateTypeChoices(): Array<{
   id: ProductTypeId;
@@ -571,6 +576,7 @@ export function labelRow(shape: TemplateShape): string[] {
     payment_options: 'طرق الدفع المسموحة (id|id)',
     how_to_use: 'طريقة الاستخدام (نص)',
     usage_url: 'رابط الدليل الرسمي',
+    gini_url: 'رابط المنتج في تطبيق جني',
     group: 'مجموعة الخيار / عنوان مجموعة المواصفات',
     value: 'قيمة الخيار / اسم اللون / العنوان',
     label: 'اسم المواصفة (سطر spec)',
@@ -678,6 +684,7 @@ export interface ParsedProduct {
   payment_options: string[] | null;
   how_to_use: string | null;
   usage_url: string | null;
+  gini_url: string | null;
   /** null when the sheet has no hashtags column at all, so an older file
    *  leaves a product's stored tags alone instead of clearing them. */
   hashtags: string[] | null;
@@ -1485,6 +1492,7 @@ export function parseImport(text: string, shape: TemplateShape): ParseResult {
         payment_options: index.has('payment_options') ? splitList(cell(r, 'payment_options')) : null,
         how_to_use: index.has('how_to_use') ? cell(r, 'how_to_use') : null,
         usage_url: index.has('usage_url') ? cell(r, 'usage_url') : null,
+        gini_url: index.has('gini_url') ? cell(r, 'gini_url') : null,
         hashtags: index.has('hashtags') ? splitList(cell(r, 'hashtags')) : null,
         membership_rules: membershipRulesFrom((name) => cell(r, name), (name) => index.has(name), line, issues),
         spec_fields: spec,
@@ -2137,6 +2145,7 @@ export interface ExportProduct {
   payment_options: string[];
   how_to_use: string;
   usage_url: string;
+  gini_url: string;
   hashtags: string[];
   /**
    * §18 — the product-scoped membership discount rules this product has, at
@@ -2237,6 +2246,7 @@ export function serializeProducts(products: ExportProduct[], shape: TemplateShap
       payment_options: p.payment_options.join('|'),
       how_to_use: p.how_to_use,
       usage_url: p.usage_url,
+      gini_url: p.gini_url,
       hashtags: p.hashtags.join('|'),
       ...membershipCells(p.membership_rules),
       ...spec,
@@ -2491,6 +2501,30 @@ export function exampleRows(shape: TemplateShape): Array<Record<string, string>>
       description: 'A worked example row — delete it before importing.',
       price: '95000',
       options: [['Plug', 'EU']],
+      colors: [],
+    },
+    // The laser line. Both examples are shaped like the thing a laser admin
+    // actually types: a machine sold by model, and a consumable sold by the
+    // sheet — which is the option group a plywood buyer picks from, exactly as
+    // the filament example is sold by spool weight.
+    laser: {
+      name: 'Example Laser Engraver',
+      description: 'A worked example row — delete it before importing.',
+      price: '950000',
+      options: [
+        ['Model', 'Standard'],
+        ['Model', 'With rotary'],
+      ],
+      colors: [],
+    },
+    laser_material: {
+      name: 'Example Laser Plywood Sheet',
+      description: 'A worked example row — delete it before importing.',
+      price: '4000',
+      options: [
+        ['Thickness', '3 mm'],
+        ['Thickness', '5 mm'],
+      ],
       colors: [],
     },
   };
@@ -2911,7 +2945,7 @@ ${def.hint_ar}
 أنواع الأسطر
 ------------
 ${[
-    rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, standard_delivery_enabled, standard_delivery_quantity_step, standard_delivery_fee_iqd, personal_delivery_enabled, personal_delivery_quantity_step, personal_delivery_fee_iqd, warranty_base_months, serialized, payment_options, how_to_use, usage_url, membership.*, spec.*'),
+    rowType('product', 'المنتج نفسه — سطر واحد لكل منتج', 'name, description, status, sku, display_order, is_featured, brand, category, sub_category, hashtags, sale_types, inventory_mode, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, direct_surcharge_iqd, stock, low_stock_threshold, standard_delivery_enabled, standard_delivery_quantity_step, standard_delivery_fee_iqd, personal_delivery_enabled, personal_delivery_quantity_step, personal_delivery_fee_iqd, warranty_base_months, serialized, payment_options, how_to_use, usage_url, gini_url, membership.*, spec.*'),
     rowType('option', 'قيمة واحدة من مجموعة خيارات — نسخة المنتج ونوع توفرها معًا', 'group, value, sku_part, image, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, availability_type, lead_time_text, lead_time_min_days, lead_time_max_days, variant_key, variant_label'),
     rowType('color', 'لون واحد وروابطه بالخيارات', 'value (اسم اللون), hex, sku_part, image, links, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),
     rowType('variant', 'توليفة مخزون واحدة (خيارات + لون)', 'links (Group:Value|Group:Value|color:Name), sku_part, active, stock, low_stock_threshold, price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd'),

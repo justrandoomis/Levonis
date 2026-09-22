@@ -44,6 +44,17 @@ import SummaryInfo from '../components/ui/SummaryInfo';
  * imports at all, so nothing of the Worker runtime enters the bundle.
  */
 import { COD_TAX_BLOCK_IQD, COD_TAX_PER_BLOCK_IQD } from '../../packages/shipping/src/codTax';
+/**
+ * THE SIX DIGITS, FROM THE MODULE THAT ALSO REFUSES THEM AT THE DOOR.
+ *
+ * `computeCheckout` tests this exact expression before it will allocate an
+ * order, and `orders.gini_order_no` carries a matching CHECK. Importing it
+ * rather than re-typing `/^\d{6}$/` here is what keeps the field's verdict and
+ * the server's from drifting — a client that accepted five digits would spend
+ * the customer's tap on a refusal it could have explained in place.
+ */
+import { GINI_ORDER_NO_RE } from '../../packages/pricing/src/paymentPolicy';
+import GiniCheckoutOption from '../components/checkout/GiniCheckoutOption';
 import BundleContents, { type BundleContentLine } from '../components/bundles/BundleContents';
 import AddressForm from '../components/address/AddressForm';
 /**
@@ -223,6 +234,29 @@ interface CheckoutQuoteDto {
     financed_iqd?: number;
     due_at?: string | null;
   };
+  /**
+   * «أقساط عبر تطبيق جني» as the SERVER priced this cart.
+   *
+   * `paid_iqd` and `delivery_due_iqd` are produced inside the one function
+   * that prices the order and always sum to the payable, so the screen prints
+   * both instead of subtracting one from the other and arriving at a third
+   * number. They are 0 until Gini is actually the chosen method — a preview of
+   * another method must not show a door amount that method will not charge —
+   * which is why nothing here is ever used as a fallback for the generic
+   * `due_on_delivery_iqd` row.
+   */
+  gini?: {
+    available: boolean;
+    selected: boolean;
+    /** Settled inside the app. Never collected by us, never from the wallet. */
+    paid_iqd: number;
+    /** The ONLY money this order owes at the door: the delivery fee, 0 on pickup. */
+    delivery_due_iqd: number;
+    conditions: { ar: string; en: string; ckb: string };
+    app_url: string;
+    /** «يبقى الطلب معلقا حتى ٢٤ ساعه» — how long before the sweep cancels it. */
+    hold_hours: number;
+  };
   priority_delivery?: { eligible: boolean; max_hours: 12; due_at: string | null; reason: string | null };
   /** 'direct' = priced by the direct-sale rule (a direct cart, or a pre-order
    *  paid cash on delivery); 'preorder' = the transport commission applies. */
@@ -339,6 +373,18 @@ const STRINGS = {
     prepaidByWallet: 'مدفوع بالكامل من محفظتك — يُطبَّق تسعير الطلب المسبق.',
     printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} مقدماً من المحفظة.`,
     printerAdvanceShort: (need: string, have: string) => `رصيد محفظتك ${have} ولا يغطي الدفعة المقدمة ${need}. اشحن المحفظة أو اختر الاستلام من المتجر.`,
+    // ── «خدمه اقساطي على تطبيق جني» ───────────────────────────────────────
+    giniRow: 'طلبتها أقساط من تطبيق جني؟',
+    giniRowHint: 'سعر المنتج محسوب داخل التطبيق — تدفع التوصيل فقط.',
+    giniOrderNoLabel: 'رقم الطلب في تطبيق جني',
+    giniOrderNoHelp: 'ستة أرقام كما تظهر في تطبيق جني.',
+    giniOrderNoBlock: 'اكتب رقم الطلب في تطبيق جني (٦ أرقام).',
+    giniPaidRow: 'مدفوع عبر تطبيق جني',
+    giniDoorRow: 'يُدفع عند الاستلام — كلفة التوصيل فقط',
+    giniPickupRow: 'استلام من المخزن — لا يوجد مبلغ عند الاستلام',
+    giniWarning: (hours: string) =>
+      `طلبك لا يُعتبر مؤكداً إلا بعد شرائه من تطبيق جني ومسح باركود الاستلام. بدون ذلك يبقى الطلب معلقاً ${hours} ساعة ثم يُلغى تلقائياً.`,
+    giniPlacedTitle: 'بقي مسح باركود الاستلام',
   },
   en: {
     quoteLoading: 'Calculating delivery...',
@@ -381,6 +427,18 @@ const STRINGS = {
     prepaidByWallet: 'Paid in full from your wallet — pre-order pricing applies.',
     printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid in advance from your wallet.`,
     printerAdvanceShort: (need: string, have: string) => `Your wallet holds ${have}, which does not cover the ${need} advance. Top up your wallet, or choose store pickup.`,
+    // ── Gini instalments (Qi Card / Rafidain Bank) ────────────────────────
+    giniRow: 'Ordered it in instalments from the Gini app?',
+    giniRowHint: 'The product price is settled inside the app — you only pay for delivery.',
+    giniOrderNoLabel: 'Gini app order number',
+    giniOrderNoHelp: 'Six digits, exactly as the Gini app shows them.',
+    giniOrderNoBlock: 'Enter your 6-digit order number from the Gini app.',
+    giniPaidRow: 'Paid through the Gini app',
+    giniDoorRow: 'Due on delivery — the delivery fee only',
+    giniPickupRow: 'Store pickup — nothing is due on collection',
+    giniWarning: (hours: string) =>
+      `Your order is not confirmed until you buy it in the Gini app and the receipt barcode is scanned. Without that it stays pending for ${hours} hours and is then cancelled automatically.`,
+    giniPlacedTitle: 'The receipt barcode still has to be scanned',
   },
   ckb: {
     quoteLoading: 'حسابکردنی گەیاندن...',
@@ -427,6 +485,18 @@ const STRINGS = {
     prepaidByWallet: 'بە تەواوی لە جزدانەکەتەوە دراوە — نرخی پێش-داواکاری جێبەجێ دەبێت.',
     printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
     printerAdvanceShort: (need: string, have: string) => `جزدانەکەت ${have} هەیە، کە ${need}ی پێشەکی ناگرێتەوە. جزدان پڕ بکەرەوە یان وەرگرتن لە فرۆشگا هەڵبژێرە.`,
+    // ── قیست لە ڕێگەی ئەپی جینی ───────────────────────────────────────────
+    giniRow: 'بە قیست لە ئەپی جینی داوات کردووە؟',
+    giniRowHint: 'نرخی بەرهەمەکە لە ناو ئەپەکەدا حساب دەکرێت — تەنها کرێی گەیاندن دەدەیت.',
+    giniOrderNoLabel: 'ژمارەی داواکاری لە ئەپی جینی',
+    giniOrderNoHelp: 'شەش ژمارە، هەروەک لە ئەپی جینیدا دەردەکەوێت.',
+    giniOrderNoBlock: 'ژمارەی داواکاری لە ئەپی جینی بنووسە (٦ ژمارە).',
+    giniPaidRow: 'لە ڕێگەی ئەپی جینی درا',
+    giniDoorRow: 'لە کاتی وەرگرتن دەدرێت — تەنها کرێی گەیاندن',
+    giniPickupRow: 'وەرگرتن لە فرۆشگا — لە کاتی وەرگرتن هیچ پارەیەک نادرێت',
+    giniWarning: (hours: string) =>
+      `داواکارییەکەت دڵنیا ناکرێتەوە تا لە ئەپی جینی نەیکڕیت و باڕکۆدی وەرگرتن سکان نەکرێت. بەبێ ئەوە داواکارییەکە ${hours} کاتژمێر چاوەڕوان دەمێنێتەوە و پاشان خۆکارانە هەڵدەوەشێتەوە.`,
+    giniPlacedTitle: 'هێشتا دەبێت باڕکۆدی وەرگرتن سکان بکرێت',
   },
 };
 
@@ -585,6 +655,17 @@ export default function Checkout() {
   const [requestedDay, setRequestedDay] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('');
   /**
+   * «رقم الطلب في تطبيق جني» — the six digits, kept as the string that was
+   * typed rather than a number, because leading zeros are part of it and
+   * `Number('000123')` is not.
+   *
+   * It is NOT cleared when the customer moves away from Gini and back: a
+   * mis-tap on the wallet row should not throw away a number they copied out
+   * of another app. Nothing reads it while another method is selected, and
+   * nothing sends it (see `placeOrder`).
+   */
+  const [giniOrderNo, setGiniOrderNo] = useState('');
+  /**
    * THE «استخدام كود خاص» DISCLOSURE. Closed by default — most orders carry no
    * code, and an empty input in the middle of a price column is a question
    * nobody asked. `promoOpen` below forces it open when the order already has
@@ -737,6 +818,24 @@ export default function Checkout() {
   const offeredPaymentIds = quote?.allowed_payment_methods ?? DEFAULT_OFFERED_PAYMENT_IDS;
   const filteredPaymentMethods = checkoutPaymentMethods.filter((m) => offeredPaymentIds.includes(m.id));
   const offeredKey = filteredPaymentMethods.map((m) => m.id).join(',');
+  /**
+   * GINI IS OFFERED FROM THIS LIST BUT NOT DRAWN IN IT.
+   *
+   * «خيار ناعم وبسيط ليس ضخما» — the owner asked for a quiet line under cash
+   * on delivery, not a fourth card of equal weight. So it stays a member of
+   * `filteredPaymentMethods` (which is what the default-selection effect above
+   * and the server's allow-list agree on) and is skipped by the map below,
+   * which draws it as a soft row instead.
+   *
+   * THE ANCHOR IS CASH, and falls back to the last card rather than
+   * disappearing: a shop that deleted the cash row from its settings would
+   * otherwise lose the Gini option with it, silently — the same class of bug
+   * `normalizedSetting` exists to stop on the server side.
+   */
+  const giniOffered = filteredPaymentMethods.some((m) => m.id === 'gini');
+  const giniAnchorId = filteredPaymentMethods.some((m) => m.id === 'cash')
+    ? 'cash'
+    : filteredPaymentMethods.filter((m) => m.id !== 'gini').slice(-1)[0]?.id ?? '';
   useEffect(() => {
     if (filteredPaymentMethods.length === 0) return;
     if (!paymentMethod || !filteredPaymentMethods.some((m) => m.id === paymentMethod)) {
@@ -1111,6 +1210,37 @@ export default function Checkout() {
 
   const isPrepaidMethod = paymentMethod === 'wallet' || paymentMethod === 'full_advance';
   const isBnplMethod = paymentMethod === 'bnpl';
+  const isGiniMethod = paymentMethod === 'gini';
+  /**
+   * THE NUMBER IS VALID OR IT IS NOT — the same expression the server tests.
+   * Trimmed because a number pasted out of the Gini app arrives with the
+   * whitespace around it, and refusing that would be a refusal about a space.
+   */
+  const giniOrderNoTrimmed = giniOrderNo.trim();
+  const giniOrderNoValid = GINI_ORDER_NO_RE.test(giniOrderNoTrimmed);
+  /**
+   * THE TWO GINI FIGURES ARE THE SERVER'S OR THEY DO NOT EXIST.
+   *
+   * There is no local fallback on purpose. The split is computed inside the
+   * one function that prices the order, where it is carved OUT of the payable
+   * the delivery fee is already inside; any arithmetic repeated here would be
+   * a second opinion about how much is due at a customer's door. Until a quote
+   * lands the rows read 0 — and the button is blocked on the missing quote
+   * anyway, so no order can be placed against them.
+   */
+  const giniPaidIqd = isGiniMethod ? quote?.gini?.paid_iqd ?? 0 : 0;
+  const giniDeliveryDueIqd = isGiniMethod ? quote?.gini?.delivery_due_iqd ?? 0 : 0;
+  /**
+   * How long the order waits for its receipt scan, in the warning's sentence.
+   * Unlike the two figures above this DOES fall back — to «٢٤ ساعه», the
+   * owner's own number and the shipped default — because it is a promise
+   * about time, not an amount of money, and a sentence with a hole in it
+   * explains nothing at all.
+   */
+  const giniHoldHours = (() => {
+    const h = quote?.gini?.hold_hours;
+    return typeof h === 'number' && Number.isFinite(h) && h > 0 ? Math.trunc(h) : 24;
+  })();
   const requiredAdvance = isPrepaidMethod ? orderTotal : 0;
   const isAdvanceRequired = requiredAdvance > 0;
 
@@ -1196,6 +1326,18 @@ export default function Checkout() {
     if (!selectedAddressId) return S.blockAddress;
     if (!deliveryMethod) return S.blockDelivery;
     if (!paymentMethod) return S.blockPayment;
+    /**
+     * «بعد وضع رقم الطلب داخل تطبيق جني المكون من ٦ ارقام» — a CONJUNCT, and
+     * never an early return in `placeOrder`.
+     *
+     * It sits here, immediately after the payment choice, because it is part
+     * of that choice: the field it names is open on screen the moment Gini is
+     * selected, so this is the thing the customer can fix soonest of all the
+     * refusals below it. The server refuses the same order with
+     * GINI_ORDER_NO_REQUIRED; this is what stops the tap that would earn that
+     * refusal, and says which six digits are missing.
+     */
+    if (isGiniMethod && !giniOrderNoValid) return S.giniOrderNoBlock;
     if (shippingNeedsConfig) return S.needsConfig;
     if (!consentSatisfied) return S.policyRequired;
     if (!isBalanceSufficient) return S.blockAdvance;
@@ -1248,6 +1390,12 @@ export default function Checkout() {
         deliveryMethodId: deliveryMethod,
         protectedDelivery,
         paymentMethodId: paymentMethod,
+        // The Gini order the customer already placed in the app — the only
+        // handle we have on a purchase Levonis did not process. Sent ONLY on a
+        // Gini order: on any other method it is not part of the input the
+        // server parses, and a stray value there would be a number attached to
+        // an order nobody can reconcile against Gini.
+        giniOrderNo: isGiniMethod ? giniOrderNoTrimmed : undefined,
         useWallet: isWalletActive,
         usePoints,
         itemIds: items.map((i) => i.id),
@@ -1454,6 +1602,45 @@ export default function Checkout() {
               </div>
             )}
           </div>
+
+          {/*
+            THE ORDER IS PLACED AND IT IS NOT YET CONFIRMED.
+
+            «ملاحظه مهمه هنا للمستخدم ان الطلب لم يتم تاكيده الا بعد طلب من
+            تطبيق جني وتاكيد مسح باركود الاستلام». The heading above this says
+            «تم استلام طلبك بنجاح», which is true of every other method and
+            only half true of this one — a Gini order sits at `pending` until
+            the receipt barcode is scanned, and is cancelled if it never is.
+            Leaving the customer with the general success line alone would be
+            telling them the thing is done while a clock runs against it.
+
+            Drawn off the SERVER'S state, not off the method the screen had
+            selected: `awaiting_receipt` is the only state this sentence is
+            true in, and an order that somehow arrived already scanned must
+            not be handed a warning about a scan.
+          */}
+          {placedOrder.gini?.state === 'awaiting_receipt' ? (
+            <div
+              data-gini-pending
+              className="mb-10 w-full max-w-sm rounded-xl border border-warning/25 bg-warning/[0.06] p-4 text-start"
+            >
+              <p className="flex items-start gap-2 text-[13px] font-medium text-warning">
+                <AlertCircle aria-hidden="true" className="mt-px w-4 h-4 shrink-0" strokeWidth={1.5} />
+                {S.giniPlacedTitle}
+              </p>
+              <p className="mt-2 text-[12px] font-light leading-relaxed text-zinc-400">
+                {S.giniWarning(String(giniHoldHours))}
+              </p>
+              {placedOrder.gini.order_no ? (
+                <p className="mt-2 text-[12px] text-zinc-500">
+                  {S.giniOrderNoLabel}:{' '}
+                  <span dir="ltr" className="font-mono tracking-widest text-zinc-300">
+                    {placedOrder.gini.order_no}
+                  </span>
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="flex items-center gap-3">
             <button
@@ -1781,7 +1968,11 @@ export default function Checkout() {
             </h2>
             <div className="grid grid-cols-1 gap-3">
               {filteredPaymentMethods.map(method => (
-                <label key={method.id} data-selected={paymentMethod === method.id} className="lv-choice relative flex cursor-pointer items-center gap-4 p-4">
+                /* Offered, but drawn as the soft row below cash rather than as
+                   a fourth card of equal weight. */
+                method.id === 'gini' ? null : (
+                <React.Fragment key={method.id}>
+                <label data-selected={paymentMethod === method.id} className="lv-choice relative flex cursor-pointer items-center gap-4 p-4">
                   <input
                     type="radio"
                     name="payment"
@@ -1832,6 +2023,29 @@ export default function Checkout() {
                   </div>
                   <span className="lv-choice-mark"><Check className="h-3 w-3" aria-hidden="true" /></span>
                 </label>
+                {giniOffered && method.id === giniAnchorId ? (
+                  <GiniCheckoutOption
+                    selected={isGiniMethod}
+                    orderNo={giniOrderNo}
+                    onOrderNoChange={setGiniOrderNo}
+                    onChoose={() => {
+                      // The same two lines the radios above run: the buyer has
+                      // an opinion now, so the wallet-first default stops
+                      // having one.
+                      paymentPickedRef.current = true;
+                      setPaymentMethod('gini');
+                    }}
+                    strings={{
+                      row: S.giniRow,
+                      hint: S.giniRowHint,
+                      label: S.giniOrderNoLabel,
+                      help: S.giniOrderNoHelp,
+                      warning: S.giniWarning(String(giniHoldHours)),
+                    }}
+                  />
+                ) : null}
+                </React.Fragment>
+                )
               ))}
             </div>
           </section>
@@ -2444,7 +2658,15 @@ export default function Checkout() {
               )}
             </div>
 
-            {/* Wallet Block */}
+            {/*
+              THE WALLET IS NOT OFFERED ON A GINI ORDER, because it cannot be
+              applied to one. The goods were settled inside the Gini app, so
+              the server forces the applied balance to 0 — leaving a live
+              toggle here would offer a deduction that will never appear, and
+              the customer would read the unchanged total as a bug in the
+              switch rather than as the rule it is.
+            */}
+            {isGiniMethod ? null : (
             <div className={`mt-4 pt-4 border-t border-white/5 transition-all`}>
                 <div className="flex items-center justify-between gap-4 mb-2">
                     <div className="flex items-center gap-3">
@@ -2498,6 +2720,7 @@ export default function Checkout() {
                     </div>
                 )}
             </div>
+            )}
 
             {/*
               POINTS, AS A QUIET LINE — «واسفله بسطر ناعم وهو استخدام النقاط».
@@ -2602,7 +2825,38 @@ export default function Checkout() {
                   </div>
                 ) : null}
 
-                {isBnplMethod ? (
+                {/*
+                  «ويظهر المبلغ الذي يدفع عند التوصيل فقط» — the Gini order in
+                  two rows, both of them the server's own figures.
+
+                  They are printed SEPARATELY and never subtracted from one
+                  another: `paid_iqd` and `delivery_due_iqd` are carved out of
+                  one payable inside the function that prices the order, so
+                  they already sum to the total above. Deriving either one here
+                  would be this screen's second opinion about how much money is
+                  owed at a customer's door.
+                */}
+                {isGiniMethod ? (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-text-secondary">{S.giniPaidRow}</span>
+                      <span data-testid="checkout-gini-paid" className="tabular-nums font-bold text-text-primary">
+                        {money(giniPaidIqd)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className={giniDeliveryDueIqd === 0 ? 'text-gold' : 'text-text-secondary'}>
+                        {giniDeliveryDueIqd === 0 ? S.giniPickupRow : S.giniDoorRow}
+                      </span>
+                      <span
+                        data-testid="checkout-gini-door"
+                        className={`tabular-nums font-bold ${giniDeliveryDueIqd === 0 ? 'text-gold' : 'text-text-primary'}`}
+                      >
+                        {money(giniDeliveryDueIqd)}
+                      </span>
+                    </div>
+                  </>
+                ) : isBnplMethod ? (
                   <>
                     <div className="flex justify-between items-center">
                       <span className="text-text-secondary">

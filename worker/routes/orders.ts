@@ -13,7 +13,7 @@ import {
   type PhysicalDimensions,
 } from '../lib/physicalDimensions';
 import { deliversToHome, getSetting, getSettings, printerNoteIqdFrom } from '../lib/settings';
-import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig } from '../lib/settings';
+import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig, GiniPolicy } from '../lib/settings';
 import { addDays, baghdadDay, baghdadDayOf, isDay } from '../lib/baghdadTime';
 import { COMPOSED_SNAPSHOT, COST_BASIS, costSnapshot, type CostBasis } from '../lib/financeLedger';
 import {
@@ -82,6 +82,8 @@ import {
   isBnpl,
   isCod,
   isPaymentMethodAllowed,
+  isGini,
+  GINI_ORDER_NO_RE,
   isPrepaid,
   preorderPricingFor,
   PAYMENT_METHOD_NOT_ALLOWED,
@@ -89,6 +91,7 @@ import {
 import type { PreorderPricing } from '../lib/pricing';
 import { printerProductIds } from '../lib/printerIdentity';
 import { printerHomeDeliveryAdvanceIqd } from '../lib/printerAdvance';
+import { giniSplit, giniHoldUntil, giniStateOf } from '../lib/gini';
 import { refuseNonPrinterWarranty } from '../lib/warrantyPlans';
 import { lineOrderType, saleAvailability } from './products';
 import { capacityFrom, EMPTY_RELATIONS, loadRelationsViews, snapshotFrom } from '../lib/productOverlay';
@@ -175,8 +178,17 @@ function iqdToUsdCents(iqd: number, rate: number): number {
   return Math.ceil((iqd * 100) / rate);
 }
 
-const eventPaymentMethod = (id: string): 'wallet' | 'cash' | 'bnpl' =>
-  isBnpl(id) ? 'bnpl' : isCod(id) ? 'cash' : 'wallet';
+/**
+ * The id as ANALYTICS sees it — and the enum swallows anything it has no
+ * name for. This used to fall through to 'wallet' for every id that was
+ * neither BNPL nor cash, so a Gini order would have been published as a
+ * wallet purchase: a payment method that moved no Levo money at all counted
+ * as the one that moves nothing but. The contract enum
+ * (packages/contracts/src/events/common.ts) carries 'gini' now, and this
+ * tests for it before the fallback rather than after.
+ */
+const eventPaymentMethod = (id: string): 'wallet' | 'cash' | 'bnpl' | 'gini' =>
+  isBnpl(id) ? 'bnpl' : isGini(id) ? 'gini' : isCod(id) ? 'cash' : 'wallet';
 
 /**
  * §5 unified financial snapshot: ONE server-computed money view every cart,
@@ -226,8 +238,24 @@ function financialSnapshot(
   const total = Number(o.total_iqd) || 0;
   const due = Number(o.due_on_delivery_iqd) || 0;
   const bnplDue = Number(o.bnpl_due_iqd) || 0;
+  /**
+   * WHAT GINI ALREADY SETTLED, WHICH THIS VIEW WOULD OTHERWISE NEVER SEE.
+   *
+   * `paid` below is "wallet money, or what the courier actually collected" —
+   * and a Gini order has neither for its goods. Gini paid them, outside
+   * Levonis, before the order existed. Without this term the order reports
+   * its FULL price outstanding for ever: at first only after a collection is
+   * recorded (the delivery fee), which is the worst version of the bug,
+   * because the number looks right on the order-detail screen until the
+   * courier hands the fee in and then jumps to the whole product price.
+   *
+   * It is READ FROM THE STORED COLUMN, not inferred as `total - due`. The
+   * subtraction happens to give the same answer today and stops doing so the
+   * first time anything else is collected against the order.
+   */
+  const giniPaid = Number(o.gini_paid_iqd) || 0;
   const collected = snap ? snap.collected_iqd : null;
-  const paid = collected === null ? walletIqd : collected;
+  const paid = giniPaid + (collected === null ? walletIqd : collected);
   const outstanding = Math.max(0, total - paid);
   const support = safeParse<Record<string, unknown> | null>(o.support_snapshot, null);
 
@@ -250,6 +278,8 @@ function financialSnapshot(
     points_tx_id: pointsUsed > 0 ? `wtx_ord_${String(o.id)}_pts` : null,
     due_on_delivery_iqd: due,
     bnpl_due_iqd: bnplDue,
+    /** Settled inside the Gini app — a payment, never a discount. */
+    gini_paid_iqd: giniPaid,
     bnpl_due_at: o.bnpl_due_at ?? null,
     collected_iqd: collected,
     outstanding_iqd: bnplDue > 0 ? bnplDue : collected === null ? due : outstanding,
@@ -660,6 +690,27 @@ export function orderPublic(
     address: safeParse(o.address_snapshot, {}),
     delivery_method: safeParse(o.delivery_method_snapshot, {}),
     payment_method_id: o.payment_method_id,
+    /**
+     * «أقساط عبر تطبيق جني», as the customer's own screen needs to explain it:
+     * what the app settled, where the order stands with the bank, and until
+     * when it waits. Absent on every other payment method rather than a block
+     * of zeroes, so a screen can test for it instead of for a state string.
+     *
+     * The barcode itself is deliberately NOT here. It is the token that tells
+     * Gini the goods were handed over, and a customer's order payload is the
+     * wrong place to publish it — staff scan it from the parcel, not from the
+     * account page.
+     */
+    gini:
+      String(o.payment_method_id ?? '') === 'gini'
+        ? {
+            order_no: String(o.gini_order_no ?? ''),
+            state: giniStateOf(o.gini_state),
+            paid_iqd: Number(o.gini_paid_iqd) || 0,
+            hold_until: o.gini_hold_until ?? null,
+            received_at: o.gini_received_at ?? null,
+          }
+        : null,
     subtotal_iqd: o.subtotal_iqd,
     shipping_iqd: o.shipping_iqd,
     cod_tax_iqd: Number(o.cod_tax_iqd) || 0,
@@ -1528,6 +1579,14 @@ interface CheckoutInput {
    * before this field existed.
    */
   requestedDeliveryDate: string;
+  /**
+   * «رقم الطلب في تطبيق جني» — the six digits Gini gave the customer for the
+   * purchase they made in the app. '' for every other payment method, and
+   * '' is also legal on a QUOTE for a Gini cart: the preview prices the order
+   * before the customer has gone to the app, and refusing there would hide
+   * the delivery fee that tells them what they will owe at the door.
+   */
+  giniOrderNo: string;
 }
 
 interface ComputedLine {
@@ -1696,6 +1755,13 @@ interface CheckoutComputation {
   bnpl: BnplEligibility | null;
   bnplAmount: number;
   bnplDueAt: string | null;
+  /** «خدمه اقساطي على تطبيق جني» — the owner's switch, as this checkout read it. */
+  giniEnabled: boolean;
+  giniPolicy: GiniPolicy;
+  /** Settled inside the Gini app. 0 on every other payment method. */
+  giniPaidIqd: number;
+  /** The only money a Gini order owes us — the delivery fee, 0 for a pickup. */
+  giniDeliveryDueIqd: number;
   /** Actual 12-hour service verdict for this method/address/cart. */
   priorityDelivery: PriorityDeliveryVerdict;
   /** 'direct' when the lines were priced by the direct-sale rule — a direct
@@ -1824,6 +1890,11 @@ async function computeCheckout(
     // day ceiling onto the row, and a second round trip for one small object
     // would be one more thing between the customer and a placed order.
     'deliveryDayPolicy',
+    // Whether «أقساط عبر تطبيق جني» may be offered at all, and how long a
+    // Gini order waits for its receipt scan. Read here with the payment
+    // methods it gates, so the offered list and the hold frozen onto the row
+    // come from one snapshot of the owner's settings.
+    'giniPolicy',
   ]);
   const delivery = (settings.checkoutDeliveryMethods as DeliveryMethod[]).find((m) => m.id === input.deliveryMethodId);
   if (!delivery) throw badRequest('Please choose a valid delivery method');
@@ -1904,7 +1975,14 @@ async function computeCheckout(
   // PRO membership, account approval, KYC, approved address and available
   // credit. A client-supplied `bnpl` id cannot put itself on this list.
   const bnplBase = await bnplEligibility(c.env.DB, user.id, address);
-  const allowedMethods = allowedPaymentMethods(shippingType, { bnplEligible: bnplBase.eligible });
+  // «خدمه اقساطي على تطبيق جني» is offered only while the owner has it on.
+  // It is not an eligibility question — the bank decides who it finances, and
+  // it decides inside its own app, which is why nothing here asks about this
+  // customer at all.
+  const giniPolicy = settings.giniPolicy as GiniPolicy;
+  const giniEnabled = giniPolicy.enabled === true;
+  const methodOptions = { bnplEligible: bnplBase.eligible, giniEnabled };
+  const allowedMethods = allowedPaymentMethods(shippingType, methodOptions);
   // The owner's rule: pay in advance from the wallet, or cash on delivery.
   // An id the settings still list but the policy does not accept (a
   // half-advance) is refused with the offered list beside the refusal, so
@@ -1912,7 +1990,7 @@ async function computeCheckout(
   // no id yet stays allowed and prices as prepaid.
   if (
     input.paymentMethodId &&
-    !isPaymentMethodAllowed(input.paymentMethodId, shippingType, { bnplEligible: bnplBase.eligible })
+    !isPaymentMethodAllowed(input.paymentMethodId, shippingType, methodOptions)
   ) {
     throw badRequest(
       isBnpl(input.paymentMethodId)
@@ -1920,6 +1998,27 @@ async function computeCheckout(
         : 'This payment method is not available for this order — pay in advance from your wallet or choose cash on delivery.',
       isBnpl(input.paymentMethodId) ? bnplBase.reason ?? 'BNPL_NOT_ELIGIBLE' : PAYMENT_METHOD_NOT_ALLOWED,
       { payment_method_id: input.paymentMethodId, allowed_payment_methods: allowedMethods, shipping_type: shippingType }
+    );
+  }
+  /**
+   * «رقم الطلب في تطبيق جني — رقم مكون من ٦ ارقام», CHECKED SERVER-SIDE.
+   *
+   * It is the only handle we have on a purchase Levonis did not process:
+   * without it nobody here can find the order in Gini, tell the platform the
+   * customer received the goods, or answer a dispute with the bank. The shape
+   * is checked in the client's ordered blocker list, here, and again by the
+   * CHECK on `orders.gini_order_no` (migration 0103).
+   *
+   * ONLY AT THE ORDER DOOR. A quote is a preview: it prices, it does not
+   * refuse (see the long note inside `settle` on why throwing here once took
+   * the whole checkout screen down). A customer who has selected Gini and not
+   * yet typed the number gets a correct quote showing the delivery fee, which
+   * is exactly the number that helps them decide.
+   */
+  if (options.allocate && isGini(input.paymentMethodId) && !GINI_ORDER_NO_RE.test(input.giniOrderNo)) {
+    throw badRequest(
+      'أدخل رقم الطلب في تطبيق جني المكوّن من ٦ أرقام. / Enter the 6-digit Gini order number.',
+      'GINI_ORDER_NO_REQUIRED'
     );
   }
   // «If the customer chooses Cash on Delivery, the price must follow the same
@@ -2811,13 +2910,42 @@ async function computeCheckout(
      * components — see worker/lib/printerAdvance.ts for why that lever would
      * break every printer checkout instead of guarding it.
      */
-    const printerAdvance = printerHomeDeliveryAdvanceIqd({
-      hasPrinterLine: p.lines.some((l) => l.is_printer),
-      isPickup,
-      noteIqd: printerNoteIqdFrom(settings.printerHomeDeliveryNoteIqd),
-    });
+    /**
+     * AND IT IS 0 ON A GINI ORDER — «بدون طلب ٥٠ الف للطابعه».
+     *
+     * The advance exists because a printer sent to a home is a large,
+     * awkward, non-returnable delivery and the shop wants skin in the game
+     * before it loads one onto a van. A Gini printer has already been PAID
+     * FOR IN FULL inside the app before this checkout ever happened; asking
+     * its buyer for 50,000 from a Levo wallet they may not even use is asking
+     * twice for commitment they have already given. Forced to 0 here rather
+     * than only in `requiredAdvance` below, because this figure is ALSO what
+     * the checkout screen prints to explain why money is wanted — and a
+     * screen that announces an advance nothing will collect is the defect
+     * this number was introduced to remove.
+     */
+    const isGiniOrder = isGini(input.paymentMethodId);
+    const printerAdvance = isGiniOrder
+      ? 0
+      : printerHomeDeliveryAdvanceIqd({
+          hasPrinterLine: p.lines.some((l) => l.is_printer),
+          isPickup,
+          noteIqd: printerNoteIqdFrom(settings.printerHomeDeliveryNoteIqd),
+        });
 
     requiredAdvance = Math.min(Math.max(requiredAdvance, shipping.advance_due_iqd, printerAdvance), afterPoints);
+    /**
+     * NOTHING IS REQUIRED IN ADVANCE FOR A GINI ORDER, from any rule.
+     *
+     * `requiredAdvance` is a MAX over several of them, so zeroing the printer
+     * contributor alone is not enough — `shipping.advance_due_iqd` is the
+     * other live one, and the next rule added to that max would silently
+     * reach a Gini order too. The client greys its confirm button out on
+     * `applied_iqd >= required_advance_iqd`, so anything surviving here is a
+     * Gini checkout nobody can complete, refused with a balance message that
+     * describes a payment Levonis is not taking.
+     */
+    if (isGiniOrder) requiredAdvance = 0;
 
     /**
      * AN ADVANCE TAKES THE ADVANCE, NOT THE WHOLE WALLET.
@@ -2836,7 +2964,22 @@ async function computeCheckout(
      * order into a prepaid one and empty an account they never offered.
      */
     let walletApplied = 0;
-    if (input.useWallet) {
+    if (isGiniOrder) {
+      /**
+       * THE WALLET MUST NOT PART-PAY A GINI ORDER.
+       *
+       * `useWallet` takes `min(balance, afterPoints)` — the WHOLE payable, not
+       * an advance — and a checkout screen that leaves its wallet toggle on
+       * while the customer switches to Gini would hand us a price Qi Card has
+       * already financed. The customer would be charged twice for one
+       * product, once in their Levo balance and once in their instalments,
+       * and the second charge is not one we could see to refund.
+       *
+       * Refused rather than ignored-on-the-client: the toggle is a client
+       * fact and this is the only place that decides what the wallet pays.
+       */
+      walletApplied = 0;
+    } else if (input.useWallet) {
       walletApplied = Math.min(walletBalanceIqd, afterPoints);
     } else if (requiredAdvance > 0) {
       walletApplied = Math.min(walletBalanceIqd, requiredAdvance);
@@ -2933,7 +3076,50 @@ async function computeCheckout(
     const codTaxExemptionIqd = taxBenefit.cod_exempt ? codTaxBeforeExemptionIqd : 0;
     const codTaxIqd = Math.max(0, codTaxBeforeExemptionIqd - codTaxExemptionIqd);
     const financedIqd = isBnpl(input.paymentMethodId) ? payableBeforeCodTax : 0;
-    const dueOnDelivery = isBnpl(input.paymentMethodId) ? 0 : payableBeforeCodTax + codTaxIqd;
+
+    /**
+     * THE GINI SPLIT — computed HERE, inside `settle`, and returned from it.
+     *
+     * `settle` runs up to THREE times for one checkout (the requested basis,
+     * the prepaid re-settle, the cash-on-delivery re-price) and
+     * `computeCheckout` may discard the winner and settle a different priced
+     * set. A Gini figure calculated after this function returns belongs to a
+     * pricing basis that did not win — the same reason `financedIqd` is
+     * returned from here on the line above rather than derived outside.
+     *
+     * The invariant, which `giniSplit` enforces by construction:
+     *     giniPaidIqd + giniDeliveryDueIqd === payableBeforeCodTax
+     * The delivery fee is ALREADY inside `payableBeforeCodTax` (it entered
+     * through `beforeDiscounts`), so the door amount is carved OUT of the
+     * payable and never added to it, and it is clamped to the payable so a
+     * coupon-and-points order that costs less than its own delivery cannot
+     * produce a negative "paid by Gini". `shipping.total_iqd` is the fee AS
+     * CHARGED — after the waiver and the membership subsidy — so a PRO whose
+     * delivery was waived is asked for nothing at the door.
+     */
+    const { paidIqd: giniPaidIqd, deliveryDueIqd: giniDeliveryDueIqd } = isGiniOrder
+      ? giniSplit(payableBeforeCodTax, shipping.total_iqd)
+      : { paidIqd: 0, deliveryDueIqd: 0 };
+
+    /**
+     * NO COURIER CASH CHARGE ON A GINI ORDER, AND THAT IS A DECISION.
+     *
+     * `codDeliveryTaxIqd` already answers 0 for this id, because it tests for
+     * 'cash' and its two aliases — so today the outcome is right by string
+     * matching rather than by intent, and the next id added to that test
+     * would change this order's total without anyone meaning to.
+     *
+     * The rule is charged per COMPLETE 500,000 IQD collected at the door. A
+     * Gini order's door amount is a delivery fee — five figures at the very
+     * most — so a whole block can never be reached and the honest charge is 0
+     * on the arithmetic as well as on the id. «ويظهر المبلغ الذي يدفع عند
+     * التوصيل فقط»: the customer is told the fee and pays the fee.
+     */
+    const dueOnDelivery = isBnpl(input.paymentMethodId)
+      ? 0
+      : isGiniOrder
+        ? giniDeliveryDueIqd
+        : payableBeforeCodTax + codTaxIqd;
 
     /**
      * Priced for EVERY configured method, not just the chosen one. A method
@@ -2988,6 +3174,13 @@ async function computeCheckout(
       codTaxExemptionIqd,
       codTaxExemptionRuleId: codTaxExemptionIqd > 0 ? taxBenefit.rule_id : null,
       financedIqd,
+      /**
+       * §5 — WHAT GINI SETTLED AND WHAT IS LEFT FOR THE DOOR, from the basis
+       * that actually won. Both are 0 on every other payment method, and
+       * their sum is `payableBeforeCodTax` by construction.
+       */
+      giniPaidIqd,
+      giniDeliveryDueIqd,
       /** §19 — everything the order freezes about this membership's effect. */
       benefits: {
         tier: tierStatus.tier,
@@ -3057,6 +3250,12 @@ async function computeCheckout(
     bnpl: finalBnpl ?? (bnplBase.eligible ? bnplBase : null),
     bnplAmount: settled.financedIqd,
     bnplDueAt: finalBnplDueAt,
+    giniEnabled,
+    giniPolicy,
+    // From `settled`, never recomputed out here: the basis that won is the
+    // only one whose figures belong on this order.
+    giniPaidIqd: settled.giniPaidIqd,
+    giniDeliveryDueIqd: settled.giniDeliveryDueIqd,
     priorityDelivery,
     pricingBasis: priced.pricingBasis,
     codReprices,
@@ -3137,6 +3336,10 @@ function checkoutInputFrom(body: Record<string, unknown>, requirePayment: boolea
     // shape itself is checked against the order's own window below rather
     // than here — this only keeps a megabyte out of the validator.
     requestedDeliveryDate: str(body.requestedDeliveryDate, 'requestedDeliveryDate', { max: 10, required: false }),
+    // Six characters is the whole value; the SHAPE is judged in
+    // `computeCheckout`, where the payment method is known and a quote is
+    // still allowed to answer with a price instead of an error.
+    giniOrderNo: str(body.giniOrderNo, 'giniOrderNo', { max: 6, required: false }),
   };
 }
 
@@ -3334,6 +3537,24 @@ orderRoutes.post('/quote', async (c) => {
 
   const blockers: string[] = [];
   if (comp.shipping.needs_config.length > 0) blockers.push('SHIPPING_NEEDS_CONFIG');
+  /**
+   * AN ADVANCE THE WALLET CANNOT COVER IS A BLOCKER, and it was not one.
+   *
+   * `can_checkout` is the server's answer to "may this be bought?", and
+   * src/pages/Checkout.tsx's own header calls it "the last word". It was not:
+   * a cart with a printer going to a home address requires 50,000 IQD in the
+   * Levo wallet (`printerHomeDeliveryAdvanceIqd`), and the quote answered
+   * `can_checkout: true` for a cart its own order door then refused with 400
+   * INSUFFICIENT_BALANCE. The client had to re-derive the verdict from
+   * `wallet.required_advance_iqd` to get it right, which is the second
+   * implementation this field exists to remove.
+   *
+   * The INSUFFICIENT_BALANCE throw below is gated on `options.allocate`, so
+   * the QUOTE never threw for this — it priced happily and said yes. Now it
+   * prices happily and says no, which is what a preview that refuses nothing
+   * but reports everything is supposed to do.
+   */
+  if (comp.requiredAdvance > comp.walletApplied) blockers.push('ADVANCE_NOT_COVERED');
 
   return c.json({
     success: true,
@@ -3360,6 +3581,25 @@ orderRoutes.post('/quote', async (c) => {
             due_at: comp.bnplDueAt,
           }
         : { eligible: false },
+      /**
+       * «أقساط عبر تطبيق جني» as this cart sees it.
+       *
+       * `paid_iqd` and `delivery_due_iqd` always sum to the payable, so the
+       * screen can print «يُدفع عند الاستلام: كلفة التوصيل فقط» from the
+       * server's own arithmetic instead of subtracting one figure from
+       * another and arriving at a different number. They are 0 unless the
+       * customer has actually chosen Gini — a preview of another method must
+       * not show a door amount that method will not charge.
+       */
+      gini: {
+        available: comp.giniEnabled,
+        selected: comp.giniPaidIqd > 0 || comp.giniDeliveryDueIqd > 0,
+        paid_iqd: comp.giniPaidIqd,
+        delivery_due_iqd: comp.giniDeliveryDueIqd,
+        conditions: comp.giniPolicy.conditions,
+        app_url: comp.giniPolicy.app_url,
+        hold_hours: comp.giniPolicy.hold_hours,
+      },
       priority_delivery: comp.priorityDelivery,
       /** 'direct' when the lines were priced by the direct-sale rule (a direct
        *  cart, or a pre-order cart paid cash on delivery); 'preorder' when the
@@ -3383,10 +3623,19 @@ orderRoutes.post('/quote', async (c) => {
        * Informational notes, never part of any total. The printer note is
        * echoed only when a line is a printer AND a home delivery is requested
        * (no note for store pickup) AND the owner has an amount configured.
+       *
+       * AND NOT ON A GINI ORDER — «بدون طلب ٥٠ الف للطابعه». The note's own
+       * sentence is «يدفع 50,000 د.ع مقدماً», and on a Gini printer nothing
+       * will be asked for: the machine was paid for inside the app and
+       * `requiredAdvance` is 0. Printing the note anyway would put a figure on
+       * the screen that no step of this checkout ever collects, which is the
+       * exact failure the advance was made enforceable to end.
        */
       notes: {
         printer_home_delivery_iqd:
-          !comp.isPickup && comp.lines.some((l) => l.is_printer) ? comp.printerNoteIqd : null,
+          !comp.isPickup && !isGini(input.paymentMethodId) && comp.lines.some((l) => l.is_printer)
+            ? comp.printerNoteIqd
+            : null,
       },
       shipping: comp.shipping,
       /** Every method's real fee for this cart — so the screen prints a true
@@ -3662,6 +3911,26 @@ orderRoutes.post('/', async (c) => {
    */
   const deliveryDay = checkoutDeliveryDay(comp, orderShippingType, input.requestedDeliveryDate, now);
 
+  /**
+   * «ملاحظه مهمه ... ان الطلب لم يتم تاكيده الا بعد طلب من تطبيق جني وتاكيد
+   * مسح باركود الاستلام، وبخلاف ذلك يبقى الطلب معلقا حتى ٢٤ ساعه ويلغي في
+   * حال عدم الاستجابة» — the whole Gini contract, as four bound values.
+   *
+   * The order is created `pending` at `received` like every other order: there
+   * is no 'gini_pending' status and there must not be one (migration 0103 says
+   * why). `gini_state` is what tells a waiting-for-Gini order apart from a
+   * waiting-for-an-admin one, and it is the flag the confirm gate and the
+   * sweep both read.
+   *
+   * THE DEADLINE IS FROZEN HERE. `giniHoldUntil` is computed once, from the
+   * policy as this checkout read it, so an owner who changes `hold_hours`
+   * tomorrow cannot shorten a window a customer was already promised.
+   */
+  const isGiniPayment = isGini(input.paymentMethodId);
+  const giniState = isGiniPayment ? 'awaiting_receipt' : '';
+  const giniHoldUntilIso = isGiniPayment ? giniHoldUntil(now, comp.giniPolicy.hold_hours) : null;
+  const giniOrderNo = isGiniPayment ? input.giniOrderNo : '';
+
   const stmts = [
     c.env.DB.prepare(
       `INSERT INTO orders (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot,
@@ -3673,8 +3942,9 @@ orderRoutes.post('/', async (c) => {
          benefit_version_id, membership_discount_iqd, shipping_before_benefit_iqd, shipping_benefit_iqd,
          cod_tax_before_exemption_iqd, cod_tax_exemption_iqd, benefit_snapshot,
          delivery_day_schedulable, delivery_day_window_end, delivery_due_day, delivery_day_source,
+         gini_order_no, gini_paid_iqd, gini_state, gini_hold_until,
          created_at, updated_at)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       orderId, user.id, JSON.stringify(comp.address), input.deliveryMethodId, deliverySnapshot,
       input.paymentMethodId, comp.subtotal, shippingTotal, comp.codTaxIqd, comp.pointsDiscount, comp.walletApplied,
@@ -3712,6 +3982,16 @@ orderRoutes.post('/', async (c) => {
        * order whose day kept moving must be able to tell those apart.
        */
       deliveryDay.schedulable, deliveryDay.window_end, deliveryDay.day, deliveryDay.source,
+      /**
+       * IN THE SAME BATCH AS THE ORDER — the four Gini columns are not a
+       * follow-up write. `gini_paid_iqd` is what the money view and the
+       * invoice read to know the goods were settled, and `gini_state` is what
+       * the confirm gate reads before it lets stock be deducted; an order
+       * that committed without them is an order whose price is outstanding
+       * and whose receipt requirement does not exist. Both are facts about
+       * this row, so they land with it or not at all.
+       */
+      giniOrderNo, comp.giniPaidIqd, giniState, giniHoldUntilIso,
       now, now
     ),
   ];

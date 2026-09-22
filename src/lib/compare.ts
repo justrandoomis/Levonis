@@ -112,7 +112,9 @@ export interface CompareProductCard {
   image: string | null;
   /** The BASE price — the cheapest way to buy it. A «يبدأ من» figure. */
   price_iqd: number;
-  product_type: 'printer' | 'parts' | 'filament' | 'accessory' | null;
+  /** Mirrors `ProductTypeId` in worker/lib/templateFamilies.ts — the laser
+   *  machine and the laser/blade consumable are the two the line added. */
+  product_type: 'printer' | 'parts' | 'filament' | 'accessory' | 'laser' | 'laser_material' | null;
   section: { id: string; slug: string; label: Trilingual } | null;
   brand_id: string | null;
   /** Open box / used / refurbished. A comparison that hides this calls a used

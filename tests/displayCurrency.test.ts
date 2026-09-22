@@ -127,13 +127,21 @@ test('every customer-facing price goes through the hook, not formatIqd', () => {
   /**
    * THE ONE EXCEPTION, NAMED AND BOUNDED.
    *
-   * A RATE IS NOT A PRICE. «6,000 د.ع عن كل 500,000 د.ع» is how the
-   * cash-on-delivery charge is DEFINED — quoted from
-   * packages/shipping/src/codTax so the sentence cannot drift from what the
-   * server charges — and converting a definition would make the explanation
-   * depend on a rate the shop can change tomorrow. The allowance is for those
-   * two constants and nothing else: any OTHER formatIqd in this file fails
-   * the count below, which is what keeps the exception from spreading.
+   * A RATE IS NOT A PRICE. «3 الف لكل 500 الف» is how the cash-on-delivery
+   * charge is DEFINED, and converting a definition would make the explanation
+   * depend on a rate the shop can change tomorrow.
+   *
+   * IT IS QUOTED FROM THE ADMIN'S SETTING, NOT FROM THE PACKAGED CONSTANT.
+   * This used to assert `formatIqd(COD_TAX_PER_BLOCK_IQD)` — the compiled-in
+   * default — which pinned the sentence to a number the owner could no longer
+   * change once «وتكون قابله للتغير من قبل الادارة» was implemented: the shop
+   * charged 3,000 and the screen kept explaining 6,000. `codTaxPerBlockIqd`
+   * and `codTaxBlockIqd` are `settingRate(settings?.…, CONSTANT)`, so the
+   * constants survive as the fallback and the sentence follows the rate.
+   *
+   * The allowance is for those two values and nothing else: any OTHER
+   * formatIqd in this file fails the count below, which is what keeps the
+   * exception from spreading.
    */
   const RATE_SENTENCE = 'src/pages/Checkout.tsx';
   const offenders: string[] = [];
@@ -149,8 +157,12 @@ test('every customer-facing price goes through the hook, not formatIqd', () => {
       const calls = code.match(/\bformatIqd\(/g) ?? [];
       if (rel === RATE_SENTENCE) {
         // Exactly the four: two constants, twice (Arabic and English).
-        assert.equal(calls.length, 4, `${rel}: the rate-sentence allowance is for those two constants only`);
-        assert.equal((code.match(/formatIqd\(COD_TAX_(PER_BLOCK|BLOCK)_IQD\)/g) ?? []).length, 4);
+        assert.equal(calls.length, 4, `${rel}: the rate-sentence allowance is for those two rates only`);
+        assert.equal(
+          (code.match(/formatIqd\(codTax(PerBlock|Block)Iqd\)/g) ?? []).length,
+          4,
+          `${rel}: the rate sentence must quote the ADMIN's configured rate, not the packaged constant`
+        );
         continue;
       }
       if (calls.length) offenders.push(rel);

@@ -12,6 +12,7 @@ import CopyField from './CopyField';
 import MysteryReveal from '../offers/MysteryReveal';
 import OrderChatPanel from './OrderChatPanel';
 import OrderStagePanel from './OrderStagePanel';
+import GiniReceiptPanel from './GiniReceiptPanel';
 import OrderStatusCorrection from './OrderStatusCorrection';
 
 /**
@@ -183,6 +184,14 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
           <OrderChatPanel orderId={orderId} active />
         ) : tab === 'stages' ? (
           <div className="flex-1 overflow-y-auto p-4 min-h-0 space-y-4">
+            {/* THE GINI GATE, ABOVE THE PATH IT BLOCKS. The server refuses to
+                move an unscanned Gini order across the stock boundary, so the
+                buttons below would simply keep answering GINI_RECEIPT_REQUIRED
+                until the barcode is recorded here. Null on every other payment
+                method, so an ordinary order sees nothing extra. */}
+            {detail.gini ? (
+              <GiniReceiptPanel orderId={orderId} gini={detail.gini} dir={dir} onScanned={load} />
+            ) : null}
             {detail.tracking ? (
               // Moving a stage reloads the whole detail, because the move
               // changes the available list, the history and the legacy

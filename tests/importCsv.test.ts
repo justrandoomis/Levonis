@@ -202,6 +202,8 @@ test('an empty vocabulary still produces a valid template and an honest README',
 const sample: ExportProduct = {
   key: 'LEVO-A1-01',
   dimensions: EMPTY_DIMENSIONS(),
+  // 0104 — the product's page in the Qi Card instalments app.
+  gini_url: '',
   name: 'Bambu Lab A1 Combo',
   description: 'Nozzle diameter: 0.4 mm. Build volume: 256 mm.',
   status: 'active',
@@ -1012,18 +1014,29 @@ test('splitComboKey inverts the key inventory.ts builds', () => {
   assert.deepEqual(splitComboKey(''), { option_value_ids: [], color_id: null });
 });
 
-// -------------------------------------------------- the four product types
+// ------------------------------------------------------ the product types
 //
 // The owner's «ويكون حسب نوع المنتج اذا طابعه او ملحقات او فلمنت او اكسسوار».
-// These tests hold the split itself: four types, each with its own columns,
-// each reachable from the sections that mean it.
+// These tests hold the split itself: each type with its own columns, each
+// reachable from the sections that mean it.
+//
+// THE SET GREW FROM FOUR TO SIX, and the two additions are the laser line:
+// «إضافة قسم جديد وهو قسم الليزر بجانب طابعات الفلامنت والرزن» added a machine
+// that is neither a printer nor a part, and «اضافه مواد الطباعه بجانب الفلمنت
+// والرزن» added a consumable that is neither a filament nor a resin. Each one
+// is a NAME a human picks in the import panel, not a new storage family — a
+// cutter is still `devices` and a plywood sheet is still `materials`.
+//
+// THE LASER ACCESSORIES DID NOT ADD A SEVENTH. A lens, a honeycomb bed and a
+// filter cartridge are «ملحقات وقطع», which already existed; the seeded
+// section joined that type's sectionSlugs instead. The assertion below is
+// deliberately exact so that a type appearing without that argument being made
+// fails here first.
 
-test('there are exactly the four product types the owner named', () => {
-  assert.deepEqual(PRODUCT_TYPES.map((t) => t.id), ['printer', 'parts', 'filament', 'accessory']);
-  assert.deepEqual(
-    templateTypeChoices().map((t) => t.id),
-    ['printer', 'parts', 'filament', 'accessory']
-  );
+test('the product types are the owner\'s four plus the laser line', () => {
+  const expected = ['printer', 'parts', 'filament', 'accessory', 'laser', 'laser_material'];
+  assert.deepEqual(PRODUCT_TYPES.map((t) => t.id), expected);
+  assert.deepEqual(templateTypeChoices().map((t) => t.id), expected);
   assert.ok(templateTypeChoices().every((t) => t.label_ar && t.hint_ar && t.spec_columns > 0));
 });
 
@@ -1042,6 +1055,21 @@ test('each type gets its own columns, and no type declares a field twice', () =>
   assert.ok(!seen.get('filament')!.includes('build_volume'));
   assert.ok(seen.get('filament')!.includes('diameter'));
   assert.ok(!seen.get('printer')!.includes('diameter'));
+  // The laser line asks its own questions and none of the printer's: a cutter
+  // states a work area where a printer states a build volume, and a plywood
+  // sheet states a sheet thickness where a spool states a diameter.
+  assert.ok(seen.get('laser')!.includes('work_area'));
+  assert.ok(!seen.get('laser')!.includes('build_volume'), 'a laser has no build volume');
+  assert.ok(!seen.get('laser')!.includes('nozzle'), 'a laser has no nozzle');
+  assert.ok(seen.get('laser_material')!.includes('sheet_thickness'));
+  assert.ok(!seen.get('laser_material')!.includes('diameter'), 'a sheet has no filament diameter');
+  // THE ONE THAT IS A BUG AND NOT A PREFERENCE. GET /api/products/print-calculator
+  // offers every active materials product with a readable `net_weight` as a
+  // filament to price a 3D print by the gram; a sheet carrying that field would
+  // appear there as something a printer could extrude. Its mass is asked for
+  // under a different id.
+  assert.ok(!seen.get('laser_material')!.includes('net_weight'), 'the print calculator reads net_weight');
+  assert.ok(seen.get('laser_material')!.includes('sheet_weight'));
   // And an accessory or a part is asked neither.
   for (const light of ['parts', 'accessory'] as const) {
     assert.ok(!seen.get(light)!.includes('build_volume'), `${light} should not ask for a build volume`);
@@ -1137,6 +1165,8 @@ test('every field of the product form is expressible in the sheet', () => {
     // apply (worker/lib/importApply.ts hands the doc to localizeRespectingAuthored).
     how_to_use: 'how_to_use', how_to_use_ar: 'how_to_use', how_to_use_ckb: 'how_to_use',
     spec_fields: 'spec.*',
+    // 0104 — the product's page in the Qi Card instalments app.
+    gini_url: 'gini_url',
     // device coverage (products.ops_policy) — the base the extended warranty adds to
     warranty_base_months: 'warranty_base_months', serialized: 'serialized',
     // Open box / used / refurbished. One doc field, a BLOCK of columns — the

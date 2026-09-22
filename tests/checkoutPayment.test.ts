@@ -240,7 +240,11 @@ test('a pre-order cart quotes the configured price with no method or the wallet,
   assert.equal(open.lines[0].unit_price_iqd, 115_000);
   assert.equal(open.pricing_basis, 'preorder');
   assert.equal(open.shipping_type, 'preorder_sea');
-  assert.deepEqual(open.allowed_payment_methods, ['wallet', 'cash']);
+  // «أقساط عبر تطبيق جني» ships ENABLED (`giniPolicy.enabled`), so it is part
+  // of the offered list on every cart now. It is server-gated like BNPL — the
+  // owner's switch rather than this customer's eligibility — which is why it
+  // appears here and BNPL does not.
+  assert.deepEqual(open.allowed_payment_methods, ['wallet', 'cash', 'gini']);
 
   // Wallet = pay in advance: the pre-order price exactly as configured.
   const wallet = (await json(await post(a, '/api/orders/quote', quoteBody('addr_b', 'wallet')))).quote;
@@ -557,7 +561,7 @@ test('half_advance is refused with 400 PAYMENT_METHOD_NOT_ALLOWED and the offere
   assert.equal(q.status, 400);
   const qb = await json(q);
   assert.equal(qb.code, PAYMENT_METHOD_NOT_ALLOWED);
-  assert.deepEqual(qb.details.allowed_payment_methods, ['wallet', 'cash']);
+  assert.deepEqual(qb.details.allowed_payment_methods, ['wallet', 'cash', 'gini']);
   assert.equal(qb.details.shipping_type, 'preorder_sea');
 
   const o = await post(a, '/api/orders', orderBody('addr_b', 'half_advance', { useWallet: true }));
@@ -587,7 +591,7 @@ test('a direct cart: cash and wallet are both allowed, the premium is charged (n
   assert.equal(cash.lines[0].unit_price_iqd, 150_000);
   assert.equal(cash.lines[0].breakdown.transport, null);
   assert.deepEqual(cash.lines[0].breakdown.direct, { surcharge_iqd: 50_000, waived: false });
-  assert.deepEqual(cash.allowed_payment_methods, ['wallet', 'cash']);
+  assert.deepEqual(cash.allowed_payment_methods, ['wallet', 'cash', 'gini']);
 
   const wallet = (await json(await post(buyer, '/api/orders/quote', quoteBody('addr_b', 'wallet', { useWallet: true })))).quote;
   assert.equal(wallet.lines[0].unit_price_iqd, 150_000, 'the payment method never changes a direct line');
@@ -623,7 +627,7 @@ test('an eligible PRO checkout finances with BNPL and freezes the 12-hour fulfil
     '/api/orders/quote',
     quoteBody('addr_p', 'bnpl', { deliveryMethodId: 'personal' })
   ))).quote;
-  assert.deepEqual(quote.allowed_payment_methods, ['wallet', 'cash', 'bnpl']);
+  assert.deepEqual(quote.allowed_payment_methods, ['wallet', 'cash', 'bnpl', 'gini']);
   assert.equal(quote.bnpl.eligible, true);
   assert.equal(quote.bnpl.financed_iqd, 100_000);
   assert.equal(quote.due_on_delivery_iqd, 0);
@@ -686,7 +690,7 @@ test('forged BNPL payment ids are rejected for PLUS and PREMIUM even with approv
   for (const [user, addressId] of [['plus_bnpl', 'addr_plus_bnpl'], ['premium_bnpl', 'addr_premium_bnpl']] as const) {
     const a = appAs(db, user);
     const open = (await json(await post(a, '/api/orders/quote', quoteBody(addressId, undefined)))).quote;
-    assert.deepEqual(open.allowed_payment_methods, ['wallet', 'cash']);
+    assert.deepEqual(open.allowed_payment_methods, ['wallet', 'cash', 'gini']);
     const refused = await post(a, '/api/orders', orderBody(addressId, 'bnpl'));
     const body = await json(refused);
     assert.equal(refused.status, 400);
@@ -708,8 +712,12 @@ test('the printer note: is_printer on the quote lines and the order items, the a
   const home = (await json(await post(a, '/api/orders/quote', quoteBody('addr_b', 'cash')))).quote;
   assert.equal(home.lines[0].is_printer, true);
   assert.equal(home.notes.printer_home_delivery_iqd, 50_000, 'the owner’s default, from settings');
-  assert.equal(home.cod_tax_iqd, 6_000, 'COD delivery tax is a separate server-calculated line');
-  assert.equal(home.total_iqd, 899_000 + 5_000 + 6_000, 'the printer note is NOT added to the total');
+  // «الضريبه في شركة التوصيل اجعلها 3 الف لكل 500 الف» — the owner's rate,
+  // charged per COMPLETE block of what is collected at the door. The printer
+  // advance is debited from the wallet first, so the door carries 854,000:
+  // one whole block, and 3,000 of tax.
+  assert.equal(home.cod_tax_iqd, 3_000, 'COD delivery tax is a separate server-calculated line');
+  assert.equal(home.total_iqd, 899_000 + 5_000 + 3_000, 'the printer note is NOT added to the total');
 
   const pickup = (await json(await post(a, '/api/orders/quote', quoteBody('addr_b', 'cash', { deliveryMethodId: 'pickup' })))).quote;
   assert.equal(pickup.lines[0].is_printer, true);
@@ -718,11 +726,11 @@ test('the printer note: is_printer on the quote lines and the order items, the a
   const placed = await json(await post(a, '/api/orders', orderBody('addr_b', 'cash')));
   assert.equal(placed.success, true, JSON.stringify(placed));
   assert.equal(placed.order.items[0].is_printer, true);
-  assert.equal(placed.order.cod_tax_iqd, 6_000);
-  assert.equal(placed.order.total_iqd, 910_000);
+  assert.equal(placed.order.cod_tax_iqd, 3_000);
+  assert.equal(placed.order.total_iqd, 907_000);
   const detail = await json(await a.request(`/api/orders/${placed.order.id}`));
   assert.equal(detail.order.items[0].is_printer, true);
-  assert.equal(detail.order.cod_tax_iqd, 6_000, 'persisted order details use the COD tax snapshot');
+  assert.equal(detail.order.cod_tax_iqd, 3_000, 'persisted order details use the COD tax snapshot');
 
   // The owner can change or clear the amount; a cleared amount means no note.
   raw.exec("INSERT INTO admin_settings (key, value) VALUES ('printerHomeDeliveryNoteIqd', '75000')");

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Truck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Landmark, Truck } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
 import { api } from '../lib/api';
@@ -74,6 +74,10 @@ const STRINGS = {
       total ? `ضمان ممدد +${ext} (الإجمالي ${total})` : `ضمان ممدد +${ext}`,
     codDirectPricing: 'سُعِّر كبيع مباشر (الدفع عند الاستلام)',
     printerNote: (v: string) => `عند طلب توصيل الطابعة إلى المنزل يُدفع ${v} عند الاستلام.`,
+    giniAwaiting: 'لم يُؤكَّد هذا الطلب بعد: يجب مسح باركود الاستلام في تطبيق جني أولاً.',
+    giniHold: (d: string) => `إذا لم يتم المسح حتى ${d} يُلغى الطلب تلقائيًا.`,
+    giniNo: 'رقم الطلب في تطبيق جني',
+    giniExpired: 'انتهت مهلة هذا الطلب قبل مسح باركود الاستلام وأُلغي. يمكنك إنشاء طلب جديد.',
     cancelledNotice: 'أُلغي الطلب.',
     reviewThanks: 'شكرًا — مراجعتك بانتظار الاعتماد.',
     linkedNotice: 'تم ربط الجهاز بحسابك.',
@@ -104,6 +108,10 @@ const STRINGS = {
       total ? `Extended warranty +${ext} (${total} in total)` : `Extended warranty +${ext}`,
     codDirectPricing: 'Priced as a direct sale (cash on delivery)',
     printerNote: (v: string) => `When home delivery is requested for a printer, ${v} is paid on delivery.`,
+    giniAwaiting: 'This order is not confirmed yet: the receipt barcode has to be scanned in the Gini app first.',
+    giniHold: (d: string) => `If it is not scanned by ${d}, the order is cancelled automatically.`,
+    giniNo: 'Gini app order number',
+    giniExpired: 'The hold ran out before the receipt barcode was scanned, and the order was cancelled. You can place a new one.',
     cancelledNotice: 'The order was cancelled.',
     reviewThanks: 'Thank you — your review is awaiting approval.',
     linkedNotice: 'The device is now linked to your account.',
@@ -134,6 +142,10 @@ const STRINGS = {
       total ? `گەرەنتی درێژکراوە +${ext} (کۆی گشتی ${total})` : `گەرەنتی درێژکراوە +${ext}`,
     codDirectPricing: 'وەک فرۆشتنی ڕاستەوخۆ نرخ کراوە (پارەدان لە کاتی گەیاندن)',
     printerNote: (v: string) => `کاتێک گەیاندنی پرینتەر بۆ ماڵەوە داوا دەکرێت، ${v} لە کاتی گەیاندن دەدرێت.`,
+    giniAwaiting: 'ئەم داواکارییە هێشتا پەسەند نەکراوە: پێویستە سەرەتا باڕکۆدی وەرگرتن لە ئەپی جینی سکان بکرێت.',
+    giniHold: (d: string) => `ئەگەر تا ${d} سکان نەکرێت، داواکارییەکە خۆکارانە هەڵدەوەشێتەوە.`,
+    giniNo: 'ژمارەی داواکاری لە ئەپی جینی',
+    giniExpired: 'ماوەکە بەسەرچوو پێش ئەوەی باڕکۆدی وەرگرتن سکان بکرێت و داواکارییەکە هەڵوەشێندرایەوە. دەتوانیت داواکارییەکی نوێ بکەیت.',
     cancelledNotice: 'داواکارییەکە هەڵوەشێنرایەوە.',
     reviewThanks: 'سوپاس — پێداچوونەوەکەت چاوەڕێی پەسەندکردنە.',
     linkedNotice: 'ئامێرەکە بە هەژمارەکەت بەسترا.',
@@ -402,6 +414,44 @@ export default function OrderDetail() {
                   {tracking?.shipping_type_label && <span className="block text-zinc-600">{tracking.shipping_type_label}</span>}
                 </p>
               </div>
+              {/*
+                «ملاحظه مهمه للمستخدم ان الطلب لم يتم تاكيده الا بعد طلب من
+                تطبيق جني وتاكيد مسح باركود الاستلام» — SAID HERE TOO.
+
+                The checkout's success screen carried this warning and nothing
+                else did, so a customer who closed that screen lost the only
+                notice that a twenty-four hour clock was running against their
+                order. This page is where they come back to, and the pill above
+                says «قيد المراجعة» — true of every pending order and only half
+                true of this one.
+
+                Drawn off the SERVER's `gini.state`, never off a payment label:
+                the state is what the sweep and the confirm gate both read.
+              */}
+              {order.gini && order.gini.state === 'awaiting_receipt' && (
+                <div data-gini-awaiting className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-200">
+                  <Landmark className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>
+                    <span className="font-bold">{s.giniAwaiting}</span>
+                    {order.gini.hold_until && (
+                      <span className="mt-0.5 block font-normal text-amber-200/80">
+                        {s.giniHold(formatDate(order.gini.hold_until, lang))}
+                      </span>
+                    )}
+                    {order.gini.order_no && (
+                      <span className="mt-0.5 block font-normal text-amber-200/70">
+                        {s.giniNo}: <span dir="ltr" className="font-mono">{order.gini.order_no}</span>
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
+              {order.gini && order.gini.state === 'expired' && (
+                <div data-gini-expired className="mt-3 flex items-start gap-2 rounded-xl border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-[12px] text-zinc-300">
+                  <Landmark className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>{s.giniExpired}</span>
+                </div>
+              )}
               {order.priority === 1 && (
                 <div data-pro-priority className="mt-3 flex items-start gap-2 rounded-xl border border-[#B03142]/35 bg-[#B03142]/10 px-3 py-2 text-[12px] font-bold text-[#f3bdc5]">
                   <Truck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

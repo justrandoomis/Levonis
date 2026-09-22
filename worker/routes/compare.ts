@@ -287,7 +287,7 @@ export function place(row: ProductRow, tax: Taxonomy): Placed {
     specs: specSheet(row.spec_fields),
     branch,
     // No family means nobody has ever told the shop what KIND of thing this
-    // is, and the four product types are defined per family. Null rather than
+    // is, and the product types are defined per family. Null rather than
     // a guess: `compareProducts` treats an unknown type as "compare on what
     // they share", which is the honest answer.
     productType: family ? productTypeForBranch(family, refs) : null,

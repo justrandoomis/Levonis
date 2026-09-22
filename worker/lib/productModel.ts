@@ -310,6 +310,21 @@ export interface ProductDoc {
   is_featured: boolean;
   display_order: number;
   payment_options: string[];
+  /**
+   * «عند النقر عليه ينقله الى الرابط (يكون رابط المنتج في تطبيق جني)» — where
+   * «تريدها اقساط ؟» sends this particular product inside the Gini app.
+   *
+   * Per product, because the point of the note is to land the customer on the
+   * thing they were looking at: the six-digit order number they bring back to
+   * checkout has to belong to the right item, and a customer dropped into a
+   * catalogue to search for it is a customer who gives up.
+   *
+   * '' means no link of its own — the storefront falls back to
+   * `giniPolicy.app_url`, and to no link at all when the owner set neither.
+   * It goes through `safeLink` both in and out because it lands in an href on
+   * a public page.
+   */
+  gini_url: string;
   hashtags: string[];
   how_to_use: string;
   /**
@@ -907,6 +922,10 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     is_featured: !!row.is_featured,
     display_order: typeof row.display_order === 'number' ? row.display_order : 0,
     payment_options: safeParse<string[]>(row.payment_options, []),
+    // Through the same door on the way out as on the way in: a row written
+    // before `safeLink` guarded this column, or edited around the admin, must
+    // not reach an href unfiltered.
+    gini_url: safeLink(row.gini_url),
     hashtags: safeParse<string[]>(row.hashtags, []),
     how_to_use: s(row.how_to_use, 20000),
     how_to_use_ar: s(row.how_to_use_ar, 20000),
@@ -1392,6 +1411,10 @@ export function validateProductDoc(body: Record<string, unknown>, opts: { requir
     is_featured: !!body.is_featured,
     display_order: Number.isInteger(body.display_order) ? (body.display_order as number) : 0,
     payment_options: Array.isArray(body.payment_options) ? (body.payment_options as string[]).slice(0, 20).map((x) => s(x, 60)) : [],
+    // http(s) or a single relative path; `javascript:` and `data:` are DROPPED
+    // rather than escaped, which is what every other admin-supplied link on a
+    // public page does (worker/lib/homeContent.ts).
+    gini_url: safeLink(body.gini_url),
     // Normalized on the way in, so what a product carries, what the managed
     // vocabulary lists and what the import sheet round-trips are one spelling.
     hashtags: Array.isArray(body.hashtags)
@@ -1470,6 +1493,7 @@ export function serializeDoc(doc: ProductDoc): Record<string, unknown> {
     is_featured: doc.is_featured ? 1 : 0,
     display_order: doc.display_order,
     payment_options: JSON.stringify(doc.payment_options),
+    gini_url: doc.gini_url,
     hashtags: JSON.stringify(doc.hashtags),
     how_to_use: doc.how_to_use,
     how_to_use_ar: doc.how_to_use_ar,
@@ -1632,6 +1656,8 @@ export function projectPublic(doc: ProductDoc, coarse = false) {
     is_featured: doc.is_featured,
     display_order: doc.display_order,
     payment_options: doc.payment_options,
+    /** Public by nature: it is the link the «تريدها اقساط ؟» popup opens. */
+    gini_url: doc.gini_url,
     hashtags: doc.hashtags,
     how_to_use: doc.how_to_use,
     how_to_use_ar: doc.how_to_use_ar,
@@ -1649,6 +1675,12 @@ export const PRODUCT_COLUMNS = [
   'template_family','sku','spec_fields','images','options','colors','specifications','labels',
   'warranty_plans','ops_policy','content_blocks','translation_meta','is_featured',
   'display_order','payment_options','hashtags','how_to_use','how_to_use_ar','how_to_use_ckb','usage_guide',
+  // THE GINI PRODUCT LINK (migration 0104). Same lesson as `condition_doc` and
+  // the dimensions below: this list IS the write path, and a field
+  // `serializeDoc` emits but this line omits is produced, carried to the
+  // statement and silently dropped at HTTP 200. Never NULL — the column is
+  // NOT NULL and `safeLink` returns '' for anything it refuses.
+  'gini_url',
   // OPEN BOX / USED / REFURBISHED (migration 0085). THIS LIST IS THE WRITE
   // PATH: `serializeDoc` above has emitted `condition_doc` since the feature
   // was added, but both writers bind only the columns named here

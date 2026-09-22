@@ -33,6 +33,7 @@
 
 import { stageLabel, stagesFor, type OrderStage } from './orderStages';
 import type { ShippingType } from './shippingType';
+import { levonisCollectibleSql } from './gini';
 
 export type RevealStage = 'paid' | 'confirmed' | 'preparing' | 'shipped' | 'delivered';
 
@@ -280,6 +281,10 @@ export async function loadAllocations(
  * A fully prepaid order records its purchase settlement inside the checkout
  * batch, so it is paid the instant it exists; a cash-on-delivery order becomes
  * paid when `POST /api/orders/:id/settlement` records the collection.
+ *
+ * `levonisCollectibleSql` is why the comparison is not against `total_iqd`
+ * flat: a Gini order's goods were settled in the bank's app and can never
+ * appear in this table, so the plain total would keep a box sealed for ever.
  */
 export async function paidOrderIds(db: D1Database, orderIds: string[]): Promise<Set<string>> {
   const out = new Set<string>();
@@ -292,7 +297,7 @@ export async function paidOrderIds(db: D1Database, orderIds: string[]): Promise<
         `SELECT o.id AS id FROM orders o
           WHERE o.id IN (${part.map(() => '?').join(', ')})
             AND (SELECT COALESCE(SUM(s.amount_iqd), 0) FROM order_payment_settlements s WHERE s.order_id = o.id)
-                >= o.total_iqd`
+                >= ${levonisCollectibleSql('o')}`
       )
       .bind(...part)
       .all<{ id: string }>();

@@ -67,6 +67,37 @@ export interface CheckoutPaymentMethod {
   titleEn: string;
   icon: string;
 }
+/**
+ * «خدمه اقساطي على تطبيق جني ( مصرف الرافدين )» — the instalments service the
+ * customer takes out in the Gini app, financed entirely outside Levonis.
+ *
+ * THE TEXT IS HAND-WRITTEN IN THREE LANGUAGES and is the actual condition the
+ * customer has to meet — «الشروط يكون موظفا على مصرف الرافدين». It lives in a
+ * setting rather than in the bundle because it is a bank's rule: the day
+ * Rafidain widens it past its own staff, the owner edits a form instead of
+ * waiting for a deploy. Nothing here is machine-translated, and an owner who
+ * clears one language is shown the next one they DID write (`pickText`),
+ * never a placeholder.
+ */
+export interface GiniPolicy {
+  enabled: boolean;
+  /** Who Gini will finance, as the bank states it — shown in the popup. */
+  conditions: { ar: string; en: string; ckb: string };
+  /**
+   * «يبقى الطلب معلقا حتى ٢٤ ساعه ويلغي في حال عدم الاستجابة» — how long an
+   * order waits for the Gini receipt scan before the sweep releases its stock
+   * and cancels it. Hours, not minutes: this is a bank's queue, not a
+   * checkout timeout.
+   */
+  hold_hours: number;
+  /**
+   * Where «تريدها اقساط ؟» sends a customer whose product carries no
+   * `gini_url` of its own — the app's own landing page. Empty means the note
+   * is shown without a link rather than pointing at a page that cannot show
+   * the product.
+   */
+  app_url: string;
+}
 export interface BnplPolicy {
   enabled: boolean;
   due_days: number;
@@ -133,6 +164,11 @@ export const SETTING_DEFAULTS = {
     { id: 'wallet', titleAr: 'محفظة ليفو', titleEn: 'Levo Wallet', icon: 'Wallet' },
     { id: 'cash', titleAr: 'الدفع عند الاستلام', titleEn: 'Cash on Delivery', icon: 'Banknote' },
     { id: 'bnpl', titleAr: 'اشترِ الآن وادفع لاحقًا', titleEn: 'Buy Now, Pay Later', icon: 'CalendarClock' },
+    // «خيار ناعم وبسيط ليس ضخما» — it sits under cash on delivery, and it is
+    // a row here for one reason only: checkout intersects this setting with
+    // the server's allowed list, so an id missing from it is invisible with no
+    // error at all. `normalizedSetting` rescues it on a configured shop.
+    { id: 'gini', titleAr: 'أقساط عبر تطبيق جني', titleEn: 'Instalments via Gini', icon: 'Landmark' },
     { id: 'full_advance', titleAr: 'الدفع مقدما بالكامل', titleEn: 'Full Payment in Advance', icon: 'CreditCard' },
     { id: 'half_advance', titleAr: 'دفع نصف المبلغ مقدما', titleEn: '50% Payment in Advance', icon: 'CreditCard' },
   ] as CheckoutPaymentMethod[],
@@ -146,6 +182,28 @@ export const SETTING_DEFAULTS = {
     require_verified_identity: true,
     require_approved_address: true,
   } as BnplPolicy,
+  /**
+   * Gini instalments (Qi Card / Rafidain Bank). SHIPS ENABLED because the
+   * owner asked for the service itself, not for a switch to find later — and
+   * enabling it adds one soft row to checkout and one note on the product
+   * page, neither of which can move a dinar on an order that does not choose
+   * it.
+   *
+   * THE HOLD IS THE OWNER'S NUMBER, WRITTEN DOWN. Twenty-four hours is the
+   * wait a Gini order gets before `giniSweep.ts` releases its stock; changing
+   * it here changes the sweep, and never an order already placed, whose
+   * `gini_hold_until` was frozen at checkout.
+   */
+  giniPolicy: {
+    enabled: true,
+    conditions: {
+      ar: 'خدمة التقسيط عبر تطبيق جني متاحة لموظفي مصرف الرافدين. يتم شراء المنتج وتقسيطه داخل تطبيق جني، ويُدفع سعر التوصيل فقط عند الاستلام.',
+      en: 'Gini instalments are available to Rafidain Bank employees. The product is bought and financed inside the Gini app; only the delivery fee is paid on receipt.',
+      ckb: 'خزمەتگوزاری قیستی ئەپی جینی بۆ فەرمانبەرانی بانکی ڕافیدەین بەردەستە. بەرهەمەکە لە ناو ئەپی جینی دەکڕدرێت و قیست دەکرێت، تەنها کرێی گەیاندن لە کاتی وەرگرتن دەدرێت.',
+    },
+    hold_hours: 24,
+    app_url: '',
+  } as GiniPolicy,
   // The existing same-day personal-delivery method is the initially supported
   // 12-hour service area. Admin configuration can add methods/regions later.
   proPriorityDelivery: {
@@ -468,6 +526,11 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   // The printer note is customer-facing copy: the product page and the cart
   // read it before any quote exists.
   'printerHomeDeliveryNoteIqd',
+  // «تريدها اقساط ؟» is drawn on the product page, which a signed-out visitor
+  // sees, and the popup has to state the Rafidain condition there — before
+  // any cart, any quote or any account exists. The three fields are the offer
+  // itself, in the bank's own words; nothing internal is in them.
+  'giniPolicy',
   // Checkout has to draw the day picker BEFORE an order exists, so it needs
   // `max_days` and `allow_same_day` with nothing to read them off. The three
   // values are the offer itself — the same thing the picker puts on screen —
@@ -479,11 +542,25 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
 
 function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeof SETTING_DEFAULTS)[K] {
   if (key === 'checkoutPaymentMethods') {
+    /**
+     * THE STORED ARRAY IS A WHOLE ANSWER, NOT A PATCH — which is why a method
+     * added to the defaults after a shop was configured is INVISIBLE there
+     * rather than new. Checkout offers the intersection of this setting with
+     * the server's allowed ids, so an id the owner's saved array predates is
+     * simply not drawn, with no error anywhere to explain it. That is exactly
+     * what happened to BNPL, and `gini` would have repeated it on every shop
+     * whose settings row was written before today.
+     *
+     * Re-injected by id, never by position: an owner who deliberately deleted
+     * a row keeps it deleted only if the row is genuinely theirs to delete —
+     * these two are server-gated (PRO eligibility, `giniPolicy.enabled`), so
+     * the switch that turns them off is the policy, not this list.
+     */
     const configured = Array.isArray(value) ? value : [];
-    const bnpl = SETTING_DEFAULTS.checkoutPaymentMethods.find((m) => m.id === 'bnpl')!;
-    return (configured.some((m) => typeof m === 'object' && m !== null && (m as { id?: unknown }).id === 'bnpl')
-      ? configured
-      : [...configured, bnpl]) as (typeof SETTING_DEFAULTS)[K];
+    const hasId = (id: string) =>
+      configured.some((m) => typeof m === 'object' && m !== null && (m as { id?: unknown }).id === id);
+    const missing = SETTING_DEFAULTS.checkoutPaymentMethods.filter((m) => m.id === 'bnpl' || m.id === 'gini').filter((m) => !hasId(m.id));
+    return (missing.length === 0 ? configured : [...configured, ...missing]) as (typeof SETTING_DEFAULTS)[K];
   }
   // Merged over the defaults like `bnplPolicy` below, but through the policy
   // module's own resolver rather than a bare spread: a stored `max_days` of 0
@@ -492,6 +569,27 @@ function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeo
   // clamp belongs to the policy, so the read side calls it.
   if (key === 'deliveryDayPolicy') {
     return resolveDeliveryDayPolicy(value) as (typeof SETTING_DEFAULTS)[K];
+  }
+  /**
+   * Merged like `bnplPolicy`, and then once more one level down. The stored
+   * value is a whole object, so a shop that saved `{ enabled: false }` before
+   * the text existed would otherwise read back with three EMPTY conditions —
+   * a popup that states no condition at all. The three languages are merged
+   * key by key so an owner who rewrote only the Arabic keeps the English and
+   * the Sorani they never touched.
+   */
+  if (key === 'giniPolicy') {
+    const object: Record<string, unknown> =
+      typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+    const storedText: Record<string, unknown> =
+      typeof object.conditions === 'object' && object.conditions !== null && !Array.isArray(object.conditions)
+        ? (object.conditions as Record<string, unknown>)
+        : {};
+    return {
+      ...SETTING_DEFAULTS.giniPolicy,
+      ...object,
+      conditions: { ...SETTING_DEFAULTS.giniPolicy.conditions, ...storedText },
+    } as (typeof SETTING_DEFAULTS)[K];
   }
   if (key === 'bnplPolicy' || key === 'proPriorityDelivery') {
     const object: Record<string, unknown> =

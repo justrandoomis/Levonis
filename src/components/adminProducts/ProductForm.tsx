@@ -1405,6 +1405,35 @@ export default function ProductForm({
             خيارات الدفع المحفوظة: <span dir="ltr">{doc.payment_options.join(', ')}</span> — تُعدَّل عبر القالب النصي.
           </p>
         )}
+
+        {/* «تريدها أقساط؟» — the ONE switch that turns the instalments note on
+            for this product. Until this field existed the column could only be
+            written from the TXT template, so a feature that shipped enabled had
+            no way to appear on any product from the admin at all.
+
+            EMPTY IS THE OFF POSITION and it is the default: the storefront
+            draws nothing without a link, because a note under an offer the
+            shop cannot open is worse than no note. The value is stored through
+            `safeLink` (worker/lib/productModel.ts) and the product page refuses
+            anything that is not http(s), so a pasted `javascript:` or a
+            relative path is dropped rather than rendered — which is also why
+            the hint asks for the full link and not a path. */}
+        <div className="mb-4 max-w-xl">
+          <Field
+            ar="رابط المنتج في تطبيق جني (التقسيط)"
+            en="This product's page in the Gini instalments app"
+            hint="اتركه فارغًا إذا لم يكن المنتج معروضًا في جني — عندها لا تظهر ملاحظة «تريدها أقساط؟». الرابط الكامل فقط (https://…)."
+          >
+            <TextInput
+              type="url"
+              inputMode="url"
+              placeholder="https://"
+              data-form="gini-url"
+              value={doc.gini_url}
+              onChange={(e) => setDoc((d) => ({ ...d, gini_url: e.target.value }))}
+            />
+          </Field>
+        </div>
         <WarrantySection
           isPrinter={isPrinterCatalog}
           plans={doc.warranty_plans}

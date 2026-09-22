@@ -55,6 +55,9 @@ interface OrderRow {
   due_on_delivery_iqd: number;
   bnpl_due_iqd?: number | null;
   bnpl_due_at?: string | null;
+  /** Settled inside the Gini app (migration 0103). Optional: a database one
+   *  migration behind simply has no such column, and 0 is then the truth. */
+  gini_paid_iqd?: number | null;
   delivery_waived: number | null;
   membership_tier_snapshot: string | null;
   coupon_snapshot: string | null;
@@ -202,6 +205,26 @@ function paymentFacts(order: OrderRow): { paid: number; due: number; status: Inv
   const financed = Math.max(0, Number(order.bnpl_due_iqd) || 0);
   if (financed > 0) {
     return { paid: Math.max(0, total - financed), due: financed, status: 'bnpl_due' };
+  }
+  /**
+   * A GINI ORDER'S GOODS WERE PAID FOR OUTSIDE THIS INVOICE.
+   *
+   * Qi Card settled them in the Gini app before the order existed, and the
+   * only figure left for us is the delivery fee. The generic path below would
+   * arrive at the same two numbers by subtraction today — which is precisely
+   * why this branch is here rather than left implicit: `paid` is READ from
+   * the column the checkout froze, so the invoice keeps saying what Gini paid
+   * even once something else is collected against the order and the
+   * subtraction stops agreeing with it.
+   *
+   * It is NOT 'bnpl_due'. Nothing is due to Levonis on instalments; there is
+   * no schedule here, no limit and no ledger — 'partial' says the true thing,
+   * that part of this invoice is settled and a delivery fee is not.
+   */
+  const giniPaid = Math.max(0, Number(order.gini_paid_iqd) || 0);
+  if (giniPaid > 0) {
+    const doorDue = Math.max(0, Number(order.due_on_delivery_iqd) || 0);
+    return { paid: giniPaid, due: doorDue, status: doorDue <= 0 ? 'paid' : 'partial' };
   }
   const due = Math.max(0, Number(order.due_on_delivery_iqd) || 0);
   const paid = Math.max(0, total - due);

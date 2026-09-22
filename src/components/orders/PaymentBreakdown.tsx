@@ -29,6 +29,8 @@ const STRINGS = {
     total: 'المجموع',
     payment: 'الدفع',
     wallet: 'من المحفظة',
+    // «يتم الحساب داخل تطبيق جني» — a payment, never a discount.
+    giniPaid: 'مدفوع عبر تطبيق جني',
     collected: 'المحصَّل',
     outstanding: 'المتبقي عند التسليم',
     bnplOutstanding: 'رصيد BNPL المستحق',
@@ -57,6 +59,7 @@ const STRINGS = {
     total: 'Total',
     payment: 'Payment',
     wallet: 'Paid from wallet',
+    giniPaid: 'Paid inside the Gini app',
     collected: 'Collected',
     outstanding: 'Due on delivery',
     bnplOutstanding: 'BNPL balance due',
@@ -85,6 +88,7 @@ const STRINGS = {
     total: 'کۆی گشتی',
     payment: 'پارەدان',
     wallet: 'لە جزدانەوە',
+    giniPaid: 'لە ناو ئەپی جینی درا',
     collected: 'وەرگیراو',
     outstanding: 'ماوە لە کاتی گەیاندن',
     bnplOutstanding: 'قەرزی BNPL',
@@ -184,10 +188,19 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
 
       <dl className="mt-3 pt-3 border-t border-zinc-800 divide-y divide-zinc-800/60">
         <div className="pb-1 text-[11px] font-bold text-zinc-500">{s.payment}</div>
+        {/* WHERE THE REST OF THE MONEY WENT. Without this row a Gini order
+            reads as a 30,000 total with 5,000 outstanding and no account of
+            the other 25,000 — the admin's receipt sheet has carried the line
+            since day one and the customer's own summary did not. It is the
+            SERVER's stored figure, never `total − outstanding`. */}
+        {(f.gini_paid_iqd ?? 0) > 0 && <Row label={s.giniPaid} value={money(f.gini_paid_iqd ?? 0)} negative />}
         {f.wallet_applied_iqd > 0 && <Row label={s.wallet} value={money(f.wallet_applied_iqd)} negative />}
         {f.collected_iqd !== null && f.collected_iqd !== undefined && <Row label={s.collected} value={money(f.collected_iqd)} />}
         {f.outstanding_iqd > 0 && <Row label={f.payment_state === 'bnpl_due' ? s.bnplOutstanding : s.outstanding} value={money(f.outstanding_iqd)} />}
-        {f.wallet_applied_iqd <= 0 && (f.collected_iqd === null || f.collected_iqd === undefined) && f.outstanding_iqd <= 0 && (
+        {/* The "nothing to itemise" fallback, which a Gini order HAS something
+            to itemise for — the row above already names the payment, so this
+            would restate the same money under a second label. */}
+        {f.wallet_applied_iqd <= 0 && (f.gini_paid_iqd ?? 0) <= 0 && (f.collected_iqd === null || f.collected_iqd === undefined) && f.outstanding_iqd <= 0 && (
           <Row label={s.state[f.payment_state] ?? f.payment_state} value={money(f.total_iqd)} muted />
         )}
       </dl>

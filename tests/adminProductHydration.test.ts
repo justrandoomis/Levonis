@@ -113,6 +113,9 @@ function fullDoc(): ProductDocV2 & { catalog_ids: string[] } {
     display_order: 5,
     payment_options: ['wallet', 'cash'],
     hashtags: ['bambu', 'fdm'],
+    // «تريدها أقساط؟» opens THIS link, and a distinct value here is what
+    // proves the form does not silently drop it on the way through.
+    gini_url: 'https://gini.example/product/bambu-a1',
     how_to_use: 'Plug and print',
     how_to_use_ar: 'وصّلها واطبع',
     how_to_use_ckb: '',

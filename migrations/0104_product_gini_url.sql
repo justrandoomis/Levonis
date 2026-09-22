@@ -1,0 +1,31 @@
+-- ============================================================================
+--  0104 — «عند النقر عليه ينقله الى الرابط (يكون رابط المنتج في تطبيق جني)».
+-- ============================================================================
+-- NONDESTRUCTIVE: one ADD COLUMN on `products`, no backfill. Every existing
+-- product reads '' — no Gini link — and the «تريدها اقساط ؟» note is then NOT
+-- DRAWN AT ALL: no greyed line, no "coming soon". A note without a link is an
+-- offer the shop cannot keep. An empty string is never rendered as an href.
+--
+-- THERE IS DELIBERATELY NO FALL BACK TO `giniPolicy.app_url`. The owner's
+-- wording is «يكون رابط المنتج في تطبيق جني», and a landing page that cannot
+-- show this product would be the wrong promise under this particular
+-- sentence (src/pages/Product.tsx says the same from the other side).
+--
+-- PER PRODUCT, NOT PER SHOP. The owner's wording is specific: the button in
+-- the popup opens THAT PRODUCT inside the Gini app, not the app's front page.
+-- A customer sent to a catalogue they then have to search is a customer who
+-- gives up, and the six-digit order number they bring back to checkout has to
+-- belong to the right item.
+--
+-- IT IS A URL FROM THE ADMIN, SO IT GOES THROUGH `safeLink`
+-- (worker/lib/homeContent.ts) — http(s) or a single relative path, with
+-- `javascript:` and `data:` DROPPED rather than escaped. This value lands in
+-- an href on a public product page; it takes the same door every other
+-- admin-supplied link takes.
+--
+-- AND IT IS IN `PRODUCT_COLUMNS` (worker/lib/productModel.ts). That list IS
+-- the write path — both writers bind only the columns named there — and its
+-- own comment records two past fields that were serialized, carried to the
+-- statement and silently dropped at HTTP 200 because they were missing from
+-- it.
+ALTER TABLE products ADD COLUMN gini_url TEXT NOT NULL DEFAULT '';

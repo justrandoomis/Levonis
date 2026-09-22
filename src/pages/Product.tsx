@@ -47,12 +47,13 @@ import {
   ChevronDown, Minus, Plus, X, FileText, Settings2, ShieldCheck, Truck,
   AlertTriangle, Store, ZoomIn, Image as ImageIcon, Box, ExternalLink, PlayCircle, Wrench, TrendingUp, PackageOpen,
 } from 'lucide-react';
-import { api, ApiError, CartItem } from '../lib/api';
+import { api, ApiError, CartItem, pickText } from '../lib/api';
 import { rememberViewed } from '../lib/recentlyViewed';
 import { useGoBack } from '../lib/useGoBack';
 import { setCartCount, countCartItems } from '../lib/cartCount';
 import ReviewSection from '../components/reviews/ReviewSection';
 import CheaperElsewhereSheet from '../components/product/CheaperElsewhereSheet';
+import GiniInstalmentsSheet, { giniLinkOf } from '../components/product/GiniInstalmentsSheet';
 import SafeImage from '../components/ui/SafeImage';
 import Note from '../components/ui/Note';
 import { Overlay } from '../components/ui/Overlay';
@@ -87,7 +88,7 @@ import { useMoney } from '../CurrencyContext';
 
 const STRINGS = {
   ar: {
-    compareCta: 'المقارنة', cheaperCta: 'وجدتها بمكان أرخص',
+    compareCta: 'المقارنة', cheaperCta: 'وجدتها بمكان أرخص', giniCta: 'تريدها أقساط؟',
     back: 'رجوع', share: 'مشاركة', linkCopied: 'تم نسخ الرابط', favorite: 'إضافة للمفضلة',
     unfavorite: 'إزالة من المفضلة', gallery: 'صور المنتج', noImages: 'لا توجد صور لهذا المنتج',
     imageOf: 'صورة {n} من {total}', zoom: 'تكبير الصورة', close: 'إغلاق',
@@ -166,7 +167,7 @@ const STRINGS = {
     REGULAR_PRICE_INVALID: 'سعر هذا المنتج غير صالح — تواصل مع الدعم.',
   },
   en: {
-    compareCta: 'Compare', cheaperCta: 'Found it cheaper',
+    compareCta: 'Compare', cheaperCta: 'Found it cheaper', giniCta: 'Want it in instalments?',
     back: 'Back', share: 'Share', linkCopied: 'Link copied', favorite: 'Add to favourites',
     unfavorite: 'Remove from favourites', gallery: 'Product images', noImages: 'This product has no images yet',
     imageOf: 'Image {n} of {total}', zoom: 'Zoom image', close: 'Close',
@@ -232,7 +233,7 @@ const STRINGS = {
     REGULAR_PRICE_INVALID: 'This product has an invalid price — please contact support.',
   },
   ckb: {
-    compareCta: 'بەراورد', cheaperCta: 'لە شوێنێکی هەرزانتر دۆزیمەوە',
+    compareCta: 'بەراورد', cheaperCta: 'لە شوێنێکی هەرزانتر دۆزیمەوە', giniCta: 'بە قیست دەتەوێت؟',
     back: 'گەڕانەوە', share: 'هاوبەشکردن', linkCopied: 'بەستەرەکە کۆپی کرا', favorite: 'زیادکردن بۆ دڵخوازەکان',
     unfavorite: 'لابردن لە دڵخوازەکان', gallery: 'وێنەکانی بەرهەم', noImages: 'ئەم بەرهەمە هێشتا وێنەی نییە',
     imageOf: 'وێنەی {n} لە {total}', zoom: 'گەورەکردنی وێنە', close: 'داخستن',
@@ -391,6 +392,10 @@ interface ProductDetail {
     }>;
   };
   merchant?: { id: string; name: string; verified: boolean };
+  /** This product's own page in the Gini app — the only thing «تريدها أقساط؟»
+   *  can open. Empty (or absent on an older worker) means the shop has not
+   *  listed this product there, and the note is not drawn at all. */
+  gini_url?: string;
   /** The CHEAPEST way to buy this product, resolved at the viewer's tier —
    *  the same number the card showed. Never `price_iqd`, which is the base
    *  row and may be a price nobody is charged. */
@@ -762,6 +767,7 @@ export default function Product() {
   const { lang, dir } = useLanguage();
   const { isAuthenticated } = useAuth();
   const [cheaperOpen, setCheaperOpen] = useState(false);
+  const [giniOpen, setGiniOpen] = useState(false);
   const { settings: publicSettings } = useWallet();
   const s = STRINGS[lang as Lang];
   const pageRef = useRef<HTMLDivElement>(null);
@@ -774,6 +780,29 @@ export default function Product() {
   })();
 
   const [product, setProduct] = useState<ProductDetail | null>(null);
+
+  /**
+   * «تريدها أقساط؟» — WHETHER THE NOTE EXISTS AT ALL.
+   *
+   * Both halves are facts, not preferences: the owner's switch
+   * (`giniPolicy.enabled`, the same one that decides whether checkout offers
+   * the method) and a usable link to THIS product in the app. A note without a
+   * link is an offer the shop cannot keep, so it is not drawn — no greyed
+   * line, no "coming soon", nothing. `app_url` is deliberately NOT a fallback
+   * here: the owner asked for «يكون رابط المنتج في تطبيق جني», and a landing
+   * page that cannot show this product would be the wrong promise under this
+   * sentence.
+   *
+   * IT WAITS FOR THE SETTINGS RATHER THAN GUESSING. Drawing the note while
+   * `publicSettings` is still null and then removing it a moment later is a
+   * promise made and withdrawn on the screen; not knowing yet is not a reason
+   * to offer. A worker old enough to have no `giniPolicy` at all leaves
+   * `enabled` undefined, which is not `false` — there the product's own link
+   * is the whole answer, as it was before the setting existed.
+   */
+  const giniPolicy = publicSettings?.giniPolicy;
+  const giniLink = publicSettings && giniPolicy?.enabled !== false ? giniLinkOf(product?.gini_url) : '';
+
   /** Header signals: the sales TIER (never the exact count) and the score. */
   const [salesBadge, setSalesBadge] = useState<number | null>(null);
   const [rating, setRating] = useState<{ average: number; count: number } | null>(null);
@@ -3836,6 +3865,44 @@ export default function Product() {
                 </button>
               </div>
 
+              {/*
+                «يكون كملاحظه بسيطه في اسفل الزرين» — a NOTE, under the pair,
+                and deliberately not a third button.
+
+                The two above are already one weight below Add to cart; a third
+                control of the same size would turn a quiet row into a menu and
+                put an instalments offer at the same emphasis as the purchase
+                this page is for. So this is body text with an underline — the
+                web's own "this opens something" affordance — at the smallest
+                size the page uses, in the muted foreground.
+
+                It is still a real `<button>`: it takes the global `:active`
+                dim and the focus ring, and it reads as a control to a screen
+                reader, which a `<span onClick>` would not.
+
+                DRAWN FOR SIGNED-OUT VISITORS TOO. Nothing behind it needs an
+                account — the sheet states a bank's condition and opens a link —
+                so sending someone to /auth first would be a gate in front of
+                information, unlike the price report beside it which files
+                something against their name.
+              */}
+              {giniLink ? (
+                <div className="pt-1">
+                  {/* Quiet to the eye, but a full-size target to the thumb:
+                      `min-h-[40px]` with negative inline margin keeps the line
+                      looking like body text while staying comfortably tappable
+                      on the phone this page is mostly read on. */}
+                  <button
+                    type="button"
+                    onClick={() => setGiniOpen(true)}
+                    data-product-gini
+                    className="inline-flex min-h-[40px] items-center -mx-1 rounded-sm px-1 text-[12.5px] font-light text-zinc-500 underline decoration-zinc-700 underline-offset-4 transition-colors hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  >
+                    {s.giniCta}
+                  </button>
+                </div>
+              ) : null}
+
               <div className="pt-2">
                 <ReviewSection productId={product.id} />
               </div>
@@ -4011,6 +4078,17 @@ export default function Product() {
         productId={product.id}
         onClose={() => setCheaperOpen(false)}
       />
+
+      {/* Mounted only when there is a link to open, so the sheet can never be
+          opened onto an empty promise by a stale piece of state. */}
+      {giniLink ? (
+        <GiniInstalmentsSheet
+          open={giniOpen}
+          url={giniLink}
+          condition={pickText(giniPolicy?.conditions, lang)}
+          onClose={() => setGiniOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

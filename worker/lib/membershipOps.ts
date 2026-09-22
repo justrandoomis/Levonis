@@ -16,6 +16,7 @@ import { benefits, getLaunchConfig, getTierStatus, tierInherits } from './entitl
 import { newId } from './crypto';
 import { audit } from './audit';
 import { parseSupportSnapshot, type SupportSnapshot } from './supportCode';
+import { levonisCollectibleSql } from './gini';
 
 /**
  * Calendar-month addition with month-end clamping: the day-of-month is
@@ -530,6 +531,8 @@ interface SupportOrderRow {
   user_id: string;
   status: string;
   total_iqd: number;
+  /** Settled inside the Gini app (migration 0103) — never ours to collect. */
+  gini_paid_iqd: number | null;
   delivered_at: string | null;
   support_snapshot: string | null;
 }
@@ -620,7 +623,7 @@ export async function evaluateSupportGiftForOrder(
   };
 
   const order = await db
-    .prepare('SELECT id, user_id, status, total_iqd, delivered_at, support_snapshot FROM orders WHERE id = ?')
+    .prepare('SELECT id, user_id, status, total_iqd, gini_paid_iqd, delivered_at, support_snapshot FROM orders WHERE id = ?')
     .bind(orderId)
     .first<SupportOrderRow>();
   if (!order) return { ...base, reason: 'order_not_found' };
@@ -648,7 +651,11 @@ export async function evaluateSupportGiftForOrder(
     orderCancelled: order.status === 'cancelled',
     delivered: order.status === 'delivered' && !!order.delivered_at,
     collectedIqd: Number(collectedRow?.collected) || 0,
-    totalIqd: Number(order.total_iqd) || 0,
+    // What LEVONIS had to collect, which is the whole total on every method
+    // but one: a Gini order's goods were paid for inside the bank's app and
+    // never pass through `order_payment_settlements`, so the plain total
+    // would park every referrer's gift in 'payment_not_settled' for ever.
+    totalIqd: Math.max(0, (Number(order.total_iqd) || 0) - (Number(order.gini_paid_iqd) || 0)),
   });
 
   // A claim that can no longer stand is cancelled rather than left dangling
@@ -767,7 +774,7 @@ export async function evaluateSupportGiftForOrder(
             AND needs_review = 0
             AND EXISTS (SELECT 1 FROM orders o WHERE o.id = ?1 AND o.status = 'delivered')
             AND (SELECT COALESCE(SUM(s.amount_iqd), 0) FROM order_payment_settlements s WHERE s.order_id = ?1)
-                >= (SELECT o.total_iqd FROM orders o WHERE o.id = ?1)`
+                >= (SELECT ${levonisCollectibleSql('o')} FROM orders o WHERE o.id = ?1)`
       )
       .bind(orderId, nowIso, order.delivered_at)
       .run();

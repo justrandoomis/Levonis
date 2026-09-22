@@ -52,6 +52,7 @@ import { arabicFoldSql, phoneDigitsSql } from '../lib/sqlFold';
 import { getOrderPointsSnapshots } from '../lib/pointsOps';
 import { telegramConfigured, telegramGetMe } from '../lib/telegram';
 import {
+  STAGE_LEGACY_STATUS,
   STAGE_SOURCE,
   canMoveStage,
   resolveDurations,
@@ -60,6 +61,13 @@ import {
   stagesFor,
   type OrderStage,
 } from '../lib/orderStages';
+import { safeLink } from '../lib/homeContent';
+import {
+  GINI_RECEIPT_REQUIRED,
+  GINI_RECEIPT_REQUIRED_MESSAGE,
+  giniBlocksConfirmation,
+  giniStateOf,
+} from '../lib/gini';
 import { moveOrderStage, stagePath, stageRowFrom, sweepDueStages } from '../lib/orderStageOps';
 import { ALWASEET, alwaseetDriver, resolveWire } from '../lib/delivery/alwaseet';
 import {
@@ -1001,6 +1009,11 @@ function validateProductBody(body: Record<string, unknown>) {
       typeof body.membership_prices === 'object' && body.membership_prices !== null ? body.membership_prices : {}
     ),
     payment_options: jsonArray(body.payment_options, 'payment_options', 20),
+    // «رابط المنتج في تطبيق جني». Through `safeLink` here as well as in
+    // productModel: this legacy route binds `Object.keys(p)` straight into the
+    // statement, so nothing else stands between an admin's paste and a column
+    // that ends up in an href on a public page.
+    gini_url: safeLink(body.gini_url),
     subcategory_id: str(body.subcategory_id, 'subcategory_id', { max: 60, required: false }),
     categories: str(body.categories, 'categories', { max: 500, required: false }),
     display_order: int(body.display_order, 'display_order', { min: -100_000, max: 100_000, def: 0 }),
@@ -2179,12 +2192,36 @@ async function receiptDataFor(c: Context<AppContext>, id: string) {
           amount_iqd: Number(coupon?.discount_iqd) || 0, negative: true },
         { label_ar: 'خصم النقاط', label_en: 'Points', amount_iqd: Number(o.points_discount_iqd) || 0, negative: true },
         { label_ar: 'من المحفظة', label_en: 'Wallet', amount_iqd: Number(o.wallet_applied_iqd) || 0, negative: true },
+        // «يتم الحساب داخل تطبيق جني» — without this row the receipt shows the
+        // full price against a door amount of one delivery fee and does not
+        // add up, and a customer looking at it cannot see why they are being
+        // asked for 5,000 on a 904,000 order.
+        { label_ar: 'مدفوع عبر تطبيق جني', label_en: 'Paid via Gini', amount_iqd: Number(o.gini_paid_iqd) || 0, negative: true },
       ],
       subtotal_iqd: Number(o.subtotal_iqd) || 0,
       shipping_iqd: Number(o.shipping_iqd) || 0,
       total_iqd: Number(o.total_iqd) || 0,
       due_on_delivery_iqd: Number(o.due_on_delivery_iqd) || 0,
       payment_method: String(o.payment_method_id ?? ''),
+      /**
+       * WHERE THIS ORDER STANDS WITH THE BANK — on the sheet staff work from.
+       *
+       * The receipt is what a packer has in front of them, and on a Gini order
+       * the thing they must check before touching it is whether the barcode
+       * was scanned. `gini_state` is that check; the order number is what they
+       * look it up in the app by. Null on every other payment method, so
+       * nothing extra prints on an ordinary receipt.
+       */
+      gini:
+        String(o.payment_method_id ?? '') === 'gini'
+          ? {
+              order_no: String(o.gini_order_no ?? ''),
+              state: giniStateOf(o.gini_state),
+              paid_iqd: Number(o.gini_paid_iqd) || 0,
+              hold_until: o.gini_hold_until ?? null,
+              received_at: o.gini_received_at ?? null,
+            }
+          : null,
       shipping_type_label: SHIPPING_TYPE_LABELS[shippingType].ar,
       support_code: String(safeParse<{ ref?: string } | null>(o.support_snapshot, null)?.ref ?? ''),
     },
@@ -2289,11 +2326,10 @@ function labelFrom(data: Awaited<ReturnType<typeof receiptDataFor>>['data'], ord
     address: data.address,
     landmark: data.landmark,
     notes: data.notes,
-    // Cash on delivery collects what is still owed; anything prepaid
-    // collects nothing. Read from the order, never assumed from the total.
-    cod_iqd: String(order.payment_method_id) === 'cash'
-      ? Number(order.total_iqd) || 0
-      : Number(order.due_on_delivery_iqd) || 0,
+    // WHAT IS STILL OWED AT THE DOOR, for every payment method — see the
+    // shipment-creation call below for why the cash arm used to read
+    // `total_iqd` and why that over-collected a part-prepaid order.
+    cod_iqd: Math.max(0, Number(order.due_on_delivery_iqd) || 0),
     item_count: itemCount,
     tracking_no: String(order.delivery_tracking_no ?? ''),
     created_at: data.created_at,
@@ -2373,9 +2409,8 @@ adminRoutes.get('/labels', async (c) => {
       address: String(address.address ?? ''),
       landmark: String(address.landmark ?? ''),
       notes: String(address.notes ?? ''),
-      cod_iqd: String(o.payment_method_id) === 'cash'
-        ? Number(o.total_iqd) || 0
-        : Number(o.due_on_delivery_iqd) || 0,
+      // The same one column the sticker and the courier dispatch read.
+      cod_iqd: Math.max(0, Number(o.due_on_delivery_iqd) || 0),
       item_count: counts.get(String(o.id)) ?? 0,
       tracking_no: String(o.delivery_tracking_no ?? ''),
       created_at: String(o.created_at ?? ''),
@@ -2518,10 +2553,31 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
     address: String(address.address ?? ''),
     landmark: String(address.landmark ?? ''),
     notes: String(address.notes ?? ''),
-    // Cash on delivery collects the total; anything already paid collects
-    // nothing. Getting this wrong takes money off a customer twice, so it is
-    // read from the order rather than assumed.
-    amountIqd: String(order.payment_method_id) === 'cash' ? Number(order.total_iqd) || 0 : 0,
+    /**
+     * WHAT THE DRIVER COLLECTS AT THE DOOR — the order's own stored figure.
+     *
+     * This used to read `payment_method_id === 'cash' ? total_iqd : 0`, and it
+     * was wrong in two directions.
+     *
+     * 0 FOR EVERYTHING THAT IS NOT CASH. That held while "not cash" meant
+     * "already paid in full", and Gini ended it: those orders settle their
+     * GOODS inside the app and still owe the delivery fee in cash — «ويتم دفع
+     * التوصيل فقط». Sending 0 puts the driver on the doorstep with nothing to
+     * collect and loses the fee on every Gini delivery, silently, because a
+     * shipment created for 0 is not an error anywhere.
+     *
+     * AND `total_iqd` FOR CASH. A cash order can be PARTLY prepaid — the
+     * 50,000 printer home-delivery advance is debited from the wallet at
+     * checkout — and `total_iqd` still names the whole price. Handing the
+     * courier that figure collects the advance a second time, from a customer
+     * who already paid it.
+     *
+     * `due_on_delivery_iqd` is the one column that answers the question being
+     * asked: what is still owed at the door, tax included, frozen at
+     * checkout. The two label paths above read it now as well, so the sticker,
+     * the receipt and the courier's own record cannot say three things.
+     */
+    amountIqd: Math.max(0, Number(order.due_on_delivery_iqd) || 0),
     itemCount: (items ?? []).reduce((n, i) => n + Number(i.qty || 0), 0),
     itemsSummary: (items ?? []).map((i) => `${i.name_snapshot} x${i.qty}`).join(', ').slice(0, 500),
   });
@@ -2589,6 +2645,103 @@ adminRoutes.post('/orders/sweep-stages', async (c) => {
   return c.json({ success: true, ...report });
 });
 
+/**
+ * THE GINI RECEIPT GATE — «يجب اعلام منصه جني بانه استلم المنتج قبل ان يتم
+ * تجهيز الطلب من الاداره».
+ *
+ * Gini's purchase closes when the customer's receipt barcode is scanned; that
+ * scan is what tells the bank the goods were handed over. Until it happens
+ * Levonis is holding stock against a purchase the platform does not yet
+ * consider complete, and preparing the order would hand the goods over with
+ * nothing on Gini's side saying so.
+ *
+ * IT IS KEYED ON CROSSING THE STOCK BOUNDARY, not on landing on `confirmed`.
+ * Every stage from `confirmed` onwards maps to a legacy status inside
+ * STOCK_DEDUCTED_STATES, and that crossing is what turns the checkout's hold
+ * into a real decrement — so an admin jumping an unscanned order straight to
+ * a warehouse stage has to meet the same refusal as one pressing confirm.
+ *
+ * Cancelling is deliberately NOT gated: an order nobody scanned is exactly
+ * the order staff may need to let go of, and the sweep does the same thing on
+ * the clock.
+ */
+async function refuseUnscannedGini(c: Context<AppContext>, orderId: string, legacyTarget: string) {
+  if (!STOCK_DEDUCTED_STATES.has(legacyTarget)) return;
+  const row = await c.env.DB.prepare(
+    'SELECT payment_method_id, gini_state, gini_order_no FROM orders WHERE id = ?'
+  )
+    .bind(orderId)
+    .first<Record<string, unknown>>();
+  if (!row || !giniBlocksConfirmation(row)) return;
+  throw badRequest(GINI_RECEIPT_REQUIRED_MESSAGE, GINI_RECEIPT_REQUIRED, {
+    gini_state: giniStateOf(row.gini_state),
+    gini_order_no: String(row.gini_order_no ?? ''),
+  });
+}
+
+/**
+ * «تاكيد مسح باركود الاستلام» — staff scan the barcode Gini gave the customer,
+ * and the order becomes preparable.
+ *
+ * THE ORDER OF EVENTS IS THE OWNER'S AND IT IS BACKWARDS FROM EVERY OTHER
+ * PAYMENT METHOD. Normally goods move and then money follows; here the scan
+ * tells Gini the customer HAS the product — «يعتبر انه استلم المنتج» — and
+ * only then may the shop prepare it. That is the bank's flow, not ours, and
+ * the gate above is the only thing that keeps the two steps in that order.
+ *
+ * ONE SCAN, RECORDED WITH ITS BARCODE. The flip is conditional on the state
+ * we read, so two members of staff scanning the same parcel leave exactly one
+ * winner and the second is told it was already done rather than overwriting
+ * the first scan's time. An order whose hold already expired is NOT revived
+ * here: its stock went back to the shelf and may since have been sold, so
+ * reviving it from a barcode would promise goods that are no longer there.
+ */
+adminRoutes.post('/orders/:id/gini-receipt', async (c) => {
+  const adminUser = c.get('user')!;
+  const id = c.req.param('id');
+  const body = await c.req.json().catch(() => ({}));
+  // The barcode is whatever Gini printed; we store it, we do not parse it.
+  // Refusing an unfamiliar shape would block a real handover over a format
+  // the bank is free to change.
+  const barcode = str(body.barcode, 'barcode', { min: 1, max: 120 });
+
+  const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  if (!order) throw notFound('Order not found');
+  if (String(order.payment_method_id ?? '') !== 'gini') {
+    throw badRequest('This order was not paid through the Gini app.', 'NOT_A_GINI_ORDER');
+  }
+  const state = giniStateOf(order.gini_state);
+  if (state === 'received') {
+    throw badRequest('The Gini receipt for this order was already scanned.', 'GINI_ALREADY_RECEIVED', {
+      received_at: order.gini_received_at ?? null,
+    });
+  }
+  if (state === 'expired') {
+    throw badRequest(
+      'انتهت مهلة هذا الطلب وأُلغي قبل مسح الباركود — اطلب من الزبون إنشاء طلب جديد. / This order\'s Gini hold expired and it was cancelled before the barcode was scanned — the customer needs to place a new order.',
+      'GINI_HOLD_EXPIRED'
+    );
+  }
+
+  const now = new Date().toISOString();
+  const res = await c.env.DB.prepare(
+    `UPDATE orders
+        SET gini_state = 'received', gini_receipt_barcode = ?1, gini_received_at = ?2, updated_at = ?2
+      WHERE id = ?3 AND gini_state = 'awaiting_receipt'`
+  )
+    .bind(barcode, now, id)
+    .run();
+  if ((res.meta.changes ?? 0) === 0) {
+    throw badRequest('The order changed while you were editing — reload and retry');
+  }
+
+  await audit(c.env.DB, adminUser.id, 'order.gini_receipt', id, {
+    gini_order_no: String(order.gini_order_no ?? ''),
+    barcode,
+  });
+  return c.json({ success: true, gini_state: 'received', received_at: now });
+});
+
 adminRoutes.patch('/orders/:id/stage', async (c) => {
   const adminUser = c.get('user')!;
   const id = c.req.param('id');
@@ -2596,6 +2749,7 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
   const to = str(body.stage, 'stage', { max: 40 }) as OrderStage;
   if (!(to in STAGE_SOURCE)) throw badRequest(`Unknown stage "${to}"`);
   const note = str(body.note, 'note', { max: 500, required: false });
+  await refuseUnscannedGini(c, id, STAGE_LEGACY_STATUS[to]);
 
   const res = await moveOrderStage(c.env, {
     orderId: id,
@@ -2662,6 +2816,15 @@ adminRoutes.patch('/orders/:id', async (c) => {
   const from = String(order.status);
   if (!ORDER_TRANSITIONS[from]?.includes(next)) {
     throw badRequest(`Cannot move an order from "${from}" to "${next}"`);
+  }
+  // The same refusal the stage door applies, on the same condition — this
+  // dropdown is still the fastest way to move an order and must not be the
+  // way round the rule.
+  if (giniBlocksConfirmation(order) && STOCK_DEDUCTED_STATES.has(next)) {
+    throw badRequest(GINI_RECEIPT_REQUIRED_MESSAGE, GINI_RECEIPT_REQUIRED, {
+      gini_state: giniStateOf(order.gini_state),
+      gini_order_no: String(order.gini_order_no ?? ''),
+    });
   }
 
   // delivered_at is stamped in the SAME conditional update as the status flip

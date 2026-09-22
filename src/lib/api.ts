@@ -455,6 +455,10 @@ export interface ApiProduct {
   how_to_use: string;
   how_to_use_ar?: string;
   how_to_use_ckb?: string;
+  /** This product's page in the Gini instalments app; '' when it is not listed
+   *  there. The product page draws «تريدها أقساط؟» only when it is a real
+   *  http(s) link (src/components/product/GiniInstalmentsSheet.tsx). */
+  gini_url?: string;
   stock: number | null;
   created_at: string;
   merchant?: { id: string; name: string; verified: boolean };
@@ -955,6 +959,24 @@ export interface ApiOrder {
    *  payment label. */
   bnpl_due_iqd?: number;
   bnpl_due_at?: string | null;
+  /**
+   * The Gini side of an order financed inside the app (worker/routes/orders.ts
+   * `orderPublic`). Null — not a block of zeroes — on every other payment
+   * method, so a screen tests for the block rather than for a state string.
+   *
+   * `state` is what decides whether the order is really going anywhere:
+   * 'awaiting_receipt' means the receipt barcode has not been scanned, so the
+   * shop may not prepare it and the hold expires at `hold_until`. The barcode
+   * itself is deliberately not here — staff scan it off the parcel.
+   */
+  gini?: {
+    order_no: string;
+    state: '' | 'awaiting_receipt' | 'received' | 'expired';
+    /** Settled inside the Gini app; never money Levonis collected. */
+    paid_iqd: number;
+    hold_until: string | null;
+    received_at: string | null;
+  } | null;
   coupon?: { coupon_id?: string; code?: string; discount_iqd?: number } | null;
   coupon_discount_iqd?: number;
   progress?: OrderStageProgress;
@@ -1013,6 +1035,14 @@ export interface OrderFinancial {
   due_on_delivery_iqd: number;
   bnpl_due_iqd?: number;
   bnpl_due_at?: string | null;
+  /**
+   * Settled inside the Gini app before the order existed — a PAYMENT, never a
+   * discount, and never money Levonis collected. Read from the stored column
+   * rather than inferred as `total − due`, because the subtraction stops
+   * agreeing the first time anything else is collected against the order.
+   * 0 on every other payment method.
+   */
+  gini_paid_iqd?: number;
   collected_iqd: number | null;
   outstanding_iqd: number;
   payment_state: 'paid' | 'partial' | 'cod_due' | 'bnpl_due' | string;
@@ -1336,6 +1366,23 @@ export interface PublicSettings {
    * picker everywhere at once.
    */
   deliveryDayPolicy?: { enabled: boolean; max_days: number; allow_same_day: boolean };
+  /**
+   * «خدمة التقسيط عبر تطبيق جني» as the owner configured it.
+   *
+   * Public because the product page draws «تريدها أقساط؟» for a SIGNED-OUT
+   * visitor, with no cart and no quote to read the condition off. `conditions`
+   * is the bank's own rule in the owner's words — never machine-translated, so
+   * `pickText` falls back to a language they did write rather than to a blank.
+   * Optional: a client on a worker that predates the setting falls back to the
+   * sheet's compiled sentence instead of printing nothing.
+   */
+  giniPolicy?: {
+    enabled: boolean;
+    conditions: LocalizedText;
+    /** How long a placed Gini order waits for its receipt scan before it is cancelled. */
+    hold_hours: number;
+    app_url: string;
+  };
 }
 
 /** Owner-authored copy, one string per language. Never machine-translated —

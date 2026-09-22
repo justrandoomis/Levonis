@@ -94,6 +94,7 @@ import {
   isProductType,
   isTemplateFamily,
   productTypeForBranch,
+  PRODUCT_TYPES,
   type SectionRef,
   type ProductTypeId,
 } from '../lib/templateFamilies';
@@ -223,8 +224,9 @@ function sectionBranch(rows: CatalogRow[], id: string): SectionRef[] {
  * Resolves ?category= to a shape, or fails with a message naming the reason.
  *
  * THE SHAPE COMES FROM THE PRODUCT TYPE, not from the section directly: the
- * section picks a family and a branch, the branch picks one of the four types
- * the owner works in (طابعة / ملحقات / فلمنت / اكسسوار), and the type owns the
+ * section picks a family and a branch, the branch picks one of the types the
+ * owner works in (طابعة / ملحقات / فلمنت / اكسسوار, plus the laser line's
+ * ليزر / مواد ليزر وقص), and the type owns the
  * columns. A section export and that type's blank template are therefore the
  * same file shape, which is what makes "download, fill, import" and "export,
  * edit, import" the same workflow.
@@ -267,7 +269,10 @@ function typeParam(raw: string | undefined): ProductTypeId | undefined {
   if (!raw) return undefined;
   if (!isProductType(raw)) {
     throw badRequest(
-      `type: "${raw}" is not a product type — use one of printer, parts, filament, accessory`,
+      // The list is READ from the registry rather than spelled out here: it
+      // was spelled out, and the day «ليزر» and «مواد ليزر وقص» were added the
+      // message went on naming four types that no longer were all of them.
+      `type: "${raw}" is not a product type — use one of ${PRODUCT_TYPES.map((t) => t.id).join(', ')}`,
       'BAD_TYPE'
     );
   }
@@ -336,8 +341,8 @@ adminImportRoutes.get('/template', async (c) => {
 
 // GET /types --------------------------------------------------------------
 //
-// The four product types and what each one costs in columns, so the import
-// panel can offer them without a second copy of the list in `src/`.
+// The product types and what each one costs in columns, so the import panel
+// can offer them without a second copy of the list in `src/`.
 
 adminImportRoutes.get('/types', (c) => c.json({ success: true, types: templateTypeChoices() }));
 
@@ -488,6 +493,7 @@ async function exportProducts(
       payment_options: doc.payment_options,
       how_to_use: doc.how_to_use,
       usage_url: doc.usage_guide?.official_url ?? '',
+      gini_url: doc.gini_url ?? '',
       hashtags: doc.hashtags,
       // §18. A tier with no product rule contributes NO entry, and
       // `serializeProducts` then writes six empty cells for it — never

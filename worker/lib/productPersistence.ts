@@ -2610,9 +2610,16 @@ export async function planProductSave(
      * See worker/lib/conditionProjection.ts for why this one asks first rather
      * than repairing on failure like the reads do.
      */
-    const [hasCondition, dimensionPresence] = await Promise.all([
+    const [hasCondition, dimensionPresence, hasGiniUrl] = await Promise.all([
       productsHaveConditionDoc(db),
       Promise.all(DIMENSION_FIELDS.map((field) => productsHaveColumn(db, field))),
+      // 0104, and the same minute-long window: `gini_url` joined
+      // PRODUCT_COLUMNS with the instalments feature, and a column in that
+      // list is BOUND on every save. Without this probe the first deploy
+      // carrying Gini answered "table products has no column named gini_url"
+      // to every product save until the migration landed — an ordinary edit
+      // to an ordinary product, 500ing for a field nobody had touched.
+      productsHaveColumn(db, 'gini_url'),
     ]);
     /**
      * A price-only save may cross the minute before 0098 reaches the database,
@@ -2636,6 +2643,27 @@ export async function planProductSave(
       );
     }
     for (const field of missingDimensions) dropped.add(field);
+    /**
+     * THE GINI LINK, UNDER THE SAME RULE AS A DIMENSION.
+     *
+     * Empty is the off position and the default — a product with no link
+     * draws no «تريدها أقساط؟» note — so dropping the column costs nothing
+     * and a price-only save crosses the deploy window untouched. A link the
+     * owner actually typed is a different matter: acknowledging it at HTTP
+     * 200 and storing nothing is the exact failure PRODUCT_COLUMNS' own
+     * comment records twice, so that one names the migration instead.
+     */
+    if (!hasGiniUrl) {
+      if (String(doc.gini_url ?? '') !== '') {
+        throw new HttpError(
+          503,
+          'تعذّر حفظ رابط تطبيق جني قبل تطبيق ترحيل قاعدة البيانات 0104 / the Gini app link requires database migration 0104',
+          'GINI_URL_MIGRATION_REQUIRED',
+          { errors: ['gini_url: column is not installed'] }
+        );
+      }
+      dropped.add('gini_url');
+    }
     const writable = dropped.size === 0 ? PRODUCT_COLUMNS : PRODUCT_COLUMNS.filter((k) => !dropped.has(k));
     if (intent.mode === 'create') {
       statements.push(

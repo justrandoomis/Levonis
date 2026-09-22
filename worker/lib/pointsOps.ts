@@ -49,6 +49,7 @@
 import type { Env } from './types';
 import { safeParse } from './types';
 import { newId } from './crypto';
+import { levonisCollectibleSql } from './gini';
 import { getTierStatus } from './entitlements';
 import {
   applyMultiplierX100,
@@ -529,7 +530,7 @@ export function buildSettlementStatements(
           SET settled_at = ?2
         WHERE order_id = ?1 AND kind = 'purchase' AND state = 'pending' AND settled_at IS NULL
           AND (SELECT COALESCE(SUM(s.amount_iqd), 0) FROM order_payment_settlements s WHERE s.order_id = ?1)
-              >= (SELECT o.total_iqd FROM orders o WHERE o.id = ?1)`
+              >= (SELECT ${levonisCollectibleSql('o')} FROM orders o WHERE o.id = ?1)`
     ).bind(orderId, at),
   ];
 }
@@ -546,9 +547,9 @@ export async function recordOrderSettlement(
   orderId: string,
   input: SettlementInput
 ): Promise<SettlementResult> {
-  const order = await env.DB.prepare('SELECT id, status, total_iqd FROM orders WHERE id = ?')
+  const order = await env.DB.prepare('SELECT id, status, total_iqd, gini_paid_iqd FROM orders WHERE id = ?')
     .bind(orderId)
-    .first<{ id: string; status: string; total_iqd: number }>();
+    .first<{ id: string; status: string; total_iqd: number; gini_paid_iqd: number }>();
   if (!order) return { recorded: false, duplicate: false, collected_iqd: 0, total_iqd: 0, fully_settled: false, reason: 'order_not_found' };
   if (order.status === 'cancelled') {
     return { recorded: false, duplicate: false, collected_iqd: 0, total_iqd: Number(order.total_iqd) || 0, fully_settled: false, reason: 'order_cancelled' };
@@ -570,12 +571,20 @@ export async function recordOrderSettlement(
     .first<{ collected: number }>();
   const collected = Number(sums?.collected) || 0;
   const total = Number(order.total_iqd) || 0;
+  /**
+   * `fully_settled` is the caller's cue to stamp the `'paid'` milestone and
+   * release the accrual, so it has to ask the same question the statement
+   * above does: has everything LEVONIS is owed arrived? On a Gini order the
+   * goods were settled in the bank's app, and measuring the courier's five
+   * thousand against the whole price answers no for ever.
+   */
+  const collectible = Math.max(0, total - (Number(order.gini_paid_iqd) || 0));
   return {
     recorded: !duplicate,
     duplicate,
     collected_iqd: collected,
     total_iqd: total,
-    fully_settled: collected >= total,
+    fully_settled: collected >= collectible,
   };
 }
 

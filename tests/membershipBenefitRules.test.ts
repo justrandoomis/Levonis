@@ -280,13 +280,17 @@ test('PRO: the COD tax is CALCULATED IN FULL and then exempted — both numbers 
     deliveryMethodId: 'standard',
     payableBeforeTaxIqd: 1_000_000,
   });
-  assert.equal(calculated, 12_000, 'two complete 500,000 blocks at 6,000 each');
+  // «اجعلها 3 الف لكل 500 الف» — the owner halved the per-block charge, so two
+  // complete blocks of 500,000 now cost 6,000 rather than 12,000. The figure is
+  // the PACKAGED DEFAULT: this call passes no rate, which is what an
+  // unconfigured shop charges.
+  assert.equal(calculated, 6_000, 'two complete 500,000 blocks at 3,000 each');
 
   const proExempt = taxBenefit(rule({ benefit_type: 'cod_tax_exemption', discount_mode: null, cod_tax_exempt: true }));
   assert.equal(proExempt.cod_exempt, true);
   const payable = proExempt.cod_exempt ? 0 : calculated;
   assert.equal(payable, 0);
-  assert.equal(calculated, 12_000, 'and the calculated figure is still there to record');
+  assert.equal(calculated, 6_000, 'and the calculated figure is still there to record');
 });
 
 test('PREMIUM: the COD tax stays, because its rule says so', () => {
@@ -294,7 +298,7 @@ test('PREMIUM: the COD tax stays, because its rule says so', () => {
     rule({ tier: 'prime', benefit_type: 'cod_tax_exemption', discount_mode: null, cod_tax_exempt: false })
   );
   assert.equal(premium.cod_exempt, false);
-  assert.equal(calculateCodTaxIqd(1_000_000), 12_000);
+  assert.equal(calculateCodTaxIqd(1_000_000), 6_000);
 });
 
 test('the COD exemption is a rule, not a tier check anywhere in the code', () => {

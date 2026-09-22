@@ -362,6 +362,25 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'wallet_adjustments.event_key': 'event identity',
   'wallet_holds.event_key': 'event identity',
   'wallet_transactions.event_key': 'event identity',
+  /**
+   * 0103/0104 — THE TWO GINI STRINGS, AND NEITHER IS A PATH.
+   *
+   * `products.gini_url` is an EXTERNAL link: the product's page in the Qi Card
+   * instalments app, typed by an administrator and passed through `safeLink`
+   * before it is ever stored. Nothing uploads to it and nothing serves from
+   * it, so an orphan sweep that treated it as a reference would be scanning
+   * somebody else's website for our bytes.
+   *
+   * `orders.gini_receipt_barcode` is the code printed on the customer's Gini
+   * collection slip, captured by the admin scanner as TEXT. It identifies a
+   * receipt in Gini's system; there is no image of it in our bucket.
+   *
+   * Classified rather than left unknown because the sweep refuses to run at
+   * all while one column is unclassified — which is the right default, and
+   * the reason this list exists.
+   */
+  'products.gini_url': 'an external link to the product in the Gini app',
+  'orders.gini_receipt_barcode': 'the Gini collection barcode, as text',
   'rate_limits.key': 'the throttle bucket, e.g. login:1.2.3.4',
   'policy_documents.key': 'the policy slug — terms, privacy, warranty',
   'policy_acceptances.policy_key': 'the same policy slug',

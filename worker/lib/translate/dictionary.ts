@@ -39,6 +39,9 @@ export const IDENTITY_TERMS: readonly string[] = [
   // Arabic transliteration would be a word nobody searches for and nobody says.
   'klipper', 'marlin', 'reprapfirmware', 'bowden', 'bltouch',
   'hepa', 'pom', 'ptfe', 'dmd', 'corexy',
+  // A board grade, printed on the sheet in Latin in every shop in Baghdad —
+  // the same call 'petg' and 'asa' above already make.
+  'mdf',
   // THE POWER VOCABULARY WHERE THE WORD IS THE SAME IN EVERY LANGUAGE. An
   // Iraqi buyer says «يو بي إس» out loud and writes UPS, and every unit on
   // sale in Baghdad has «kVA» printed on the carton — an Arabic or Kurdish
@@ -221,7 +224,11 @@ export const PHRASES: Record<string, TermEntry> = {
   'auto leveling': { ar: 'التسوية التلقائية', ckb: 'هاوسەنگکردنی خۆکار' },
   'automatic leveling': { ar: 'التسوية التلقائية' },
   'filament runout sensor': { ar: 'حساس نفاد الفلامنت' },
-  'enclosure': { ar: 'الهيكل المغلق' },
+  // The Sorani was missing and «الهيكل» is a TEMPLATE label now — the laser
+  // safety group asks every cutter whether it has one — so a Kurdish customer
+  // would have met an English word on every laser page. «ژووری داخراو» is
+  // built from «داخراو», which this file already records for `enclosed`.
+  'enclosure': { ar: 'الهيكل المغلق', ckb: 'ژووری داخراو' },
   'air filter': { ar: 'فلتر الهواء' },
   'multi-color': { ar: 'متعدد الألوان', ckb: 'فرەڕەنگ' },
   'multi color': { ar: 'متعدد الألوان', ckb: 'فرەڕەنگ' },
@@ -568,4 +575,99 @@ export const PHRASES: Record<string, TermEntry> = {
   'battery backup': { ar: 'بطارية احتياطية', ckb: 'باتریی یەدەگ' },
   'voltage regulator': { ar: 'منظّم جهد', ckb: 'ڕێکخەری ڤۆڵتاژ' },
   'power cut': { ar: 'انقطاع الكهرباء', ckb: 'بڕانی کارەبا' },
+
+  // ---------------------------------------------------------------- 0102
+  // THE LASER LINE'S VOCABULARY. «إضافة قسم جديد وهو قسم الليزر بجانب طابعات
+  // الفلامنت والرزن … وكذلك اضافه مواد الطباعه بجانب الفلمنت والرزن … مواد
+  // الصيانه والاكسسوارات ايضا». Every label and every select option the three
+  // laser groups in templateFamilies.ts added is recorded here by hand, in
+  // both languages, because tests/templateLanguageTriples.test.ts holds the
+  // rule that a spec a customer cannot read is not a spec they can compare.
+  //
+  // NOTHING BELOW WAS MACHINE-TRANSLATED, which is this file's whole premise.
+  // Where a confident Sorani technical term exists it is used; where one does
+  // not, a plain descriptive phrase built from words this file already records
+  // is used instead of a guess — «دوگمەی وەستانی خێرا» for an emergency stop,
+  // «شیاوی هەڵکۆڵین» for engravable. Those are listed for a native speaker to
+  // review; they are not inventions dressed as terminology.
+  //
+  // WHERE THE ENGLISH TOKEN IS THE ANSWER the word is in IDENTITY_TERMS rather
+  // than transliterated here — «MDF» joined «PETG» and «HEPA» above.
+  'laser': { ar: 'ليزر', ckb: 'لەیزەر' },
+  'laser source': { ar: 'مصدر الليزر', ckb: 'سەرچاوەی لەیزەر' },
+  // The four sources are recorded as WHOLE PHRASES. templateFamilies.ts says
+  // why: a bare «fiber» would answer «فايبر» for every «carbon fiber» in the
+  // catalogue, where «ألياف الكربون» is the only right word.
+  'co2 laser': { ar: 'ليزر CO2', ckb: 'لەیزەری CO2' },
+  'diode laser': { ar: 'ليزر دايود', ckb: 'لەیزەری دایۆد' },
+  'infrared laser': { ar: 'ليزر تحت أحمر', ckb: 'لەیزەری ژێرسوور' },
+  'fiber laser': { ar: 'ليزر فايبر', ckb: 'لەیزەری فایبەر' },
+  'laser power': { ar: 'قدرة الليزر', ckb: 'وزەی لەیزەر' },
+  'laser wavelength': { ar: 'الطول الموجي لليزر', ckb: 'درێژی شەپۆلی لەیزەر' },
+  'work area': { ar: 'مساحة العمل', ckb: 'ڕووبەری کار' },
+  'max material thickness': { ar: 'أقصى سماكة للمادة', ckb: 'زۆرترین ئەستووری کەرەستە' },
+  'engraving speed': { ar: 'سرعة الحفر', ckb: 'خێرایی هەڵکۆڵین' },
+  'cutting speed': { ar: 'سرعة القص', ckb: 'خێرایی بڕین' },
+  // The Arabic the engine already composed for this one, recorded verbatim so
+  // the label cannot drift between the form and the comparison the day some
+  // other rule changes. Only the Sorani was actually missing.
+  'positioning accuracy': { ar: 'دقة التموضع', ckb: 'وردی دیاریکردنی شوێن' },
+  'auto focus': { ar: 'التركيز التلقائي', ckb: 'فۆکەسی خۆکار' },
+  'rotary axis': { ar: 'المحور الدوّار', ckb: 'تەوەری سووڕاوە' },
+
+  'laser safety class': { ar: 'فئة أمان الليزر', ckb: 'پۆلی سەلامەتی لەیزەر' },
+  'fully enclosed': { ar: 'مغلق بالكامل', ckb: 'تەواو داخراو' },
+  'open frame': { ar: 'هيكل مفتوح', ckb: 'چوارچێوەی کراوە' },
+  'open frame + optional enclosure': {
+    ar: 'هيكل مفتوح + غطاء اختياري',
+    ckb: 'چوارچێوەی کراوە + داپۆشەری ئارەزوومەندانە',
+  },
+  'fume extraction': { ar: 'شفط الأدخنة', ckb: 'ڕاکێشانی دووکەڵ' },
+  'built-in filter': { ar: 'فلتر مدمج', ckb: 'فلتەری ناوەکی' },
+  'exhaust fan + duct': { ar: 'مروحة شفط + خرطوم', ckb: 'پەنکەی دەرکردن + لوولە' },
+  'external filter unit': { ar: 'وحدة فلترة خارجية', ckb: 'یەکەی پاڵاوتنی دەرەکی' },
+  'emergency stop': { ar: 'زر الإيقاف الطارئ', ckb: 'دوگمەی وەستانی خێرا' },
+  'flame detection': { ar: 'كشف اللهب', ckb: 'دۆزینەوەی گڕ' },
+  'tilt detection': { ar: 'كشف الإمالة', ckb: 'دۆزینەوەی لارکردن' },
+  'lid safety interlock': { ar: 'قفل أمان الغطاء', ckb: 'قفڵی سەلامەتی داپۆشەر' },
+
+  'laser accessory type': { ar: 'نوع ملحق الليزر', ckb: 'جۆری پێداویستی لەیزەر' },
+  'focal length': { ar: 'البعد البؤري', ckb: 'درێژی فۆکەس' },
+  'filter rated life': { ar: 'العمر الافتراضي للفلتر', ckb: 'تەمەنی پێشبینیکراوی فلتەر' },
+  'rotary max diameter': { ar: 'أقصى قطر للمحور الدوّار', ckb: 'زۆرترین تیرەی تەوەری سووڕاوە' },
+  'work surface size': { ar: 'مقاس سطح العمل', ckb: 'قەبارەی ڕووی کار' },
+
+  // --------------------------------------------- laser and blade materials
+  'substrate': { ar: 'المادة الأساس', ckb: 'کەرەستەی بنەڕەت' },
+  // «أبلكاش» is what the sheet is called in a Baghdad timber yard and
+  // «ئەبلەکاش» is the same word in Kurdish — the same call this file makes for
+  // «أونلاين» over «التحويل المزدوج»: the shop word, not the textbook one.
+  'plywood': { ar: 'خشب أبلكاش', ckb: 'ئەبلەکاش' },
+  'leather': { ar: 'جلد', ckb: 'چەرم' },
+  'fabric': { ar: 'قماش', ckb: 'قوماش' },
+  'glass': { ar: 'زجاج', ckb: 'شووشە' },
+  'stone': { ar: 'حجر', ckb: 'بەرد' },
+  'sheet length': { ar: 'طول اللوح', ckb: 'درێژی تەختە' },
+  'sheet width': { ar: 'عرض اللوح', ckb: 'پانی تەختە' },
+  'sheet thickness': { ar: 'سماكة اللوح', ckb: 'ئەستووری تەختە' },
+  'sheet weight': { ar: 'وزن اللوح', ckb: 'کێشی تەختە' },
+  'sheets per pack': { ar: 'عدد الألواح في العبوة', ckb: 'ژمارەی تەختە لە پاکێتدا' },
+  'coating': { ar: 'الطلاء', ckb: 'ڕووپۆش' },
+  // «شیاوی» — "fit for" — rather than a verb form, because the field is a
+  // property of the sheet and not an instruction to the reader.
+  'engravable': { ar: 'قابل للحفر', ckb: 'شیاوی هەڵکۆڵین' },
+  'cuttable': { ar: 'قابل للقص', ckb: 'شیاوی بڕین' },
+  'adhesive backing': { ar: 'ظهر لاصق', ckb: 'پشتی چەسپاو' },
+  'media format': { ar: 'شكل المادة', ckb: 'شێوەی کەرەستە' },
+  'roll': { ar: 'لفة', ckb: 'ڕۆڵ' },
+  'flat sheet': { ar: 'لوح مسطح', ckb: 'تەختەی تەخت' },
+  'media width': { ar: 'عرض المادة', ckb: 'پانی کەرەستە' },
+  'media length': { ar: 'طول المادة', ckb: 'درێژی کەرەستە' },
+  'media thickness': { ar: 'سماكة المادة', ckb: 'ئەستووری کەرەستە' },
+  'recommended blade depth': { ar: 'عمق الشفرة الموصى به', ckb: 'قووڵایی پێشنیارکراوی تیغ' },
+  'backing liner': { ar: 'الورق الفاصل', ckb: 'کاغەزی جیاکەرەوە' },
+  'weeding difficulty': { ar: 'صعوبة إزالة الزوائد', ckb: 'ئاستەمی لابردنی زیادەکان' },
+  'easy': { ar: 'سهل', ckb: 'ئاسان' },
+  'moderate': { ar: 'متوسط', ckb: 'مامناوەند' },
+  'difficult': { ar: 'صعب', ckb: 'ئەستەم' },
 };

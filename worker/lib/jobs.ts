@@ -14,6 +14,7 @@ import { sweepDeliveryStatuses } from './delivery/sync';
 import { getSetting } from './settings';
 import { sweepExpiredOrders } from './orderExpirySweep';
 import type { OrderExpiryReport } from './orderExpirySweep';
+import { sweepGiniHolds, type GiniHoldReport } from './giniSweep';
 import { resolveOrderExpiry } from './orderExpiry';
 import type { SupportGiftReconciliation } from './membershipOps';
 import { sweepBnplOverdue, type BnplOverdueReport } from './bnpl';
@@ -93,6 +94,14 @@ export interface DurableJobsReport {
    */
   order_stages: SweepReport;
   order_expiry: OrderExpiryReport;
+  /**
+   * Gini orders whose 24-hour receipt hold ran out — «يبقى الطلب معلقا حتى ٢٤
+   * ساعه ويلغي في حال عدم الاستجابة». A SECOND sweep beside `order_expiry`
+   * rather than a clause inside it: that one requires the whole total to be
+   * uncollected, which a Gini order can never satisfy, and relaxing the clause
+   * would strip the protection from every other order (worker/lib/giniSweep.ts).
+   */
+  gini_holds: GiniHoldReport;
   /** Cancelled, never-fulfilled orders permanently removed after 30 days. */
   cancelled_order_retention: CancelledOrderSweepReport;
   /**
@@ -188,6 +197,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     support_gifts: { scanned: 0, cancelled: 0, became_due: 0, flagged: 0 },
     order_stages: { scanned: 0, promoted: 0, skipped: 0, errors: [] },
     order_expiry: { configured: false, scanned: 0, cancelled: 0, skipped: 0, errors: 0 },
+    gini_holds: { scanned: 0, cancelled: 0, skipped: 0, errors: 0 },
     cancelled_order_retention: { retention_days: 30, scanned: 0, deleted: 0, skipped: 0, errors: 0 },
     delivery_sync: { configured: false, scanned: 0, moved: 0, unmapped: 0, errors: 0 },
     bnpl_overdue: { scanned: 0, overdue: 0, suspended: 0 },
@@ -444,6 +454,21 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
       resolveOrderExpiry(await getSetting(env.DB, 'orderExpiryConfig')),
       nowIso
     );
+  });
+
+  // 11b-ii. The Gini receipt hold. IMMEDIATELY AFTER the expiry sweep and
+  //      BEFORE the stock-alert sweep for the same reason 11b sits where it
+  //      does: releasing a Gini order's units raises availability through
+  //      `stock_reserved` without touching `stock`, so a customer waiting on
+  //      that colour is told in this tick rather than the next.
+  //
+  //      It carries no `configured` flag. The hold is not an owner-optional
+  //      policy the way order expiry is — an order that sits on stock for ever
+  //      because nobody scanned a barcode is a defect, not a setting — and the
+  //      per-order deadline was frozen at checkout, so a shop that disables the
+  //      Gini method still has to let its outstanding orders go.
+  await step('gini_holds', async () => {
+    report.gini_holds = await sweepGiniHolds(env, nowIso, 100);
   });
 
   // 11c. A cancelled order remains visible for support for exactly thirty

@@ -297,7 +297,11 @@ const humanBytes = (n: number) =>
 // -------------------------------------------------------------------- types
 
 type Format = 'csv' | 'zip' | 'txt';
-type ProductTypeId = 'printer' | 'parts' | 'filament' | 'accessory';
+// Mirrors `ProductTypeId` in worker/lib/templateFamilies.ts. The VALUES arrive
+// as JSON from /api/admin/import/types, so a stale union here does not break
+// the build — it goes wrong later, when the first `switch` written against it
+// silently misses a type the registry has and this line does not.
+type ProductTypeId = 'printer' | 'parts' | 'filament' | 'accessory' | 'laser' | 'laser_material';
 
 interface Catalog {
   id: string;

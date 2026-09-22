@@ -309,6 +309,14 @@ export interface ProductDocV2 {
   is_featured: boolean;
   display_order: number;
   payment_options: string[];
+  /**
+   * «عند النقر عليه ينقله الى الرابط (يكون رابط المنتج في تطبيق جني)» —
+   * migration 0104. THIS product's page in the Gini instalments app, which is
+   * the only thing the «تريدها أقساط؟» note on the product page opens; '' and
+   * the note is not drawn at all. The server puts it through `safeLink` on the
+   * way in and out, and the storefront refuses anything that is not http(s).
+   */
+  gini_url: string;
   hashtags: string[];
   how_to_use: string;
   /** 0079. The Arabic and Sorani of `how_to_use`; '' = read the English. */

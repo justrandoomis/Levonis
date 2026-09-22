@@ -584,6 +584,209 @@ export const DEVICES: TemplateFamilyDef = {
         compare: { parse: 'number', better: 'higher', weight: 1 },
       })],
     },
+    /*
+     * THE LASER IS A DEVICE, AND THAT IS THE WHOLE ARGUMENT FOR IT LIVING HERE.
+     *
+     * «إضافة قسم جديد وهو قسم الليزر بجانب طابعات الفلامنت والرزن». A cutter is
+     * a machine on a desk with a nameplate, a warranty and a camera, so it is
+     * filed in «الأجهزة» beside the printers rather than in a third family.
+     * That is not tidiness: `ALL_GROUPS` at the bottom of this file walks the
+     * literal [DEVICES, MATERIALS], so a group declared inside these two is
+     * picked up by the product page's spec table and by the comparison for
+     * free, and a group declared anywhere else would be invisible to both.
+     *
+     * WHAT IT DOES NOT DO is join the `printer-technology` axis. A leaf there
+     * would pull these groups into the printer TYPE and put a wavelength and a
+     * work area on every unnarrowed printer template — thirty fields wider for
+     * a machine that has neither.
+     */
+    'laser-machines': {
+      id: 'laser',
+      label_ar: 'خاص بأجهزة الليزر',
+      label_en: 'Laser specifics',
+      fields: [
+        /* THE FIRST QUESTION A LASER BUYER ASKS, and the one that decides what
+           the machine can touch at all: a diode marks wood and cuts thin ply,
+           a CO2 cuts acrylic, a fibre marks bare metal. Not scored — they are
+           three different machines, not three grades of one. */
+        t('laser_source', 'نوع مصدر الليزر', 'Laser source', 'select', {
+          /* WHOLE PHRASES, NOT THE BARE WORDS. «Fiber» on its own reaches
+             every «carbon fiber» in the shop and would have the dictionary
+             answer «فايبر» where «ألياف الكربون» is the only right word; the
+             file's own note beside «online» makes the same argument. */
+          options: ['CO2 laser', 'Diode laser', 'Infrared laser', 'Fiber laser'],
+          compare: { parse: 'text', better: 'none' },
+        }),
+        /* THE OPTICAL WATTS, AND NOT THE ONES ON THE ELECTRICITY BILL. This is
+           the only power figure in the file that IS a capability, which is why
+           it is scored while `power` in «مواصفات الجهاز» is not: 40 W cuts what
+           20 W only scorches. Vendors also quote an input wattage next to it —
+           that one belongs in `rated_power`. */
+        t('laser_power', 'قدرة الليزر', 'Laser power', 'number', {
+          unit: 'W',
+          compare: { parse: 'number', better: 'higher', weight: 3 },
+          hint_ar: 'القدرة البصرية للشعاع لا قدرة الجهاز من الكهرباء — مثال: 40',
+        }),
+        /* A SEPARATE ID FROM THE RESIN GROUP'S `wavelength` ON PURPOSE.
+           `specGroupsFromFields` gives a field id to the FIRST group that
+           claims it, and this file's devices are walked before its materials —
+           so reusing `wavelength` here would drag every resin bottle's 405 nm
+           out from under «خاص بمواد Resin» and file it under a laser heading. */
+        t('laser_wavelength', 'الطول الموجي لليزر', 'Laser wavelength', 'number', {
+          unit: 'nm',
+          compare: { parse: 'number', better: 'none' },
+          hint_ar: 'مثال: 455 للدايود، 10600 لليزر CO2',
+        }),
+        /* The laser's answer to `build_volume`, and ranked the same way: on the
+           area, shown as the two axes a buyer measures their sheet against. */
+        t('work_area', 'مساحة العمل', 'Work area', 'text', {
+          unit: 'mm',
+          hint_ar: 'مثال: 400 x 400',
+          compare: { parse: 'dimensions', better: 'higher', weight: 3 },
+        }),
+        t('max_material_thickness', 'أقصى سماكة للمادة', 'Max material thickness', 'number', {
+          unit: 'mm',
+          compare: { parse: 'number', better: 'higher', weight: 2 },
+          hint_ar: 'أقصى سماكة يقطعها الجهاز بمرّة واحدة — مثال: 10',
+        }),
+        /* TWO SPEEDS, NOT ONE, because they are not the same job: engraving
+           sweeps the head over the surface and cutting drags the beam through
+           the material at a fraction of it. A single «السرعة» row would let a
+           vendor quote the flattering one. */
+        t('engraving_speed', 'سرعة الحفر', 'Engraving speed', 'number', {
+          unit: 'mm/s',
+          compare: { parse: 'number', better: 'higher', weight: 2 },
+        }),
+        t('cutting_speed', 'سرعة القص', 'Cutting speed', 'number', {
+          unit: 'mm/s',
+          compare: { parse: 'number', better: 'higher', weight: 2 },
+        }),
+        /* LOWER WINS, and it sits two rows under two fields where the bigger
+           number does — the same trap `xy_resolution` is annotated for. This is
+           how far the head misses its target, so 0.01 beats 0.05. */
+        t('positioning_accuracy', 'دقة التموضع', 'Positioning accuracy', 'number', {
+          unit: 'mm',
+          compare: { parse: 'number', better: 'lower', weight: 2 },
+        }),
+        /* Whether the machine finds the surface itself. «Optional» is a real
+           third answer — the probe can be bought — and is treated as one. */
+        t('auto_focus', 'التركيز التلقائي', 'Auto focus', 'select', {
+          options: ['Yes', 'No', 'Optional'],
+          compare: { parse: 'boolean', better: 'yes', weight: 2 },
+        }),
+        /* Not a yes/no: «Optional» here means a separate purchase, and a buyer
+           engraving tumblers needs to know which of the three it is. Unscored,
+           because an included rotary does not make a worse cutter a better one. */
+        t('rotary_axis', 'المحور الدوّار', 'Rotary axis', 'select', {
+          options: ['Included', 'Optional', 'Not supported'],
+          compare: { parse: 'text', better: 'none' },
+        }),
+      ],
+    },
+    /*
+     * THE GROUP THAT IS NOT A SPEC SHEET BUT A WARNING LABEL.
+     *
+     * A 3D printer's worst day is a failed print. A laser's is a fire in a
+     * closed room, and the difference between the two machines is entirely in
+     * this group — which is why it is its own heading rather than four more
+     * rows appended to the one above it.
+     */
+    'laser-safety': {
+      id: 'laser_safety',
+      label_ar: 'السلامة والحماية',
+      label_en: 'Safety & protection',
+      fields: [
+        /* FREE TEXT, AND DELIBERATELY NOT A SELECT. The classes are an IEC
+           scale (1, 1C, 2, 3R, 3B, 4) and every one of them would need an
+           Arabic and a Sorani rendering nobody in this shop has written; the
+           class is also quoted on the box in Latin exactly as it is typed here.
+           Shown, never scored: a Class 4 machine is not a worse machine, it is
+           an open-frame one, which `laser_enclosure` says properly. */
+        t('laser_class', 'فئة أمان الليزر', 'Laser safety class', 'text', {
+          hint_ar: 'كما هي مكتوبة على الجهاز — مثال: Class 1',
+          compare: { parse: 'text', better: 'none' },
+        }),
+        /* A SEPARATE ID FROM THE FDM GROUP'S `enclosed`, for the reason given
+           beside `laser_wavelength`: «خاص بطابعات FDM» is walked first, and a
+           shared id would show a laser's enclosure under a printer's heading.
+           It is also a different question — three answers, not two. */
+        t('laser_enclosure', 'الهيكل', 'Enclosure', 'select', {
+          options: ['Fully enclosed', 'Open frame', 'Open frame + optional enclosure'],
+          compare: { parse: 'text', better: 'none' },
+        }),
+        t('fume_extraction', 'شفط الأدخنة', 'Fume extraction', 'select', {
+          options: ['Built-in filter', 'Exhaust fan + duct', 'External filter unit', 'Optional add-on', 'None'],
+          compare: { parse: 'text', better: 'none' },
+          hint_ar: 'قص الأكريليك والخشب يطلع دخاناً — هذا الحقل يقرر أين يذهب',
+        }),
+        /* The four below ARE scored, and they are the only safety rows in the
+           file that are. A machine that stops when the lid opens, sees a flame
+           and notices it was knocked over is straightforwardly safer than one
+           that does none of that — there is no buyer for whom the other answer
+           is the right one. */
+        t('emergency_stop', 'زر الإيقاف الطارئ', 'Emergency stop', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 2 },
+        }),
+        t('flame_detection', 'كشف اللهب', 'Flame detection', 'select', {
+          options: ['Yes', 'No', 'Optional'],
+          compare: { parse: 'boolean', better: 'yes', weight: 2 },
+        }),
+        t('tilt_detection', 'كشف الإمالة', 'Tilt detection', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 1 },
+        }),
+        t('safety_interlock', 'قفل أمان الغطاء', 'Lid safety interlock', 'select', {
+          options: ['Yes', 'No'],
+          compare: { parse: 'boolean', better: 'yes', weight: 2 },
+        }),
+      ],
+    },
+    /*
+     * A LENS IS A PART, AND NOTHING NEW IS INVENTED FOR IT.
+     *
+     * «مواد الصيانه والاكسسوارات ايضا». A replacement lens, a honeycomb bed and
+     * a filter cartridge are what «ملحقات وقطع» already means, so they ride the
+     * EXISTING `parts` type — this group is added to it exactly as `acc_resin`
+     * is, and the seeded «ملحقات الليزر» section is added to its sectionSlugs.
+     * A separate accessory type would have been a fifth name for a thing the
+     * owner already has four names for.
+     *
+     * The kind of part is FREE TEXT with an Arabic hint, not a select, for the
+     * same reason `laser_class` is: the alternative was eight option strings
+     * needing an invented Sorani apiece, and the product's own name already
+     * says «عدسة» or «خرطوشة فلتر».
+     */
+    'laser-accessories': {
+      id: 'laser_acc',
+      label_ar: 'ملحقات الليزر',
+      label_en: 'Laser accessory',
+      fields: [
+        t('laser_part_kind', 'نوع ملحق الليزر', 'Laser accessory type', 'text', {
+          hint_ar: 'مثال: عدسة، وحدة ليزر، فوهة هواء، لوح خلية النحل، محور دوّار، خرطوشة فلتر',
+        }),
+        /* A property of the lens, not a grade of it: a short focal length
+           engraves finer detail and a long one reaches through thicker stock. */
+        t('focal_length', 'البعد البؤري', 'Focal length', 'number', {
+          unit: 'mm',
+          compare: { parse: 'number', better: 'none' },
+        }),
+        t('filter_life', 'العمر الافتراضي للفلتر', 'Filter rated life', 'number', {
+          unit: 'h',
+          compare: { parse: 'number', better: 'higher', weight: 1 },
+          hint_ar: 'ساعات التشغيل قبل تبديل الخرطوشة — اكتب الرقم فقط',
+        }),
+        t('rotary_max_diameter', 'أقصى قطر للمحور الدوّار', 'Rotary max diameter', 'number', {
+          unit: 'mm',
+          compare: { parse: 'number', better: 'higher', weight: 1 },
+        }),
+        t('work_surface_size', 'مقاس سطح العمل', 'Work surface size', 'text', {
+          unit: 'mm',
+          hint_ar: 'لألواح خلية النحل والمساند — مثال: 400 x 400',
+          compare: { parse: 'dimensions', better: 'none' },
+        }),
+      ],
+    },
   },
 };
 
@@ -738,6 +941,124 @@ export const MATERIALS: TemplateFamilyDef = {
         t('use_case', 'الاستخدام', 'Use case'),
       ],
     },
+    /*
+     * A PLYWOOD SHEET IS A MATERIAL, WHICH IS WHY THERE IS NO THIRD FAMILY.
+     *
+     * «اضافه مواد الطباعه بجانب الفلمنت والرزن». The two groups below are the
+     * laser's answer to «خاص بمواد FDM» and «خاص بمواد Resin»: a thing bought
+     * by the sheet or the roll, consumed by a machine, priced per piece. The
+     * split between them is the MACHINE that eats it — a beam or a blade — and
+     * it is an AXIS (`cut-material-technology`, below), so a product filed in
+     * «مواد الليزر» is never asked how deep to set a cutting blade.
+     *
+     * NOT ONE FIELD HERE IS `net_weight`, AND THAT IS A DELIBERATE OMISSION.
+     * `GET /api/products/print-calculator` (worker/routes/products.ts) offers
+     * EVERY active `materials` product carrying a readable `net_weight` as a
+     * filament to price a 3D print by the gram. A 3 mm birch sheet with «1000»
+     * in that field would appear in the calculator's spool list as something a
+     * printer could extrude. The per-sheet mass is asked for as `sheet_weight`
+     * instead — a different id, so the shipping weight is still recorded and
+     * the calculator still cannot see it.
+     */
+    'laser-materials': {
+      id: 'laser_mat',
+      label_ar: 'خاص بمواد الليزر',
+      label_en: 'Laser material specifics',
+      fields: [
+        /* WHAT THE SHEET IS MADE OF, which decides whether the machine can cut
+           it or only mark it — and, for PVC and anything coated in it, whether
+           it may be cut at all. A different question from `material_type` in
+           «مواصفات المادة», which is where the vendor's own trade name goes. */
+        t('substrate', 'المادة الأساس', 'Substrate', 'select', {
+          options: ['Plywood', 'MDF', 'Acrylic', 'Leather', 'Paper', 'Fabric', 'Metal', 'Glass', 'Stone', 'Other'],
+          compare: { parse: 'text', better: 'none' },
+        }),
+        /* THE THREE NUMBERS ARE ASKED SEPARATELY, not as one «الأبعاد» string,
+           because a buyer matches a sheet against a work area by comparing two
+           of them and against a cut depth by comparing the third. None is
+           scored: a bigger sheet is a different product, not a better one, and
+           a thicker one is harder to cut, not finer. */
+        t('sheet_length', 'طول اللوح', 'Sheet length', 'number', {
+          unit: 'mm', compare: { parse: 'number', better: 'none' },
+        }),
+        t('sheet_width', 'عرض اللوح', 'Sheet width', 'number', {
+          unit: 'mm', compare: { parse: 'number', better: 'none' },
+        }),
+        t('sheet_thickness', 'سماكة اللوح', 'Sheet thickness', 'number', {
+          unit: 'mm', compare: { parse: 'number', better: 'none' },
+        }),
+        /* THE SHIPPING MASS OF ONE SHEET. See the group header: this exists as
+           its own id precisely so that it is NOT `net_weight`, which the print
+           calculator reads as "grams of filament in this box". */
+        t('sheet_weight', 'وزن اللوح', 'Sheet weight', 'number', {
+          unit: 'g', compare: { parse: 'number', better: 'none' },
+          hint_ar: 'وزن اللوح الواحد — للشحن، وليس للحاسبة',
+        }),
+        t('coating', 'الطلاء', 'Coating', 'text', {
+          hint_ar: 'مثال: وجه ملوّن، قشرة خشب، طبقة تعليم بالليزر',
+        }),
+        /* TWO ANSWERS, NOT ONE. Anodised aluminium marks beautifully and never
+           cuts; 3 mm ply does both. A single «متوافق مع الليزر» would have hidden
+           the difference the buyer is actually shopping for. */
+        t('engravable', 'قابل للحفر', 'Engravable', 'select', {
+          options: ['Yes', 'No'], compare: { parse: 'boolean', better: 'yes', weight: 1 },
+        }),
+        t('cuttable', 'قابل للقص', 'Cuttable', 'select', {
+          options: ['Yes', 'No'], compare: { parse: 'boolean', better: 'yes', weight: 1 },
+        }),
+        t('sheets_per_pack', 'عدد الألواح في العبوة', 'Sheets per pack', 'number', {
+          compare: { parse: 'number', better: 'higher', weight: 1 },
+        }),
+        /* A fitment, not a virtue: a self-adhesive sheet is what a sign maker
+           wants and the last thing a box maker wants. */
+        t('adhesive_backing', 'ظهر لاصق', 'Adhesive backing', 'select', {
+          options: ['Yes', 'No'], compare: { parse: 'boolean', better: 'none' },
+        }),
+      ],
+    },
+    'blade-cutting-materials': {
+      id: 'blade_mat',
+      label_ar: 'خاص بمواد القص بالشفرة',
+      label_en: 'Blade cutting material specifics',
+      fields: [
+        /* THE ONE FIELD THE OTHER FOUR DEPEND ON: a roll is measured in metres
+           and a sheet in millimetres, and the length column below means a
+           different quantity depending on this answer. */
+        t('media_format', 'شكل المادة', 'Media format', 'select', {
+          // «Flat sheet» rather than a bare «Sheet», for the reason given at
+          // `laser_source`: the single word also means a spec sheet.
+          options: ['Roll', 'Flat sheet'], compare: { parse: 'text', better: 'none' },
+        }),
+        t('media_width', 'عرض المادة', 'Media width', 'number', {
+          unit: 'mm', compare: { parse: 'number', better: 'none' },
+        }),
+        /* METRES, because that is how vinyl is sold and how a buyer compares
+           two rolls. Scored upward for once — with the format and the width
+           fixed, more length in the box IS more product, exactly as
+           `net_weight` is on a spool. */
+        t('media_length', 'طول المادة', 'Media length', 'number', {
+          unit: 'm', compare: { parse: 'number', better: 'higher', weight: 2 },
+        }),
+        t('media_thickness', 'سماكة المادة', 'Media thickness', 'number', {
+          unit: 'mm', compare: { parse: 'number', better: 'none' },
+        }),
+        /* The vendor's own setting, quoted as a number or a range, and read as
+           neither better nor worse — it is an instruction for the machine. */
+        t('blade_depth', 'عمق الشفرة الموصى به', 'Recommended blade depth', 'text', {
+          unit: 'mm', compare: { parse: 'range', better: 'none' },
+          hint_ar: 'الإعداد الذي توصي به الشركة — مثال: 1-2',
+        }),
+        t('backing_liner', 'الورق الفاصل', 'Backing liner', 'text', {
+          hint_ar: 'مثال: ورق سيليكون قابل للفصل — أو لا يوجد',
+        }),
+        /* How much work is left AFTER the machine finishes, which is the half
+           of the job a spec sheet never mentions. Shown, not scored: «صعب» is
+           a warning to a beginner and nothing at all to a sign shop. */
+        t('weeding_difficulty', 'صعوبة إزالة الزوائد', 'Weeding difficulty', 'select', {
+          options: ['Easy', 'Moderate', 'Difficult'], compare: { parse: 'text', better: 'none' },
+        }),
+      ],
+    },
   },
 };
 
@@ -771,7 +1092,22 @@ export function isTemplateFamily(v: unknown): v is 'devices' | 'materials' {
 // stored under a field its type does not declare is preserved on import
 // (worker/lib/importApply.ts merges spec fields, it never replaces them).
 
-export type ProductTypeId = 'printer' | 'parts' | 'filament' | 'accessory';
+/*
+ * SIX NAMES NOW, AND THE TWO NEW ONES ARE NOT A SECOND SYSTEM.
+ *
+ * The owner's four were «طابعه / ملحقات / فلمنت / اكسسوار». «إضافة قسم جديد وهو
+ * قسم الليزر بجانب طابعات الفلامنت والرزن» added a machine that is neither a
+ * printer nor a part, and «اضافه مواد الطباعه بجانب الفلمنت والرزن» added a
+ * consumable that is neither a filament nor a resin — so each got a name,
+ * inside the family it already belonged to.
+ *
+ * THE LASER ACCESSORIES DID NOT GET ONE. A lens and a filter cartridge are
+ * «ملحقات وقطع», which already exists; the seeded «ملحقات الليزر» section was
+ * added to that type's sectionSlugs and its spec group to that type's groups.
+ * A type is a question a human answers when they sit down to type a product
+ * in, and "is this a laser lens or a printer nozzle?" is not one of them.
+ */
+export type ProductTypeId = 'printer' | 'parts' | 'filament' | 'accessory' | 'laser' | 'laser_material';
 
 export interface ProductTypeDef {
   id: ProductTypeId;
@@ -816,6 +1152,85 @@ const g = (family: TemplateFamilyDef, slug: string): TemplateGroup[] => {
   return found ? [found] : [];
 };
 
+/**
+ * Fields SELECTED from a family's common group — never re-declared.
+ *
+ * THE TWO LASER TYPES CANNOT TAKE `common` WHOLE, and neither can they afford
+ * a second copy of it. «مواصفات الجهاز» asks a printer for its build volume,
+ * its nozzle diameter and its print speed; «مواصفات المادة» asks a spool for
+ * its diameter, its printing temperature and its bed temperature. Put those in
+ * front of a laser cutter or a plywood sheet and the admin form asks questions
+ * the product cannot answer — the precision the owner asked for («لجعل هناك
+ * دقه باضافه المعلومات») working in reverse.
+ *
+ * Copying the twenty fields that DO apply would have been the other failure:
+ * two definitions of `warranty`, one of which quietly stops matching the other.
+ * So this picks the field OBJECTS out of the family's own list. A `compare`
+ * annotation edited in «مواصفات الجهاز» reaches the laser template in the same
+ * edit, because it is the same object.
+ *
+ * An id this family's common group does not declare is dropped rather than
+ * invented — a typo here must not become a field nobody can see.
+ */
+const fromCommon = (family: TemplateFamilyDef, ...ids: string[]): TemplateField[] => {
+  const by = new Map(family.common.fields.map((f) => [f.id, f]));
+  return ids.map((id) => by.get(id)).filter((f): f is TemplateField => f !== undefined);
+};
+
+/**
+ * What a laser cutter has in common with every other machine on the shelf.
+ *
+ * WHAT IS LEFT OUT IS THE POINT, and it is exactly five ids: `technology`
+ * (its options are FDM / Resin / SLA / DLP — the laser's own answer is
+ * `laser_source`), `build_volume`, `print_speed`, `resolution` and `nozzle`.
+ * The laser group above asks the same four questions in the machine's own
+ * units — work area, engraving and cutting speed, positioning accuracy — so
+ * nothing is lost by dropping them and a form of thirty rows is not printed
+ * for a machine that answers twenty-five.
+ *
+ * `slicer_software` is left out for the same reason and is not replaced: a
+ * cutter is driven by LightBurn or the vendor's own suite, which is what
+ * `companion_app` already asks for.
+ */
+const LASER_CORE: TemplateGroup = {
+  id: 'laser_core',
+  label_ar: 'مواصفات الجهاز',
+  label_en: 'Device specifications',
+  fields: fromCommon(
+    DEVICES,
+    'model', 'release_year', 'skill_level', 'supported_materials',
+    'power', 'dimensions', 'weight', 'connectivity', 'compatibility', 'display',
+    'camera', 'camera_resolution', 'camera_fps', 'noise_level',
+    'companion_app', 'assembly', 'warranty', 'in_the_box'
+  ),
+};
+
+/**
+ * What a sheet or a roll has in common with every other consumable.
+ *
+ * THE FOUR IT DOES NOT TAKE FROM «مواصفات المادة» are `diameter`, `print_temp`,
+ * `bed_temp` — a plywood sheet has no filament diameter and is never heated to
+ * 220 °C — and `net_weight`, which is the one with teeth: the print calculator
+ * reads that field to offer a material as filament by the gram (see the
+ * «مواد الليزر» group header). `dimensions` is left out too, because the sheet
+ * group asks for the three axes separately and by name.
+ *
+ * `processing_mode` IS taken, and it is the field that already anticipated
+ * this section: its options have read «Laser Material / Blade Cutting Material»
+ * since before there was a laser catalogue to put them in.
+ */
+const LASER_MATERIAL_CORE: TemplateGroup = {
+  id: 'laser_material_core',
+  label_ar: 'مواصفات المادة',
+  label_en: 'Material specifications',
+  fields: fromCommon(
+    MATERIALS,
+    'material_type', 'processing_mode', 'color_name', 'color_hex', 'finish',
+    'compatibility', 'quantity_per_pack', 'operating_temp', 'storage',
+    'certifications', 'in_the_box'
+  ),
+};
+
 export const PRODUCT_TYPES: ProductTypeDef[] = [
   {
     id: 'printer',
@@ -847,10 +1262,19 @@ export const PRODUCT_TYPES: ProductTypeDef[] = [
       'electronics',
       'hardware-parts',
       'parts',
+      // «ملحقات الليزر» — the seeded section and the two slugs 0102 falls back
+      // to if a live store already owns the first. A laser section missing
+      // from this list would be resolved by `productTypeForBranch`'s last
+      // line, which answers `printer` for anything in the devices family: a
+      // replacement lens would be handed the build-volume form.
+      'laser-accessories',
+      'laser-accessories-levo',
+      'cat_laser_acc',
     ],
     groups: [
       ...g(DEVICES, 'printer-accessories'),
       ...g(DEVICES, 'resin-printer-accessories'),
+      ...g(DEVICES, 'laser-accessories'),
       ...g(MATERIALS, 'electronics'),
       ...g(MATERIALS, 'hardware-parts'),
       PHYSICAL_CORE,
@@ -877,6 +1301,63 @@ export const PRODUCT_TYPES: ProductTypeDef[] = [
       ...g(MATERIALS, 'model-kits'),
       ...g(MATERIALS, 'cyberbrick-rc'),
       PHYSICAL_CORE,
+    ],
+  },
+  {
+    id: 'laser',
+    label_ar: 'ليزر',
+    label_en: 'Laser',
+    family: 'devices',
+    hint_ar: 'أجهزة القص والحفر بالليزر — CO2 ودايود وفايبر.',
+    // EVERY SLUG 0102 CAN WRITE, not just the one it prefers. That migration
+    // copies 0018's contract — `<slug>` then `<slug>-levo` then the bare id —
+    // because a live store may already own «laser-machines», and a section
+    // whose slug is in no type's list falls through to the devices family's
+    // headline type and silently becomes a printer.
+    sectionSlugs: [
+      'laser-machines',
+      'laser-machines-levo',
+      'cat_laser_machines',
+      // The root, so a product filed directly under «أجهزة الليزر» — before
+      // anyone picks a child section — is a laser rather than a printer. The
+      // branch is walked leaf-first, so an accessory under it is still a part.
+      'laser-crafting',
+      'laser-crafting-levo',
+      'cat_laser',
+    ],
+    groups: [
+      // THE LASER GROUPS COME FIRST, and that ordering is load bearing:
+      // `dedupeFields` gives a field id to the first group that claims it, so
+      // the specific group must precede the core — the same rule `parts` and
+      // `accessory` follow with PHYSICAL_CORE.
+      ...g(DEVICES, 'laser-machines'),
+      ...g(DEVICES, 'laser-safety'),
+      // The mains questions are the same questions for any machine on Iraqi
+      // power, and powerAdvice.ts sizes a UPS from these fields whatever the
+      // machine is. A cutter draws its tube AND its extraction fan from the
+      // same socket, so it needs them at least as much as a printer does.
+      ...g(DEVICES, 'device-environment'),
+      LASER_CORE,
+    ],
+  },
+  {
+    id: 'laser_material',
+    label_ar: 'مواد ليزر وقص',
+    label_en: 'Laser & cutting materials',
+    family: 'materials',
+    hint_ar: 'ما يُقص أو يُحفر: ألواح خشب وأكريليك وجلد، ولفّات فينيل وورق.',
+    sectionSlugs: [
+      'laser-material',
+      'laser-material-levo',
+      'cat_materials_laser',
+      'blade-cutting-material',
+      'blade-cutting-material-levo',
+      'cat_materials_blade',
+    ],
+    groups: [
+      ...g(MATERIALS, 'laser-materials'),
+      ...g(MATERIALS, 'blade-cutting-materials'),
+      LASER_MATERIAL_CORE,
     ],
   },
 ];
@@ -936,12 +1417,30 @@ const AXES: Record<string, SeededLeaf[]> = {
     { id: 'cat_materials_fdm', slug: 'fdm-materials', groups: ['fdm_mat'] },
     { id: 'cat_materials_resin', slug: 'resin-materials', groups: ['resin_mat'] },
   ],
+  // A BEAM AND A BLADE ARE NOT THE SAME CONSUMABLE, and the `laser_material`
+  // type carries both groups because it covers both shelves. Without this axis
+  // a vinyl roll would be asked its engravable substrate and a birch sheet how
+  // deep to set a blade — the union problem the printer template was split to
+  // end. It is a NEW axis rather than a leaf on `printer-technology`: a laser
+  // leaf there would pull these groups into the printer type.
+  'cut-material-technology': [
+    { id: 'cat_materials_laser', slug: 'laser-material', groups: ['laser_mat'] },
+    { id: 'cat_materials_blade', slug: 'blade-cutting-material', groups: ['blade_mat'] },
+  ],
   // «ملحقات طابعات FDM» declares no group of its own, but it is still the
   // statement "this is not a Resin accessory" — without the empty entry an FDM
   // accessory would keep being asked for a wash-station capacity.
+  //
+  // «ملحقات الليزر» IS THE THIRD SIBLING, and it has to be, because `parts`
+  // now carries `laser_acc`. A group added to a type without a leaf on the
+  // type's axis is added to EVERY section of that type: the nozzle sheet grew
+  // a focal length and a filter life, and the lens sheet kept the resin
+  // wash-station capacity. That is the same inflation the printer template was
+  // split to end, one type over.
   'accessory-technology': [
     { id: 'cat_pacc_fdm', slug: 'fdm-printer-accessories', groups: [] },
     { id: 'cat_pacc_resin', slug: 'resin-printer-accessories', groups: ['acc_resin'] },
+    { id: 'cat_laser_acc', slug: 'laser-accessories', groups: ['laser_acc'] },
   ],
 };
 

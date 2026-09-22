@@ -353,6 +353,12 @@ const SCALAR_FIELDS: FieldSpec[] = [
   ...dimensionFields('dimensions'),
   // usage guide — the steps are the `usage_steps` group below
   f('usage_official_url', 'string', 'usage', 'رابط الدليل الرسمي للمنتج (صفحة الشركة المصنّعة) — official documentation URL; فارغ = لا يوجد'),
+  // «تريدها اقساط ؟» — the product's own page inside the Gini app. Here, and
+  // not only in the admin form, so an owner importing a catalogue does not
+  // then have to open every product to paste one link. `safeLink` in
+  // productModel refuses anything that is not http(s) or a relative path, so
+  // a bad value in a file is dropped rather than carried to an href.
+  f('gini_url', 'string', 'usage', 'رابط المنتج في تطبيق جني (التقسيط) — this product\'s page in the Gini instalments app; فارغ = لا يوجد رابط خاص بالمنتج'),
 ];
 
 const GROUP_SPECS: GroupSpec[] = [
@@ -1966,6 +1972,7 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
   // The setup & usage guide — the one form section that had no key at all,
   // so «يملأ جميع الحقول» was structurally impossible for it.
   push('usage_official_url', doc.usage_guide?.official_url ?? '');
+  push('gini_url', doc.gini_url ?? '');
   sorted(doc.usage_guide?.steps ?? []).forEach((st, i) => {
     const p = `usage_steps.${i + 1}`;
     push(`${p}.id`, st.id);
@@ -2902,6 +2909,9 @@ export function toDocBody(
         // usage text erase its Arabic and Kurdish while reporting it preserved.
         how_to_use_ar: existing.how_to_use_ar,
         how_to_use_ckb: existing.how_to_use_ckb,
+        // Carried for the same reason: a file that says nothing about the
+        // Gini link must not erase one somebody pasted in the admin.
+        gini_url: existing.gini_url,
         price_iqd: existing.price_iqd,
         pro_price_iqd: existing.pro_price_iqd,
         prime_price_iqd: existing.prime_price_iqd,
@@ -3011,6 +3021,9 @@ export function toDocBody(
       case 'usage_official_url':
         // Nested in usage_guide; the steps beside it are a group (below).
         body.usage_guide = { ...guideOf(body), official_url: typeof pf.value === 'string' ? pf.value : '' };
+        break;
+      case 'gini_url':
+        body.gini_url = typeof pf.value === 'string' ? pf.value : '';
         break;
       case 'standard_delivery_enabled':
       case 'standard_delivery_quantity_step':

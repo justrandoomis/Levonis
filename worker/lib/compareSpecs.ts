@@ -169,20 +169,23 @@ const SHARED_LABEL: Trilingual = {
   ckb: 'تایبەتمەندییە هاوبەشەکان',
 };
 
-/** The definitions carry no Kurdish (see the module header), so the four type
+/** The definitions carry no Kurdish (see the module header), so the type
  *  names — the only labels this module authors rather than reads — do. */
 const TYPE_CKB: Record<ProductTypeId, string> = {
   printer: 'پرینتەری سێ ڕەهەندی',
   parts: 'پارچە و پێداویستی',
   filament: 'فیلامێنت و مادە',
   accessory: 'ئێکسێسوار',
+  laser: 'ئامێری لەیزەر',
+  laser_material: 'کەرەستەی لەیزەر و بڕین',
 };
 
-type Tech = 'fdm' | 'resin' | 'other' | null;
+type Tech = 'fdm' | 'resin' | 'laser' | 'other' | null;
 
-const TECH_LABEL: Record<'fdm' | 'resin' | 'other', Trilingual> = {
+const TECH_LABEL: Record<'fdm' | 'resin' | 'laser' | 'other', Trilingual> = {
   fdm: { ar: 'FDM', en: 'FDM', ckb: 'FDM' },
   resin: { ar: 'راتنج', en: 'Resin', ckb: 'ڕەزین' },
+  laser: { ar: 'ليزر', en: 'Laser', ckb: 'لەیزەر' },
   other: { ar: '', en: '', ckb: '' },
 };
 
@@ -580,17 +583,26 @@ function resolveProduct(p: CompareInputProduct): Resolved {
 }
 
 function resolveTech(p: CompareInputProduct): Tech {
+  // A LASER ANSWERS THIS QUESTION IN A DIFFERENT FIELD, and it has to be read
+  // first. `technology` is a printer select (FDM / Resin / SLA / DLP) and the
+  // laser template deliberately does not carry it — templateFamilies' LASER_CORE
+  // leaves it out because the machine's own answer is `laser_source`. Without
+  // this line two identical cutters would compare as «ليزر» against nothing and
+  // the header would fall back to the bare type name.
+  if (rawOf(p.spec_fields, 'laser_source') !== '') return 'laser';
   const stated = rawOf(p.spec_fields, 'technology').toLowerCase();
   if (stated !== '') {
+    if (stated.includes('laser')) return 'laser';
     if (stated.includes('fdm') || stated.includes('fff')) return 'fdm';
     if (/resin|msla|sla|dlp|lcd/.test(stated)) return 'resin';
     return 'other';
   }
-  // No `technology` recorded: the branch the product is filed in is the other
-  // place that statement lives (templateFamilies' printer-technology axis).
+  // Nothing recorded: the branch the product is filed in is the other place
+  // that statement lives (templateFamilies' technology axes).
   const slugs = (p.section_slugs ?? []).map((s) => s.toLowerCase());
   if (slugs.some((s) => s.includes('fdm'))) return 'fdm';
   if (slugs.some((s) => s.includes('resin'))) return 'resin';
+  if (slugs.some((s) => s.includes('laser'))) return 'laser';
   return null;
 }
 
@@ -607,7 +619,7 @@ function basisOf(resolved: Resolved[]): { basis: CompareBasis; basis_label: Tril
     ckb: TYPE_CKB[def.id],
   };
   if (!sameTech) return { basis: 'same_type', basis_label: typeLabel };
-  const tech = TECH_LABEL[first.tech as 'fdm' | 'resin' | 'other'];
+  const tech = TECH_LABEL[first.tech as 'fdm' | 'resin' | 'laser' | 'other'];
   const join = (a: string, b: string) => (b === '' ? a : `${a} ${b}`);
   return {
     basis: 'same_section',

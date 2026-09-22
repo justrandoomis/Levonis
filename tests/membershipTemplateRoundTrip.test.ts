@@ -388,6 +388,8 @@ test('serializeProducts and parseImport are inverses for the membership block', 
   const base: ExportProduct = {
     key: 'SER-1',
     dimensions: EMPTY_DIMENSIONS(),
+    // 0104 — the product's page in the Qi Card instalments app.
+    gini_url: '',
     name: 'Serializer',
     description: '',
     status: 'active',

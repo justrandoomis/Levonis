@@ -29,7 +29,21 @@
  * `checkoutPaymentMethods` setting. `full_advance` is TOLERATED as an alias of
  * `wallet` because stored orders and the API scripts already carry it — it is
  * not offered by the storefront. `half_advance` is neither "pay in advance"
- * nor "cash on delivery" in the owner's words, so it is refused.
+ * nor "cash on delivery" in the owner's words, so it is refused. `bnpl` is
+ * PRO financing carried on our own books. `gini` is the fifth id and the only
+ * one whose money never touches Levonis at all.
+ *
+ * WHY `gini` IS ITS OWN ID AND NOT A FLAVOUR OF `bnpl`. «خدمه اقساطي على
+ * تطبيق جني (مصرف الرافدين)» — the customer buys the product inside the Gini
+ * app, Qi Card/Rafidain finances it there, and Levonis learns of it only as a
+ * six-digit order number the customer types at checkout. There is no Levonis
+ * credit limit, no repayment schedule, no ledger row and no instalment we ever
+ * collect: the only money that reaches us is the delivery fee at the door.
+ * `bnpl` is the opposite of every one of those (migration 0066 guards its
+ * ledger on an ACTIVE PRO with an approved credit line), so the two share a
+ * word in English and nothing else. Anyone tempted to fold them together will
+ * point a charge at `bnpl_ledger` and have the trigger abort a checkout that
+ * was never financed by us.
  *
  * The merchant storefront (routes/storeOrders.ts) has its own vocabulary
  * ('cod' | 'wallet') and is deliberately not touched by this module.
@@ -40,12 +54,30 @@ import type { ShippingType } from './shippingType';
 /** 400 code for a payment id the policy refuses. */
 export const PAYMENT_METHOD_NOT_ALLOWED = 'PAYMENT_METHOD_NOT_ALLOWED';
 
-/** Base methods plus BNPL only after the server proves this checkout eligible. */
+/**
+ * What the server may offer for this cart.
+ *
+ * Both extras are OPT-IN and default to absent, which is what keeps the two
+ * ids off a checkout that has not earned them: BNPL only after the server has
+ * proved this account eligible, and Gini only while the owner has the service
+ * switched on (`giniPolicy.enabled`). A client that posts either id without
+ * the server having said so is refused by `isPaymentMethodAllowed` below.
+ */
 export function allowedPaymentMethods(
   _shippingType: ShippingType | null,
-  options: { bnplEligible?: boolean } = {}
+  options: PaymentMethodOptions = {}
 ): string[] {
-  return options.bnplEligible ? ['wallet', 'cash', 'bnpl'] : ['wallet', 'cash'];
+  const ids = ['wallet', 'cash'];
+  if (options.bnplEligible) ids.push('bnpl');
+  if (options.giniEnabled) ids.push('gini');
+  return ids;
+}
+
+/** What the SERVER knows that a bare id cannot say for itself. */
+export interface PaymentMethodOptions {
+  bnplEligible?: boolean;
+  /** «خدمه اقساطي على تطبيق جني» — the owner's switch, never the client's. */
+  giniEnabled?: boolean;
 }
 
 /** Cash on delivery — the platform id is 'cash'. */
@@ -64,6 +96,18 @@ export function isBnpl(paymentMethodId: string): boolean {
 }
 
 /**
+ * Instalments taken out inside the Gini app (Qi Card / Rafidain Bank).
+ *
+ * Neither prepaid nor cash on delivery: the goods are settled outside Levonis
+ * and only the delivery fee is collected at the door. Whether the service is
+ * switched on is the owner's setting, not something an id can answer, so it
+ * stays outside this pure parser exactly as BNPL eligibility does.
+ */
+export function isGini(paymentMethodId: string): boolean {
+  return paymentMethodId === 'gini';
+}
+
+/**
  * May this cart be paid with this id? The offered list is what the storefront
  * shows; the accepted set is that list plus the tolerated alias, so an old
  * client or script keeps working without the alias ever being advertised.
@@ -71,9 +115,15 @@ export function isBnpl(paymentMethodId: string): boolean {
 export function isPaymentMethodAllowed(
   paymentMethodId: string,
   shippingType: ShippingType | null,
-  options: { bnplEligible?: boolean } = {}
+  options: PaymentMethodOptions = {}
 ): boolean {
-  return isCod(paymentMethodId) || isPrepaid(paymentMethodId) || (isBnpl(paymentMethodId) && allowedPaymentMethods(shippingType, options).includes('bnpl'));
+  const offered = allowedPaymentMethods(shippingType, options);
+  return (
+    isCod(paymentMethodId) ||
+    isPrepaid(paymentMethodId) ||
+    (isBnpl(paymentMethodId) && offered.includes('bnpl')) ||
+    (isGini(paymentMethodId) && offered.includes('gini'))
+  );
 }
 
 /**
@@ -83,4 +133,17 @@ export function isPaymentMethodAllowed(
  */
 export function preorderPricingFor(paymentMethodId: string): 'prepaid' | 'cod' {
   return isCod(paymentMethodId) ? 'cod' : 'prepaid';
+}
+
+/**
+ * The six digits Gini gives the customer for their order in the app, which is
+ * the only handle Levonis has on a purchase it did not process. Checked
+ * server-side where the checkout input is parsed and again by the CHECK
+ * constraint on `orders.gini_order_no`, because a typo here is an order
+ * nobody can reconcile against the Gini platform afterwards.
+ */
+export const GINI_ORDER_NO_RE = /^[0-9]{6}$/;
+
+export function isGiniOrderNo(value: unknown): boolean {
+  return typeof value === 'string' && GINI_ORDER_NO_RE.test(value);
 }

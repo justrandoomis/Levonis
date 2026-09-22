@@ -62,6 +62,41 @@ test('every schema has exactly one fixture; every fixture validates, round-trips
   }
 });
 
+/**
+ * THE PAYMENT ENUM, EXERCISED ON EVERY SCHEMA THAT CARRIES ONE.
+ *
+ * `oneOf(...)` refuses a value it was not given, which is the safety the
+ * catalogue wants and also the trap: a new checkout id that never reaches this
+ * enum does not fail loudly, it is swallowed by the producer's fallback —
+ * `eventPaymentMethod` answered 'wallet' for anything it did not recognise, so
+ * 'gini', a method whose money never touches a Levo wallet at all, would have
+ * been published to Analytics as a wallet purchase.
+ *
+ * WHY THIS IS A DERIVED PAYLOAD RATHER THAN A SECOND FIXTURE FILE. The first
+ * test above asserts EXACTLY ONE fixture per schema — `deepEqual(files, …)` —
+ * and a `CheckoutStarted.v1.gini.json` beside the existing one would fail it.
+ * So each real fixture is re-read and its payment field swapped, which also
+ * keeps the rest of the payload honest: it is the shipped fixture, not a
+ * hand-written shape that could drift from it.
+ */
+test('every checkout payment id the server can emit validates, including gini', () => {
+  const swap: Record<string, (p: Record<string, unknown>, id: string) => Record<string, unknown>> = {
+    'CheckoutStarted.v1': (p, id) => ({ ...p, payment_method: id }),
+    'OrderDelivered.v1': (p, id) => ({ ...p, payment_method: id }),
+    'OrderCreated.v1': (p, id) => ({ ...p, payment: { ...(p.payment as Record<string, unknown>), method: id } }),
+  };
+  for (const [key, apply] of Object.entries(swap)) {
+    const schema = EVENT_SCHEMAS[key];
+    assert.ok(schema, `${key}: no schema`);
+    const raw = JSON.parse(readFileSync(join(FIXTURES, `${key}.json`), 'utf8')) as EventEnvelope;
+    for (const id of ['wallet', 'cash', 'bnpl', 'gini']) {
+      schema.parse(apply(raw.payload as Record<string, unknown>, id));
+    }
+    // And the enum is still an allowlist, not a free string.
+    assert.throws(() => schema.parse(apply(raw.payload as Record<string, unknown>, 'qi_card')), `${key}: an unknown id must be refused`);
+  }
+});
+
 test('subscriptions and producers are consistent with the schema registry', () => {
   for (const [key, consumers] of Object.entries(SUBSCRIPTIONS)) {
     assert.ok(EVENT_SCHEMAS[key], `${key} has consumers but no schema`);

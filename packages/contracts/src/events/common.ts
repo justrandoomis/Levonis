@@ -5,7 +5,19 @@ export const id = nonEmptyStr;
 export const idOrNull = nullable(nonEmptyStr);
 export const locale = oneOf('ar', 'en', 'ckb');
 export const sellerType = oneOf('platform', 'merchant');
-export const paymentMethod = oneOf('wallet', 'cash', 'bnpl');
+/**
+ * The checkout ids, never renamed (worker/lib/paymentPolicy.ts).
+ *
+ * 'gini' joined them with the instalments service: the goods are financed
+ * inside the Gini app (Qi Card / Rafidain) and only the delivery fee reaches
+ * us. It has to be ITS OWN VALUE here and not be folded into 'bnpl' or left
+ * to a producer's fallback — `eventPaymentMethod` answered 'wallet' for every
+ * id it did not recognise, so before this line a purchase that moved no Levo
+ * money whatsoever was published to Analytics as a wallet purchase, and the
+ * revenue-by-method rollup would have been wrong with nothing to notice it
+ * by.
+ */
+export const paymentMethod = oneOf('wallet', 'cash', 'bnpl', 'gini');
 export const ledgerCurrency = oneOf('USD', 'POINT', 'IQD');
 export const userHash = hex64;
 export const amount = nonNegInt;

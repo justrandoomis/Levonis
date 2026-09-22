@@ -36,7 +36,7 @@ import {
   TEMPLATE_VERSION,
 } from '../worker/lib/template';
 import { validateProductDoc } from '../worker/lib/productModel';
-import { narrowGroups } from '../worker/lib/templateFamilies';
+import { narrowGroups, PRODUCT_TYPES } from '../worker/lib/templateFamilies';
 
 // --------------------------------------------------------------- harness
 
@@ -118,9 +118,14 @@ test('blank template parses with zero errors and zero unknown keys', () => {
 test('every per-type blank parses clean with active, empty specification rows', () => {
   // `?type=` appends the product type's own specification sheet. It is served
   // as empty `spec.*` rows whose update semantics are preserve-on-empty; this
-  // proves it for all four types rather than assuming it.
+  // proves it for EVERY type rather than assuming it.
+  //
+  // COUNTED FROM THE REGISTRY, not written out. This line said `4` and the day
+  // «ليزر» and «مواد ليزر وقص» joined PRODUCT_TYPES it failed on the number
+  // while the two new sheets it was meant to check went unexamined. The
+  // registry is the list; a type added to it is a type proved here.
   const d = templateDownloadDiagnostics();
-  assert.equal(d.typed.length, 4);
+  assert.equal(d.typed.length, PRODUCT_TYPES.length);
   for (const t of d.typed) {
     assert.equal(t.errors, 0, `the ${t.type} template must not carry parse errors`);
     assert.deepEqual(t.unknown_keys, [], `the ${t.type} template must not carry unknown keys`);
