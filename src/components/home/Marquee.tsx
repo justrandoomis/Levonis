@@ -121,6 +121,26 @@ export default function Marquee({
   /** When something we did not cause last moved the belt. */
   const userAtRef = useRef(0);
   const hoverRef = useRef(false);
+  /**
+   * A FINGER RESTING ON THE BELT, which is not the same fact as a finger
+   * MOVING it.
+   *
+   * The expiring `userAtRef` timestamp below covers every gesture that
+   * scrolls — a drag, a wheel, a fling — because those move the element and
+   * the loop notices. A finger held STILL scrolls nothing, so that signal
+   * never fires, and without this the belt would slide out from under a
+   * thumb that is trying to press a mark. The first draft of this rewrite did
+   * exactly that.
+   *
+   * It is a counter cleared from the WINDOW, not a boolean cleared from the
+   * element. That is the whole difference between this and the `hovered`
+   * latch it replaced: a window-level `pointerup` fires wherever the finger
+   * lifts, so it cannot be withheld the way `mouseleave` is. And it expires
+   * anyway after five seconds, so even a lost event costs a pause rather
+   * than the feature.
+   */
+  const pressRef = useRef(0);
+  const pressAtRef = useRef(0);
   const reducedRef = useRef(false);
   const measureRef = useRef<() => void>(() => {});
 
@@ -191,8 +211,14 @@ export default function Marquee({
     // hover behind is exactly the class of bug this rewrite exists to end.
     const onBlur = () => {
       hoverRef.current = false;
+      pressRef.current = 0;
     };
     window.addEventListener('blur', onBlur);
+    const onRelease = () => {
+      pressRef.current = 0;
+    };
+    window.addEventListener('pointerup', onRelease);
+    window.addEventListener('pointercancel', onRelease);
 
     let frame = 0;
     let last = 0;
@@ -231,16 +257,25 @@ export default function Marquee({
         userAtRef.current = now;
       }
 
+      // A finger that is DOWN owns the belt even while it is perfectly still.
+      // Folded into the same timestamp so there is one gate, not two, and so
+      // the pause runs on for the same breath after the lift.
+      if (pressRef.current > 0 && now - pressAtRef.current < 5000) userAtRef.current = now;
+
       // The belt belongs to whoever is touching it, and for a breath after —
       // long enough to cover an iOS momentum fling handing back control.
       if (now - userAtRef.current < 140) return;
 
-      const active = document.activeElement;
-      const keyboard =
-        !!active &&
-        el.contains(active) &&
-        typeof active.matches === 'function' &&
-        active.matches(':focus-visible');
+      // FAILS OPEN. An engine that does not know `:focus-visible` throws here,
+      // and the right default is to keep drifting: that is the property the
+      // owner asked for, and reduced motion still parks it below.
+      let keyboard = false;
+      try {
+        const active = document.activeElement;
+        keyboard = !!active && el.contains(active) && active.matches(':focus-visible');
+      } catch {
+        keyboard = false;
+      }
 
       if (hoverRef.current || keyboard || reducedRef.current) {
         // Parked, not lost: stay where the belt actually is so resuming does
@@ -267,6 +302,8 @@ export default function Marquee({
       cancelAnimationFrame(frame);
       mq?.removeEventListener?.('change', onPref);
       window.removeEventListener('blur', onBlur);
+      window.removeEventListener('pointerup', onRelease);
+      window.removeEventListener('pointercancel', onRelease);
     };
   }, []);
 
@@ -282,6 +319,17 @@ export default function Marquee({
       // near the top of the home page, so a customer swiping up from there
       // found it frozen. Horizontal dragging is unaffected.
       style={{ touchAction: 'manipulation', overscrollBehaviorX: 'contain' }}
+      onPointerDown={() => {
+        // EVERY pointer type, unlike hover: a thumb holding the belt still is
+        // exactly the case hover cannot see.
+        //
+        // `performance.now()` and not `event.timeStamp`: the tick compares
+        // this against the timestamp rAF hands it, and older engines put a
+        // `Date.now()` epoch on events — which would make the five-second
+        // expiry below fire on the first frame, every time.
+        pressRef.current += 1;
+        pressAtRef.current = performance.now();
+      }}
       onPointerEnter={(e) => {
         // A REAL MOUSE ONLY. A touch cannot set this, so it cannot leave it
         // set — which is the defect this whole file was rewritten for.

@@ -426,6 +426,19 @@ test('nothing that stops the belt can latch, and the browser proof says so', () 
   // arrives cannot strand the belt.
   assert.match(src, /userAtRef\.current/);
   assert.match(src, /now - userAtRef\.current < 140/);
+  // AND A FINGER HELD STILL IS ITS OWN FACT. It scrolls nothing, so the
+  // movement signal above cannot see it — without this the belt slides out
+  // from under a thumb trying to press a mark, which the first draft of this
+  // rewrite shipped. Cleared from the WINDOW so it cannot be withheld, and
+  // expiring anyway so a lost event costs a pause rather than the feature.
+  assert.match(src, /onPointerDown=/);
+  assert.match(src, /pressRef\.current \+= 1;/);
+  assert.match(src, /window\.addEventListener\('pointerup', onRelease\)/);
+  assert.match(src, /window\.addEventListener\('pointercancel', onRelease\)/);
+  assert.match(src, /pressRef\.current > 0 && now - pressAtRef\.current < 5000/);
+  // The focus probe fails OPEN: an engine that cannot answer must not park
+  // the belt for ever.
+  assert.match(src, /catch \{\s*\n\s*keyboard = false;/);
   // And the loop is mounted once, so no stopper can tear it down and rebuild
   // it in a stopped state — which is what the dependency array used to do.
   assert.doesNotMatch(src, /\}, \[dir, speed, stride, drifting, wrap\]\);/);
@@ -456,6 +469,8 @@ test('the belt has a real browser proof, and it drives the real component', () =
     'the belt must recycle, not park at the end',
     'the belt must drift in LTR as well',
     'prefers-reduced-motion must stop the drift',
+    'a held finger must park the belt',
+    'the drift must resume when the finger lifts',
   ]) {
     assert.ok(e2e.includes(claim), `the browser proof still asserts: ${claim}`);
   }

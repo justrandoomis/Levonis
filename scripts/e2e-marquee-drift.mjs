@@ -56,12 +56,29 @@ async function travel(page, belt, ms) {
         const t0 = performance.now();
         let min = start;
         let max = start;
+        let prev = start;
+        // DISTANCE TRAVELLED, not start-to-max.
+        //
+        // An endless belt RECYCLES: once per stride it folds a whole set
+        // back, and after that fold the position is numerically lower while
+        // the pixels on screen are identical. Measured as `max - start`, a
+        // belt reads as barely moving whenever the window happens to straddle
+        // that fold — a measurement artefact, not a stopped belt, and the
+        // difference between testing the feature and testing where in the
+        // loop the sample began.
+        let moved = 0;
         const step = () => {
           const at = Math.abs(el.scrollLeft);
+          const d = at - prev;
+          // Forward, and small. A fold is one big jump backwards; a gesture is
+          // a big jump either way. Both are excluded, so `moved` is the drift
+          // and nothing else.
+          if (d > 0 && d < 40) moved += d;
+          prev = at;
           if (at < min) min = at;
           if (at > max) max = at;
           if (performance.now() - t0 < ms) requestAnimationFrame(step);
-          else resolve({ start, end: at, min, max, elapsed: performance.now() - t0 });
+          else resolve({ start, end: at, min, max, moved, elapsed: performance.now() - t0 });
         };
         requestAnimationFrame(step);
       }),
@@ -103,8 +120,8 @@ async function run(engine, name) {
     const a = await travel(page, belt, 1200);
     measurements.push({ engine: name, belt, case: 'drift', ...a });
     assert.ok(
-      a.max - a.start > 12,
-      `${name}/${belt}: the belt must drift on its own — moved ${(a.max - a.start).toFixed(2)}px in ${Math.round(a.elapsed)}ms`
+      a.moved > 12,
+      `${name}/${belt}: the belt must drift on its own — moved ${a.moved.toFixed(2)}px in ${Math.round(a.elapsed)}ms`
     );
     cases++;
 
@@ -121,8 +138,8 @@ async function run(engine, name) {
     const b = await travel(page, belt, 1000);
     measurements.push({ engine: name, belt, case: 'after-tap', ...b });
     assert.ok(
-      b.max - b.start > 10,
-      `${name}/${belt}: a tap must not latch the belt off — moved ${(b.max - b.start).toFixed(2)}px after a tap`
+      b.moved > 10,
+      `${name}/${belt}: a tap must not latch the belt off — moved ${b.moved.toFixed(2)}px after a tap`
     );
     cases++;
 
@@ -155,17 +172,79 @@ async function run(engine, name) {
     );
     cases++;
 
-    // A MOUSE RESTING ON THE BELT PARKS IT — the pointer is still over the
-    // belt from the wheel above, and a mark sliding out from under a cursor
-    // that is trying to click it is the reason hover exists at all. This is
-    // the ONLY thing that may stop the belt without expiring, and it is
-    // allowed to because a mouse genuinely leaves and genuinely returns.
+    // ---------------------------------------------------------------- C0
+    // A FINGER HELD STILL ON THE BELT STOPS IT.
+    //
+    // This is NOT covered by the drag case and it is the regression the first
+    // draft of the rewrite shipped: a stationary finger scrolls nothing, so a
+    // loop that only notices movement never notices the finger, and the belt
+    // slides out from under a thumb trying to press a mark. `pointerdown` is
+    // the only evidence that exists, and it has to be cleared from the window
+    // rather than the element or it becomes the very latch this replaced.
+    // It has to be a TOUCH pointer, and that is the whole point. A
+    // `mouse.down()` also fires `pointerenter`, so the belt would park on
+    // HOVER and the case would pass on an implementation that ignores the
+    // press entirely — a test that is satisfied for the wrong reason. A
+    // dispatched touch pointer sets no hover, so only the press can stop it.
+    //
+    // The cursor is parked in the corner first for the same reason: a mouse
+    // left resting on the belt by the case above would park it, and this case
+    // would then prove nothing at all.
+    await page.mouse.move(4, 4);
+    await delay(250);
+    await page.$eval(`[data-belt="${belt}"] .lv-mq`, (el) => {
+      const r = el.getBoundingClientRect();
+      el.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          pointerId: 7,
+          pointerType: 'touch',
+          isPrimary: true,
+          clientX: r.left + r.width / 2,
+          clientY: r.top + r.height / 2,
+        })
+      );
+    });
+    await delay(200);
+    const held = await travel(page, belt, 700);
+    measurements.push({ engine: name, belt, case: 'held', ...held });
+    assert.ok(
+      held.moved < 3,
+      `${name}/${belt}: a held finger must park the belt (moved ${held.moved.toFixed(2)}px)`
+    );
+    cases++;
+
+    // AND THE LIFT IS HEARD ON THE WINDOW, wherever it happens. That is what
+    // makes the press a signal and not the latch this file was rewritten to
+    // kill: a `pointerup` on the element can be withheld, one on the window
+    // cannot.
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new PointerEvent('pointerup', { bubbles: true, pointerId: 7, pointerType: 'touch', isPrimary: true })
+      );
+    });
+    await delay(250);
+    const lifted = await travel(page, belt, 800);
+    measurements.push({ engine: name, belt, case: 'lifted', ...lifted });
+    assert.ok(
+      lifted.moved > 8,
+      `${name}/${belt}: the drift must resume when the finger lifts (moved ${lifted.moved.toFixed(2)}px)`
+    );
+    cases++;
+
+    // A MOUSE RESTING ON THE BELT PARKS IT. A mark sliding out from under a
+    // cursor that is trying to click it is the reason hover exists at all,
+    // and this is the ONLY thing allowed to stop the belt without expiring —
+    // allowed to, because a mouse genuinely leaves and genuinely returns,
+    // which is exactly what a touch screen's synthesised hover does not do.
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await delay(400);
     const parked = await travel(page, belt, 700);
     measurements.push({ engine: name, belt, case: 'hover-parked', ...parked });
     assert.ok(
-      parked.max - parked.min < 3,
-      `${name}/${belt}: a resting mouse must park the belt (moved ${(parked.max - parked.min).toFixed(2)}px)`
+      parked.moved < 3,
+      `${name}/${belt}: a resting mouse must park the belt (moved ${parked.moved.toFixed(2)}px)`
     );
     cases++;
 
@@ -178,8 +257,8 @@ async function run(engine, name) {
     const c = await travel(page, belt, 900);
     measurements.push({ engine: name, belt, case: 'resume', ...c });
     assert.ok(
-      c.max - c.start > 8,
-      `${name}/${belt}: the drift must resume once the pointer leaves — moved ${(c.max - c.start).toFixed(2)}px`
+      c.moved > 8,
+      `${name}/${belt}: the drift must resume once the pointer leaves — moved ${c.moved.toFixed(2)}px`
     );
     cases++;
 
@@ -201,7 +280,7 @@ async function run(engine, name) {
       `${name}/${belt}: the belt must recycle, not park at the end (${long.max.toFixed(1)} of ${ceiling})`
     );
     assert.ok(
-      long.max - long.min > 12,
+      long.moved > 40,
       `${name}/${belt}: it must still be moving after several seconds`
     );
     cases++;
@@ -219,8 +298,8 @@ async function run(engine, name) {
   const ltr = await travel(page, 'ltr', 1200);
   measurements.push({ engine: name, belt: 'ltr', case: 'ltr', ...ltr });
   assert.ok(
-    ltr.max - ltr.start > 12,
-    `${name}: the belt must drift in LTR as well — moved ${(ltr.max - ltr.start).toFixed(2)}px`
+    ltr.moved > 12,
+    `${name}: the belt must drift in LTR as well — moved ${ltr.moved.toFixed(2)}px`
   );
   cases++;
 
@@ -238,8 +317,8 @@ async function run(engine, name) {
   );
   measurements.push({ engine: name, belt: 'brands', case: 'reduced', ...still, swipeable });
   assert.ok(
-    still.max - still.min < 3,
-    `${name}: prefers-reduced-motion must stop the drift (moved ${(still.max - still.min).toFixed(2)}px)`
+    still.moved < 3,
+    `${name}: prefers-reduced-motion must stop the drift (moved ${still.moved.toFixed(2)}px)`
   );
   assert.ok(swipeable, `${name}: and must still leave a rail a finger can drag`);
   cases += 2;
