@@ -652,9 +652,75 @@ export async function rankCompareCandidates(
   return selected.map((candidate) => cardOf(candidate, images.get(candidate.row.id) || null));
 }
 
+/**
+ * WHAT CAN BE COMPARED AT ALL — the FIRST slot, with nothing to rank against.
+ *
+ * Deliberately not a second copy of `rankCompareCandidates` with the anchor
+ * bits removed: there is no ranking to do. The catalogue's own order is the
+ * honest answer, the search text narrows it, and the ONE rule both lists share
+ * — never offer a product the comparison cannot draw — is applied here in the
+ * same two places, the SQL predicate and `hasAnySpec`.
+ */
+export async function browseCompareCandidates(
+  db: D1Database,
+  tax: Taxonomy,
+  q: string,
+  limit: number
+): Promise<CompareProductCard[]> {
+  // Through `likePattern`, never `'%' + q + '%'` — D1 refuses a LIKE pattern
+  // over 50 BYTES and Arabic is two bytes a letter. See the long note in
+  // rankCompareCandidates; tests/sqlLikeBytes.test.ts fails the build on the
+  // concatenated form.
+  const pattern = likePattern(q);
+  const textClause = pattern ? ` AND (${sqlLikeClause(['name', 'name_ar', 'name_ku'], '?1')})` : '';
+  const bindings: unknown[] = pattern ? [pattern] : [];
+
+  const { results } = await db.prepare(
+    `SELECT ${PRODUCT_COLUMNS} FROM products
+      WHERE status = 'active' AND spec_fields <> '{}' AND spec_fields <> ''
+      ${textClause}
+      ORDER BY created_at DESC
+      LIMIT ${CANDIDATE_POOL}`
+  )
+    .bind(...bindings)
+    .all<ProductRow>();
+
+  const placed = (results ?? [])
+    .map((row) => place(row, tax))
+    // `spec_fields <> '{}'` catches the default, not a malformed or all-empty
+    // document — the same second look the anchored path takes.
+    .filter((candidate) => hasAnySpec(candidate.specs))
+    .slice(0, limit);
+
+  const images = await loadAuthoritativeProductImages(db, placed.map((candidate) => candidate.row.id));
+  return placed.map((candidate) => cardOf(candidate, images.get(candidate.row.id) || null));
+}
+
+/**
+ * `for` IS OPTIONAL, AND THAT IS THE «زر لاضافه الطابعه».
+ *
+ * «عند الضغط على المقارنة فإنه يظهر فقط الذي شاهدته مؤخرا أريد أن يكون زر
+ *  لاضافه الطابعه.» With nothing placed there is no anchor to rank against,
+ * and the page's only way in was the last product this browser happened to
+ * look at. Somebody who has just arrived — or who cleared their storage, or
+ * who wants a machine unlike the one they were reading — had no way to start a
+ * comparison at all.
+ *
+ * Without an anchor the ranking cannot be "like this one", so it is the
+ * catalogue's own order — newest first — narrowed by the search text, and it
+ * answers `for: null`. Everything else is identical, INCLUDING the rule that
+ * a product with no specification sheet is never offered: a tap that ends in
+ * `COMPARE_NO_SPECS` is a tap that teaches people not to tap, and that is as
+ * true on the first slot as on the second.
+ *
+ * There is no type gate here, on purpose. With no anchor there is no type to
+ * gate ON, and this list only ever fills the FIRST slot — from the second
+ * onwards the anchored path takes over and applies it. Hiding filament from
+ * somebody who came to compare filament would be the worse failure.
+ */
 compareRoutes.get('/candidates', async (c) => {
   await rateLimit(c, 'compare-candidates', 120, 60);
-  const anchorId = str(c.req.query('for'), 'for', { min: 1, max: 60 });
+  const anchorId = str(c.req.query('for'), 'for', { max: 60, required: false });
   // Bounded by CHARACTERS here and by BYTES inside likePattern. Both are
   // needed: this cap stops a megabyte of query text reaching the pattern
   // builder, and the byte cap is the one D1 actually enforces (50 bytes, which
@@ -665,6 +731,15 @@ compareRoutes.get('/candidates', async (c) => {
   // the anchor's own card, so loading a draft first and refusing second would
   // still have read an unpublished product's name and price into memory on a
   // public route — and one `if` away from returning it.
+  if (!anchorId) {
+    const tax = taxonomy(await loadCatalogs(c.env.DB));
+    return c.json({
+      success: true,
+      for: null,
+      products: await browseCompareCandidates(c.env.DB, tax, q, MAX_CANDIDATES),
+    });
+  }
+
   const anchor = await c.env.DB
     .prepare(`SELECT ${PRODUCT_COLUMNS} FROM products WHERE id = ? AND status = 'active'`)
     .bind(anchorId)

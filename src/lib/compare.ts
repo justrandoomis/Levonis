@@ -175,8 +175,10 @@ export interface CompareResponse {
 
 export interface CandidatesResponse {
   success: true;
-  /** The anchor's own card, which is why this call can also fill an empty page. */
-  for: CompareProductCard;
+  /** The anchor's own card, which is why this call can also fill an empty page.
+   *  NULL when no anchor was given — the «إضافة طابعة» path, where the list is
+   *  the catalogue rather than "machines like this one". */
+  for: CompareProductCard | null;
   products: CompareProductCard[];
 }
 
@@ -196,16 +198,25 @@ export function fetchComparison(ids: string[], opts?: RequestOptions): Promise<C
   return api.get<CompareResponse>(`/api/compare?ids=${encodeURIComponent(ids.join(','))}`, opts);
 }
 
+/**
+ * `anchorId` MAY BE NULL, and that is the «زر لاضافه الطابعه».
+ *
+ * With a machine placed, the list is "what is worth comparing with this one".
+ * With none — a first visit, cleared storage, or someone who wants a machine
+ * unlike the one they were reading — the server answers with the catalogue,
+ * newest first, narrowed by whatever was typed. Without this the comparison
+ * page could only ever be started from a product page.
+ */
 export function fetchCandidates(
-  anchorId: string,
+  anchorId: string | null,
   q: string,
   opts?: RequestOptions
 ): Promise<CandidatesResponse> {
-  const query = q.trim() ? `&q=${encodeURIComponent(q.trim())}` : '';
-  return api.get<CandidatesResponse>(
-    `/api/compare/candidates?for=${encodeURIComponent(anchorId)}${query}`,
-    opts
-  );
+  const params = new URLSearchParams();
+  if (anchorId) params.set('for', anchorId);
+  if (q.trim()) params.set('q', q.trim());
+  const query = params.toString();
+  return api.get<CandidatesResponse>(`/api/compare/candidates${query ? `?${query}` : ''}`, opts);
 }
 
 // ------------------------------------------------------------ the URL is it
@@ -244,6 +255,24 @@ export function writeIds(ids: string[]): string {
 }
 
 // --------------------------------------------------------------- reading it
+
+/**
+ * field_id → the WHOLE ROW, so a caller can read the typed value behind a
+ * chart axis rather than re-deriving one.
+ *
+ * «بالإضافة إلى الشريط اجعل هنالك رقما يكتب … أمامه رقم وليس فقط شريط.» The
+ * chart's own `series` is a 0..1 RATIO against the best answer on that axis,
+ * which is the right number for the length of a bar and the wrong one to print
+ * — «78%» of what, exactly. The figure a reader wants is «32 mm³/s», and the
+ * only place it exists is the row the server already sent, with its unit
+ * already applied. Reading it from there is also what keeps the chart and the
+ * table below it from ever disagreeing.
+ */
+export function rowIndex(result: CompareResult): Map<string, CompareRow> {
+  const out = new Map<string, CompareRow>();
+  for (const group of result.groups) for (const row of group.rows) out.set(row.field_id, row);
+  return out;
+}
 
 /** field_id → label, for the verdict's win/loss lists and the chart legend. */
 export function labelIndex(result: CompareResult): Map<string, Trilingual> {

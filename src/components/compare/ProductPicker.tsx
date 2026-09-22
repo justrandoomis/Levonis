@@ -110,7 +110,8 @@ export default function ProductPicker({
 }: {
   open: boolean;
   onClose: () => void;
-  /** The machine the visitor arrived with; the ranking is relative to it. */
+  /** The machine the visitor arrived with; the ranking is relative to it.
+   *  NULL asks for the catalogue instead — see fetchCandidates. */
   anchorId: string | null;
   exclude: string[];
   onPick: (card: CompareProductCard) => void;
@@ -136,7 +137,11 @@ export default function ProductPicker({
   }, [open]);
 
   useEffect(() => {
-    if (!open || !anchorId) return;
+    // A null anchor is not a reason to show nothing: it is the «إضافة طابعة»
+    // case, and the server answers it with the catalogue. The guard used to be
+    // `!anchorId` and that is why the sheet could only ever open from a
+    // product page.
+    if (!open) return;
     const controller = new AbortController();
     setBusy(true);
     const timer = setTimeout(() => {

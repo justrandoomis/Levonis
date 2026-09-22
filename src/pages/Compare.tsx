@@ -198,7 +198,10 @@ export default function Compare() {
     }
     const controller = new AbortController();
     fetchCandidates(seedId, '', { signal: controller.signal, mascot: 'silent' })
-      .then((res) => setSeedCards([res.for, ...res.products]))
+      // `for` is nullable now (the anchor-free list answers null); a seeded
+      // call always has one, but filtering is cheaper than a crash if it does
+      // not.
+      .then((res) => setSeedCards([res.for, ...res.products].filter(Boolean) as CompareProductCard[]))
       // A product that has since been unpublished is not an error worth
       // showing: the empty state simply falls back to the catalogue link.
       .catch(() => setSeedCards(null));
@@ -259,7 +262,13 @@ export default function Compare() {
           <Scale aria-hidden="true" className="h-4 w-4 text-[var(--color-text-muted)]" />
           {s.pageTitle}
         </h1>
-        {ids.length > 0 && ids.length < MAX_COMPARE_IDS ? (
+        {/*
+          AVAILABLE WITH NOTHING PLACED TOO. The gate used to be
+          `ids.length > 0`, so on the one screen where the visitor has
+          nothing yet — «يظهر فقط الذي شاهدته مؤخرا» — there was no control
+          at all, and the recently-viewed list was the only way in.
+        */}
+        {ids.length < MAX_COMPARE_IDS ? (
           <button
             type="button"
             onClick={() => setPicking(-1)}
@@ -315,6 +324,30 @@ export default function Compare() {
         <section className="lv-surface p-4">
           <h2 className="text-sm font-bold text-[var(--color-text-primary)]">{s.emptyTitle}</h2>
           <p className="mt-1 text-[12px] leading-5 text-[var(--color-text-secondary)]">{s.emptyBody}</p>
+
+          {/*
+            THE BUTTON, ABOVE THE LIST RATHER THAN INSTEAD OF IT.
+
+            «عند الضغط على المقارنة فإنه يظهر فقط الذي شاهدته مؤخرا أريد أن
+             يكون زر لاضافه الطابعه.»
+
+            The recently-viewed rail below is genuinely the fastest way in for
+            somebody who has just come off a product page, and it stays. What
+            was missing is a way in for everybody else — a first visit, cleared
+            storage, or wanting a machine unlike the one they were reading —
+            and for them the rail was not "few choices", it was NO choices.
+            This opens the same picker the second slot uses, which now has a
+            search box over the whole catalogue because `for` became optional
+            on the endpoint behind it.
+          */}
+          <button
+            type="button"
+            onClick={() => setPicking(-1)}
+            className="lv-button lv-button-primary lv-button-sm mt-3 w-full sm:w-auto"
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            {s.addProduct}
+          </button>
 
           {seedCards && seedCards.length > 0 ? (
             <>

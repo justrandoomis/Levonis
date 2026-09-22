@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useLanguage } from '../../LanguageContext';
 import {
+  rowIndex,
   tri,
   type CompareLang,
   type CompareProductCard,
@@ -37,11 +38,26 @@ import { productTone } from './tones';
  * fought back to the right edge in RTL. `inline-size` and logical properties do
  * that for free and correctly, in both directions.
  *
- * THE BAR IS NOT THE VALUE. 0..1 is a RATIO against the best answer on that
- * axis (the server's `normaliseAxis`), not a percentage of anything a customer
- * can buy, so no number is printed on the bar. The real, typed figure for every
- * axis is a row in the table below, which is where a reader who wants the
- * number goes.
+ * THE BAR IS NOT THE VALUE, AND THE NUMBER BESIDE IT IS.
+ *
+ * «في المحاور الحاسمة بالإضافة إلى الشريط اجعل هنالك رقما يكتب — مثلا أقصى
+ *  معدل تدفق — يكتب مع الشريط أمامه رقم وليس فقط شريط.»
+ *
+ * 0..1 is a RATIO against the best answer on that axis (the server's
+ * `normaliseAxis`), not a percentage of anything a customer can buy, so the
+ * ratio is still never printed: «78%» would be a number that answers no
+ * question. What is printed is the machine's OWN typed figure with its unit —
+ * «32 mm³/s», «300 °C» — read from the row the server already sent for that
+ * field (`rowIndex`). The bar keeps doing the comparing at a glance; the
+ * figure answers "how much, exactly" without a scroll to the table.
+ *
+ * Reading the value from the row rather than re-deriving it is the whole
+ * safety of this: the chart and the table below it cannot come to disagree,
+ * because they are printing the same string.
+ *
+ * A machine with no answer on an axis shows «—», not a zero. The server sends
+ * `missing: true` for "nobody wrote this down", and a 0 there would read as a
+ * measured zero — which on «أقصى معدل تدفق» is a very different claim.
  */
 export default function SpecChart({
   products,
@@ -54,6 +70,8 @@ export default function SpecChart({
   const s = compareStrings(lang);
   const l = lang as CompareLang;
   const { axes, series } = result.chart;
+  // field_id → the row the figure lives in. Built once per comparison.
+  const rows = useMemo(() => rowIndex(result), [result]);
 
   return (
     <section aria-labelledby="lv-compare-chart" className="lv-section">
@@ -96,24 +114,43 @@ export default function SpecChart({
                     const value = series[p]?.[a] ?? 0;
                     const percent = Math.round(Math.max(0, Math.min(1, value)) * 100);
                     const tone = productTone(p);
+                    const cell = rows.get(axis.field_id)?.values[p];
+                    const figure = cell && !cell.missing && cell.text ? cell.text : '—';
                     return (
                       <div
                         key={product.id}
-                        className="h-2 overflow-hidden rounded-full bg-[var(--color-surface-selected)]"
+                        className="flex items-center gap-2"
                         role="img"
-                        aria-label={`${tri(product.name, l)} — ${tri(axis.label, l)}: ${percent}%`}
+                        aria-label={`${tri(product.name, l)} — ${tri(axis.label, l)}: ${figure}`}
                       >
-                        <div
-                          className="h-full rounded-full transition-[width] duration-300 ease-out"
-                          style={{
-                            // `inline-size`, not `width`: in RTL the bar has to
-                            // grow from the right edge, and that is what a
-                            // logical property means. A `width` here would grow
-                            // every bar out of the left edge in Arabic.
-                            inlineSize: `${Math.max(percent, 2)}%`,
-                            backgroundColor: tone.color,
-                          }}
-                        />
+                        <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-surface-selected)]">
+                          <div
+                            className="h-full rounded-full transition-[width] duration-300 ease-out"
+                            style={{
+                              // `inline-size`, not `width`: in RTL the bar has to
+                              // grow from the right edge, and that is what a
+                              // logical property means. A `width` here would grow
+                              // every bar out of the left edge in Arabic.
+                              inlineSize: `${Math.max(percent, 2)}%`,
+                              backgroundColor: tone.color,
+                            }}
+                          />
+                        </div>
+                        {/*
+                          ALWAYS LTR, and a fixed minimum width. The figure is
+                          digits plus a Latin unit («32 mm³/s»); left to the
+                          page's RTL the browser would reorder the unit around
+                          the number. `tabular-nums` and the floor keep the
+                          column of figures aligned down the axis instead of
+                          jittering with each value's width.
+                        */}
+                        <span
+                          dir="ltr"
+                          className="shrink-0 text-end text-[11px] tabular-nums text-[var(--color-text-secondary)]"
+                          style={{ minInlineSize: '4.5rem' }}
+                        >
+                          {figure}
+                        </span>
                       </div>
                     );
                   })}
