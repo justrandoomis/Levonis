@@ -1,0 +1,25 @@
+-- «أما الواتساب فأقصد فهو مفعل من wasender ويعمل لكن لا يوجد زر لدى المستخدم
+--  يمكنه بالتفعيل الواتساب.»
+--
+-- THE CHANNEL WORKED AND THE CUSTOMER HAD NO SAY IN IT. Order updates go out
+-- on WhatsApp to whatever verified number the account carries — the shop sends
+-- through WasenderAPI from its own number, so there is no handshake and
+-- nothing to link. Settings could therefore only ever REPORT the state
+-- («جاهز» / «يحتاج رقمًا»), because there was nothing in the database for a
+-- switch to write to. This column is that thing.
+--
+-- DEFAULT 1, WHICH IS EXACTLY TODAY'S BEHAVIOUR. Every existing account keeps
+-- receiving what it receives now; the migration changes nobody's messages. A
+-- default of 0 would have silently switched a live channel off for every
+-- customer in the shop the moment it was applied, which is a far bigger
+-- decision than "add a button" and is not the one that was asked for.
+--
+-- WHAT IT DOES NOT TOUCH. `phone_e164` stays the account's verified identity,
+-- and WhatsApp sign-in codes are a different path with a different consent —
+-- somebody who turns off order updates has not asked to be locked out of their
+-- own account. worker/lib/customerNotify.ts reads this column in the ONE place
+-- that decides whether the WhatsApp channel is in a notification's plan, and
+-- an opt-out makes the channel ABSENT rather than BLOCKED: blocked is reserved
+-- for "this account could be reached and the deployment cannot do it", and a
+-- customer's own choice is not a deployment fault to record on every send.
+ALTER TABLE users ADD COLUMN notify_whatsapp INTEGER NOT NULL DEFAULT 1;

@@ -76,6 +76,17 @@ export interface CustomerReach {
   email: string | null;
   /** E.164, proven owned (see the module note) — or null. */
   phone: string | null;
+  /**
+   * THE CUSTOMER'S OWN ANSWER about WhatsApp, kept separate from `phone`.
+   *
+   * «لا يوجد زر لدى المستخدم يمكنه بالتفعيل الواتساب» — there is one now, and
+   * `users.notify_whatsapp` is what it writes (migration 0101, default 1, so
+   * nobody's messages changed the day it landed). It is NOT folded into
+   * `phone` because that field is the account's verified identity and is read
+   * for sign-in codes too: somebody who turned off order updates has not asked
+   * to be locked out of their own account.
+   */
+  wants_whatsapp: boolean;
   /** A live private chat with the customer bot — or null. */
   telegram_chat_id: number | null;
 }
@@ -94,7 +105,7 @@ function langOfLocale(locale: unknown): EmailLang {
  */
 export async function reachFor(env: Env, userId: string): Promise<CustomerReach> {
   const row = await env.DB.prepare(
-    `SELECT u.id, u.locale, u.email, u.email_verified_at, u.phone_e164,
+    `SELECT u.id, u.locale, u.email, u.email_verified_at, u.phone_e164, u.notify_whatsapp,
             (SELECT l.chat_id FROM telegram_links l
               WHERE l.user_id = u.id AND l.revoked_at IS NULL
               ORDER BY l.verified_at DESC LIMIT 1) AS chat_id
@@ -113,12 +124,13 @@ interface ReachRow {
   email: string | null;
   email_verified_at: string | null;
   phone_e164: string | null;
+  notify_whatsapp: number | null;
   chat_id: number | null;
 }
 
 /** Nothing reaches this person — a deleted account, or a lookup that failed. */
 function emptyReach(userId: string): CustomerReach {
-  return { user_id: userId, lang: 'ar', email: null, phone: null, telegram_chat_id: null };
+  return { user_id: userId, lang: 'ar', email: null, phone: null, wants_whatsapp: false, telegram_chat_id: null };
 }
 
 /** One row → one reach. Shared by the single and the bulk lookup so the two
@@ -130,6 +142,11 @@ function reachFromRow(row: ReachRow): CustomerReach {
     lang: langOfLocale(row.locale),
     email: mail,
     phone: isE164(row.phone_e164) ? row.phone_e164 : null,
+    // A row from a database that has not run migration 0101 yet reads null,
+    // and null is the OLD behaviour — everyone opted in. Only an explicit 0
+    // turns the channel off, so a deploy that lands before its migration
+    // cannot silence a live channel.
+    wants_whatsapp: row.notify_whatsapp !== 0,
     telegram_chat_id: typeof row.chat_id === 'number' ? row.chat_id : null,
   };
 }
@@ -169,7 +186,7 @@ export async function reachForMany(env: Env, userIds: string[]): Promise<Map<str
     const part = unique.slice(i, i + REACH_IN_CHUNK);
     const placeholders = part.map(() => '?').join(',');
     const res = await env.DB.prepare(
-      `SELECT u.id, u.locale, u.email, u.email_verified_at, u.phone_e164, l.chat_id
+      `SELECT u.id, u.locale, u.email, u.email_verified_at, u.phone_e164, u.notify_whatsapp, l.chat_id
          FROM users u
          LEFT JOIN telegram_links l ON l.user_id = u.id AND l.revoked_at IS NULL
         WHERE u.id IN (${placeholders})`
@@ -399,7 +416,11 @@ function planChannels(
     } else plan.send.push(item);
   }
 
-  if (wanted.includes('whatsapp') && reach.phone) {
+  // ABSENT, NOT BLOCKED, when the customer has turned it off. `blocked` is
+  // reserved for "this account CAN be reached and the deployment cannot do
+  // it" — see the note above — and a customer's own choice is not a
+  // deployment fault to write an outbox row about on every single send.
+  if (wanted.includes('whatsapp') && reach.phone && reach.wants_whatsapp) {
     const item: ChannelItem = { channel: 'whatsapp', message: { kind: 'whatsapp', to: reach.phone, text } };
     if (!live.whatsapp) {
       // Two different facts with two different remedies: no key at all is an

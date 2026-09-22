@@ -35,6 +35,27 @@ profileRoutes.patch('/', async (c) => {
       ? localeToDb(oneOf(body.locale, 'locale', ['en', 'ar', 'ckb', 'ku'] as const))
       : user.locale;
 
+  /**
+   * THE WHATSAPP SWITCH — «لا يوجد زر لدى المستخدم يمكنه بالتفعيل الواتساب».
+   *
+   * A strict boolean, because a truthy string would let `"false"` turn the
+   * channel ON. Omitting the key leaves the stored value alone, so every other
+   * caller of this route (the language row, the avatar, the username) cannot
+   * flip a notification preference it never mentioned.
+   *
+   * There is no "can you receive WhatsApp" check here on purpose: the account
+   * may have no verified number yet, and recording the answer of somebody who
+   * is about to verify one is better than refusing it and making them come
+   * back. worker/lib/customerNotify.ts needs BOTH a number and this flag.
+   */
+  let notifyWhatsapp = user.notify_whatsapp !== 0 ? 1 : 0;
+  if (body.notify_whatsapp !== undefined) {
+    if (typeof body.notify_whatsapp !== 'boolean') {
+      throw badRequest('notify_whatsapp must be true or false', 'BAD_NOTIFY_WHATSAPP');
+    }
+    notifyWhatsapp = body.notify_whatsapp ? 1 : 0;
+  }
+
   let profileJson = user.profile_json;
   if (body.profile !== undefined) {
     if (typeof body.profile !== 'object' || body.profile === null || Array.isArray(body.profile)) {
@@ -93,9 +114,9 @@ profileRoutes.patch('/', async (c) => {
   try {
     await c.env.DB.prepare(
       `UPDATE users SET name = ?, bio = ?, website = ?, locale = ?, profile_json = ?, username = ?, avatar_key = ?,
-          country = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`
+          country = ?, notify_whatsapp = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`
     )
-      .bind(name, bio, website, locale, profileJson, newUsername, avatarKey, country, user.id)
+      .bind(name, bio, website, locale, profileJson, newUsername, avatarKey, country, notifyWhatsapp, user.id)
       .run();
   } catch (e) {
     // The availability check above and this write are not one operation, so

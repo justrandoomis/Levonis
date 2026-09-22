@@ -313,6 +313,9 @@ export interface ApiUser {
   /** MASKED, e.g. `+9647******567` — the account's own verified number. */
   phone: string | null;
   has_phone: boolean;
+  /** The customer's own answer on WhatsApp order updates. True is the default
+   *  and is what every account carried before the switch existed. */
+  notify_whatsapp: boolean;
   /** Whether Google sign-in is linked. The Google subject stays server-side. */
   has_google: boolean;
   /** Signup-wizard state: 'new' | 'existing' | 'skipped' | 'done'. Separate

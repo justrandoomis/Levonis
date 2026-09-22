@@ -176,6 +176,10 @@ export interface SessionUser {
   country: string | null;
   /** The account's own verified phone, E.164. NULL until Telegram proves it. */
   phone_e164: string | null;
+  /** 1 = order updates may go out on WhatsApp, 0 = the customer said no
+   *  (migration 0101, default 1). Null on a database that predates it, which
+   *  reads as the old behaviour: everyone opted in. */
+  notify_whatsapp?: number | null;
   /** 'new' | 'existing' | 'skipped' | 'done' — the signup wizard, not the
    *  profile. A finished wizard with every optional step skipped is 'done'
    *  AND an incomplete profile; they are separate questions (0033). */
@@ -254,6 +258,9 @@ export function publicUser(u: SessionUser) {
     // log, a screenshot or a support ticket.
     phone: u.phone_e164 ? maskPhone(u.phone_e164) : null,
     has_phone: !!u.phone_e164,
+    // The customer's own WhatsApp switch, so Settings can draw its state
+    // rather than guessing it. Only an explicit 0 is off — see 0101.
+    notify_whatsapp: u.notify_whatsapp !== 0,
     // Signup-wizard state and profile completion travel with the user object
     // so every surface reads the same answer. `completion` is derived from
     // the fields on every read, never stored (see lib/profileCompletion.ts).

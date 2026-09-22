@@ -98,6 +98,11 @@ const STRINGS = {
     waReadyNote: 'ستصلك تحديثات طلبك على واتساب على الرقم الموثّق في حسابك، ويمكنك تسجيل الدخول برمز يصل إليه.',
     waNeedsPhoneNote: 'لا يوجد رقم موثّق على حسابك بعد. وثّق رقمك عبر تيليغرام ليعمل واتساب.',
     waGoVerify: 'توثيق رقمي',
+    waOff: 'مُطفأ',
+    waSwitch: 'استقبال تحديثات الطلب على واتساب',
+    waSwitchOffNote: 'مُطفأ. لن تصلك تحديثات الطلب على واتساب — تبقى تصلك على البريد وتيليغرام إن كانا مربوطين.',
+    waSwitchSaved: 'تم الحفظ',
+    waSwitchFailed: 'تعذّر الحفظ. حاول مرة أخرى.',
     changePassword: 'تغيير كلمة المرور', currentPassword: 'كلمة المرور الحالية',
     newPassword: 'كلمة المرور الجديدة', confirmPassword: 'تأكيد كلمة المرور',
     pwMin: `الحد الأدنى ${PASSWORD_MIN} أحرف.`, pwMismatch: 'كلمتا المرور غير متطابقتين.',
@@ -173,6 +178,11 @@ const STRINGS = {
     waReadyNote: 'Order updates reach you on WhatsApp at the verified number on your account, and you can sign in with a code sent there.',
     waNeedsPhoneNote: 'Your account has no verified number yet. Verify one through Telegram and WhatsApp starts working.',
     waGoVerify: 'Verify my number',
+    waOff: 'Off',
+    waSwitch: 'Get order updates on WhatsApp',
+    waSwitchOffNote: 'Off. Order updates will not go to WhatsApp — email and Telegram still reach you where they are linked.',
+    waSwitchSaved: 'Saved',
+    waSwitchFailed: 'Could not save. Try again.',
     changePassword: 'Change password', currentPassword: 'Current password',
     newPassword: 'New password', confirmPassword: 'Confirm password',
     pwMin: `Minimum ${PASSWORD_MIN} characters.`, pwMismatch: 'The passwords do not match.',
@@ -248,6 +258,11 @@ const STRINGS = {
     waReadyNote: 'نوێکارییەکانی داواکارییەکەت بە واتساپ دەگەن بەو ژمارە پشتڕاستکراوەی هەژمارەکەت، و دەتوانیت بە کۆد بچیتە ژوورەوە.',
     waNeedsPhoneNote: 'هێشتا ژمارەیەکی پشتڕاستکراو لەسەر هەژمارەکەت نییە. بە تێلێگرام ژمارەکەت پشتڕاست بکەرەوە.',
     waGoVerify: 'پشتڕاستکردنەوەی ژمارەکەم',
+    waOff: 'کوژاوەتەوە',
+    waSwitch: 'وەرگرتنی نوێکارییەکانی داواکاری لەسەر واتسئاپ',
+    waSwitchOffNote: 'کوژاوەتەوە. نوێکارییەکانی داواکاری بۆ واتسئاپ نانێردرێن — ئیمەیڵ و تێلێگرام هەر پێت دەگەن ئەگەر بەستراوبن.',
+    waSwitchSaved: 'پاشەکەوت کرا',
+    waSwitchFailed: 'پاشەکەوت نەکرا. دووبارە هەوڵ بدەرەوە.',
     changePassword: 'گۆڕینی وشەی تێپەڕ', currentPassword: 'وشەی تێپەڕی ئێستا',
     newPassword: 'وشەی تێپەڕی نوێ', confirmPassword: 'دووبارەکردنەوەی وشەی تێپەڕ',
     pwMin: `لانیکەم ${PASSWORD_MIN} پیت.`, pwMismatch: 'وشە تێپەڕەکان وەک یەک نین.',
@@ -819,6 +834,46 @@ export default function Settings() {
     }
   };
 
+  /**
+   * THE BUTTON THE OWNER ASKED FOR — «لا يوجد زر لدى المستخدم يمكنه بالتفعيل
+   * الواتساب».
+   *
+   * OPTIMISTIC, AND HONEST WHEN IT FAILS. The switch moves at once, because a
+   * toggle that waits for a round trip on Iraqi mobile data reads as broken
+   * and gets tapped twice. If the write is refused the switch moves BACK and
+   * says so — the one thing it must never do is stay where the finger put it
+   * while the server still holds the other answer.
+   *
+   * `refreshUser()` is what actually settles the state: the optimistic value
+   * is a local guess, and the user object is the truth every other surface
+   * reads.
+   */
+  const [waBusy, setWaBusy] = useState(false);
+  const [waDraft, setWaDraft] = useState<boolean | null>(null);
+  const [waMsg, setWaMsg] = useState('');
+  const [waError, setWaError] = useState('');
+  const waOn = waDraft ?? user?.notify_whatsapp ?? true;
+
+  const toggleWhatsapp = async () => {
+    if (!user || waBusy) return;
+    const next = !waOn;
+    setWaDraft(next);
+    setWaBusy(true);
+    setWaMsg('');
+    setWaError('');
+    try {
+      await api.patch('/api/profile', { notify_whatsapp: next });
+      await refreshUser();
+      setWaDraft(null);
+      setWaMsg(s.waSwitchSaved);
+    } catch {
+      setWaDraft(null);
+      setWaError(s.waSwitchFailed);
+    } finally {
+      setWaBusy(false);
+    }
+  };
+
   const requestPush = async () => {
     if (pushStatus === 'unsupported' || pushStatus === 'blocked' || pushStatus === 'granted') return;
     await Notification.requestPermission();
@@ -1385,16 +1440,27 @@ export default function Settings() {
                 <div className="px-4 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-bold text-[15px]">{s.notifWhatsapp}</span>
+                    {/*
+                      THREE STATES, NOT TWO. «مُفعّل» beside a switch the
+                      customer has just turned off is the panel contradicting
+                      itself, which is exactly the kind of "control with no
+                      effect" this page exists to remove. Reachability and
+                      consent are different facts and each gets its own word.
+                    */}
                     <span
                       className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                        user?.has_phone ? 'text-success bg-success/10' : 'text-warning bg-warning/10'
+                        !user?.has_phone
+                          ? 'text-warning bg-warning/10'
+                          : waOn
+                            ? 'text-success bg-success/10'
+                            : 'text-zinc-400 bg-white/5'
                       }`}
                     >
-                      {user?.has_phone ? s.waReady : s.waNeedsPhone}
+                      {!user?.has_phone ? s.waNeedsPhone : waOn ? s.waReady : s.waOff}
                     </span>
                   </div>
                   <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">
-                    {user?.has_phone ? s.waReadyNote : s.waNeedsPhoneNote}
+                    {!user?.has_phone ? s.waNeedsPhoneNote : waOn ? s.waReadyNote : s.waSwitchOffNote}
                   </p>
                   {user?.has_phone ? (
                     <p className="mt-1 text-[12px] text-zinc-500" dir="ltr">
@@ -1405,6 +1471,49 @@ export default function Settings() {
                       {s.waGoVerify}
                     </a>
                   )}
+
+                  {/*
+                    THE SWITCH, and it is drawn only where it can mean
+                    something: this deployment HAS a provider (the branch above
+                    it) and this account has a number for it to reach. Offering
+                    it to somebody with no verified number would be a control
+                    with no effect, which is the thing this page removed the
+                    Appearance row for — they are pointed at «توثيق رقمي»
+                    instead, which is the step that actually unlocks it.
+
+                    Default ON, matching migration 0101 and therefore matching
+                    what every account already receives: this adds a way to say
+                    no, it does not quietly turn a live channel off.
+                  */}
+                  {user?.has_phone ? (
+                    <>
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <span className="flex-1 text-[13px] text-zinc-300 leading-relaxed">{s.waSwitch}</span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={waOn}
+                          aria-label={s.waSwitch}
+                          disabled={waBusy}
+                          onClick={() => void toggleWhatsapp()}
+                          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                            waOn ? 'bg-success' : 'bg-zinc-700'
+                          } ${waBusy ? 'opacity-60' : 'cursor-pointer'}`}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${
+                              waOn
+                                ? rtl ? '-translate-x-6' : 'translate-x-6'
+                                : rtl ? '-translate-x-1' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      {waMsg ? <p className="mt-1 text-[12px] text-emerald-300">{waMsg}</p> : null}
+                      {waError ? <p className="mt-1 text-[12px] text-amber-300">{waError}</p> : null}
+                    </>
+                  ) : null}
                 </div>
               )}
             </SectionCard>
