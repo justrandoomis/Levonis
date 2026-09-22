@@ -46,10 +46,11 @@ import {
   Layers, Weight, Palette, CircleCheck,
 } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { api, ApiError, formatIqd } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { GOVERNORATES } from '../../lib/governorates';
 import { UnauthorizedState } from '../ui/AsyncStates';
 import { MAX_ATTACHMENTS, formatBytes, uploadRequestFiles, type RequestFile } from '../media/RequestAttachments';
+import { useMoney } from '../../CurrencyContext';
 
 // ------------------------------------------------------------------ the shapes
 
@@ -698,8 +699,18 @@ export default function PrintRequestWizard({
     const g = GOVERNORATES.find((x) => x.id === id);
     return g ? (lang === 'en' ? g.en : lang === 'ckb' ? g.ckb : g.ar) : id;
   };
-  /** formatIqd speaks Arabic; English gets the Latin form the rest of the app uses. */
-  const money = (n: number) => loc(formatIqd(n), `${Math.round(n).toLocaleString('en-US')} IQD`);
+  /**
+   * THE WIZARD'S OWN FORMATTER, now built on the customer's chosen currency.
+   *
+   * It existed because `formatIqd` speaks Arabic («د.ع») and the English pane
+   * wanted the Latin form. That is still true of the DINAR, so the English
+   * branch keeps its own spelling — but in dollars there is nothing to
+   * localise: `$1,250.00` is the same string in every language, and the
+   * conversion must not be spelled out twice.
+   */
+  const { money: displayMoney, converted } = useMoney();
+  const money = (n: number) =>
+    converted ? displayMoney(n) : loc(displayMoney(n), `${Math.round(n).toLocaleString('en-US')} IQD`);
 
   if (published) {
     return (

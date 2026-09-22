@@ -16,13 +16,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Clock, Wallet } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { formatIqd, formatUsdCents } from '../../lib/api';
+import { formatUsdCents } from '../../lib/api';
 import { formatDate } from '../orders/format';
 import { Overlay, Sheet } from '../ui/Overlay';
 import Spinner from '../ui/Spinner';
 import { TIER_META, membershipStateLabel, tierLabel } from './tierMeta';
 import type { ApiPlan, LaunchInfo, PurchaseQuote, PurchaseResult } from './types';
 import { needsTopUp, purchaseErrorText } from './purchaseErrors';
+import { useMoney } from '../../CurrencyContext';
 
 const PHONE_QUERY = '(max-width: 639px)';
 
@@ -70,6 +71,7 @@ function Fact({ label, value, tone = 'plain' }: { label: React.ReactNode; value:
 }
 
 export function PurchaseConfirm(props: PurchaseConfirmProps) {
+  const { money } = useMoney();
   const { open, onClose, plan, quote, quoteLoading, quoteError, onRetryQuote, phase, result, quoteChanged, onConfirm, onRetry, anchor, launch } = props;
   const { t, lang, dir } = useLanguage();
   const phone = usePhone();
@@ -133,11 +135,11 @@ export function PurchaseConfirm(props: PurchaseConfirmProps) {
           ) : ok ? (
             <>
               <dl className="mt-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 divide-y divide-zinc-800" data-confirm-facts>
-                <Fact label={t('price')} value={formatIqd(ok.price_iqd)} />
+                <Fact label={t('price')} value={money(ok.price_iqd)} />
                 {ok.credit_iqd > 0 && (
-                  <Fact label={`${t('upgradeCredit')} (${tierLabel(ok.upgrade_from_tier)})`} value={`− ${formatIqd(ok.credit_iqd)}`} tone="negative" />
+                  <Fact label={`${t('upgradeCredit')} (${tierLabel(ok.upgrade_from_tier)})`} value={`− ${money(ok.credit_iqd)}`} tone="negative" />
                 )}
-                {ok.credit_iqd > 0 && <Fact label={t('amountDue')} value={formatIqd(ok.charge_iqd)} />}
+                {ok.credit_iqd > 0 && <Fact label={t('amountDue')} value={money(ok.charge_iqd)} />}
                 <Fact
                   label={t('walletDebit')}
                   value={
@@ -230,12 +232,12 @@ export function PurchaseConfirm(props: PurchaseConfirmProps) {
               </p>
               {result.res.credit_iqd > 0 && (
                 <p className="mt-1.5 ps-6 tabular-nums" dir="ltr">
-                  {t('upgradeCredit')}: − {formatIqd(result.res.credit_iqd)}
+                  {t('upgradeCredit')}: − {money(result.res.credit_iqd)}
                 </p>
               )}
               {result.res.charged_iqd > 0 && (
                 <p className="mt-1 ps-6 tabular-nums" dir="ltr">
-                  {t('walletDebit')}: {formatIqd(result.res.charged_iqd)}
+                  {t('walletDebit')}: {money(result.res.charged_iqd)}
                   {result.res.charged_usd_cents > 0 ? ` (${formatUsdCents(result.res.charged_usd_cents)})` : ''}
                 </p>
               )}

@@ -10,13 +10,14 @@ import {
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
-import { api, ApiProduct, ApiOrder, usdCentsToIqd, formatIqd } from '../lib/api';
+import { api, ApiProduct, ApiOrder, usdCentsToIqd } from '../lib/api';
 import ProfileIconGrid, { ProfileIconAction } from '../components/profile/ProfileIconGrid';
 import GuestCard from '../components/profile/GuestCard';
 import MyReviewsTab from '../components/profile/MyReviewsTab';
 import QrCodeModal from '../components/profile/QrCodeModal';
 import DirectStockEdge from '../components/DirectStockEdge';
 import InstallAppButton from '../components/pwa/InstallAppButton';
+import { useMoney } from '../CurrencyContext';
 
 interface FavoriteItem {
   id: string;
@@ -69,6 +70,7 @@ const bundleShelfPrice = (b: BundleShelfCard): number | null => {
 };
 
 export default function Profile() {
+  const { money } = useMoney();
   const [suggestedProducts, setSuggestedProducts] = useState<ApiProduct[]>([]);
   // Bundle cards from /api/bundles. The card shape changed with the
   // composition model (docs/BUNDLES_MYSTERY.md §10): the listing is light on
@@ -667,7 +669,7 @@ export default function Profile() {
                   <span className="text-[9px] font-bold line-clamp-2 leading-tight mb-1 text-white">{bundle.name}</span>
                   {bundleShelfPrice(bundle) !== null && (
                     <div className="text-[#ff0036] font-bold flex items-baseline gap-0.5 mt-auto">
-                      <span className="text-[12px] leading-none">{formatIqd(bundleShelfPrice(bundle)!)}</span>
+                      <span className="text-[12px] leading-none">{money(bundleShelfPrice(bundle)!)}</span>
                     </div>
                   )}
                 </button>
@@ -726,10 +728,10 @@ export default function Profile() {
 
                     <div className="mt-auto flex items-baseline justify-between">
                        <span className="text-[#ff5000] font-bold text-[15px] flex items-baseline gap-0.5">
-                         {formatIqd(p.price_iqd || 0)}
+                         {money(p.price_iqd || 0)}
                        </span>
                        {p.display_regular_iqd != null && p.display_regular_iqd > (p.display_price_iqd ?? p.price_iqd) && (
-                         <span className="text-[11px] text-zinc-500 line-through">{formatIqd(p.display_regular_iqd)}</span>
+                         <span className="text-[11px] text-zinc-500 line-through">{money(p.display_regular_iqd)}</span>
                        )}
                     </div>
                   </div>
@@ -780,7 +782,7 @@ export default function Profile() {
                          </h3>
 
                          <div className="flex items-baseline gap-1.5 text-[#ff0036] font-bold mb-1.5 mt-auto">
-                           <span className="text-[15px] leading-none">{formatIqd(item.price_iqd || 0)}</span>
+                           <span className="text-[15px] leading-none">{money(item.price_iqd || 0)}</span>
                          </div>
 
                          <div className="text-zinc-500 text-[11px] flex items-center gap-0.5">

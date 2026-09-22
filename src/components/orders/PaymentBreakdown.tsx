@@ -8,10 +8,10 @@
  * a payment that already happened.
  */
 import { Coins, Clock, CheckCircle2, Ban } from 'lucide-react';
-import { formatIqd } from '../../lib/api';
 import type { ApiOrder, ApiOrderItem, OrderFinancial } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { asLang, formatDate } from './format';
+import { useMoney } from '../../CurrencyContext';
 
 const STRINGS = {
   ar: {
@@ -136,6 +136,7 @@ function Row({ label, value, strong = false, muted = false, negative = false }: 
 }
 
 export default function PaymentBreakdown({ order, financial }: { order: ApiOrder; financial: OrderFinancial }) {
+  const { money, moneyBoth } = useMoney();
   const { lang } = useLanguage();
   const s = STRINGS[asLang(lang)];
   const f = financial;
@@ -165,25 +166,29 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
       </div>
 
       <dl className="mt-3 divide-y divide-zinc-800/60">
-        <Row label={s.merchandise} value={formatIqd(f.merchandise_iqd)} />
-        {f.fees_iqd > 0 && <Row label={feesLabel} value={formatIqd(f.fees_iqd)} />}
-        {f.coupon_discount_iqd > 0 && <Row label={`${s.coupon}${couponCode}`} value={formatIqd(f.coupon_discount_iqd)} negative />}
-        {f.points_value_iqd > 0 && <Row label={`${s.pointsUsed} (${f.points_used})`} value={formatIqd(f.points_value_iqd)} negative />}
+        <Row label={s.merchandise} value={money(f.merchandise_iqd)} />
+        {f.fees_iqd > 0 && <Row label={feesLabel} value={money(f.fees_iqd)} />}
+        {f.coupon_discount_iqd > 0 && <Row label={`${s.coupon}${couponCode}`} value={money(f.coupon_discount_iqd)} negative />}
+        {f.points_value_iqd > 0 && <Row label={`${s.pointsUsed} (${f.points_used})`} value={money(f.points_value_iqd)} negative />}
         <Row
           label={s.shipping}
-          value={f.shipping_iqd === 0 ? (f.delivery_waived ? `${s.free} · ${s.waived}` : s.free) : formatIqd(f.shipping_iqd)}
+          value={f.shipping_iqd === 0 ? (f.delivery_waived ? `${s.free} · ${s.waived}` : s.free) : money(f.shipping_iqd)}
         />
-        {f.cod_tax_iqd > 0 && <Row label={s.codTax} value={formatIqd(f.cod_tax_iqd)} />}
-        <Row label={s.total} value={formatIqd(f.total_iqd)} strong />
+        {f.cod_tax_iqd > 0 && <Row label={s.codTax} value={money(f.cod_tax_iqd)} />}
+        {/* THE CHARGE, IN THE CURRENCY IT WAS MADE IN. The lines above follow
+            the customer's chosen currency; the total keeps the dinar, because
+            this is a record of money that already moved and the figure has to
+            reconcile against a receipt and a bank. */}
+        <Row label={s.total} value={moneyBoth(f.total_iqd)} strong />
       </dl>
 
       <dl className="mt-3 pt-3 border-t border-zinc-800 divide-y divide-zinc-800/60">
         <div className="pb-1 text-[11px] font-bold text-zinc-500">{s.payment}</div>
-        {f.wallet_applied_iqd > 0 && <Row label={s.wallet} value={formatIqd(f.wallet_applied_iqd)} negative />}
-        {f.collected_iqd !== null && f.collected_iqd !== undefined && <Row label={s.collected} value={formatIqd(f.collected_iqd)} />}
-        {f.outstanding_iqd > 0 && <Row label={f.payment_state === 'bnpl_due' ? s.bnplOutstanding : s.outstanding} value={formatIqd(f.outstanding_iqd)} />}
+        {f.wallet_applied_iqd > 0 && <Row label={s.wallet} value={money(f.wallet_applied_iqd)} negative />}
+        {f.collected_iqd !== null && f.collected_iqd !== undefined && <Row label={s.collected} value={money(f.collected_iqd)} />}
+        {f.outstanding_iqd > 0 && <Row label={f.payment_state === 'bnpl_due' ? s.bnplOutstanding : s.outstanding} value={money(f.outstanding_iqd)} />}
         {f.wallet_applied_iqd <= 0 && (f.collected_iqd === null || f.collected_iqd === undefined) && f.outstanding_iqd <= 0 && (
-          <Row label={s.state[f.payment_state] ?? f.payment_state} value={formatIqd(f.total_iqd)} muted />
+          <Row label={s.state[f.payment_state] ?? f.payment_state} value={money(f.total_iqd)} muted />
         )}
       </dl>
 

@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Package } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { api, formatIqd, type ApiProduct } from '../../lib/api';
+import { api, type ApiProduct } from '../../lib/api';
 import SafeImage from '../ui/SafeImage';
 import CardPrice from '../CardPrice';
 import SectionHeader from './SectionHeader';
 import { useRail } from '../../lib/useRail';
 import type { BundleCard } from '../bundles/BundleTile';
+import { useMoney } from '../../CurrencyContext';
 
 /**
  * THE COMBO SHELF — «الكومبو», drawn the way the owner asked for it.
@@ -37,6 +38,7 @@ import type { BundleCard } from '../bundles/BundleTile';
  * nothing when the shop has published no combos.
  */
 export default function ComboShelf() {
+  const { money } = useMoney();
   const { loc } = useLanguage();
   const rail = useRail();
   const [combos, setCombos] = useState<BundleCard[]>([]);
@@ -85,7 +87,7 @@ export default function ComboShelf() {
               {/* The headline the shape exists for: what this combo saves. */}
               <span className="text-[12px] font-bold text-info mb-2 truncate">
                 {saving > 0
-                  ? loc(`وفّر ${formatIqd(saving)}`, `Save ${formatIqd(saving)}`, `${formatIqd(saving)} پاشەکەوت`)
+                  ? loc(`وفّر ${money(saving)}`, `Save ${money(saving)}`, `${money(saving)} پاشەکەوت`)
                   : loc('باقة', 'Bundle', 'پاکێج')}
               </span>
 
@@ -128,7 +130,7 @@ export default function ComboShelf() {
               </h3>
               {total > price && (
                 <span className="text-[11px] text-zinc-500 tabular-nums">
-                  <span className="line-through">{formatIqd(total)}</span>
+                  <span className="line-through">{money(total)}</span>
                 </span>
               )}
             </Link>

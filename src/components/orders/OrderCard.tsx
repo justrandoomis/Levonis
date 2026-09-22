@@ -13,7 +13,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, Truck, Star, XCircle, Clock } from 'lucide-react';
-import { formatIqd } from '../../lib/api';
 import type { ApiOrder } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import SafeImage from '../ui/SafeImage';
@@ -21,6 +20,7 @@ import OrderTracker from '../OrderTracker';
 import StatusHairline from './StatusHairline';
 import InlineCopy from './InlineCopy';
 import { asLang, countItems, formatDate, formatDateTime, itemCountLabel, statusLabel, statusStyle } from './format';
+import { useMoney } from '../../CurrencyContext';
 
 const STRINGS = {
   ar: {
@@ -137,6 +137,7 @@ export default function OrderCard({
   onCancel: (order: ApiOrder, anchor: HTMLElement | null) => void;
   onReview: (order: ApiOrder, anchor: HTMLElement | null) => void;
 }) {
+  const { money } = useMoney();
   const { lang } = useLanguage();
   const s = STRINGS[asLang(lang)];
   const count = countItems(order.items, order.item_count);
@@ -227,15 +228,15 @@ export default function OrderCard({
         <div className="mt-3 flex items-end justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] text-zinc-500">{s.total}</p>
-            <p className="text-[#BAA369] font-bold text-[15px] tabular-nums">{formatIqd(order.total_iqd)}</p>
+            <p className="text-[#BAA369] font-bold text-[15px] tabular-nums">{money(order.total_iqd)}</p>
             {due > 0 && (
               <p className="text-[11.5px] text-zinc-400 tabular-nums">
-                {s.due}: {formatIqd(due)}
+                {s.due}: {money(due)}
               </p>
             )}
             {bnplDue > 0 && (
               <p className="text-[11.5px] text-[#f3bdc5] tabular-nums">
-                {s.bnplDue}: {formatIqd(bnplDue)}
+                {s.bnplDue}: {money(bnplDue)}
               </p>
             )}
           </div>

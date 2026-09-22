@@ -41,7 +41,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, PackageOpen, PackageSearch } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
-import { fetchGradedStock, formatIqd, type GradedProduct } from '../lib/api';
+import { fetchGradedStock, type GradedProduct } from '../lib/api';
 import {
   conditionGradeLabel,
   conditionKindLabel,
@@ -52,6 +52,7 @@ import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { ProductGridSkeleton } from '../components/ui/Skeleton';
 import { productPrimaryImage } from '../lib/productImage';
 import { readPageCache, writePageCache } from '../lib/pageCache';
+import { useMoney } from '../CurrencyContext';
 
 /** 'all' plus the three kinds the server can actually store. */
 type KindFilter = 'all' | ConditionKind;
@@ -287,6 +288,7 @@ export default function UsedPrinters() {
  * sale. It is only ever shown when the SERVER found an honest saving.
  */
 function GradedCard({ p, lang }: { p: GradedProduct; lang: string }) {
+  const { money } = useMoney();
   /** `lang` stays a prop because conditionKindLabel/conditionGradeLabel take
    *  it, but the card's OWN sentences go through `loc(ar, en, ckb)` — three
    *  languages, never a two-way test that drops Sorani into the Arabic arm. */
@@ -361,10 +363,10 @@ function GradedCard({ p, lang }: { p: GradedProduct; lang: string }) {
         ) : null}
 
         <span className="mt-auto flex flex-col pt-1">
-          <span className="text-[14px] leading-5 font-bold text-white tabular-nums">{formatIqd(price)}</span>
+          <span className="text-[14px] leading-5 font-bold text-white tabular-nums">{money(price)}</span>
           {reference ? (
             <span className="text-[11px] leading-4 text-zinc-500 line-through tabular-nums">
-              {formatIqd(reference.reference_iqd)}
+              {money(reference.reference_iqd)}
             </span>
           ) : null}
         </span>

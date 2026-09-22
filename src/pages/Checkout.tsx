@@ -11,7 +11,7 @@ import {
   Lock, CheckCircle2, Plus, Receipt, ShoppingCart, CalendarClock, Tag
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
-import { api, ApiAddress, ApiError, ApiOrder, CartItem, formatIqd, newIdempotencyKey, usdCentsToIqd } from '../lib/api';
+import { api, ApiAddress, ApiError, ApiOrder, CartItem, newIdempotencyKey, usdCentsToIqd, formatIqd } from '../lib/api';
 import type { DeliveryDayOption } from '../lib/api';
 import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
 /**
@@ -61,6 +61,7 @@ import { mascot } from '../lib/mascot';
  * on a tier id or spells a label out.
  */
 import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
+import { useMoney } from '../CurrencyContext';
 
 /**
  * The refusal codes validateCoupon can produce. A quote that fails with one
@@ -481,6 +482,7 @@ function offeredCheckoutDays(
 }
 
 export default function Checkout() {
+  const { money, moneyBoth } = useMoney();
   const navigate = useNavigate();
   const location = useLocation();
   const { lang, dir, loc } = useLanguage();
@@ -1625,7 +1627,7 @@ export default function Checkout() {
                           ? '—'
                           : displayedPrice === 0
                             ? loc('مجاناً', 'Free', 'بەخۆڕایی')
-                            : formatIqd(displayedPrice)}
+                            : money(displayedPrice)}
                     </span>
                   </div>
                   <span className="lv-choice-mark ms-1"><Check className="h-3 w-3" aria-hidden="true" /></span>
@@ -1785,7 +1787,7 @@ export default function Checkout() {
                     {line.variant && (
                       <p className="text-xs text-zinc-500 mb-1.5 font-light">{line.variant}</p>
                     )}
-                    <span className="text-sm font-medium text-white tabular-nums">{formatIqd(line.lineTotal)}</span>
+                    <span className="text-sm font-medium text-white tabular-nums">{money(line.lineTotal)}</span>
                     {line.mysterySpools ? (
                       <p className="mt-1 text-[11.5px] text-zinc-400">
                         {loc(
@@ -1860,7 +1862,7 @@ export default function Checkout() {
 
             <div className="flex justify-between items-center text-zinc-400">
               <span className="font-light">{loc('المجموع الفرعي', 'Subtotal')}</span>
-              <span className="text-white font-normal tabular-nums">{formatIqd(total)}</span>
+              <span className="text-white font-normal tabular-nums">{money(total)}</span>
             </div>
 
             {/*
@@ -1892,7 +1894,7 @@ export default function Checkout() {
                         `داشکاندنی ئەندامێتی ${memberLabel}`
                       )}
                     </span>
-                    <span className="font-normal tabular-nums">-{formatIqd(memberOrderDiscount)}</span>
+                    <span className="font-normal tabular-nums">-{money(memberOrderDiscount)}</span>
                   </div>
                 )}
                 {memberSavingTotal > 0 && memberSavingTotal !== memberOrderDiscount && (
@@ -1902,13 +1904,13 @@ export default function Checkout() {
                   >
                     {memberOrderDiscount > 0 && memberUnitDiscount > 0
                       ? loc(
-                          `وفّرت ${formatIqd(memberSavingTotal)} بعضوية ${memberLabel} — منها ${formatIqd(memberUnitDiscount)} مطبّقة في أسعار المنتجات أعلاه`,
-                          `Saved ${formatIqd(memberSavingTotal)} with your ${memberLabel} membership — ${formatIqd(memberUnitDiscount)} of it is already in the prices above`
+                          `وفّرت ${money(memberSavingTotal)} بعضوية ${memberLabel} — منها ${money(memberUnitDiscount)} مطبّقة في أسعار المنتجات أعلاه`,
+                          `Saved ${money(memberSavingTotal)} with your ${memberLabel} membership — ${money(memberUnitDiscount)} of it is already in the prices above`
                         )
                       : loc(
-                          `وفّرت ${formatIqd(memberSavingTotal)} بعضوية ${memberLabel}`,
-                          `Saved ${formatIqd(memberSavingTotal)} with ${memberLabel} membership`,
-                          `پاشەکەوتت کرد ${formatIqd(memberSavingTotal)} — ئەندامێتی ${memberLabel}`
+                          `وفّرت ${money(memberSavingTotal)} بعضوية ${memberLabel}`,
+                          `Saved ${money(memberSavingTotal)} with ${memberLabel} membership`,
+                          `پاشەکەوتت کرد ${money(memberSavingTotal)} — ئەندامێتی ${memberLabel}`
                         )}
                   </p>
                 )}
@@ -1921,14 +1923,14 @@ export default function Checkout() {
                   {loc('خصم الكود', 'Promo discount')}{' '}
                   <span dir="ltr" className="text-zinc-500 text-xs">{quote.coupon.code}</span>
                 </span>
-                <span className="font-normal">-{formatIqd(Number(quote.coupon.discount_iqd))}</span>
+                <span className="font-normal">-{money(Number(quote.coupon.discount_iqd))}</span>
               </div>
             )}
 
             {pointsDiscount > 0 && (
               <div className="flex justify-between items-center text-gold/90">
                 <span className="font-light">{loc('خصم النقاط', 'Points Discount')}</span>
-                <span className="font-normal tabular-nums">-{formatIqd(pointsDiscount)}</span>
+                <span className="font-normal tabular-nums">-{money(pointsDiscount)}</span>
               </div>
             )}
 
@@ -1972,13 +1974,13 @@ export default function Checkout() {
                   <span className="text-emerald-400 font-normal">
                     {shippingWaived && quote && quote.shipping.total_before_waiver_iqd > 0 && (
                       <span className="text-zinc-500 line-through font-light mx-2 text-xs">
-                        {formatIqd(quote.shipping.total_before_waiver_iqd)}
+                        {money(quote.shipping.total_before_waiver_iqd)}
                       </span>
                     )}
                     {S.freeShipping}
                   </span>
                 ) : (
-                  <span className="text-white font-normal tabular-nums">{formatIqd(shippingIqd)}</span>
+                  <span className="text-white font-normal tabular-nums">{money(shippingIqd)}</span>
                 )
               }
               note={
@@ -2010,8 +2012,8 @@ export default function Checkout() {
                           `گەیاندنی بێبەرامبەری ${memberLabel}`
                         )
                       : loc(
-                          `عضوية ${memberLabel} غطّت ${formatIqd(memberShipping.subsidy_iqd)} من أجرة التوصيل البالغة ${formatIqd(memberShipping.fee_before_benefit_iqd)}، وتدفع ${formatIqd(memberShipping.fee_paid_iqd)}`,
-                          `Your ${memberLabel} membership covered ${formatIqd(memberShipping.subsidy_iqd)} of the ${formatIqd(memberShipping.fee_before_benefit_iqd)} delivery fee — you pay ${formatIqd(memberShipping.fee_paid_iqd)}`
+                          `عضوية ${memberLabel} غطّت ${money(memberShipping.subsidy_iqd)} من أجرة التوصيل البالغة ${money(memberShipping.fee_before_benefit_iqd)}، وتدفع ${money(memberShipping.fee_paid_iqd)}`,
+                          `Your ${memberLabel} membership covered ${money(memberShipping.subsidy_iqd)} of the ${money(memberShipping.fee_before_benefit_iqd)} delivery fee — you pay ${money(memberShipping.fee_paid_iqd)}`
                         )}
                   </p>
                 ) : null
@@ -2043,7 +2045,7 @@ export default function Checkout() {
                           {component.units > 1 ? ` × ${component.units}` : ''}
                         </span>
                         <span className={`tabular-nums ${component.waived ? 'text-emerald-400' : 'text-zinc-300'}`}>
-                          {component.waived ? S.freeShipping : formatIqd(component.fee_iqd)}
+                          {component.waived ? S.freeShipping : money(component.fee_iqd)}
                         </span>
                       </div>
                     );
@@ -2083,7 +2085,7 @@ export default function Checkout() {
                         <span className="text-emerald-400">{S.protectedFree}</span>
                       ) : (
                         <span className="text-zinc-300">
-                          + {formatIqd(quote.protected_delivery.fee_iqd ?? 0)}
+                          + {money(quote.protected_delivery.fee_iqd ?? 0)}
                         </span>
                       )}
                     </span>
@@ -2113,7 +2115,7 @@ export default function Checkout() {
                 testId="cod-tax"
                 label={S.codTax}
                 question={loc('لماذا توجد ضريبة على التوصيل؟', 'Why is there a delivery tax?')}
-                value={<span className="text-white font-normal tabular-nums">{formatIqd(codTaxRowIqd)}</span>}
+                value={<span className="text-white font-normal tabular-nums">{money(codTaxRowIqd)}</span>}
               >
                 <p>{loc(
                   'شركة التوصيل تأخذ ضريبة على الطلبات ذات المبلغ العالي المدفوع عند الاستلام — وهي ليست من المتجر.',
@@ -2124,6 +2126,13 @@ export default function Checkout() {
                     ever changes, this explanation changes with it instead of
                     quietly becoming a lie. */}
                 <p className="tabular-nums">{loc(
+                  /* A RATE, NOT A PRICE — so it does not follow the currency
+                     switch. «6,000 د.ع عن كل 500,000 د.ع» is how the charge is
+                     DEFINED, in the unit it is legislated and collected in, and
+                     it is quoted from packages/shipping/src/codTax so the
+                     sentence cannot drift from what the server actually
+                     charges. Converting a definition would make the explanation
+                     depend on a rate the shop can change tomorrow. */
                   `وقدرها ${formatIqd(COD_TAX_PER_BLOCK_IQD)} عن كل ${formatIqd(COD_TAX_BLOCK_IQD)} من المبلغ المدفوع عند الاستلام.`,
                   `It is ${formatIqd(COD_TAX_PER_BLOCK_IQD)} for every ${formatIqd(COD_TAX_BLOCK_IQD)} collected at the door.`
                 )}</p>
@@ -2140,7 +2149,7 @@ export default function Checkout() {
                   <span className="font-light">
                     {loc(`إعفاء عضوية ${memberLabel}`, `${memberLabel} membership exemption`)}
                   </span>
-                  <span className="font-normal tabular-nums">-{formatIqd(codTaxExemption)}</span>
+                  <span className="font-normal tabular-nums">-{money(codTaxExemption)}</span>
                 </div>
                 <p className="mt-1 text-[11.5px] leading-relaxed text-gold/90" data-checkout-member-cod>
                   {loc('تم إعفاؤك من ضريبة الدفع عند الاستلام', 'You are exempt from the cash-on-delivery tax')}
@@ -2171,7 +2180,7 @@ export default function Checkout() {
                 question={loc('ما هي عمولة الدفع عند الاستلام؟', 'What is the cash-on-delivery commission?')}
                 value={
                   <span className="tabular-nums" data-checkout-cod-commission>
-                    +{formatIqd(codSurchargeIqd)}
+                    +{money(codSurchargeIqd)}
                   </span>
                 }
               >
@@ -2228,7 +2237,7 @@ export default function Checkout() {
             {quote && quote.shipping.advance_due_iqd > 0 && (
               <p className="text-xs text-amber-400/90 font-light flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
-                {S.advanceDue(formatIqd(quote.shipping.advance_due_iqd))}
+                {S.advanceDue(money(quote.shipping.advance_due_iqd))}
               </p>
             )}
 
@@ -2242,14 +2251,14 @@ export default function Checkout() {
                 icon={<Truck className="w-4 h-4" strokeWidth={1.5} />}
                 testId="checkout-printer-note"
               >
-                <span className="font-light">{S.printerNote(formatIqd(printerNoteIqd))}</span>
+                <span className="font-light">{S.printerNote(money(printerNoteIqd))}</span>
                 {/* Only once the quote says the balance cannot cover it. The
                     sentence above is a term of sale and stays quiet; this one
                     is the reason the Complete button is disabled, so it is
                     worth the tone change. */}
                 {printerAdvanceUnmet && (
                   <span className="mt-1 block font-medium">
-                    {S.printerAdvanceShort(formatIqd(printerNoteIqd), formatIqd(walletBalanceShown))}
+                    {S.printerAdvanceShort(money(printerNoteIqd), money(walletBalanceShown))}
                   </span>
                 )}
               </Note>
@@ -2303,7 +2312,6 @@ export default function Checkout() {
                   <PromoCodeField
                     lang={lang}
                     showLabel={false}
-                    formatIqd={formatIqd}
                     onApplied={(code) => {
                       setCouponError('');
                       setCouponCode(code);
@@ -2342,7 +2350,7 @@ export default function Checkout() {
                                 {loc('استخدام المحفظة', 'Use Wallet')}
                             </span>
                             <span className="text-xs text-zinc-500 font-light block">
-                                {loc('الرصيد:', 'Balance:')} <span className="text-zinc-300">{formatIqd(walletBalanceShown)}</span>
+                                {loc('الرصيد:', 'Balance:')} <span className="text-zinc-300">{money(walletBalanceShown)}</span>
                             </span>
                         </div>
                     </div>
@@ -2405,9 +2413,9 @@ export default function Checkout() {
                       {loc('استخدام النقاط', 'Use points', 'بەکارهێنانی خاڵ')}
                     </span>
                     <span className="block text-[11.5px] text-zinc-500 tabular-nums">
-                      {loc('الرصيد', 'Balance', 'باڵانس')}: {formatIqd(quote?.points.balance ?? pointBalance)}
+                      {loc('الرصيد', 'Balance', 'باڵانس')}: {money(quote?.points.balance ?? pointBalance)}
                       {quote?.points.eligible_merchandise_iqd != null
-                        ? ` · ${loc('الحد الأقصى لهذا الطلب', 'Max for this order', 'زۆرترین بۆ ئەم داواکارییە')} ${formatIqd(quote.points.eligible_merchandise_iqd)}`
+                        ? ` · ${loc('الحد الأقصى لهذا الطلب', 'Max for this order', 'زۆرترین بۆ ئەم داواکارییە')} ${money(quote.points.eligible_merchandise_iqd)}`
                         : ''}
                     </span>
                   </span>
@@ -2464,8 +2472,19 @@ export default function Checkout() {
                 <span className="text-text-primary font-bold text-[15px]">
                   {loc('إجمالي الطلب', 'Order total', 'کۆی داواکاری')}
                 </span>
+                {/*
+                  THE ONE FIGURE THAT NEVER LEAVES DINARS.
+
+                  Every price on this page follows the customer's chosen
+                  currency (src/CurrencyContext.tsx), and this one does too —
+                  but it keeps the dinar beside it, because the dinar is what
+                  is actually charged. A converted figure, at a rate this shop
+                  sets and can change tomorrow, is not the number the
+                  customer's bank will see, and the screen with the pay button
+                  on it is the last place to be approximate.
+                */}
                 <span data-testid="checkout-order-total" className="text-2xl font-black text-text-primary tabular-nums">
-                  {formatIqd(orderTotal)}
+                  {moneyBoth(orderTotal)}
                 </span>
               </div>
 
@@ -2473,7 +2492,7 @@ export default function Checkout() {
                 {walletDiscount > 0 ? (
                   <div className="flex justify-between items-center text-text-secondary">
                     <span>{loc('مدفوع من المحفظة', 'Paid from your wallet', 'لە جزدان درا')}</span>
-                    <span className="tabular-nums">−{formatIqd(walletDiscount)}</span>
+                    <span className="tabular-nums">−{money(walletDiscount)}</span>
                   </div>
                 ) : null}
 
@@ -2484,7 +2503,7 @@ export default function Checkout() {
                         {loc('المبلغ المموّل عبر BNPL', 'Financed with BNPL', 'دابین کراو بە BNPL')}
                       </span>
                       <span data-testid="checkout-bnpl-financed" className="tabular-nums font-bold text-text-primary">
-                        {formatIqd(bnplFinancedIqd)}
+                        {money(bnplFinancedIqd)}
                       </span>
                     </div>
                     {quote?.bnpl?.due_at ? (
@@ -2506,7 +2525,7 @@ export default function Checkout() {
                       data-testid="checkout-due-on-delivery"
                       className={`tabular-nums font-bold ${amountRemainingOnDelivery === 0 ? 'text-gold' : 'text-text-primary'}`}
                     >
-                      {formatIqd(amountRemainingOnDelivery)}
+                      {money(amountRemainingOnDelivery)}
                     </span>
                   </div>
                 )}
@@ -2571,7 +2590,7 @@ export default function Checkout() {
         <div className="mx-auto w-full max-w-[640px] flex items-center gap-3">
           <div className="min-w-0 basis-[8.5rem] shrink-0">
             <div className="text-[11px] text-text-muted">{loc('إجمالي الطلب', 'Order total', 'کۆی داواکاری')}</div>
-            <div className="text-text-primary font-black text-[15px] tabular-nums truncate">{formatIqd(orderTotal)}</div>
+            <div className="text-text-primary font-black text-[15px] tabular-nums truncate">{money(orderTotal)}</div>
           </div>
           <div className="flex-1 min-w-0">{orderButton}</div>
         </div>

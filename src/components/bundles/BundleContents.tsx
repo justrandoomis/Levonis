@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
-import { formatIqd } from '../../lib/api';
+import { useMoney } from '../../CurrencyContext';
 
 /**
  * ONE MAIN ITEM WITH EXPANDABLE CONTENTS — the disclosure the cart, the
@@ -52,6 +52,7 @@ export default function BundleContents({
   defaultOpen?: boolean;
   className?: string;
 }) {
+  const { money } = useMoney();
   const { loc } = useLanguage();
   const m = useMotion();
   const [open, setOpen] = useState(defaultOpen);
@@ -123,14 +124,14 @@ export default function BundleContents({
                       )}
                     </span>
                     {typeof l.value_iqd === 'number' && l.value_iqd > 0 && (
-                      <span className="shrink-0 text-[11.5px] text-zinc-400 tabular-nums">{formatIqd(l.value_iqd)}</span>
+                      <span className="shrink-0 text-[11.5px] text-zinc-400 tabular-nums">{money(l.value_iqd)}</span>
                     )}
                   </li>
                 ))}
                 {componentTotalIqd !== null && componentTotalIqd > 0 && (
                   <li className="mt-0.5 pt-1.5 border-t border-zinc-800 flex items-center justify-between gap-3 text-[11.5px] text-zinc-400">
                     <span>{loc('قيمة القطع منفردة', 'Bought separately', 'بەجیا کڕدرا')}</span>
-                    <span className="tabular-nums line-through">{formatIqd(componentTotalIqd)}</span>
+                    <span className="tabular-nums line-through">{money(componentTotalIqd)}</span>
                   </li>
                 )}
               </ul>

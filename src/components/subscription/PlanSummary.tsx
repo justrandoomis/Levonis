@@ -14,12 +14,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertTriangle, Clock, Wallet } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
-import { formatIqd, formatUsdCents } from '../../lib/api';
+import { formatUsdCents } from '../../lib/api';
 import { formatDate } from '../orders/format';
 import Spinner from '../ui/Spinner';
 import { TIER_META, tierLabel } from './tierMeta';
 import type { ApiPlan, LaunchInfo, PurchaseQuote } from './types';
 import { purchaseErrorText } from './purchaseErrors';
+import { useMoney } from '../../CurrencyContext';
 
 export interface PlanSummaryProps {
   plan: ApiPlan | null;
@@ -59,6 +60,7 @@ export function PlanSummary({
   ctaRef,
   busy,
 }: PlanSummaryProps) {
+  const { money } = useMoney();
   const { t, loc, lang } = useLanguage();
   const m = useMotion();
 
@@ -106,7 +108,7 @@ export function PlanSummary({
               </p>
               {priced && plan.duration_months > 1 && plan.per_month_iqd !== null && (
                 <p className="text-zinc-500 text-[11.5px] tabular-nums" dir="ltr">
-                  {formatIqd(plan.per_month_iqd)} / {t('month')}
+                  {money(plan.per_month_iqd)} / {t('month')}
                 </p>
               )}
             </div>
@@ -115,7 +117,7 @@ export function PlanSummary({
               dir="ltr"
               data-summary-price
             >
-              {priced ? formatIqd(plan.price_iqd as number) : t('priceTBA')}
+              {priced ? money(plan.price_iqd as number) : t('priceTBA')}
             </p>
           </motion.div>
         </AnimatePresence>
@@ -148,11 +150,11 @@ export function PlanSummary({
                 {ok.credit_iqd > 0 && (
                   <Row
                     label={`${t('upgradeCredit')} (${tierLabel(ok.upgrade_from_tier)})`}
-                    value={`− ${formatIqd(ok.credit_iqd)}`}
+                    value={`− ${money(ok.credit_iqd)}`}
                     tone="negative"
                   />
                 )}
-                {ok.credit_iqd > 0 && <Row label={t('amountDue')} value={formatIqd(ok.charge_iqd)} />}
+                {ok.credit_iqd > 0 && <Row label={t('amountDue')} value={money(ok.charge_iqd)} />}
                 <Row
                   label={t('walletDebit')}
                   value={

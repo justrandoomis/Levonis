@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom';
 import { Sparkles, Flame, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { formatIqd, type ApiProduct } from '../../lib/api';
+import { type ApiProduct } from '../../lib/api';
 import SafeImage from '../ui/SafeImage';
 import { productPrimaryImage } from '../../lib/productImage';
 import { rankByAffinity, readRecentlyViewed } from '../../lib/recentlyViewed';
+import { useMoney } from '../../CurrencyContext';
 
 /**
  * THE TWO TILES THAT CHANGE WHILE YOU LOOK AT THEM — «سلكشن» and «سوبر ديلز».
@@ -98,6 +99,7 @@ const PER_PAGE = 4;
 const MAX_PAGES = 2;
 
 function PricePlate({ p }: { p: ApiProduct }) {
+  const { money } = useMoney();
   const display = p.display_price_iqd ?? p.price_iqd;
   const regular = p.display_regular_iqd ?? p.price_iqd;
   const discounted = display < regular;
@@ -117,7 +119,7 @@ function PricePlate({ p }: { p: ApiProduct }) {
           discounted ? 'text-gold' : 'text-white'
         }`}
       >
-        {formatIqd(display)}
+        {money(display)}
       </span>
       {/* The struck regular price needs about 58px of its own and there are
           only ~74 in a phone slot, so it is held back to `sm`. On a phone the
@@ -125,7 +127,7 @@ function PricePlate({ p }: { p: ApiProduct }) {
           signal, in the space that exists. */}
       {discounted && (
         <span className="hidden sm:inline text-[10px] leading-4 text-zinc-400 line-through tabular-nums whitespace-nowrap">
-          {formatIqd(regular)}
+          {money(regular)}
         </span>
       )}
     </span>

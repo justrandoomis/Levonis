@@ -1,7 +1,8 @@
 import React from 'react';
 import { Star } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
-import { formatIqd, type ApiProduct } from '../lib/api';
+import { type ApiProduct } from '../lib/api';
+import { useMoney } from '../CurrencyContext';
 
 /**
  * The ONE price block every product card renders (home rails, /products grid,
@@ -26,6 +27,7 @@ import { formatIqd, type ApiProduct } from '../lib/api';
  * variant prices, so «يبدأ من» is honest, never decorative.
  */
 export default function CardPrice({ p, compact = false }: { p: ApiProduct; compact?: boolean }) {
+  const { money } = useMoney();
   const { loc } = useLanguage();
 
   const main = p.display_price_iqd ?? p.price_iqd;
@@ -63,17 +65,17 @@ export default function CardPrice({ p, compact = false }: { p: ApiProduct; compa
           }`}
         >
           {memberPrice && <Star aria-hidden className="w-3 h-3 fill-gold" />}
-          {formatIqd(main)}
+          {money(main)}
         </span>
         {struck !== null && (
-          <span className="text-zinc-500 text-[11px] line-through truncate">{formatIqd(struck)}</span>
+          <span className="text-zinc-500 text-[11px] line-through truncate">{money(struck)}</span>
         )}
       </div>
       {teasers.map((t) => (
         <div key={t.label} className="flex items-center gap-1 mt-0.5 min-w-0">
           <Star aria-hidden className="w-2.5 h-2.5 text-gold/70 shrink-0" />
           <span className="text-zinc-500 font-medium text-[10px] truncate">
-            {t.label} {formatIqd(t.price)} ({loc('للمشتركين', 'members', 'بۆ ئەندامان')})
+            {t.label} {money(t.price)} ({loc('للمشتركين', 'members', 'بۆ ئەندامان')})
           </span>
         </div>
       ))}

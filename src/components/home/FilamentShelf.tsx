@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../LanguageContext';
-import { formatIqd, type ApiProduct } from '../../lib/api';
+import { type ApiProduct } from '../../lib/api';
 import SafeImage from '../ui/SafeImage';
 import SectionHeader from './SectionHeader';
 import { productPrimaryImage } from '../../lib/productImage';
+import { useMoney } from '../../CurrencyContext';
 
 /**
  * THE FILAMENT SHELF — «الفيلمنت العشوائي», a dense swatch wall.
@@ -28,6 +29,7 @@ import { productPrimaryImage } from '../../lib/productImage';
  * browse, a different handful when you come back.
  */
 export default function FilamentShelf({ products }: { products: ApiProduct[] }) {
+  const { money } = useMoney();
   const { t, loc } = useLanguage();
   if (products.length === 0) return null;
 
@@ -63,7 +65,7 @@ export default function FilamentShelf({ products }: { products: ApiProduct[] }) 
                 {p.name}
               </span>
               <span className="block text-[11px] font-bold text-white tabular-nums truncate">
-                {formatIqd(price)}
+                {money(price)}
               </span>
             </Link>
           );

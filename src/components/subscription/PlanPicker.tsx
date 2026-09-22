@@ -12,12 +12,12 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
-import { formatIqd } from '../../lib/api';
 import { Segmented } from '../ui/Segmented';
 import { TabPanels } from '../ui/Tabs';
 import { ErrorState, EmptyState } from '../ui/AsyncStates';
 import { TIER_META, type AnyTier, type PaidTier } from './tierMeta';
 import type { ApiPlan } from './types';
+import { useMoney } from '../../CurrencyContext';
 
 export interface PlanPickerProps {
   plans: ApiPlan[] | null;
@@ -68,6 +68,7 @@ export function PlanPicker({
   onSelectPlan,
   currentTier,
 }: PlanPickerProps) {
+  const { money } = useMoney();
   const { t } = useLanguage();
   const m = useMotion();
   const meta = TIER_META[activeTier];
@@ -175,7 +176,7 @@ export function PlanPicker({
                     {priced ? (
                       <>
                         <span className="text-white font-bold text-[13.5px] tabular-nums truncate max-w-full" dir="ltr">
-                          {formatIqd(p.price_iqd as number)}
+                          {money(p.price_iqd as number)}
                         </span>
                         {/* Two short lines, not one long one: a four-up row inside
                             the desktop two-column layout leaves ~100px per card.
@@ -183,7 +184,7 @@ export function PlanPicker({
                         {p.duration_months > 1 && p.per_month_iqd !== null && (
                           <>
                             <span className="text-zinc-400 text-[11px] tabular-nums truncate max-w-full mt-0.5" dir="ltr">
-                              {formatIqd(p.per_month_iqd)}
+                              {money(p.per_month_iqd)}
                             </span>
                             <span className="text-zinc-500 text-[10px] truncate max-w-full">{t('perMonth')}</span>
                           </>

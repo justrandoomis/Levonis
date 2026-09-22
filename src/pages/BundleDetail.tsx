@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Lock, Package, Sparkles } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
-import { api, ApiError, formatIqd, type ApiProduct, type CartItem } from '../lib/api';
+import { api, ApiError, type ApiProduct, type CartItem } from '../lib/api';
 import { useAuth } from '../AuthContext';
 import { refusalText } from '../lib/refusalStrings';
 import { useFreshOnReturn } from '../lib/useFreshOnReturn';
@@ -17,6 +17,7 @@ import Note from '../components/ui/Note';
 import { tierLabel } from '../components/subscription/tierMeta';
 import { StateChip, type BundleCard } from '../components/bundles/BundleTile';
 import { authPathWithSupportRef } from '../lib/supportRef';
+import { useMoney } from '../CurrencyContext';
 
 /**
  * ONE BUNDLE OR MYSTERY OFFER (docs/BUNDLES_MYSTERY.md §10, §13).
@@ -215,6 +216,7 @@ interface CompositionQuote {
 }
 
 export default function BundleDetail() {
+  const { money } = useMoney();
   const { slug = '' } = useParams();
   const { dir, lang, loc } = useLanguage();
   const s = STRINGS[lang];
@@ -523,7 +525,7 @@ export default function BundleDetail() {
             <h3 className="text-white font-bold text-[15px] mb-1">{s.locked}</h3>
             <p className="text-[13px] text-zinc-400 mb-4">{s.lockedBody}</p>
             {typeof bundle.display_regular_iqd === 'number' && (
-              <p className="text-zinc-300 font-bold tabular-nums mb-4">{formatIqd(bundle.display_regular_iqd)}</p>
+              <p className="text-zinc-300 font-bold tabular-nums mb-4">{money(bundle.display_regular_iqd)}</p>
             )}
             <Link
               to={bundle.viewer_tier?.tier ? '/subscription' : '/auth?next=/bundles'}
@@ -539,7 +541,7 @@ export default function BundleDetail() {
               <>
                 <BundleSavingLine componentTotalIqd={comp.component_total_iqd} savingPercent={comp.saving_percent} />
                 <p className="text-[11px] text-zinc-500">
-                  {s.total}: <span className="tabular-nums">{formatIqd(comp.component_total_iqd)}</span>
+                  {s.total}: <span className="tabular-nums">{money(comp.component_total_iqd)}</span>
                 </p>
               </>
             )}
@@ -795,7 +797,7 @@ export default function BundleDetail() {
 
                 {quote && (
                   <p className="text-[13px] text-zinc-300">
-                    <span className="tabular-nums font-bold text-white">{formatIqd(quote.line_total_iqd)}</span>
+                    <span className="tabular-nums font-bold text-white">{money(quote.line_total_iqd)}</span>
                   </p>
                 )}
 

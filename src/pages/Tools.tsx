@@ -62,7 +62,7 @@ import {
   Upload,
   Users,
 } from 'lucide-react';
-import { failureText, formatIqd } from '../lib/api';
+import { failureText } from '../lib/api';
 import {
   formatDuration,
   formatGrams,
@@ -79,6 +79,7 @@ import {
   type QuotePrinter,
 } from '../lib/printQuote';
 import GramsQuotePanel from '../components/tools/GramsQuotePanel';
+import { useMoney } from '../CurrencyContext';
 
 type Lang = 'ar' | 'en' | 'ckb';
 type Quality = 'draft' | 'standard' | 'fine';
@@ -280,6 +281,7 @@ const REFUSAL_KEY: Record<string, keyof (typeof STRINGS)['ar']> = {
 };
 
 export default function Tools() {
+  const { money } = useMoney();
   const navigate = useNavigate();
   const { lang, dir } = useLanguage();
   const L = (lang in STRINGS ? lang : 'ar') as Lang;
@@ -743,11 +745,11 @@ export default function Tools() {
           <section className="rounded-2xl border border-[#BAA369]/30 bg-gradient-to-b from-[#BAA369]/[0.07] to-transparent p-5">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">{s.price}</p>
             <p className="text-white font-bold text-[30px] leading-tight mt-1 tabular-nums" dir="ltr" data-quote-price>
-              {formatIqd(quote.price_iqd)}
+              {money(quote.price_iqd)}
             </p>
             {quote.range_iqd.high > quote.range_iqd.low && (
               <p className="text-zinc-400 text-[12px] mt-1 tabular-nums" dir="ltr">
-                {s.rangeNote}: {formatIqd(quote.range_iqd.low)} – {formatIqd(quote.range_iqd.high)}
+                {s.rangeNote}: {money(quote.range_iqd.low)} – {money(quote.range_iqd.high)}
               </p>
             )}
             <p

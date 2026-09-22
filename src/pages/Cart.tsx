@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { mascot } from '../lib/mascot';
-import { api, ApiError, CartItem, formatIqd } from '../lib/api';
+import { api, ApiError, CartItem } from '../lib/api';
 import type { CartWarrantyPlan } from '../lib/api';
 import { shippingTypeLabel, type ShippingType } from '../lib/shippingType';
 import { asLang, monthsLabel } from '../components/orders/format';
@@ -32,6 +32,7 @@ import {
 } from '../lib/supportRef';
 import MerchantCartView from '../components/merchant/MerchantCartView';
 import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
+import { useMoney } from '../CurrencyContext';
 
 /**
  * Component-local trilingual strings for the support-code block (§3.3).
@@ -310,6 +311,7 @@ interface CartWriteResponse {
 const PRO_LABEL = tierLabel('pro');
 
 export default function Cart() {
+  const { money } = useMoney();
   const navigate = useNavigate();
   const { t, lang, dir, loc } = useLanguage();
   const sc = SUPPORT_STRINGS[lang] ?? SUPPORT_STRINGS.ar;
@@ -1401,7 +1403,7 @@ export default function Cart() {
                   </div>
 
                   <div className="min-w-0 flex flex-wrap items-baseline gap-1.5 mb-2 mt-1">
-                    <span className="max-w-full text-white font-semibold text-[15px] sm:text-[17px] tabular-nums">{formatIqd(item.unit_price_iqd)}</span>
+                    <span className="max-w-full text-white font-semibold text-[15px] sm:text-[17px] tabular-nums">{money(item.unit_price_iqd)}</span>
                     {hasSale && (
                       <>
                         <span className="text-zinc-500 text-[12px] line-through">{(regularUnit as number).toLocaleString()}</span>
@@ -1418,9 +1420,9 @@ export default function Cart() {
                     <p className="-mt-1 mb-2 text-[11.5px] leading-relaxed text-gold/90" data-cart-member-saving={item.id}>
                       <span className="tabular-nums">
                         {loc(
-                          `وفّرت ${formatIqd(memberSaving)} بعضوية ${memberLabel}`,
-                          `Saved ${formatIqd(memberSaving)} with ${memberLabel} membership`,
-                          `پاشەکەوتت کرد ${formatIqd(memberSaving)} — ئەندامێتی ${memberLabel}`
+                          `وفّرت ${money(memberSaving)} بعضوية ${memberLabel}`,
+                          `Saved ${money(memberSaving)} with ${memberLabel} membership`,
+                          `پاشەکەوتت کرد ${money(memberSaving)} — ئەندامێتی ${memberLabel}`
                         )}
                       </span>
                       {memberLine && memberLine.capped_by !== 'none' && (
@@ -1488,7 +1490,7 @@ export default function Cart() {
                     <p className="-mt-1.5 mb-2 text-[11.5px] text-zinc-400 tabular-nums flex items-center gap-1.5" data-cart-warranty-fee={item.id}>
                       <ShieldCheck className="w-3 h-3 text-gold shrink-0" aria-hidden="true" />
                       <span className="truncate">
-                        {ew.includes} · +{formatIqd(item.breakdown.warranty.fee_iqd)}
+                        {ew.includes} · +{money(item.breakdown.warranty.fee_iqd)}
                       </span>
                     </p>
                   )}
@@ -1508,7 +1510,7 @@ export default function Cart() {
                           <span className="min-w-0 flex-1">
                             <span className="block text-[12px] font-bold text-zinc-200 leading-tight">{ew.title}</span>
                             <span className={`block text-[11px] leading-tight truncate tabular-nums ${current ? 'text-gold/90' : 'text-zinc-500'}`}>
-                              {current ? `${warrantyPlanLabel(current)} · +${formatIqd(current.fee_iqd)}` : ew.none}
+                              {current ? `${warrantyPlanLabel(current)} · +${money(current.fee_iqd)}` : ew.none}
                             </span>
                           </span>
                           <ChevronRight className={`w-3.5 h-3.5 text-zinc-500 shrink-0 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />
@@ -1531,7 +1533,7 @@ export default function Cart() {
                       same tone the product page and the order use. */}
                   {item.is_printer && printerNoteIqd !== null && (
                     <Note tone="zinc" compact animate={false} icon={<Truck className="w-3.5 h-3.5" />} className="mb-2 !border-x-0 !border-e-0 !border-y-0 !rounded-none !bg-transparent !py-1.5 !ps-2.5 !pe-0 !text-[11px] text-text-muted" testId="cart-printer-note">
-                      {printerNoteText(formatIqd(printerNoteIqd))}
+                      {printerNoteText(money(printerNoteIqd))}
                     </Note>
                   )}
 
@@ -1548,7 +1550,7 @@ export default function Cart() {
                     >
                       {(() => {
                         const m = movedPrices.get(item.id)!;
-                        const was = formatIqd(m.from);
+                        const was = money(m.from);
                         const up = m.to > m.from;
                         if (lang === 'en') {
                           return up
@@ -1737,7 +1739,7 @@ export default function Cart() {
               {/* The engine behind this has existed since migration 0002; the
                   box was disabled because nothing could create a code and
                   nothing could type one. Both halves exist now. */}
-              <PromoCodeField lang={lang} formatIqd={formatIqd} />
+              <PromoCodeField lang={lang} />
             </div>
           )}
         </div>
@@ -1910,7 +1912,7 @@ export default function Cart() {
 
           <div className="flex justify-between items-center">
             <span className="text-zinc-400 text-[14px]">{loc('المجموع الفرعي', 'Subtotal', 'کۆی بەشی')}</span>
-            <span className="text-zinc-200 text-[14px] font-medium">{formatIqd(totalOriginalPrice)}</span>
+            <span className="text-zinc-200 text-[14px] font-medium">{money(totalOriginalPrice)}</span>
           </div>
 
           {otherDiscounts > 0 && (
@@ -1918,7 +1920,7 @@ export default function Cart() {
               <div className="flex items-center gap-1">
                 <span className="text-[14px]">{loc('خصم ليفو', 'Levo Discount', 'داشکاندنی لیڤۆ')}</span>
               </div>
-              <span className="text-[14px] font-medium">- {formatIqd(otherDiscounts)}</span>
+              <span className="text-[14px] font-medium">- {money(otherDiscounts)}</span>
             </div>
           )}
 
@@ -1939,7 +1941,7 @@ export default function Cart() {
                   )}
                 </span>
               </div>
-              <span className="text-[14px] font-medium">- {formatIqd(memberNamedSaving)}</span>
+              <span className="text-[14px] font-medium">- {money(memberNamedSaving)}</span>
             </div>
           )}
 
@@ -1948,7 +1950,7 @@ export default function Cart() {
               <div className="flex items-center gap-1">
                 <span className="text-[14px]">{loc('خصم النقاط', 'Points Discount', 'داشکاندنی خاڵ')}</span>
               </div>
-              <span className="text-[14px] font-medium">- {formatIqd(pointsDiscount)}</span>
+              <span className="text-[14px] font-medium">- {money(pointsDiscount)}</span>
             </div>
           )}
 
@@ -1960,7 +1962,7 @@ export default function Cart() {
               {shipping === 0 ? (
                 <span className="text-gold">{loc('مجاني', 'Free', 'بەخۆڕایی')}</span>
               ) : (
-                formatIqd(shipping)
+                money(shipping)
               )}
             </span>
           </div>
@@ -1985,13 +1987,13 @@ export default function Cart() {
                       `گەیاندنی بێبەرامبەری ${memberLabel}`
                     )
                   : loc(
-                      `عضوية ${memberLabel} تغطي حتى ${formatIqd(deliveryBenefit.subsidy)} من أجرة التوصيل`,
-                      `Your ${memberLabel} membership covers up to ${formatIqd(deliveryBenefit.subsidy)} of the delivery fee`
+                      `عضوية ${memberLabel} تغطي حتى ${money(deliveryBenefit.subsidy)} من أجرة التوصيل`,
+                      `Your ${memberLabel} membership covers up to ${money(deliveryBenefit.subsidy)} of the delivery fee`
                     )
                 : loc(
-                    `أضف ${formatIqd(deliveryBenefit.shortBy)} ليصبح التوصيل مجانيًا بعضوية ${memberLabel}`,
-                    `Add ${formatIqd(deliveryBenefit.shortBy)} more for free delivery with your ${memberLabel} membership`,
-                    `${formatIqd(deliveryBenefit.shortBy)} زیاد بکە بۆ گەیاندنی بێبەرامبەری ${memberLabel}`
+                    `أضف ${money(deliveryBenefit.shortBy)} ليصبح التوصيل مجانيًا بعضوية ${memberLabel}`,
+                    `Add ${money(deliveryBenefit.shortBy)} more for free delivery with your ${memberLabel} membership`,
+                    `${money(deliveryBenefit.shortBy)} زیاد بکە بۆ گەیاندنی بێبەرامبەری ${memberLabel}`
                   )}
               {deliveryBenefit.methodNames.length > 0 &&
                 ` (${deliveryBenefit.methodNames.join(loc('، ', ', '))})`}
@@ -2031,7 +2033,7 @@ export default function Cart() {
 
           <div className="flex justify-between items-center">
             <span className="text-white font-bold text-[15px]">{loc('المجموع الكلي', 'Total', 'کۆی گشتی')}</span>
-            <span className="text-white font-bold text-[17px]">{formatIqd(total)}</span>
+            <span className="text-white font-bold text-[17px]">{money(total)}</span>
           </div>
         </div>
         </>
@@ -2092,7 +2094,7 @@ export default function Cart() {
 
             <div className="flex flex-col items-end flex-1 min-w-0 pe-1">
               <span className="text-white font-bold text-[17px] tabular-nums truncate w-full text-end">
-                {formatIqd(total)}
+                {money(total)}
               </span>
               {/* Always present, only sometimes visible — the row cannot
                   change the bar's height by appearing. */}
@@ -2101,7 +2103,7 @@ export default function Cart() {
                   savedTotal > 0 ? 'text-gold/80' : 'invisible'
                 }`}
               >
-                {loc('وفّرت', 'Saved', 'پاشەکەوتت کرد')} {formatIqd(savedTotal)}
+                {loc('وفّرت', 'Saved', 'پاشەکەوتت کرد')} {money(savedTotal)}
               </span>
             </div>
 
@@ -2206,7 +2208,7 @@ export default function Cart() {
                     >
                       <span className="min-w-0 truncate tabular-nums text-text-primary">{warrantyPlanLabel(w)}</span>
                       <span className="flex shrink-0 items-center gap-2 tabular-nums text-[12px] text-text-secondary">
-                        {saving && warrantyPendingPlan === w.id ? <Spinner size="xs" delayMs={0} decorative /> : `+${formatIqd(w.fee_iqd)}`}
+                        {saving && warrantyPendingPlan === w.id ? <Spinner size="xs" delayMs={0} decorative /> : `+${money(w.fee_iqd)}`}
                         <Check className={`h-4 w-4 ${checked ? 'text-text-primary' : 'invisible'}`} aria-hidden="true" />
                       </span>
                     </button>
@@ -2288,7 +2290,7 @@ export default function Cart() {
                   <div className="w-20 h-20 rounded-lg bg-zinc-800" />
                 )}
                 <div>
-                  <p className="text-white font-bold text-lg tabular-nums">{formatIqd(variantView.unit_price_iqd)}</p>
+                  <p className="text-white font-bold text-lg tabular-nums">{money(variantView.unit_price_iqd)}</p>
                   {variantView.stock !== null && (
                     <p className="text-sm text-zinc-400">{loc('المخزون', 'Stock', 'کۆگا')}: {variantView.stock}</p>
                   )}
@@ -2343,7 +2345,7 @@ export default function Cart() {
                         aria-pressed={active}
                         className="lv-choice flex items-center gap-2 px-4 py-2 text-sm"
                       >
-                        <span>{oName}{typeof o.price_iqd === 'number' && o.price_iqd > 0 ? ` — ${formatIqd(o.price_iqd)}` : ''}</span>
+                        <span>{oName}{typeof o.price_iqd === 'number' && o.price_iqd > 0 ? ` — ${money(o.price_iqd)}` : ''}</span>
                         <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
                       </button>
                     );
@@ -2446,7 +2448,7 @@ export default function Cart() {
                       )}
                       {typeof sm.price_iqd === 'number' && sm.price_iqd > 0 && (
                         <p className="text-[13px] mt-1.5 font-bold text-text-secondary">
-                          {formatIqd(sm.price_iqd)}
+                          {money(sm.price_iqd)}
                         </p>
                       )}
                     </div>

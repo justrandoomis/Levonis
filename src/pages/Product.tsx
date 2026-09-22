@@ -47,7 +47,7 @@ import {
   ChevronDown, Minus, Plus, X, FileText, Settings2, ShieldCheck, Truck,
   AlertTriangle, Store, ZoomIn, Image as ImageIcon, Box, ExternalLink, PlayCircle, Wrench, TrendingUp, PackageOpen,
 } from 'lucide-react';
-import { api, ApiError, CartItem, formatIqd } from '../lib/api';
+import { api, ApiError, CartItem } from '../lib/api';
 import { rememberViewed } from '../lib/recentlyViewed';
 import { useGoBack } from '../lib/useGoBack';
 import { setCartCount, countCartItems } from '../lib/cartCount';
@@ -81,6 +81,7 @@ import {
 } from '../components/product/stockAlertTargets';
 import { conditionKindLabel, type ConditionEntry } from '../lib/condition';
 import { resolveOrderType, resolveTransport, routeIsUsable } from '../lib/productSelection';
+import { useMoney } from '../CurrencyContext';
 
 // ------------------------------------------------------------------ strings
 
@@ -746,6 +747,7 @@ function readPathSlug(): string {
 const readPathSlugServer = (): string => '';
 
 export default function Product() {
+  const { money } = useMoney();
   const { slug } = useParams();
   const location = useLocation();
   const urlSlug = useSyncExternalStore(subscribeToPath, readPathSlug, readPathSlugServer);
@@ -1836,7 +1838,7 @@ export default function Product() {
       chosen.duration_kind === 'extension'
         ? s.extendedPlan(monthsLabel(chosen.duration_months, lang))
         : pick(lang as Lang, chosen.title_ar, chosen.title_en, chosen.title_ckb) || chosen.id;
-    return `${label} · +${formatIqd(chosen.fee_iqd)}`;
+    return `${label} · +${money(chosen.fee_iqd)}`;
   })();
   const specGroups = (product.spec_groups ?? []).filter((g) => (g.rows ?? []).length > 0);
   const legacySpecs = product.specifications ?? [];
@@ -2263,7 +2265,7 @@ export default function Product() {
                 priceIsPending ? 'opacity-55' : 'opacity-100'
               }`}
             >
-              {formatIqd(unitPrice!)}
+              {money(unitPrice!)}
             </span>
             {appliedMemberTier ? (
               /* §8 — NAMED BY TIER, from tierMeta: «سعر PRO» / «سعر PREMIUM». */
@@ -2286,17 +2288,17 @@ export default function Product() {
               numbers or to discover the benefit at checkout. */}
           {shownPrice.applied < shownPrice.regular ? (
             <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="text-zinc-500 text-sm line-through tabular-nums">{formatIqd(shownPrice.regular)}</span>
+              <span className="text-zinc-500 text-sm line-through tabular-nums">{money(shownPrice.regular)}</span>
               {memberSavingIqd !== null ? (
                 <span data-testid="product-member-saving" className="text-gold text-[12.5px] font-bold tabular-nums">
-                  {s.savedWithTier(formatIqd(memberSavingIqd), appliedMemberLabel)}
+                  {s.savedWithTier(money(memberSavingIqd), appliedMemberLabel)}
                 </span>
               ) : null}
             </div>
           ) : null}
           {qty > 1 ? (
             <div className="text-zinc-400 text-[13px] mt-2">
-              {s.lineTotal}: <span className="text-white font-bold tabular-nums">{formatIqd(lineTotal!)}</span>
+              {s.lineTotal}: <span className="text-white font-bold tabular-nums">{money(lineTotal!)}</span>
             </div>
           ) : null}
         </>
@@ -2315,7 +2317,7 @@ export default function Product() {
               <span className="text-zinc-400 text-[12px] font-bold">{s.from}</span>
             ) : null}
             <span className="text-white font-bold text-xl tabular-nums opacity-80">
-              {formatIqd(product.display_price_iqd ?? product.price_iqd)}
+              {money(product.display_price_iqd ?? product.price_iqd)}
             </span>
           </div>
           <p className="text-zinc-400 text-[13px] mt-2">{quoteLoading ? s.updatingPrice : s.priceUnavailable}</p>
@@ -2341,7 +2343,7 @@ export default function Product() {
           <span className="text-[12.5px] font-medium flex min-w-0 items-center gap-1.5">
             <Star aria-hidden="true" className="w-3.5 h-3.5 shrink-0 text-gold" />
             <span className="truncate">{s.memberPriceOf(PRO_LABEL)}</span>
-            <span className="shrink-0 tabular-nums font-bold text-gold">{formatIqd(proInvite.unit_iqd)}</span>
+            <span className="shrink-0 tabular-nums font-bold text-gold">{money(proInvite.unit_iqd)}</span>
           </span>
           <span className="shrink-0 text-[11.5px] font-semibold text-text-muted group-hover:text-text-secondary">
             {isPrime ? s.upgradeTo(PRO_LABEL) : s.subscribe}
@@ -2361,7 +2363,7 @@ export default function Product() {
                 ? ` · ${s.extendedPlan(monthsLabel(quote!.warranty.duration_months, lang))}`
                 : ''}
             </dt>
-            <dd className="text-zinc-200 tabular-nums">{formatIqd(quote!.warranty.fee_iqd)}</dd>
+            <dd className="text-zinc-200 tabular-nums">{money(quote!.warranty.fee_iqd)}</dd>
           </div>
         </dl>
       ) : null}
@@ -2371,7 +2373,7 @@ export default function Product() {
           never added to any figure on this page. */}
       {source === 'catalog' && product.is_printer === true && printerNoteIqd !== null ? (
         <Note tone="zinc" compact animate={false} icon={<Truck className="w-4 h-4" />} className="mt-3" testId="product-printer-note">
-          {s.printerNote(formatIqd(printerNoteIqd))}
+          {s.printerNote(money(printerNoteIqd))}
         </Note>
       ) : null}
     </div>
@@ -2482,7 +2484,7 @@ export default function Product() {
                 <span className="block">{s.directSale}</span>
                 <span className="block text-[11px] text-zinc-400 font-medium leading-snug">{s.fulfilDirectSub}</span>
                 {directUsable && directFinal !== null ? (
-                  <span className="block tabular-nums text-[14px] font-bold mt-1" data-direct-final>{formatIqd(directFinal)}</span>
+                  <span className="block tabular-nums text-[14px] font-bold mt-1" data-direct-final>{money(directFinal)}</span>
                 ) : null}
                 {/* CLOSED, AND IT SAYS WHY. Never a dead chip with no sentence. */}
                 {!directUsable ? (
@@ -2512,7 +2514,7 @@ export default function Product() {
                 {preUsable && preorderFromFinal !== null ? (
                   <span className="block tabular-nums text-[14px] font-bold mt-1">
                     <span className="text-[10px] font-medium text-zinc-400 me-1">{s.from}</span>
-                    {formatIqd(preorderFromFinal)}
+                    {money(preorderFromFinal)}
                   </span>
                 ) : null}
                 {!preUsable ? (
@@ -2616,7 +2618,7 @@ export default function Product() {
                       : !usable
                         ? s.routeQuotaFull
                         : final !== null
-                          ? formatIqd(final)
+                          ? money(final)
                           : s.transportUnset}
                   </span>
                 </button>
@@ -3071,7 +3073,7 @@ export default function Product() {
                         ) : null}
                       </span>
                       <span className="ms-auto flex shrink-0 items-center gap-2 tabular-nums text-[13px]" aria-busy={quoteLoading || undefined}>
-                        <span>+{formatIqd(w.fee_iqd)}</span>
+                        <span>+{money(w.fee_iqd)}</span>
                         <span className="lv-choice-mark"><Check aria-hidden="true" className="h-3 w-3" /></span>
                       </span>
                     </button>
@@ -3929,7 +3931,7 @@ export default function Product() {
                 priceIsPending ? 'opacity-55' : 'opacity-100'
               }`}
             >
-              {lineTotal !== null ? formatIqd(lineTotal) : '—'}
+              {lineTotal !== null ? money(lineTotal) : '—'}
             </div>
           </div>
           {barStepper}

@@ -22,9 +22,10 @@ import {
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import { UnauthorizedState } from '../ui/AsyncStates';
-import { ApiError, formatIqd } from '../../lib/api';
+import { ApiError } from '../../lib/api';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
 import { printApi, priceRange, type MyRequestRow, type Confidence } from '../../lib/printApi';
+import { useMoney } from '../../CurrencyContext';
 
 const CONFIDENCE_TEXT: Record<Confidence, [string, string]> = {
   high: ['دقة عالية', 'High confidence'],
@@ -44,6 +45,7 @@ const STATE_TEXT: Record<string, [string, string]> = {
 };
 
 export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => void }) {
+  const { money } = useMoney();
   const { loc, lang } = useLanguage();
   const { isAuthenticated } = useAuth();
   const [rows, setRows] = useState<MyRequestRow[] | null>(null);
@@ -159,7 +161,7 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
 
                   {p && (p.estimate_low_iqd !== null || p.estimate_high_iqd !== null) && (
                     <p className="mt-2 text-gold font-bold text-[13.5px]" dir="ltr" data-my-request-estimate>
-                      {priceRange(p.estimate_low_iqd, p.estimate_high_iqd, formatIqd)}
+                      {priceRange(p.estimate_low_iqd, p.estimate_high_iqd, money)}
                       {p.estimate_confidence && (
                         <span className="ms-2 text-[10.5px] font-semibold text-zinc-400" dir="auto">
                           {loc(...CONFIDENCE_TEXT[p.estimate_confidence])}
@@ -199,7 +201,7 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
                         <BadgeCheck className="w-3.5 h-3.5" />
                         {r.accepted.merchant_name}
                         {r.accepted.price_iqd !== null && (
-                          <span className="ms-auto" dir="ltr">{formatIqd(r.accepted.price_iqd)}</span>
+                          <span className="ms-auto" dir="ltr">{money(r.accepted.price_iqd)}</span>
                         )}
                       </p>
                       {r.accepted.completion_days !== null && r.accepted.completion_days > 0 && (

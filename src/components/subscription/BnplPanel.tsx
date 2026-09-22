@@ -8,9 +8,10 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Clock3, CreditCard, Loader2, RefreshCw, ShieldCheck, WalletCards } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useWallet } from '../../WalletContext';
-import { api, formatIqd, newIdempotencyKey } from '../../lib/api';
+import { api, newIdempotencyKey } from '../../lib/api';
 import { apiRefusal, refusalText } from '../../lib/refusalStrings';
 import { formatDate } from '../orders/format';
+import { useMoney } from '../../CurrencyContext';
 
 interface Eligibility {
   eligible: boolean;
@@ -92,6 +93,7 @@ const COPY = {
 } as const;
 
 export function BnplPanel({ activePro }: { activePro: boolean }) {
+  const { money } = useMoney();
   const { lang } = useLanguage();
   const { refreshWallet } = useWallet();
   const s = COPY[lang];
@@ -231,7 +233,7 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
             ].map(([label, value]) => (
               <div key={String(label)} className="rounded-2xl border border-white/8 bg-black/25 p-3">
                 <dt className="text-[10px] font-bold text-zinc-500">{label}</dt>
-                <dd className="mt-1 text-sm font-black text-white" dir="ltr">{formatIqd(Number(value))}</dd>
+                <dd className="mt-1 text-sm font-black text-white" dir="ltr">{money(Number(value))}</dd>
               </div>
             ))}
           </dl>
@@ -319,7 +321,7 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
                     </p>
                   </div>
                   <span className={`font-black ${signed > 0 ? 'text-red-300' : 'text-emerald-300'}`} dir="ltr">
-                    {signed > 0 ? '+' : '−'}{formatIqd(Math.abs(signed))}
+                    {signed > 0 ? '+' : '−'}{money(Math.abs(signed))}
                   </span>
                 </li>
               );

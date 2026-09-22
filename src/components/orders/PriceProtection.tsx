@@ -11,12 +11,13 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { ShieldCheck, Clock } from 'lucide-react';
-import { api, formatIqd } from '../../lib/api';
+import { api } from '../../lib/api';
 import type { ApiOrder } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import Spinner from '../ui/Spinner';
 import { asLang, daysLeftLabel, formatDate } from './format';
 import { apiRefusal } from '../../lib/refusalStrings';
+import { useMoney } from '../../CurrencyContext';
 
 interface Claim {
   id: string;
@@ -86,6 +87,7 @@ const STRINGS = {
 } as const;
 
 export default function PriceProtection({ order }: { order: ApiOrder }) {
+  const { money } = useMoney();
   const { lang } = useLanguage();
   const s = STRINGS[asLang(lang)];
   const delivered = order.status === 'delivered';
@@ -179,8 +181,8 @@ export default function PriceProtection({ order }: { order: ApiOrder }) {
                   </span>
                 </div>
                 <p className="mt-1 text-[11.5px] text-zinc-500 tabular-nums">
-                  {s.paid} {formatIqd(c.original_unit_iqd)} · {s.observed} {formatIqd(c.observed_unit_iqd)}
-                  {c.credited_iqd > 0 && ` · ${s.credited} ${formatIqd(c.credited_iqd)}`}
+                  {s.paid} {money(c.original_unit_iqd)} · {s.observed} {money(c.observed_unit_iqd)}
+                  {c.credited_iqd > 0 && ` · ${s.credited} ${money(c.credited_iqd)}`}
                   {' · '}
                   {s.requestedAt} {formatDate(c.requested_at, lang)}
                 </p>

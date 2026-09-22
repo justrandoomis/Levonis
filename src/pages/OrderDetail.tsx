@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Truck } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
-import { api, formatIqd } from '../lib/api';
+import { api } from '../lib/api';
 import Note from '../components/ui/Note';
 import BundleContents from '../components/bundles/BundleContents';
 import MysteryReveal from '../components/offers/MysteryReveal';
@@ -26,6 +26,7 @@ import ReviewSheet from '../components/orders/ReviewSheet';
 import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
 import { apiRefusal } from '../lib/refusalStrings';
 import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, statusLabel, statusStyle } from '../components/orders/format';
+import { useMoney } from '../CurrencyContext';
 
 /**
  * ONE order, everything the customer can know or do about it.
@@ -176,6 +177,7 @@ const TILE =
   'flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 px-4 min-h-[52px] hover:bg-zinc-800/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]';
 
 export default function OrderDetail() {
+  const { money } = useMoney();
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -393,7 +395,7 @@ export default function OrderDetail() {
               <div className="mt-3 flex items-end justify-between gap-3">
                 <div>
                   <p className="text-[11px] text-zinc-500">{s.total}</p>
-                  <p className="text-[#BAA369] font-bold text-[17px] tabular-nums">{formatIqd(order.total_iqd)}</p>
+                  <p className="text-[#BAA369] font-bold text-[17px] tabular-nums">{money(order.total_iqd)}</p>
                 </div>
                 <p className="text-[12px] text-zinc-500 text-end">
                   {itemCountLabel(countItems(order.items, order.item_count), lang)}
@@ -514,11 +516,11 @@ export default function OrderDetail() {
                               )}
                               {it.variant && <p className="text-[12px] text-zinc-500 truncate">{it.variant}</p>}
                               <p className="text-[12px] text-zinc-400 tabular-nums mt-0.5">
-                                × {it.qty} · {formatIqd(Number(unitPrice) || 0)}
+                                × {it.qty} · {money(Number(unitPrice) || 0)}
                               </p>
                               {extras.length > 0 && <p className="text-[11px] text-zinc-500 truncate">{extras.join(' · ')}</p>}
                             </div>
-                            <p className="text-[13.5px] text-white font-bold tabular-nums shrink-0">{formatIqd(it.line_total_iqd)}</p>
+                            <p className="text-[13.5px] text-white font-bold tabular-nums shrink-0">{money(it.line_total_iqd)}</p>
                           </div>
 
                           {/* A bundle is ONE item here too, with its parts
@@ -551,7 +553,7 @@ export default function OrderDetail() {
 
                           {showPrinterNote && (
                             <Note tone="gold" compact animate={false} icon={<Truck className="w-3.5 h-3.5" aria-hidden />} className="mt-3" testId="order-printer-note">
-                              {s.printerNote(formatIqd(printerNoteIqd))}
+                              {s.printerNote(money(printerNoteIqd))}
                             </Note>
                           )}
 

@@ -23,9 +23,9 @@
 import type { ReactNode } from 'react';
 import { Check, ChevronDown, Info, Truck } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { formatIqd } from '../../lib/api';
 import { TIER_META, type PaidTier } from './tierMeta';
 import type { PlanFeatures } from './types';
+import { useMoney } from '../../CurrencyContext';
 
 /* ------------------------------------------ what the server says it promises */
 
@@ -120,8 +120,19 @@ function statesADeliveryThreshold(benefits: TierBenefits | null | undefined): bo
   return fs.methods === null || fs.methods.some(isDeliveryMethodId);
 }
 
+/**
+ * A FORMATTER IS PASSED IN, exactly as `loc` is.
+ *
+ * These are pure sentence builders at module scope — no component, no hook —
+ * and the amounts inside them are prices like any other: they must follow the
+ * currency the customer chose (src/CurrencyContext.tsx). Threading it is what
+ * keeps them pure and keeps «خصم 100,000 د.ع» from being the one figure on the
+ * page that ignores the switch.
+ */
+type Money = (iqd: number) => string;
+
 /** "خصم 10% على الطابعات — حتى 100,000 د.ع لكل وحدة", from the rule alone. */
-function discountLine(rule: BenefitDiscountRule, loc: Loc): string | null {
+function discountLine(rule: BenefitDiscountRule, loc: Loc, money: Money): string | null {
   const ar = rule.target_name_ar.trim();
   const en = rule.target_name_en.trim();
   const name = loc(ar || en, en || ar, ar || en);
@@ -140,7 +151,7 @@ function discountLine(rule: BenefitDiscountRule, loc: Loc): string | null {
   } else if (rule.discount_mode === 'fixed') {
     const fixed = rule.fixed_iqd;
     if (fixed === null || !(fixed > 0)) return null;
-    const amount = formatIqd(fixed);
+    const amount = money(fixed);
     head =
       rule.scope === 'global'
         ? loc(`خصم ${amount} لكل وحدة`, `${amount} off every unit`, `داشکاندنی ${amount} بۆ هەر یەکێک`)
@@ -159,7 +170,7 @@ function discountLine(rule: BenefitDiscountRule, loc: Loc): string | null {
   // A ceiling with no `cap_scope` is inert in `unitDiscountIqd` and in
   // `lineBenefit`, so it is not a limit and is not claimed as one.
   if (rule.max_discount_iqd !== null && rule.cap_scope) {
-    const cap = formatIqd(rule.max_discount_iqd);
+    const cap = money(rule.max_discount_iqd);
     limits.push(
       rule.cap_scope === 'per_unit'
         ? loc(`حتى ${cap} لكل وحدة`, `up to ${cap} per unit`, `زۆرترین داشکاندن ${cap} بۆ هەر یەکێک`)
@@ -179,14 +190,14 @@ function discountLine(rule: BenefitDiscountRule, loc: Loc): string | null {
   }
   // `selectRule` tests this with `>=`, so it reads "or more" and never "above".
   if (rule.min_subtotal_iqd !== null && rule.min_subtotal_iqd > 0) {
-    const min = formatIqd(rule.min_subtotal_iqd);
+    const min = money(rule.min_subtotal_iqd);
     limits.push(loc(`للطلبات من ${min} فأكثر`, `on orders of ${min} or more`));
   }
   return limits.length ? `${head} — ${limits.join(loc('، ', ', '))}` : head;
 }
 
 /** "توصيل مجاني للطلبات فوق 75,000 د.ع", and which methods it covers. */
-function freeShippingLine(tier: 'prime' | 'pro', fs: BenefitFreeShipping, loc: Loc): string | null {
+function freeShippingLine(tier: 'prime' | 'pro', fs: BenefitFreeShipping, loc: Loc, money: Money): string | null {
   // `methods: null` covers every method. A list covers exactly what it names,
   // and an id this page cannot name is dropped rather than printed raw — a
   // machine value must never reach a customer's screen.
@@ -195,8 +206,8 @@ function freeShippingLine(tier: 'prime' | 'pro', fs: BenefitFreeShipping, loc: L
   // apply, and there is no free delivery to promise.
   if (covered !== null && covered.length === 0) return null;
 
-  const threshold = fs.threshold_iqd !== null ? formatIqd(fs.threshold_iqd) : null;
-  const subsidy = fs.max_subsidy_iqd !== null ? formatIqd(fs.max_subsidy_iqd) : null;
+  const threshold = fs.threshold_iqd !== null ? money(fs.threshold_iqd) : null;
+  const subsidy = fs.max_subsidy_iqd !== null ? money(fs.max_subsidy_iqd) : null;
 
   // §3: with a subsidy ceiling the member can still pay a difference, so the
   // delivery is never called free — it is called what it is. Each figure is
@@ -235,15 +246,20 @@ function freeShippingLine(tier: 'prime' | 'pro', fs: BenefitFreeShipping, loc: L
  * then the delivery, then the cash-on-delivery tax. An unconfigured benefit
  * contributes nothing — there is no default sentence to fall back to.
  */
-function shoppingLines(tier: 'prime' | 'pro', benefits: TierBenefits | null | undefined, loc: Loc): string[] {
+function shoppingLines(
+  tier: 'prime' | 'pro',
+  benefits: TierBenefits | null | undefined,
+  loc: Loc,
+  money: Money
+): string[] {
   if (!benefits) return [];
   const out: string[] = [];
   for (const rule of benefits.discounts) {
-    const line = discountLine(rule, loc);
+    const line = discountLine(rule, loc, money);
     if (line) out.push(line);
   }
   if (benefits.free_shipping) {
-    const line = freeShippingLine(tier, benefits.free_shipping, loc);
+    const line = freeShippingLine(tier, benefits.free_shipping, loc, money);
     if (line) out.push(line);
   }
   // §4: the tax is calculated on every order and then waived, so this says
@@ -332,11 +348,12 @@ function BenefitCard({ tier, title, subtitle, inheritance, lines, inheritedLines
 
 export function BenefitsSection({ features, benefits, loading }: BenefitsSectionProps) {
   const { t, loc } = useLanguage();
+  const { money } = useMoney();
 
   // The configured half of each paid tier's list. `prime` is the API id;
   // PREMIUM is the name on every customer-facing surface (tierMeta).
-  const premiumShopping = shoppingLines('prime', benefits?.prime, loc);
-  const proShopping = shoppingLines('pro', benefits?.pro, loc);
+  const premiumShopping = shoppingLines('prime', benefits?.prime, loc, money);
+  const proShopping = shoppingLines('pro', benefits?.pro, loc, money);
 
   const plusLines = [
     loc('متجر شخصي على username.levonis-iq.com', 'Personal storefront at username.levonis-iq.com', 'فرۆشگای تایبەتی لە username.levonis-iq.com'),

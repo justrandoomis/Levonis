@@ -31,7 +31,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, Package, Plus, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { formatIqd } from '../../lib/api';
+import { useMoney } from '../../CurrencyContext';
 
 export type AccessoryUnit = 'piece' | 'pair' | 'set' | 'cm' | 'gram';
 
@@ -87,6 +87,7 @@ export default function AccessoryPicker({
   onChange: (rows: AccessoryRow[]) => void;
   disabled?: boolean;
 }) {
+  const { money } = useMoney();
   const { loc } = useLanguage();
   // Closed by default. Most jobs have no hardware at all, and a section that
   // opens itself asks every customer a question that only some of them have.
@@ -169,7 +170,7 @@ export default function AccessoryPicker({
                     <optgroup key={g.category} label={g.label}>
                       {g.items.map((o) => (
                         <option key={o.id} value={o.id}>
-                          {`${name(o)} — ${formatIqd(o.cost_iqd)}/${unitLabel(o.unit)}`}
+                          {`${name(o)} — ${money(o.cost_iqd)}/${unitLabel(o.unit)}`}
                         </option>
                       ))}
                     </optgroup>
@@ -234,6 +235,7 @@ export function AccessoryBreakdown({
   lines: ReadonlyArray<{ id: string; qty: number; iqd: number; name_ar: string; name_en: string; name_ckb: string }>;
   unknown: readonly string[];
 }) {
+  const { money } = useMoney();
   const { loc } = useLanguage();
   if (lines.length === 0 && unknown.length === 0) return null;
   return (
@@ -241,7 +243,7 @@ export function AccessoryBreakdown({
       {lines.map((l) => (
         <div key={l.id} className="flex items-center justify-between gap-2 text-[11.5px] leading-5 text-zinc-400">
           <span dir="auto" className="min-w-0 truncate">{`${l.qty}× ${loc(l.name_ar, l.name_en, l.name_ckb)}`}</span>
-          <span className="shrink-0 tabular-nums">{formatIqd(l.iqd)}</span>
+          <span className="shrink-0 tabular-nums">{money(l.iqd)}</span>
         </div>
       ))}
       {unknown.length > 0 ? (

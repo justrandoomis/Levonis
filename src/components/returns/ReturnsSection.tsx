@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RotateCcw, AlertCircle, Camera, X, ChevronDown, CheckCircle2, Clock } from 'lucide-react';
-import { api, ApiOrder, formatIqd, uploadFile } from '../../lib/api';
+import { api, ApiOrder, uploadFile } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { asLang, daysLeftLabel, formatDate } from '../orders/format';
 import { apiRefusal } from '../../lib/refusalStrings';
+import { useMoney } from '../../CurrencyContext';
 
 /**
  * Returns section for ONE order (final-phase §6.2) — wired into the Orders
@@ -242,6 +243,7 @@ function daysLeftFrom(deliveredIso: string | null | undefined): number | null {
 }
 
 export default function ReturnsSection({ order, units }: { order: OrderLike; units?: ReturnsUnitLike[] }) {
+  const { money } = useMoney();
   const { lang, dir } = useLanguage();
   const S = STRINGS[lang as keyof typeof STRINGS] ?? STRINGS.ar;
 
@@ -490,7 +492,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                         )}
                         <div className="min-w-0">
                           <p className="text-xs text-white truncate">{it.name}</p>
-                          <p className="text-[10px] text-zinc-500">× {it.qty} · {formatIqd(it.line_total_iqd)}</p>
+                          <p className="text-[10px] text-zinc-500">× {it.qty} · {money(it.line_total_iqd)}</p>
                           {w.state === 'open' && orderWindow !== 'open' && (
                             <p className="text-[10px] text-emerald-400/90">{S.daysLeft(w.days as number)}</p>
                           )}

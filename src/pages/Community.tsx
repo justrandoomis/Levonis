@@ -6,7 +6,7 @@ import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
 import { TabStrip, TabPanels } from '../components/ui/Tabs';
 import { Sheet } from '../components/ui/Overlay';
-import { api, ApiError, formatIqd } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { storeHref } from '../lib/merchant';
 import { useRail } from '../lib/useRail';
 import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
@@ -15,6 +15,7 @@ import {
   MessageSquare, Plus, Store,
   BadgeCheck, X
 } from 'lucide-react';
+import { useMoney } from '../CurrencyContext';
 
 interface CommunityProduct {
   id: string;
@@ -52,6 +53,7 @@ interface CommunityRequest {
 }
 
 export default function Community() {
+  const { money } = useMoney();
   const navigate = useNavigate();
   const location = useLocation();
   const { lang, dir, t } = useLanguage();
@@ -338,7 +340,7 @@ export default function Community() {
                           </div>
                           <div className="p-3">
                             <h3 className="text-white font-medium text-sm line-clamp-2 mb-1">{name}</h3>
-                            <div className="text-white font-bold text-sm">{formatIqd(p.price_iqd || 0)}</div>
+                            <div className="text-white font-bold text-sm">{money(p.price_iqd || 0)}</div>
                           </div>
                         </Link>
                       );

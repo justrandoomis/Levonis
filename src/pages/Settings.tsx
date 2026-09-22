@@ -61,6 +61,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, User, MapPin, Bell, Globe, LogOut, ShieldCheck, Mail, KeyRound, Link2, FileText, LifeBuoy, Loader2, Check, Coins, CheckCircle2, Download } from 'lucide-react';
 import { useAuth } from '../AuthContext';
+import { useMoney } from '../CurrencyContext';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, listSessions, revokeSession, revokeOtherSessions, type ApiSession } from '../lib/api';
 import TelegramLink from '../components/security/TelegramLink';
@@ -134,7 +135,10 @@ const STRINGS = {
     approvedNote: 'العنوان المعتمد نسخة مجمّدة: تعديل العنوان المحفوظ لا يغيّرها. تغيير النسخة المعتمدة يمر بطلب دعم وموافقة الإدارة، والعنوان البديل يأخذ التسعير العادي دون حذف اشتراكك.',
     language: 'اللغة', direction: 'اتجاه الصفحة', rtl: 'من اليمين إلى اليسار', ltr: 'من اليسار إلى اليمين',
     langSaved: 'حُفظت اللغة في حسابك.', langSaveFailed: 'تعذر حفظ اللغة على الخادم — التغيير مطبّق في هذا المتصفح فقط.',
-    currency: 'العملة', currencyNote: 'دفاتر المتجر والطلبات بالدينار العراقي. لا يوجد إعداد عملة عرض لكل حساب، ولن تُعاد تسعير طلبات مؤكدة.',
+    currency: 'العملة',
+    currencyNote: 'اختر العملة التي تقرأ بها الأسعار. الدفاتر والطلبات تبقى بالدينار العراقي، ولن تُعاد تسعير طلبات مؤكدة.',
+    currencyRate: (rate: string) => `سعر الصرف: 1 دولار = ${rate} دينار — يحدده المتجر.`,
+    currencyConvertedNote: 'الأسعار بالدولار تحويل تقريبي بهذا السعر. المبلغ المسحوب من بطاقتك أو المدفوع عند الاستلام هو الدينار، ولذلك يبقى الدينار ظاهراً عند الدفع.',
     pushTitle: 'إشعارات المتصفح (Web Push)',
     pushUnsupported: 'غير مدعوم في هذا المتصفح', pushBlocked: 'محظورة من إعدادات المتصفح',
     pushGranted: 'إذن المتصفح ممنوح', pushOff: 'إذن المتصفح غير ممنوح',
@@ -214,7 +218,10 @@ const STRINGS = {
     approvedNote: 'The approved address is a frozen copy: editing the saved address does not change it. Changing the approved copy goes through a support request and admin approval; an alternative address gets ordinary pricing without cancelling your subscription.',
     language: 'Language', direction: 'Page direction', rtl: 'Right to left', ltr: 'Left to right',
     langSaved: 'Language saved to your account.', langSaveFailed: 'Could not save the language on the server — it applies to this browser only.',
-    currency: 'Currency', currencyNote: 'Store and order ledgers are in Iraqi dinar. There is no per-account display currency, and no confirmed order is ever re-priced.',
+    currency: 'Currency',
+    currencyNote: 'Choose the currency you read prices in. The ledgers and your orders stay in Iraqi dinar, and no confirmed order is ever re-priced.',
+    currencyRate: (rate: string) => `Exchange rate: $1 = ${rate} IQD — set by the shop.`,
+    currencyConvertedNote: 'Dollar prices are an approximate conversion at that rate. What is charged is the dinar, which is why the dinar stays on screen at checkout.',
     pushTitle: 'Browser notifications (Web Push)',
     pushUnsupported: 'Not supported in this browser', pushBlocked: 'Blocked in browser settings',
     pushGranted: 'Browser permission granted', pushOff: 'Browser permission not granted',
@@ -297,7 +304,10 @@ const STRINGS = {
     approvedNote: 'ناونیشانی پەسەندکراو کۆپییەکی جێگیرە: دەستکاری ناونیشانی پاشەکەوتکراو ناگۆڕێت. گۆڕینی کۆپییە پەسەندکراوەکە بە داواکاری پشتگیری و ڕەزامەندی بەڕێوەبەرایەتی دەبێت؛ ناونیشانی جێگرەوە نرخی ئاسایی وەردەگرێت بەبێ هەڵوەشاندنەوەی بەشداریت.',
     language: 'زمان', direction: 'ئاراستەی پەڕە', rtl: 'ڕاست بۆ چەپ', ltr: 'چەپ بۆ ڕاست',
     langSaved: 'زمان لە هەژمارەکەت پاشەکەوتکرا.', langSaveFailed: 'نەتوانرا زمان لەسەر ڕاژەکار پاشەکەوت بکرێت — تەنها بۆ ئەم وێبگەڕە جێبەجێ دەبێت.',
-    currency: 'دراو', currencyNote: 'دەفتەری فرۆشگا و داواکارییەکان بە دیناری عێراقییە. ڕێکخستنی دراوی پیشاندان بۆ هەر هەژمارێک نییە، و هیچ داواکارییەکی پەسەندکراو دووبارە نرخ نادرێت.',
+    currency: 'دراو',
+    currencyNote: 'ئەو دراوە هەڵبژێرە کە نرخەکانی پێ دەخوێنیتەوە. دەفتەر و داواکارییەکانت بە دیناری عێراقی دەمێننەوە، و هیچ داواکارییەکی پەسەندکراو دووبارە نرخ نادرێت.',
+    currencyRate: (rate: string) => `نرخی ئاڵوگۆڕ: ١ دۆلار = ${rate} دینار — لەلایەن فرۆشگاوە دانراوە.`,
+    currencyConvertedNote: 'نرخەکانی دۆلار گۆڕینێکی نزیکەیەن بەو نرخە. ئەوەی وەردەگیرێت دینارە، بۆیە لە کاتی پارەدان دینار لەسەر شاشە دەمێنێتەوە.',
     pushTitle: 'ئاگادارکردنەوەی وێبگەڕ (Web Push)',
     pushUnsupported: 'لەم وێبگەڕەدا پشتگیری نەکراوە', pushBlocked: 'لە ڕێکخستنی وێبگەڕ ڕێگری کراوە',
     pushGranted: 'مۆڵەتی وێبگەڕ دراوە', pushOff: 'مۆڵەتی وێبگەڕ نەدراوە',
@@ -648,6 +658,7 @@ function Field({
 export default function Settings() {
   const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
+  const { currency, setCurrency, rate, converted } = useMoney();
   const { lang, setLang, dir, t } = useLanguage();
   const s = STRINGS[lang];
   const rtl = dir === 'rtl';
@@ -1027,12 +1038,52 @@ export default function Settings() {
                 {langMsg ? <p className="mt-1 text-[12px] text-emerald-300">{langMsg}</p> : null}
                 {langError ? <p className="mt-1 text-[12px] text-amber-300">{langError}</p> : null}
               </div>
+              {/*
+                «تغيير العملة … في لوحة الإدارة يكون سعر الدولار يساوي 1400
+                 دينار فيتم التحويل عند تغيير العملة.»
+
+                THIS ROW USED TO BE A PARAGRAPH SAYING THERE WAS NO SETTING,
+                which was true and was the honest thing to write at the time:
+                the rate existed and was already the administrator's, but
+                nothing let a customer ask for the conversion. Now it does, and
+                the row states the rate it converts at — a conversion whose
+                rate is not on screen is a number the reader cannot check.
+
+                A DEVICE PREFERENCE, like the language above it: it works
+                signed out, which is most of the people deciding whether to
+                buy here, and it is stored in this browser rather than on the
+                account. Nothing about it reaches the server, and no price,
+                order or ledger changes — see src/CurrencyContext.tsx.
+              */}
               <div className="px-4 py-3">
                 <p className="font-bold text-[15px] flex items-center gap-2">
                   <Coins aria-hidden="true" className="w-4 h-4 text-zinc-400" />
                   {s.currency}
                 </p>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.currencyNote}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(['IQD', 'USD'] as const).map((code) => (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => setCurrency(code)}
+                      aria-pressed={currency === code}
+                      data-selected={currency === code}
+                      className="lv-choice min-h-11 px-4 text-sm font-bold"
+                      dir="ltr"
+                    >
+                      {code === 'IQD' ? 'IQD · د.ع' : 'USD · $'}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[12px] text-zinc-500 leading-relaxed">{s.currencyNote}</p>
+                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">
+                  {s.currencyRate(rate.toLocaleString('en-US'))}
+                </p>
+                {converted ? (
+                  <p className="mt-1 text-[12px] text-amber-300/90 leading-relaxed">
+                    {s.currencyConvertedNote}
+                  </p>
+                ) : null}
               </div>
               {/*
                 «تحميل التطبيق» BELONGS IN PREFERENCES, and specifically here.

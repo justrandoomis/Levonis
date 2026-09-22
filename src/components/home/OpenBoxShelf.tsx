@@ -1,13 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { PackageOpen } from 'lucide-react';
-import { type ApiProduct, formatIqd } from '../../lib/api';
+import { type ApiProduct } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import SafeImage from '../ui/SafeImage';
 import SectionHeader from './SectionHeader';
 import { productPrimaryImage } from '../../lib/productImage';
 import { conditionKindLabel, conditionGradeLabel, type ConditionEntry } from '../../lib/condition';
 import { useRail } from '../../lib/useRail';
+import { useMoney } from '../../CurrencyContext';
 
 /**
  * OPEN BOX, USED AND REFURBISHED — the shelf.
@@ -49,6 +50,7 @@ export default function OpenBoxShelf({ products }: { products: ApiProduct[] }) {
 }
 
 function OpenBoxCard({ p, lang }: { p: ApiProduct; lang: string }) {
+  const { money } = useMoney();
   const condition = (p as ApiProduct & { condition?: ConditionEntry | null }).condition ?? null;
   const reference = (p as ApiProduct & { condition_reference?: { reference_iqd: number; saving_iqd: number } })
     .condition_reference;
@@ -91,12 +93,12 @@ function OpenBoxCard({ p, lang }: { p: ApiProduct; lang: string }) {
         ) : null}
 
         <span className="mt-0.5 flex flex-col">
-          <span className="text-[14px] font-bold text-white tabular-nums">{formatIqd(price)}</span>
+          <span className="text-[14px] font-bold text-white tabular-nums">{money(price)}</span>
           {/* The NEW product's current price, not a compare-at on this row.
               Present only when the server found an honest saving. */}
           {reference ? (
             <span className="text-[11px] text-zinc-500 line-through tabular-nums">
-              {formatIqd(reference.reference_iqd)}
+              {money(reference.reference_iqd)}
             </span>
           ) : null}
         </span>

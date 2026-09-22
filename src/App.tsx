@@ -163,6 +163,7 @@ function useIdlePrefetch() {
 }
 import { LanguageProvider } from './LanguageContext';
 import { WalletProvider } from './WalletContext';
+import { CurrencyProvider } from './CurrencyContext';
 import { AuthProvider, useAuth } from './AuthContext';
 import { Navigate } from 'react-router-dom';
 import Header from './components/Header';
@@ -772,6 +773,11 @@ export default function App() {
     <AuthProvider>
       <LanguageProvider>
         <WalletProvider>
+          {/* INSIDE WalletProvider, because the rate it converts at is that
+              provider's `exchangeRate` — the administrator's own setting,
+              served to every visitor by /api/settings/public. Outside the
+              Router, because a reading preference is not a route. */}
+          <CurrencyProvider>
           <Router>
             <StoreProvider>
               {/* THE TWO THINGS THAT MUST RENDER ON EVERY SHELL are siblings
@@ -791,6 +797,7 @@ export default function App() {
               <AppContent />
             </StoreProvider>
           </Router>
+          </CurrencyProvider>
         </WalletProvider>
       </LanguageProvider>
     </AuthProvider>

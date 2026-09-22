@@ -24,6 +24,7 @@ import { useState } from 'react';
 import { Tag, Check, X, Loader2 } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import { mascot } from '../lib/mascot';
+import { useMoney } from '../CurrencyContext';
 
 export const PROMO_STORAGE_KEY = 'levonis.promo_code';
 
@@ -132,12 +133,14 @@ const STRINGS = {
 
 export default function PromoCodeField({
   lang,
-  formatIqd,
   onApplied,
   showLabel = true,
 }: {
   lang: string;
-  formatIqd: (n: number) => string;
+  // The formatter used to be a PROP, passed down from whichever page hosted
+  // this field. It is a context now (src/CurrencyContext.tsx), so the field
+  // follows the customer's chosen currency wherever it is mounted and no
+  // caller can hand it a different one by mistake.
   /** Told the accepted code, or '' when it was removed. */
   onApplied?: (code: string) => void;
   /**
@@ -148,6 +151,7 @@ export default function PromoCodeField({
    */
   showLabel?: boolean;
 }) {
+  const { money } = useMoney();
   const s = STRINGS[(lang as keyof typeof STRINGS) in STRINGS ? (lang as keyof typeof STRINGS) : 'ar'];
   const [input, setInput] = useState('');
   const [applied, setApplied] = useState<CheckResult | null>(null);
@@ -167,7 +171,7 @@ export default function PromoCodeField({
         const reason = s.reasons[res.reason ?? ''] ?? s.reasons.CODE_NOT_FOUND;
         setError(
           res.reason === 'MIN_TOTAL_NOT_MET' && typeof res.min_total_iqd === 'number'
-            ? `${reason} — ${s.minIs}: ${formatIqd(res.min_total_iqd)}`
+            ? `${reason} — ${s.minIs}: ${money(res.min_total_iqd)}`
             : reason
         );
         setApplied(null);
@@ -220,7 +224,7 @@ export default function PromoCodeField({
             </div>
             {typeof applied.estimated_discount_iqd === 'number' && (
               <p className="text-zinc-300 text-[11px] mt-0.5">
-                {s.estimate}: <span dir="ltr">{formatIqd(applied.estimated_discount_iqd)}</span>
+                {s.estimate}: <span dir="ltr">{money(applied.estimated_discount_iqd)}</span>
               </p>
             )}
           </div>

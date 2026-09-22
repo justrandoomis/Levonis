@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLanguage } from '../../LanguageContext';
-import { formatIqd } from '../../lib/api';
 import OfferBadge from '../ui/OfferBadge';
+import { useMoney } from '../../CurrencyContext';
 
 /**
  * THE BUNDLE'S ORIGINAL TOTAL AND ITS SAVING (docs/BUNDLES_MYSTERY.md §13.2).
@@ -29,6 +29,7 @@ export default function BundleSavingLine({
   savingPercent: number;
   className?: string;
 }) {
+  const { money } = useMoney();
   const { loc } = useLanguage();
   // A saving that is not real is not shown — the same rule compare-at follows.
   if (!(savingPercent > 0) || !(componentTotalIqd > 0)) return null;
@@ -36,7 +37,7 @@ export default function BundleSavingLine({
   return (
     <div className={`flex items-center gap-2 min-w-0 ${className}`}>
       <span className="text-zinc-500 text-[11px] line-through tabular-nums truncate">
-        {formatIqd(componentTotalIqd)}
+        {money(componentTotalIqd)}
       </span>
       <OfferBadge tone="saving">
         {loc(`وفّر ${savingPercent}٪`, `Save ${savingPercent}%`, `${savingPercent}٪ پاشەکەوت`)}

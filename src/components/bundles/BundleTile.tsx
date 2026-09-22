@@ -2,13 +2,14 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Lock, Package } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { formatIqd, type ApiProduct } from '../../lib/api';
+import { type ApiProduct } from '../../lib/api';
 import SafeImage from '../ui/SafeImage';
 import CardPrice from '../CardPrice';
 import OfferBadge from '../ui/OfferBadge';
 import Countdown from '../ui/Countdown';
 import BundleSavingLine from './BundleSavingLine';
 import { tierLabel } from '../subscription/tierMeta';
+import { useMoney } from '../../CurrencyContext';
 
 /**
  * THE BUNDLE CARD, AND THE CARD-STATE VOCABULARY (docs/BUNDLES_MYSTERY.md §13).
@@ -106,6 +107,7 @@ export default function BundleTile({
   onRevalidate?: () => void;
   className?: string;
 }) {
+  const { money } = useMoney();
   const { lang, loc } = useLanguage();
   const gated = b.offer.required_tiers.length > 0;
   const membersOnly = { ar: 'حصري للمشتركين', en: 'Members only', ckb: 'تەنها بۆ ئەندامان' }[lang];
@@ -179,7 +181,7 @@ export default function BundleTile({
               {/* The ONLY price a locked card may carry, and only when the
                   offer allows a preview: never a member rung nobody sold. */}
               {typeof b.display_regular_iqd === 'number' && (
-                <span className="text-zinc-400 font-bold text-[13px] tabular-nums">{formatIqd(b.display_regular_iqd)}</span>
+                <span className="text-zinc-400 font-bold text-[13px] tabular-nums">{money(b.display_regular_iqd)}</span>
               )}
               <div className="text-[10px] text-gold font-bold mt-0.5">
                 {membersOnly}

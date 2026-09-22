@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
+import { useMoney } from '../CurrencyContext';
 import { api, uploadFile, usdCentsToIqd, iqdToUsdCents } from '../lib/api';
 import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../components/ui/AsyncStates';
@@ -473,9 +474,23 @@ export default function Wallet() {
   const isRtl = dir === 'rtl';
 
   const { paymentMethods, currency: defaultCurrency, exchangeRate, refreshWallet } = useWallet();
+  const { currency: siteCurrency } = useMoney();
 
-  // Display currency is a page-local preference only; stored money is USD cents.
-  const [currency, setCurrency] = useState<'IQD' | 'USD'>(defaultCurrency);
+  /**
+   * PAGE-LOCAL, BUT IT OPENS ON THE SAME ANSWER AS THE REST OF THE SHOP.
+   *
+   * This toggle predates the site-wide currency setting and is kept: the
+   * wallet's ledger is genuinely USD cents (migrations/0001_init.sql), so
+   * reading a BALANCE in dollars is a different question from reading a PRICE
+   * in dollars, and someone reconciling a deposit wants to flip it without
+   * changing how the catalogue reads.
+   *
+   * What it must not do is contradict the setting on arrival. Two controls
+   * disagreeing about the same word on first paint is the confusion this shop
+   * removes, not adds: the site preference seeds it, the store's own default
+   * is the fallback for a browser that has never answered.
+   */
+  const [currency, setCurrency] = useState<'IQD' | 'USD'>(siteCurrency ?? defaultCurrency);
   const [balances, setBalances] = useState<Balances>(EMPTY_BALANCES);
   const [transactions, setTransactions] = useState<TxView[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalView[]>([]);

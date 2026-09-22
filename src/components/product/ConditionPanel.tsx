@@ -1,9 +1,9 @@
 import React from 'react';
 import { PackageOpen, ShieldCheck, Clock, Wrench, AlertTriangle, Info } from 'lucide-react';
-import { formatIqd } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import SafeImage from '../ui/SafeImage';
 import { conditionGradeLabel, conditionKindLabel, conditionText, type ConditionEntry } from '../../lib/condition';
+import { useMoney } from '../../CurrencyContext';
 
 /**
  * WHAT THIS UNIT ACTUALLY IS, BEFORE ANYONE PAYS FOR IT.
@@ -84,6 +84,7 @@ export default function ConditionPanel({
   condition: ConditionEntry;
   reference?: { reference_iqd: number; saving_iqd: number } | null;
 }) {
+  const { money } = useMoney();
   const { lang } = useLanguage();
   const s = STRINGS[lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar'];
   const fault = conditionText(condition, 'fault', lang);
@@ -143,10 +144,10 @@ export default function ConditionPanel({
         <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 px-4 pb-3.5">
           <span className="text-[11px] text-text-muted">{s.newPrice}</span>
           <span className="text-[13px] text-text-muted line-through tabular-nums">
-            {formatIqd(reference.reference_iqd)}
+            {money(reference.reference_iqd)}
           </span>
           <span className="text-[12px] font-bold text-success tabular-nums">
-            {s.saving(formatIqd(reference.saving_iqd))}
+            {s.saving(money(reference.saving_iqd))}
           </span>
         </div>
       )}

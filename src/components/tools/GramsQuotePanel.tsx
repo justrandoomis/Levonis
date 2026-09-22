@@ -33,7 +33,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Loader2, Plus, Scale, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { failureText, formatIqd } from '../../lib/api';
+import { failureText } from '../../lib/api';
 import { quoteByGrams, type GramsQuoteResponse } from './gramsQuoteApi';
 import AccessoryPicker, {
   AccessoryBreakdown,
@@ -42,6 +42,7 @@ import AccessoryPicker, {
   type AccessoryRow,
 } from './AccessoryPicker';
 import { api } from '../../lib/api';
+import { useMoney } from '../../CurrencyContext';
 
 /** Only what this panel reads. Structural, so the page's richer catalogue
  *  objects pass straight in without this file importing their module. */
@@ -85,6 +86,7 @@ export default function GramsQuotePanel({
   printers: GramsPrinterOption[];
   materials: GramsFilamentOption[];
 }) {
+  const { money } = useMoney();
   const { loc } = useLanguage();
 
   const [printerId, setPrinterId] = useState('');
@@ -538,11 +540,11 @@ export default function GramsQuotePanel({
         <section className="rounded-2xl border border-[#BAA369]/30 bg-gradient-to-b from-[#BAA369]/[0.07] to-transparent p-5">
           <p className="text-[11px] leading-snug font-semibold uppercase tracking-wider text-zinc-500">{t.price}</p>
           <p className="text-white font-bold text-[30px] leading-tight mt-1 tabular-nums" dir="ltr" data-grams-price>
-            {formatIqd(result.quote.price_iqd)}
+            {money(result.quote.price_iqd)}
           </p>
           {result.quote.range_iqd.high > result.quote.range_iqd.low && (
             <p className="text-zinc-400 text-[12px] leading-snug mt-1 tabular-nums" dir="ltr">
-              {t.range}: {formatIqd(result.quote.range_iqd.low)} – {formatIqd(result.quote.range_iqd.high)}
+              {t.range}: {money(result.quote.range_iqd.low)} – {money(result.quote.range_iqd.high)}
             </p>
           )}
 
