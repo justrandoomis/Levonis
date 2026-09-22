@@ -8,7 +8,7 @@ import {
   ArrowLeft, ArrowRight, Truck, Store,
   CreditCard, Wallet, Banknote,
   Check, Sparkles, MapPin, AlertCircle,
-  Lock, CheckCircle2, Plus, Receipt, ShoppingCart, CalendarClock
+  Lock, CheckCircle2, Plus, Receipt, ShoppingCart, CalendarClock, Tag
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
 import { api, ApiAddress, ApiError, ApiOrder, CartItem, formatIqd, newIdempotencyKey, usdCentsToIqd } from '../lib/api';
@@ -27,6 +27,20 @@ import { dayLabel, deliveryWindow, resolveDeliveryDayPolicy } from '../../worker
 import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
 import PromoCodeField, { readStoredPromo, storePromo } from '../components/PromoCodeField';
 import Note from '../components/ui/Note';
+import SummaryInfo from '../components/ui/SummaryInfo';
+/**
+ * THE TAX RATE THE «!» QUOTES IS THE RATE THE SERVER CHARGES.
+ *
+ * The delivery-company tax is explained to the customer in two numbers, and
+ * those two numbers are the policy module's own — the same constants
+ * `calculateCodTaxIqd` divides by. Typing «6,000 لكل 500,000» into a sentence
+ * here would make this screen a second, silent copy of the rate that nobody
+ * would remember to change. The module is a pure leaf with no imports at all,
+ * so nothing of the Worker runtime enters the bundle; the precedent is
+ * `src/lib/productImage.ts`, which reaches into `packages/pricing` for exactly
+ * this reason.
+ */
+import { COD_TAX_BLOCK_IQD, COD_TAX_PER_BLOCK_IQD } from '../../packages/shipping/src/codTax';
 import BundleContents, { type BundleContentLine } from '../components/bundles/BundleContents';
 import AddressForm from '../components/address/AddressForm';
 /**
@@ -287,7 +301,7 @@ const STRINGS = {
     dayRefused: 'لم يعد يوم التوصيل الذي اخترته متاحًا، فأُلغي الاختيار. اضغط «إتمام الطلب» مرة أخرى ليصلك في أقرب وقت، أو اختر يومًا آخر.',
     advanceDue: (v: string) => `رسوم توصيل الطابعة (${v}) تُدفع مقدماً من المحفظة.`,
     freeShipping: 'مجاناً',
-    codTax: 'ضريبة الدفع عند الاستلام',
+    codTax: 'ضريبة شركة التوصيل',
     whyTitle: 'تفاصيل التوصيل',
     policyTitle: 'الموافقة على السياسات',
     policyAgree: 'قرأتُ وأوافق على:',
@@ -322,7 +336,7 @@ const STRINGS = {
     dayRefused: 'The delivery day you chose is no longer available, so the choice was cleared. Press Place order again to have it as soon as possible, or pick another day.',
     advanceDue: (v: string) => `Printer delivery fees (${v}) are paid in advance from your wallet.`,
     freeShipping: 'Free',
-    codTax: 'Cash on Delivery Tax',
+    codTax: 'Delivery company tax',
     whyTitle: 'Delivery details',
     policyTitle: 'Policy consent',
     policyAgree: 'I have read and agree to:',
@@ -357,6 +371,10 @@ const STRINGS = {
     dayRefused: 'ئەو ڕۆژەی گەیاندن کە هەڵتبژاردبوو چیتر بەردەست نییە، بۆیە هەڵبژاردنەکە سڕایەوە. دووبارە «تەواوکردنی داواکاری» دابگرە بۆ ئەوەی لە زووترین کاتدا بگات، یان ڕۆژێکی تر هەڵبژێرە.',
     advanceDue: (v: string) => `کرێی گەیاندنی پرینتەر (${v}) پێشوەخت لە جزدانەکەتەوە دەدرێت.`,
     freeShipping: 'بەخۆڕایی',
+    /* The Arabic and English names were changed to say WHO takes this tax
+       («ضريبة شركة التوصيل»). The Sorani below is hand-written and still names
+       the same charge; it is left exactly as a Kurdish speaker wrote it rather
+       than machine-renamed to match, which is the store's standing rule. */
     codTax: 'باجی پارەدان لە کاتی گەیاندن',
     whyTitle: 'وردەکاری گەیاندن',
     policyTitle: 'ڕەزامەندی لەسەر سیاسەتەکان',
@@ -524,6 +542,14 @@ export default function Checkout() {
    */
   const [requestedDay, setRequestedDay] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('');
+  /**
+   * THE «استخدام كود خاص» DISCLOSURE. Closed by default — most orders carry no
+   * code, and an empty input in the middle of a price column is a question
+   * nobody asked. `promoOpen` below forces it open when the order already has
+   * a code on it, so a customer who wants to REMOVE one is never hunting for
+   * a field that collapsed itself.
+   */
+  const [showPromoField, setShowPromoField] = useState(false);
   const [useWalletBalance, setUseWalletBalance] = useState(false);
 
   // Server-authoritative quote (POST /api/orders/quote): re-fetched whenever
@@ -1031,6 +1057,16 @@ export default function Checkout() {
   // Advance payment logic: "pay in advance" is the wallet method (the legacy
   // `full_advance` id means the same thing), and it covers the whole total —
   // the server refuses a half advance (worker/lib/paymentPolicy.ts).
+  /**
+   * THE PROMO FIELD IS OPEN WHEN THERE IS SOMETHING TO SEE IN IT.
+   *
+   * A customer who already has a code on this order must be able to find it
+   * and take it off; hiding the field behind a link they have no reason to
+   * press would strand them. So the disclosure is a floor, not a gate: they
+   * can open it, and a live coupon opens it for them.
+   */
+  const promoOpen = showPromoField || !!quote?.coupon || !!couponCode;
+
   const isPrepaidMethod = paymentMethod === 'wallet' || paymentMethod === 'full_advance';
   const isBnplMethod = paymentMethod === 'bnpl';
   const requiredAdvance = isPrepaidMethod ? orderTotal : 0;
@@ -1773,8 +1809,57 @@ export default function Checkout() {
           </div>
 
           <div className="space-y-4 pt-6 border-t border-white/5 mt-auto text-sm">
+            {/* ═══════════════════════════════════════════════════════════════
+                §15 — THE MONEY COLUMN, IN THE ORDER A CUSTOMER READS IT.
+
+                It used to run: subtotal, shipping, a note, the coupon FIELD,
+                the points CARD, another note, the wallet. Three different
+                KINDS of thing — figures, explanations and controls —
+                interleaved, so nobody could tell where the price stopped and
+                the choices began, and each note landed between two numbers it
+                had nothing to do with. «هذا السلوك غير مناسب ويسبب ارتباك.»
+
+                It now runs in four bands, and each band answers one question:
+
+                  1. WHAT THE GOODS COST       subtotal, and what came off it
+                  2. WHAT IT COSTS TO ARRIVE   delivery, its tax, its commission
+                  3. WHAT YOU SHOULD KNOW      every note, together, once
+                  4. WHAT SETTLES IT           the code, the wallet, the points
+
+                Bands 1 and 2 carry the figures that add up to the total
+                below — plus the one control that changes a fee in band 2
+                itself, protected delivery, which is kept beside the delivery
+                row it prices rather than exiled to band 4 away from its own
+                number. Band 3 adds nothing to any total and is styled so it
+                can never be mistaken for a row. Band 4 holds the three ways to
+                settle the bill and no summed figure at all.
+
+                Two figures carry a «!» — the delivery and the delivery
+                company's tax — because they are the two the customer neither
+                chose nor could predict. `SummaryInfo` opens its answer UNDER
+                the row, so it never covers the next number.
+                ═══════════════════════════════════════════════════════════════ */}
+
+            {/* ── 1. WHAT THE GOODS COST ──────────────────────────────────── */}
+            {/*
+              THE MONEY LABELS BELOW READ `loc(ar, en)`, NOT `dir === 'rtl'`.
+
+              `dir` is 'rtl' for Arabic AND for Kurdish, so the old ternary
+              handed a Sorani reader the Arabic string while looking, in the
+              source, like a language choice. It was not one: it was a
+              DIRECTION choice standing in for a language, and every Kurdish
+              gap in this column was invisible because of it.
+
+              `loc` with two arguments falls back to Arabic for ckb by
+              documented design (LanguageContext.tsx), so what renders today is
+              byte-for-byte what rendered before — the missing Sorani is simply
+              a visible empty slot now, which a Kurdish speaker can fill,
+              rather than a ternary nobody would think to look inside. No
+              Kurdish is invented here; the store writes its own.
+            */}
+
             <div className="flex justify-between items-center text-zinc-400">
-              <span className="font-light">{dir === 'rtl' ? 'المجموع الفرعي' : 'Subtotal'}</span>
+              <span className="font-light">{loc('المجموع الفرعي', 'Subtotal')}</span>
               <span className="text-white font-normal tabular-nums">{formatIqd(total)}</span>
             </div>
 
@@ -1829,31 +1914,59 @@ export default function Checkout() {
                 )}
               </div>
             )}
-            {/* One line about the pricing rule in force on a pre-order cart:
-                cash on delivery prices the lines as a direct sale while the
-                order keeps its journey; paying in advance keeps the configured
-                pre-order price. Read from the quote, never inferred here, and
-                only when cash on delivery would change the number at all. */}
-            {pricingBasisLine && quote && (
-              <p
-                className="text-[11.5px] text-zinc-500 font-light leading-relaxed"
-                data-checkout-pricing-basis={quote.pricing_basis}
+
+            {quote?.coupon && Number(quote.coupon.discount_iqd) > 0 && (
+              <div className="flex justify-between items-center text-emerald-400">
+                <span className="font-light">
+                  {loc('خصم الكود', 'Promo discount')}{' '}
+                  <span dir="ltr" className="text-zinc-500 text-xs">{quote.coupon.code}</span>
+                </span>
+                <span className="font-normal">-{formatIqd(Number(quote.coupon.discount_iqd))}</span>
+              </div>
+            )}
+
+            {pointsDiscount > 0 && (
+              <div className="flex justify-between items-center text-gold/90">
+                <span className="font-light">{loc('خصم النقاط', 'Points Discount')}</span>
+                <span className="font-normal tabular-nums">-{formatIqd(pointsDiscount)}</span>
+              </div>
+            )}
+
+            {/* §3.3/§5 — the support code appears in the money view with an
+                explicit ZERO. The server echoes it from the resolved snapshot,
+                so this line can never claim an attribution the order will not
+                actually carry. */}
+            {quote?.support && (
+              <div
+                data-testid="checkout-support-line"
+                className="flex justify-between items-center gap-3 text-[13px] text-sky-300"
               >
-                {pricingBasisLine}
-              </p>
+                <span className="font-light truncate">{S.supportLine(quote.support.referrer_username || quote.support.ref)}</span>
+                <span className="font-normal shrink-0 text-zinc-400">{S.supportZero}</span>
+              </div>
             )}
-            {/* The wallet settled the whole cash order: nothing is collected at
-                the door, so the server priced it as the prepaid pre-order it
-                is — and the customer is told why the total moved. */}
-            {prepaidByWallet && (
-              <Note tone="gold" icon={<Wallet className="w-4 h-4" strokeWidth={1.5} />} testId="checkout-prepaid-by-wallet">
-                <span className="font-light">{S.prepaidByWallet}</span>
-              </Note>
-            )}
-            <div>
-              <div className="flex justify-between items-center text-zinc-400">
-                <span className="font-light">{dir === 'rtl' ? 'الشحن' : 'Shipping'}</span>
-                {quoteLoading ? (
+
+            {/* ── 2. WHAT IT COSTS TO ARRIVE ──────────────────────────────── */}
+
+            {/*
+              «تكلفة التوصيل إلى البيت» — NOT «الشحن», by owner instruction, and
+              the rename is the smaller half of the fix. The word «الشحن» is
+              what a shop says when one flat fee covers the parcel; this fee is
+              summed per product and per piece, which is why the customer could
+              not reconcile it with anything and why the breakdown that explains
+              it used to sit in a permanent box below, pushing the rest of the
+              column down for every customer whether they wondered or not.
+
+              The breakdown is now the ANSWER to the «!» — the same server
+              components and the same server reasons, moved inside, shown to
+              whoever asks and to nobody else.
+            */}
+            <SummaryInfo
+              testId="delivery"
+              label={loc('تكلفة التوصيل إلى البيت', 'Home delivery cost')}
+              question={loc('كيف حُسبت تكلفة التوصيل؟', 'How is the delivery cost calculated?')}
+              value={
+                quoteLoading ? (
                   <span className="text-zinc-500 font-light text-xs">{S.quoteLoading}</span>
                 ) : shippingIqd === 0 ? (
                   <span className="text-emerald-400 font-normal">
@@ -1865,73 +1978,89 @@ export default function Checkout() {
                     {S.freeShipping}
                   </span>
                 ) : (
-                  <span className="text-white font-normal">{formatIqd(shippingIqd)}</span>
-                )}
-              </div>
+                  <span className="text-white font-normal tabular-nums">{formatIqd(shippingIqd)}</span>
+                )
+              }
+              note={
+                /*
+                  §11 — WHOSE MEMBERSHIP DID IT, said under the figure it
+                  explains, and ALWAYS visible: a ceiling that BINDS means the
+                  customer paid part of the fee, so nothing here may call it
+                  free (§3). What the membership covered, the fee it came off
+                  and what is left to pay are all stated, and all three are the
+                  server's own numbers. This is a fact about the price, not an
+                  answer to a question, so it is not behind the «!».
 
-              {/*
-                §11 — WHY THE DELIVERY COSTS WHAT IT COSTS, and whose membership
-                did it, said under the figure it explains.
+                  The Sorani «گەیاندنی بێبەرامبەری PREMIUM» is the membership
+                  ledger's own line; the covered-in-part sentence has no Sorani
+                  equivalent in the store, so it reads in Arabic there rather
+                  than in invented Kurdish.
+                */
+                memberShipping && !quoteLoading ? (
+                  <p
+                    className="mt-1 text-[11.5px] leading-relaxed text-gold/90 tabular-nums"
+                    data-checkout-member-delivery={
+                      memberShipping.fee_paid_iqd === 0 ? 'free' : memberShipping.subsidy_capped ? 'capped' : 'partial'
+                    }
+                  >
+                    {memberShipping.fee_paid_iqd === 0
+                      ? loc(
+                          `التوصيل مجاني بفضل عضوية ${memberLabel}`,
+                          `Delivery is free thanks to your ${memberLabel} membership`,
+                          `گەیاندنی بێبەرامبەری ${memberLabel}`
+                        )
+                      : loc(
+                          `عضوية ${memberLabel} غطّت ${formatIqd(memberShipping.subsidy_iqd)} من أجرة التوصيل البالغة ${formatIqd(memberShipping.fee_before_benefit_iqd)}، وتدفع ${formatIqd(memberShipping.fee_paid_iqd)}`,
+                          `Your ${memberLabel} membership covered ${formatIqd(memberShipping.subsidy_iqd)} of the ${formatIqd(memberShipping.fee_before_benefit_iqd)} delivery fee — you pay ${formatIqd(memberShipping.fee_paid_iqd)}`
+                        )}
+                  </p>
+                ) : null
+              }
+            >
+              <p>{loc(
+                'التوصيل يُحسب حسب كل منتج وعدد قطعه، لا مبلغاً واحداً للطلب — لذلك يتغيّر المبلغ كلما تغيّرت السلة.',
+                'Delivery is charged per product and per number of pieces, not as one flat fee for the order — so it moves whenever the cart does.'
+              )}</p>
 
-                A ceiling that BINDS means the customer paid part of the fee, so
-                nothing here may call it free (§3): what the membership covered,
-                the fee it came off and what is left to pay are all stated, and
-                all three are the server's own numbers.
-
-                The Sorani «گەیاندنی بێبەرامبەری PREMIUM» is the membership
-                ledger's own line; the covered-in-part sentence has no Sorani
-                equivalent in the store, so it reads in Arabic there rather than
-                in invented Kurdish.
-              */}
-              {memberShipping && !quoteLoading && (
-                <p
-                  className="mt-1 text-[11.5px] leading-relaxed text-gold/90 tabular-nums"
-                  data-checkout-member-delivery={
-                    memberShipping.fee_paid_iqd === 0 ? 'free' : memberShipping.subsidy_capped ? 'capped' : 'partial'
-                  }
-                >
-                  {memberShipping.fee_paid_iqd === 0
-                    ? loc(
-                        `التوصيل مجاني بفضل عضوية ${memberLabel}`,
-                        `Delivery is free thanks to your ${memberLabel} membership`,
-                        `گەیاندنی بێبەرامبەری ${memberLabel}`
-                      )
-                    : loc(
-                        `عضوية ${memberLabel} غطّت ${formatIqd(memberShipping.subsidy_iqd)} من أجرة التوصيل البالغة ${formatIqd(memberShipping.fee_before_benefit_iqd)}، وتدفع ${formatIqd(memberShipping.fee_paid_iqd)}`,
-                        `Your ${memberLabel} membership covered ${formatIqd(memberShipping.subsidy_iqd)} of the ${formatIqd(memberShipping.fee_before_benefit_iqd)} delivery fee — you pay ${formatIqd(memberShipping.fee_paid_iqd)}`
-                      )}
-                </p>
+              {quote && quote.shipping.components.length > 0 && (
+                <div className="space-y-1.5 border-t border-white/5 pt-2">
+                  {quote.shipping.components.map((component, index) => {
+                    const names: Record<string, [string, string]> = {
+                      ordinary: ['توصيل الطلب', 'Order delivery'],
+                      protected: ['حماية وتغليف', 'Protected handling'],
+                      printer_small: ['توصيل طابعة صغيرة', 'Small printer delivery'],
+                      printer_large: ['توصيل طابعة كبيرة', 'Large printer delivery'],
+                      carton: ['كرتونة كمية إضافية', 'Extra quantity carton'],
+                      product: ['توصيل حسب المنتج', 'Product delivery'],
+                    };
+                    const name = component.product_name
+                      ? [component.product_name, component.product_name]
+                      : names[component.kind] ?? [component.kind, component.kind];
+                    return (
+                      <div key={`${component.kind}:${index}`} className="flex items-center justify-between gap-3">
+                        <span className="text-zinc-500">
+                          {loc(name[0], name[1])}
+                          {component.units > 1 ? ` × ${component.units}` : ''}
+                        </span>
+                        <span className={`tabular-nums ${component.waived ? 'text-emerald-400' : 'text-zinc-300'}`}>
+                          {component.waived ? S.freeShipping : formatIqd(component.fee_iqd)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
-            </div>
 
-            {quote && quote.shipping.components.length > 0 && (
-              <div className="rounded-lg border border-white/5 bg-white/[0.025] px-3 py-2 space-y-1.5">
-                {quote.shipping.components.map((component, index) => {
-                  const names: Record<string, [string, string]> = {
-                    ordinary: ['توصيل الطلب', 'Order delivery'],
-                    protected: ['حماية وتغليف', 'Protected handling'],
-                    printer_small: ['توصيل طابعة صغيرة', 'Small printer delivery'],
-                    printer_large: ['توصيل طابعة كبيرة', 'Large printer delivery'],
-                    carton: ['كرتونة كمية إضافية', 'Extra quantity carton'],
-                    product: ['توصيل حسب المنتج', 'Product delivery'],
-                  };
-                  const name = component.product_name
-                    ? [component.product_name, component.product_name]
-                    : names[component.kind] ?? [component.kind, component.kind];
-                  return (
-                    <div key={`${component.kind}:${index}`} className="flex items-center justify-between gap-3 text-xs">
-                      <span className="text-zinc-500">
-                        {dir === 'rtl' ? name[0] : name[1]}
-                        {component.units > 1 ? ` × ${component.units}` : ''}
-                      </span>
-                      <span className={component.waived ? 'text-emerald-400' : 'text-zinc-300'}>
-                        {component.waived ? S.freeShipping : formatIqd(component.fee_iqd)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+              {/* Server quote transparency: WHY a fee/waiver applies (§6.3). */}
+              {quote && quote.shipping.reasons.length > 0 && (
+                <div className="border-t border-white/5 pt-2 space-y-1">
+                  <div className="text-[11px] uppercase tracking-widest text-zinc-500">{S.whyTitle}</div>
+                  {quote.shipping.reasons.map((r, i) => (
+                    <p key={i} className="leading-relaxed">{r}</p>
+                  ))}
+                </div>
+              )}
+            </SummaryInfo>
 
             {/* Protected delivery — offered only when the owner priced it, so
                 the customer never sees a switch that cannot be honoured. */}
@@ -1964,21 +2093,145 @@ export default function Checkout() {
               </label>
             )}
 
-            {/* Server quote transparency: WHY a fee/waiver applies (§6.3). */}
-            {quote && quote.shipping.reasons.length > 0 && (
-              <div className="rounded-lg bg-white/[0.03] border border-white/5 p-3 space-y-1">
-                <div className="text-[11px] uppercase tracking-widest text-zinc-500">{S.whyTitle}</div>
-                {quote.shipping.reasons.map((r, i) => (
-                  <p key={i} className="text-xs text-zinc-400 font-light leading-relaxed">{r}</p>
-                ))}
+            {/*
+              §14 — THE DELIVERY COMPANY'S TAX, AND ITS EXEMPTION, AS TWO ROWS.
+
+              «ضريبة شركة التوصيل» — renamed by owner instruction from «ضريبة
+              الدفع عند الاستلام». The old name said WHEN it is taken and never
+              WHO takes it, so a customer reading it could only conclude the
+              shop had invented a charge. It is the courier's, on a high cash
+              amount, and the «!» now says so with the policy's own two numbers.
+
+              The row shows what the tax engine calculated, which is the figure
+              on the courier's cash sheet. The exemption beneath it is what the
+              membership waived, and the two together come to what is charged —
+              so the column still reaches the total, and the customer can see
+              what the membership was worth instead of a silent zero.
+            */}
+            {codTaxRowIqd > 0 && (
+              <SummaryInfo
+                testId="cod-tax"
+                label={S.codTax}
+                question={loc('لماذا توجد ضريبة على التوصيل؟', 'Why is there a delivery tax?')}
+                value={<span className="text-white font-normal tabular-nums">{formatIqd(codTaxRowIqd)}</span>}
+              >
+                <p>{loc(
+                  'شركة التوصيل تأخذ ضريبة على الطلبات ذات المبلغ العالي المدفوع عند الاستلام — وهي ليست من المتجر.',
+                  'The delivery company charges a tax on high amounts collected at the door — it is not the store’s.'
+                )}</p>
+                {/* The two numbers come from the policy module the server
+                    charges by, never from a sentence typed here: if the rate
+                    ever changes, this explanation changes with it instead of
+                    quietly becoming a lie. */}
+                <p className="tabular-nums">{loc(
+                  `وقدرها ${formatIqd(COD_TAX_PER_BLOCK_IQD)} عن كل ${formatIqd(COD_TAX_BLOCK_IQD)} من المبلغ المدفوع عند الاستلام.`,
+                  `It is ${formatIqd(COD_TAX_PER_BLOCK_IQD)} for every ${formatIqd(COD_TAX_BLOCK_IQD)} collected at the door.`
+                )}</p>
+                <p>{loc(
+                  'اختيار الدفع من المحفظة أو الدفع المسبق يُلغيها بالكامل.',
+                  'Paying from your wallet or in advance removes it entirely.'
+                )}</p>
+              </SummaryInfo>
+            )}
+
+            {showCodExemption && (
+              <div>
+                <div className="flex justify-between items-center text-gold/90" data-checkout-cod-tax-exemption>
+                  <span className="font-light">
+                    {loc(`إعفاء عضوية ${memberLabel}`, `${memberLabel} membership exemption`)}
+                  </span>
+                  <span className="font-normal tabular-nums">-{formatIqd(codTaxExemption)}</span>
+                </div>
+                <p className="mt-1 text-[11.5px] leading-relaxed text-gold/90" data-checkout-member-cod>
+                  {loc('تم إعفاؤك من ضريبة الدفع عند الاستلام', 'You are exempt from the cash-on-delivery tax')}
+                </p>
               </div>
             )}
+
+            {/*
+              «عمولة الدفع عند الاستلام للطلب المسبق» — shown, by owner
+              instruction, BUT NEVER SUMMED, and the distinction is the whole
+              point of this block.
+
+              A pre-order paid at the door is priced as a direct sale
+              (`pricing_basis === 'direct'`), so the difference is ALREADY
+              inside the line prices in the subtotal above. Adding it here as
+              an ordinary row would charge it a second time on screen and the
+              column would stop reaching the total — the exact confusion this
+              reorder exists to end. So it is drawn in the quiet tone reserved
+              for figures that are not summed, and the «!» says where the money
+              actually is. The customer still sees the number they asked to
+              see; the arithmetic stays true.
+            */}
+            {codDirectPricing && codSurchargeIqd > 0 && (
+              <SummaryInfo
+                testId="cod-commission"
+                tone="quiet"
+                label={loc('عمولة الدفع عند الاستلام', 'Cash-on-delivery commission')}
+                question={loc('ما هي عمولة الدفع عند الاستلام؟', 'What is the cash-on-delivery commission?')}
+                value={
+                  <span className="tabular-nums" data-checkout-cod-commission>
+                    +{formatIqd(codSurchargeIqd)}
+                  </span>
+                }
+              >
+                <p>{loc(
+                  'الطلب المسبق المدفوع عند الاستلام يُسعَّر كبيع مباشر، والفرق هو هذه العمولة.',
+                  'A pre-order paid at the door is priced as a direct sale — this commission is the difference.'
+                )}</p>
+                <p>{loc(
+                  'المبلغ محسوب أصلاً داخل أسعار المنتجات في المجموع الفرعي أعلاه، فهو معروض للتوضيح فقط ولا يُضاف مرة ثانية.',
+                  'It is already inside the product prices in the subtotal above — shown here for clarity, never added twice.'
+                )}</p>
+                <p>{loc(
+                  'الدفع من المحفظة أو الدفع المسبق يُعيد سعر الطلب المسبق ويُلغي هذه العمولة.',
+                  'Paying from your wallet or in advance restores the pre-order price and removes it.'
+                )}</p>
+              </SummaryInfo>
+            )}
+
+            {/* ── 3. WHAT YOU SHOULD KNOW ─────────────────────────────────── */}
+
+            {/*
+              EVERY NOTE, TOGETHER, ONCE. These used to be scattered through
+              the figures — the pricing rule above the delivery, the printer
+              term between the coupon and the points — so each one interrupted
+              an addition the customer was in the middle of. None of them is a
+              row and none of them is summed; gathered here they read as what
+              they are, terms of the sale, and the money column above them is
+              left to add up uninterrupted.
+            */}
+
+            {/* One line about the pricing rule in force on a pre-order cart:
+                cash on delivery prices the lines as a direct sale while the
+                order keeps its journey; paying in advance keeps the configured
+                pre-order price. Read from the quote, never inferred here, and
+                only when cash on delivery would change the number at all. */}
+            {pricingBasisLine && quote && (
+              <p
+                className="text-[11.5px] text-zinc-500 font-light leading-relaxed"
+                data-checkout-pricing-basis={quote.pricing_basis}
+              >
+                {pricingBasisLine}
+              </p>
+            )}
+
+            {/* The wallet settled the whole cash order: nothing is collected at
+                the door, so the server priced it as the prepaid pre-order it
+                is — and the customer is told why the total moved. */}
+            {prepaidByWallet && (
+              <Note tone="gold" icon={<Wallet className="w-4 h-4" strokeWidth={1.5} />} testId="checkout-prepaid-by-wallet">
+                <span className="font-light">{S.prepaidByWallet}</span>
+              </Note>
+            )}
+
             {quote && quote.shipping.advance_due_iqd > 0 && (
               <p className="text-xs text-amber-400/90 font-light flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
                 {S.advanceDue(formatIqd(quote.shipping.advance_due_iqd))}
               </p>
             )}
+
             {/* The printer home-delivery NOTE (owner mandate) — informational
                 only, never added to a total. The amount is the server's
                 (settings), echoed on the quote only for a printer line going
@@ -2001,12 +2254,14 @@ export default function Checkout() {
                 )}
               </Note>
             )}
+
             {shippingNeedsConfig && (
               <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex gap-2 text-amber-400">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
                 <p className="text-xs leading-relaxed font-light">{S.needsConfig}</p>
               </div>
             )}
+
             {/* THE SERVER'S OWN SENTENCE, not a constant about it.
                 `setQuoteError(refusalWithCounter(err, lang, 'quote failed'))`
                 already computes the reason the server gave — and this line
@@ -2024,148 +2279,56 @@ export default function Checkout() {
               </p>
             )}
 
-            {/* The promo code, priced against the REAL total — delivery
-                included — which is why it lives here and not only in the
-                cart. The line below is the server's figure from the quote,
-                never a client-side recomputation of it. */}
+            {/* ── 4. WHAT SETTLES IT ──────────────────────────────────────── */}
+
+            {/*
+              THE THREE WAYS TO PAY LESS OR PAY DIFFERENTLY, and nothing else.
+
+              Each used to shout from inside the money column: a headed promo
+              input, a bordered points card, the wallet block — three boxes
+              competing with the figures they were supposed to adjust. They are
+              controls, so they belong AFTER the price, in the order the owner
+              asked for: the code, then the wallet, then the points.
+
+              The code is a QUIET LINE that expands
+              («سطر ناعم استخدام كود خاص من تنقر عليه يتوسع لادخال الكود»),
+              because most orders do not carry one and an empty input is a
+              question nobody asked. It opens by itself when the order already
+              has a code on it, so a customer who wants to remove one finds it
+              open, not hidden.
+            */}
             <div className="pt-1">
-              <PromoCodeField
-                lang={lang}
-                formatIqd={formatIqd}
-                onApplied={(code) => {
-                  setCouponError('');
-                  setCouponCode(code);
-                }}
-              />
-              {couponError && (
-                <p role="alert" className="text-[#e4899a] text-[11px] mt-2">
-                  {couponError}
-                </p>
+              {promoOpen ? (
+                <div id="checkout-promo-field">
+                  <PromoCodeField
+                    lang={lang}
+                    showLabel={false}
+                    formatIqd={formatIqd}
+                    onApplied={(code) => {
+                      setCouponError('');
+                      setCouponCode(code);
+                    }}
+                  />
+                  {couponError && (
+                    <p role="alert" className="text-[#e4899a] text-[11px] mt-2">
+                      {couponError}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowPromoField(true)}
+                  aria-expanded={false}
+                  aria-controls="checkout-promo-field"
+                  data-checkout-promo-toggle
+                  className="inline-flex items-center gap-2 text-[13px] font-light text-zinc-500 hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                >
+                  <Tag className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
+                  {loc('استخدام كود خاص', 'Use a special code')}
+                </button>
               )}
             </div>
-
-            {quote?.coupon && Number(quote.coupon.discount_iqd) > 0 && (
-              <div className="flex justify-between items-center text-emerald-400">
-                <span className="font-light">
-                  {dir === 'rtl' ? 'خصم الكود' : 'Promo discount'}{' '}
-                  <span dir="ltr" className="text-zinc-500 text-xs">{quote.coupon.code}</span>
-                </span>
-                <span className="font-normal">-{formatIqd(Number(quote.coupon.discount_iqd))}</span>
-              </div>
-            )}
-
-            {pointsDiscount > 0 && (
-              <div className="flex justify-between items-center text-gold/90">
-                <span className="font-light">{dir === 'rtl' ? 'خصم النقاط' : 'Points Discount'}</span>
-                <span className="font-normal tabular-nums">-{formatIqd(pointsDiscount)}</span>
-              </div>
-            )}
-
-            {/*
-              POINTS, AS A CONTROL. The customer could see the discount line
-              above with no way to turn it off, no way to turn it on if they
-              arrived without it, and no sight of their balance — while the
-              sibling discount, the promo code, sits two rows up with a full
-              input. Everything here comes from `quote.points`, which the
-              server has been sending all along: the spendable balance, the
-              redemption cap (points pay for merchandise, never for shipping or
-              fees) and what this order earns back.
-            */}
-            {(quote?.points.balance ?? pointBalance) > 0 || pointsDiscount > 0 ? (
-              <div className="rounded-xl border border-border-subtle bg-surface p-3">
-                <label className="flex items-center justify-between gap-3 cursor-pointer">
-                  <span className="min-w-0">
-                    <span className="block text-text-primary text-[13px] font-medium">
-                      {loc('استخدام النقاط', 'Use points', 'بەکارهێنانی خاڵ')}
-                    </span>
-                    <span className="block text-[11.5px] text-text-muted tabular-nums">
-                      {loc('الرصيد', 'Balance', 'باڵانس')}: {formatIqd(quote?.points.balance ?? pointBalance)}
-                      {quote?.points.eligible_merchandise_iqd != null
-                        ? ` · ${loc('الحد الأقصى لهذا الطلب', 'Max for this order', 'زۆرترین بۆ ئەم داواکارییە')} ${formatIqd(quote.points.eligible_merchandise_iqd)}`
-                        : ''}
-                    </span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    className="peer sr-only"
-                    checked={usePoints}
-                    onChange={() => setUsePoints((v) => !v)}
-                    disabled={(quote?.points.balance ?? pointBalance) === 0}
-                  />
-                  {/* The knob is a CHILD of the track, so `peer-checked:`
-                      cannot reach it directly — the nested `[&>span]` selector
-                      carries the state inward. It travels on
-                      `inset-inline-start` rather than a translate so the switch
-                      reads correctly in Arabic and Kurdish with one rule. */}
-                  <span
-                    aria-hidden="true"
-                    className="relative shrink-0 w-[46px] h-[28px] rounded-full bg-surface-selected transition-colors duration-200 peer-checked:bg-gold peer-checked:[&>span]:start-[21px] peer-focus-visible:ring-2 peer-focus-visible:ring-focus peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-canvas"
-                  >
-                    <span className="absolute top-[3px] start-[3px] w-[22px] h-[22px] rounded-full bg-white transition-[inset-inline-start] duration-200 ease-out" />
-                  </span>
-                </label>
-                {quote?.points.earn_pending ? (
-                  <p className="mt-2 text-[11.5px] text-text-muted tabular-nums">
-                    {loc('ستكسب', 'You will earn', 'دەستت دەکەوێت')} {quote.points.earn_pending.toLocaleString()}{' '}
-                    {loc('نقطة من هذا الطلب', 'points from this order', 'خاڵ لەم داواکارییە')}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-
-            {/* §3.3/§5 — the support code appears in the money view with an
-                explicit ZERO. The server echoes it from the resolved snapshot,
-                so this line can never claim an attribution the order will not
-                actually carry. */}
-            {quote?.support && (
-              <div
-                data-testid="checkout-support-line"
-                className="flex justify-between items-center gap-3 text-[13px] text-sky-300"
-              >
-                <span className="font-light truncate">{S.supportLine(quote.support.referrer_username || quote.support.ref)}</span>
-                <span className="font-normal shrink-0 text-zinc-400">{S.supportZero}</span>
-              </div>
-            )}
-
-            {/*
-              §14 — THE CASH-ON-DELIVERY TAX, AND ITS EXEMPTION, AS TWO ROWS.
-
-              The row shows what the tax engine calculated, which is the figure
-              on the courier's cash sheet. The exemption beneath it is what the
-              membership waived, and the two together come to what is charged —
-              so the column still reaches the total, and the customer can see
-              what the membership was worth instead of a silent zero.
-
-              It sits here, at the foot of the money column and before the
-              wallet, because that is the order §11 reads in: subtotal, the
-              membership, the coupon, the points, delivery, the tax, the
-              exemption — and only then what settles the bill. It used to sit
-              directly under the subtotal, showing the charged figure alone, so
-              an exempt member saw the tax vanish with nothing to say why.
-
-              The Sorani «باجی پارەدان لە کاتی گەیاندن» is this file's own; the
-              exemption has no Sorani equivalent in the store, so it reads in
-              Arabic there rather than in invented Kurdish.
-            */}
-            {codTaxRowIqd > 0 && (
-              <div className="flex justify-between items-center text-zinc-400" data-checkout-cod-tax>
-                <span className="font-light">{S.codTax}</span>
-                <span className="text-white font-normal tabular-nums">{formatIqd(codTaxRowIqd)}</span>
-              </div>
-            )}
-            {showCodExemption && (
-              <div>
-                <div className="flex justify-between items-center text-gold/90" data-checkout-cod-tax-exemption>
-                  <span className="font-light">
-                    {loc(`إعفاء عضوية ${memberLabel}`, `${memberLabel} membership exemption`)}
-                  </span>
-                  <span className="font-normal tabular-nums">-{formatIqd(codTaxExemption)}</span>
-                </div>
-                <p className="mt-1 text-[11.5px] leading-relaxed text-gold/90" data-checkout-member-cod>
-                  {loc('تم إعفاؤك من ضريبة الدفع عند الاستلام', 'You are exempt from the cash-on-delivery tax')}
-                </p>
-              </div>
-            )}
 
             {/* Wallet Block */}
             <div className={`mt-4 pt-4 border-t border-white/5 transition-all`}>
@@ -2176,10 +2339,10 @@ export default function Checkout() {
                         </div>
                         <div>
                             <span className="font-normal text-white block text-sm">
-                                {dir === 'rtl' ? 'استخدام المحفظة' : 'Use Wallet'}
+                                {loc('استخدام المحفظة', 'Use Wallet')}
                             </span>
                             <span className="text-xs text-zinc-500 font-light block">
-                                {dir === 'rtl' ? 'الرصيد:' : 'Balance:'} <span className="text-zinc-300">{formatIqd(walletBalanceShown)}</span>
+                                {loc('الرصيد:', 'Balance:')} <span className="text-zinc-300">{formatIqd(walletBalanceShown)}</span>
                             </span>
                         </div>
                     </div>
@@ -2204,9 +2367,7 @@ export default function Checkout() {
                     <div className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex gap-2 text-red-400">
                         <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
                         <p className="text-xs leading-relaxed font-light">
-                            {dir === 'rtl'
-                                ? 'الرصيد غير كافٍ للدفع المقدم.'
-                                : 'Insufficient balance for advance.'}
+                            {loc('الرصيد غير كافٍ للدفع المقدم.', 'Insufficient balance for advance.')}
                         </p>
                     </div>
                 )}
@@ -2215,20 +2376,68 @@ export default function Checkout() {
                      <div className="mt-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex gap-2 text-emerald-400">
                         <Sparkles className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
                         <p className="text-xs leading-relaxed font-light">
-                            {dir === 'rtl'
-                                ? `خصم ${walletDiscount.toLocaleString()} د.ع`
-                                : `-${walletDiscount.toLocaleString()} IQD deduction`}
+                            {loc(
+                                `خصم ${walletDiscount.toLocaleString()} د.ع`,
+                                `-${walletDiscount.toLocaleString()} IQD deduction`
+                            )}
                         </p>
                     </div>
                 )}
             </div>
 
-            {walletDiscount > 0 && (
-              <div className="flex justify-between items-center text-emerald-400 bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/10">
-                <span className="flex items-center gap-2 font-normal text-sm"><Sparkles className="w-4 h-4" /> {dir === 'rtl' ? 'رصيد مستخدم' : 'Used Balance'}</span>
-                <span className="font-medium text-sm">-{formatIqd(walletDiscount)}</span>
+            {/*
+              POINTS, AS A QUIET LINE — «واسفله بسطر ناعم وهو استخدام النقاط».
+
+              It was a bordered card the same weight as the wallet block above
+              it, so two settlement controls of very different importance
+              looked identical. The control is unchanged — the same switch, the
+              same balance, the same cap — but it is now a line under the
+              wallet rather than a second box beside it. Everything still comes
+              from `quote.points`: the spendable balance, the redemption cap
+              (points pay for merchandise, never for shipping or fees) and what
+              this order earns back.
+            */}
+            {(quote?.points.balance ?? pointBalance) > 0 || pointsDiscount > 0 ? (
+              <div className="pt-1">
+                <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-light text-zinc-300">
+                      {loc('استخدام النقاط', 'Use points', 'بەکارهێنانی خاڵ')}
+                    </span>
+                    <span className="block text-[11.5px] text-zinc-500 tabular-nums">
+                      {loc('الرصيد', 'Balance', 'باڵانس')}: {formatIqd(quote?.points.balance ?? pointBalance)}
+                      {quote?.points.eligible_merchandise_iqd != null
+                        ? ` · ${loc('الحد الأقصى لهذا الطلب', 'Max for this order', 'زۆرترین بۆ ئەم داواکارییە')} ${formatIqd(quote.points.eligible_merchandise_iqd)}`
+                        : ''}
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="peer sr-only"
+                    checked={usePoints}
+                    onChange={() => setUsePoints((v) => !v)}
+                    disabled={(quote?.points.balance ?? pointBalance) === 0}
+                  />
+                  {/* The knob is a CHILD of the track, so `peer-checked:`
+                      cannot reach it directly — the nested `[&>span]` selector
+                      carries the state inward. It travels on
+                      `inset-inline-start` rather than a translate so the switch
+                      reads correctly in Arabic and Kurdish with one rule. */}
+                  <span
+                    aria-hidden="true"
+                    className="relative shrink-0 w-11 h-6 rounded-full bg-zinc-800 transition-colors duration-200 peer-checked:bg-white peer-checked:[&>span]:start-[22px] peer-checked:[&>span]:bg-black peer-focus-visible:ring-2 peer-focus-visible:ring-focus peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-canvas"
+                  >
+                    <span className="absolute top-1 start-1 w-4 h-4 rounded-full bg-zinc-400 transition-[inset-inline-start] duration-200 ease-out" />
+                  </span>
+                </label>
+                {quote?.points.earn_pending ? (
+                  <p className="mt-2 text-[11.5px] text-zinc-500 tabular-nums">
+                    {loc('ستكسب', 'You will earn', 'دەستت دەکەوێت')} {quote.points.earn_pending.toLocaleString()}{' '}
+                    {loc('نقطة من هذا الطلب', 'points from this order', 'خاڵ لەم داواکارییە')}
+                  </p>
+                ) : null}
               </div>
-            )}
+            ) : null}
 
             {/*
               THE NUMBER THE CUSTOMER IS AGREEING TO PAY.
@@ -2239,6 +2448,12 @@ export default function Checkout() {
               95,000, shipping 5,000, used balance −30,000, and then a 70,000
               headline. The 100,000 being committed to appeared nowhere and had
               to be summed by hand across six rows.
+
+              The «رصيد مستخدم −30,000» row that used to sit directly above
+              this block is gone (§15): it was the THIRD statement of
+              `walletDiscount` on one screen — the wallet toggle announces it,
+              and the settlement line below restates it as what it is, money
+              already paid. Two places, each doing a different job.
 
               The total is the headline now, and what happens to it — paid from
               the wallet, financed, collected at the door — is the settlement

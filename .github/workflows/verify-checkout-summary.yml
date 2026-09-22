@@ -1,0 +1,93 @@
+name: 53 - Checkout price column reads in order (no deployment)
+
+# «هذا السلوك غير مناسب ويسبب ارتباك … يجب أن يكون المجموع الفرعي وأسفله كل
+#  التفاصيل … ثم علامة تعجب أمام كلمة تكلفة التوصيل إلى البيت.»
+#
+# TWO PROPERTIES, AND NEITHER IS VISIBLE TO AN ORDINARY UNIT TEST.
+#
+# The first is ORDER. Every row in this column rendered correctly before the
+# owner complained — the bug was the sequence, and sequence is exactly what a
+# render test of one block cannot see. `checkoutSummaryOrder.test.ts` reads the
+# source and pins the order of the markers.
+#
+# The second is GEOMETRY. A disclosure can pass every grep and still be useless
+# on the device this shop is run from: a hover affordance never opens under a
+# finger, an absolutely-positioned panel opens on top of the next figure, and a
+# panel inside the row's own flex squeezes the price off the line. So the second
+# job drives the real component in a real engine, taps with a real touch
+# pointer, and measures real boxes at phone and iPad widths.
+#
+# It reads nothing and deploys nothing.
+
+on:
+  pull_request:
+    branches: [Main]
+    paths:
+      - 'src/pages/Checkout.tsx'
+      - 'src/components/ui/SummaryInfo.tsx'
+      - 'src/components/PromoCodeField.tsx'
+      - 'packages/shipping/src/codTax.ts'
+      - 'tests/checkoutSummaryOrder.test.ts'
+      - 'tests/browser/summary*'
+      - 'scripts/e2e-summary-info.mjs'
+      - '.github/workflows/verify-checkout-summary.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checkout-summary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  column:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: The order the owner asked for
+        run: node --import tsx --test tests/checkoutSummaryOrder.test.ts
+
+      - name: Install isolated browser engines
+        run: |
+          npm install --prefix /tmp/levonis-browser --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
+          /tmp/levonis-browser/node_modules/.bin/playwright install --with-deps chromium webkit
+
+      # WebKit is the engine the shop is actually run from. It is also the one
+      # that synthesises a mouse-enter from a tap, which is how a hover-based
+      # affordance can look alive in Chromium and be dead on the owner's iPad.
+      - name: Tap the «!» in a real engine and measure what it moved
+        env:
+          PLAYWRIGHT_MODULE: /tmp/levonis-browser/node_modules/playwright
+          OUT_DIR: /tmp/levonis-diagnostics/summary
+        run: |
+          mkdir -p /tmp/levonis-diagnostics/summary
+          node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4176 > /tmp/levonis-diagnostics/summary/vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4176/tests/browser/summary.html >/dev/null; then break; fi
+            sleep 1
+          done
+          set +e
+          node scripts/e2e-summary-info.mjs > /tmp/levonis-diagnostics/summary/proof.log 2>&1
+          result=$?
+          tail -60 /tmp/levonis-diagnostics/summary/proof.log
+          exit "$result"
+
+      - name: Keep the screenshots and the measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkout-summary-proof
+          path: /tmp/levonis-diagnostics/summary
+          if-no-files-found: warn

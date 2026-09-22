@@ -134,11 +134,19 @@ export default function PromoCodeField({
   lang,
   formatIqd,
   onApplied,
+  showLabel = true,
 }: {
   lang: string;
   formatIqd: (n: number) => string;
   /** Told the accepted code, or '' when it was removed. */
   onApplied?: (code: string) => void;
+  /**
+   * False where the CALLER already names this control — checkout puts the
+   * field behind a «استخدام كود خاص» disclosure, so the heading here would be
+   * the same words twice, one under the other. The cart, which shows the field
+   * outright with nothing else naming it, keeps its heading.
+   */
+  showLabel?: boolean;
 }) {
   const s = STRINGS[(lang as keyof typeof STRINGS) in STRINGS ? (lang as keyof typeof STRINGS) : 'ar'];
   const [input, setInput] = useState('');
@@ -197,10 +205,12 @@ export default function PromoCodeField({
 
   return (
     <div data-promo-field>
-      <p className="text-white font-bold mb-2 text-sm flex items-center gap-1.5">
-        <Tag className="w-4 h-4 text-zinc-400" aria-hidden />
-        {s.label}
-      </p>
+      {showLabel && (
+        <p className="text-white font-bold mb-2 text-sm flex items-center gap-1.5">
+          <Tag className="w-4 h-4 text-zinc-400" aria-hidden />
+          {s.label}
+        </p>
+      )}
       {applied ? (
         <div className="flex items-center justify-between gap-3 bg-[#59A846]/10 border border-[#59A846]/40 rounded-lg px-3 py-2.5">
           <div className="min-w-0">
