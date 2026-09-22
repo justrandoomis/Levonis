@@ -323,6 +323,20 @@ export default function PrintRequestWizard({
   const [linkUrl, setLinkUrl] = useState('');
   const [linkBusy, setLinkBusy] = useState(false);
   const [link, setLink] = useState<{ link: ParsedLink; info: LinkInfo } | null>(null);
+  /**
+   * The cover the source's API named, if it named one, and whether it loaded.
+   *
+   * `https` only, and that is not caution for its own sake: the page is served
+   * over https, so an `http` image is simply blocked by the browser, and a
+   * `data:` or relative string from somebody else's API is not a picture of
+   * anything. `pickImages` on the worker applies the same rule; this repeats
+   * it because what is rendered must be decided where it is rendered.
+   */
+  const linkCover = (() => {
+    const first = link?.info.images?.[0] ?? '';
+    return /^https:\/\//i.test(first) ? first : '';
+  })();
+  const [coverFailed, setCoverFailed] = useState(false);
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   // ---- what the server made of it
@@ -428,6 +442,7 @@ export default function PrintRequestWizard({
         url: linkUrl.trim(),
       });
       setLink(d);
+      setCoverFailed(false);
       // The provider knows the model's own name; offering it saves typing and
       // is far more useful to a merchant than "طلب طباعة".
       if (!title.trim() && d.info.name) setTitle(d.info.name.slice(0, 140));
@@ -648,6 +663,13 @@ export default function PrintRequestWizard({
           external_id: link?.link.external_id ?? '',
           name: link?.info.name ?? '',
           creator: link?.info.creator ?? '',
+          // «البيانات فقط، والصورة بالرابط» — the cover travels as a LINK to
+          // the source's own CDN and is never downloaded, never re-hosted and
+          // never written to R2. The merchant sees the same picture the
+          // customer confirmed; the shop stores no bytes it has no licence to,
+          // and nothing goes stale when the designer replaces the render. The
+          // server keeps it only if it is an absolute https URL.
+          image_url: linkCover,
           resolved: link?.info.resolved ?? false,
         },
       });
@@ -886,7 +908,7 @@ export default function PrintRequestWizard({
                 <input
                   data-wizard="link-url"
                   value={linkUrl}
-                  onChange={(e) => { setLinkUrl(e.target.value); setLink(null); }}
+                  onChange={(e) => { setLinkUrl(e.target.value); setLink(null); setCoverFailed(false); }}
                   disabled={!!requestId}
                   dir="ltr"
                   inputMode="url"
@@ -907,17 +929,53 @@ export default function PrintRequestWizard({
 
               {link && (
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-3 mt-2" data-wizard="link-result">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <p className="text-zinc-200 text-[12.5px] font-semibold truncate">
-                      {link.info.name || link.link.host}
-                    </p>
+                  <div className="flex items-start gap-3">
+                    {/*
+                      THE PICTURE IS THE CONFIRMATION. A customer pasting a
+                      link is saying "print me this one", and a name and a
+                      creator are a poor way to check that the shop understood
+                      which one. It is loaded straight from the source's own
+                      CDN — never downloaded, never copied into R2 — which is
+                      the owner's decision on this and also why it is `https`
+                      only and carries no referrer. If it fails to load, the
+                      row silently loses the thumbnail and keeps everything
+                      else: a broken frame would look like a broken request.
+                    */}
+                    {linkCover && !coverFailed && (
+                      <img
+                        data-wizard="link-cover"
+                        src={linkCover}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                        onError={() => setCoverFailed(true)}
+                        className="w-14 h-14 rounded-xl object-cover bg-black/40 border border-white/10 shrink-0"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <p className="text-zinc-200 text-[12.5px] font-semibold truncate">
+                          {link.info.name || link.link.host}
+                        </p>
+                      </div>
+                      {link.info.creator && (
+                        <p className="text-zinc-500 text-[11.5px]">
+                          {loc('التصميم لـ', 'Designed by')} {link.info.creator}
+                        </p>
+                      )}
+                      <a
+                        href={link.link.canonical_url}
+                        target="_blank"
+                        rel="noopener noreferrer nofollow"
+                        dir="ltr"
+                        className="text-zinc-500 hover:text-zinc-300 text-[11px] truncate block mt-0.5 transition-colors"
+                      >
+                        {link.link.host}
+                      </a>
+                    </div>
                   </div>
-                  {link.info.creator && (
-                    <p className="text-zinc-500 text-[11.5px]">
-                      {loc('التصميم لـ', 'Designed by')} {link.info.creator}
-                    </p>
-                  )}
                   {!link.info.resolved && (
                     <p className="text-zinc-400 text-[11.5px] leading-relaxed mt-1.5">
                       {loc(

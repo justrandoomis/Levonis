@@ -64,6 +64,44 @@ import { getMediaObject, putMediaObject } from '../lib/mediaStorage';
  * metadata — so even a leaked link leaks a preview, not the customer's model.
  */
 
+/**
+ * WHAT WE KEEP ABOUT SOMEBODY ELSE'S PAGE, and nothing else.
+ *
+ * `source_meta` used to be stored as whatever object the browser sent:
+ * `typeof body.source_meta === 'object'` and straight into D1. Every field in
+ * it is read back and shown to a merchant, so "whatever the customer sent" was
+ * the wrong contract for a blob that ends up on another person's screen.
+ *
+ * The keys are fixed here, and `image_url` is the one that needed a rule.
+ *
+ * THE OWNER'S DECISION ON THE COVER IMAGE: «البيانات فقط، والصورة بالرابط».
+ * The picture is shown from the source's own URL and is never downloaded,
+ * never re-hosted and never written to R2 — so nothing of theirs is copied,
+ * nothing goes stale when they replace it, and the shop stores no bytes it
+ * has no licence to. What that costs is that the URL is a LINK TO ANOTHER
+ * HOST, which is why it must be an absolute https one: `http` would break the
+ * page it is drawn on, and anything else is not a picture.
+ *
+ * Length is capped at the same 600 as `source_url` — a URL longer than that is
+ * not a permalink, it is a payload.
+ */
+function sanitizeSourceMeta(input: unknown): Record<string, string | boolean> {
+  const raw = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+  const text = (key: string, max: number): string => {
+    const value = raw[key];
+    return typeof value === 'string' ? value.slice(0, max) : '';
+  };
+  const image = typeof raw.image_url === 'string' ? raw.image_url.trim() : '';
+  return {
+    provider: text('provider', 60),
+    external_id: text('external_id', 80),
+    name: text('name', 300),
+    creator: text('creator', 160),
+    image_url: /^https:\/\//i.test(image) && image.length <= 600 ? image : '',
+    resolved: raw.resolved === true,
+  };
+}
+
 export const printRequestRoutes = new Hono<AppContext>();
 
 // ------------------------------------------------------------------ helpers
@@ -646,7 +684,7 @@ printRequestRoutes.post('/requests/:id/publish', requireAuth, async (c) => {
 
   const sourceKind = body.source_kind === 'link' ? 'link' : 'upload';
   const sourceUrl = str(body.source_url, 'source_url', { max: 600, required: false }) ?? '';
-  const sourceMeta = body.source_meta && typeof body.source_meta === 'object' ? body.source_meta : {};
+  const sourceMeta = sanitizeSourceMeta(body.source_meta);
   const providers = await getSetting(c.env.DB, 'printLinkProviders');
   const sourceProvider = sourceUrl ? (parseModelLink(sourceUrl, providers)?.provider ?? '') : '';
 
