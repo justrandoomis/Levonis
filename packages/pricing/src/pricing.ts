@@ -908,20 +908,89 @@ export function resolveUnitPrice(input: {
   const inferredType: 'direct_sale' | 'pre_order' = method ? 'pre_order' : 'direct_sale';
   const lineType = statedType ?? inferredType;
 
-  const fulfillment = findFulfillment(option, lineType);
-  if (statedType && option && !fulfillment && (option.fulfillments?.length ?? 0) > 0) {
+  /**
+   * CASH ON DELIVERY PAYS THE DIRECT-SALE PRICE, AND STAYS A PRE-ORDER.
+   *
+   * The owner's rule: a pre-order settled from the Levo wallet keeps the
+   * cheaper pre-order price; the same pre-order paid at the door is priced as
+   * a direct sale. It was implemented once — through `hasDirectPremium`, the
+   * product-level `direct_surcharge_iqd` scalar at the top of this function.
+   *
+   * That scalar stopped being writable. #10 removed the product-level
+   * surcharge control and moved availability onto per-option CELLS, so on
+   * every product configured since, `direct_surcharge_iqd` is null, the COD
+   * branch below never fires, and the door costs exactly what the wallet
+   * costs. Measured on a real shape: wallet 505,000, COD 505,000, direct
+   * 550,000 — the shop absorbing 45,000 IQD on every unit it hands over for
+   * cash.
+   *
+   * So the question had to change from "is there a direct PREMIUM?" to "is
+   * there a direct CELL to price from?".
+   *
+   * `lineType` is NOT touched, deliberately. It still says `pre_order`, and it
+   * must: FULFILLMENT_NOT_OFFERED, the import quota, the lead time and the
+   * fourteen pre-order stages all read it, and a COD pre-order is still a
+   * pre-order in every one of them. Only the LADDER moves.
+   *
+   * Guarded on the direct cell existing AND being enabled, for the reason
+   * stated at the top of this file about the scalar: a model with no direct
+   * sale has nothing to price as one, so it keeps its commission and the door
+   * is never cheaper than the wallet.
+   */
+  const directCell = findFulfillment(option, 'direct_sale');
+  const codPricesAsDirect =
+    preorderPricing === 'cod' &&
+    lineType === 'pre_order' &&
+    (hasDirectPremium || (directCell !== null && directCell.enabled !== false));
+  const pricingType: 'direct_sale' | 'pre_order' =
+    codPricesAsDirect && directCell !== null && directCell.enabled !== false ? 'direct_sale' : lineType;
+
+  // The VALIDITY checks below read `lineType` — what the customer ordered —
+  // while the money reads `pricingType`. Conflating them is what made a COD
+  // pre-order either free of its premium or charged twice for it.
+  const fulfillment = findFulfillment(option, pricingType);
+  const orderedFulfillment = findFulfillment(option, lineType);
+  /** True only when the money moved to the other cell — the COD-with-a-direct-cell case. */
+  const ladderMoved = pricingType !== lineType;
+  if (statedType && option && !orderedFulfillment && (option.fulfillments?.length ?? 0) > 0) {
     // The model publishes its order types and this is not one of them.
     errors.push('FULFILLMENT_NOT_OFFERED');
   }
-  if (fulfillment && fulfillment.enabled === false) errors.push('FULFILLMENT_DISABLED');
+  // Every check from here to the end of this block asks about the cell the
+  // customer ORDERED. Asking the pricing cell instead would mean a pre-order
+  // the shop had switched off still passed, because under COD the pricing
+  // cell is the enabled direct one.
+  if (orderedFulfillment && orderedFulfillment.enabled === false) errors.push('FULFILLMENT_DISABLED');
 
-  const transportRow = fulfillment && method ? findTransport(fulfillment, method) : null;
+  // A route is a PRE-ORDER row by type (`OptionFulfillment.transports`: "Pre-order
+  // only: how the unit reaches Iraq"). Looked up on the direct cell it would
+  // always be null, so a disabled route would clear TRANSPORT_DISABLED and an
+  // unconfigured one would clear the `modelOffersIt` test further down.
+  const transportRow = orderedFulfillment && method ? findTransport(orderedFulfillment, method) : null;
   if (transportRow && transportRow.enabled === false) errors.push('TRANSPORT_DISABLED');
 
   const priceRows: LadderRows = {
     option,
     fulfillment: fulfillment && fulfillment.enabled !== false ? fulfillment : null,
-    transport: transportRow && transportRow.enabled !== false ? transportRow : null,
+    /**
+     * ...but the route is NOT a rung on the direct ladder.
+     *
+     * `pick` walks base -> option -> fulfilment -> transport -> colour, so the
+     * route sits BELOW the cell and wins. Under COD that would hand the
+     * pre-order route's own price straight back and undo the swap above: the
+     * door would pay the wallet price again on every model whose Air row
+     * states a figure. A direct sale has no routes, so the direct ladder has
+     * no rung here.
+     *
+     * The route is not lost: it still decides `shipping_type`, the fourteen
+     * stages and tracking, and its freight is charged as the direct premium
+     * that the waiver below swaps the commission for.
+     *
+     * Gated on `ladderMoved`, not on `codPricesAsDirect`: the legacy
+     * `direct_surcharge_iqd` path prices from the PRE-ORDER cell and must keep
+     * its route rung exactly as it always had.
+     */
+    transport: !ladderMoved && transportRow && transportRow.enabled !== false ? transportRow : null,
     color,
   };
 
@@ -1090,14 +1159,18 @@ export function resolveUnitPrice(input: {
         // The route checkbox decides availability; leaving an optional amount
         // blank must not close pre-order or show “commission not configured”.
         if (commission === null || commission === undefined) commission = 0;
-        if (preorderPricing === 'cod' && hasDirectPremium) {
+        if (codPricesAsDirect) {
           // Cash on delivery: the owner's rule is that this line follows the
           // DIRECT-SALE pricing, so the commission is not the fee here — the
           // direct premium below is. The method stays: shipping_type, the
           // fourteen stages, tracking and the gift rule all read it. Only
-          // when there IS a direct premium to price the line with: a product
-          // with none keeps its commission (the branch below), so the door is
-          // never cheaper than the wallet.
+          // when there IS a direct price to charge instead — a premium scalar
+          // or an enabled direct CELL. A model with neither keeps its
+          // commission (the branch below), so the door is never cheaper than
+          // the wallet. Waiving it without the direct ladder having actually
+          // supplied the price is how the door became 25,000 CHEAPER than the
+          // wallet on a product carrying both; pairing the waiver with
+          // `codPricesAsDirect` is what closes that.
           transport = { method, commission_iqd: commission, waived: true, waived_by: 'cod_direct_pricing' };
         } else {
           // §5: "لا تمنح PRIME أي ميزة PRO أخرى تلقائيًا" — the preorder
