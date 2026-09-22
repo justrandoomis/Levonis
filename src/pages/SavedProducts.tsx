@@ -1,14 +1,22 @@
 /**
- * The visitor's saved store products — where the storefront hearts land.
- * A card click walks back into the product on the store's own site (its
- * subdomain when it has one, the in-site page otherwise), and the heart
- * here removes the save in place. Same skeleton as FollowedStores.
+ * «المحفوظات» — where BOTH hearts land.
+ *
+ * The owner's report: «في المحفوظات عند حفظ منتج معين لا يظهر وتظهر لا توجد
+ * منتجات محفوظه بعد». The heart on the main product page worked; this page
+ * was empty, because it only ever read the storefront hearts
+ * (`community_product_favorites`) and the main one writes `favorites`.
+ *
+ * The server now returns both on one list, each row saying which `source` it
+ * came from, and this page reads that in the only two places it can matter:
+ * where a card OPENS, and which door the heart DELETES through. Getting the
+ * second one wrong would be worse than the original bug — a delete against
+ * the other table succeeds, reports success, and removes nothing.
  */
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
-import { ApiError } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { communityFavoritesApi, type SavedProduct } from '../lib/merchant';
 import { ArrowLeft, ArrowRight, ShoppingBag, Heart } from 'lucide-react';
 
@@ -45,13 +53,17 @@ export default function SavedProducts() {
     };
   }, []);
 
-  const remove = async (e: React.MouseEvent, id: string) => {
+  // The heart deletes from the table the save is actually in. A DELETE against
+  // the wrong one is a 200 that removes nothing, so the row would come back on
+  // the next load and the buyer would read the tap as broken.
+  const remove = async (e: React.MouseEvent, p: SavedProduct) => {
     e.stopPropagation();
     if (busyId) return;
-    setBusyId(id);
+    setBusyId(p.product_id);
     try {
-      await communityFavoritesApi.remove(id);
-      setItems((prev) => prev.filter((p) => p.product_id !== id));
+      if (p.source === 'catalog') await api.delete(`/api/profile/favorites/${p.product_id}`);
+      else await communityFavoritesApi.remove(p.product_id);
+      setItems((prev) => prev.filter((x) => !(x.product_id === p.product_id && x.source === p.source)));
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) navigate('/auth');
     } finally {
@@ -60,6 +72,12 @@ export default function SavedProducts() {
   };
 
   const openProduct = (p: SavedProduct) => {
+    // A catalogue product lives on this site and nowhere else — no merchant,
+    // no subdomain to hop to.
+    if (p.source === 'catalog') {
+      navigate(`/product/${p.slug}`);
+      return;
+    }
     if (p.store_url && /^https?:\/\//.test(p.store_url)) {
       // The store's own site opens in its own tab; the saved list stays put.
       window.open(`${p.store_url.replace(/\/$/, '')}/p/${p.slug}`, '_blank', 'noopener,noreferrer');
@@ -92,13 +110,13 @@ export default function SavedProducts() {
             <Heart className="w-16 h-16 mb-4 opacity-50" />
             <p>{loc('لا توجد منتجات محفوظة بعد', 'Nothing saved yet', 'هیچ پاشەکەوت نەکراوە')}</p>
             <p className="text-[12px] text-zinc-600 mt-1.5">
-              {loc('اضغط القلب على أي منتج داخل متجر لحفظه هنا.', 'Tap the heart on any store product to keep it here.', 'قڵبەکە دابگرە بۆ پاشەکەوتکردن.')}
+              {loc('اضغط القلب على أي منتج — في المتجر أو داخل متجر تاجر — لحفظه هنا.', 'Tap the heart on any product, here or in a merchant store, to keep it here.', 'قڵبەکە دابگرە بۆ پاشەکەوتکردن.')}
             </p>
           </div>
         ) : (
           items.map((p) => (
             <div
-              key={p.product_id}
+              key={`${p.source}:${p.product_id}`}
               onClick={() => openProduct(p)}
               className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-3 flex items-center gap-3.5 cursor-pointer hover:bg-zinc-800/50 transition-colors"
             >
@@ -113,16 +131,20 @@ export default function SavedProducts() {
                 <h3 className="font-semibold text-[13.5px] truncate" dir="auto">
                   {dir === 'rtl' && p.name_ar ? p.name_ar : p.name}
                 </h3>
-                <div className="text-[12px] text-zinc-400 truncate">{p.store_name}</div>
+                <div className="text-[12px] text-zinc-400 truncate">
+                  {p.store_name || loc('متجر ليفونيس', 'Levonis store', 'فرۆشگای لیڤۆنیس')}
+                </div>
                 <div className="text-[12px] text-zinc-300 mt-0.5" dir="ltr">
                   {Number(p.price_iqd).toLocaleString('en-US')} IQD
-                  {!p.in_stock && (
+                  {/* `false`, not `null`: unknown says nothing rather than
+                      guessing. See the comment on `in_stock` in the route. */}
+                  {p.in_stock === false && (
                     <span className="text-zinc-500"> · {loc('غير متوفر', 'Unavailable', 'بەردەست نییە')}</span>
                   )}
                 </div>
               </div>
               <button
-                onClick={(e) => remove(e, p.product_id)}
+                onClick={(e) => remove(e, p)}
                 disabled={busyId === p.product_id}
                 className="w-9 h-9 rounded-full border border-zinc-700 flex items-center justify-center shrink-0 disabled:opacity-50"
                 aria-label={loc('إزالة من المحفوظات', 'Remove from saved', 'لابردن')}

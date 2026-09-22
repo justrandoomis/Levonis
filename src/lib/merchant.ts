@@ -402,6 +402,14 @@ export interface ProductsImportReport {
 
 /** One saved store product, as the saved-items list renders it. */
 export interface SavedProduct {
+  /**
+   * WHICH HEART SAVED THIS, and therefore which page opens it and which door
+   * deletes it. 'store' = a merchant's own product in
+   * `community_product_favorites`; 'catalog' = a shop product in `favorites`,
+   * saved from the main product page. Both land on «المحفوظات»; treating them
+   * as one is what made the catalogue ones invisible.
+   */
+  source: 'store' | 'catalog';
   product_id: string;
   slug: string;
   name: string;
@@ -409,10 +417,16 @@ export interface SavedProduct {
   image: string | null;
   price_iqd: number;
   original_price_iqd: number | null;
-  in_stock: boolean;
+  /**
+   * null on a catalogue product: its availability is the whole availability
+   * engine, not a column, so this list does not claim one either way and the
+   * card prints no availability note.
+   */
+  in_stock: boolean | null;
   saved_at: string;
-  store_slug: string;
-  store_name: string;
+  /** null on a catalogue product — it has no merchant behind it. */
+  store_slug: string | null;
+  store_name: string | null;
   store_url: string | null;
 }
 
