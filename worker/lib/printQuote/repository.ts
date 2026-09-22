@@ -307,6 +307,7 @@ export async function loadMaterialPrices(
 
   const catalogue: Record<string, number> = {};
   const platformByType: Record<string, number> = {};
+  const wantedTypes = new Set<string>();
   for (const row of mats ?? []) {
     const id = str(row.id);
     const price = num(row.price_iqd);
@@ -314,12 +315,96 @@ export async function loadMaterialPrices(
       const grams = netWeightGrams(row.spec_fields);
       if (grams > 0) catalogue[id] = (price / grams) * 1000;
     }
+    const type = str(row.material_type).trim().toUpperCase();
+    if (type) wantedTypes.add(type);
     const fallback = optNum(row.default_iqd_per_kg);
-    if (fallback && fallback > 0) platformByType[str(row.material_type).toUpperCase()] = fallback;
+    if (fallback && fallback > 0 && type) platformByType[type] = fallback;
   }
+
+  // THE SHOP'S OWN FILAMENT, FOUND BY TYPE RATHER THAN BY A LINK NOBODY DRAWS.
+  //
+  // «لا يمكن تسعير هذه المادة» on PLA — the commonest filament there is — and
+  // the reason was two systems looking for the same thing in two places.
+  //
+  // The rung above prices a material from the product it is SOLD as, through
+  // `print_materials.product_id`. That column is written by nothing in this
+  // application: migration 0078 seeds the nine materials without it, no admin
+  // screen sets it, and `productDeletion` only ever clears it. So the rung is
+  // unreachable in practice. The rung below it reads `default_iqd_per_kg`,
+  // which 0078 deliberately leaves NULL — «a made-up filament price is exactly
+  // the kind of number §53 forbids» — and which nothing writes either.
+  //
+  // Both are right to refuse to invent a number. But the shop is not silent
+  // about what a kilo of PLA costs: it SELLS PLA, as a `materials`-family
+  // product with a real price and a real net weight, and
+  // `GET /api/products/print-calculator` has been reading exactly that since
+  // before this engine existed. The engine simply could not see it.
+  //
+  // So it reads the same products, the same way, matched on the material TYPE
+  // the product states rather than on a foreign key. Nothing is invented: a
+  // shop that sells no PLA still cannot price PLA, and says so.
+  //
+  // IT LANDS ON THE `platform` RUNG ON PURPOSE, below the merchant's spool and
+  // below a deliberately linked product. A type match is not this exact
+  // material — «PLA» priced from whichever PLA the shop sells — and `platform`
+  // is the provenance that makes `cost.ts` answer `estimated` with a ±12%
+  // band rather than `exact` to the dinar.
+  if (wantedTypes.size) {
+    const { results: filaments } = await db
+      .prepare(
+        `SELECT price_iqd, spec_fields
+           FROM products
+          WHERE status = 'active' AND template_family = 'materials' AND price_iqd > 0
+          LIMIT 500`
+      )
+      .all<Row>();
+    for (const row of filaments ?? []) {
+      const price = num(row.price_iqd);
+      if (!(price > 0)) continue;
+      const grams = netWeightGrams(row.spec_fields);
+      if (!(grams > 0)) continue;
+      const type = productMaterialType(row.spec_fields, wantedTypes);
+      if (!type) continue;
+      const perKg = (price / grams) * 1000;
+      // The cheapest, for the same reason the spool rung takes the cheapest:
+      // it is the one a sensible shop reaches for first.
+      const current = platformByType[type];
+      if (current === undefined || perKg < current) platformByType[type] = perKg;
+    }
+  }
+
   if (Object.keys(catalogue).length) sources.catalogue = catalogue;
   if (Object.keys(platformByType).length) sources.platformByType = platformByType;
   return sources;
+}
+
+/**
+ * The material type a filament PRODUCT states, when it is one the engine knows.
+ *
+ * The field is free text on the `materials` template — shops write «PLA»,
+ * «PLA Basic», «PETG HF», «pla». It is matched against the types the engine
+ * actually holds, and only by EXACT equality of the first word.
+ *
+ * Exactness is the whole point. A prefix match would read «PLA-CF» as PLA and
+ * price a carbon-filled, abrasive filament at plain PLA's rate — a real number
+ * for the wrong material is worse than no number, which is the rule the rest of
+ * this file is built on. First-word-only is what lets «PLA Basic» through while
+ * «PLA-CF Basic» still resolves to PLA-CF and nothing else. «PLA+» matches
+ * neither, and is left unpriced rather than assumed.
+ */
+export function productMaterialType(specFields: unknown, known: ReadonlySet<string>): string {
+  let stated = '';
+  try {
+    const specs = JSON.parse(str(specFields) || '{}') as Record<string, unknown>;
+    stated = str(specs.material_type) || str(specs.material);
+  } catch {
+    return '';
+  }
+  const normalised = stated.trim().toUpperCase();
+  if (!normalised) return '';
+  if (known.has(normalised)) return normalised;
+  const first = normalised.split(/\s+/)[0] ?? '';
+  return first && known.has(first) ? first : '';
 }
 
 /** The materials template stores net weight as a string: "1000", "1000 g",
