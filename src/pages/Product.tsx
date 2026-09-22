@@ -2379,6 +2379,62 @@ export default function Product() {
 
   const activeModel = models?.find((m) => m.key === modelKey) ?? null;
 
+  /**
+   * «الوضع في الاختيار يسبب أرباك للعميل ولا يعرف وغير clean» — AND THE
+   * SHARPEST CASE OF IT WAS THE SAME QUESTION ASKED TWICE.
+   *
+   * Two panels on this page can both ask how the thing is fulfilled:
+   *
+   *   · the «طريقة التوفر» cards at the top, gated on `offersBoth`, which is
+   *     `modes.length >= 2` — the server saying this selection can be bought
+   *     now AND pre-ordered;
+   *   · the «طريقة التوفر» row INSIDE the version chooser, for LEGACY data
+   *     where one version is several option rows, each declaring its own route.
+   *
+   * On legacy data both are true at once, so the customer met the question
+   * twice, in two places, with two different sets of buttons — and pressing
+   * one left the other looking unanswered, because they are not the same
+   * control: the top cards set the order type, the inline row picks the OPTION
+   * ROW that carries the route.
+   *
+   * ONE OF THEM HAS TO STAND DOWN, and it must be the top one. The inline row
+   * is not a duplicate of a question — it is the only control that can answer
+   * it on this shape of data, because choosing the route means choosing which
+   * option row is in the cart. The top cards cannot do that.
+   *
+   * Read from `models` as a whole rather than from the SELECTED model, so the
+   * answer is a property of the product and cannot flip a panel in and out
+   * mid-flow as the buyer moves between versions.
+   */
+  const routeAskedPerVersion = (models ?? []).some((m) => m.options.length > 1);
+
+  /**
+   * THE ANSWER, ON THE QUESTION — «الوضع في الاختيار … غير clean».
+   *
+   * Four to six `lv-section` panels stack down this column, and until now they
+   * all looked identical whether or not the buyer had answered them. An
+   * unanswered one carried an amber «اختر …» and an answered one carried
+   * nothing, so the only way to read the column was to open every panel and
+   * look for the ticked chip inside it. On a phone that is most of a screen
+   * per question.
+   *
+   * `Chosen` puts the answer at the end of its own question, in the quiet type
+   * the house uses for secondary facts. The column then reads as a summary —
+   * «طريقة التوفر · طلب مسبق»، «وسيلة النقل · بحري»، «النسخة · X1C» — and the
+   * questions still open are the ones wearing amber. One cue per state, and
+   * neither competes with the price.
+   *
+   * It is the answer IN FORCE, never the raw press: an option that closed
+   * while the page was open changes what the panel below is showing, so a
+   * header that quoted the press would contradict the tick underneath it.
+   */
+  const Chosen = ({ value }: { value: string | null | undefined }) =>
+    value ? (
+      <span className="ms-2 font-medium text-[12px] text-zinc-400" data-chosen>
+        · {value}
+      </span>
+    ) : null;
+
   const selectionBlocks = (
     <>
       {/*
@@ -2400,11 +2456,12 @@ export default function Product() {
         Nothing else changed. Every block below is the same JSX it was, with
         the same gate, the same handlers and the same state — this is a move.
       */}
-      {offersBoth ? (
+      {offersBoth && !routeAskedPerVersion ? (
         <fieldset className="lv-section" data-fulfilment-chooser>
           <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
             <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
             {s.fulfilment}
+            <Chosen value={effectivePreorder ? s.preorderMode : directUsable ? s.directSale : null} />
           </legend>
           <div className="mt-2 flex flex-col gap-2">
             {/* Choosing direct sale does NOT forget the route: a buyer who
@@ -2511,6 +2568,7 @@ export default function Product() {
           <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
             <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
             {s.transport}
+            <Chosen value={effectiveTransport ? transportLabel(s, effectiveTransport) : null} />
             {/* THE PANEL SAYS IT IS REQUIRED, beside the choice itself — the
                 same shape the colour fieldset uses for `color_required`. The
                 button below is disabled until a route is named (`routeReady`),
@@ -2585,6 +2643,13 @@ export default function Product() {
               <fieldset key={group.id} className="lv-section" data-option-group={group.id}>
                 <legend className="px-1 text-white font-bold text-[14px]">
                   {group.name_en}
+                  <Chosen
+                    value={(() => {
+                      if (!groupSelected) return null;
+                      const picked = options.find((item) => item.id === groupSelected);
+                      return picked ? pickName(picked.name_en, picked.name, picked.name_ar) : null;
+                    })()}
+                  />
                   {!groupSelected ? (
                     <span className="ms-2 text-amber-300 font-medium text-[12px]">{s.chooseOption}</span>
                   ) : null}
@@ -2667,6 +2732,7 @@ export default function Product() {
         <fieldset className="lv-section" data-variant-chooser>
           <legend className="px-1 text-white font-bold text-[14px]">
             {tr('اختر النسخة', 'Choose the version', 'وەشان هەڵبژێرە')}
+            <Chosen value={activeModel?.label} />
             {!modelKey ? <span className="ms-2 text-amber-300 font-medium text-[12px]">{s.chooseOption}</span> : null}
           </legend>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -2783,6 +2849,12 @@ export default function Product() {
         <fieldset className="lv-section">
           <legend className="px-1 text-white font-bold text-[14px]">
             {s.options}
+            <Chosen
+              value={(() => {
+                const picked = options.find((item) => item.id === optionId);
+                return picked ? pickName(picked.name_en, picked.name, picked.name_ar) : null;
+              })()}
+            />
             {availability?.selection.option_required && !optionId ? (
               <span className="ms-2 text-amber-300 font-medium text-[12px]">{s.chooseOption}</span>
             ) : null}
@@ -2835,6 +2907,12 @@ export default function Product() {
         <fieldset className="lv-section">
           <legend className="px-1 text-white font-bold text-[14px]">
             {s.colors}
+            <Chosen
+              value={(() => {
+                const picked = orderedColors.find((col) => col.id === colorId);
+                return picked ? pickName(picked.name_en, picked.name, picked.name_ar) : null;
+              })()}
+            />
             {availability?.selection.color_required && !colorId ? (
               <span className="ms-2 text-amber-300 font-medium text-[12px]">{s.chooseColor}</span>
             ) : null}

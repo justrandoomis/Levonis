@@ -167,3 +167,62 @@ test('the rules are total: no input leaves a request carrying a half-answer', ()
   assert.equal(resolveTransport('sea', 'pre_order', undefined), '', 'no facts yet carries no route');
   assert.equal(resolveTransport('sea', 'pre_order', { transports: [] }), '');
 });
+
+/**
+ * THE SECOND HALF OF THE SAME REPORT, which is about the SCREEN rather than
+ * the state: «الوضع في الاختيار يسبب أرباك للعميل ولا يعرف وغير clean».
+ *
+ * These two are source assertions, deliberately. The first is about which
+ * panels EXIST together — a rendering question with no runtime state to drive
+ * — and the second is about a presentation rule that is easy to drop from one
+ * panel in a later edit and impossible to notice from the other five.
+ */
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const PRODUCT = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '..', 'src/pages/Product.tsx'),
+  'utf8'
+);
+
+test('«طريقة التوفر» is asked once, never twice on the same screen', () => {
+  // Two panels can ask how the thing is fulfilled: the cards at the top, gated
+  // on `offersBoth`, and the row inside the version chooser, which exists for
+  // LEGACY data where one version is several option rows each declaring its
+  // own route. On legacy data both were true at once, so the customer met the
+  // question twice — with two different sets of buttons that are not the same
+  // control, so answering one left the other looking unanswered.
+  assert.match(
+    PRODUCT,
+    /\{offersBoth && !routeAskedPerVersion \? \(\n\s*<fieldset className="lv-section" data-fulfilment-chooser>/,
+    'the top fulfilment cards can appear beside the per-version row again'
+  );
+  // Read from `models` as a whole, not the SELECTED model: a gate on the
+  // active model flips a whole panel in and out as the buyer moves between
+  // versions, which is a worse confusion than the one it fixes.
+  assert.match(
+    PRODUCT,
+    /const routeAskedPerVersion = \(models \?\? \[\]\)\.some\(\(m\) => m\.options\.length > 1\);/
+  );
+  // The per-version row is the one that stays, because it is the only control
+  // that can answer the question on that shape of data.
+  assert.ok(PRODUCT.includes('data-availability-chooser'), 'the per-version row is still there');
+});
+
+test('every choice panel shows its own answer, so the column reads as a summary', () => {
+  // Until now an answered panel carried nothing and an unanswered one carried
+  // amber, so the only way to read the column was to open every panel and look
+  // for the ticked chip inside it.
+  const uses = PRODUCT.match(/<Chosen\b/g) ?? [];
+  assert.ok(uses.length >= 6, `only ${uses.length} panels state their answer`);
+  // One quiet cue, in the house's secondary type — never a second accent
+  // competing with the price.
+  assert.match(PRODUCT, /const Chosen = \(\{ value \}: \{ value: string \| null \| undefined \}\) =>/);
+  assert.match(PRODUCT, /className="ms-2 font-medium text-\[12px\] text-zinc-400" data-chosen/);
+  // The two the owner named by hand read the value IN FORCE, not the raw
+  // press: a header quoting a press the server has closed would contradict the
+  // tick in the panel underneath it.
+  assert.match(PRODUCT, /<Chosen value=\{effectivePreorder \? s\.preorderMode : directUsable \? s\.directSale : null\} \/>/);
+  assert.match(PRODUCT, /<Chosen value=\{effectiveTransport \? transportLabel\(s, effectiveTransport\) : null\} \/>/);
+});
