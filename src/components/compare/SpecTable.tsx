@@ -5,6 +5,7 @@ import {
   rowDiffers,
   rowScoring,
   specGroups,
+  columnName,
   tri,
   type CompareLang,
   type CompareGroup,
@@ -175,7 +176,7 @@ function WideGroup({
                   style={{ backgroundColor: productTone(i).color }}
                 />
                 <span className="truncate text-[11px] font-bold text-[var(--color-text-primary)]">
-                  {tri(product.name, l)}
+                  {columnName(product, l)}
                 </span>
               </span>
             </th>
@@ -237,7 +238,7 @@ function NarrowGroup({
                       style={{ backgroundColor: tone.color }}
                     />
                     <span className="truncate text-[11px] text-[var(--color-text-muted)]">
-                      {tri(product.name, l)}
+                      {columnName(product, l)}
                     </span>
                   </span>
                   <span className="min-w-0 text-end">

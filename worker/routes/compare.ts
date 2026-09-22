@@ -69,6 +69,8 @@ import {
 import { compareProducts, type CompareResult } from '../lib/compareSpecs';
 import { adviseFromSpecs, type PowerAdvice } from '../lib/powerAdvice';
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
+import { parseProductRow } from '../lib/productModel';
+import { buildGrid } from '../lib/priceGrid';
 
 export const compareRoutes = new Hono<AppContext>();
 
@@ -166,6 +168,21 @@ export interface CompareProductCard {
    *  comparison that does not say so compares a used machine with a new one
    *  and calls the used one cheaper. */
   graded: boolean;
+  /**
+   * ON A COMPARISON COLUMN ONLY: the product this column is, when `id` is a
+   * slot key rather than a product id. The page needs it for the link to the
+   * product page, which knows nothing about slots.
+   */
+  product_id?: string;
+  /** ON A COMPARISON COLUMN ONLY: the option this column is priced and
+   *  labelled as, or null for the product as sold at its base price. */
+  option?: { id: string; label: Trilingual } | null;
+  /**
+   * ON A PICKER CARD ONLY, and only when there are at least TWO: the options
+   * this product can be added as, so the picker can ask «أي خيار؟» before it
+   * adds. Absent — not empty — when there is nothing to ask.
+   */
+  options?: Array<{ id: string; label: Trilingual }>;
 }
 
 const tri = (ar: string, en: string, ckb: string): Trilingual => ({
@@ -329,16 +346,52 @@ export function cardOf(p: Placed, image: string | null = null): CompareProductCa
  * A client that asked for six products and got four back would render four and
  * be wrong about which two it dropped — and the visitor would think they had
  * removed something. Duplicates are collapsed rather than refused: two links
- * to the same printer is a mistake nobody needs to be told about, and a
- * product compared against itself is a page of ties.
+ * to the same SLOT is a mistake nobody needs to be told about.
+ *
+ * A SLOT IS `productId` OR `productId:optionId`.
+ *
+ * «خاصه الطابعات التي تحمل ليزر او كومبو فيه جهاز ams فهذا يفرق — مثلا يقارن
+ *  بين طابعه ونفس الطابعه لكن الخيار يختلف.»
+ *
+ * The same printer bought as Combo and as the bare unit is two different
+ * purchases at two different prices, and until now the page could not address
+ * the difference at all: the ids were product ids, so the two columns would
+ * have collapsed into one. The option id rides in the same string, which keeps
+ * the whole comparison a LINK someone can send — the property this file's
+ * header calls the feature.
  */
-function readIds(raw: string | undefined): string[] {
+/** One column of the comparison: a product, optionally narrowed to one of its
+ *  option values. */
+interface CompareSlot {
+  /** Exactly what was in the URL — the id the page removes and replaces by. */
+  key: string;
+  productId: string;
+  optionId: string | null;
+}
+
+function readIds(raw: string | undefined): CompareSlot[] {
+  const slots: CompareSlot[] = [];
   const ids: string[] = [];
   for (const piece of String(raw ?? '').split(',')) {
-    const id = piece.trim();
-    if (!id) continue;
-    if (id.length > 60) throw badRequest('One of the product ids is not a product id', 'COMPARE_BAD_ID');
-    if (!ids.includes(id)) ids.push(id);
+    const key = piece.trim();
+    if (!key) continue;
+    if (key.length > 96) throw badRequest('One of the product ids is not a product id', 'COMPARE_BAD_ID');
+    const cut = key.indexOf(':');
+    const productId = cut < 0 ? key : key.slice(0, cut);
+    const optionId = cut < 0 ? null : key.slice(cut + 1);
+    if (!productId || productId.length > 60) {
+      throw badRequest('One of the product ids is not a product id', 'COMPARE_BAD_ID');
+    }
+    if (optionId !== null && (!optionId || optionId.length > 60 || optionId.includes(':'))) {
+      throw badRequest('One of the option ids is not an option id', 'COMPARE_BAD_ID');
+    }
+    // DEDUPED ON THE WHOLE SLOT, not on the product. «يقارن بين طابعه ونفس
+    // الطابعه لكن الخيار يختلف» is the case this page exists for now, and
+    // collapsing it on the product id would silently delete the second column.
+    if (!ids.includes(key)) {
+      ids.push(key);
+      slots.push({ key, productId, optionId });
+    }
   }
   if (ids.length === 0) {
     throw badRequest(
@@ -353,7 +406,7 @@ function readIds(raw: string | undefined): string[] {
       { max: MAX_COMPARE_IDS }
     );
   }
-  return ids;
+  return slots;
 }
 
 /**
@@ -377,7 +430,11 @@ const label = (row: ProductRow): string => row.name_ar || row.name || row.slug;
  */
 compareRoutes.get('/', async (c) => {
   await rateLimit(c, 'compare-read', 120, 60);
-  const ids = readIds(c.req.query('ids'));
+  const slots = readIds(c.req.query('ids'));
+  // One product may fill two slots — the whole point of the option id — so the
+  // lookup is over the DISTINCT products, and the columns are rebuilt from the
+  // slots afterwards.
+  const ids = [...new Set(slots.map((slot) => slot.productId))];
 
   const placeholders = ids.map(() => '?').join(',');
   const { results } = await c.env.DB.prepare(
@@ -413,7 +470,9 @@ compareRoutes.get('/', async (c) => {
 
   // Order follows the REQUEST, not the database: the visitor put one machine
   // on the right and one on the left, and an IN list has no order of its own.
-  const rows = ids.map((id) => byId.get(id)!);
+  // One row per SLOT, so the same product appearing twice under two options is
+  // two columns.
+  const rows = slots.map((slot) => byId.get(slot.productId)!);
 
   const hidden = rows.filter((r) => r.status !== 'active');
   if (hidden.length) {
@@ -425,10 +484,73 @@ compareRoutes.get('/', async (c) => {
 
   const [catalogRows, images] = await Promise.all([
     loadCatalogs(c.env.DB),
-    loadAuthoritativeProductImages(c.env.DB, rows.map((row) => row.id)),
+    loadAuthoritativeProductImages(c.env.DB, ids),
   ]);
+  /**
+   * THE OPTIONS COME OFF THE ROW, not out of a second query. `options` is a
+   * PRODUCT_COLUMNS column, and `parseProductRow` is the one parser for it —
+   * the same one the product page and the admin form read, so an option that
+   * was upgraded or renumbered cannot mean one thing here and another there.
+   */
+  const docById = new Map(ids.map((id) => [id, parseProductRow(byId.get(id) as unknown as Record<string, unknown>)]));
   const tax = taxonomy(catalogRows);
   const placed = rows.map((row) => place(row, tax));
+
+  /**
+   * THE OPTION EACH COLUMN IS PRICED AS, resolved before anything is drawn.
+   *
+   * An option id that is not this product's, or is not active any more, is
+   * REFUSED BY NAME rather than quietly falling back to the base product: a
+   * shared link that silently changed which configuration it compares is worse
+   * than one that says the configuration is gone. The shape blames one
+   * `product_id`, the same shape `COMPARE_NO_SPECS` uses, so the page's "drop
+   * that column" affordance works on it unchanged.
+   */
+  const picked = slots.map((slot) => {
+    if (!slot.optionId) return null;
+    const option = docById.get(slot.productId)?.options.find((o) => o.id === slot.optionId);
+    if (!option || option.active === false) {
+      const row = byId.get(slot.productId)!;
+      throw badRequest(
+        `الخيار المطلوب من «${label(row)}» ما عاد موجود. / ` +
+          `The requested option of “${row.name || row.slug}” no longer exists.`,
+        'COMPARE_OPTION_NOT_FOUND',
+        { product_id: slot.productId, option_id: slot.optionId }
+      );
+    }
+    return option;
+  });
+
+  /**
+   * THE PRICE OF A CHOSEN OPTION COMES FROM `buildGrid`, never from arithmetic
+   * written here.
+   *
+   * An option's regular price is a LADDER — an absolute override, or an
+   * adjustment measured from the product's own price, clamped against the
+   * member tiers — and packages/pricing/src/priceGrid.ts is the one
+   * implementation of it, the same one the admin grid and the TXT export read.
+   * A second copy in this file would start agreeing and end disagreeing, and
+   * the number it disagreed about would be a price on a page whose whole job
+   * is telling someone which machine to buy.
+   */
+  const priceOf = (index: number): number => {
+    const option = picked[index];
+    const doc = docById.get(slots[index].productId)!;
+    const base = Number(doc.price_iqd) || 0;
+    if (!option) return base;
+    const grid = buildGrid({
+      price_iqd: base,
+      prime_price_iqd: doc.prime_price_iqd,
+      pro_price_iqd: doc.pro_price_iqd,
+      product_cost_iqd: doc.product_cost_iqd,
+      selling_type: doc.selling_type,
+      sale_types: doc.sale_types,
+      options: doc.options,
+      colors: doc.colors,
+    });
+    const line = grid.find((g) => g.level === 'option' && g.id === option.id);
+    return line?.cells.regular.effective ?? base;
+  };
 
   /**
    * «في المقارنة … يجب أن يكون الفيلمنت مقابل الفيلمنت الطابعة مقابل الطابعة».
@@ -496,7 +618,28 @@ compareRoutes.get('/', async (c) => {
     );
   }
 
-  const cards = placed.map((product) => cardOf(product, images.get(product.row.id) || null));
+  /**
+   * THE CARD IS THE SLOT, not the product.
+   *
+   * `card.id` is what the page removes by, replaces by and writes back into
+   * `?ids=`. Giving it the slot key is what makes «نفس الطابعه لكن الخيار
+   * يختلف» round-trip: two columns of one printer are two ids, and closing
+   * either one closes the right column. The option travels beside it so the
+   * column can be labelled «X1C · كومبو» rather than showing the same name
+   * twice with two different prices and no explanation.
+   */
+  const cards = placed.map((product, i) => {
+    const option = picked[i];
+    return {
+      ...cardOf(product, images.get(product.row.id) || null),
+      id: slots[i].key,
+      product_id: product.row.id,
+      price_iqd: priceOf(i),
+      option: option
+        ? { id: option.id, label: tri(option.name_ar, option.name_en, option.name_ckb) }
+        : null,
+    };
+  });
   /**
    * ALIGNED WITH `products`, INDEX FOR INDEX, and emitted for a single column
    * too. The product page opens «قارن» with one machine already in place and
@@ -514,12 +657,17 @@ compareRoutes.get('/', async (c) => {
   if (placed.length < 2) return c.json({ success: true, products: cards, power, comparison: null });
 
   const comparison: CompareResult = compareProducts({
-    products: placed.map((p) => ({
-      id: p.row.id,
+    products: placed.map((p, i) => ({
+      // The SLOT id, so a comparison of one printer against itself under two
+      // options has two distinguishable columns rather than one id twice.
+      id: slots[i].key,
       product_type: p.productType,
       section_slugs: p.branch.map((b) => b.slug),
       spec_fields: p.specs,
-      price_iqd: Number(p.row.price_iqd) || 0,
+      // The price of the CONFIGURATION, from buildGrid — see priceOf above.
+      // The spec sheet is the product's; the price is the option's, and the
+      // price row is the one line where the two columns genuinely differ.
+      price_iqd: priceOf(i),
     })),
   });
 
@@ -649,7 +797,35 @@ export async function rankCompareCandidates(
     db,
     selected.map((candidate) => candidate.row.id)
   );
-  return selected.map((candidate) => cardOf(candidate, images.get(candidate.row.id) || null));
+  return selected.map((candidate) =>
+    withOptions(cardOf(candidate, images.get(candidate.row.id) || null), candidate.row)
+  );
+}
+
+/**
+ * THE OPTIONS A CARD CAN BE ADDED AS, so the picker can ask before it adds.
+ *
+ * «اجعل عند الضغط على إضافة يظهر نافذة منبثقة يختار الخيار قبل الإضافة للمقارنه
+ *  خاصه الطابعات التي تحمل ليزر او كومبو فيه جهاز ams فهذا يفرق.»
+ *
+ * ONLY WHEN THERE IS SOMETHING TO ASK. A product with one active option — or
+ * none — is added straight away: a popup offering a single answer is a tap the
+ * customer pays for and learns nothing from. Fewer than two, and the key is
+ * absent rather than an empty array, so the client's test is simply "is there
+ * a list".
+ *
+ * It is read off the row's own `options` column through `parseProductRow`, the
+ * same parser the product page uses, so the names in the popup are the names
+ * on the product page.
+ */
+function withOptions(card: CompareProductCard, row: ProductRow): CompareProductCard {
+  const doc = parseProductRow(row as unknown as Record<string, unknown>);
+  const active = doc.options.filter((o) => o.active !== false);
+  if (active.length < 2) return card;
+  return {
+    ...card,
+    options: active.map((o) => ({ id: o.id, label: tri(o.name_ar, o.name_en, o.name_ckb) })),
+  };
 }
 
 /**
@@ -693,7 +869,9 @@ export async function browseCompareCandidates(
     .slice(0, limit);
 
   const images = await loadAuthoritativeProductImages(db, placed.map((candidate) => candidate.row.id));
-  return placed.map((candidate) => cardOf(candidate, images.get(candidate.row.id) || null));
+  return placed.map((candidate) =>
+    withOptions(cardOf(candidate, images.get(candidate.row.id) || null), candidate.row)
+  );
 }
 
 /**
@@ -755,7 +933,7 @@ compareRoutes.get('/candidates', async (c) => {
 
   return c.json({
     success: true,
-    for: cardOf(anchorPlaced, images.get(anchor.id) || null),
+    for: withOptions(cardOf(anchorPlaced, images.get(anchor.id) || null), anchor),
     products: await rankCompareCandidates(c.env.DB, anchorPlaced, tax, q, MAX_CANDIDATES),
   });
 });

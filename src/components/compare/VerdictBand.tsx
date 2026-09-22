@@ -5,6 +5,7 @@ import { useLanguage } from '../../LanguageContext';
 import { useRail } from '../../lib/useRail';
 import {
   leaders,
+  columnName,
   tri,
   type CompareLang,
   type CompareProductCard,
@@ -162,7 +163,7 @@ export default function VerdictBand({
                       style={{ backgroundColor: tone.color }}
                     />
                     <h3 className="truncate text-[13px] font-bold text-[var(--color-text-primary)]">
-                      {tri(product.name, l)}
+                      {columnName(product, l)}
                     </h3>
                   </div>
                   {product.graded ? (

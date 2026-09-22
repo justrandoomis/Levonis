@@ -3,7 +3,7 @@ import { BadgeDollarSign } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import {
   priceDeltas,
-  tri,
+  columnName,
   type CompareLang,
   type CompareProductCard,
   type CompareRow,
@@ -79,7 +79,7 @@ export default function PriceRow({
                   style={{ backgroundColor: tone.color }}
                 />
                 <span className="truncate text-[12px] text-[var(--color-text-secondary)]">
-                  {tri(product.name, l)}
+                  {columnName(product, l)}
                 </span>
               </span>
 

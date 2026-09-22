@@ -46,7 +46,7 @@ test('the chart prints the typed figure, never the normalised ratio', () => {
   assert.ok(!/\{percent\}%|\$\{percent\}%`?\s*<\/span>/.test(chart), 'the ratio is being printed as a figure');
   // Even the accessible name is the real value now: «78%» is no more useful
   // read aloud than it is on screen.
-  assert.match(chart, /aria-label=\{`\$\{tri\(product\.name, l\)\} — \$\{tri\(axis\.label, l\)\}: \$\{figure\}`\}/);
+  assert.match(chart, /aria-label=\{`\$\{columnName\(product, l\)\} — \$\{tri\(axis\.label, l\)\}: \$\{figure\}`\}/);
 });
 
 test('a missing answer is an em dash, never a zero', () => {

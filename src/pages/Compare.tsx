@@ -13,7 +13,7 @@ import {
   labelIndex,
   priceRow,
   readIds,
-  tri,
+  columnName,
   writeIds,
   type CompareLang,
   type CompareProductCard,
@@ -214,20 +214,26 @@ export default function Compare() {
   const [picking, setPicking] = useState<number | null>(null);
 
   const onPicked = useCallback(
-    (card: CompareProductCard) => {
+    (card: CompareProductCard, optionId: string | null) => {
       const index = picking;
       setPicking(null);
       if (index === null) return;
+      const key = optionId ? `${card.id}:${optionId}` : card.id;
       if (index < 0) {
-        setIds([...ids, card.id]);
+        setIds([...ids, key]);
         return;
       }
       const next = [...ids];
-      next[index] = card.id;
+      next[index] = key;
       setIds(next);
     },
     [ids, picking, setIds]
   );
+
+  /** `productId` or `productId:optionId` — the id the URL and the server both
+   *  speak. See readIds in worker/routes/compare.ts. */
+  const slotKey = (productId: string, optionId: string | null): string =>
+    optionId ? `${productId}:${optionId}` : productId;
 
   const removeId = useCallback((id: string) => setIds(ids.filter((v) => v !== id)), [ids, setIds]);
 
@@ -358,7 +364,7 @@ export default function Compare() {
                 <CandidateGrid
                   cards={seedCards}
                   excluded={ids}
-                  onPick={(card) => setIds([...ids, card.id])}
+                  onPick={(card, optionId) => setIds([...ids, slotKey(card.id, optionId)])}
                   s={s}
                 />
               </div>
@@ -389,10 +395,14 @@ export default function Compare() {
             {s.onlyOneBody}
           </p>
           <h3 className="mt-4 text-[12px] font-bold text-[var(--color-text-muted)]">
-            {s.pickLike(tri(products[0].name, lang as CompareLang))}
+            {s.pickLike(columnName(products[0], lang as CompareLang))}
           </h3>
           <div className="mt-2">
-            <SecondSlot anchorId={products[0].id} exclude={ids} onPick={(card) => setIds([...ids, card.id])} />
+            <SecondSlot
+              anchorId={products[0].product_id ?? products[0].id}
+              exclude={ids}
+              onPick={(card, optionId) => setIds([...ids, slotKey(card.id, optionId)])}
+            />
           </div>
         </section>
       ) : null}
@@ -457,7 +467,7 @@ function SecondSlot({
 }: {
   anchorId: string;
   exclude: string[];
-  onPick: (card: CompareProductCard) => void;
+  onPick: (card: CompareProductCard, optionId: string | null) => void;
 }) {
   const { lang } = useLanguage();
   const s = compareStrings(lang);

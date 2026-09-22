@@ -76,6 +76,10 @@ export interface CompareStrings {
   pickNoneHint: string;
   pickLike: (name: string) => string;
   openProduct: string;
+  optionTitle: (name: string) => string;
+  optionBody: string;
+  optionBase: string;
+  optionBaseNote: string;
 
   // empty / error
   emptyTitle: string;
@@ -147,6 +151,10 @@ const ar: CompareStrings = {
   pickNone: 'ما لكينا منتج يصلح للمقارنة.',
   pickNoneHint: 'جرب تدور باسم ثاني، أو افتح المتجر واختار من هناك.',
   pickLike: (name) => `منتجات تشبه ${name}`,
+  optionTitle: (name) => `أي خيار من ${name}؟`,
+  optionBody: 'الخيار يفرق بالسعر — الليزر والكومبو ووحدة AMS ما تنباع بنفس السعر. اختر الخيار اللي تريد تقارنه.',
+  optionBase: 'السعر الأساسي',
+  optionBaseNote: 'أرخص طريقة لشراء المنتج، بدون أي خيار.',
   openProduct: 'افتح صفحة المنتج',
 
   emptyTitle: 'ابدأ المقارنة',
@@ -218,6 +226,10 @@ const en: CompareStrings = {
   pickNone: 'Nothing here can be compared.',
   pickNoneHint: 'Try another name, or open the shop and pick from there.',
   pickLike: (name) => `Products like ${name}`,
+  optionTitle: (name) => `Which ${name}?`,
+  optionBody: 'The option changes the price — the laser, the Combo and the AMS unit do not sell for the same money. Pick the one you want compared.',
+  optionBase: 'Base price',
+  optionBaseNote: 'The cheapest way to buy it, with no option added.',
   openProduct: 'Open the product page',
 
   emptyTitle: 'Start a comparison',
@@ -289,6 +301,10 @@ const ckb: CompareStrings = {
   pickNone: 'هیچ شتێک نییە بەراورد بکرێت.',
   pickNoneHint: 'ناوێکی تر تاقی بکەرەوە، یان فرۆشگا بکەرەوە و لەوێ هەڵبژێرە.',
   pickLike: (name) => `بەرهەمی وەک ${name}`,
+  optionTitle: (name) => `کام هەڵبژاردەی ${name}؟`,
+  optionBody: 'هەڵبژاردە نرخ دەگۆڕێت — لەیزەر و کۆمبۆ و یەکەی AMS بە یەک نرخ نافرۆشرێن. ئەوەی دەتەوێت بەراورد بکرێت هەڵبژێرە.',
+  optionBase: 'نرخی بنەڕەتی',
+  optionBaseNote: 'هەرزانترین ڕێگا بۆ کڕینی، بەبێ هیچ هەڵبژاردەیەک.',
   openProduct: 'لاپەڕەی بەرهەم بکەرەوە',
 
   emptyTitle: 'بەراورد دەست پێ بکە',

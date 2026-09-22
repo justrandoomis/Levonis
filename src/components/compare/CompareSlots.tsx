@@ -3,7 +3,12 @@ import { Link } from 'react-router-dom';
 import { X, Repeat, ChevronsUp, Plus, ExternalLink } from 'lucide-react';
 import SafeImage from '../ui/SafeImage';
 import { useLanguage } from '../../LanguageContext';
-import { MAX_COMPARE_IDS, tri, type CompareLang, type CompareProductCard } from '../../lib/compare';
+import {
+  MAX_COMPARE_IDS,
+  columnName,
+  type CompareLang,
+  type CompareProductCard,
+} from '../../lib/compare';
 import { compareStrings } from './strings';
 import { productTone } from './tones';
 
@@ -57,7 +62,7 @@ export default function CompareSlots({
 
       <ul className="space-y-2">
         {products.map((product, i) => {
-          const name = tri(product.name, l);
+          const name = columnName(product, l);
           const tone = productTone(i);
           return (
             <li

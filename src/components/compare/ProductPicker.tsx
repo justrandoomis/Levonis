@@ -40,6 +40,108 @@ import { compareStrings, type CompareStrings } from './strings';
  *  enough that the list feels attached to the box. */
 const SEARCH_DEBOUNCE_MS = 300;
 
+/**
+ * WHICH ONE OF IT — asked BEFORE the column is added, not after.
+ *
+ * «في صفحة المقارنة اجعل عند الضغط على إضافة يظهر نافذة منبثقة يختار الخيار
+ *  قبل الإضافة للمقارنه خاصه الطابعات التي تحمل ليزر او كومبو فيه جهاز ams
+ *  فهذا يفرق — مثلا يقارن بين طابعه ونفس الطابعه لكن الخيار يختلف.»
+ *
+ * A printer sold bare, with a laser, and as a Combo with an AMS is three
+ * purchases at three prices under one name. The comparison addressed products,
+ * so all three were the same column and the difference the customer came to
+ * read was the one thing the page could not show.
+ *
+ * WHY THE BASE PRICE IS ON THE LIST AND IS FIRST. The product's own price is
+ * this shop's cheapest-way-to-buy-it figure, and it is a real answer —
+ * somebody comparing two machines on their entry price is not making a
+ * mistake. Making the popup demand an option would turn one tap into two for
+ * the commonest case.
+ *
+ * AND IT IS NEVER SHOWN FOR ONE OPTION. `card.options` is absent below two, so
+ * a product that cannot be configured is added straight away. A popup offering
+ * a single answer is a tap that teaches nothing.
+ */
+function OptionSheet({
+  card,
+  onClose,
+  onPick,
+  s,
+}: {
+  card: CompareProductCard | null;
+  onClose: () => void;
+  onPick: (optionId: string | null) => void;
+  s: CompareStrings;
+}) {
+  const { lang } = useLanguage();
+  const l = lang as CompareLang;
+  const options = card?.options ?? [];
+  return (
+    <Sheet open={!!card} onClose={onClose} label={s.pickTitle} panelClassName="max-h-[85dvh]">
+      {/* GUARDED OUTSIDE THE SHEET, not inside its body: JSX children are an
+          ordinary eager argument, so a body reading `card.` would be built —
+          and would throw — before the Sheet decided it was closed. */}
+      {card ? (
+        <div className="flex max-h-[85dvh] flex-col p-4">
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
+              {s.optionTitle(tri(card.name, l))}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={s.back}
+              className="lv-button lv-button-ghost min-h-[44px] min-w-[44px] shrink-0 px-0"
+            >
+              <X aria-hidden="true" className="h-5 w-5" />
+            </button>
+          </div>
+          <p className="mt-1 text-[12px] leading-5 text-[var(--color-text-secondary)]">{s.optionBody}</p>
+
+          <ul className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto">
+            <li>
+              <button
+                type="button"
+                onClick={() => onPick(null)}
+                className="lv-choice w-full p-3 text-start"
+              >
+                <span className="block text-[13px] font-bold text-[var(--color-text-primary)]">
+                  {s.optionBase}
+                </span>
+                <span className="mt-0.5 block text-[11px] text-[var(--color-text-muted)]">
+                  {s.optionBaseNote}
+                </span>
+              </button>
+            </li>
+            {options.map((option) => (
+              <li key={option.id}>
+                <button
+                  type="button"
+                  onClick={() => onPick(option.id)}
+                  className="lv-choice w-full p-3 text-start"
+                >
+                  <span className="block text-[13px] font-bold text-[var(--color-text-primary)]">
+                    {tri(option.label, l)}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </Sheet>
+  );
+}
+
+/**
+ * THE GRID OWNS THE QUESTION, because the grid owns the tap.
+ *
+ * Every way into the comparison goes through here — the picker sheet, the
+ * empty state's recently-viewed rail and the second slot — so asking «أي
+ * خيار؟» in one place is what makes it impossible to add a column without
+ * being asked. A gate written into each caller would be three gates, and the
+ * third one would be forgotten.
+ */
 export function CandidateGrid({
   cards,
   excluded,
@@ -48,12 +150,18 @@ export function CandidateGrid({
 }: {
   cards: CompareProductCard[];
   excluded: string[];
-  onPick: (card: CompareProductCard) => void;
+  /** `optionId` is null for the product at its base price. */
+  onPick: (card: CompareProductCard, optionId: string | null) => void;
   s: CompareStrings;
 }) {
   const { lang } = useLanguage();
   const l = lang as CompareLang;
-  const offered = cards.filter((c) => !excluded.includes(c.id));
+  const [asking, setAsking] = useState<CompareProductCard | null>(null);
+  // `excluded` carries slot keys («p:o»); a card is offered unless the PRODUCT
+  // is already placed, whichever option it was placed as — two columns of one
+  // printer come from the option sheet, not from tapping the same card twice.
+  const placed = new Set(excluded.map((key) => key.split(':')[0]));
+  const offered = cards.filter((c) => !placed.has(c.id));
 
   if (offered.length === 0) {
     return (
@@ -65,7 +173,8 @@ export function CandidateGrid({
   }
 
   return (
-    <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <>
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       {offered.map((card) => (
         <li key={card.id}>
           {/* The whole row is the tap target, and it is a button rather than a
@@ -73,7 +182,7 @@ export function CandidateGrid({
               navigate away from it. */}
           <button
             type="button"
-            onClick={() => onPick(card)}
+            onClick={() => (card.options?.length ? setAsking(card) : onPick(card, null))}
             className="lv-choice flex w-full items-center gap-3 p-2 text-start"
           >
             <SafeImage
@@ -97,7 +206,18 @@ export function CandidateGrid({
           </button>
         </li>
       ))}
-    </ul>
+      </ul>
+      <OptionSheet
+        card={asking}
+        onClose={() => setAsking(null)}
+        onPick={(optionId) => {
+          const card = asking;
+          setAsking(null);
+          if (card) onPick(card, optionId);
+        }}
+        s={s}
+      />
+    </>
   );
 }
 
@@ -114,7 +234,7 @@ export default function ProductPicker({
    *  NULL asks for the catalogue instead — see fetchCandidates. */
   anchorId: string | null;
   exclude: string[];
-  onPick: (card: CompareProductCard) => void;
+  onPick: (card: CompareProductCard, optionId: string | null) => void;
 }) {
   const { lang } = useLanguage();
   const s = compareStrings(lang);

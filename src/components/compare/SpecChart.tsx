@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useLanguage } from '../../LanguageContext';
 import {
   rowIndex,
+  columnName,
   tri,
   type CompareLang,
   type CompareProductCard,
@@ -98,7 +99,7 @@ export default function SpecChart({
                   className="h-2.5 w-2.5 rounded-full"
                   style={{ backgroundColor: productTone(i).color }}
                 />
-                <span className="text-[var(--color-text-secondary)]">{tri(product.name, l)}</span>
+                <span className="text-[var(--color-text-secondary)]">{columnName(product, l)}</span>
               </li>
             ))}
           </ul>
@@ -121,7 +122,7 @@ export default function SpecChart({
                         key={product.id}
                         className="flex items-center gap-2"
                         role="img"
-                        aria-label={`${tri(product.name, l)} — ${tri(axis.label, l)}: ${figure}`}
+                        aria-label={`${columnName(product, l)} — ${tri(axis.label, l)}: ${figure}`}
                       >
                         <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-surface-selected)]">
                           <div

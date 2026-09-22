@@ -118,6 +118,15 @@ export interface CompareProductCard {
   /** Open box / used / refurbished. A comparison that hides this calls a used
    *  machine cheaper than a new one. */
   graded: boolean;
+  /** ON A COMPARISON COLUMN ONLY: the product, when `id` is a slot key
+   *  (`productId:optionId`) rather than a product id. */
+  product_id?: string;
+  /** ON A COMPARISON COLUMN ONLY: the option this column is priced as. */
+  option?: { id: string; label: Trilingual } | null;
+  /** ON A PICKER CARD ONLY, and only when there are at least two: what this
+   *  product can be added AS. «خاصه الطابعات التي تحمل ليزر او كومبو فيه جهاز
+   *  ams فهذا يفرق.» */
+  options?: Array<{ id: string; label: Trilingual }>;
 }
 
 /**
@@ -255,6 +264,26 @@ export function writeIds(ids: string[]): string {
 }
 
 // --------------------------------------------------------------- reading it
+
+/**
+ * THE NAME OF A COLUMN, which is not always the name of a product.
+ *
+ * «يقارن بين طابعه ونفس الطابعه لكن الخيار يختلف.» Two columns of one printer
+ * under two options would otherwise print the same name twice, with two
+ * different prices and nothing on screen saying why. The option is appended
+ * with a middle dot — «X1C · كومبو» — rather than in brackets, because it is a
+ * continuation of the name, not an aside about it, and the dot reads the same
+ * in both writing directions.
+ *
+ * A column with no option is the product's own name, unchanged. Everywhere a
+ * column is named goes through here, so the legend, the verdict, the table
+ * headers, the price row and the slot list cannot label the same column three
+ * different ways.
+ */
+export function columnName(card: CompareProductCard, lang: CompareLang): string {
+  const base = tri(card.name, lang);
+  return card.option ? `${base} · ${tri(card.option.label, lang)}` : base;
+}
 
 /**
  * field_id → the WHOLE ROW, so a caller can read the typed value behind a

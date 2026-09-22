@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { ChevronDown, Plug } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { tri, type CompareLang, type CompareProductCard, type PowerAdvice } from '../../lib/compare';
+import { tri, type CompareLang, type CompareProductCard, type PowerAdvice,
+  columnName,
+} from '../../lib/compare';
 
 /**
  * «كم تستهلك الطابعة من كهرباء في العراق على 220 فولت … بالأمبيرية وكم تحتاج من
@@ -84,7 +86,7 @@ export default function PowerBlock({
                 attribute. The name is English in every language, like every
                 other product name in the shop. */}
             <h3 dir="ltr" className="mb-2 text-[13px] font-semibold leading-5 text-[var(--color-text-primary)] text-start">
-              {tri(product.name, l)}
+              {columnName(product, l)}
             </h3>
             <ul className="flex flex-col gap-2">
               {advice.points.map((point) => (
