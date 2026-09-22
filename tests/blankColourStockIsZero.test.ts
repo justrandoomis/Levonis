@@ -193,3 +193,58 @@ test('the reader this relies on still says a missing row is zero', () => {
   // blank used to fall into.
   assert.match(inventory, /if \(v\.stock === null\) return untracked;/);
 });
+
+/**
+ * WHERE THE 25 ZEROS CAME FROM — the other half of the owner's report, and a
+ * boundary this change deliberately does not cross.
+ *
+ * `product_colors.stock` is a DIFFERENT counter from the per-combination
+ * `product_variants.stock` the rule above resolves. A colour with a NULL
+ * stock means "this product does not track per colour", and
+ * `deriveInventoryMode` reads it exactly that way — so zeroing those would
+ * move a shop that tracks at option or product level onto a row of empty
+ * colour shelves nobody asked for.
+ *
+ * The audit below is the answer to «من كتب الأصفار». Every writer of a colour
+ * stock in this repository passes the value through unchanged, and `num()` on
+ * the import path answers `null` — never `0` — for a blank, a missing field or
+ * a non-integer. NOTHING here manufactures a zero from an empty box.
+ *
+ * Which leaves the admin's own keyboard, and the wall that was standing in
+ * front of it: «أدخل مخزون البيع المباشر لكل خيار مرتبط بهذا اللون» refused to
+ * save until every direct-sale shelf carried a typed number, beside a box
+ * reading «0 = نفد». That is the owner's own account of what happened —
+ * «يجبرني على وضع مخزون لكل لون 0 كتابه» — and removing the wall is what
+ * stops it happening again.
+ *
+ * This test exists so the audit stays true. If some later change starts
+ * coercing a blank colour stock to zero, the explanation above quietly becomes
+ * wrong and this is where that is caught.
+ */
+test('nothing turns a blank COLOUR stock into a zero, on any path', () => {
+  const root = new URL('..', import.meta.url);
+  const read = (rel: string) => readFileSync(new URL(rel, root), 'utf8');
+
+  // The form hands the colour's stock over exactly as typed.
+  const model = read('src/components/adminProducts/form/model.ts');
+  assert.match(model, /colors: rel\.colors\.map\(\(c, ci\) => \(\{[\s\S]{0,400}stock: c\.stock,/);
+  assert.match(model, /stock: c\.stock \?\? null,/, 'and reads it back the same way');
+
+  // The import path answers null for anything that is not a whole number —
+  // a blank column, a missing field, the string "0".
+  const productModel = read('worker/lib/productModel.ts');
+  assert.match(productModel, /const num = \(v: unknown\): number \| null =>\s*\n\s*typeof v === 'number' && Number\.isInteger\(v\) && v >= 0 \? v : null;/);
+  assert.match(productModel, /stock: num\(c\.stock\),/, 'the colour row goes through it');
+
+  // The server stores what it was given.
+  const persistence = read('worker/lib/productPersistence.ts');
+  assert.match(persistence, /stock: nullableInt\(col\.stock, `\$\{where\}\.stock`, 10_000_000\),/);
+  assert.doesNotMatch(persistence, /col\.stock \?\? 0/, 'a null colour stock is not a zero');
+
+  // And the mode derivation still reads a null colour stock as "not tracked
+  // per colour" rather than as an empty shelf.
+  assert.match(model, /if \(rel\.colors\.some\(\(c\) => c\.stock !== null\)\) return 'COLOR';/);
+
+  // The wall that made a human type them is gone.
+  assert.doesNotMatch(model, /أدخل مخزون البيع المباشر لكل خيار مرتبط بهذا اللون/);
+});
