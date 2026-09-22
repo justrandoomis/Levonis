@@ -147,6 +147,7 @@ test("1: the autosave skip reports 'I cannot tell' for a painted session", async
     quality: "q",
     strength: "s",
     support: "none",
+    infill: "balanced",
     plateCount: 1,
   };
 

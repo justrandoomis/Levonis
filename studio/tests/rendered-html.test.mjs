@@ -1,8 +1,20 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import test from "node:test";
 
-test("renders the production slicer shell and security policy", async () => {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+const workerBuild = new URL("../dist/server/index.js", import.meta.url);
+
+/**
+ * `npm test` and workflow 8 build first. The repo-wide `npm run test:unit`
+ * runs this suite WITHOUT a Studio build — it is there to catch source-level
+ * breakage in minutes rather than in a deploy — so these two cases state that
+ * they did not run instead of failing on a missing artifact. A visible skip is
+ * the house answer; a green tick over an artifact nobody built is not.
+ */
+const needsBuild = { skip: existsSync(workerBuild) ? false : "dist/server is missing — run `npm run build` first" };
+
+test("renders the production slicer shell and security policy", needsBuild, async () => {
+  const workerUrl = new URL(workerBuild);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
@@ -59,8 +71,8 @@ test("renders the production slicer shell and security policy", async () => {
  * "Worker terminated (likely out of memory): worker error". Withholding the
  * two isolation headers makes the engine take its own single-threaded branch.
  */
-test("iOS and iPadOS do not get cross-origin isolation", async () => {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+test("iOS and iPadOS do not get cross-origin isolation", needsBuild, async () => {
+  const workerUrl = new URL(workerBuild);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-ios`);
   const { default: worker } = await import(workerUrl.href);
 

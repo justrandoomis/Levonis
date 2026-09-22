@@ -246,7 +246,11 @@ test("mobile visual system uses solid surfaces and expandable controls", async (
     readFile(cssUrl, "utf8"),
   ]);
 
-  assert.match(app, /className="mobile-tooltray"/);
+  // The tray gained a collapse modifier («زر تقصير وتطويل قائمة الادوات»), so
+  // its class is a template literal now. The base class is what the mobile
+  // visual system is built on; the modifier is appended to it, never instead
+  // of it.
+  assert.match(app, /className=(?:"mobile-tooltray"|\{`mobile-tooltray\$\{)/);
   assert.match(app, /className="mobile-toolgrid"/);
   assert.match(app, /className="mobile-primarybar"/);
   assert.match(css, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
@@ -614,7 +618,7 @@ test("the expensive autosave capture is gated on a cheap change signal", async (
   // The signature must cover everything the 3MF depends on.
   assert.match(app, /adapter\.sceneFingerprint\(\)/);
   assert.match(app, /`plates=\$\{plateCount\}`/);
-  assert.match(app, /`\$\{profileId\}:\$\{quality\}:\$\{strength\}:\$\{support\}`/);
+  assert.match(app, /`\$\{profileId\}:\$\{quality\}:\$\{strength\}:\$\{support\}:\$\{infill\}`/);
 
   // And the controller must check it BEFORE capturing, not after — a hash of
   // the produced file can only ever skip the upload.
@@ -696,7 +700,10 @@ test("restores and project imports are never mistaken for a spawn", async () => 
   assert.match(engine, /addObject: \(c, y, G = null\) => \{/);
   assert.match(app, /if \(restoreInFlightRef\.current\) \{[\s\S]{0,300}restoreInFlightRef\.current = false;\s*return;/);
   // A failed import must not leave the latch armed forever.
-  assert.match(app, /restoreInFlightRef\.current = false;\s*setImportProgress\(null\);/);
+  // The post-dispatch wait (the stretch the engine spends reading the mesh)
+  // is torn down on the same path, between the two, so the row cannot be
+  // re-raised by a wait nobody will ever end.
+  assert.match(app, /restoreInFlightRef\.current = false;\s*(?:endImportWait\(\);\s*)?setImportProgress\(null\);/);
 
   // A new project forgets both sets, or the next import would look like a
   // restore of the previous project's ids.
