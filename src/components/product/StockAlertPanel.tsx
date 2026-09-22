@@ -77,6 +77,7 @@ import { useLanguage } from '../../LanguageContext';
 import { Sheet } from '../ui/Overlay';
 import Spinner from '../ui/Spinner';
 import { asLang, type Lang } from '../orders/format';
+import { authPathWithSupportRef } from '../../lib/supportRef';
 import {
   alertRefusalText,
   buildAlertTargets,
@@ -411,7 +412,7 @@ export default function StockAlertPanel({
 
   const toSignIn = useCallback(() => {
     const dest = productPathWithIntent(productSlug, selectedWishes);
-    navigate(`/auth?next=${encodeURIComponent(dest)}`);
+    navigate(authPathWithSupportRef(dest));
   }, [navigate, productSlug, selectedWishes]);
 
   /** Opening always shows what is ACTUALLY armed right now — a sheet that

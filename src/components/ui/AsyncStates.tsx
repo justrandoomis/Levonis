@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { AlertTriangle, WifiOff, PackageSearch, LogIn, RefreshCw, Inbox, ShieldAlert, ArrowRight } from 'lucide-react';
 import { ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { authPathWithSupportRef } from '../../lib/supportRef';
 
 /**
  * Unified async states for the storefront. loading / empty / error(retry) /
@@ -359,7 +360,7 @@ export function UnauthorizedState({
       compact={compact}
     >
       <Link
-        to={`/auth?next=${encodeURIComponent(dest)}`}
+        to={authPathWithSupportRef(dest)}
         className="mt-1 min-h-[44px] px-6 rounded-xl bg-gold text-black text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-all"
       >
         <LogIn aria-hidden="true" className="w-4 h-4" />

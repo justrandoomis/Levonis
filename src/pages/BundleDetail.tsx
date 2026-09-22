@@ -16,6 +16,7 @@ import { ErrorState } from '../components/ui/AsyncStates';
 import Note from '../components/ui/Note';
 import { tierLabel } from '../components/subscription/tierMeta';
 import { StateChip, type BundleCard } from '../components/bundles/BundleTile';
+import { authPathWithSupportRef } from '../lib/supportRef';
 
 /**
  * ONE BUNDLE OR MYSTERY OFFER (docs/BUNDLES_MYSTERY.md §10, §13).
@@ -384,7 +385,7 @@ export default function BundleDetail() {
   const addToCart = useCallback(async () => {
     if (!bundle || addInFlight.current) return;
     if (!isAuthenticated) {
-      navigate(`/auth?next=${encodeURIComponent(`/bundles/${slug}`)}`);
+      navigate(authPathWithSupportRef(`/bundles/${slug}`));
       return;
     }
     addInFlight.current = true;
@@ -402,7 +403,7 @@ export default function BundleDetail() {
       setNotice(`${s.added} (${count})`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        navigate(`/auth?next=${encodeURIComponent(`/bundles/${slug}`)}`);
+        navigate(authPathWithSupportRef(`/bundles/${slug}`));
         return;
       }
       const code = err instanceof ApiError ? err.code ?? '' : '';

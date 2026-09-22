@@ -489,7 +489,12 @@ test('the save is the server\'s one atomic batch, never delete-then-add', () => 
 test('a signed-out visitor is sent to sign in and back with the choice', () => {
   const panel = read(PANEL);
   assert.match(panel, /productPathWithIntent\(productSlug, selectedWishes\)/);
-  assert.match(panel, /navigate\(`\/auth\?next=\$\{encodeURIComponent\(dest\)\}`\)/);
+  // Through the shared helper, not a hand-built URL: this panel sits on a
+  // product page, and a page reached from a share link carries a referral that
+  // a bare `/auth?next=` silently drops (tests/shareReferralSurvivesSignIn).
+  // With nothing captured the helper returns exactly the URL it replaced.
+  assert.match(panel, /navigate\(authPathWithSupportRef\(dest\)\)/);
+  assert.match(panel, /from '\.\.\/\.\.\/lib\/supportRef'/);
   // A 401 arriving mid-flight is the same bounce, not a red error line.
   assert.match(panel, /e instanceof ApiError && e\.status === 401[\s\S]{0,80}toSignIn\(\)/);
   // …and the sheet says so BEFORE the tap, so the redirect is not a surprise.

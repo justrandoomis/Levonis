@@ -59,7 +59,7 @@ import { Overlay } from '../components/ui/Overlay';
 import { ProductDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 import { monthsLabel } from '../components/orders/format';
-import { captureSupportRefFromSearch } from '../lib/supportRef';
+import { authPathWithSupportRef, captureSupportRefFromSearch } from '../lib/supportRef';
 import { productGalleryForSelection, productVariantIdForSelection } from '../lib/productImage';
 import {
   formatPhysicalMeasurement,
@@ -1392,7 +1392,7 @@ export default function Product() {
   const toggleFavorite = async () => {
     if (!product || favBusy || source !== 'catalog') return;
     if (!isAuthenticated) {
-      navigate(`/auth?next=${encodeURIComponent(`/product/${product.slug}`)}`);
+      navigate(authPathWithSupportRef(`/product/${product.slug}`));
       return;
     }
     const was = favorite;
@@ -1405,7 +1405,7 @@ export default function Product() {
     } catch (err) {
       setFavorite(was);
       if (err instanceof ApiError && err.status === 401) {
-        navigate(`/auth?next=${encodeURIComponent(`/product/${product.slug}`)}`);
+        navigate(authPathWithSupportRef(`/product/${product.slug}`));
         return;
       }
       setActionError(err instanceof Error ? err.message : 'Failed to update favorites');
@@ -1424,7 +1424,7 @@ export default function Product() {
       // both pass. Retrying after a failure is safe (the server upserts one row).
       if (addInFlight.current) return;
       if (!isAuthenticated) {
-        navigate(`/auth?next=${encodeURIComponent(`/product/${product.slug}`)}`);
+        navigate(authPathWithSupportRef(`/product/${product.slug}`));
         return;
       }
       addInFlight.current = true;
@@ -1457,7 +1457,7 @@ export default function Product() {
         setCartCount(count);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
-          navigate(`/auth?next=${encodeURIComponent(`/product/${product.slug}`)}`);
+          navigate(authPathWithSupportRef(`/product/${product.slug}`));
           return;
         }
         // A cart may hold exactly one shipping type. The SERVER owns that rule
@@ -3624,7 +3624,7 @@ export default function Product() {
                     // `toggleFavorite` already gives — rather than a second
                     // sign-in prompt invented for this one button.
                     if (!isAuthenticated) {
-                      navigate(`/auth?next=${encodeURIComponent(`/product/${product.slug}`)}`);
+                      navigate(authPathWithSupportRef(`/product/${product.slug}`));
                       return;
                     }
                     setCheaperOpen(true);

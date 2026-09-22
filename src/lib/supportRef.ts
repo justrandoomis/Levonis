@@ -264,6 +264,54 @@ export function clearSupportRef(opts: { store?: RefStore | null } = {}): void {
   }
 }
 
+/**
+ * THE /auth URL TO SEND A VISITOR TO WITHOUT DROPPING THE REFERRAL.
+ *
+ * «الإحالة عند مشاركة المنتج مع مستخدم آخر لا تعمل». The share link is
+ * correct (`productSupportPath` -> `/product/<slug>?ref=<handle>`) and the
+ * product page captures the ref. What was lost was the trip through sign-in.
+ *
+ * A shared product page is opened by someone who usually does NOT have an
+ * account — that is the point of sharing it. The first thing they do is tap
+ * add-to-cart or the heart, and every one of those sent them to
+ * `/auth?next=/product/<slug>`: no `ref`. §3 keeps two separate things here,
+ * and that one URL broke both of them.
+ *
+ *   * THE SIGNUP INVITE (`referral_attributions`, bound exactly once at
+ *     account creation) reads `?ref=` off /auth and nothing else. With the
+ *     parameter gone, the account that the sharer brought in was recorded as
+ *     having no inviter — permanently, because the binding happens once.
+ *   * THE PURCHASE SUPPORT CODE survived only by luck: it lives in
+ *     sessionStorage, which persists across a same-tab navigation. An
+ *     email-first sign-up finishes in whatever tab the mail app opens, and
+ *     there the storage — and the code — is gone.
+ *
+ * So the ref rides BOTH ways: as `?ref=` for the sign-up binding, and inside
+ * `next` so the return trip re-captures it into a session that may be new.
+ *
+ * It is read from the CAPTURED state, never from the current URL: that state
+ * is what already honours §3.3's rules — a removal is respected, and a
+ * conflict is not silently resolved. A visitor who removed the code is sent
+ * to a plain /auth, which is the whole point of having removed it.
+ */
+export function authPathWithSupportRef(
+  next: string,
+  opts: { store?: RefStore | null; now?: number } = {}
+): string {
+  const path = next.startsWith('/') && !next.startsWith('//') ? next : '/';
+  const store = opts.store === undefined ? sessionStore() : opts.store;
+  const state = readSupportRefState(opts.now ?? Date.now(), store);
+  // Lowercased, like `productSupportPath` and `inviteLinkFor`: one canonical
+  // spelling in URLs. The server resolves case-insensitively either way, and
+  // /auth shows this value in an editable field, so it should read the same as
+  // the link the sharer sent.
+  const ref = (state.current?.ref ?? '').toLowerCase();
+  if (!ref) return `/auth?next=${encodeURIComponent(path)}`;
+  // `next` keeps its own query string: a product path may already carry one.
+  const withRef = `${path}${path.includes('?') ? '&' : '?'}ref=${encodeURIComponent(ref)}`;
+  return `/auth?next=${encodeURIComponent(withRef)}&ref=${encodeURIComponent(ref)}`;
+}
+
 /** The invite link for a handle. Origin is the live one, never hardcoded. */
 export function inviteLinkFor(username: string, origin: string): string {
   const clean = normalizeSupportRef(username);

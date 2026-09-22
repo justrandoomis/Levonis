@@ -7,6 +7,7 @@ import { api } from '../lib/api';
 import { cartCountStore, setCartCount, countCartItems } from '../lib/cartCount';
 import { signalBloub } from './bloub/events';
 import { MotionCharacterAnchor } from './bloub/MotionCharacterAnchor';
+import { authPathWithSupportRef } from '../lib/supportRef';
 
 /**
  * Routes on which the floating bottom nav does not render. Exported so the
@@ -111,7 +112,7 @@ export default function BottomNav() {
 
   const linkTarget = (path: string) =>
     !isAuthenticated && PROTECTED_PATHS.has(path)
-      ? `/auth?next=${encodeURIComponent(path)}`
+      ? authPathWithSupportRef(path)
       : path;
 
   const renderItem = (item: NavItem) => {
