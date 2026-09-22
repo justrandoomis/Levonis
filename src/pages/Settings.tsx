@@ -299,14 +299,41 @@ interface AddressesResponse {
 
 // --------------------------------------------------------------- primitives
 
-function SectionCard({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+function SectionCard({
+  title,
+  icon,
+  children,
+  id,
+  bare = false,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  /** An anchor, for a link that scrolls to this section («توثيق رقمي»). */
+  id?: string;
+  /**
+   * The section's children ALREADY carry their own surfaces — the linking
+   * section is two independent provider cards, not a list of rows — so the
+   * shared surface would draw a box around two boxes. They still get the same
+   * heading and the same rhythm, which is the whole point of passing through
+   * here rather than hand-rolling a seventh look.
+   */
+  bare?: boolean;
+}) {
   return (
-    <section className="mb-7">
+    // `break-inside-avoid` is what makes the two-column layout below a set of
+    // whole cards rather than a magazine that splits «الأمان» down the middle.
+    // `scrollMarginTop` clears the fixed header for an anchored jump.
+    <section id={id} className="mb-7 break-inside-avoid" style={id ? { scrollMarginTop: '72px' } : undefined}>
       <h2 className="text-text-muted text-xs font-bold uppercase tracking-[0.08em] mb-2 ms-1 flex items-center gap-2">
         {icon}
         {title}
       </h2>
-      <div className="lv-surface overflow-hidden divide-y divide-border-subtle/70">{children}</div>
+      {bare ? (
+        <div className="space-y-3">{children}</div>
+      ) : (
+        <div className="lv-surface overflow-hidden divide-y divide-border-subtle/70">{children}</div>
+      )}
     </section>
   );
 }
@@ -628,7 +655,7 @@ export default function Settings() {
         </div>
       </div>
 
-      <div className="px-3 sm:px-4 py-5 max-w-xl mx-auto pb-[max(4rem,env(safe-area-inset-bottom))]">
+      <div className="px-3 sm:px-4 py-5 max-w-xl md:max-w-4xl mx-auto pb-[max(4rem,env(safe-area-inset-bottom))]">
         {!user ? (
           <div className="lv-surface p-6 text-center">
             <p className="text-text-primary font-bold mb-3">{s.guestTitle}</p>
@@ -641,7 +668,37 @@ export default function Settings() {
           </div>
         ) : (
           <>
-            {/* ------------------------------------------------ 1. Account */}
+            {/*
+              §16 — SEVEN CARDS, IN THE ORDER THEY ARE USED, AND TWO ABREAST
+              WHERE THERE IS ROOM.
+
+              «الوضع في الإعدادات غير مناسب غير مرتب أعد الترتيب لتكون أنسب
+               وأمتع بصريا — استخدم مهارات التصميم.»
+
+              TWO THINGS WERE WRONG, and neither was any one control.
+
+              THE SHAPE. Seven cards of wildly uneven height — security and
+              notifications are over a hundred lines each, privacy is two rows
+              — stacked in a 576px column. On the iPad this shop is run from
+              that is a narrow ribbon with a quarter of the screen empty on
+              each side and a very long scroll, and the two giants sat next to
+              each other in it. They are laid out in two columns from `md` up,
+              so the tablet reads as a page rather than a phone screen
+              stretched, and each card refuses to break across the gap.
+
+              THE ORDER. It ran account, security, linking, addresses,
+              preferences, notifications — front-loading the things a person
+              sets up ONCE and burying the things they come back to change.
+              Language, currency and theme are the most-visited settings in a
+              trilingual shop, so preferences sit second, with addresses under
+              them; the one-time setup (security, linking) follows; the
+              channels come after that, and help is last, where help belongs.
+
+              The eight blocks keep their own comments and every control is
+              untouched — this is a reorder and a layout, not a rewrite.
+            */}
+            <div className="md:columns-2 md:gap-x-5">
+            {/* -------------------------------------------- 1. Account */}
             <SectionCard title={s.secAccount} icon={<User aria-hidden="true" className="w-4 h-4" />}>
               <Link
                 to="/edit-profile"
@@ -666,7 +723,106 @@ export default function Settings() {
               </div>
             </SectionCard>
 
-            {/* ----------------------------------------------- 2. Security */}
+            {/* ---------------------------------------- 2. Preferences */}
+            <SectionCard title={s.secPrefs} icon={<Globe aria-hidden="true" className="w-4 h-4" />}>
+              <div className="px-4 py-3">
+                <p className="font-bold text-[15px] mb-2">{s.language}</p>
+                <div className="flex gap-2 flex-wrap">
+                  {([
+                    ['ar', 'العربية'],
+                    ['en', 'English'],
+                    ['ckb', 'کوردیی ناوەندی'],
+                  ] as const).map(([code, label]) => (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => void chooseLanguage(code)}
+                      disabled={langBusy}
+                      aria-pressed={lang === code}
+                      data-selected={lang === code}
+                      className="lv-choice min-h-11 px-4 text-sm font-bold disabled:opacity-60"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[12px] text-zinc-500">
+                  {s.direction}: {rtl ? s.rtl : s.ltr}
+                </p>
+                {langBusy ? <p className="mt-1 text-[12px] text-zinc-400">{s.saving}</p> : null}
+                {langMsg ? <p className="mt-1 text-[12px] text-emerald-300">{langMsg}</p> : null}
+                {langError ? <p className="mt-1 text-[12px] text-amber-300">{langError}</p> : null}
+              </div>
+              <div className="px-4 py-3">
+                <p className="font-bold text-[15px] flex items-center gap-2">
+                  <Coins aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+                  {s.currency}
+                </p>
+                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.currencyNote}</p>
+              </div>
+              {/*
+                «تحميل التطبيق» BELONGS IN PREFERENCES, and specifically here.
+
+                It is a device-and-browser preference with no order and no
+                security consequence — the same kind of thing as the language
+                and the currency rows above it — and it sits immediately
+                before the Web Push block, which is its nearest relative in
+                both shape and honesty.
+
+                IT STATES ITS REAL STATE, like every other row on this page.
+                When the shop is already running as an installed app the
+                control disappears and the row says so, because a button that
+                installs something already installed is the "control with no
+                effect" this file's header removed the Appearance row for. The
+                button itself hides on the same condition; the check is
+                repeated here so the row does not become a title and a
+                paragraph with nothing under them.
+              */}
+              <div className="px-4 py-3">
+                <p className="font-bold text-[15px] flex items-center gap-2">
+                  <Download aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+                  {t('pwaInstallTitle')}
+                </p>
+                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{t('pwaSettingsNote')}</p>
+                {appInstalled ? (
+                  <p className="mt-2 text-[12px] text-success">{t('pwaInstallDone')}</p>
+                ) : (
+                  <InstallAppButton />
+                )}
+              </div>
+            </SectionCard>
+
+            {/* ------------------------------------------ 3. Addresses */}
+            <SectionCard title={s.secAddresses} icon={<MapPin aria-hidden="true" className="w-4 h-4" />}>
+              <NavRow
+                label={s.addressesRow}
+                description={
+                  addresses
+                    ? addresses.addresses.length === 0
+                      ? s.addressesNone
+                      : `${s.addressesCount.replace('{n}', String(addresses.addresses.length))}${
+                          defaultAddress ? ` · ${s.addressesDefault.replace('{label}', defaultAddress.label)}` : ''
+                        }`
+                    : addressesError || s.loading
+                }
+                icon={<MapPin aria-hidden="true" className="w-5 h-5" />}
+                to="/addresses"
+                dirIsRtl={rtl}
+              />
+              <div className="px-4 py-3">
+                <p className="text-[12px] text-zinc-300">
+                  {addresses ? (addresses.approved_snapshot ? s.approvedYes : s.approvedNo) : s.loading}
+                </p>
+                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.approvedNote}</p>
+                {addressesError ? (
+                  <button type="button" onClick={() => void loadAddresses()} className="mt-2 text-[12px] text-gold font-bold min-h-[44px]">
+                    {s.retry}
+                  </button>
+                ) : null}
+              </div>
+            </SectionCard>
+
+            {/* ------------------------------------------- 4. Security */}
             <SectionCard title={s.secSecurity} icon={<ShieldCheck aria-hidden="true" className="w-4 h-4" />}>
               {/* Email verification — real status */}
               <div className="px-4 py-3">
@@ -813,19 +969,26 @@ export default function Settings() {
               />
             </SectionCard>
 
-            {/* ------------------------------------------------ 3. Linking */}
-            <section className="mb-6" id="settings-linking" style={{ scrollMarginTop: '72px' }}>
-              <h2 className="text-text-muted text-xs font-bold uppercase tracking-[0.08em] mb-2 ms-1 flex items-center gap-2">
-                <Link2 aria-hidden="true" className="w-4 h-4" />
-                {s.secLinking}
-              </h2>
+            {/* -------------------------------------------- 5. Linking */}
+            {/* IT IS A SectionCard NOW, like the other six. This one section
+                hand-rolled its own heading and spacing, so on a page of seven
+                identical cards exactly one looked different — which is a large
+                part of «غير مرتب» for a page whose entire job is to look
+                orderly. `id` and the scroll offset stay: «توثيق رقمي» on the
+                WhatsApp row scrolls here by anchor. */}
+            <SectionCard
+              title={s.secLinking}
+              icon={<Link2 aria-hidden="true" className="w-4 h-4" />}
+              id="settings-linking"
+              bare
+            >
               <TelegramLink />
               {/* This row used to say "the API does not expose Google link
                   status, so this page cannot honestly show linked or not
                   linked" — an honest message about a gap that has now been
                   closed. `has_google` is a boolean on the user object; the
                   Google subject itself still never leaves the server. */}
-              <div className="mt-3 lv-surface overflow-hidden">
+              <div className="lv-surface overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-4">
                   <span className="text-zinc-400" aria-hidden="true">
                     <Link2 className="w-5 h-5" />
@@ -874,7 +1037,7 @@ export default function Settings() {
                 notifications section already says so once.
               */}
               {whatsappConfigured ? (
-                <div className="mt-3 lv-surface overflow-hidden" data-linking-whatsapp>
+                <div className="lv-surface overflow-hidden" data-linking-whatsapp>
                   <div className="flex items-center gap-3 px-4 py-4">
                     <span className="text-zinc-400" aria-hidden="true">
                       <Link2 className="w-5 h-5" />
@@ -896,108 +1059,9 @@ export default function Settings() {
                   ) : null}
                 </div>
               ) : null}
-            </section>
-
-            {/* ---------------------------------------------- 4. Addresses */}
-            <SectionCard title={s.secAddresses} icon={<MapPin aria-hidden="true" className="w-4 h-4" />}>
-              <NavRow
-                label={s.addressesRow}
-                description={
-                  addresses
-                    ? addresses.addresses.length === 0
-                      ? s.addressesNone
-                      : `${s.addressesCount.replace('{n}', String(addresses.addresses.length))}${
-                          defaultAddress ? ` · ${s.addressesDefault.replace('{label}', defaultAddress.label)}` : ''
-                        }`
-                    : addressesError || s.loading
-                }
-                icon={<MapPin aria-hidden="true" className="w-5 h-5" />}
-                to="/addresses"
-                dirIsRtl={rtl}
-              />
-              <div className="px-4 py-3">
-                <p className="text-[12px] text-zinc-300">
-                  {addresses ? (addresses.approved_snapshot ? s.approvedYes : s.approvedNo) : s.loading}
-                </p>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.approvedNote}</p>
-                {addressesError ? (
-                  <button type="button" onClick={() => void loadAddresses()} className="mt-2 text-[12px] text-gold font-bold min-h-[44px]">
-                    {s.retry}
-                  </button>
-                ) : null}
-              </div>
             </SectionCard>
 
-            {/* -------------------------------------------- 5. Preferences */}
-            <SectionCard title={s.secPrefs} icon={<Globe aria-hidden="true" className="w-4 h-4" />}>
-              <div className="px-4 py-3">
-                <p className="font-bold text-[15px] mb-2">{s.language}</p>
-                <div className="flex gap-2 flex-wrap">
-                  {([
-                    ['ar', 'العربية'],
-                    ['en', 'English'],
-                    ['ckb', 'کوردیی ناوەندی'],
-                  ] as const).map(([code, label]) => (
-                    <button
-                      key={code}
-                      type="button"
-                      onClick={() => void chooseLanguage(code)}
-                      disabled={langBusy}
-                      aria-pressed={lang === code}
-                      data-selected={lang === code}
-                      className="lv-choice min-h-11 px-4 text-sm font-bold disabled:opacity-60"
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-2 text-[12px] text-zinc-500">
-                  {s.direction}: {rtl ? s.rtl : s.ltr}
-                </p>
-                {langBusy ? <p className="mt-1 text-[12px] text-zinc-400">{s.saving}</p> : null}
-                {langMsg ? <p className="mt-1 text-[12px] text-emerald-300">{langMsg}</p> : null}
-                {langError ? <p className="mt-1 text-[12px] text-amber-300">{langError}</p> : null}
-              </div>
-              <div className="px-4 py-3">
-                <p className="font-bold text-[15px] flex items-center gap-2">
-                  <Coins aria-hidden="true" className="w-4 h-4 text-zinc-400" />
-                  {s.currency}
-                </p>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.currencyNote}</p>
-              </div>
-              {/*
-                «تحميل التطبيق» BELONGS IN PREFERENCES, and specifically here.
-
-                It is a device-and-browser preference with no order and no
-                security consequence — the same kind of thing as the language
-                and the currency rows above it — and it sits immediately
-                before the Web Push block, which is its nearest relative in
-                both shape and honesty.
-
-                IT STATES ITS REAL STATE, like every other row on this page.
-                When the shop is already running as an installed app the
-                control disappears and the row says so, because a button that
-                installs something already installed is the "control with no
-                effect" this file's header removed the Appearance row for. The
-                button itself hides on the same condition; the check is
-                repeated here so the row does not become a title and a
-                paragraph with nothing under them.
-              */}
-              <div className="px-4 py-3">
-                <p className="font-bold text-[15px] flex items-center gap-2">
-                  <Download aria-hidden="true" className="w-4 h-4 text-zinc-400" />
-                  {t('pwaInstallTitle')}
-                </p>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{t('pwaSettingsNote')}</p>
-                {appInstalled ? (
-                  <p className="mt-2 text-[12px] text-success">{t('pwaInstallDone')}</p>
-                ) : (
-                  <InstallAppButton />
-                )}
-              </div>
-            </SectionCard>
-
-            {/* ------------------------------------------ 6. Notifications */}
+            {/* -------------------------------------- 6. Notifications */}
             <SectionCard title={s.secNotifications} icon={<Bell aria-hidden="true" className="w-4 h-4" />}>
               <div className="px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
@@ -1128,7 +1192,7 @@ export default function Settings() {
               )}
             </SectionCard>
 
-            {/* --------------------------------------- 7. Privacy and help */}
+            {/* ----------------------------------- 7. Privacy and help */}
             <SectionCard title={s.secPrivacy} icon={<FileText aria-hidden="true" className="w-4 h-4" />}>
               <NavRow label={s.policies} icon={<FileText aria-hidden="true" className="w-5 h-5" />} to="/policies" dirIsRtl={rtl} />
               <NavRow label={s.support} icon={<LifeBuoy aria-hidden="true" className="w-5 h-5" />} to="/support" dirIsRtl={rtl} />
@@ -1137,6 +1201,9 @@ export default function Settings() {
                 <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.closureNote}</p>
               </div>
             </SectionCard>
+            </div>
+
+
 
             {/* ------------------------------------------------- 8. Logout */}
             <div className="lv-surface overflow-hidden">

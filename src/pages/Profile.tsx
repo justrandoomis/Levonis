@@ -442,70 +442,66 @@ export default function Profile() {
         </div>
         )}
 
-        {/* The referral programme lives on /referrals, and ONLY there.
-            It used to be duplicated here as a full card — the link, both
-            campaigns explained, and the reward list — which is a whole second
-            place to maintain the same thing and a long block between the
-            member card and the actions people actually come to this page for.
-            The single row below is a signpost, not a copy. */}
-        {isAuthenticated && (
-          <button
-            type="button"
-            data-profile-referrals
-            onClick={() => navigate('/referrals')}
-            className="w-full bg-white dark:bg-[#1a1a1a] rounded-xl p-3 mb-3 shadow-sm text-black dark:text-white flex items-center gap-3 min-h-[56px] text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
-          >
-            <Gift className="w-5 h-5 text-[#ff5000] shrink-0" strokeWidth={2} aria-hidden="true" />
-            <span className="flex-1 min-w-0">
-              <span className="block font-bold text-[14px]">{t('referralProgram')}</span>
-              <span className="block text-[11px] text-zinc-500 truncate">
-                {mine?.referral?.code
-                  ? `${t('referralCode')}: ${mine.referral.code}`
-                  : loc('شارك رابطك واكسب مكافآت', 'Share your link and earn rewards', 'لینکەکەت بەشدار بکە و خەڵات وەربگرە')}
-              </span>
-            </span>
-            {dir === 'rtl' ? (
-              <ChevronLeft className="w-4 h-4 shrink-0 text-zinc-400" aria-hidden="true" />
-            ) : (
-              <ChevronRight className="w-4 h-4 shrink-0 text-zinc-400" aria-hidden="true" />
-            )}
-          </button>
-        )}
+        {/*
+          TWO SIGNPOSTS, ONE ROW — «برنامج الإحالة وتنبيهاته اجعلها في سطر واحد
+          زرين في سطر واحد وليس في سطرين».
 
-        {/* «تنبيهاتي» — the standing restock requests, which until now had no
-            screen at all: a customer could arm an alert on a product page and
-            then had no way on earth to see what they were waiting for, or to
-            read that one of them had been cancelled because the option was
-            deleted. One signpost, like the referral row above it; the page
-            itself is /stock-alerts and it is the only place that list lives.
-            Member-only, because a guest holds no alerts and the row would do
-            nothing but bounce them through /auth to an empty list. */}
+          They were two full-width rows, stacked, each with a title, a subtitle
+          and a chevron: 112px of a phone screen spent on two links, pushing the
+          quick actions people actually come here for below the fold. They are
+          peers — both are "go and see the list of a thing you have" — so they
+          read as a pair rather than as a sequence, and a pair belongs side by
+          side.
+
+          The subtitle goes with the second row. At half the width it would
+          truncate to a few characters and say nothing, and a truncated
+          explanation is worse than none: the title and the icon already say
+          what the destination is. The referral CODE is the one subtitle worth
+          keeping, because it is a fact the customer may want to read without
+          opening anything — so it stays, under its own title, at 11px.
+
+          The referral programme still lives on /referrals and the alerts on
+          /stock-alerts, and ONLY there. These are signposts, never a copy.
+        */}
         {isAuthenticated && (
-          <button
-            type="button"
-            data-profile-stock-alerts
-            onClick={() => navigate('/stock-alerts')}
-            className="w-full bg-white dark:bg-[#1a1a1a] rounded-xl p-3 mb-3 shadow-sm text-black dark:text-white flex items-center gap-3 min-h-[56px] text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
-          >
-            <BellRing className="w-5 h-5 text-[#BAA369] shrink-0" strokeWidth={2} aria-hidden="true" />
-            <span className="flex-1 min-w-0">
-              <span className="block font-bold text-[14px] leading-5">
-                {loc('تنبيهاتي', 'My alerts', 'ئاگادارکردنەوەکانم')}
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <button
+              type="button"
+              data-profile-referrals
+              onClick={() => navigate('/referrals')}
+              className="min-w-0 bg-white dark:bg-[#1a1a1a] rounded-xl p-3 shadow-sm text-black dark:text-white flex items-center gap-2.5 min-h-[56px] text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            >
+              <Gift className="w-5 h-5 text-[#ff5000] shrink-0" strokeWidth={2} aria-hidden="true" />
+              <span className="flex-1 min-w-0">
+                <span className="block font-bold text-[13px] leading-4 truncate">{t('referralProgram')}</span>
+                {mine?.referral?.code ? (
+                  <span dir="ltr" className="block text-[11px] leading-4 text-zinc-500 truncate text-start">
+                    {mine.referral.code}
+                  </span>
+                ) : null}
               </span>
-              <span className="block text-[11px] leading-4 text-zinc-500 truncate">
-                {loc(
-                  'كل شي تنتظر رجوعه للمخزون',
-                  'Everything you are waiting to come back in stock',
-                  'هەرچی چاوەڕێی گەڕانەوەی بۆ کۆگا دەکەیت'
-                )}
+            </button>
+
+            {/* «تنبيهاتي» — the standing restock requests. Until this row
+                existed a customer could arm an alert on a product page and then
+                had no way on earth to see what they were waiting for, or to
+                read that one had been cancelled because the option was deleted.
+                Member-only: a guest holds no alerts and the row would do
+                nothing but bounce them through /auth to an empty list. */}
+            <button
+              type="button"
+              data-profile-stock-alerts
+              onClick={() => navigate('/stock-alerts')}
+              className="min-w-0 bg-white dark:bg-[#1a1a1a] rounded-xl p-3 shadow-sm text-black dark:text-white flex items-center gap-2.5 min-h-[56px] text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            >
+              <BellRing className="w-5 h-5 text-[#BAA369] shrink-0" strokeWidth={2} aria-hidden="true" />
+              <span className="flex-1 min-w-0">
+                <span className="block font-bold text-[13px] leading-4 truncate">
+                  {loc('تنبيهاتي', 'My alerts', 'ئاگادارکردنەوەکانم')}
+                </span>
               </span>
-            </span>
-            {dir === 'rtl' ? (
-              <ChevronLeft className="w-4 h-4 shrink-0 text-zinc-400" aria-hidden="true" />
-            ) : (
-              <ChevronRight className="w-4 h-4 shrink-0 text-zinc-400" aria-hidden="true" />
-            )}
-          </button>
+            </button>
+          </div>
         )}
 
         {/* Second Card: quick actions. Real destinations; guests are routed

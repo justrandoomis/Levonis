@@ -34,10 +34,13 @@ test('the linking section has a WhatsApp row now', () => {
   const at = settings.indexOf('data-linking-whatsapp');
   assert.ok(at > 0, 'the row exists');
   // In the LINKING section, which is where the report came from — after its
-  // heading and before the section closes.
+  // heading and before the section closes. Bounded by the section's OWN close
+  // rather than by whichever section happens to follow it: the seven cards
+  // were reordered for «أعد الترتيب» and a neighbour's name is not a boundary.
   const sectionStart = settings.indexOf('id="settings-linking"');
-  const sectionEnd = settings.indexOf('4. Addresses');
-  assert.ok(sectionStart > 0 && sectionEnd > sectionStart);
+  assert.ok(sectionStart > 0, 'the linking section is still anchorable');
+  const sectionEnd = settings.indexOf('</SectionCard>', sectionStart);
+  assert.ok(sectionEnd > sectionStart, 'the linking section still closes');
   assert.ok(at > sectionStart && at < sectionEnd, 'inside «الربط», not somewhere else');
 });
 
