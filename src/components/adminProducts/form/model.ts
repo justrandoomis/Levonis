@@ -1057,7 +1057,94 @@ const fulfillmentToWire = (f: FormFulfillment) => ({
       : [],
 });
 
-export function relationsToWire(rel: RelationsState) {
+/**
+ * A BLANK DIRECT-SALE SHELF MEANS ZERO, AND IS SAVED AS ZERO.
+ *
+ * «في الألوان عند تفعيلها فإنه يجبرني على وضع مخزون لكل لون بالرغم من أن
+ *  التوضيح انه إذا كان الحقل فارغا يعني صفر غير متوفر أو نافذ، لكن المشكلة
+ *  أنه يجبرني على وضع مخزون لكل لون 0 كتابة».
+ *
+ * The box says «0 = نفد» and the form refused to publish until all 23 of them
+ * were typed by hand. Both behaviours were defensible on their own and they
+ * could not both be right, so here is what a blank actually meant before this
+ * function existed:
+ *
+ *   * a MISSING variant row is already zero. worker/lib/inventory.ts, in
+ *     VARIANT_COMBINATION mode: "a combination with no `product_variants` row
+ *     is NOT sellable… no silent fallback to base stock".
+ *   * a PRESENT row whose `stock` is NULL is UNTRACKED — the same file returns
+ *     `untracked` for it, which is unlimited.
+ *
+ * And the form creates a row, with `stock: null`, the moment a colour is
+ * linked to a model. So every blank box in that grid was an UNLIMITED shelf,
+ * not an empty one — the exact opposite of what the placeholder promised. On
+ * top of that, `deriveInventoryMode` only answers VARIANT_COMBINATION when
+ * every exact combination carries a number, so publishing with blanks would
+ * also have dropped the whole product to a single shared counter.
+ *
+ * That is what the blocking error was protecting against, and typing 0 into
+ * 23 boxes is not the way to protect against it. The blank is resolved at the
+ * SAVE BOUNDARY instead, to the number the placeholder already promised:
+ * zero. A shelf nobody filled is a shelf with nothing on it.
+ *
+ * It only ever touches a combination `directStockCombinations` returns — a
+ * direct-sale shelf on a live model. Pre-order quantities are a different
+ * counter with a different owner and are never written here, and a row the
+ * admin typed a number into is returned untouched.
+ *
+ * Pure, and returns a new object: `relationsToWire` must not mutate the state
+ * React is still rendering from.
+ */
+export function withBlankDirectStockAsZero(rel: RelationsState): RelationsState {
+  const wanted = directStockCombinations(rel);
+  if (wanted.length === 0) return rel;
+  const valuesById = new Map(rel.groups.flatMap((g) => g.values.map((v) => [v.id, v] as const)));
+  const sellsDirect = (ids: string[]) =>
+    ids.some((id) =>
+      valuesById.get(id)?.fulfillments.some((f) => f.fulfillment_type === 'direct_sale' && f.enabled)
+    );
+  const byKey = new Map(rel.variants.map((v) => [combinationKey(v), v] as const));
+  const filled = new Set<string>();
+  const added: FormVariant[] = [];
+  for (const combo of wanted) {
+    if (!sellsDirect(combo.option_value_ids)) continue;
+    const key = combinationKey(combo);
+    const row = byKey.get(key);
+    if (row) {
+      if (row.stock === null) filled.add(row.id);
+      continue;
+    }
+    // No row at all. The server already reads that as zero, but the mode
+    // derivation reads it as "grid incomplete" and falls back to one shared
+    // counter — so the row is materialised rather than left implicit.
+    added.push({
+      id: localId('pv'),
+      option_value_ids: combo.option_value_ids,
+      color_id: combo.color_id,
+      sku: '',
+      active: true,
+      stock: 0,
+      reserved: 0,
+      low_stock_threshold: null,
+      dimensions: emptyDimensions(),
+      ...emptyPrices(),
+    });
+  }
+  if (filled.size === 0 && added.length === 0) return rel;
+  return {
+    ...rel,
+    variants: [
+      ...rel.variants.map((v) => (filled.has(v.id) ? { ...v, stock: 0 } : v)),
+      ...added,
+    ],
+  };
+}
+
+export function relationsToWire(input: RelationsState) {
+  // Blanks become zeros BEFORE the mode is derived, so the payload and the
+  // mode are computed from the same, complete grid. See the note on the
+  // function: a blank direct-sale shelf means nothing is on it.
+  const rel = withBlankDirectStockAsZero(input);
   return {
     inventory_mode: deriveInventoryMode(rel),
     groups: rel.groups.map((g, gi) => ({
@@ -1386,7 +1473,6 @@ export function validateForm(input: {
     ladder(v, 'تركيبة', e, `variant_price:${v.id}`);
   }
   const valuesById = new Map(input.rel.groups.flatMap((g) => g.values.map((v) => [v.id, v] as const)));
-  const variantsByKey = new Map(input.rel.variants.map((v) => [combinationKey(v), v] as const));
   const exactDirectStock = directStockCombinations(input.rel);
   if (exactDirectStock.length === 0) {
     for (const value of valuesById.values()) {
@@ -1398,18 +1484,29 @@ export function validateForm(input: {
       }
     }
   }
-  for (const combo of exactDirectStock) {
-    const direct = combo.option_value_ids.some((id) =>
-      valuesById.get(id)?.fulfillments.some((f) => f.fulfillment_type === 'direct_sale' && f.enabled)
-    );
-    if (!direct) continue;
-    const row = variantsByKey.get(combinationKey(combo));
-    if (!row || row.stock === null) {
-      e[combo.color_id ? `color_stock:${combo.color_id}` : 'inventory_mode'] = combo.color_id
-        ? 'أدخل مخزون البيع المباشر لكل خيار مرتبط بهذا اللون'
-        : 'أدخل مخزون البيع المباشر للخيارات التي لا ترتبط بألوان';
-    }
-  }
+  /**
+   * A BLANK COMBINATION IS NO LONGER A REFUSAL.
+   *
+   * This loop used to block publishing until every exact direct-sale shelf
+   * carried a typed number — twenty-three of them on the owner's own product,
+   * each of which they were being asked to type «0» into while the box beside
+   * it said «0 = نفد». The danger it guarded was real (a present row with a
+   * NULL stock reads as UNTRACKED, i.e. unlimited, and an incomplete grid
+   * drops the product to one shared counter), but the guard was aimed at the
+   * admin rather than at the data.
+   *
+   * `withBlankDirectStockAsZero` resolves it at the save boundary instead, to
+   * the number the placeholder already promised, so there is nothing left to
+   * refuse and the loop is gone with its lookup map.
+   *
+   * THE OPTION-LEVEL CHECK ABOVE IS DELIBERATELY UNTOUCHED. A blank there is
+   * not the same question: with no colour grid, an option whose stock is NULL
+   * means "this product does not track per option", and `deriveInventoryMode`
+   * answers BASE — the product's own counter. Zeroing those would move a shop
+   * that tracks at product level onto twenty empty per-option shelves, which
+   * is a different decision from the one the owner asked for and theirs to
+   * make.
+   */
   if (input.rel.inventory_mode === 'VARIANT_COMBINATION' && input.rel.variants.length === 0) {
     e.inventory_mode = 'وضع التركيبات يحتاج تركيبة واحدة على الأقل وإلا لا يمكن البيع';
   }

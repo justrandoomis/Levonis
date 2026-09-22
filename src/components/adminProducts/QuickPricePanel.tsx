@@ -46,6 +46,7 @@ import {
   emptyFulfillment,
   relationsFromWire,
   relationsToWire,
+  withBlankDirectStockAsZero,
   type FormFulfillment,
   type FormTransport,
   type FormVariant,
@@ -581,31 +582,44 @@ export default function QuickPricePanel({
           ),
         })),
       };
-      const wire = relationsToWire(complete);
+      /**
+       * THE SAME RULE AS THE FULL FORM: a blank direct-sale shelf is zero.
+       *
+       * This panel threw twice for a blank — once for a combination with no
+       * row at all, once for a row with no number — and the owner met the
+       * same wall here that they met in the full editor. `relationsToWire`
+       * resolves it (`withBlankDirectStockAsZero`), so the resolved state is
+       * what this function reads from that point on. Reading `complete` below
+       * would send the wire a zero and the ledger a null, from one save.
+       */
+      const resolved = withBlankDirectStockAsZero(complete);
+      const wire = relationsToWire(resolved);
       const fulfillments = wire.groups.flatMap((g) =>
         g.values.flatMap((v) => v.fulfillments.map((f) => ({ ...f, option_id: v.id })))
       );
-      const allValues = complete.groups.flatMap((g) => g.values);
+      const allValues = resolved.groups.flatMap((g) => g.values);
       const directValueIds = new Set(
         allValues
           .filter((v) => v.fulfillments.some((f) => f.fulfillment_type === 'direct_sale' && f.enabled))
           .map((v) => v.id)
       );
-      const exact = directStockCombinations(complete).filter((combo) =>
+      const exact = directStockCombinations(resolved).filter((combo) =>
         combo.option_value_ids.some((id) => directValueIds.has(id))
       );
-      const variantsByKey = new Map(complete.variants.map((v) => [combinationKey(v), v] as const));
-      const missing = exact.filter((combo) => !variantsByKey.has(combinationKey(combo)));
-      if (missing.length > 0) {
-        throw new Error('أكمل ربط الألوان ومخزونها من التعديل الكامل أولًا، ثم ارجع إلى التعديل السريع.');
-      }
-      const variantRows = exact.map((combo) => variantsByKey.get(combinationKey(combo))!);
+      const variantsByKey = new Map(resolved.variants.map((v) => [combinationKey(v), v] as const));
+      // Every exact shelf has a row and a number now — the resolution above
+      // materialised the ones nobody filled. The two refusals that stood here
+      // are gone with the wall they were part of.
+      const variantRows = exact.map((combo) => variantsByKey.get(combinationKey(combo))!).filter(Boolean);
       const optionRows = exact.length === 0
         ? allValues.filter((v) => directValueIds.has(v.id))
         : [];
-      if (variantRows.some((v) => v.stock === null) || optionRows.some((v) => v.stock === null)) {
-        throw new Error('أدخل مخزون البيع المباشر لكل خيار أو لون مفعّل قبل الحفظ.');
-      }
+      // The OPTION side keeps its own rule, which this panel already had: an
+      // enabled direct option with no number saves as zero (see the `stock:`
+      // expression in the fulfilment mapper above). Only a row the resolution
+      // could not reach would still be null, and it is dropped rather than
+      // sent as one.
+      const optionStockRows = optionRows.filter((v) => v.stock !== null);
       const directStock = exact.length > 0
         ? variantRows.map((v) => ({
             scope: 'variant' as const,
@@ -613,7 +627,7 @@ export default function QuickPricePanel({
             stock: v.stock,
             low_stock_threshold: v.low_stock_threshold,
           }))
-        : optionRows.map((v) => ({
+        : optionStockRows.map((v) => ({
             scope: 'option' as const,
             id: v.id,
             stock: v.stock,

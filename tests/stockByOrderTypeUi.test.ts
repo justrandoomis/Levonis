@@ -72,7 +72,27 @@ test('direct stock is option-owned until a colour is linked, then exact option-c
   assert.match(model, /export function directStockCombinations/);
   assert.match(model, /color_id: null/);
   assert.match(model, /return 'VARIANT_COMBINATION'/);
-  assert.match(model, /أدخل مخزون البيع المباشر لكل خيار مرتبط بهذا اللون/);
+
+  // A BLANK SHELF IS ZERO, NOT A REFUSAL. This used to pin the opposite: the
+  // error that blocked saving until every exact option-colour box carried a
+  // typed number — twenty-three of them on the owner's own product, each
+  // beside a box reading «0 = نفد». The grid must still be complete when it
+  // reaches the server (a present row with a NULL stock is UNTRACKED, and a
+  // hole in the grid drops the product to one shared counter), so the blank
+  // is resolved at the save boundary instead of demanded from the admin.
+  assert.doesNotMatch(model, /أدخل مخزون البيع المباشر لكل خيار مرتبط بهذا اللون/);
+  assert.doesNotMatch(model, /أدخل مخزون البيع المباشر للخيارات التي لا ترتبط بألوان/);
+  assert.match(model, /export function withBlankDirectStockAsZero/);
+  assert.match(model, /const rel = withBlankDirectStockAsZero\(input\);/);
+  // Resolved BEFORE the mode is derived, or the payload and the mode would be
+  // computed from two different grids.
+  const wire = model.slice(model.indexOf('export function relationsToWire'));
+  assert.ok(
+    wire.indexOf('withBlankDirectStockAsZero(input)') < wire.indexOf('deriveInventoryMode(rel)'),
+    'the blanks must be filled before the inventory mode is derived from them'
+  );
+  // The option-level blank is a different question and keeps its own check.
+  assert.match(model, /أدخل مخزون البيع المباشر لهذا الخيار/);
 });
 
 test('the product-level selling section keeps delivery and warranty, not stock or surcharge fields', () => {
@@ -88,7 +108,13 @@ test('Quick Price Edit mirrors fulfilment, route increases and exact direct stoc
   const quick = read(QUICK);
   assert.match(quick, /function QuickFulfillmentPanel/);
   assert.match(quick, /التوفر والزيادة والمخزون حسب الخيار/);
-  assert.match(quick, /directStockCombinations\(complete\)/);
+  // Read from the RESOLVED state, not the raw one: the quick panel routes
+  // through the same save-boundary rule as the full editor, so a blank
+  // direct-sale shelf is a zero here too rather than a wall.
+  assert.match(quick, /const resolved = withBlankDirectStockAsZero\(complete\);/);
+  assert.match(quick, /directStockCombinations\(resolved\)/);
+  assert.doesNotMatch(quick, /أكمل ربط الألوان ومخزونها من التعديل الكامل أولًا/);
+  assert.doesNotMatch(quick, /أدخل مخزون البيع المباشر لكل خيار أو لون مفعّل قبل الحفظ/);
   assert.match(quick, /scope: 'variant' as const/);
   assert.match(quick, /scope: 'option' as const/);
   assert.match(quick, /inventoryMode = exact\.length > 0 \? 'VARIANT_COMBINATION' : 'OPTION'/);
