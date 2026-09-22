@@ -838,6 +838,55 @@ export default function Settings() {
                 </p>
                 <p className="px-4 py-3 text-[12px] text-text-muted leading-relaxed border-t border-border-subtle/70">{s.unlinkNote}</p>
               </div>
+
+              {/*
+                «في لوحة الإعدادات في الربط لا يوجد خيار لربط ال WhatsApp».
+                True, and the reason it was missing is the reason this row is
+                shaped the way it is.
+
+                THERE IS NOTHING TO LINK. Telegram and Google are ACCOUNTS
+                this one is joined to, with a handshake each. WhatsApp is not:
+                the shop sends through WasenderAPI from its own number, to the
+                VERIFIED NUMBER already on this account — `phone_e164`, which
+                migration 0013 only ever writes after Telegram contact
+                verification. There is no WhatsApp handshake to offer, and
+                drawing a «ربط واتساب» button that opened nothing would be the
+                worst answer: a control with no effect.
+
+                So the row reports the state instead of inventing an action,
+                in the section the owner went looking in, and points at the
+                Telegram link above — which is the thing that actually turns
+                WhatsApp on. The same two states were already drawn in the
+                notifications section; the strings are shared rather than
+                restated, so the two can never come to disagree.
+
+                Drawn only when the DEPLOYMENT has a provider: without one,
+                this is not a channel the customer can reach at all, and the
+                notifications section already says so once.
+              */}
+              {whatsappConfigured ? (
+                <div className="mt-3 lv-surface overflow-hidden" data-linking-whatsapp>
+                  <div className="flex items-center gap-3 px-4 py-4">
+                    <span className="text-zinc-400" aria-hidden="true">
+                      <Link2 className="w-5 h-5" />
+                    </span>
+                    <span className="flex-1 text-[14px] font-semibold text-white">{s.notifWhatsapp}</span>
+                    <span
+                      className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-bold ${
+                        user?.has_phone ? 'text-success bg-success/10' : 'text-warning bg-warning/10'
+                      }`}
+                    >
+                      {user?.has_phone ? s.waReady : s.waNeedsPhone}
+                    </span>
+                  </div>
+                  <p className="px-4 pb-3 text-[12px] text-zinc-500 leading-relaxed">
+                    {user?.has_phone ? s.waReadyNote : s.waNeedsPhoneNote}
+                  </p>
+                  {user?.has_phone ? (
+                    <p className="px-4 pb-4 text-[12px] text-zinc-500" dir="ltr">{user.phone}</p>
+                  ) : null}
+                </div>
+              ) : null}
             </section>
 
             {/* ---------------------------------------------- 4. Addresses */}
