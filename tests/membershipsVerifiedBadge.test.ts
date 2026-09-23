@@ -48,6 +48,25 @@ function setup() {
     INSERT INTO restriction_cases (id, user_id, kind, state, reason, benefit_flags) VALUES
       ('rc1','gated','other','active','complaint','["verifiedMerchant"]');
   `);
+  /**
+   * THE COMMUNITY DOOR IS OPENED HERE, DELIBERATELY, AND IT IS NOT THE
+   * SUBJECT OF THIS FILE.
+   *
+   * `communityRoutes` runs `communityGate()` in front of every handler below
+   * it (worker/routes/community.ts), and that gate ships CLOSED: with no
+   * `admin_settings.communityGate` row — which is the state of every fresh
+   * database, this fixture included — `/merchants`, `/store/:id` and
+   * `/followed` answer 503 COMMUNITY_CLOSED and never reach the badge code.
+   * The four tests here would then die on `body.merchants` being undefined,
+   * which says nothing at all about whether PRO and `verified` are kept
+   * apart.
+   *
+   * Closed-by-default is the owner's instruction and is asserted where it
+   * belongs, in tests/communityGate.test.ts. This file asks a question one
+   * step INSIDE that door, so it opens the door explicitly rather than
+   * depending on a default that is meant to change with one admin write.
+   */
+  raw.exec(`INSERT INTO admin_settings (key, value) VALUES ('communityGate', '{"open":true}');`);
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
 

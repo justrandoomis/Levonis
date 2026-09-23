@@ -69,6 +69,10 @@ import AddressForm from '../components/address/AddressForm';
 import ChannelNudge from '../components/notify/ChannelNudge';
 import { apiRefusal } from '../lib/refusalStrings';
 import { mascot } from '../lib/mascot';
+import { duringBackgroundRefresh } from '../lib/mascotRequest';
+import { useBusy } from '../lib/busy';
+import { useMotion } from '../lib/motion';
+import { motion } from 'motion/react';
 /**
  * The tier's CUSTOMER-FACING NAME. `prime` is PREMIUM on every screen in the
  * store, and `tierMeta` is the one table that says so — nothing here branches
@@ -580,6 +584,9 @@ export default function Checkout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { lang, dir, loc } = useLanguage();
+  /** The house motion kit. Used only by the confirmation panel below, which
+   *  is the one thing on this page that has an entrance. */
+  const m = useMotion();
   const {
     checkoutDeliveryMethods,
     checkoutPaymentMethods,
@@ -688,6 +695,31 @@ export default function Checkout() {
   const [protectedDelivery, setProtectedDelivery] = useState(false);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState('');
+
+  /**
+   * THE TWO WAITS ON THIS PAGE THAT DESERVE THE WHOLE SCREEN.
+   *
+   * THE ORDER. `submitting` is already the authority — it disables the button
+   * and `finally` clears it on every exit, including the 401 that navigates
+   * to /auth before the `finally` runs, because `useBusy` releases on its
+   * layout effect's cleanup and an unmount IS a cleanup. The overlay is a
+   * SECOND line of defence and never a precondition: it does not gate
+   * `placeOrder`, it does not touch `idempotencyKeyRef`, and if it failed to
+   * mount entirely every order would still be placeable.
+   *
+   * THE RE-QUOTE, AND ONLY THE RE-QUOTE. `quote !== null` is what separates
+   * the two cases. The FIRST quote is a page-load state — it belongs to the
+   * loading screen below, and there is nothing yet for a customer to be
+   * protected from. Every quote after it was caused by a switch the customer
+   * just flipped, and it is re-pricing the total the Place-order button is
+   * about to commit them to. `canCompleteOrder` already refuses during it;
+   * this is what makes that refusal visible instead of leaving a dimmed
+   * button and a total quietly changing underneath it. The 140ms threshold
+   * swallows the fast ones, so flipping a switch on a good connection still
+   * shows nothing at all.
+   */
+  useBusy(submitting, 'order');
+  useBusy(quoteLoading && quote !== null, 'quote');
   // Versioned-policy consent: ALWAYS starts unchecked; any material quote
   // change (totals / shipping / required versions) resets it.
   const [policyAccepted, setPolicyAccepted] = useState(false);
@@ -1449,7 +1481,27 @@ export default function Checkout() {
       });
       setPlacedInvoiceNo(data.invoice_no ?? null);
       setPlacedOrder(data.order);
-      refreshWallet().catch(() => {});
+      /**
+       * NOBODY ASKED FOR THIS REQUEST, SO THE CHARACTER MUST NOT PERFORM IT.
+       *
+       * The balance changed, so it is re-read — but the customer pressed
+       * «تأكيد الطلب», not «refresh my wallet». Unwrapped, this `GET
+       * /api/wallet` went through the ordinary request funnel:
+       * `requestFeedbackPolicy` marks a GET silent only for the poll routes
+       * and the two auth reads, so 120ms later `mascot.begin('loading')` took
+       * the `loading` WORK state at priority 80 — and `celebrate` is a
+       * reaction at 65. For the whole wallet round trip the character wore the
+       * loading face, on top of the one moment in this application that is
+       * supposed to be merry.
+       *
+       * `duringBackgroundRefresh` raises the flag around the SYNCHRONOUS start
+       * of the call only, and `beginRequestFeedback` runs synchronously inside
+       * `request`, so this lands on exactly this GET and on nothing the
+       * promise starts later. It is preferred to adding `/api/wallet` to the
+       * silent list: the wallet page's own refresh IS foreground work and
+       * should keep its loading face.
+       */
+      duringBackgroundRefresh(() => refreshWallet()).catch(() => {});
       /**
        * §15 — THE ONE MOMENT THAT DESERVES MORE THAN THE HOUSE SUCCESS.
        *
@@ -1606,7 +1658,7 @@ export default function Checkout() {
   if (placedOrder) {
     return (
       <div className="h-full min-h-0 w-full overflow-y-auto bg-canvas text-text-primary flex flex-col font-sans selection:bg-white/20">
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in-95 duration-700">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           {/*
             THE CHARACTER ARRIVES; THE CHECKMARK DOES NOT PULSE.
 
@@ -1623,26 +1675,76 @@ export default function Checkout() {
             The descent is the animation the owner asked for, and it is the
             mechanism the character already uses to go anywhere.
 
-            `celebrate` is signalled beside it: priority 65 for 1.5s, above the
-            notification the order will produce, then back to calm. Under
-            reduced motion the engine cross-fades instead of travelling, and
-            the character is simply already here.
+            THIS SLOT HAS NO ENTRANCE OF ITS OWN, deliberately. It is the
+            destination the character is measuring and flying towards; a panel
+            that moved its own anchor mid-flight would retarget the journey it
+            started. Everything BELOW it animates instead, and `y` is a
+            transform, so none of it changes where this box is.
+
+            WHAT `celebrate` NOW MEANS HERE. `mascot.outcome('ordered')` in
+            `placeOrder` raises the mood at the moment the server answered; the
+            journey's ARRIVAL is what plays it (`mascot.navigationComplete`
+            takes the destination kind and a `stage` celebrates). It used to be
+            played on the HTTP response alone, and a header-to-stage descent
+            takes about 1.3s — so the 1.5s window was two thirds spent before
+            the character was anywhere near this page, and it touched down
+            wearing the 320ms `arrival` face instead.
+
+            UNDER REDUCED MOTION the character still travels: the engine
+            flattens the wind-up, the stretch, the trail and the settle squash
+            and shortens the journey to a flat 200ms glide, which is not the
+            same claim as "it cross-fades and is simply already here" — that
+            sentence used to be here and was not true of the code.
           */}
           <div className="mb-8 flex items-center justify-center">
             <MotionCharacterAnchor kind="stage" />
           </div>
 
-          <h2 className="text-2xl md:text-4xl font-normal mb-3 tracking-tight">
-            {dir === 'rtl' ? 'تم استلام طلبك بنجاح' : 'Order Successfully Placed'}
-          </h2>
+          {/*
+            THE PAGE ARRIVES INSTEAD OF BEING FOUND ALREADY FINISHED.
 
-          <p className="text-zinc-500 max-w-md mx-auto mb-10 text-base font-light">
+            These carried `animate-in fade-in zoom-in-95 duration-700`, which
+            emits no CSS in this build at all: Tailwind v4 here has no
+            `tailwindcss-animate` plugin and `src/index.css` is a bare
+            `@import "tailwindcss"`, so those four classes were inert and the
+            whole panel appeared instantly and completely — while the mascot
+            was still a second away from it. A finished page plus a late
+            walking ball is most of «الحركة خاطئة».
+
+            A short stagger on the house spring puts it right without making
+            anybody wait for the one thing they came here for: the order
+            number is on screen inside a fifth of a second, and the sequence is
+            finished long before the character lands on it. `useMotion()`
+            collapses the spring to a cross-fade and `m.travel()` to zero under
+            prefers-reduced-motion, so the reduced path is an opacity fade with
+            no offset and no stagger to sit through.
+          */}
+          <motion.h2
+            className="text-2xl md:text-4xl font-normal mb-3 tracking-tight"
+            initial={{ opacity: 0, y: m.travel(12) }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={m.spring('ui')}
+          >
+            {dir === 'rtl' ? 'تم استلام طلبك بنجاح' : 'Order Successfully Placed'}
+          </motion.h2>
+
+          <motion.p
+            className="text-zinc-500 max-w-md mx-auto mb-10 text-base font-light"
+            initial={{ opacity: 0, y: m.travel(12) }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...m.spring('ui'), delay: m.reduced ? 0 : 0.06 }}
+          >
             {dir === 'rtl'
               ? 'شكراً لك. سنقوم بمعالجة طلبك وإعلامك بآخر التحديثات قريباً.'
               : 'Thank you. We will process your order and notify you with updates soon.'}
-          </p>
+          </motion.p>
 
-          <div className="bg-[#0a0a0a] border border-white/5 rounded-xl p-6 max-w-xs w-full mb-10 shadow-xl">
+          <motion.div
+            className="bg-[#0a0a0a] border border-white/5 rounded-xl p-6 max-w-xs w-full mb-10 shadow-xl"
+            initial={{ opacity: 0, y: m.travel(12) }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...m.spring('ui'), delay: m.reduced ? 0 : 0.12 }}
+          >
             <div className="text-xs text-zinc-500 mb-1 font-light">{dir === 'rtl' ? 'رقم الطلب' : 'Order Number'}</div>
             <div className="text-lg font-mono tracking-widest text-white">{placedOrder.id}</div>
             {placedInvoiceNo && (
@@ -1651,7 +1753,7 @@ export default function Checkout() {
                 <div className="text-sm font-mono tracking-wider text-white">{placedInvoiceNo}</div>
               </div>
             )}
-          </div>
+          </motion.div>
 
           {/*
             THE ORDER IS PLACED AND IT IS NOT YET CONFIRMED.
@@ -1692,7 +1794,12 @@ export default function Checkout() {
             </div>
           ) : null}
 
-          <div className="flex items-center gap-3">
+          <motion.div
+            className="flex items-center gap-3"
+            initial={{ opacity: 0, y: m.travel(12) }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...m.spring('ui'), delay: m.reduced ? 0 : 0.18 }}
+          >
             <button
               onClick={() => navigate('/orders')}
               className="bg-white/10 text-white hover:bg-white/20 font-normal py-3 px-8 rounded-xl transition-all border border-white/10"
@@ -1705,7 +1812,7 @@ export default function Checkout() {
             >
               {dir === 'rtl' ? 'العودة للرئيسية' : 'Back to Home'}
             </button>
-          </div>
+          </motion.div>
         </div>
 
         {/* Last in the tree and non-blocking by construction: it portals to

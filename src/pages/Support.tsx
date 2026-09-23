@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, uploadFile } from '../lib/api';
 import {
   ArrowLeft,
   ArrowRight,
@@ -14,6 +14,7 @@ import {
   ChevronDown,
   CheckCircle2,
   AlertTriangle,
+  Paperclip,
 } from 'lucide-react';
 /**
  * A TICKET IS A PROMISE OF A REPLY, and a reply that only reaches the in-app
@@ -103,6 +104,16 @@ interface TicketMsg {
   body: string;
   is_staff: boolean;
   created_at: string;
+  /** 'text' on every message written before migration 0107. */
+  kind?: 'text' | 'image' | 'video';
+  /** `/files/<key>`, composed by the server. Null for a typed message. */
+  file_url?: string | null;
+  /**
+   * A bubble that exists only in this browser, waiting for the server. It is
+   * rendered at reduced opacity and is replaced by the real row — same id,
+   * same timestamp — the moment the POST answers.
+   */
+  pending?: boolean;
 }
 
 interface OrderOption {
@@ -156,6 +167,9 @@ const STRINGS = {
     signIn: 'تسجيل الدخول',
     replyPlaceholder: 'اكتب ردك...',
     reply: 'رد',
+    attach: 'إرفاق ملف',
+    uploading: 'جارٍ الرفع…',
+    attachFailed: 'تعذر إرسال الصورة',
     you: 'أنت',
     staff: 'فريق ليفونيس',
     loading: 'جارٍ التحميل...',
@@ -230,6 +244,9 @@ const STRINGS = {
     signIn: 'Sign in',
     replyPlaceholder: 'Write your reply...',
     reply: 'Reply',
+    attach: 'Attach file',
+    uploading: 'Uploading…',
+    attachFailed: 'Failed to send image',
     you: 'You',
     staff: 'LEVONIS team',
     loading: 'Loading...',
@@ -291,6 +308,9 @@ const STRINGS = {
     signIn: 'چوونەژوورەوە',
     replyPlaceholder: 'وەڵامەکەت بنووسە...',
     reply: 'وەڵام',
+    attach: 'هاوپێچکردنی فایل',
+    uploading: 'بارکردن…',
+    attachFailed: 'بارکردن سەرکەوتوو نەبوو',
     you: 'تۆ',
     staff: 'تیمی ليڤۆنیس',
     loading: 'بارکردن...',
@@ -665,6 +685,10 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
   const [replyText, setReplyText] = useState('');
   const [replyBusy, setReplyBusy] = useState(false);
   const [replyError, setReplyError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const tempCounter = useRef(0);
 
   const load = useCallback(async () => {
     if (!isAuthenticated) {
@@ -687,6 +711,11 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
     load();
   }, [load, refreshKey]);
 
+  /**
+   * OPENING a ticket is the one moment a spinner is honest: there is nothing
+   * on screen yet and the thread has to arrive. REPLYING is not that moment,
+   * and this function is no longer called for it — see `commitReply`.
+   */
   const openThread = useCallback(
     async (id: string) => {
       setOpenId(id);
@@ -705,143 +734,345 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
     [s.loadError]
   );
 
-  const sendReply = async () => {
-    if (!openId || replyText.trim().length === 0) return;
-    setReplyBusy(true);
+  /**
+   * THE LAST BUBBLE IS THE ONE WORTH SEEING.
+   *
+   * A ticket with a dozen messages opened at the TOP and the composer was
+   * below the fold, so the first thing the customer had to do to answer was
+   * scroll. Keyed on the message count as well as the ticket, so a reply that
+   * was just appended brings itself into view — the same sentinel pattern the
+   * order chat uses (src/pages/Chat.tsx).
+   */
+  const messageCount = thread ? thread.messages.length : 0;
+  useEffect(() => {
+    if (!openId) return;
+    bottomRef.current?.scrollIntoView({ block: 'end' });
+  }, [openId, messageCount, threadLoading]);
+
+  const nextTempId = () => {
+    tempCounter.current += 1;
+    return `temp-${Date.now()}-${tempCounter.current}`;
+  };
+
+  /**
+   * A REPLY APPENDS. IT DOES NOT RELOAD THE WORLD.
+   *
+   * What this replaces: `await openThread(openId)` followed by `await load()`.
+   * `openThread` sets `thread` to null and `threadLoading` to true BEFORE its
+   * GET, so the render swapped the entire conversation for a centred
+   * «جارٍ التحميل...» — every bubble the customer had just been reading
+   * unmounted and came back — and `load()` put the ticket LIST into its own
+   * loading state behind it. Three round trips for one sent sentence, with a
+   * blank screen in the middle of them, on a tablet over Iraqi mobile data.
+   *
+   * Now: the bubble is on screen before the request leaves, the server hands
+   * back the row it wrote (id, timestamp, kind, file url) and that row
+   * replaces the temporary one in place. Nothing else is re-fetched — the
+   * ticket's own row in the list is patched from the same response, because
+   * the only three things a reply changes about it are its state, its
+   * `updated_at` and its message count, and all three are known here.
+   *
+   * ON FAILURE the bubble is REMOVED and the text is put back in the box.
+   * A message that did not reach support must not sit in the thread looking
+   * like it did.
+   */
+  const commitReply = async (
+    payload: { body?: string; fileKey?: string },
+    optimistic: { body: string; kind: 'text' | 'image' | 'video'; file_url: string | null },
+    onFailure?: () => void
+  ) => {
+    const ticketId = openId;
+    if (!ticketId) return;
+    const tempId = nextTempId();
     setReplyError('');
+    setThread((prev) =>
+      prev && prev.ticket.id === ticketId
+        ? {
+            ...prev,
+            messages: [
+              ...prev.messages,
+              {
+                id: tempId,
+                body: optimistic.body,
+                is_staff: false,
+                created_at: new Date().toISOString(),
+                kind: optimistic.kind,
+                file_url: optimistic.file_url,
+                pending: true,
+              },
+            ],
+          }
+        : prev
+    );
     try {
-      await api.post(`/api/support/tickets/${openId}/messages`, { body: replyText.trim() });
-      setReplyText('');
-      await openThread(openId);
-      await load();
+      const res = await api.post<{ message?: TicketMsg; ticket_state?: Ticket['state']; updated_at?: string }>(
+        `/api/support/tickets/${ticketId}/messages`,
+        payload
+      );
+      setThread((prev) => {
+        if (!prev || prev.ticket.id !== ticketId) return prev;
+        const settled: TicketMsg = res?.message
+          ? { ...res.message, pending: false }
+          : // A Worker that predates the row-returning response still ACCEPTED
+            // the message. Keeping the local bubble and merely clearing its
+            // pending state is the truthful reading of a 200 with no body.
+            {
+              id: tempId,
+              body: optimistic.body,
+              is_staff: false,
+              created_at: new Date().toISOString(),
+              kind: optimistic.kind,
+              file_url: optimistic.file_url,
+              pending: false,
+            };
+        return {
+          ticket: { ...prev.ticket, state: res?.ticket_state ?? 'waiting_staff', updated_at: res?.updated_at ?? prev.ticket.updated_at },
+          messages: prev.messages.map((m) => (m.id === tempId ? settled : m)),
+        };
+      });
+      setTickets((prev) =>
+        prev.map((t) =>
+          t.id === ticketId
+            ? {
+                ...t,
+                state: res?.ticket_state ?? 'waiting_staff',
+                updated_at: res?.updated_at ?? t.updated_at,
+                message_count: typeof t.message_count === 'number' ? t.message_count + 1 : t.message_count,
+              }
+            : t
+        )
+      );
     } catch (e) {
+      setThread((prev) =>
+        prev && prev.ticket.id === ticketId ? { ...prev, messages: prev.messages.filter((m) => m.id !== tempId) } : prev
+      );
       setReplyError(e instanceof ApiError ? e.message : s.netError);
+      onFailure?.();
+    }
+  };
+
+  const sendReply = async () => {
+    const text = replyText.trim();
+    if (!openId || text.length === 0 || replyBusy) return;
+    setReplyBusy(true);
+    setReplyText('');
+    try {
+      await commitReply({ body: text }, { body: text, kind: 'text', file_url: null }, () => setReplyText(text));
     } finally {
       setReplyBusy(false);
     }
   };
 
+  /**
+   * «لا توجد طريقة لإرفاق وسائط» — the photograph of the failed print.
+   *
+   * The bubble appears with the LOCAL object URL the instant the file is
+   * chosen, because the upload itself is the slow part and a customer who
+   * picked a photo and saw nothing happen picks it again. The object URL is
+   * revoked once the server's own `/files/…` has replaced it.
+   *
+   * The ticket id is passed to the upload so the object is filed under the
+   * TICKET, and the server refuses a ticket that is not this account's before
+   * a byte is stored.
+   */
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !openId || uploading || replyBusy) return;
+    const localUrl = URL.createObjectURL(file);
+    const kind: 'image' | 'video' = file.type.startsWith('video/') ? 'video' : 'image';
+    setUploading(true);
+    setReplyError('');
+    try {
+      const uploaded = await uploadFile(file, 'support', openId);
+      await commitReply({ fileKey: uploaded.key }, { body: '', kind, file_url: localUrl });
+    } catch (err) {
+      setReplyError(err instanceof ApiError ? err.message : s.attachFailed);
+    } finally {
+      setUploading(false);
+      URL.revokeObjectURL(localUrl);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
-      <div className="lv-surface space-y-3 py-12 text-center text-text-secondary">
-        <p>{s.ticketsSignIn}</p>
-        <button onClick={() => signIn()} className="lv-button lv-button-primary px-4">
-          {s.signIn}
-        </button>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="lv-surface mx-auto max-w-3xl space-y-3 py-12 text-center text-text-secondary">
+          <p>{s.ticketsSignIn}</p>
+          <button onClick={() => signIn()} className="lv-button lv-button-primary px-4">
+            {s.signIn}
+          </button>
+        </div>
       </div>
     );
   }
 
   if (openId) {
+    /**
+     * THE COMPOSER IS A SIBLING OF THE SCROLLER, NOT ITS LAST CHILD.
+     *
+     * It used to be ordinary flow content inside one scrolling column, so on a
+     * two-message ticket the box sat a few hundred pixels down a full-height
+     * screen — near the TOP, with dead space under it — and on a long ticket
+     * it sat below the fold. Both are the same defect: the input's position
+     * was decided by how much had been said. The assistant tab on this very
+     * page and the order chat already do it the other way; this is that shape.
+     */
     return (
-      <div className="space-y-3">
-        <button onClick={() => setOpenId(null)} className="text-xs text-zinc-400 hover:text-white font-bold">
-          ← {s.back}
-        </button>
-        {threadLoading ? (
-          <div className="text-center py-8 text-zinc-500">{s.loading}</div>
-        ) : thread ? (
-          <>
-            <div className="lv-surface p-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-white font-bold text-sm break-words">{thread.ticket.subject}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATE_STYLES[thread.ticket.state]}`}>
-                  {stateLabel(s, thread.ticket.state)}
-                </span>
-                {thread.ticket.priority === 1 && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/10 text-yellow-400">{s.proPriority}</span>
-                )}
-              </div>
-              {thread.ticket.order_id && <div className="text-xs text-zinc-500 font-mono mt-1">{thread.ticket.order_id}</div>}
-            </div>
-            <div className="space-y-2">
-              {thread.messages.map((m) => (
-                <div key={m.id} className={`flex ${m.is_staff ? 'justify-start' : 'justify-end'}`}>
-                  <div
-                    className={`max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap break-words ${
-                      m.is_staff ? 'bg-surface text-text-secondary' : 'bg-surface-selected border border-border-subtle text-text-primary'
-                    }`}
-                  >
-                    <div className="text-[10px] text-zinc-500 mb-0.5">
-                      {m.is_staff ? s.staff : s.you} · {fmtDate(m.created_at, lang)}
-                    </div>
-                    {m.body}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+          <div className="mx-auto max-w-3xl space-y-3">
+            <button onClick={() => setOpenId(null)} className="text-xs text-zinc-400 hover:text-white font-bold">
+              ← {s.back}
+            </button>
+            {threadLoading ? (
+              <div className="text-center py-8 text-zinc-500">{s.loading}</div>
+            ) : thread ? (
+              <>
+                <div className="lv-surface p-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-white font-bold text-sm break-words">{thread.ticket.subject}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATE_STYLES[thread.ticket.state]}`}>
+                      {stateLabel(s, thread.ticket.state)}
+                    </span>
+                    {thread.ticket.priority === 1 && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/10 text-yellow-400">{s.proPriority}</span>
+                    )}
                   </div>
+                  {thread.ticket.order_id && <div className="text-xs text-zinc-500 font-mono mt-1">{thread.ticket.order_id}</div>}
                 </div>
-              ))}
+                <div className="space-y-2">
+                  {thread.messages.map((m) => (
+                    <div key={m.id} className={`flex ${m.is_staff ? 'justify-start' : 'justify-end'}`}>
+                      <div
+                        className={`max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap break-words ${
+                          m.is_staff ? 'bg-surface text-text-secondary' : 'bg-surface-selected border border-border-subtle text-text-primary'
+                        } ${m.pending ? 'opacity-60' : ''}`}
+                      >
+                        <div className="text-[10px] text-zinc-500 mb-0.5">
+                          {m.is_staff ? s.staff : s.you} · {fmtDate(m.created_at, lang)}
+                        </div>
+                        {m.kind === 'image' && m.file_url && (
+                          <img
+                            referrerPolicy="no-referrer"
+                            src={m.file_url}
+                            alt=""
+                            className="mb-1 max-h-[300px] w-full rounded-lg object-cover"
+                          />
+                        )}
+                        {m.kind === 'video' && m.file_url && (
+                          <video src={m.file_url} controls playsInline className="mb-1 max-h-[300px] w-full rounded-lg" />
+                        )}
+                        {m.body}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8 text-red-400 text-sm">{replyError || s.loadError}</div>
+            )}
+            <div ref={bottomRef} className="h-px shrink-0" aria-hidden="true" />
+          </div>
+        </div>
+
+        {thread && (
+          <div className="z-40 shrink-0 border-t border-border-subtle bg-surface-raised/98 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="mx-auto max-w-3xl space-y-2">
+              {replyError && (
+                <div role="alert" className="text-xs text-red-400">
+                  {replyError}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  className="hidden"
+                  onChange={onPickFile}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading || replyBusy}
+                  aria-label={s.attach}
+                  title={s.attach}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-surface text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </button>
+                <input
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') sendReply();
+                  }}
+                  maxLength={4000}
+                  placeholder={uploading ? s.uploading : s.replyPlaceholder}
+                  aria-label={s.replyPlaceholder}
+                  className="lv-input flex-1 min-w-0 text-sm"
+                />
+                <button
+                  onClick={sendReply}
+                  disabled={replyBusy || uploading || replyText.trim().length === 0}
+                  className="lv-button lv-button-primary px-4"
+                >
+                  {s.reply}
+                </button>
+              </div>
             </div>
-            {replyError && <div className="text-xs text-red-400">{replyError}</div>}
-            <div className="flex gap-2">
-              <input
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') sendReply();
-                }}
-                maxLength={4000}
-                placeholder={s.replyPlaceholder}
-                aria-label={s.replyPlaceholder}
-                className="lv-input flex-1 min-w-0 text-sm"
-              />
-              <button
-                onClick={sendReply}
-                disabled={replyBusy || replyText.trim().length === 0}
-                className="lv-button lv-button-primary px-4"
-              >
-                {s.reply}
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="text-center py-8 text-red-400 text-sm">{replyError || s.loadError}</div>
+          </div>
         )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex justify-end">
-        <button onClick={load} aria-label={s.retry} className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface text-text-secondary hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
-      {loading ? (
-        <div className="text-center py-8 text-zinc-500">{s.loading}</div>
-      ) : error ? (
-        <div className="text-center py-8 text-red-400 text-sm space-y-2">
-          <div>{error}</div>
-          <button onClick={load} className="text-xs text-zinc-400 underline">
-            {s.retry}
+    <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="mx-auto max-w-3xl space-y-3">
+        <div className="flex justify-end">
+          <button onClick={load} aria-label={s.retry} className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface text-text-secondary hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
-      ) : tickets.length === 0 ? (
-        <div className="lv-surface py-12 text-center text-text-muted">{s.ticketsEmpty}</div>
-      ) : (
-        tickets.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => openThread(t.id)}
-            className="w-full rounded-lg bg-surface p-3 text-start transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-bold text-white break-words flex-1 min-w-0">{t.subject}</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${STATE_STYLES[t.state]}`}>
-                {stateLabel(s, t.state)}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500 flex-wrap">
-              <span>{fmtDate(t.created_at, lang)}</span>
-              {t.priority === 1 && <span className="text-yellow-400 font-bold">{s.proPriority}</span>}
-              {typeof t.message_count === 'number' && (
-                <span className="flex items-center gap-1">
-                  <MessageSquare className="w-3 h-3" /> {t.message_count}
+        {loading ? (
+          <div className="text-center py-8 text-zinc-500">{s.loading}</div>
+        ) : error ? (
+          <div className="text-center py-8 text-red-400 text-sm space-y-2">
+            <div>{error}</div>
+            <button onClick={load} className="text-xs text-zinc-400 underline">
+              {s.retry}
+            </button>
+          </div>
+        ) : tickets.length === 0 ? (
+          <div className="lv-surface py-12 text-center text-text-muted">{s.ticketsEmpty}</div>
+        ) : (
+          tickets.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => openThread(t.id)}
+              className="w-full rounded-lg bg-surface p-3 text-start transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-bold text-white break-words flex-1 min-w-0">{t.subject}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${STATE_STYLES[t.state]}`}>
+                  {stateLabel(s, t.state)}
                 </span>
-              )}
-            </div>
-          </button>
-        ))
-      )}
+              </div>
+              <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500 flex-wrap">
+                <span>{fmtDate(t.created_at, lang)}</span>
+                {t.priority === 1 && <span className="text-yellow-400 font-bold">{s.proPriority}</span>}
+                {typeof t.message_count === 'number' && (
+                  <span className="flex items-center gap-1">
+                    <MessageSquare className="w-3 h-3" /> {t.message_count}
+                  </span>
+                )}
+              </div>
+            </button>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -1045,10 +1276,12 @@ export default function Support() {
       </div>
 
       {tab === 'tickets' ? (
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <div className="mx-auto max-w-3xl">
+        /* THE TAB IS A COLUMN, NOT A SCROLLER. `TicketsTab` owns its own
+           scrolling now, because an open thread has to put a scrolling message
+           list and a `shrink-0` composer side by side inside this height —
+           which is impossible while the parent is the thing that scrolls. */
+        <div className="flex min-h-0 flex-1 flex-col">
           <TicketsTab s={s} lang={lang} refreshKey={ticketsRefresh} />
-          </div>
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">

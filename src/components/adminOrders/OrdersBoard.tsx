@@ -28,7 +28,7 @@
  * already on the payload.
  *
  * ---------------------------------------------------------------------------
- *  THE FOUR JOURNEYS ARE THE «النوع» SELECT, AND THERE IS NO "ALL"
+ *  THE JOURNEYS ARE THE «النوع» SELECT, AND «الكل» IS ONE OF THEM
  * ---------------------------------------------------------------------------
  * «فصلها في الطلبات المسبقة» — a container forty days out is a different kind
  * of waiting from a box that has to go out this morning, and interleaving them
@@ -38,14 +38,35 @@
  *
  *      مباشر  → scope=open                          جوي  → preorder + air
  *      بحري   → scope=preorder, type=preorder_sea   بري  → preorder + land
+ *      الكل   → scope=all (work list) / NO `type` at all (archive)
  *
- * An aggregate «كل المسبقة» option was deliberately NOT added, even though
- * `scope=preorder` alone would serve it: the archive below reaches delivered
- * and cancelled orders through `scope=delivered` / `scope=cancelled`, where
- * the journey can only be expressed as `type`, and `type` has no value meaning
- * "any pre-order". The aggregate would therefore work in the work list and
- * silently show direct orders in the archive. Four honest options beat five
- * where the fifth lies in one combination.
+ * «الكل» WAS ADDED, AND WHAT THIS NOTE USED TO REJECT IS STILL REJECTED.
+ * The option this file refused was an aggregate spelled `scope=preorder`: the
+ * archive reaches delivered and cancelled orders through `scope=delivered` /
+ * `scope=cancelled`, where the journey can only be expressed as `type`, and
+ * `type` has no value meaning "any pre-order" — so that spelling would have
+ * worked in the work list and silently shown direct orders in the archive.
+ * «الكل» is a different thing and it is honest in BOTH halves, because in both
+ * it is an ABSENCE rather than a value: in the work list it is `scope=all`,
+ * whose WHERE is the partial index's own and carries no `shipping_type` clause
+ * at all; in the archive it is simply no `type` parameter. There is no
+ * combination in which it can name the wrong population. The owner asked for
+ * it — «الكل» — and this is the spelling that can be given.
+ *
+ * ---------------------------------------------------------------------------
+ *  THE NUMBER BESIDE EACH OPTION
+ * ---------------------------------------------------------------------------
+ * «عدد بجانب كل خيار». Both vectors come from the server's `options` block,
+ * folded from one GROUP BY, and each honours the OTHER select while ignoring
+ * its own — so the number beside the option currently chosen is the same
+ * number as the board's total, and the other numbers answer "how many would I
+ * get if I tapped this". A count computed from `orders` on this page would
+ * answer neither: the page is thirty rows of a set that may be three hundred.
+ *
+ * `options` is NULL during a pierced lookup (an order number, a phone number),
+ * and then no option carries a number. That is not a gap — a lookup has no
+ * alternatives to count, and a stale number beside an option is worse than
+ * none.
  *
  * ---------------------------------------------------------------------------
  *  EVERY DECISION IS THE SERVER'S
@@ -85,8 +106,9 @@ import { countText } from './OrderBoardBadges';
  *  queries, rather than two hundred rows and two hundred and one. */
 const PAGE_SIZE = 30;
 
-/** The four journeys, as the server's `type` values. See the header note. */
-type Journey = 'direct' | 'preorder_air' | 'preorder_sea' | 'preorder_land';
+/** The four journeys, as the server's `type` values, plus «الكل» — which is
+ *  the ABSENCE of a journey rather than one of them. See the header note. */
+type Journey = 'all' | 'direct' | 'preorder_air' | 'preorder_sea' | 'preorder_land';
 
 /**
  * ONE WORD EACH, AND THE SEPARATION CARRIED BY AN `<optgroup>`.
@@ -159,7 +181,18 @@ export default function OrdersBoard() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  /**
+   * «مباشر» IS STILL THE DEFAULT, AND «الكل» IS AN OPTION, NOT THE OPENING
+   * SCREEN. «فصلها في الطلبات المسبقة» is a decision about what the board
+   * shows when nobody has asked for anything: a container forty days out
+   * interleaved by day among this morning's boxes is what made the old board
+   * useless, and adding an «الكل» option must not quietly restore that as the
+   * first thing an owner sees every morning. The number beside «الكل» says
+   * how much is behind it, which is what makes one tap enough.
+   */
   const [journey, setJourney] = useState<Journey>('direct');
+  /** The one-tap move in flight, so the row can spin and nothing double-fires. */
+  const [advancing, setAdvancing] = useState<string | null>(null);
   const [status, setStatus] = useState<'' | OrderStatus>('');
   const [archive, setArchive] = useState(false);
   const [archiveScope, setArchiveScope] = useState<ArchiveScope>('delivered');
@@ -172,13 +205,27 @@ export default function OrdersBoard() {
   const loadOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE) });
+    /**
+     * `lang` IS SENT, AND IT IS NOT DECORATION. Two strings on this payload are
+     * rendered by the SERVER — `due_label` («اليوم» / «الأربعاء ٢٣ أيلول») and
+     * `quick_next.label` (the stage the button moves to) — and `langOf` reads
+     * exactly this parameter, defaulting to Arabic. Without it an English or
+     * Sorani admin gets an otherwise-translated board with two Arabic strings
+     * in the middle of it, one of them on a button that changes an order.
+     */
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE), lang });
     if (archive) {
       // In the archive the scope is the STATE, so the journey has to be sent
       // as `type` — it is no longer implied by the scope the way `open` implies
-      // direct.
+      // direct. «الكل» sends NO `type`, which is the one spelling of "any
+      // journey" this half understands; see the header note.
       params.set('scope', archiveScope);
-      params.set('type', journey);
+      if (journey !== 'all') params.set('type', journey);
+    } else if (journey === 'all') {
+      // The live set with no `shipping_type` clause at all — the partial
+      // index's own WHERE, and the cheapest of the three live scopes.
+      params.set('scope', 'all');
+      if (status) params.set('status', status);
     } else if (journey === 'direct') {
       // AND NOT `type=direct` BESIDE IT. `scope=open` already restricts to
       // direct orders through a clause written to match `idx_orders_board_open`
@@ -206,7 +253,7 @@ export default function OrdersBoard() {
     } finally {
       setLoading(false);
     }
-  }, [archive, archiveScope, journey, status, query, page]);
+  }, [archive, archiveScope, journey, status, query, page, lang]);
 
   useEffect(() => {
     loadOrders();
@@ -249,6 +296,49 @@ export default function OrdersBoard() {
    * page it could be read as a board total, so it says which it is.
    */
   const proHere = orders.filter((o) => o.priority === 1).length;
+
+  /**
+   * «مباشر ٦» — the option and what tapping it would return.
+   *
+   * A MISSING NUMBER IS NO NUMBER, not a zero. `options` is null during a
+   * pierced lookup, and writing «مباشر ٠» there would be a claim about the
+   * board that the server explicitly declined to make.
+   */
+  const opt = (label: string, n: number | undefined): string =>
+    n === undefined ? label : `${label} ${countText(n, latin)}`;
+  const typeOpts = data?.options?.type;
+  const statusOpts = data?.options?.status;
+
+  /**
+   * ONE TAP FORWARD, and the move is the SERVER'S — `order.quick_next.stage`,
+   * through the same `PATCH /orders/:id/stage` door the modal's stage panel
+   * uses. Not a status PATCH: the stage is the authority for what the customer
+   * is told, and the two doors must not be able to say different things about
+   * the same order.
+   *
+   * THE SERVER'S REFUSAL IS SHOWN VERBATIM. A Gini receipt that was never
+   * scanned, an offer allowance already spent, a stage somebody else moved
+   * while this board was open — each has its own sentence, and «تعذّر» in
+   * place of any of them sends an admin hunting the wrong problem.
+   */
+  const advance = async (order: AdminOrderRow) => {
+    const next = order.quick_next;
+    if (!next || advancing) return;
+    setAdvancing(order.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await api.patch(`/api/admin/orders/${order.id}/stage`, { stage: next.stage });
+      /* OWNER: Sorani to be written by hand — `loc(ar, en)` falls back to the
+         Arabic text for a Kurdish reader rather than inventing Kurdish. */
+      setNotice(loc(`تم النقل إلى: ${next.label}`, `Moved to: ${next.label}`));
+      await loadOrders();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : loc('تعذّر تحديث الحالة', 'Failed to update the status') /* OWNER: Sorani by hand. */);
+    } finally {
+      setAdvancing(null);
+    }
+  };
 
   const deleteCancelled = async (order: AdminOrderRow) => {
     if (order.status !== 'cancelled' || deletingId) return;
@@ -370,11 +460,12 @@ export default function OrdersBoard() {
           aria-label={loc('نوع الطلب', 'Order type', 'جۆری داواکاری')}
           className="lv-input min-w-0 px-2 text-[14px] leading-[1.4] font-bold"
         >
-          <option value="direct">{loc('مباشر', 'Direct', 'ڕاستەوخۆ')}</option>
+          <option value="all">{opt(loc('الكل', 'All', 'هەموو'), typeOpts?.all)}</option>
+          <option value="direct">{opt(loc('مباشر', 'Direct', 'ڕاستەوخۆ'), typeOpts?.direct)}</option>
           <optgroup label={loc('الطلبات المسبقة', 'Pre-orders', 'داواکارییە پێشوەختەکان')}>
             {PREORDER_JOURNEYS.map((j) => (
               <option key={j.id} value={j.id}>
-                {loc(j.ar, j.en, j.ckb)}
+                {opt(loc(j.ar, j.en, j.ckb), typeOpts?.[j.id])}
               </option>
             ))}
           </optgroup>
@@ -397,15 +488,15 @@ export default function OrdersBoard() {
           {archive ? (
             ARCHIVE_SCOPES.map((s) => (
               <option key={s.id} value={s.id}>
-                {loc(s.ar, s.en, s.ckb)}
+                {opt(loc(s.ar, s.en, s.ckb), statusOpts?.[s.id])}
               </option>
             ))
           ) : (
             <>
-              <option value="">{loc('كل الحالات', 'Any status', 'هەموو دۆخەکان')}</option>
+              <option value="">{opt(loc('كل الحالات', 'Any status', 'هەموو دۆخەکان'), statusOpts?.any)}</option>
               {OPEN_STATUSES.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {loc(s.ar, s.en, s.ckb)}
+                  {opt(loc(s.ar, s.en, s.ckb), statusOpts?.[s.id])}
                 </option>
               ))}
             </>
@@ -460,6 +551,8 @@ export default function OrdersBoard() {
                 loc={loc}
                 onOpen={setOpenOrderId}
                 onDelete={deleteCancelled}
+                onAdvance={advance}
+                advancing={advancing === o.id}
                 deleting={deletingId === o.id}
               />
             ))}

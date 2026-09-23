@@ -16,10 +16,26 @@ import type { PolicyDocument } from './types';
  * setting that happens to be off, but because Levonis holds neither the
  * merchant's stock nor their cash. Saying it plainly here is what stops a
  * customer expecting to pay a merchant's courier in cash.
+ *
+ * VERSION 3 — WHY IT MOVED. Two corrections a customer could see on the
+ * page; the archive keeps version 2 byte for byte.
+ *   * THE NAME. The store is written «Levonis», in Latin script, in all three
+ *     languages. 4 transliterated occurrences left the body here — 2 in the
+ *     Arabic body and 2 in the Sorani one, and the Sorani pair is why this line
+ *     names a count rather than a spelling: the corpus used TWO Sorani forms,
+ *     «لێڤۆنیس» with ێ (U+06CE) and «لیڤۆنیس» with ی (U+06CC), and a
+ *     replacement that knew only the first left the second published under an
+ *     Arabic body that already read «Levonis». tests/policyCorpus.test.ts now
+ *     enumerates all three forms.
+ *   * THE UNKNOWNS. 5 articles and 5 further lines in this document still state a
+ *     fact the owner has not given, so ./render.ts WITHHOLDS them from the published
+ *     text rather than show a customer a `{{TOKEN}}`. They are still authored
+ *     below, and each one returns of its own accord the moment its value is
+ *     written in and the version moves again.
  */
 export const payment: PolicyDocument = {
   key: 'payment',
-  version: 2,
+  version: 3,
   effective_at: '2026-01-01',
   title: {
     ar: 'سياسة الدفع والمحفظة',
@@ -74,7 +90,7 @@ export const payment: PolicyDocument = {
 ## 3. الدفع عند الاستلام
 
 ### 3.1 نطاقه
-الدفع عند الاستلام متاح في طلبات متجر ليفونيس الرسمي المسلَّمة إلى عنوان. وهو غير متاح في طلبات متاجر مجتمع ليفو، وغير متاح على الاستلام من المخزن.
+الدفع عند الاستلام متاح في طلبات متجر Levonis الرسمي المسلَّمة إلى عنوان. وهو غير متاح في طلبات متاجر مجتمع ليفو، وغير متاح على الاستلام من المخزن.
 
 ### 3.2 المبلغ المستحق عند الباب
 المبلغ المستحق عند الباب هو المعروض على الطلب وعلى الفاتورة، بعد خصم ما دُفع مقدماً من المحفظة أو بالنقاط. ولا يُطلب من الزبون مبلغ يخالف الفاتورة.
@@ -218,7 +234,7 @@ export const payment: PolicyDocument = {
 لا يوجد دفع عند الاستلام في طلبات التجار. ولا يُطلب من الزبون مال عند الباب في هذا المسار، ومن طُلب منه ذلك فليرفض وليبلغ الدعم.
 
 ### 9.3 لا استلام من المخزن على هذا المسار
-لا يوجد استلام من مخزن ليفونيس لطلبات التجار، لأن المتجر لا يحتفظ ببضاعة التاجر.
+لا يوجد استلام من مخزن Levonis لطلبات التجار، لأن المتجر لا يحتفظ ببضاعة التاجر.
 
 ### 9.4 سبب هذه القاعدة
 المتجر لا يملك بضاعة التاجر ولا يحصّل عنه: لا مندوب له عند الباب ولا شباك له في المخزن. فالدفع المسبق ليس خياراً مفعّلاً بل هو بنية هذا المسار.
@@ -648,7 +664,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 ## 3. پارەدان لە کاتی وەرگرتن
 
 ### 3.1 بواری
-پارەدان لە کاتی وەرگرتن لە داواکارییەکانی فرۆشگا فەرمییەکەی لیڤۆنیسدا بەردەستە کە بۆ ناونیشانێک دەگەیەنرێن. لە داواکارییەکانی فرۆشگاکانی کۆمەڵگای لیڤۆدا بەردەست نییە، و لەسەر وەرگرتن لە کۆگاش بەردەست نییە.
+پارەدان لە کاتی وەرگرتن لە داواکارییەکانی فرۆشگا فەرمییەکەی Levonisدا بەردەستە کە بۆ ناونیشانێک دەگەیەنرێن. لە داواکارییەکانی فرۆشگاکانی کۆمەڵگای لیڤۆدا بەردەست نییە، و لەسەر وەرگرتن لە کۆگاش بەردەست نییە.
 
 ### 3.2 ئەو بڕەی لە بەردەرگا دەدرێت
 ئەو بڕەی لە بەردەرگا دەدرێت ئەوەیە لەسەر داواکارییەکە و لەسەر پسووڵەکەدا پیشان دراوە، دوای بڕینی ئەوەی پێشەکی لە جزدان یان بە خاڵ دراوە. لە کڕیار بڕێک داوا ناکرێت کە جیاواز بێت لە پسووڵەکە.
@@ -792,7 +808,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 لە داواکارییەکانی بازرگاناندا پارەدان لە کاتی وەرگرتن نییە. لەم ڕێڕەوەدا هیچ پارەیەک لە بەردەرگا لە کڕیار داوا ناکرێت، و ئەوەی داوای لێ بکرێت دەبێت ڕەتی بکاتەوە و پشتیوانی ئاگادار بکاتەوە.
 
 ### 9.3 لەم ڕێڕەوەدا وەرگرتن لە کۆگا نییە
-بۆ داواکارییەکانی بازرگانان وەرگرتن لە کۆگای لیڤۆنیس نییە، چونکە فرۆشگا کاڵای بازرگان هەڵناگرێت.
+بۆ داواکارییەکانی بازرگانان وەرگرتن لە کۆگای Levonis نییە، چونکە فرۆشگا کاڵای بازرگان هەڵناگرێت.
 
 ### 9.4 هۆکاری ئەم ڕێسایە
 فرۆشگا نە خاوەنی کاڵای بازرگانە و نە لە جیاتی ئەو کۆ دەکاتەوە: نە گەیەنەری هەیە لە بەردەرگا و نە پەنجەرەی هەیە لە کۆگادا بۆی. بۆیە پارەدانی پێشەکی ڕێکخستنێک نییە کە چالاک کرابێت، بەڵکو پێکهاتەی ئەم ڕێڕەوەیە.

@@ -25,6 +25,7 @@ import { storeCheckoutApi, iqd, type StoreQuote } from '../lib/merchant';
 import { useFreshOnReturn } from '../lib/useFreshOnReturn';
 import AddressForm from '../components/address/AddressForm';
 import { useStore } from '../StoreContext';
+import { useBusy } from '../lib/busy';
 
 export default function StoreCheckout() {
   const { loc, dir } = useLanguage();
@@ -40,6 +41,19 @@ export default function StoreCheckout() {
   const [coupon, setCoupon] = useState('');
   const [couponError, setCouponError] = useState('');
   const [placing, setPlacing] = useState(false);
+  /**
+   * THE SECOND ORDER DOOR GETS THE SAME BLOCKING WAIT AS THE FIRST.
+   *
+   * This page has its own `POST /api/store-orders` and its own inline
+   * `Loader2`, and an inline spinner inside a button protects that button and
+   * nothing else — not the header, not the bottom navigation, not a link in
+   * the summary above it. `placing` is already the authority (the button is
+   * disabled on it and it is cleared in the request's own settlement); the
+   * overlay only makes the refusal cover the whole screen. It is not a
+   * precondition for placing: the idempotency key minted once per visit stays
+   * the real duplicate guard, exactly as the header of this file says.
+   */
+  useBusy(placing, 'order');
   const [placeError, setPlaceError] = useState('');
   const [done, setDone] = useState<string | null>(null);
 

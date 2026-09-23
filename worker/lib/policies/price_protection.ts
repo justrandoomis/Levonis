@@ -21,10 +21,20 @@ import type { PolicyDocument } from './types';
  * order older than exact variant tracking), and a claim that is refused for a
  * reason the customer could have read in advance is a support argument the
  * document should have prevented.
+ *
+ * VERSION 2 — WHY IT MOVED. One correction a customer could see on the page;
+ * the archive keeps version 1 byte for byte. This is the only document in the
+ * corpus that never spelled the store's name in Arabic or Sorani, so the
+ * brand pass left it alone.
+ *   * THE UNKNOWNS. 6 articles and 6 further lines in this document still state a
+ *     fact the owner has not given, so ./render.ts WITHHOLDS them from the published
+ *     text rather than show a customer a `{{TOKEN}}`. They are still authored
+ *     below, and each one returns of its own accord the moment its value is
+ *     written in and the version moves again.
  */
 export const price_protection: PolicyDocument = {
   key: 'price_protection',
-  version: 1,
+  version: 2,
   effective_at: '2026-01-01',
   title: {
     ar: 'سياسة الأسعار وتغييرها وإلغاء الطلب',

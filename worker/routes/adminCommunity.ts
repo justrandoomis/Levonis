@@ -28,7 +28,12 @@ import { audit } from '../lib/audit';
 import { getSetting } from '../lib/settings';
 import { releaseEscrow, refundEscrow, escrowForOrder, getEscrow, merchantBalance } from '../lib/escrowOps';
 import { badgeFor } from '../lib/merchantOps';
+import {
+  COMMUNITY_GATE_SETTING_KEY,
+  readCommunityGate,
+} from '../lib/communityGate';
 import { canMoveOffer, type OfferState } from '../lib/communityStates';
+import { chunk } from '../lib/inventory';
 import { refreshMerchantRating } from './merchantReviews';
 
 export const adminCommunityRoutes = new Hono<AppContext>();
@@ -139,6 +144,141 @@ adminCommunityRoutes.patch('/settings', async (c) => {
 
   await audit(c.env.DB, admin.id, 'admin.community_settings', 'community', changed);
   return c.json({ success: true, settings: changed, applies_to: 'future transactions only' });
+});
+
+// ------------------------------------------------------------ the gate
+
+/**
+ * «ليفو كوميونيتي تحت الصيانة، واسمح بالأعضاء من قائمة في الادارة» — the one
+ * switch that decides whether customers may enter the community, and the list
+ * of people who may enter anyway.
+ *
+ * Read and written HERE and nowhere else, so every flip carries an audit row
+ * naming who did it and which way it went. It is deliberately NOT one of the
+ * FEE_KEYS above and not reachable through the generic settings PATCH: those
+ * are numbers with bounds, this is a door, and a door that can be opened by a
+ * handler that does not audit is a door nobody can account for afterwards.
+ *
+ * The allow-list is USER IDS (see worker/lib/communityGate.ts for why it can
+ * never be usernames or emails), and every id is checked against `users`
+ * before it is stored — a typo saved silently is an owner believing they let
+ * somebody in who is still locked out.
+ */
+/**
+ * D1 refuses more than 100 bound parameters in one statement, and this
+ * codebase chunks id lists at 90 so a caller can add a bound value of its own
+ * without discovering the ceiling in production (worker/lib/customerNotify.ts
+ * states the rule; worker/lib/stockAlerts.ts and four other call sites obey
+ * it). The allow-list is capped at 200 entries below, which is TWICE the
+ * ceiling — so both the read and the write of it are chunked, not trusted to
+ * stay small.
+ *
+ * The unit tests cannot see this: they run node:sqlite, whose variable limit
+ * is 999. Only D1 refuses, and only in production.
+ */
+const GATE_ID_CHUNK = 90;
+
+adminCommunityRoutes.get('/gate', async (c) => {
+  const gate = await readCommunityGate(c.env.DB);
+  // The names beside the ids, so the panel can show people rather than
+  // opaque strings. An id whose user has since been deleted still comes back
+  // — it is in the stored list and the owner should be able to see and remove
+  // it — with nulls where the row used to be.
+  const members: Array<Record<string, unknown>> = [];
+  if (gate.allowed.length) {
+    const byId = new Map<string, Record<string, unknown>>();
+    // CHUNKED, because the list this reads back is the list the PUT below
+    // allows: up to 200 ids, and D1 refuses more than 100 bound parameters in
+    // one statement (worker/lib/customerNotify.ts states the rule; five call
+    // sites already chunk for it). Unchunked, the one thing that would break
+    // is RENDERING a large allow-list — the panel would 500 on exactly the
+    // list the owner needs to see in order to shorten it.
+    for (const part of chunk(gate.allowed, GATE_ID_CHUNK)) {
+      const marks = part.map(() => '?').join(',');
+      const { results } = await c.env.DB.prepare(
+        `SELECT id, username, name, email FROM users WHERE id IN (${marks})`
+      ).bind(...part).all<Record<string, unknown>>();
+      for (const u of results) byId.set(String(u.id), u);
+    }
+    for (const id of gate.allowed) members.push(byId.get(id) ?? { id, username: null, name: null, email: null });
+  }
+  return c.json({
+    success: true,
+    open: gate.open,
+    closed: !gate.open,
+    allowed_user_ids: gate.allowed,
+    members,
+    key: COMMUNITY_GATE_SETTING_KEY,
+  });
+});
+
+/**
+ * One upsert, one audit row. `open` and `allowed_user_ids` are written
+ * together because they are one decision — "shut, except these people" — and
+ * writing them apart would leave a window where the community is closed with
+ * yesterday's list, or open with tomorrow's.
+ */
+adminCommunityRoutes.put('/gate', async (c) => {
+  const admin = c.get('user')!;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  if (typeof body.open !== 'boolean') throw badRequest('open must be true or false', 'COMMUNITY_OPEN_REQUIRED');
+  const open = body.open;
+
+  const raw = body.allowed_user_ids;
+  if (raw !== undefined && !Array.isArray(raw)) throw badRequest('allowed_user_ids must be an array of user ids');
+  const asked = Array.isArray(raw) ? raw : [];
+  // A list is a list of people, not a payload: 200 is far past any plausible
+  // testing cohort and keeps the existence check to one bounded statement.
+  if (asked.length > 200) throw badRequest('allowed_user_ids may not exceed 200 entries');
+  const ids: string[] = [];
+  for (const [i, v] of asked.entries()) {
+    const id = str(v, `allowed_user_ids[${i}]`, { min: 1, max: 80 });
+    if (!ids.includes(id)) ids.push(id);
+  }
+
+  if (ids.length) {
+    const known = new Set<string>();
+    // The same chunking, for the same ceiling: 200 ids is TWO HUNDRED bound
+    // parameters in one `IN (…)`, and D1 stops at 100. Unchunked, an owner
+    // allow-listing 101 beta members gets a 500, the gate is never written,
+    // and the members stay locked out of a community the owner believes he
+    // just let them into.
+    for (const part of chunk(ids, GATE_ID_CHUNK)) {
+      const marks = part.map(() => '?').join(',');
+      const { results } = await c.env.DB.prepare(`SELECT id FROM users WHERE id IN (${marks})`)
+        .bind(...part)
+        .all<{ id: string }>();
+      for (const r of results) known.add(String(r.id));
+    }
+    const missing = ids.filter((id) => !known.has(id));
+    if (missing.length) {
+      throw badRequest(
+        `لا يوجد مستخدم بهذا المعرف / No such user: ${missing.slice(0, 5).join(', ')}`,
+        'COMMUNITY_ALLOW_UNKNOWN_USER'
+      );
+    }
+  }
+
+  const before = await readCommunityGate(c.env.DB);
+  const nowIso = new Date().toISOString();
+  // The same upsert `setSetting` uses; the key is not a typed SETTING_DEFAULTS
+  // entry because the generic settings PUT must not be able to open the
+  // community without an audit row naming who opened it.
+  await c.env.DB.prepare(
+    'INSERT INTO admin_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  )
+    .bind(
+      COMMUNITY_GATE_SETTING_KEY,
+      JSON.stringify({ open, allowed_user_ids: ids, updated_at: nowIso, by: admin.id })
+    )
+    .run();
+  await audit(c.env.DB, admin.id, 'community.gate_update', COMMUNITY_GATE_SETTING_KEY, {
+    before_open: before.open,
+    after_open: open,
+    before_allowed: before.allowed.length,
+    after_allowed: ids.length,
+  });
+  return c.json({ success: true, open, closed: !open, allowed_user_ids: ids, changed: before.open !== open });
 });
 
 // --------------------------------------------------------------- merchants
@@ -658,6 +798,74 @@ adminCommunityRoutes.post('/complaints/:id/status', async (c) => {
 
   await audit(c.env.DB, admin.id, 'admin.complaint_status', id, { status });
   return c.json({ success: true, status });
+});
+
+/**
+ * ANSWER THE PERSON. «الشكاوى» — the owner's own word for what was missing.
+ *
+ * WHAT WAS BROKEN. `GET /complaints/:id` has selected the thread from
+ * `community_complaint_messages` since migration 0031, and the admin panel
+ * could set a STATUS on a complaint — but there was no INSERT anywhere in the
+ * repository, in any route, for that table. An admin could read a customer's
+ * complaint, move it to «waiting_customer», and the customer would be waiting
+ * on a reply the product had no way to send. A status is not an answer.
+ *
+ * `internal` IS THE HALF THAT MAKES THIS SAFE. The column has been on the
+ * table since 0031 with the comment "admin-only note, never shown to parties",
+ * and a dispute desk that cannot write a note to itself writes the note in the
+ * reply instead — to the person it is about. Both kinds go in the same ordered
+ * thread so the sequence of the case is one list, and the flag is what decides
+ * who may read a row. It is explicit on every write: a note that becomes a
+ * reply by omission is the failure mode worth designing against, so an absent
+ * or unparseable `internal` means a PUBLIC reply, which is the thing the admin
+ * meant to type, and a note has to say so.
+ *
+ * IT DOES NOT MOVE THE STATUS. Replying and deciding are two acts by two
+ * different rules — `/status` writes `resolved_at` and the resolution text —
+ * and fusing them would make every typed sentence a state transition. The
+ * panel calls both when it means both.
+ *
+ * THE COMPLAINT MUST EXIST, checked before the insert rather than left to the
+ * foreign key: a 404 naming the complaint is an answer an admin can act on,
+ * and a raw FK violation is a 500.
+ */
+adminCommunityRoutes.post('/complaints/:id/messages', async (c) => {
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const text = str(body.body, 'body', { min: 1, max: 4000 });
+  const internal = body.internal === true;
+
+  const complaint = await c.env.DB.prepare('SELECT id, status FROM community_complaints WHERE id = ?')
+    .bind(id)
+    .first<{ id: string; status: string }>();
+  if (!complaint) throw notFound('Complaint not found');
+
+  const messageId = newId('cmsg');
+  await c.env.DB.prepare(
+    `INSERT INTO community_complaint_messages (id, complaint_id, sender_id, sender_role, body, internal)
+     VALUES (?,?,?,'admin',?,?)`
+  )
+    .bind(messageId, id, admin.id, text, internal ? 1 : 0)
+    .run();
+
+  // The complaint itself moved in the sense that matters to a queue sorted by
+  // activity: somebody worked it. `status` is deliberately untouched.
+  await c.env.DB.prepare('UPDATE community_complaints SET updated_at = ? WHERE id = ?')
+    .bind(nowIso(), id)
+    .run();
+
+  await audit(c.env.DB, admin.id, 'admin.complaint_message', id, { internal, length: text.length });
+
+  const message = await c.env.DB.prepare(
+    `SELECT cm.*, u.name AS sender_name FROM community_complaint_messages cm
+       JOIN users u ON u.id = cm.sender_id
+      WHERE cm.id = ?`
+  )
+    .bind(messageId)
+    .first<Record<string, unknown>>();
+
+  return c.json({ success: true, message });
 });
 
 // ------------------------------------------------------------- settlement

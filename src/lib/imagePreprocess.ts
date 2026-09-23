@@ -270,6 +270,10 @@ export const UPLOAD_MAX_EDGE: Record<string, number> = {
   chat: 2_048,
   receipt: 2_048,
   community: 2_048,
+  // A ticket attachment is read at the same size a chat attachment is — inside
+  // a bubble, on a phone — and it is the evidence for a complaint, so it gets
+  // the conversation edge rather than the catalogue's.
+  support: 2_048,
 };
 
 /**

@@ -33,36 +33,133 @@ const source = readFileSync(new URL('../src/components/bloub/AppIntro.tsx', impo
 /** Prose about a rule is not the rule — every comment here quotes what was removed. */
 const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-/** The body of the per-frame tick, from its declaration to the `start` that arms it. */
-function frameBody(): string {
-  const from = code.indexOf('const tick = (now: number)');
-  assert.ok(from > 0, 'the loop body should be findable — has `tick` been renamed?');
-  const to = code.indexOf('const start = ', from);
-  assert.ok(to > from, 'the loop should be followed by `start`');
+/**
+ * A NAMED SLICE OF THE SOURCE, so a guard can say WHERE it applies.
+ *
+ * These are source-shape assertions, which means they are only as good as
+ * their boundaries; each one asserts its own, loudly, so a rename fails with
+ * "has `tick` been renamed?" rather than by silently guarding nothing.
+ */
+function slice(fromNeedle: string, toNeedle: string, what: string): string {
+  const from = code.indexOf(fromNeedle);
+  assert.ok(from > 0, `${what} should be findable — has it been renamed? (looking for \`${fromNeedle}\`)`);
+  const to = code.indexOf(toNeedle, from);
+  assert.ok(to > from, `${what} should be followed by \`${toNeedle}\``);
   return code.slice(from, to);
 }
+
+/** The body of the per-frame tick, from its declaration to the `start` that arms it. */
+function frameBody(): string {
+  return slice('const tick = (now: number)', 'const start = ', 'the loop body');
+}
+
+/**
+ * The body of the anchor measurement, from its declaration to the `schedule`
+ * that asks for it.
+ *
+ * THE SLICE THE OLD TEST DID NOT LOOK AT, and the reflow came back through it.
+ * `frameBody()` stops at `const start = `; `measure` is declared after that, so
+ * for as long as it ran on a `requestAnimationFrame` of its own it was outside
+ * every guard here — and it landed in the SAME frame as the loop, after it,
+ * once per scroll event, reading `getBoundingClientRect`, `getComputedStyle`
+ * and `offsetParent` immediately downstream of the loop's `style.transform`
+ * write. The character looked perfect; the page stuttered.
+ *
+ * Note the rule that applies here is NOT the one `frameBody` enforces.
+ * Measuring layout is this function's entire job, so "contains no readers"
+ * would be an absurd assertion. What has to hold is the ORDER — every read
+ * before every write, and the whole of it before the frame draws.
+ */
+function measureBody(): string {
+  return slice('const measure = () => {', 'function schedule(', 'the anchor measurement');
+}
+
+/** The layout questions a browser cannot answer without recomputing layout. */
+const LAYOUT_READERS = [
+  'layoutViewport(',
+  'getBoundingClientRect',
+  'getComputedStyle',
+  'clientWidth',
+  'clientHeight',
+  'offsetWidth',
+  'offsetHeight',
+  'offsetParent',
+  'scrollTop',
+  'scrollHeight',
+  'innerWidth',
+  'innerHeight',
+];
 
 test('the loop never measures layout', () => {
   const frame = frameBody();
   // Each of these forces the browser to recompute layout before it can answer.
   // In a function that also writes style, every one of them is a reflow.
-  for (const reader of [
-    'layoutViewport(',
-    'getBoundingClientRect',
-    'getComputedStyle',
-    'clientWidth',
-    'clientHeight',
-    'offsetWidth',
-    'offsetHeight',
-    'offsetParent',
-    'scrollTop',
-    'scrollHeight',
-    'innerWidth',
-    'innerHeight',
-  ]) {
+  for (const reader of LAYOUT_READERS) {
     assert.ok(
       !frame.includes(reader),
       `${reader} is read inside the animation frame — cache it from the resize listeners instead`
+    );
+  }
+});
+
+test('the frame reads before it writes: the measurement is folded in, first', () => {
+  const frame = frameBody();
+  // The read phase exists at all...
+  assert.match(
+    frame,
+    /if \(measurePending\) \{\s*measurePending = false;\s*measure\(\);/,
+    'the frame should consume a pending measurement, once, at the top'
+  );
+  // ...and it is ahead of everything this frame writes. `writeFrame` sets
+  // `style.transform` and `handle.current?.apply` pushes attributes onto the
+  // SVG; a measurement after either of them is the forced reflow again.
+  const read = frame.indexOf('measure()');
+  const write = frame.indexOf('writeFrame(');
+  const draw = frame.indexOf('handle.current?.apply');
+  assert.ok(read > 0 && write > 0 && draw > 0, 'read phase, writeFrame and apply should all be findable');
+  assert.ok(read < write, 'the measurement must come BEFORE the frame writes any transform');
+  assert.ok(read < draw, 'the measurement must come BEFORE the frame draws the face');
+});
+
+test('the measurement has no frame of its own', () => {
+  /**
+   * This is the whole mechanism. A second `requestAnimationFrame` cannot be
+   * ordered against the loop's own — `tick` re-arms itself on its first line,
+   * so anything queued after frame N runs after it in frame N+1 — and that is
+   * precisely how a read ended up downstream of a write. One frame, one
+   * callback, and a flag in between.
+   */
+  assert.ok(
+    !/requestAnimationFrame\(measure\)/.test(code),
+    'measure must not own a requestAnimationFrame — raise `measurePending` and let the loop consume it'
+  );
+  for (const raf of code.match(/requestAnimationFrame\((\w+)\)/g) ?? []) {
+    assert.equal(raf, 'requestAnimationFrame(tick)', `only the loop may be scheduled on a frame, found ${raf}`);
+  }
+  assert.match(
+    code,
+    /function schedule\(animate = false\) \{[\s\S]*?measurePending = true;/,
+    'schedule must raise the flag rather than queue a frame'
+  );
+});
+
+test('the measurement itself asks every question before it writes anything', () => {
+  /**
+   * Reading layout is what this function is FOR, so the guard is order, not
+   * absence: the last `getBoundingClientRect` / `getComputedStyle` /
+   * `offsetParent` must come before the first `writeFrame`. Reverse that and
+   * the reflow is back inside a single function, where the loop's ordering
+   * cannot save it.
+   */
+  const body = measureBody();
+  const firstWrite = body.indexOf('writeFrame(');
+  assert.ok(firstWrite > 0, 'measure should still write the frame it measured');
+  for (const reader of LAYOUT_READERS) {
+    const last = body.lastIndexOf(reader);
+    if (last === -1) continue;
+    assert.ok(
+      last < firstWrite,
+      `${reader} is read AFTER measure() has already written a transform — that is the forced reflow, one function further in`
     );
   }
 });

@@ -1,0 +1,56 @@
+-- ============================================================================
+--  0107 — A SUPPORT TICKET CAN CARRY THE PICTURE OF THE THING THAT WENT WRONG.
+-- ============================================================================
+-- NONDESTRUCTIVE: two ADD COLUMNs on `support_ticket_messages`. Nothing is
+-- dropped, nothing is rewritten, and NO ROW IS BACKFILLED — every message
+-- written before this applies reads `kind='text'` and `file_key IS NULL`,
+-- which is the truth about it: it was typed, and it carried no file.
+--
+-- 0010 created this table with id/ticket_id/sender_id/is_staff/body/created_at
+-- and stated a NONDESTRUCTIVE contract. This migration keeps it.
+--
+-- ---------------------------------------------------------------------------
+--  WHY
+-- ---------------------------------------------------------------------------
+-- «لا توجد طريقة لإرفاق وسائط» — a support ticket was the one conversation on
+-- this platform that could not carry a photograph. A customer whose print came
+-- out wrong, whose parcel arrived crushed, whose screen shows an error, had to
+-- DESCRIBE it in words to a person who then had to imagine it. Every other
+-- thread already had the file: `chat_messages` has carried `kind` + `file_key`
+-- since 0001_init, `community_complaint_messages` declares `file_key` in 0031,
+-- and the upload route has sniffed magic bytes, refused HEIC in three
+-- languages and converted to WebP for a year. The gap was HERE, in the four
+-- columns this table has, and nowhere else.
+--
+-- ---------------------------------------------------------------------------
+--  THE SHAPE IS COPIED, DELIBERATELY, FROM `chat_messages`
+-- ---------------------------------------------------------------------------
+-- Same pair of columns, same names, same default. A support attachment and a
+-- chat attachment are the same object with the same lifecycle, and giving them
+-- two different spellings is how the two code paths drift until one of them
+-- forgets to check something. `video` is admitted where `chat_messages` admits
+-- only `image`, because the upload route ALREADY allows a clip in a
+-- conversation (a forty-megabyte ceiling, `purpose='chat'`) and the single
+-- most useful thing a customer can send a support agent is ten seconds of a
+-- print failing.
+--
+-- `body` stays NOT NULL with no default of its own, so an attachment-only
+-- message stores the empty string rather than NULL — the read paths join
+-- `body` into a bubble and a NULL there would print «null» to a customer.
+--
+-- ---------------------------------------------------------------------------
+--  THE CHECK IS ON THE NEW COLUMN ONLY
+-- ---------------------------------------------------------------------------
+-- SQLite evaluates an ADD COLUMN's CHECK against new writes only; it never
+-- rescans the existing rows, which is what keeps this additive. The default
+-- satisfies it, so the existing rows are valid under it the moment it lands.
+-- ============================================================================
+
+ALTER TABLE support_ticket_messages
+  ADD COLUMN kind TEXT NOT NULL DEFAULT 'text' CHECK (kind IN ('text','image','video'));
+
+-- The R2 object key, exactly as `buildMediaKey` produced it —
+-- `support/<ticket_id>/attachments/<id>.webp`. NULL for a typed message. It is
+-- stored as a KEY and never as a URL: `/files/<key>` is composed at read time
+-- so the delivery route stays the only thing that decides who may read it.
+ALTER TABLE support_ticket_messages ADD COLUMN file_key TEXT;

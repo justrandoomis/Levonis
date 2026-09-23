@@ -167,7 +167,7 @@ import { coverageState, maskSerial } from '../lib/deviceOps';
 import type { ShippingType } from '../lib/shippingType';
 import type { PolicyRef } from '../lib/policyOps';
 import { createInvoiceForOrder } from '../lib/invoices';
-import { announceAfterResponse, orderTopic } from '../lib/adminTopicRouting';
+import { announceAfterResponse, orderAnnouncement, orderTopic } from '../lib/adminTopicRouting';
 import { notifyOrderPlaced } from '../lib/orderNotify';
 
 export const orderRoutes = new Hono<AppContext>();
@@ -4564,11 +4564,42 @@ orderRoutes.post('/', async (c) => {
    * is a REJECTED promise, not the returned miss this call site assumed — an
    * unhandled rejection riding on the request of a customer who has just paid.
    * The wrapper cannot reject.
+   *
+   * AND THE TEXT IS NO LONGER WRITTEN HERE. It used to be one English template
+   * literal on this line carrying seven facts — a username, a COUNT of items, a
+   * total — so the owner learned that an order existed and nothing about what
+   * was in it, and opened the admin panel every time to find out. The builder
+   * lives in adminTopicRouting.ts beside the routing policy it belongs to, is
+   * written in Arabic for the group that reads it, and is fed ONLY values this
+   * handler has already computed and validated: `comp.lines` carry the product
+   * names, the resolved «option / colour» text and the per-line money, and
+   * `comp.address` is the row this checkout already read. Nothing here queries.
+   *
+   * `comp.address.address` — the street line — is deliberately NOT passed, and
+   * the builder does not accept it: see the privacy contract in the header of
+   * adminTopicRouting.ts for exactly what this message may say about a person —
+   * name, MASKED phone, governorate/area/landmark — and why the door is not on
+   * that list.
    */
   announceAfterResponse(
     c,
     orderTopic(orderShippingType),
-    `🛒 New order ${orderId}\nCustomer: ${user.username || `#${user.id}`}\nItems: ${comp.lines.filter((l) => !l.bundle_parent_item_id).length}\nTotal: ${comp.totalIqd.toLocaleString()} IQD (${input.paymentMethodId})\n${comp.bnplAmount > 0 ? `BNPL due: ${comp.bnplAmount.toLocaleString()} IQD · ${comp.bnplDueAt}` : `Due on delivery: ${comp.dueOnDelivery.toLocaleString()} IQD`}\nFulfilment: ${fulfillmentService}`
+    orderAnnouncement({
+      orderId,
+      customerName: user.name || user.username || `#${user.id}`,
+      phone: comp.address?.phone,
+      governorate: comp.address?.governorate,
+      area: comp.address?.area,
+      landmark: comp.address?.landmark,
+      shippingType: orderShippingType,
+      paymentMethodId: input.paymentMethodId,
+      fulfilmentService: fulfillmentService,
+      totalIqd: comp.totalIqd,
+      bnplIqd: comp.bnplAmount,
+      bnplDueAt: comp.bnplDueAt,
+      dueOnDeliveryIqd: comp.dueOnDelivery,
+      lines: comp.lines,
+    })
   );
   const data = (await loadOrder(c.env.DB, orderId))!;
   const snaps = await getOrderPointsSnapshots(c.env, [orderId]);

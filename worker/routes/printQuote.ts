@@ -196,6 +196,64 @@ async function platformMinimumJobIqd(db: D1Database): Promise<number> {
 }
 
 /**
+ * WHAT AN HOUR ON THE MACHINE COSTS, WHEN THE MACHINE ITSELF DOES NOT SAY.
+ *
+ * THE BUG THIS CLOSES, because it is not obvious from any one file: choosing a
+ * different printer did not change the price. Not by a dinar, for any of the
+ * fourteen machines in the catalogue, at any quantity that fits on one plate.
+ *
+ * The reason is that the printer only reaches a customer's price through TIME.
+ * A faster hotend prints the same solid in fewer hours — `geometryAdapter.ts`
+ * computes that correctly, and the screen shows it — but hours are turned into
+ * money by exactly three lines in `cost.ts`, and every one of them multiplies
+ * those hours by a figure that is zero on the live database:
+ *
+ *   DEPRECIATION  `machineIqdPerHour(printer)`, which returns 0 while
+ *                 `useful_print_hours` is NULL.
+ *   MAINTENANCE   `printer.maintenanceIqdPerHour`, NULL.
+ *   ELECTRICITY   `printer.power`, all four wattages NULL.
+ *
+ * Migration 0078 leaves every one of those columns NULL on purpose — «a made-up
+ * purchase price would flow straight into every quote as a real cost» — and no
+ * route, admin screen or later migration has ever written one. So the machine's
+ * running cost was not merely unknown: it was being given away at zero, which
+ * is a fabricated figure of its own, and the one thing the printer changes was
+ * being multiplied by it.
+ *
+ * WHY THE OWNER'S OWN RATE, AND NOT A NUMBER INVENTED HERE. The platform has
+ * had a machine-hour rate since long before this engine existed:
+ * `printPricingConfig.machine_hour_iqd` («depreciation + maintenance per
+ * machine-hour, when the merchant has not declared their own»), which the
+ * print-REQUEST estimate already charges on every job. The two engines quote
+ * the same shop. A calculator that bills the machine at 0 while the request
+ * flow bills it at 1,200 is not a cautious calculator — it is the platform
+ * telling a customer two different prices for one job, which is the very thing
+ * `platformMinimumJobIqd` above refuses to let the file path and the grams path
+ * do. So this reads the SAME owner-edited setting, from the same row, and is
+ * reported as `platform` so no panel can mistake it for this shop's own figure.
+ *
+ * THE LADDER, unchanged in order and now merely complete: a merchant's declared
+ * economics beat the model card, the model card beats the platform default, and
+ * the platform default beats nothing at all. This function is only consulted
+ * for the last rung — a printer that carries real purchase economics is priced
+ * from them, and this never overrides anybody.
+ */
+async function platformMachineHourIqd(db: D1Database, technology: 'fdm' | 'resin'): Promise<number> {
+  try {
+    const cfg = await getSetting(db, 'printPricingConfig');
+    const table = (cfg as { machine_hour_iqd?: unknown } | null)?.machine_hour_iqd;
+    if (table && typeof table === 'object') {
+      const value = Number((table as Record<string, unknown>)[technology]);
+      if (Number.isFinite(value) && value >= 0) return value;
+    }
+  } catch {
+    // Same rule as the floor above: an unparseable settings row must not take
+    // the quote down, and the seeded default is a number the owner agreed to.
+  }
+  return DEFAULT_PRICING.machine_hour_iqd[technology] ?? 0;
+}
+
+/**
  * A guest needs to read back the analysis they just made, and they have no
  * account to prove it with. The client keeps a random token; the server keeps
  * only its HASH, so a leaked database row is not a key to anybody's model.
@@ -815,6 +873,7 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
     ? await c.env.DB.prepare('SELECT * FROM printer_models WHERE id = ?').bind(printerModelId).first<Record<string, unknown>>()
     : null;
   if (!modelRow) throw badRequest('This analysis has no printer to price against', 'NO_PRINTER');
+  const printer = printerModelFromRow(modelRow);
 
   // PER PART on this path, where the grams path is per job: this route knows a
   // copy count, so ten keychains need ten rings. The floor and the hardware are
@@ -822,12 +881,13 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
   // calculator must never answer the same question with two numbers.
   const priced = await priceForPrinter(c, {
     analysis: loaded.analysis,
-    printer: printerModelFromRow(modelRow),
+    printer,
     merchantId,
     merchantPrinter: null,
     quantity,
     targetMarginPercent: Number(body.target_margin_percent) || PLATFORM_TARGET_MARGIN_PERCENT,
     minimumJobIqd: await platformMinimumJobIqd(c.env.DB),
+    platformMachineHourIqd: await platformMachineHourIqd(c.env.DB, printer.technology),
     accessories: await pricedAccessories(c.env.DB, readAccessories(body.accessories), quantity),
   });
 
@@ -1156,6 +1216,10 @@ printQuoteRoutes.post('/grams-quote', async (c) => {
     quantity: 1,
     targetMarginPercent: Number(body.target_margin_percent) || PLATFORM_TARGET_MARGIN_PERCENT,
     minimumJobIqd: await platformMinimumJobIqd(c.env.DB),
+    // Read for the same reason the floor is: the file calculator and the grams
+    // calculator must never answer the same question with two numbers, and an
+    // hour on the machine is the same hour whichever door the customer came in.
+    platformMachineHourIqd: await platformMachineHourIqd(c.env.DB, printer.technology),
     accessories,
   });
 
@@ -1213,6 +1277,12 @@ printQuoteRoutes.post('/analyses/:id/compare', requireAuth, async (c) => {
   // settings, not of the machine, so re-reading it per printer would be the
   // same row fetched a dozen times for the same answer.
   const minimumJobIqd = await platformMinimumJobIqd(c.env.DB);
+  // Read once for the whole comparison too, and for the stronger reason: a rate
+  // re-fetched per printer could differ between two rows of one table if the
+  // owner edited the setting mid-loop, and the table would then be comparing
+  // machines against two different definitions of an hour.
+  const platformFdmMachineHourIqd = await platformMachineHourIqd(c.env.DB, 'fdm');
+  const platformResinMachineHourIqd = await platformMachineHourIqd(c.env.DB, 'resin');
   const analysis = loaded.analysis;
   const materialTypes = analysis.materials.map((m) => m.materialType).filter(Boolean);
 
@@ -1243,6 +1313,8 @@ printQuoteRoutes.post('/analyses/:id/compare', requireAuth, async (c) => {
       quantity,
       targetMarginPercent: Number(body.target_margin_percent) || PLATFORM_TARGET_MARGIN_PERCENT,
       minimumJobIqd,
+      platformMachineHourIqd:
+        mp.model.technology === 'resin' ? platformResinMachineHourIqd : platformFdmMachineHourIqd,
     });
 
     rows.push({
@@ -1259,14 +1331,17 @@ printQuoteRoutes.post('/analyses/:id/compare', requireAuth, async (c) => {
         machine_hours: priced.result.machineHours,
         waste_grams: priced.result.wasteGrams,
         change_seconds: MULTI_MATERIAL_DEFAULTS[mp.multiMaterial].secondsPerChange,
+        // THE RATE THAT WAS ACTUALLY CHARGED, not a second calculation of it.
+        // This row used to re-derive the figure from `mp.overrides` and the
+        // model card, which was the same answer only for as long as those were
+        // the engine's only two sources. They are not: a machine with no
+        // purchase economics is now priced at the owner's platform rate, and a
+        // «لماذا» row that re-derived 0 while the quote above it charged 1,200
+        // would be a black box wearing an explanation (§25). So it is read off
+        // the snapshot the price was built from, which is the only figure that
+        // cannot drift from what the merchant was billed.
         machine_iqd_per_hour: Math.round(
-          mp.overrides.purchaseIqd !== undefined
-            ? machineIqdPerHour({
-                purchaseIqd: mp.overrides.purchaseIqd,
-                residualIqd: mp.overrides.residualIqd ?? 0,
-                usefulPrintHours: mp.overrides.usefulPrintHours ?? mp.model.usefulPrintHours,
-              })
-            : machineIqdPerHour(mp.model)
+          ((priced.snapshot.machine_iqd_per_hour as { value?: unknown } | undefined)?.value as number) ?? 0
         ),
       },
     });
@@ -1288,6 +1363,11 @@ interface PriceForPrinterInput {
    *  rather than read here because this function touches no settings of its
    *  own and a comparison loop must not re-read the same row per printer. */
   minimumJobIqd: number;
+  /** The owner's configured machine-hour rate for this technology, from
+   *  `platformMachineHourIqd`. Passed in for the same reason the floor is —
+   *  this function reads no settings of its own, and the comparison loop must
+   *  not re-read one settings row per printer. */
+  platformMachineHourIqd: number;
   /** Already priced against the catalogue and already multiplied by the copy
    *  count, for the same reason the floor is: a comparison loop must not read
    *  the same settings row once per printer, and two multiplications of one
@@ -1352,7 +1432,17 @@ async function priceForPrinter(
             }),
             'merchant'
           )
-        : undefined,
+        : // THE LAST RUNG (see `platformMachineHourIqd`). Consulted only when
+          // this merchant has declared nothing AND the model card carries no
+          // purchase economics of its own — which is every seeded machine, and
+          // is why an hour on a printer used to cost nothing and why choosing a
+          // different printer could not move a price. `undefined` here would
+          // leave `cost.ts` to fall back on `machineIqdPerHour(printer)`, which
+          // is 0 without `useful_print_hours`; a real model card still wins,
+          // because this branch is not taken when it has one.
+          machineIqdPerHour(input.printer) > 0
+          ? undefined
+          : sourced(input.platformMachineHourIqd, 'platform'),
     maintenanceIqdPerHourOverride:
       overrides.maintenanceIqdPerHour !== undefined
         ? sourced(overrides.maintenanceIqdPerHour, 'merchant')
@@ -1400,6 +1490,10 @@ async function priceForPrinter(
       // §30: the floor is an INPUT to the price, so a quote that was lifted to
       // it is only explainable afterwards if the row remembers what it was.
       minimum_job_iqd: input.minimumJobIqd,
+      // §30 again, and for a line that is now the difference between two
+      // printers: the machine-hour rate is an owner setting, so a quote priced
+      // at 1,200 is only explainable next month if the row says it was 1,200.
+      machine_iqd_per_hour: pricing.machineIqdPerHourOverride ?? sourced(machineIqdPerHour(input.printer), 'profile'),
       // §30: what the hardware was, not just what it came to. A catalogue the
       // owner reprices next month must not change what this quote meant.
       accessories: input.accessories?.lines ?? [],

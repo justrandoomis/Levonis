@@ -24,6 +24,8 @@
  *   POST  /admin/orders/:orderId/units/backfill   (re)create units, idempotent
  *   POST  /admin/units/:unitId/serial       assign serial (reassign = explicit)
  *   PATCH /admin/units/:unitId/delivery     correct ONE unit's delivered_at
+ *   PATCH /admin/units/:unitId/warranty     change ONE unit's warranty MONTHS
+ *                                           (audited; shortening needs a flag)
  *   POST  /admin/units/:unitId/replace      replacement (history preserved)
  *   GET   /admin/claims  · PATCH /admin/claims/:id   claim workflow decisions
  *   POST  /admin/products/:id/ops-policy    explicit serialization config
@@ -71,6 +73,7 @@ import {
 } from '../lib/warrantyPlans';
 import { upgradeWarranty } from '../lib/productModel';
 import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
+import { chunk } from '../lib/inventory';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { sniff } from './uploads';
 import { getMediaObject, storeMedia } from '../lib/mediaStorage';
@@ -123,7 +126,7 @@ export function receiptNoFrom(input: string): string | null {
 }
 
 /** A claim at one of these stages is closed and no longer binds the device to its holder. */
-const CLOSED_CLAIM_SQL = `stage IN ('rejected','replaced','resolved') OR (stage IS NULL AND status IN ('rejected','approved'))`;
+export const CLOSED_CLAIM_SQL = `stage IN ('rejected','replaced','resolved') OR (stage IS NULL AND status IN ('rejected','approved'))`;
 
 const UNIT_COLS = `id, order_id, order_item_id, product_id, owner_user_id, unit_index,
   delivered_at, warranty_base_months, warranty_ext_months, warranty_start_at, warranty_end_at,
@@ -191,6 +194,27 @@ function devicePublic(row: DeviceRow, opts: { admin?: boolean; viewerId?: string
     },
     replaced_by_unit_id: row.replaced_by_unit_id ?? null,
     replacement_of_unit_id: row.replacement_of_unit_id ?? null,
+    // WHO HOLDS IT — admin only. `DEVICE_SELECT` has carried `reg_user_id`
+    // all along, but only the serial lookup ever resolved it to a person, so
+    // an admin holding an order number or a customer's email saw «مُفعَّل»
+    // and a date and could not learn WHOSE account the device sits in
+    // without already knowing its serial. The id travels here; the account
+    // behind it is resolved by `adminUnitsWithAccounts` below.
+    //
+    // Gated on `admin` and nothing else: this same function answers GET
+    // /mine, where a transferred device deliberately hides the buyer from
+    // its later holder. A holder's identity is a fact about someone else.
+    ...(opts.admin
+      ? {
+          registration: row.registered_at
+            ? {
+                user_id: row.reg_user_id ?? null,
+                registered_at: row.registered_at,
+                revoked_at: row.revoked_at ?? null,
+              }
+            : null,
+        }
+      : null),
     // The live warranty receipt for this unit, when one was issued: the
     // customer may open its public verification page and print it.
     receipt: row.receipt_no ? { receipt_no: row.receipt_no, status: row.receipt_status ?? 'active' } : null,
@@ -216,6 +240,59 @@ const DEVICE_SELECT = `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u
 /** Loads one unit with everything devicePublic needs, by unit id. */
 async function loadDevice(db: D1Database, unitId: string): Promise<DeviceRow | null> {
   return db.prepare(`${DEVICE_SELECT} WHERE u.id = ?`).bind(unitId).first<DeviceRow>();
+}
+
+interface AdminAccount {
+  id: string;
+  email: string;
+  username: string | null;
+  name: string | null;
+}
+
+/** The house `IN (…)` chunk: D1 stops at 100 bound parameters, and 90 leaves
+ *  the caller room for a bound value of its own. */
+const ACCOUNT_IN_CHUNK = 90;
+
+/**
+ * The admin device payload, with the two accounts named: who BOUGHT the unit
+ * and who HOLDS it now. One query for the whole page, not one per row.
+ *
+ * ADMIN ONLY, for the same reason `devicePublic` gates `registration`: these
+ * are two people's identities, and the customer-facing branches of this file
+ * must never carry them.
+ *
+ * `holder` is null for a revoked link — the row survives a release so the
+ * unlink keeps a date, but a released device is held by nobody.
+ */
+async function adminUnitsWithAccounts(db: D1Database, rows: DeviceRow[]) {
+  const ids = [...new Set(rows.flatMap((r) => [r.owner_user_id, r.reg_user_id]).filter((x) => !!x))] as string[];
+  /**
+   * CHUNKED AT 90, because this list is TWO ids per unit and a page of units
+   * is 200 (`/admin/units?email=` binds `LIMIT 200`, and the by-order branch
+   * binds no LIMIT at all). D1 refuses more than 100 bound parameters in one
+   * statement — worker/lib/customerNotify.ts states the rule and five call
+   * sites already obey it — so a reseller whose 200 printers sit in 100+
+   * different holders' accounts would otherwise 500 the admin search that
+   * exists precisely to show who holds them.
+   *
+   * The suite cannot catch this: node:sqlite allows 999 variables. The
+   * ceiling is D1's alone.
+   */
+  const people: AdminAccount[] = [];
+  for (const part of chunk(ids, ACCOUNT_IN_CHUNK)) {
+    const { results } = await db
+      .prepare(`SELECT id, email, username, name FROM users WHERE id IN (${part.map(() => '?').join(',')})`)
+      .bind(...part)
+      .all<AdminAccount>();
+    people.push(...results);
+  }
+  const byId = new Map(people.map((x) => [x.id, x]));
+  const person = (id: string | null | undefined): AdminAccount | null => (id ? byId.get(id) ?? null : null);
+  return rows.map((r) => ({
+    ...devicePublic(r, { admin: true }),
+    buyer: person(r.owner_user_id),
+    holder: r.reg_user_id && !r.revoked_at ? person(r.reg_user_id) : null,
+  }));
 }
 
 /**
@@ -871,7 +948,7 @@ deviceRoutes.get('/admin/orders/:orderId/units', async (c) => {
       `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u.owner_user_id, u.unit_index,
               u.delivered_at, u.warranty_base_months, u.warranty_ext_months, u.warranty_start_at,
               u.warranty_end_at, u.policy_version, u.replaced_by_unit_id, u.replacement_of_unit_id, u.created_at,
-              s.serial_raw, r.registered_at, r.revoked_at,
+              s.serial_raw, r.registered_at, r.revoked_at, r.user_id AS reg_user_id,
               oi.name_snapshot, oi.image_snapshot
          FROM order_item_units u
          LEFT JOIN device_serials s ON s.unit_id = u.id
@@ -914,10 +991,7 @@ deviceRoutes.get('/admin/orders/:orderId/units', async (c) => {
         warranty_plan: snap ? { plan_id: snap.plan_id ?? null, duration_months: snap.duration_months ?? null, duration_kind: snap.duration_kind ?? null } : null,
       };
     }),
-    units: units.map((u) => ({
-      ...devicePublic(u, { admin: true }),
-      registration: u.registered_at ? { registered_at: u.registered_at, revoked_at: u.revoked_at ?? null } : null,
-    })),
+    units: await adminUnitsWithAccounts(c.env.DB, units),
   });
 });
 
@@ -936,24 +1010,7 @@ deviceRoutes.get('/admin/units', async (c) => {
       : await c.env.DB.prepare('SELECT unit_id FROM device_serials WHERE serial_norm = ?').bind(normalizeSerial(serial)).first<{ unit_id: string }>();
     const row = unitRow?.unit_id ? await loadDevice(c.env.DB, unitRow.unit_id) : null;
     if (!row) return c.json({ success: true, units: [] });
-    const people = await c.env.DB.prepare('SELECT id, email, username, name FROM users WHERE id IN (?, ?)')
-      .bind(row.owner_user_id, row.reg_user_id ?? '')
-      .all<{ id: string; email: string; username: string | null; name: string | null }>();
-    const person = (id: string | null) => {
-      const p = id ? people.results.find((x) => x.id === id) : null;
-      return p ? { id: p.id, email: p.email, username: p.username, name: p.name } : null;
-    };
-    return c.json({
-      success: true,
-      units: [
-        {
-          ...devicePublic(row, { admin: true }),
-          registration: row.registered_at ? { registered_at: row.registered_at, revoked_at: row.revoked_at ?? null } : null,
-          buyer: person(row.owner_user_id),
-          holder: row.reg_user_id && !row.revoked_at ? person(row.reg_user_id) : null,
-        },
-      ],
-    });
+    return c.json({ success: true, units: await adminUnitsWithAccounts(c.env.DB, [row]) });
   }
   let ownerId = userId;
   if (!ownerId) {
@@ -965,7 +1022,8 @@ deviceRoutes.get('/admin/units', async (c) => {
     `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u.owner_user_id, u.unit_index,
             u.delivered_at, u.warranty_base_months, u.warranty_ext_months, u.warranty_start_at,
             u.warranty_end_at, u.policy_version, u.replaced_by_unit_id, u.replacement_of_unit_id, u.created_at,
-            s.serial_raw, r.registered_at, r.revoked_at, oi.name_snapshot, oi.image_snapshot
+            s.serial_raw, r.registered_at, r.revoked_at, r.user_id AS reg_user_id,
+            oi.name_snapshot, oi.image_snapshot
        FROM order_item_units u
        LEFT JOIN device_serials s ON s.unit_id = u.id
        LEFT JOIN device_registrations r ON r.unit_id = u.id
@@ -975,13 +1033,7 @@ deviceRoutes.get('/admin/units', async (c) => {
   )
     .bind(ownerId)
     .all<DeviceRow>();
-  return c.json({
-    success: true,
-    units: results.map((u) => ({
-      ...devicePublic(u, { admin: true }),
-      registration: u.registered_at ? { registered_at: u.registered_at, revoked_at: u.revoked_at ?? null } : null,
-    })),
-  });
+  return c.json({ success: true, units: await adminUnitsWithAccounts(c.env.DB, results) });
 });
 
 /**
@@ -1136,6 +1188,162 @@ deviceRoutes.patch('/admin/units/:unitId/delivery', async (c) => {
   });
   const cov = coverageState(deliveredAt, win.end_at);
   return c.json({ success: true, delivered_at: deliveredAt, warranty_end_at: win.end_at, state: cov.state });
+});
+
+// ------------------------------------------------------ warranty duration
+
+/**
+ * THE ONE LEVER ON A UNIT'S WARRANTY CLOCK.
+ *
+ * A warranty clock is otherwise IMMUTABLE. It is written once, at delivery,
+ * by `createUnitsOnDelivery` — start = delivered_at, months = whatever the
+ * checkout's `warranty_snapshot` sold — and after that only the delivered_at
+ * correction above moves it, and only by moving the delivery date. Nothing
+ * else in this codebase rewrites `warranty_base_months` or
+ * `warranty_ext_months` on a unit that already exists, and the product-level
+ * ops policy applies to FUTURE deliveries only.
+ *
+ * This route exists for exactly two situations the owner actually has:
+ * a deliberate goodwill decision («امنحه ستة أشهر إضافية»), and a base
+ * period that was mis-imported or mis-configured at the time of sale. It is
+ * not a bulk tool and it is not part of any automatic flow.
+ *
+ * WHAT IT DOES NOT TOUCH, on purpose:
+ *   · `order_items.warranty_snapshot` — a PLACEMENT-TIME snapshot of what was
+ *     sold. It is never recomputed, here or anywhere; rewriting it would
+ *     falsify the record of the sale itself.
+ *   · `warranty_receipts` — the paper is a snapshot by design (see the
+ *     contract at the head of worker/routes/warranty.ts). Moving a clock
+ *     never reissues a receipt; the order screen already computes a `drift`
+ *     flag for the divergence this creates (warranty.ts), and reissuing is a
+ *     separate, deliberate admin act.
+ *   · the replacement chain, the serial, and the registration.
+ *
+ * SHORTENING IS THE DANGEROUS DIRECTION. `warranty_end_at` is what the
+ * customer's device card renders, what a claim attaches as `warranty_facts`,
+ * and what the public receipt verification answers with — so pulling it in
+ * can silently end coverage someone was already told they had. A shorter
+ * window therefore needs an EXPLICIT `confirm_shorter`, the same shape the
+ * serial reassignment uses for the same reason. Either direction is audited
+ * with who, when, why, and both windows.
+ */
+deviceRoutes.patch('/admin/units/:unitId/warranty', async (c) => {
+  const admin = c.get('user')!;
+  const unitId = c.req.param('unitId');
+  const body = await c.req.json().catch(() => ({}));
+  const reason = str(body.reason, 'reason', { min: 5, max: 500 });
+
+  const unit = await c.env.DB.prepare(`SELECT ${UNIT_COLS} FROM order_item_units WHERE id = ?`)
+    .bind(unitId)
+    .first<UnitRow>();
+  if (!unit) throw notFound('Unit not found');
+
+  const oldTotal = unitTotalMonths(unit);
+  /**
+   * THE DEFAULT IS NOT EXEMPT FROM THE FLOOR. `int(v, name, { def })` returns
+   * `def` BEFORE it compares against `min` (worker/lib/http.ts) — the early
+   * return sits above the range check — so passing the stored value straight
+   * in would let a unit whose `warranty_base_months` is 0 sail past a guard
+   * that reads as if it forbids 0. `warranty_base_months` is a plain nullable
+   * INTEGER with no CHECK (migrations/0003_final_phase.sql), so 0 is a value a
+   * row can really hold, and an admin who submitted only `ext_months` would
+   * then have written `total = ext_months` and moved the customer's end date
+   * on the strength of a base the form never showed them.
+   *
+   * A stored base below the floor is therefore NOT offered as a default: the
+   * admin is asked to state the base they mean. That is the whole point of a
+   * screen whose every write is audited with a reason.
+   */
+  const storedBase = Number(unit.warranty_base_months);
+  const baseDefault = Number.isInteger(storedBase) && storedBase >= 1 ? storedBase : undefined;
+  const baseMonths = int(body.base_months, 'base_months', { min: 1, max: 240, def: baseDefault });
+  const extMonths = int(body.ext_months, 'ext_months', { min: 0, max: 240, def: Number(unit.warranty_ext_months) || 0 });
+  if (baseMonths + extMonths > 240) throw badRequest('base_months + ext_months must not exceed 240');
+
+  /**
+   * A replacement unit that CARRIES the original device's end date keeps that
+   * date through `recomputeUnitWindow` by design — the customer's coverage
+   * follows the machine they bought, not the box they were handed second.
+   * Writing months here would therefore change the stored numbers and move
+   * nothing, which is the one outcome worth refusing outright: the admin
+   * would read "saved" and the coverage would not budge. Say where the lever
+   * actually is instead.
+   */
+  const pv = safeParse<Record<string, unknown>>(unit.policy_version, {});
+  if (pv.carried === 'original_end') {
+    throw conflict(
+      'This replacement unit carries the ORIGINAL device\'s warranty end date — its months are not the lever. Change the original unit\'s warranty instead.',
+      'CARRIED_END'
+    );
+  }
+
+  // The months live in TWO places: the columns, and `policy_version.total`,
+  // which `unitTotalMonths` reads FIRST. Writing only the columns would leave
+  // the stored total in charge and the window unchanged — the same silent
+  // no-op the check above refuses. Both move together or neither does.
+  const nextPolicy = JSON.stringify({
+    ...pv,
+    base: baseMonths,
+    ext: extMonths,
+    total: baseMonths + extMonths,
+  });
+  const nextUnit: UnitRow = {
+    ...unit,
+    warranty_base_months: baseMonths,
+    warranty_ext_months: extMonths,
+    policy_version: nextPolicy,
+  };
+
+  // No delivery, no clock: units are created with a window only once a
+  // delivery date exists. The months are still recorded — the delivery
+  // correction above recomputes the window from them when the date lands.
+  const win = unit.delivered_at
+    ? recomputeUnitWindow(nextUnit, unit.warranty_start_at ?? unit.delivered_at)
+    : { start_at: unit.warranty_start_at, end_at: unit.warranty_end_at };
+
+  const oldEndMs = unit.warranty_end_at ? Date.parse(unit.warranty_end_at) : NaN;
+  const newEndMs = win.end_at ? Date.parse(win.end_at) : NaN;
+  const shortens = Number.isFinite(oldEndMs) && Number.isFinite(newEndMs) && newEndMs < oldEndMs;
+  if (shortens && body.confirm_shorter !== true) {
+    throw new HttpError(
+      409,
+      'This shortens a warranty the customer may already have been told about. Repeat with the explicit confirm_shorter flag to record the decision.',
+      'CONFIRM_SHORTER_REQUIRED'
+    );
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE order_item_units
+        SET warranty_base_months = ?, warranty_ext_months = ?, warranty_start_at = ?, warranty_end_at = ?, policy_version = ?
+      WHERE id = ?`
+  )
+    .bind(baseMonths, extMonths, win.start_at, win.end_at, nextPolicy, unitId)
+    .run();
+
+  await audit(c.env.DB, admin.id, 'device.unit_warranty_months', unitId, {
+    reason,
+    shortened: shortens,
+    old_base_months: unit.warranty_base_months,
+    new_base_months: baseMonths,
+    old_ext_months: Number(unit.warranty_ext_months) || 0,
+    new_ext_months: extMonths,
+    old_total_months: oldTotal,
+    new_total_months: baseMonths + extMonths,
+    old_end_at: unit.warranty_end_at,
+    new_end_at: win.end_at,
+  });
+
+  const cov = coverageState(unit.delivered_at, win.end_at);
+  return c.json({
+    success: true,
+    base_months: baseMonths,
+    ext_months: extMonths,
+    months: baseMonths + extMonths,
+    warranty_start_at: win.start_at,
+    warranty_end_at: win.end_at,
+    shortened: shortens,
+    state: cov.state,
+  });
 });
 
 // ------------------------------------------------------------- replacement

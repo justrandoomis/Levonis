@@ -134,7 +134,31 @@ export const SETTING_DEFAULTS = {
    * issued receipt keeps the copy it was printed with (migration 0042).
    */
   warrantyConfig: DEFAULT_WARRANTY_CONFIG as WarrantyConfig,
-  exchangeRate: 1400, // IQD per 1 USD
+  /**
+   * 1 USD = 1,400 IQD — A CONFIRMED FIGURE, NOT A PLACEHOLDER.
+   *
+   * The owner answered the standing question on 2026-09-23 («نعم في سعر الصرف
+   * أكمل وأطبق القرار») and docs/DECISIONS.md row 6 is now ✅: the rate stands
+   * at 1,400 and the rounding policy stands exactly as written. This comment
+   * exists because the number did not change — without it, the next reader
+   * finds a bare literal on a money path and has no way to tell a decision
+   * from a guess, which is how the same question gets asked a fourth time.
+   *
+   * THE ROUNDING IS A PAIR AND IT LEANS ONE WAY ON PURPOSE.
+   * `iqdToUsdCents` rounds UP and `usdCentsToIqd` rounds DOWN
+   * (worker/lib/escrowOps.ts), so a hold never under-reserves and a spendable
+   * balance is never reported as covering a total it cannot actually pay.
+   * `corroboratedDeclaredIqd` (worker/lib/walletOps.ts) accepts both `floor`
+   * and `floor + 1` so a client that has not reloaded since the rate moved is
+   * not refused. None of that is changed by this decision; it is ratified.
+   *
+   * IT IS STILL A SETTING, and confirming it did not freeze it. The admin
+   * writes it through `PATCH` with `int(value, …, { min: 1, max: 1_000_000 })`
+   * (worker/routes/admin.ts), and every operation stores an
+   * `exchange_rate_snapshot` of the rate it actually used, so moving the rate
+   * tomorrow cannot rewrite what somebody was charged today.
+   */
+  exchangeRate: 1400, // IQD per 1 USD — confirmed, DECISIONS.md row 6
   /**
    * THE COURIER'S CASH-HANDLING CHARGE, «قابله للتغير من قبل الادارة».
    *

@@ -9,6 +9,7 @@ import { STUDIO_URL } from '../../translations';
 import SectionHeader from './SectionHeader';
 import { useRail } from '../../lib/useRail';
 import type { SiteMediaEntry } from '../../lib/api';
+import { useCommunityAccess } from '../../pages/community/access';
 
 /**
  * What LEVONIS does besides sell boxes — eleven compact cards on one
@@ -188,6 +189,16 @@ export default function ServicesGrid({ siteMedia = [] }: { siteMedia?: SiteMedia
     siteMedia.find((m) => m.group === 'service' && m.slot === `service-${id}`)?.url || '';
   // Short cards: a snappier decay suits a rail this narrow.
   const rail = useRail({ decelerationRate: 0.99 });
+  /**
+   * The community tile is dropped while the server says Levo Community is
+   * shut (worker/lib/communityGate.ts). Presentation only — the gate itself is
+   * on the server and a tapped stale tile lands on the maintenance card — but
+   * a rail of services should not advertise one that is closed. An answer
+   * that has not arrived, or one that failed, keeps the tile: an unknown state
+   * is not a refusal, and the rail must not reshuffle under a thumb.
+   */
+  const { access: communityAccess } = useCommunityAccess();
+  const communityShut = communityAccess?.may_enter === false;
 
   /**
    * The four cards added with the owner's list have no key in
@@ -235,7 +246,7 @@ export default function ServicesGrid({ siteMedia = [] }: { siteMedia?: SiteMedia
     { id: 'warranty', to: '/warranty', title: t('svcWarrantyTitle'), icon: ShieldCheck },
     { id: 'community', to: '/community', title: t('svcCommunityTitle'), icon: Users },
     { id: 'support', to: '/support', title: loc('الدعم', 'Support', 'پشتگیری'), icon: LifeBuoy },
-  ];
+  ].filter((card) => !(card.id === 'community' && communityShut));
 
   return (
     <section data-home-section="services" className="mb-10 sm:mb-12">

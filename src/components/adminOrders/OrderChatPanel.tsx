@@ -1,18 +1,31 @@
 import { useChatPresence } from '../../lib/useChatPresence';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Send } from 'lucide-react';
+import { Camera, Paperclip, Send } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { api, ApiError } from '../../lib/api';
+import { api, ApiError, uploadFile } from '../../lib/api';
 import Spinner from '../ui/Spinner';
 import { ErrorState } from '../ui/AsyncStates';
 
+/**
+ * `fileUrl`, AND THAT NAME IS THE WHOLE OF A BUG THIS PANEL SHIPPED WITH.
+ *
+ * This interface declared `url`. The server has always sent `fileUrl`
+ * (worker/routes/chats.ts, `GET /:id/messages`), so `m.url` was `undefined`
+ * for every picture that ever reached this screen, the `kind === 'image' &&
+ * m.url` branch never ran, and an image message fell through to the text
+ * branch — which rendered `m.body`, the EMPTY STRING an attachment-only
+ * message stores. The customer sent a photograph of the thing they meant and
+ * the admin packing the box saw a blank bubble with a timestamp. With
+ * strictNullChecks off nothing warned about it, and no test looked at a
+ * rendered bubble.
+ */
 interface ChatMessage {
   id: string;
   sender_id: string;
   kind: 'text' | 'image';
   body: string;
   created_at: string;
-  url?: string;
+  fileUrl?: string | null;
 }
 
 /**
@@ -28,6 +41,29 @@ interface ChatMessage {
  * The thread is scoped to the order (chats.order_id, migration 0026), so it is
  * a different conversation from the customer's general DM with support and
  * stays findable months later.
+ *
+ * ---------------------------------------------------------------------------
+ *  ATTACHMENTS: CAMERA AND FILE. THERE IS NO MICROPHONE, AND THAT IS NOT AN
+ *  OVERSIGHT.
+ * ---------------------------------------------------------------------------
+ * «كاميرا/ملف/صوت». Two of the three are here, and they are one code path:
+ * both inputs hand a `File` to `uploadFile(file, 'chat', chatId)`, which files
+ * it under the CONVERSATION — the owner's own ordering, «الثاني الاسهل في فتح
+ * المحادثه» — and the send then names the stored key. The camera input is the
+ * same picker with `capture`, because on a phone that is the difference
+ * between "take a photo of the damaged box" and "go find it in your gallery",
+ * and on a desktop the attribute is simply ignored.
+ *
+ * A VOICE NOTE CANNOT BE STORED BY THIS SCHEMA. `chat_messages.kind` carries
+ * `CHECK (kind IN ('text','image'))` from migrations/0001_init.sql:306, and
+ * SQLite cannot alter a CHECK without rewriting the table — which this project
+ * does not do to live rows. `worker/routes/uploads.ts` would refuse the bytes
+ * first in any case: it sniffs magic numbers and admits images and MP4 only,
+ * so a WebM or M4A recording is «Unsupported file type» before it reaches the
+ * message. Both halves are outside this screen and both would have to change
+ * together; a microphone button that produced a red line on every tap would be
+ * a worse answer than none, and a voice note silently stored as `kind='image'`
+ * would be a lie in the database. It is reported as BLOCKED rather than faked.
  */
 export default function OrderChatPanel({ orderId, active }: { orderId: string; active: boolean }) {
   const { loc } = useLanguage();
@@ -39,9 +75,12 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [attaching, setAttaching] = useState(false);
   const presence = useChatPresence(chatId, active && !error);
   const listRef = useRef<HTMLDivElement | null>(null);
   const openedFor = useRef<string | null>(null);
+  const cameraRef = useRef<HTMLInputElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,6 +143,39 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
     }
   };
 
+  /**
+   * ONE PATH FOR BOTH BUTTONS: upload, then send the KEY.
+   *
+   * THE INPUT IS CLEARED FIRST (`e.target.value = ''`), before any await. A
+   * file input fires no `change` when the same file is picked twice, so an
+   * upload that failed could not be retried with the same photograph without
+   * this — the admin taps, nothing happens, and there is nothing on screen to
+   * explain why.
+   *
+   * THE REFUSAL IS SHOWN AS THE SERVER WROTE IT. An iPhone HEIC photograph has
+   * its own sentence in three languages, and «تعذّر الإرسال» in place of it
+   * would hide the one instruction that fixes it (export as JPEG).
+   */
+  const attach = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !chatId || attaching) return;
+    setAttaching(true);
+    setSendError(null);
+    try {
+      const uploaded = await uploadFile(file, 'chat', chatId);
+      await api.post(`/api/chats/${chatId}/messages`, { kind: 'image', fileKey: uploaded.key });
+      const msgs = await api.get<{ messages: ChatMessage[] }>(`/api/chats/${chatId}/messages`);
+      setMessages(msgs.messages || []);
+    } catch (err) {
+      setSendError(
+        err instanceof ApiError ? err.message : loc('تعذّر إرسال الصورة', 'Could not send the image') /* OWNER: Sorani by hand; loc() falls back to ar. */
+      );
+    } finally {
+      setAttaching(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center py-16">
@@ -140,8 +212,18 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
                   mine ? 'bg-olive text-white' : 'bg-zinc-800 text-zinc-100'
                 }`}
               >
-                {m.kind === 'image' && m.url ? (
-                  <img src={m.url} alt="" className="rounded-lg max-w-full" referrerPolicy="no-referrer" />
+                {m.kind === 'image' && m.fileUrl ? (
+                  <a href={m.fileUrl} target="_blank" rel="noopener noreferrer">
+                    {/* Tapping opens the full object. The bubble is 75% of a
+                        modal column, which is too small to read a serial
+                        number or a damaged corner off. */}
+                    <img
+                      src={m.fileUrl}
+                      alt={loc('صورة مرفقة', 'Attached image') /* OWNER: Sorani by hand. */}
+                      className="rounded-lg max-w-full"
+                      referrerPolicy="no-referrer"
+                    />
+                  </a>
                 ) : (
                   <span className="whitespace-pre-wrap break-words">{m.body}</span>
                 )}
@@ -164,6 +246,52 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
             send();
           }}
         >
+          {/* HIDDEN INPUTS, VISIBLE BUTTONS. A bare `<input type="file">`
+              cannot be styled to 44px or given an Arabic label — the browser
+              writes «Choose file» in its own language — so the input carries
+              the behaviour and the button carries the label. `capture` is what
+              makes the first one open the camera on a phone; a desktop browser
+              ignores the attribute and shows the ordinary picker, which is the
+              right fallback rather than a button that does nothing. */}
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            data-order-chat-camera
+            onChange={attach}
+          />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            data-order-chat-file
+            onChange={attach}
+          />
+          <button
+            type="button"
+            disabled={attaching || sending}
+            onClick={() => cameraRef.current?.click()}
+            data-order-chat-camera-button
+            title={loc('التقاط صورة', 'Take a photo') /* OWNER: Sorani by hand. */}
+            aria-label={loc('التقاط صورة', 'Take a photo') /* OWNER: Sorani by hand. */}
+            className="w-11 h-11 shrink-0 rounded-xl border border-zinc-700 text-zinc-300 flex items-center justify-center disabled:opacity-40 hover:bg-zinc-800 transition-colors"
+          >
+            {attaching ? <Spinner size="sm" /> : <Camera className="w-4 h-4" aria-hidden />}
+          </button>
+          <button
+            type="button"
+            disabled={attaching || sending}
+            onClick={() => fileRef.current?.click()}
+            data-order-chat-attach
+            title={loc('إرفاق ملف', 'Attach a file') /* OWNER: Sorani by hand. */}
+            aria-label={loc('إرفاق ملف', 'Attach a file') /* OWNER: Sorani by hand. */}
+            className="w-11 h-11 shrink-0 rounded-xl border border-zinc-700 text-zinc-300 flex items-center justify-center disabled:opacity-40 hover:bg-zinc-800 transition-colors"
+          >
+            <Paperclip className="w-4 h-4" aria-hidden />
+          </button>
           <textarea
             value={draft}
             onChange={(e) => { setDraft(e.target.value); presence.onEdit(e.target.value); }}

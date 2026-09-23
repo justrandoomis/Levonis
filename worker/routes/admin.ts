@@ -56,6 +56,7 @@ import {
   STAGE_SOURCE,
   canMoveStage,
   resolveDurations,
+  nextStageOf,
   stageForLegacyStatus,
   stageLabel,
   stagesFor,
@@ -1459,10 +1460,23 @@ adminRoutes.post('/wallet/credit', async (c) => {
  *                    container in transit is a different kind of waiting from a
  *                    box that has to go out this morning, and interleaving them
  *                    by day puts a shipment forty days out in among today's.
+ *   scope=all        «الكل» — the same live set with NO shipping_type clause at
+ *                    all. It is the union of `open` and `preorder`, not a third
+ *                    population, and it is the CHEAPEST of the three: its WHERE
+ *                    is `idx_orders_board_open`'s own WHERE and nothing else,
+ *                    so the planner reads the partial index end to end in the
+ *                    ORDER BY's own order. It exists because the board's «الكل»
+ *                    option must mean the same thing in the archive, where the
+ *                    journey can only be expressed as `type` — and «all» there
+ *                    is simply NO `type` parameter. That is the difference
+ *                    between this and the aggregate the board's header note
+ *                    rejected: `scope=preorder` as "any pre-order" would have
+ *                    silently included direct orders in the archive, where this
+ *                    one sends nothing and therefore cannot lie.
  *   scope=delivered  «الطلبات التي تم توصيلها يتم عزلها»
  *   scope=cancelled  «الطلبات الملغية … يتم عزلها»
  */
-const BOARD_SCOPES = ['open', 'preorder', 'delivered', 'cancelled'] as const;
+const BOARD_SCOPES = ['open', 'preorder', 'all', 'delivered', 'cancelled'] as const;
 const BOARD_DUE = ['today', 'tomorrow', 'week', 'later', 'unscheduled'] as const;
 const BOARD_TYPES = ['direct', 'preorder_air', 'preorder_sea', 'preorder_land'] as const;
 
@@ -1511,6 +1525,50 @@ function dueBucketOf(day: unknown, today: string, tomorrow: string, weekEnd: str
   if (d === today) return 'today';
   if (d === tomorrow) return 'tomorrow';
   return d <= weekEnd ? 'week' : 'later';
+}
+
+/**
+ * ===========================================================================
+ *  ONE TAP FORWARD — «زر سريع لتغيير الحالة»
+ * ===========================================================================
+ * The row's quick button, decided HERE, for the same reason every other
+ * decision on this board is: the screen renders what it was given.
+ *
+ * IT IS THE NEXT STAGE ON THE ORDER'S OWN PATH, never a status. The panel in
+ * the modal already refuses to hold a copy of the path — «عند تحديث الطلب يظهر
+ * خيارين فقط» is the incident that rule was written after — and a row that
+ * guessed "confirmed comes after pending" would be the same mistake with less
+ * room to notice it: a pre-order has fourteen stages and four of the first
+ * five are different per journey.
+ *
+ * THE STAGE COLUMN IS NOT ALWAYS THE ANSWER. An order written before 0028
+ * carries no `stage`, and a row whose stage is not on ITS OWN path (a journey
+ * changed after the fact) would otherwise produce a move the stage door then
+ * refuses — a button that does nothing but show a red line. Both fall back to
+ * the stage the LEGACY status implies, which is exactly what `orderPublic`
+ * does for the customer's tracker, so the two readings of the same row cannot
+ * disagree.
+ *
+ * NULL IS THE HONEST ANSWER at the end of the path and for a cancelled order,
+ * and the row then renders no button rather than a disabled one.
+ *
+ * `source` RIDES WITH IT so the row can say when the thing it is about to do
+ * is normally the courier's or the clock's — the same mark the stage panel
+ * puts on those moves. It costs no query: every value here is already on the
+ * row or in `orderStages`.
+ */
+function quickNextOf(o: Record<string, unknown>, lang: string): { quick_next: { stage: string; label: string; source: string } | null } {
+  const shippingType = asShippingType(o.shipping_type);
+  const path = stagesFor(shippingType);
+  const raw = String(o.stage ?? '');
+  const from: OrderStage = (path as readonly string[]).includes(raw)
+    ? (raw as OrderStage)
+    : stageForLegacyStatus(String(o.status ?? ''), shippingType);
+  const next = raw === 'cancelled' || String(o.status ?? '') === 'cancelled' ? null : nextStageOf(from, shippingType);
+  if (!next) return { quick_next: null };
+  return {
+    quick_next: { stage: next, label: stageLabel(next, shippingType, lang), source: STAGE_SOURCE[next] },
+  };
 }
 
 adminRoutes.get('/orders', async (c) => {
@@ -1564,8 +1622,54 @@ adminRoutes.get('/orders', async (c) => {
   const clauses: string[] = [];
   const params: unknown[] = [];
 
+  /**
+   * ==========================================================================
+   *  THE SECOND WHERE — «عدد بجانب كل خيار»
+   * ==========================================================================
+   * A count beside a filter option only means something if it answers "how
+   * many rows would I get if I tapped THIS", and that is not the board's own
+   * WHERE: a board already narrowed to «جوي» would report zero beside «بحري»
+   * and make every other option look empty. So the facet base drops the TWO
+   * dimensions the two selects control — the journey and the status — and
+   * keeps everything else the admin has said (the day, the search, and which
+   * half of the world they are looking at).
+   *
+   * LIVE AND ARCHIVE ARE THE HALVES, and the split is the only thing the facet
+   * base keeps of the scope. `open` and `preorder` are a shipping_type clause
+   * wearing a scope's name, so a facet base that kept them could never count
+   * the option that is NOT selected. `IN ('delivered','cancelled')` is the
+   * archive's own half, which is what lets the second select report «تم
+   * التسليم ٤ · ملغاة ١» while the board shows one of them.
+   *
+   * ONE EXTRA STATEMENT, and it rides in the same `Promise.all` as the rows
+   * and the COUNT — a third parallel round trip to D1, not a third serial one.
+   * It is a GROUP BY over (shipping_type, status), which is the whole matrix
+   * both selects need in one answer, rather than nine COUNTs. Its widest
+   * shape is the archive's, `status IN ('delivered','cancelled')` — but that
+   * is the same set the archive's own `COUNT(*)` already scans beside it, so
+   * this is one comparable scan more, not a new order of cost.
+   *
+   * IT DOES NOT RUN FOR A PIERCED LOOKUP. An order number is not a browse: it
+   * has no other options to offer counts for, and its facet base would have no
+   * WHERE at all — a GROUP BY over every order ever placed, for a screen
+   * showing one row. `options` is then null and the board shows no counts.
+   */
+  const facetClauses: string[] = [];
+  const facetParams: unknown[] = [];
+  const bothWheres = (sql: string, ...bind: unknown[]) => {
+    clauses.push(sql);
+    params.push(...bind);
+    facetClauses.push(sql);
+    facetParams.push(...bind);
+  };
+
   if (!pierces) {
-    if (scope === 'open' || scope === 'preorder') {
+    if (scope === 'delivered' || scope === 'cancelled') {
+      facetClauses.push("o.status IN ('delivered','cancelled')");
+    } else {
+      facetClauses.push("o.status NOT IN ('delivered','cancelled')");
+    }
+    if (scope === 'open' || scope === 'preorder' || scope === 'all') {
       // ######################################################################
       // #  THIS STRING IS VERBATIM FROM idx_orders_board_open. DO NOT REWRITE #
       // ######################################################################
@@ -1599,7 +1703,13 @@ adminRoutes.get('/orders', async (c) => {
       //
       // The `<>` form does not need it — an inequality is not indexable here
       // anyway — but both carry it so the two branches cannot drift.
-      clauses.push(scope === 'open' ? "+o.shipping_type = 'direct'" : "+o.shipping_type <> 'direct'");
+      //
+      // AND `all` PUSHES NEITHER. «الكل» is the index's own WHERE with nothing
+      // added — the one shape of this query that needs no `+` at all, because
+      // there is no equality for the planner to be tempted by.
+      if (scope !== 'all') {
+        clauses.push(scope === 'open' ? "+o.shipping_type = 'direct'" : "+o.shipping_type <> 'direct'");
+      }
     } else {
       clauses.push('o.status = ?');
       params.push(scope);
@@ -1619,20 +1729,20 @@ adminRoutes.get('/orders', async (c) => {
       // separate kind of work on Wednesday — it is today's work, and it is the
       // most urgent of it. The counts still report `overdue` on its own so the
       // header can say how much of today is late.
+      //
+      // THE DAY IS NOT A FACET DIMENSION, so it goes into both WHEREs: an
+      // admin looking at today's work wants «مباشر ٦» to mean six boxes going
+      // out today, not six boxes in existence.
       if (due === 'today') {
-        clauses.push('o.delivery_due_day IS NOT NULL AND o.delivery_due_day <= ?');
-        params.push(today);
+        bothWheres('o.delivery_due_day IS NOT NULL AND o.delivery_due_day <= ?', today);
       } else if (due === 'tomorrow') {
-        clauses.push('o.delivery_due_day = ?');
-        params.push(tomorrow);
+        bothWheres('o.delivery_due_day = ?', tomorrow);
       } else if (due === 'week') {
-        clauses.push('o.delivery_due_day > ? AND o.delivery_due_day <= ?');
-        params.push(tomorrow, weekEnd);
+        bothWheres('o.delivery_due_day > ? AND o.delivery_due_day <= ?', tomorrow, weekEnd);
       } else if (due === 'later') {
-        clauses.push('o.delivery_due_day > ?');
-        params.push(weekEnd);
+        bothWheres('o.delivery_due_day > ?', weekEnd);
       } else {
-        clauses.push('o.delivery_due_day IS NULL');
+        bothWheres('o.delivery_due_day IS NULL');
       }
     }
   }
@@ -1672,8 +1782,7 @@ adminRoutes.get('/orders', async (c) => {
     // A HALF-OPEN UTC RANGE, never `substr(created_at,1,10)`. An order placed
     // at 01:00 Baghdad carries a `created_at` dated the PREVIOUS day in UTC, so
     // slicing the string files three hours of every day under yesterday.
-    clauses.push('o.created_at >= ? AND o.created_at < ?');
-    params.push(search.date.from, search.date.to);
+    bothWheres('o.created_at >= ? AND o.created_at < ?', search.date.from, search.date.to);
   } else if (search.kind === 'name') {
     // BOTH NAMES: the account's `u.name` and the delivery name frozen in the
     // snapshot, which is often a different person — a gift, or an office.
@@ -1686,17 +1795,19 @@ adminRoutes.get('/orders', async (c) => {
     // guard.
     const pattern = likePattern(search.folded);
     if (pattern) {
-      clauses.push(
+      bothWheres(
         `(${sqlLikeClause([
           arabicFoldSql(`COALESCE(u.name,'')`),
           arabicFoldSql(`COALESCE(${SNAPSHOT_NAME_SQL},'')`),
-        ])})`
+        ])})`,
+        pattern,
+        pattern
       );
-      params.push(pattern, pattern);
     }
   }
 
   const where = clauses.length > 0 ? ` WHERE ${clauses.map((x) => `(${x})`).join(' AND ')}` : '';
+  const facetWhere = facetClauses.length > 0 ? ` WHERE ${facetClauses.map((x) => `(${x})`).join(' AND ')}` : '';
 
   /**
    * ONE `FROM`, SHARED BY BOTH STATEMENTS, AND THAT IS THE POINT.
@@ -1711,7 +1822,7 @@ adminRoutes.get('/orders', async (c) => {
    */
   const FROM = 'FROM orders o LEFT JOIN users u ON u.id = o.user_id';
 
-  const [{ results }, countRow] = await Promise.all([
+  const [{ results }, countRow, facetRows] = await Promise.all([
     c.env.DB.prepare(
       `SELECT o.*, u.email, u.username, u.name AS user_name, u.phone_e164 AS user_phone
          ${FROM}${where}
@@ -1741,7 +1852,67 @@ adminRoutes.get('/orders', async (c) => {
     )
       .bind(today, today, tomorrow, tomorrow, weekEnd, weekEnd, ...params)
       .first<Record<string, number>>(),
+    // THE WHOLE MATRIX IN ONE STATEMENT. Both selects are served from the same
+    // (shipping_type, status) grouping, so the number beside «جوي» and the
+    // number beside «قيد التجهيز» can never be computed against two different
+    // populations. `null` for a pierced lookup — see the facet note above.
+    pierces
+      ? Promise.resolve({ results: [] as Array<Record<string, unknown>> })
+      : c.env.DB.prepare(
+          `SELECT o.shipping_type AS t, o.status AS s, COUNT(*) AS n
+             ${FROM}${facetWhere}
+            GROUP BY o.shipping_type, o.status`
+        )
+          .bind(...facetParams)
+          .all<Record<string, unknown>>(),
   ]);
+
+  /**
+   * THE MATRIX, FOLDED THE TWO WAYS THE TWO SELECTS READ IT.
+   *
+   * Each vector honours the OTHER select's choice and ignores its own, which
+   * is what makes the number beside the option the admin has actually selected
+   * equal to `total`. Folded HERE and not in the browser for the reason this
+   * route's header gives for everything else on this screen: the board renders
+   * decisions, it does not make them.
+   */
+  const matrix = (facetRows?.results ?? []) as Array<{ t?: unknown; s?: unknown; n?: unknown }>;
+  const sumWhere = (keep: (t: string, st: string) => boolean): number => {
+    let n = 0;
+    for (const r of matrix) {
+      if (keep(String(r.t ?? ''), String(r.s ?? ''))) n += Number(r.n) || 0;
+    }
+    return n;
+  };
+  // `status` is the live selects' second dimension; in the archive that role is
+  // played by the SCOPE, because «تم التسليم» and «ملغاة» are the two options
+  // the second select offers there.
+  const statusDim = scope === 'delivered' || scope === 'cancelled' ? scope : status;
+  const typeMatches = (t: string): boolean => (type ? t === type : true);
+  const statusMatches = (st: string): boolean => (statusDim ? st === statusDim : true);
+  const options = pierces
+    ? null
+    : {
+        /** The journey select, «الكل» included — it is the sum, not a query. */
+        type: {
+          all: sumWhere((_t, st) => statusMatches(st)),
+          direct: sumWhere((t, st) => t === 'direct' && statusMatches(st)),
+          preorder_air: sumWhere((t, st) => t === 'preorder_air' && statusMatches(st)),
+          preorder_sea: sumWhere((t, st) => t === 'preorder_sea' && statusMatches(st)),
+          preorder_land: sumWhere((t, st) => t === 'preorder_land' && statusMatches(st)),
+        },
+        /** The status select. `any` is «كل الحالات»; the archive reads the
+         *  `delivered` / `cancelled` pair instead. */
+        status: {
+          any: sumWhere((t) => typeMatches(t)),
+          pending: sumWhere((t, st) => st === 'pending' && typeMatches(t)),
+          confirmed: sumWhere((t, st) => st === 'confirmed' && typeMatches(t)),
+          processing: sumWhere((t, st) => st === 'processing' && typeMatches(t)),
+          shipped: sumWhere((t, st) => st === 'shipped' && typeMatches(t)),
+          delivered: sumWhere((t, st) => st === 'delivered' && typeMatches(t)),
+          cancelled: sumWhere((t, st) => st === 'cancelled' && typeMatches(t)),
+        },
+      };
 
   // TWO QUERIES, NOT 201. This used to fetch 200 orders and then run a
   // separate `SELECT * FROM order_items WHERE order_id = ?` for EACH one —
@@ -1769,6 +1940,7 @@ adminRoutes.get('/orders', async (c) => {
   const out = results.map((o) => {
     const day = typeof o.delivery_due_day === 'string' ? o.delivery_due_day : '';
     return {
+      ...quickNextOf(o, lang),
       ...orderPublic(o, byOrder.get(String(o.id)) ?? [], undefined, adminMystery),
       email: o.email,
       username: o.username,
@@ -1820,6 +1992,8 @@ adminRoutes.get('/orders', async (c) => {
      * «ابحث كاسم» beside it. A classifier that guesses wrong is cheap to
      * correct and expensive to hide.
      */
+    /** «عدد بجانب كل خيار» — null during a pierced lookup. See the facet note. */
+    options,
     search_kind: search.kind,
     search:
       search.kind === 'none'

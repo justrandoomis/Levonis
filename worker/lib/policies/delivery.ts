@@ -29,11 +29,12 @@ import type { PolicyDocument } from './types';
  *     "hardcoded constants ... not settings" — and that sentence is why 3.22
  *     went on promising six thousand per five hundred thousand after the
  *     owner halved the charge. So 3.22 states NO figure: it defers
- *     to the checkout screen the way 3.3 does, and it must stay that way
- *     until something in this corpus can resolve a live setting at read
- *     time (worker/routes/policies.ts serves `doc.body[lang]` verbatim —
- *     there is no substitution pass, and a `{{TOKEN}}` here would reach the
- *     customer as literal braces).
+ *     to the checkout screen the way 3.3 does, and it must stay that way.
+ *     A `{{TOKEN}}` is not the way round it either. ./render.ts now WITHHOLDS
+ *     any line that still carries one, so a token no longer reaches the
+ *     customer as literal braces — but withholding is silence, not a figure,
+ *     and a clause that named the rate would still have to be re-published
+ *     every time the owner edited the setting. The deferral stands.
  *
  * WHY 3.35 EXISTS. worker/lib/delivery/ has createShipment and getShipment
  * and nothing else — there is no reschedule endpoint and no reroute call on
@@ -50,10 +51,22 @@ import type { PolicyDocument } from './types';
  *
  * Customs (3.23) has NO engine in this worker. The article therefore states
  * who bears such a charge if one arises and refuses to quantify it.
+ *
+ * VERSION 3 — WHY IT MOVED. Two corrections a customer could see on the
+ * page; the archive keeps version 2 byte for byte.
+ *   * THE NAME. The store is written «Levonis», in Latin script, in all three
+ *     languages. 4 transliterated occurrences left the body here. Where the
+ *     name carried an Arabic or Sorani affix the affix was detached rather than
+ *     swallowed by the replacement, so the sentence still parses.
+ *   * THE UNKNOWNS. 18 lines in this document still state a
+ *     fact the owner has not given, so ./render.ts WITHHOLDS them from the published
+ *     text rather than show a customer a `{{TOKEN}}`. They are still authored
+ *     below, and each one returns of its own accord the moment its value is
+ *     written in and the version moves again.
  */
 export const delivery: PolicyDocument = {
   key: 'delivery',
-  version: 2,
+  version: 3,
   effective_at: '2026-01-01',
   title: {
     ar: 'سياسة التوصيل والشحن والرسوم',
@@ -67,14 +80,14 @@ export const delivery: PolicyDocument = {
 
 ### 3.1 نطاق الوثيقة
 - تسري هذه الوثيقة على كل طلب يُنشأ داخل المنصة ويُسلَّم داخل جمهورية العراق.
-- تسري على طلبات المتجر الرسمي لليفونيس، وعلى طلبات متاجر المجتمع في حدود ما تنص عليه المادة 3.5.
+- تسري على طلبات المتجر الرسمي لـ Levonis، وعلى طلبات متاجر المجتمع في حدود ما تنص عليه المادة 3.5.
 - لا تسري على نقل يرتبه الزبون بنفسه مع ناقل من عنده، ولا على بضاعة لم تُشترَ من المنصة.
 - ما ورد هنا يحكم النقل والتسليم والأجور. أما العيب والضمان والإرجاع فمحلها الوثائق المخصصة لها.
 
 ### 3.2 التعريفات
 يُقصد بالألفاظ الآتية، أينما وردت في هذه الوثيقة، المعاني المبيّنة إزاءها:
 
-- المتجر: {{LEVONIS_LEGAL_NAME}}، المشغّل لمنصة ليفونيس.
+- المتجر: {{LEVONIS_LEGAL_NAME}}، المشغّل لمنصة Levonis.
 - شركة التوصيل أو الناقل: الشركة المستقلة التي تنقل الطرد وتسلّمه، وهي شخص قانوني مستقل عن المتجر.
 - الطرد: الوحدة المغلّفة المسلّمة إلى الناقل بموجب طلب واحد.
 - التسليم إلى الناقل: اللحظة التي يستلم فيها الناقل الطرد من المتجر أو من مخزنه.
@@ -671,14 +684,14 @@ The Store does not bear transit damage; it nevertheless does the following by wa
 
 ### 3.1 بوارى ئەم بەڵگەنامەیە
 - ئەم بەڵگەنامەیە لەسەر هەر داواکارییەک جێبەجێ دەبێت کە لە ناو پلاتفۆرمەکەدا دروست دەکرێت و لە ناو کۆماری عێراقدا دەگەیەنرێت.
-- لەسەر داواکارییەکانی فرۆشگای فەرمیی لێڤۆنیس جێبەجێ دەبێت، و لەسەر داواکارییەکانی فرۆشگاکانی کۆمەڵگە لە سنووری ئەوەی بڕگەی 3.5 دەیڵێت.
+- لەسەر داواکارییەکانی فرۆشگای فەرمیی Levonis جێبەجێ دەبێت، و لەسەر داواکارییەکانی فرۆشگاکانی کۆمەڵگە لە سنووری ئەوەی بڕگەی 3.5 دەیڵێت.
 - لەسەر ئەو گواستنەوەیە جێبەجێ نابێت کە کڕیار خۆی لەگەڵ گەیەنەرێکی خۆی ڕێک دەخات، و نە لەسەر کاڵایەک کە لە پلاتفۆرمەکەوە نەکڕدراوە.
 - ئەوەی لێرەدا هاتووە گواستنەوە و گەیاندن و کرێیەکان بەڕێوە دەبات. بەڵام عەیب و گەرەنتی و گەڕاندنەوە لەو بەڵگەنامانەدان کە تایبەتن پێیان.
 
 ### 3.2 پێناسەکان
 مەبەست لەم وشانەی خوارەوە، لە هەر شوێنێکی ئەم بەڵگەنامەیەدا بێن، ئەو مانایانەیە کە بەرامبەریان دیاری کراون:
 
-- فرۆشگا: {{LEVONIS_LEGAL_NAME}}، بەڕێوەبەری پلاتفۆرمی لێڤۆنیس.
+- فرۆشگا: {{LEVONIS_LEGAL_NAME}}، بەڕێوەبەری پلاتفۆرمی Levonis.
 - کۆمپانیای گەیاندن یان گەیەنەر: ئەو کۆمپانیا سەربەخۆیەی پاکەتەکە دەگوازێتەوە و دەیگەیەنێت، و کەسێکی یاسایی سەربەخۆیە لە فرۆشگا.
 - پاکەت: ئەو یەکە پێچراوەی بە یەک داواکاری دراوەتە گەیەنەر.
 - ڕادەستکردن بە گەیەنەر: ئەو ساتەی گەیەنەر پاکەتەکە لە فرۆشگا یان لە کۆگاکەی وەردەگرێت.

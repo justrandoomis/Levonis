@@ -8,6 +8,7 @@ import { cartCountStore, setCartCount, countCartItems } from '../lib/cartCount';
 import { signalBloub } from './bloub/events';
 import { MotionCharacterAnchor } from './bloub/MotionCharacterAnchor';
 import { authPathWithSupportRef } from '../lib/supportRef';
+import { useCommunityAccess } from '../pages/community/access';
 
 /**
  * Routes on which the floating bottom nav does not render. Exported so the
@@ -139,9 +140,21 @@ export default function BottomNav() {
     { icon: User, label: t('profile'), path: '/profile' },
     { icon: ShoppingCart, label: t('cart'), path: '/cart' },
   ];
+  /**
+   * THE COMMUNITY TAB DISAPPEARS WHEN THE SERVER SAYS THE COMMUNITY IS SHUT.
+   *
+   * Presentation only: the refusal is worker/lib/communityGate.ts, and a tab
+   * still tapped from a stale bundle lands on the maintenance card. What this
+   * buys is that nobody is invited into a door that will not open. An answer
+   * that has not arrived yet, or one that failed, keeps the tab — the bar must
+   * not flicker a tab away on a dropped request, and an unknown state is not a
+   * refusal.
+   */
+  const { access: communityAccess } = useCommunityAccess();
+  const communityShut = communityAccess?.may_enter === false;
   const rightItems = [
     { icon: MessageCircle, label: t('webCenter'), path: '/chats' },
-    { icon: Users, label: t('community'), path: '/community' },
+    ...(communityShut ? [] : [{ icon: Users, label: t('community'), path: '/community' }]),
   ];
   type NavItem = (typeof leftItems)[number];
 

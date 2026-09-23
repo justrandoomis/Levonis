@@ -188,7 +188,7 @@ uploadRoutes.post('/', async (c) => {
 
   const form = await c.req.formData().catch(() => null);
   if (!form) throw badRequest('Expected multipart form data');
-  const purpose = oneOf(form.get('purpose'), 'purpose', ['receipt', 'avatar', 'chat', 'product', 'community'] as const);
+  const purpose = oneOf(form.get('purpose'), 'purpose', ['receipt', 'avatar', 'chat', 'product', 'community', 'support'] as const);
   const file = form.get('file');
   if (!(file instanceof File)) throw badRequest('No file uploaded');
 
@@ -209,7 +209,15 @@ uploadRoutes.post('/', async (c) => {
    * ceiling below still applies to images regardless — a video allowance must
    * not become an 8 MB photo allowance of 40.
    */
-  const allowVideo = purpose === 'product' || purpose === 'chat';
+  /**
+   * A SUPPORT TICKET IS A CONVERSATION TOO.
+   *
+   * The clip of a print peeling off the bed, ten seconds of a printer making
+   * the wrong noise — that is the single most useful thing a customer can hand
+   * a support agent, and it is the same forty-megabyte ceiling a chat clip
+   * already has. The image ceiling below still applies to images.
+   */
+  const allowVideo = purpose === 'product' || purpose === 'chat' || purpose === 'support';
   const maxSize = allowVideo ? VIDEO_MAX : IMAGE_MAX;
   if (file.size > maxSize) {
     throw badRequest(`File is too large (max ${Math.round(maxSize / 1024 / 1024)} MB)`);
@@ -386,8 +394,34 @@ uploadRoutes.post('/', async (c) => {
     if (!member) throw forbidden('Not a participant in this conversation');
   }
 
+  /**
+   * A SUPPORT ATTACHMENT BELONGS TO THE TICKET, for the reason the chat block
+   * above states for a conversation: one thread's files sit in one folder, and
+   * access becomes ONE question with one answer — is this your ticket.
+   *
+   * Ownership is verified HERE, before a byte is stored, so the key cannot
+   * name a ticket the uploader does not own. An admin may attach to any
+   * ticket: staff answering a complaint routinely send back a photograph of
+   * the replacement part or a screenshot of the tracking page, and they are
+   * already authorised to read and write the whole thread.
+   */
+  let supportEntity = '';
+  if (purpose === 'support') {
+    supportEntity = str(form.get('entity_id'), 'entity_id', { max: 64 });
+    if (user.role !== 'admin') {
+      const own = await c.env.DB.prepare('SELECT 1 AS x FROM support_tickets WHERE id = ? AND user_id = ? LIMIT 1')
+        .bind(supportEntity, user.id)
+        .first();
+      if (!own) throw forbidden('Not your ticket');
+    } else {
+      const exists = await c.env.DB.prepare('SELECT 1 AS x FROM support_tickets WHERE id = ? LIMIT 1').bind(supportEntity).first();
+      if (!exists) throw forbidden('Not your ticket');
+    }
+  }
+
   const target: { visibility: MediaVisibility; domain: MediaDomain; entityId: string; keyKind: string } =
     purpose === 'receipt' ? { visibility: 'private', domain: 'receipts', entityId: user.id, keyKind: 'evidence' } :
+    purpose === 'support' ? { visibility: 'private', domain: 'support', entityId: supportEntity, keyKind: storedMime.startsWith('video/') ? 'video' : 'attachments' } :
     purpose === 'avatar' ? { visibility: 'public', domain: 'users', entityId: user.id, keyKind: 'avatar' } :
     purpose === 'chat' ? { visibility: 'private', domain: 'chat', entityId: chatEntity, keyKind: storedMime.startsWith('video/') ? 'video' : 'attachments' } :
     purpose === 'community' ? { visibility: 'public', domain: 'merchants', entityId: user.id, keyKind: 'public' } :
@@ -464,6 +498,33 @@ fileRoutes.get('/*', async (c) => {
         .bind(chatId, user.id)
         .first();
       if (!row && user.role !== 'admin') throw forbidden('Not your file');
+    } else if (key.startsWith('support/')) {
+      /**
+       * ONE QUESTION: IS THIS YOUR TICKET.
+       *
+       * The same single-lookup shape as the chat branch above, and for the
+       * same reason: the key names the ticket — `support/<ticket id>/…` — so
+       * ownership is one row, not a search for a MESSAGE carrying the key. A
+       * file that has been uploaded but not yet sent still belongs to the
+       * person whose ticket it is, and a file whose message was deleted
+       * belongs to nobody else.
+       *
+       * STAFF READ EVERY TICKET, which is not a widening: the admin console
+       * renders exactly these threads, and an agent who cannot open the
+       * photograph the customer attached is being shown an empty box in the
+       * middle of the conversation they are supposed to answer.
+       *
+       * The `else` below is the whole safety argument for every OTHER private
+       * prefix and it is untouched: an unrecognised private key is still a
+       * 404, so adding this branch opens `support/` and nothing else.
+       */
+      const ticketId = key.split('/')[1] ?? '';
+      if (user.role !== 'admin') {
+        const own = await c.env.DB.prepare('SELECT 1 AS x FROM support_tickets WHERE id = ? AND user_id = ? LIMIT 1')
+          .bind(ticketId, user.id)
+          .first();
+        if (!own) throw forbidden('Not your file');
+      }
     } else {
       throw notFound();
     }

@@ -82,8 +82,17 @@ let modalLockState:
   | undefined;
 
 /** The app scrolls in #main-scroll-container, not body. Lock both, once, and
- * keep the lock alive when one modal opens over another. */
-function acquireModalLock(): () => void {
+ * keep the lock alive when one modal opens over another.
+ *
+ * EXPORTED because the blocking busy layer (`src/components/ui/AppBusy.tsx`)
+ * is a second thing that takes the screen, and it must share THIS counter
+ * rather than keep its own. Two independent locks would each restore the
+ * overflow they captured: a busy overlay released while a sheet is still open
+ * would hand the page back its scroll with the sheet still sitting on it, and
+ * would clear `html[data-overlay-open]` — the flag `src/index.css` uses to
+ * move the bottom navigation and the character out of a modal's way. One
+ * counter, one restore, whoever is last out. */
+export function acquireModalLock(): () => void {
   if (modalLockCount === 0) {
     const main = document.getElementById('main-scroll-container');
     modalLockState = {

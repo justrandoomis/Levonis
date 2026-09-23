@@ -47,7 +47,7 @@ import {
   createPurchaseHold, commitHoldStatements, holdSettledEventStatements, getAvailableBalances,
 } from '../lib/walletOps';
 import { rootDomainFrom } from '../lib/hosts';
-import { announceAfterResponse, orderTopic } from '../lib/adminTopicRouting';
+import { announceAfterResponse, orderAnnouncement, orderTopic } from '../lib/adminTopicRouting';
 
 export const storeOrderRoutes = new Hono<AppContext>();
 storeOrderRoutes.use('*', requireAuth);
@@ -494,11 +494,28 @@ storeOrderRoutes.post('/', async (c) => {
   announceAfterResponse(
     c,
     orderTopic('direct'),
-    `🛒 New store order ${orderId}` +
-      `\nStore: ${String(cart.store_name).slice(0, 80)}` +
-      `\nItems: ${cart.lines.length}` +
-      `\nTotal: ${cart.total_iqd.toLocaleString()} IQD (paid from wallet)` +
-      `\nMerchant receives: ${split.merchant_receivable_iqd.toLocaleString()} IQD`
+    orderAnnouncement({
+      orderId,
+      storeName: cart.store_name,
+      customerName: user.name || user.username || `#${user.id}`,
+      phone: address?.phone,
+      governorate: address?.governorate,
+      area: address?.area,
+      landmark: address?.landmark,
+      shippingType: 'direct',
+      paymentMethodId: 'wallet',
+      totalIqd: cart.total_iqd,
+      // Nothing is ever due at the door on this path (the prepaid-only rule
+      // above), so the message says so with a zero rather than omitting the
+      // line — an absent figure reads as "unknown", which is worse here.
+      dueOnDeliveryIqd: 0,
+      merchantReceivableIqd: split.merchant_receivable_iqd,
+      // `PricedLine` has no `variant`: this path stores option and colour as
+      // IDS (see the `order_items` INSERT above), and an id in a group message
+      // is noise. The builder prints the line without one rather than showing
+      // the owner a uuid.
+      lines: cart.lines,
+    })
   );
 
   const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();

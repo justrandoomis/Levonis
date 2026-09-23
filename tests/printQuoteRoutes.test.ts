@@ -271,6 +271,107 @@ test('a customer gets a real number WITHOUT a slicer, and it never claims to be 
   }
 });
 
+/**
+ * THE OWNER'S BUG, IN THE ONE SHAPE THAT CATCHES IT.
+ *
+ * «CHOOSING A DIFFERENT PRINTER DOES NOT CHANGE THE PRICE». It did not, and no
+ * test noticed, because the engine's own unit tests hand `priceJob` a printer
+ * carrying invented economics (350,000 IQD, 6,000 useful hours, 95 W) and those
+ * DO move a price. The live catalogue carries none: migration 0078 leaves
+ * `purchase_iqd`, `useful_print_hours`, `maintenance_iqd_per_hour` and all four
+ * wattages NULL on every seeded machine, on purpose, and no route or admin
+ * screen has ever written one.
+ *
+ * The printer reaches a price ONLY through time, and all three lines that turn
+ * hours into money were multiplying them by zero. So the A1 mini and the H2D
+ * quoted a single 20 mm cube to the same dinar while the screen showed two
+ * different print times beside the identical figure.
+ *
+ * This runs the REAL migrations and the REAL router, so it fails the moment the
+ * machine-hour rate stops reaching the quote — which is exactly how it got here
+ * in the first place.
+ *
+ * WHAT IT ASSERTS, AND WHY NOT "THE FASTER MACHINE IS CHEAPER". It is not, on
+ * this fixture, and the reason is a real one worth pinning rather than dodging:
+ * the H2D lays down the cube faster (5.3 min against 6.5) and is ENCLOSED, so
+ * 0078 gives it a six-minute warm-up against the A1 mini's four — and on a
+ * five-minute print the warm-up is most of the job. So the flagship honestly
+ * costs MORE here and would honestly cost less on anything large. The invariant
+ * that holds either way, and the one a rate reaching the quote actually
+ * guarantees, is that the machine with more hours on it costs more. A rate that
+ * arrived without the hours attached would move both prices by the same amount
+ * and still pass a bare `notEqual`, so that is what is asserted.
+ */
+test('two printers, one file, two prices — the machine hour is not free', async () => {
+  const raw = freshDb();
+  const bytes = stlBytes();
+  const bucket = {
+    put: async () => ({}),
+    get: async () => ({ arrayBuffer: async () => bytes.buffer.slice(0) }),
+    head: async () => null,
+    delete: async () => undefined,
+  };
+  const a = stubApp(asD1(raw), null, mount, { env: { R2_PRIVATE: bucket, R2_PUBLIC: bucket, BUCKET: bucket } });
+  raw.prepare(`UPDATE print_materials SET default_iqd_per_kg = 22000 WHERE id = 'pla'`).run();
+
+  // The seed's own physics, and the ONLY thing separating these two rows that
+  // a customer's quote can see: 28 mm³/s against 32, and 2.0 s of travel per
+  // layer against 1.5. Both run PLA, both take the cube. Nothing else differs
+  // that the file path reads.
+  const quoteOn = async (printerModelId: string) => {
+    const up = (await upload(a, `tok-${printerModelId}`)).body;
+    const id = up.analysis_id as string;
+    const h = { 'X-Guest-Token': `tok-${printerModelId}` };
+    const measured = await json(
+      await post(a, `/api/print-quote/analyses/${id}/measure`, { printer_model_id: printerModelId, material_id: 'pla' }, h)
+    );
+    assert.equal(measured.success, true, JSON.stringify(measured));
+    const priced = await json(await post(a, `/api/print-quote/analyses/${id}/quote`, {}, h));
+    assert.equal(priced.quote.confidence, 'estimated', JSON.stringify(priced.quote));
+    return { quote: priced.quote, analysis: measured.analysis, quoteId: priced.quote_id as string };
+  };
+
+  const slow = await quoteOn('bbl-a1m');
+  const fast = await quoteOn('bbl-h2d');
+
+  // The premise: the engine really does think these are different jobs in time.
+  // If this ever stops being true the price assertion below means nothing.
+  assert.ok(
+    slow.analysis.print_minutes_per_plate > fast.analysis.print_minutes_per_plate,
+    `the A1 mini must be the slower machine (${slow.analysis.print_minutes_per_plate} vs ${fast.analysis.print_minutes_per_plate})`
+  );
+  // THE SYMPTOM ITSELF: two machines, one file, two prices. Before the rate
+  // reached the quote these were equal to the dinar.
+  assert.notEqual(
+    fast.quote.price_iqd,
+    slow.quote.price_iqd,
+    `both printers quoted ${slow.quote.price_iqd} — the printer is not reaching the price`
+  );
+
+  // And the difference is the HOURS, in the only direction an hourly rate can
+  // push them. The enclosed machine spends longer warming up than it saves
+  // printing a 20 mm cube, so on this fixture it is the dearer one — which is
+  // the honest answer, not a bug.
+  assert.ok(fast.quote.machine_hours > slow.quote.machine_hours, 'premise: the H2D spends longer on this cube');
+  assert.ok(
+    fast.quote.price_iqd > slow.quote.price_iqd,
+    `more hours must cost more: ${fast.quote.price_iqd} at ${fast.quote.machine_hours} h against ${slow.quote.price_iqd} at ${slow.quote.machine_hours} h`
+  );
+
+  // §30: the rate decided the difference, so the stored quote has to remember
+  // what it was — otherwise neither price is explainable next month.
+  const stored = row<Record<string, unknown>>(raw, 'SELECT * FROM print_quotes WHERE id = ?', slow.quoteId)!;
+  const snapshot = JSON.parse(String(stored.snapshot)) as Record<string, unknown>;
+  const rate = snapshot.machine_iqd_per_hour as { value: number; from: string };
+  assert.ok(rate.value > 0, 'a quote that charged for machine time must record the rate it charged');
+  // And it is the PLATFORM's figure, not this shop's — no panel may show it as
+  // a merchant's own number, because the merchant never entered one.
+  assert.equal(rate.from, 'platform');
+
+  // §22 still holds: the new line is a cost, and a customer sees no costs.
+  assert.ok(!JSON.stringify(slow.quote).toLowerCase().includes('machine_iqd'));
+});
+
 test('a model that cannot fit the machine is refused before it is priced', async () => {
   const raw = freshDb();
   const bytes = stlBytes();

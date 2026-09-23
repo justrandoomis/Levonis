@@ -8,6 +8,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { getTierStatus, benefits, usersWithEntitlement } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
+import { communityAdminDoor, communityGate, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 
 export const communityRoutes = new Hono<AppContext>();
 
@@ -55,6 +56,45 @@ function communityProductPublic(p: Record<string, unknown>) {
     created_at: p.created_at,
   };
 }
+
+// ------------------------------------------------- the maintenance gate
+
+/**
+ * PUBLIC, AND ALWAYS ANSWERS. Registered BEFORE the gate — and named in
+ * COMMUNITY_GATE_OPEN_PATHS so the order can never be the only thing keeping
+ * it alive — so the app can ask "is the community open to me?" without being
+ * refused, and can then say «تحت الصيانة» because the SERVER said so. That is
+ * what lets the owner open the community, or add one member to the list, with
+ * one settings write and no deploy.
+ *
+ * `may_enter` folds the admin door and the allow-list in, so an admin's own
+ * phone shows the working community while a customer's shows the notice, and
+ * an allow-listed member's shows the community without being told they are on
+ * a list. `closed` is what the CARD says; `may_enter` is what this viewer may
+ * do about it. They differ for exactly those two people.
+ */
+communityRoutes.get('/access', async (c) => {
+  const gate = await readCommunityGate(c.env.DB);
+  const user = c.get('user');
+  // Never cached: this is the answer that decides whether a page is shown,
+  // and it is per-user — a shared cache would hand one visitor's verdict to
+  // the next one through it.
+  c.header('Cache-Control', 'no-store');
+  return c.json({
+    success: true,
+    closed: !gate.open,
+    admin: communityAdminDoor(user),
+    may_enter: communityMayEnter(gate, user),
+  });
+});
+
+/**
+ * The wall. See worker/lib/communityGate.ts for which handlers sit inside it
+ * and which few answer with it up — that enumeration was traced to its
+ * callers, because closing a merchant out of their own live shop is the one
+ * way this change could cost somebody real money.
+ */
+communityRoutes.use('*', communityGate());
 
 communityRoutes.get('/products', async (c) => {
   const { results } = await c.env.DB.prepare(

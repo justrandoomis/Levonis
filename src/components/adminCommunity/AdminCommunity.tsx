@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { ApiError } from '../../lib/api';
 import PrintPricingAdmin from './PrintPricingAdmin';
+import CommunityGatePanel from './CommunityGatePanel';
 import { newIdempotencyKey } from '../../lib/api';
 import {
   adminCommunityApi, iqd, badgeLabel,
@@ -83,7 +84,15 @@ export default function AdminCommunity({ dir }: { dir: 'ltr' | 'rtl' }) {
       {section === 'disputes' && <Disputes t={t} />}
       {section === 'finance' && <Finance t={t} />}
       {section === 'reputation' && <Reputation t={t} />}
-      {section === 'settings' && <SettingsSection t={t} />}
+      {section === 'settings' && (
+        <div className="space-y-4">
+          {/* The door comes first: an admin opening this screen during
+              maintenance is far more likely to be here for the switch than
+              for a commission percentage. */}
+          <CommunityGatePanel t={t} />
+          <SettingsSection t={t} />
+        </div>
+      )}
       {section === 'print' && <PrintPricingAdmin dir={dir} />}
     </div>
   );

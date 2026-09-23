@@ -108,8 +108,15 @@ export interface RequestOptions {
  * a dead connection surfaces as an error while the customer is still looking
  * at the screen. Uploads pass their own (or 0) — a large file legitimately
  * takes longer than any page interaction.
+ *
+ * EXPORTED BECAUSE THE BLOCKING OVERLAY MUST OUTLAST IT. src/components/ui/
+ * AppBusy.tsx derives its safety ceiling from this number: a ceiling shorter
+ * than the request deadline hands the page back to the customer while the
+ * POST is still in flight, which is precisely the window the overlay exists
+ * to cover. Reading the constant instead of copying it is what keeps the two
+ * from drifting apart the next time either is tuned.
  */
-const DEFAULT_TIMEOUT_MS = 20000;
+export const DEFAULT_TIMEOUT_MS = 20000;
 
 async function requestRaw<T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
   const init: RequestInit = { method, credentials: 'same-origin', headers: { ...opts?.headers } };
@@ -1115,7 +1122,7 @@ export type OrderDueBucket = 'overdue' | 'today' | 'tomorrow' | 'week' | 'later'
  * not a bucket — «فصلها في الطلبات المسبقة» — because a container in transit
  * is a different kind of waiting from a box that must go out this morning.
  */
-export type AdminOrderScope = 'open' | 'preorder' | 'delivered' | 'cancelled';
+export type AdminOrderScope = 'open' | 'preorder' | 'all' | 'delivered' | 'cancelled';
 
 /**
  * Which reading of the search box won. One box, four readings, tried in a
@@ -1157,6 +1164,19 @@ export interface AdminOrderRow extends ApiOrder {
   /** «اليوم» / «غدًا» / «الأربعاء ٢٣ أيلول», localised BY THE SERVER. The
    *  screen renders this string and never formats a day itself. */
   due_label?: string;
+  /**
+   * THE ONE-TAP MOVE, decided by the server — the next stage on THIS order's
+   * own path, already labelled in the caller's language. `null` at the end of
+   * the path and for a cancelled order, and the row then shows no button.
+   *
+   * It is a STAGE, never a status: the path is fourteen stages long for a
+   * pre-order and the first five differ per journey, so a row that guessed
+   * "confirmed comes after pending" would offer moves the stage door then
+   * refuses. `source` is who normally makes this move (manual / automatic /
+   * delivery_api), so the row can mark the ones that are the clock's or the
+   * courier's rather than presenting them as ordinary.
+   */
+  quick_next?: { stage: string; label: string; source: 'manual' | 'automatic' | 'delivery_api' } | null;
 }
 
 /** The whole board in one answer: a page, its totals, and what it understood. */
@@ -1197,6 +1217,30 @@ export interface AdminOrdersResponse {
     later: number;
     unscheduled: number;
   };
+  /**
+   * «عدد بجانب كل خيار» — how many rows each filter option would return.
+   *
+   * Each vector honours the OTHER select and ignores its own, so the number
+   * beside the option currently selected equals `counts.total`. Computed by
+   * the server from one GROUP BY, for the reason everything else on this board
+   * is: the screen renders decisions, it does not make them.
+   *
+   * `null` for a PIERCED lookup (an order number, a phone number). That is not
+   * a browse — there are no other options to count, and counting them would
+   * mean a GROUP BY over every order ever placed for a screen showing one row.
+   */
+  options: {
+    type: { all: number; direct: number; preorder_air: number; preorder_sea: number; preorder_land: number };
+    status: {
+      any: number;
+      pending: number;
+      confirmed: number;
+      processing: number;
+      shipped: number;
+      delivered: number;
+      cancelled: number;
+    };
+  } | null;
 }
 
 /** Everything the fulfilment screen needs for ONE order. */
@@ -1844,7 +1888,7 @@ export function newIdempotencyKey(): string {
 /** Upload a file; returns its key + URL. */
 export async function uploadFile(
   file: File,
-  purpose: 'receipt' | 'avatar' | 'chat' | 'product' | 'community',
+  purpose: 'receipt' | 'avatar' | 'chat' | 'product' | 'community' | 'support',
   /**
    * The thing this file belongs to, when it is not the uploader.
    *
@@ -1853,6 +1897,10 @@ export async function uploadFile(
    * must say which conversation. The server verifies participation before it
    * stores a byte, so passing a chat you are not in is refused rather than
    * trusted.
+   *
+   * A SUPPORT attachment is filed under the TICKET for the same reason and
+   * checked the same way: `purpose:'support'` must name the ticket, and the
+   * server refuses a ticket that is not yours before storing anything.
    */
   entityId?: string
 ): Promise<{ key: string; url: string; mime?: string; bytes?: number; width?: number | null; height?: number | null; visibility?: 'public' | 'private' }> {

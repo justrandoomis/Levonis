@@ -54,10 +54,22 @@ import type { PolicyDocument } from './types';
  * (`shippingPolicy.pro_threshold_iqd` / `prime_threshold_iqd`), so they are
  * written as the same placeholders the delivery document uses rather than as
  * two numbers that would drift apart between documents.
+ *
+ * VERSION 2 — WHY IT MOVED. Two corrections a customer could see on the
+ * page; the archive keeps version 1 byte for byte.
+ *   * THE NAME. The store is written «Levonis», in Latin script, in all three
+ *     languages. 2 transliterated occurrences left the body here. Where the
+ *     name carried an Arabic or Sorani affix the affix was detached rather than
+ *     swallowed by the replacement, so the sentence still parses.
+ *   * THE UNKNOWNS. 9 articles and 9 further lines in this document still state a
+ *     fact the owner has not given, so ./render.ts WITHHOLDS them from the published
+ *     text rather than show a customer a `{{TOKEN}}`. They are still authored
+ *     below, and each one returns of its own accord the moment its value is
+ *     written in and the version moves again.
  */
 export const membership: PolicyDocument = {
   key: 'membership',
-  version: 1,
+  version: 2,
   effective_at: '2026-01-01',
   title: {
     ar: 'سياسة العضويات',
@@ -68,7 +80,7 @@ export const membership: PolicyDocument = {
     ar: `## 1. التمهيد والنطاق والتعريفات
 
 ### 1.1 الغرض من هذه الوثيقة
-تبيّن هذه الوثيقة فئات العضوية المدفوعة في منصة ليفونيس، وما تمنحه كل فئة على وجه التحديد، وكيف تُشترى وكيف تُرقّى، ومتى تبدأ ومتى تنتهي، وكيف تُلغى وما يُعاد عند الإلغاء، وما يبقى للزبون مما استحقه قبل انقضاء عضويته، وما يوقف مزاياه إذا أساء استعمالها.
+تبيّن هذه الوثيقة فئات العضوية المدفوعة في منصة Levonis، وما تمنحه كل فئة على وجه التحديد، وكيف تُشترى وكيف تُرقّى، ومتى تبدأ ومتى تنتهي، وكيف تُلغى وما يُعاد عند الإلغاء، وما يبقى للزبون مما استحقه قبل انقضاء عضويته، وما يوقف مزاياه إذا أساء استعمالها.
 
 ### 1.2 الأطراف
 المتجر: {{LEVONIS_LEGAL_NAME}}، المسجل برقم {{LEVONIS_REGISTRATION_NO}}، وعنوانه {{LEVONIS_ADDRESS}}. والعضو: صاحب الحساب الذي اشترى خطة عضوية أو مُنحت له.
@@ -884,7 +896,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the hours of busi
     ckb: `## 1. پێشەکی و بوار و پێناسەکان
 
 ### 1.1 مەبەستی ئەم بەڵگەنامەیە
-ئەم بەڵگەنامەیە پلەکانی ئەندامێتیی پارەدراو لە پلاتفۆرمی لێڤۆنیسدا ڕوون دەکاتەوە، و بە وردی دەڵێت هەر پلەیەک چی دەبەخشێت، چۆن دەکڕدرێت و چۆن بەرز دەکرێتەوە، کەی دەست پێدەکات و کەی کۆتایی دێت، چۆن هەڵدەوەشێنرێتەوە و چی دەگەڕێنرێتەوە، چی بۆ کڕیار دەمێنێتەوە لەوەی پێش کۆتاییهاتنی ئەندامێتییەکەی شایستەی بووە، و چی سوودەکانی ڕادەگرێت ئەگەر خراپ بەکاری بهێنێت.
+ئەم بەڵگەنامەیە پلەکانی ئەندامێتیی پارەدراو لە پلاتفۆرمی Levonis دا ڕوون دەکاتەوە، و بە وردی دەڵێت هەر پلەیەک چی دەبەخشێت، چۆن دەکڕدرێت و چۆن بەرز دەکرێتەوە، کەی دەست پێدەکات و کەی کۆتایی دێت، چۆن هەڵدەوەشێنرێتەوە و چی دەگەڕێنرێتەوە، چی بۆ کڕیار دەمێنێتەوە لەوەی پێش کۆتاییهاتنی ئەندامێتییەکەی شایستەی بووە، و چی سوودەکانی ڕادەگرێت ئەگەر خراپ بەکاری بهێنێت.
 
 ### 1.2 لایەنەکان
 فرۆشگا: {{LEVONIS_LEGAL_NAME}}، تۆمارکراو بە ژمارەی {{LEVONIS_REGISTRATION_NO}}، و ناونیشانی {{LEVONIS_ADDRESS}}. ئەندام: خاوەنی ئەو هەژمارەیە کە پلانێکی ئەندامێتی کڕیوە یان پێی بەخشراوە.

@@ -124,6 +124,10 @@ export const STRINGS = {
     stateResolved: 'محلولة',
     replyPlaceholder: 'رد الفريق...',
     reply: 'إرسال الرد',
+    // Reused verbatim from the warranty console's own attach controls — the
+    // same action, so the same words, in all three languages.
+    attach: 'إرفاق ملف',
+    uploading: 'جارٍ الرفع…',
     moveTo: 'نقل إلى...',
     customer: 'العميل',
     staffLabel: 'الفريق',
@@ -234,6 +238,8 @@ export const STRINGS = {
     stateResolved: 'Resolved',
     replyPlaceholder: 'Staff reply...',
     reply: 'Send reply',
+    attach: 'Attach file',
+    uploading: 'Uploading…',
     moveTo: 'Move to...',
     customer: 'Customer',
     staffLabel: 'Staff',
@@ -344,6 +350,8 @@ export const STRINGS = {
     stateResolved: 'چارەسەرکراوە',
     replyPlaceholder: 'وەڵامی تیم...',
     reply: 'ناردنی وەڵام',
+    attach: 'هاوپێچکردنی فایل',
+    uploading: 'بارکردن…',
     moveTo: 'گواستنەوە بۆ...',
     customer: 'کڕیار',
     staffLabel: 'تیم',

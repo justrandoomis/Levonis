@@ -52,11 +52,22 @@ const STRINGS = 'src/components/adminMemberships/strings.ts';
 const FOLDER = 'src/components/adminMemberships';
 const folderFiles = () => readdirSync(join(ROOT, FOLDER)).map((f) => `${FOLDER}/${f}`);
 
-/** The members table only — the support queue below it is another surface. */
+/**
+ * The members table only — what follows it in this file is another surface.
+ *
+ * The end boundary USED to be `function QueueSection`, the support queue that
+ * lived under this table. That queue moved to
+ * src/components/adminSupport/SupportQueue.tsx when it got its own sidebar
+ * entry («لا توجد صفحة في الادارة للرد على رسائل المستخدمين» — it was the
+ * second tab of a membership panel filed under marketing, so nobody found
+ * it). The reason for a boundary is unchanged and still load-bearing: the
+ * assertions below forbid a clickable `<tr>`, and a slice that ran to the end
+ * of the file would judge the members table by another section's markup.
+ */
 function membersSection(): string {
   const text = code(CONSOLE);
   const start = text.indexOf('function MembersSection');
-  const end = text.indexOf('function QueueSection');
+  const end = text.indexOf('function PlansSection');
   assert.ok(start > 0 && end > start, 'the members table must still be a section of its own');
   return text.slice(start, end);
 }

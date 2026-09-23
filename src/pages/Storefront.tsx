@@ -41,6 +41,7 @@ import {
 import { GOVERNORATE_LABELS } from '../lib/governorates';
 import { WidgetIcon } from '../components/merchant/profileIcons';
 import { useStore } from '../StoreContext';
+import { useCommunityAccess } from './community/access';
 import InstallAppButton from '../components/pwa/InstallAppButton';
 
 /**
@@ -78,6 +79,19 @@ export default function Storefront({
   const { loc, lang } = useLanguage();
   const { user } = useAuth();
   const { store: hostStore } = useStore();
+  /**
+   * THE BACK ARROW MUST NOT POINT AT A CLOSED DOOR.
+   *
+   * This shop is reachable by its OWN address and stays open while Levo
+   * Community is under maintenance — that is the deliberate shape of the gate
+   * (worker/lib/communityGate.ts). But the arrow in the cover's corner is the
+   * only way out of this page, and it points into the directory. While the
+   * server says this viewer may not enter, it points at the site's front page
+   * instead: a way out that works, rather than a maintenance card or a hidden
+   * arrow that strands the visitor on a shop.
+   */
+  const { access: communityAccess } = useCommunityAccess();
+  const backTo = communityAccess?.may_enter === false ? '/' : '/community';
 
   const [store, setStore] = useState<MerchantStore | null>(injected ?? null);
   const [loading, setLoading] = useState(!injected);
@@ -260,7 +274,7 @@ export default function Storefront({
               corners, not writing-direction ones. */}
           {hostStore ? (
             <a
-              href={`${MAIN_SITE}/community`}
+              href={`${MAIN_SITE}${backTo === '/' ? '' : backTo}`}
               className="absolute top-3 left-3 w-9 h-9 flex items-center justify-center text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
               aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
             >
@@ -268,7 +282,7 @@ export default function Storefront({
             </a>
           ) : (
             <Link
-              to="/community"
+              to={backTo}
               className="absolute top-3 left-3 w-9 h-9 flex items-center justify-center text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
               aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
             >

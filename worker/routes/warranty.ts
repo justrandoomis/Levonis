@@ -28,6 +28,10 @@ import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { getSetting, setSetting } from '../lib/settings';
 import { normalizeSerial, unitTotalMonths, type UnitRow } from '../lib/deviceOps';
+// The one definition of "a claim that is still open" lives with the claim
+// workflow that writes those stages; this screen must not grow a second one
+// that quietly drifts from it.
+import { CLOSED_CLAIM_SQL } from './devices';
 import {
   DEFAULT_WARRANTY_CONFIG,
   RECEIPT_NO_RE,
@@ -324,12 +328,28 @@ interface OrderUnitRow extends UnitRow {
   receipt_status: string | null;
   receipt_end: string | null;
   receipt_serial: string | null;
+  reg_user_id: string | null;
+  registered_at: string | null;
+  revoked_at: string | null;
+  holder_email: string | null;
+  holder_username: string | null;
+  holder_name: string | null;
+  open_claims: number | null;
 }
 
 /**
  * The order's warranty-eligible units, each with its serial and whichever
  * receipt it already has. This is what the order screen's "Warranty & Serial
  * Numbers" section renders — one row per PHYSICAL device, never per SKU.
+ *
+ * It also answers WHICH ACCOUNT HOLDS THE MACHINE. Registration is a
+ * different table with a different owner (worker/routes/devices.ts writes it;
+ * this file only reads), and for want of one LEFT JOIN this screen could
+ * show an admin a serial and a warranty window while «الطابعة المرتبطة» —
+ * the linked printer, the thing the customer will phone about — stayed
+ * invisible unless the admin already knew the serial to look it up by.
+ * `holder` is null for a revoked link: the row survives a release so the
+ * unlink keeps its date, but a released device is held by nobody.
  */
 warrantyAdminRoutes.get('/orders/:orderId', async (c) => {
   const orderId = c.req.param('orderId');
@@ -349,11 +369,16 @@ warrantyAdminRoutes.get('/orders/:orderId', async (c) => {
             u.warranty_end_at, u.policy_version, u.replaced_by_unit_id, u.replacement_of_unit_id,
             s.serial_raw, oi.name_snapshot, oi.unit_price_iqd, oi.option_snapshot,
             w.id AS receipt_id, w.receipt_no, w.status AS receipt_status, w.warranty_end_at AS receipt_end,
-            w.serial_raw AS receipt_serial
+            w.serial_raw AS receipt_serial,
+            r.user_id AS reg_user_id, r.registered_at, r.revoked_at,
+            ru.email AS holder_email, ru.username AS holder_username, ru.name AS holder_name,
+            (SELECT COUNT(*) FROM warranty_claims wc WHERE wc.unit_id = u.id AND NOT (${CLOSED_CLAIM_SQL})) AS open_claims
        FROM order_item_units u
        LEFT JOIN device_serials s ON s.unit_id = u.id
        LEFT JOIN order_items oi ON oi.id = u.order_item_id
        LEFT JOIN warranty_receipts w ON w.unit_id = u.id AND w.status IN ('draft','active')
+       LEFT JOIN device_registrations r ON r.unit_id = u.id
+       LEFT JOIN users ru ON ru.id = r.user_id
       WHERE u.order_id = ?
       ORDER BY u.order_item_id, u.unit_index`
   )
@@ -394,8 +419,25 @@ warrantyAdminRoutes.get('/orders/:orderId', async (c) => {
       warranty_start_at: u.warranty_start_at ?? null,
       warranty_end_at: u.warranty_end_at ?? null,
       months: unitTotalMonths(u),
+      base_months: u.warranty_base_months ?? null,
+      ext_months: Number(u.warranty_ext_months) || 0,
       replaced: !!u.replaced_by_unit_id,
       replacement_of: u.replacement_of_unit_id ?? null,
+      // Whether the coverage can be moved from this screen at all: a
+      // replacement that carries the original's end date has no months lever
+      // (worker/routes/devices.ts refuses it rather than saving a no-op).
+      carried_end: safeParse<{ carried?: string }>(u.policy_version, {}).carried === 'original_end',
+      open_claims: Number(u.open_claims ?? 0),
+      registration:
+        u.registered_at && !u.revoked_at
+          ? {
+              user_id: u.reg_user_id,
+              email: u.holder_email ?? null,
+              username: u.holder_username ?? null,
+              name: u.holder_name ?? null,
+              registered_at: u.registered_at,
+            }
+          : null,
       receipt: u.receipt_id
         ? {
             id: u.receipt_id,

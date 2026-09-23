@@ -57,11 +57,41 @@
  * `worker/lib/walletNotify.ts` masks the phone even in the wallet caption,
  * where the reviewer genuinely needs a contact, so nothing less careful is
  * acceptable in a message that exists only to say "something arrived".
+ *
+ * AND THE ONE MESSAGE THAT IS NOT «SOMETHING ARRIVED». The order notification
+ * is not read to be informed, it is read to DECIDE: whether today's run can
+ * carry it, whether the thing is in the room, whether to confirm it now. For
+ * as long as it carried seven facts and no product names it could not be read
+ * that way at all — it said «Items: 3» and the owner opened the admin panel
+ * every single time, which is the panel doing the notification's job.
+ * `orderAnnouncement` below is therefore allowed MORE than the paragraph above
+ * allows, and this is the exact list of what more:
+ *
+ *   • THE PRODUCT LINES — name, the already-resolved «option / colour» text,
+ *     quantity and line total — because they are the whole reason the message
+ *     is opened. A mystery spool prints its `name_snapshot` and never the
+ *     drawn product, so §8.2 is not defeated by the one surface that is handed
+ *     the in-memory line instead of the stored row.
+ *   • THE TRANSPORT, read from `SHIPPING_TYPE_LABELS` and never re-worded.
+ *   • THE CUSTOMER'S NAME, and the phone MASKED — `maskPhone`, the same
+ *     function and the same shape `worker/lib/walletNotify.ts` uses in the
+ *     wallet caption, where the reviewer genuinely has to call.
+ *   • THE DELIVERY AREA at governorate / area / landmark granularity.
+ *
+ * WHAT IT STILL REFUSES, which is the part of the paragraph above that did not
+ * move: the street line (`addresses.address`) is not in the message, the full
+ * phone is not in the message, and the email is not in the message. A courier
+ * needs a door; somebody deciding whether to confirm an order does not, and a
+ * group export holding every customer's street is a different kind of document
+ * from one holding «بغداد — الكرادة». `orderAnnouncement` does not even take
+ * the street as a parameter, so a later caller cannot pass it by accident.
  */
 
 import type { Env } from './types';
 import { notifyAdminTopic, type NotifyOutcome, type TopicKey } from './telegramAdmin';
-import { SHIPPING_TYPES, isPreorder, type ShippingType } from './shippingType';
+import { SHIPPING_TYPES, SHIPPING_TYPE_LABELS, isPreorder, type ShippingType } from './shippingType';
+import { maskPhone } from './phone';
+import { groupDigits, sanitizeUserText } from './walletNotify';
 
 /**
  * THE ORDER SPLIT, COMPUTED THE WAY THE REST OF THE SYSTEM COMPUTES IT.
@@ -88,11 +118,19 @@ import { SHIPPING_TYPES, isPreorder, type ShippingType } from './shippingType';
  * mistake, which is the one to make.
  */
 export function orderTopic(shippingType: unknown): TopicKey {
+  return isPreorder(normalizeShippingType(shippingType)) ? 'orders_preorder' : 'orders_direct';
+}
+
+/**
+ * The «anything unreadable is direct» rule of the comment above, as ONE
+ * function, because two things now depend on it: which topic the order is
+ * filed in, and which transport NAME the message prints. If those two ever
+ * normalised differently the group would show a message headed «شحن مباشر»
+ * sitting in «📝 Orders pre-order», and nothing would be wrong enough to log.
+ */
+function normalizeShippingType(shippingType: unknown): ShippingType {
   const raw = String(shippingType ?? '');
-  const type: ShippingType = (SHIPPING_TYPES as readonly string[]).includes(raw)
-    ? (raw as ShippingType)
-    : 'direct';
-  return isPreorder(type) ? 'orders_preorder' : 'orders_direct';
+  return (SHIPPING_TYPES as readonly string[]).includes(raw) ? (raw as ShippingType) : 'direct';
 }
 
 /**
@@ -125,6 +163,240 @@ export function orderTopic(shippingType: unknown): TopicKey {
  */
 export function ticketTopic(unitId: unknown): TopicKey {
   return unitId ? 'warranty' : 'support';
+}
+
+// ------------------------------------------------------------ order message
+
+/**
+ * HOW MANY PRODUCT LINES ARE PRINTED BEFORE THE REST IS COUNTED.
+ *
+ * `sendMessageToChat` slices the body at 4000 characters (worker/lib/telegram.ts)
+ * and says nothing when it does, so an unbounded list does not fail loudly —
+ * it silently eats the TOTAL at the bottom, which is the one figure the owner
+ * scrolls to. Every field below is length-capped by `sanitizeUserText`, so a
+ * fifteen-line list is roughly 2,100 characters on top of a header that cannot
+ * exceed a few hundred: the money is always still on screen. A cart with more
+ * lines than this is a cart the panel should be opened for anyway.
+ */
+const ORDER_LINES_SHOWN = 15;
+
+/**
+ * ONE PRODUCT LINE, AS BOTH ORDER PATHS ALREADY HOLD IT.
+ *
+ * Deliberately loose, and deliberately reading two names for the same money:
+ * `ComputedLine` (worker/routes/orders.ts) calls the line total `line`, while
+ * the community-store `PricedLine` (worker/routes/storeOrders.ts) calls it
+ * `line_total_iqd`. Normalising that difference HERE keeps both call sites a
+ * plain handoff of rows they already have in memory; the alternative is a
+ * mapping expression in each route, which is two more places for the message
+ * to drift apart from itself.
+ */
+export interface OrderAnnouncementLine {
+  name?: unknown;
+  name_ar?: unknown;
+  /**
+   * ALREADY HUMAN TEXT, not an id. `resolveCartLine` (worker/routes/cart.ts)
+   * builds it by looking every selected option value and the colour up in the
+   * product document and joining their DISPLAY names with ' / '. So «الخيار
+   * واللون» costs no query here and needs no second vocabulary.
+   */
+  variant?: unknown;
+  qty?: unknown;
+  line?: unknown;
+  line_total_iqd?: unknown;
+  /**
+   * Set on a bundle COMPONENT. Components carry zero money and belong under
+   * their parent, which is why the count this message replaces already
+   * filtered on exactly this field; printing them would show the owner a
+   * five-line order for a two-item cart, each component priced at nothing.
+   */
+  bundle_parent_item_id?: unknown;
+  /**
+   * §8.2 SURVIVES CONTACT WITH THE GROUP. On a mystery spool the sibling
+   * `name` and `product_id` carry the REAL drawn product — `planInventory`
+   * needs them — and only the `order_items` INSERT binds NULL in their place.
+   * Every other surface is protected structurally; this one is not, because it
+   * is handed the in-memory line rather than the stored row. So the snapshot
+   * is read FIRST and the real name is never reachable from here.
+   */
+  mystery_spool?: { name_snapshot?: unknown; variant_snapshot?: unknown } | null;
+}
+
+/**
+ * EVERYTHING THE MESSAGE IS ALLOWED TO SAY — and nothing the builder has to
+ * fetch. Every field is already in memory at both call sites at the moment the
+ * order commits, which is what keeps this function synchronous and what keeps
+ * it out of the request's critical path.
+ *
+ * All fields are optional and all are read defensively. `strictNullChecks` is
+ * OFF in this repo, so the compiler will not warn about a missing one, and the
+ * header above spells out what a throw in here would cost: the text is built
+ * EAGERLY by the caller, before `announceAfterResponse` is entered, so it
+ * lands on the request of a customer whose order has already committed. There
+ * is no `.toLocaleString()` on a possibly-undefined anywhere below.
+ */
+export interface OrderAnnouncementInput {
+  orderId?: unknown;
+  /** Set only for a community-store sale; it changes the headline, because the
+   *  first question about a store order is always whose store it was. */
+  storeName?: unknown;
+  customerName?: unknown;
+  /** Printed MASKED. See the header. */
+  phone?: unknown;
+  governorate?: unknown;
+  area?: unknown;
+  landmark?: unknown;
+  /** A `ShippingType`, normalised the same way `orderTopic` normalises it. */
+  shippingType?: unknown;
+  paymentMethodId?: unknown;
+  /** `orders.fulfillment_service`. Printed only when it is not 'standard'. */
+  fulfilmentService?: unknown;
+  totalIqd?: unknown;
+  bnplIqd?: unknown;
+  bnplDueAt?: unknown;
+  dueOnDeliveryIqd?: unknown;
+  /** Community-store sales only: what the merchant is owed from this order. */
+  merchantReceivableIqd?: unknown;
+  lines?: OrderAnnouncementLine[];
+}
+
+/**
+ * THE TWO PAYMENT METHODS, IN WORDS THE OWNER ALREADY WROTE.
+ *
+ * `allowedPaymentMethods` (worker/lib/paymentPolicy.ts) admits exactly
+ * `wallet` and `cash`, plus `full_advance` as the stored alias of `wallet`
+ * kept for orders placed before the rename. The Arabic is lifted verbatim from
+ * the customer's own payment summary
+ * (src/components/orders/PaymentBreakdown.tsx: «من المحفظة», «الدفع عند
+ * الاستلام») rather than written fresh, so the group and the customer are
+ * never reading two different names for one thing.
+ *
+ * AN UNKNOWN ID FALLS THROUGH AS ITSELF, sanitized. A message that says
+ * `gini` is honest and searchable; one that guesses «من المحفظة» for it would
+ * be a lie about where the money is, which is the only kind of mistake this
+ * line can make that matters.
+ */
+const PAYMENT_METHOD_AR: Record<string, string> = {
+  wallet: 'من المحفظة',
+  full_advance: 'من المحفظة',
+  cash: 'الدفع عند الاستلام',
+};
+
+/** Dinars, grouped by the deterministic formatter the wallet captions use —
+ *  never `toLocaleString`, whose output depends on the runtime's ICU data and
+ *  which throws nothing useful when handed an undefined. */
+function iqd(value: unknown): string {
+  const n = Number(value);
+  return `${groupDigits(Number.isFinite(n) ? n : 0)} د.ع`;
+}
+
+/**
+ * THE MESSAGE THE OWNER ACTUALLY READS WHEN AN ORDER LANDS.
+ *
+ * It replaces a seven-fact English template literal that lived inline at the
+ * checkout call site and said, in full: a new order exists, by a username, with
+ * N items, for a total. Not one product name, not one option, not one
+ * quantity, no transport, no customer and no area — so «Items: 3» was a
+ * prompt to go and open the admin panel, every time, which is the panel doing
+ * the notification's job. Everything added here is a value the handler had
+ * already computed and validated; the builder performs no query and can add no
+ * latency to a checkout.
+ *
+ * ARABIC, AND ONLY ARABIC. This is a STAFF message in the owner's own group,
+ * the same audience and the same register as `buildDepositCaption` and
+ * `TOPIC_LABELS`. The customer-facing ar/en/ckb rule does not reach it, so no
+ * Sorani is written here and none is needed.
+ *
+ * EVERY USER-SUPPLIED VALUE GOES THROUGH `sanitizeUserText`. A product name or
+ * a landmark carrying a bidi override would otherwise reorder the lines around
+ * it — the totals could be made to read as another line's — and a newline
+ * inside one would forge a field of its own. The send carries no parse_mode,
+ * so nothing can additionally activate as markup.
+ */
+export function orderAnnouncement(input: OrderAnnouncementInput = {}): string {
+  const lines = Array.isArray(input.lines) ? input.lines : [];
+  // The same filter the `Items:` count it replaces already applied.
+  const sellable = lines.filter((l) => !(l && l.bundle_parent_item_id));
+  const shown = sellable.slice(0, ORDER_LINES_SHOWN);
+  const hidden = sellable.length - shown.length;
+
+  const orderId = sanitizeUserText(input.orderId, { max: 64 });
+  const storeName = sanitizeUserText(input.storeName, { max: 80 });
+  const out: string[] = [];
+
+  out.push(storeName ? `🛒 طلب متجر جديد — ${orderId}` : `🛒 طلب جديد — ${orderId}`);
+  if (storeName) out.push(`المتجر: ${storeName}`);
+
+  const customer = sanitizeUserText(input.customerName, { max: 60 });
+  // `maskPhone` is the wallet caption's own function, used on the wallet's own
+  // terms: five leading digits, three trailing, stars in between. A reviewer
+  // can recognise a number they already hold; nobody can read one off a
+  // forwarded screenshot.
+  const phoneRaw = sanitizeUserText(input.phone, { max: 24 });
+  const phone = phoneRaw ? maskPhone(phoneRaw) : '';
+  if (customer || phone) out.push(`الزبون: ${[customer, phone].filter(Boolean).join(' · ')}`);
+
+  // AREA, NOT ADDRESS. `addresses.address` — the street line — is deliberately
+  // not a parameter of this function, so no later caller can pass it by
+  // accident. See the header contract.
+  const area = [
+    sanitizeUserText(input.governorate, { max: 40 }),
+    sanitizeUserText(input.area, { max: 40 }),
+  ]
+    .filter(Boolean)
+    .join(' — ');
+  const landmark = sanitizeUserText(input.landmark, { max: 60 });
+  if (area || landmark) out.push(`المنطقة: ${[area, landmark].filter(Boolean).join(' · ')}`);
+
+  // The transport NAME is owner-authored and lives in one place. Re-wording it
+  // here would be a second copy to keep in step with the storefront's.
+  out.push(`النقل: ${SHIPPING_TYPE_LABELS[normalizeShippingType(input.shippingType)].ar}`);
+
+  const payment = sanitizeUserText(input.paymentMethodId, { max: 40 });
+  const fulfilment = sanitizeUserText(input.fulfilmentService, { max: 40 });
+  // `hasOwnProperty`, not a bare lookup: `paymentMethodId` is a string that
+  // reached us from a request body, and a plain object answers 'constructor'
+  // and 'toString' with functions. `${PAYMENT_METHOD_AR['constructor']}` would
+  // paste a function body into the group message.
+  const payLabel = Object.prototype.hasOwnProperty.call(PAYMENT_METHOD_AR, payment)
+    ? PAYMENT_METHOD_AR[payment]
+    : payment;
+  const meta = [payment ? `الدفع: ${payLabel}` : ''];
+  // 'PRO' / 'PRO · 12H' is the vocabulary the admin order board already prints
+  // for this column (src/components/adminOrders/OrderBoardBadges.tsx); it is
+  // language-neutral on purpose and needs no new wording in any language.
+  if (fulfilment === 'pro_priority_12h') meta.push('⚡ PRO · 12H');
+  else if (fulfilment === 'pro_priority') meta.push('⚡ PRO');
+  const metaLine = meta.filter(Boolean).join(' · ');
+  if (metaLine) out.push(metaLine);
+
+  out.push('');
+  out.push(`الأصناف (${sellable.length}):`);
+  for (const l of shown) {
+    const spool = l && l.mystery_spool;
+    const name = sanitizeUserText(spool ? spool.name_snapshot : (l && (l.name_ar || l.name)), { max: 60 });
+    const variant = sanitizeUserText(spool ? spool.variant_snapshot : l && l.variant, { max: 50 });
+    const qtyNum = Number(l && l.qty);
+    const qty = Number.isFinite(qtyNum) && qtyNum > 0 ? Math.trunc(qtyNum) : 1;
+    const money = iqd(l && (l.line !== undefined && l.line !== null ? l.line : l.line_total_iqd));
+    out.push(`• ${name || 'صنف'}${variant ? ` — ${variant}` : ''} × ${qty} — ${money}`);
+  }
+  if (hidden > 0) out.push(`و ${groupDigits(hidden)} سطر آخر`);
+
+  out.push('');
+  out.push(`الإجمالي: ${iqd(input.totalIqd)}`);
+  const bnpl = Number(input.bnplIqd);
+  if (Number.isFinite(bnpl) && bnpl > 0) {
+    const due = sanitizeUserText(input.bnplDueAt, { max: 40 });
+    out.push(`الأقساط المؤجلة: ${iqd(bnpl)}${due ? ` — يستحق ${due}` : ''}`);
+  } else if (input.dueOnDeliveryIqd !== undefined && input.dueOnDeliveryIqd !== null) {
+    out.push(`المستحق عند التسليم: ${iqd(input.dueOnDeliveryIqd)}`);
+  }
+  if (input.merchantReceivableIqd !== undefined && input.merchantReceivableIqd !== null) {
+    out.push(`يستلم التاجر: ${iqd(input.merchantReceivableIqd)}`);
+  }
+
+  return out.join('\n');
 }
 
 /** What `announceToAdmins` adds to `NotifyOutcome`: the send threw. */

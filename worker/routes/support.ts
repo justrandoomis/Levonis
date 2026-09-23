@@ -58,6 +58,7 @@ import {
   oneOf,
 } from '../lib/http';
 import { newId } from '../lib/crypto';
+import { isSafeMediaKey } from '../lib/mediaStorage';
 import { audit } from '../lib/audit';
 import { announceAfterResponse, ticketTopic } from '../lib/adminTopicRouting';
 import { notifySupportReply } from '../lib/engagementNotify';
@@ -2458,7 +2459,63 @@ function ticketPublic(t: TicketRow, opts: { admin?: boolean } = {}) {
 
 function messagePublic(m: Record<string, unknown>) {
   // Customer-safe: staff identity stays internal; only the is_staff flag ships.
-  return { id: m.id, body: m.body, is_staff: !!m.is_staff, created_at: m.created_at };
+  //
+  // THE KEY NEVER SHIPS — THE URL DOES. `file_key` is the R2 object name and
+  // it is the thing the delivery route authorises against; handing it to a
+  // client would invite somebody to compose their own `/files/<key>` for a
+  // neighbouring ticket. `/files/…` is composed HERE so there is exactly one
+  // spelling of a support attachment's address in the product, and the
+  // delivery route in uploads.ts stays the only thing that decides who may
+  // read it.
+  const fileKey = typeof m.file_key === 'string' && m.file_key ? m.file_key : null;
+  return {
+    id: m.id,
+    body: m.body,
+    is_staff: !!m.is_staff,
+    created_at: m.created_at,
+    kind: typeof m.kind === 'string' && m.kind ? m.kind : 'text',
+    file_url: fileKey ? `/files/${fileKey}` : null,
+  };
+}
+
+/**
+ * WHAT A TICKET MESSAGE MAY SAY, AND WHAT IT MAY CARRY.
+ *
+ * One parser for both POST handlers — the customer's and the staff's — because
+ * the two used to share nothing but a copied line, and a rule enforced on one
+ * door is not a rule. It answers three questions at once:
+ *
+ *   1. IS THERE ANYTHING HERE AT ALL. `body` was `{ min: 1 }` and that was the
+ *      whole validation, which is correct while text is the only thing a
+ *      message can be. An attachment-only message has no text, so the minimum
+ *      moves off `body` and onto the message: text OR a file, never neither.
+ *
+ *   2. IS THIS FILE ACTUALLY THIS TICKET'S FILE. The key is built by
+ *      `buildMediaKey` as `support/<ticket id>/<kind>/<object>.<ext>` and the
+ *      upload route proved ownership of that ticket before a byte was stored.
+ *      Re-checking the prefix here is what stops a caller who obtained a key
+ *      for their OWN ticket from stapling it onto someone else's thread — the
+ *      upload check and this check are about two different tickets, and both
+ *      have to hold.
+ *
+ *   3. DOES THE KIND MATCH THE KEY. `kind` decides which element the client
+ *      renders, and an `<img>` pointed at an mp4 is a broken bubble. It is
+ *      derived from the key's own folder rather than trusted from the body, so
+ *      the row cannot disagree with the object it names.
+ */
+function ticketMessageInput(body: Record<string, unknown>, ticketId: string): { body: string; kind: 'text' | 'image' | 'video'; fileKey: string | null } {
+  const text = str(body.body, 'body', { min: 0, max: 4000, required: false });
+  const rawKey = body.fileKey;
+  if (rawKey === undefined || rawKey === null || rawKey === '') {
+    if (text.trim().length === 0) throw badRequest('Message is empty');
+    return { body: text, kind: 'text', fileKey: null };
+  }
+  if (!isSafeMediaKey(rawKey)) throw badRequest('Invalid file reference');
+  const key = rawKey;
+  if (!key.startsWith(`support/${ticketId}/`)) throw badRequest('That file does not belong to this ticket');
+  const folder = key.split('/')[2] ?? '';
+  if (folder !== 'attachments' && folder !== 'video') throw badRequest('Invalid file reference');
+  return { body: text, kind: folder === 'video' ? 'video' : 'image', fileKey: key };
 }
 
 supportRoutes.get('/tickets', requireAuth, async (c) => {
@@ -2562,7 +2619,7 @@ supportRoutes.get('/tickets/:id', requireAuth, async (c) => {
     .first<TicketRow>();
   if (!ticket) throw notFound('Ticket not found');
   const { results: messages } = await c.env.DB.prepare(
-    'SELECT id, body, is_staff, created_at FROM support_ticket_messages WHERE ticket_id = ? ORDER BY created_at ASC LIMIT 500'
+    'SELECT id, body, is_staff, created_at, kind, file_key FROM support_ticket_messages WHERE ticket_id = ? ORDER BY created_at ASC LIMIT 500'
   )
     .bind(ticket.id)
     .all<Record<string, unknown>>();
@@ -2577,15 +2634,32 @@ supportRoutes.post('/tickets/:id/messages', requireAuth, async (c) => {
     .first<TicketRow>();
   if (!ticket) throw notFound('Ticket not found');
   const body = await c.req.json().catch(() => ({}));
-  const message = str(body.body, 'body', { min: 1, max: 4000 });
+  const input = ticketMessageInput(body, ticket.id);
+  const message = input.body;
   const now = new Date().toISOString();
+  /**
+   * THE ID AND THE TIMESTAMP ARE MINTED HERE, NOT LEFT TO THE COLUMN DEFAULT.
+   *
+   * The response now carries the row that was just written, because the client
+   * appends it instead of re-fetching the thread. That is only honest if the
+   * id and the time in the response are the id and the time in the database —
+   * so `created_at` is bound explicitly rather than letting
+   * `strftime(...,'now')` pick a second value nobody can see. A bubble whose
+   * timestamp is a guess sorts wrongly the moment the thread is reloaded.
+   */
+  const msgId = newId('tkm');
   // A customer reply on a resolved ticket honestly reopens it (waiting_staff).
   await c.env.DB.batch([
-    c.env.DB.prepare('INSERT INTO support_ticket_messages (id, ticket_id, sender_id, is_staff, body) VALUES (?, ?, ?, 0, ?)').bind(
-      newId('tkm'),
+    c.env.DB.prepare(
+      'INSERT INTO support_ticket_messages (id, ticket_id, sender_id, is_staff, body, kind, file_key, created_at) VALUES (?, ?, ?, 0, ?, ?, ?, ?)'
+    ).bind(
+      msgId,
       ticket.id,
       user.id,
-      message
+      message,
+      input.kind,
+      input.fileKey,
+      now
     ),
     c.env.DB.prepare(
       "UPDATE support_tickets SET state = 'waiting_staff', updated_at = ?, last_customer_msg_at = ?, resolved_at = NULL, resolved_by = NULL WHERE id = ?"
@@ -2639,7 +2713,25 @@ supportRoutes.post('/tickets/:id/messages', requireAuth, async (c) => {
     );
   }
 
-  return c.json({ success: true });
+  /**
+   * THE ROW, NOT JUST `{success:true}`.
+   *
+   * The client used to answer its own send by throwing the thread away and
+   * asking for it again — `setThread(null)`, a spinner over every bubble, two
+   * more round trips — because a bare `{success:true}` gave it nothing to
+   * append. It has the row now: the same id, the same instant and the same
+   * shape the GET would have returned for it, so a reply lands as one new
+   * bubble under the last one.
+   *
+   * `ticket` carries the PRE-update state, so the state that ships is the one
+   * the batch above actually wrote, spelled out rather than re-read.
+   */
+  return c.json({
+    success: true,
+    message: messagePublic({ id: msgId, body: message, is_staff: 0, created_at: now, kind: input.kind, file_key: input.fileKey }),
+    ticket_state: 'waiting_staff',
+    updated_at: now,
+  });
 });
 
 // ============================================================ admin surface
@@ -2682,7 +2774,7 @@ supportRoutes.get('/admin/tickets/:id', async (c) => {
     .first<TicketRow>();
   if (!ticket) throw notFound('Ticket not found');
   const { results: messages } = await c.env.DB.prepare(
-    'SELECT id, body, is_staff, created_at FROM support_ticket_messages WHERE ticket_id = ? ORDER BY created_at ASC LIMIT 500'
+    'SELECT id, body, is_staff, created_at, kind, file_key FROM support_ticket_messages WHERE ticket_id = ? ORDER BY created_at ASC LIMIT 500'
   )
     .bind(ticket.id)
     .all<Record<string, unknown>>();
@@ -2694,18 +2786,26 @@ supportRoutes.post('/admin/tickets/:id/messages', async (c) => {
   const ticket = await c.env.DB.prepare('SELECT * FROM support_tickets WHERE id = ?').bind(c.req.param('id')).first<TicketRow>();
   if (!ticket) throw notFound('Ticket not found');
   const body = await c.req.json().catch(() => ({}));
-  const message = str(body.body, 'body', { min: 1, max: 4000 });
+  const input = ticketMessageInput(body, ticket.id);
+  const message = input.body;
   const now = new Date().toISOString();
   // The id is minted into a variable rather than inline because the
   // notification below keys its replay protection on THIS message: one reply,
-  // one buzz, however many times the request is retried.
+  // one buzz, however many times the request is retried. It is also what the
+  // response hands back, so the console appends the bubble it just sent
+  // instead of reloading the thread on top of itself.
   const msgId = newId('tkm');
   await c.env.DB.batch([
-    c.env.DB.prepare('INSERT INTO support_ticket_messages (id, ticket_id, sender_id, is_staff, body) VALUES (?, ?, ?, 1, ?)').bind(
+    c.env.DB.prepare(
+      'INSERT INTO support_ticket_messages (id, ticket_id, sender_id, is_staff, body, kind, file_key, created_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?)'
+    ).bind(
       msgId,
       ticket.id,
       admin.id,
-      message
+      message,
+      input.kind,
+      input.fileKey,
+      now
     ),
     c.env.DB.prepare("UPDATE support_tickets SET state = 'waiting_customer', updated_at = ?, last_staff_msg_at = ? WHERE id = ?").bind(
       now,
@@ -2713,7 +2813,7 @@ supportRoutes.post('/admin/tickets/:id/messages', async (c) => {
       ticket.id
     ),
   ]);
-  await audit(c.env.DB, admin.id, 'support.ticket.reply', ticket.id, { chars: message.length });
+  await audit(c.env.DB, admin.id, 'support.ticket.reply', ticket.id, { chars: message.length, kind: input.kind });
   /**
    * THE CUSTOMER IS TOLD THEIR TICKET WAS ANSWERED.
    *
@@ -2741,7 +2841,14 @@ supportRoutes.post('/admin/tickets/:id/messages', async (c) => {
     // simply nothing to keep the isolate alive for.
     void notifySupportReply(c.env, ticket.id, msgId);
   }
-  return c.json({ success: true });
+  // The row, for the same reason the customer path returns one: the console
+  // appends its own reply rather than re-fetching the thread it is looking at.
+  return c.json({
+    success: true,
+    message: messagePublic({ id: msgId, body: message, is_staff: 1, created_at: now, kind: input.kind, file_key: input.fileKey }),
+    ticket_state: 'waiting_customer',
+    updated_at: now,
+  });
 });
 
 supportRoutes.patch('/admin/tickets/:id', async (c) => {

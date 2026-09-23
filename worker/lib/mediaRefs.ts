@@ -305,6 +305,12 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   { table: 'chat_messages', column: 'file_key', kind: 'text', why: 'a chat attachment' },
   { table: 'claim_messages', column: 'file_key', kind: 'text', why: 'a warranty-claim attachment' },
   { table: 'community_complaint_messages', column: 'file_key', kind: 'text', why: 'a complaint attachment' },
+  // Migration 0107. Registered IN THE SAME COMMIT as the column, because
+  // `verifyMediaCoverage` refuses the whole sweep while ANY key-bearing
+  // column is unclassified — an unregistered support attachment would not
+  // merely be missed, it would silently turn the entire guarded cleanup into
+  // a no-op for every other prefix too.
+  { table: 'support_ticket_messages', column: 'file_key', kind: 'text', why: 'a support-ticket attachment' },
   { table: 'warranty_claims', column: 'evidence', kind: 'json', why: 'private evidence keys' },
   { table: 'return_cases', column: 'evidence', kind: 'json', why: 'private evidence keys' },
   { table: 'restriction_cases', column: 'evidence', kind: 'json', why: 'private evidence keys' },

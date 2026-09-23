@@ -32,6 +32,16 @@ export interface WarrantyUnitRow {
   warranty_start_at: string | null;
   warranty_end_at: string | null;
   months: number | null;
+  base_months: number | null;
+  ext_months: number;
+  /** A replacement unit that carries the ORIGINAL device's end date. Its
+   *  months are not the lever — the device route refuses to save a no-op. */
+  carried_end: boolean;
+  open_claims: number;
+  /** WHICH ACCOUNT HOLDS THE MACHINE. Null when nobody has linked it, or
+   *  when the link was released. The order screen could show a serial and a
+   *  warranty window while «الطابعة المرتبطة» stayed invisible. */
+  registration: { user_id: string | null; email: string | null; username: string | null; name: string | null; registered_at: string } | null;
   replaced: boolean;
   replacement_of: string | null;
   receipt: {
@@ -96,6 +106,22 @@ const STR = {
     notDelivered: 'الطلب غير مُسلَّم بعد — يمكن تجهيز الوصل الآن ويبدأ الضمان من التاريخ المذكور أدناه.',
     cancelled: 'الطلب ملغى — لا يُصدر ضمان لطلب لم يُسلَّم.',
     loading: 'جارٍ التحميل…',
+    linkedTo: 'الجهاز مرتبط بحساب',
+    linkedSince: 'منذ',
+    notLinked: 'غير مرتبط بأي حساب بعد',
+    openClaims: 'مطالبات ضمان مفتوحة',
+    editDuration: 'تعديل مدة الضمان',
+    durationTitle: 'مدة الضمان تُحسب مرة واحدة عند التسليم. تغييرها قرار متعمّد يُسجَّل في سجل التدقيق باسمك وتاريخه، ولا يُعاد إصدار الوصل المطبوع.',
+    baseMonths: 'المدة الأساسية (شهر)',
+    extMonths: 'التمديد (شهر)',
+    durationReason: 'السبب (5 أحرف على الأقل، يُسجَّل في سجل التدقيق)',
+    saveDuration: 'حفظ المدة',
+    durationSaved: 'تم تحديث مدة الضمان.',
+    monthsRequired: 'أدخل مدة أساسية صحيحة (1 إلى 240 شهرًا).',
+    shorterWarn: 'هذا التغيير يُنهي التغطية قبل تاريخها الحالي، وقد يكون الزبون قد أُبلغ بالتاريخ القديم. أكّد لتتابع.',
+    shorterConfirm: 'نعم، قصّر التغطية',
+    carriedEnd: 'وحدة بديلة تحمل تاريخ نهاية الجهاز الأصلي — عدّل ضمان الوحدة الأصلية.',
+    cancel: 'إلغاء',
   },
   en: {
     title: 'Warranty & Serial Numbers',
@@ -134,6 +160,22 @@ const STR = {
     notDelivered: 'The order is not delivered yet — the receipt can be prepared now and starts on the date below.',
     cancelled: 'The order was cancelled — no warranty is issued for an order that was never delivered.',
     loading: 'Loading…',
+    linkedTo: 'Linked to account',
+    linkedSince: 'since',
+    notLinked: 'Not linked to any account yet',
+    openClaims: 'open warranty claim(s)',
+    editDuration: 'Change warranty duration',
+    durationTitle: 'A warranty duration is computed once, at delivery. Changing it is a deliberate decision, recorded in the audit trail with your name and the time, and the printed receipt is not reissued.',
+    baseMonths: 'Base months',
+    extMonths: 'Extension months',
+    durationReason: 'Reason (min 5 characters, recorded in the audit trail)',
+    saveDuration: 'Save duration',
+    durationSaved: 'Warranty duration updated.',
+    monthsRequired: 'Enter a valid base duration (1 to 240 months).',
+    shorterWarn: 'This ends the coverage earlier than it ends today, and the customer may already have been told the old date. Confirm to continue.',
+    shorterConfirm: 'Yes, shorten the coverage',
+    carriedEnd: 'A replacement unit carrying the original device’s end date — change the original unit’s warranty instead.',
+    cancel: 'Cancel',
   },
 };
 
@@ -161,6 +203,12 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
     });
   const [drafts, setDrafts] = useState<Record<string, { serial: string; months: string; start: string; start0: string }>>({});
   const [copied, setCopied] = useState('');
+  // The warranty-duration editor, open for at most one unit at a time. The
+  // shorten confirmation arms ONLY after the server has refused this exact
+  // change once, so a live window can never be pulled in on a first click.
+  const [durationFor, setDurationFor] = useState<string | null>(null);
+  const [duration, setDuration] = useState({ base: '', ext: '', reason: '', shorter: false });
+  const [durationNote, setDurationNote] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -233,6 +281,62 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
     }
   };
 
+  const openDuration = (unit: WarrantyUnitRow) => {
+    setDurationNote('');
+    setErr(null);
+    if (durationFor === unit.id) {
+      setDurationFor(null);
+      return;
+    }
+    setDurationFor(unit.id);
+    setDuration({
+      base: unit.base_months !== null ? String(unit.base_months) : String(unit.months ?? ''),
+      ext: String(unit.ext_months ?? 0),
+      reason: '',
+      shorter: false,
+    });
+  };
+
+  /**
+   * Moves the unit's CLOCK — not the paper. The device route owns the
+   * warranty columns (this file only reads them), audits the change, and
+   * refuses a shortening it was not explicitly told about; that refusal is
+   * the prompt below, not an error to swallow.
+   */
+  const saveDuration = async (unit: WarrantyUnitRow) => {
+    const base = Number(duration.base);
+    const ext = Number(duration.ext || '0');
+    if (!Number.isInteger(base) || base < 1 || base > 240 || !Number.isInteger(ext) || ext < 0 || ext > 240) {
+      setErr(t.monthsRequired);
+      return;
+    }
+    if (duration.reason.trim().length < 5) {
+      setErr(t.reasonRequired);
+      return;
+    }
+    const key = `dur:${unit.id}`;
+    setBusy(key, true);
+    setErr(null);
+    try {
+      await api.patch(`/api/devices/admin/units/${unit.id}/warranty`, {
+        base_months: base,
+        ext_months: ext,
+        reason: duration.reason.trim(),
+        confirm_shorter: duration.shorter || undefined,
+      });
+      setDurationFor(null);
+      setDurationNote(t.durationSaved);
+      await load();
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'CONFIRM_SHORTER_REQUIRED') {
+        setDuration((d) => ({ ...d, shorter: true }));
+      }
+      setErr(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBusy(key, false);
+    }
+  };
+
   const generate = async (unit: WarrantyUnitRow) => {
     const d = drafts[unit.id];
     const key = `gen:${unit.id}`;
@@ -292,6 +396,12 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
       {err && (
         <div className="mb-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300" role="alert">
           {err}
+        </div>
+      )}
+
+      {durationNote && (
+        <div className="mb-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[12px] text-emerald-300" role="status">
+          {durationNote}
         </div>
       )}
 
@@ -417,6 +527,122 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
 
                   {!u.serial && !u.receipt && (
                     <p className="mt-1.5 text-[11px] text-amber-300/90">{t.needSerial}</p>
+                  )}
+
+                  {/* WHO HOLDS THE MACHINE, and the window it is under. The
+                      serial says which box; this says which customer account
+                      will phone about it, and whether a claim is already
+                      open on it. */}
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                    {u.registration ? (
+                      <span className="text-zinc-400" data-warranty-holder={u.id}>
+                        <ShieldCheck className="inline w-3 h-3 me-1 text-emerald-400" aria-hidden />
+                        {t.linkedTo}:{' '}
+                        <span className="text-zinc-200 break-all" dir="ltr">
+                          {u.registration.email || u.registration.username || u.registration.name || u.registration.user_id}
+                        </span>{' '}
+                        <span className="text-zinc-500">
+                          {t.linkedSince} {dateInput(u.registration.registered_at)}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-zinc-500" data-warranty-holder={u.id}>{t.notLinked}</span>
+                    )}
+                    {u.open_claims > 0 && (
+                      <span className="text-amber-300/90">
+                        <AlertTriangle className="inline w-3 h-3 me-1" aria-hidden />
+                        {u.open_claims} {t.openClaims}
+                      </span>
+                    )}
+                    <span className="text-zinc-500">
+                      {t.months}: <span className="text-zinc-300" dir="ltr">{u.months ?? '—'}</span>
+                      {' · '}
+                      {t.end}: <span className="text-zinc-300" dir="ltr">{dateInput(u.warranty_end_at) || '—'}</span>
+                    </span>
+                    {u.carried_end ? (
+                      <span className="text-zinc-500">{t.carriedEnd}</span>
+                    ) : (
+                      !u.replaced && (
+                        <button
+                          type="button"
+                          onClick={() => openDuration(u)}
+                          data-warranty-edit-duration={u.id}
+                          className="text-zinc-400 hover:text-white underline underline-offset-2"
+                        >
+                          {t.editDuration}
+                        </button>
+                      )
+                    )}
+                  </div>
+
+                  {durationFor === u.id && (
+                    <div className="mt-2 rounded-xl border border-zinc-700 bg-zinc-900/70 p-3 space-y-2">
+                      <p className="text-[11px] text-zinc-400 leading-relaxed">{t.durationTitle}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <label className="block">
+                          <span className="block text-[11px] font-bold text-zinc-400 mb-1">{t.baseMonths}</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={240}
+                            dir="ltr"
+                            value={duration.base}
+                            data-warranty-base={u.id}
+                            onChange={(e) => setDuration((d) => ({ ...d, base: e.target.value }))}
+                            className="w-24 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-[#6B46FF] focus:outline-none"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="block text-[11px] font-bold text-zinc-400 mb-1">{t.extMonths}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={240}
+                            dir="ltr"
+                            value={duration.ext}
+                            data-warranty-ext={u.id}
+                            onChange={(e) => setDuration((d) => ({ ...d, ext: e.target.value }))}
+                            className="w-24 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-[#6B46FF] focus:outline-none"
+                          />
+                        </label>
+                      </div>
+                      <label className="block">
+                        <span className="block text-[11px] font-bold text-zinc-400 mb-1">{t.durationReason}</span>
+                        <textarea
+                          rows={2}
+                          minLength={5}
+                          maxLength={500}
+                          value={duration.reason}
+                          data-warranty-reason={u.id}
+                          onChange={(e) => setDuration((d) => ({ ...d, reason: e.target.value }))}
+                          className="w-full bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 py-2 text-[13px] text-white focus:border-[#6B46FF] focus:outline-none resize-none"
+                        />
+                      </label>
+                      {duration.shorter && (
+                        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-200 leading-relaxed">
+                          {t.shorterWarn}
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void saveDuration(u)}
+                          disabled={busy(`dur:${u.id}`)}
+                          data-warranty-save-duration={u.id}
+                          className="inline-flex items-center gap-1.5 min-h-10 px-3.5 rounded-lg bg-[#6B46FF] hover:bg-[#5a3ae0] text-white text-[12px] font-bold disabled:opacity-40"
+                        >
+                          {busy(`dur:${u.id}`) ? <RefreshCw className="w-4 h-4 animate-spin" aria-hidden /> : <ShieldCheck className="w-4 h-4" aria-hidden />}
+                          {duration.shorter ? t.shorterConfirm : t.saveDuration}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDurationFor(null)}
+                          className="min-h-10 px-3 rounded-lg border border-zinc-700 bg-zinc-900 text-[12px] font-bold text-zinc-300 hover:bg-zinc-800"
+                        >
+                          {t.cancel}
+                        </button>
+                      </div>
+                    </div>
                   )}
 
                   {/* The paper is a snapshot on purpose, so a corrected serial

@@ -26,6 +26,15 @@ const Storefront = React.lazy(() => import('./pages/Storefront'));
 const MerchantStart = React.lazy(() => import('./pages/MerchantStart'));
 const StorefrontProduct = React.lazy(() => import('./pages/StorefrontProduct'));
 import UpdateReadyToast from './components/pwa/UpdateReadyToast';
+/**
+ * THE ONE BLOCKING WAIT, and it is mounted here for the same reason the intro
+ * is: an order is placed from the platform checkout and from a merchant's own
+ * subdomain, so the layer that covers that wait has to sit above both route
+ * trees. It is a STATIC import, not a lazy one — a takeover that has to
+ * download a chunk before it can block anything would arrive after the taps it
+ * exists to swallow. It draws nothing until something takes a hold.
+ */
+import AppBusy from './components/ui/AppBusy';
 import HostAppleIdentity from './components/pwa/HostAppleIdentity';
 /**
  * SPLIT OUT ON PURPOSE. The viewer is the only screen in the application that
@@ -85,6 +94,22 @@ const BundleDetail = React.lazy(() => import('./pages/BundleDetail'));
  */
 const RouteFallback = () => {
   useCharacterBusy(true);
+  /**
+   * AND IT TAKES THE SCREEN, not just the routed rectangle.
+   *
+   * This element is `min-h-dvh` and covers the page content — but BottomNav,
+   * the header and the back gesture render OUTSIDE every Suspense boundary
+   * below and stayed live and tappable while a chunk downloaded. A customer
+   * on a slow connection could therefore queue three navigations into a route
+   * that had not arrived yet.
+   *
+   * `route` is the lowest-ranked reason on purpose (src/lib/busy.ts): an
+   * order or a re-quote in flight keeps its own sentence, and a chunk that
+   * lands inside BUSY_DELAY_MS paints nothing at all. This is also the one
+   * place the reason is taken — it was declared, ranked and given a label in
+   * all three languages while nothing in the application ever held it.
+   */
+  useBusy(true, 'route');
   return (
     <div className="min-h-dvh bg-black" aria-busy="true" aria-live="polite">
       <span className="sr-only">…</span>
@@ -236,6 +261,9 @@ import FarmSkeleton, { GamesPageSkeleton } from './pages/farm/FarmSkeleton';
  * outside, so it must not drag the game's chunk into the first bundle.
  */
 import { FarmGate } from './pages/farm/shelved';
+// The community's maintenance gate. Eagerly imported for the same reason
+// FarmGate is: it wraps lazy routes, so it must exist before they load.
+import { CommunityGate } from './pages/community/access';
 import BrowseMissionTimer from './components/BrowseMissionTimer';
 const Policies = React.lazy(() => import('./pages/Policies'));
 const Support = React.lazy(() => import('./pages/Support'));
@@ -295,6 +323,7 @@ import EmailVerifyBanner from './components/auth/EmailVerifyBanner';
 const AppIntro = React.lazy(() => import('./components/bloub/AppIntro'));
 import { MotionCharacterFallbackHeader, useCharacterBusy } from './components/bloub/MotionCharacterAnchor';
 import { homeCriticalReadyStore } from './lib/appBootstrap';
+import { useBusy } from './lib/busy';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoaded } = useAuth();
@@ -679,23 +708,37 @@ function AppContent() {
               (It previously sat behind RequireCommunityProfile too, which
               redirected to /edit-profile whenever `username` was unset — so
               Google and Telegram accounts, which have none, could not reach
-              it either.) */}
-          <Route path="/community" element={<Community />} />
+              it either.)
+
+              IT IS NOW BEHIND CommunityGate — and the sentence above still
+              holds. The gate is not a PROFILE gate: it asks the server one
+              question, «is Levo Community open to me?», and a guest is as
+              welcome through an open one as a signed-in customer. What it
+              adds is the owner's maintenance switch and the allow-list beside
+              it (worker/lib/communityGate.ts), which is enforced on the
+              server; this wrapper only spares a refused visitor a page whose
+              every call would answer 503. */}
+          <Route path="/community" element={<CommunityGate><Community /></CommunityGate>} />
           {/* Resolves slug / store id / merchant id to the SAME storefront
               profile the subdomain serves; profile-only merchants from the
               pre-store era fall through to the legacy page inside. */}
-          <Route path="/community/store/:id" element={<CommunityStorePage />} />
+          <Route path="/community/store/:id" element={<CommunityGate><CommunityStorePage /></CommunityGate>} />
           {/* The subdomain-free way into a shop. Kept working forever so
               existing links, shared messages and search results never break
               (§57); the storefront reports its canonical subdomain URL. */}
-          <Route path="/community/store/:slug/p/:productSlug" element={<StorefrontProduct />} />
+          <Route path="/community/store/:slug/p/:productSlug" element={<CommunityGate><StorefrontProduct /></CommunityGate>} />
           {/* The customer-request marketplace. Browsable signed out; acting
               on it needs an account, which each control handles itself. */}
           <Route path="/requests" element={<Requests />} />
           <Route path="/merchant/start" element={<ProtectedRoute><MerchantStart /></ProtectedRoute>} />
           <Route path="/merchant" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
           <Route path="/merchant/*" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
-          <Route path="/followed-stores" element={<ProtectedRoute><FollowedStores /></ProtectedRoute>} />
+          {/* Behind the gate too: the page is a list of COMMUNITY stores and it
+              reads /api/community/followed, which the wall refuses. Without
+              this wrapper a refused visitor got the server's refusal rendered
+              as a red error box — honest, but not what «تحت الصيانة» should
+              look like. */}
+          <Route path="/followed-stores" element={<ProtectedRoute><CommunityGate><FollowedStores /></CommunityGate></ProtectedRoute>} />
           <Route path="/saved-items" element={<ProtectedRoute><SavedProducts /></ProtectedRoute>} />
           {/* «تنبيهاتي» — GATED, because /api/stock-alerts is behind requireAuth
               and a signed-out visitor would otherwise reach a page whose only
@@ -794,6 +837,7 @@ export default function App() {
                   unresolved-host fallback becoming the real application. */}
               <AppBootstrapLayer />
               <UpdateReadyToast />
+              <AppBusy />
               <AppContent />
             </StoreProvider>
           </Router>

@@ -49,6 +49,42 @@ test('the customer calculator computes no money of its own', () => {
   assert.ok(/reduce\(/.test(tools), 'the per-material totals are still derived from the payload');
 });
 
+/**
+ * THE UPLOAD HAS TO BE VISIBLE WHILE IT IS THE ONLY THING HAPPENING.
+ *
+ * WHAT THIS CAN AND CANNOT PROVE, stated because a source guard that oversells
+ * itself is worse than none. It cannot prove the row looks right — that needs a
+ * browser, and the page pulls in the router, the language and the currency
+ * contexts. What it CAN prove is the structural fact the bug turned on: the
+ * Calculate button, which carries the spinner for the measuring and pricing
+ * legs, is rendered behind `analysisId` — and `analysisId` does not exist until
+ * the upload has already finished. So the upload leg has nowhere to show itself
+ * unless the FILE ROW shows it, and this pins that it still does.
+ *
+ * And it pins the other half: no percentage. `uploadModel` is a single
+ * `fetch`, which reports no progress, so any number on this screen would be
+ * invented — the same rule the header of `components/header.tsx` states and
+ * the same one the Studio's frozen 87% is a lesson in.
+ */
+test('the calculator shows the upload on the file row, and invents no percentage', () => {
+  const tools = code(read('src/pages/Tools.tsx'));
+
+  // The Calculate button — and therefore its spinner — is gated on analysisId.
+  assert.match(tools, /\{analysisId && \(/, 'the Calculate button is no longer gated on analysisId');
+
+  // So the upload leg is surfaced on its own, from a flag the file row reads.
+  assert.match(tools, /stage === 'uploading'/, 'nothing distinguishes the upload leg any more');
+  const fileRow = tools.slice(tools.indexOf('{file ? ('), tools.indexOf('{s.change}'));
+  assert.ok(fileRow.length > 0, 'the file row could not be located');
+  assert.match(fileRow, /uploading/, 'the file row shows nothing while the file is going up');
+  assert.match(fileRow, /s\.uploading/, 'the file row must say so in the customer\'s language');
+
+  // A spinner, not a number. Anything shaped like a progress percentage here
+  // would be fabricated.
+  assert.ok(!/upload[A-Za-z]*(Percent|Progress)/i.test(tools), 'the upload must not carry a fabricated percentage');
+  assert.ok(!/<progress[^>]*value=/.test(tools), 'a valued progress bar claims a number nobody measured');
+});
+
 test('the merchant costing panel is reachable only from the merchant dashboard', () => {
   const dashboard = code(read('src/pages/MerchantDashboardPage.tsx'));
   assert.match(dashboard, /CostingTab/, 'the dashboard must mount the costing tab');

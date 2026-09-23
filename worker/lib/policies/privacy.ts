@@ -55,10 +55,20 @@ import type { PolicyDocument } from './types';
  * RETENTION PERIODS ARE PLACEHOLDERS. The code keeps orders, ledger rows,
  * acceptances and audit rows indefinitely; how long the owner INTENDS to keep
  * them is a decision, not a fact readable from a schema.
+ *
+ * VERSION 2 — WHY IT MOVED. Two corrections a customer could see on the
+ * page; the archive keeps version 1 byte for byte.
+ *   * THE NAME. The store is written «Levonis», in Latin script, in all three
+ *     languages. 2 transliterated occurrences left the body here.
+ *   * THE UNKNOWNS. 15 articles and 15 further lines in this document still state a
+ *     fact the owner has not given, so ./render.ts WITHHOLDS them from the published
+ *     text rather than show a customer a `{{TOKEN}}`. They are still authored
+ *     below, and each one returns of its own accord the moment its value is
+ *     written in and the version moves again.
  */
 export const privacy: PolicyDocument = {
   key: 'privacy',
-  version: 1,
+  version: 2,
   effective_at: '2026-01-01',
   title: {
     ar: 'سياسة الخصوصية',
@@ -69,7 +79,7 @@ export const privacy: PolicyDocument = {
     ar: `## 1. التمهيد
 
 ### 1.1 الغرض من هذه الوثيقة
-تبيّن هذه الوثيقة ما يجمعه ليفونيس من بيانات، ولماذا، وأين يُحفظ، ومن يطّلع عليه، وكم يبقى، وما حقوق الزبون فيه وكيف يمارسها.
+تبيّن هذه الوثيقة ما يجمعه Levonis من بيانات، ولماذا، وأين يُحفظ، ومن يطّلع عليه، وكم يبقى، وما حقوق الزبون فيه وكيف يمارسها.
 
 ### 1.2 المسؤول عن البيانات
 {{LEVONIS_LEGAL_NAME}}، العنوان {{LEVONIS_ADDRESS}}، القناة المعتمدة {{LEVONIS_SUPPORT_CONTACT}}، ومسؤول البيانات {{DATA_PROTECTION_CONTACT}}.
@@ -575,7 +585,7 @@ On a data question, this document prevails over the Store's other documents.
     ckb: `## 1. پێشەکی
 
 ### 1.1 مەبەستی ئەم بەڵگەنامەیە
-ئەم بەڵگەنامەیە ڕوون دەکاتەوە لێڤۆنیس چ داتایەک کۆدەکاتەوە، بۆچی، لە کوێ دەیپارێزێت، کێ دەیبینێت، چەند دەمێنێتەوە، و کڕیار چ مافێکی تێدایە و چۆن بەکاری دەهێنێت.
+ئەم بەڵگەنامەیە ڕوون دەکاتەوە Levonis چ داتایەک کۆدەکاتەوە، بۆچی، لە کوێ دەیپارێزێت، کێ دەیبینێت، چەند دەمێنێتەوە، و کڕیار چ مافێکی تێدایە و چۆن بەکاری دەهێنێت.
 
 ### 1.2 بەرپرسی داتا
 {{LEVONIS_LEGAL_NAME}}، ناونیشان {{LEVONIS_ADDRESS}}، کەناڵی پەسەندکراو {{LEVONIS_SUPPORT_CONTACT}}، و پەیوەندیی داتا {{DATA_PROTECTION_CONTACT}}.

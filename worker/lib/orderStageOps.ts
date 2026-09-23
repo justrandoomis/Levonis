@@ -54,7 +54,7 @@ import { OrderDeliveredV1 } from '@levonis/contracts/events/v1/OrderDelivered';
 import { deliversToHome, getSetting } from './settings';
 import { reachedMilestones, revealStampStatement } from './mysteryReveal';
 import { reclaimOrderRedemptionsStatement } from './offers';
-import { notifyOrderDelivered } from './orderNotify';
+import { notifyOrderStatus } from './orderNotify';
 
 /** Mirrors STOCK_DEDUCTED_STATES in the admin route — the same four statuses. */
 const STOCK_DEDUCTED_STATES = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
@@ -410,11 +410,32 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
    * silence — which is exactly what happens today.
    *
    * Before the stock block below, so a deduction that needs a human cannot
-   * also cost the customer their message. `notifyOrderDelivered` never throws
-   * and the event key is the STATUS, so the admin door's own call for the same
+   * also cost the customer their message. `notifyOrderStatus` never throws and
+   * the event key is the STATUS, so the admin door's own call for the same
    * order is a no-op rather than a second message.
+   *
+   * ==========================================================================
+   *  IT IS EVERY STATUS, NOT ONLY `delivered`. THIS WAS THE HOLE.
+   * ==========================================================================
+   * This line used to read `if (opts.to === 'delivered')`, and the legacy
+   * `PATCH /api/admin/orders/:id` dropdown next to it called
+   * `notifyOrderStatus` for all four. So WHICH DOOR THE ADMIN HAPPENED TO USE
+   * decided whether the customer was told their order was confirmed, shipped
+   * or cancelled — and the stage panel is the door the fulfilment screen
+   * actually offers, the one the modal's own note calls "already the
+   * authority". Confirming an order from the panel, or Al-Waseet reporting a
+   * parcel picked up, told the customer nothing at all.
+   *
+   * THE TRIGGER IS THE LEGACY STATUS CHANGING, not the stage. Fourteen stages
+   * map onto six statuses — five of the pre-order path's stages are all
+   * `shipped` — so keying on the stage would send five «تم شحن طلبك» messages
+   * for one journey. `legacyFrom !== legacyTo` sends one, and
+   * `notifyOrderStatus` ignores everything that is not one of the four worth a
+   * customer's attention (`processing` is a warehouse fact). The event key
+   * carries the status, so an order that legitimately reaches `shipped` twice
+   * — reversed and re-shipped — still notifies once.
    */
-  if (opts.to === 'delivered') await notifyOrderDelivered(env, order.id);
+  if (legacyFrom !== legacyTo) await notifyOrderStatus(env, order.id, legacyTo);
 
   const notes: string[] = [];
   const wasDeducted = STOCK_DEDUCTED_STATES.has(legacyFrom);

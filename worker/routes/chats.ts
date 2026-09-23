@@ -212,7 +212,30 @@ chatRoutes.post('/:id/messages', async (c) => {
   let fileKey: string | null = null;
   if (kind === 'image') {
     fileKey = str(body.fileKey, 'fileKey', { min: 5, max: 300 });
-    if (!fileKey.startsWith(`chat/${user.id}/`)) throw badRequest('Invalid image reference');
+    /**
+     * ======================================================================
+     *  THE KEY NAMES THE CONVERSATION, NOT THE SENDER.
+     * ======================================================================
+     * This line read `chat/${user.id}/` and had to be changed the day the
+     * upload route re-filed chat attachments under the chat — «الثاني الاسهل
+     * في فتح المحادثه», the owner's own reason. It was not changed, so EVERY
+     * attachment has been refused since: `uploads.ts` builds
+     * `chat/<chatId>/attachments/<id>.webp` (buildMediaKey, purpose='chat',
+     * entityId = the chat), the bytes land in R2, and this check then rejects
+     * the message the upload was for. The customer sees «تعذر إرسال الصورة»
+     * and an orphan object stays in the bucket. Nobody could send a picture in
+     * any conversation on this platform — the order chat included, which is
+     * the screen this is being fixed for.
+     *
+     * AND THE NEW FORM IS THE STRONGER CHECK, not merely the matching one.
+     * `assertParticipant` above has already established that this account is
+     * in THIS chat; pinning the key's first segment to the same chat id is
+     * therefore the whole question — a member cannot attach another
+     * conversation's file, which the sender-scoped form never prevented.
+     * `uploads.ts` verifies participation before it stores a byte, so the two
+     * halves now ask the same question in the same words.
+     */
+    if (!fileKey.startsWith(`chat/${chatId}/`)) throw badRequest('Invalid image reference');
     const head = await headMediaObject(c.env, 'private', fileKey);
     if (!head) throw badRequest('Image upload not found');
   }

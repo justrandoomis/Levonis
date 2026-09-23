@@ -721,11 +721,44 @@ export interface AdminReputation {
   events: AdminReputationEvent[];
 }
 
+/** One row of a complaint thread. `internal` is an admin-only note that the
+ *  parties never see (migration 0031); everything else is the reply. */
+export interface AdminComplaintMessage {
+  id: string;
+  complaint_id: string;
+  sender_id: string;
+  sender_role: string;
+  sender_name: string | null;
+  body: string;
+  file_key: string | null;
+  internal: number;
+  created_at: string;
+}
+
 export const adminCommunityApi = {
   overview: () => api.get<{ success: true } & CommunityOverview>('/api/admin/community/overview'),
   settings: () => api.get<{ settings: Record<string, string> }>('/api/admin/community/settings'),
   saveSettings: (body: Record<string, number>) =>
     api.patch<{ settings: Record<string, number>; applies_to: string }>('/api/admin/community/settings', body),
+
+  /**
+   * The maintenance gate — «ليفو كوميونيتي تحت الصيانة، واسمح بالأعضاء من
+   * قائمة في الادارة». Its own pair of routes rather than a couple of keys in
+   * `settings` above, because opening the community is a door and every flip
+   * of it is audited on the server (worker/routes/adminCommunity.ts).
+   */
+  gate: () =>
+    api.get<{
+      open: boolean;
+      closed: boolean;
+      allowed_user_ids: string[];
+      members: Array<{ id: string; username: string | null; name: string | null; email: string | null }>;
+    }>('/api/admin/community/gate'),
+  saveGate: (open: boolean, allowed_user_ids: string[]) =>
+    api.put<{ open: boolean; closed: boolean; allowed_user_ids: string[]; changed: boolean }>(
+      '/api/admin/community/gate',
+      { open, allowed_user_ids }
+    ),
 
   merchants: (q = '') =>
     api.get<{ merchants: AdminMerchantRow[] }>(
@@ -759,12 +792,23 @@ export const adminCommunityApi = {
   complaint: (id: string) =>
     api.get<{
       complaint: AdminComplaintRow;
-      messages: Record<string, unknown>[];
+      messages: AdminComplaintMessage[];
       escrow: AdminEscrow | null;
       escrow_events: Record<string, unknown>[];
     }>(`/api/admin/community/complaints/${id}`),
   setComplaintStatus: (id: string, status: string, resolution: string) =>
     api.post<{ status: string }>(`/api/admin/community/complaints/${id}/status`, { status, resolution }),
+  /**
+   * The REPLY. A status is not an answer — see the route's own header in
+   * worker/routes/adminCommunity.ts. `internal` is passed explicitly on every
+   * call, never left to a default, because the difference between the two is
+   * whether the person who complained reads it.
+   */
+  replyToComplaint: (id: string, body: string, internal: boolean) =>
+    api.post<{ message: AdminComplaintMessage }>(`/api/admin/community/complaints/${id}/messages`, {
+      body,
+      internal,
+    }),
 
   /** The settlement decision. Appends events; never rewrites amounts. */
   resolveEscrow: (id: string, decision: 'release' | 'refund' | 'partial_refund', reason: string, amount_iqd?: number) =>

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { newSqlite, SqliteD1, ROOT, createTableSql } from './fixtures/d1';
 import { preparePolicyAcceptance, isPolicyAcceptanceConflict, policyDocHash } from '../worker/lib/policyOps';
+import { getPolicyDocument } from '../worker/lib/policies';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 import type { Env } from '../worker/lib/types';
 
@@ -23,11 +24,16 @@ async function fixture() {
       .run(id,key,version,lang,'Title',`Body ${lang}`,hash,'published');
     return {id,hash};
   };
-  const ar = await seed('terms',1,'ar'); const en = await seed('terms',1,'en');
-  await seed('privacy',1,'ar');
+  // The version comes from the REGISTRY, never from a literal. Every
+  // correction to the text bumps `version` in worker/lib/policies/, and a
+  // fixture that seeded a hardcoded 1 would fail this whole file on the next
+  // one while saying nothing true about the transaction it is testing.
+  const V = (key: string) => getPolicyDocument(key)!.version;
+  const ar = await seed('terms',V('terms'),'ar'); const en = await seed('terms',V('terms'),'en');
+  await seed('privacy',V('privacy'),'ar');
   const env = {DB:new SqliteD1(raw)} as unknown as Env;
-  const accepted=[{key:'terms',version:1},{key:'privacy',version:1}];
-  return {raw,env,seed,ar,en,accepted};
+  const accepted=[{key:'terms',version:V('terms')},{key:'privacy',version:V('privacy')}];
+  return {raw,env,seed,ar,en,accepted,V};
 }
 
 /**
@@ -87,11 +93,11 @@ test('a failed order transaction leaves no order or detached consent', async () 
 });
 
 test('a policy published between quote verification and commit rolls the whole order back', async () => {
-  const {raw,env,seed,accepted}=await fixture();
+  const {raw,env,seed,accepted,V}=await fixture();
   try {
     const p=await preparePolicyAcceptance(env,'u','order:o1',accepted,{orderId:'o1'});
-    await seed('terms',2,'ar');
-    raw.prepare("UPDATE policy_documents SET status='archived' WHERE key='terms' AND version=1").run();
+    await seed('terms',V('terms')+1,'ar');
+    raw.prepare("UPDATE policy_documents SET status='archived' WHERE key='terms' AND version=?").run(V('terms'));
     await assert.rejects(env.DB.batch([env.DB.prepare("INSERT INTO orders VALUES ('o1')"),...p.statements]),isPolicyAcceptanceConflict);
     assert.equal(raw.prepare('SELECT COUNT(*) n FROM policy_acceptances').get()?.n,0);
     assert.equal(raw.prepare('SELECT COUNT(*) n FROM orders').get()?.n,0);
@@ -125,12 +131,12 @@ test('consent cannot be bypassed by an empty archive — the requirement is the 
 });
 
 test('database refuses edits and deletion of previously published text but permits archiving', async () => {
-  const {raw}=await fixture();
+  const {raw,ar}=await fixture();
   try {
-    for (const sql of ["UPDATE policy_documents SET body='changed' WHERE id='terms_1_ar'", "DELETE FROM policy_documents WHERE id='terms_1_ar'", "UPDATE policy_documents SET status='draft' WHERE id='terms_1_ar'"]) {
+    for (const sql of [`UPDATE policy_documents SET body='changed' WHERE id='${ar.id}'`, `DELETE FROM policy_documents WHERE id='${ar.id}'`, `UPDATE policy_documents SET status='draft' WHERE id='${ar.id}'`]) {
       assert.throws(()=>raw.exec(sql),/POLICY_IMMUTABLE/);
     }
-    raw.prepare("UPDATE policy_documents SET status='archived' WHERE id='terms_1_ar'").run();
-    assert.throws(()=>raw.exec("UPDATE policy_documents SET status='published' WHERE id='terms_1_ar'"),/POLICY_IMMUTABLE/);
+    raw.prepare("UPDATE policy_documents SET status='archived' WHERE id=?").run(ar.id);
+    assert.throws(()=>raw.exec(`UPDATE policy_documents SET status='published' WHERE id='${ar.id}'`),/POLICY_IMMUTABLE/);
   } finally {raw.close();}
 });

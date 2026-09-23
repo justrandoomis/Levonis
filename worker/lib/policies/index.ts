@@ -1,4 +1,5 @@
 import type { PolicyDocument, PolicyText } from './types';
+import { publishedPolicyBody } from './render';
 
 import { purchase } from './purchase';
 import { selling } from './selling';
@@ -58,7 +59,52 @@ export type PolicyKey = keyof typeof MODULES;
 
 export const POLICY_KEYS = Object.keys(MODULES) as readonly PolicyKey[];
 
-export const POLICY_DOCUMENTS: readonly PolicyDocument[] = POLICY_KEYS.map((key) => MODULES[key]);
+/**
+ * The corpus AS AUTHORED, placeholders and all. It exists for one reader:
+ * tests/policyCorpus.test.ts, which asserts that the unknowns are still named
+ * `{{LIKE_THIS}}` and still trilingual, so the owner's to-do list cannot rot.
+ * Nothing that serves, archives or hashes a document may read it — see
+ * ./render.ts for why the published text is a different string.
+ */
+export const POLICY_SOURCE_DOCUMENTS: readonly PolicyDocument[] = POLICY_KEYS.map((key) => MODULES[key]);
+
+/**
+ * The PUBLISHED text: the source with every clause that still states an
+ * unknown withheld. ./render.ts carries the reasoning; what matters here is
+ * that this is the only corpus the rest of the worker can see, so the bytes
+ * that are rendered, archived, hashed and accepted are one and the same.
+ *
+ * The body is a memoised GETTER, not a computed value, because the listing
+ * endpoint and policySync's presence check read `key`, `version` and `title`
+ * and never a body — and paying twelve milliseconds of every isolate's
+ * startup to render eighteen trilingual documents that the request may not
+ * even ask for is a cost with nothing on the other side of it.
+ */
+function publishedDocument(doc: PolicyDocument): PolicyDocument {
+  let body: PolicyText | null = null;
+  return {
+    key: doc.key,
+    version: doc.version,
+    effective_at: doc.effective_at,
+    title: doc.title,
+    get body(): PolicyText {
+      if (!body) {
+        body = {
+          ar: publishedPolicyBody(doc.body.ar),
+          en: publishedPolicyBody(doc.body.en),
+          ckb: publishedPolicyBody(doc.body.ckb),
+        };
+      }
+      return body;
+    },
+  };
+}
+
+const PUBLISHED = Object.fromEntries(
+  POLICY_KEYS.map((key) => [key, publishedDocument(MODULES[key])])
+) as Record<PolicyKey, PolicyDocument>;
+
+export const POLICY_DOCUMENTS: readonly PolicyDocument[] = POLICY_KEYS.map((key) => PUBLISHED[key]);
 
 /**
  * Sections exist so the reader can present a corpus this size as a structured
@@ -140,7 +186,7 @@ export function isPolicyKey(value: unknown): value is PolicyKey {
 
 /** The registry answer for one key, or null — never a database round trip. */
 export function getPolicyDocument(key: string): PolicyDocument | null {
-  return isPolicyKey(key) ? MODULES[key] : null;
+  return isPolicyKey(key) ? PUBLISHED[key] : null;
 }
 
 /** Which section a key belongs to, for the reader's table of contents. */

@@ -85,6 +85,20 @@ const STRINGS = {
     confirmUnlink: 'فكّ الربط',
     unlinking: 'جارٍ فكّ الربط…',
     unlinkedOk: 'تم فكّ ربط الجهاز.',
+    editWarranty: 'تعديل مدة الضمان',
+    warrantyTitle: 'تعديل مدة ضمان هذه الوحدة؟',
+    warrantyBody: 'مدة الضمان تُحسب مرة واحدة عند التسليم. تغييرها هنا قرار متعمّد — منحة من المالك أو تصحيح مدة أساسية مُدخلة بالخطأ — ويُسجَّل في سجل التدقيق باسمك وتاريخه.',
+    warrantyNote: 'لا يُعاد إصدار وصل الضمان المطبوع: الوصل لقطة بتاريخه، وإعادة إصداره إجراء منفصل من شاشة «الضمانات».',
+    baseMonths: 'المدة الأساسية (شهر)',
+    extMonths: 'التمديد (شهر)',
+    currentEnd: 'نهاية الضمان الحالية',
+    monthsRequired: 'أدخل مدة أساسية صحيحة (1 إلى 240 شهرًا).',
+    saveWarranty: 'حفظ المدة',
+    warrantySaved: 'تم تحديث مدة الضمان.',
+    shorterTitle: 'هذا التغيير يُقصّر ضمانًا قائمًا',
+    shorterBody: 'المدة الجديدة تُنهي التغطية قبل تاريخها الحالي. قد يكون الزبون قد أُبلغ بالتاريخ القديم. أكّد أنك تقصد ذلك.',
+    shorterConfirm: 'نعم، قصّر التغطية',
+    carriedEnd: 'هذه وحدة بديلة تحمل تاريخ نهاية الجهاز الأصلي — عدّل ضمان الوحدة الأصلية.',
     cancel: 'إلغاء',
     close: 'إغلاق',
   },
@@ -156,6 +170,20 @@ const STRINGS = {
     confirmUnlink: 'Unlink',
     unlinking: 'Unlinking…',
     unlinkedOk: 'Device unlinked.',
+    editWarranty: 'Change warranty duration',
+    warrantyTitle: 'Change this unit’s warranty duration?',
+    warrantyBody: 'A warranty duration is computed once, at delivery. Changing it here is a deliberate decision — an owner’s goodwill grant, or a base period that was entered wrong — and it is recorded in the audit trail with your name and the time.',
+    warrantyNote: 'The printed receipt is NOT reissued: the paper is a snapshot of its own date, and reissuing it is a separate action on the Warranties screen.',
+    baseMonths: 'Base months',
+    extMonths: 'Extension months',
+    currentEnd: 'Current warranty end',
+    monthsRequired: 'Enter a valid base duration (1 to 240 months).',
+    saveWarranty: 'Save duration',
+    warrantySaved: 'Warranty duration updated.',
+    shorterTitle: 'This shortens an existing warranty',
+    shorterBody: 'The new duration ends the coverage earlier than it ends today. The customer may already have been told the old date. Confirm that you mean it.',
+    shorterConfirm: 'Yes, shorten the coverage',
+    carriedEnd: 'This is a replacement unit carrying the original device’s end date — change the original unit’s warranty instead.',
     cancel: 'Cancel',
     close: 'Close',
   },
@@ -227,6 +255,26 @@ const STRINGS = {
     confirmUnlink: 'لابردنی بەستن',
     unlinking: 'لابردنی بەستن…',
     unlinkedOk: 'بەستنی ئامێرەکە لابرا.',
+    // OWNER: THE SORANI FOR THE WARRANTY-DURATION BLOCK IS YOURS TO WRITE BY
+    // HAND. Every key below carries the ARABIC text on purpose — it is never
+    // machine-translated Kurdish, and this screen is the one that SHORTENS a
+    // customer's live warranty, so a confirm button phrased by a machine is
+    // the worst possible place to start. The Sorani entries elsewhere in this
+    // table are the owner's own earlier wording and are untouched.
+    editWarranty: 'تعديل مدة الضمان', // OWNER: Sorani to be written by hand.
+    warrantyTitle: 'تعديل مدة ضمان هذه الوحدة؟', // OWNER: Sorani to be written by hand.
+    warrantyBody: 'مدة الضمان تُحسب مرة واحدة عند التسليم. تغييرها هنا قرار متعمّد — منحة من المالك أو تصحيح مدة أساسية مُدخلة بالخطأ — ويُسجَّل في سجل التدقيق باسمك وتاريخه.', // OWNER: Sorani to be written by hand.
+    warrantyNote: 'لا يُعاد إصدار وصل الضمان المطبوع: الوصل لقطة بتاريخه، وإعادة إصداره إجراء منفصل من شاشة «الضمانات».', // OWNER: Sorani to be written by hand.
+    baseMonths: 'المدة الأساسية (شهر)', // OWNER: Sorani to be written by hand.
+    extMonths: 'التمديد (شهر)', // OWNER: Sorani to be written by hand.
+    currentEnd: 'نهاية الضمان الحالية', // OWNER: Sorani to be written by hand.
+    monthsRequired: 'أدخل مدة أساسية صحيحة (1 إلى 240 شهرًا).', // OWNER: Sorani to be written by hand.
+    saveWarranty: 'حفظ المدة', // OWNER: Sorani to be written by hand.
+    warrantySaved: 'تم تحديث مدة الضمان.', // OWNER: Sorani to be written by hand.
+    shorterTitle: 'هذا التغيير يُقصّر ضمانًا قائمًا', // OWNER: Sorani to be written by hand.
+    shorterBody: 'المدة الجديدة تُنهي التغطية قبل تاريخها الحالي. قد يكون الزبون قد أُبلغ بالتاريخ القديم. أكّد أنك تقصد ذلك.', // OWNER: Sorani to be written by hand.
+    shorterConfirm: 'نعم، قصّر التغطية', // OWNER: Sorani to be written by hand.
+    carriedEnd: 'هذه وحدة بديلة تحمل تاريخ نهاية الجهاز الأصلي — عدّل ضمان الوحدة الأصلية.', // OWNER: Sorani to be written by hand.
     cancel: 'هەڵوەشاندنەوە',
     close: 'داخستن',
   },
@@ -252,16 +300,19 @@ interface AdminDevice {
   };
   replaced_by_unit_id: string | null;
   replacement_of_unit_id: string | null;
-  registration: { registered_at: string; revoked_at: string | null } | null;
-  /** Present on `/admin/units` lookups (serial / email / user_id). */
-  buyer?: AdminAccount | null;
-  holder?: AdminAccount | null;
+  registration: { user_id: string | null; registered_at: string; revoked_at: string | null } | null;
+  /** WHO BOUGHT IT and WHO HOLDS IT — on every admin branch, not only the
+   *  serial lookup: an admin searching by order number or by the customer's
+   *  email is exactly the admin who does not know the serial yet. */
+  buyer: AdminAccount | null;
+  holder: AdminAccount | null;
 }
 
 /** An audited unit action waiting on the admin's confirmation and reason. */
 type PendingUnitAction =
   | { kind: 'reassign'; device: AdminDevice; serial: string; detail: string }
-  | { kind: 'replace'; device: AdminDevice };
+  | { kind: 'replace'; device: AdminDevice }
+  | { kind: 'warranty'; device: AdminDevice };
 
 interface AdminAccount {
   id: string;
@@ -389,6 +440,13 @@ export default function AdminSerials() {
   const [pendingSerial, setPendingSerial] = useState('');
   const [pendingBusy, setPendingBusy] = useState(false);
   const [pendingError, setPendingError] = useState('');
+  // The warranty-duration edit: the two month fields, and the second,
+  // explicit consent the server demands before a window is pulled IN. The
+  // flag is armed only after the server has refused once, so the admin can
+  // never shorten a live warranty on the first click.
+  const [pendingBase, setPendingBase] = useState('');
+  const [pendingExt, setPendingExt] = useState('');
+  const [pendingShorter, setPendingShorter] = useState(false);
 
   const loadBySerial = useCallback(async (q: string) => {
     if (!q.trim()) return;
@@ -517,6 +575,9 @@ export default function AdminSerials() {
     setPendingReason('');
     setPendingSerial('');
     setPendingError('');
+    setPendingShorter(false);
+    setPendingBase(action.device.warranty.base_months !== null ? String(action.device.warranty.base_months) : '');
+    setPendingExt(String(action.device.warranty.ext_months ?? 0));
   };
 
   const confirmPending = async () => {
@@ -534,6 +595,26 @@ export default function AdminSerials() {
       if (pending.kind === 'reassign') {
         await api.post(`/api/devices/admin/units/${pending.device.unit_id}/serial`, { serial: pending.serial, reassign: true, reason });
         setSerialDrafts((d) => ({ ...d, [pending.device.unit_id]: '' }));
+      } else if (pending.kind === 'warranty') {
+        const base = Number(pendingBase);
+        if (!Number.isInteger(base) || base < 1 || base > 240) {
+          setPendingError(s.monthsRequired);
+          return;
+        }
+        const ext = Number(pendingExt || '0');
+        if (!Number.isInteger(ext) || ext < 0 || ext > 240) {
+          setPendingError(s.monthsRequired);
+          return;
+        }
+        await api.patch(`/api/devices/admin/units/${pending.device.unit_id}/warranty`, {
+          base_months: base,
+          ext_months: ext,
+          reason,
+          // Sent only after the server has already refused this exact change
+          // once and the admin ticked the box below.
+          confirm_shorter: pendingShorter || undefined,
+        });
+        setUnitsNotice(s.warrantySaved);
       } else {
         const res = await api.post<{ note: string }>(`/api/devices/admin/units/${pending.device.unit_id}/replace`, {
           new_serial: pendingSerial.trim() || undefined,
@@ -544,6 +625,10 @@ export default function AdminSerials() {
       setPending(null);
       refreshCurrent();
     } catch (e) {
+      // The server refuses a shortening it was not told about. That refusal
+      // is the prompt, not an error to swallow: arm the confirmation and let
+      // the admin say it again on purpose.
+      if (e instanceof ApiError && e.code === 'CONFIRM_SHORTER_REQUIRED') setPendingShorter(true);
       setPendingError(e instanceof ApiError ? e.message : s.error);
     } finally {
       setPendingBusy(false);
@@ -572,6 +657,7 @@ export default function AdminSerials() {
   };
 
   const replaceUnit = (device: AdminDevice) => openPending({ kind: 'replace', device });
+  const editWarranty = (device: AdminDevice) => openPending({ kind: 'warranty', device });
 
   // ------------------------------------------------------------ claims tab
   const [claims, setClaims] = useState<AdminClaim[]>([]);
@@ -732,6 +818,19 @@ export default function AdminSerials() {
                     {u.warranty.base_months !== null ? `${u.warranty.base_months}m` : '—'}
                     {u.warranty.ext_months > 0 ? ` +${u.warranty.ext_months}m` : ''}
                   </div>
+                  {/* The duration itself, not just the delivery date it is
+                      measured from. A replaced unit is frozen here for the
+                      same reason it is frozen everywhere else on this row. */}
+                  {!u.replaced_by_unit_id && (
+                    <button
+                      type="button"
+                      onClick={() => editWarranty(u)}
+                      disabled={busyUnit === u.unit_id}
+                      className="inline-flex items-center gap-1 mt-1 text-[11px] text-zinc-400 hover:text-white transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+                    >
+                      <ShieldCheck className="w-3 h-3" aria-hidden="true" />{s.editWarranty}
+                    </button>
+                  )}
                 </td>
                 <td className="py-3 px-4"><CoverageBadge device={u} s={s} /></td>
                 <td className="py-3 px-4 text-[11px] leading-relaxed">
@@ -993,7 +1092,7 @@ export default function AdminSerials() {
           </button>
           <div className="pe-10">
             <h3 id="admin-unit-action-title" className="text-white text-base font-bold">
-              {pending?.kind === 'replace' ? s.replaceTitle : s.reassignTitle}
+              {pending?.kind === 'replace' ? s.replaceTitle : pending?.kind === 'warranty' ? s.warrantyTitle : s.reassignTitle}
             </h3>
             {pending && (
               <p className="text-zinc-400 text-[12px] mt-1">
@@ -1009,8 +1108,19 @@ export default function AdminSerials() {
             )}
           </div>
           <p className="text-zinc-400 text-sm leading-relaxed">
-            {pending?.kind === 'replace' ? `${s.replaceBody} ${s.replaceNote}` : s.reassignConfirm}
+            {pending?.kind === 'replace'
+              ? `${s.replaceBody} ${s.replaceNote}`
+              : pending?.kind === 'warranty'
+                ? s.warrantyBody
+                : s.reassignConfirm}
           </p>
+          {/* The paper is a snapshot by design; moving the clock never
+              rewrites a receipt already handed over. Saying so here is the
+              difference between a snapshot and a document that went stale
+              without anyone being told. */}
+          {pending?.kind === 'warranty' && (
+            <p className="text-zinc-500 text-[12px] leading-relaxed">{s.warrantyNote}</p>
+          )}
           {/* The server's own account of the clash — which unit holds the serial today. */}
           {pending?.kind === 'reassign' && pending.detail && (
             <p className="text-zinc-500 text-[12px] leading-relaxed" dir="auto">{pending.detail}</p>
@@ -1029,6 +1139,52 @@ export default function AdminSerials() {
                 disabled={pendingBusy}
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm font-mono outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-[#BAA369]"
               />
+            </div>
+          )}
+          {pending?.kind === 'warranty' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label htmlFor="admin-unit-warranty-base" className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.baseMonths}</label>
+                  <input
+                    id="admin-unit-warranty-base"
+                    type="number"
+                    min={1}
+                    max={240}
+                    step={1}
+                    dir="ltr"
+                    value={pendingBase}
+                    onChange={(e) => setPendingBase(e.target.value)}
+                    disabled={pendingBusy}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="admin-unit-warranty-ext" className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.extMonths}</label>
+                  <input
+                    id="admin-unit-warranty-ext"
+                    type="number"
+                    min={0}
+                    max={240}
+                    step={1}
+                    dir="ltr"
+                    value={pendingExt}
+                    onChange={(e) => setPendingExt(e.target.value)}
+                    disabled={pendingBusy}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+                  />
+                </div>
+              </div>
+              <p className="text-[12px] text-zinc-500">
+                {s.currentEnd}: <span className="text-zinc-300">{fmtDate(pending.device.warranty.end_at, lang)}</span>
+              </p>
+              {pendingShorter && (
+                <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
+                  <p className="text-amber-200 text-[13px] font-bold">{s.shorterTitle}</p>
+                  <p className="text-amber-200/80 text-[12px] leading-relaxed">{s.shorterBody}</p>
+                  <p className="text-amber-200/80 text-[12px] font-bold">{s.shorterConfirm}</p>
+                </div>
+              )}
             </div>
           )}
           <div>
@@ -1063,7 +1219,15 @@ export default function AdminSerials() {
               disabled={pendingBusy || pendingReason.trim().length < 5}
               className="min-h-[44px] rounded-xl bg-[#ef233c] text-white text-sm font-bold hover:brightness-110 disabled:opacity-50 transition-[filter,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
             >
-              {pendingBusy ? s.working : pending?.kind === 'replace' ? s.replace : s.confirmReassign}
+              {pendingBusy
+                ? s.working
+                : pending?.kind === 'replace'
+                  ? s.replace
+                  : pending?.kind === 'warranty'
+                    ? pendingShorter
+                      ? s.shorterConfirm
+                      : s.saveWarranty
+                    : s.confirmReassign}
             </button>
           </div>
         </div>

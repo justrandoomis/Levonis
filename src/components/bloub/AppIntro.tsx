@@ -114,6 +114,15 @@ interface Journey {
   plan: TravelPlan;
   startedAt: number;
   boot: boolean;
+  /**
+   * TRUE WHEN THE DESTINATION IS A STAGE, carried on the journey because by
+   * the time it lands the anchor that started it may not be the one
+   * `measureCharacterAnchor()` would answer with any more. A stage exists to
+   * be reacted to — the order-confirmation panel raises one — so the arrival
+   * plays `celebrate` rather than the 320ms `arrival` punctuation a route
+   * change gets. See `mascot.navigationComplete`.
+   */
+  stage: boolean;
 }
 
 /**
@@ -242,7 +251,11 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     if (failed) return;
     mascot.setVisible(!document.hidden);
 
-    let frameId = 0;
+    /**
+     * A MEASUREMENT IS OWED THIS FRAME. Not a handle to a `requestAnimationFrame`
+     * of its own — see `schedule` and the read phase in `tick`.
+     */
+    let measurePending = false;
     let rafId = 0;
     let animateNext = false;
     let occupied: HTMLElement | null = null;
@@ -304,9 +317,10 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     };
 
     const finishJourney = () => {
+      const landed = journeyRef.current;
       journeyRef.current = null;
       setPhase('docked');
-      mascot.navigationComplete();
+      mascot.navigationComplete(landed?.stage ? 'stage' : 'route');
       // Any sub-journey drift the anchor accumulated while the character was
       // in the air is applied now, at rest, where a few pixels are invisible.
       // Applying it mid-flight would have meant replacing the plan, and
@@ -383,6 +397,34 @@ export default function AppIntro({ ready }: { ready: boolean }) {
 
     const tick = (now: number) => {
       rafId = running ? window.requestAnimationFrame(tick) : 0;
+      /**
+       * THE READ PHASE, AND IT IS FIRST BECAUSE THE ORDER IS THE WHOLE FIX.
+       *
+       * `measure` asks the browser real questions about layout —
+       * `getBoundingClientRect`, `getComputedStyle`, `offsetParent`. Those are
+       * cheap only when the browser has nothing to recompute. It used to run
+       * on a `requestAnimationFrame` of its OWN, queued from a capture-phase
+       * scroll listener, which meant it landed in the same frame as this loop
+       * and always AFTER it: `tick` re-arms itself on its first line, so a
+       * scroll event fired after frame N put `measure` behind `tick` in frame
+       * N+1. By then this function had already written `style.transform` onto
+       * the character and pushed six attributes onto the SVG. A write followed
+       * by a read of layout is a FORCED SYNCHRONOUS REFLOW — the browser must
+       * stop and lay the whole document out again before it can answer — once
+       * per scroll frame, on every route, on a phone. That is the owner's
+       * «التعليك lagging والتشنج ... بين فترات متقاربه ومستمره».
+       *
+       * Folding it in here removes the reflow BY CONSTRUCTION rather than by
+       * removing a measurement: every question is asked before this frame
+       * writes anything, so there is never a write for a read to follow. The
+       * invariant the journey machinery depends on is untouched — the flag is
+       * consumed here and nowhere else, so `measure` still runs at most once
+       * per frame, and a burst of scroll events still collapses onto one pass.
+       */
+      if (measurePending) {
+        measurePending = false;
+        measure();
+      }
       // Clamped so a tab that was throttled does not resume with a single
       // enormous step that teleports the gaze — the very thing §4 forbids.
       const dt = lastFrameAt ? Math.min(0.05, Math.max(0, (now - lastFrameAt) / 1000)) : 1 / 60;
@@ -431,8 +473,13 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       rafId = 0;
     };
 
+    /**
+     * THE FRAME'S ONE MEASUREMENT. Called only from the read phase at the top
+     * of `tick`, never scheduled on a frame of its own. Everything it asks the
+     * browser is asked before `writeFrame` below, and before this pass writes
+     * anything either: reads first, then writes, in that order, always.
+     */
     const measure = () => {
-      frameId = 0;
       const animate = animateNext;
       animateNext = false;
       const now = performance.now();
@@ -573,7 +620,11 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       // replaces only the destination, so it still lands, on the new anchor.
       // A route change (animate) is a genuinely new intention and still plans.
       if (inFlight && !animate) {
-        journeyRef.current = { ...inFlight, plan: retargetTravel(inFlight.plan, next) };
+        // Retargeting keeps the clock and replaces the destination — so it
+        // must also replace what that destination is WORTH. A journey
+        // retargeted onto the confirmation stage still celebrates when it
+        // lands; one retargeted off it no longer does.
+        journeyRef.current = { ...inFlight, plan: retargetTravel(inFlight.plan, next), stage: target.kind === 'stage' };
         return;
       }
 
@@ -595,7 +646,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
         next.x + next.size / 2 - last.x - last.size / 2,
         next.y + next.size / 2 - last.y - last.size / 2,
       );
-      journeyRef.current = { plan, startedAt: performance.now(), boot };
+      journeyRef.current = { plan, startedAt: performance.now(), boot, stage: target.kind === 'stage' };
       setPhase('travelling');
       // Arriving on a stage is not navigation. The page that raised it says
       // what the character should feel there (the confirmation panel signals
@@ -608,9 +659,24 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       start();
     };
 
+    /**
+     * ASK FOR A MEASUREMENT ON THE NEXT FRAME. A FLAG, NOT A FRAME.
+     *
+     * This used to own a `requestAnimationFrame` of its own, which is how the
+     * measurement ended up behind the draw in the same frame (see the read
+     * phase in `tick`). It now raises a flag the loop consumes at the top of
+     * its next turn, so the collapsing behaviour is identical — a hundred
+     * scroll events between two frames are still one measurement — and the
+     * ordering is fixed rather than incidental.
+     *
+     * The loop has to be turning for the flag to be read. It always is while
+     * the tab is visible; a hidden tab serves frames to nobody, and
+     * `onVisibility` re-arms the loop and the measurement together.
+     */
     function schedule(animate = false) {
       animateNext = animateNext || animate;
-      if (!frameId) frameId = window.requestAnimationFrame(measure);
+      measurePending = true;
+      if (!document.hidden) start();
     }
     scheduleRef.current = schedule;
 
@@ -732,7 +798,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       scheduleRef.current = () => {};
       stop();
       window.clearTimeout(settleTimer);
-      window.cancelAnimationFrame(frameId);
+      measurePending = false;
       journeyRef.current = null;
       mascot.activity('anchor-loading', null);
       mascot.activity('anchor-travel', null);

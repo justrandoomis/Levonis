@@ -1,0 +1,526 @@
+/**
+ * LEVO COMMUNITY IS UNDER MAINTENANCE — «ليفو كوميونيتي تحت الصيانة، واسمح
+ * بالأعضاء من قائمة في الادارة».
+ *
+ * This suite pins what that had to mean to be true rather than decorative:
+ *
+ *   * THE SERVER REFUSES, not just the app. /api/community writes real rows —
+ *     customer requests, merchant profiles, follows — and answers a curl from
+ *     anyone, so every gated route answers 503 COMMUNITY_CLOSED to a visitor
+ *     while it is shut, and a refused request creates NOTHING;
+ *   * IT SHIPS CLOSED. With no `admin_settings.communityGate` row the
+ *     community is shut, so the deploy itself carries out the instruction.
+ *     Only the literal `{"open": true}` opens it — a blank, a malformed
+ *     value, `{"open": "true"}` or a non-array allow-list all read as closed
+ *     with an EMPTY list;
+ *   * THE ALLOW-LIST LETS EXACTLY THE NAMED IDS IN, and matches on `users.id`
+ *     — never a username or an email, which their owner can change;
+ *   * THE ADMIN DOOR STAYS OPEN on the existing `users.role` check;
+ *   * THE MERCHANT'S OWN SHOP IS OUTSIDE THE WALL. /my-store,
+ *     /my-store/products and /profile-status answer while the community is
+ *     shut, because a merchant runs a live business from them and closing a
+ *     browsing surface must not strand trade in flight;
+ *   * ONE SWITCH, NO DEPLOY, AND AUDITED. One settings write through the
+ *     admin route opens it or adds a member, and every flip leaves an audit
+ *     row naming who did it;
+ *   * CLOSING IS NOT A WIPE. Every merchant, product, request and follow is
+ *     still there, byte for byte, when it reopens;
+ *   * and the client half is PRESENTATION: it reads the same three booleans
+ *     and refuses to invent an answer it could not read.
+ *
+ * The real routes run against the real migrations through the SQLite adapter;
+ * only the session is stubbed. The client half is read as source, the way the
+ * other client-gate suites do it.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { Hono } from 'hono';
+import { ROOT, SqliteD1 } from './fixtures/d1';
+import type { AppContext } from '../worker/lib/types';
+import { HttpError, requireMainHost } from '../worker/lib/http';
+import { classifyHost } from '../worker/lib/hosts';
+import {
+  COMMUNITY_GATE_SETTING_KEY,
+  communityGateFromSetting,
+  communityMayEnter,
+  communityPathOutsideWall,
+  readCommunityGate,
+} from '../worker/lib/communityGate';
+import { communityRoutes } from '../worker/routes/community';
+import { adminCommunityRoutes } from '../worker/routes/adminCommunity';
+import { communityAccessOf } from '../src/pages/community/access';
+
+// ------------------------------------------------------------------ harness
+
+function setup() {
+  const raw = new DatabaseSync(':memory:');
+  raw.exec('PRAGMA foreign_keys = ON;');
+  const dir = join(ROOT, 'migrations');
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) raw.exec(readFileSync(join(dir, f), 'utf8'));
+  raw.exec(`
+    INSERT INTO users (id,name,email,password_hash,role,username) VALUES
+      ('u1','Sara','sara@x.co','h','customer','sara'),
+      ('u2','Ali','ali@x.co','h','customer','ali'),
+      ('boss','Owner','a@x.co','h','admin','boss');
+    INSERT INTO community_merchants (id,user_id,name,bio) VALUES ('cm1','u2','Ali Prints','bio');
+    INSERT INTO community_products (id,merchant_id,slug,name,price_iqd) VALUES ('cp1','cm1','thing','Thing',5000);
+    INSERT INTO community_requests (id,customer_id,title) VALUES ('creq1','u1','Need a bracket');
+  `);
+  // No communityGate row on purpose: that IS the shipped state.
+  return { raw, db: new SqliteD1(raw) as unknown as D1Database };
+}
+
+function appAs(db: D1Database, userId: string | null, role = 'customer', host = 'levonis-iq.com') {
+  const a = new Hono<AppContext>();
+  a.use('*', async (c, next) => {
+    if (userId) {
+      c.set('user', { id: userId, role, email: `${userId}@x.co`, username: userId, name: userId } as never);
+    }
+    c.set('host', classifyHost(host, 'levonis-iq.com'));
+    c.env = { DB: db, INITIAL_ADMIN_EMAIL: 'a@x.co' } as never;
+    await next();
+  });
+  // Exactly how worker/index.ts wires the two routers.
+  a.use('/api/admin/*', requireMainHost);
+  a.route('/api/admin/community', adminCommunityRoutes);
+  a.route('/api/community', communityRoutes);
+  a.onError((err, c) => {
+    if (err instanceof HttpError) {
+      return c.json(
+        { success: false, error: err.message, code: err.code, ...(err.details ? { details: err.details } : {}) },
+        err.status as 400
+      );
+    }
+    throw err;
+  });
+  return a;
+}
+type App = ReturnType<typeof appAs>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const json = async (res: Response) => (await res.json()) as Record<string, any>;
+const post = (a: App, path: string, body: Record<string, unknown> = {}) =>
+  a.request(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
+    body: JSON.stringify(body),
+  });
+const put = (a: App, path: string, body: Record<string, unknown>) =>
+  a.request(path, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+/** Write the switch the way the admin route does, without going through it. */
+const setSwitch = (raw: DatabaseSync, value: string) =>
+  raw
+    .prepare('INSERT INTO admin_settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .run(COMMUNITY_GATE_SETTING_KEY, value);
+const count = (raw: DatabaseSync, sql: string) => (raw.prepare(sql).get() as { n: number }).n;
+
+/** Every gated route, one of each shape. */
+const GATED_READS = [
+  '/api/community/products',
+  '/api/community/merchants',
+  '/api/community/requests',
+  '/api/community/store/cm1',
+  '/api/community/followed',
+];
+const GATED_WRITES: Array<[string, Record<string, unknown>]> = [
+  ['/api/community/requests', { title: 'A new bracket' }],
+  ['/api/community/store/cm1/follow', {}],
+  ['/api/community/requests/creq1/close', {}],
+];
+
+// ------------------------------------------------------- the server refuses
+
+test('shipped closed: with no settings row every gated route refuses a customer AND a guest with 503 COMMUNITY_CLOSED', async () => {
+  const { db, raw } = setup();
+  const customer = appAs(db, 'u1');
+  const guest = appAs(db, null);
+
+  for (const path of GATED_READS) {
+    for (const [who, a] of [['a customer', customer], ['a guest', guest]] as const) {
+      const res = await a.request(path);
+      assert.equal(res.status, 503, `${path} answered ${res.status} to ${who}`);
+      const body = await json(res);
+      assert.equal(body.success, false);
+      assert.equal(body.code, 'COMMUNITY_CLOSED', `${path} → ${JSON.stringify(body)}`);
+      assert.equal(body.details?.closed, true, `${path} says which switch refused it`);
+      // The refusal is honest: it names the place and its state rather than
+      // pretending the route is missing.
+      assert.match(String(body.error), /صيانة|maintenance/);
+    }
+  }
+  for (const [path, payload] of GATED_WRITES) {
+    const res = await post(customer, path, payload);
+    assert.equal(res.status, 503, `${path} answered ${res.status}`);
+    assert.equal((await json(res)).code, 'COMMUNITY_CLOSED');
+  }
+  const res = await customer.request('/api/community/store/cm1/follow', { method: 'DELETE' });
+  assert.equal(res.status, 503);
+
+  // A refused request created nothing.
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM community_requests WHERE title = 'A new bracket'"), 0);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM follows'), 0);
+  assert.equal(
+    (raw.prepare("SELECT status FROM community_requests WHERE id='creq1'").get() as { status: string }).status,
+    'open',
+    'the refused close left the request open'
+  );
+});
+
+test('the gate is in front of requireAuth: a guest is told the place is shut, not asked to sign in', async () => {
+  const { db } = setup();
+  const guest = appAs(db, null);
+  // /followed is requireAuth-only. Closed, it must answer 503, not 401 —
+  // being asked to sign in for a page that would refuse you anyway is a lie.
+  const res = await guest.request('/api/community/followed');
+  assert.equal(res.status, 503);
+  assert.equal((await json(res)).code, 'COMMUNITY_CLOSED');
+});
+
+test('only {"open": true} opens it; every unreadable value reads CLOSED with an empty list', async () => {
+  for (const v of [
+    undefined,
+    null,
+    '',
+    '   ',
+    'true',
+    '{',
+    '[]',
+    'null',
+    '{"open":"true"}',
+    '{"open":1}',
+    '{"closed":false}',
+    '{"open":false}',
+  ]) {
+    const gate = communityGateFromSetting(v as string | null | undefined);
+    assert.equal(gate.open, false, `${JSON.stringify(v)} must not open the community`);
+    assert.deepEqual([...gate.allowed], [], `${JSON.stringify(v)} must carry no allow-list`);
+  }
+  assert.equal(communityGateFromSetting('{"open":true}').open, true);
+
+  // A non-array allow-list contributes nobody; an array yields only the
+  // non-empty strings in it.
+  assert.deepEqual([...communityGateFromSetting('{"open":false,"allowed_user_ids":"u1"}').allowed], []);
+  assert.deepEqual([...communityGateFromSetting('{"open":false,"allowed_user_ids":{"0":"u1"}}').allowed], []);
+  assert.deepEqual(
+    [...communityGateFromSetting('{"open":false,"allowed_user_ids":["u1",null,42,"","  ","u2"]}').allowed],
+    ['u1', 'u2']
+  );
+});
+
+test('a malformed row does not open the community through the real reader', async () => {
+  const { db, raw } = setup();
+  setSwitch(raw, '{"open":tru');
+  assert.equal((await readCommunityGate(db)).open, false);
+  const res = await appAs(db, 'u1').request('/api/community/products');
+  assert.equal(res.status, 503, 'a value nobody can parse is not permission');
+});
+
+test('opened: everyone gets in again, including a guest', async () => {
+  const { db, raw } = setup();
+  setSwitch(raw, '{"open":true}');
+  for (const a of [appAs(db, 'u1'), appAs(db, null)]) {
+    for (const path of ['/api/community/products', '/api/community/merchants', '/api/community/requests', '/api/community/store/cm1']) {
+      const res = await a.request(path);
+      assert.equal(res.status, 200, `${path} answered ${res.status} with the community open`);
+    }
+  }
+});
+
+// -------------------------------------------------------- the allow-list
+
+test('the allow-list lets exactly the named ids in, and nobody else', async () => {
+  const { db, raw } = setup();
+  setSwitch(raw, '{"open":false,"allowed_user_ids":["u1"]}');
+
+  const listed = await appAs(db, 'u1').request('/api/community/products');
+  assert.equal(listed.status, 200, 'the listed member is let in while it is shut');
+
+  const other = await appAs(db, 'u2').request('/api/community/products');
+  assert.equal(other.status, 503, 'a member who is not on the list is still refused');
+
+  const guest = await appAs(db, null).request('/api/community/products');
+  assert.equal(guest.status, 503, 'a guest has no id and matches no slot');
+});
+
+test('the allow-list matches user IDS, never a username or an email', async () => {
+  const { db, raw } = setup();
+  // u1's username is 'sara' and email 'sara@x.co'. Putting either in the list
+  // must let NOBODY in: anything its owner can change is an impersonation
+  // surface, so only the server-minted id may match.
+  for (const handle of ['sara', 'sara@x.co', 'Sara']) {
+    setSwitch(raw, JSON.stringify({ open: false, allowed_user_ids: [handle] }));
+    const res = await appAs(db, 'u1').request('/api/community/products');
+    assert.equal(res.status, 503, `"${handle}" must not be a way into the community`);
+  }
+});
+
+test('an empty id never matches an empty slot', () => {
+  const gate = communityGateFromSetting('{"open":false,"allowed_user_ids":["u1"]}');
+  assert.equal(communityMayEnter(gate, null), false);
+  assert.equal(communityMayEnter(gate, { id: '', role: 'customer' } as never), false);
+  assert.equal(communityMayEnter(gate, { id: 'u1', role: 'customer' } as never), true);
+});
+
+// ------------------------------------------------------- the admin door
+
+test('an admin is let through the whole time, on users.role and nothing else', async () => {
+  const { db } = setup();
+  const admin = appAs(db, 'boss', 'admin');
+  for (const path of GATED_READS) {
+    const res = await admin.request(path);
+    assert.equal(res.status, 200, `${path} answered ${res.status} to an admin while shut`);
+  }
+  // A customer claiming the role in a header or a body gets nowhere: the role
+  // is read from the session the server resolved, never from the request.
+  const faker = appAs(db, 'u1');
+  const res = await faker.request('/api/community/products', { headers: { 'x-role': 'admin', role: 'admin' } });
+  assert.equal(res.status, 503);
+});
+
+// ------------------------------------------------- what stays outside the wall
+
+test('a merchant keeps running their own shop while the community is shut', async () => {
+  const { db, raw } = setup();
+  // u2 owns cm1 and is NOT on the allow-list.
+  const merchant = appAs(db, 'u2');
+
+  const mine = await merchant.request('/api/community/my-store');
+  assert.equal(mine.status, 200, '/my-store must answer: a live catalogue is not a browsing surface');
+  assert.equal((await json(mine)).merchant.id, 'cm1');
+
+  const status = await merchant.request('/api/community/profile-status');
+  assert.equal(status.status, 200, '/profile-status decides what a merchant is shown at all');
+
+  const added = await post(merchant, '/api/community/my-store/products', { name: 'New thing', price_iqd: 7000 });
+  assert.equal(added.status, 200, 'a merchant may still add to their own catalogue');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_products'), 2);
+
+  const del = await merchant.request(`/api/community/my-store/products/${(await json(added)).id}`, { method: 'DELETE' });
+  assert.equal(del.status, 200);
+});
+
+test('the enumeration of what is outside the wall is exact, and anything unknown is INSIDE it', () => {
+  for (const p of [
+    '/api/community/access',
+    '/api/community/my-store',
+    '/api/community/my-store/products',
+    '/api/community/my-store/products/cp1',
+    '/api/community/profile-status',
+  ]) {
+    assert.equal(communityPathOutsideWall(p), true, `${p} must answer with the wall up`);
+  }
+  for (const p of [
+    '/api/community/products',
+    '/api/community/merchants',
+    '/api/community/requests',
+    '/api/community/store/cm1',
+    '/api/community/followed',
+    // Not a prefix trick: a route that merely STARTS with an allowed word is
+    // inside, because the match is on a path segment boundary.
+    '/api/community/my-storefront',
+    '/api/community/profile-status-x',
+    '/api/community/accessories',
+    // And a route nobody has written yet is gated until somebody names it.
+    '/api/community/something-new',
+  ]) {
+    assert.equal(communityPathOutsideWall(p), false, `${p} must be inside the wall`);
+  }
+});
+
+// ------------------------------------------------------- the status route
+
+test('GET /access always answers, is never cached, and tells each viewer the truth about themselves', async () => {
+  const { db, raw } = setup();
+
+  const shut = await appAs(db, 'u1').request('/api/community/access');
+  assert.equal(shut.status, 200, 'the status route must answer while the community is shut');
+  assert.equal(shut.headers.get('Cache-Control'), 'no-store', 'a per-viewer verdict must never be cached');
+  assert.deepEqual(await json(shut), { success: true, closed: true, admin: false, may_enter: false });
+
+  const admin = await json(await appAs(db, 'boss', 'admin').request('/api/community/access'));
+  assert.deepEqual(admin, { success: true, closed: true, admin: true, may_enter: true }, 'closed is what the CARD says; may_enter is what this viewer may do');
+
+  setSwitch(raw, '{"open":false,"allowed_user_ids":["u1"]}');
+  const member = await json(await appAs(db, 'u1').request('/api/community/access'));
+  assert.deepEqual(member, { success: true, closed: true, admin: false, may_enter: true });
+
+  setSwitch(raw, '{"open":true}');
+  const open = await json(await appAs(db, null).request('/api/community/access'));
+  assert.deepEqual(open, { success: true, closed: false, admin: false, may_enter: true });
+});
+
+// ------------------------------------------------------- the admin switch
+
+test('one audited settings write opens the community and adds a member — no deploy, no migration', async () => {
+  const { db, raw } = setup();
+  const admin = appAs(db, 'boss', 'admin');
+
+  const before = await json(await admin.request('/api/admin/community/gate'));
+  assert.equal(before.open, false);
+  assert.deepEqual(before.allowed_user_ids, []);
+
+  const added = await put(admin, '/api/admin/community/gate', { open: false, allowed_user_ids: ['u1', 'u1'] });
+  assert.equal(added.status, 200);
+  assert.deepEqual((await json(added)).allowed_user_ids, ['u1'], 'a repeated id is stored once');
+
+  // The customer is in, on the strength of that one row.
+  assert.equal((await appAs(db, 'u1').request('/api/community/products')).status, 200);
+  assert.equal((await appAs(db, 'u2').request('/api/community/products')).status, 503);
+
+  // And the panel can show a person rather than an opaque string.
+  const listed = await json(await admin.request('/api/admin/community/gate'));
+  assert.equal(listed.members[0].username, 'sara');
+
+  const opened = await put(admin, '/api/admin/community/gate', { open: true, allowed_user_ids: [] });
+  assert.equal((await json(opened)).changed, true);
+  assert.equal((await appAs(db, 'u2').request('/api/community/products')).status, 200);
+
+  // Every flip is on the record, naming who did it.
+  const audits = raw
+    .prepare("SELECT actor_id, detail FROM audit_log WHERE action = 'community.gate_update' ORDER BY id")
+    .all() as Array<{ actor_id: string; detail: string }>;
+  assert.equal(audits.length, 2, 'both writes were audited');
+  assert.ok(audits.every((r) => r.actor_id === 'boss'), 'the audit row names who flipped it');
+  // And which way it went, so the record answers "when did the community open?"
+  assert.deepEqual(JSON.parse(audits[1].detail).before_open, false);
+  assert.deepEqual(JSON.parse(audits[1].detail).after_open, true);
+});
+
+test('the admin switch refuses a list it cannot honour rather than storing a typo', async () => {
+  const { db, raw } = setup();
+  const admin = appAs(db, 'boss', 'admin');
+
+  const bad = await put(admin, '/api/admin/community/gate', { open: false, allowed_user_ids: ['u1', 'usr_typo'] });
+  assert.equal(bad.status, 400);
+  assert.equal((await json(bad)).code, 'COMMUNITY_ALLOW_UNKNOWN_USER');
+  // Nothing was written: an owner must never believe they let somebody in who
+  // is still locked out.
+  assert.equal(count(raw, `SELECT COUNT(*) AS n FROM admin_settings WHERE key = '${COMMUNITY_GATE_SETTING_KEY}'`), 0);
+
+  const noOpen = await put(admin, '/api/admin/community/gate', { allowed_user_ids: [] });
+  assert.equal(noOpen.status, 400);
+  assert.equal((await json(noOpen)).code, 'COMMUNITY_OPEN_REQUIRED');
+
+  const notArray = await put(admin, '/api/admin/community/gate', { open: false, allowed_user_ids: 'u1' });
+  assert.equal(notArray.status, 400);
+
+  const tooMany = await put(admin, '/api/admin/community/gate', {
+    open: false,
+    allowed_user_ids: Array.from({ length: 201 }, (_, i) => `u${i}`),
+  });
+  assert.equal(tooMany.status, 400);
+});
+
+test('the switch is admin-only and apex-only', async () => {
+  const { db } = setup();
+  assert.equal((await appAs(db, 'u1').request('/api/admin/community/gate')).status, 403);
+  assert.equal((await appAs(db, null).request('/api/admin/community/gate')).status, 401);
+  // A merchant subdomain cannot reach the admin surface at all (§53).
+  const sub = appAs(db, 'boss', 'admin', 'shop.levonis-iq.com');
+  assert.equal((await sub.request('/api/admin/community/gate')).status, 404);
+});
+
+// ------------------------------------------------------ closing is not a wipe
+
+test('closing deletes nothing: every merchant, product, request and follow survives it', async () => {
+  const { db, raw } = setup();
+  setSwitch(raw, '{"open":true}');
+  assert.equal((await post(appAs(db, 'u1'), '/api/community/store/cm1/follow')).status, 200);
+
+  const beforeRows = {
+    merchants: count(raw, 'SELECT COUNT(*) AS n FROM community_merchants'),
+    products: count(raw, 'SELECT COUNT(*) AS n FROM community_products'),
+    requests: count(raw, 'SELECT COUNT(*) AS n FROM community_requests'),
+    follows: count(raw, 'SELECT COUNT(*) AS n FROM follows'),
+  };
+
+  await put(appAs(db, 'boss', 'admin'), '/api/admin/community/gate', { open: false, allowed_user_ids: [] });
+  assert.equal((await appAs(db, 'u1').request('/api/community/products')).status, 503);
+
+  assert.deepEqual(
+    {
+      merchants: count(raw, 'SELECT COUNT(*) AS n FROM community_merchants'),
+      products: count(raw, 'SELECT COUNT(*) AS n FROM community_products'),
+      requests: count(raw, 'SELECT COUNT(*) AS n FROM community_requests'),
+      follows: count(raw, 'SELECT COUNT(*) AS n FROM follows'),
+    },
+    beforeRows,
+    'the refusal is a door, not a delete'
+  );
+
+  // Reopening puts it all back exactly as it was.
+  await put(appAs(db, 'boss', 'admin'), '/api/admin/community/gate', { open: true, allowed_user_ids: [] });
+  const store = await json(await appAs(db, 'u1').request('/api/community/store/cm1'));
+  assert.equal(store.followers, 1);
+  assert.equal(store.following, true);
+});
+
+// --------------------------------------------------------- the client half
+
+test('the client reads the same three booleans and never invents an answer', () => {
+  assert.deepEqual(communityAccessOf({ success: true, closed: true, admin: false, may_enter: false }), {
+    closed: true,
+    admin: false,
+    may_enter: false,
+  });
+  assert.deepEqual(communityAccessOf({ closed: false, admin: true, may_enter: true }), {
+    closed: false,
+    admin: true,
+    may_enter: true,
+  });
+  // A body missing either decisive boolean is not permission.
+  for (const body of [null, undefined, 'ok', 42, {}, { closed: true }, { may_enter: true }, { closed: 'true', may_enter: true }]) {
+    assert.equal(communityAccessOf(body), null, `${JSON.stringify(body)} must not read as an answer`);
+  }
+});
+
+test('the client gate is presentation, and says so — the refusal it reflects is the server\'s', () => {
+  const src = readFileSync(join(ROOT, 'src/pages/community/access.tsx'), 'utf8');
+  // It asks the always-answering route, and never a gated one.
+  assert.match(src, /\/api\/community\/access/);
+  assert.ok(!/\/api\/community\/(products|merchants|requests|store)/.test(src), 'the gate must not call a route that would refuse it');
+  // It is keyed on the viewer, so a guest's verdict cannot survive a sign-in.
+  assert.match(src, /user\?\.id/);
+  // NO NEW SORANI. Every ckb word on the card comes from a translation key
+  // that already exists, never from an inline ckb literal.
+  assert.match(src, /t\('community'\)/);
+  assert.match(src, /t\('maintenanceMain'\)/);
+  assert.match(src, /t\('comingSoon'\)/);
+});
+
+test('the entry points reflect the server, and none of them hard-codes the verdict', () => {
+  for (const f of [
+    'src/components/BottomNav.tsx',
+    'src/components/home/ServicesGrid.tsx',
+    'src/components/DashboardLayout.tsx',
+    'src/pages/Storefront.tsx',
+  ]) {
+    const src = readFileSync(join(ROOT, f), 'utf8');
+    assert.match(src, /useCommunityAccess/, `${f} must ask the server`);
+    // An answer that has not arrived, or one that failed, must NOT hide the
+    // link: `may_enter === false` is the only thing that does.
+    assert.match(src, /may_enter === false/, `${f} must hide only on an explicit refusal`);
+  }
+  // The three community routes are wrapped in the gate.
+  const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
+  for (const path of ['/community"', '/community/store/:id"', '/community/store/:slug/p/:productSlug"']) {
+    const line = app.split('\n').find((l) => l.includes(`path="${path}`) && l.includes('Route'));
+    assert.ok(line, `no route line for ${path}`);
+    assert.match(String(line), /CommunityGate/, `${path} is not behind the gate`);
+  }
+});
+
+test('the ckb on the maintenance card is wording this repo already had, not a new translation', () => {
+  const tr = readFileSync(join(ROOT, 'src/translations.ts'), 'utf8');
+  // The three keys the card composes must all carry hand-written Sorani.
+  for (const [key, ckb] of [
+    ['community', 'کۆمەڵگە'],
+    ['maintenanceMain', 'چاککردنەوە'],
+    ['comingSoon', 'بەم زووانە'],
+  ] as const) {
+    assert.ok(tr.includes(`${key}: "${ckb}"`), `${key} must still carry the existing Sorani "${ckb}"`);
+  }
+});

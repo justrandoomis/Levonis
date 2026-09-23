@@ -191,10 +191,31 @@ export function createMascotController(clock: MascotClock = CLOCK) {
         case 'rejected': return api.trigger('warning');
       }
     },
-    navigationComplete() {
+    /**
+     * THE JOURNEY LANDED — AND WHAT THAT IS WORTH DEPENDS ON WHERE IT LANDED.
+     *
+     * A journey used to end one way: `arrival`, 320ms, priority 40. That is
+     * right for a route change, where the destination is simply the next
+     * page's dock and the arrival is punctuation.
+     *
+     * It is wrong for a STAGE. A stage is not a dock the character happens to
+     * end up at; it is a destination a page raised for the express purpose of
+     * being reacted to — today, the order-confirmation panel. Triggering
+     * `celebrate` at the moment the HTTP response resolved spent the whole
+     * 1.5s window in transit: the character was still somewhere in the middle
+     * of the screen when the happiest thing it does was over, and it touched
+     * down wearing `arrival`. The reaction belongs to the arrival, because the
+     * arrival is what the reaction is about.
+     *
+     * `'route'` stays the default deliberately. Every other caller — a route
+     * change, a silent dock past its deadline, a tab that came back mid-flight
+     * — keeps the 320ms punctuation it had, so this cannot turn ordinary
+     * navigation into a celebration by omission.
+     */
+    navigationComplete(destination: 'route' | 'stage' = 'route') {
       work.delete('anchor-travel');
       reactions.delete('navigating'); reactions.delete('returning');
-      api.trigger('arrival');
+      api.trigger(destination === 'stage' ? 'celebrate' : 'arrival');
     },
     setVisible(value: boolean) {
       if (visible === value) return;

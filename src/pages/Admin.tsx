@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp } from 'lucide-react';
+import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { useAuth } from '../AuthContext';
 
@@ -73,6 +73,21 @@ const AdminSerials = React.lazy(() => import('../components/AdminSerials'));
 const AdminReviews = React.lazy(() => import('../components/AdminReviews'));
 const AdminKyc = React.lazy(() => import('../components/AdminKyc'));
 const AdminMemberships = React.lazy(() => import('../components/AdminMemberships'));
+/**
+ * «لا توجد صفحة في الادارة للرد على رسائل المستخدمين والشكاوى والتذاكر.»
+ *
+ * There was one. It was the second TAB of the panel above — a membership
+ * console — filed under «العضويات والتسويق»/Growth, and nothing in this
+ * sidebar contained the word «الدعم» or «تذاكر». The owner looked for a place
+ * to answer customers, found members and marketing, and reported the screen as
+ * missing. That report is correct about the product even though the code
+ * existed: a console reached only by someone who already knows it is hidden
+ * inside memberships is not a console anybody staffs.
+ *
+ * So the queue is its own entry, under Administration, with its own chunk —
+ * the same component the memberships tab mounts, never a second copy.
+ */
+const SupportQueue = React.lazy(() => import('../components/adminSupport/SupportQueue'));
 // What a PREMIUM or a PRO membership is WORTH at a checkout — the rules of
 // `membership_benefit_rules`, the simulator that prices a basket through the
 // checkout's own functions, and the version history (docs/MEMBERSHIP_BENEFITS.md
@@ -118,6 +133,7 @@ type AdminTab =
   | 'reviews'
   | 'kyc'
   | 'memberships'
+  | 'support'
   | 'membership_benefits'
   | 'coupons'
   | 'delivery'
@@ -165,6 +181,12 @@ export default function Admin() {
     { id: 'coupons', icon: Ticket, label: loc('أكواد الخصم', 'Promo codes'), ...section('growth', 'العضويات والتسويق', 'Growth') },
     { id: 'offers', icon: PercentIcon, label: loc('العروض الخاصة', 'Special offers', 'ئۆفەرە تایبەتەکان'), ...section('growth', 'العضويات والتسويق', 'Growth') },
     { id: 'ads', icon: Megaphone, label: loc('الإعلانات والنصوص', 'Ads & texts'), ...section('growth', 'العضويات والتسويق', 'Growth') },
+    /* The word «الدعم» exists in this sidebar now, and it is first in the
+       Administration group because answering a waiting customer outranks every
+       other administrative errand under it. The Kurdish label is the queue's
+       OWN existing wording (adminMemberships/strings.ts `tabQueue`), not a new
+       translation. */
+    { id: 'support', icon: LifeBuoy, label: loc('الدعم والتذاكر', 'Support & tickets', 'ڕیزی پشتگیری'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     { id: 'users', icon: Users, label: t('adminUsers'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     { id: 'kyc', icon: ShieldCheck, label: loc('التحقق والعناوين', 'KYC & addresses'), ...section('administration', 'الإدارة', 'Administration') },
     { id: 'serials', icon: Barcode, label: loc('الأجهزة والتسلسلات', 'Serials & devices'), ...section('administration', 'الإدارة', 'Administration') },
@@ -260,6 +282,10 @@ export default function Admin() {
 
         {activeTab === 'memberships' && (
            <AdminMemberships />
+        )}
+
+        {activeTab === 'support' && (
+           <SupportQueue />
         )}
 
         {activeTab === 'membership_benefits' && <AdminBenefits />}

@@ -56,10 +56,20 @@ import type { PolicyDocument } from './types';
  * NO UPTIME NUMBER APPEARS HERE. There is no SLA in this codebase and no
  * status page to measure one against; article 9.2 promises effort and names
  * maintenance instead of inventing a percentage the owner cannot defend.
+ *
+ * VERSION 2 — WHY IT MOVED. Two corrections a customer could see on the
+ * page; the archive keeps version 1 byte for byte.
+ *   * THE NAME. The store is written «Levonis», in Latin script, in all three
+ *     languages. 2 transliterated occurrences left the body here.
+ *   * THE UNKNOWNS. 7 articles and 7 further lines in this document still state a
+ *     fact the owner has not given, so ./render.ts WITHHOLDS them from the published
+ *     text rather than show a customer a `{{TOKEN}}`. They are still authored
+ *     below, and each one returns of its own accord the moment its value is
+ *     written in and the version moves again.
  */
 export const site_terms: PolicyDocument = {
   key: 'site_terms',
-  version: 1,
+  version: 2,
   effective_at: '2026-01-01',
   title: {
     ar: 'شروط استخدام الموقع',
@@ -70,7 +80,7 @@ export const site_terms: PolicyDocument = {
     ar: `## 1. التمهيد
 
 ### 1.1 الغرض من هذه الوثيقة
-تحكم هذه الوثيقة استخدام موقع ليفونيس وتطبيقاته ونطاقاته الفرعية: ما يجوز للزائر فعله، وما لا يجوز، وما يملكه المتجر من محتوى، وما يرفعه الزبون، وكيف يعمل المساعد داخل الموقع، وما مسؤولية المتجر عن استمرار الخدمة.
+تحكم هذه الوثيقة استخدام موقع Levonis وتطبيقاته ونطاقاته الفرعية: ما يجوز للزائر فعله، وما لا يجوز، وما يملكه المتجر من محتوى، وما يرفعه الزبون، وكيف يعمل المساعد داخل الموقع، وما مسؤولية المتجر عن استمرار الخدمة.
 
 ### 1.2 علاقتها بالشروط والأحكام العامة
 الشروط والأحكام العامة تحكم **العقد**: من الطرفان، وكيف ينعقد البيع، وحدود المسؤولية، والاختصاص. وهذه الوثيقة تحكم **البرمجية**: الموقع والحساب والرفع والوصول الآلي. من يتصفح دون شراء تلزمه هذه الوثيقة وحدها. وعند التعارض في مسألة تعاقدية، تسري الشروط والأحكام العامة.
@@ -418,7 +428,7 @@ The invalidity of one provision does not invalidate the others.
     ckb: `## 1. پێشەکی
 
 ### 1.1 مەبەستی ئەم بەڵگەنامەیە
-ئەم بەڵگەنامەیە بەکارهێنانی ماڵپەڕی لێڤۆنیس و ئەپەکانی و ژێردۆمەینەکانی ڕێک دەخات: سەردانکەر چی دەتوانێت بیکات، چی ناتوانێت، فرۆشگا خاوەنی چ ناوەڕۆکێکە، کڕیار چی بار دەکات، یاریدەدەری ناو ماڵپەڕ چۆن کار دەکات، و بەرپرسیارێتی فرۆشگا لە بەردەوامی خزمەتگوزاری چییە.
+ئەم بەڵگەنامەیە بەکارهێنانی ماڵپەڕی Levonis و ئەپەکانی و ژێردۆمەینەکانی ڕێک دەخات: سەردانکەر چی دەتوانێت بیکات، چی ناتوانێت، فرۆشگا خاوەنی چ ناوەڕۆکێکە، کڕیار چی بار دەکات، یاریدەدەری ناو ماڵپەڕ چۆن کار دەکات، و بەرپرسیارێتی فرۆشگا لە بەردەوامی خزمەتگوزاری چییە.
 
 ### 1.2 پەیوەندی بە مەرج و ڕێسا گشتییەکانەوە
 مەرجە گشتییەکان **گرێبەست** ڕێک دەخەن: لایەنەکان کێن، فرۆشتن چۆن دروست دەبێت، سنووری بەرپرسیارێتی، و دەسەڵاتی دادوەری. ئەم بەڵگەنامەیە **نەرمەکاڵا** ڕێک دەخات: ماڵپەڕ، هەژمار، بارکردن و دەستڕاگەیشتنی خۆکار. ئەوەی بەبێ کڕین دەگەڕێت تەنها بە ئەم بەڵگەنامەیە پابەندە. لە پرسێکی گرێبەستیدا، مەرجە گشتییەکان سەرچاوەن.

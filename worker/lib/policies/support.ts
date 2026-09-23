@@ -45,10 +45,20 @@ import type { PolicyDocument } from './types';
  * therefore a placeholder for the owner to fill, and article 7.1 states that
  * the targets are targets and not guarantees, which is the only honest thing
  * a document can say about a queue worked by people.
+ *
+ * VERSION 2 — WHY IT MOVED. Two corrections a customer could see on the
+ * page; the archive keeps version 1 byte for byte.
+ *   * THE NAME. The store is written «Levonis», in Latin script, in all three
+ *     languages. 2 transliterated occurrences left the body here.
+ *   * THE UNKNOWNS. 13 articles and 19 further lines in this document still state a
+ *     fact the owner has not given, so ./render.ts WITHHOLDS them from the published
+ *     text rather than show a customer a `{{TOKEN}}`. They are still authored
+ *     below, and each one returns of its own accord the moment its value is
+ *     written in and the version moves again.
  */
 export const support: PolicyDocument = {
   key: 'support',
-  version: 1,
+  version: 2,
   effective_at: '2026-01-01',
   title: {
     ar: 'سياسة الدعم والتواصل والشكاوى',
@@ -59,7 +69,7 @@ export const support: PolicyDocument = {
     ar: `## 1. التمهيد والنطاق والتعريفات
 
 ### 1.1 الغرض من هذه الوثيقة
-تبيّن هذه الوثيقة قنوات الدعم المعتمدة في ليفونيس، وأوقات العمل، وما ينبغي أن يكون جاهزاً لدى الزبون قبل التواصل، ومواعيد الرد والحل المستهدفة، وكيف تُصعَّد الشكوى، وكيف يُعالج النزاع مع تاجر في مجتمع ليفو، وما لا يفعله الدعم مهما طُلب منه.
+تبيّن هذه الوثيقة قنوات الدعم المعتمدة في Levonis، وأوقات العمل، وما ينبغي أن يكون جاهزاً لدى الزبون قبل التواصل، ومواعيد الرد والحل المستهدفة، وكيف تُصعَّد الشكوى، وكيف يُعالج النزاع مع تاجر في مجتمع ليفو، وما لا يفعله الدعم مهما طُلب منه.
 
 ### 1.2 الأطراف
 المتجر: {{LEVONIS_LEGAL_NAME}}، المسجل برقم {{LEVONIS_REGISTRATION_NO}}، وعنوانه {{LEVONIS_ADDRESS}}. والزبون: صاحب الحساب أو من يتواصل مع المتجر بشأن طلب أو منتج.
@@ -769,7 +779,7 @@ The approved channel of contact: {{LEVONIS_SUPPORT_CONTACT}}, during {{LEVONIS_S
     ckb: `## 1. پێشەکی و بوار و پێناسەکان
 
 ### 1.1 مەبەستی ئەم بەڵگەنامەیە
-ئەم بەڵگەنامەیە کەناڵە پەسەندکراوەکانی پشتگیری لە لێڤۆنیس ڕوون دەکاتەوە، و کاتەکانی کار، و ئەوەی پێویستە کڕیار پێش پەیوەندیکردن ئامادەی بێت، و کاتە ئامانجدارەکانی وەڵام و چارەسەر، و چۆن سکاڵا بەرز دەکرێتەوە، و چۆن ناکۆکی لەگەڵ بازرگانێکی کۆمەڵگەی لێڤۆ چارەسەر دەکرێت، و ئەوەی پشتگیری ناینێت هەرچەندە داوای لێ بکرێت.
+ئەم بەڵگەنامەیە کەناڵە پەسەندکراوەکانی پشتگیری لە Levonis ڕوون دەکاتەوە، و کاتەکانی کار، و ئەوەی پێویستە کڕیار پێش پەیوەندیکردن ئامادەی بێت، و کاتە ئامانجدارەکانی وەڵام و چارەسەر، و چۆن سکاڵا بەرز دەکرێتەوە، و چۆن ناکۆکی لەگەڵ بازرگانێکی کۆمەڵگەی لێڤۆ چارەسەر دەکرێت، و ئەوەی پشتگیری ناینێت هەرچەندە داوای لێ بکرێت.
 
 ### 1.2 لایەنەکان
 فرۆشگا: {{LEVONIS_LEGAL_NAME}}، تۆمارکراو بە ژمارە {{LEVONIS_REGISTRATION_NO}}، ناونیشانی {{LEVONIS_ADDRESS}}. کڕیار: خاوەن هەژمار، یان ئەو کەسەی سەبارەت بە داواکارییەک یان بەرهەمێک پەیوەندی بە فرۆشگاوە دەکات.

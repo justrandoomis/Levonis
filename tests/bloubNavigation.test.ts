@@ -37,7 +37,18 @@ test('one shared character persists between measured anchors and respects reduce
   assert.equal((intro.match(/<BloubHome\b/g) ?? []).length, 1);
   assert.match(intro, /completedRef\.current/);
   assert.match(intro, /measureCharacterAnchor\(\)/);
-  assert.match(intro, /requestAnimationFrame\(measure\)/);
+  /**
+   * STILL EXACTLY ONE MEASUREMENT PER FRAME — which is what this line has
+   * always been here to pin — but it now rides the loop's OWN frame instead
+   * of a second `requestAnimationFrame` of its own. A scroll raises a flag and
+   * `tick` consumes it in its read phase, before the frame writes anything.
+   * The old shape could not be ordered against the loop: `tick` re-arms itself
+   * on its first line, so a measurement queued after frame N always landed
+   * AFTER the draw in frame N+1 — a forced synchronous reflow, once per scroll
+   * frame, on every route. See tests/mascotFrameBudget.test.ts.
+   */
+  assert.match(intro, /measurePending = true;/);
+  assert.match(intro, /if \(measurePending\) \{\s*measurePending = false;\s*measure\(\);/);
   assert.doesNotMatch(intro, /attempts < 5/);
   assert.match(intro, /data-bloub-rendered/);
   assert.match(app, /<AppBootstrapLayer\s*\/>[\s\S]{0,100}<AppContent\s*\/>/);

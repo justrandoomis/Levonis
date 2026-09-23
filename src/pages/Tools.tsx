@@ -319,6 +319,30 @@ export default function Tools() {
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
+  /**
+   * THE MOMENT THE FILE LANDS, SHOWN AS A MOMENT.
+   *
+   * «ما في انميشن لما تختار الملف». Picking a model used to change almost
+   * nothing on screen: the row swapped to a filename, and then the page sat
+   * still for however long a thirty-megabyte 3MF takes on a phone connection
+   * with no sign that anything was happening — and when the upload finally
+   * finished, the only confirmation was a twelve-pixel tick that had quietly
+   * appeared beside the file size. A customer who is not sure their file was
+   * accepted picks it again, which starts a second upload.
+   *
+   * So the row now says which of the three states it is in — chosen, going up,
+   * accepted — and the third one ANNOUNCES itself for a second and a half
+   * before settling back, because an acceptance that was never visible is the
+   * same as no acceptance at all.
+   */
+  const [justAccepted, setJustAccepted] = useState(false);
+  useEffect(() => {
+    if (!analysisId) return;
+    setJustAccepted(true);
+    const t = setTimeout(() => setJustAccepted(false), 1600);
+    return () => clearTimeout(t);
+  }, [analysisId]);
+
   useEffect(() => {
     const ac = new AbortController();
     Promise.all([loadPrinters(ac.signal), loadMaterials(ac.signal)])
@@ -411,6 +435,10 @@ export default function Tools() {
   }, [analysisId, printerId, materialId, quality, strength, supports, quantity, invalidate, s]);
 
   const busy = stage !== 'idle';
+  /** The first leg on its own: it is the only one that runs before the
+   *  Calculate button exists, so it is the only one with nowhere else to show
+   *  itself. Measuring and pricing already have that button's spinner. */
+  const uploading = stage === 'uploading';
   const totalGrams = analysis?.materials.reduce((n, m) => n + m.grams, 0) ?? 0;
   const wasteGrams = analysis?.materials.reduce((n, m) => n + m.wasteGrams, 0) ?? 0;
   const totalMinutes = analysis ? analysis.plate_count * (analysis.print_minutes_per_plate + analysis.preparation_minutes) : 0;
@@ -479,8 +507,12 @@ export default function Tools() {
             const dropped = e.dataTransfer.files?.[0];
             if (dropped) void pickFile(dropped);
           }}
-          className={`rounded-2xl border transition-colors ${
-            dragging ? 'border-[#BAA369] bg-[#BAA369]/5' : 'border-zinc-800 bg-zinc-950'
+          className={`rounded-2xl border transition-colors duration-300 motion-reduce:transition-none ${
+            dragging
+              ? 'border-[#BAA369] bg-[#BAA369]/5'
+              : justAccepted
+                ? 'border-emerald-500/60 bg-emerald-500/[0.04]'
+                : 'border-zinc-800 bg-zinc-950'
           }`}
         >
           <input
@@ -496,15 +528,43 @@ export default function Tools() {
           />
           {file ? (
             <div className="p-4 flex items-center gap-3">
-              <span className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 grid place-items-center shrink-0">
-                <Box className="w-5 h-5 text-[#BAA369]" aria-hidden />
+              {/* The tile carries the state, because it is the one thing on the
+                  row big enough to notice out of the corner of an eye. */}
+              <span
+                className={`w-10 h-10 rounded-xl border grid place-items-center shrink-0 transition-colors duration-300 motion-reduce:transition-none ${
+                  uploading
+                    ? 'bg-[#BAA369]/10 border-[#BAA369]/40'
+                    : analysisId
+                      ? 'bg-emerald-500/10 border-emerald-500/40'
+                      : 'bg-zinc-900 border-zinc-800'
+                }`}
+              >
+                {uploading ? (
+                  <Loader2 className="w-5 h-5 text-[#BAA369] animate-spin motion-reduce:animate-none" aria-hidden />
+                ) : analysisId ? (
+                  <Check
+                    className={`w-5 h-5 text-emerald-400 transition-transform duration-300 motion-reduce:transition-none ${
+                      justAccepted ? 'scale-125' : 'scale-100'
+                    }`}
+                    aria-hidden
+                  />
+                ) : (
+                  <Box className="w-5 h-5 text-[#BAA369]" aria-hidden />
+                )}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-white text-[13px] font-medium truncate">{file.name}</p>
-                <p className="text-zinc-500 text-[11px] tabular-nums" dir="ltr">
-                  {(file.size / 1024 / 1024).toFixed(1)} MB
-                  {analysisId && <Check className="w-3 h-3 inline-block ms-1.5 text-emerald-400" aria-hidden />}
-                </p>
+                {/* WHAT IT SAYS WHILE IT IS WORKING. `s.uploading` already
+                    exists in all three languages — this screen showed it only
+                    on the Calculate button, which is not rendered yet while the
+                    first upload is still going. */}
+                {uploading ? (
+                  <p className="text-[#BAA369] text-[11px]">{s.uploading}</p>
+                ) : (
+                  <p className="text-zinc-500 text-[11px] tabular-nums" dir="ltr">
+                    {(file.size / 1024 / 1024).toFixed(1)} MB
+                  </p>
+                )}
               </div>
               <button
                 type="button"

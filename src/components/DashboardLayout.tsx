@@ -31,6 +31,7 @@ import { useMotion } from '../lib/motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { api } from '../lib/api';
+import { useCommunityAccess } from '../pages/community/access';
 
 interface SidebarItem {
   id: string;
@@ -207,6 +208,9 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
     });
   };
 
+  const { access: communityAccess } = useCommunityAccess();
+  const communityShut = communityAccess?.may_enter === false;
+
   // Resolve the signed-in user's real community store id (if any) so the
   // "My Store" links can point at the actual page.
   useEffect(() => {
@@ -221,8 +225,20 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
     return () => { cancelled = true; };
   }, [isAuthenticated]);
 
+  /**
+   * «متجري». The public page for a store lives inside the community
+   * directory, which is exactly what the maintenance gate closes — so while
+   * the community is shut for this viewer, this sends the merchant to the
+   * console they run the shop FROM rather than to the card that would tell
+   * them the directory is closed. Their catalogue, their orders and their own
+   * storefront subdomain are all outside the wall on purpose
+   * (worker/lib/communityGate.ts): closing a browsing surface must not close
+   * a business.
+   */
   const goToMyStore = () => {
-    if (myStoreId) {
+    if (communityShut) {
+      navigate('/merchant');
+    } else if (myStoreId) {
       navigate(`/community/store/${myStoreId}`);
     } else {
       navigate('/edit-profile');
@@ -376,6 +392,11 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
             <div id="dash-topbar-slot" className="flex-1 min-w-0 flex items-center gap-3 sm:gap-5" />
           ) : (
             <div className="hidden lg:flex items-center gap-6 text-[13px] font-semibold text-zinc-400 min-w-0">
+              {/* Dropped while the server says Levo Community is shut
+                  (worker/lib/communityGate.ts). Presentation only; an unknown
+                  or failed answer keeps the link rather than removing a way
+                  out of the dashboard on one dropped request. */}
+              {communityShut ? null : (
               <button
                 onClick={() => navigate('/community')}
                 className="hover:text-white transition-colors flex items-center gap-2 whitespace-nowrap"
@@ -383,6 +404,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                 {dir === 'rtl' ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
                 {t.community}
               </button>
+              )}
               <span className="text-white font-bold border-b-2 border-[#D4AF37] py-1 whitespace-nowrap">
                 {t.dashboard}
               </span>

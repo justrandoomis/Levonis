@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   POLICY_DOCUMENTS,
+  POLICY_SOURCE_DOCUMENTS,
   POLICY_KEYS,
   POLICY_SECTIONS,
   getPolicyDocument,
@@ -9,8 +12,10 @@ import {
   policySectionOf,
 } from '../worker/lib/policies';
 import { POLICY_LANGS, policyDocHash } from '../worker/lib/policies/types';
+import { publishedPolicyBody } from '../worker/lib/policies/render';
 import { CHECKOUT_POLICY_KEYS } from '../worker/lib/policyOps';
 import { asD1, freshDb } from './fixtures/app';
+import { ROOT } from './fixtures/d1';
 import { ensurePolicyCorpus, resetPolicyCorpusMemo } from '../worker/lib/policySync';
 
 /**
@@ -96,11 +101,16 @@ test('the text is LEVONIS\'s own: no transplanted manufacturer identity, no comp
 
 test('nothing about this shop is invented: every unknown fact is a named placeholder', () => {
   // A registration number or a support line the code does not hold is worse
-  // than a blank in a document shown to a bank, so the corpus leaves a
+  // than a blank in a document shown to a bank, so the SOURCE corpus leaves a
   // `{{PLACEHOLDER}}`. This pins the FORM of them, so a half-substituted or
   // lowercase template token is caught rather than shipped as prose.
+  //
+  // POLICY_SOURCE_DOCUMENTS, not POLICY_DOCUMENTS: the placeholders are the
+  // owner's to-do list and they stay in the modules, but a customer never sees
+  // one — worker/lib/policies/render.ts withholds the line that carries it,
+  // and the test below is what proves that.
   const seen = new Set<string>();
-  for (const doc of POLICY_DOCUMENTS) {
+  for (const doc of POLICY_SOURCE_DOCUMENTS) {
     for (const lang of POLICY_LANGS) {
       for (const match of doc.body[lang].matchAll(/\{\{([^}]*)\}\}/g)) {
         seen.add(match[1]);
@@ -114,10 +124,116 @@ test('nothing about this shop is invented: every unknown fact is a named placeho
   // The placeholder set is a to-do list for the owner; it is asserted to be
   // trilingual so a fact filled in Arabic alone cannot leave the other two
   // languages silently promising something different.
-  for (const doc of POLICY_DOCUMENTS) {
+  for (const doc of POLICY_SOURCE_DOCUMENTS) {
     const per = POLICY_LANGS.map((lang) => new Set([...doc.body[lang].matchAll(/\{\{([^}]*)\}\}/g)].map((m) => m[1])));
     for (const name of per[0]) {
       assert.ok(per[1].has(name) && per[2].has(name), `${doc.key}: {{${name}}} is missing from a translation`);
+    }
+  }
+});
+
+/**
+ * THE STORE HAS ONE NAME AND IT IS LATIN. The corpus used to transliterate it
+ * into each script — «ليفونيس» in Arabic, «لێڤۆنیس» in Sorani — while the
+ * English text, the logo, the domain and article 11.2's own trademark clause
+ * all said «Levonis». The owner photographed the mismatch on the policies
+ * page. A mark that is spelled three ways is three marks, and the one clause
+ * in the corpus that exists to protect it was naming a form nothing else used.
+ *
+ * The library's own subtitle sits outside the registry and is checked from
+ * source, because it is rendered on the SAME page directly above these
+ * documents and a fix that missed it would be visible in the same photograph.
+ */
+test('the store is «Levonis» in every language — the transliteration is not published', () => {
+  // BOTH Sorani spellings, because the corpus really used both and a
+  // find-and-replace that knew about one of them left the other shipping: the
+  // second letter is ێ (U+06CE) in some bodies and ی (U+06CC) in others, and
+  // they are different code points, so a guard naming one is green while the
+  // other is published. selling/ckb carried 12 of the ی form, purchase/ckb 6
+  // and payment/ckb 2 while the ar and en bodies of those SAME documents
+  // already read «Levonis».
+  for (const script of ['ليفونيس', 'لێڤۆنیس', 'لیڤۆنیس']) {
+    for (const doc of POLICY_SOURCE_DOCUMENTS) {
+      for (const lang of POLICY_LANGS) {
+        assert.ok(!doc.body[lang].includes(script), `${doc.key}/${lang} still transliterates the store name`);
+        assert.ok(!doc.title[lang].includes(script), `${doc.key}/${lang} titles the transliterated name`);
+      }
+    }
+    const strings = readFileSync(join(ROOT, 'src/components/policies/policyStrings.tsx'), 'utf8');
+    assert.ok(!strings.includes(script), 'the policy library subtitle still transliterates the store name');
+  }
+  // Article 11.2 protects three distinct forms and must keep naming all three.
+  const terms = POLICY_DOCUMENTS.find((d) => d.key === 'terms')!;
+  for (const lang of POLICY_LANGS) {
+    for (const mark of ['Levonis', 'LEVONIS', 'LEVO']) {
+      assert.ok(terms.body[lang].includes(mark), `terms/${lang}: the trademark clause dropped «${mark}»`);
+    }
+  }
+});
+
+/**
+ * THE PUBLISHED TEXT CARRIES NO TEMPLATE TOKEN. This is the assertion the
+ * corpus never had, and the gap was photographed by the owner: the Terms page
+ * showed «يسري على هذه الشروط … قانون {{GOVERNING_LAW_JURISDICTION}}» and
+ * «تختص {{COMPETENT_COURT}} بنظر النزاع» to the public.
+ *
+ * POLICY_DOCUMENTS is what worker/routes/policies.ts serves, what
+ * worker/lib/policySync.ts archives and what ./types.ts hashes, so asserting
+ * on it here covers every path a customer's eyes or a court's copy can reach.
+ */
+test('no published policy shows a customer a template token', () => {
+  for (const doc of POLICY_DOCUMENTS) {
+    for (const lang of POLICY_LANGS) {
+      assert.ok(!/\{\{/.test(doc.body[lang]), `${doc.key}/${lang} publishes a placeholder`);
+      assert.ok(!/\{\{/.test(doc.title[lang]), `${doc.key}/${lang} titles a placeholder`);
+    }
+  }
+});
+
+/**
+ * WITHHOLDING NEVER LEAVES A HEADING WITH NOTHING UNDER IT, and never empties
+ * a document. An `### 18.1 القانون الواجب التطبيق` whose only paragraph was
+ * held back reads as a broken page, which is the same class of defect as the
+ * token itself; and the three languages must lose the SAME articles, or a
+ * customer who accepted the Arabic and argues in Kurdish is arguing from a
+ * different contract.
+ */
+test('a withheld clause takes its heading with it, in all three languages alike', () => {
+  const articles = (body: string) =>
+    body.split('\n').filter((l) => l.startsWith('### ')).map((l) => l.slice(4).split(' ')[0]).join(',');
+  for (const doc of POLICY_DOCUMENTS) {
+    for (const lang of POLICY_LANGS) {
+      const lines = doc.body[lang].split('\n');
+      assert.ok(lines.some((l) => l.trim()), `${doc.key}/${lang} published empty`);
+      lines.forEach((line, i) => {
+        if (!line.startsWith('#')) return;
+        const level = line.startsWith('### ') ? ['### ', '## '] : ['## '];
+        let content = false;
+        for (let j = i + 1; j < lines.length && !level.some((s) => lines[j].startsWith(s)); j++) {
+          if (lines[j].trim()) content = true;
+        }
+        assert.ok(content, `${doc.key}/${lang}: heading «${line}» has nothing under it`);
+      });
+      assert.ok(!/\n{3,}/.test(doc.body[lang]), `${doc.key}/${lang}: withholding left a blank run`);
+    }
+    assert.equal(articles(doc.body.en), articles(doc.body.ar), `${doc.key}: en lost different articles from ar`);
+    assert.equal(articles(doc.body.ckb), articles(doc.body.ar), `${doc.key}: ckb lost different articles from ar`);
+  }
+});
+
+/**
+ * A DOCUMENT WITH NO PLACEHOLDER MUST COME BACK BYTE FOR BYTE. The render pass
+ * only ever deletes; if it ever rewrote, reflowed or trimmed a body it had no
+ * business touching, every hash in `policy_documents` would move under a
+ * version number that did not.
+ */
+test('the render pass is a no-op on text that states no unknown', () => {
+  const sample = '## 1. عنوان\n\n### 1.1 مادة\nنص.\n\n- بند\n- بند آخر';
+  assert.equal(publishedPolicyBody(sample), sample);
+  for (const doc of POLICY_SOURCE_DOCUMENTS) {
+    for (const lang of POLICY_LANGS) {
+      if (/\{\{/.test(doc.body[lang])) continue;
+      assert.equal(publishedPolicyBody(doc.body[lang]), doc.body[lang], `${doc.key}/${lang} was altered for nothing`);
     }
   }
 });
@@ -164,11 +280,14 @@ test('policyDocHash is deterministic and content-sensitive', async () => {
  * from the admin screen; packages/shipping/src/codTax.ts holds only the
  * unconfigured default and receives the rate as an argument.
  *
- * worker/routes/policies.ts serves `doc.body[lang]` VERBATIM — there is no
- * substitution pass anywhere in worker/ or src/, so a `{{TOKEN}}` in a body
- * would reach the customer as literal braces. That leaves exactly one way for
- * these documents to stay true: state no figure and defer to the checkout
- * screen, the way article 3.3 already does for the delivery fees.
+ * A `{{TOKEN}}` is not an escape hatch for a figure like this one.
+ * worker/lib/policies/render.ts withholds every line that still carries a
+ * placeholder, so a token can no longer reach the customer as literal braces
+ * — but what the customer then gets is SILENCE, not the live rate, and the
+ * clause would still have to be re-published by hand on every rate change.
+ * That leaves exactly one way for these documents to stay true: state no
+ * figure and defer to the checkout screen, the way article 3.3 already does
+ * for the delivery fees.
  *
  * This is a regression test with a history. The charge was halved from six
  * thousand to three thousand per five hundred thousand and made configurable,
