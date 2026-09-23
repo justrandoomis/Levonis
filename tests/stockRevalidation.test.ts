@@ -30,11 +30,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, get, json, row } from './fixtures/app';
+import { freshDb, asD1, stubApp, post, patch, get, json, row } from './fixtures/app';
 import { orderRoutes } from '../worker/routes/orders';
 import { cartRoutes } from '../worker/routes/cart';
 import { acceptedPolicies } from './lib/policies';
 import { apiRefusal } from '../src/lib/refusalStrings';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { ROOT } from './fixtures/d1';
 
 /** One shelf with exactly three units, and two customers holding baskets. */
 function seed(raw: DatabaseSync) {
@@ -231,4 +234,104 @@ test('a price CUT reaches the customer too — it is not only a raise', async ()
     res.order.id as string
   )!;
   assert.equal(item.unit_price_iqd, 19000);
+});
+
+
+// ══════════════════════════════ (a') the same race, one screen earlier
+
+/**
+ * THE DOOR INTO THE CART, NOT THE DOOR INTO THE ORDER.
+ *
+ * The owner's scenario is written about confirming an order, but the customer
+ * meets it first at «أضف إلى السلة»: the product page caps its stepper from
+ * `availability.stock.max_qty`, read when the page loaded, so a unit taken by
+ * someone else in between is refused by `POST /api/cart/items` — and by
+ * `PATCH /api/cart/items/:id` for the + button — with `QTY_UNAVAILABLE`.
+ *
+ * That refusal used to carry its remainder ONLY inside the English sentence
+ * `Only 2 left`, with no `details`, and `QTY_UNAVAILABLE` was in neither the
+ * refusal table nor the counted set. So the Arabic cart printed that English
+ * clause and appended its own Arabic counter note to it, and the product page
+ * printed it bare. The number has to arrive as DATA for any of the three
+ * languages to be able to say it.
+ */
+test('the add-to-cart door names the real remainder as a number, in all three languages', async () => {
+  const raw = freshDb();
+  seed(raw);
+  cartLine(raw, 'ci_a', 'ua', 1);
+  const db = asD1(raw);
+
+  // A orders first and holds one unit; two remain on the shelf.
+  const first = await json(await post(appFor(db, 'ua', 'a@x.co'), '/api/orders', orderBody('ad_a')));
+  assert.equal(first.success, true);
+  assert.equal(stockOf(raw).stock_reserved, 1);
+
+  // B's product page still shows three, so B asks for three.
+  const res = await post(appFor(db, 'ub', 'b@x.co'), '/api/cart/items', { productId: 'p_pla', qty: 3 });
+  assert.equal(res.status, 400, 'the add must be refused, not silently clamped');
+  const body = await json(res);
+  assert.equal(body.code, 'QTY_UNAVAILABLE');
+  assert.equal(body.details?.available, 2, 'the remainder must travel as a number, not only inside English prose');
+  assert.equal(body.details?.preorder, false, 'this shelf is a direct sale, not an import quota');
+
+  const err = { code: body.code, details: body.details, message: body.error ?? '' };
+  assert.match(apiRefusal(err, 'ar', ''), /2/);
+  assert.match(apiRefusal(err, 'ar', ''), /قلّل الكمية/);
+  assert.match(apiRefusal(err, 'en', ''), /Only 2 left in stock/);
+  assert.match(apiRefusal(err, 'ckb', ''), /2/);
+  // And no language falls through to the server's own English clause.
+  for (const lang of ['ar', 'ckb'] as const) {
+    assert.ok(!/Only 2 left/.test(apiRefusal(err, lang, '')), `${lang} still reads the server's English sentence`);
+  }
+
+  // Nothing was added, and the shelf did not move.
+  assert.deepEqual(stockOf(raw), { stock: 3, stock_reserved: 1 });
+});
+
+test('and the + button in the cart is refused with the same number', async () => {
+  const raw = freshDb();
+  seed(raw);
+  cartLine(raw, 'ci_a', 'ua', 1);
+  cartLine(raw, 'ci_b', 'ub', 1);
+  const db = asD1(raw);
+  await json(await post(appFor(db, 'ua', 'a@x.co'), '/api/orders', orderBody('ad_a')));
+
+  // The quantity stepper is the OTHER write door, and it raises the same code.
+  const res = await patch(appFor(db, 'ub', 'b@x.co'), '/api/cart/items/ci_b', { qty: 3 });
+  assert.equal(res.status, 400);
+  const body = await json(res);
+  assert.equal(body.code, 'QTY_UNAVAILABLE');
+  assert.equal(body.details?.available, 2);
+  assert.match(apiRefusal({ code: body.code, details: body.details, message: '' }, 'ar', ''), /2/);
+});
+
+// ═════════════════════════ (c') the price on the screen it is read from
+
+/**
+ * «يجب التاكد من ان السعر يتحدث» — AND THE PRODUCT PAGE IS WHERE IT IS READ.
+ *
+ * The cart and the checkout re-read themselves when the customer comes back to
+ * the tab (`useFreshOnReturn`), but the product page — the screen where the
+ * customer actually decides — fetched once in a mount effect and never again.
+ * A phone leaves that page mounted for hours: an app switch, a backgrounded
+ * browser and a bfcache `back` all re-run no React effect, so the price and
+ * the shelf count on screen were whatever they were when the page opened.
+ *
+ * The refresh itself is a browser behaviour (the same one the browser probe
+ * pins for the cart); what is checkable here is that the page is WIRED to the
+ * shared hook at all, which is the whole of the defect. It is asserted against
+ * the source for the same reason `tests/mascotInteraction.test.ts` asserts
+ * against `useFreshOnReturn.ts`'s source: there is no DOM in this suite.
+ */
+test('the product page re-reads the price and the shelf when the customer comes back', () => {
+  const src = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
+  assert.match(src, /import \{ useFreshOnReturn \} from '\.\.\/lib\/useFreshOnReturn'/,
+    'the product page never asks the server again after it mounts');
+  assert.match(src, /useFreshOnReturn\(/, 'the hook is imported but never called');
+  // It must re-run the QUOTE — that is what carries both the price and
+  // `liveAvailability` — rather than invent a second fetch path.
+  assert.match(src, /useFreshOnReturn\(\(\) => setQuoteToken/);
+  // And it must hold while the customer is mid-action, so a refresh never
+  // lands under an add in flight or under a dialog they are answering.
+  assert.match(src, /useFreshOnReturn\([\s\S]{0,200}enabled: !addingToCart/);
 });

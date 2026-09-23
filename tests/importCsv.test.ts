@@ -26,7 +26,7 @@ import {
 } from '../worker/lib/importCsv';
 import { blankDoc } from '../src/components/adminProducts/types';
 import { EMPTY_DIMENSIONS } from '../worker/lib/productModel';
-import { PRODUCT_TYPES, groupsForType, productTypeForSection } from '../worker/lib/templateFamilies';
+import { PRODUCT_TYPES, groupsForSection, groupsForType, productTypeForSection } from '../worker/lib/templateFamilies';
 import { normKey, resolveProduct, splitComboKey } from '../worker/lib/importApply';
 import type { CatalogRef, ExistingShape, ImportMaps } from '../worker/lib/importApply';
 import type { Lookups } from '../worker/lib/lookups';
@@ -1088,6 +1088,34 @@ test('a section resolves to its type leaf-first, and an unmapped one falls back 
   assert.equal(productTypeForSection('materials', ['a-section-nobody-mapped']), 'filament');
 });
 
+test('every slug 0102 can write for the laser line resolves to its own type', () => {
+  // THE ONE FAILURE 0102's HEADER SPENDS EIGHT LINES ON. The migration writes
+  // `<slug>`, falls back to `<slug>-levo` if a live store already owns it, and
+  // to the bare id if that is taken too. A laser section whose slug is in no
+  // type's `sectionSlugs` falls through `productTypeForBranch`'s last line —
+  // `family === 'devices' ? 'printer' : 'filament'` — and a laser cutter is
+  // quietly handed the 76-field printer form, build volume and nozzle
+  // included. The printer line has had exactly this guard since 0018
+  // (tests/printerTemplateNarrowing.test.ts); the laser line had none, so a
+  // future rename inside `sectionSlugs` would have gone out green.
+  for (const slug of ['laser-machines', 'laser-machines-levo', 'cat_laser_machines', 'laser-crafting', 'laser-crafting-levo', 'cat_laser'])
+    assert.equal(productTypeForSection('devices', [slug]), 'laser', `slug "${slug}" was not recognised as a laser`);
+  for (const slug of ['laser-material', 'laser-material-levo', 'cat_materials_laser', 'blade-cutting-material', 'blade-cutting-material-levo', 'cat_materials_blade'])
+    assert.equal(productTypeForSection('materials', [slug]), 'laser_material', `slug "${slug}" was not recognised as a cutting material`);
+  // A lens is «ملحقات وقطع», not a seventh type — the same three spellings.
+  for (const slug of ['laser-accessories', 'laser-accessories-levo', 'cat_laser_acc'])
+    assert.equal(productTypeForSection('devices', [slug]), 'parts', `slug "${slug}" should stay «ملحقات وقطع»`);
+  // The leaf still wins inside a full branch: a lens filed under «الليزر».
+  assert.equal(productTypeForSection('devices', ['laser-accessories-levo', 'laser-crafting']), 'parts');
+  // And the cut-material axis narrows: a beam and a blade are not the same
+  // consumable, so a «مواد الليزر» sheet is never asked a blade depth.
+  assert.deepEqual(
+    groupsForSection('materials', [{ id: 'cat_materials_laser', slug: 'laser-material' }]).map((g) => g.id),
+    ['laser_mat', 'laser_material_core'],
+    'a «مواد الليزر» sheet must not be asked a blade depth'
+  );
+});
+
 test("the form's spec groups and the template's spec columns are the same list", () => {
   // worker/routes/adminTaxonomy.ts serves fieldsFor() to the form and
   // templateShape() builds the columns; both go through groupsForType, so a
@@ -1490,6 +1518,41 @@ test('a sheet with no sale_types cell preserves the stored value', () => {
   // With nothing stored either, the old default still applies.
   const fresh = resolveProduct(p, null, maps, { newId: idFactory(), money: true });
   assert.deepEqual(fresh.doc.sale_types, ['direct_sale']);
+});
+
+test('the sheet’s gini_url is APPLIED, not parsed and thrown away', () => {
+  // 0104's «رابط المنتج في تطبيق جني». The column existed on every side of the
+  // pipeline except this one: the template declares it, the export fills it,
+  // the parser reads it — and `resolveProduct` built the document without it,
+  // so the owner could export 200 products, paste in the Gini links, re-upload
+  // and be told every row succeeded with nothing saved. A CREATE landed with
+  // '' and an UPDATE kept the stored value through the `existing.doc` spread,
+  // which is why the sheet's cell was inert rather than destructive and why
+  // no error was ever raised. Only the two assertions below can tell.
+  const p = parsedSample();
+  p.gini_url = 'https://gini.iq/p/bambu-a1';
+  const created = resolveProduct(p, null, maps, { newId: idFactory(), money: true });
+  assert.equal(created.doc.gini_url, 'https://gini.iq/p/bambu-a1', 'the link the owner typed never reached the document');
+
+  const stored: ExistingShape = {
+    id: 'prod_1',
+    slug: 'stored-product',
+    inventory_mode: 'product',
+    doc: { gini_url: 'https://gini.iq/p/old' } as Record<string, unknown>,
+    groups: [],
+    values: [],
+    colors: [],
+    images: [],
+    variants: [],
+  };
+  // ABSENT MEANS PRESERVE — a sheet exported before the column existed carries
+  // `null`, and re-importing it must not strip a link it never carried.
+  const older = { ...parsedSample(), gini_url: null };
+  assert.equal(resolveProduct(older, stored, maps, { newId: () => 'FRESH', money: true }).doc.gini_url, 'https://gini.iq/p/old');
+  // A BLANK CELL CLEARS IT — otherwise un-listing a product from Gini is not
+  // expressible in a sheet at all.
+  const cleared = { ...parsedSample(), gini_url: '' };
+  assert.equal(resolveProduct(cleared, stored, maps, { newId: () => 'FRESH', money: true }).doc.gini_url, '');
 });
 
 test('bundle survives an options-derived sale type', () => {

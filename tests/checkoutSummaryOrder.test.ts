@@ -185,6 +185,16 @@ test('the tax is named after WHO takes it, and the «!» quotes the policy modul
   // assertion is here so the next person looking for it finds the answer.
   assert.ok(!CHECKOUT.includes('data-checkout-cod-tax>'), 'the hand-rolled tax row is back');
   assert.ok(INFO.includes('data-summary-row={testId}'), 'every explained row must stay addressable');
+  // AND THE COMMENT ABOVE THE SENTENCE COUNTS TOO. The rendered string was
+  // parameterised correctly, but the comment two rows above it went on
+  // asserting «6,000 د.ع عن كل 500,000 د.ع» as the DEFINITION of the charge —
+  // instructing the next reader to "fix" the interpolation back into the rate
+  // the shop stopped charging. A stale explanation beside a live number is the
+  // same failure as a stale number, one maintainer removed.
+  assert.ok(
+    !CHECKOUT.includes('6,000'),
+    'the halved rate is documented everywhere but here: a comment or a string still states 6,000'
+  );
 });
 
 test('the cash-on-delivery commission is shown but never summed', () => {
@@ -286,5 +296,98 @@ test('the points control kept every guard it had when it was a card', () => {
   assert.ok(
     !CHECKOUT.includes('rounded-xl border border-border-subtle bg-surface p-3'),
     'the points card border is back, and it outweighs the wallet again'
+  );
+});
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * «عند الضغط على تأكيد الطلب لا يحدث شيء» — THE SAME REPORT, THE OTHER HALF.
+ *
+ * The first half was the DISABLED button, and its reason now travels into the
+ * phone's fixed bar. The second half is the press that IS allowed, reaches
+ * POST /api/orders and comes back refused — a coupon at its per-user limit, a
+ * delivery day that closed overnight, a BNPL eligibility that moved. That
+ * sentence lived in exactly one place: the document flow at the tail of the
+ * summary column, which below `lg` is a viewport or more under the bar the
+ * thumb is resting on. And because the block notice yields to `submitError`,
+ * the bar went from one message to NONE at the moment there was most to say.
+ *
+ * These are source-shape assertions for the same reason the rest of this file
+ * is: every string involved was already correct and already trilingual. The
+ * bug is WHERE a correct sentence is printed, and placement is the one thing a
+ * render test of a single block cannot see.
+ * ───────────────────────────────────────────────────────────────────────────*/
+test('a refused order prints its reason in the phone bar, not a viewport below it', () => {
+  assert.ok(
+    CHECKOUT.includes('const submitNotice = submitError ? ('),
+    'the server refusal must be one element that can travel with the button, the way blockNotice does'
+  );
+  const bar = CHECKOUT.slice(at(CHECKOUT, 'lg:hidden fixed inset-x-0 bottom-0'));
+  assert.ok(bar.includes('{submitNotice}'), 'the phone action bar must carry the server refusal');
+  assert.ok(bar.includes('{blockNotice}'), 'the phone action bar must still carry the pre-press block reason');
+  assert.ok(
+    bar.indexOf('{submitNotice}') < bar.indexOf('{blockNotice}'),
+    'the refusal answers the tap that just happened, so it is read first'
+  );
+  assert.ok(
+    CHECKOUT.includes('role="alert"\n      data-checkout-submit-error'),
+    'a refusal nobody scrolls to is a refusal nobody hears either'
+  );
+  // ONE alert per screen: the flow copy is wide-screen only now, so a phone
+  // customer is not handed the same refusal twice by a screen reader.
+  const flow = CHECKOUT.slice(at(CHECKOUT, '{submitError && ('), at(CHECKOUT, '{requiredPolicies.length === 0 && ('));
+  assert.ok(
+    flow.includes('hidden lg:flex'),
+    'the document-flow copy must be hidden on the screen where the fixed bar already shows it'
+  );
+});
+
+test('a re-quote says it is waiting, on the button the customer is tapping', () => {
+  // `blockReason` deliberately returns null for `quoteLoading` — a wait is not
+  // a refusal and must not be drawn in the red role="alert" block. The comment
+  // justifying that traded it for «the button already says «جارٍ…» for it»,
+  // and the button never read `quoteLoading`: it just dimmed, kept saying
+  // «تأكيد الطلب», and explained nothing. Flipping the wallet switch or
+  // picking «الدفع عند الاستلام» — the last acts before confirming — each
+  // start that round trip.
+  const button = CHECKOUT.slice(
+    at(CHECKOUT, 'data-testid="checkout-place-order"'),
+    at(CHECKOUT, 'const consentBlock')
+  );
+  assert.ok(
+    button.includes('aria-busy={submitting || quoteLoading}'),
+    'a dimmed button is a state a screen reader never hears; aria-busy is what says it is a wait'
+  );
+  assert.ok(
+    button.includes('S.quoteLoading'),
+    'the button must say it is pricing — reusing the delivery row’s sentence, hand-written in all three languages'
+  );
+});
+
+test('no second printer advance is announced on a Gini order', () => {
+  // «بدون طلب ٥٠ الف للطابعه». The server nulls the printer NOTE for Gini, so
+  // that block stays quiet — but `shipping.advance_due_iqd` is a SECOND figure
+  // and arrives untouched. On a Gini order the printer fee is collected at the
+  // door and already printed in the Gini row, while the wallet toggle is
+  // hidden and the applied balance is forced to 0: «تُدفع مقدماً من المحفظة»
+  // demands money from a wallet this order does not use.
+  assert.ok(
+    CHECKOUT.includes('{quote && !isGiniMethod && quote.shipping.advance_due_iqd > 0 && ('),
+    'the wallet-advance sentence must be suppressed for Gini, like the printer note and the wallet toggle'
+  );
+});
+
+test('the insufficient-balance refusal picks its language, not the text direction', () => {
+  // `dir` is 'rtl' for Arabic AND for Kurdish, so `dir === 'rtl' ? ar : en` at
+  // the highest-stakes moment in the app handed every Sorani reader Arabic.
+  // The Kurdish for this exact sentence already existed a thousand lines
+  // above, as the block reason shown for the same condition BEFORE the press.
+  assert.ok(
+    CHECKOUT.includes('setSubmitError(`${S.blockAdvance} — ${msg}`);'),
+    'the refusal must reuse the trilingual S.blockAdvance the pre-press block already shows'
+  );
+  assert.ok(
+    !CHECKOUT.includes("dir === 'rtl' ? `الرصيد غير كافٍ للدفع المقدم المطلوب"),
+    'the direction-picked Arabic prefix is back on the INSUFFICIENT_BALANCE refusal'
   );
 });

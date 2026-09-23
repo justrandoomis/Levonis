@@ -233,6 +233,29 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ckb: 'بڕی بەردەست بۆ ئەم داواکارییە بەس نییە. بڕەکە کەم بکەرەوە یان بەرهەمەکە لاببە.',
   },
 
+  /**
+   * THE SAME RACE, ONE SCREEN EARLIER — THE DOOR INTO THE CART.
+   *
+   * `OUT_OF_STOCK` is "there are none"; this is "there are not that many".
+   * `worker/routes/cart.ts` raises it from BOTH cart write doors (add an item,
+   * change a quantity) and it carried the same defect for the same reason: it
+   * was listed in docs/BUNDLES_MYSTERY.md §15.3 as a "reused code, unchanged in
+   * meaning", on the premise that a reused code already has a sentence
+   * somewhere. It did not. The server's sentence is `Only 2 left`, in English,
+   * and `src/pages/Cart.tsx` appended its Arabic counter note to it — so the
+   * customer who lost the race read one line in two languages.
+   *
+   * THIS ENTRY IS THE COUNT-FREE ONE, exactly as OUT_OF_STOCK's is. When the
+   * server sends a remainder, `stockRefusal` below builds the counted sentence
+   * instead; this is what a mystery-pool member gets, and what the per-order
+   * ceiling gets, where there is no remainder to name at all.
+   */
+  QTY_UNAVAILABLE: {
+    ar: 'الكمية المطلوبة غير متاحة حاليًا. قلّل الكمية.',
+    en: 'The requested quantity is not available right now. Lower the quantity.',
+    ckb: 'ژمارەی داواکراو ئێستا بەردەست نییە. بڕەکە کەم بکەرەوە.',
+  },
+
   // ---- the two counters behind one basket (migration 0075) ----------------
   /**
    * THE ONE REFUSAL A CUSTOMER MUST NOT READ AS "SOLD OUT".
@@ -336,8 +359,10 @@ export function apiRefusal(err: unknown, lang: Lang, fallback = ''): string {
   return refusalText(code, lang, message || fallback);
 }
 
-/** The codes whose refusal can carry a remainder worth naming. */
-const COUNTED_STOCK_CODES = new Set(['OUT_OF_STOCK', 'PREORDER_CAPACITY_EXHAUSTED']);
+/** The codes whose refusal can carry a remainder worth naming. `QTY_UNAVAILABLE`
+ *  is the cart door's "not that many" and carries `details.available` for the
+ *  same reason the order door's `OUT_OF_STOCK` does — see the table entry. */
+const COUNTED_STOCK_CODES = new Set(['OUT_OF_STOCK', 'PREORDER_CAPACITY_EXHAUSTED', 'QTY_UNAVAILABLE']);
 
 /**
  * «بقي 2 فقط» — THE NUMBER, IN THE CUSTOMER'S LANGUAGE.
@@ -369,7 +394,12 @@ export function stockRefusal(err: unknown, lang: Lang): string | null {
   const available = details.available;
   if (typeof available !== 'number' || !Number.isFinite(available) || available < 0) return null;
   const n = Math.trunc(available);
-  const preorder = code === 'PREORDER_CAPACITY_EXHAUSTED';
+  // WHICH COUNTER THE NUMBER CAME OFF, not which code was raised. A pre-order
+  // is limited by its IMPORT QUOTA and never by the shelf, so `QTY_UNAVAILABLE`
+  // on a pre-order line must not be read out as «لم يبقَ سوى n من هذا المنتج»
+  // about a product whose shelf may be full — the same distinction
+  // `refuseQty` in worker/routes/cart.ts makes when it picks the counter.
+  const preorder = code === 'PREORDER_CAPACITY_EXHAUSTED' || details.preorder === true;
   if (n === 0) {
     if (preorder) {
       return lang === 'en'

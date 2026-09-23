@@ -311,7 +311,13 @@ adminImportRoutes.get('/template', async (c) => {
     shape = templateShape(type, [], { includeCost: money });
     stem = typeStem(type, 'template');
   } else {
-    throw badRequest('type: pick a product type (printer / parts / filament / accessory) or pass a section id');
+    // READ FROM THE REGISTRY, for the same reason as `typeParam` above: this
+    // line spelled the four types out, and it went on naming four after «ليزر»
+    // and «مواد ليزر وقص» were added — telling the owner the store sells four
+    // kinds of product at the exact moment it asks him to name one.
+    throw badRequest(
+      `type: pick a product type (${PRODUCT_TYPES.map((t) => t.id).join(' / ')}) or pass a section id`
+    );
   }
 
   // The accepted values of the classification columns ride along with the

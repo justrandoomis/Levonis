@@ -50,6 +50,7 @@ import {
 import { api, ApiError, CartItem, pickText } from '../lib/api';
 import { rememberViewed } from '../lib/recentlyViewed';
 import { useGoBack } from '../lib/useGoBack';
+import { useFreshOnReturn } from '../lib/useFreshOnReturn';
 import { setCartCount, countCartItems } from '../lib/cartCount';
 import ReviewSection from '../components/reviews/ReviewSection';
 import CheaperElsewhereSheet from '../components/product/CheaperElsewhereSheet';
@@ -61,6 +62,7 @@ import { ProductDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 import { monthsLabel } from '../components/orders/format';
 import { authPathWithSupportRef, captureSupportRefFromSearch } from '../lib/supportRef';
+import { refusalText, stockRefusal } from '../lib/refusalStrings';
 import { productGalleryForSelection, productVariantIdForSelection } from '../lib/productImage';
 import {
   formatPhysicalMeasurement,
@@ -1230,6 +1232,41 @@ export default function Product() {
   }, [productSlug, source, priceKey, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, quoteToken]);
 
   /**
+   * «يجب التاكد من ان السعر يتحدث» — ON THE SCREEN WHERE THE PRICE IS READ.
+   *
+   * Everything above is a MOUNT effect or a SELECTION effect: the detail load
+   * keys on the slug, the quote keys on what the customer chose. Neither fires
+   * again for a page that simply stays open, and on a phone that is the normal
+   * case — the tab is left while the customer checks WhatsApp, the app is
+   * backgrounded, or `back` restores the page from the bfcache, which remounts
+   * nothing and re-runs no effect. The admin repriced and the last unit sold in
+   * between, and the page kept showing yesterday's figure with «أضف إلى
+   * السلة» live above it.
+   *
+   * The back-navigation snapshot cache already refuses to paint a REMEMBERED
+   * price on this page for exactly that reason (and `tests/backNavigationCache`
+   * asserts this file never touches it); this is the other half of the same
+   * rule — a price LEFT on screen goes stale the same way a remembered one
+   * does, and the exclusion buys nothing on its own for a page that simply
+   * stays mounted.
+   *
+   * IT ASKS FOR A QUOTE, NOT FOR THE WHOLE PAGE. The quote is what the price
+   * and `liveAvailability` are read from, so one round trip refreshes both the
+   * number and the shelf count — and, unlike bumping `retryToken`, it does not
+   * put the detail load back into its skeleton and blank the page every time
+   * the customer returns to the tab. The quote effect already re-runs on
+   * `quoteToken`, so there is no second fetch path to keep in step.
+   *
+   * The hold is the same one the cart and checkout use: never land a refresh
+   * under an add the customer is waiting on, under the lightbox, or under the
+   * shipping-conflict dialog they are answering.
+   */
+  useFreshOnReturn(() => setQuoteToken((n) => n + 1), {
+    enabled: !addingToCart && !lightbox && shippingConflict === null,
+    minIntervalMs: 8_000,
+  });
+
+  /**
    * A CONFIRMATION IS A MOMENT, NOT A STATE. The "added to cart" notice used
    * to stay on screen until the next add or a navigation, so it sat under the
    * button as a permanent claim about something that happened a minute ago —
@@ -1598,18 +1635,37 @@ export default function Product() {
          * import quota closed. `reasonText` returns the CODE when it has no
          * sentence, so only a decoded one is used and everything else still
          * falls back to what the server said.
+         *
+         * AND THE NUMBER COMES FIRST WHEN THE DOOR SENT ONE.
+         *
+         * «يجب التاكد بان المخزون يتحدث ويعطيه اشعارا بان المتبقي فقط 2.» The
+         * add-to-cart door is where that race is actually lost: the stepper is
+         * capped from `availability.stock.max_qty`, which was read when this
+         * page loaded, so another buyer taking a unit in between is refused
+         * HERE with `QTY_UNAVAILABLE` and a remainder. None of this page's own
+         * sentences can carry a figure — they are static strings — so the
+         * counted one from `src/lib/refusalStrings.ts` is preferred whenever
+         * the server sent `details.available`, and it is built in all three
+         * languages from that number rather than from English prose.
+         *
+         * `refusalText` is the last stop before the server's own sentence: it
+         * owns the count-FREE wording for the cases with no remainder to name
+         * (a per-order ceiling, a mystery-pool member whose exact count §8.2
+         * row 18 suppresses), which this page has no string for.
          */
         const code = err instanceof ApiError ? err.code ?? '' : '';
+        const counted = stockRefusal(err, lang);
         const said = code ? reasonText(s, code) : '';
+        const raw = err instanceof Error ? err.message : 'Failed to add to cart';
         setActionError(
-          said && said !== code ? said : err instanceof Error ? err.message : 'Failed to add to cart'
+          counted || (said && said !== code ? said : refusalText(code, lang, raw))
         );
       } finally {
         addInFlight.current = false;
         setAddingToCart(false);
       }
     },
-    [product, qty, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, isAuthenticated, navigate, s]
+    [product, qty, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, isAuthenticated, navigate, s, lang]
   );
 
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);

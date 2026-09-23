@@ -162,3 +162,63 @@ test('the dollar figure is kept, named and quiet — not deleted', () => {
   const notify = read('worker/lib/walletNotify.ts');
   assert.match(notify, /الدفتر: \$\{formatUsdCents/, 'the precedent this copies has moved');
 });
+
+/**
+ * THE THIRD RULE THIS FILE NOW CARRIES: a setting the SERVER reads has to have
+ * a screen SOMEBODY can reach.
+ *
+ * `giniPolicy` was a stored setting the worker read on every checkout, with a
+ * generic PUT that accepted it and not one client that ever called it. Its own
+ * doc comment in worker/lib/settings.ts is the reason the text lives in a
+ * setting at all — «the day Rafidain widens it past its own staff, the owner
+ * edits a form instead of waiting for a deploy» — and there was no form. The
+ * owner could not switch Gini off, could not move the 24-hour hold, and could
+ * not correct the bank's own wording without a release.
+ */
+test('the owner can govern Gini from the admin, not only from a deploy', () => {
+  const store = read('src/components/AdminStoreSettings.tsx');
+
+  // It is written from the screen that already loads the admin settings, so no
+  // second GET and no second source of truth appears beside shippingPolicy.
+  assert.ok(
+    store.includes("api.put('/api/admin/settings/giniPolicy'"),
+    'nothing in the admin writes giniPolicy — the switch is still a deploy'
+  );
+  assert.ok(
+    store.includes('res.settings?.giniPolicy'),
+    'the panel does not hydrate from the settings GET it already makes'
+  );
+  assert.match(store, /data-admin="gini-policy"/, 'the panel is not rendered');
+
+  // All four governable fields, not just the switch: the hold is what the
+  // sweep cancels on and the conditions are what the customer reads.
+  for (const field of ['enabled', 'hold_hours', 'app_url', 'conditions']) {
+    assert.ok(store.includes(field), `giniPolicy.${field} has no control`);
+  }
+
+  // THE HOLD IS CLAMPED BEFORE IT IS SAVED. PUT /settings/:key stores the
+  // object verbatim, and a 0 typed into the box would freeze an already-expired
+  // `gini_hold_until` onto every new order for the sweep to cancel on sight.
+  assert.match(store, /const GINI_HOLD_MIN_HOURS = 1;/);
+  assert.match(store, /const GINI_HOLD_MAX_HOURS = 168;/);
+  assert.match(
+    store,
+    /Math\.min\(GINI_HOLD_MAX_HOURS, Math\.max\(GINI_HOLD_MIN_HOURS, hours\)\)/,
+    'a hold typed outside the usable range reaches the server'
+  );
+
+  // THE CONDITION TEXT IS CUSTOMER-FACING, SO IT CARRIES ITS THREE LANGUAGES,
+  // and the defaults offered are the hand-written ones the server already
+  // ships — nothing here is machine-translated into Sorani.
+  const settings = read('worker/lib/settings.ts');
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const match = new RegExp(`${lang}: '([^']+)'`).exec(
+      settings.slice(settings.indexOf('giniPolicy: {'), settings.indexOf('proPriorityDelivery'))
+    );
+    assert.ok(match, `the server default for conditions.${lang} moved`);
+    assert.ok(
+      store.includes(match[1]),
+      `the admin default for conditions.${lang} is not the server's hand-written string`
+    );
+  }
+});

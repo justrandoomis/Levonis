@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
-import { REFUSAL_STRINGS, apiRefusal, refusalText } from '../src/lib/refusalStrings';
+import { REFUSAL_STRINGS, apiRefusal, refusalText, stockRefusal } from '../src/lib/refusalStrings';
 
 /** §15.3, verbatim: "the customer-facing subset of the tables above". */
 const CUSTOMER_FACING = [
@@ -239,4 +239,56 @@ test('apiRefusal decodes the code and falls back to the server sentence, never t
   assert.equal(apiRefusal(null, 'en', 'fallback'), 'fallback');
   // An unknown code is never printed as itself.
   assert.equal(apiRefusal({ code: 'NOPE_NOT_A_CODE' }, 'en', 'fallback'), 'fallback');
+});
+
+
+/**
+ * `QTY_UNAVAILABLE` — THE CART DOOR'S "NOT THAT MANY", IN THREE LANGUAGES.
+ *
+ * §15.3 files this under "reused codes, unchanged in meaning", on the premise
+ * that a reused code already has a sentence elsewhere. That premise was false
+ * for `OUT_OF_STOCK` and it was false here for the same reason: the only
+ * sentence was the server's `Only 2 left`, in English, raised by BOTH cart
+ * write doors (`POST /api/cart/items` and `PATCH /api/cart/items/:id`) — and
+ * `src/pages/Cart.tsx` appends its Arabic counter note to whatever comes back,
+ * so the customer who lost the race read one line in two languages.
+ */
+test('the cart door refusal names the remainder in all three languages, never in English prose', () => {
+  const short = { code: 'QTY_UNAVAILABLE', details: { available: 2, preorder: false }, message: 'Only 2 left' };
+  assert.match(apiRefusal(short, 'ar', 'x'), /2/);
+  assert.match(apiRefusal(short, 'ar', 'x'), /قلّل الكمية/);
+  assert.match(apiRefusal(short, 'en', 'x'), /Only 2 left in stock/);
+  assert.match(apiRefusal(short, 'ckb', 'x'), /2/);
+  for (const lang of ['ar', 'ckb'] as const) {
+    assert.ok(!/Only 2 left/.test(apiRefusal(short, lang, 'x')), `${lang} still reads the server's English clause`);
+  }
+
+  // NO REMAINDER TO NAME. The per-order ceiling and a mystery-pool member both
+  // arrive without `available` — §8.2 row 18 forbids publishing the count for
+  // the latter — so the count-free table entry answers, in every language, and
+  // never the server's sentence and never the bare identifier.
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const capped = { code: 'QTY_UNAVAILABLE', details: { max_qty: 10, preorder: false }, message: 'At most 10 per order' };
+    assert.equal(apiRefusal(capped, lang, 'x'), REFUSAL_STRINGS.QTY_UNAVAILABLE[lang]);
+    assert.ok(REFUSAL_STRINGS.QTY_UNAVAILABLE[lang].trim().length > 0);
+  }
+  assert.notEqual(REFUSAL_STRINGS.QTY_UNAVAILABLE.ckb, REFUSAL_STRINGS.QTY_UNAVAILABLE.ar, 'ckb is a copy of the Arabic');
+  assert.notEqual(REFUSAL_STRINGS.QTY_UNAVAILABLE.ckb, REFUSAL_STRINGS.QTY_UNAVAILABLE.en);
+  for (const lang of ['ar', 'ckb'] as const) {
+    assert.ok(!/[A-Z]{3,}_[A-Z]/.test(REFUSAL_STRINGS.QTY_UNAVAILABLE[lang]), 'a machine code leaked into the sentence');
+  }
+
+  // AND IT NAMES THE COUNTER THE NUMBER CAME OFF. A pre-order is limited by
+  // its import quota, never by the shelf, so «لم يبقَ سوى n من هذا المنتج» —
+  // a sentence about stock — must not be said about a line whose shelf may be
+  // full. `details.preorder` is what the door sends to say which one answered.
+  const quota = { code: 'QTY_UNAVAILABLE', details: { available: 2, preorder: true }, message: 'Only 2 left' };
+  assert.match(apiRefusal(quota, 'ar', 'x'), /الطلب المسبق/);
+  assert.match(apiRefusal(quota, 'en', 'x'), /pre-order place/);
+  assert.ok(!/in stock/.test(apiRefusal(quota, 'en', 'x')), 'an import quota was read out as shelf stock');
+
+  // An older server that sends no details at all still gets a sentence, not
+  // the English clause it shipped with.
+  assert.equal(apiRefusal({ code: 'QTY_UNAVAILABLE', message: 'Only 2 left' }, 'ar', 'x'), REFUSAL_STRINGS.QTY_UNAVAILABLE.ar);
+  assert.equal(stockRefusal({ code: 'QTY_UNAVAILABLE', message: 'Only 2 left' }, 'ar'), null);
 });

@@ -1071,7 +1071,27 @@ async function handleAdminUpdate(env: Env, update: AdminUpdate): Promise<void> {
     await refuseUnauthorized(env, msg);
     return;
   }
-  await handleAdminCommand({ env, msg, telegramUserId: from as number });
+  const outcome = await handleAdminCommand({ env, msg, telegramUserId: from as number });
+  // THE ONLY MOMENT THE SCOPED MENU CAN EVER BE WRITTEN.
+  //
+  // `setAdminBotCommands` needs a bound group to scope to, and the other call
+  // site — POST /admin/set-admin-webhook — runs BEFORE any `/topic_here` can
+  // reach this worker at all, so on a fresh setup there is necessarily no group
+  // and it returns false. `bound_group` is returned only when this command is
+  // the one that created the config row (telegramAdminCommands.bindHere), so
+  // this fires exactly once per binding, including after /admin/group/reset.
+  //
+  // Best effort on purpose: the menu is cosmetic, the binding is not, and the
+  // owner has already been told «تم ربط…» by the time we get here. A Telegram
+  // hiccup must not turn a successful bind into a failed webhook delivery that
+  // Telegram then retries.
+  if (outcome === 'bound_group') {
+    try {
+      await setAdminBotCommands(env);
+    } catch (e) {
+      console.error('admin menu registration after bind failed', scrubTokens(env, e instanceof Error ? e.message : String(e)));
+    }
+  }
 }
 
 /** The admin bot's own fast callback answer for refusals it makes before the

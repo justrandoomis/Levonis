@@ -114,9 +114,10 @@ survive.
 
 ## 4. The cash-on-delivery tax is calculated, then exempted
 
-The existing engine (`packages/shipping/src/codTax.ts`,
-6,000 IQD per complete 500,000 IQD payable at the door) is untouched and still
-runs on every order. The membership then waives it as a benefit, and **both
+The existing engine (`packages/shipping/src/codTax.ts`, the admin-configured
+rate per complete block of the amount payable at the door — `codTaxPerBlockIqd`
+/ `codTaxBlockIqd` in `worker/lib/settings.ts`, 3,000 IQD per 500,000 IQD until
+the owner changes them) is untouched and still runs on every order. The membership then waives it as a benefit, and **both
 numbers are recorded**:
 
 ```

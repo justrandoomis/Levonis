@@ -1441,13 +1441,40 @@ export function statedAvailability(
  * direct sale it read "Only 0 left" for a pre-order the shop was happy to take.
  * `max_qty` is already the clamp `saleAvailability` computed from whichever
  * counter answered, so it is the honest ceiling in both modes.
+ *
+ * AND THE NUMBER TRAVELS AS DATA, NOT ONLY INSIDE THE ENGLISH SENTENCE.
+ *
+ * «يجب التاكد بان المخزون يتحدث ويعطيه اشعارا بان المتبقي فقط 2.» This is the
+ * owner's race one screen EARLIER than the order door: the add-to-cart and the
+ * quantity stepper refuse here, and the remainder used to exist only inside
+ * `Only 2 left` — English prose, which no client can translate. An Arabic or
+ * Sorani customer read that sentence on an RTL page at the moment they lost
+ * the last unit, and `src/pages/Cart.tsx` appended its Arabic counter note to
+ * it, producing one line in two languages.
+ *
+ * `details` is the same channel `OUT_OF_STOCK` and `worker/lib/bundleCart.ts`
+ * already use, and `src/lib/refusalStrings.ts` builds the counted sentence
+ * from it in all three languages.
+ *
+ * WHICH KEY IS SENT SAYS WHICH ANSWER IT IS.
+ *   · `available` — a real remainder off the counter that limits this line.
+ *   · `max_qty`   — there is NO remainder to name (untracked stock, or a
+ *                   mystery-pool member whose exact count is suppressed by
+ *                   §8.2 row 18); the client falls back to the count-free
+ *                   sentence and this is only the per-order ceiling, which is
+ *                   already published in `availability.stock.max_qty`.
+ *   · `preorder`  — the counter is the IMPORT QUOTA, not the shelf, so the
+ *                   client must not say «لم يبقَ سوى n من هذا المنتج» about a
+ *                   product whose shelf may be untouched. Same reason the
+ *                   remainder above is read from `preorder.capacity`.
  */
 function refuseQty(availability: SaleAvailability) {
-  const remaining =
-    availability.mode === 'preorder' ? availability.preorder.capacity.available : availability.stock.available;
+  const preorder = availability.mode === 'preorder';
+  const remaining = preorder ? availability.preorder.capacity.available : availability.stock.available;
   return badRequest(
     remaining === null ? `At most ${availability.stock.max_qty} per order` : `Only ${remaining} left`,
-    'QTY_UNAVAILABLE'
+    'QTY_UNAVAILABLE',
+    remaining === null ? { max_qty: availability.stock.max_qty, preorder } : { available: remaining, preorder }
   );
 }
 

@@ -885,6 +885,23 @@ export function resolveProduct(
         ? ((existing?.doc.payment_options as string[] | undefined) ?? [])
         : p.payment_options,
     how_to_use: p.how_to_use === null ? ((existing?.doc.how_to_use as string | undefined) ?? '') : p.how_to_use,
+    /**
+     * «رابط المنتج في تطبيق جني» — 0104's instalments link, and until this
+     * line the one column of the sheet that was parsed, labelled, exported and
+     * then dropped on the floor. Every other side of the pipeline was already
+     * complete (importCsv.ts declares it, reads it and writes it into every
+     * export), so the owner could export 200 products, paste in the Gini
+     * links, re-upload, be told every row succeeded — and have nothing saved:
+     * an UPDATE kept the stored value through the `existing.doc` spread above,
+     * so the cell was an inert no-op, and a CREATE was written with '' because
+     * `safeLink(undefined)` is ''. No RowIssue, no preview error, nothing to
+     * diagnose; the «تريدها أقساط؟» note simply never appeared.
+     *
+     * Same null-means-preserve rule as `how_to_use` directly above: `null` is
+     * "the sheet has no such column" (an older export must not strip a link
+     * it never carried) and '' is "the cell is blank", which clears it.
+     */
+    gini_url: p.gini_url === null ? ((existing?.doc.gini_url as string | undefined) ?? '') : p.gini_url,
     preorder_transports: transports,
     spec_groups: specGroups,
     labels,

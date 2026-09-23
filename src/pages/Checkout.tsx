@@ -1375,6 +1375,36 @@ export default function Checkout() {
       </p>
     ) : null;
 
+  /**
+   * THE SERVER'S REFUSAL TRAVELS WITH THE BUTTON TOO.
+   *
+   * `blockNotice` above answers «why is the button grey». This answers the
+   * harder half of the same complaint — «عند الضغط على تأكيد الطلب لا يحدث
+   * شيء» — the press that WAS allowed and that the server then refused: a
+   * coupon that hit its per-user limit, a delivery day that closed overnight,
+   * a BNPL eligibility that changed since the quote. Every one of those lands
+   * in `submitError`, and `submitError` was printed in ONE place: the document
+   * flow at the tail of the summary column, which on a phone is a viewport or
+   * more below the fixed bar the customer just tapped. Worse, `blockNotice`
+   * is suppressed while `submitError` is set — so the bar went from one
+   * message to NONE at the exact moment there was most to say, and the tap
+   * read as «لا يحدث شيء» for every server-side refusal.
+   *
+   * It renders in the bar, and the flow copy below it is `hidden lg:` — so a
+   * phone customer gets exactly one `role="alert"`, next to the thumb that
+   * caused it, and a wide screen keeps the centred sentence under the rail.
+   */
+  const submitNotice = submitError ? (
+    <p
+      role="alert"
+      data-checkout-submit-error
+      className="text-[12px] leading-snug text-danger font-medium flex items-start gap-1.5"
+    >
+      <AlertCircle aria-hidden="true" className="w-3.5 h-3.5 shrink-0 mt-px" />
+      <span>{submitError}</span>
+    </p>
+  ) : null;
+
   const amountRemainingOnDelivery = quote ? quote.due_on_delivery_iqd : orderTotal - walletDiscount;
   const bnplFinancedIqd = isBnplMethod
     ? quote?.bnpl?.financed_iqd ?? Math.max(0, orderTotal - walletDiscount)
@@ -1447,7 +1477,14 @@ export default function Checkout() {
        */
       const msg = refusalWithCounter(err, lang, 'Order could not be placed. Please try again.');
       if (err instanceof ApiError && err.code === 'INSUFFICIENT_BALANCE') {
-        setSubmitError(dir === 'rtl' ? `الرصيد غير كافٍ للدفع المقدم المطلوب — ${msg}` : msg);
+        /* `dir === 'rtl'` is true for Arabic AND for Kurdish, so the ternary
+           this replaces was a DIRECTION test wearing a language test's clothes
+           and handed every Sorani reader the Arabic prefix — the exact trap
+           the comment above the summary column narrates. `S.blockAdvance` is
+           hand-written in ar/en/ckb and is already what line ~1343 shows for
+           this same condition BEFORE the press, so the sentence no longer
+           changes its mind between the block and the refusal. */
+        setSubmitError(`${S.blockAdvance} — ${msg}`);
       } else if (err instanceof ApiError && err.code === 'POLICY_ACCEPTANCE_REQUIRED') {
         setPolicyAccepted(false);
         setConsentResetNote(true);
@@ -1501,10 +1538,23 @@ export default function Checkout() {
       data-testid="checkout-place-order"
       onClick={placeOrder}
       disabled={!canCompleteOrder}
+      /* A disabled button is a refusal a screen reader never hears; `aria-busy`
+         is what says the two waits above are waits. */
+      aria-busy={submitting || quoteLoading}
       className="lv-button lv-button-primary w-full min-h-[52px] text-base"
     >
+      {/* `blockReason` returns null for `quoteLoading` BECAUSE OF THIS LINE —
+          a re-quote is a wait, not a refusal, and must not be drawn in the red
+          `role="alert"` block. That bargain was only half kept: the label never
+          read `quoteLoading`, so a customer who flipped the wallet switch or
+          picked «الدفع عند الاستلام» and tapped straight away met a dimmed
+          button that still said «تأكيد الطلب» and explained nothing — the dead
+          button again. `S.quoteLoading` is the same sentence the delivery row
+          shows, already hand-written in all three languages. */}
       {submitting
         ? loc('جارٍ تأكيد الطلب…', 'Placing order…', 'داواکاری دەنێردرێت…')
+        : quoteLoading
+        ? S.quoteLoading
         : loc('تأكيد الطلب', 'Place order', 'دڵنیاکردنەوەی داواکاری')}
     </button>
   );
@@ -2447,8 +2497,9 @@ export default function Checkout() {
                     quietly becoming a lie. */}
                 <p className="tabular-nums">{loc(
                   /* A RATE, NOT A PRICE — so it does not follow the currency
-                     switch. «6,000 د.ع عن كل 500,000 د.ع» is how the charge is
-                     DEFINED, in the unit it is legislated and collected in, and
+                     switch. «3 الف لكل 500 الف» is how the charge is DEFINED —
+                     the ADMIN'S CONFIGURED RATE, in the unit it is legislated
+                     and collected in, and
                      it is quoted from packages/shipping/src/codTax so the
                      sentence cannot drift from what the server actually
                      charges. Converting a definition would make the explanation
@@ -2554,7 +2605,17 @@ export default function Checkout() {
               </Note>
             )}
 
-            {quote && quote.shipping.advance_due_iqd > 0 && (
+            {/* NOT ON A GINI ORDER — «بدون طلب ٥٠ الف للطابعه».
+                `advance_due_iqd` is the SECOND printer-advance figure on this
+                screen. The first (`notes.printer_home_delivery_iqd`) is nulled
+                for Gini by the server, so the note below stays quiet; this one
+                is part of the raw shipping breakdown and arrives untouched. On
+                a Gini order the printer fee is collected at the door and is
+                already printed in the Gini row, the wallet toggle is hidden,
+                and the server forces the applied balance to 0 — so «تُدفع
+                مقدماً من المحفظة» demands money from a wallet this order does
+                not use, and describes one figure two contradictory ways. */}
+            {quote && !isGiniMethod && quote.shipping.advance_due_iqd > 0 && (
               <p className="text-xs text-amber-400/90 font-light flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
                 {S.advanceDue(money(quote.shipping.advance_due_iqd))}
@@ -2924,8 +2985,12 @@ export default function Checkout() {
               {orderButton}
             </div>
 
+            {/* Wide screen only. On a phone the same sentence rides in the
+                fixed bar with the button (`submitNotice`), so this copy is
+                hidden there rather than duplicated — two `role="alert"`
+                paragraphs carrying one refusal is one refusal read twice. */}
             {submitError && (
-              <p role="alert" className="text-center text-sm text-danger mt-4 font-medium flex items-center justify-center gap-2">
+              <p role="alert" className="text-center text-sm text-danger mt-4 font-medium hidden lg:flex items-center justify-center gap-2">
                 <AlertCircle aria-hidden="true" className="w-4 h-4 shrink-0" />
                 {submitError}
               </p>
@@ -2950,7 +3015,12 @@ export default function Checkout() {
           {/* THE REASON TRAVELS WITH THE BUTTON. On a phone this bar is fixed
               and outside the document order, so a message left in the flow
               above is a message the customer never scrolls back to — which is
-              exactly how a refusal reads as «لا يحدث شيء». */}
+              exactly how a refusal reads as «لا يحدث شيء».
+              BOTH sentences ride here: the server's refusal first, because it
+              is the fresher answer and the one that follows a tap, and the
+              pre-press block reason second. `blockNotice` already yields to
+              `submitError`, so only one of the two is ever on screen. */}
+          {submitNotice}
           {blockNotice}
           <div className="flex items-center gap-3">
             <div className="min-w-0 basis-[8.5rem] shrink-0">

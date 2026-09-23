@@ -29,6 +29,9 @@
  */
 
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
+import { deliversToHome, getSetting, getSettings, type CheckoutPaymentMethod, type DeliveryMethod } from '../lib/settings';
+import { allowedPaymentMethods } from '../lib/paymentPolicy';
+import { ensurePolicyCorpusQuietly } from '../lib/policySync';
 import {
   compileLexicon,
   decideIntent,
@@ -228,11 +231,11 @@ type Locale = 'ar' | 'en' | 'ckb';
 const LEXICON: Record<Intent, LexEntry> = {
   order_status: {
     phrases: ['حالة الطلب', 'وين طلبي', 'وين وصل طلبي', 'order status', 'where is my order', 'track my order', 'داواکاریەکەم لە کوێیە'],
-    stems: ['order', 'ord', 'طلبي', 'طلباتي', 'الطلبية', 'داواکاری', 'داواکاریەکەم'],
+    stems: ['order', 'ord', 'طلبي', 'طلباتي', 'الطلبية', 'الطلب', 'داواکاری', 'داواکاریەکەم'],
   },
   delivery_estimate: {
     phrases: ['شنو موعد التوصيل', 'متى يوصل', 'متى يصل', 'وقت التوصيل', 'shipping time', 'when will it arrive', 'delivery date', 'کەی دەگات'],
-    stems: ['delivery', 'arrive', 'توصيل', 'يوصل', 'يصل', 'وصول', 'گەیاندن'],
+    stems: ['delivery', 'arrive', 'توصيل', 'يوصل', 'يصل', 'وصول', 'وصل', 'تسليم', 'گەیاندن'],
   },
   my_devices: {
     phrases: ['my printer', 'my devices', 'الأجهزة المسجلة', 'ئامێرەکانم'],
@@ -252,7 +255,7 @@ const LEXICON: Record<Intent, LexEntry> = {
   },
   return_help: {
     phrases: ['ارجاع المنتج', 'استرجاع المبلغ', 'how do i return', 'گەڕاندنەوەی کاڵا'],
-    stems: ['return', 'refund', 'ارجاع', 'استرجاع', 'استبدال', 'گەڕاندنەوە'],
+    stems: ['return', 'refund', 'ارجاع', 'ارجع', 'ترجيع', 'استرجاع', 'استبدال', 'گەڕاندنەوە'],
   },
   password_help: {
     phrases: ['كلمة المرور', 'كلمة السر', 'نسيت كلمة', 'forgot my password', 'reset password', 'وشەی نهێنی'],
@@ -297,7 +300,7 @@ const LEXICON: Record<Intent, LexEntry> = {
   },
   open_ticket: {
     phrases: ['فتح تذكرة', 'عندي مشكلة', 'open a ticket', 'file a complaint'],
-    stems: ['ticket', 'complaint', 'تذكرة', 'شكوى', 'مشكلة', 'تیکێت', 'سکاڵا'],
+    stems: ['ticket', 'complaint', 'تذكرة', 'شكوى', 'مشكلة', 'خربان', 'عاطل', 'معطل', 'تیکێت', 'سکاڵا'],
   },
   human_handoff: {
     phrases: ['اريد اتكلم مع موظف', 'talk to a human', 'real person', 'customer service', 'کارمەندێک'],
@@ -316,7 +319,7 @@ const LEXICON: Record<Intent, LexEntry> = {
   },
   bot_identity: {
     phrases: ['هل انت روبوت', 'انت بوت', 'انت انسان', 'are you a bot', 'are you human', 'are you real', 'من انت', 'شنو انت'],
-    stems: ['bot', 'robot', 'روبوت', 'بوت', 'ذكاء'],
+    stems: ['bot', 'robot', 'روبوت', 'بوت', 'ذكاء', 'ڕۆبۆت'],
   },
   /**
    * «ساعدني باختيار طابعه» — THE SENTENCE IN THE SCREENSHOT.
@@ -347,11 +350,30 @@ const LEXICON: Record<Intent, LexEntry> = {
   },
   shipping_cost: {
     phrases: ['كم اجور التوصيل', 'شكد التوصيل', 'اجرة التوصيل', 'كلفة التوصيل', 'shipping cost', 'delivery fee', 'نرخی گەیاندن'],
-    stems: ['اجور', 'اجرة', 'كلفة'],
+    stems: ['اجور', 'اجرة', 'كلفة', 'شحن'],
   },
+  /**
+   * INSTALMENTS ARE A WAY TO PAY, so they live here rather than in an intent
+   * of their own. «اكو تقسيط؟» is among the first three questions asked about
+   * a 1,400,000 IQD printer in Iraq, and it matched nothing at all — while
+   * `giniPolicy` has shipped enabled, the `gini` row is in
+   * `checkoutPaymentMethods` and the product page already draws «تريدها
+   * أقساط؟». The answer is assembled in `handlePaymentMethods`, which reads
+   * the owner's own switch and quotes the conditions he wrote; the vocabulary
+   * only has to get the sentence there.
+   *
+   * «قیست» is written with the Kurdish ی, which `normalizeText` folds onto ي —
+   * so one spelling reaches both keyboards and no second entry is needed.
+   */
   payment_methods: {
-    phrases: ['طرق الدفع', 'كيف ادفع', 'الدفع عند الاستلام', 'payment methods', 'how do i pay', 'cash on delivery', 'شێوازی پارەدان'],
-    stems: ['payment', 'pay', 'دفع', 'ادفع', 'زين كاش', 'zaincash', 'fastpay', 'پارەدان'],
+    phrases: [
+      'طرق الدفع', 'كيف ادفع', 'الدفع عند الاستلام', 'اكو تقسيط', 'هل يوجد تقسيط', 'تطبيق جني',
+      'payment methods', 'how do i pay', 'cash on delivery', 'do you have instalments', 'شێوازی پارەدان',
+    ],
+    stems: [
+      'payment', 'pay', 'دفع', 'ادفع', 'زين كاش', 'zaincash', 'fastpay', 'پارەدان',
+      'تقسيط', 'اقساط', 'اقسط', 'gini', 'instalment', 'installment', 'قیست',
+    ],
   },
   offers_help: {
     phrases: ['كود خصم', 'كود الخصم', 'هل يوجد عرض', 'العروض الحالية', 'promo code', 'discount code', 'any offers', 'داشکاندن'],
@@ -378,7 +400,7 @@ const LEXICON: Record<Intent, LexEntry> = {
       'وين موقعكم', 'اين تقعون', 'عنوان المحل', 'رقم الهاتف', 'اوقات الدوام', 'متى تفتحون',
       'where are you located', 'your address', 'phone number', 'opening hours', 'ناونیشان',
     ],
-    stems: ['العنوان', 'الدوام', 'موقعكم', 'محلكم', 'فرعكم'],
+    stems: ['العنوان', 'الدوام', 'موقعكم', 'محلكم', 'فرعكم', 'رقمكم', 'هاتفكم', 'تلفونكم'],
   },
 };
 
@@ -558,6 +580,15 @@ const T: Record<Locale, Record<string, string>> = {
       'إلغاء الطلب يتم من فريق الدعم حتى نتأكد من حالة الطلب قبل ما ينشحن. اختار طلبك من صفحة طلباتي، أو افتح تذكرة وننجزلك ياها.',
     orders_open: 'فتح طلباتي',
     no_printers_yet: 'ما عندنا طابعات معروضة حالياً.',
+    shipping_cost_reply:
+      'طرق التوصيل المعروضة عند الدفع وأجورها:\n{lines}\n\nهذي الأجرة الأساسية لكل طريقة؛ المبلغ النهائي يتحسب بشاشة الدفع حسب القطع والكمية وعنوانك.',
+    payment_methods_reply: 'طرق الدفع المعروضة عند الدفع:\n{lines}\n\nالمعروض يختلف حسب سلتك وحسابك، وشاشة الدفع هي المرجع.',
+    offers_reply:
+      'إذا عندك كود خصم، اكتبه بخانة كود الخصم بصفحة السلة أو عند الدفع، والسيرفر يتأكد منه قبل ما تدفع. نقاطك تنخصم من المبلغ عند الدفع، وأي تخفيض على منتج يظهر على بطاقة المنتج نفسها.',
+    contact_reply:
+      'التواصل مع فريق ليفونيس يكون من داخل تذكرة دعم بالموقع — هاي القناة الرسمية وتنحفظ بيها كل الردود. ما عندي عنوان ولا رقم هاتف منشور بالموقع، وما أريد أعطيك معلومة مو مسجلة.',
+    pickup_map: 'موقع الاستلام على الخريطة',
+    fee_free: 'مجاناً',
   },
   en: {
     sign_in_needed: 'This information is private to your account. Please sign in to continue.',
@@ -685,6 +716,15 @@ const T: Record<Locale, Record<string, string>> = {
       'Cancelling is handled by the support team, so we can check the order has not shipped first. Pick the order on My Orders, or open a ticket and we will do it.',
     orders_open: 'Open my orders',
     no_printers_yet: 'We have no printers listed at the moment.',
+    shipping_cost_reply:
+      'The delivery methods offered at checkout and their fees:\n{lines}\n\nThat is the base fee for each method; the final amount is worked out on the checkout screen from the items, the quantity and your address.',
+    payment_methods_reply: 'The payment methods offered at checkout:\n{lines}\n\nWhat is offered depends on your cart and your account, and the checkout screen is the authority.',
+    offers_reply:
+      'If you have a discount code, type it into the promo-code box in the cart or at checkout; the server validates it before you pay. Your points come off the amount at checkout, and any discount on a product is shown on the product card itself.',
+    contact_reply:
+      'You reach the LEVONIS team from inside a support ticket on the site — that is the official channel and every reply is kept in it. No shop address or phone number is published on the site, and I will not hand you a detail that is not recorded.',
+    pickup_map: 'Pickup location on the map',
+    fee_free: 'Free',
   },
   ckb: {
     sign_in_needed: 'ئەم زانیارییە تایبەتە بە هەژمارەکەت. بۆ بەردەوامبوون بچۆ ژوورەوە.',
@@ -811,6 +851,16 @@ const T: Record<Locale, Record<string, string>> = {
       'هەڵوەشاندنەوە لەلایەن تیمی پشتگیرییەوە دەکرێت، تاکو سەرەتا دڵنیا بین داواکارییەکە نەنێردراوە. داواکارییەکەت لە پەڕەی داواکاریەکانم هەڵبژێرە، یان تیکێتێک بکەرەوە و بۆت دەکەین.',
     orders_open: 'کردنەوەی داواکاریەکانم',
     no_printers_yet: 'ئێستا هیچ پرینتەرێکمان لیست نەکراوە.',
+    shipping_cost_reply:
+      'شێوازەکانی گەیاندن کە لە کاتی پارەدان پێشکەش دەکرێن و کرێیان:\n{lines}\n\nئەمە کرێی بنەڕەتی هەر شێوازێکە؛ بڕی کۆتایی لە پەڕەی پارەدان بەپێی پارچە و بڕ و ناونیشانەکەت هەژمار دەکرێت.',
+    payment_methods_reply:
+      'شێوازەکانی پارەدان کە لە کاتی پارەدان پێشکەش دەکرێن:\n{lines}\n\nئەوەی پێشکەش دەکرێت بەپێی سەبەتە و هەژمارەکەت دەگۆڕێت، و پەڕەی پارەدان سەرچاوەی کۆتاییە.',
+    offers_reply:
+      'ئەگەر کۆدی داشکاندنت هەیە، لە خانەی کۆدی داشکاندن لە سەبەتە یان لە کاتی پارەدان بینووسە، و سێرڤەر پێش پارەدان پشتڕاستی دەکاتەوە. خاڵەکانت لە کاتی پارەدان لە بڕەکە کەم دەکرێنەوە، و هەر داشکاندنێکی بەرهەم لەسەر کارتی بەرهەمەکەدا دەردەکەوێت.',
+    contact_reply:
+      'پەیوەندی بە تیمی ليڤۆنیسەوە لە ناو تیکێتی پشتگیری ماڵپەڕەکەدا دەکرێت — ئەمە کەناڵە فەرمییەکەیە و هەموو وەڵامێک تێیدا دەپارێزرێت. هیچ ناونیشان یان ژمارەی تەلەفۆن لە ماڵپەڕەکەدا بڵاو نەکراوەتەوە، و زانیاری تۆمارنەکراوت پێ ناڵێم.',
+    pickup_map: 'شوێنی وەرگرتن لەسەر نەخشە',
+    fee_free: 'بەخۆڕایی',
   },
 };
 
@@ -1455,6 +1505,13 @@ async function handlePowerUsage(
           intent: 'power_usage' as const,
           params: { ids: m.row.id },
         })),
+        // «أي واحدة تقصد؟» IS A QUESTION, so it has to be remembered like
+        // one. Chips alone were an answer only for somebody who taps; a
+        // customer who TYPES «P1S» had it read as a fresh cold message,
+        // because a reply without `expects` clears the client's memory
+        // (src/pages/Support.tsx). Next turn `ids` is empty again and
+        // `params.q` fills the name in, so no handler change is needed here.
+        expects: { intent: 'power_usage', slot: 'q' },
       };
     }
     target = matches[0];
@@ -1542,9 +1599,30 @@ async function handleCompareProducts(
           intent: 'compare_products' as const,
           params: { ids: m.row.id },
         })),
+        // Still nothing identified, so still waiting: the typed answer
+        // re-enters this same branch as `q` next turn.
+        expects: { intent: 'compare_products', slot: 'q' },
       };
     }
     placed = matches;
+  }
+
+  /**
+   * «اخترت A1 Combo. وياه أي وحدة نقارن؟» — AND THE TYPED ANSWER IS READ.
+   *
+   * The anchor arrives as `ids` and the second machine as the `q` the
+   * question above was waiting for. Guarded on `ids.length === 1` so this
+   * cannot re-run on the turn that established the anchor FROM `q` (that turn
+   * has no `ids` at all and its `q` names the machine already placed). An
+   * ambiguous or unknown name falls through to the chips below, which now
+   * keep the question open instead of dead-ending it.
+   */
+  if (ids.length === 1 && placed.length === 1) {
+    const second = str(params.q, 'q', { max: 100, required: false });
+    if (second.length >= 2) {
+      const found = (await findComparable(db, second, tax, 2)).filter((p) => p.row.id !== placed[0].row.id);
+      if (found.length === 1) placed = [placed[0], found[0]];
+    }
   }
 
   // One machine named and not the other: OFFER the second, never choose it.
@@ -1560,6 +1638,16 @@ async function handleCompareProducts(
         intent: 'compare_products' as const,
         params: { ids: `${anchor.row.id},${cd.id}` },
       })),
+      /**
+       * THE SLOT STAYS `q`, AND THE ANCHOR TRAVELS IN `params`.
+       *
+       * `slot: 'ids'` looks like the obvious choice and is a trap: the route
+       * fills the slot with `{ ...pending.params, [pending.slot]: text }`, so
+       * an `ids` slot would OVERWRITE the anchor it is carrying with the raw
+       * words the customer typed, and the comparison would lose the machine
+       * it had just confirmed.
+       */
+      expects: { intent: 'compare_products', slot: 'q', params: { ids: anchor.row.id } },
     };
   }
 
@@ -1637,8 +1725,24 @@ async function handleCompareProducts(
   };
 }
 
+/**
+ * THE ARCHIVE IS SEEDED BY WHOEVER READS IT FIRST, and until now that was
+ * never this route.
+ *
+ * `policy_documents` has exactly two writers — `ensurePolicyCorpus` and the
+ * publication flow — and the only callers were the policy PAGES and the
+ * owner's policy console. The pages render from the code registry, so they
+ * look perfect on a database nobody has synced; the assistant reads the
+ * TABLE, so on a fresh deploy, a D1 restore or a staging shop it answered
+ * «لا توجد سياسات منشورة بعد» about eighteen documents the very same site was
+ * serving one tap away. Awaiting the shared, memoised, best-effort sync here
+ * makes the assistant self-healing in exactly the way the pages already are:
+ * one projection query on a cold isolate, nothing at all on a warm one, and a
+ * failure is logged rather than turned into an error reply.
+ */
 async function handlePolicyQuestion(c: Context<AppContext>, params: Record<string, unknown>, loc: Locale): Promise<AssistantReply> {
   const db = c.env.DB;
+  await ensurePolicyCorpusQuietly(db);
   const key = str(params.key, 'key', { max: 40, required: false });
   const dbLang = loc; // policy_documents stores 'ckb' directly (0003)
   if (key) {
@@ -1783,7 +1887,10 @@ async function handleSubjectSearch(
     : { ...found, intent, expects: { intent, slot: 'q' } };
 }
 
-/** A published policy, answered directly instead of listing twenty of them. */
+/**
+ * The document, as a LAST RESORT — when the shop's own settings carry nothing
+ * to answer with, the archive is still better than a shrug.
+ */
 function handleTopicPolicy(
   c: Context<AppContext>,
   intent: Intent,
@@ -1791,6 +1898,164 @@ function handleTopicPolicy(
   loc: Locale
 ): Promise<AssistantReply> {
   return handlePolicyQuestion(c, { key }, loc).then((reply) => ({ ...reply, intent }));
+}
+
+/**
+ * A POLICY DOCUMENT IS A "READ MORE" CARD, NEVER THE ANSWER.
+ *
+ * «كم اجور التوصيل» used to be answered with `body.slice(0, 320)` — the first
+ * 320 characters of a 26,000-character legal text, which is always its
+ * chapter-one preamble. So the customer got «## وثيقة التوصيل والشحن
+ * والرسوم — المادة 3 … وهي تُقرأ مع وثيقة الشراء» with the markdown hashes
+ * rendered literally (the bubble is whitespace-pre-wrap, not a renderer) and
+ * not one fee anywhere in it. «وين موقعكم», «رقم الهاتف» and «اوقات الدوام»
+ * all returned the identical «### 1.1 الغرض من هذه الوثيقة». That is the
+ * «غبي جدا» behaviour this batch exists to end, and no section picker fixes
+ * it: delivery §3.3 states its own figures are indicative and names the
+ * CHECKOUT SCREEN as the authority on price, and the corpus deliberately
+ * holds no shop address or phone at all.
+ *
+ * So the four topic intents answer from the shop's own live data — the same
+ * settings rows the checkout screen reads — and the document rides along as
+ * a card the customer can open if they want the legal text. The assistant and
+ * the checkout can therefore never quote different numbers at each other.
+ */
+async function policyReadMore(c: Context<AppContext>, key: string, loc: Locale): Promise<AssistantCard[]> {
+  const db = c.env.DB;
+  await ensurePolicyCorpusQuietly(db);
+  const pick = (lang: Locale) =>
+    db
+      .prepare("SELECT title, version FROM policy_documents WHERE key = ? AND lang = ? AND status = 'published' ORDER BY version DESC LIMIT 1")
+      .bind(key, lang)
+      .first<{ title: string; version: number }>();
+  let doc = await pick(loc);
+  if (!doc && loc !== 'ar') doc = await pick('ar');
+  if (!doc) return [];
+  return [{ title: doc.title, badge: `v${doc.version}`, link: { label: tr(loc, 'policy_read'), to: `/policies/${key}` } }];
+}
+
+/** The owner's own label for a method, in the language the checkout uses. */
+function methodTitle(loc: Locale, m: { titleAr: string; titleEn: string }): string {
+  return loc === 'en' ? m.titleEn : m.titleAr;
+}
+
+/**
+ * «كم اجور التوصيل» — FROM THE ROW THE CHECKOUT PRICES THE ORDER WITH.
+ *
+ * `checkoutDeliveryMethods[].price_iqd` is the ORDINARY TARIFF: worker/routes
+ * /orders.ts substitutes it for `shippingConfig.ordinary_iqd` when it quotes
+ * the order, so it is the one figure the assistant may state without ever
+ * contradicting the screen. It is not the whole fee — printer and carton
+ * components are added per cart, and a member waiver can remove it — which is
+ * exactly why the sentence calls it the base fee and sends the customer to
+ * the checkout for the total, rather than inventing one here.
+ */
+async function handleShippingCost(c: Context<AppContext>, loc: Locale): Promise<AssistantReply> {
+  const settings = await getSettings(c.env.DB, ['checkoutDeliveryMethods']);
+  const methods = (settings.checkoutDeliveryMethods as DeliveryMethod[]) ?? [];
+  const lines = methods.map((m) => {
+    const fee = Number(m.price_iqd) > 0 ? fmtIqd(loc, Number(m.price_iqd)) : tr(loc, 'fee_free');
+    const desc = (loc === 'en' ? m.descEn : m.descAr) || '';
+    return desc ? `• ${methodTitle(loc, m)} — ${desc} — ${fee}` : `• ${methodTitle(loc, m)} — ${fee}`;
+  });
+  // An owner who has saved an EMPTY method list has told us nothing; the
+  // document is then the only honest thing left to show.
+  if (lines.length === 0) return handleTopicPolicy(c, 'shipping_cost', 'delivery', loc);
+  return {
+    intent: 'shipping_cost',
+    text: tr(loc, 'shipping_cost_reply', { lines: lines.join('\n') }),
+    cards: await policyReadMore(c, 'delivery', loc),
+  };
+}
+
+/**
+ * «طرق الدفع» AND «اكو تقسيط» — THE SAME QUESTION, and the policy document
+ * answers the second one WRONGLY.
+ *
+ * worker/lib/policies/payment.ts §5.6 says instalments are not granted
+ * outside the PRO deferred-payment chapter, which was true when it was
+ * written and is no longer the whole truth: `giniPolicy` ships ENABLED, the
+ * `gini` row is in `checkoutPaymentMethods`, and the product page already
+ * asks «تريدها أقساط؟». Quoting the document at somebody asking about
+ * instalments would therefore deny a service the shop is selling.
+ *
+ * The list is the settings rows INTERSECTED with `allowedPaymentMethods`,
+ * which is the same intersection the checkout screen draws, so an id the
+ * server would refuse is never offered in a sentence. BNPL is deliberately
+ * absent: it is offered only after the server has proved this account
+ * eligible, and naming it here would promise financing to someone who cannot
+ * have it. The Gini conditions are the owner's own hand-written ar/en/ckb
+ * text from the setting — nothing here is composed or translated.
+ */
+async function handlePaymentMethods(c: Context<AppContext>, loc: Locale): Promise<AssistantReply> {
+  const [settings, gini] = await Promise.all([
+    getSettings(c.env.DB, ['checkoutPaymentMethods']),
+    getSetting(c.env.DB, 'giniPolicy'),
+  ]);
+  const rows = (settings.checkoutPaymentMethods as CheckoutPaymentMethod[]) ?? [];
+  const offered = allowedPaymentMethods(null, { giniEnabled: !!gini.enabled });
+  const shown = rows.filter((m) => offered.includes(m.id));
+  if (shown.length === 0) return handleTopicPolicy(c, 'payment_methods', 'payment', loc);
+  const lines = shown.map((m) => `• ${methodTitle(loc, m)}`);
+  if (gini.enabled && shown.some((m) => m.id === 'gini')) {
+    lines.push('', gini.conditions[loc] || gini.conditions.ar);
+  }
+  return {
+    intent: 'payment_methods',
+    text: tr(loc, 'payment_methods_reply', { lines: lines.join('\n') }),
+    cards: await policyReadMore(c, 'payment', loc),
+  };
+}
+
+/**
+ * «كود خصم» — WHERE THE BOX IS, not the rewards document's preamble.
+ *
+ * It deliberately does NOT list live coupon codes: `coupons` carries
+ * per-tier and per-user limits, and reciting the table in a public chat would
+ * hand every visitor a code that was cut for one membership. What a customer
+ * asking this needs is where to type the one they were given, and that the
+ * server checks it before any money moves.
+ */
+async function handleOffers(c: Context<AppContext>, loc: Locale): Promise<AssistantReply> {
+  return {
+    intent: 'offers_help',
+    text: tr(loc, 'offers_reply'),
+    links: [{ label: tr(loc, 'points_link'), to: '/points' }],
+    cards: await policyReadMore(c, 'rewards', loc),
+  };
+}
+
+/**
+ * «وين موقعكم» / «رقم الهاتف» / «اوقات الدوام» — ANSWERED BY SAYING WHAT WE
+ * HAVE AND ADMITTING WHAT WE DO NOT.
+ *
+ * This repository stores no shop address, no phone number and no opening
+ * hours; worker/lib/settings.ts says so in as many words, and the checkout
+ * refuses to draw a map pin it was not given. The one piece of real location
+ * data that exists is `map_url` on a PICKUP method — the link the owner
+ * pasted into the admin — and the customer standing in front of this question
+ * is usually the one who wants to collect in person, so it is offered when it
+ * is configured and silently absent when it is not. Inventing the rest would
+ * send somebody to a place that does not exist.
+ */
+async function handleContactInfo(c: Context<AppContext>, loc: Locale): Promise<AssistantReply> {
+  const settings = await getSettings(c.env.DB, ['checkoutDeliveryMethods']);
+  const methods = (settings.checkoutDeliveryMethods as DeliveryMethod[]) ?? [];
+  // flatMap rather than filter().map(): a `typeof m.map_url === 'string'`
+  // test inside `filter` does not narrow the element type for the `map` that
+  // follows it, so the url has to be held in a local where the check is made.
+  const links: AssistantLink[] = methods.flatMap((m) => {
+    if (deliversToHome(m)) return [];
+    const to = typeof m.map_url === 'string' ? m.map_url.trim() : '';
+    if (!to.startsWith('https://')) return [];
+    return [{ label: `${methodTitle(loc, m)} — ${tr(loc, 'pickup_map')}`, to, external: true }];
+  });
+  return {
+    intent: 'contact_info',
+    text: tr(loc, 'contact_reply'),
+    links: links.length ? links : undefined,
+    cards: await policyReadMore(c, 'support', loc),
+  };
 }
 
 /** A link is the whole answer for these three — the page is the feature. */
@@ -2115,19 +2380,21 @@ supportRoutes.post('/assistant', async (c) => {
     case 'materials_help':
       reply = await handleSubjectSearch(c, intent, resolved, freeText, loc);
       break;
-    // The shop's own published documents answer these three, so the answer
-    // cannot drift from what the policy pages say.
+    // THE SHOP'S OWN LIVE DATA ANSWERS THESE FOUR, and the published document
+    // rides along as a card. Routing them straight into the policy archive
+    // returned a legal preamble with no fee, no method, no address and no
+    // opening hours in it — see `policyReadMore` for the whole story.
     case 'shipping_cost':
-      reply = await handleTopicPolicy(c, intent, 'delivery', loc);
+      reply = await handleShippingCost(c, loc);
       break;
     case 'payment_methods':
-      reply = await handleTopicPolicy(c, intent, 'payment', loc);
+      reply = await handlePaymentMethods(c, loc);
       break;
     case 'offers_help':
-      reply = await handleTopicPolicy(c, intent, 'rewards', loc);
+      reply = await handleOffers(c, loc);
       break;
     case 'contact_info':
-      reply = await handleTopicPolicy(c, intent, 'support', loc);
+      reply = await handleContactInfo(c, loc);
       break;
     case 'wallet_help':
       reply = handleWallet(loc);

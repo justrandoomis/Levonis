@@ -1437,10 +1437,24 @@ const AXES: Record<string, SeededLeaf[]> = {
   // a focal length and a filter life, and the lens sheet kept the resin
   // wash-station capacity. That is the same inflation the printer template was
   // split to end, one type over.
+  //
+  // «إلكترونيات» AND «قطع هاردوير» ARE ON THIS AXIS TOO, even though 0018
+  // parents them to `cat_makers` and not to «ملحقات الطابعات» at all. They are
+  // `parts` sections, so they inherit every group of the type — and with no
+  // entry here they named no leaf, which `excludedGroups` reads as "the branch
+  // has no opinion" and answers with the union. That is right for the root
+  // «ملحقات الطابعات», which genuinely has not said which technology it is; it
+  // is wrong for an ESP32 board, which has said, by not being a printer
+  // accessory. Their entries declare no group of their own — the entry IS the
+  // statement "neither a Resin nor a laser accessory", which is what keeps the
+  // electronics sheet from asking a focal length, a rotary-axis diameter and a
+  // wash-station capacity.
   'accessory-technology': [
     { id: 'cat_pacc_fdm', slug: 'fdm-printer-accessories', groups: [] },
     { id: 'cat_pacc_resin', slug: 'resin-printer-accessories', groups: ['acc_resin'] },
     { id: 'cat_laser_acc', slug: 'laser-accessories', groups: ['laser_acc'] },
+    { id: 'cat_makers_elec', slug: 'electronics', groups: [] },
+    { id: 'cat_makers_hw', slug: 'hardware-parts', groups: [] },
   ],
 };
 

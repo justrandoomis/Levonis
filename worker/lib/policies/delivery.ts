@@ -20,9 +20,20 @@ import type { PolicyDocument } from './types';
  *     Both thresholds are owner configuration and an admin benefit rule can
  *     replace them outright, so they are placeholders here rather than the
  *     75,000 / 150,000 that happen to be seeded today.
- *   * The cash-on-delivery tax in 3.22 is the one set of figures stated
- *     outright: COD_TAX_BLOCK_IQD / COD_TAX_PER_BLOCK_IQD are hardcoded
- *     constants in packages/shipping/src/codTax.ts, not settings.
+ *   * The cash-on-delivery tax in 3.22 is ADMIN-EDITABLE exactly like the
+ *     delivery fees above: codTaxPerBlockIqd / codTaxBlockIqd are
+ *     `admin_settings` rows in worker/lib/settings.ts, both published in
+ *     PUBLIC_SETTING_KEYS so a sentence can quote the CONFIGURED rate.
+ *     packages/shipping/src/codTax.ts holds only the unconfigured default
+ *     and takes the rate as an argument. This note once said the opposite —
+ *     "hardcoded constants ... not settings" — and that sentence is why 3.22
+ *     went on promising six thousand per five hundred thousand after the
+ *     owner halved the charge. So 3.22 states NO figure: it defers
+ *     to the checkout screen the way 3.3 does, and it must stay that way
+ *     until something in this corpus can resolve a live setting at read
+ *     time (worker/routes/policies.ts serves `doc.body[lang]` verbatim —
+ *     there is no substitution pass, and a `{{TOKEN}}` here would reach the
+ *     customer as literal braces).
  *
  * WHY 3.35 EXISTS. worker/lib/delivery/ has createShipment and getShipment
  * and nothing else — there is no reschedule endpoint and no reroute call on
@@ -42,7 +53,7 @@ import type { PolicyDocument } from './types';
  */
 export const delivery: PolicyDocument = {
   key: 'delivery',
-  version: 1,
+  version: 2,
   effective_at: '2026-01-01',
   title: {
     ar: 'سياسة التوصيل والشحن والرسوم',
@@ -208,7 +219,7 @@ export const delivery: PolicyDocument = {
 
 ### 3.22 الدفع عند الباب وضريبة التحصيل النقدي
 - الدفع عند الاستلام متاح على مسار المتجر الرسمي حيث يظهر في شاشة الدفع، وغير متاح على مسار متاجر المجتمع وفق المادة 3.5.
-- يُستوفى على المبلغ المحصّل نقداً عند الباب ضريبة تحصيل مقدارها ستة آلاف دينار عن كل خمسمائة ألف دينار كاملة من المبلغ المستحق قبل الضريبة. والكسر الذي لا يبلغ خمسمائة ألف كاملة لا يُستوفى عنه شيء.
+- يُستوفى على المبلغ المحصّل نقداً عند الباب ضريبة تحصيل، تُحتسب بمقدار مقرر عن كل شريحة كاملة من المبلغ المستحق قبل الضريبة، والمقداران كلاهما معروضان في شاشة الدفع لذلك الطلب. والكسر الذي لا يبلغ شريحة كاملة لا يُستوفى عنه شيء. والمقداران قابلان للتعديل من إدارة المتجر، والمعتمد في كل طلب هو ما ظهر في شاشة الدفع لذلك الطلب وقت تثبيته.
 - هذه الضريبة لا تُستوفى على الاستلام من المخزن، لأن لا تحصيل عند باب ولا نقل لنقد.
 - تظهر الضريبة في الفاتورة بنداً مستقلاً بمقدارها، ولا تُدمج في السعر.
 - إذا كان الزبون معفى منها بموجب عضويته، احتُسبت كاملة ثم بُيّن الإعفاء بإزائها في الفاتورة، حتى يبقى الرقمان قابلين للمراجعة، ولا يظهر صفر لا يُعرف كيف صار صفراً.
@@ -510,7 +521,7 @@ Charges following the nature of the goods may be added to the standard delivery 
 
 ### 3.22 Payment at the door and the cash collection tax
 - Cash on delivery is available on the official store path where it appears at checkout, and is not available on the community stores path under article 3.5.
-- A collection tax of six thousand dinars is due on the amount collected in cash at the door for every complete five hundred thousand dinars of the amount payable before the tax. A fraction not amounting to a complete five hundred thousand bears nothing.
+- A collection tax is due on the amount collected in cash at the door, charged at a stated amount for every complete block of the amount payable before the tax; the amount of the tax and the size of the block are both displayed at checkout for that order. A fraction not amounting to a complete block bears nothing. Both figures may be amended by the Store's administration, and what governs each order is what appeared at checkout for that order at the time it was placed.
 - This tax is not due on warehouse pickup, because there is no collection at a door and no carriage of cash.
 - The tax appears on the invoice as an independent item in its amount and is not merged into the price.
 - Where the customer is exempt from it under their membership, it is calculated in full and the exemption is then stated against it on the invoice, so that both figures remain auditable and no zero appears whose derivation is unknown.
@@ -812,7 +823,7 @@ The Store does not bear transit damage; it nevertheless does the following by wa
 
 ### 3.22 پارەدان لە بەردەرگا و باجی کۆکردنەوەی نەقد
 - پارەدان لە کاتی وەرگرتن لە ڕێڕەوی فرۆشگای فەرمیدا بەردەستە لەو شوێنانەی لە شاشەی پارەداندا دەردەکەوێت، و لە ڕێڕەوی فرۆشگاکانی کۆمەڵگەدا بەردەست نییە بەپێی بڕگەی 3.5.
-- لەسەر ئەو بڕەی بە نەقد لە بەردەرگا کۆدەکرێتەوە، باجی کۆکردنەوە بە بڕی شەش هەزار دینار دەکەوێتە ئەستۆ بۆ هەر پێنج سەد هەزار دینارێکی تەواو لەو بڕەی پێش باج دەکەوێتە ئەستۆ. ئەو پارچەیەی نەگاتە پێنج سەد هەزاری تەواو، هیچی لێ وەرناگیرێت.
+- لەسەر ئەو بڕەی بە نەقد لە بەردەرگا کۆدەکرێتەوە، باجی کۆکردنەوە دەکەوێتە ئەستۆ، بە بڕێکی دیاریکراو بۆ هەر بڕێکی تەواو لەو بڕەی پێش باج دەکەوێتە ئەستۆ، و هەردوو بڕەکە لە شاشەی پارەدانی ئەو داواکارییەدا پیشان دەدرێن. ئەو پارچەیەی نەگاتە بڕێکی تەواو، هیچی لێ وەرناگیرێت. هەردوو بڕەکە دەکرێت لەلایەن بەڕێوەبەرایەتیی فرۆشگاوە بگۆڕدرێن، و ئەوەی لە هەر داواکارییەکدا پەسەندکراوە، ئەوەیە کە لە شاشەی پارەدانی ئەو داواکارییەدا لە کاتی جێگیرکردنیدا دەرکەوتووە.
 - ئەم باجە لەسەر وەرگرتن لە کۆگا وەرناگیرێت، چونکە نە کۆکردنەوە لە بەردەرگایەک هەیە و نە گواستنەوەی پارە.
 - باجەکە لە پسووڵەکەدا وەک بڕگەیەکی سەربەخۆ بە بڕەکەیەوە دەردەکەوێت، و لەگەڵ نرخەکەدا تێکەڵ ناکرێت.
 - ئەگەر کڕیار بەپێی ئەندامێتییەکەی لێی بەخشراو بێت، بە تەواوی دەژمێردرێت و پاشان بەخشینەکە بەرامبەری لە پسووڵەکەدا ڕوون دەکرێتەوە، تاکو هەردوو ژمارەکە شیاوی پێداچوونەوە بمێننەوە، و سفرێک دەرنەکەوێت کە نەزانرێت چۆن بووە بە سفر.

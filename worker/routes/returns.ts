@@ -16,6 +16,12 @@
  *  - Refund destination is the existing wallet pattern — flagged as a
  *    configurable default (decision register row 8: refund destination and
  *    shipping-refund policy await the owner). Shipping is NOT refunded here.
+ *    A GINI ORDER IS THE EXCEPTION AND IT IS NOT A POLICY CHOICE: its goods
+ *    were settled inside the bank's app and never reached Levonis, so no Levo
+ *    wallet credit is posted. The amount the customer is still owed is
+ *    reported as `gini_refund_due_iqd` and written onto the case's note, for
+ *    staff to reverse with Gini/Rafidain — that side is settled outside this
+ *    system.
  *
  * Price protection — price_protection_claims + price_history (0003):
  *  - Claim on MY delivered order item within 7 days of delivered_at.
@@ -618,7 +624,7 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       .bind(kase.order_item_id)
       .first<Record<string, unknown>>();
     const order = await c.env.DB.prepare(
-      'SELECT id, user_id, subtotal_iqd, shipping_iqd, points_discount_iqd, coupon_snapshot, exchange_rate FROM orders WHERE id = ?'
+      'SELECT id, user_id, subtotal_iqd, shipping_iqd, points_discount_iqd, coupon_snapshot, exchange_rate, gini_paid_iqd FROM orders WHERE id = ?'
     )
       .bind(kase.order_id)
       .first<Record<string, unknown>>();
@@ -649,8 +655,33 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       const base = (Number(order.subtotal_iqd) || 0) + (Number(order.shipping_iqd) || 0);
       const alloc = base > 0 ? Math.floor((discounts * caseGross) / base) : 0;
       const refundIqd = Math.max(0, caseGross - alloc);
+
+      // WE MAY ONLY GIVE BACK MONEY WE ACTUALLY TOOK.
+      //
+      // On a Gini order the goods were settled inside the bank's app before
+      // this order existed and `gini_paid_iqd` is the record of it; the only
+      // dinar that ever reached Levonis is the delivery fee at the door, and
+      // shipping is not refunded here anyway. Crediting `refundIqd` to the
+      // Levo wallet would therefore mint spendable balance out of nothing —
+      // ~894,000 IQD on the 899,000 printer — while the customer's
+      // instalments to Rafidain carry on untouched.
+      //
+      // This is the same invariant `levonisCollectibleSql` (worker/lib/gini.ts)
+      // and `sweepGiniHolds` already state: the correction is on OUR side of
+      // the split, never on Gini's, and «the cancellation of an order we never
+      // collected for is not ours to reverse».
+      //
+      // The customer is still owed the money — they really did pay the bank —
+      // so the amount is not clamped away silently. `refundIqd` stays in
+      // `refundResult`, in the audit row and on the case's own note as
+      // `gini_refund_due_iqd`, so the admin resolving the case can see that a
+      // Gini-side reversal has to be arranged with the bank. There is no
+      // integration to do it for us and inventing one here would be a lie.
+      const giniPaidIqd = Math.max(0, Math.trunc(Number(order.gini_paid_iqd) || 0));
+      const settledByGini = giniPaidIqd > 0;
+      const walletRefundIqd = settledByGini ? 0 : refundIqd;
       const rate = Number(order.exchange_rate) || 1400; // the ORDER's historical rate
-      const cents = Math.round((refundIqd * 100) / rate);
+      const cents = Math.round((walletRefundIqd * 100) / rate);
 
       let credited = false;
       if (cents > 0) {
@@ -691,9 +722,29 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
         amount_usd_cents: cents,
         credited,
         wallet_tx: `wtx_ret_${id}`,
-        channel: 'wallet',
-        channel_note: 'Refund destination is a configurable default pending the owner decision (docs/DECISIONS.md row 8); shipping fees are not refunded here.',
+        channel: settledByGini ? 'gini' : 'wallet',
+        ...(settledByGini
+          ? { gini_paid_iqd: giniPaidIqd, gini_refund_due_iqd: refundIqd }
+          : {}),
+        channel_note: settledByGini
+          ? `This order's goods were settled inside the Gini app (${giniPaidIqd} IQD), not collected by Levonis, so no Levo wallet credit was posted. The customer is owed ${refundIqd} IQD on the Gini/Rafidain side — arrange the instalment reversal with the bank; Levonis has no integration that can do it. Shipping fees are not refunded here.`
+          : 'Refund destination is a configurable default pending the owner decision (docs/DECISIONS.md row 8); shipping fees are not refunded here.',
       };
+
+      // The case itself has to carry it too, not just this one response: the
+      // queue is where a second member of staff picks the case up, and a
+      // pending bank-side refund that lives only in an HTTP response nobody
+      // kept is a customer left out of pocket.
+      if (settledByGini && refundIqd > 0) {
+        const giniNote = `[GINI] No wallet credit — goods settled in the Gini app. ${refundIqd} IQD is owed to the customer through Gini/Rafidain and must be arranged with the bank.`;
+        await c.env.DB.prepare(
+          `UPDATE return_cases
+              SET admin_note = CASE WHEN COALESCE(admin_note, '') = '' THEN ?1 ELSE admin_note || char(10) || ?1 END
+            WHERE id = ?2 AND COALESCE(admin_note, '') NOT LIKE '%[GINI]%'`
+        )
+          .bind(giniNote, id)
+          .run();
+      }
 
       // Proportional purchase-points reversal for the refunded merchandise
       // portion (idempotent per case; never double-reverses).
@@ -746,7 +797,17 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
 
   await audit(c.env.DB, admin.id, 'return.transition', id, {
     from, to, resolution, reason,
-    refund: refundResult ? { amount_iqd: refundResult.amount_iqd, credited: refundResult.credited } : null,
+    refund: refundResult
+      ? {
+          amount_iqd: refundResult.amount_iqd,
+          credited: refundResult.credited,
+          channel: refundResult.channel,
+          // Stamped in the audit trail as well: this is the number staff need
+          // months later when the bank asks what Levonis reversed and what it
+          // did not.
+          gini_refund_due_iqd: refundResult.gini_refund_due_iqd ?? 0,
+        }
+      : null,
   });
 
   const row = await c.env.DB.prepare('SELECT * FROM return_cases WHERE id = ?').bind(id).first<ReturnCaseRow>();

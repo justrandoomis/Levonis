@@ -19,7 +19,7 @@ import type { PolicyDocument } from './types';
  */
 export const payment: PolicyDocument = {
   key: 'payment',
-  version: 1,
+  version: 2,
   effective_at: '2026-01-01',
   title: {
     ar: 'سياسة الدفع والمحفظة',
@@ -80,7 +80,7 @@ export const payment: PolicyDocument = {
 المبلغ المستحق عند الباب هو المعروض على الطلب وعلى الفاتورة، بعد خصم ما دُفع مقدماً من المحفظة أو بالنقاط. ولا يُطلب من الزبون مبلغ يخالف الفاتورة.
 
 ### 3.3 ضريبة الدفع عند الاستلام
-تُضاف ضريبة مقدارها ستة آلاف دينار عن كل خمسمئة ألف دينار كاملة من المبلغ المستحق عند الباب. ولا تُفرض على الطلب المدفوع مسبقاً ولا على الاستلام من المخزن، وقد تُعفى منها بعض مستويات العضوية، ويُعرض مقدارها ومقدار الإعفاء رقمين منفصلين.
+تُضاف ضريبة بمقدار مقرر عن كل شريحة كاملة من المبلغ المستحق عند الباب، ومقدار الضريبة ومقدار الشريحة كلاهما معروضان في شاشة الدفع لذلك الطلب وقابلان للتعديل من إدارة المتجر. ولا تُفرض على الطلب المدفوع مسبقاً ولا على الاستلام من المخزن، وقد تُعفى منها بعض مستويات العضوية، ويُعرض مقدارها ومقدار الإعفاء رقمين منفصلين.
 
 ### 3.4 التحصيل هو ما يُثبت الدفع
 لا يُعدّ الطلب مدفوعاً بمجرد تسليمه، بل بتسجيل التحصيل في النظام. وما يترتب على الدفع من آثار — ومنها تحرير النقاط المكتسبة — يبدأ من تاريخ تسجيل التحصيل.
@@ -367,7 +367,7 @@ Cash on delivery is available on orders from the official LEVONIS store delivere
 The amount due at the door is the amount stated on the order and on the invoice, after deduction of whatever was paid in advance from the wallet or in points. The customer is not asked for an amount that differs from the invoice.
 
 ### 3.3 The cash-on-delivery tax
-A tax of six thousand dinars is added for every complete five hundred thousand dinars of the amount payable at the door. It is not charged on a prepaid order or on warehouse pickup; certain membership levels may be exempt from it, and the tax and the exemption are displayed as two separate figures.
+A tax is added at a stated amount for every complete block of the amount payable at the door; the tax and the size of the block are both displayed at checkout for that order and may be amended by the Store's administration. It is not charged on a prepaid order or on warehouse pickup; certain membership levels may be exempt from it, and the tax and the exemption are displayed as two separate figures.
 
 ### 3.4 Collection is what proves payment
 An order is not treated as paid merely because it was delivered, but by the recording of the collection in the system. The consequences of payment — including the release of earned points — run from the date the collection is recorded.
@@ -654,7 +654,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 ئەو بڕەی لە بەردەرگا دەدرێت ئەوەیە لەسەر داواکارییەکە و لەسەر پسووڵەکەدا پیشان دراوە، دوای بڕینی ئەوەی پێشەکی لە جزدان یان بە خاڵ دراوە. لە کڕیار بڕێک داوا ناکرێت کە جیاواز بێت لە پسووڵەکە.
 
 ### 3.3 باجی پارەدان لە کاتی وەرگرتن
-باجێکی شەش هەزار دینار زیاد دەکرێت بۆ هەر پێنج سەد هەزار دینارێکی تەواو لەو بڕەی لە بەردەرگا دەدرێت. لەسەر داواکاری پێشەکی دراو و لەسەر وەرگرتن لە کۆگا زیاد ناکرێت، و لەوانەیە هەندێک ئاستی ئەندامێتی لێی ببەخشرێن، و بڕی باج و بڕی بەخشین وەک دوو ژمارەی جیاواز پیشان دەدرێن.
+باجێک بە بڕێکی دیاریکراو زیاد دەکرێت بۆ هەر بڕێکی تەواو لەو بڕەی لە بەردەرگا دەدرێت، و هەردوو بڕەکە لە شاشەی پارەدانی ئەو داواکارییەدا پیشان دەدرێن و دەکرێت لەلایەن بەڕێوەبەرایەتیی فرۆشگاوە بگۆڕدرێن. لەسەر داواکاری پێشەکی دراو و لەسەر وەرگرتن لە کۆگا زیاد ناکرێت، و لەوانەیە هەندێک ئاستی ئەندامێتی لێی ببەخشرێن، و بڕی باج و بڕی بەخشین وەک دوو ژمارەی جیاواز پیشان دەدرێن.
 
 ### 3.4 کۆکردنەوە ئەوەیە پارەدان دەسەلمێنێت
 داواکارییەک تەنها بەوەی گەیەنراوە بە دراو دانانرێت، بەڵکو بە تۆمارکردنی کۆکردنەوەکە لە سیستەمدا. ئەو کاریگەرییانەی لە پارەدانەوە دێن — لەوانەش ئازادکردنی خاڵە بەدەستهێنراوەکان — لە بەرواری تۆمارکردنی کۆکردنەوەکەوە دەست پێدەکەن.

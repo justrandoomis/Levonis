@@ -356,3 +356,54 @@ test('catalogSubtreeFilter binds its own parameters, in order', () => {
   assert.deepEqual(f.params, ['cat_printers', 'cat_printers']);
   assert.ok(!/\?\d/.test(f.sql), 'no numbered placeholders — callers concatenate this beside plain ones');
 });
+
+// =========================================================================
+// «الليزر يعتبر كطابعة» — THE OWNER'S DECISION, PINNED
+// =========================================================================
+
+test('a laser machine is a printer for every rule that pays out; its shelves are not', async () => {
+  /**
+   * «الليزر يعتبر كطابعة أي أنه يعامل كطابعة فيلمنت أو رزن: من الضمان الممدد،
+   *  من دفع مقدمة خمسين ألف، التوصيل، خصم الصيانة للبرو — نفس طابعة الفيلمنت
+   *  والرزن.»
+   *
+   * Migration 0102 originally shipped 0 on all five laser nodes with a long
+   * argument for it. The owner overruled that, and `is_printer_catalog` is the
+   * single column every one of those rules reads — the extended warranty
+   * (warrantyPlans.ts), the «٥٠ الف» home-delivery advance (printerAdvance.ts),
+   * the PRO maintenance discount and the PLUS gift (membershipOps.ts), the
+   * review reward (reviewQuality.ts) and the referral free delivery
+   * (orderStageOps.ts). A silent revert to 0 would switch all six off at once
+   * and nothing else in the suite would notice, so the flag is pinned here.
+   *
+   * THE SPLIT IS THE POINT, and it is migration 0018's split, not a new one:
+   * the MACHINES carry the flag (`cat_printers`, `cat_printers_fdm`,
+   * `cat_printers_resin` do); the ACCESSORIES and the CONSUMABLES do not
+   * (`cat_pacc*`, `cat_materials*` do not). A lens is not a machine and a sheet
+   * of plywood is not a machine. That is «نفس طابعة الفيلمنت والرزن» read
+   * literally, so both halves are asserted — a future edit that flags all five
+   * would start charging a 50,000 advance on a roll of vinyl.
+   */
+  const raw = freshDb();
+  const flagOf = (id: string) =>
+    (raw.prepare('SELECT is_printer_catalog AS f FROM catalogs WHERE id = ?').get(id) as { f: number } | undefined)?.f;
+
+  for (const id of ['cat_laser', 'cat_laser_machines']) {
+    assert.equal(flagOf(id), 1, `${id} must be treated as a printer — the owner's decision`);
+  }
+  for (const id of ['cat_laser_acc', 'cat_materials_laser', 'cat_materials_blade']) {
+    assert.equal(flagOf(id), 0, `${id} is a consumable or a part, not a machine`);
+  }
+
+  // The rule the flag actually feeds, exercised rather than assumed: a product
+  // filed under the laser machines answers the same question an FDM printer does.
+  raw.prepare(
+    `INSERT INTO products (id, slug, name, description, price_iqd, status, category_id, sub_category_id)
+     VALUES ('p_laser', 'p_laser', 'Laser Cutter', '', 900000, 'active', 'cat_laser', 'cat_laser_machines')`
+  ).run();
+  raw.prepare(
+    `INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('p_laser', 'cat_laser_machines', 1)`
+  ).run();
+  const ids = await printerProductIds(asD1(raw), ['p_laser']);
+  assert.equal(ids.has('p_laser'), true, 'a laser cutter must resolve as a printer to printerIdentity');
+});

@@ -11,38 +11,49 @@
 -- WHY THE MATERIALS HANG OFF `cat_materials` AND THE MACHINES DO NOT. A sheet
 -- of plywood is «مواد الطباعة» in the same sense a spool is: a consumable in
 -- the materials family, sold by the piece, filed beside «مواد FDM» and «مواد
--- Resin». A cutter is not a printer and does not belong under «الطابعات», so
--- it gets a root of its own at sort 25 — between the printer accessories and
--- the materials, which is where «بجانب» puts it on the storefront.
+-- Resin». A cutter is not filed UNDER «الطابعات» — it is a different machine
+-- and a shopper looking for one is not browsing 3D printers — so it gets a
+-- root of its own at sort 25, between the printer accessories and the
+-- materials, which is where «بجانب» puts it on the storefront. That is a
+-- statement about the SHELF only; what RULES it is sold under is the section
+-- below, and there it is treated exactly as a printer.
 --
--- ============================ is_printer_catalog = 0, AND IT IS A DECISION ==
+-- ================ is_printer_catalog = 1 ON THE MACHINES — THE OWNER'S CALL ==
 --
--- That column is not a label. worker/lib/warrantyPlans.ts refuses an extended
--- warranty for a product no catalog of which carries the flag, and
--- worker/lib/membershipOps.ts keys the PLUS gift and the PRO maintenance
--- discount off the same join. Setting it to 1 here would silently enrol every
--- laser cutter in three membership rules that were written, priced and worded
--- for 3D printers — a maintenance discount on a machine whose maintenance is a
--- lens and a filter, and a warranty plan whose percentages were set against a
--- printer's failure modes.
+-- «الليزر يعتبر كطابعة، أي أنه يعامل كطابعة فيلمنت أو رزن: من الضمان الممدد،
+--  من دفع مقدمة خمسين ألف، التوصيل، خصم الصيانة للبرو — نفس طابعة الفيلمنت
+--  والرزن.»
 --
--- AND IT IS NOT ONLY THOSE THREE, which is the part worth writing down. The
--- same flag is read by worker/lib/printerIdentity.ts, and through it by:
---   * worker/lib/printerAdvance.ts — the «٥٠ الف» paid on delivery when home
---     delivery is requested for a printer. A cutter at 0 is sold with no
---     advance, which is the one consequence here that is MONEY and the one the
---     owner should be asked about first;
---   * worker/lib/reviewQuality.ts — a review of a non-printer earns no reward;
---   * the referral free-delivery rule and the `is_printer` flag on
---     `OrderDelivered` (worker/lib/orderStageOps.ts).
+-- This file first shipped with 0 on all five nodes and a long argument for it.
+-- The argument was mine, not the shop's, and the owner has answered it: a
+-- laser cutter is a machine they sell the way they sell a printer, so it
+-- carries the printer's rules. The flag is what carries them, so the flag is 1.
 --
--- So the laser line ships OUTSIDE all of them. This is reversible and is meant
--- to be: when the owner decides a cutter should carry the printer warranty and
--- the printer advance, it is one UPDATE on `catalogs.is_printer_catalog` from
--- the taxonomy screen, and nothing in the code has to change with it. It is
--- one UPDATE in the other direction too, which is why 0 is the safe default:
--- a rule that was never applied is easier to start than a payment taken from a
--- customer under a rule that was never meant for their machine.
+-- WHAT THE 1 TURNS ON, each one asked for by name:
+--   * worker/lib/warrantyPlans.ts      — the extended warranty (+12 / +24)
+--   * worker/lib/printerAdvance.ts     — the «٥٠ الف» advance on home delivery
+--   * worker/lib/membershipOps.ts      — the PRO maintenance discount, and the
+--                                        PLUS gift that shares the same join
+--   * worker/lib/reviewQuality.ts      — a review of a machine earns its reward
+--   * worker/lib/orderStageOps.ts      — the referral free-delivery rule and
+--                                        `is_printer` on `OrderDelivered`
+--
+-- WHY ONLY TWO OF THE FIVE NODES. This mirrors migration 0018 exactly rather
+-- than inventing a rule for the laser line: there `cat_printers`,
+-- `cat_printers_fdm` and `cat_printers_resin` are 1, while `cat_pacc*` (the
+-- accessories) and `cat_materials*` are 0. A spool is not a printer and a lens
+-- is not a printer; the machine is. So `cat_laser` and `cat_laser_machines`
+-- are 1, and the accessories and the two consumable shelves stay 0 — which is
+-- «نفس طابعة الفيلمنت والرزن» read literally.
+--
+-- WHAT THE 1 DOES **NOT** DO, and this is the part worth knowing. It does not
+-- give a laser cutter the printer's SPEC SHEET. The form and the CSV template
+-- are chosen by `template_family` through `productTypeForBranch`
+-- (worker/lib/templateFamilies.ts), which never reads this column; the only
+-- place the two meet is `worker/lib/importApply.ts`, where the flag feeds
+-- `printerWarrantyRules` and nothing else. So a cutter is asked for its laser
+-- source and its work area, not for a nozzle diameter — and is still sold with
+-- the printer's warranty, advance and PRO discount.
 --
 -- ============================================ the seeding contract, from 0018
 --
@@ -66,14 +77,14 @@ INSERT INTO catalogs (id, parent_id, slug, name_ar, name_en, name_ckb, sort, is_
          CASE WHEN NOT EXISTS (SELECT 1 FROM catalogs WHERE slug = 'laser-crafting') THEN 'laser-crafting'
             WHEN NOT EXISTS (SELECT 1 FROM catalogs WHERE slug = 'laser-crafting-levo') THEN 'laser-crafting-levo'
             ELSE 'cat_laser' END,
-         'أجهزة الليزر', 'Laser Crafting', 'دروستکردن بە لەیزەر', 25, 0, 1, 'devices'
+         'أجهزة الليزر', 'Laser Crafting', 'دروستکردن بە لەیزەر', 25, 1, 1, 'devices'
    WHERE NOT EXISTS (SELECT 1 FROM catalogs WHERE id = 'cat_laser');
 INSERT INTO catalogs (id, parent_id, slug, name_ar, name_en, name_ckb, sort, is_printer_catalog, active, template_family)
   SELECT 'cat_laser_machines', 'cat_laser',
          CASE WHEN NOT EXISTS (SELECT 1 FROM catalogs WHERE slug = 'laser-machines') THEN 'laser-machines'
             WHEN NOT EXISTS (SELECT 1 FROM catalogs WHERE slug = 'laser-machines-levo') THEN 'laser-machines-levo'
             ELSE 'cat_laser_machines' END,
-         'ماكينات الليزر', 'Laser Machines', 'ئامێری لەیزەر', 26, 0, 1, 'devices'
+         'ماكينات الليزر', 'Laser Machines', 'ئامێری لەیزەر', 26, 1, 1, 'devices'
    WHERE NOT EXISTS (SELECT 1 FROM catalogs WHERE id = 'cat_laser_machines');
 -- «ملحقات الليزر» is a DEVICES section on purpose: it resolves to the existing
 -- «ملحقات وقطع» product type, which is where a lens, a honeycomb bed and a

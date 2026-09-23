@@ -427,8 +427,24 @@ export default function OrderDetail() {
 
                 Drawn off the SERVER's `gini.state`, never off a payment label:
                 the state is what the sweep and the confirm gate both read.
+
+                BUT NOT ON A CANCELLED ORDER. Only the expiry sweep ever writes
+                `gini_state='expired'`; a customer pressing Cancel — `can_cancel`
+                is true for any pending order, so this is the ordinary path, not
+                an edge case — and an admin cancelling by hand both flip
+                `status` and leave the state at 'awaiting_receipt' for ever.
+                Without this test the «ملغي» pill and «امسح الباركود وإلا يُلغى
+                الطلب غدًا» sit one under the other, telling the customer to go
+                and act on an order that no longer exists.
+
+                The status test lives HERE and not in `orderPublic`, because
+                mapping cancelled → 'expired' server-side would make the box
+                below assert the hold ran out — which is false for an order
+                somebody cancelled on purpose, and it is the sentence the
+                customer would then read. The genuine sweep case still renders
+                exactly as before.
               */}
-              {order.gini && order.gini.state === 'awaiting_receipt' && (
+              {order.status !== 'cancelled' && order.gini && order.gini.state === 'awaiting_receipt' && (
                 <div data-gini-awaiting className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-200">
                   <Landmark className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   <span>

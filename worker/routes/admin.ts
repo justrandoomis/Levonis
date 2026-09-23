@@ -2521,6 +2521,19 @@ adminRoutes.put('/delivery/statuses/:remoteId', async (c) => {
  * Refuses to create a SECOND shipment for an order that already has one:
  * a double-tap would put two drivers on the same parcel and leave us syncing
  * the wrong id.
+ *
+ * AND REFUSES AN UNSCANNED GINI ORDER, for the same reason the two admin
+ * doors do. «يجب اعلام منصه جني بانه استلم المنتج قبل ان يتم تجهيز الطلب» —
+ * handing the parcel to a courier IS preparing it, and it is the point of no
+ * return: once a shipment exists, the 15-minute courier sweep force-moves the
+ * order through `moveOrderStage` (worker/lib/delivery/sync.ts) into shipped /
+ * delivered, both inside STOCK_DEDUCTED_STATES, with no gate of its own.
+ *
+ * The gate belongs HERE and not in that sweep. The courier reports what
+ * physically happened; refusing to record a delivered parcel would leave
+ * inventory believing shipped units are still on the shelf. Gated here, an
+ * unscanned Gini order can never acquire a `delivery_remote_id` in the first
+ * place, so the sweep never sees one.
  */
 adminRoutes.post('/orders/:id/delivery', async (c) => {
   const adminUser = c.get('user')!;
@@ -2533,6 +2546,12 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
     throw badRequest('This order already has a delivery shipment.', 'SHIPMENT_EXISTS', {
       remote_id: order.delivery_remote_id,
       tracking_no: order.delivery_tracking_no ?? '',
+    });
+  }
+  if (giniBlocksConfirmation(order)) {
+    throw badRequest(GINI_RECEIPT_REQUIRED_MESSAGE, GINI_RECEIPT_REQUIRED, {
+      gini_state: giniStateOf(order.gini_state),
+      gini_order_no: String(order.gini_order_no ?? ''),
     });
   }
   const address = safeParse<Record<string, unknown>>(order.address_snapshot, {});
@@ -2722,12 +2741,30 @@ adminRoutes.post('/orders/:id/gini-receipt', async (c) => {
       'GINI_HOLD_EXPIRED'
     );
   }
+  // A CANCELLED ORDER WAS NEVER HANDED OVER, so there is nothing to tell the
+  // bank. A manual cancellation — by the customer or by an admin — leaves
+  // `gini_state` at 'awaiting_receipt' (only the sweep writes 'expired', and
+  // its candidates are pending orders), so the state check above lets a
+  // cancelled order straight through to the scan form. Recording a receipt on
+  // it would write the one record the owner keeps to answer a dispute —
+  // «يجب اعلام منصه جني بانه استلم المنتج» — asserting the customer took goods
+  // that never shipped, and would silently clear the GINI_RECEIPT_REQUIRED
+  // gate for anyone who later re-opens the order. Re-open it first, then scan.
+  if (String(order.status ?? '') === 'cancelled') {
+    throw badRequest(
+      'هذا الطلب ملغى — أعِد فتحه قبل تسجيل مسح باركود الاستلام. / This order is cancelled — re-open it before recording the receipt scan.',
+      'ORDER_CANCELLED'
+    );
+  }
 
   const now = new Date().toISOString();
   const res = await c.env.DB.prepare(
+    // `status <> 'cancelled'` repeats the guard above inside the fence, so an
+    // order cancelled between the read and this write loses the race instead
+    // of being stamped as received.
     `UPDATE orders
         SET gini_state = 'received', gini_receipt_barcode = ?1, gini_received_at = ?2, updated_at = ?2
-      WHERE id = ?3 AND gini_state = 'awaiting_receipt'`
+      WHERE id = ?3 AND gini_state = 'awaiting_receipt' AND status <> 'cancelled'`
   )
     .bind(barcode, now, id)
     .run();

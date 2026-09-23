@@ -22,7 +22,7 @@ import type { PolicyDocument } from './types';
  */
 export const purchase: PolicyDocument = {
   key: 'purchase',
-  version: 1,
+  version: 2,
   effective_at: '2026-01-01',
   title: {
     ar: 'سياسة الشراء',
@@ -195,7 +195,7 @@ export const purchase: PolicyDocument = {
 كل كلف التوصيل على الزبون. ويُستثنى من ذلك أعضاء PRO و LEVO PRIME فوق قيمة طلب محددة، حيث يتحملها المتجر: الإعفاء لعضو PRO الفعّال عند تجاوز قيمة البضاعة المؤهلة حدّ {{PRO_FREE_DELIVERY_MIN_IQD}} دينار حصراً بالزيادة، ويشمل التوصيل الاعتيادي والتغليف المحمي. أما LEVO PRIME فيُعفى من أجرة التوصيل الاعتيادية وحدها عند تجاوز حدّ {{PRIME_FREE_DELIVERY_MIN_IQD}} دينار حصراً بالزيادة. والرقم المعتمد في كل طلب هو المعروض في شاشة الدفع لذلك الطلب، وتفصيل الشروط في سياسة التوصيل.
 
 ### 6.7 ضريبة الدفع عند الاستلام
-عند اختيار الدفع عند الاستلام مع التوصيل إلى عنوان، تُضاف ضريبة مقدارها ستة آلاف دينار عن كل خمسمئة ألف دينار كاملة من المبلغ المستحق عند الباب. ولا تُفرض هذه الضريبة على الاستلام من المخزن ولا على الطلب المدفوع مسبقاً. وقد تُعفى منها بعض مستويات العضوية، ويُعرض مقدار الضريبة والإعفاء رقمين منفصلين على الفاتورة.
+عند اختيار الدفع عند الاستلام مع التوصيل إلى عنوان، تُضاف ضريبة بمقدار مقرر عن كل شريحة كاملة من المبلغ المستحق عند الباب. ومقدار الضريبة ومقدار الشريحة كلاهما قابلان للتعديل من إدارة المتجر، والرقم المعتمد في كل طلب هو المعروض في شاشة الدفع لذلك الطلب. ولا تُفرض هذه الضريبة على الاستلام من المخزن ولا على الطلب المدفوع مسبقاً. وقد تُعفى منها بعض مستويات العضوية، ويُعرض مقدار الضريبة والإعفاء رقمين منفصلين على الفاتورة.
 
 ### 6.8 مقدمة توصيل الطابعة إلى المنزل
 توصيل الطابعة إلى عنوان يستلزم دفع مقدمة من المحفظة قبل إتمام الطلب، بالمبلغ المعروض على صفحة المنتج وفي شاشة الدفع، وهو عند تاريخ نفاذ هذه النسخة خمسون ألف دينار. ولا تُطلب هذه المقدمة عند الاستلام من المخزن، ويُرفض الطلب إذا لم يغطها الرصيد.
@@ -535,7 +535,7 @@ The delivery fee and the tax attached to it are set by the delivery companies, n
 All delivery costs are on the customer. PRO and LEVO PRIME members above a stated order value are excepted, and there the Store carries them: the waiver for an active PRO member applies where the eligible merchandise value is strictly more than {{PRO_FREE_DELIVERY_MIN_IQD}} dinars, and covers ordinary delivery and protected packing. LEVO PRIME is waived the ordinary delivery fee alone where the value is strictly more than {{PRIME_FREE_DELIVERY_MIN_IQD}} dinars. The figure that governs a given order is the one displayed on that order's checkout screen, and the conditions are detailed in the Delivery Policy.
 
 ### 6.7 The cash-on-delivery tax
-Where cash on delivery is chosen with delivery to an address, a tax of six thousand dinars is added for every complete five hundred thousand dinars of the amount payable at the door. It is not charged on warehouse pickup nor on a prepaid order. Certain membership levels may be exempt from it, and the tax and the exemption are shown as two separate figures on the invoice.
+Where cash on delivery is chosen with delivery to an address, a tax is added at a stated amount for every complete block of the amount payable at the door. The amount of the tax and the size of the block may both be amended by the Store's administration, and the figure that governs a given order is the one displayed on that order's checkout screen. It is not charged on warehouse pickup nor on a prepaid order. Certain membership levels may be exempt from it, and the tax and the exemption are shown as two separate figures on the invoice.
 
 ### 6.8 The printer home-delivery advance
 Home delivery of a printer requires an advance paid from the wallet before the order can be placed, in the amount displayed on the product page and at checkout, which at the effective date of this version is fifty thousand dinars. The advance is not required for warehouse pickup, and the order is refused if the balance does not cover it.
@@ -875,7 +875,7 @@ The approved contact point for complaints and enquiries is {{LEVONIS_SUPPORT_CON
 هەموو تێچووەکانی گەیاندن لەسەر کڕیارن. ئەندامانی PRO و LEVO PRIME لە سەرووی بەهایەکی دیاریکراوی داواکاری لەمە دەردەچن، و لەوێدا فرۆشگا هەڵیدەگرێت: بەخشینەکە بۆ ئەندامی PRO ی چالاک کاتێک جێبەجێ دەبێت کە بەهای کاڵای شایستە بە تەواوی زیاتر بێت لە {{PRO_FREE_DELIVERY_MIN_IQD}} دینار، و گەیاندنی ئاسایی و پاکەتکردنی پارێزراو دەگرێتەوە. بەڵام LEVO PRIME تەنها لە کرێی گەیاندنی ئاسایی دەبەخشرێت کاتێک بەهاکە بە تەواوی زیاتر بێت لە {{PRIME_FREE_DELIVERY_MIN_IQD}} دینار. ئەو ژمارەیەی بۆ هەر داواکارییەک کاری پێدەکرێت ئەوەیە لە شاشەی پارەدانی ئەو داواکارییەدا پیشان دەدرێت، و مەرجەکان لە سیاسەتی گەیاندندا وردتر کراون.
 
 ### 6.7 باجی پارەدان لە کاتی وەرگرتن
-لە کاتی هەڵبژاردنی پارەدان لە کاتی وەرگرتن لەگەڵ گەیاندن بۆ ناونیشانێک، باجێکی شەش هەزار دینار زیاد دەکرێت بۆ هەر پێنج سەد هەزار دینارێکی تەواو لەو بڕەی لە بەردەرگا دەدرێت. لەسەر وەرگرتن لە کۆگا و لەسەر داواکاری پێشەکی دراو زیاد ناکرێت. لەوانەیە هەندێک ئاستی ئەندامێتی لێی ببەخشرێن، و بڕی باج و بەخشین وەک دوو ژمارەی جیاواز لەسەر پسووڵەکە پیشان دەدرێن.
+لە کاتی هەڵبژاردنی پارەدان لە کاتی وەرگرتن لەگەڵ گەیاندن بۆ ناونیشانێک، باجێک بە بڕێکی دیاریکراو زیاد دەکرێت بۆ هەر بڕێکی تەواو لەو بڕەی لە بەردەرگا دەدرێت. هەردوو بڕەکە دەکرێت لەلایەن بەڕێوەبەرایەتیی فرۆشگاوە بگۆڕدرێن، و ئەو ژمارەیەی بۆ هەر داواکارییەک کاری پێدەکرێت ئەوەیە لە شاشەی پارەدانی ئەو داواکارییەدا پیشان دەدرێت. لەسەر وەرگرتن لە کۆگا و لەسەر داواکاری پێشەکی دراو زیاد ناکرێت. لەوانەیە هەندێک ئاستی ئەندامێتی لێی ببەخشرێن، و بڕی باج و بەخشین وەک دوو ژمارەی جیاواز لەسەر پسووڵەکە پیشان دەدرێن.
 
 ### 6.8 پێشەکی گەیاندنی چاپکەر بۆ ماڵ
 گەیاندنی چاپکەر بۆ ناونیشانێک پێویستی بە پێشەکییەکە لە جزدانەوە پێش تەواوکردنی داواکاری، بەو بڕەی لەسەر پەڕەی بەرهەم و لە شاشەی پارەداندا پیشان دەدرێت، کە لە بەرواری جێبەجێبوونی ئەم وەشانەدا پەنجا هەزار دینارە. ئەم پێشەکییە بۆ وەرگرتن لە کۆگا داوا ناکرێت، و داواکارییەکە ڕەت دەکرێتەوە ئەگەر باڵانس داینەپۆشێت.

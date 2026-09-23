@@ -40,6 +40,22 @@ export interface CodTaxRate {
   perBlockIqd: number;
 }
 
+/**
+ * A rate AS IT ARRIVES FROM A SETTINGS ROW, where either side may be missing.
+ *
+ * `admin_settings` returns `null` for a key the owner has never set, and the
+ * SPA's own `PublicSettings` types these two as `number | null | undefined`.
+ * `normalizeCodTaxRate` has always handled that — `Number(null)` is 0 and
+ * `Number(undefined)` is NaN, and both fail its guards and fall back — but the
+ * parameter said `Partial<CodTaxRate>`, which does not admit `null`, so the
+ * one honest caller could not type-check. This is the type the function has
+ * always really accepted.
+ */
+export interface CodTaxRateInput {
+  blockIqd?: number | null;
+  perBlockIqd?: number | null;
+}
+
 export const DEFAULT_COD_TAX_RATE: CodTaxRate = {
   blockIqd: COD_TAX_BLOCK_IQD,
   perBlockIqd: COD_TAX_PER_BLOCK_IQD,
@@ -54,7 +70,7 @@ export const DEFAULT_COD_TAX_RATE: CodTaxRate = {
  * falls back to the default rather than propagating; a per-block of exactly 0
  * is LEGAL and means "no tax", which is a thing an owner may genuinely want.
  */
-export function normalizeCodTaxRate(rate?: Partial<CodTaxRate> | null): CodTaxRate {
+export function normalizeCodTaxRate(rate?: CodTaxRateInput | null): CodTaxRate {
   const block = Number(rate?.blockIqd);
   const per = Number(rate?.perBlockIqd);
   return {
@@ -66,7 +82,7 @@ export function normalizeCodTaxRate(rate?: Partial<CodTaxRate> | null): CodTaxRa
 /** The configured charge for every COMPLETE block payable at the door. */
 export function calculateCodTaxIqd(
   codPayableBeforeTaxIqd: number,
-  rate?: Partial<CodTaxRate> | null
+  rate?: CodTaxRateInput | null
 ): number {
   const { blockIqd, perBlockIqd } = normalizeCodTaxRate(rate);
   const base = Math.max(0, Math.trunc(codPayableBeforeTaxIqd));
@@ -80,7 +96,7 @@ export function codDeliveryTaxIqd(
     deliveryMethodId: string;
     payableBeforeTaxIqd: number;
   },
-  rate?: Partial<CodTaxRate> | null
+  rate?: CodTaxRateInput | null
 ): number {
   const payment = input.paymentMethodId.trim().toLowerCase();
   const delivery = input.deliveryMethodId.trim().toLowerCase();

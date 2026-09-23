@@ -759,6 +759,37 @@ test('the command menu is scoped to the admin group, never registered globally',
   }
 });
 
+test('the scoped menu is registered by the bind itself — the webhook call is too early to do it', async () => {
+  const raw = freshDb();
+  seedSiteAdmin(raw);
+  const tg = stubTelegram();
+  try {
+    // The real order of events: the webhook MUST be registered before any
+    // /topic_here can reach the worker, so at that moment there is no group to
+    // scope a menu to and nothing is written. If the only registration lived
+    // there, the menu would stay empty forever.
+    const a = app(raw, { APP_ORIGIN: 'https://levonis-iq.com' }, ADMIN_USER);
+    await post(a, '/api/telegram/admin/set-admin-webhook', { confirm: 'SET-ADMIN-WEBHOOK' });
+    assert.equal(tg.calls.filter((c) => c.method === 'setMyCommands').length, 0);
+
+    // The FIRST /topic_here adopts the group — and that is the moment the menu
+    // becomes registrable, so it is registered right there, scoped.
+    tg.calls.length = 0;
+    await hook(app(raw), forumMsg({ text: '/topic_here general', thread: null }));
+    const menus = tg.calls.filter((c) => c.method === 'setMyCommands');
+    assert.equal(menus.length, 1, 'the bind that adopted the group registered the menu');
+    assert.deepEqual(menus[0].body.scope, { type: 'chat', chat_id: String(GROUP) });
+
+    // And only that one: a later topic binding in the same group is not a new
+    // adoption, so it does not re-post the menu on every command.
+    tg.calls.length = 0;
+    await hook(app(raw), forumMsg({ text: '/topic_here wallet', thread: 12 }));
+    assert.equal(tg.calls.filter((c) => c.method === 'setMyCommands').length, 0);
+  } finally {
+    tg.restore();
+  }
+});
+
 test('the admin console Telegram test reports the ROUTER, not the retired legacy chat', async () => {
   const raw = freshDb();
   seedSiteAdmin(raw);

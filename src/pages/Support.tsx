@@ -163,6 +163,19 @@ const STRINGS = {
     retry: 'إعادة المحاولة',
     subjectRequired: 'الموضوع مطلوب (3 أحرف على الأقل)',
     messageRequired: 'الرسالة مطلوبة (5 أحرف على الأقل)',
+    /* THE OPENING MENU IS CLIENT-SIDE, SO IT HAS TO MIRROR THE SERVER'S.
+       The first screen is seeded locally (button-first: no round trip before
+       the customer has said anything), so these rows — not
+       worker/routes/support.ts MENU_ITEMS — are the chips a cold /support
+       actually shows. The server list only reaches the screen LATER, on a
+       greeting/thanks/clarify reply, so the two drifted silently once
+       `choose_printer`, `compare_products`, `power_usage` and `open_ticket`
+       were promoted server-side: «ساعدني باختيار طابعة» — the owner's own
+       sentence, and the one thing a first-time buyer wants — was reachable
+       only by typing it.
+       RULE: intent for intent, in the same order as MENU_ITEMS
+       (worker/routes/support.ts), in all three dictionaries, with the
+       server's own labels rather than fresh translations. */
     menu: [
       { intent: 'order_status', label: 'حالة طلبي' },
       { intent: 'delivery_estimate', label: 'موعد التوصيل' },
@@ -173,7 +186,11 @@ const STRINGS = {
       { intent: 'return_help', label: 'الإرجاع' },
       { intent: 'password_help', label: 'كلمة المرور' },
       { intent: 'product_search', label: 'بحث عن منتج' },
+      { intent: 'choose_printer', label: 'ساعدني باختيار طابعة' },
+      { intent: 'compare_products', label: 'مقارنة منتجين' },
+      { intent: 'power_usage', label: 'استهلاك الكهرباء وحجم الـ UPS' },
       { intent: 'policy_question', label: 'السياسات' },
+      { intent: 'open_ticket', label: 'فتح تذكرة دعم' },
       { intent: 'human_handoff', label: 'التحدث مع الفريق' },
     ],
   },
@@ -230,7 +247,11 @@ const STRINGS = {
       { intent: 'return_help', label: 'Returns' },
       { intent: 'password_help', label: 'Password' },
       { intent: 'product_search', label: 'Search products' },
+      { intent: 'choose_printer', label: 'Help me choose a printer' },
+      { intent: 'compare_products', label: 'Compare two products' },
+      { intent: 'power_usage', label: 'Power draw and UPS size' },
       { intent: 'policy_question', label: 'Policies' },
+      { intent: 'open_ticket', label: 'Open a support ticket' },
       { intent: 'human_handoff', label: 'Talk to the team' },
     ],
   },
@@ -287,7 +308,11 @@ const STRINGS = {
       { intent: 'return_help', label: 'گەڕاندنەوە' },
       { intent: 'password_help', label: 'وشەی نهێنی' },
       { intent: 'product_search', label: 'گەڕان بۆ بەرهەم' },
+      { intent: 'choose_printer', label: 'یارمەتیم بدە پرینتەر هەڵبژێرم' },
+      { intent: 'compare_products', label: 'بەراوردی دوو بەرهەم' },
+      { intent: 'power_usage', label: 'ڕاکێشانی کارەبا و قەبارەی UPS' },
       { intent: 'policy_question', label: 'سیاسەتەکان' },
+      { intent: 'open_ticket', label: 'کردنەوەی تیکێتی پشتگیری' },
       { intent: 'human_handoff', label: 'قسە لەگەڵ تیمەکە' },
     ],
   },
@@ -963,12 +988,24 @@ export default function Support() {
           type="button"
           onClick={() => navigate(-1)}
           aria-label={s.back}
-          className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-surface text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
         </button>
         <LifeBuoy className="w-5 h-5 shrink-0 text-gold" aria-hidden="true" />
-        <h1 className="text-text-primary font-bold text-lg">{s.title}</h1>
+        {/* ONE BAR STAYS ONE BAR AT 320px.
+            Fixed chrome in this row is 188px (32 padding + 44 back button +
+            20 icon + 44 character slot + 4x12 gaps), leaving 132px for an
+            18px-bold title. «الدعم والمساعدة» and «پشتگیری و یارمەتی» are
+            both wider than that, so without a guard the h1 wrapped, the bar
+            grew to two rows, and the character sat beside a two-line title —
+            the stacked shape this header exists to remove. Everything else in
+            the row is `shrink-0`, so the title is the only thing that gives;
+            `min-w-0` must ride along with `truncate`, because the
+            `whitespace-nowrap` inside `truncate` otherwise raises the flex
+            item's automatic minimum to its full max-content width and pushes
+            the title out of the bar instead of ellipsizing it. */}
+        <h1 className="min-w-0 truncate text-text-primary font-bold text-lg">{s.title}</h1>
         {/* ONE BAR, NOT TWO.
             The shell reserves `lv-character-fallback-header` — a full 60-72px
             strip of its own — for any route that registers no character
@@ -981,7 +1018,9 @@ export default function Support() {
             title rather than at the trailing edge because it was asked for
             «بجانب كلمه المساعده والدعم» — beside the words, not across the
             bar from them. */}
-        <MotionCharacterHome kind="top-header" compact busy={busy} />
+        <div className="shrink-0">
+          <MotionCharacterHome kind="top-header" compact busy={busy} />
+        </div>
         <span className="flex-1" aria-hidden="true" />
       </div>
 

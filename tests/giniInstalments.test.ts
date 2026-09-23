@@ -31,6 +31,7 @@ import { HttpError } from '../worker/lib/http';
 import { orderRoutes } from '../worker/routes/orders';
 import { cartRoutes } from '../worker/routes/cart';
 import { adminRoutes } from '../worker/routes/admin';
+import { returnRoutes } from '../worker/routes/returns';
 import { classifyHost } from '../worker/lib/hosts';
 import { requireMainHost } from '../worker/lib/http';
 import { recordOrderSettlement } from '../worker/lib/pointsOps';
@@ -101,6 +102,9 @@ function appAs(db: D1Database) {
   });
   a.route('/api/orders', orderRoutes);
   a.route('/api/cart', cartRoutes);
+  // The customer's own return request — mounted here because the refund it
+  // ends in is where the Gini money rule has to hold.
+  a.route('/api/returns', returnRoutes);
   a.onError((err, c) => {
     if (err instanceof HttpError) {
       return c.json({ success: false, error: err.message, code: err.code, details: err.details ?? null }, err.status as 400);
@@ -127,6 +131,7 @@ function adminAppAs(db: D1Database) {
   });
   a.use('/api/admin/*', requireMainHost);
   a.route('/api/admin', adminRoutes);
+  a.route('/api/returns', returnRoutes);
   a.onError((err, c) => {
     if (err instanceof HttpError) {
       return c.json({ success: false, error: err.message, code: err.code, details: err.details ?? null }, err.status as 400);
@@ -534,6 +539,47 @@ test('an unscanned gini order cannot be confirmed through either admin door, and
   assert.equal(cancellable.status, 200, await cancellable.clone().text());
 });
 
+/**
+ * A CANCELLED ORDER WAS NEVER HANDED OVER, SO THE BANK MUST NOT BE TOLD IT WAS.
+ *
+ * Only the expiry sweep ever writes gini_state='expired', and its candidates
+ * are `status='pending' AND stage='received'`. Every MANUAL cancellation — the
+ * customer's own, the admin's dropdown, the stage door that is deliberately
+ * ungated — leaves the state at 'awaiting_receipt', so without a status test
+ * the scan form on a dead order is live and the server accepts it: the one
+ * record kept to answer a dispute with Rafidain would assert the customer took
+ * goods that never shipped, and the GINI_RECEIPT_REQUIRED gate would be
+ * cleared for whoever re-opens the order later.
+ */
+test('a cancelled gini order cannot be stamped as received in the bank app', async () => {
+  const { raw, db } = setup();
+  cartLine(raw, 'ci1', 'p_pla', 2);
+  const a = appAs(db);
+  const placed = await json(await post(a, '/api/orders', orderBody({ giniOrderNo: '770770' })));
+  assert.equal(placed.success, true, JSON.stringify(placed));
+  await Promise.all(pending.splice(0));
+  const id = placed.order.id as string;
+  const admin = adminAppAs(db);
+
+  // The ungated cancel door, exactly as the test above says it is meant to be.
+  const cancelled = await send(admin, 'PATCH', `/api/admin/orders/${id}/stage`, { stage: 'cancelled' });
+  assert.equal(cancelled.status, 200, await cancelled.clone().text());
+  const afterCancel = raw.prepare('SELECT status, gini_state FROM orders WHERE id = ?').get(id) as Record<string, unknown>;
+  assert.equal(afterCancel.status, 'cancelled');
+  assert.equal(afterCancel.gini_state, 'awaiting_receipt', 'nothing repairs the state — that is why the guard is needed');
+
+  const scan = await send(admin, 'POST', `/api/admin/orders/${id}/gini-receipt`, { barcode: 'GN-77-00001' });
+  assert.equal(scan.status, 400, await scan.clone().text());
+  assert.equal((await json(scan)).code, 'ORDER_CANCELLED');
+
+  const row = raw.prepare('SELECT gini_state, gini_received_at, gini_receipt_barcode FROM orders WHERE id = ?').get(id) as Record<string, unknown>;
+  assert.equal(row.gini_state, 'awaiting_receipt', 'the bank was not told');
+  assert.ok(!row.gini_received_at);
+  assert.ok(!row.gini_receipt_barcode);
+  const audits = raw.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'order.gini_receipt' AND target = ?").get(id) as { n: number };
+  assert.equal(Number(audits.n), 0, 'and no receipt row was written into the record staff answer disputes from');
+});
+
 test('the scan is what opens the gate: after the barcode, confirm succeeds and the stock is deducted', async () => {
   const { raw, db } = setup();
   cartLine(raw, 'ci1', 'p_pla', 2);
@@ -677,6 +723,24 @@ test('the courier is asked for the delivery fee on a gini order — not 0, and n
       throw err;
     });
 
+    // AND THE PARCEL IS NOT HANDED OVER BEFORE THE BANK IS TOLD. Creating a
+    // shipment is the point of no return: the 15-minute courier sweep then
+    // force-moves the order to shipped/delivered through `moveOrderStage`,
+    // which deducts the stock with no Gini gate of its own — the one crossing
+    // «يجب اعلام منصه جني… قبل ان يتم تجهيز الطلب» exists to prevent, reached
+    // without the scan both admin doors refuse. The precondition belongs here
+    // and not in the sweep: the courier's report of a delivered parcel must
+    // still be recorded, or inventory believes shipped units are on the shelf.
+    const unscanned = await admin.request(`/api/admin/orders/${id}/delivery`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }, undefined, ctx);
+    assert.equal(unscanned.status, 400, await unscanned.clone().text());
+    assert.equal((await json(unscanned)).code, 'GINI_RECEIPT_REQUIRED');
+    assert.equal(sent.length, 0, 'nothing left the building');
+    const noShipment = raw.prepare('SELECT delivery_remote_id FROM orders WHERE id = ?').get(id) as { delivery_remote_id: string | null };
+    assert.ok(!noShipment.delivery_remote_id, 'and the order cannot acquire a remote id the sweep would pick up');
+
+    const scanned = await admin.request(`/api/admin/orders/${id}/gini-receipt`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ barcode: 'GN-66-00001' }) }, undefined, ctx);
+    assert.equal(scanned.status, 200, await scanned.clone().text());
+
     const res = await admin.request(`/api/admin/orders/${id}/delivery`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }, undefined, ctx);
     assert.equal(res.status, 200, await res.clone().text());
   } finally {
@@ -687,4 +751,128 @@ test('the courier is asked for the delivery fee on a gini order — not 0, and n
   assert.equal(sent[0].price, DELIVERY_IQD, 'the door amount, which is the delivery fee');
   assert.notEqual(sent[0].price, 0, 'the old `not cash → 0` rule lost this fee on every gini delivery');
   assert.notEqual(sent[0].price, PRINTER_IQD + DELIVERY_IQD, 'and it is never the whole price gini already financed');
+});
+
+// ------------------------------------- what may be REFUNDED, and to whom
+
+/**
+ * A REFUND MAY ONLY GIVE BACK MONEY LEVONIS ACTUALLY TOOK.
+ *
+ * The return pipeline credits the Levo wallet with the returned line's stored
+ * price, net of discounts, and it read nothing about how the order was paid.
+ * On a Gini order that is ~894,000 IQD of real, immediately spendable balance
+ * conjured out of nothing on one printer: the goods were settled inside the
+ * bank's app before the order existed — `gini_paid_iqd` is the record of it —
+ * and the only dinar that ever reached Levonis is the delivery fee at the
+ * door, which is not refunded here anyway. The customer's instalments to
+ * Rafidain are untouched either way.
+ *
+ * The customer is still owed the money, so the amount is not clamped away in
+ * silence: it comes back as `gini_refund_due_iqd`, lands in the audit row, and
+ * is written onto the case's own note — the queue is where the next member of
+ * staff picks the case up — so somebody knows to arrange the reversal with the
+ * bank. There is no Gini integration here and inventing one would be a lie.
+ */
+test('an approved return on a gini order credits no wallet balance — the goods money was never ours', async () => {
+  const { raw, db } = setup();
+  cartLine(raw, 'ci1', 'p_x1');
+  const a = appAs(db);
+  const placed = await json(await post(a, '/api/orders', orderBody({ giniOrderNo: '880880' })));
+  assert.equal(placed.success, true, JSON.stringify(placed));
+  await Promise.all(pending.splice(0));
+  const id = placed.order.id as string;
+  const admin = adminAppAs(db);
+
+  // The real road to a refundable order: scanned, confirmed, delivered.
+  assert.equal((await send(admin, 'POST', `/api/admin/orders/${id}/gini-receipt`, { barcode: 'GN-88-00001' })).status, 200);
+  assert.equal((await send(admin, 'PATCH', `/api/admin/orders/${id}/stage`, { stage: 'confirmed' })).status, 200);
+  raw
+    .prepare("UPDATE orders SET status='delivered', stage='delivered', delivered_at=? WHERE id=?")
+    .run(new Date().toISOString(), id);
+
+  const money = raw.prepare('SELECT gini_paid_iqd AS gini, due_on_delivery_iqd AS due FROM orders WHERE id = ?').get(id) as
+    { gini: number; due: number };
+  assert.equal(Number(money.gini), PRINTER_IQD, 'the bank financed the goods');
+  assert.equal(Number(money.due), DELIVERY_IQD, 'and the door collected the fee, nothing else');
+
+  const itemId = String((raw.prepare('SELECT id FROM order_items WHERE order_id = ?').get(id) as { id: string }).id);
+  const opened = await json(await post(a, '/api/returns', { orderItemId: itemId, qty: 1, reason: 'defective' }));
+  assert.equal(opened.success, true, JSON.stringify(opened));
+  // Named rather than `(opened.case ?? opened.cases?.[0]).id`: if the route
+  // ever answers with neither shape, that expression throws a bare TypeError
+  // and the failure says nothing about what the door actually returned.
+  const openedCase = opened.case ?? (Array.isArray(opened.cases) ? opened.cases[0] : undefined);
+  assert.ok(openedCase?.id, `POST /api/returns returned no case: ${JSON.stringify(opened)}`);
+  const caseId = String(openedCase.id);
+
+  const spendable = () =>
+    Number(
+      (raw
+        .prepare("SELECT COALESCE(SUM(amount),0) AS n FROM wallet_transactions WHERE user_id='buyer' AND currency='USD' AND status='approved'")
+        .get() as { n: number }).n
+    );
+  const before = spendable();
+
+  for (const to of ['assessment', 'approved', 'received', 'inspected']) {
+    const step = await send(admin, 'POST', `/api/returns/admin/${caseId}/transition`, { to });
+    assert.equal(step.status, 200, `${to}: ${await step.clone().text()}`);
+  }
+  const resolved = await json(
+    await send(admin, 'POST', `/api/returns/admin/${caseId}/transition`, { to: 'resolved', resolution: 'refund' })
+  );
+  assert.equal(resolved.success, true, JSON.stringify(resolved));
+
+  // THE ASSERTION THE BUG FAILS: not one cent of Levo balance was minted.
+  assert.equal(spendable(), before, 'a wallet credit here is money Levonis never received');
+  assert.equal(resolved.refund.credited, false);
+  assert.equal(resolved.refund.amount_usd_cents, 0);
+  assert.equal(resolved.refund.channel, 'gini');
+  const ledger = raw.prepare('SELECT COUNT(*) AS n FROM wallet_transactions WHERE id = ?').get(`wtx_ret_${caseId}`) as { n: number };
+  assert.equal(Number(ledger.n), 0, 'no deposit row at all, so nothing can be released by a later approval either');
+
+  // AND IT DID NOT VANISH: the admin resolving the case is told what the bank
+  // still owes, and so is the case itself.
+  assert.ok(Number(resolved.refund.gini_refund_due_iqd) > 800_000, JSON.stringify(resolved.refund));
+  assert.equal(Number(resolved.refund.gini_refund_due_iqd), Number(resolved.refund.amount_iqd));
+  assert.match(String(resolved.refund.channel_note), /Gini/);
+  const note = String((raw.prepare('SELECT admin_note FROM return_cases WHERE id = ?').get(caseId) as { admin_note: string }).admin_note);
+  assert.match(note, /\[GINI\]/, 'the queue is where the next member of staff picks this up');
+  assert.match(note, new RegExp(String(resolved.refund.gini_refund_due_iqd)));
+
+  // The goods still came back and the points still go back: only the money
+  // side that was never ours is withheld.
+  const restores = raw.prepare("SELECT COUNT(*) AS n FROM inventory_ledger WHERE order_id = ? AND kind = 'restore'").get(id) as { n: number };
+  assert.ok(Number(restores.n) > 0, 'the returned unit is back on the shelf');
+});
+
+// --------------------------------------------- and what the CUSTOMER reads
+
+/**
+ * «ملاحظه مهمه للمستخدم» — BUT NOT ON AN ORDER THAT NO LONGER EXISTS.
+ *
+ * Nothing rewrites `gini_state` when an order is cancelled by hand (only the
+ * sweep writes 'expired', and it selects pending orders), and `can_cancel` is
+ * true for any pending order — so the ordinary customer cancel leaves the
+ * amber «امسح الباركود وإلا يُلغى الطلب غدًا» box rendering directly under the
+ * «ملغي» pill, telling the customer to go and act on a dead order.
+ *
+ * The guard is asserted on the SOURCE because it belongs on the client: a
+ * server-side cancelled → 'expired' mapping would make the customer read
+ * «انتهت مهلة هذا الطلب قبل مسح باركود الاستلام», which asserts the hold ran
+ * out — false for an order somebody cancelled on purpose.
+ */
+test('the order page does not ask a cancelled gini order to scan a barcode', () => {
+  const src = readFileSync(join(ROOT, 'src/pages/OrderDetail.tsx'), 'utf8');
+  assert.match(
+    src,
+    /\{order\.status !== 'cancelled' && order\.gini && order\.gini\.state === 'awaiting_receipt' && \(/,
+    'the awaiting notice must be gated on the order still being alive'
+  );
+  // The genuine sweep case is untouched: that copy IS true, and it is the
+  // only thing a cancelled-by-hand order must not be shown instead.
+  assert.match(src, /\{order\.gini && order\.gini\.state === 'expired' && \(/);
+  assert.ok(
+    !/giniStateOf\(/.test(src),
+    'and the status is not laundered into a gini state on the way here'
+  );
 });

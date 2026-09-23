@@ -1,15 +1,20 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-// The compiled default, used ONLY as the fallback when the server has not
-// sent a configured rate. packages/shipping/src/codTax is a pure leaf with no
-// imports, so nothing of the Worker runtime enters the bundle.
-import { COD_TAX_BLOCK_IQD, COD_TAX_PER_BLOCK_IQD } from '../packages/shipping/src/codTax';
-
-/** A configured positive integer, or the compiled default. */
-function positiveOr(value: unknown, fallback: number): number {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : fallback;
-}
+// THE SAME NORMALIZER THE SERVER CHARGES FROM, not a second guard beside it.
+// packages/shipping/src/codTax is a pure leaf with no imports, so nothing of
+// the Worker runtime enters the bundle, and it already holds the compiled
+// default used ONLY as the fallback when the server has not sent a configured
+// rate.
+//
+// IT IS IMPORTED RATHER THAN RE-IMPLEMENTED because the two sides of the rate
+// are guarded differently and a local `> 0` gets one of them wrong. The BLOCK
+// is a divisor, so a zero or non-finite block falls back — `Math.floor(x / 0)`
+// is Infinity. The PER-BLOCK charge of exactly 0 is a REAL configured rate
+// meaning «the charge is switched off», which the admin screen tells the owner
+// to type and the server stores verbatim. Coercing that 0 back to the 3,000
+// default would show the owner a charge they had just turned off and, on their
+// next save of the pair, write 3,000 back to the server.
+import { normalizeCodTaxRate } from '../packages/shipping/src/codTax';
 import {
   api,
   WalletTx,
@@ -147,6 +152,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     [refreshSettings]
   );
 
+  const codTaxRate = normalizeCodTaxRate({
+    perBlockIqd: settings?.codTaxPerBlockIqd,
+    blockIqd: settings?.codTaxBlockIqd,
+  });
+
   const value: WalletContextType = {
     balanceUsdCents,
     pointBalance,
@@ -157,8 +167,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     checkoutPaymentMethods: settings?.checkoutPaymentMethods ?? [],
     cartShippingMethods: settings?.cartShippingMethods ?? [],
     exchangeRate: settings?.exchangeRate ?? 1400,
-    codTaxPerBlockIqd: positiveOr(settings?.codTaxPerBlockIqd, COD_TAX_PER_BLOCK_IQD),
-    codTaxBlockIqd: positiveOr(settings?.codTaxBlockIqd, COD_TAX_BLOCK_IQD),
+    codTaxPerBlockIqd: codTaxRate.perBlockIqd,
+    codTaxBlockIqd: codTaxRate.blockIqd,
     currency: settings?.currency ?? 'IQD',
     adVideoUrl: settings?.adVideoUrl ?? '',
     settings,

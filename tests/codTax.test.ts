@@ -11,6 +11,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   calculateCodTaxIqd,
   codDeliveryTaxIqd,
@@ -18,6 +21,9 @@ import {
   COD_TAX_BLOCK_IQD,
   COD_TAX_PER_BLOCK_IQD,
 } from '../worker/lib/codTax';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 test('the default charge is 3,000 IQD for each complete 500,000 IQD block', () => {
   assert.equal(COD_TAX_PER_BLOCK_IQD, 3_000, 'the owner halved it from 6,000');
@@ -108,4 +114,45 @@ test('a fractional configured rate is truncated, never carried into a price', ()
   const charged = calculateCodTaxIqd(1_000_000, { perBlockIqd: 3_000.7, blockIqd: 500_000.9 });
   assert.equal(charged, 6_000);
   assert.equal(Math.trunc(charged), charged);
+});
+
+test('the browser reads the rate through the same normalizer, so a saved 0 survives the round trip', () => {
+  // THE BUG THIS PINS. The admin screen tells the owner «Set the charge to 0
+  // to switch it off», the handler accepts it and the server stores 0 — but
+  // WalletContext guarded BOTH halves with one `n > 0` helper, so the 0 came
+  // back out of the context as the 3,000 default. The owner watched the field
+  // snap back, and the next save of the pair wrote 3,000 to the server and
+  // re-enabled a charge they had turned off.
+  //
+  // The fix is not a second guard with a different comparison: it is the
+  // SERVER'S OWN normalizer, which already draws the line in the right place —
+  // strictly positive block (it is the divisor), non-negative charge.
+  const ctx = read('src/WalletContext.tsx');
+  assert.match(
+    ctx,
+    /import \{ normalizeCodTaxRate \} from '\.\.\/packages\/shipping\/src\/codTax';/,
+    'the browser no longer shares the server\u2019s normalizer'
+  );
+  assert.match(ctx, /codTaxPerBlockIqd: codTaxRate\.perBlockIqd,/, 'the charge is guarded locally again');
+  assert.match(ctx, /codTaxBlockIqd: codTaxRate\.blockIqd,/, 'the block is guarded locally again');
+  // Comments may NAME the old shape; what must not come back is code that
+  // discards a configured charge for failing to be positive.
+  const code = ctx.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  assert.ok(
+    !/n\s*>\s*0\s*\?\s*Math\.trunc/.test(code),
+    'a `> 0` coercion is back in WalletContext \u2014 a charge of 0 will be discarded again'
+  );
+
+  // And the value the context would publish for a shop that switched the
+  // charge off is still 0, not the compiled default.
+  const shown = normalizeCodTaxRate({ perBlockIqd: 0, blockIqd: COD_TAX_BLOCK_IQD });
+  assert.equal(shown.perBlockIqd, 0);
+  assert.equal(shown.blockIqd, COD_TAX_BLOCK_IQD);
+  assert.notEqual(shown.perBlockIqd, COD_TAX_PER_BLOCK_IQD);
+
+  // The admin screen's promise, which is the half that made this a trap: it
+  // rejects only a NEGATIVE charge, and says so on screen.
+  const admin = read('src/components/AdminWalletSettings.tsx');
+  assert.ok(admin.includes('per < 0'), 'the admin handler stopped allowing a charge of 0');
+  assert.ok(admin.includes('Set the charge to 0 to switch it off'), 'the on-screen promise was dropped');
 });

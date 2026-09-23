@@ -153,3 +153,69 @@ test('policyDocHash is deterministic and content-sensitive', async () => {
     assert.notEqual(a, other);
   }
 });
+
+/**
+ * THE COD TAX IS A SETTING, SO NO DOCUMENT MAY QUOTE IT.
+ *
+ * `codTaxPerBlockIqd` / `codTaxBlockIqd` are `admin_settings` rows
+ * (worker/lib/settings.ts, both in PUBLIC_SETTING_KEYS). The owner edits them
+ * from the admin screen; packages/shipping/src/codTax.ts holds only the
+ * unconfigured default and receives the rate as an argument.
+ *
+ * worker/routes/policies.ts serves `doc.body[lang]` VERBATIM — there is no
+ * substitution pass anywhere in worker/ or src/, so a `{{TOKEN}}` in a body
+ * would reach the customer as literal braces. That leaves exactly one way for
+ * these documents to stay true: state no figure and defer to the checkout
+ * screen, the way article 3.3 already does for the delivery fees.
+ *
+ * This is a regression test with a history. The charge was halved from six
+ * thousand to three thousand per five hundred thousand and made configurable,
+ * and delivery.ts, payment.ts and purchase.ts went on promising six thousand —
+ * in all three languages, nine sentences, published and binding — because the
+ * header note in delivery.ts said the figures were hardcoded constants. The
+ * assertion below is what makes the next rate change harmless.
+ */
+test('no policy quotes a figure for the cash-on-delivery tax — it is an admin setting and the documents defer to checkout', () => {
+  // Small numbers written out beside "dinars". The corpus spells its amounts
+  // in words, so this catches a re-hardcoded rate in any of the three
+  // languages. "five hundred thousand dinars" / «پێنج سەد هەزار دینار» /
+  // «خمسمئة ألف دينار» do not match: the block word sits between.
+  const QUOTED_DINARS: Record<string, RegExp> = {
+    ar: /(ثلاثة|أربعة|خمسة|ستة|ستّة|سبعة|ثمانية|تسعة|عشرة)\s+آلاف\s+دينار/,
+    en: /\b(three|four|five|six|seven|eight|nine|ten)\s+thousand\s+dinars\b/i,
+    ckb: /(سێ|چوار|پێنج|شەش|حەوت|هەشت|نۆ|دە)\s+هەزار\s+دینار/,
+  };
+  // The sentence that imposes the charge, and the phrase that must replace the
+  // figure in it: the screen the customer is actually looking at.
+  const IMPOSES: Record<string, RegExp> = {
+    ar: /ضريبة[^\n]*(الباب|التحصيل النقدي)|(الباب|عند الاستلام)[^\n]*ضريبة/,
+    en: /tax[^\n]*(at the door|door)|(at the door)[^\n]*tax/i,
+    ckb: /باج[^\n]*بەردەرگا|بەردەرگا[^\n]*باج/,
+  };
+  const DEFERS: Record<string, RegExp> = {
+    ar: /شاشة الدفع/,
+    en: /checkout/i,
+    ckb: /شاشەی پارەدان/,
+  };
+
+  for (const key of ['delivery', 'payment', 'purchase']) {
+    const doc = POLICY_DOCUMENTS.find((d) => d.key === key)!;
+    for (const lang of POLICY_LANGS) {
+      const body = doc.body[lang];
+      const lines = body.split('\n').filter((line) => IMPOSES[lang].test(line));
+      assert.ok(lines.length > 0, `${key}/${lang}: the cash-on-delivery charge is no longer described at all`);
+      for (const line of lines) {
+        assert.ok(
+          !QUOTED_DINARS[lang].test(line),
+          `${key}/${lang} states a fixed dinar figure for the door tax, which a settings change silently falsifies: ${line}`
+        );
+      }
+      // Stating no figure is only half of it; the reader has to be told where
+      // the real figure lives, or the clause is merely vague.
+      assert.ok(
+        lines.some((line) => DEFERS[lang].test(line)),
+        `${key}/${lang}: the door-tax clause names no figure and does not point at the checkout screen either`
+      );
+    }
+  }
+});

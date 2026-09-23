@@ -174,6 +174,37 @@ test('the same narrowing applies to materials and to printer accessories', () =>
   assert.ok(flatFields(resinAcc).some((f) => f.id === 'capacity'));
 });
 
+/** The five fields «ملحقات الليزر» adds to the `parts` type. */
+const LASER_ACC_FIELDS = ['laser_part_kind', 'focal_length', 'filter_life', 'rotary_max_diameter', 'work_surface_size'];
+
+test('an ESP32 board is not asked a focal length: «إلكترونيات» and «قطع هاردوير» are on the accessory axis too', () => {
+  // 0018 parents these two under «صناعة ومشاريع», not under «ملحقات
+  // الطابعات» — but they are `parts` sections, so every group the type gains
+  // reaches them. When «ملحقات الليزر» added `laser_acc` to the type, the
+  // electronics sheet grew a focal length and a rotary-axis diameter, and it
+  // had been carrying the resin wash-station capacity before that. Naming
+  // them as zero-group leaves is the statement "neither a Resin nor a laser
+  // accessory", which is what drops both.
+  for (const [id, slug] of [['cat_makers_elec', 'electronics'], ['cat_makers_hw', 'hardware-parts']] as const) {
+    const branch: SectionRef[] = [{ id, slug }];
+    assert.equal(productTypeForBranch('devices', branch), 'parts', `${slug} is still «ملحقات وقطع»`);
+    const shown = flatFields(groupsForSection('devices', branch)).map((f) => f.id);
+    for (const f of LASER_ACC_FIELDS) assert.ok(!shown.includes(f), `${slug} is being asked for "${f}"`);
+    assert.ok(!shown.includes('capacity'), `${slug} is being asked for a resin-tank capacity`);
+    // Narrowing is not a synonym for hiding: their own groups are untouched.
+    assert.deepEqual(groupsForSection('devices', branch).map((g) => g.id), [
+      'acc_common', 'electronics', 'hardware', 'physical_core',
+    ]);
+  }
+
+  // «ملحقات الليزر» keeps its own five, and the root «ملحقات الطابعات» keeps
+  // the union, because a product filed straight under it has not said which.
+  const laserAcc = flatFields(groupsForSection('devices', [{ id: 'cat_laser_acc', slug: 'laser-accessories' }])).map((f) => f.id);
+  for (const f of LASER_ACC_FIELDS) assert.ok(laserAcc.includes(f), `"${f}" went missing from a laser accessory`);
+  const root = flatFields(groupsForSection('devices', [{ id: 'cat_pacc', slug: 'printer-accessories' }])).map((f) => f.id);
+  for (const f of LASER_ACC_FIELDS) assert.ok(root.includes(f), 'the root keeps the union — the branch has not said');
+});
+
 // ------------------------------------------- the dedupe runs after the filter
 
 test('dropping a group hands its shared fields to the group that survives', () => {

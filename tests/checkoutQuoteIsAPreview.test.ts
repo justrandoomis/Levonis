@@ -57,7 +57,11 @@ test('the refusal the customer reads is the server’s own sentence', () => {
 
 test('the tax rule itself was never broken — only unreachable', () => {
   // Worth pinning: the owner reported «الضريبة لا تعمل», and the arithmetic is
-  // correct. floor(payable / 500,000) x 6,000, tax base excluding the tax.
+  // correct. floor(payable / blockIqd) x perBlockIqd — the ADMIN'S CONFIGURED
+  // rate (codTaxPerBlockIqd / codTaxBlockIqd in worker/lib/settings.ts, 3,000
+  // per 500,000 unconfigured), tax base excluding the tax. The figures are not
+  // restated here on purpose: tests/codTax.test.ts owns the numbers, and a
+  // comment that repeats them goes stale the next time the owner edits them.
   const codTax = readFileSync(join(ROOT, 'packages/shipping/src/codTax.ts'), 'utf8');
   assert.match(codTax, /delivery === 'standard' \|\| delivery === 'personal'/, 'pickup is taxless by rule');
   const boundary = readFileSync(join(ROOT, 'tests/codTax.test.ts'), 'utf8');

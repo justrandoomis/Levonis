@@ -61,6 +61,51 @@ const SHIPPING_DEFAULTS: ShippingPolicy = {
   printer_advance_required: true,
 };
 
+/**
+ * «خدمه اقساطي على تطبيق جني ( مصرف الرافدين )» — THE BANK'S OWN RULE, GIVEN
+ * THE FORM ITS DOC COMMENT ALREADY PROMISED.
+ *
+ * worker/lib/settings.ts states why this text is a stored setting rather than
+ * a string in the bundle: «the day Rafidain widens it past its own staff, the
+ * owner edits a form instead of waiting for a deploy». The setting existed and
+ * the generic PUT accepted it, but no screen ever wrote it, so in practice the
+ * kill switch, the hold and the condition text were all still a deploy. This
+ * is that form.
+ *
+ * THE THREE LANGUAGES ARE HAND-WRITTEN AND NONE OF THEM IS REQUIRED. The popup
+ * falls through to the next language the owner DID write (`pickText`), never
+ * to a placeholder, so clearing one box is a legitimate thing to do. The
+ * values below are the same defaults the server ships, restated here because
+ * an admin bundle must not import the Worker's settings module; they are what
+ * an unconfigured shop shows and what a missing language falls back to.
+ *
+ * CHANGING THE HOLD DOES NOT REACH BACKWARDS. `gini_hold_until` is frozen onto
+ * the order at checkout from the hold in force then, and the sweep cancels on
+ * that stored instant — a shop that moves 24 hours to 48 lengthens the wait for
+ * orders placed afterwards and touches nothing already waiting.
+ */
+interface GiniPolicy {
+  enabled: boolean;
+  conditions: { ar: string; en: string; ckb: string };
+  hold_hours: number;
+  app_url: string;
+}
+
+const GINI_DEFAULTS: GiniPolicy = {
+  enabled: true,
+  conditions: {
+    ar: 'خدمة التقسيط عبر تطبيق جني متاحة لموظفي مصرف الرافدين. يتم شراء المنتج وتقسيطه داخل تطبيق جني، ويُدفع سعر التوصيل فقط عند الاستلام.',
+    en: 'Gini instalments are available to Rafidain Bank employees. The product is bought and financed inside the Gini app; only the delivery fee is paid on receipt.',
+    ckb: 'خزمەتگوزاری قیستی ئەپی جینی بۆ فەرمانبەرانی بانکی ڕافیدەین بەردەستە. بەرهەمەکە لە ناو ئەپی جینی دەکڕدرێت و قیست دەکرێت، تەنها کرێی گەیاندن لە کاتی وەرگرتن دەدرێت.',
+  },
+  hold_hours: 24,
+  app_url: '',
+};
+
+/** The sweep's floor and a week's ceiling — a hold outside these is unusable. */
+const GINI_HOLD_MIN_HOURS = 1;
+const GINI_HOLD_MAX_HOURS = 168;
+
 const DELIVERY_ICONS = ['Truck', 'User', 'Store', 'CreditCard', 'Banknote'];
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -123,6 +168,10 @@ export default function AdminStoreSettings() {
   const [policyState, setPolicyState] = useState<SaveState>('idle');
   const [policyError, setPolicyError] = useState<string | null>(null);
 
+  const [gini, setGini] = useState<GiniPolicy | null>(null);
+  const [giniState, setGiniState] = useState<SaveState>('idle');
+  const [giniError, setGiniError] = useState<string | null>(null);
+
   const [gift, setGift] = useState<PreorderGift | null>(null);
   const [giftState, setGiftState] = useState<SaveState>('idle');
   const [giftError, setGiftError] = useState<string | null>(null);
@@ -146,12 +195,23 @@ export default function AdminStoreSettings() {
         setPolicy({ ...SHIPPING_DEFAULTS, ...raw });
         const rawGift = (res.settings?.preorderGiftConfig ?? {}) as Partial<PreorderGift>;
         setGift({ ...GIFT_DEFAULTS, ...rawGift });
+        const rawGini = (res.settings?.giniPolicy ?? {}) as Partial<GiniPolicy>;
+        // The languages are merged one by one, not as a whole object: a stored
+        // empty string is the owner deliberately clearing that language and
+        // must survive, while a language the row simply does not carry falls
+        // back to the shipped default.
+        setGini({
+          ...GINI_DEFAULTS,
+          ...rawGini,
+          conditions: { ...GINI_DEFAULTS.conditions, ...(rawGini.conditions ?? {}) },
+        });
         const rawNote = Number(res.settings?.printerHomeDeliveryNoteIqd);
         setPrinterNote(Number.isFinite(rawNote) && rawNote >= 0 ? Math.round(rawNote) : 50000);
       } catch {
         if (alive) {
           setPolicy({ ...SHIPPING_DEFAULTS });
           setGift({ ...GIFT_DEFAULTS });
+          setGini({ ...GINI_DEFAULTS, conditions: { ...GINI_DEFAULTS.conditions } });
         }
       }
     })();
@@ -185,6 +245,34 @@ export default function AdminStoreSettings() {
       setPrinterNoteError(e instanceof ApiError ? e.message : 'Save failed');
     }
   }, [printerNote]);
+
+  /**
+   * The hold is clamped HERE because the generic PUT /settings/:key stores the
+   * object verbatim — a 0 typed by accident would freeze an already-expired
+   * `gini_hold_until` onto every new order and the sweep would cancel it on
+   * its first pass.
+   */
+  const saveGini = useCallback(async () => {
+    if (!gini) return;
+    setGiniState('saving');
+    setGiniError(null);
+    const hours = Math.round(Number(gini.hold_hours));
+    const value: GiniPolicy = {
+      ...gini,
+      hold_hours: Number.isFinite(hours)
+        ? Math.min(GINI_HOLD_MAX_HOURS, Math.max(GINI_HOLD_MIN_HOURS, hours))
+        : GINI_DEFAULTS.hold_hours,
+      app_url: (gini.app_url || '').trim(),
+    };
+    try {
+      await api.put('/api/admin/settings/giniPolicy', { value });
+      setGini(value);
+      setGiniState('saved');
+    } catch (e) {
+      setGiniState('error');
+      setGiniError(e instanceof ApiError ? e.message : 'Save failed');
+    }
+  }, [gini]);
 
   const saveGift = useCallback(async () => {
     if (!gift) return;
@@ -683,6 +771,93 @@ export default function AdminStoreSettings() {
           </div>
           <div className="mt-5">
             <SaveButton state={printerNoteState} onClick={() => void savePrinterNote()} error={printerNoteError} />
+          </div>
+        </div>
+      )}
+
+      {/* The Gini partnership — the switch, the wait, and the bank's wording. */}
+      {gini && (
+        <div className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6" data-admin="gini-policy">
+          <h2 className="text-xl font-bold mb-1">أقساط جني (مصرف الرافدين)</h2>
+          <p className="text-sm text-zinc-400 mb-4">
+            التقسيط يتم بالكامل داخل تطبيق جني ولا يمر أي مبلغ منه عبر الموقع. إطفاء المفتاح يخفي
+            الخيار من الدفع ومن صفحة المنتج فورًا، ولا يمس أي طلب سبق تقديمه.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="flex items-center gap-2 self-end py-2">
+              <input
+                type="checkbox"
+                checked={gini.enabled}
+                onChange={(e) => { setGini((g) => (g ? { ...g, enabled: e.target.checked } : g)); setGiniState('idle'); }}
+              />
+              <span className="text-sm">تفعيل الدفع بالأقساط عبر جني</span>
+            </label>
+            <label className="block">
+              <span className="block text-sm text-zinc-400 mb-1">مدة تعليق الطلب (ساعات)</span>
+              <input
+                type="number"
+                min={GINI_HOLD_MIN_HOURS}
+                max={GINI_HOLD_MAX_HOURS}
+                step={1}
+                value={gini.hold_hours}
+                onChange={(e) => {
+                  const n = Math.round(Number(e.target.value));
+                  setGini((g) => (g ? { ...g, hold_hours: Number.isFinite(n) ? n : g.hold_hours } : g));
+                  setGiniState('idle');
+                }}
+                className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
+              />
+              <span className="block text-xs text-zinc-500 mt-1">
+                من {GINI_HOLD_MIN_HOURS} إلى {GINI_HOLD_MAX_HOURS} ساعة، والافتراضي 24. ينتظر الطلب وصل جني
+                هذه المدة ثم يُلغى وتُحرَّر بضاعته. الرقم يُجمَّد على الطلب عند تقديمه، فتغييره هنا لا يمس طلبًا قائمًا.
+              </span>
+            </label>
+            <label className="block md:col-span-2">
+              <span className="block text-sm text-zinc-400 mb-1">رابط تطبيق جني (اختياري)</span>
+              <input
+                type="text"
+                value={gini.app_url}
+                placeholder="https://..."
+                onChange={(e) => { setGini((g) => (g ? { ...g, app_url: e.target.value } : g)); setGiniState('idle'); }}
+                className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2 font-mono text-sm"
+                dir="ltr"
+              />
+              <span className="block text-xs text-zinc-500 mt-1">
+                يُستخدم للمنتجات التي لا رابط جني خاصًا لها. اتركه فارغًا لعرض الملاحظة بلا رابط
+                بدل الإشارة إلى صفحة لا تعرض المنتج.
+              </span>
+            </label>
+          </div>
+          <div className="mt-5">
+            <span className="block text-sm text-zinc-400 mb-1">شروط المصرف كما يعلنها — تظهر للزبون</span>
+            <p className="text-xs text-zinc-500 mb-3">
+              ثلاث لغات مكتوبة بخط اليد، لا ترجمة آلية. إفراغ لغة ليس خطأ: يُعرض للزبون أول لغة كتبتها.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {([
+                ['ar', 'العربية', 'rtl'],
+                ['en', 'English', 'ltr'],
+                ['ckb', 'کوردی', 'rtl'],
+              ] as const).map(([lang, label, dir]) => (
+                <label key={lang} className="block">
+                  <span className="block text-sm text-zinc-400 mb-1">{label}</span>
+                  <textarea
+                    rows={4}
+                    value={gini.conditions[lang]}
+                    dir={dir}
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      setGini((g) => (g ? { ...g, conditions: { ...g.conditions, [lang]: text } } : g));
+                      setGiniState('idle');
+                    }}
+                    className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="mt-5">
+            <SaveButton state={giniState} onClick={() => void saveGini()} error={giniError} />
           </div>
         </div>
       )}

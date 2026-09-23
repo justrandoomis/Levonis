@@ -52,8 +52,16 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 const user: StubUser = { id: 'u_brain', role: 'customer', email: 'c@x.co' };
 
-/** One printer whose name is the one in the screenshot. */
-function seed(): DatabaseSync {
+/**
+ * One printer whose name is the one in the screenshot.
+ *
+ * `more` adds further printers that share a spec sheet with these two. It is
+ * optional and empty by default, so every test written before it sees exactly
+ * the same two machines — it exists for the one case that needs an AMBIGUOUS
+ * name lookup («A1» matching two rows), which two products with no common
+ * substring cannot produce.
+ */
+function seed(more: Array<[string, string, string, number]> = []): DatabaseSync {
   const raw = freshDb();
   const shelf = raw.prepare("SELECT id FROM catalogs WHERE slug = 'fdm-printers'").get() as { id: string };
   const add = (id: string, slug: string, name: string, price: number, specs: Record<string, string>) =>
@@ -67,6 +75,9 @@ function seed(): DatabaseSync {
       .run(id, slug, name, name, price, JSON.stringify(specs), shelf.id);
   add('p_a1c', 'a1-combo', 'A1 Combo', 1_400_000, { print_speed: '500', build_volume: '256 x 256 x 256' });
   add('p_p1s', 'p1s', 'P1S', 1_200_000, { print_speed: '300', build_volume: '256 x 256 x 256' });
+  for (const [id, slug, name, price] of more) {
+    add(id, slug, name, price, { print_speed: '200', build_volume: '180 x 180 x 180' });
+  }
   return raw;
 }
 
@@ -476,6 +487,8 @@ test('all three dictionaries carry every new string', () => {
     'studio_open', 'account_reply', 'account_open', 'account_profile', 'cancel_order_reply', 'orders_open',
     'c_choose_printer', 'c_price', 'c_stock', 'c_materials', 'c_shipping_cost', 'c_payment', 'c_offers',
     'c_wallet', 'c_studio', 'c_account', 'c_cancel_order', 'c_contact', 'c_greeting',
+    // The four topic answers that stopped quoting a legal preamble.
+    'shipping_cost_reply', 'payment_methods_reply', 'offers_reply', 'contact_reply', 'pickup_map', 'fee_free',
   ]) {
     assert.equal(
       (route.match(new RegExp(`^ {4}${key}:`, 'gm')) ?? []).length,
@@ -483,6 +496,191 @@ test('all three dictionaries carry every new string', () => {
       `${key} is missing from one of ar / en / ckb`
     );
   }
+});
+
+// ══════════════════════ answering from the SHOP, not from a legal document
+
+/**
+ * «الدعم الالي ليس chat bot، هو غبي جدا».
+ *
+ * Four of the fifteen new intents resolved perfectly and then answered with
+ * `doc.body.slice(0, 320)` — the opening 320 characters of a policy document,
+ * which is always its chapter-one preamble, markdown hashes and all. An
+ * intent that RESOLVES and then says the wrong thing is worse than one that
+ * never resolved, because the customer has no way to tell it was not
+ * understood. These tests fail against that slice.
+ */
+
+test('«كم اجور التوصيل» answers with the fees the checkout charges', async () => {
+  const db = asD1(seed());
+  const reply = await ask(db, { text: 'كم اجور التوصيل' });
+  assert.equal(reply.intent, 'shipping_cost');
+
+  // What it used to be: «## وثيقة التوصيل والشحن والرسوم — المادة 3 …».
+  assert.ok(!reply.text.includes('##'), 'the bubble is plain text — a heading marker reaches the customer literally');
+  // The methods and the tariffs, read from the row worker/routes/orders.ts
+  // prices the order with, so the two surfaces cannot disagree.
+  for (const method of ['توصيل عادي', 'توصيل شخصي', 'استلام من المخزن']) {
+    assert.ok(reply.text.includes(method), `${method} is missing from the answer`);
+  }
+  assert.ok(reply.text.includes('5,000 د.ع'), 'the standard tariff, as a number');
+  assert.ok(reply.text.includes('مجاناً'), 'and a pickup has no fee at all');
+  // The document survives as a "read more" card — never as the answer.
+  assert.equal(reply.cards.length, 1);
+  assert.equal(reply.cards[0].link.to, '/policies/delivery');
+});
+
+test('«وين موقعكم» says what the shop has and admits what it does not', async () => {
+  const db = asD1(seed());
+  const reply = await ask(db, { text: 'وين موقعكم' });
+  assert.equal(reply.intent, 'contact_info');
+  // «وين موقعكم», «رقم الهاتف» and «اوقات الدوام» all used to return this one
+  // paragraph, which contains no address, no number and no hours.
+  assert.ok(!reply.text.includes('الغرض من هذه الوثيقة'));
+  assert.ok(!reply.text.includes('###'));
+  assert.match(reply.text, /تذكرة دعم/, 'the channel that actually exists');
+  assert.equal(reply.cards[0].link.to, '/policies/support');
+});
+
+test('«كود خصم» says where the box is instead of quoting the rewards preamble', async () => {
+  const db = asD1(seed());
+  const reply = await ask(db, { text: 'كود خصم' });
+  assert.equal(reply.intent, 'offers_help');
+  assert.ok(!reply.text.includes('الغرض من هذه الوثيقة'));
+  assert.match(reply.text, /كود الخصم/);
+  assert.equal(reply.cards[0].link.to, '/policies/rewards');
+});
+
+test('«اكو تقسيط» is answered with the instalment service the shop really sells', async () => {
+  /**
+   * Gini has shipped enabled since the head of this branch: the `gini` row is
+   * in `checkoutPaymentMethods` and the product page draws «تريدها أقساط؟».
+   * The payment DOCUMENT says the opposite — §5.6 denies instalments outside
+   * the PRO deferred-payment chapter — so quoting it at somebody asking about
+   * instalments would refuse a service they can buy today.
+   */
+  const db = asD1(seed());
+  const reply = await ask(db, { text: 'اكو تقسيط' });
+  assert.equal(reply.intent, 'payment_methods', 'this used to match no intent at all');
+  assert.match(reply.text, /أقساط عبر تطبيق جني/);
+  assert.match(reply.text, /مصرف الرافدين/, 'the owner’s own condition, read from giniPolicy');
+  // BNPL is offered only after the server has proved the account eligible, so
+  // it is not named in a public answer.
+  assert.ok(!reply.text.includes('اشترِ الآن وادفع لاحقًا'));
+  assert.equal(reply.cards[0].link.to, '/policies/payment');
+});
+
+test('the assistant seeds the policy archive it reads', async () => {
+  /**
+   * `policy_documents` has two writers and neither of them is this route. The
+   * policy PAGES render from the code registry, so they look perfect on a
+   * database nobody has synced; the assistant reads the TABLE. On a fresh
+   * deploy, a D1 restore or a staging shop it therefore told the customer
+   * «لا توجد سياسات منشورة بعد» while /policies/payment served the full text
+   * one tap away. `freshDb()` reproduces exactly that state: migrated, memo
+   * cleared, archive empty, nothing has ever hit /api/policies.
+   */
+  const db = asD1(seed());
+  const listed = await ask(db, { text: 'سياسة الموقع' });
+  assert.equal(listed.intent, 'policy_question');
+  assert.notEqual(listed.text, 'لا توجد سياسات منشورة بعد — ستظهر هنا فور نشرها من المالك.');
+  assert.ok(listed.choices.length > 3, 'the published corpus, listed as choices');
+  const one = await ask(db, { intent: 'policy_question', params: { key: 'payment' } });
+  assert.match(one.text, /الدفع/);
+});
+
+// ═══════════════════════════════ the words a customer actually types
+
+test('the ordinary phrasings that used to fall through now reach an answer', async () => {
+  const db = asD1(seed());
+  for (const [message, intent] of [
+    // «وين طلبي» worked and «وين الطلب» did not — one letter apart, and the
+    // failing one is what somebody types before the order feels like theirs.
+    ['وين الطلب', 'order_status'],
+    // «تم التسليم» is the app's own label on every order screen, and it was
+    // the one word the delivery entry omitted.
+    ['التسليم كم يوم', 'delivery_estimate'],
+    ['هل تشحنون للبصرة', 'shipping_cost'],
+    // Somebody whose machine has died, met with a fourteen-item menu.
+    ['الطابعة خربانة', 'open_ticket'],
+    ['رقمكم', 'contact_info'],
+    // A shipped checkout method with no word anywhere in the dictionary.
+    ['اكو تقسيط', 'payment_methods'],
+    ['بالتقسيط', 'payment_methods'],
+    // bot_identity was the one intent of the twenty-nine carrying no Kurdish
+    // evidence at all, so its ckb answer was unreachable in Kurdish.
+    ['تۆ ڕۆبۆتیت؟', 'bot_identity'],
+  ] as const) {
+    const reply = await ask(db, { text: message });
+    assert.equal(reply.intent, intent, `«${message}» must be answered, not clarified`);
+  }
+});
+
+test('«اريد ارجع المنتج» asks about both topics instead of answering the wrong one', async () => {
+  /**
+   * «ارجاع» does not contain «ارجع» — the alef is medial — and the fuzzy path
+   * needs five characters where this token has four. The only surviving
+   * evidence was «المنتج», one confident hit, so a customer sending a printer
+   * back was told «لم أجد منتجات مطابقة في الكتالوج العام». A wrong answer,
+   * not a clarify, and the file's own comment requires the clarify for the
+   * near-identical «اريد استرجاع المنتج».
+   */
+  const db = asD1(seed());
+  const reply = await ask(db, { text: 'اريد ارجع المنتج' });
+  assert.equal(reply.intent, 'clarify', 'this used to resolve confidently to product_search');
+  assert.deepEqual(
+    reply.choices.map((c: { intent: string }) => c.intent).sort(),
+    ['product_search', 'return_help']
+  );
+  // And the pair tests/support.test.ts pins is untouched.
+  assert.equal((await ask(db, { text: 'اريد استرجاع البضاعة' })).intent, 'return_help');
+});
+
+// ══════════════════════════ the SECOND question is remembered as well
+
+test('the comparison’s second question carries its anchor and its memory', async () => {
+  /**
+   * The owner's screenshot displaced by exactly one turn. Turn two asked
+   * «اخترت A1 Combo. وياه أي وحدة نقارن؟» and returned no `expects` at all, so
+   * the client cleared its memory and «P1S» typed on the next line became a
+   * cold product search — with A1 Combo silently dropped.
+   */
+  const db = asD1(seed());
+  const t1 = await ask(db, { intent: 'compare_products' });
+  const t2 = await ask(db, { text: 'A1 combo', expects: t1.expects });
+  assert.deepEqual(
+    t2.expects,
+    { intent: 'compare_products', slot: 'q', params: { ids: 'p_a1c' } },
+    'the slot stays `q`: an `ids` slot would overwrite the anchor with the typed words'
+  );
+  const t3 = await ask(db, { text: 'P1S', expects: t2.expects });
+  assert.equal(t3.intent, 'compare_products', 'this used to become a bare product_search');
+  assert.deepEqual(t3.table.columns, ['A1 Combo', 'P1S'], 'both machines, in the order they were named');
+});
+
+test('a second name we cannot place keeps the question open instead of dropping it', async () => {
+  const db = asD1(seed());
+  const t1 = await ask(db, { intent: 'compare_products' });
+  const t2 = await ask(db, { text: 'A1 combo', expects: t1.expects });
+  const t3 = await ask(db, { text: 'zzzz qqqq', expects: t2.expects });
+  assert.equal(t3.intent, 'compare_products');
+  assert.match(t3.text, /A1 Combo/, 'the anchor is still the anchor');
+  assert.deepEqual(t3.expects, { intent: 'compare_products', slot: 'q', params: { ids: 'p_a1c' } });
+});
+
+test('«أي واحدة تقصد؟» is a question too, so the power answer remembers asking it', async () => {
+  // Two machines whose names share a prefix, which is the only way to reach
+  // the ambiguous branch at all.
+  const db = asD1(seed([['p_a1m', 'a1-mini', 'A1 Mini', 900_000]]));
+  const asked = await ask(db, { text: 'كم تستهلك A1' });
+  assert.equal(asked.intent, 'power_usage');
+  assert.equal(asked.text, 'أي واحدة تقصد؟');
+  assert.ok(asked.choices.length > 1);
+  assert.deepEqual(
+    asked.expects,
+    { intent: 'power_usage', slot: 'q' },
+    'without this the typed answer is read as a brand new message'
+  );
 });
 
 // ═══════════════════════════════════════════════════ still not a model
@@ -557,4 +755,84 @@ test('the shell’s fallback strip is still what yields — the rule is not copi
   assert.match(anchors, /hasPageAnchor: \(\) => \[\.\.\.anchors\.values\(\)\]\.some\(\(a\) => a\.kind !== 'top-fallback'\)/);
   const shell = read('src/components/bloub/MotionCharacterAnchor.tsx');
   assert.match(shell, /if \(characterLayout\.hasPageAnchor\(\)\) return null;/);
+});
+
+// ═══════════════════════════ «ساعدني باختيار طابعه» — on the menu, not typed
+
+test('support page: the client opening menu mirrors the server MENU_ITEMS, in all three languages', () => {
+  /**
+   * The chips on a COLD /support screen are seeded client-side — the page is
+   * button-first and makes no request before the customer has said anything —
+   * so `STRINGS[lang].menu` in src/pages/Support.tsx, not MENU_ITEMS in this
+   * route, is what the customer actually sees first. MENU_ITEMS only reaches
+   * the screen later, on a greeting/thanks/clarify reply.
+   *
+   * That is exactly how the two drifted: `choose_printer` was promoted into
+   * MENU_ITEMS with a comment saying so, and the screen kept showing eleven
+   * rows without it. «ساعدني باختيار طابعه» — the sentence in the owner's
+   * screenshot — was reachable only by typing it.
+   *
+   * Intent for intent, same order, three dictionaries. Labels are not
+   * compared: the client reuses the server's own strings, but this test is
+   * about the WIRING, and a copy that fell out of sync on order or membership
+   * is the failure that actually reaches a phone.
+   */
+  const route = read('worker/routes/support.ts');
+  const menuItems = route.slice(route.indexOf('const MENU_ITEMS'), route.indexOf('const CHOICE_LABELS'));
+  const serverIntents = [...menuItems.matchAll(/\{ intent: '([a-z_]+)', labelKey:/g)].map((m) => m[1]);
+  assert.ok(serverIntents.includes('choose_printer'), 'MENU_ITEMS must still carry the screenshot sentence');
+
+  const page = read('src/pages/Support.tsx');
+  const blocks = [...page.matchAll(/menu: \[([\s\S]*?)\n {4}\],/g)].map((m) => m[1]);
+  assert.equal(blocks.length, 3, 'expected exactly three client menus: ar, en, ckb');
+
+  for (const [i, block] of blocks.entries()) {
+    const clientIntents = [...block.matchAll(/\{ intent: '([a-z_]+)', label:/g)].map((m) => m[1]);
+    assert.deepEqual(
+      clientIntents,
+      serverIntents,
+      `client menu #${i} drifted from the server opening menu`
+    );
+    // Every row must carry a real label, or a chip renders blank.
+    const labels = [...block.matchAll(/label: '([^']+)'/g)].map((m) => m[1]);
+    assert.equal(labels.length, clientIntents.length);
+  }
+});
+
+// ═══════════════════════════════ «شريط واحد» — still one bar at 320px
+
+test('support page: the header title is width-guarded so the one bar cannot become two', () => {
+  /**
+   * Fixed chrome in the header row is 188px at a 320px viewport — 32 padding
+   * + 44 back button + 20 LifeBuoy + 44 character slot + four 12px gaps —
+   * leaving 132px for an 18px-bold title. «الدعم والمساعدة» and
+   * «پشتگیری و یارمەتی» are both wider than that, so an unguarded <h1> wraps,
+   * the bar grows to a second row, and the character ends up beside a
+   * two-line title: the stacked shape the header above exists to remove.
+   *
+   * The guard has three parts and needs all three. `truncate` alone is not
+   * enough — its `whitespace-nowrap` raises the flex item's automatic minimum
+   * size to max-content, which pushes the title out of the bar instead of
+   * ellipsizing it — so `min-w-0` rides with it. And the title can only be
+   * the thing that gives if everything else in the row refuses to: the back
+   * button, the icon and the character slot are all `shrink-0`.
+   */
+  const page = read('src/pages/Support.tsx');
+  const start = page.indexOf('{/* header */}');
+  const header = page.slice(start, page.indexOf('{/* tabs */}'));
+  assert.ok(start > 0 && header.length > 0, 'header block not found');
+
+  const h1 = header.match(/<h1 className="([^"]*)">\{s\.title\}<\/h1>/);
+  assert.ok(h1, 'the header must render the title in an <h1>');
+  assert.match(h1[1], /\btruncate\b/, 'the title must not be allowed to wrap');
+  assert.match(h1[1], /\bmin-w-0\b/, 'truncate without min-w-0 overflows the bar instead of ellipsizing');
+
+  // Back button and character slot must not absorb the shrink.
+  const backButton = header.slice(header.indexOf('<button'), header.indexOf('</button>'));
+  assert.match(backButton, /\bshrink-0\b/, 'the back button must keep its 44px hit target');
+  assert.match(
+    header,
+    /<div className="[^"]*\bshrink-0\b[^"]*">\s*<MotionCharacterHome kind="top-header" compact busy=\{busy\} \/>/,
+    'the character slot must be wrapped in a shrink-0 box, as src/pages/Settings.tsx does'
+  );
 });
