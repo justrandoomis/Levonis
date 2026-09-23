@@ -131,7 +131,7 @@ export async function sweepExpiredOrders(
             WHERE id = ?2 AND status = 'pending' AND stage = 'received'`
         ).bind(nowIso, id),
         ...(stock.plan?.statements ?? []),
-        ...cancelledOrderRefundStatements(env, order, 'system', nowIso),
+        ...(await cancelledOrderRefundStatements(env, order, 'system', nowIso)),
         // In the SAME batch: a history row written after the batch could be
         // lost to a crash, leaving a cancellation nobody can explain.
         env.DB.prepare(

@@ -18,6 +18,7 @@ import { Hono } from 'hono';
 import { ROOT, SqliteD1 } from './fixtures/d1';
 import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
+import { walletSpendCents } from '../worker/lib/walletOps';
 import { classifyHost } from '../worker/lib/hosts';
 import { membershipsRoutes } from '../worker/routes/memberships';
 import { subscriptionRoutes } from '../worker/routes/subscription';
@@ -25,7 +26,15 @@ import { validateCoupon } from '../worker/lib/membershipOps';
 import type { Env } from '../worker/lib/types';
 
 const RATE = 1400; // the shipped exchangeRate default: IQD per USD
-const cents = (iqd: number) => Math.ceil((iqd * 100) / RATE);
+/*
+  THE SAME CONVERSION THE PURCHASE USES, imported rather than copied.
+  This helper held its own `Math.ceil`, and when `walletSpendCents` moved to
+  FLOOR — «عند الدولار يقرب الى عدد صحيح اقل», the rule that stopped a 50,000
+  د.ع deposit refusing a 50,000 د.ع bill — six tests failed against code that
+  was right. A test that re-implements the arithmetic it is checking only
+  ever pins the copy.
+*/
+const cents = (iqd: number) => walletSpendCents(iqd, null, RATE);
 
 function setup(launched = true) {
   const raw = new DatabaseSync(':memory:');
@@ -406,7 +415,7 @@ test('a confirmation carries the figures the page showed: a drifted quote is ref
   assert.equal(fresh.ok, true);
   assert.equal(fresh.charge_iqd, 29000);
   assert.equal(fresh.exchange_rate, 1500);
-  assert.equal(fresh.charge_usd_cents, Math.ceil((29000 * 100) / 1500));
+  assert.equal(fresh.charge_usd_cents, walletSpendCents(29000, null, 1500));
   assert.equal(typeof fresh.balance_usd_cents, 'number');
   assert.equal(rows(raw, 'u1').length, 0, 'nothing was written');
   assert.equal(walletRows(raw, 'u1').length, 0, 'nothing was charged');

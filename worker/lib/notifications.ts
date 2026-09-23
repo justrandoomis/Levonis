@@ -49,7 +49,17 @@ export type NotificationKind =
    * only by opening the site and looking, while a sheet on the site offered to
    * send them exactly that news on WhatsApp or Telegram.
    */
-  | 'support_reply';
+  | 'support_reply'
+  /**
+   * «الشكاوى» — an admin answered a complaint
+   * (worker/routes/adminCommunity.ts). Added for the same reason
+   * `support_reply` was, one surface over: `community_complaint_messages` had
+   * no INSERT anywhere in the repository, and when one was added there was
+   * still NO customer-facing screen that reads that table. A reply written
+   * into a thread the reporter cannot open is not an answer, so this row is
+   * where they actually read it — behind their own login, carrying the text.
+   */
+  | 'complaint_reply';
 
 export interface NotificationInput {
   userId: string;
@@ -67,9 +77,11 @@ export interface NotificationInput {
    * still arrives, still reads correctly, and has permanently lost the join
    * back to what it is about — which for a stock alert is the product the
    * customer is being told to go and buy. 'product' is here because
-   * 'stock_back' is above.
+   * 'stock_back' is above, and 'complaint' because 'complaint_reply' is —
+   * widened in the same commit as the kind, which is what this paragraph
+   * asks for.
    */
-  entity_type?: 'request' | 'offer' | 'order' | 'review' | 'product' | 'ticket' | '';
+  entity_type?: 'request' | 'offer' | 'order' | 'review' | 'product' | 'ticket' | 'complaint' | '';
   entity_id?: string;
   meta?: Record<string, unknown>;
   /** Unique per user. Empty means "no replay protection wanted". */

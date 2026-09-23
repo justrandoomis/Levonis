@@ -1,0 +1,201 @@
+# WHY WAS THE DELIVERY FREE? — READ-ONLY.
+#
+# The owner reported: «يظهر لبعض المستخدمين التوصيل مجاني بالرغم توصيل الشخصي
+# البريميوم هو 50000», then corrected the diagnosis: «مشترك برو يحصل على
+# التوصيل المجاني سواء شخصي او عادي لكن المشكلة … ان المستخدم لم يكن مشتركا
+# بالاشتراك البرو وقد حصل على خصم».
+#
+# So the question is not which METHOD a benefit covers — PRO covers both, and
+# that is the owner's rule. The question is how somebody with no active PRO
+# subscription was priced as though they had one. Every order already records
+# the answer, because §19/§21 froze it at purchase:
+#
+#   membership_tier_snapshot   the tier the SERVER resolved for that customer
+#   delivery_waived            the membership waiver fired
+#   referral_delivery_waived   the referral printer reward fired instead
+#   shipping_before_benefit_iqd / shipping_benefit_iqd   what came off the bill
+#   benefit_snapshot           the rule ids and figures behind it
+#
+# This workflow reads those columns and nothing else. EVERY statement is a
+# SELECT: it never deploys, never migrates, never writes a row, and prints no
+# secret. It answers the question with the shop's own data instead of a guess.
+#
+# The live site is served by the `staging` environment on `levonis-db-staging`
+# — a naming quirk of this project, not a typo. deploy-staging-code.yml is the
+# workflow that ships levonis-iq.com.
+name: 56 - Diagnose Free Delivery (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      order_id:
+        description: 'One order id to explain in full (optional — leave empty to list recent waived orders)'
+        required: false
+        default: ''
+      days:
+        description: 'How many days back to look'
+        required: false
+        default: '30'
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      ORDER_ID: ${{ github.event.inputs.order_id }}
+      DAYS: ${{ github.event.inputs.days || '30' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: The configured free-delivery rules, as they stand right now
+        continue-on-error: true
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
+          echo "── membership_benefit_rules (free_shipping)"
+          q "SELECT id, tier, enabled, free_shipping_threshold_iqd AS threshold,
+                    shipping_methods, max_shipping_subsidy_iqd AS ceiling,
+                    valid_from, valid_until, label
+               FROM membership_benefit_rules
+              WHERE benefit_type = 'free_shipping'
+              ORDER BY tier, priority DESC" \
+            | jq -r '.[0].results[] | "\(.tier)  \(.id)  enabled=\(.enabled)  >\(.threshold)  methods=\(.shipping_methods // "NULL (every method)")  ceiling=\(.ceiling // "none")  \(.label // "")"'
+          echo
+          echo "   NULL under methods means the rule covers EVERY delivery method,"
+          echo "   which is what a rule created in the admin defaults to."
+
+      - name: The delivery methods and what each one costs
+        continue-on-error: true
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
+          q "SELECT value FROM settings WHERE key = 'checkoutDeliveryMethods'" \
+            | jq -r '.[0].results[0].value' \
+            | jq -r '.[] | "\(.id)\t\(.price_iqd)\t\(.titleAr)"' || echo "   (not configured — defaults apply)"
+
+      # ------------------------------------------------------------ the orders
+      - name: Orders whose delivery was free — and WHO got it
+        continue-on-error: true
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
+          echo "── free delivery in the last $DAYS days, newest first"
+          q "SELECT id, created_at, user_id,
+                    membership_tier_snapshot AS tier,
+                    delivery_method_id AS method,
+                    delivery_waived, referral_delivery_waived,
+                    shipping_before_benefit_iqd AS before_iqd,
+                    shipping_benefit_iqd AS benefit_iqd,
+                    shipping_iqd AS charged_iqd,
+                    total_iqd
+               FROM orders
+              WHERE (delivery_waived = 1 OR referral_delivery_waived = 1 OR shipping_iqd = 0)
+                AND created_at >= datetime('now', '-${DAYS} days')
+              ORDER BY created_at DESC
+              LIMIT 60" \
+            | jq -r '.[0].results[] | "\(.created_at)  \(.id)  tier=\(.tier)  \(.method)  waived=\(.delivery_waived) referral=\(.referral_delivery_waived)  \(.before_iqd) → \(.charged_iqd)  total=\(.total_iqd)"'
+
+      - name: THE ONE THAT MATTERS — free delivery for somebody with no membership
+        continue-on-error: true
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
+          echo "── orders priced as tier 'free' that still paid nothing for delivery"
+          echo "   (if the referral column is 1, the printer referral reward did it —"
+          echo "    membershipOps.ts:239 — and no membership was involved at all)"
+          q "SELECT id, created_at, user_id, membership_tier_snapshot AS tier,
+                    delivery_method_id AS method, delivery_waived, referral_delivery_waived,
+                    shipping_before_benefit_iqd AS before_iqd, shipping_iqd AS charged_iqd,
+                    total_iqd
+               FROM orders
+              WHERE membership_tier_snapshot IN ('free', 'plus')
+                AND (delivery_waived = 1 OR referral_delivery_waived = 1)
+                AND created_at >= datetime('now', '-${DAYS} days')
+              ORDER BY created_at DESC
+              LIMIT 40" \
+            | jq -r '.[0].results[] | "\(.created_at)  \(.id)  tier=\(.tier)  \(.method)  waived=\(.delivery_waived) referral=\(.referral_delivery_waived)  \(.before_iqd) → \(.charged_iqd)"'
+          echo
+          echo "── and the same question for PREMIUM on a NON-standard method"
+          echo "   (PREMIUM's rule is standard only, so a free personal delivery here is wrong)"
+          q "SELECT id, created_at, membership_tier_snapshot AS tier, delivery_method_id AS method,
+                    delivery_waived, referral_delivery_waived, shipping_iqd AS charged_iqd
+               FROM orders
+              WHERE membership_tier_snapshot = 'prime'
+                AND delivery_method_id <> 'standard'
+                AND (delivery_waived = 1 OR shipping_iqd = 0)
+                AND created_at >= datetime('now', '-${DAYS} days')
+              ORDER BY created_at DESC
+              LIMIT 40" \
+            | jq -r '.[0].results[] | "\(.created_at)  \(.id)  \(.method)  waived=\(.delivery_waived)  charged=\(.charged_iqd)"'
+
+      - name: Did the customer actually hold a membership at the time?
+        continue-on-error: true
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
+          echo "── every membership row behind an order that got a waiver"
+          q "SELECT o.id AS order_id, o.created_at AS ordered_at,
+                    o.membership_tier_snapshot AS snapshot_tier,
+                    m.id AS membership_id, m.tier, m.state, m.source,
+                    m.starts_at, m.expires_at
+               FROM orders o
+               LEFT JOIN memberships m ON m.user_id = o.user_id
+              WHERE (o.delivery_waived = 1 OR o.referral_delivery_waived = 1)
+                AND o.created_at >= datetime('now', '-${DAYS} days')
+              ORDER BY o.created_at DESC
+              LIMIT 60" \
+            | jq -r '.[0].results[] | "\(.order_id)  snapshot=\(.snapshot_tier)  membership=\(.tier // "NONE")/\(.state // "-")  source=\(.source // "-")  expires=\(.expires_at // "NEVER")"'
+          echo
+          echo "   expires=NEVER on an 'active' row is a membership the expiry sweep"
+          echo "   cannot reach: entitlements.ts:221 only touches rows with a date."
+
+      - name: Referral rewards — the tier-independent free delivery
+        continue-on-error: true
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
+          echo "── how many customers currently qualify for the printer referral waiver"
+          q "SELECT COUNT(*) AS attributed FROM referral_attributions WHERE campaign = 'printer'" \
+            | jq -r '.[0].results[0] | "attributed friends: \(.attributed)"'
+          q "SELECT COUNT(*) AS spent FROM referral_rewards WHERE campaign = 'printer'" \
+            | jq -r '.[0].results[0] | "rewards already spent: \(.spent)"'
+          echo "── orders that used it"
+          q "SELECT id, created_at, user_id, shipping_before_benefit_iqd AS before_iqd, shipping_iqd AS charged_iqd
+               FROM orders WHERE referral_delivery_waived = 1
+              ORDER BY created_at DESC LIMIT 20" \
+            | jq -r '.[0].results[] | "\(.created_at)  \(.id)  \(.before_iqd) → \(.charged_iqd)"'
+
+      - name: One order, explained in full
+        if: env.ORDER_ID != ''
+        continue-on-error: true
+        run: |
+          q() { npx wrangler d1 execute levonis-db-staging --remote --json --command "$1"; }
+          echo "── the order row"
+          q "SELECT id, created_at, user_id, status, membership_tier_snapshot, delivery_method_id,
+                    delivery_waived, referral_delivery_waived, benefit_version_id,
+                    merchandise_iqd, shipping_before_benefit_iqd, shipping_benefit_iqd, shipping_iqd,
+                    membership_discount_iqd, total_iqd
+               FROM orders WHERE id = '${ORDER_ID}'" \
+            | jq '.[0].results[0]'
+          echo "── the frozen benefit snapshot (which rule, tested against what)"
+          q "SELECT benefit_snapshot FROM orders WHERE id = '${ORDER_ID}'" \
+            | jq -r '.[0].results[0].benefit_snapshot // "(none)"' | jq . || true
+          echo "── the delivery method as the order froze it"
+          q "SELECT delivery_method_snapshot FROM orders WHERE id = '${ORDER_ID}'" \
+            | jq -r '.[0].results[0].delivery_method_snapshot // "(none)"' | jq . || true
+          echo "── that customer's memberships"
+          q "SELECT m.id, m.tier, m.state, m.source, m.starts_at, m.expires_at, m.price_paid_iqd
+               FROM memberships m JOIN orders o ON o.user_id = m.user_id
+              WHERE o.id = '${ORDER_ID}'" \
+            | jq -c '.[0].results'
+          echo "── the products on it, and whether they carry their own delivery rules"
+          q "SELECT oi.product_id, oi.qty, p.name, json_extract(p.ops_policy, '$.delivery_options') AS delivery_options
+               FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
+              WHERE oi.order_id = '${ORDER_ID}'" \
+            | jq -c '.[0].results'
+
+      - name: What this run did
+        if: always()
+        run: |
+          echo "READ-ONLY. Every statement above is a SELECT."
+          echo "No deploy, no migration, no write, no secret printed."

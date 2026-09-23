@@ -33,8 +33,26 @@ test('the advance refusal fires on the ORDER door only', () => {
   // already differ by, not a new concept.
   assert.match(block, /if \(options\.allocate\) \{[\s\S]{0,400}throw badRequest\(/);
   assert.match(block, /'INSUFFICIENT_BALANCE'/, 'and still refuses with the same code');
-  // The rounding branch below it takes the same door.
-  assert.match(orders, /if \(options\.allocate && walletApplied < requiredAdvance\) \{/);
+  /*
+    THERE IS NO SECOND DOOR ANY MORE, AND THAT IS THE STRONGER GUARANTEE.
+    This line used to pin a second `if (options.allocate && walletApplied <
+    requiredAdvance)` branch, which existed only to re-refuse after the ceil in
+    `iqdToUsdCents` had scaled a wallet application back below the advance it
+    had just covered. `walletSpendCents` floors and caps on the CENTS side, so
+    the scale-back is gone and so is the branch that answered for it.
+    Pinning the branch by its text would now fail on code that is right, so
+    pin the rule instead: exactly one shortfall refusal exists in the whole
+    file, and the scale-back that manufactured the second one is absent.
+  */
+  assert.equal(
+    orders.split("'INSUFFICIENT_BALANCE'").length - 1,
+    1,
+    'one shortfall refusal in the file, and the assertions above put it behind options.allocate'
+  );
+  assert.ok(
+    !/walletApplied = walletIqdAvailable\(/.test(orders),
+    'the rounding scale-back is gone — the cap belongs on the cents, not on the dinars'
+  );
 });
 
 test('the quote still reports the shortfall as data the screen can read', () => {

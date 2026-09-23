@@ -10,8 +10,11 @@
  *   POST /parse-zip          multipart ZIP of .txt templates, per-file results
  *
  * Apply never trusts a client-prebuilt document: the template text is parsed
- * and validated server-side on every call. Unknown brand/catalog references
- * block the write with needs_review — never silent creation or drop.
+ * and validated server-side on every call. A reference resolves by slug, id or
+ * NAME; an unknown section or catalog still blocks the write with needs_review.
+ * An unknown BRAND is created instead of refused (the owner's decision), but
+ * never silently: /parse discloses it as `brands_to_create` before /apply
+ * writes it. The whole reasoning is on `resolveRefs` below.
  *
  * §6.1 download contract (iPad Safari): the two GET downloads answer with
  * `text/plain; charset=utf-8`, an explicit `Content-Disposition: attachment`
@@ -60,6 +63,8 @@ import {
   type ProductSavePlan,
 } from '../lib/productPersistence';
 import { resolveTemplateFamilies, type CatalogRow } from './adminTaxonomy';
+import { createPendingBrand, loadRefRows, matchRef, planBrandCreate } from '../lib/templateRefs';
+import { ambiguousMessage } from '../lib/importApply';
 import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import { getSetting } from '../lib/settings';
 import { rateLimit } from '../lib/ratelimit';
@@ -1105,9 +1110,47 @@ function touchesStructure(parsed: ParsedTemplate): boolean {
   return STRUCTURE_GROUPS.some((g) => (parsed.groups[g]?.length ?? 0) > 0 || !!parsed.groupClears[g]);
 }
 
-/** Resolves brand/catalog slug-or-id references against the DB. Unknown
- *  values become needs_review entries — the change is withheld entirely
- *  (no partial catalog list, no silently created brand). */
+/**
+ * BRAND / SECTION / CATALOG REFERENCES, RESOLVED AGAINST THE DATABASE.
+ *
+ * ── THE CONTRACT THIS REPLACES ────────────────────────────────────────────
+ * This resolver used to say, and enforce: *«brands are never silently
+ * created»*. A reference that did not match a slug or an id became a
+ * needs_review entry and the whole change was withheld. The reasoning was
+ * sound and is still half true — a brand invented from a typo is how a
+ * catalogue ends up holding "Bambu", "bambu lab" and "BambuLab" as three
+ * brands (worker/lib/importApply.ts says the same about the CSV sheet).
+ *
+ * THE OWNER HAS OVERRULED THE «NEVER CREATED» HALF, in their own words:
+ * «اجعل ينشئ البراند بدل أن يرفض، يعني يضيف براند جديد». A person bulk-loading
+ * a catalogue should not have to stop, open التصنيفات, add a brand and come
+ * back. So a genuinely new brand IS created by the import now.
+ *
+ * THE WORD THAT SURVIVES FROM THE OLD CONTRACT IS **SILENTLY**, and these
+ * three rules are what replace the protection it gave:
+ *
+ *   1. NOT SILENT. `POST /parse` runs before `POST /apply` and already reports
+ *      counts, warnings and errors. A brand that will be created is disclosed
+ *      THERE, as `brands_to_create` — its own line in the check panel, neither
+ *      an error nor silence — so the owner reads «سيُنشأ» before pressing
+ *      «ابدأ الاستيراد» instead of discovering a new row in التصنيفات after.
+ *   2. NOT INVENTED FROM A NAME THAT ALREADY EXISTS. The old refusal was
+ *      triggered overwhelmingly by brands that DO exist and were named by
+ *      their display name; matching now reads name_ar/name_en/name_ckb too
+ *      (`matchRef`, worker/lib/templateRefs.ts). Creation is what is left
+ *      after that, which is a much smaller and much more honest set.
+ *   3. NOT DUPLICATED. `createPendingBrand` re-resolves immediately before it
+ *      writes and derives the slug again, so the same file applied twice — or
+ *      ten files in one archive naming one new brand — produce ONE row.
+ *
+ * AMBIGUITY IS NOT A RESOLUTION AND IS NOT A CREATE. If a name answers to more
+ * than one row, the reference is refused by name with the candidates' slugs,
+ * so the owner disambiguates by slug. Taking the first row would mis-file
+ * every product in the batch, and minting a third brand would be worse.
+ *
+ * SECTIONS AND CATALOGS ARE STILL NEVER CREATED, and that is not an oversight
+ * — see the note above their loop.
+ */
 async function resolveRefs(db: D1Database, parsed: ParsedTemplate): Promise<ResolvedRefs> {
   const refs: ResolvedRefs = { needs_review: [] };
 
@@ -1117,18 +1160,37 @@ async function resolveRefs(db: D1Database, parsed: ParsedTemplate): Promise<Reso
     if (!v) {
       refs.brand_id = null;
     } else {
-      const row = await db.prepare('SELECT id FROM brands WHERE slug = ? OR id = ?').bind(v, v).first<{ id: string }>();
-      if (row) refs.brand_id = row.id;
-      else refs.needs_review!.push({
-        key: 'brand', line: brandField.line, value: v,
-        message: `unknown brand "${v}" — create the brand first or fix the slug/id (brands are never silently created)`,
-      });
+      const match = matchRef(await loadRefRows(db, 'brands'), v);
+      if (match.kind === 'hit') refs.brand_id = match.id;
+      else if (match.kind === 'ambiguous')
+        refs.needs_review!.push({
+          key: 'brand', line: brandField.line, value: v,
+          message: `${ambiguousMessage('brand', v)} — ${match.candidates.join('، ')}`,
+        });
+      else {
+        // Genuinely new: planned here, DISCLOSED by /parse, written by /apply.
+        const pending = await planBrandCreate(db, v);
+        (refs.brands_to_create ??= []).push(pending);
+        refs.brand_id = pending.id;
+      }
     }
   }
 
   // The main section and the sub-section are single references into the SAME
-  // catalogs tree the `catalogs` list draws from — resolved by slug or id, and
-  // never silently created, exactly like the brand above.
+  // catalogs tree the `catalogs` list draws from — resolved by slug, id or
+  // name, and still NEVER created.
+  //
+  // WHY THE OWNER'S «أنشئ بدل أن ترفض» IS NOT EXTENDED HERE. A brand row is a
+  // name and a slug; everything the file states about it is in the file. A
+  // section is a NODE: it carries a `parent_id` and, through it, the
+  // `template_family` that decides which spec sheet the product's form and
+  // export even have (`resolveTemplateFamilies`, `groupsForSection`). A name
+  // alone supplies neither. A section invented from `category=طابعات` would
+  // land at the root with no family, and every product filed under it would
+  // lose its whole §10 spec sheet while reporting success — a quieter and
+  // larger failure than the refusal it replaced. So an unknown section is
+  // still refused, and the message still says where to create it.
+  const catalogRows = await loadRefRows(db, 'catalogs');
   for (const [key, target] of [
     ['category', 'category_id'],
     ['sub_category', 'sub_category_id'],
@@ -1140,8 +1202,13 @@ async function resolveRefs(db: D1Database, parsed: ParsedTemplate): Promise<Reso
       refs[target] = null;
       continue;
     }
-    const row = await db.prepare('SELECT id FROM catalogs WHERE slug = ? OR id = ?').bind(v, v).first<{ id: string }>();
-    if (row) refs[target] = row.id;
+    const match = matchRef(catalogRows, v);
+    if (match.kind === 'hit') refs[target] = match.id;
+    else if (match.kind === 'ambiguous')
+      refs.needs_review!.push({
+        key, line: field.line, value: v,
+        message: `${ambiguousMessage(key, v)} — ${match.candidates.join('، ')}`,
+      });
     else
       refs.needs_review!.push({
         key,
@@ -1160,9 +1227,15 @@ async function resolveRefs(db: D1Database, parsed: ParsedTemplate): Promise<Reso
       const ids: string[] = [];
       let allResolved = true;
       for (const w of wanted) {
-        const row = await db.prepare('SELECT id FROM catalogs WHERE slug = ? OR id = ?').bind(w, w).first<{ id: string }>();
-        if (row) {
-          ids.push(row.id);
+        const match = matchRef(catalogRows, w);
+        if (match.kind === 'hit') {
+          ids.push(match.id);
+        } else if (match.kind === 'ambiguous') {
+          allResolved = false;
+          refs.needs_review!.push({
+            key: 'catalogs', line: catField.line, value: w,
+            message: `${ambiguousMessage('catalogs', w)} — ${match.candidates.join('، ')}`,
+          });
         } else {
           allResolved = false;
           refs.needs_review!.push({
@@ -2083,6 +2156,15 @@ templateRoutes.post('/parse', async (c) => {
       source_host,
     })),
     needs_review: needsReview,
+    /**
+     * THE LINE THAT REPLACES «brands are never silently created».
+     *
+     * A brand this file names that does not exist yet is not an error and is
+     * not silence: it is stated here, by name and by the slug it will get, on
+     * the screen the owner is already reading before «ابدأ الاستيراد». Empty
+     * is the ordinary answer and means every brand the file names exists.
+     */
+    brands_to_create: (a.refs.brands_to_create ?? []).map((b) => ({ name: b.name, slug: b.slug })),
     // A plan the apply will refuse is a validation error of this file, in the
     // field the check step already shows. `a.validation_error` wins when both
     // exist: the document is judged before the save it would make (and
@@ -2455,6 +2537,9 @@ templateRoutes.post('/apply', async (c) => {
 
   let isUpdate = mode === 'update';
   const warnings: string[] = [];
+  /** What the apply did with `brands_to_create` — reported as data, so the
+   *  panel can name the row that now exists without a sentence to translate. */
+  const brandsCreated: Array<{ id: string; name: string; slug: string; created: boolean }> = [];
   const analysisValidationResponse = (analysis: Analysis) => {
     const error = analysis.validation_error!;
     return c.json({
@@ -2577,6 +2662,42 @@ templateRoutes.post('/apply', async (c) => {
       unknown_keys: a.parsed.unknown_keys,
       warnings,
     }, 400);
+  }
+
+  /**
+   * THE BRAND THE CHECK DISCLOSED IS WRITTEN HERE — and nowhere else.
+   *
+   * WHY NOT IN `resolveRefs`. That function runs for `POST /parse` too, and a
+   * check step that creates rows is not a check step. It also runs a second
+   * time inside this handler when a duplicate is resolved to `update_existing`.
+   * One create, at one seam, after every refusal that does not need the
+   * network has already had its turn.
+   *
+   * WHY BEFORE THE FINGERPRINT CLAIM. `createPendingBrand` is idempotent by
+   * name, so a retried submission finds the row rather than making a second
+   * one; claiming first would only mean a retry could not create it at all.
+   *
+   * `doc.brand_id` is re-pointed at whatever actually exists — the row just
+   * inserted, or the one somebody added between the check and this apply.
+   */
+  for (const pending of a.refs.brands_to_create ?? []) {
+    const made = await createPendingBrand(c.env.DB, pending);
+    if ('ambiguous' in made) {
+      return c.json({
+        success: false,
+        error: 'Template needs review — nothing was written',
+        code: 'NEEDS_REVIEW',
+        needs_review: [{
+          key: 'brand',
+          line: a.parsed.fields.brand?.line ?? 0,
+          value: pending.name,
+          message: `${ambiguousMessage('brand', pending.name)} — ${made.ambiguous.join('، ')}`,
+        }],
+        unknown_keys: a.parsed.unknown_keys,
+      }, 400);
+    }
+    if (doc.brand_id === pending.id) doc.brand_id = made.id;
+    brandsCreated.push({ id: made.id, name: pending.name, slug: pending.slug, created: made.created });
   }
 
   const fingerprintClaim = await claimApplyFingerprint(c.env.DB, fingerprint);
@@ -2951,6 +3072,10 @@ templateRoutes.post('/apply', async (c) => {
     cost_refused: plan.costRefused,
     unknown_keys: a.parsed.unknown_keys,
     warnings,
+    /** The brands the check disclosed, and whether this apply is the run that
+     *  actually inserted each one — `false` means it already existed by the
+     *  time the write came round, which is what a re-run must report. */
+    brands_created: brandsCreated,
     ...readBackBlock(stored, spec, plan),
     mismatches: [],
     price_history_rows: plan.priceHistory.length,
@@ -3044,6 +3169,9 @@ templateRoutes.post('/parse-zip', async (c) => {
         warnings: [...(a.merge?.warnings ?? a.parsed.warnings), ...(a.doc ? priceWarnings(a.doc) : [])],
         unknown_keys: a.parsed.unknown_keys,
         needs_review: needsReview,
+        // Per file, for the same reason the single-file check states it: an
+        // archive is exactly where a new brand would otherwise go unread.
+        brands_to_create: (a.refs.brands_to_create ?? []).map((b) => ({ name: b.name, slug: b.slug })),
         validation_error: refusal,
         applied_fields: a.merge?.applied_fields ?? [],
         // §7.3 — the same pre-flight statement the single-file /parse makes.

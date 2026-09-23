@@ -91,7 +91,7 @@ export default function Profile() {
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const { t, dir, lang, loc } = useLanguage();
   const navigate = useNavigate();
-  const { balanceUsdCents, pointBalance, exchangeRate } = useWallet();
+  const { balanceUsdCents, balanceIqd: walletBalanceIqd, pointBalance, exchangeRate } = useWallet();
   const { isAuthenticated, user, isLoaded } = useAuth();
 
   const now = Date.now();
@@ -216,7 +216,14 @@ export default function Profile() {
     ? `${window.location.origin}/auth?ref=${mine.referral.code}`
     : '';
 
-  const balanceIqd = usdCentsToIqd(balanceUsdCents, exchangeRate);
+  /**
+   * The dinar balance the SERVER computed (migration 0108) — not
+   * `usdCentsToIqd(balanceUsdCents, exchangeRate)`, which is the conversion
+   * that showed a customer who paid 50,000 د.ع a balance of 49,994. Falls
+   * back to the old conversion only while the context has not loaded yet, so
+   * the card never reads 0 for a wallet that has money in it.
+   */
+  const balanceIqd = walletBalanceIqd || usdCentsToIqd(balanceUsdCents, exchangeRate);
   // Fabricating an avatar for a guest would suggest a signed-in identity —
   // guests get a neutral placeholder icon instead.
   const avatarUrl = isAuthenticated

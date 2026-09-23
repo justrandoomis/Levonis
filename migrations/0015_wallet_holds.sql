@@ -27,10 +27,43 @@
 --     as an anomaly instead of silently eating the balance twice.
 --
 -- Money is INTEGER cents throughout (no floating point). IQD display values
--- are derived at the edge from the exchange-rate setting (decision row 6);
--- the stored unit stays USD cents because the whole existing ledger,
--- checkout and refund paths are USD cents — changing the stored unit would
--- be a destructive rewrite of live balances, not a migration.
+-- are derived at the edge from the exchange-rate setting (decision row 6).
+--
+-- THE SENTENCE THAT STOOD HERE IS SUPERSEDED, AND IT IS KEPT VERBATIM SO THE
+-- REPLACEMENT CAN BE JUDGED AGAINST IT. It read:
+--
+--   «the stored unit stays USD cents because the whole existing ledger,
+--    checkout and refund paths are USD cents — changing the stored unit
+--    would be a destructive rewrite of live balances, not a migration.»
+--
+-- WHAT IS STILL TRUE: the stored unit IS still USD cents, and for exactly the
+-- reason given. Every CHECK in this file is a cents identity, `wallet_holds`
+-- below has no dinar column at all, and `CHECK (amount > 0)` on
+-- `wallet_transactions` is the mechanism `usdSpendStatement` uses to abort a
+-- D1 batch. Re-denominating any of it would still be a destructive rewrite.
+-- Migration 0108 says so again in full and refuses it again.
+--
+-- WHAT IS NO LONGER TRUE: the clause that followed from it in practice — that
+-- a DINAR FIGURE is therefore always derived from the cents. The owner has
+-- set the opposite rule, in writing:
+--
+--   «اجعل عندما يكتب المستخدم الرصيد يضاف كما هو ولكن يحول الى الدولار
+--    وليس العكس»
+--
+-- The dinars the customer types are what is added, and the dollar is
+-- converted FROM them. Derivation-from-cents cost a live customer a sale: a
+-- typed 50,000 د.ع floored to 3,571 cents and read back as 49,994, six dinars
+-- short of a 50,000 د.ع printer advance that is denominated in dinars and
+-- never converted at all.
+--
+-- HOW BOTH HOLD AT ONCE, which is the whole of the replacement: the typed
+-- dinars are RECORDED beside the cents (0105 for a deposit, 0106 for a
+-- withdrawal, 0108 on the ledger row itself) and a dinar balance is the cents
+-- balance refined within the one cent the cents cannot resolve. Nothing
+-- stored was rewritten to achieve that, no balance was recomputed, and no
+-- cent figure is ever computed from a dinar column. THE ONE RULE FOR WHICH
+-- UNIT WINS IS WRITTEN OUT IN FULL IN migrations/0108_wallet_ledger_dinars.sql
+-- and is quoted, not restated, everywhere it is applied.
 
 -- ---------------------------------------------------------------- holds
 

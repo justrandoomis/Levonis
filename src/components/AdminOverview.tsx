@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Crown,
   TrendingUp,
+  LifeBuoy,
 } from 'lucide-react';
 
 interface OverviewStats {
@@ -31,6 +32,9 @@ interface OverviewStats {
   outgoing_usd_cents: number;
   pending_wallet_requests: number;
   open_community_requests: number;
+  /** Tickets whose ball is on THIS side of the desk: `open` + `waiting_staff`
+   *  (worker/routes/admin.ts). `waiting_customer` is not a queue. */
+  support_tickets_waiting: number;
 }
 
 interface RecentOrder {
@@ -56,6 +60,7 @@ const EMPTY_STATS: OverviewStats = {
   outgoing_usd_cents: 0,
   pending_wallet_requests: 0,
   open_community_requests: 0,
+  support_tickets_waiting: 0,
 };
 
 const ORDER_STATUS_COLORS: Record<string, string> = {
@@ -277,6 +282,17 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
           <Wallet className="w-5 h-5 text-[#c5a059]" />,
           'bg-[#c5a059]/10',
           onNavigateTab ? () => onNavigateTab('wallet_requests') : undefined
+        )}
+        {/* THE SUPPORT QUEUE, on the first screen. «الدعم والتذاكر» shipped as a
+            tab with no count anywhere on the dashboard, so a waiting customer
+            was invisible until somebody thought to open the tab. It is also a
+            DOOR: the card navigates straight into the queue it counts. */}
+        {statCard(
+          dir === 'rtl' ? 'تذاكر بانتظار الرد' : 'Tickets awaiting a reply',
+          stats.support_tickets_waiting.toLocaleString(),
+          <LifeBuoy className="w-5 h-5 text-sky-400" />,
+          'bg-sky-500/10',
+          onNavigateTab ? () => onNavigateTab('support') : undefined
         )}
         {statCard(
           dir === 'rtl' ? 'طلبات المجتمع المفتوحة' : 'Open Community Requests',

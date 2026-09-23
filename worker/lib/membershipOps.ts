@@ -230,55 +230,28 @@ export async function attributeReferral(env: Env, newUserId: string, code: strin
 }
 
 /**
- * Referral 9.1 — free delivery for the referred friend's qualifying printer
- * purchase. Returns true when the order qualifies (referred user with a
- * printer attribution and the order contains a printer-catalog product).
- * One qualifying purchase per friend: once a printer referral reward exists
- * for this referred user, later orders no longer qualify.
+ * REFERRAL 9.1'S DELIVERY WAIVER IS WITHDRAWN, and this note is what stands
+ * where `referralFreeDeliveryApplies` used to.
+ *
+ * It answered one question — "may this order ship for nothing?" — with a YES
+ * that asked for no subscription, no tier and no membership rule, and then
+ * `quoteShipping` waived EVERY delivery component it had, including a
+ * personal tariff the owner prices at 50,000 د.ع. The owner's report was
+ * «يظهر لبعض المستخدمين التوصيل مجاني», and their own diagnosis was the rest
+ * of it: «المستخدم لم يكن مشتركا بالاشتراك البرو وقد حصل على خصم». The
+ * decision on it was «ألغِ المكافأة تماماً».
+ *
+ * Deleted rather than disabled behind a flag: a switch that nobody can see is
+ * how this shipped in the first place. The three things it read still exist
+ * and still mean what they meant —
+ *   `referral_attributions`   who referred whom, and for which campaign,
+ *   `referral_rewards`        the REFERRER's reward, a different payment to a
+ *                             different person, untouched by this,
+ *   `orders.referral_delivery_waived`  the record on orders that already had
+ *                             the waiver, which stays readable so a past
+ *                             invoice still explains itself.
+ * Nothing writes a 1 into that column any more.
  */
-export async function referralFreeDeliveryApplies(env: Env, userId: string, productIds: string[]): Promise<boolean> {
-  const ids = productIds.filter((p) => typeof p === 'string' && p !== '').slice(0, 200);
-  if (ids.length === 0) return false;
-
-  const attribution = await env.DB.prepare(
-    "SELECT referrer_id FROM referral_attributions WHERE referred_id = ? AND campaign = 'printer'"
-  )
-    .bind(userId)
-    .first();
-  if (!attribution) return false;
-
-  const alreadyUsed = await env.DB.prepare(
-    "SELECT 1 AS x FROM referral_rewards WHERE campaign = 'printer' AND referred_id = ? LIMIT 1"
-  )
-    .bind(userId)
-    .first();
-  if (alreadyUsed) return false;
-
-  // The reward row above is written on DELIVERY. Between the first qualifying
-  // order and its delivery — weeks, for a printer shipped from abroad — every
-  // further printer order the friend placed also went out with free delivery,
-  // because nothing at checkout remembered that the waiver had been used. An
-  // order that already carries the referral waiver and is not cancelled has
-  // spent the one qualifying purchase (migration 0049 records it on the order).
-  const pendingUse = await env.DB.prepare(
-    "SELECT 1 AS x FROM orders WHERE user_id = ? AND referral_delivery_waived = 1 AND status <> 'cancelled' LIMIT 1"
-  )
-    .bind(userId)
-    .first();
-  if (pendingUse) return false;
-
-  const placeholders = ids.map(() => '?').join(',');
-  const hit = await env.DB.prepare(
-    `SELECT 1 AS x
-       FROM product_catalogs pc
-       JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
-      WHERE pc.product_id IN (${placeholders})
-      LIMIT 1`
-  )
-    .bind(...ids)
-    .first();
-  return !!hit;
-}
 
 export interface CouponCheck {
   ok: boolean;

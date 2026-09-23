@@ -97,7 +97,10 @@ function requiredName(value: unknown, existing: string | undefined): string {
   return str(value, 'name_en', { min: 1, max: 120 });
 }
 
-async function uniqueSlug(db: D1Database, table: string, base: string, exceptId: string | null): Promise<string> {
+/** EXPORTED for worker/lib/templateRefs.ts: a brand the TXT import creates on
+ *  demand must take its slug through the same uniqueness loop the taxonomy
+ *  panel uses, or the two writers would disagree about what `bambu-lab-2` is. */
+export async function uniqueSlug(db: D1Database, table: string, base: string, exceptId: string | null): Promise<string> {
   for (let i = 0; i < 50; i++) {
     const candidate = i === 0 ? base : `${base}-${i + 1}`;
     const row = await db

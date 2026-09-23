@@ -25,6 +25,13 @@
  *    "free standard" and stops there, so a PRIME member who wants the parcel
  *    protected pays for that part, which is also what prime_waiver_covers
  *    ='ordinary_only' has always meant.
+ *  - PRO'S FREE DELIVERY COVERS BOTH METHODS. Owner, stated directly:
+ *    «مشترك برو يحصل على التوصيل المجاني سواء شخصي او عادي». The seeded rule's
+ *    '["standard","personal"]' is therefore the owner's rule and not an
+ *    invention — PREMIUM is the tier that gets standard only. What must never
+ *    happen is the waiver reaching somebody who is not an active subscriber at
+ *    all, which is a question about ELIGIBILITY and not about which method a
+ *    benefit covers.
  *  - LEVO PRIME (product-form mandate §5) gets free delivery ONLY when the
  *    eligible merchandise total — after product discounts, coupons AND points,
  *    before delivery — is STRICTLY greater than 150,000 IQD. 150,000 itself is
@@ -295,18 +302,28 @@ export function quoteShipping(input: {
   if (input.deliveryMethod) {
     for (const item of input.items) {
       if (item.delivery === undefined || item.qty <= 0) continue;
-      const rule = item.delivery[input.deliveryMethod];
-      if (!rule?.enabled) {
+      /**
+       * NAMED `methodRule`, NOT `rule`. It used to be `rule`, which shadowed
+       * the membership decision declared above — and the waiver below asks
+       * `rule ? …` meaning "did the admin configure a benefit rule?". Shadowed,
+       * that question was answered by the PRODUCT's own delivery rule, which
+       * the `!enabled` guard immediately below guarantees is truthy, so the
+       * test was always true and the two branches under it were dead code. One
+       * identifier reused eight lines apart silently deleted the only place
+       * that asked which delivery METHOD a waiver covers.
+       */
+      const methodRule = item.delivery[input.deliveryMethod];
+      if (!methodRule?.enabled) {
         needs.push(`product:${item.product_id}:${input.deliveryMethod}_unavailable`);
         reasons.push(`${input.deliveryMethod} delivery is unavailable for product ${item.product_id}.`);
         continue;
       }
-      const fee = productDeliveryFeeIqd(item.qty, rule);
+      const fee = productDeliveryFeeIqd(item.qty, methodRule);
       // PREMIUM covers standard delivery only. PRO can cover a personal rule
       // only when the owner's existing policy explicitly says "all".
-      // The rule ALREADY tested the method (`method_not_covered` above), so a
-      // rule-driven waiver needs no second opinion about which method it
-      // covers. Without a rule the historical constant still applies.
+      // The membership rule ALREADY tested the method (`method_not_covered`
+      // above), so a rule-driven waiver needs no second opinion about which
+      // method it covers. Without a rule the historical constant still applies.
       const waived =
         independent ||
         (rule
@@ -318,8 +335,8 @@ export function quoteShipping(input: {
         kind: 'product',
         product_id: item.product_id,
         method: input.deliveryMethod,
-        quantity_step: Math.max(1, Math.trunc(rule.quantity_step)),
-        fee_per_step_iqd: Math.max(0, Math.trunc(rule.fee_iqd)),
+        quantity_step: Math.max(1, Math.trunc(methodRule.quantity_step)),
+        fee_per_step_iqd: Math.max(0, Math.trunc(methodRule.fee_iqd)),
         fee_iqd: fee,
         waived,
         units: Math.max(0, Math.trunc(item.qty)),

@@ -468,6 +468,8 @@ interface Balances {
   usd_cents_settled: number;
   usd_cents_held: number;
   usd_cents_available: number;
+  /** The same available balance in DINARS, computed server-side (0108). */
+  iqd_available: number;
   usd_cents_pending_deposits: number;
   usd_cents_pending_withdrawals: number;
   points_settled: number;
@@ -486,6 +488,7 @@ const EMPTY_BALANCES: Balances = {
   usd_cents_settled: 0,
   usd_cents_held: 0,
   usd_cents_available: 0,
+  iqd_available: 0,
   usd_cents_pending_deposits: 0,
   usd_cents_pending_withdrawals: 0,
   points_settled: 0,
@@ -690,6 +693,39 @@ export default function Wallet() {
    * is still the only thing that formats a balance — an aggregate has no typed
    * figure and none may be invented for it.
    */
+  /**
+   * THE AVAILABLE BALANCE, PRINTED AS THE CUSTOMER'S OWN DINARS.
+   *
+   * «يكتب مستخدم خمسين ألف فيضاف أصبح أقل 49,994.» `fmt` converts the stored
+   * cents, and that conversion is not the inverse of the one the deposit form
+   * did — at 1,400 a cent is 14 د.ع, so a typed 50,000 has no cent value that
+   * reads back as 50,000. Since migration 0108 the server computes the dinar
+   * balance from the figures the requests recorded and sends it as
+   * `balances.iqd_available`, so this card prints testimony refined onto the
+   * cents rather than arithmetic over them.
+   *
+   * AND THE DOLLAR IS DERIVED FROM THE DINARS, «وليس العكس» — floor, which is
+   * the owner's «وعند الدولار يقرب الى عدد صحيح اقل» and gives $35.71 for
+   * 50,000 د.ع exactly. The floor did not change; what it is applied to did.
+   *
+   * A server that sent no figure (an old bundle talking to a new one, or a
+   * failed load) falls back to `fmt`, which is what every balance did before.
+   */
+  const fmtAvailable = useCallback(
+    (showSymbol = true) => {
+      const iqd = Number(balances.iqd_available);
+      if (!Number.isFinite(iqd) || iqd <= 0) return fmt(balances.usd_cents_available, showSymbol);
+      if (currency === 'IQD') {
+        const formatted = iqd.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        return showSymbol ? `IQD ${formatted}` : formatted;
+      }
+      const cents = iqdToUsdCents(iqd, exchangeRate);
+      const formatted = (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return showSymbol ? `$${formatted}` : formatted;
+    },
+    [balances.iqd_available, balances.usd_cents_available, currency, exchangeRate, fmt]
+  );
+
   const fmtOperation = useCallback(
     (op: Operation) => {
       if (currency !== 'IQD') return fmt(op.amount);
@@ -805,7 +841,7 @@ export default function Wallet() {
           ) : (
             <span dir="ltr" className="text-[40px] sm:text-[52px] font-black text-gold tracking-tight leading-none mt-1">
               {/* A failed load shows a dash, never a fabricated zero balance. */}
-              {loadError ? '—' : fmt(balances.usd_cents_available)}
+              {loadError ? '—' : fmtAvailable()}
             </span>
           )}
           <span className="text-zinc-500 text-[11px] mt-1">{s.availableHint}</span>

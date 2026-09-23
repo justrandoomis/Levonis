@@ -69,6 +69,317 @@ const settledPointsSql = (u: string) => `(SELECT COALESCE(SUM(CASE WHEN t.type='
        FROM wallet_transactions t
       WHERE t.user_id = ${u} AND t.currency = 'POINT' AND t.status = 'approved')`;
 
+/**
+ * THE DINARS THE CENTS COULD NOT HOLD — «يضاف كما هو ولكن يحول الى الدولار
+ * وليس العكس» (migration 0108, which carries the full contract).
+ *
+ * A customer typed 50,000 د.ع. `iqdToUsdCents` floors, so 3,571 cents were
+ * credited, and every balance converted them back with floor(3,571 × 1,400 /
+ * 100) = 49,994. The printer advance is 50,000 د.ع NATIVE — read straight out
+ * of `printerHomeDeliveryNoteIqd`, never converted, never rounded — so the
+ * shop refused a customer who had paid exactly enough. Ceil does not fix it
+ * either: it credits 50,008, which is the defect 0106 was written to end. At
+ * 1,400 a cent is 14 د.ع, only multiples of 14 are representable, and 50,000
+ * is not one of them. The fault is not the direction of the rounding. It is
+ * which of the two numbers is the SOURCE.
+ *
+ * THE ONE RULE FOR WHICH UNIT WINS, quoted from 0108 rather than restated:
+ *
+ *   A wallet row's dinars are the dinars RECORDED on it — `amount_iqd`, or
+ *   `wallet_deposit_meta.declared_amount_iqd` (0105) for a deposit filed
+ *   before that column existed — read at the rate recorded beside them. A row
+ *   that recorded no dinars has none, and converts from its cents at today's
+ *   rate exactly as it always has. Nothing is ever converted the other way.
+ *
+ * So this fragment sums, per user, only the REMAINDER each recorded row
+ * carries above what its own cents convert to at its own snapshot rate:
+ *
+ *   dust(row) = MAX(0, recorded_iqd − floor(amount × snapshot_rate / 100))
+ *
+ * signed + for a credit and − for a debit. A row with no testimony
+ * contributes nothing, which is why NO EXISTING BALANCE MOVES: at the instant
+ * 0108 applies, `amount_iqd` is NULL on every row in the table.
+ *
+ * ---------------------------------------------------------------------------
+ *  THE CEILING IS PER ROW. THIS IS THE CORRECTION, AND IT IS THE WHOLE FIX.
+ * ---------------------------------------------------------------------------
+ * The first draft of this file clamped the SUM into one cent's worth, and
+ * `walletIqdAvailable` still carries the sentence that defended it. That clamp
+ * reproduced the owner's exact complaint for anyone who reached 50,000 د.ع in
+ * more than one transfer: two typed deposits of 25,000 lose 10 د.ع each to the
+ * floor, the honest remainder is 20, the clamp cut it to 14, and the balance
+ * read 49,994 — the owner's number — and the 50,000 د.ع printer advance was
+ * refused again. Three and four transfers fail the same way.
+ *
+ * A PER-WALLET CEILING CANNOT TELL FORTY ORPHAN REMAINDERS FROM TWO
+ * CORROBORATED ONES, because by the time the rows are summed the difference
+ * is gone. A PER-ROW ceiling can: the widest a single floor() can miss by is
+ * one dinar less than a cent — `ceil(rate/100) − 1`, 13 د.ع at 1,400 — so a
+ * row claiming more than that is not a rounding remainder, it is a claim, and
+ * it is cut to the largest remainder it could honestly have been. Forty
+ * honest deposits then carry forty honest remainders, which is what the
+ * customer actually paid in and was not credited.
+ *
+ * ONLY A CUSTOMER'S OWN TOP-UP IS CEILINGED, and the join decides it: a row
+ * with a `wallet_deposit_meta` beside it is a DEPOSIT REQUEST, whose dinar
+ * figure is unvalidated client input. Every other row's dinars were written by
+ * this server — a checkout debit, a membership charge, a cancel refund copying
+ * the debit it reverses — and a ceiling on those would be a bug, not a guard:
+ *
+ *   * A DEBIT MUST CANCEL EVERYTHING IT SPENT. One order that empties a wallet
+ *     funded by four top-ups carries four remainders, and a debit ceilinged at
+ *     one cent would strand three of them as dinars nothing backs.
+ *   * A REFUND MUST RESTORE EVERYTHING IT GIVES BACK. The cancel refund copies
+ *     the debit's dinars verbatim (worker/lib/orderCancelOps.ts); ceiling the
+ *     copy and the round trip stops being one — 50,000 د.ع out, 49,993 back,
+ *     which is the very shape this change exists to end.
+ *
+ * NOTHING IS TRUSTED THAT WAS NOT ALREADY TRUSTED. `corroboratedDeclaredIqd`
+ * re-runs the conversion server-side before a deposit's testimony is stored at
+ * all, so the ceiling is the SECOND guard, for the one case corroboration
+ * cannot see: an admin approving a deposit for fewer cents than were declared.
+ * And the sum is clamped at ZERO before it is read (`walletIqdAvailable`), so
+ * the worst any over-large debit can do is take the reading back to the plain
+ * cents conversion every screen printed before 0108.
+ *
+ * WHAT THE SHOP IS EXPOSED TO, stated so it is never mistaken for a leak: the
+ * ceilinged sum is bounded by 13 د.ع per TESTIFIED DEPOSIT — about one US cent
+ * each — and every dinar of it is money the shop received by bank transfer and
+ * did not credit, because `iqdToUsdCents` floored it away. Honouring it is
+ * repayment, not a discount.
+ *
+ * A HOLD ALREADY SPENT THE CENTS, SO IT MUST ALREADY SPEND THE DINARS. The
+ * WHERE used to read `status = 'approved'` alone, and a withdrawal's cents
+ * leave `available` the moment its hold goes active — while its ledger row is
+ * still `pending`. The dinar reading therefore stayed high until the payout
+ * was recorded and then dropped at an instant when no money moved. The row is
+ * counted here under exactly the condition `effectiveHoldsUsdSql` uses to stop
+ * counting its hold, so the two hand over between them and the reading is
+ * continuous across the payout.
+ *
+ * IT NEVER REACHES A SPEND GUARD. `availableUsdSql` is untouched and is still
+ * the only thing `usdSpendStatement`, `holdInsertStatement` and
+ * `approvableWithdrawalSql` consult. This is read by display and by the
+ * advance comparison; it moves no money and it appears in no WHERE clause
+ * that does.
+ */
+export const walletDustIqdSql = (u: string) => `(SELECT COALESCE(SUM(
+         (CASE WHEN t.type = 'deposit' THEN 1 ELSE -1 END) *
+         CASE WHEN t.type = 'deposit' AND m.tx_id IS NOT NULL
+              THEN MIN(
+                     MAX(0, COALESCE(t.amount_iqd, m.declared_amount_iqd)
+                            - (t.amount * COALESCE(t.exchange_rate_snapshot, m.exchange_rate_snapshot)) / 100),
+                     (COALESCE(t.exchange_rate_snapshot, m.exchange_rate_snapshot) + 99) / 100 - 1
+                   )
+              ELSE MAX(0, COALESCE(t.amount_iqd, m.declared_amount_iqd)
+                          - (t.amount * COALESCE(t.exchange_rate_snapshot, m.exchange_rate_snapshot)) / 100)
+         END
+       ),0)
+       FROM wallet_transactions t
+       LEFT JOIN wallet_deposit_meta m ON m.tx_id = t.id
+      WHERE t.user_id = ${u} AND t.currency = 'USD'
+        AND (t.status = 'approved'
+             OR EXISTS (SELECT 1 FROM wallet_holds h
+                         WHERE h.tx_id = t.id AND h.user_id = t.user_id AND h.state = 'active'))
+        AND COALESCE(t.amount_iqd, m.declared_amount_iqd) > 0
+        AND COALESCE(t.exchange_rate_snapshot, m.exchange_rate_snapshot) > 0)`;
+
+export interface WalletDustReading {
+  /** Signed sum of the per-row remainders above, in whole dinars. */
+  dust_iqd: number;
+  /**
+   * Whether `wallet_transactions` actually has 0108's columns. False means the
+   * Worker is live ahead of its database: the reading degraded to exactly the
+   * pre-0108 behaviour, and callers must not try to WRITE those columns either.
+   */
+  ledger_dinars: boolean;
+}
+
+/** Set once 0108's columns are seen; see `walletLedgerDinarsReady`. */
+let walletLedgerDinarsCache = false;
+
+/**
+ * Read the dust term, and say whether the database can carry it at all.
+ *
+ * A DEPLOY MAY LAND BEFORE ITS MIGRATION — that is the whole reason
+ * worker/lib/schemaVersion.ts exists, and `requestWithdrawal` below already
+ * builds its batch twice for the same reason. A balance query that throws
+ * because 0108 has not run yet would take the wallet page, the checkout quote
+ * and every affordability decision down at once. So the absence of the
+ * columns is an ANSWER: dust 0, which is precisely how every balance read
+ * before this existed. Anything that is NOT a missing-schema error propagates,
+ * because a D1 outage must not be reported as "you have no dinars".
+ */
+export async function readWalletDust(db: D1Database, userId: string): Promise<WalletDustReading> {
+  try {
+    const row = await db
+      .prepare(`SELECT ${walletDustIqdSql('?1')} AS dust_iqd`)
+      .bind(userId)
+      .first<{ dust_iqd: number }>();
+    walletLedgerDinarsCache = true;
+    return { dust_iqd: Number(row?.dust_iqd ?? 0) || 0, ledger_dinars: true };
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+    console.error(
+      `wallet_transactions is behind the deployment (0108 not applied): ${
+        e instanceof Error ? e.message : String(e)
+      }`
+    );
+    return { dust_iqd: 0, ledger_dinars: false };
+  }
+}
+
+/**
+ * DOES THIS DATABASE CARRY 0108's LEDGER DINAR COLUMNS AT ALL?
+ *
+ * WHY A SECOND PROBE EXISTS. `readWalletDust` above answers the same question
+ * as a side effect, but only for a caller that has a user id and wants a
+ * balance. The REFUND path has neither: `cancelledOrderRefundStatements`
+ * builds statements for an order, in a sweep that may hold hundreds of them,
+ * and it must know whether it may name `amount_iqd` in an INSERT before it
+ * writes one. Naming a column that is not there does not degrade — it aborts
+ * the D1 batch that is cancelling the order and returning the money.
+ *
+ * MEMOISED, AND ONLY IN ONE DIRECTION. The columns cannot be dropped, so a
+ * `true` is true for the life of the isolate and is cached. A `false` is
+ * re-probed every time, because it means the migration has not landed YET and
+ * the next request may be after it has — a cached `false` would keep a whole
+ * isolate writing dinar-less refunds long after the database could hold them.
+ * The probe is a single indexed-free `LIMIT 0` read of one row's shape.
+ *
+ * ANYTHING THAT IS NOT A MISSING COLUMN PROPAGATES AS `false` here rather than
+ * throwing, because this question is asked while a refund batch is being
+ * BUILT: a D1 blip must not turn a cancel into an exception. The refund still
+ * posts, in the shape this file wrote before 0108 existed.
+ */
+export async function walletLedgerDinarsReady(db: D1Database): Promise<boolean> {
+  if (walletLedgerDinarsCache) return true;
+  try {
+    await db.prepare('SELECT amount_iqd, exchange_rate_snapshot FROM wallet_transactions LIMIT 0').all();
+    walletLedgerDinarsCache = true;
+    return true;
+  } catch (e) {
+    if (!isSchemaMissing(e)) {
+      console.error(
+        `could not probe wallet_transactions for 0108's columns: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
+    return false;
+  }
+}
+
+/**
+ * THE ONE PLACE A WALLET BALANCE BECOMES DINARS. Every screen and every
+ * affordability test reads this number and no other; nothing recomputes it.
+ *
+ *   balance_iqd = floor(available_cents × rate / 100)   ← unchanged, as always
+ *               + the recorded remainders, never below zero
+ *
+ * THE INVARIANT, in one line, because it is what makes the design checkable:
+ * THE DINAR BALANCE IS NEVER BELOW WHAT THE CENTS ALONE CONVERT TO. That is
+ * the lower clamp, and it is why NO EXISTING BALANCE CAN FALL: a wallet whose
+ * rows recorded nothing, or whose debits recorded more remainder than its
+ * credits, reads exactly the figure every screen printed before 0108.
+ *
+ * THE UPPER CLAMP IS GONE, AND ITS REMOVAL IS THE FIX. It read
+ * `Math.min(dust, Math.ceil(rate / 100))` and it defended itself with the
+ * sentence «a customer with forty testified deposits still carries at most one
+ * cent of remainder». That sentence was true and the clamp was still wrong,
+ * for two separate reasons:
+ *
+ *   * IT DISCARDED HONEST DINARS. Two typed deposits of 25,000 د.ع lose 10 د.ع
+ *     each to the floor. The honest remainder is 20; the clamp cut it to 14;
+ *     the balance read 49,994 — the owner's own number — and the 50,000 د.ع
+ *     printer advance was refused for the second time. The owner's customer is
+ *     not hypothetical and neither is their second transfer.
+ *   * IT WAS ONE DINAR TOO WIDE ANYWAY. `ceil(rate / 100)` is 14 at 1,400,
+ *     while the widest a single floor() can miss by is 13 — so on a wallet
+ *     with a single remainder it handed out one dinar more than any honest
+ *     row could have carried.
+ *
+ * THE CEILING MOVED TO WHERE IT CAN TELL THE CASES APART: `walletDustIqdSql`
+ * bounds what EACH ROW may contribute, at `ceil(row_rate / 100) − 1`. Forty
+ * honest deposits keep forty honest remainders; one forged or
+ * admin-reduced claim is cut to the largest remainder it could have been.
+ * Summing first and clamping afterwards cannot make that distinction, which
+ * is the whole reason the clamp used to be in this function and no longer is.
+ *
+ * AN EMPTY WALLET READS EMPTY. Zero available cents returns 0 whatever the
+ * remainders say — dinars with no cents behind them are not a balance, and
+ * this is also what makes a wallet spent down to nothing read 0 rather than
+ * the few dinars its last deposit's remainder left behind.
+ *
+ * THE DOLLAR IS THE DERIVED FIGURE NOW, not the source: $ = floor(dinars ×
+ * 100 / rate) / 100, so 50,000 د.ع shows as $35.71 — the owner's own example,
+ * and the same floor 0106 settled on. The floor did not change. Its subject
+ * did.
+ */
+export function walletIqdAvailable(availableCents: number, dustIqd: number, exchangeRate: number): number {
+  const rate = Number.isFinite(exchangeRate) && exchangeRate > 0 ? Math.trunc(exchangeRate) : 0;
+  if (!rate) return 0;
+  const cents = Number.isFinite(availableCents) ? Math.trunc(availableCents) : 0;
+  if (cents <= 0) return 0;
+  const converted = Math.floor((cents * rate) / 100);
+  // The only clamp left, and the one that protects every live balance: a
+  // negative net remainder (a debit that recorded more dinars than the credits
+  // it spent) reads as the plain cents conversion, never as less than it.
+  const dust = Math.max(Number.isFinite(dustIqd) ? Math.trunc(dustIqd) : 0, 0);
+  return converted + dust;
+}
+
+/**
+ * WHAT A DINAR-QUOTED WALLET PAYMENT COSTS IN CENTS — the one conversion on
+ * the spend side, and the counterpart of `walletIqdAvailable` on the read side.
+ *
+ * «وليس العكس» applied to a spend: the order, the membership and the store
+ * cart are all priced in DINARS, the ledger moves in CENTS, and this is the
+ * single place that turns one into the other. It FLOORS, for the reason the
+ * whole change exists — `iqdToUsdCents`'s ceil asks for 3,572 cents to pay a
+ * 50,000 د.ع bill out of the 3,571 cents that same 50,000 د.ع put in, and that
+ * one cent is every refusal in the owner's report.
+ *
+ * AND IT NEVER ASKS FOR MORE CENTS THAN ARE THERE. The dinar balance may sit
+ * up to one cent per testified deposit above what its cents convert to —
+ * money the shop was transferred and did not credit — so a customer spending
+ * their whole balance can name more dinars than the cents can fund. Capping
+ * here is what turns that into a settled debt instead of a CHECK violation:
+ * `usdSpendStatement` writes −1 and aborts the entire D1 batch when the amount
+ * exceeds the balance, so an uncapped figure would not refuse the order, it
+ * would fail it.
+ *
+ * WHO PAYS THE DIFFERENCE, stated plainly: the shop, at most one cent per
+ * order — about 13 د.ع at 1,400 — and only ever out of dinars it already
+ * received by bank transfer and floored away at deposit time. The ceil this
+ * replaces put the same cent on the CUSTOMER and refused sales while doing it.
+ *
+ * ZERO CENTS IS ZERO PAYMENT. A dinar figure below one cent's worth converts
+ * to no cents at all, and no ledger row can carry it: `CHECK (amount > 0)` on
+ * `wallet_transactions` forbids a zero debit, so a caller that applied such a
+ * figure would grant the discount with nothing debited. Callers must treat 0
+ * here as "the wallet pays nothing", never as "the wallet pays for free".
+ */
+export function walletSpendCents(
+  iqd: number,
+  /**
+   * The cents on hand, or NULL for "this caller holds no balance to cap
+   * against". `quotePurchase` (worker/routes/memberships.ts) states what a
+   * membership costs without knowing whose wallet will pay it, and a caller
+   * that cannot cap must say so rather than pass a stand-in figure that
+   * silently becomes a cap of zero.
+   */
+  availableCents: number | null,
+  exchangeRate: number
+): number {
+  const rate = Number.isFinite(exchangeRate) && exchangeRate > 0 ? Math.trunc(exchangeRate) : 0;
+  const dinars = Number.isFinite(iqd) ? Math.trunc(iqd) : 0;
+  if (!rate || dinars <= 0) return 0;
+  const cost = Math.floor((dinars * 100) / rate);
+  if (availableCents === null || availableCents === undefined) return cost;
+  const available = Number.isFinite(availableCents) ? Math.trunc(availableCents) : 0;
+  if (available <= 0) return 0;
+  return Math.min(cost, available);
+}
+
 const NOW_SQL = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
 
 /**
@@ -171,16 +482,55 @@ export function corroboratedDeclaredIqd(
  */
 export function usdSpendStatement(
   db: D1Database,
-  p: { txId: string; userId: string; amountCents: number; note: string; ref: string; nowIso: string }
+  p: {
+    txId: string;
+    userId: string;
+    amountCents: number;
+    note: string;
+    ref: string;
+    nowIso: string;
+    /**
+     * THE DINARS THIS DEBIT WAS DENOMINATED IN (migration 0108), when it was
+     * denominated in dinars at all — a checkout advance is, a membership
+     * charge computed in cents is not. Recording it is what makes the dust
+     * term cancel: a wallet credited 50,000 د.ع and then spent 50,000 د.ع
+     * reads zero rather than the six-dinar remainder of its own credit.
+     *
+     * TESTIMONY, NOT MONEY, exactly as 0105 and 0106 have it: `amountCents`
+     * above is still the only figure the CASE guard compares and the only
+     * figure the row's `amount` carries. Omit it and the statement is the one
+     * this file has always written, byte for byte.
+     */
+    amountIqd?: number | null;
+    exchangeRateSnapshot?: number | null;
+  }
 ): D1PreparedStatement {
+  const iqd = Number.isInteger(p.amountIqd) && (p.amountIqd as number) > 0 ? (p.amountIqd as number) : null;
+  const rate =
+    iqd !== null && Number.isInteger(p.exchangeRateSnapshot) && (p.exchangeRateSnapshot as number) > 0
+      ? (p.exchangeRateSnapshot as number)
+      : null;
+  // The dinars travel only WITH the rate they were typed at: a figure with no
+  // rate beside it cannot be converted by any later reader and would be a
+  // claim nothing backs (the rule `corroboratedDeclaredIqd` already applies).
+  if (iqd === null || rate === null) {
+    return db
+      .prepare(
+        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
+         SELECT ?1, ?2, 'withdrawal', 'USD',
+           CASE WHEN ${availableUsdSql('?2')} >= ?3 THEN ?3 ELSE -1 END,
+           'approved', ?4, ?5, 'system', ?6`
+      )
+      .bind(p.txId, p.userId, p.amountCents, p.note, p.ref, p.nowIso);
+  }
   return db
     .prepare(
-      `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
+      `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at, amount_iqd, exchange_rate_snapshot)
        SELECT ?1, ?2, 'withdrawal', 'USD',
          CASE WHEN ${availableUsdSql('?2')} >= ?3 THEN ?3 ELSE -1 END,
-         'approved', ?4, ?5, 'system', ?6`
+         'approved', ?4, ?5, 'system', ?6, ?7, ?8`
     )
-    .bind(p.txId, p.userId, p.amountCents, p.note, p.ref, p.nowIso);
+    .bind(p.txId, p.userId, p.amountCents, p.note, p.ref, p.nowIso, iqd, rate);
 }
 
 /**
@@ -910,27 +1260,53 @@ export async function requestWithdrawal(
   /**
    * THE BATCH, BUILT TWICE-ABLE.
    *
-   * `withDeclared` false rebuilds the request INSERT without the two columns
-   * migration 0106 adds. It is not a style choice — see `runMoneyBatch` below.
+   * TWO FLAGS, AND THEY DEGRADE IN ORDER. `withLedgerDinars` false rebuilds
+   * the LEDGER insert without the two columns migration 0108 adds to
+   * `wallet_transactions`; `withDeclared` false rebuilds the REQUEST insert
+   * without the two migration 0106 adds to `wallet_withdrawals`. It is not a
+   * style choice — see `runMoneyBatch` below.
+   *
+   * SEPARATE, BECAUSE A DATABASE IS BEHIND BY MIGRATIONS AND NOT BY ERAS. D1
+   * says «no such column» without saying which table it meant, so the retry
+   * ladder drops the NEWEST testimony first and only then the older one. One
+   * shared flag would have thrown away a withdrawal's 0106 record — already
+   * applied, already populated, and the only number on the payout card a human
+   * reads before making a transfer — because an unrelated migration was a
+   * deploy late.
    */
-  const buildStatements = (withDeclared: boolean) => [
+  const buildStatements = (withDeclared: boolean, withLedgerDinars: boolean) => [
     holdInsertStatement(db, holdId, 'withdrawal', holdInput),
     // Ledger row: pending until an actual payout is recorded. Dependent on
     // the hold having been created by the statement above.
     db
       .prepare(
-        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, account_number, ref, created_by)
-         SELECT ?1, ?2, 'withdrawal', 'USD', ?3, 'pending', ?4, ?5, ?6, 'user'
+        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, account_number, ref, created_by${
+          withLedgerDinars ? ', amount_iqd, exchange_rate_snapshot' : ''
+        })
+         SELECT ?1, ?2, 'withdrawal', 'USD', ?3, 'pending', ?4, ?5, ?6, 'user'${
+           withLedgerDinars ? ', ?8, ?9' : ''
+         }
           WHERE EXISTS (SELECT 1 FROM wallet_holds h WHERE h.id = ?7 AND h.state = 'active')`
       )
       .bind(
-        txId,
-        p.userId,
-        p.amountCents,
-        (p.note ?? '').slice(0, 500),
-        p.destination.account.slice(0, 100),
-        wdId,
-        holdId
+        ...[
+          txId,
+          p.userId,
+          p.amountCents,
+          (p.note ?? '').slice(0, 500),
+          p.destination.account.slice(0, 100),
+          wdId,
+          holdId,
+          /**
+           * THE DINARS ON THE LEDGER ROW TOO (migration 0108), not only on the
+           * request row 0106 gave them. The request row is the payout card;
+           * the LEDGER row is what a balance is summed from, and a withdrawal
+           * whose dinars are not on it leaves the deposit's remainder behind
+           * as orphan dinars when a customer empties their wallet. Same
+           * corroborated pair, written once, read by `walletDustIqdSql`.
+           */
+          ...(withLedgerDinars ? [declaredIqd, rateSnapshot] : []),
+        ]
       ),
     // Request row with the destination frozen at confirmation.
     db
@@ -1002,21 +1378,31 @@ export async function requestWithdrawal(
    * is the same answer to the same deploy ordering on the read side.
    */
   const runMoneyBatch = async (): Promise<D1Result[] | null> => {
-    try {
-      return await db.batch(buildStatements(true));
-    } catch (e) {
-      if (!isSchemaMissing(e)) return null; // UNIQUE race → classify below.
-      console.error(
-        `wallet_withdrawals is behind the deployment (0106 not applied): ${
-          e instanceof Error ? e.message : String(e)
-        }`
-      );
+    /**
+     * THE LADDER: full testimony, then without 0108's ledger columns, then
+     * without 0106's request columns either. Each rung is tried only when the
+     * one above failed for a MISSING COLUMN — a UNIQUE race or a D1 outage
+     * stops the ladder immediately, because retrying a money batch that failed
+     * for any other reason is how one request becomes two payouts.
+     */
+    const rungs: Array<[boolean, boolean]> = [
+      [true, true],
+      [true, false],
+      [false, false],
+    ];
+    for (let i = 0; i < rungs.length; i += 1) {
       try {
-        return await db.batch(buildStatements(false));
-      } catch {
-        return null;
+        return await db.batch(buildStatements(rungs[i][0], rungs[i][1]));
+      } catch (e) {
+        if (!isSchemaMissing(e)) return null; // UNIQUE race → classify below.
+        console.error(
+          `the wallet schema is behind the deployment (0106/0108 not applied): ${
+            e instanceof Error ? e.message : String(e)
+          }`
+        );
       }
     }
+    return null;
   };
   const res = await runMoneyBatch();
   if (res && (res[0]?.meta.changes ?? 0) > 0) return { ok: true, id: wdId, replayed: false };
@@ -1401,7 +1787,15 @@ export async function createDepositRequest(db: D1Database, p: CreateDepositInput
   const reviewState = initialDepositReviewState({ fingerprintSeenBefore: !!seen });
 
   const txId = p.txId ?? newId('wtx');
-  const statements = [
+  /**
+   * BUILT TWICE-ABLE, for the same reason `requestWithdrawal` is below: a
+   * Worker can reach production ahead of its migration. `withLedgerDinars`
+   * false rebuilds the ledger INSERT without the two columns 0108 adds, and
+   * the request then files exactly as it did before 0108 existed — the meta
+   * row still records the typed dinars (0105), so nothing is lost but the
+   * dust term, which reads 0 on that database anyway.
+   */
+  const buildStatements = (withLedgerDinars: boolean) => [
     db
       .prepare(
         `UPDATE wallet_deposit_meta
@@ -1412,24 +1806,33 @@ export async function createDepositRequest(db: D1Database, p: CreateDepositInput
       .bind(provider, channel, referenceNorm),
     db
       .prepare(
-        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, payment_method, receipt_key, ref, created_by)
-         SELECT ?1, ?2, 'deposit', 'USD', ?3, 'pending', ?4, ?5, ?6, ?7, 'user'
+        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, payment_method, receipt_key, ref, created_by${
+          withLedgerDinars ? ', amount_iqd, exchange_rate_snapshot' : ''
+        })
+         SELECT ?1, ?2, 'deposit', 'USD', ?3, 'pending', ?4, ?5, ?6, ?7, 'user'${
+           withLedgerDinars ? ', ?11, ?12' : ''
+         }
           WHERE NOT EXISTS (
             SELECT 1 FROM wallet_deposit_meta m
              WHERE m.provider = ?8 AND m.channel = ?9 AND m.reference_norm = ?10
                AND m.reference_norm <> '' AND m.dedup_active = 1)`
       )
       .bind(
-        txId,
-        p.userId,
-        p.amountCents,
-        (p.note ?? '').slice(0, 500),
-        (p.paymentMethod ?? '').slice(0, 60),
-        p.receiptKey,
-        reference,
-        provider,
-        channel,
-        referenceNorm
+        ...[
+          txId,
+          p.userId,
+          p.amountCents,
+          (p.note ?? '').slice(0, 500),
+          (p.paymentMethod ?? '').slice(0, 60),
+          p.receiptKey,
+          reference,
+          provider,
+          channel,
+          referenceNorm,
+          // The SAME corroborated pair the meta row below records — never a
+          // second, differently-filtered copy of the customer's claim.
+          ...(withLedgerDinars ? [declaredIqd, rateSnapshot] : []),
+        ]
       ),
     db
       .prepare(
@@ -1456,10 +1859,26 @@ export async function createDepositRequest(db: D1Database, p: CreateDepositInput
   ];
 
   try {
-    const res = await db.batch(statements);
+    const res = await db.batch(buildStatements(true));
     if ((res[1]?.meta.changes ?? 0) > 0) return { ok: true, txId, reviewState };
-  } catch {
+  } catch (e) {
     // UNIQUE(provider, channel, reference_norm) race — batch rolled back.
+    // A database behind on 0108 is a different thing entirely, and answering
+    // it with «this reference was already submitted» would tell the customer
+    // their transfer was a duplicate when the deploy is simply early.
+    if (isSchemaMissing(e)) {
+      console.error(
+        `wallet_transactions is behind the deployment (0108 not applied): ${
+          e instanceof Error ? e.message : String(e)
+        }`
+      );
+      try {
+        const res = await db.batch(buildStatements(false));
+        if ((res[1]?.meta.changes ?? 0) > 0) return { ok: true, txId, reviewState };
+      } catch {
+        // Fall through to the duplicate answer below.
+      }
+    }
   }
   return { ok: false, reason: 'DUPLICATE_REFERENCE' };
 }

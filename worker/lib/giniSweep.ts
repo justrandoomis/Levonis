@@ -142,7 +142,7 @@ export async function sweepGiniHolds(env: Env, nowIso: string, limit = 100): Pro
               AND gini_state = 'awaiting_receipt'`
         ).bind(nowIso, id),
         ...(stock.plan?.statements ?? []),
-        ...cancelledOrderRefundStatements(env, order, 'system', nowIso),
+        ...(await cancelledOrderRefundStatements(env, order, 'system', nowIso)),
         // In the SAME batch: a history row written afterwards could be lost to
         // a crash, leaving a cancellation nobody can explain to a customer who
         // is still waiting on the bank.

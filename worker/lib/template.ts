@@ -278,16 +278,16 @@ const SCALAR_FIELDS: FieldSpec[] = [
   f('original_price_iqd', 'iqd', 'pricing', 'السعر قبل الخصم — compare-at price; shown only when above the selling price; __NULL__ = none', { nullable: true, min: 0, max: IQD_MAX }),
   f('product_cost_iqd', 'iqd', 'pricing', 'الكلفة (داخلي) — internal cost, NEVER exposed publicly; __NULL__ = unknown', { nullable: true, min: 0, max: IQD_MAX }),
   // classification
-  f('brand', 'ref', 'classification', 'العلامة التجارية — brand slug or id, resolved against the brands table; unknown values need review; __NULL__ = no brand', { nullable: true }),
-  f('catalogs', 'csv', 'classification', 'الكتالوجات — comma-separated catalog slugs or ids; unknown values need review; empty = in no catalog', { nullable: true }),
+  f('brand', 'ref', 'classification', 'العلامة التجارية — brand slug, id or name (ar/en/ckb), resolved against the brands table; a brand that does not exist yet is created and the check step says so first; __NULL__ = no brand', { nullable: true }),
+  f('catalogs', 'csv', 'classification', 'الكتالوجات — comma-separated catalog slugs, ids or names; unknown values need review (a section is never created); empty = in no catalog', { nullable: true }),
   // ---- EIGHT FIELDS THE FILE COULD NOT SAY --------------------------------
   // Every one of these is edited in the admin form and stored on `products`,
   // and none had a template key: worker/lib/template.ts carried them across an
   // update untouched and defaulted them to null on a create. So a product made
   // from a .txt had no section — and the owner asking the file to «يملأ جميع
   // الحقول» was asking for something structurally impossible.
-  f('category', 'ref', 'classification', 'القسم الرئيسي — main section slug or id from the sections tree; __NULL__ = بلا قسم. مطلوب للنشر.', { nullable: true }),
-  f('sub_category', 'ref', 'classification', 'القسم الفرعي — sub-section slug or id; __NULL__ = بلا قسم فرعي', { nullable: true }),
+  f('category', 'ref', 'classification', 'القسم الرئيسي — main section slug, id or name from the sections tree; __NULL__ = بلا قسم. مطلوب للنشر.', { nullable: true }),
+  f('sub_category', 'ref', 'classification', 'القسم الفرعي — sub-section slug, id or name; __NULL__ = بلا قسم فرعي', { nullable: true }),
   f('template_family', 'enum', 'classification', 'عائلة قالب المواصفات: devices | materials | فارغ — تحدد أي حقول spec.* تخصّ هذا المنتج', { enumValues: ['', 'devices', 'materials'] as const }),
   f('sku', 'string', 'classification', 'رمز المنتج — SKU; فارغ = بلا رمز'),
   f('hashtags', 'csv', 'classification', 'وسوم — comma-separated hashtags'),
@@ -2387,9 +2387,34 @@ export interface NeedsReviewEntry { key: string; line: number; value: string; me
 /** Scalar keys the ROUTE resolves against a table before the body is built. */
 const REF_KEYS = new Set(['brand', 'catalogs', 'category', 'sub_category']);
 
+/**
+ * A brand the file names that does not exist yet and the apply WILL create.
+ *
+ * It is carried from the check step to the apply step as DATA, not as prose:
+ * the check route returns it so the owner sees «سيُنشأ» before pressing
+ * «ابدأ الاستيراد», and the apply route materialises it through
+ * `createPendingBrand` (./templateRefs.ts). `id` is allocated at check time so
+ * the line the owner reads, the preview's diff and the row finally inserted
+ * are one brand rather than three descriptions of one.
+ */
+export interface PendingBrand {
+  id: string;
+  /** The name exactly as the file spelled it. */
+  name: string;
+  name_ar: string;
+  name_en: string;
+  slug: string;
+}
+
 export interface ResolvedRefs {
   /** resolved brand id; null = clear brand; undefined = omitted/unresolved (preserve) */
   brand_id?: string | null;
+  /**
+   * Brands this file names that do not exist yet. `brand_id` already points at
+   * the entry's `id`, so the merge proceeds and the preview is complete; the
+   * ROW is written only by the apply, and only after the check disclosed it.
+   */
+  brands_to_create?: PendingBrand[];
   /** resolved catalog ids; undefined = omitted/unresolved (preserve associations) */
   catalog_ids?: string[];
   /** resolved main-section id; null = clear; undefined = omitted/unresolved */

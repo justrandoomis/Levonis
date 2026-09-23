@@ -42,9 +42,10 @@ import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { feeFor } from '../lib/merchantOps';
-import { exchangeRate, iqdToUsdCents, usdCentsToIqd } from '../lib/escrowOps';
+import { exchangeRate } from '../lib/escrowOps';
 import {
   createPurchaseHold, commitHoldStatements, holdSettledEventStatements, getAvailableBalances,
+  readWalletDust, walletIqdAvailable, walletSpendCents,
 } from '../lib/walletOps';
 import { rootDomainFrom } from '../lib/hosts';
 import { announceAfterResponse, orderAnnouncement, orderTopic } from '../lib/adminTopicRouting';
@@ -213,14 +214,23 @@ storeOrderRoutes.post('/quote', async (c) => {
   // BEFORE the button: a customer who finds out at the last tap has already
   // chosen an address and typed a coupon for an order they cannot place.
   //
-  // The comparison is done in CENTS, against the same conversion the hold
-  // will run, so the answer here and the answer there cannot disagree by a
-  // rounding step.
-  const [rate, balances] = await Promise.all([
+  // THE COMPARISON IS DONE IN DINARS, which is the unit both sides are quoted
+  // in — «يضاف كما هو ولكن يحول الى الدولار وليس العكس», migration 0108.
+  //
+  // It used to be done in CENTS through `iqdToUsdCents`, which CEILS, and that
+  // is the platform checkout's refusal wearing a different coat: a wallet the
+  // wallet page prints as exactly 50,000 د.ع holds 3,571 cents, a 50,000 د.ع
+  // cart asked for ceil(5,000,000 / 1,400) = 3,572, and `wallet_covers` came
+  // back false one cent short — beside a `wallet_available_iqd` of 49,994 that
+  // contradicted the wallet page by six dinars. Both figures now come from
+  // `walletIqdAvailable`, the one function that turns a balance into dinars,
+  // so this screen and the wallet screen cannot disagree at all.
+  const [rate, balances, dust] = await Promise.all([
     exchangeRate(c.env.DB),
     getAvailableBalances(c.env, user.id),
+    readWalletDust(c.env.DB, user.id),
   ]);
-  const requiredCents = iqdToUsdCents(cart.total_iqd, rate);
+  const walletAvailableIqd = walletIqdAvailable(balances.usd_cents_available, dust.dust_iqd, rate);
 
   return c.json({
     success: true,
@@ -228,12 +238,9 @@ storeOrderRoutes.post('/quote', async (c) => {
       ...cart,
       payment_method: 'wallet' as const,
       /** Spendable only — money already held for another order is not it. */
-      wallet_available_iqd: usdCentsToIqd(balances.usd_cents_available, rate),
-      wallet_covers: requiredCents <= balances.usd_cents_available,
-      wallet_shortfall_iqd: Math.max(
-        0,
-        cart.total_iqd - usdCentsToIqd(balances.usd_cents_available, rate)
-      ),
+      wallet_available_iqd: walletAvailableIqd,
+      wallet_covers: cart.total_iqd <= walletAvailableIqd,
+      wallet_shortfall_iqd: Math.max(0, cart.total_iqd - walletAvailableIqd),
       /**
        * Where to top up, as an ABSOLUTE url.
        *
@@ -313,10 +320,53 @@ storeOrderRoutes.post('/', async (c) => {
   const split = await feeFor(c.env.DB, 'store', cart.subtotal_iqd - cart.discount_iqd);
   const rate = await exchangeRate(c.env.DB);
 
-  // Wallet payment is reserved and committed in the same request. A hold
-  // rather than a bare debit, so an insufficient balance writes nothing at
-  // all instead of a half-paid order.
-  const walletCents = iqdToUsdCents(cart.total_iqd, rate);
+  /**
+   * Wallet payment is reserved and committed in the same request. A hold
+   * rather than a bare debit, so an insufficient balance writes nothing at
+   * all instead of a half-paid order.
+   *
+   * THE AMOUNT IS THE CART'S DINARS, CONVERTED DOWN — the same
+   * `walletSpendCents` the platform checkout and the membership purchase use,
+   * and for the same reason: `iqdToUsdCents` ceils, and the extra cent it asks
+   * for is one the wallet that funded the cart does not hold. The refusal that
+   * produced was «Your wallet balance does not cover this order» for a wallet
+   * the quote above had just said covered it.
+   *
+   * THE GUARD IS STILL THE HOLD'S OWN. `walletSpendCents` caps at the cents
+   * read a moment ago, so the affordability question is answered HERE, in
+   * dinars, against the figure the customer was shown. That makes the cap a
+   * read-then-write, which is why the hold's `WHERE available >= amount` stays
+   * exactly as it was: a balance that moved in between still refuses the hold
+   * and still writes nothing.
+   */
+  const walletDust = await readWalletDust(c.env.DB, user.id);
+  const walletBalances = await getAvailableBalances(c.env, user.id);
+  const walletBalanceIqd = walletIqdAvailable(
+    walletBalances.usd_cents_available,
+    walletDust.dust_iqd,
+    rate
+  );
+  if (cart.total_iqd > walletBalanceIqd) {
+    throw badRequest('Your wallet balance does not cover this order', 'INSUFFICIENT_FUNDS', {
+      required_iqd: cart.total_iqd,
+      wallet_available_iqd: walletBalanceIqd,
+    });
+  }
+  /**
+   * A PRICE BELOW ONE CENT'S WORTH STILL HAS TO MOVE MONEY.
+   *
+   * `walletSpendCents` floors, so a charge under 14 د.ع (at 1,400) converts to
+   * zero cents — and `CHECK (amount > 0)` on `wallet_transactions` means a
+   * zero-cent debit cannot be written at all. On the platform checkout that is
+   * answered by the wallet paying nothing and the customer owing the few
+   * dinars at the door. HERE THERE IS NO DOOR: a community store order is
+   * prepaid from the wallet and by nothing else, so "no ledger row" would
+   * mean "shipped free". The charge is therefore raised to one cent, which the balance
+   * check above guarantees is there (a positive dinar balance needs at least
+   * one cent behind it). The customer pays at most one cent — 13 د.ع — more
+   * than the quoted dinars, once, on a price smaller than that.
+   */
+  const walletCents = Math.max(1, walletSpendCents(cart.total_iqd, walletBalances.usd_cents_available, rate));
   const hold = await createPurchaseHold(c.env.DB, {
     userId: user.id,
     amountCents: walletCents,

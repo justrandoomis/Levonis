@@ -39,6 +39,8 @@ export type { DeliveryMethod as CheckoutDeliveryMethod, CheckoutPaymentMethod, C
 interface WalletContextType {
   /** USD balance in cents. */
   balanceUsdCents: number;
+  /** The same balance in dinars, computed server-side (migration 0108). */
+  balanceIqd: number;
   /** Point balance (1 point = 1 IQD at checkout). */
   pointBalance: number;
   transactions: WalletTx[];
@@ -81,6 +83,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const { user, isLoaded: authLoaded } = useAuth();
 
   const [balanceUsdCents, setBalanceUsdCents] = useState(0);
+  /**
+   * THE BALANCE IN DINARS, AS THE SERVER COMPUTED IT (migration 0108).
+   *
+   * Not `usdCentsToIqd(balanceUsdCents, exchangeRate)`: that conversion is
+   * what made a customer who typed 50,000 د.ع read 49,994, and it is also
+   * computed here at a rate this context reads ONCE on mount and never
+   * repolls — so a long-open tab would price a balance at a rate the shop has
+   * since moved. The server owns the rule now; this only carries the answer.
+   * 0 until the first load, exactly as `balanceUsdCents` is.
+   */
+  const [balanceIqd, setBalanceIqd] = useState(0);
   const [pointBalance, setPointBalance] = useState(0);
   const [transactions, setTransactions] = useState<WalletTx[]>([]);
   const [pointTransactions, setPointTransactions] = useState<WalletTx[]>([]);
@@ -99,6 +112,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const refreshWallet = useCallback(async () => {
     if (!user) {
       setBalanceUsdCents(0);
+      setBalanceIqd(0);
       setPointBalance(0);
       setTransactions([]);
       setPointTransactions([]);
@@ -107,11 +121,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     try {
       const data = await api.get<{
         balance_usd_cents: number;
+        balance_iqd: number;
         point_balance: number;
         transactions: WalletTx[];
         point_transactions: WalletTx[];
       }>('/api/wallet');
       setBalanceUsdCents(data.balance_usd_cents);
+      setBalanceIqd(Number(data.balance_iqd) || 0);
       setPointBalance(data.point_balance);
       setTransactions(data.transactions);
       setPointTransactions(data.point_transactions);
@@ -159,6 +175,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const value: WalletContextType = {
     balanceUsdCents,
+    balanceIqd,
     pointBalance,
     transactions,
     pointTransactions,

@@ -241,6 +241,48 @@ test('the route refuses nonsense and a unit that does not exist', async () => {
   assert.equal((await patch(app, '/api/devices/admin/units/nope/warranty', { base_months: 12, reason: 'سبب كافٍ' })).status, 404);
 });
 
+/**
+ * THE `min: 1` FLOOR HAS TO APPLY TO THE DEFAULT TOO.
+ *
+ * `int(v, name, { min, def })` returns `def` BEFORE it compares against `min`
+ * — worker/lib/http.ts returns early on an absent value — so passing the
+ * unit's stored base straight in let a unit whose `warranty_base_months` is 0
+ * sail past a guard that reads as if it forbids 0. The column is a plain
+ * nullable INTEGER with no CHECK (migrations/0003_final_phase.sql), so 0 is a
+ * value a row can really hold: an imported unit, plus an admin who submits
+ * only `ext_months`, wrote `policy_version.total = ext_months` and MOVED THE
+ * CUSTOMER'S END DATE on the strength of a base the form never showed them.
+ *
+ * A stored base below the floor is therefore not offered as a default; the
+ * admin is asked to state the base they mean, on a screen whose every write is
+ * audited with a reason.
+ */
+test('a stored base of 0 is not handed back as a default past the min: 1 floor', async () => {
+  const { raw, db } = seed();
+  raw.exec("UPDATE order_item_units SET warranty_base_months = 0, policy_version = '{\"v\":1}' WHERE id = 'u2'");
+  const app = devicesApp(db);
+
+  const res = await patch(app, '/api/devices/admin/units/u2/warranty', { ext_months: 12, reason: 'منحة من المالك' });
+  assert.equal(res.status, 400, 'base_months must be stated, not defaulted to a value the floor forbids');
+
+  const unit = raw
+    .prepare('SELECT warranty_base_months, warranty_ext_months, policy_version FROM order_item_units WHERE id = ?')
+    .get('u2') as Record<string, unknown>;
+  assert.equal(unit.warranty_base_months, 0, 'the refusal leaves the row exactly as it was');
+  assert.equal(unit.warranty_ext_months, 0);
+  assert.ok(!String(unit.policy_version).includes('"total"'), 'and writes no total');
+
+  // A base that IS above the floor still defaults, which is the whole point of
+  // letting an admin change only the extension.
+  const ok = await patch(app, '/api/devices/admin/units/u1/warranty', { ext_months: 12, reason: 'منحة من المالك' });
+  assert.equal(ok.status, 200);
+  const u1 = raw
+    .prepare('SELECT warranty_base_months, warranty_ext_months FROM order_item_units WHERE id = ?')
+    .get('u1') as Record<string, unknown>;
+  assert.equal(u1.warranty_base_months, 12, "the unit's own stored base is still the default");
+  assert.equal(u1.warranty_ext_months, 12);
+});
+
 test('a customer never learns who holds a device from the customer surface', async () => {
   const { db } = seed();
   const app = stubApp(db, { id: 'holder', role: 'customer' as const, email: 'kawa@x.co' }, (a) => a.route('/api/devices', deviceRoutes));

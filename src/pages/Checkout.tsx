@@ -591,6 +591,7 @@ export default function Checkout() {
     checkoutDeliveryMethods,
     checkoutPaymentMethods,
     balanceUsdCents,
+    balanceIqd: walletBalanceIqdFromServer,
     pointBalance,
     exchangeRate,
     refreshWallet,
@@ -945,7 +946,17 @@ export default function Checkout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAddressId, deliveryMethod, paymentMethod, usePoints, useWalletBalance, protectedDelivery, itemIdsKey, supportRef, couponCode]);
 
-  const walletBalanceIQD = usdCentsToIqd(balanceUsdCents, exchangeRate);
+  /**
+   * THE PRE-QUOTE BALANCE, IN DINARS, AS THE SERVER COMPUTED IT (0108).
+   *
+   * It used to be `usdCentsToIqd(balanceUsdCents, exchangeRate)` — the same
+   * floor that turned a paid 50,000 د.ع into 49,994 and made this screen grey
+   * its own confirm button out before the server was ever asked. The decisive
+   * figure is still `quote.wallet.*` below; this one only chooses the default
+   * payment method, and it must not disagree with the quote about whether the
+   * wallet covers the cart.
+   */
+  const walletBalanceIQD = walletBalanceIqdFromServer || usdCentsToIqd(balanceUsdCents, exchangeRate);
 
   /**
    * THE WALLET IS THE DEFAULT AS SOON AS IT IS A REAL ONE.

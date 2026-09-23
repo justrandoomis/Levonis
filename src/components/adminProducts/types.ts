@@ -314,6 +314,15 @@ export interface TemplateError { line: number; key: string; message: string }
 export interface NeedsReviewEntry { key: string; line: number; value: string; message: string }
 export interface DiffEntry { field: string; before: string | null; after: string | null }
 
+/**
+ * A brand the file names that does not exist yet and the import WILL create.
+ *
+ * It is NOT an error and NOT a warning the server writes a sentence for: it is
+ * the disclosure that replaced «brands are never silently created», carried as
+ * data so the panel can state it in the language the panel is already in.
+ */
+export interface BrandToCreate { name: string; slug: string }
+
 export interface ParseResponse {
   product_id: string | null;
   is_create: boolean;
@@ -321,6 +330,8 @@ export interface ParseResponse {
   warnings: string[];
   unknown_keys: string[];
   needs_review: NeedsReviewEntry[];
+  /** Absent from an older server's answer, so always read it defensively. */
+  brands_to_create?: BrandToCreate[];
   validation_error: { message: string; code?: string } | null;
   applied_fields: string[];
   cleared_fields: string[];
@@ -456,6 +467,9 @@ export interface ApplyVerifyFailure {
   errors?: Array<string | TemplateError>;
   /** Unresolved references — the write was refused before anything was written. */
   needs_review?: NeedsReviewEntry[];
+  /** What the apply did with the brands the check disclosed. `created: false`
+   *  means the row already existed by the time the write came round. */
+  brands_created?: Array<{ id: string; name: string; slug: string; created: boolean }>;
   warnings?: string[];
   unknown_keys?: string[];
 }
@@ -470,6 +484,7 @@ export interface ZipFileResult {
   warnings: string[];
   unknown_keys: string[];
   needs_review: NeedsReviewEntry[];
+  brands_to_create?: BrandToCreate[];
   validation_error?: { message: string; code?: string } | null;
   applied_fields?: string[];
   spec_fields?: ApplySpecReport | null;

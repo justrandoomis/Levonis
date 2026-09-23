@@ -22,6 +22,7 @@ import { asD1, freshDb, json, post, row, stubApp, type App } from './fixtures/ap
 import { printQuoteRoutes } from '../worker/routes/printQuote';
 import type { Hono } from 'hono';
 import type { AppContext } from '../worker/lib/types';
+import { machineIqdPerHour } from '../worker/lib/printQuote/printers';
 
 const mount = (a: Hono<AppContext>) => a.route('/api/print-quote', printQuoteRoutes);
 
@@ -302,6 +303,97 @@ test('a customer gets a real number WITHOUT a slicer, and it never claims to be 
  * arrived without the hours attached would move both prices by the same amount
  * and still pass a bare `notEqual`, so that is what is asserted.
  */
+/**
+ * AND THE SYMPTOM IS ONLY HALF CLOSED — STATED HERE RATHER THAN LEFT TO BE
+ * REDISCOVERED.
+ *
+ * The test above is real: the machine hour reaches the price, and mutating the
+ * rate to zero collapses every quote. But over the WHOLE catalogue that fix
+ * produces only FOUR distinct prices for fourteen FDM machines, because the
+ * seed (migrations/0078) gives the file path exactly four inputs to work with
+ * — flow 28 for the A1 series and 32 for everything else, layer overhead 2.0
+ * for the moving-bed machines and 1.5 for CoreXY, and warm-up 4 open / 6
+ * enclosed. TEN machines share one signature, and the X1 Carbon and the H2D
+ * are both in it. An owner comparing the two obvious flagships still sees the
+ * identical dinar.
+ *
+ * THAT IS A DATA GAP, NOT A CODE ONE, AND IT MUST NOT BE CLOSED BY INVENTING
+ * NUMBERS. 0078 says so in its own words: an unconfirmed flow figure takes the
+ * conservative 32 because overstating cost is the safe direction, and «an
+ * admin raising it is a correction, never a discovery». Writing a plausible
+ * per-model flow rate or a plausible purchase price would put a made-up number
+ * on a money path, which is the one thing the pricing engine is built not to
+ * do.
+ *
+ * THE LEVER THAT WOULD SEPARATE THEM ALREADY EXISTS AND IS EMPTY. `purchase_iqd`
+ * / `useful_print_hours` on the model row feed `machineIqdPerHour`, which
+ * OUTRANKS the platform rate (worker/routes/printQuote.ts) — and they are NULL
+ * on all fourteen seeded machines, which is why the platform rung is reached
+ * at all. So the first test below pins the gap honestly, and the second proves
+ * the lever is live the moment the owner supplies what he paid. Recorded for
+ * him as row 100 of docs/DECISIONS.md.
+ */
+test('machines the seed cannot tell apart quote the same — by construction, not by accident', () => {
+  const raw = freshDb();
+  const rows = raw
+    .prepare(
+      `SELECT id, max_volumetric_flow_mm3_s f, sustained_flow_fraction sf,
+              layer_overhead_seconds lo, warmup_minutes wm,
+              purchase_iqd, useful_print_hours
+         FROM printer_models WHERE technology = 'fdm' ORDER BY id`
+    )
+    .all() as Array<Record<string, number | string | null>>;
+
+  // Nothing carries purchase economics, which is WHY the platform rate is the
+  // rung that decides. The day one of these is filled in, this number moves
+  // and the test says so.
+  assert.equal(
+    rows.filter((r) => r.purchase_iqd !== null || r.useful_print_hours !== null).length,
+    0,
+    'a seeded machine must not carry an invented purchase price (§53, migrations/0078)'
+  );
+
+  const signatures = new Map<string, string[]>();
+  for (const r of rows) {
+    const key = `${r.f}|${r.sf}|${r.lo}|${r.wm}`;
+    signatures.set(key, [...(signatures.get(key) ?? []), String(r.id)]);
+  }
+  assert.equal(signatures.size, 4, 'four distinct physics signatures across the catalogue');
+
+  const biggest = [...signatures.values()].sort((a, b) => b.length - a.length)[0];
+  assert.ok(
+    biggest.includes('bbl-x1c') && biggest.includes('bbl-h2d'),
+    'the two flagships an owner compares are in the same signature, so they quote alike'
+  );
+  assert.equal(biggest.length, 10, 'ten of fourteen machines are indistinguishable to the file path');
+});
+
+test('the per-model lever that WOULD separate them is live, and outranks the platform rate', () => {
+  const raw = freshDb();
+  const readOne = (id: string) =>
+    raw
+      .prepare('SELECT purchase_iqd p, residual_iqd r, useful_print_hours h FROM printer_models WHERE id = ?')
+      .get(id) as { p: number | null; r: number | null; h: number | null };
+
+  assert.equal(machineIqdPerHour({ purchaseIqd: 0, residualIqd: 0, usefulPrintHours: 0 }), 0, 'empty means 0, never Infinity');
+  const seeded = readOne('bbl-x1c');
+  assert.equal(seeded.p, null);
+  assert.equal(seeded.h, null);
+
+  // What the owner entering his own figures would buy: two machines with
+  // IDENTICAL seeded physics stop costing the same hour.
+  raw
+    .prepare('UPDATE printer_models SET purchase_iqd = ?, residual_iqd = ?, useful_print_hours = ? WHERE id = ?')
+    .run(2_600_000, 200_000, 4000, 'bbl-x1c');
+  const x1c = readOne('bbl-x1c');
+  const h2d = readOne('bbl-h2d');
+  const rateOf = (m: { p: number | null; r: number | null; h: number | null }) =>
+    machineIqdPerHour({ purchaseIqd: m.p ?? 0, residualIqd: m.r ?? 0, usefulPrintHours: m.h ?? 0 });
+  assert.ok(rateOf(x1c) > 0, "the owner's figure produces a real hourly rate");
+  assert.equal(rateOf(h2d), 0, 'and the machine he has not priced still falls through to the platform rung');
+  assert.notEqual(rateOf(x1c), rateOf(h2d), 'which is the whole point: two flagships, two hours, two prices');
+});
+
 test('two printers, one file, two prices — the machine hour is not free', async () => {
   const raw = freshDb();
   const bytes = stlBytes();

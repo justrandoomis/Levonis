@@ -43,7 +43,7 @@
  * fails otherwise, which is the point: the value exists so that a deploy can
  * notice its own database is behind, and a stale value notices nothing.
  */
-export const EXPECTED_MIGRATION = '0107_support_message_media.sql';
+export const EXPECTED_MIGRATION = '0108_wallet_ledger_dinars.sql';
 
 /**
  * How many migration files this code expects to have been applied.
@@ -59,11 +59,11 @@ export const EXPECTED_MIGRATION = '0107_support_message_media.sql';
  * as a shortfall whatever its position. Kept honest by the same test as the
  * name above.
  *
- * IT IS NOT THE HIGHEST NUMBER. There are 105 files and the newest is 0107 —
+ * IT IS NOT THE HIGHEST NUMBER. There are 106 files and the newest is 0108 —
  * the numbering has gaps, which is exactly why the count has to be its own
  * constant rather than something derived from the name.
  */
-export const EXPECTED_MIGRATION_COUNT = 105;
+export const EXPECTED_MIGRATION_COUNT = 106;
 
 /**
  * The leading number of a migration filename, or null when it has none.

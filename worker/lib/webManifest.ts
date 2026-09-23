@@ -174,6 +174,34 @@ const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066
  * the middle of an Arabic sentence flip the run direction mid-line, and this
  * string has no surrounding page to steady it; the Arabic spelling is the one
  * PLATFORM_DESCRIPTION two constants above already uses for the same reason.
+ *
+ * AND THE LEGAL CORPUS NOW DISAGREES WITH THIS PARAGRAPH — DELIBERATELY, AND
+ * THE BOUNDARY IS WORTH WRITING DOWN. The owner photographed the policies page
+ * and the mismatch on it: the English text, the logo, the domain and article
+ * 11.2's own trademark clause all said «Levonis» while the Arabic and Sorani
+ * bodies transliterated it. Every document in worker/lib/policies now reads
+ * «Levonis» in all three languages, and tests/policyCorpus.test.ts enforces it
+ * there.
+ *
+ * IT WAS NOT EXTENDED TO THIS FILE, OR TO THE OTHER BARE STRINGS. A policy
+ * document is a PAGE: the Latin word sits inside a long paragraph with a
+ * direction the surrounding block has already established, and the UBA
+ * resolves it. These do not have that. A manifest description is handed to
+ * Chromium's install dialog and to launchers with no page around it, a
+ * sign-in email (worker/lib/emailTemplates.ts) is rendered by whatever client
+ * the customer uses, and neither gives the run anything to steady it. That is
+ * the reason the Arabic spelling was chosen here and it has not stopped being
+ * true.
+ *
+ * SO THE BRAND IS SPLIT, AND THAT IS AN OWNER DECISION, NOT A BUG TO QUIETLY
+ * CLOSE. Roughly 57 «ليفونيس» and 37 of the Sorani transliteration remain
+ * outside the corpus, including copy a customer reads — this string, and «حسابك
+ * في ليفونيس» in the sign-in email. A customer who reads the Terms and then
+ * that email is shown two names for one shop. Unifying them means changing
+ * what a customer sees in their inbox, which is the owner's call; it is
+ * recorded as row 99 of docs/DECISIONS.md rather than decided here. Until it
+ * is answered, this paragraph is the boundary: corpus in Latin, bare strings
+ * in Arabic script, and neither side silently drifting into the other.
  */
 const NAME_ALREADY_HAS_A_NOUN = /^(?:متجر|محل|شركة|مؤسسة|معمل|ورشة)\s/;
 

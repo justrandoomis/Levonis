@@ -1066,6 +1066,20 @@ async function checkTxt(file: File | null, pasted: string, t: Strings): Promise<
     ...res.needs_review.map((n) =>
       readIssueEntry({ line: n.line, key: n.key, message: `${t.needsReview}: ${n.message} «${n.value}»` }, { product: file?.name ?? 'template' })
     ),
+    /**
+     * THE HALF THAT IS NOT ON THE SERVER. `brands_to_create` is the check
+     * step's disclosure that this file will ADD a brand rather than be refused
+     * for naming one that does not exist. Dropping it here would put the owner
+     * back where they started — pressing «ابدأ الاستيراد» and finding out
+     * afterwards. It is a note, never a block, and it is spelled out of the
+     * panel's own words so no new sentence has to be translated.
+     */
+    ...(res.brands_to_create ?? []).map((b) =>
+      readIssueEntry(
+        { key: 'brand', message: `${t.create}: ${t.lkBrand} «${b.name}» → ${b.slug}` },
+        { product: file?.name ?? 'template', severity: 'warning' }
+      )
+    ),
     ...res.warnings.map((w) => readIssueEntry({ key: '', message: w }, { product: file?.name ?? 'template', severity: 'warning' })),
   ];
   const blocked = issues.some((i) => i.severity === 'error');
@@ -1124,6 +1138,13 @@ async function checkTxtArchive(file: File, t: Strings): Promise<CheckResult> {
       ...(f.validation_error ? [readIssueEntry({ line: 0, key: '', message: f.validation_error.message }, { product: f.name })] : []),
       ...f.needs_review.map((n) =>
         readIssueEntry({ line: n.line, key: n.key, message: `${t.needsReview}: ${n.message} «${n.value}»` }, { product: f.name })
+      ),
+      // Per file, for the same reason as the single-file lane above.
+      ...(f.brands_to_create ?? []).map((b) =>
+        readIssueEntry(
+          { key: 'brand', message: `${t.create}: ${t.lkBrand} «${b.name}» → ${b.slug}` },
+          { product: f.name, severity: 'warning' }
+        )
       ),
       ...f.warnings.map((w) => readIssueEntry({ key: '', message: w }, { product: f.name, severity: 'warning' })),
     ];

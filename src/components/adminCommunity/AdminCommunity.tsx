@@ -1172,6 +1172,20 @@ function Disputes({ t }: { t: T }) {
 function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void }) {
   const [d, setD] = useState<Awaited<ReturnType<typeof adminCommunityApi.complaint>> | null>(null);
   const [busy, setBusy] = useState(false);
+  /**
+   * THE REPLY BOX. The thread has been fetched by `complaint(id)` since this
+   * screen existed and was never drawn, and nothing in the product could write
+   * to it — so an admin could move a complaint to «بانتظار العميل» and the
+   * customer was waiting on a message the shop had no way to send.
+   *
+   * `internal` is a deliberate, visible switch rather than a default: the
+   * difference between the two is whether the person who complained reads what
+   * was typed, and that is not a difference to leave to a remembered setting.
+   * It resets to «رد» after every send for the same reason.
+   */
+  const [reply, setReply] = useState('');
+  const [internal, setInternal] = useState(false);
+  const [replyError, setReplyError] = useState('');
 
   const load = useCallback(() => {
     adminCommunityApi.complaint(id).then(setD).catch(() => {});
@@ -1225,6 +1239,25 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
     }
   }
 
+  async function send() {
+    const text = reply.trim();
+    if (!text || busy) return;
+    setBusy(true);
+    setReplyError('');
+    try {
+      await adminCommunityApi.replyToComplaint(id, text, internal);
+      // Cleared only after the server took it: a network failure that also
+      // ate the admin's paragraph is the one way to make this worse.
+      setReply('');
+      setInternal(false);
+      load();
+    } catch (e) {
+      setReplyError(e instanceof ApiError ? e.message : t('تعذّر الإرسال', 'Could not send'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!d) return <Spin />;
   const settled = d.escrow && !['held', 'disputed'].includes(d.escrow.state);
 
@@ -1244,6 +1277,81 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
           <span>·</span>
           <ComplaintPill status={d.complaint.status} t={t} />
         </div>
+      </Section>
+
+      <Section title={t('المحادثة', 'The conversation')}>
+        {!d.messages.length && (
+          <p className="text-zinc-600 text-[12px] mb-3">
+            {t('لا توجد رسائل بعد — أول رد يبدأ من هنا.', 'No messages yet — the first reply starts here.')}
+          </p>
+        )}
+        <div className="space-y-2 mb-3">
+          {d.messages.map((m) => (
+            <div
+              key={m.id}
+              className={`rounded-2xl px-3.5 py-2.5 border ${
+                m.internal
+                  ? 'border-amber-500/30 bg-amber-500/5'
+                  : m.sender_role === 'admin'
+                    ? 'border-olive/40 bg-olive/10'
+                    : 'border-zinc-700/50 bg-zinc-800/30'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-zinc-400 text-[11px]">{m.sender_name ?? m.sender_role}</span>
+                {!!m.internal && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300">
+                    {t('ملاحظة داخلية — لا يراها أحد الطرفين', 'Internal note — neither party sees it')}
+                  </span>
+                )}
+              </div>
+              <p className="text-zinc-200 text-[13px] leading-relaxed whitespace-pre-wrap">{m.body}</p>
+            </div>
+          ))}
+        </div>
+
+        <textarea
+          value={reply}
+          onChange={(e) => setReply(e.target.value)}
+          rows={3}
+          maxLength={4000}
+          placeholder={t('اكتب ردك على الشكوى…', 'Write your reply to the complaint…')}
+          className="w-full rounded-2xl border border-zinc-700/50 bg-zinc-900/60 px-3.5 py-2.5 text-[13px] text-zinc-100 placeholder:text-zinc-600"
+        />
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          {/* Two named buttons, not one checkbox: the admin picks what this
+              sentence IS before sending it, and the choice is visible in the
+              same glance as the text. */}
+          <button
+            type="button"
+            onClick={() => setInternal(false)}
+            className={`px-3.5 min-h-[36px] rounded-xl text-[12px] font-semibold border transition-colors ${
+              !internal ? 'bg-olive text-white border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+            }`}
+          >
+            {t('رد يراه صاحب الشكوى', 'Reply the reporter sees')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setInternal(true)}
+            className={`px-3.5 min-h-[36px] rounded-xl text-[12px] font-semibold border transition-colors ${
+              internal
+                ? 'bg-amber-500/20 text-amber-200 border-amber-500/50'
+                : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+            }`}
+          >
+            {t('ملاحظة داخلية', 'Internal note')}
+          </button>
+          <button
+            type="button"
+            onClick={send}
+            disabled={busy || !reply.trim()}
+            className="ms-auto px-5 min-h-[40px] rounded-2xl bg-olive text-white font-bold text-[13px] disabled:opacity-40"
+          >
+            {t('إرسال', 'Send')}
+          </button>
+        </div>
+        {!!replyError && <p className="text-red-300 text-[12px] mt-2">{replyError}</p>}
       </Section>
 
       {d.escrow && (

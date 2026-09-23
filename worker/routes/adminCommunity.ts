@@ -34,6 +34,7 @@ import {
 } from '../lib/communityGate';
 import { canMoveOffer, type OfferState } from '../lib/communityStates';
 import { chunk } from '../lib/inventory';
+import { notifyComplaintReply } from '../lib/engagementNotify';
 import { refreshMerchantRating } from './merchantReviews';
 
 export const adminCommunityRoutes = new Hono<AppContext>();
@@ -856,6 +857,36 @@ adminCommunityRoutes.post('/complaints/:id/messages', async (c) => {
     .run();
 
   await audit(c.env.DB, admin.id, 'admin.complaint_message', id, { internal, length: text.length });
+
+  /**
+   * AND THE PERSON IS TOLD — WHICH IS THE HALF THAT MAKES THIS A REPLY.
+   *
+   * Nothing in `src/` reads `community_complaint_messages` on the customer
+   * side; the only customer touch on a complaint is the POST that files one
+   * (worker/routes/marketplace.ts). So a row in this table, on its own, is a
+   * sentence typed into a room with no door — an admin believing they have
+   * answered while the reporter is still waiting. `notifyComplaintReply`
+   * writes the answer into `user_notifications`, which the reporter reads
+   * behind their own login, and sends a short "an answer arrived" line to
+   * whatever outbound channel can reach them.
+   *
+   * ONLY FOR A PUBLIC REPLY. An internal note exists so this desk can write to
+   * ITSELF; mailing it to the person it is about is the worst thing this
+   * feature could do, so the guard is here as well as in the function's own
+   * contract.
+   *
+   * `waitUntil` through the guarded accessor, and the function cannot throw:
+   * the reply is recorded whether or not anything can be delivered.
+   * `c.executionCtx` throws in Hono when there is no context, which is every
+   * test in this suite, so it is reached inside the try.
+   */
+  if (!internal) {
+    try {
+      c.executionCtx.waitUntil(notifyComplaintReply(c.env, id, messageId, text));
+    } catch {
+      void notifyComplaintReply(c.env, id, messageId, text);
+    }
+  }
 
   const message = await c.env.DB.prepare(
     `SELECT cm.*, u.name AS sender_name FROM community_complaint_messages cm

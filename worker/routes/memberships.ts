@@ -1,5 +1,12 @@
 import { Hono } from 'hono';
-import { getAvailableBalances, usdSpendStatement } from '../lib/walletOps';
+import {
+  getAvailableBalances,
+  readWalletDust,
+  usdSpendStatement,
+  walletIqdAvailable,
+  walletLedgerDinarsReady,
+  walletSpendCents,
+} from '../lib/walletOps';
 import type { AppContext, Env, SessionUser } from '../lib/types';
 import { requireAuth, requireAdmin, requireMainHost, badRequest, forbidden, notFound, oneOf, str, int, HttpError } from '../lib/http';
 import { canViewFinancials } from '../lib/adminScope';
@@ -17,7 +24,6 @@ import {
   isApprovedDefaultAddress,
 } from '../lib/entitlements';
 import { bnplEligibility, bnplOutstanding, bnplRepaymentStatement } from '../lib/bnpl';
-import { iqdToUsdCents } from '../lib/escrowOps';
 import { addMonths, attributeReferral, onProSubscriptionPurchased } from '../lib/membershipOps';
 import { TIER_RANK } from '../lib/pricing';
 import { publicBenefitSummary } from '../lib/membershipBenefits';
@@ -380,7 +386,24 @@ export async function quotePurchase(
     : null;
 
   const exchangeRate = Number(await getSetting(db, 'exchangeRate')) || 1400;
-  const chargedUsdCents = cost > 0 ? Math.ceil((cost * 100) / exchangeRate) : 0;
+  /**
+   * THE PRICE IS IN DINARS AND THE WALLET PAYS IT IN DINARS — «يضاف كما هو
+   * ولكن يحول الى الدولار وليس العكس» (migration 0108).
+   *
+   * This line ceiled. A membership priced at exactly the customer's displayed
+   * dinar balance then asked for one cent MORE than that balance holds — a
+   * wallet showing 50,000 د.ع holds 3,571 cents, ceil(5,000,000 / 1,400) is
+   * 3,572 — and the purchase was refused with INSUFFICIENT_BALANCE while the
+   * wallet page printed a figure that covered it. `walletSpendCents`
+   * (worker/lib/walletOps.ts) is the one conversion on the spend side and it
+   * floors; the affordability question is asked in dinars, below, against
+   * `walletIqdAvailable`.
+   *
+   * `null` as the cents on hand because THIS function has no balance to cap
+   * against and must not pretend to: it states what the charge costs, and the
+   * caller that holds the balance caps it.
+   */
+  const chargedUsdCents = walletSpendCents(cost, null, exchangeRate);
 
   return {
     plan,
@@ -397,8 +420,69 @@ export async function quotePurchase(
   };
 }
 
-/** The quote as the API states it — GET /quote and the QUOTE_CHANGED refusal share it. */
-export function quotePayload(q: PurchaseQuote, balanceUsdCents: number) {
+/**
+ * The wallet charge a membership refund is reversing, in BOTH units.
+ *
+ * `amount_iqd` / `exchange_rate_snapshot` are migration 0108's columns and a
+ * Worker can be live ahead of its database, so the shape of the SELECT is
+ * decided by `walletLedgerDinarsReady` rather than by a try/catch around a
+ * money read: asking for a column that is not there is an error, and an error
+ * here would turn a cancel into a failure instead of a refund without dinars.
+ */
+async function readChargeForRefund(
+  db: D1Database,
+  txId: string
+): Promise<{
+  amount: number;
+  currency: string;
+  amount_iqd: number | null;
+  exchange_rate_snapshot: number | null;
+} | null> {
+  const withDinars = await walletLedgerDinarsReady(db);
+  const row = await db
+    .prepare(
+      withDinars
+        ? "SELECT amount, currency, amount_iqd, exchange_rate_snapshot FROM wallet_transactions WHERE id = ? AND type = 'withdrawal'"
+        : "SELECT amount, currency FROM wallet_transactions WHERE id = ? AND type = 'withdrawal'"
+    )
+    .bind(txId)
+    .first<{
+      amount: number;
+      currency: string;
+      amount_iqd?: number | null;
+      exchange_rate_snapshot?: number | null;
+    }>();
+  if (!row) return null;
+  return {
+    amount: Number(row.amount) || 0,
+    currency: String(row.currency),
+    amount_iqd: (row.amount_iqd as number) ?? null,
+    exchange_rate_snapshot: (row.exchange_rate_snapshot as number) ?? null,
+  };
+}
+
+/**
+ * The quote as the API states it — GET /quote and the QUOTE_CHANGED refusal
+ * share it.
+ *
+ * `shortfall_usd_cents` IS COMPUTED IN DINARS AND PRINTED IN DOLLARS, and
+ * that is not a cosmetic ordering. The subscription screens disable their
+ * button on `shortfall_usd_cents > 0` (src/components/subscription/
+ * PurchaseConfirm.tsx, PlanSummary.tsx), so a shortfall computed by comparing
+ * a CEILED charge against the cents was the membership half of the owner's
+ * report: a wallet the wallet page printed as 50,000 د.ع showed a one-cent
+ * shortfall against a 50,000 د.ع membership and the confirm button stayed
+ * dead. The price and the balance are both dinar figures — «يضاف كما هو ولكن
+ * يحول الى الدولار وليس العكس» — so they are subtracted as dinars, by the one
+ * rule in migration 0108, and only the presentation is converted.
+ *
+ * `balanceIqd` is what `walletIqdAvailable` returned for this customer. A
+ * caller that genuinely has no balance (there is none today) may pass 0, and
+ * the screen then reports the whole price as the shortfall, which is what a
+ * balance of nothing means.
+ */
+export function quotePayload(q: PurchaseQuote, balanceUsdCents: number, balanceIqd: number) {
+  const shortfallIqd = Math.max(0, q.charge_iqd - (Number(balanceIqd) || 0));
   return {
     ok: true as const,
     plan: planPublic(q.plan),
@@ -408,7 +492,12 @@ export function quotePayload(q: PurchaseQuote, balanceUsdCents: number) {
     exchange_rate: q.exchange_rate,
     charge_usd_cents: q.charge_usd_cents,
     balance_usd_cents: balanceUsdCents,
-    shortfall_usd_cents: Math.max(0, q.charge_usd_cents - balanceUsdCents),
+    balance_iqd: Number(balanceIqd) || 0,
+    shortfall_iqd: shortfallIqd,
+    // A shortfall of a few dinars must not FLOOR to "nothing missing" — that
+    // is the client's enable condition, and it would put the button back where
+    // this whole change found it.
+    shortfall_usd_cents: shortfallIqd > 0 ? Math.max(1, walletSpendCents(shortfallIqd, null, q.exchange_rate)) : 0,
     activate_now: q.activate_now,
     launch_at: q.launch.launch_at,
     expires_at: q.expires_at,
@@ -507,13 +596,71 @@ export async function subscribeUser(
       409,
       'تغير السعر أو سعر الصرف منذ عرض الملخص — راجع الأرقام الجديدة ثم أكد مرة أخرى / The price or exchange rate changed since the summary was shown — review the new figures and confirm again',
       'QUOTE_CHANGED',
-      { quote: quotePayload(q, balances.usd_cents_available) }
+      {
+        quote: quotePayload(
+          q,
+          balances.usd_cents_available,
+          walletIqdAvailable(
+            balances.usd_cents_available,
+            (await readWalletDust(db, user.id)).dust_iqd,
+            q.exchange_rate
+          )
+        ),
+      }
     );
   }
   const cost = q.charge_iqd;
   const credit = q.credit_iqd;
-  const chargedUsdCents = q.charge_usd_cents;
   const upgradeFrom = q.upgrade_from;
+  /**
+   * CAN THIS WALLET PAY THIS PRICE? ASKED IN DINARS, WHICH IS THE UNIT THE
+   * PRICE IS QUOTED IN — «يضاف كما هو ولكن يحول الى الدولار وليس العكس».
+   *
+   * The question used to be asked only by `usdSpendStatement`'s own CHECK, in
+   * CENTS, against a charge that had been CEILED: a membership priced at
+   * exactly the customer's displayed balance asked for one cent more than the
+   * wallet held and was refused, while the wallet page printed a figure that
+   * covered it. Both halves are fixed here — the charge floors
+   * (`quotePurchase`) and the comparison is `walletIqdAvailable`, the same
+   * function GET /api/wallet, the checkout and the store quote all read.
+   *
+   * THE CENTS GUARD IS NOT REPLACED, ONLY PRECEDED. This read-then-cap is the
+   * affordability ANSWER; `usdSpendStatement`'s `CASE … ELSE -1` is still the
+   * only thing that decides whether the money may move, and a balance that
+   * fell between this read and that write still aborts the batch and is still
+   * reported as INSUFFICIENT_BALANCE by the catch below.
+   */
+  const [walletBalances, walletDust] = await Promise.all([
+    getAvailableBalances(env, user.id),
+    readWalletDust(db, user.id),
+  ]);
+  const walletBalanceIqd = walletIqdAvailable(
+    walletBalances.usd_cents_available,
+    walletDust.dust_iqd,
+    q.exchange_rate
+  );
+  if (cost > walletBalanceIqd) {
+    throw badRequest(
+      'رصيد المحفظة غير كاف لهذا الاشتراك / Insufficient wallet balance for this membership',
+      'INSUFFICIENT_BALANCE'
+    );
+  }
+  /**
+   * A PRICE BELOW ONE CENT'S WORTH STILL HAS TO MOVE MONEY.
+   *
+   * `walletSpendCents` floors, so a charge under 14 د.ع (at 1,400) converts to
+   * zero cents — and `CHECK (amount > 0)` on `wallet_transactions` means a
+   * zero-cent debit cannot be written at all. On the platform checkout that is
+   * answered by the wallet paying nothing and the customer owing the few
+   * dinars at the door. HERE THERE IS NO DOOR: the wallet is the only payment
+   * method on this path, so "no ledger row" would mean "granted free". The
+   * charge is therefore floored to a minimum of one cent, which the balance
+   * check above guarantees is there (a positive dinar balance needs at least
+   * one cent behind it). The customer pays at most one cent — 13 د.ع — more
+   * than the quoted dinars, once, on a price smaller than that.
+   */
+  const chargedUsdCents =
+    cost > 0 ? Math.max(1, walletSpendCents(cost, walletBalances.usd_cents_available, q.exchange_rate)) : 0;
 
   const state = q.activate_now ? 'active' : 'prepaid_pending_launch';
   const startsAt = q.activate_now ? nowIso : null;
@@ -537,6 +684,20 @@ export async function subscribeUser(
           (credit > 0 && upgradeFrom ? ` — credited ${credit} IQD for remaining ${tierLabel(upgradeFrom.tier)} days` : ''),
         ref: membershipId,
         nowIso: nowIso,
+        /**
+         * THE DINARS THIS CHARGE WAS QUOTED IN (migration 0108). The customer
+         * was shown `cost` DINARS and the cents above are what that figure
+         * floors to, so recording the pair is what makes the balance fall by
+         * the price on the screen instead of by its conversion — and what
+         * lets the cancel refund below give back exactly what was taken.
+         *
+         * Only when the database can hold it: `readWalletDust` above already
+         * probed those columns, so a Worker live ahead of its migration
+         * writes the row exactly as it always did instead of aborting a money
+         * batch.
+         */
+        amountIqd: walletDust.ledger_dinars ? cost : null,
+        exchangeRateSnapshot: walletDust.ledger_dinars ? q.exchange_rate : null,
       })
     );
   }
@@ -777,8 +938,18 @@ membershipsRoutes.get('/quote', requireAuth, async (c) => {
     }
     throw e;
   }
-  const balances = await getAvailableBalances(c.env, user.id);
-  return c.json({ success: true, quote: quotePayload(q, balances.usd_cents_available) });
+  const [balances, dust] = await Promise.all([
+    getAvailableBalances(c.env, user.id),
+    readWalletDust(c.env.DB, user.id),
+  ]);
+  return c.json({
+    success: true,
+    quote: quotePayload(
+      q,
+      balances.usd_cents_available,
+      walletIqdAvailable(balances.usd_cents_available, dust.dust_iqd, q.exchange_rate)
+    ),
+  });
 });
 
 membershipsRoutes.get('/mine', requireAuth, async (c) => {
@@ -900,7 +1071,32 @@ membershipsRoutes.post('/bnpl/repay', requireAuth, async (c) => {
   const outstanding = await bnplOutstanding(c.env.DB, user.id);
   if (amountIqd > outstanding) throw badRequest('Repayment cannot exceed the outstanding balance', 'BNPL_REPAYMENT_EXCEEDS_DEBT');
   const rate = Number(await getSetting(c.env.DB, 'exchangeRate')) || 1400;
-  const walletCents = iqdToUsdCents(amountIqd, rate);
+  /**
+   * A REPAYMENT IS A DINAR DEBT PAID FROM A DINAR BALANCE — «يضاف كما هو ولكن
+   * يحول الى الدولار وليس العكس» (migration 0108).
+   *
+   * `iqdToUsdCents` stood here and CEILS, so repaying exactly the balance the
+   * wallet page printed asked for one cent more than the wallet held and the
+   * batch aborted as BNPL_REPAYMENT_CONFLICT — a refusal about rounding
+   * wearing the words of a race. `walletSpendCents` floors and caps, the
+   * affordability question is asked in dinars, and the dinars are recorded on
+   * the debit so the balance falls by the figure the customer typed.
+   */
+  const [walletBalances, walletDust] = await Promise.all([
+    getAvailableBalances(c.env, user.id),
+    readWalletDust(c.env.DB, user.id),
+  ]);
+  const walletBalanceIqd = walletIqdAvailable(
+    walletBalances.usd_cents_available,
+    walletDust.dust_iqd,
+    rate
+  );
+  if (amountIqd > walletBalanceIqd) {
+    throw badRequest('رصيد المحفظة غير كاف لهذه الدفعة / Insufficient wallet balance for this repayment', 'INSUFFICIENT_BALANCE');
+  }
+  // The same minimum one cent the membership purchase takes, and for the same
+  // reason: a repayment that writes no ledger row would clear debt for free.
+  const walletCents = Math.max(1, walletSpendCents(amountIqd, walletBalances.usd_cents_available, rate));
   const now = new Date().toISOString();
   try {
     await c.env.DB.batch([
@@ -911,6 +1107,10 @@ membershipsRoutes.post('/bnpl/repay', requireAuth, async (c) => {
         note: 'BNPL repayment',
         ref: ledgerKey,
         nowIso: now,
+        // The dinars the customer typed (migration 0108), so the balance falls
+        // by the repayment and not by its conversion.
+        amountIqd: walletDust.ledger_dinars ? amountIqd : null,
+        exchangeRateSnapshot: walletDust.ledger_dinars ? rate : null,
       }),
       bnplRepaymentStatement(c.env.DB, { userId: user.id, amountIqd, idempotencyKey, createdAt: now }),
     ]);
@@ -1455,14 +1655,42 @@ membershipsRoutes.post('/admin/:id/cancel', async (c) => {
     // Refund exactly what was charged when the original tx is visible;
     // otherwise convert price_paid_iqd at the current rate.
     let cents = 0;
+    /**
+     * A REFUND GIVES BACK WHAT THE DEBIT TOOK — IN BOTH UNITS.
+     *
+     * The cents were always copied from the original charge. The DINARS were
+     * not, and that is a balance that falls with no money moving: the charge
+     * records `amount_iqd` (migration 0108), which cancels the remainder of
+     * the deposits it spent; a refund that carries only cents restores every
+     * cent and leaves the remainder cancelled, so the customer reads a few
+     * dinars LESS than before they subscribed and can be refused a purchase
+     * they could afford an hour earlier.
+     *
+     * The pair is COPIED, never recomputed: a refund must not invent a rate,
+     * and a charge that recorded no dinars is reversed by a refund that
+     * records none either — exactly symmetric, so the remainder sum is
+     * untouched by both.
+     */
+    let refundIqd: number | null = null;
+    let refundRate: number | null = null;
     if (m.wallet_tx_id) {
-      const tx = await db
-        .prepare("SELECT amount, currency FROM wallet_transactions WHERE id = ? AND type = 'withdrawal'")
-        .bind(m.wallet_tx_id)
-        .first<{ amount: number; currency: string }>();
-      if (tx && tx.currency === 'USD') cents = Number(tx.amount) || 0;
+      const tx = await readChargeForRefund(db, String(m.wallet_tx_id));
+      if (tx && tx.currency === 'USD') {
+        cents = Number(tx.amount) || 0;
+        refundIqd = Number.isInteger(tx.amount_iqd) && (tx.amount_iqd as number) > 0 ? (tx.amount_iqd as number) : null;
+        refundRate =
+          refundIqd !== null &&
+          Number.isInteger(tx.exchange_rate_snapshot) &&
+          (tx.exchange_rate_snapshot as number) > 0
+            ? (tx.exchange_rate_snapshot as number)
+            : null;
+        if (refundRate === null) refundIqd = null;
+      }
     }
     if (cents === 0 && Number(m.price_paid_iqd) > 0) {
+      // No visible charge row to copy. The price is converted at today's rate,
+      // and it stays a CEIL: this is the one place that gives back more than
+      // it can prove was taken, and it must never give back less.
       const rate = Number(await getSetting(db, 'exchangeRate')) || 1400;
       cents = Math.ceil((Number(m.price_paid_iqd) * 100) / rate);
     }
@@ -1471,10 +1699,16 @@ membershipsRoutes.post('/admin/:id/cancel', async (c) => {
         // Deterministic id — a retried cancel can never double-refund.
         await db
           .prepare(
-            `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
+            refundIqd !== null
+              ? `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at, amount_iqd, exchange_rate_snapshot)
+             VALUES (?, ?, 'deposit', 'USD', ?, 'approved', ?, ?, 'system', ?, ?, ?)`
+              : `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
              VALUES (?, ?, 'deposit', 'USD', ?, 'approved', ?, ?, 'system', ?)`
           )
-          .bind(`wtx_refund_${id}`, m.user_id, cents, `Refund for cancelled membership ${id}`, id, nowIso)
+          .bind(
+            ...[`wtx_refund_${id}`, m.user_id, cents, `Refund for cancelled membership ${id}`, id, nowIso],
+            ...(refundIqd !== null ? [refundIqd, refundRate] : [])
+          )
           .run();
         refundedUsdCents = cents;
       } catch (e) {

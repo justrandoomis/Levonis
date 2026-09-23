@@ -88,6 +88,7 @@ const AdminMemberships = React.lazy(() => import('../components/AdminMemberships
  * the same component the memberships tab mounts, never a second copy.
  */
 const SupportQueue = React.lazy(() => import('../components/adminSupport/SupportQueue'));
+const PriceReportsPanel = React.lazy(() => import('../components/adminPriceReports/PriceReportsPanel'));
 // What a PREMIUM or a PRO membership is WORTH at a checkout — the rules of
 // `membership_benefit_rules`, the simulator that prices a basket through the
 // checkout's own functions, and the version history (docs/MEMBERSHIP_BENEFITS.md
@@ -134,6 +135,7 @@ type AdminTab =
   | 'kyc'
   | 'memberships'
   | 'support'
+  | 'price_reports'
   | 'membership_benefits'
   | 'coupons'
   | 'delivery'
@@ -191,6 +193,13 @@ export default function Admin() {
     { id: 'kyc', icon: ShieldCheck, label: loc('التحقق والعناوين', 'KYC & addresses'), ...section('administration', 'الإدارة', 'Administration') },
     { id: 'serials', icon: Barcode, label: loc('الأجهزة والتسلسلات', 'Serials & devices'), ...section('administration', 'الإدارة', 'Administration') },
     { id: 'reviews', icon: Star, label: loc('المراجعات والهدايا', 'Reviews & gifts'), ...section('administration', 'الإدارة', 'Administration') },
+    /* «شكاوى الأسعار». /api/admin/price-reports has existed with a full list,
+       a computed gap and an audited decision, and NOTHING in src/ called it —
+       the only caller in the app was the customer's POST. An admin API with no
+       sidebar entry is a feature that, to the person looking for it, is not
+       there. No third `loc` argument: a Kurdish-reading admin gets the Arabic
+       label, and the Sorani is the owner's to write by hand. */
+    { id: 'price_reports', icon: Tag, label: loc('شكاوى الأسعار', 'Price reports'), ...section('administration', 'الإدارة', 'Administration') },
     { id: 'delivery', icon: Truck, label: loc('التوصيل المحلي', 'Local delivery'), ...section('administration', 'الإدارة', 'Administration') },
     { id: 'community', icon: Store, label: loc('مجتمع ليفو', 'Levo Community'), ...section('administration', 'الإدارة', 'Administration') },
     { id: 'printer_farm', icon: Factory, label: loc('مزرعة الطابعات', 'Printer Farm', 'کێڵگەی چاپکەر'), ...section('administration', 'الإدارة', 'Administration') },
@@ -287,6 +296,8 @@ export default function Admin() {
         {activeTab === 'support' && (
            <SupportQueue />
         )}
+
+        {activeTab === 'price_reports' && <PriceReportsPanel />}
 
         {activeTab === 'membership_benefits' && <AdminBenefits />}
 

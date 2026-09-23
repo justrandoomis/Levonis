@@ -27,6 +27,8 @@ import {
   depositAmountReview,
   flagWithdrawalForReconciliation,
   getWalletBreakdown,
+  readWalletDust,
+  walletIqdAvailable,
   getWithdrawal,
   markWithdrawalPaid,
   operationNumber,
@@ -173,8 +175,14 @@ walletRoutes.get('/', async (c) => {
   sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
-  const [breakdown, usdRows, pointRows, withdrawals, reviews] = await Promise.all([
+  const [breakdown, dust, exchangeRateSetting, usdRows, pointRows, withdrawals, reviews] = await Promise.all([
     getWalletBreakdown(c.env.DB, user.id),
+    // Migration 0108 — the dinars the cents could not hold. Read here rather
+    // than converted in the browser: src/WalletContext.tsx reads the rate once
+    // on mount and never repolls, so a long-open tab would compute a balance
+    // at a rate the shop has since moved.
+    readWalletDust(c.env.DB, user.id),
+    getSetting(c.env.DB, 'exchangeRate'),
     c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>(),
     c.env.DB.prepare(
       "SELECT * FROM wallet_transactions WHERE user_id = ? AND currency = 'POINT' ORDER BY created_at DESC LIMIT 200"
@@ -230,10 +238,24 @@ walletRoutes.get('/', async (c) => {
     };
   };
 
+  /**
+   * THE BALANCE IN DINARS, AND THE ONLY PLACE IT IS COMPUTED.
+   *
+   * «يضاف كما هو ولكن يحول الى الدولار وليس العكس» (migration 0108). Every
+   * screen that used to run `usdCentsToIqd(balance_usd_cents, rate)` reads
+   * this instead, so the rule for which unit wins lives on the server, in one
+   * function, and no client re-derives it. `balance_usd_cents` is untouched
+   * and still the spendable cents — the money, and the thing every spend
+   * guard compares.
+   */
+  const exchangeRate = Number(exchangeRateSetting) || 0;
+  const balanceIqd = walletIqdAvailable(breakdown.usd_cents_available, dust.dust_iqd, exchangeRate);
+
   return c.json({
     success: true,
     // Back-compatible key — now the SPENDABLE balance (settled minus holds).
     balance_usd_cents: breakdown.usd_cents_available,
+    balance_iqd: balanceIqd,
     point_balance: breakdown.points_settled,
     transactions: (usdRows.results ?? []).map(decorate),
     point_transactions: (pointRows.results ?? []).map((t) => ({ ...walletTxPublic(t), number: operationNumber(String(t.id), 'P') })),
@@ -241,6 +263,7 @@ walletRoutes.get('/', async (c) => {
       usd_cents_settled: breakdown.usd_cents_settled,
       usd_cents_held: breakdown.usd_cents_held,
       usd_cents_available: breakdown.usd_cents_available,
+      iqd_available: balanceIqd,
       usd_cents_pending_deposits: breakdown.usd_cents_pending_deposits,
       usd_cents_pending_withdrawals: breakdown.usd_cents_pending_withdrawals,
       points_settled: breakdown.points_settled,

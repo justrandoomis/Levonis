@@ -85,6 +85,9 @@ const COPY = {
     offerBody: (id: string) => `وصلك عرض جديد على طلبك ${id}. افتح الطلب لمقارنة العروض.`,
     offerTitle: 'عرض جديد على طلبك',
     priceLabel: 'السعر',
+    complaintSubject: (id: string) => `رد على شكواك ${id}`,
+    complaintShort: (id: string) => `وصلك رد من إدارة ليفونيس على شكواك ${id}. افتح الإشعارات في التطبيق لقراءته.`,
+    complaintTitle: 'رد على شكواك',
   },
   en: {
     supportSubject: (id: string) => `Reply on your ticket ${id}`,
@@ -94,6 +97,9 @@ const COPY = {
     offerBody: (id: string) => `A merchant sent an offer on your request ${id}. Open it to compare offers.`,
     offerTitle: 'A new offer on your request',
     priceLabel: 'Price',
+    complaintSubject: (id: string) => `Reply on your complaint ${id}`,
+    complaintShort: (id: string) => `Levonis answered your complaint ${id}. Open your notifications in the app to read it.`,
+    complaintTitle: 'A reply on your complaint',
   },
   ckb: {
     supportSubject: (id: string) => `وەڵامێک بۆ تیکێتەکەت ${id}`,
@@ -103,6 +109,14 @@ const COPY = {
     offerBody: (id: string) => `بازرگانێک ئۆفەرێکی نوێی ناردووە بۆ داواکاریەکەت ${id}. بیکەرەوە بۆ بەراوردکردنی ئۆفەرەکان.`,
     offerTitle: 'ئۆفەرێکی نوێ بۆ داواکاریەکەت',
     priceLabel: 'نرخ',
+    // OWNER: the Sorani for the three complaint lines is yours to write by
+    // hand. They carry the ARABIC text on purpose — no Kurdish is generated
+    // here, and Arabic is the closer of the two for a Sorani reader (the same
+    // choice src/components/notifications/NotificationBell.tsx already makes
+    // when it falls back).
+    complaintSubject: (id: string) => `رد على شكواك ${id}`, // OWNER: Sorani by hand.
+    complaintShort: (id: string) => `وصلك رد من إدارة ليفونيس على شكواك ${id}. افتح الإشعارات في التطبيق لقراءته.`, // OWNER: Sorani by hand.
+    complaintTitle: 'رد على شكواك', // OWNER: Sorani by hand.
   },
 } as const;
 
@@ -208,5 +222,81 @@ export async function notifyOfferReceived(env: Env, offerId: string): Promise<vo
     await notifyCustomer(env, row.customer_id, `offer_received:${row.id}`, msg);
   } catch (e) {
     console.error('notifyOfferReceived failed for', offerId, e instanceof Error ? e.message : String(e));
+  }
+}
+
+/**
+ * «الشكاوى» — AN ADMIN ANSWERED, SO THE PERSON WHO COMPLAINED IS TOLD.
+ *
+ * WHY THIS HAD TO EXIST BEFORE THE REPLY ROUTE COULD BE CALLED FINISHED.
+ * `community_complaint_messages` has existed since migration 0031 and nothing
+ * in the repository ever inserted into it; a reply route closed that half. But
+ * there is still NO CUSTOMER-FACING SCREEN anywhere in `src/` that reads that
+ * table — the only customer touch on a complaint is `POST
+ * /api/marketplace/orders/:id/dispute`, which files one and never reads it
+ * back. So a reply written into the thread would have been a sentence typed
+ * into a room with no door: an admin believing they had answered, and a
+ * customer still waiting.
+ *
+ * THE IN-APP ROW CARRIES THE TEXT, AND THE OUTBOUND CHANNELS DO NOT. That
+ * split is deliberate and it follows the rule stated on the COPY table above:
+ * WhatsApp and Telegram are carried by third parties and a complaint answer
+ * can name an amount, an address or another person, so the outbound line says
+ * only that an answer arrived. `user_notifications` is behind the customer's
+ * own login, exactly as a page on the site would be, so that is where the
+ * answer itself lives — and it is the only place it currently CAN live.
+ *
+ * AN INTERNAL NOTE IS NEVER SENT. The caller only reaches this function for a
+ * public reply; the column exists so a dispute desk can write to itself, and
+ * mailing that to the person it is about is the worst outcome this feature
+ * has. The guard is at the call site AND the contract is stated here, because
+ * one of the two being forgotten is how it would happen.
+ *
+ * TOTAL, like everything else in this file: it is called after the message
+ * row has committed, and neither a Telegram outage nor a D1 blip may turn an
+ * admin's sent reply into an error on their screen.
+ */
+export async function notifyComplaintReply(
+  env: Env,
+  complaintId: string,
+  messageId: string,
+  replyText: string
+): Promise<void> {
+  try {
+    const complaint = await env.DB.prepare('SELECT id, reporter_id FROM community_complaints WHERE id = ?')
+      .bind(complaintId)
+      .first<{ id: string; reporter_id: string }>();
+    if (!complaint) return;
+    const t = COPY[await localeOf(env, complaint.reporter_id)];
+
+    /**
+     * THE EVENT KEY CARRIES THE MESSAGE ID, not the complaint id — the same
+     * reasoning as `notifySupportReply`. A dispute is a conversation and the
+     * third answer is as much news as the first; keying on the complaint would
+     * deliver one reply and silently swallow every one after it.
+     */
+    await notify(env.DB, {
+      userId: complaint.reporter_id,
+      kind: 'complaint_reply',
+      title_ar: COPY.ar.complaintTitle,
+      title_en: COPY.en.complaintTitle,
+      // The answer itself. There is nowhere else the reporter can read it.
+      body_ar: replyText,
+      body_en: replyText,
+      // No link: a link to a screen that does not exist is the failure this
+      // function was written to avoid, one level down.
+      link: '',
+      entity_type: 'complaint',
+      entity_id: complaint.id,
+      eventKey: `complaint.reply:${messageId}`,
+    });
+
+    const msg: CustomerMessage = {
+      subject: t.complaintSubject(complaint.id),
+      body: t.complaintShort(complaint.id),
+    };
+    await notifyCustomer(env, complaint.reporter_id, `complaint.reply:${messageId}`, msg);
+  } catch (e) {
+    console.error('notifyComplaintReply failed for', complaintId, e instanceof Error ? e.message : String(e));
   }
 }

@@ -1,0 +1,178 @@
+-- ============================================================================
+--  0108 — «يضاف كما هو» : THE DINARS THE CUSTOMER TYPED ARE THE DINARS THEY
+--         HOLD, AND THE DOLLAR IS DERIVED FROM THEM.
+-- ============================================================================
+-- NONDESTRUCTIVE: two nullable ADD COLUMNs on `wallet_transactions`. Nothing
+-- is dropped, no CHECK is added, no existing CHECK is touched, and NO ROW IS
+-- BACKFILLED — every row that exists when this applies reads NULL on both
+-- columns, which is the truth about it. `wallet_transactions.amount` is not
+-- read, not recomputed and not rewritten by this file or by anything it
+-- enables.
+--
+-- ---------------------------------------------------------------------------
+--  THE REPORT
+-- ---------------------------------------------------------------------------
+--   «عند تعبئة المحفظة مثلا يكتب مستخدم خمسين ألف فيضاف أصبح أقل 49,994 —
+--    اجعل عندما يكتب المستخدم الرصيد يضاف كما هو ولكن يحول الى الدولار وليس
+--    العكس. وهذه المشكلة سببت عائقا لدى مستخدم قام بتعبئة خمسين ألف وعندما
+--    يريد أن يطلب منتجا الذي يكون طابعة تطلب خمسين ألف ضبط فيقول له الرصيد
+--    غير كافي.»
+--
+-- Two facts, and the second is the one costing a sale. A customer typed
+-- 50,000 د.ع. `iqdToUsdCents` floored it to 3,571 cents ($35.71, the owner's
+-- own example) and every balance converted it back with floor(3,571 × 1,400 /
+-- 100) = 49,994. The printer advance (`printerHomeDeliveryNoteIqd`, 50,000,
+-- worker/lib/printerAdvance.ts) is a NATIVE dinar figure: it is never
+-- converted and never rounded. So `49,994 < 50,000` and the shop refused a
+-- customer who had paid exactly enough.
+--
+-- NO ROUNDING RULE REPAIRS THIS, and 0105 already proved why: at 1,400 a cent
+-- is 14 د.ع, so only multiples of 14 are representable and 50,000 is not one
+-- of them. Ceil credits 50,008 — more than was transferred, which is the
+-- defect 0106 was written to end. Floor credits 49,994 — less than was
+-- transferred, which is the defect in front of us. The pair is not a round
+-- trip and no third rounding makes it one. The error is not in the direction
+-- of the rounding; it is in WHICH NUMBER IS THE SOURCE.
+--
+-- ---------------------------------------------------------------------------
+--  THE RULE THE OWNER SET, AND WHAT IT REPLACES
+-- ---------------------------------------------------------------------------
+-- «يضاف كما هو ولكن يحول الى الدولار وليس العكس» — the dinar figure is added
+-- as typed and the DOLLAR is converted from it, not the other way round.
+--
+-- 0106's arrangement was the other way round: the cents were the source and
+-- the dinars were re-derived from them for display. That arrangement is
+-- SUPERSEDED here. What is NOT superseded is 0106's floor: it stops being the
+-- rule for computing a balance and becomes the rule for DISPLAYING the dollar
+-- that a dinar balance is worth. 50,000 د.ع still shows as $35.71, exactly as
+-- the owner wrote it. The floor did not change. Its subject did.
+--
+-- ---------------------------------------------------------------------------
+--  WHY A DUST TERM AND NOT A DINAR LEDGER
+-- ---------------------------------------------------------------------------
+-- The obvious reading of «وليس العكس» is: move the ledger to dinars. That
+-- remains impossible, and the reason is structural rather than conservative:
+--
+--   * `wallet_holds` (0015) has NO dinar column and `available = settled −
+--     held`, so a dinar balance is not expressible for a brand-new row either,
+--     let alone a live one;
+--   * `CHECK (net_cents = amount_cents - fee_cents)` on `wallet_withdrawals`
+--     is a CENTS identity enforced by D1;
+--   * `CHECK (amount > 0)` on `wallet_transactions` is not validation — it is
+--     the concurrency mechanism. `usdSpendStatement` writes -1 on purpose so
+--     the constraint aborts a whole D1 batch. Re-denominating the column
+--     would silently stop every guard in the wallet from guarding;
+--   * and most of the table's rows never had a customer typing dinars at all
+--     — refunds, admin credits, escrow settlements, price protection. A
+--     per-row dinar sum has a permanent hole there, not a legacy one.
+--
+-- So the ledger stays in cents and a SECOND, SMALLER quantity is recorded
+-- beside it: the dinars the customer typed, and the rate they were typed at.
+-- The balance in dinars is then the cents balance REFINED WITHIN THE ONE CENT
+-- THE CENTS CANNOT RESOLVE:
+--
+--     balance_iqd = floor(available_cents × today_rate / 100)   ← unchanged
+--                 + dust_iqd                                     ← new, never < 0
+--
+--     dust_iqd(row) = MAX(0, amount_iqd − floor(amount × rate_snapshot / 100))
+--
+-- read at the row's OWN snapshot rate, signed + for a credit and − for a
+-- debit, summed over the user's approved USD rows (and over a withdrawal whose
+-- HOLD has already taken the cents, so the two units leave together), and then
+-- clamped at ZERO — never below the cents, which is what makes every live
+-- balance safe.
+--
+-- For the customer in the report: floor(3,571 × 1,400 / 100) = 49,994, and
+-- dust = 50,000 − 49,994 = 6. 49,994 + 6 = 50,000. Not 49,994. Not 50,008.
+-- The figure they typed, because it is the figure that was recorded.
+--
+-- ---------------------------------------------------------------------------
+--  THE ONE RULE FOR WHICH UNIT WINS. Quoted wherever a dinar balance is
+--  computed; there is no second rule anywhere.
+-- ---------------------------------------------------------------------------
+--   A wallet row's dinars are the dinars RECORDED on it — `amount_iqd` here,
+--   or `wallet_deposit_meta.declared_amount_iqd` (0105) for a deposit filed
+--   before this column existed — read at the rate recorded beside them. A row
+--   that recorded no dinars has none, and converts from its cents at today's
+--   rate exactly as it always has. Nothing is ever converted the other way:
+--   NO CENT FIGURE IS EVER COMPUTED FROM A DINAR COLUMN, so a forged claim
+--   cannot buy money. And the recorded dinars may only ever RAISE a reading,
+--   never lower one — that is what the MAX(0, …) above is for, and it is not
+--   cosmetic.
+--
+-- WHY THE MAX(0, …) IS LOAD-BEARING. Deposits filed in the window between
+-- 0105 and 0106 recorded a typed 50,000 beside CEILED cents of 3,572, which
+-- convert to 50,008. Reading their testimony without the clamp would take
+-- eight dinars off a balance a live customer has already been shown. A
+-- recovered record may correct a balance upward, because that balance was
+-- short of what was paid. It may never correct one downward, because the
+-- customer did not pay less than they paid. One clamp, stated once, applied
+-- to every row without a vintage test.
+--
+-- WHERE THE CEILING GOES, AND WHY NOT ON THE SUM. An earlier draft of this
+-- file clamped the SUM into one cent's worth. That reproduced the owner's
+-- complaint for anyone who reached 50,000 د.ع in more than one transfer: two
+-- typed deposits of 25,000 lose 10 د.ع each to the floor, the honest remainder
+-- is 20, the clamp cut it to 14, the balance read 49,994 — the owner's own
+-- number — and the 50,000 د.ع advance was refused a second time. A ceiling on
+-- the sum CANNOT TELL FORTY ORPHAN REMAINDERS FROM TWO CORROBORATED ONES,
+-- because by the time the rows are summed the difference is gone.
+--
+-- The ceiling is therefore PER ROW, and only on a CUSTOMER'S OWN CLAIM — a
+-- row with a `wallet_deposit_meta` beside it, which is a deposit request and
+-- nothing else. Its remainder may be at most `ceil(rate/100) − 1`, the widest
+-- a single floor() could honestly have missed by. Every other row's dinars
+-- were written by this server — a checkout debit, a membership charge, a
+-- cancel refund copying the debit it reverses — and ceiling those would be a
+-- bug rather than a guard: one order that empties a wallet funded by four
+-- top-ups must cancel four remainders, and a refund must give back every
+-- dinar its debit took or the customer ends the round trip poorer than they
+-- began. `corroboratedDeclaredIqd` already refuses a claim the cents do not
+-- corroborate; the per-row ceiling is the second guard, for the one case
+-- corroboration cannot see — an admin approving fewer cents than were
+-- declared.
+--
+-- WHAT THE SHOP IS EXPOSED TO, so it is never mistaken for a leak. The sum is
+-- bounded by one cent per TESTIFIED DEPOSIT, and every dinar of it is money
+-- the shop received by bank transfer and did not credit, because the floor
+-- discarded it. Honouring it is repayment. Concretely: a wallet spending its
+-- whole balance is debited the cents it holds and credited the dinars it was
+-- shown, so an order can carry up to 13 د.ع (at 1,400) of the shop's own
+-- under-credit. The ceil this replaces put exactly the same cent on the
+-- CUSTOMER and refused sales while doing it.
+--
+-- AN EMPTIED WALLET READS EMPTY. Zero available cents returns zero whatever
+-- the remainders say, so a wallet spent down to nothing reads 0 rather than
+-- the orphan dinars of its last credit. A KNOWN AND DELIBERATE BOUND SITS
+-- BESIDE THAT: the escrow, store-order and BNPL paths reserve in cents and
+-- record no dinars, so a wallet PARTLY spent through them keeps the
+-- remainders of the deposits that funded it and reads up to one cent per
+-- deposit above its cents. It always favours the customer, it is bounded by
+-- what was floored away at deposit time, and every cents guard still refuses
+-- the overspend.
+--
+-- ---------------------------------------------------------------------------
+--  WHAT THESE COLUMNS MAY NEVER DO
+-- ---------------------------------------------------------------------------
+-- THEY ARE NOT MONEY AND THEY ARE NOT A SPEND GUARD. `availableUsdSql`,
+-- `usdSpendStatement`, `holdInsertStatement` and `approvableWithdrawalSql`
+-- are unchanged and still run on cents alone: the dust term is read by
+-- balance DISPLAY and by the advance COMPARISON, and it never reaches a WHERE
+-- clause that moves money. A crafted request that declares 50,000,000 د.ع
+-- beside 100 cents still reserves 100 cents — and is refused testimony
+-- outright by `corroboratedDeclaredIqd`, which re-runs the conversion
+-- server-side before either column is written.
+--
+-- NO CHECK CONSTRAINT, ON PURPOSE — the same choice 0105 and 0106 made. The
+-- whole-positive-integer filter lives in code, which stores NULL rather than
+-- a repaired number. A CHECK on a testimony column would turn a client bug
+-- into a D1 constraint abort in the middle of a money batch, where the
+-- rollback path would misreport it as an insufficient balance.
+--
+-- NOTHING IS BACKFILLED AND NO RATE IS INVENTED. A row that recorded no rate
+-- did not record one; `admin_settings.exchangeRate` is a single mutable row
+-- with no history table, so what the rate was the week an old deposit was
+-- filed is simply not stored. Those rows keep converting at today's rate,
+-- which is what every screen has always done with them.
+ALTER TABLE wallet_transactions ADD COLUMN amount_iqd INTEGER;
+ALTER TABLE wallet_transactions ADD COLUMN exchange_rate_snapshot INTEGER;

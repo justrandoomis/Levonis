@@ -141,8 +141,10 @@ export interface ImportMaps {
   };
 }
 
-/** The message an ambiguous cell earns, in the sheet's own language. */
-const ambiguousMessage = (column: string, value: string) =>
+/** The message an ambiguous cell earns, in the sheet's own language.
+ *  EXPORTED because the TXT import refuses an ambiguous brand/section name for
+ *  exactly the same reason, and two hand-written copies of one sentence drift. */
+export const ambiguousMessage = (column: string, value: string) =>
   `${column}: أكثر من صف يحمل الاسم "${value}" — اكتب الـslug بدلًا من الاسم لتحديد المقصود`;
 
 export interface ResolvedProduct {

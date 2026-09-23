@@ -122,6 +122,10 @@ function kindIcon(kind: string) {
       return Package;
     case 'support_reply':
       return LifeBuoy;
+    // A complaint answer is support wearing a different hat; the bell should
+    // not make the customer learn a second glyph for "somebody replied to me".
+    case 'complaint_reply':
+      return LifeBuoy;
     default:
       return Bell;
   }

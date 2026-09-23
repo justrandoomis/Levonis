@@ -131,12 +131,14 @@ import {
   type BnplEligibility,
 } from '../lib/bnpl';
 import { priorityDeliveryVerdict, type PriorityDeliveryVerdict } from '../lib/priorityDelivery';
+import { validateCoupon } from '../lib/membershipOps';
 import {
-  referralFreeDeliveryApplies,
-  validateCoupon,
-  grantPrinterGiftIfEligible,
-} from '../lib/membershipOps';
-import { getAvailableBalances, usdSpendStatement } from '../lib/walletOps';
+  getAvailableBalances,
+  readWalletDust,
+  usdSpendStatement,
+  walletIqdAvailable,
+  walletSpendCents,
+} from '../lib/walletOps';
 import { buildSupportSnapshot } from '../lib/supportCode';
 import {
   eligibleMerchandiseIqd,
@@ -173,10 +175,29 @@ import { notifyOrderPlaced } from '../lib/orderNotify';
 export const orderRoutes = new Hono<AppContext>();
 orderRoutes.use('*', requireAuth);
 
-/** IQD -> USD cents, rounded up so the wallet never undercharges. */
-function iqdToUsdCents(iqd: number, rate: number): number {
-  return Math.ceil((iqd * 100) / rate);
-}
+/**
+ * THE CEIL THAT USED TO LIVE HERE IS GONE, AND THIS IS WHERE IT WENT.
+ *
+ * `function iqdToUsdCents(iqd, rate) { return Math.ceil((iqd * 100) / rate); }`
+ * — «rounded up so the wallet never undercharges» — had exactly two callers,
+ * both of them the wallet's share of a checkout. It is the SECOND door that
+ * refused the customer in «الرصيد غير كافي»: a wallet credited by the owner's
+ * floor holds 3,571 cents for a typed 50,000 د.ع, and applying 50,000 د.ع
+ * through the ceil asked for 3,572 — one cent more than the same 50,000 د.ع
+ * put in. Raising the reported balance alone would have moved the refusal from
+ * one line to the next and downgraded its message from the explicit Arabic
+ * printer sentence to a bare English one.
+ *
+ * The rule it expressed is NOT abandoned: a RESERVATION must never under-hold
+ * the debt it guarantees, and worker/lib/escrowOps.ts still ceils for every
+ * hold. A wallet application is not a reservation. It spends in the unit the
+ * wallet is denominated in, at the same floor the credit used, and records the
+ * dinars on the debit (migration 0108) so the balance falls by the figure the
+ * customer was shown. That conversion is `walletSpendCents`
+ * (worker/lib/walletOps.ts), shared now with the community store checkout and
+ * the membership purchase so the three cannot disagree about whether a wallet
+ * covers a dinar price.
+ */
 
 /**
  * The id as ANALYTICS sees it — and the enum swallows anything it has no
@@ -1825,6 +1846,8 @@ interface CheckoutComputation {
   walletBalanceIqd: number;
   walletApplied: number;
   walletUsdCents: number;
+  /** Whether `wallet_transactions` has migration 0108's dinar columns yet. */
+  walletLedgerDinars: boolean;
   requiredAdvance: number;
   totalIqd: number; // payable after coupon+points (before wallet)
   dueOnDelivery: number;
@@ -2617,10 +2640,28 @@ async function computeCheckout(
       )
     : 0;
 
-  // Independent promo path: referral free delivery — a SEPARATE policy from
-  // the PRO waiver, passed into the quote so it is never doubled. The same
-  // products whichever basis priced them.
-  const independentFreeDelivery = await referralFreeDeliveryApplies(c.env, user.id, priced.productIds);
+  /**
+   * THE REFERRAL DELIVERY WAIVER IS WITHDRAWN. Owner's decision, on this
+   * report: «ألغِ المكافأة تماماً».
+   *
+   * It used to call `referralFreeDeliveryApplies` — a referred friend buying
+   * a printer had the WHOLE delivery fee waived, whichever method they chose,
+   * and it asked for no subscription at all. That is how «لبعض المستخدمين»
+   * saw «التوصيل مجاناً» on a 1,255,000 د.ع order against a 50,000 د.ع
+   * personal tariff, and it is the answer to «المستخدم لم يكن مشتركا
+   * بالاشتراك البرو وقد حصل على خصم»: nothing about it was ever a membership.
+   *
+   * A PRO subscriber's free delivery — standard AND personal, the owner's own
+   * rule — is untouched by this: it comes from the benefit rules below, not
+   * from here.
+   *
+   * The engine keeps its `independentFreeDelivery` input, because an
+   * owner-approved promotion is a real thing a future rule may express. What
+   * is gone is the one promotion that granted it without anybody deciding to.
+   * The REFERRER's own reward (`referral_rewards`, campaign 'printer') is a
+   * different payment to a different person and is not touched.
+   */
+  const independentFreeDelivery = false;
 
   // Store pickup: no last-mile delivery happens, so no delivery fees at all.
   const isPickup = delivery.id === 'pickup';
@@ -2679,8 +2720,26 @@ async function computeCheckout(
   // points are NEVER spendable). getAvailableBalances is the wallet slice's
   // frozen contract — settled minus active holds/reservations. Read once —
   // the balance does not change with the pricing basis.
-  const available = await getAvailableBalances(c.env, user.id);
-  const walletBalanceIqd = Math.floor((available.usd_cents_available * exchangeRate) / 100);
+  /**
+   * THE BALANCE IN DINARS — «يضاف كما هو ولكن يحول الى الدولار وليس العكس».
+   *
+   * This line used to be `Math.floor(usd_cents_available * exchangeRate / 100)`
+   * and it is where a customer who paid 50,000 د.ع became 49,994. The printer
+   * advance below is a NATIVE dinar figure (`printerHomeDeliveryNoteIqd`, read
+   * verbatim by worker/lib/printerAdvance.ts), so the comparison at
+   * `walletApplied < requiredAdvance` is dinars against dinars and the six
+   * dinars the floor discarded refused a customer who had paid enough.
+   *
+   * `walletIqdAvailable` (worker/lib/walletOps.ts, contract in migration 0108)
+   * adds back exactly the remainder the recorded testimony proves was paid,
+   * clamped to one cent's worth. It is NEVER BELOW the old conversion, so no
+   * order that quoted before can quote worse now.
+   */
+  const [available, walletDust] = await Promise.all([
+    getAvailableBalances(c.env, user.id),
+    readWalletDust(c.env.DB, user.id),
+  ]);
+  const walletBalanceIqd = walletIqdAvailable(available.usd_cents_available, walletDust.dust_iqd, exchangeRate);
 
   // §4.2 accrual rule at the rate in force for THIS purchase instant, and the
   // §3.3 support attribution — resolved server-side, zero monetary effect.
@@ -3035,17 +3094,65 @@ async function computeCheckout(
         );
       }
     }
-    const walletUsdCents = walletApplied > 0 ? iqdToUsdCents(walletApplied, exchangeRate) : 0;
-    if (walletUsdCents > available.usd_cents_available) {
-      // Rounding pushed us past the balance; scale back to what the balance covers.
-      walletApplied = Math.floor((available.usd_cents_available * exchangeRate) / 100);
-      // Same door as above: the preview reports the shortfall, the order refuses it.
-      if (options.allocate && walletApplied < requiredAdvance) {
-        throw badRequest('Insufficient wallet balance', 'INSUFFICIENT_BALANCE');
-      }
-    }
-    const finalWalletUsdCents =
-      walletApplied > 0 ? Math.min(iqdToUsdCents(walletApplied, exchangeRate), available.usd_cents_available) : 0;
+    /**
+     * THE SECOND DOOR, AND WHY IT USED TO RE-REFUSE EVERY FIX TO THE FIRST.
+     *
+     * `iqdToUsdCents` at the top of this file CEILS — «rounded up so the
+     * wallet never undercharges» — and that is still right for a HOLD, which
+     * must not under-reserve the debt it exists to guarantee. IT IS WRONG FOR
+     * A WALLET APPLICATION, and this is the arithmetic: a wallet credited by
+     * the owner's floor holds 3,571 cents for a typed 50,000 د.ع. Applying
+     * 50,000 د.ع through the ceil asks for 3,572 — one cent MORE than the same
+     * 50,000 د.ع put in — so the line below scaled `walletApplied` back to
+     * 49,994 and the order refused with the bare English «Insufficient wallet
+     * balance», one screen after the explicit Arabic printer sentence.
+     *
+     * The wallet pays in the unit the wallet is denominated in.
+     * `walletSpendCents` (worker/lib/walletOps.ts) is the one place that
+     * converts a dinar-quoted payment into cents, it floors, and it never asks
+     * for more cents than the wallet holds. The dinars are recorded on the
+     * debit (migration 0108) so the balance falls by exactly `walletApplied`
+     * and not by the cents' conversion. That is «وليس العكس» applied to the
+     * spend side: the dinar is the source, the cent is derived from it.
+     *
+     * WHAT USED TO STAND HERE AND WAS WRONG. Two lines claimed to "scale back
+     * to what the balance covers" by reassigning `walletApplied =
+     * walletIqdAvailable(...)` — the identical figure `walletApplied` had just
+     * been min()'d against, so nothing was ever scaled back and the refusal
+     * re-tested a number that could not have changed. The cap belongs on the
+     * CENTS, which is the side that can overflow, and `walletSpendCents` now
+     * carries it.
+     *
+     * WHO PAYS THE REMAINDER, because the header this replaces claimed nobody
+     * did. The dinar balance may stand up to one cent per testified deposit
+     * above what its cents convert to, so an order that spends the whole
+     * balance is credited up to one cent's worth — 13 د.ع at 1,400 — more than
+     * leaves the wallet. THAT IS THE SHOP REPAYING ITS OWN UNDER-CREDIT: every
+     * one of those dinars arrived by bank transfer and was floored away when
+     * the deposit was approved. It is bounded by what was floored away, it is
+     * cancelled on this very debit (which records `walletApplied` dinars, so
+     * the remainder it spent stops being counted), and it is the mirror image
+     * of the ceil that used to put the same cent on the customer.
+     */
+    const walletUsdCents = walletSpendCents(walletApplied, available.usd_cents_available, exchangeRate);
+    /**
+     * A WALLET PAYMENT WORTH LESS THAN A CENT IS NOT A WALLET PAYMENT.
+     *
+     * `CHECK (amount > 0)` on `wallet_transactions` means a zero-cent debit
+     * cannot be written, and the checkout batch guards its own debit with
+     * `if (comp.walletUsdCents > 0)`. So an application of, say, 10 د.ع at
+     * 1,400 — floor(1,000 / 1,400) = 0 cents — used to reduce
+     * `payableBeforeCodTax` by 10 د.ع against NO ledger row and NO balance
+     * movement, on every order, for ever. Under the old ceil it was always at
+     * least one cent and the hole did not exist.
+     *
+     * The wallet therefore pays nothing here rather than paying for free. The
+     * customer owes those few dinars at the door, which is where they would
+     * have owed them had they left the toggle off, and the balance they were
+     * shown is untouched.
+     */
+    if (walletUsdCents <= 0) walletApplied = 0;
+    const finalWalletUsdCents = walletUsdCents;
     const payableBeforeCodTax = Math.max(0, afterPoints - walletApplied);
     /**
      * §14 — THE TAX IS CALCULATED IN FULL, THEN EXEMPTED.
@@ -3303,6 +3410,7 @@ async function computeCheckout(
     walletBalanceIqd,
     walletApplied: settled.walletApplied,
     walletUsdCents: settled.walletUsdCents,
+    walletLedgerDinars: walletDust.ledger_dinars,
     requiredAdvance: settled.requiredAdvance,
     totalIqd: settled.totalIqd,
     dueOnDelivery: settled.dueOnDelivery,
@@ -3872,8 +3980,9 @@ orderRoutes.post('/', async (c) => {
     },
   });
   // WHICH waiver produced the free delivery is recorded apart from the fact of
-  // it: the referral waiver is one-per-friend, and the check that enforces
-  // "one" reads this column at the next checkout (referralFreeDeliveryApplies).
+  // it. The referral waiver that used to set this is withdrawn, so the column
+  // now only ever takes a 1 from a promotion the owner adds deliberately — and
+  // the rows already carrying a 1 keep explaining the orders they belong to.
   const referralWaived = comp.shipping.waiver_source === 'promotion' ? 1 : 0;
   // PRO preparation/support priority is membership-wide. The 12-hour SLA is
   // narrower and is snapshot separately only where method/address/cart pass.
@@ -4223,6 +4332,20 @@ orderRoutes.post('/', async (c) => {
         note: `Wallet payment on order ${orderId}`,
         ref: orderId,
         nowIso: now,
+        /**
+         * THE DINARS THIS DEBIT WAS QUOTED IN (migration 0108). The order
+         * charged `walletApplied` DINARS; the cents above are what that figure
+         * floors to. Recording the pair is what makes the balance fall by the
+         * figure the customer was shown rather than by its conversion — a
+         * wallet filled with 50,000 د.ع and spent on a 50,000 د.ع advance
+         * reads zero, not the six-dinar remainder of its own credit.
+         *
+         * Only when the database can hold it: `readWalletDust` above already
+         * probed those columns, so a Worker live ahead of its migration writes
+         * the row exactly as it always did instead of aborting a money batch.
+         */
+        amountIqd: comp.walletLedgerDinars ? comp.walletApplied : null,
+        exchangeRateSnapshot: comp.walletLedgerDinars ? comp.exchangeRate : null,
       })
     );
   }
@@ -4532,12 +4655,25 @@ orderRoutes.post('/', async (c) => {
   // admin retry can re-issue it (idempotent per order+revision).
   const invoice = await createInvoiceForOrder(c.env, orderId);
 
-  // PLUS gift on printer purchase — only when the owner enabled it and set the
-  // milestone to the payment event (grant itself is idempotent per order).
-  const printerGift = comp.printerGiftConfig as { enabled: boolean; plan_id: string; milestone: 'paid' | 'delivered' };
-  if (printerGift?.enabled === true && printerGift.milestone === 'paid') {
-    c.executionCtx.waitUntil(grantPrinterGiftIfEligible(c.env, orderId));
-  }
+  /*
+   * THE PRINTER GIFT MEMBERSHIP IS NOT GRANTED HERE ANY MORE. Owner's
+   * decision: «الهديه تعطى يدويا وليس تلقائيا».
+   *
+   * This door was the worse of the two: `milestone: 'paid'` fires the instant
+   * the order ROW is written, which for cash on delivery is before a single
+   * dinar has been collected — and nothing revoked the membership if the order
+   * was then cancelled. A customer could place a printer order, cancel it, and
+   * keep a live PRO or PLUS row that every benefit in the shop then honoured.
+   * That is the other half of «المستخدم لم يكن مشتركا بالاشتراك البرو وقد حصل
+   * على خصم»: by the ledger he WAS subscribed, and nobody had decided it.
+   *
+   * The gift now goes through a person. `POST /api/memberships/admin/grant`
+   * already grants any plan to any account, the admin screen already calls it
+   * (src/components/adminMemberships/actions.tsx), and an administrator can
+   * see the order before deciding. `grantPrinterGiftIfEligible` stays in
+   * worker/lib/membershipOps.ts with its idempotency intact so a manual path
+   * can still use it; nothing calls it on a schedule.
+   */
   // The CUSTOMER hears about their own order too — email, WhatsApp and
   // Telegram, on whichever of the three can reach them. Until this line the
   // only party told an order existed was the admin group below.
@@ -4942,7 +5078,7 @@ orderRoutes.post('/:id/cancel', async (c) => {
           WHERE id = ? AND status = 'pending'`
       ).bind(id),
       ...(stock.plan?.statements ?? []),
-      ...cancelledOrderRefundStatements(c.env, data.order, 'system', now),
+      ...(await cancelledOrderRefundStatements(c.env, data.order, 'system', now)),
       bnplCancellationStatement(c.env.DB, user.id, id, now),
     ]);
   } catch (e) {

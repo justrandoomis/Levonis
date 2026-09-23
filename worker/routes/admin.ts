@@ -32,7 +32,7 @@ import { deleteCancelledOrder, OrderDeletionRefusal } from '../lib/orderDeletion
 import { reclaimOrderRedemptionsStatement } from '../lib/offers';
 import { resolveOrderExpiry } from '../lib/orderExpiry';
 import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
-import { onOrderDelivered, grantPrinterGiftIfEligible } from '../lib/membershipOps';
+import { onOrderDelivered } from '../lib/membershipOps';
 import { createUnitsOnDelivery, type CreateUnitsResult } from '../lib/deviceOps';
 import { awardOrderPoints } from '../lib/pointsOps';
 import { getBalances, walletTxPublic } from '../lib/wallet';
@@ -229,7 +229,7 @@ adminRoutes.get('/providers', async (c) => {
 
 adminRoutes.get('/overview', async (c) => {
   const db = c.env.DB;
-  const [orders, users, wallet, pendingWallet, pendingCommunity, recentOrders] = await Promise.all([
+  const [orders, users, wallet, pendingWallet, pendingCommunity, waitingTickets, recentOrders] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS total,
               SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
@@ -267,6 +267,21 @@ adminRoutes.get('/overview', async (c) => {
         WHERE wt.status = 'pending' ORDER BY wt.created_at DESC LIMIT 10`
     ).all<Record<string, unknown>>(),
     db.prepare("SELECT COUNT(*) AS n FROM community_requests WHERE status = 'open'").first<{ n: number }>(),
+    /**
+     * HOW MANY PEOPLE ARE WAITING ON US, on the dashboard the owner opens
+     * first. The «الدعم والتذاكر» screen was added with its own queue and
+     * nothing on the overview said a queue existed, so the only way to find
+     * out whether anyone was waiting was to go and look.
+     *
+     * `open` and `waiting_staff` are the two states where the ball is on this
+     * side of the desk (migration 0010). `waiting_customer` is deliberately
+     * NOT counted — the shop has answered and is waiting on them — and
+     * neither is `resolved`. A badge that counts tickets the shop cannot act
+     * on is a badge people learn to ignore.
+     */
+    db
+      .prepare("SELECT COUNT(*) AS n FROM support_tickets WHERE state IN ('open','waiting_staff')")
+      .first<{ n: number }>(),
     db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 10').all<Record<string, unknown>>(),
   ]);
 
@@ -293,6 +308,7 @@ adminRoutes.get('/overview', async (c) => {
         : {}),
       pending_wallet_requests: pendingWallet.results.length,
       open_community_requests: pendingCommunity?.n ?? 0,
+      support_tickets_waiting: waitingTickets?.n ?? 0,
     },
     pending_wallet_requests: money
       ? pendingWallet.results.map((t) => ({
@@ -2283,12 +2299,15 @@ async function deliveredEffects(
 
   // Referral 9.1 milestone: records delivered_at-based eligibility (idempotent).
   c.executionCtx.waitUntil(onOrderDelivered(c.env, id));
-  // PLUS gift on printer purchase, when the owner set the milestone to
-  // delivery (grant itself is idempotent per order).
-  const printerGift = await getSetting(c.env.DB, 'printerGiftConfig');
-  if (printerGift?.enabled === true && printerGift.milestone === 'delivered') {
-    c.executionCtx.waitUntil(grantPrinterGiftIfEligible(c.env, id));
-  }
+  /*
+   * NO AUTOMATIC PRINTER-GIFT MEMBERSHIP AT DELIVERY EITHER — «الهديه تعطى
+   * يدويا وليس تلقائيا». The same decision that removed the 'paid' door in
+   * worker/routes/orders.ts removes this one: a membership somebody did not
+   * buy and nobody granted is a subscriber by the ledger and not by anyone's
+   * intent, and every benefit in the shop believes the ledger.
+   * The administrator who marks this order delivered is already looking at it;
+   * granting the gift is one more deliberate click on the memberships screen.
+   */
   /*
    * THE MESSAGE LEAVES FROM THE SAME PLACE THE GRANTS DO. `deliveredEffects`
    * is where both delivered doors converge, and its own docstring says that is
@@ -3160,7 +3179,7 @@ adminRoutes.patch('/orders/:id', async (c) => {
       const res = await c.env.DB.batch([
         flipStmt,
         ...(stock.plan?.statements ?? []),
-        ...cancelledOrderRefundStatements(c.env, order, 'admin', new Date().toISOString()),
+        ...(await cancelledOrderRefundStatements(c.env, order, 'admin', new Date().toISOString())),
       ]);
       flipped = res[0]?.meta.changes ?? 0;
     } catch (e) {

@@ -24,13 +24,22 @@ import { Hono } from 'hono';
 import { ROOT, SqliteD1, type SqliteStatement } from './fixtures/d1';
 import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
+import { walletSpendCents } from '../worker/lib/walletOps';
 import { classifyHost } from '../worker/lib/hosts';
 import { membershipsRoutes } from '../worker/routes/memberships';
 import { grantPrinterGiftIfEligible } from '../worker/lib/membershipOps';
 import type { Env } from '../worker/lib/types';
 
 const RATE = 1400;
-const cents = (iqd: number) => Math.ceil((iqd * 100) / RATE);
+/*
+  THE SAME CONVERSION THE PURCHASE USES, imported rather than copied.
+  This helper held its own `Math.ceil`, and when `walletSpendCents` moved to
+  FLOOR — «عند الدولار يقرب الى عدد صحيح اقل», the rule that stopped a 50,000
+  د.ع deposit refusing a 50,000 د.ع bill — six tests failed against code that
+  was right. A test that re-implements the arithmetic it is checking only
+  ever pins the copy.
+*/
+const cents = (iqd: number) => walletSpendCents(iqd, null, RATE);
 
 const migrationFiles = () => readdirSync(join(ROOT, 'migrations')).filter((x) => x.endsWith('.sql')).sort();
 
