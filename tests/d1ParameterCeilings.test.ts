@@ -142,6 +142,30 @@ test('every list-driven IN (…) on these paths is chunked, and at the house siz
       `${file}: the chunk is 90 — 100 is D1's refusal point and 90 leaves room for a bound value of its own`
     );
     assert.match(src, new RegExp(`chunk\\([^)]*, ${constant}\\)`), `${file}: the constant has to be USED`);
+    /**
+     * USED FOR EVERY ONE OF THEM, not for one of them.
+     *
+     * The first version of this assertion stopped at the line above: it asked
+     * that `chunk(…, CONST)` appear SOMEWHERE in the file. adminCommunity.ts
+     * has TWO list-driven `IN (…)` queries — the read of the gate and the
+     * write of it — and the defect shipped on both, so a guard satisfied by
+     * either one of them is green through exactly half of the bug it names.
+     * Verified by mutation: replacing the PUT's `chunk(ids, GATE_ID_CHUNK)`
+     * with `[ids]` left the GET's call matching and this file all-green.
+     *
+     * So the two are COUNTED against each other. Every templated `IN (${…})`
+     * on these paths is built from a list, and each one must have its own
+     * chunk loop feeding it; one more `IN (…)` than there are loops means a
+     * query somewhere binds a whole list, which is the 500 this file exists
+     * to prevent and which node:sqlite will never reproduce.
+     */
+    const templated = src.match(/IN \(\$\{/g) ?? [];
+    const loops = src.match(new RegExp(`for \\(const part of chunk\\([^)]*, ${constant}\\)\\)`, 'g')) ?? [];
+    assert.equal(
+      loops.length,
+      templated.length,
+      `${file}: ${templated.length} templated IN (…) but ${loops.length} chunk loop(s) — one of them binds a whole list`
+    );
     assert.match(src, /import \{ chunk \} from '\.\.\/lib\/inventory';/, `${file}: one chunk helper, not a fourth`);
   }
 });

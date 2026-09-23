@@ -67,14 +67,32 @@ function rowOf(raw: DatabaseSync, sql: string, ...params: unknown[]): Record<str
   return found as Record<string, unknown>;
 }
 
+/**
+ * The answer as THIS FILE reads it. The two routes do not export a response
+ * type, and the obvious shortcut — `Record<string, any>` — would let an
+ * assertion keep compiling on a field the route had stopped sending, which is
+ * the one failure this file exists to catch. So the fields are named, and
+ * loosely: `?` on everything the routes omit rather than send empty, `unknown`
+ * inside the arrays this file only ever `deepEqual`s or stringifies.
+ */
+interface TemplateBody {
+  code?: string;
+  product_id?: string;
+  errors?: unknown[];
+  needs_review?: { message?: unknown }[];
+  brands_to_create?: { name?: string; slug?: string }[];
+  brands_created?: { id?: string; name?: string; slug?: string; created?: boolean }[];
+  preview?: { brand_id?: string; category_id?: string };
+}
+
 const parse = async (app: App, text: string) => {
   const res = await post(app, '/api/admin/template/parse', { text });
-  return { status: res.status, body: (await res.json()) as Record<string, any> };
+  return { status: res.status, body: (await res.json()) as TemplateBody };
 };
 
 const apply = async (app: App, text: string) => {
   const res = await post(app, '/api/admin/template/apply', { text, mode: 'draft', confirm: true });
-  return { status: res.status, body: (await res.json()) as Record<string, any> };
+  return { status: res.status, body: (await res.json()) as TemplateBody };
 };
 
 // ------------------------------------------------- the reported symptom
@@ -130,7 +148,7 @@ test('the apply creates it, with the slug the check promised', async () => {
   const { status, body } = await apply(app, text);
   assert.equal(status, 200, JSON.stringify(body));
   assert.deepEqual(
-    body.brands_created.map((b: Record<string, unknown>) => ({ name: b.name, slug: b.slug, created: b.created })),
+    body.brands_created.map((b) => ({ name: b.name, slug: b.slug, created: b.created })),
     [{ name: 'Elegoo', slug: pre.body.brands_to_create[0].slug, created: true }]
   );
   const made = rowOf(raw, 'SELECT * FROM brands WHERE slug = ?', 'elegoo');
@@ -353,7 +371,7 @@ test('EXPORT -> IMPORT of an unchanged product survives, brand and section inclu
   assert.equal(back.body.preview.brand_id, 'brd_bambu');
 
   const reapplied = await post(app, '/api/admin/template/apply', { text, mode: 'update', confirm: true });
-  const reapplyBody = (await reapplied.json()) as Record<string, any>;
+  const reapplyBody = (await reapplied.json()) as TemplateBody;
   assert.equal(reapplied.status, 200, JSON.stringify(reapplyBody));
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM brands'), 5, 'and never adds one');
   assert.equal(rowOf(raw, 'SELECT brand_id FROM products WHERE id = ?', productId).brand_id, 'brd_bambu');
