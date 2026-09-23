@@ -311,6 +311,45 @@ export default function AdminWalletRequests() {
                 <div className="text-[11px] text-zinc-500 tabular-nums" dir="ltr">
                   {formatUsdCents(t.amount)} · {exchangeRate.toLocaleString()} IQD/USD
                 </div>
+                {/**
+                  * THE NUMBER TO TRANSFER — because it is NOT the one above it.
+                  *
+                  * The commission is deducted from the requested amount, so a
+                  * customer who asks for 50,000 د.ع at 3% is owed about 48,500
+                  * and the shop keeps the rest. This card carried the gross and
+                  * nothing else, which meant the figure a reviewer read
+                  * immediately before making a bank transfer was the figure
+                  * they must NOT transfer.
+                  *
+                  * It appears only when a commission was actually withheld: on
+                  * a request filed while the rate was 0, gross and net are the
+                  * same number and a second line saying so would be noise.
+                  * `net_cents` is read for presence, not truthiness — a route
+                  * that does not carry it must not silently render 0 د.ع as a
+                  * payout instruction.
+                  *
+                  * Both figures come off the row, written when the request was
+                  * filed and held together by `CHECK (net_cents = amount_cents
+                  * - fee_cents)`, so changing the commission tomorrow cannot
+                  * restate what an outstanding request is worth.
+                  */}
+                {t.withdrawal
+                  && typeof t.withdrawal.net_cents === 'number'
+                  && typeof t.withdrawal.fee_cents === 'number'
+                  && t.withdrawal.fee_cents > 0 && (
+                  <div className="w-full md:w-auto rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2 mt-1">
+                    <div className="flex items-baseline justify-between gap-4 md:justify-end">
+                      <span className="text-[10px] uppercase tracking-wide text-amber-200/70">Transfer</span>
+                      <span className="text-base font-bold text-amber-100 tabular-nums">
+                        {formatWalletIqd(t.withdrawal.net_cents, exchangeRate)}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-zinc-500 tabular-nums mt-0.5 md:text-right" dir="ltr">
+                      commission {formatWalletIqd(t.withdrawal.fee_cents, exchangeRate)} withheld ·{' '}
+                      {formatUsdCents(t.withdrawal.net_cents)}
+                    </div>
+                  </div>
+                )}
                 {stepsFor(t).length > 0 && decision?.id !== t.id && (
                   <div className="flex gap-2">
                     {stepsFor(t).map((b) => (

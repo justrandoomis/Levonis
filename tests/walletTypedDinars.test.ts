@@ -165,3 +165,65 @@ test('both admin surfaces print the typed dinars for both kinds', () => {
   assert.match(admin, /LEFT JOIN wallet_deposit_meta m ON m\.tx_id = wt\.id/);
   assert.match(admin, /m\.declared_amount_iqd AS deposit_declared_iqd/);
 });
+
+// -------------------------------------- the payout the reviewer must make
+
+test('the admin card states what to TRANSFER, which is not what was requested', () => {
+  /**
+   * THE MONEY-OPERATIONS GAP THIS CLOSES. «عمولة للسحب بقدر 3%» is DEDUCTED
+   * from the requested amount — migration 0015's `CHECK (net_cents =
+   * amount_cents - fee_cents)` settled that — so the figure a human is
+   * supposed to hand over is the net, and the payout card printed the GROSS
+   * and nothing else. A reviewer reading «50,000 د.ع» immediately before
+   * opening their banking app would transfer 1,500 د.ع too much, every time,
+   * on every withdrawal. Nothing failed; the shop simply paid more than it
+   * owed.
+   *
+   * SOURCE RULES, because this is a rendering defect and no behavioural test
+   * of a formatter can see it: a card that never renders `net_cents` is a card
+   * that cannot be wrong about the arithmetic.
+   */
+  const card = read('src/components/AdminWalletRequests.tsx');
+  const admin = read('worker/routes/admin.ts');
+
+  // The route has to carry it before the card can show it — this was the
+  // actual reason the gap existed: the SELECT joined wallet_withdrawals for
+  // the declared dinars and left the payout figures behind.
+  assert.match(admin, /w\.net_cents AS withdrawal_net_cents/, 'the admin list must SELECT the net');
+  assert.match(admin, /w\.fee_cents AS withdrawal_fee_cents/, 'the admin list must SELECT the commission');
+  assert.equal(
+    (admin.match(/w\.net_cents AS withdrawal_net_cents/g) ?? []).length,
+    2,
+    'both admin lists — the overview strip and the requests page — carry it, or they disagree about one request'
+  );
+  assert.match(admin, /net_cents: t\.withdrawal_net_cents === null/, 'the mapper must expose it by presence, not truthiness');
+
+  assert.match(card, /formatWalletIqd\(t\.withdrawal\.net_cents, exchangeRate\)/, 'the card stopped showing the payout');
+  assert.match(card, /commission \{formatWalletIqd\(t\.withdrawal\.fee_cents, exchangeRate\)\} withheld/, 'the card must say where the difference went');
+
+  // Presence, never truthiness: a route that does not carry net_cents must not
+  // render «0 د.ع» as an instruction to transfer nothing.
+  assert.match(card, /typeof t\.withdrawal\.net_cents === 'number'/, 'a missing net must not render as zero');
+  // And a request filed while the commission was off has nothing to disclose.
+  assert.match(card, /t\.withdrawal\.fee_cents > 0/, 'gross == net needs no second line');
+});
+
+test('the payout arithmetic is the ledger’s, not a second opinion', () => {
+  // What the engine stores for a typed 50,000 د.ع at 1,400 with the 3% default,
+  // recomputed here from the real conversion so the card's inputs are pinned.
+  const amountCents = iqdToUsdCents(50_000, 1400);          // floor -> 3571
+  const feeCents = Math.floor((amountCents * 300) / 10_000); // floor -> 107
+  const netCents = amountCents - feeCents;                   // 3464
+
+  assert.equal(amountCents, 3571);
+  assert.equal(feeCents, 107);
+  assert.equal(netCents, 3464);
+  // migration 0015: CHECK (net_cents = amount_cents - fee_cents)
+  assert.equal(netCents, amountCents - feeCents);
+  // The two numbers the card puts side by side really are different money:
+  // the request reads 50,000 د.ع and the transfer is ~48,496 د.ع.
+  assert.equal(usdCentsToIqd(amountCents, 1400), 49_994);
+  assert.equal(usdCentsToIqd(netCents, 1400), 48_496);
+  assert.ok(usdCentsToIqd(amountCents, 1400) - usdCentsToIqd(netCents, 1400) > 1000,
+    'the gap is large enough that showing only the gross is a real overpayment');
+});

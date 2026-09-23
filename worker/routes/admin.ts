@@ -256,6 +256,8 @@ adminRoutes.get('/overview', async (c) => {
               w.needs_reconciliation AS withdrawal_needs_reconciliation,
               w.payout_reference AS withdrawal_payout_reference,
               w.declared_amount_iqd AS withdrawal_declared_iqd,
+              w.fee_cents AS withdrawal_fee_cents,
+              w.net_cents AS withdrawal_net_cents,
               m.declared_amount_iqd AS deposit_declared_iqd
          FROM wallet_transactions wt
          LEFT JOIN users u ON u.id = wt.user_id
@@ -1209,6 +1211,30 @@ function withdrawalRef(t: Record<string, unknown>) {
         t.withdrawal_declared_iqd === null || t.withdrawal_declared_iqd === undefined
           ? null
           : Number(t.withdrawal_declared_iqd),
+      /**
+       * WHAT ACTUALLY LEAVES THE BALANCE — and therefore what a human is
+       * supposed to hand over.
+       *
+       * The commission is DEDUCTED from the requested amount («العمولة تُخصم من
+       * المبلغ المطلوب»), so for a 3% rate a customer who asks for 50,000 د.ع
+       * is owed roughly 48,500 and the shop keeps the rest. Until now this
+       * card printed the GROSS and nothing else, so the number a reviewer read
+       * immediately before making a bank transfer was the one they must NOT
+       * transfer. That gap arrived with the commission itself and is the whole
+       * reason these two columns travel.
+       *
+       * They ride on the row rather than being recomputed from today's rate:
+       * `fee_cents` and `net_cents` were written when the request was filed
+       * and `CHECK (net_cents = amount_cents - fee_cents)` (migration 0015)
+       * holds them together, so changing the commission tomorrow cannot
+       * restate what an outstanding request is worth.
+       */
+      fee_cents: t.withdrawal_fee_cents === null || t.withdrawal_fee_cents === undefined
+        ? null
+        : Number(t.withdrawal_fee_cents),
+      net_cents: t.withdrawal_net_cents === null || t.withdrawal_net_cents === undefined
+        ? null
+        : Number(t.withdrawal_net_cents),
     },
   };
 }
@@ -1223,7 +1249,9 @@ adminRoutes.get('/wallet-requests', async (c) => {
                     w.id AS withdrawal_id, w.state AS withdrawal_state,
                     w.needs_reconciliation AS withdrawal_needs_reconciliation,
                     w.payout_reference AS withdrawal_payout_reference,
-                    w.declared_amount_iqd AS withdrawal_declared_iqd
+                    w.declared_amount_iqd AS withdrawal_declared_iqd,
+                    w.fee_cents AS withdrawal_fee_cents,
+                    w.net_cents AS withdrawal_net_cents
                FROM wallet_transactions wt
                LEFT JOIN users u ON u.id = wt.user_id
                LEFT JOIN wallet_withdrawals w ON w.tx_id = wt.id

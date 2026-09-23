@@ -1280,6 +1280,15 @@ export interface WalletWithdrawalRef {
   /** The dinars the customer typed (migration 0106), or null for a request
    *  filed before the column existed. Read for display, never recomputed. */
   declared_amount_iqd: number | null;
+  /** The commission withheld, in ledger cents — written when the request was
+   *  filed, so a later rate or rate-policy change cannot restate it.
+   *  `null` on a route that does not carry it. */
+  fee_cents?: number | null;
+  /** WHAT THE CUSTOMER IS ACTUALLY OWED, in ledger cents: `amount_cents -
+   *  fee_cents`, held together by a CHECK in migration 0015. The commission is
+   *  DEDUCTED from the requested amount, so this — not `amount` — is the
+   *  figure a human transfers. */
+  net_cents?: number | null;
 }
 
 export interface WalletTx {
