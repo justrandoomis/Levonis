@@ -39,7 +39,7 @@ import {
 } from '../worker/lib/warranty';
 import { renderWarrantyDoc, type WarrantyDocData } from '../worker/lib/warrantyDoc';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, count, json, pending } from './fixtures/app';
+import { freshDb, asD1, stubApp, post, get, count, json, pending } from './fixtures/app';
 import { profileRoutes } from '../worker/routes/profile';
 import { deviceRoutes } from '../worker/routes/devices';
 
@@ -744,6 +744,116 @@ test('«منتج غير مرتبط كطابعة؟» is gone from the UI — and 
    */
   const route = srcFile('worker/routes/profile.ts');
   assert.match(route, /profileRoutes\.post\('\/warranty-claims'/);
-  assert.doesNotMatch(route, /410/);
-  assert.match(srcFile('worker/routes/devices.ts'), /unit_id IS NULL|c\.unit_id/);
+  /**
+   * ANCHORED TO A STATUS CODE, not to three digits anywhere in the file.
+   * `doesNotMatch(route, /410/)` passed only because the digits happened to
+   * occur nowhere in profile.ts, and this is an IQD shop whose prices are
+   * six-digit integers: the first 4100-dinar literal, the first limit of 1410
+   * or the first id carrying 410 would have turned this red with a message
+   * telling whoever wrote it they had sealed POST /warranty-claims, which they
+   * had not. A false failure in the file the gates most want green.
+   */
+  assert.doesNotMatch(
+    route,
+    /\b410\s*[,)]|status\(\s*410|statusCode:\s*410|['"]410['"]/,
+    'the route must not answer 410 — see above for why it stays'
+  );
+});
+
+test('«مطالباتي» still lists the general claims — the ones with no unit', async () => {
+  /**
+   * THE HALF THE SOURCE GREP COULD NOT PIN. The change removed the affordance
+   * that OPENS a general claim and deliberately left POST /warranty-claims
+   * alive, because it is the only writer of `warranty_claims` rows with
+   * `unit_id IS NULL` and the customer's list is what makes the ones already
+   * filed answerable. The assertion offered for that half was
+   * `assert.match(srcFile('worker/routes/devices.ts'), /unit_id IS NULL|c\.unit_id/)`,
+   * which is vacuous: its left alternative matches `r.unit_id IS NULL` in the
+   * add-a-printer join and `replaced_by_unit_id IS NULL` in the replacement
+   * guard, and its right one matches the `wc.unit_id` of an unrelated LEFT
+   * JOIN. Adding `AND wc.unit_id IS NOT NULL` to GET /api/devices/claims makes
+   * every general claim a customer has filed vanish from their list and the
+   * whole warranty suite stays green.
+   *
+   * So this asks the route, through the door the customer uses, with a claim
+   * that HAS no unit sitting beside one that has.
+   */
+  const raw = seedDeviceClaimDb();
+  try {
+    const app = deviceApp(raw, 'buyer');
+    // The general claim, written the only way there is to write one.
+    const general = await json(
+      await post(
+        stubApp(asD1(raw), { id: 'buyer', role: 'customer', email: 'b@x.co' }, (a) => a.route('/api/profile', profileRoutes), {
+          env: ENV,
+        }),
+        '/api/profile/warranty-claims',
+        { ...CLAIM, idempotencyKey: KEY }
+      )
+    );
+    assert.equal(
+      count(raw, "SELECT COUNT(*) n FROM warranty_claims WHERE id = ? AND unit_id IS NULL", general.id),
+      1,
+      'the general claim really has no unit — otherwise this test proves nothing'
+    );
+    // ...and a device claim, so the list is not trivially one row.
+    const device = await json(
+      await post(app, '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: 'idem-key-cccccccc' })
+    );
+
+    const listed = await json(await get(app, '/api/devices/claims'));
+    const ids = (listed.claims as { id: string }[]).map((c) => c.id);
+    assert.ok(ids.includes(general.id), `the general claim must stay listed — got ${JSON.stringify(ids)}`);
+    assert.ok(ids.includes(device.id));
+
+    // And it is openable, not merely counted: a claim a customer can see in a
+    // list and cannot open is the same silence with an extra step.
+    const opened = await json(await get(app, `/api/devices/claims/${general.id}`));
+    assert.equal(opened.claim.id, general.id);
+  } finally {
+    raw.close();
+  }
+});
+
+test('one key posted at TWO units never answers with a mixture of both', async () => {
+  /**
+   * The derived id's preimage is the caller and the key, and NOT the unit —
+   * deliberately, so that one open of the form is one claim whatever the
+   * customer edits before pressing send. That makes the URL's `:unitId` free,
+   * while `warranty_facts` in the response is read off the unit in THAT URL.
+   * The replay lookup was scoped by user alone, so a key sent at two units
+   * returned unit A's claim id and stage carrying unit B's `order_id`,
+   * `delivered_at`, `warranty_end_at` and `remaining_days`, and the overlay
+   * drew that mixture as one printer's coverage.
+   *
+   * Today's overlay reseeds its key whenever `unitId` changes, so this is not
+   * reachable through the shipped client — which is the point: a guard that
+   * holds only while a component stays written a particular way is not a
+   * guard, and the client is one refactor from making it live.
+   */
+  const raw = seedDeviceClaimDb();
+  try {
+    // A SECOND printer on the same account, with a DIFFERENT warranty end, so
+    // a mixture would be visible rather than coincidentally identical.
+    raw.exec(`
+      INSERT INTO order_item_units (id, order_id, order_item_id, product_id, owner_user_id, unit_index,
+         delivered_at, warranty_base_months, warranty_start_at, warranty_end_at)
+       VALUES ('u9','ORD-1','oi1','p1','buyer',9,'2026-01-04T10:00:00.000Z',24,'2026-01-04T10:00:00.000Z','2098-06-04T10:00:00.000Z');
+      INSERT INTO device_registrations (unit_id, user_id) VALUES ('u9','buyer');
+    `);
+    const app = deviceApp(raw, 'buyer');
+    const first = await json(await post(app, '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: KEY }));
+    assert.equal(first.warranty_facts.warranty_end_at, '2099-01-04T10:00:00.000Z');
+
+    const crossed = await post(app, '/api/devices/units/u9/claims', { ...DEVICE_CLAIM, idempotencyKey: KEY });
+    const body = await json(crossed);
+    assert.notEqual(crossed.status, 200, `a cross-unit key must not answer 200: ${JSON.stringify(body)}`);
+    assert.equal(body.code, 'CLAIM_KEY_COLLISION');
+    // The refusal is the whole point: nothing was recorded on the second unit
+    // and nothing on the first was rewritten.
+    assert.equal(count(raw, 'SELECT COUNT(*) n FROM warranty_claims'), 1);
+    assert.equal(count(raw, "SELECT COUNT(*) n FROM warranty_claims WHERE unit_id='u1'"), 1);
+  } finally {
+    raw.close();
+  }
 });

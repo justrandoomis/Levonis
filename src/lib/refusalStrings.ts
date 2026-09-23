@@ -285,6 +285,42 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ckb: 'اكتملت حصة الطلب المسبق لهذا الاختيار — وهذا ليس نفادًا للمخزون. جرّب طريقة شحن أخرى أو عُد لاحقًا.',
   },
 
+  /**
+   * THE OTHER THREE WAYS A PRE-ORDER CAN BE REFUSED, and none of them is a
+   * shelf either.
+   *
+   * `saleAvailability` (worker/routes/products.ts) reports exactly four codes
+   * for a pre-order it cannot sell: the quota above, plus «the route nobody
+   * priced», «no route offered at all» and «pre-order is switched off». The
+   * cart printed «نفد المخزون» over all three, which is a sentence about a
+   * SHELF said of a line that does not come off one — the same untruth the
+   * quota entry above exists to stop, arriving by three other doors. A
+   * pre-order line whose admin unprices its route is not a sold-out product,
+   * and telling the customer it is makes them give up on something the shop
+   * still has.
+   *
+   * THE WORDING IS NOT NEW AND NOT MACHINE-TRANSLATED. These are the sentences
+   * src/pages/Product.tsx has carried by hand in all three languages since
+   * 0073 (its `REASONS` tables) — the product page and the cart now say one
+   * thing about one refusal, out of one table, rather than two screens each
+   * keeping their own copy to drift.
+   */
+  PREORDER_NOT_ENABLED: {
+    ar: 'الطلب المسبق غير مفعّل لهذا المنتج.',
+    en: 'Pre-order is not enabled for this product.',
+    ckb: 'پێشداواکاری بۆ ئەم بەرهەمە چالاک نەکراوە.',
+  },
+  NO_TRANSPORT_OFFERED: {
+    ar: 'الطلب المسبق مفعّل لكن لا توجد وسيلة نقل معروضة.',
+    en: 'Pre-order is enabled but no transport option is offered.',
+    ckb: 'پێشداواکاری چالاکە بەڵام هیچ شێوازی گواستنەوە پێشکەش نەکراوە.',
+  },
+  TRANSPORT_COMMISSION_UNCONFIGURED: {
+    ar: 'طريقة الشحن هذه غير متاحة حاليًا.',
+    en: 'This shipping route is not available right now.',
+    ckb: 'ئەم ڕێگای ناردنە لە ئێستادا بەردەست نییە.',
+  },
+
   // ---- delivery address ---------------------------------------------------
   // Both are raised by `worker/routes/addresses.ts` and reach the customer
   // inside a form they are filling in, so each says what to change.

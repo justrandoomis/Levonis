@@ -27,7 +27,7 @@ import { collapseSpelledLetters, romanize } from '../worker/lib/search/translit'
 import { boundedDistance, editBudget } from '../worker/lib/search/match';
 import { buildIndexRows, FIELD_WEIGHT } from '../worker/lib/search/index';
 import { toSearchDoc } from '../worker/lib/search/document';
-import { planSearchIndex, searchProducts } from '../worker/lib/search/store';
+import { INDEX_STAMP, planSearchIndex, searchDocsForRows, searchProducts } from '../worker/lib/search/store';
 import { normalizedSynonymSeed, SYNONYM_SEED } from '../worker/lib/search/vocabulary';
 
 type Raw = ReturnType<typeof freshDb>;
@@ -669,4 +669,191 @@ test('a BUILT index reporting no match is a real answer, not a fallback', async 
   const got = await searchProducts(asD1(raw), 'zzzqqq');
   assert.equal(got.indexReady, true);
   assert.deepEqual(got.ids, []);
+});
+
+test('THE PRE-FIX CRON’S OWN ROWS ARE REPAIRED — «كومبو» comes back without a re-save', async () => {
+  /**
+   * THE SYMPTOM THE OWNER REPORTED, AS PRODUCTION ACTUALLY HAS IT. Making the
+   * backfill and the save share one document builder fixes the NEXT product
+   * indexed. Production is not next: the pre-fix cron already ran, so every
+   * active product carries thin rows built WITHOUT `variantNames`, and the
+   * backfill's old predicate — "has no rows in search_tokens" — excluded
+   * precisely that population. The suite was green because a fresh fixture
+   * database has no tokens at all, which proves the fix for new products and
+   * says nothing about the broken ones.
+   *
+   * So this test does what the earlier one could not: it writes the rows the
+   * OLD builder wrote, then runs the real cron and demands the repair. The
+   * stamp is what makes it possible — see INDEX_STAMP in
+   * worker/lib/search/store.ts.
+   */
+  const raw = freshDb();
+  const db = asD1(raw);
+  seed(raw, 'p_x2d', 'Bambu Lab X2D 3D Printer', {
+    hashtags: ['x2d'],
+    options: [{ id: 'opt_combo', name_en: 'Combo', name_ar: 'كومبو', name_ckb: '' }],
+    colors: [{ id: 'col_jade', name_en: 'Jade White', name_ar: '', name_ckb: '' }],
+  });
+
+  // EXACTLY the document the shipped-and-broken cron composed: the same
+  // builder, minus the option and colour names.
+  await db.batch(
+    planSearchIndex(
+      db,
+      toSearchDoc({
+        id: 'p_x2d',
+        name: 'Bambu Lab X2D 3D Printer',
+        description: '',
+        hashtags: ['x2d'],
+        brandName: null,
+        categoryNames: [],
+      })
+    )
+  );
+  // ...and strip the stamp, because the builder that wrote those rows did not
+  // have one. Without this the test would be seeding today's index, not the
+  // one sitting in production.
+  raw.prepare('DELETE FROM search_tokens WHERE token = ?').run(INDEX_STAMP);
+
+  assert.deepEqual((await searchProducts(db, 'كومبو')).ids, [], 'pre-condition: the shipped bug');
+  assert.deepEqual((await searchProducts(db, 'bambu')).ids, ['p_x2d'], 'and it IS indexed, thinly');
+
+  const report = await cron(db);
+  assert.deepEqual(report.errors, []);
+  assert.equal(report.search_indexed, 1, 'the cron must NOT skip a product it indexed thinly');
+
+  assert.deepEqual((await searchProducts(db, 'كومبو')).ids, ['p_x2d'], 'the option name, repaired');
+  assert.deepEqual((await searchProducts(db, 'combo')).ids, ['p_x2d']);
+  assert.deepEqual((await searchProducts(db, 'jade white')).ids, ['p_x2d']);
+
+  // And it converges: a second run has nothing left to do, so a shop that is
+  // caught up does not rewrite its whole catalogue every cron tick.
+  const second = await cron(db);
+  assert.deepEqual(second.errors, []);
+  assert.equal(second.search_indexed, 0, 'a stamped catalogue is done');
+});
+
+test('the index STAMP is unreachable from the search side', async () => {
+  /**
+   * The stamp is a row in the same table the shopper's query scans, so the one
+   * thing it must never do is turn up as a result. `normalizeText` drops
+   * everything that is not a letter or a digit, so no typed query can produce
+   * a token beginning with U+0000 and no prefix range built from those tokens
+   * can reach one.
+   */
+  const raw = await shop();
+  const db = asD1(raw);
+  const stamped = raw.prepare('SELECT COUNT(*) n FROM search_tokens WHERE token = ?').get(INDEX_STAMP) as {
+    n: number;
+  };
+  assert.ok(stamped.n > 0, 'the fixture is stamped, so this test is asking a real question');
+  // The stamp's only letters and digits survive normalisation; the U+0000
+  // that makes it unreachable does not, so no typed query can spell it.
+  assert.equal(normalizeText(INDEX_STAMP), 'doc 2', 'a query can never carry the stamp’s own shape');
+  for (const q of [INDEX_STAMP, '\u0000', '\u0000doc', 'doc:2']) {
+    const got = await searchProducts(db, q);
+    assert.deepEqual(got.ids, [], `«${JSON.stringify(q)}» must match nothing through the stamp`);
+  }
+});
+
+test('the brand/section name lookup stays under D1’s 100-parameter refusal', async () => {
+  /**
+   * D1 REFUSES A STATEMENT WITH MORE THAN 100 BOUND PARAMETERS — the rule
+   * worker/lib/financeReport.ts §7 writes down and four other call sites chunk
+   * at 90 for. `searchDocsForRows` bound its id list TWICE, once per side of a
+   * UNION, and both of its callers hand it fifty products: the cron backfill
+   * and, since the tag rewrite started reindexing, `rewriteHashtag`. Fifty
+   * products with their own brand and two sections is 150 distinct ids and
+   * therefore 300 bound parameters — three times the limit.
+   *
+   * THE SUITE CANNOT SEE THIS BY RUNNING IT: node:sqlite allows 32766 bound
+   * parameters, so the green test and the production 500 are perfectly
+   * compatible. The only way to pin it is to COUNT what gets bound, which is
+   * what this does.
+   */
+  const raw = freshDb();
+  const db = asD1(raw);
+  const rows: Record<string, unknown>[] = [];
+  for (let i = 0; i < 50; i++) {
+    const n = String(i).padStart(3, '0');
+    raw.prepare('INSERT INTO brands (id, slug, name_ar, name_en) VALUES (?,?,?,?)').run(`brd_${n}`, `b${n}`, 'ب', `Brand ${n}`);
+    raw.prepare('INSERT INTO catalogs (id, slug, name_ar, name_en) VALUES (?,?,?,?)').run(`cat_a${n}`, `a${n}`, 'ق', `Cat ${n}`);
+    raw.prepare('INSERT INTO catalogs (id, slug, name_ar, name_en) VALUES (?,?,?,?)').run(`cat_b${n}`, `s${n}`, 'ق', `Sub ${n}`);
+    rows.push({
+      id: `p_${n}`,
+      name: `Printer ${n}`,
+      name_ar: '',
+      name_ku: '',
+      description: '',
+      hashtags: '[]',
+      sku: '',
+      brand_id: `brd_${n}`,
+      category_id: `cat_a${n}`,
+      sub_category_id: `cat_b${n}`,
+      options: '[]',
+      colors: '[]',
+    });
+  }
+
+  const bindCounts: number[] = [];
+  const counting = {
+    prepare(sql: string) {
+      const st = (db as unknown as { prepare(s: string): { bind(...a: unknown[]): unknown } }).prepare(sql);
+      return {
+        bind(...args: unknown[]) {
+          bindCounts.push(args.length);
+          return (st as { bind(...a: unknown[]): unknown }).bind(...args);
+        },
+      };
+    },
+  } as unknown as D1Database;
+
+  const docs = await searchDocsForRows(counting, rows);
+  assert.equal(docs.length, 50);
+  assert.ok(bindCounts.length > 0, 'the lookup really ran');
+  const worst = Math.max(...bindCounts);
+  assert.ok(worst <= 90, `no statement may bind more than 90 parameters; the worst bound ${worst}`);
+  // And the names still reach the documents, chunked or not.
+  assert.ok(docs[49].fields.brand?.includes('Brand 049'), 'the last chunk is not dropped');
+  assert.ok(docs[49].fields.category?.includes('Sub 049'));
+});
+
+test('RENAMING A HASHTAG across a wide catalogue does not exceed the parameter limit', async () => {
+  /**
+   * The same refusal, reached the way an admin reaches it: 120 products
+   * carrying one tag, each with its own brand and sections, renamed through
+   * `rewriteHashtag`. It chunks by PRODUCT at fifty, so before the fix the
+   * name lookup inside the loop bound 300 parameters on the first chunk — and
+   * it sits BEFORE `db.batch`, so the chunks already processed had committed
+   * their UPDATE while the throwing one and every later one had not. A
+   * half-applied rename, which is exactly what the same-batch design exists to
+   * prevent.
+   */
+  const raw = freshDb();
+  const db = asD1(raw);
+  for (let i = 0; i < 120; i++) {
+    const n = String(i).padStart(3, '0');
+    raw.prepare('INSERT INTO brands (id, slug, name_ar, name_en) VALUES (?,?,?,?)').run(`brd_${n}`, `b${n}`, 'ب', `Brand ${n}`);
+    raw.prepare('INSERT INTO catalogs (id, slug, name_ar, name_en) VALUES (?,?,?,?)').run(`cat_a${n}`, `a${n}`, 'ق', `Cat ${n}`);
+    raw.prepare('INSERT INTO catalogs (id, slug, name_ar, name_en) VALUES (?,?,?,?)').run(`cat_b${n}`, `s${n}`, 'ق', `Sub ${n}`);
+    raw
+      .prepare(
+        `INSERT INTO products (id, slug, name, description, price_iqd, status, hashtags,
+           brand_id, category_id, sub_category_id, options, colors)
+         VALUES (?,?,?,'',1000,'active',?,?,?,?,'[]','[]')`
+      )
+      .run(`p_${n}`, `p_${n}`, `Printer ${n}`, '["multi-material"]', `brd_${n}`, `cat_a${n}`, `cat_b${n}`);
+  }
+
+  const moved = await rewriteHashtag(db, 'multi-material', 'multi-mat');
+  assert.equal(moved, 120, 'every product carrying the tag is rewritten');
+  const left = raw.prepare(`SELECT COUNT(*) n FROM products WHERE hashtags LIKE '%multi-material%'`).get() as {
+    n: number;
+  };
+  assert.equal(left.n, 0, 'no half-applied rename: not one product keeps the old tag');
+  assert.equal(
+    (await searchProducts(db, 'multi-mat', { limit: 200 })).ids.length,
+    120,
+    'and the index learned the new tag'
+  );
 });

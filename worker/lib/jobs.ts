@@ -30,7 +30,14 @@ import {
 } from './stockAlerts';
 import { runGuardedMediaCleanup } from './mediaRefs';
 import { checkSchemaDrift, type DriftAlarmReport } from './schemaDriftAlarm';
-import { planSearchIndex, searchDocColumns, searchDocsForRows, searchIndexInstalled } from './search/store';
+import {
+  INDEX_STAMP,
+  planSearchIndex,
+  SEARCH_INDEX_STALE_SQL,
+  searchDocColumns,
+  searchDocsForRows,
+  searchIndexInstalled,
+} from './search/store';
 
 /**
  * Durable scheduled jobs (final-phase §11): one entrypoint the Worker wires
@@ -67,11 +74,14 @@ export interface DurableJobsReport {
   /**
    * Products indexed for search this run (search_tokens, migration 0089).
    *
-   * The index is written with every product save, so this only ever has work
-   * to do for rows that predate migration 0089 — the backfill, done in small
-   * chunks across cron runs rather than as one statement in the migration
-   * itself, because indexing needs the brand and section NAMES and a
-   * migration cannot call the tokeniser.
+   * The index is written with every product save, so this has work to do for
+   * rows that predate migration 0089 and for rows an OLDER document builder
+   * wrote (`INDEX_STAMP` in worker/lib/search/store.ts) — the backfill, done
+   * in small chunks across cron runs rather than as one statement in the
+   * migration itself, because indexing needs the brand and section NAMES and a
+   * migration cannot call the tokeniser. A steady non-zero here on a shop that
+   * is not changing means the stamp was bumped and the catalogue is being
+   * rewritten; it falls back to zero when it has caught up.
    */
   search_indexed: number;
   pruned_email_tokens: number;
@@ -287,17 +297,31 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   /**
    * 3b. BACKFILL THE SEARCH INDEX, a chunk at a time.
    *
-   * Every product save writes its own index rows, so this is only for the
-   * catalogue that existed before migration 0089. It is not in the migration
-   * because indexing reads the brand and section NAMES and runs them through
-   * the tokeniser — work SQL cannot do — and because a shop with thousands of
+   * Every product save writes its own index rows, so this is for the catalogue
+   * that existed before migration 0089 — and for any product whose rows were
+   * written by an OLDER document builder. It is not in the migration because
+   * indexing reads the brand and section NAMES and runs them through the
+   * tokeniser — work SQL cannot do — and because a shop with thousands of
    * products cannot be indexed inside one invocation, so pretending otherwise
    * would mean a backfill that silently stops halfway.
    *
-   * Bounded per run and resumable: it takes the products with no rows in the
-   * index, oldest id first, and does fifty. A shop of any size converges in a
-   * few hours of cron, and a shop that is already indexed does one cheap query
-   * that returns nothing.
+   * Bounded per run and resumable: it takes the products that do not carry the
+   * current `INDEX_STAMP`, oldest id first, and does fifty. A shop of any size
+   * converges in a few hours of cron, and a shop that is already indexed does
+   * one cheap indexed query that returns nothing.
+   *
+   * "DOES NOT CARRY THE STAMP" RATHER THAN "HAS NO ROWS AT ALL", and the
+   * difference is the whole reason the stamp exists. This step used to compose
+   * its own document, and the copy it composed had no `variantNames` — so a
+   * product the cron indexed carried no option or colour names, and «كومبو»
+   * (an OPTION name here, never part of a product name) found only the
+   * products the owner had re-saved by hand. Both writers now go through one
+   * builder, which fixes the next product indexed and repairs nothing already
+   * in the table: a thinly-indexed product HAS rows, so "no rows at all"
+   * skipped for ever exactly the population that was broken. The stamp makes
+   * "never indexed" and "indexed by the builder that dropped the option names"
+   * one predicate, so the shop repairs itself with no admin button, no
+   * migration and no re-saving the catalogue by hand.
    */
   await step('search_index_backfill', async () => {
     // A Worker can be live one migration ahead of the database. `step` would
@@ -309,10 +333,12 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
       `SELECT ${searchDocColumns('p')}
          FROM products p
         WHERE p.status = 'active'
-          AND NOT EXISTS (SELECT 1 FROM search_tokens t WHERE t.product_id = p.id)
+          AND ${SEARCH_INDEX_STALE_SQL}
         ORDER BY p.id
         LIMIT 50`
-    ).all<Record<string, unknown>>();
+    )
+      .bind(INDEX_STAMP)
+      .all<Record<string, unknown>>();
     if (!results || results.length === 0) return;
 
     // THE SAME DOCUMENT THE SAVE PATH WRITES, from the same builder. This

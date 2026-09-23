@@ -595,6 +595,21 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
    * form, never per mount — because a key that outlives the overlay would
    * replay the first claim instead of recording a genuine SECOND claim on the
    * same printer, which is worse than the duplicate it removes.
+   *
+   * WHAT A REPLAY COSTS, SAID PLAINLY. The stored claim wins: the `subject`,
+   * `description` and `attachments` on the retry are NOT written over it. That
+   * is the right trade — the alternative is a request that can rewrite a claim
+   * staff may already have read, replied to and moved a stage on, from a form
+   * the customer thinks failed — but it is a real cost and it has a shape. The
+   * customer whose POST committed while their own 20-second deadline fired
+   * sees «خطأ في الشبكة», adds the photo of the cracked nozzle they forgot,
+   * presses «إرسال» again, and the claim staff open carries neither the photo
+   * nor the corrected text while src/components/warranty/ClaimForms.tsx reads
+   * the 200 as a submit and closes the form. `replay: true` is on the response
+   * so the overlay can say so, and it is the overlay's job to say it; the
+   * orphaned `claims/<uid>/…` objects are swept with every other unreferenced
+   * upload. EDITING A FILED CLAIM IS A DIFFERENT DOOR and does not exist yet —
+   * the reply thread is where a customer adds what they forgot.
    */
   const id = idempotencyKey
     ? `wc_${(await sha256Hex(`${user.id}\n${idempotencyKey}`)).slice(0, 20)}`
@@ -628,9 +643,9 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
    */
   if (written.meta.changes === 0) {
     const existing = await c.env.DB.prepare(
-      'SELECT id, stage, priority FROM warranty_claims WHERE id = ? AND user_id = ?'
+      'SELECT id, stage, priority FROM warranty_claims WHERE id = ? AND user_id = ? AND unit_id = ?'
     )
-      .bind(id, user.id)
+      .bind(id, user.id, unit.id)
       .first<{ id: string; stage: string; priority: number }>();
     /**
      * The replay lookup is scoped by user as well as by id, and this arm is
@@ -640,6 +655,20 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
      * retrying under a random id, because a guard that silently stops guarding
      * is how the duplicate comes back, and instead of returning the row,
      * because returning it would hand one customer another customer's claim.
+     *
+     * AND BY UNIT, WHICH IS NOT THE SAME QUESTION. The id's preimage is the
+     * caller and the key, deliberately: one open of the form is one claim,
+     * whatever the customer edits in it before pressing send. The URL's
+     * `:unitId` is therefore NOT in the id, so one key posted at two different
+     * units lands on the row the first post recorded — and `warrantyFacts`
+     * just above is read from the unit in THIS URL. Without this clause the
+     * response would carry unit A's claim id and stage beside unit B's
+     * `order_id`, `delivered_at`, `warranty_end_at` and `remaining_days`, and
+     * the overlay would draw that mixture as one printer's coverage. Today's
+     * overlay reseeds its key whenever `unitId` changes so it cannot happen;
+     * a guard that depends on a client staying written that way is not a
+     * guard. A key reused across units is a caller bug, not a replay, so it
+     * gets the collision refusal below rather than a mixed answer.
      */
     if (!existing) throw conflict('That claim could not be recorded; please try again', 'CLAIM_KEY_COLLISION');
     return c.json({

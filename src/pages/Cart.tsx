@@ -215,6 +215,24 @@ function typeForTransport(method: unknown): ShippingType {
  *  render before, which defeated every memo below it. */
 const BLOCKING_STATES = new Set(['sold_out', 'ended', 'upcoming', 'locked', 'unconfigured']);
 
+/**
+ * THE REFUSALS THAT ARE ABOUT A PRE-ORDER ROUTE AND NEVER ABOUT A SHELF.
+ *
+ * Every code `saleAvailability` (worker/routes/products.ts) reports when it
+ * cannot sell a PRE-ORDER: the quota is full, the route nobody priced, no
+ * route offered at all, pre-order switched off. Not one of them means the
+ * shelf is empty — a pre-order does not come off one — so a line refused for
+ * any of them must not be printed «نفد المخزون». The sentences themselves
+ * live in the one trilingual table (src/lib/refusalStrings.ts) so this screen,
+ * the checkout and the product page cannot drift.
+ */
+const PREORDER_REFUSALS = new Set([
+  'PREORDER_CAPACITY_EXHAUSTED',
+  'PREORDER_NOT_ENABLED',
+  'NO_TRANSPORT_OFFERED',
+  'TRANSPORT_COMMISSION_UNCONFIGURED',
+]);
+
 /* ------------------------------------------------ the membership's answer
  *
  * WHAT `GET /api/cart` SAYS A MEMBERSHIP IS WORTH ON THIS CART
@@ -1697,36 +1715,76 @@ export default function Cart() {
                              * `mode: 'preorder'`, while an exhausted route
                              * resolves to `mode: 'unavailable'` with the code.
                              *
-                             * THE SENTENCE IS NOT A NEW ONE. It is the Arabic
-                             * `stockRefusal` already prints for this code at
-                             * the cart and checkout doors
-                             * (src/lib/refusalStrings.ts), so every screen
-                             * says one thing about one counter. No Sorani is
-                             * invented: `loc` falls back to the Arabic, which
-                             * is the documented choice for every 0075 sentence
-                             * in this file and in `counterNamed` above.
+                             * THE SENTENCE IS NOT A NEW ONE AND IS NOT COPIED
+                             * HERE. It is decoded from the one trilingual
+                             * table the cart and checkout doors already read
+                             * (`apiRefusal`, src/lib/refusalStrings.ts), so
+                             * every screen says one thing about one counter.
+                             * It was hand-copied as an Arabic literal for one
+                             * release, and the copy had already lost the
+                             * remedy clause the table's own entry carries —
+                             * which is what a copy does. No Sorani is
+                             * invented anywhere in the chain: the table's
+                             * `ckb` for this code IS the Arabic, its own
+                             * documented choice until the owner writes the
+                             * Kurdish by hand.
                              */
+                            const reason = item.availability?.reason ?? '';
                             const quotaFull =
-                              item.availability?.reason === 'PREORDER_CAPACITY_EXHAUSTED' ||
+                              reason === 'PREORDER_CAPACITY_EXHAUSTED' ||
                               (rem?.preorder === true && rem.left === 0);
+                            /**
+                             * AND THE OTHER THREE, WHICH ARE NOT A SHELF EITHER.
+                             *
+                             * The quota is one of FOUR refusals
+                             * `saleAvailability` reports for a pre-order it
+                             * cannot sell; the other three are the route
+                             * nobody priced, no route offered at all, and
+                             * pre-order switched off. Pinning the exception to
+                             * the quota alone left «نفد المخزون» printed over
+                             * those three — the identical untruth, reached
+                             * three other ways, and on this catalogue the ways
+                             * it is actually reached: the shop's pre-order
+                             * capacity is untracked (`capacityFor` resolves
+                             * every route to `{tracked:false}`), so a
+                             * pre-order-only line that goes dark today goes
+                             * dark as NO_TRANSPORT_OFFERED or
+                             * TRANSPORT_COMMISSION_UNCONFIGURED, never as the
+                             * quota code. A line with no shelf must never be
+                             * told it has an empty one.
+                             */
+                            const notAShelf = PREORDER_REFUSALS.has(reason);
                             const soldOut =
-                              !quotaFull && (item.availability?.mode === 'unavailable' || rem?.left === 0);
+                              !quotaFull &&
+                              !notAShelf &&
+                              (item.availability?.mode === 'unavailable' || rem?.left === 0);
                             return (
                               <span className="text-danger text-[12px] font-medium" data-line-blocked={item.id}>
                                 {quotaFull
-                                  ? loc(
-                                      'اكتملت حصة الطلب المسبق لهذا الاختيار — وهذا ليس نفادًا للمخزون.',
-                                      'The pre-order quota for this selection is full — this is not a sold-out shelf.'
-                                    )
-                                  : soldOut
-                                    ? loc('نفد المخزون', 'Out of stock', 'کۆگا بەتاڵە')
-                                    : typeof cap === 'number'
-                                      ? loc(
-                                          `بقي ${cap} فقط — قلّل الكمية`,
-                                          `Only ${cap} left — lower the quantity`,
-                                          `تەنها ${cap} ماوە — بڕەکە کەم بکەرەوە`
-                                        )
-                                      : loc('الكمية المطلوبة غير متوفرة', 'That quantity is not available', 'ئەو بڕە بەردەست نییە')}
+                                  ? /* THE SENTENCE COMES FROM THE TABLE, NOT A COPY OF IT.
+                                       This was the Arabic literal, hand-copied — and the copy
+                                       had silently lost the remedy clause («جرّب طريقة شحن
+                                       أخرى أو عُد لاحقًا») that refusalStrings' own contract
+                                       requires of this entry: "the sentence has to point at
+                                       the thing the customer can still do". One call gives
+                                       the whole sentence in all three languages, with no
+                                       literal left to drift from the checkout's. */
+                                    apiRefusal({ code: 'PREORDER_CAPACITY_EXHAUSTED' }, lang as 'ar' | 'en' | 'ckb')
+                                  : notAShelf
+                                    ? apiRefusal({ code: reason }, lang as 'ar' | 'en' | 'ckb')
+                                    : soldOut
+                                      ? loc('نفد المخزون', 'Out of stock', 'کۆگا بەتاڵە')
+                                      : typeof cap === 'number'
+                                        ? loc(
+                                            `بقي ${cap} فقط — قلّل الكمية`,
+                                            `Only ${cap} left — lower the quantity`,
+                                            `تەنها ${cap} ماوە — بڕەکە کەم بکەرەوە`
+                                          )
+                                        : loc(
+                                            'الكمية المطلوبة غير متوفرة',
+                                            'That quantity is not available',
+                                            'ئەو بڕە بەردەست نییە'
+                                          )}
                               </span>
                             );
                           }

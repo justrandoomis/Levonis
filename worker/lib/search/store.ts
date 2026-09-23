@@ -47,6 +47,56 @@ const MAX_VOCABULARY = 2000;
 const MAX_POSTINGS = 4000;
 
 /**
+ * THE STAMP THAT MAKES A THIN INDEX REPAIRABLE.
+ *
+ * WHAT WENT WRONG WITHOUT IT. The cron backfill used to compose its own
+ * document, and the copy it composed had no `variantNames` — so every product
+ * the CRON indexed carried no option or colour names, and «كومبو» (an OPTION
+ * name in this catalogue, never part of a product name) found only the
+ * products the owner had happened to re-save by hand. Making both writers use
+ * one builder fixes the NEXT product indexed. It repairs nothing already in
+ * the table: the backfill's own predicate is "has no rows at all", and a
+ * thinly-indexed product has rows. On a live shop that is every active
+ * product, for ever, with no command the owner could run short of re-saving
+ * the catalogue by hand in the admin form.
+ *
+ * SO THE INDEX CARRIES ITS OWN VERSION, one row per product, weight 0. The
+ * backfill takes the products that do not carry the CURRENT stamp, which is
+ * "never indexed" and "indexed by an older builder" in one predicate, and it
+ * rewrites them fifty per cron run until the whole catalogue matches. Bump
+ * `INDEX_STAMP` whenever the document builder starts reading a field it did
+ * not read before, and the shop repairs itself over the next few hours of
+ * cron without a migration, a deploy step or an admin button.
+ *
+ * NOT A NEW TABLE, DELIBERATELY. This shop has a deploy path that ships a
+ * Worker WITHOUT applying migrations (the Cloudflare Git integration on the
+ * default branch) — `searchIndexInstalled` above exists for exactly that
+ * window. A repair that needed a new table would sit switched off on the one
+ * database that needs it most, and nobody would know. A row in a table that
+ * is already there works the moment the code lands.
+ *
+ * IT CAN NEVER BE SEARCHED FOR. `normalizeText` reduces everything that is
+ * not `\p{L}` or `\p{N}` to a space (worker/lib/search/normalize.ts), so no
+ * query token can begin with U+0000 and no prefix range scan
+ * (`token >= p AND token < p+1`, built from those tokens) can reach it.
+ * Weight 0 means it would score nothing even if one did. `DELETE FROM
+ * search_tokens WHERE product_id = ?` above takes it with the rest of the
+ * product's rows, so it is never stale.
+ */
+export const INDEX_STAMP = '\u0000doc:2';
+
+/**
+ * The `WHERE` fragment that selects products whose index is missing OR was
+ * written by an older builder. One bound parameter: `INDEX_STAMP`.
+ *
+ * Named here rather than written out at the call site so the predicate and the
+ * stamp can never describe different versions — the same reason
+ * `SEARCH_DOC_COLUMNS` exists.
+ */
+export const SEARCH_INDEX_STALE_SQL =
+  'NOT EXISTS (SELECT 1 FROM search_tokens t WHERE t.product_id = p.id AND t.token = ?)';
+
+/**
  * Replace a product's index rows with exactly these.
  *
  * Returns STATEMENTS rather than running them, so the caller can put them in
@@ -68,6 +118,12 @@ export function planSearchIndex(db: D1Database, doc: SearchDoc): D1PreparedState
         .bind(row.product_id, row.token, row.weight)
     );
   }
+  // And the stamp that says WHICH BUILDER wrote these rows. See INDEX_STAMP.
+  stmts.push(
+    db
+      .prepare('INSERT OR REPLACE INTO search_tokens (product_id, token, weight) VALUES (?, ?, 0)')
+      .bind(doc.productId, INDEX_STAMP)
+  );
   return stmts;
 }
 
@@ -104,13 +160,46 @@ export function searchDocColumns(alias = ''): string {
 }
 
 /**
+ * D1 REFUSES A QUERY WITH MORE THAN 100 BOUND PARAMETERS, so every `IN (…)`
+ * list in this codebase is cut at 90 — worker/lib/financeReport.ts §7 writes
+ * the rule down and worker/lib/stockAlertResolve.ts, productPersistence.ts and
+ * stockAlerts.ts all honour it. Named here because the name lookup below is on
+ * the hashtag-rename path, where the chunk is fifty PRODUCTS and the ids read
+ * off them are three per product.
+ */
+const NAME_IN_CHUNK = 90;
+
+const inChunks = <T,>(xs: readonly T[]): T[][] => {
+  const out: T[][] = [];
+  for (let i = 0; i < xs.length; i += NAME_IN_CHUNK) out.push(xs.slice(i, i + NAME_IN_CHUNK));
+  return out;
+};
+
+/**
  * `products` rows -> the documents to index them under.
  *
- * ONE READ FOR THE WHOLE CHUNK. The index holds NAMES, not ids — a shopper
- * types «الطابعات» and "Bambu Lab", never `cat_printers` — so the brand and
- * the two section names have to be resolved before the document is built.
- * Doing that per product would be a read per product; one `IN` over the
- * distinct ids of the chunk is one read for all of them.
+ * NOT A READ PER PRODUCT. The index holds NAMES, not ids — a shopper types
+ * «الطابعات» and "Bambu Lab", never `cat_printers` — so the brand and the two
+ * section names have to be resolved before the document is built. Doing that
+ * per product would be fifty reads for a fifty-product chunk; one `IN` over
+ * the distinct ids collects all of them at once.
+ *
+ * TWO STATEMENTS RATHER THAN ONE `UNION`, AND EACH ONE CHUNKED. This was a
+ * single `SELECT … FROM brands WHERE id IN (…) UNION ALL SELECT … FROM
+ * catalogs WHERE id IN (…)` binding the SAME id list twice — so a fifty-
+ * product chunk with a brand and two sections each bound up to three hundred
+ * parameters against a hard limit of a hundred. Every call site is a chunk of
+ * fifty (the cron backfill and, since the tag rewrite started reindexing,
+ * `rewriteHashtag`), and the tests cannot see it because node:sqlite allows
+ * 32766 bound parameters while D1 refuses at 100. On a real catalogue the
+ * rename threw halfway through, after the earlier chunks had already
+ * committed their `UPDATE` — the half-applied rename the same-batch design
+ * exists to prevent.
+ *
+ * Brand ids and catalog ids are therefore asked for SEPARATELY, each binding
+ * its own list exactly once and in slices of `NAME_IN_CHUNK`. A fifty-product
+ * chunk costs at most three reads instead of one, and it is three reads that
+ * cannot be refused.
  *
  * The rows must come from `searchDocColumns()`. Pass them with a field
  * already overwritten when the batch is about to change it (a hashtag rename
@@ -122,26 +211,22 @@ export async function searchDocsForRows(
   rows: Record<string, unknown>[]
 ): Promise<SearchDoc[]> {
   if (rows.length === 0) return [];
-  const nameIds = [
-    ...new Set(
-      rows
-        .flatMap((r) => [r.brand_id, r.category_id, r.sub_category_id])
-        .filter((x): x is string => typeof x === 'string' && x !== '')
-    ),
+  const idsOf = (pick: (r: Record<string, unknown>) => unknown[]): string[] => [
+    ...new Set(rows.flatMap(pick).filter((x): x is string => typeof x === 'string' && x !== '')),
   ];
   const names = new Map<string, string>();
-  if (nameIds.length > 0) {
-    const ph = nameIds.map(() => '?').join(',');
-    const { results } = await db
-      .prepare(
-        `SELECT id, COALESCE(NULLIF(name_en,''), name_ar) AS n FROM brands WHERE id IN (${ph})
-         UNION ALL
-         SELECT id, COALESCE(NULLIF(name_en,''), name_ar) AS n FROM catalogs WHERE id IN (${ph})`
-      )
-      .bind(...nameIds, ...nameIds)
-      .all<{ id: string; n: string }>();
-    for (const r of results ?? []) names.set(String(r.id), String(r.n ?? ''));
-  }
+  const collect = async (table: 'brands' | 'catalogs', ids: string[]): Promise<void> => {
+    for (const part of inChunks(ids)) {
+      const ph = part.map(() => '?').join(',');
+      const { results } = await db
+        .prepare(`SELECT id, COALESCE(NULLIF(name_en,''), name_ar) AS n FROM ${table} WHERE id IN (${ph})`)
+        .bind(...part)
+        .all<{ id: string; n: string }>();
+      for (const r of results ?? []) names.set(String(r.id), String(r.n ?? ''));
+    }
+  };
+  await collect('brands', idsOf((r) => [r.brand_id]));
+  await collect('catalogs', idsOf((r) => [r.category_id, r.sub_category_id]));
   return rows.map((r) =>
     toSearchDoc({
       id: String(r.id),

@@ -120,6 +120,16 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/lib/bnpl.ts',
     'worker/lib/bundleCart.ts',
     'worker/lib/offers.ts',
+    /**
+     * NOT EVERY REFUSAL IS THROWN. `saleAvailability` here does not raise an
+     * error — it WRITES the code into `availability.reason` on every cart line
+     * and every product view, and the cart's blocked line decodes it through
+     * the same table a thrown one goes through. The four pre-order refusals
+     * (the quota, the route nobody priced, no route offered, pre-order off)
+     * reach a customer only this way, so a source list of throwers alone would
+     * call them dead weight while they are on screen.
+     */
+    'worker/routes/products.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

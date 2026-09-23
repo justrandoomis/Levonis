@@ -35,9 +35,23 @@
  *     checkout still names it (src/lib/refusalStrings.ts) — and the day the
  *     counter is reconnected, this is the wording the cart owes.
  *
- * NOTHING HERE REIMPLEMENTS THE PAGE. `lineRemaining` and the two `const`s
- * that choose the sentence are LIFTED OUT OF src/pages/Cart.tsx and run, so
- * these assertions can only pass because the shipped code behaves.
+ *   · THE THREE REFUSALS THAT ACTUALLY REACH A CART LINE TODAY. The quota is
+ *     only ONE of the four codes a pre-order can be refused with, and the test
+ *     above says why it is the one an ordinary line cannot carry: the
+ *     storefront publishes an untracked capacity, so a pre-order-only line
+ *     that goes dark goes dark as NO_TRANSPORT_OFFERED,
+ *     TRANSPORT_COMMISSION_UNCONFIGURED or PREORDER_NOT_ENABLED — and «نفد
+ *     المخزون» was printed over all three. Pinning the quota alone left the
+ *     owner's own symptom live on the path it travels.
+ *
+ *   · THE SENTENCE IS DECODED, NOT COPIED. It was hand-copied into the page as
+ *     an Arabic literal, and the copy had already lost the remedy clause the
+ *     table's entry carries.
+ *
+ * NOTHING HERE REIMPLEMENTS THE PAGE. `lineRemaining`, the `const`s that
+ * choose the sentence and the page's own set of pre-order refusal codes are
+ * all LIFTED OUT OF src/pages/Cart.tsx and run, so these assertions can only
+ * pass because the shipped code behaves.
  *
  * Run: node --import tsx --test tests/cartPreorderQuotaWording.test.ts
  */
@@ -50,7 +64,7 @@ import { ROOT } from './fixtures/d1';
 import { asD1, freshDb, stubApp, get, json, type StubUser } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
 import { resolveCapacity } from '../worker/lib/inventory';
-import { stockRefusal } from '../src/lib/refusalStrings';
+import { apiRefusal } from '../src/lib/refusalStrings';
 
 const buyer: StubUser = { id: 'u1', role: 'customer', email: 's@x.co' };
 const cartApp = (db: unknown) => stubApp(db, buyer, (a) => a.route('/api/cart', cartRoutes));
@@ -66,15 +80,33 @@ function liftLineRemaining(): (item: unknown) => Rem {
   return new Function('item', m[1]) as (item: unknown) => Rem;
 }
 
-/** The two `const`s the blocked line decides its sentence with, lifted whole. */
-function liftVerdict(): (item: unknown, rem: Rem) => { quotaFull: boolean; soldOut: boolean } {
-  const m = /const quotaFull =([\s\S]*?);\n\s*const soldOut =([\s\S]*?);\n\s*return \(/.exec(CART_SRC);
-  assert.ok(m, 'the blocked line still decides between the two sentences in two consts');
-  return new Function(
+/** The page's own set of "this refusal is not about a shelf" codes, lifted. */
+function liftPreorderRefusals(): Set<string> {
+  const m = /const PREORDER_REFUSALS = new Set\(\[([\s\S]*?)\]\);/.exec(CART_SRC);
+  assert.ok(m, 'the page still names the pre-order refusals in one Set');
+  return new Function(`return new Set([${m[1]}]);`)() as Set<string>;
+}
+
+/**
+ * The `const`s the blocked line decides its sentence with, lifted whole.
+ *
+ * THREE NOW, NOT TWO. The quota is one of four refusals a pre-order can carry
+ * and the other three were still printing «نفد المخزون» — so the whole block
+ * from `const reason` to `const soldOut` is lifted, comments and all, rather
+ * than two named captures that would silently stop covering the branch the
+ * day a fourth line is added between them.
+ */
+function liftVerdict(): (item: unknown, rem: Rem) => { quotaFull: boolean; soldOut: boolean; notAShelf: boolean } {
+  const m = /(const reason = [\s\S]*?const soldOut =[\s\S]*?;)\n\s*return \(/.exec(CART_SRC);
+  assert.ok(m, 'the blocked line still decides its sentence in consts above the return');
+  const fn = new Function(
     'item',
     'rem',
-    `const quotaFull =${m[1]}; const soldOut =${m[2]}; return { quotaFull, soldOut };`
-  ) as (item: unknown, rem: Rem) => { quotaFull: boolean; soldOut: boolean };
+    'PREORDER_REFUSALS',
+    `${m[1]} return { quotaFull, soldOut, notAShelf };`
+  ) as (item: unknown, rem: Rem, set: Set<string>) => { quotaFull: boolean; soldOut: boolean; notAShelf: boolean };
+  const set = liftPreorderRefusals();
+  return (item, rem) => fn(item, rem, set);
 }
 
 /** A direct-sale product with three on the shelf, and a line resting in a cart. */
@@ -144,7 +176,7 @@ test('a direct-sale line whose shelf emptied still reads «نفد المخزون
   const v = liftVerdict()(line, rem);
   assert.deepEqual(
     v,
-    { quotaFull: false, soldOut: true },
+    { quotaFull: false, soldOut: true, notAShelf: false },
     'nothing about the pre-order half may weaken the sentence that is simply true'
   );
 });
@@ -220,22 +252,95 @@ test('and a pre-order route the server itself calls exhausted is read the same w
 
 // ══════════════════════════════ the sentence itself: reused, never invented
 
-test('the quota sentence is the one refusalStrings already publishes, and invents no Sorani', () => {
-  const said = stockRefusal({ code: 'PREORDER_CAPACITY_EXHAUSTED', details: { available: 0 } }, 'ar');
-  assert.ok(said && said.length > 0, 'refusalStrings has an Arabic sentence for an exhausted quota');
-  assert.ok(
-    CART_SRC.includes(said),
-    'the cart prints the checkout door’s own Arabic, so one counter is described one way'
-  );
-  assert.ok(!/نفد/.test(said), 'and that sentence denies the sold-out reading rather than repeating it');
+test('the quota sentence is DECODED from refusalStrings, not copied into the page', () => {
+  /**
+   * IT WAS A COPY, AND THE COPY HAD ALREADY LOST HALF THE SENTENCE. The page
+   * hard-coded `'اكتملت حصة الطلب المسبق لهذا الاختيار — وهذا ليس نفادًا
+   * للمخزون.'`, which is `stockRefusal(…, available: 0)`'s SHORT form and not
+   * the table's own entry — so the cart dropped «جرّب طريقة شحن أخرى أو عُد
+   * لاحقًا», the clause refusalStrings' contract requires of this code ("the
+   * sentence has to point at the thing the customer can still do"). The cart
+   * pointed at nothing while the checkout pointed at another route.
+   */
+  const table = apiRefusal({ code: 'PREORDER_CAPACITY_EXHAUSTED' }, 'ar');
+  assert.match(table, /جرّب طريقة شحن أخرى أو عُد لاحقًا/, 'the table entry carries the remedy');
+  assert.ok(!/نفد المخزون/.test(table), 'and denies the sold-out reading rather than repeating it');
 
-  // The `loc` call for it takes TWO arguments: Kurdish falls back to the
-  // Arabic, which is this app's documented behaviour and what every other 0075
-  // sentence in this file does. A third argument here would be a machine
-  // translation of a refusal.
-  const call = new RegExp(`loc\\(\\s*'${said.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}',\\s*'[^']+'\\s*\\)`);
-  assert.match(CART_SRC, call, 'the quota sentence must not carry an invented ckb string');
+  // The page asks the table; it does not keep a copy that can drift from it.
+  assert.match(
+    CART_SRC,
+    /apiRefusal\(\{ code: 'PREORDER_CAPACITY_EXHAUSTED' \}, lang as 'ar' \| 'en' \| 'ckb'\)/,
+    'the blocked line decodes the code instead of printing a literal'
+  );
+  assert.ok(
+    !CART_SRC.includes('اكتملت حصة الطلب المسبق لهذا الاختيار'),
+    'no copy of the sentence is left in the page to drift'
+  );
 
   // The shelf sentence keeps the hand-written Kurdish it already had.
   assert.match(CART_SRC, /loc\('نفد المخزون', 'Out of stock', 'کۆگا بەتاڵە'\)/);
+});
+
+test('NO SORANI IS INVENTED for any of the four pre-order refusals', () => {
+  /**
+   * Three of the four are sentences src/pages/Product.tsx has carried by hand
+   * in all three languages since 0073; the table now holds that same wording
+   * so the two screens cannot drift. The fourth — the quota — has no Kurdish
+   * anybody has written, so its `ckb` IS the Arabic, which is this app's
+   * documented fallback and the choice the entry states in its own comment.
+   * What must never appear is a machine translation.
+   */
+  const productSrc = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
+  for (const code of ['PREORDER_NOT_ENABLED', 'NO_TRANSPORT_OFFERED', 'TRANSPORT_COMMISSION_UNCONFIGURED']) {
+    const ckb = apiRefusal({ code }, 'ckb');
+    assert.ok(ckb.length > 0, `${code} answers in Kurdish`);
+    assert.ok(productSrc.includes(ckb), `${code}'s Sorani is the one already hand-written in Product.tsx`);
+    const ar = apiRefusal({ code }, 'ar');
+    assert.ok(productSrc.includes(ar), `${code}'s Arabic is the one already hand-written in Product.tsx`);
+  }
+  assert.equal(
+    apiRefusal({ code: 'PREORDER_CAPACITY_EXHAUSTED' }, 'ckb'),
+    apiRefusal({ code: 'PREORDER_CAPACITY_EXHAUSTED' }, 'ar'),
+    'the quota sentence falls back to the Arabic rather than inventing Kurdish'
+  );
+});
+
+test('a pre-order line with NO USABLE ROUTE is not told its shelf is empty', async () => {
+  /**
+   * THE CASE THAT ACTUALLY HAPPENS ON THIS CATALOGUE. The quota code cannot
+   * reach an ordinary cart line today — the test above pins WHY: the
+   * storefront resolves every route to an untracked capacity, so `hasRoom` is
+   * always true and `preorderUsable` fails only for want of a ROUTE. A
+   * pre-order-only line whose admin unprices its route, disables its cell or
+   * switches pre-order off closes with NO_TRANSPORT_OFFERED,
+   * TRANSPORT_COMMISSION_UNCONFIGURED or PREORDER_NOT_ENABLED — and the page
+   * printed «نفد المخزون» over all three: the same untruth about a line that
+   * has no shelf, reached by the three doors the customer can actually reach.
+   */
+  for (const code of ['NO_TRANSPORT_OFFERED', 'TRANSPORT_COMMISSION_UNCONFIGURED', 'PREORDER_NOT_ENABLED']) {
+    const line = await lineOf(seedPreorder(), 'ci_pre');
+    const a = line.availability as { mode: string; reason: string | null; qty_ok: boolean };
+    a.mode = 'unavailable';
+    a.reason = code;
+    a.qty_ok = false;
+
+    const rem = liftLineRemaining()(line);
+    const v = liftVerdict()(line, rem);
+    assert.equal(v.notAShelf, true, `${code} is a refusal about the pre-order route`);
+    assert.equal(v.soldOut, false, `${code} must not print «نفد المخزون»`);
+    // And the sentence it does print says something true and actionable.
+    assert.ok(apiRefusal({ code }, 'ar').length > 0, `${code} has an Arabic sentence to print`);
+  }
+});
+
+test('an OUT_OF_STOCK direct-sale line is untouched by all of that', async () => {
+  // The guard on the guard: widening the "not a shelf" set must never swallow
+  // the sentence that is simply true.
+  const raw = seedShelf();
+  raw.prepare("UPDATE products SET stock = 0 WHERE id = 'p_pla'").run();
+  const line = await lineOf(raw, 'ci_shelf');
+  const rem = liftLineRemaining()(line);
+  const v = liftVerdict()(line, rem);
+  assert.equal(v.notAShelf, false);
+  assert.equal(v.soldOut, true);
 });
