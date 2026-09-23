@@ -89,6 +89,18 @@ function withdrawalPublic(w: WithdrawalRow) {
       note: w.destination_note,
       frozen_at: w.destination_frozen_at,
     },
+    /**
+     * THE DINARS THE CUSTOMER TYPED (migration 0106), or null for a request
+     * filed before that column existed — or one whose claim the server could
+     * not corroborate against its own rate and the cents that arrived. Every
+     * screen prints this when it is present and converts from the cents only
+     * when it is absent, the same one-directional fallback a deposit has
+     * carried since 0105. It is testimony beside the money, never instead of
+     * it: `amount_usd_cents` above is what was reserved and what will be
+     * debited.
+     */
+    declared_amount_iqd: w.declared_amount_iqd ?? null,
+    exchange_rate_snapshot: w.exchange_rate_snapshot ?? null,
     payout_reference: w.payout_reference || null,
     payout_at: w.payout_at,
     outcome_reason: w.outcome_reason || null,
@@ -429,10 +441,38 @@ walletRoutes.post('/withdrawals', async (c) => {
   const holder = str(body.destinationHolder, 'destinationHolder', { max: 120, required: false });
   const destinationNote = str(body.destinationNote, 'destinationNote', { max: 300, required: false });
   const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { max: 80, required: false });
+  /**
+   * WHAT THE CUSTOMER TYPED, WHEN THEY TYPED DINARS (migration 0106).
+   *
+   * The mirror of the deposit route above, and for the same reason: the hold
+   * and the later debit are computed from `amount_usd_cents` and nothing else,
+   * but the cents cannot be converted back to the figure the customer asked
+   * for. A typed 50,000 د.ع became 3,572 cents and read back as 50,008 on
+   * every withdrawal screen — eight dinars the customer never asked to
+   * withdraw. Optional, so an older client keeps working.
+   */
+  const declaredAmountIqd = int(body.declared_amount_iqd, 'declared_amount_iqd', {
+    min: 0,
+    max: 10_000_000_000,
+    def: 0,
+  });
 
   // The rate is read ONCE here and quoted ONCE inside the engine. The stored
   // fee_cents/net_cents/fee_policy are the snapshot everyone else reads.
   const feeBps = await readWithdrawalFeeBps(c.env.DB);
+  /**
+   * Read once, here, and stored beside the dinars — never re-read at display
+   * time, which is what made the figure drift in the first place.
+   *
+   * IT IS ALSO WHAT THE CLAIM IS CHECKED AGAINST. This is the SERVER's rate,
+   * not necessarily the one the customer's tab floored with, so the engine
+   * re-runs the conversion against it and stores the pair only if it lands on
+   * `amount` (`corroboratedDeclaredIqd`, worker/lib/walletOps.ts). A tab left
+   * open across a rate change, and a crafted body declaring 50,000,000 د.ع
+   * beside 100 cents, both come out the same way: NULL, and every screen
+   * converts the cents instead. The withdrawal itself is never refused for it.
+   */
+  const exchangeRate = declaredAmountIqd ? Number(await getSetting(c.env.DB, 'exchangeRate')) || 0 : 0;
 
   const res = await requestWithdrawal(c.env.DB, {
     userId: user.id,
@@ -441,6 +481,8 @@ walletRoutes.post('/withdrawals', async (c) => {
     eventKey: idempotencyKey ? `wd:${idempotencyKey}` : `wd:${newId('evt')}`,
     note,
     feeBps,
+    declaredAmountIqd: declaredAmountIqd || undefined,
+    exchangeRateSnapshot: exchangeRate || undefined,
   });
   if (!res.ok) throwForWithdrawalFailure(res);
 
@@ -471,7 +513,15 @@ walletRoutes.post('/withdrawals', async (c) => {
     announceAfterResponse(
       c,
       'wallet',
-      `🏧 New withdrawal request (pending review — no transfer made)\nOperation: ${operationNumber(res.id, 'WD')}\nUser: ${user.username || `#${user.id}`}\nAmount: $${(amount / 100).toFixed(2)}${
+      `🏧 New withdrawal request (pending review — no transfer made)\nOperation: ${operationNumber(res.id, 'WD')}\nUser: ${user.username || `#${user.id}`}\nAmount: ${
+        // The typed dinars FIRST when the request recorded them, with the
+        // ledger value named beside it — the register the deposit review card
+        // already uses («المبلغ: X د.ع (الدفتر: $Y)»). This line was dollars
+        // only, so it is gaining a figure, not swapping one.
+        row?.declared_amount_iqd
+          ? `${row.declared_amount_iqd.toLocaleString('en-US')} د.ع (ledger $${(amount / 100).toFixed(2)})`
+          : `$${(amount / 100).toFixed(2)}`
+      }${
         row && row.fee_cents > 0
           ? `\nCommission: $${(row.fee_cents / 100).toFixed(2)} (deducted) — net $${(row.net_cents / 100).toFixed(2)}`
           : ''

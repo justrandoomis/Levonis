@@ -288,10 +288,19 @@ export default function AdminWalletRequests() {
                 <div className="text-xl font-black text-white tabular-nums">
                   {/* Presence decides, not truthiness: a request with no
                       recorded dinars falls back to the conversion, and a
-                      recorded figure is printed exactly as it was filed. */}
+                      recorded figure is printed exactly as it was filed.
+                      A DEPOSIT's figure comes from the separate testimony map
+                      (migration 0105, fetched above because the legacy list
+                      route reports the ledger row only); a WITHDRAWAL's rides
+                      on the row itself (migration 0106), because both admin
+                      lists already join `wallet_withdrawals`. This is the card
+                      a human reads before making the transfer, so it must
+                      state the amount the customer actually asked for. */}
                   {declaredIqd[t.id]
                     ? formatIqd(declaredIqd[t.id].amount_iqd)
-                    : formatWalletIqd(t.amount, exchangeRate)}
+                    : t.withdrawal?.declared_amount_iqd
+                      ? formatIqd(t.withdrawal.declared_amount_iqd)
+                      : formatWalletIqd(t.amount, exchangeRate)}
                 </div>
                 {/* The ledger value AND the rate. A reviewer approving a
                     deposit is reconciling a bank transfer against a stored

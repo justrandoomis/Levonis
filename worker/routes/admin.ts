@@ -254,10 +254,13 @@ adminRoutes.get('/overview', async (c) => {
       `SELECT wt.*, u.email, u.username,
               w.id AS withdrawal_id, w.state AS withdrawal_state,
               w.needs_reconciliation AS withdrawal_needs_reconciliation,
-              w.payout_reference AS withdrawal_payout_reference
+              w.payout_reference AS withdrawal_payout_reference,
+              w.declared_amount_iqd AS withdrawal_declared_iqd,
+              m.declared_amount_iqd AS deposit_declared_iqd
          FROM wallet_transactions wt
          LEFT JOIN users u ON u.id = wt.user_id
          LEFT JOIN wallet_withdrawals w ON w.tx_id = wt.id
+         LEFT JOIN wallet_deposit_meta m ON m.tx_id = wt.id
         WHERE wt.status = 'pending' ORDER BY wt.created_at DESC LIMIT 10`
     ).all<Record<string, unknown>>(),
     db.prepare("SELECT COUNT(*) AS n FROM community_requests WHERE status = 'open'").first<{ n: number }>(),
@@ -289,7 +292,13 @@ adminRoutes.get('/overview', async (c) => {
       open_community_requests: pendingCommunity?.n ?? 0,
     },
     pending_wallet_requests: money
-      ? pendingWallet.results.map((t) => ({ ...walletTxPublic(t), ...withdrawalRef(t), email: t.email, username: t.username }))
+      ? pendingWallet.results.map((t) => ({
+          ...walletTxPublic(t),
+          ...withdrawalRef(t),
+          ...depositRef(t),
+          email: t.email,
+          username: t.username,
+        }))
       : [],
     recent_orders: recentOrders.results.map((o) => ({
       id: o.id,
@@ -1149,6 +1158,34 @@ adminRoutes.delete('/products/:id', async (c) => {
 
 /** The workflow row behind a ledger withdrawal, for the panel — or null for a
  *  deposit / a pre-0015 withdrawal, which the legacy decision still handles. */
+/**
+ * THE DINARS THE CUSTOMER TYPED ON A DEPOSIT (migration 0105), or null for a
+ * transfer recorded before that column existed.
+ *
+ * The owner's rule — «الاعتماد على السعر المدخل بدون تقريب» — is not scoped to
+ * withdrawals, and this strip is a LIVE approve/reject surface: the buttons
+ * that credit the money sit on the same row. Without this the dashboard
+ * printed «deposit 50,008 د.ع» (or 49,994 د.ع since the conversion floors) for
+ * a customer who transferred 50,000 and typed 50,000, while the Wallet
+ * Requests screen printed 50,000 for that same request — two admin screens
+ * disagreeing about one transaction, one of them under the approve button.
+ *
+ * The testimony lives in `wallet_deposit_meta`, one LEFT JOIN away in a query
+ * this route already runs; it is not worth a second fetch and it is not worth
+ * a second number.
+ */
+function depositRef(t: Record<string, unknown>) {
+  if (String(t.type) !== 'deposit') return {};
+  return {
+    deposit: {
+      declared_amount_iqd:
+        t.deposit_declared_iqd === null || t.deposit_declared_iqd === undefined
+          ? null
+          : Number(t.deposit_declared_iqd),
+    },
+  };
+}
+
 function withdrawalRef(t: Record<string, unknown>) {
   if (!t.withdrawal_id) return { withdrawal: null };
   return {
@@ -1157,6 +1194,21 @@ function withdrawalRef(t: Record<string, unknown>) {
       state: String(t.withdrawal_state),
       needs_reconciliation: Number(t.withdrawal_needs_reconciliation) === 1,
       payout_reference: t.withdrawal_payout_reference ? String(t.withdrawal_payout_reference) : null,
+      /**
+       * THE DINARS THE CUSTOMER TYPED (migration 0106), or null for a request
+       * filed before that column existed.
+       *
+       * The panel used to print `formatWalletIqd(t.amount, exchangeRate)` for
+       * a withdrawal — a conversion of the stored cents back to dinars, which
+       * is not the inverse of the one the form did. A reviewer about to make
+       * a transfer was reading 50,008 د.ع for a customer who typed 50,000.
+       * The figure travels on the row rather than through a second fetch
+       * because both admin lists already join `wallet_withdrawals`.
+       */
+      declared_amount_iqd:
+        t.withdrawal_declared_iqd === null || t.withdrawal_declared_iqd === undefined
+          ? null
+          : Number(t.withdrawal_declared_iqd),
     },
   };
 }
@@ -1170,7 +1222,8 @@ adminRoutes.get('/wallet-requests', async (c) => {
   let sql = `SELECT wt.*, u.email, u.username,
                     w.id AS withdrawal_id, w.state AS withdrawal_state,
                     w.needs_reconciliation AS withdrawal_needs_reconciliation,
-                    w.payout_reference AS withdrawal_payout_reference
+                    w.payout_reference AS withdrawal_payout_reference,
+                    w.declared_amount_iqd AS withdrawal_declared_iqd
                FROM wallet_transactions wt
                LEFT JOIN users u ON u.id = wt.user_id
                LEFT JOIN wallet_withdrawals w ON w.tx_id = wt.id

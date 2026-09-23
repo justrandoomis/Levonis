@@ -324,7 +324,25 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                     <div className="min-w-0">
                       <div className="font-bold text-white text-sm truncate flex items-center gap-2">
                         <span className="capitalize">{req.type}</span>
-                        <span className="text-[#c5a059]">{formatWalletIqd(req.amount, exchangeRate)}</span>
+                        {/* EITHER KIND PRINTS WHAT THE CUSTOMER TYPED — a
+                        withdrawal from its own row (migration 0106), a deposit
+                        from `wallet_deposit_meta` (0105), both joined by this
+                        route. The owner's rule is «في المحفظة», not «in
+                        withdrawals», and the approve/reject buttons for this
+                        request are on this same row: a reviewer must not read
+                        50,008 د.ع here and 50,000 د.ع on the Wallet Requests
+                        screen for one transaction.
+
+                        THE TWO STAT CARDS ABOVE KEEP CONVERTING, on purpose.
+                        They are aggregates, and a sum of many deposits has no
+                        typed figure — none may be invented for it. */}
+                        <span className="text-[#c5a059]">
+                          {req.withdrawal?.declared_amount_iqd
+                            ? formatIqd(req.withdrawal.declared_amount_iqd)
+                            : req.deposit?.declared_amount_iqd
+                              ? formatIqd(req.deposit.declared_amount_iqd)
+                              : formatWalletIqd(req.amount, exchangeRate)}
+                        </span>
                         {/* THE LEDGER'S OWN VALUE, kept small and named. The stored unit
                         really is USD cents (migrations/0001_init.sql), so hiding it
                         entirely would make the dinars look like the stored number and

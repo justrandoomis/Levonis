@@ -2,6 +2,7 @@ import type { Env } from './types';
 import { newId } from './crypto';
 import { audit } from './audit';
 import { busFor, emitEvent, outboxStatement } from './eventBus';
+import { isSchemaMissing } from './membershipBenefits';
 import { PaymentAuthorizedV1 } from '@levonis/contracts/events/v1/PaymentAuthorized';
 import { PaymentCompletedV1 } from '@levonis/contracts/events/v1/PaymentCompleted';
 import { PaymentFailedV1 } from '@levonis/contracts/events/v1/PaymentFailed';
@@ -87,6 +88,65 @@ export const MAX_AMOUNT_CENTS = 100_000_000;
 /** Integer-cents money guard: no floats, no NaN, no negatives, no overflow. */
 export function isValidAmountCents(v: unknown): v is number {
   return typeof v === 'number' && Number.isSafeInteger(v) && v > 0 && v <= MAX_AMOUNT_CENTS;
+}
+
+/**
+ * DOES THE CUSTOMER'S OWN DINAR FIGURE MATCH THE CENTS THEY SENT?
+ *
+ * `declared_amount_iqd` (migrations 0105 and 0106) is TESTIMONY — the figure
+ * the customer typed — and it is unvalidated client input. 0105's header
+ * answered the hazard of a forged claim with «display reads the dinars», and
+ * that answer was enough while the dinars sat beside the money. It is not
+ * enough now: the figure became the HEADLINE a human reads before making an
+ * outbound transfer, and display-reading is precisely how a human is misled.
+ * A crafted request declaring 50,000,000 د.ع beside 100 cents reserved 100
+ * cents and printed «50,000,000 د.ع» in 20px bold with «$1.00» in grey under
+ * it. A withdrawal has no observed-amount reconciliation and no receipt, so
+ * that card is the only number the payer has.
+ *
+ * So the claim is CORROBORATED BEFORE IT IS STORED, against the rate the
+ * SERVER read at submit time and the cents the request actually carries: the
+ * client's own conversion is re-run here and has to land on the same cent.
+ *
+ * THE WINDOW IS THE FLOOR OR THE CEIL OF THAT CONVERSION, AND NOTHING ELSE.
+ * `iqdToUsdCents` (src/lib/api.ts) floors since the owner's «وعند الدولار
+ * يقرب الى عدد صحيح اقل»; a browser still holding the PREVIOUS bundle ceils.
+ * Those two are the only cent values an honest client can produce for a given
+ * dinar figure at a given rate, and they are one apart. So `amountCents` is
+ * accepted at the floor or one above it — never one BELOW, which no client
+ * computes and which would let a request under-reserve against its own claim.
+ * That is the entire space of legitimate disagreement here: 14 د.ع at 1,400.
+ * Anything outside it is not a rounding difference. It is a different rate (a
+ * tab left open while the owner moved it: src/WalletContext.tsx reads
+ * /api/settings/public once on mount and never repolls) or a different number
+ * entirely, and neither may be printed as the amount to pay.
+ *
+ * IT REFUSES THE TESTIMONY, NEVER THE MONEY. A claim that does not corroborate
+ * is dropped to NULL and the request files exactly as it would have before
+ * 0105/0106 existed — every reader then converts the stored cents, which are
+ * derived from the hold and cannot be forged. Refusing the whole request was
+ * the other option and was not taken: it would turn the owner moving the rate
+ * mid-session into a failed payout request, and it would need a refusal
+ * sentence that does not exist in Sorani, which may never be machine written.
+ */
+export function corroboratedDeclaredIqd(
+  declaredAmountIqd: unknown,
+  amountCents: unknown,
+  exchangeRate: unknown
+): { declared_amount_iqd: number | null; exchange_rate_snapshot: number | null } {
+  const none = { declared_amount_iqd: null, exchange_rate_snapshot: null };
+  if (!Number.isInteger(declaredAmountIqd) || (declaredAmountIqd as number) <= 0) return none;
+  if (!Number.isInteger(exchangeRate) || (exchangeRate as number) <= 0) return none;
+  if (!isValidAmountCents(amountCents)) return none;
+  // The client's rule, re-run on this side. Floor, because that is what
+  // `iqdToUsdCents` has done since the owner's instruction; `converted + 1` is
+  // the ceil a client that has not reloaded yet still sends.
+  const converted = Math.floor(((declaredAmountIqd as number) * 100) / (exchangeRate as number));
+  if (amountCents !== converted && amountCents !== converted + 1) return none;
+  return {
+    declared_amount_iqd: declaredAmountIqd as number,
+    exchange_rate_snapshot: exchangeRate as number,
+  };
 }
 
 /**
@@ -777,6 +837,23 @@ export interface RequestWithdrawalInput {
    * snapshot, so changing the rate tomorrow cannot alter a filed request.
    */
   feeBps?: number;
+  /**
+   * WHAT THE CUSTOMER TYPED, WHEN THEY TYPED DINARS (migration 0106).
+   *
+   * `amountCents` above stays the authoritative figure and the only one the
+   * hold, the debit and the fee quote are ever computed from. This is the
+   * customer's own claim about the amount they asked for, recorded verbatim
+   * because the cents cannot be converted back to it: at 1,400 IQD/USD a cent
+   * is 14 د.ع, so 50,000 has no cent value that reads back as 50,000.
+   * Optional — an older client that does not send it files exactly as before
+   * and the column reads NULL, which is the truth about that row.
+   */
+  declaredAmountIqd?: number;
+  /** The rate the cents were computed at — the SERVER's rate at submit time,
+   *  which is also what the declared figure is checked against. Stored only
+   *  beside a figure it corroborates. Written once here, never recomputed at
+   *  display time. */
+  exchangeRateSnapshot?: number;
 }
 
 export type WithdrawalOpResult =
@@ -803,6 +880,21 @@ export async function requestWithdrawal(
    * cleanly: a withdrawal whose whole value is commission is not a withdrawal.
    */
   if (quote.net_cents <= 0) return { ok: false, reason: 'INVALID_AMOUNT' };
+  /**
+   * Recorded only when it is a whole, positive dinar figure AND the rate it
+   * arrived with converts it back onto the cents this request actually
+   * carries — `corroboratedDeclaredIqd` above says why that second half is
+   * not optional now that the figure is the headline on a payout card.
+   * Anything else is stored as NULL rather than as a repaired number: a
+   * column whose whole job is to say what the customer typed must not contain
+   * something nobody typed, and must not carry a claim nothing backs. The
+   * rate follows the figure and never travels alone.
+   */
+  const { declared_amount_iqd: declaredIqd, exchange_rate_snapshot: rateSnapshot } = corroboratedDeclaredIqd(
+    p.declaredAmountIqd,
+    p.amountCents,
+    p.exchangeRateSnapshot
+  );
   const holdId = newId('whold');
   const txId = newId('wtx');
   const wdId = newId('wd');
@@ -815,7 +907,13 @@ export async function requestWithdrawal(
     note: (p.note ?? '').slice(0, 300),
   };
 
-  const statements = [
+  /**
+   * THE BATCH, BUILT TWICE-ABLE.
+   *
+   * `withDeclared` false rebuilds the request INSERT without the two columns
+   * migration 0106 adds. It is not a style choice — see `runMoneyBatch` below.
+   */
+  const buildStatements = (withDeclared: boolean) => [
     holdInsertStatement(db, holdId, 'withdrawal', holdInput),
     // Ledger row: pending until an actual payout is recorded. Dependent on
     // the hold having been created by the statement above.
@@ -840,24 +938,30 @@ export async function requestWithdrawal(
         `INSERT INTO wallet_withdrawals
            (id, user_id, tx_id, hold_id, amount_cents, fee_cents, net_cents, fee_policy,
             destination_kind, destination_account, destination_holder, destination_note,
+            ${withDeclared ? 'declared_amount_iqd, exchange_rate_snapshot,' : ''}
             destination_frozen_at, state, created_at, updated_at)
-         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ${NOW_SQL}, 'requested', ${NOW_SQL}, ${NOW_SQL}
+         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ${
+           withDeclared ? '?13, ?14, ' : ''
+         }${NOW_SQL}, 'requested', ${NOW_SQL}, ${NOW_SQL}
           WHERE EXISTS (SELECT 1 FROM wallet_holds h WHERE h.id = ?4 AND h.state = 'active')
             AND EXISTS (SELECT 1 FROM wallet_transactions t WHERE t.id = ?3)`
       )
       .bind(
-        wdId,
-        p.userId,
-        txId,
-        holdId,
-        p.amountCents,
-        quote.fee_cents,
-        quote.net_cents,
-        quote.fee_policy,
-        p.destination.kind.slice(0, 40),
-        p.destination.account.slice(0, 120),
-        (p.destination.holder ?? '').slice(0, 120),
-        (p.destination.note ?? '').slice(0, 300)
+        ...[
+          wdId,
+          p.userId,
+          txId,
+          holdId,
+          p.amountCents,
+          quote.fee_cents,
+          quote.net_cents,
+          quote.fee_policy,
+          p.destination.kind.slice(0, 40),
+          p.destination.account.slice(0, 120),
+          (p.destination.holder ?? '').slice(0, 120),
+          (p.destination.note ?? '').slice(0, 300),
+          ...(withDeclared ? [declaredIqd, rateSnapshot] : []),
+        ]
       ),
     // Link the hold to its ledger row, so committing the payout and posting
     // the debit can never be attributed to a different transaction.
@@ -870,12 +974,52 @@ export async function requestWithdrawal(
       .bind(holdId, txId, wdId),
   ];
 
-  try {
-    const res = await db.batch(statements);
-    if ((res[0]?.meta.changes ?? 0) > 0) return { ok: true, id: wdId, replayed: false };
-  } catch {
-    // UNIQUE race → whole batch rolled back; classify below.
-  }
+  /**
+   * THE DEPLOY WINDOW, WHICH THIS FUNCTION MUST SURVIVE RATHER THAN BLAME THE
+   * CUSTOMER FOR.
+   *
+   * Between a Worker going live and `0106_withdrawal_declared_iqd.sql` being
+   * applied, this INSERT names two columns the database does not have. D1
+   * aborts the WHOLE batch, the `catch` below sees an exception it was written
+   * to read as a UNIQUE race, `classifyHoldFailure` finds no hold — because
+   * the batch rolled back — and answers INSUFFICIENT_AVAILABLE. The customer
+   * is told «Withdrawal exceeds your available balance» while holding $10,000,
+   * on every withdrawal, for the length of the window. Nothing is corrupted;
+   * the batch is atomic and writes nothing. It is a false refusal, and a false
+   * refusal about someone's own money is not an acceptable deploy cost.
+   *
+   * `EXPECTED_MIGRATION` (worker/lib/schemaVersion.ts) does not prevent this:
+   * it is surfaced as a health alarm in worker/routes/misc.ts and blocks
+   * nothing. So the batch is retried ONCE without the two columns, and only
+   * for the one error that means exactly this — `isSchemaMissing` matches
+   * SQLite's INSERT wording, «table … has no column named …». Every other
+   * failure falls through to the classifier untouched.
+   *
+   * The retry files the request the way it filed before 0106 existed: the
+   * testimony is lost (the column is not there to hold it), the MONEY is
+   * identical, and once the migration lands the next request records it again.
+   * This mirrors `cartLineSelect` in worker/lib/cartLineProjection.ts, which
+   * is the same answer to the same deploy ordering on the read side.
+   */
+  const runMoneyBatch = async (): Promise<D1Result[] | null> => {
+    try {
+      return await db.batch(buildStatements(true));
+    } catch (e) {
+      if (!isSchemaMissing(e)) return null; // UNIQUE race → classify below.
+      console.error(
+        `wallet_withdrawals is behind the deployment (0106 not applied): ${
+          e instanceof Error ? e.message : String(e)
+        }`
+      );
+      try {
+        return await db.batch(buildStatements(false));
+      } catch {
+        return null;
+      }
+    }
+  };
+  const res = await runMoneyBatch();
+  if (res && (res[0]?.meta.changes ?? 0) > 0) return { ok: true, id: wdId, replayed: false };
   const cls = await classifyHoldFailure(db, 'withdrawal', holdInput);
   if (cls.ok) {
     // The event already holds money: return the existing request rather than
@@ -905,6 +1049,12 @@ export interface WithdrawalRow {
   destination_holder: string;
   destination_note: string;
   destination_frozen_at: string;
+  /** Migration 0106 — the typed dinars, or NULL for a row filed before it,
+   *  filed during the window before it was applied, or filed with a claim the
+   *  server's own rate did not corroborate. Testimony: read for display,
+   *  never converted back into money. */
+  declared_amount_iqd: number | null;
+  exchange_rate_snapshot: number | null;
   state: WithdrawalState;
   needs_reconciliation: number;
   reconciliation_note: string;
@@ -1227,16 +1377,18 @@ export async function createDepositRequest(db: D1Database, p: CreateDepositInput
   const referenceNorm = normalizeDepositReference(reference);
   const fingerprint = (p.fingerprint ?? '').slice(0, 80);
   /**
-   * Recorded only when it is a whole, positive dinar figure. Anything else is
-   * stored as NULL rather than as a repaired number: a column whose whole job
-   * is to say what the customer typed must not contain something nobody typed.
+   * Recorded only when it is a whole, positive dinar figure that the filed
+   * rate converts back onto these cents — the SAME corroboration the
+   * withdrawal side applies, because the same crafted claim reaches the same
+   * admin card. Anything else is stored as NULL rather than as a repaired
+   * number: a column whose whole job is to say what the customer typed must
+   * not contain something nobody typed.
    */
-  const declaredIqd =
-    Number.isInteger(p.declaredAmountIqd) && (p.declaredAmountIqd as number) > 0 ? p.declaredAmountIqd : null;
-  const rateSnapshot =
-    declaredIqd !== null && Number.isInteger(p.exchangeRateSnapshot) && (p.exchangeRateSnapshot as number) > 0
-      ? p.exchangeRateSnapshot
-      : null;
+  const { declared_amount_iqd: declaredIqd, exchange_rate_snapshot: rateSnapshot } = corroboratedDeclaredIqd(
+    p.declaredAmountIqd,
+    p.amountCents,
+    p.exchangeRateSnapshot
+  );
 
   // Signal lookup only — it decides which flag the reviewer sees, never
   // whether the row may be written, so it is not a check-then-write guard.

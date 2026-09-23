@@ -439,6 +439,16 @@ interface WithdrawalView {
   money_sent: boolean;
   needs_reconciliation: boolean;
   destination: { kind: string; account: string; holder: string; note: string; frozen_at: string };
+  /**
+   * The dinars the customer typed (migration 0106), or null for a request
+   * filed before the column existed — or one whose claim the server could not
+   * corroborate against its own rate and the cents that arrived, which is the
+   * same thing as far as this screen is concerned: no recorded figure, so
+   * convert. Read for display, never recomputed — see `depositDeclaredIqd` in
+   * src/lib/api.ts for why the cents cannot be converted back to it.
+   */
+  declared_amount_iqd: number | null;
+  exchange_rate_snapshot: number | null;
   payout_reference: string | null;
   outcome_reason: string | null;
   created_at: string;
@@ -610,12 +620,34 @@ export default function Wallet() {
    * «no fee policy has been approved» sentence rather than a guess.
    */
   const [feeBps, setFeeBps] = useState(0);
+  /**
+   * THE SERVER'S OWN FLOOR, READ FROM THE SERVER.
+   *
+   * The routes refuse anything under 100 cents (worker/routes/wallet.ts, both
+   * deposits and withdrawals) and this page did not know it, so a customer who
+   * typed a small dinar figure got the raw English
+   * «amount_usd_cents must be between 100 and 100000000» printed into an
+   * Arabic modal. The policy response has published `min_amount_usd_cents`
+   * all along and this call was already making it — it was thrown away.
+   *
+   * IT MATTERS MORE SINCE THE DOLLAR STARTED FLOORING. `iqdToUsdCents` floors,
+   * so at 1,400 IQD/USD anything under 14 د.ع now converts to ZERO cents,
+   * where it used to convert to 1. Zero must never be credited or reserved,
+   * and 0 is what this guard catches first — in the customer's own language,
+   * with the refusal vocabulary the page already has.
+   *
+   * A failed read leaves it at 0, which disables only the client-side floor;
+   * the server still refuses, exactly as it did before.
+   */
+  const [minAmountCents, setMinAmountCents] = useState(0);
   useEffect(() => {
     let alive = true;
     api
-      .get<{ withdrawal: { fee_bps: number } }>('/api/wallet/policy')
+      .get<{ withdrawal: { fee_bps: number; min_amount_usd_cents: number } }>('/api/wallet/policy')
       .then((p) => {
-        if (alive) setFeeBps(Number(p.withdrawal?.fee_bps) || 0);
+        if (!alive) return;
+        setFeeBps(Number(p.withdrawal?.fee_bps) || 0);
+        setMinAmountCents(Number(p.withdrawal?.min_amount_usd_cents) || 0);
       })
       .catch(() => undefined);
     return () => {
@@ -646,16 +678,24 @@ export default function Wallet() {
    * 50,000. Since migration 0105 the request records the typed figure, so a
    * deposit shows testimony rather than arithmetic.
    *
-   * ONLY IN DINARS, AND ONLY FOR DEPOSITS. In USD the stored cents ARE the
-   * customer's number, and a withdrawal records no declared dinars — printing
-   * a typed figure there while the hold reserves the converted cents would be
-   * the same defect wearing the other shirt. Everything else falls back to
-   * `fmt`, which is still the only thing that formats a balance.
+   * ONLY IN DINARS, AND NOW FOR WITHDRAWALS TOO. In USD the stored cents ARE
+   * the customer's number, so that branch still formats them. The sentence
+   * that stood here said a withdrawal «records no declared dinars», and that
+   * was true of the schema, not of the idea: migration 0106 gives the
+   * withdrawal request the same column, written at placement time from the
+   * same typed figure. A withdrawal row therefore prints what the customer
+   * asked to withdraw, not floor(the cents that were reserved).
+   *
+   * A BALANCE IS NOT A TRANSACTION. Everything else falls back to `fmt`, which
+   * is still the only thing that formats a balance — an aggregate has no typed
+   * figure and none may be invented for it.
    */
   const fmtOperation = useCallback(
     (op: Operation) => {
-      const declared = op.tx?.depositContext?.declared_amount_iqd;
-      if (currency !== 'IQD' || op.kind !== 'deposit' || !op.tx) return fmt(op.amount);
+      if (currency !== 'IQD') return fmt(op.amount);
+      const declared =
+        op.kind === 'deposit' ? op.tx?.depositContext?.declared_amount_iqd : op.withdrawal?.declared_amount_iqd;
+      if (declared === null || declared === undefined) return fmt(op.amount);
       const iqd = depositDeclaredIqd(declared, op.amount, exchangeRate);
       return `IQD ${iqd.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
     },
@@ -1119,6 +1159,7 @@ export default function Wallet() {
           available={balances.usd_cents_available}
           paymentMethods={paymentMethods}
           feeBps={feeBps}
+          minAmountCents={minAmountCents}
           fmt={fmt}
           onClose={() => setModal(null)}
           onDone={async (message) => {
@@ -1201,6 +1242,7 @@ function RequestModal({
   available,
   paymentMethods,
   feeBps,
+  minAmountCents,
   fmt,
   onClose,
   onDone,
@@ -1215,6 +1257,9 @@ function RequestModal({
   paymentMethods: { id: string; name: string; details: string }[];
   /** Commission in basis points, as the server reports it. Display only. */
   feeBps: number;
+  /** The smallest amount the server will accept, in cents, as the server
+   *  reports it. 0 when the policy read failed — then only the server refuses. */
+  minAmountCents: number;
   fmt: (cents: number, showSymbol?: boolean) => string;
   onClose: () => void;
   onDone: (message: string) => void | Promise<void>;
@@ -1258,16 +1303,24 @@ function RequestModal({
    * which is the number the customer, the admin panel and the Telegram card
    * were all showing for a transfer of 50,000.
    *
-   * It is sent only for a DEPOSIT, because only a deposit records it
-   * (migration 0105, `wallet_deposit_meta`). A withdrawal has nowhere to put
-   * it, so the withdrawal screens keep printing the converted amount — the
-   * figure that is actually reserved — rather than a typed number the ledger
-   * would then disagree with.
+   * IT IS SENT FOR BOTH KINDS NOW. The sentence that stood here said a
+   * withdrawal «has nowhere to put it» — true of the schema at the time, and
+   * the reason this figure was deposit-only. Migration 0106 gives
+   * `wallet_withdrawals` the same pair of columns, so a withdrawal records the
+   * typed dinars exactly as a deposit does (0105, `wallet_deposit_meta`) and
+   * every withdrawal screen prints them instead of converting the cents back.
+   *
+   * It stays testimony on both sides: the ledger still disagrees with it by up
+   * to one cent, and the ledger still wins — `amountCents` is what is held and
+   * what is debited. What changed is that the customer is no longer shown the
+   * ledger's rounding as if it were their own number.
    */
   const typedIqd = currency === 'IQD' && Number.isInteger(rawAmount) && rawAmount > 0 ? rawAmount : 0;
   /**
    * THE PREVIEW OF THE COMMISSION — the same arithmetic the server will run,
-   * written once, here, and nowhere else on this page.
+   * on the same cents it will run it on. The dinar breakdown below restates
+   * it at the same basis points over the TYPED figure so the three rows a
+   * customer confirms reconcile; these cents stay the only thing sent.
    *
    * Floor, because the server floors: the rounding goes to the customer. It is
    * a PREVIEW and says so by being recomputed from the live rate on every
@@ -1279,7 +1332,36 @@ function RequestModal({
   const feeCents = feeBps > 0 ? Math.floor((amountCents * feeBps) / 10_000) : 0;
   const netCents = amountCents - feeCents;
   const feePercentLabel = `${(feeBps / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
-  const amountLabel = kind === 'deposit' && typedIqd ? `IQD ${typedIqd.toLocaleString('en-US')}` : fmt(amountCents);
+  /**
+   * THE BREAKDOWN ADDS UP, BECAUSE ALL THREE ROWS COME FROM THE TYPED FIGURE.
+   *
+   * «المبلغ» shows what the customer wrote — that is rule (1). The commission
+   * and the net sit directly beneath it, and while they were `fmt(feeCents)` /
+   * `fmt(netCents)` — the cents converted BACK through `usdCentsToIqd` — the
+   * three numbers no longer reconciled: a typed 50,000 د.ع at 1,400 with the
+   * default 3% read «50,000 / −1,498 / 48,496», and 50,000 − 1,498 is 48,502.
+   * Six dinars missing on the screen where a customer confirms money leaving.
+   *
+   * So in dinars the whole breakdown is arithmetic over the typed figure, at
+   * the same basis points the server will apply: amount − commission = net,
+   * exactly, at every rate and every fee, including a fee of zero where the
+   * net is simply the amount. In dollars nothing changes — there the stored
+   * cents ARE the customer's number and `fmt` is already exact.
+   *
+   * WHAT THIS COSTS, NAMED. The dollars that actually move are `netCents`,
+   * and converting those to dinars can differ from the net shown here by up
+   * to about one cent (14 د.ع at 1,400) — the same bounded drift the ledger
+   * absorbs everywhere else since the owner's rule, and the same reason the
+   * typed figure is recorded rather than re-derived. A preview that is short
+   * by one cent and consistent is worth more to the person confirming than
+   * three numbers that are each defensible and do not add up.
+   */
+  const feeIqd = typedIqd && feeBps > 0 ? Math.floor((typedIqd * feeBps) / 10_000) : 0;
+  const netIqd = typedIqd ? typedIqd - feeIqd : 0;
+  const iqdLabel = (n: number) => `IQD ${n.toLocaleString('en-US')}`;
+  const amountLabel = typedIqd ? iqdLabel(typedIqd) : fmt(amountCents);
+  const feeLabel = typedIqd ? iqdLabel(feeIqd) : fmt(feeCents);
+  const netLabel = typedIqd ? iqdLabel(netIqd) : fmt(netCents);
   const overBalance = kind === 'withdrawal' && amountCents > available;
   /**
    * THE WITHDRAWAL CHANNELS ARE THE DEPOSIT CHANNELS — «نفس قنوات الإيداع».
@@ -1343,7 +1425,20 @@ function RequestModal({
       return destinationAccount.trim().length >= 3 ? '' : s.accountRequired2;
     }
     if (n === 2) {
+      /**
+       * ZERO FIRST, THEN THE SERVER'S FLOOR — both with the refusal this page
+       * already owns in all three languages («أدخل مبلغًا صحيحًا» / 'Enter a
+       * valid amount' / «بڕێکی دروست بنووسە»). No new string is written here,
+       * which is the only safe answer while ckb must never be machine
+       * generated.
+       *
+       * `!amountCents` catches a floored 0 — reachable for the first time now
+       * that the conversion floors, at any dinar figure under one cent's worth
+       * — and the minimum catches everything between that and $1.00, which the
+       * route would otherwise refuse in English inside an Arabic modal.
+       */
       if (!amountCents) return s.invalidAmount;
+      if (minAmountCents > 0 && amountCents < minAmountCents) return s.invalidAmount;
       if (overBalance) return s.insufficient;
       return '';
     }
@@ -1393,6 +1488,9 @@ function RequestModal({
       } else {
         await api.post('/api/wallet/withdrawals', {
           amount_usd_cents: amountCents,
+          // Testimony alongside the money, never instead of it: the server
+          // records it and reserves the cents (migration 0106).
+          declared_amount_iqd: typedIqd || undefined,
           note: note || undefined,
           destinationKind,
           destinationAccount: destinationAccount.trim(),
@@ -1596,14 +1694,14 @@ function RequestModal({
                       {feeBps > 0 && <span dir="ltr"> ({feePercentLabel})</span>}
                     </span>
                     {feeBps > 0 ? (
-                      <span dir="ltr">−{fmt(feeCents)}</span>
+                      <span dir="ltr">−{feeLabel}</span>
                     ) : (
                       <span aria-label={s.feeNotConfigured}>—</span>
                     )}
                   </div>
                   <div className="flex justify-between text-sm text-white font-bold">
                     <span>{s.net}</span>
-                    <span dir="ltr">{fmt(netCents)}</span>
+                    <span dir="ltr">{netLabel}</span>
                   </div>
                   <div className="flex justify-between text-xs text-zinc-400">
                     <span>{s.availableAfter}</span>
@@ -1684,11 +1782,11 @@ function RequestModal({
                         {s.fee}
                         <span dir="ltr"> ({feePercentLabel})</span>
                       </span>
-                      <span dir="ltr" className="text-white font-bold">−{fmt(feeCents)}</span>
+                      <span dir="ltr" className="text-white font-bold">−{feeLabel}</span>
                     </div>
                     <div className="flex justify-between text-zinc-400">
                       <span>{s.net}</span>
-                      <span dir="ltr" className="text-white font-bold">{fmt(netCents)}</span>
+                      <span dir="ltr" className="text-white font-bold">{netLabel}</span>
                     </div>
                   </>
                 )}

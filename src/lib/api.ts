@@ -1277,6 +1277,9 @@ export interface WalletWithdrawalRef {
   state: 'requested' | 'approved' | 'processing' | 'paid' | 'rejected' | 'cancelled' | 'failed';
   needs_reconciliation: boolean;
   payout_reference: string | null;
+  /** The dinars the customer typed (migration 0106), or null for a request
+   *  filed before the column existed. Read for display, never recomputed. */
+  declared_amount_iqd: number | null;
 }
 
 export interface WalletTx {
@@ -1294,6 +1297,11 @@ export interface WalletTx {
   receiptUrl: string | null;
   ref: string;
   withdrawal?: WalletWithdrawalRef | null;
+  /** A DEPOSIT's own testimony (migration 0105), on the routes that join it.
+   *  Absent on the routes that do not — `undefined` means "not carried here",
+   *  `null` means "this transfer recorded none", and only the second one is a
+   *  reason to fall back to converting the cents. */
+  deposit?: { declared_amount_iqd: number | null } | null;
   email?: string;
   username?: string;
   userId?: string;
@@ -1724,8 +1732,64 @@ export function formatWalletIqd(cents: number, exchangeRate: number): string {
   return formatIqd(usdCentsToIqd(cents, exchangeRate));
 }
 
+/**
+ * THE DOLLAR ROUNDS DOWN — «وعند الدولار يقرب الى عدد صحيح اقل».
+ *
+ * The owner's instruction, verbatim: «في المحفظة الاعتماد على السعر المدخل
+ * بدون تقريب، وعند الدولار يقرب الى عدد صحيح اقل — مثلا 35.71 = 50,000».
+ * At 1,400 IQD/USD, floor(5,000,000 / 1,400) = 3,571 cents = $35.71, which is
+ * that example exactly. This function used to CEIL and produced $35.72.
+ *
+ * THIS PARAGRAPH REPLACES AN ARGUMENT THAT NO LONGER HOLDS. The comment that
+ * stood here said the ceil was the right direction because the alternative
+ * credits less than was transferred, and that «Math.round only turns +8 into
+ * −6, which is worse». That reasoning was about which drift to prefer, and the
+ * owner has now chosen. It is not deleted quietly: the trade-off it named is
+ * real and is stated below, so nobody re-argues it from scratch and silently
+ * flips the rule back.
+ *
+ * WHICH WAY THE ERROR NOW GOES, ON EACH SIDE. Flooring is bounded by one cent
+ * — 13 د.ع at 1,400 — AT ONE RATE, which is the only claim this bound makes.
+ * A tab left open while the owner moves the rate is a different and much
+ * larger disagreement, and it is not answered here: the server refuses to
+ * record a typed figure its own rate does not convert onto the cents that
+ * arrived (`corroboratedDeclaredIqd`, worker/lib/walletOps.ts), so such a
+ * request files with no testimony rather than with a figure that is 3,565 د.ع
+ * out. Within one rate the drift leans in OPPOSITE directions for the two
+ * operations:
+ *   • a DEPOSIT credits slightly LESS than was transferred, so the shop gains;
+ *   • a WITHDRAWAL reserves and debits slightly LESS than is paid out, so the
+ *     customer gains.
+ * Before this change a withdrawal of a typed 50,000 د.ع reserved 3,572 cents,
+ * worth 50,008 د.ع — eight dinars MORE than the customer asked for, taken from
+ * the customer. Floor ends that.
+ *
+ * IT DOES NOT PUT BOTH DRIFTS ON ONE PARTY, and an earlier draft of this
+ * header said it did — «to the shop's side on withdrawals and to the shop's
+ * side on deposits too» — which negates one of the two bullets whichever way
+ * «side» is read. The bullets are the whole truth and they point OPPOSITE
+ * ways: on a deposit the shop keeps the remainder, on a withdrawal the
+ * customer keeps it. One rule, one function, two different beneficiaries.
+ * That asymmetry is the decision, not an oversight in it, and it is written
+ * out here so nobody reads a single tidy sentence into the code and flips the
+ * rule back believing the bullets were the typo.
+ *
+ * THE DRIFT IS ABSORBED, NOT SHOWN. Rule (1) of the same instruction — «الاعتماد
+ * على السعر المدخل بدون تقريب» — is what makes that acceptable: a transaction
+ * RECORDS the dinar figure the customer typed (migration 0105 for deposits,
+ * 0106 for withdrawals) and every screen prints that figure, so the customer
+ * never reads a number they did not type. The cents remain the money. A
+ * BALANCE has no typed figure and keeps converting through `usdCentsToIqd`.
+ *
+ * SCOPE: «في المحفظة» — the wallet. The escrow/purchase-hold conversions
+ * (worker/lib/escrowOps.ts, worker/routes/orders.ts, worker/routes/
+ * storeOrders.ts, worker/routes/memberships.ts) stay CEIL, because a hold that
+ * floors is short of the debit it exists to guarantee and a charge that floors
+ * undercharges a debt denominated in dinars. Those are not wallet top-ups and
+ * the owner's sentence does not reach them.
+ */
 export function iqdToUsdCents(iqd: number, exchangeRate: number): number {
-  return Math.ceil((iqd * 100) / exchangeRate);
+  return Math.floor((iqd * 100) / exchangeRate);
 }
 
 /**
@@ -1733,14 +1797,17 @@ export function iqdToUsdCents(iqd: number, exchangeRate: number): number {
  * re-derives them.
  *
  * «كتبت ٥٠,٠٠٠ وظهر ٥٠,٠٠٨.» The pair above is not a round trip and cannot be
- * made into one: `iqdToUsdCents` rounds up so a deposit never credits less
- * than was transferred, `usdCentsToIqd` rounds down so a balance is never
- * over-promised, and at 1,400 IQD/USD a cent is 14 د.ع — so only multiples of
- * 14 are representable and 50,000 is not one of them. No rounding rule
- * repairs that; Math.round only turns +8 into −6, which is worse.
+ * made into one: at 1,400 IQD/USD a cent is 14 د.ع, so only multiples of 14
+ * are representable and 50,000 is not one of them. No rounding rule repairs
+ * that — it only chooses which way the remainder falls. Since the owner's
+ * «وعند الدولار يقرب الى عدد صحيح اقل», BOTH helpers floor: `iqdToUsdCents`
+ * down to the whole cent and `usdCentsToIqd` down to the whole dinar. That is
+ * why this function exists rather than a cleverer rule.
  *
  * So the dinar figure is READ, not computed, whenever the request recorded it
- * (migration 0105 `wallet_deposit_meta.declared_amount_iqd`). The fallback is
+ * — `wallet_deposit_meta.declared_amount_iqd` for a deposit (migration 0105)
+ * and `wallet_withdrawals.declared_amount_iqd` for a withdrawal (0106). One
+ * helper serves both: the name is historic, the contract is not. The fallback is
  * deliberately ONE-DIRECTIONAL: a row filed before that column existed, or
  * one typed in dollars, still converts from the authoritative cents. Nothing
  * ever converts the other way — the cents are the money, the dinars are the

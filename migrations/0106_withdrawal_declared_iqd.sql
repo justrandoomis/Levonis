@@ -1,0 +1,107 @@
+-- ============================================================================
+--  0106 — THE SAME TESTIMONY ON THE WITHDRAWAL SIDE, AND THE RULE CHANGE
+--         THAT MADE IT URGENT.
+-- ============================================================================
+-- NONDESTRUCTIVE: two nullable ADD COLUMNs on `wallet_withdrawals`. Nothing is
+-- dropped, no CHECK is added, and NO ROW IS BACKFILLED — a withdrawal filed
+-- before this applies reads NULL, which is the truth about it: nobody wrote
+-- that customer's dinar figure down, so nobody may now claim to know it.
+--
+-- ---------------------------------------------------------------------------
+--  WHY THE WITHDRAWAL SIDE NEEDED IT TOO
+-- ---------------------------------------------------------------------------
+-- 0105 recorded the typed dinars for a DEPOSIT and said, in this same place,
+-- that a withdrawal «has nowhere to put it». That was a statement about this
+-- table, and this migration is that answer. A customer who types 50,000 د.ع to
+-- withdraw had ceil(5,000,000 / 1,400) = 3,572 cents reserved and later
+-- debited — worth 50,008 د.ع, eight dinars MORE than they asked for, taken
+-- from the customer — and no screen, no Telegram line and no admin card
+-- recorded the figure they actually typed. The reviewer who makes the transfer
+-- was reading a converted number for a transaction the customer denominated in
+-- dinars.
+--
+-- ---------------------------------------------------------------------------
+--  THE ROUNDING RULE CHANGED, AND 0105 SAYS THE OPPOSITE
+-- ---------------------------------------------------------------------------
+-- This paragraph exists because 0105 is applied and immutable. Its header ends
+-- with «THE CEIL STAYS, AND IT IS THE RIGHT DIRECTION … the alternative
+-- (floor) would credit less than was transferred». THE OWNER HAS OVERRULED
+-- THAT, in writing:
+--
+--   «في المحفظة الاعتماد على السعر المدخل بدون تقريب، وعند الدولار يقرب الى
+--    عدد صحيح اقل — مثلا 35.71 = 50,000»
+--
+-- So `iqdToUsdCents` (src/lib/api.ts) now FLOORS. At 1,400 IQD/USD, 50,000 د.ع
+-- becomes 3,571 cents = $35.71, which is the owner's own example exactly.
+--
+-- WHICH WAY THE ERROR GOES NOW, PLAINLY, BECAUSE IT MUST NOT BE HIDDEN AND
+-- MUST NOT BE SILENTLY RE-ARGUED:
+--   • a DEPOSIT credits slightly LESS than was transferred — the shop gains;
+--   • a WITHDRAWAL debits slightly LESS than is paid out — the customer gains.
+-- The error is bounded by one cent, 13 د.ع at 1,400, per transaction. It was
+-- chosen deliberately by the owner. Whoever reads this later and wants to flip
+-- it back is looking at a decision, not at an oversight.
+--
+-- What makes it acceptable is the OTHER half of the same sentence: the dinar
+-- figure the customer typed is recorded and printed, so nobody is ever shown a
+-- number they did not type. The drift is absorbed by the ledger, not displayed.
+--
+-- ---------------------------------------------------------------------------
+--  WHAT THESE COLUMNS MAY NEVER DO
+-- ---------------------------------------------------------------------------
+-- THE LEDGER UNIT IS USD CENTS AND STAYS USD CENTS. migrations/0001_init.sql
+-- declares it and 0015_wallet_holds.sql states in writing that changing it
+-- would be a destructive rewrite of live balances rather than a migration.
+-- `declared_amount_iqd` IS TESTIMONY, NOT A SOURCE OF MONEY: the hold, the
+-- ledger debit, the fee quote and `CHECK (net_cents = amount_cents -
+-- fee_cents)` all stay on `amount_cents`, and nothing anywhere reads dinars to
+-- produce cents. If a reader ever computed cents from this column, a client
+-- could declare 50,000 د.ع alongside 900,000 cents and have the cents
+-- reserved. The fallback is deliberately ONE-DIRECTIONAL: display reads the
+-- dinars when they exist and converts from the cents when they do not.
+--
+-- NO CHECK CONSTRAINT, ON PURPOSE — the same choice 0105 made. The
+-- whole-positive-integer filter lives in code (worker/lib/walletOps.ts), which
+-- stores NULL rather than a repaired number. A CHECK on a testimony column
+-- would turn a client bug into a D1 constraint abort in the middle of a money
+-- batch, where `requestWithdrawal`'s rollback path would misreport it as a
+-- hold failure.
+--
+-- `exchange_rate_snapshot` sits beside it so a reviewer can see which rate the
+-- cents were computed at without guessing what the setting was that week. It
+-- is written once at placement time and never recomputed.
+--
+-- ---------------------------------------------------------------------------
+--  AND THE CLAIM IS CORROBORATED BEFORE IT IS WRITTEN
+-- ---------------------------------------------------------------------------
+-- «Display reads the dinars» is the answer 0105 gave to a forged claim, and it
+-- was enough while the dinars sat BESIDE the money. It is not enough here. On
+-- a withdrawal this figure became the HEADLINE on the card a human reads
+-- before making an outbound transfer, and a withdrawal has no receipt and no
+-- observed-amount reconciliation to check it against — `markWithdrawalPaid`
+-- takes a payout reference and nothing else. A crafted request declaring
+-- 50,000,000 د.ع beside 100 cents would have reserved 100 cents and printed
+-- «50,000,000 د.ع» in bold with «$1.00» in grey underneath.
+--
+-- So `corroboratedDeclaredIqd` (worker/lib/walletOps.ts) re-runs the client's
+-- own conversion on the server, at the rate the SERVER read at submit time,
+-- and stores the pair only when it lands on the cents the request carries —
+-- the floor, or the ceil a browser that has not reloaded yet still sends.
+-- Anything else is stored as NULL and every reader falls back to converting
+-- the cents, which come off the hold and cannot be forged.
+--
+-- THIS IS ALSO WHAT MAKES THE «BOUNDED BY ONE CENT» SENTENCE ABOVE TRUE. The
+-- rate the customer's tab floored with is not necessarily this one:
+-- src/WalletContext.tsx reads /api/settings/public once on mount and never
+-- repolls, so a long-open tab holds a stale rate indefinitely. Without the
+-- check, a tab loaded at 1,400 against a live 1,500 would store 50,000 د.ع
+-- beside 3,571 cents worth 53,565 د.ع — 3,565 د.ع out, not one cent. Such a
+-- row is now simply not written, and the withdrawal files without testimony
+-- rather than with a false one.
+--
+-- IT REFUSES THE TESTIMONY, NEVER THE MONEY. Refusing the whole request was
+-- the other option. It would turn the owner moving the rate mid-session into
+-- a failed payout request, and it would need a refusal sentence that does not
+-- exist in Sorani — which may never be machine written.
+ALTER TABLE wallet_withdrawals ADD COLUMN declared_amount_iqd INTEGER;
+ALTER TABLE wallet_withdrawals ADD COLUMN exchange_rate_snapshot INTEGER;

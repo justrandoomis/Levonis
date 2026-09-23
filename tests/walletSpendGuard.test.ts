@@ -32,6 +32,14 @@ function freshDb(): { db: D1Database; raw: DatabaseSync } {
   raw.exec(createTableSql('0001_init.sql', 'wallet_transactions'));
   raw.exec(createTableSql('0001_init.sql', 'audit_log'));
   raw.exec(readFileSync(join(ROOT, 'migrations', '0015_wallet_holds.sql'), 'utf8'));
+  // 0106 IS DELIBERATELY NOT APPLIED HERE. This fixture builds
+  // `wallet_withdrawals` from 0015 alone, which is exactly the shape a
+  // database has during the window between a Worker going live and its
+  // migration being run. `requestWithdrawal` names the 0106 columns, so if it
+  // could not survive their absence every test below would go red — and in
+  // production every customer would be told their balance was insufficient.
+  // Applying 0106 here would hide that, so it stays out and this whole file
+  // doubles as the deploy-order pin.
   raw.prepare('INSERT INTO users (id, email, username) VALUES (?,?,?)').run('u1', 'u1@example.com', 'u1');
   return { db: new SqliteD1(raw) as unknown as D1Database, raw };
 }

@@ -40,6 +40,7 @@ import {
   getWithdrawal,
   initialDepositReviewState,
   isValidAmountCents,
+  corroboratedDeclaredIqd,
   markWithdrawalPaid,
   normalizeDepositReference,
   operationNumber,
@@ -54,7 +55,7 @@ import {
   WITHDRAWAL_TRANSITIONS,
   type WithdrawalReconRow,
 } from '../worker/lib/walletOps';
-import { depositDeclaredIqd } from '../src/lib/api';
+import { depositDeclaredIqd, iqdToUsdCents } from '../src/lib/api';
 import type { Env } from '../worker/lib/types';
 
 function freshDb(): { db: D1Database; raw: DatabaseSync } {
@@ -62,11 +63,19 @@ function freshDb(): { db: D1Database; raw: DatabaseSync } {
   raw.exec('CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, username TEXT)');
   raw.exec(createTableSql('0001_init.sql', 'wallet_transactions'));
   raw.exec(createTableSql('0001_init.sql', 'audit_log'));
+  // The live exchange rate lives here. It is created so that the rate-change
+  // test can actually MOVE it: a test that asserts a snapshot is not
+  // recomputed has to leave something different for a recomputing reader to
+  // find, or it cannot fail for the reason its name gives.
+  raw.exec(createTableSql('0001_init.sql', 'admin_settings'));
   raw.exec(readFileSync(join(ROOT, 'migrations', '0015_wallet_holds.sql'), 'utf8'));
   // 0105 adds the customer's own dinar figure to wallet_deposit_meta. Applied
   // here for the same reason 0015 is: the INSERT that writes it has to run
   // against the real columns, not a hand-written copy of them.
   raw.exec(readFileSync(join(ROOT, 'migrations', '0105_deposit_declared_iqd.sql'), 'utf8'));
+  // 0106 does the same for wallet_withdrawals. Same reason again: the INSERT
+  // in requestWithdrawal binds these columns, so they have to be the real ones.
+  raw.exec(readFileSync(join(ROOT, 'migrations', '0106_withdrawal_declared_iqd.sql'), 'utf8'));
   raw.prepare('INSERT INTO users (id, email, username) VALUES (?,?,?)').run('u1', 'u1@example.com', 'u1');
   raw.prepare('INSERT INTO users (id, email, username) VALUES (?,?,?)').run('u2', 'u2@example.com', 'u2');
   return { db: new SqliteD1(raw) as unknown as D1Database, raw };
@@ -88,13 +97,21 @@ async function available(db: D1Database, userId = 'u1'): Promise<number> {
   return (await getAvailableBalances(envOf(db), userId)).usd_cents_available;
 }
 
-async function fileWithdrawal(db: D1Database, amount: number, key = 'k1', userId = 'u1', feeBps = 0) {
+async function fileWithdrawal(
+  db: D1Database,
+  amount: number,
+  key = 'k1',
+  userId = 'u1',
+  feeBps = 0,
+  declared?: { declaredAmountIqd?: number; exchangeRateSnapshot?: number }
+) {
   return requestWithdrawal(db, {
     userId,
     amountCents: amount,
     destination: { kind: 'manual_transfer', account: '0770-000-0000', holder: 'Test User' },
     eventKey: key,
     feeBps,
+    ...declared,
   });
 }
 
@@ -723,19 +740,84 @@ test('deposit amounts are validated as integer cents', async () => {
  */
 test('no rounding rule can return 50,000 IQD from the cents it converts to', () => {
   const RATE = 1400;
-  const iqdToCentsCeil = (iqd: number) => Math.ceil((iqd * 100) / RATE);
   const centsToIqdFloor = (cents: number) => Math.floor((cents * RATE) / 100);
 
-  // The owner's exact number, and the exact drift he reported.
-  assert.equal(iqdToCentsCeil(50_000), 3572);
-  assert.equal(centsToIqdFloor(3572), 50_008);
-  // Rounding the other way does not repair it, it only changes the sign of the
-  // error — and downwards means crediting LESS than was transferred.
+  // THE REAL FUNCTION, NOT A COPY OF IT. This test used to define its own
+  // local `iqdToCentsCeil`, so when the rule changed it would have kept
+  // passing while describing behaviour the code no longer had — a green test
+  // for a dead rule, which is worse than a red one.
+  assert.equal(iqdToUsdCents(50_000, RATE), 3571);
   assert.equal(centsToIqdFloor(3571), 49_994);
-  // Why: at this rate a cent is 14 د.ع, so only multiples of 14 exist.
+  // The superseded rule, kept only as arithmetic so the drift the owner
+  // reported is still legible: ceil produced 3,572 cents, which read back as
+  // 50,008 — eight dinars the customer never typed.
+  assert.equal(Math.ceil((50_000 * 100) / RATE), 3572);
+  assert.equal(centsToIqdFloor(3572), 50_008);
+  // Why neither direction repairs it: at this rate a cent is 14 د.ع, so only
+  // multiples of 14 exist. This is the claim that survived the rule change
+  // untouched, and it is the reason the declared columns exist at all.
   assert.equal(RATE / 100, 14);
   const reachable = [3570, 3571, 3572, 3573].map(centsToIqdFloor);
   assert.ok(!reachable.includes(50_000), 'no integer cent value reads back as 50,000');
+});
+
+/**
+ * THE OWNER'S OWN EXAMPLE, PINNED.
+ *
+ *   «في المحفظة الاعتماد على السعر المدخل بدون تقريب، وعند الدولار يقرب الى
+ *    عدد صحيح اقل — مثلا 35.71 = 50,000»
+ *
+ * At 1,400 IQD/USD, floor puts a typed 50,000 د.ع at 3,571 cents = $35.71,
+ * which is that sentence exactly. Before this rule the same input produced
+ * 3,572 = $35.72.
+ *
+ * The owner's two other examples (26.51 = 37,000 and 54.95 = 76,750) imply
+ * rates of about 1,395.7 and 1,396.7, not 1,400 — they were written on a
+ * different day's rate. They are recorded here at 1,400 as what the rule
+ * actually produces, NOT used to tune the rule.
+ */
+test('the wallet dollar rounds DOWN — 50,000 د.ع at 1,400 is $35.71', () => {
+  const RATE = 1400;
+  assert.equal(iqdToUsdCents(50_000, RATE), 3571, 'the owner’s first example, verbatim');
+  assert.equal(iqdToUsdCents(37_000, RATE), 2642);
+  assert.equal(iqdToUsdCents(76_750, RATE), 5482);
+  // Floor, never ceil and never round: the converted cents are always worth
+  // no MORE than the dinars that were typed.
+  for (const iqd of [1, 13, 14, 999, 1_400, 37_000, 50_000, 76_750, 1_234_567]) {
+    const cents = iqdToUsdCents(iqd, RATE);
+    assert.ok(Number.isInteger(cents), `${iqd} د.ع converted to a non-integer`);
+    assert.ok((cents * RATE) / 100 <= iqd, `${iqd} د.ع converted UP to ${cents} cents`);
+    assert.ok((cents + 1) * RATE > iqd * 100, `${iqd} د.ع lost more than a cent`);
+  }
+});
+
+/**
+ * H1 — FLOOR CAN PRODUCE ZERO, AND ZERO MUST NEVER BE RESERVED OR CREDITED.
+ *
+ * Under the old ceil, 1 د.ع became 1 cent and reached the server. Under floor
+ * anything below one cent's worth (14 د.ع at 1,400) becomes 0, which is a new
+ * input at the top of the chain. Every layer below refuses it, and the client
+ * refuses it first in the customer's own language (`s.invalidAmount`, which
+ * exists in ar/en/ckb already — no new string was written for this).
+ */
+test('a floored zero is refused, never credited and never reserved', async () => {
+  const RATE = 1400;
+  assert.equal(iqdToUsdCents(13, RATE), 0, 'under one cent’s worth floors to nothing');
+  assert.equal(iqdToUsdCents(14, RATE), 1, 'one cent’s worth is the smallest representable amount');
+
+  // The engine refuses it rather than writing a 0-cent hold or ledger row.
+  assert.equal(isValidAmountCents(0), false);
+  const { db, raw } = freshDb();
+  seedSettled(raw, 'u1', 100_000);
+  assert.deepEqual(await fileWithdrawal(db, 0, 'zero-wd'), { ok: false, reason: 'INVALID_AMOUNT' });
+  assert.deepEqual(await deposit(db, { amountCents: 0 }), { ok: false, reason: 'INVALID_AMOUNT' });
+  // Nothing was written on the way to that refusal.
+  const holds = raw.prepare('SELECT COUNT(*) AS n FROM wallet_holds').get() as { n: number };
+  assert.equal(holds.n, 0, 'a refused amount still opened a hold');
+  const rows = raw
+    .prepare("SELECT COUNT(*) AS n FROM wallet_transactions WHERE note <> 'seed'")
+    .get() as { n: number };
+  assert.equal(rows.n, 0, 'a refused amount still wrote a ledger row');
 });
 
 test('a deposit records the dinars the customer typed, verbatim', async () => {
@@ -806,6 +888,283 @@ test('the declared dinars never move the amount-mismatch guard off cents', async
   // guard that blocks a silent approval would have nothing to catch.
   assert.equal(depositAmountReview(meta.declared_amount_cents, 3572), 'cleared_for_decision');
   assert.equal(depositAmountReview(meta.declared_amount_cents, 50_000), 'amount_mismatch');
+});
+
+// ------------------------------- the customer's own dinars, withdrawals (0106)
+
+/**
+ * A WITHDRAWAL RECORDS WHAT WAS TYPED, TOO.
+ *
+ * 0105 gave the deposit side this column and said a withdrawal «has nowhere to
+ * put it». 0106 is that answer. The defect it closes ran in the opposite
+ * direction to the deposit one and against the CUSTOMER: a typed 50,000 د.ع
+ * had ceil() = 3,572 cents reserved and later debited, worth 50,008 د.ع.
+ */
+test('a withdrawal records the dinars the customer typed, verbatim', async () => {
+  const { db, raw } = freshDb();
+  seedSettled(raw, 'u1', 200_000);
+  const res = await fileWithdrawal(db, 3571, 'declared-1', 'u1', 0, {
+    declaredAmountIqd: 50_000,
+    exchangeRateSnapshot: 1400,
+  });
+  assert.ok(res.ok);
+  const row = await getWithdrawal(db, (res as { id: string }).id);
+  assert.equal(row!.declared_amount_iqd, 50_000, 'the typed figure is stored as typed');
+  assert.equal(row!.exchange_rate_snapshot, 1400, 'with the rate it was filed at');
+  // The money is untouched: the hold, the debit and the fee are all cents.
+  assert.equal(row!.amount_cents, 3571, 'the request row is cents and only cents');
+  const hold = raw.prepare('SELECT amount_cents FROM wallet_holds WHERE id = ?').get(row!.hold_id) as {
+    amount_cents: number;
+  };
+  assert.equal(hold.amount_cents, 3571, 'the reservation is computed from the cents, never the dinars');
+});
+
+test('a withdrawal without a declared figure stores NULL, not a repaired number', async () => {
+  const { db, raw } = freshDb();
+  seedSettled(raw, 'u1', 200_000);
+  const res = await fileWithdrawal(db, 3571, 'declared-2');
+  assert.ok(res.ok);
+  const row = await getWithdrawal(db, (res as { id: string }).id);
+  assert.equal(row!.declared_amount_iqd, null, 'nobody wrote it down, so nobody claims to know it');
+  assert.equal(row!.exchange_rate_snapshot, null);
+
+  // Not whole, not positive, or a rate with no claim beside it: all NULL.
+  const cases: Array<[string, { declaredAmountIqd?: number; exchangeRateSnapshot?: number }]> = [
+    ['declared-3', { declaredAmountIqd: 0, exchangeRateSnapshot: 1400 }],
+    ['declared-4', { declaredAmountIqd: -50_000, exchangeRateSnapshot: 1400 }],
+    ['declared-5', { declaredAmountIqd: 50_000.5, exchangeRateSnapshot: 1400 }],
+    ['declared-6', { exchangeRateSnapshot: 1400 }],
+  ];
+  for (const [key, over] of cases) {
+    const r = await fileWithdrawal(db, 3571, key, 'u1', 0, over);
+    assert.ok(r.ok, key);
+    const w = await getWithdrawal(db, (r as { id: string }).id);
+    assert.equal(w!.declared_amount_iqd, null, key);
+    assert.equal(w!.exchange_rate_snapshot, null, `${key}: a rate with no claim beside it says nothing`);
+  }
+  raw.close();
+});
+
+/**
+ * THE RATE REALLY MOVES HERE, AND THE ROW REALLY DOES NOT.
+ *
+ * An earlier version of this test had that name and never wrote a rate
+ * anywhere: it filed one withdrawal, re-read it, and asserted the same two
+ * values the test above it already asserts. Its «proof» lines were arithmetic
+ * over literals, true whatever the source code did. A reader rewritten to
+ * re-derive the dinars from the LIVE rate at read time — the exact drift 0106
+ * exists to prevent — would have sailed through it.
+ *
+ * So the live rate is written, the row is read, the rate is MOVED, and the row
+ * is read again. The two reads are compared whole. If `getWithdrawal` ever
+ * learns to convert at read time, the second read changes and this fails.
+ */
+test('a withdrawal’s recorded dinars survive a rate change', async () => {
+  const { db, raw } = freshDb();
+  seedSettled(raw, 'u1', 200_000);
+  const liveRate = () =>
+    Number(
+      JSON.parse(
+        (raw.prepare("SELECT value FROM admin_settings WHERE key = 'exchangeRate'").get() as { value: string }).value
+      )
+    );
+  const setRate = (v: number) =>
+    raw
+      .prepare(
+        "INSERT INTO admin_settings (key, value) VALUES ('exchangeRate', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+      )
+      .run(JSON.stringify(v));
+
+  setRate(1400);
+  const res = await fileWithdrawal(db, 3571, 'rate-move', 'u1', 0, {
+    declaredAmountIqd: 50_000,
+    exchangeRateSnapshot: 1400,
+  });
+  assert.ok(res.ok);
+  const id = (res as { id: string }).id;
+  const before = await getWithdrawal(db, id);
+  assert.equal(before!.declared_amount_iqd, 50_000);
+  assert.equal(before!.exchange_rate_snapshot, 1400);
+
+  // The owner moves the rate. This is a real write, and a reader that
+  // re-derived at read time would now have 1,600 sitting there to read.
+  setRate(1600);
+  assert.equal(liveRate(), 1600, 'the rate did not actually move — this test proves nothing');
+
+  const after = await getWithdrawal(db, id);
+  assert.deepEqual(after, before, 'the row moved when the rate moved — something re-derives at read time');
+  // And what re-deriving would have said, so the size of the averted drift is
+  // on the record: 57,136 د.ع for a customer who typed 50,000.
+  assert.equal(Math.floor((after!.amount_cents * liveRate()) / 100), 57_136);
+  assert.notEqual(57_136, after!.declared_amount_iqd);
+  raw.close();
+});
+
+test('no reader re-derives a transaction’s dinars when a declared figure exists', () => {
+  // The one helper both sides use. Present → printed verbatim, at ANY rate.
+  assert.equal(depositDeclaredIqd(50_000, 3571, 1400), 50_000);
+  assert.equal(depositDeclaredIqd(50_000, 3571, 1600), 50_000, 'the rate must not touch a recorded claim');
+  // Absent → converted, which is the honest answer for a pre-0105/0106 row.
+  assert.equal(depositDeclaredIqd(null, 3571, 1400), 49_994);
+});
+
+/**
+ * THE CLAIM IS CHECKED AGAINST THE CENTS BEFORE IT IS EVER STORED.
+ *
+ * `declared_amount_iqd` is unvalidated client input, and this change promoted
+ * it to the HEADLINE on the admin card a human reads before making an outbound
+ * transfer — 20px bold, with the ledger dollars demoted to 11px grey. A
+ * withdrawal has no receipt and no observed-amount reconciliation
+ * (`markWithdrawalPaid` takes only a payout reference), so that card is the
+ * only number the payer has. «Display reads the dinars», which is what 0105's
+ * header offered against this hazard, is exactly how the human is misled.
+ *
+ * Two things are proved here against the real engine, not asserted about it:
+ * the forged claim NEVER becomes money, and it is no longer stored at all —
+ * so no screen can print it.
+ */
+test('a declared figure the cents do not corroborate is never stored', async () => {
+  const { db, raw } = freshDb();
+  seedSettled(raw, 'u1', 200_000);
+
+  // The route's own ceiling (10,000,000,000 د.ع) against its floor of 100
+  // cents — 1,400 د.ع at this rate. A 7,142,857x lie, printed in bold.
+  const forged = await fileWithdrawal(db, 100, 'forged', 'u1', 0, {
+    declaredAmountIqd: 50_000_000,
+    exchangeRateSnapshot: 1400,
+  });
+  assert.ok(forged.ok, 'the MONEY is still filed — only the testimony is refused');
+  const row = await getWithdrawal(db, (forged as { id: string }).id);
+  assert.equal(row!.declared_amount_iqd, null, 'an uncorroborated claim reached the admin card');
+  assert.equal(row!.exchange_rate_snapshot, null, 'a rate with no claim beside it says nothing');
+  assert.equal(row!.amount_cents, 100, 'the money is still the cents that were sent');
+  assert.equal(row!.net_cents, 100);
+  const held = (raw.prepare('SELECT SUM(amount_cents) AS n FROM wallet_holds').get() as { n: number }).n;
+  assert.equal(held, 100, 'the reservation followed the dinars — the column became money');
+
+  // A TAB LEFT OPEN WHILE THE OWNER MOVED THE RATE. src/WalletContext.tsx
+  // fetches /api/settings/public once on mount and never repolls, so the
+  // client floors at 1,400 and the server stores at 1,500. 3,571 cents is
+  // 53,565 د.ع at the live rate, not the 50,000 that was typed — 3,565 د.ع
+  // apart, 238 times the one-cent bound the contract comments claim.
+  const stale = await fileWithdrawal(db, 3571, 'stale-rate', 'u1', 0, {
+    declaredAmountIqd: 50_000,
+    exchangeRateSnapshot: 1500,
+  });
+  assert.ok(stale.ok);
+  const staleRow = await getWithdrawal(db, (stale as { id: string }).id);
+  assert.equal(staleRow!.declared_amount_iqd, null, 'a figure filed at another rate was printed as the payout');
+  assert.equal(staleRow!.amount_cents, 3571);
+
+  // The mirror, rate dropped: 3,571 cents is only 46,423 د.ع at 1,300.
+  const dropped = await fileWithdrawal(db, 3571, 'dropped-rate', 'u1', 0, {
+    declaredAmountIqd: 50_000,
+    exchangeRateSnapshot: 1300,
+  });
+  assert.ok(dropped.ok);
+  assert.equal((await getWithdrawal(db, (dropped as { id: string }).id))!.declared_amount_iqd, null);
+  raw.close();
+});
+
+/**
+ * AND THE WINDOW IS EXACTLY ONE CENT WIDE, WHICH IS WHY A STALE BUNDLE IS
+ * STILL BELIEVED.
+ *
+ * The rule changed from ceil to floor. A browser still running the previous
+ * bundle converts the same honest 50,000 د.ع to 3,572 instead of 3,571 — one
+ * cent apart, and refusing it would silently drop the testimony of every
+ * customer who has not reloaded. Those two values are the whole window;
+ * anything outside it is refused above.
+ */
+test('the corroboration window is the floor or the ceil, and nothing else', () => {
+  const at = (iqd: number, cents: number, rate = 1400) =>
+    corroboratedDeclaredIqd(iqd, cents, rate).declared_amount_iqd;
+  // Floor: what this bundle sends.
+  assert.equal(iqdToUsdCents(50_000, 1400), 3571);
+  assert.equal(at(50_000, 3571), 50_000);
+  // Ceil: what the previous bundle sends, off by exactly one.
+  assert.equal(at(50_000, 3572), 50_000, 'a browser that has not reloaded lost its testimony');
+  // Two cents out is not a rounding difference, and one cent UNDER the floor
+  // is a conversion no client performs — it would under-reserve against the
+  // very figure it claims.
+  assert.equal(at(50_000, 3573), null);
+  assert.equal(at(50_000, 3570), null);
+  // Nothing corroborates without a rate, and a claim of zero or a fraction is
+  // not a claim at all.
+  assert.equal(at(50_000, 3571, 0), null);
+  assert.equal(corroboratedDeclaredIqd(50_000, 3571, undefined).declared_amount_iqd, null);
+  assert.equal(at(0, 3571), null);
+  assert.equal(at(-50_000, 3571), null);
+  assert.equal(at(50_000.5, 3571), null);
+  // The rate never travels without the figure it belongs to.
+  assert.equal(corroboratedDeclaredIqd(50_000, 3573, 1400).exchange_rate_snapshot, null);
+  assert.equal(corroboratedDeclaredIqd(50_000, 3571, 1400).exchange_rate_snapshot, 1400);
+});
+
+/**
+ * THE DEPLOY WINDOW — THE WORKER IS LIVE, 0106 IS NOT APPLIED YET.
+ *
+ * This is the database shape between `wrangler deploy` and
+ * `wrangler d1 migrations apply`, and it is reachable in production because
+ * `EXPECTED_MIGRATION` is only a health alarm (worker/routes/misc.ts); it
+ * blocks nothing. `requestWithdrawal` names two columns that are not there,
+ * D1 aborts the whole batch, and the classifier — finding no hold, because
+ * the batch rolled back — used to answer INSUFFICIENT_AVAILABLE. A customer
+ * holding $10,000 was told their balance was too small, on every withdrawal,
+ * for the length of the window.
+ *
+ * Nothing was corrupted by that: the batch is atomic and writes nothing. It
+ * was a false refusal about someone's own money, which is its own kind of
+ * damage. The request now files without the two columns instead — exactly as
+ * it filed before 0106 existed — and the testimony is simply absent, which is
+ * the truth about a row written into a table that has nowhere to put it.
+ *
+ * tests/walletSpendGuard.test.ts builds its whole fixture at this shape for
+ * the same reason and would go red first if this regressed.
+ */
+test('a withdrawal still files while 0106 has not been applied yet', async () => {
+  const raw = new DatabaseSync(':memory:');
+  raw.exec('CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, username TEXT)');
+  raw.exec(createTableSql('0001_init.sql', 'wallet_transactions'));
+  raw.exec(createTableSql('0001_init.sql', 'audit_log'));
+  raw.exec(readFileSync(join(ROOT, 'migrations', '0015_wallet_holds.sql'), 'utf8'));
+  raw.exec(readFileSync(join(ROOT, 'migrations', '0105_deposit_declared_iqd.sql'), 'utf8'));
+  // 0106 is deliberately absent. That is the whole test.
+  raw.prepare('INSERT INTO users (id, email, username) VALUES (?,?,?)').run('u1', 'u1@example.com', 'u1');
+  const db = new SqliteD1(raw) as unknown as D1Database;
+  seedSettled(raw, 'u1', 1_000_000);
+
+  const res = await requestWithdrawal(db, {
+    userId: 'u1',
+    amountCents: 3571,
+    destination: { kind: 'manual_transfer', account: '0770-000-0000', holder: 'Test User' },
+    eventKey: 'pre-0106',
+    feeBps: 300,
+    declaredAmountIqd: 50_000,
+    exchangeRateSnapshot: 1400,
+  });
+  assert.ok(res.ok, `a withdrawal was refused for want of a migration: ${JSON.stringify(res)}`);
+
+  // The money is filed in full, and it is the SAME money 0106 would have
+  // filed: the hold, the fee and the net all come off amount_cents.
+  const row = raw
+    .prepare('SELECT amount_cents, fee_cents, net_cents, hold_id FROM wallet_withdrawals WHERE id = ?')
+    .get((res as { id: string }).id) as { amount_cents: number; fee_cents: number; net_cents: number; hold_id: string };
+  assert.equal(row.amount_cents, 3571);
+  assert.equal(row.fee_cents, 107);
+  assert.equal(row.net_cents, 3464);
+  assert.equal(row.net_cents, row.amount_cents - row.fee_cents);
+  const hold = raw.prepare('SELECT amount_cents, state FROM wallet_holds WHERE id = ?').get(row.hold_id) as {
+    amount_cents: number;
+    state: string;
+  };
+  assert.equal(hold.amount_cents, 3571, 'the reservation is short of the debit it exists to guarantee');
+  assert.equal(hold.state, 'active');
+  assert.equal(await available(db, 'u1'), 1_000_000 - 3571);
+  // And the testimony is absent rather than invented — the column is not there.
+  const cols = (raw.prepare('PRAGMA table_info(wallet_withdrawals)').all() as { name: string }[]).map((c) => c.name);
+  assert.ok(!cols.includes('declared_amount_iqd'), 'the fixture applied 0106 after all');
+  raw.close();
 });
 
 test('the display fallback is one-directional: dinars when filed, conversion when not', () => {
