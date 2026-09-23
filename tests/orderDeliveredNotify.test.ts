@@ -60,7 +60,28 @@ const env = (raw: DatabaseSync, over: Partial<Env> = {}): Env =>
 
 function seedUser(
   raw: DatabaseSync,
-  o: { id?: string; locale?: string; email?: string | null; phone?: string | null; chat?: number | null } = {}
+  o: {
+    id?: string;
+    locale?: string;
+    email?: string | null;
+    phone?: string | null;
+    chat?: number | null;
+    /**
+     * Whether this customer has ever PICKED a language, as opposed to carrying
+     * the column's `NOT NULL DEFAULT 'en'`.
+     *
+     * `users.locale` cannot tell those apart on its own, and for a
+     * `@telegram.local` account — which is what `email: null` mints here — the
+     * default is never an answer: the phone/Telegram signup binds no locale at
+     * all. `notificationLang` (worker/lib/customerNotify.ts) therefore reads a
+     * `profile.locale_change` line in `audit_log` as the statement, written by
+     * PATCH /api/profile the moment somebody taps a language. A fixture that
+     * wants «this customer reads English» has to say so the same way, or it is
+     * describing an account that was never asked and will be answered in
+     * Arabic — correctly.
+     */
+    stated?: boolean;
+  } = {}
 ): string {
   const id = o.id ?? 'u_1';
   raw.prepare(
@@ -74,6 +95,11 @@ function seedUser(
     o.email === null ? null : new Date().toISOString(),
     o.locale ?? 'ar'
   );
+  if (o.stated) {
+    raw.prepare(
+      `INSERT INTO audit_log (actor_id, action, target, detail) VALUES (?, 'profile.locale_change', ?, ?)`
+    ).run(id, id, JSON.stringify({ to: o.locale ?? 'ar' }));
+  }
   if (o.chat != null) {
     raw.prepare(
       `INSERT INTO telegram_links (user_id, telegram_user_id, chat_id, phone_e164, verified_at)
@@ -333,10 +359,19 @@ test('A MISSING ORDER is silence, and notifyOrderDelivered never throws', async 
 // 4. THE COPY — «اجعلها رسالة مرتبة وقصيرة»
 // =========================================================================
 
-/** The plain text one channel carried, for one language. */
-async function deliveredText(locale: string): Promise<string> {
+/**
+ * The plain text one channel carried, for one language.
+ *
+ * `stated` defaults TRUE because these cases are about the COPY, not about
+ * which language gets chosen: each one names the language it wants and then
+ * asserts the sentence. Without it the English case would describe a Telegram
+ * account that never picked anything, and `notificationLang` would answer it
+ * in Arabic — which is the right answer to a different question. The choosing
+ * itself is pinned separately, below.
+ */
+async function deliveredText(locale: string, stated = true): Promise<string> {
   const raw = freshDb();
-  seedUser(raw, { locale, email: null, phone: PHONE, chat: null });
+  seedUser(raw, { locale, email: null, phone: PHONE, chat: null, stated });
   seedOrder(raw);
   await notifyOrderDelivered(env(raw), 'ORD-1');
   return payloads(raw).whatsapp!.text;
@@ -362,6 +397,54 @@ test('THE COPY — all three languages, each one line plus the link', async () =
   const ckb = await deliveredText('ku');
   assert.equal(ckb, 'LEVONIS\nداواکاری ORD-1 گەیەندرا. کاڵاکانی هەڵبسەنگێنە بۆ وەرگرتنی خاڵ.\n' + REVIEW_URL);
   assert.equal(ckb.includes('سوپاس بۆ متمانەت'), false);
+});
+
+test('THE LANGUAGE — a Telegram account that never picked one is answered in Arabic, column be damned', async () => {
+  /**
+   * «اللغة في رسالة إشعار التليكرام لا تطابق اللغة الافتراضية للموقع.»
+   *
+   * THIS IS THE OWNER'S BUG, pinned on the real notification path rather than
+   * on `notificationLang` alone — because the language is chosen in TWO places
+   * and a fix in one of them changes no word of the message. `customerNotify`
+   * picks the ENVELOPE language; `orderNotify` independently picks the COPY
+   * block. This asserts the sentence that actually arrives.
+   *
+   * The account here is the reported population exactly: a `@telegram.local`
+   * placeholder address, minted only by the phone/Telegram signup, whose very
+   * next statement writes the `telegram_links` row and which binds NO locale —
+   * so the row carries `NOT NULL DEFAULT 'en'` and has never been an answer.
+   * On an Arabic-first, Iraq-only shop it must not be read as one.
+   */
+  const raw = freshDb();
+  seedUser(raw, { locale: 'en', email: null, phone: PHONE, chat: null });
+  seedOrder(raw);
+  await notifyOrderDelivered(env(raw), 'ORD-1');
+  assert.equal(
+    payloads(raw).whatsapp!.text,
+    'LEVONIS\nتم تسليم طلبك ORD-1. قيّم منتجاته لتحصل على نقاط.\n' + REVIEW_URL,
+    'a defaulted en on a telegram.local account is not a choice of English'
+  );
+});
+
+test('THE LANGUAGE — and one tap on English is honoured for ever afterwards', async () => {
+  /**
+   * The other half, and the reason the fallback is scoped rather than blanket:
+   * a Telegram customer who genuinely wants English taps it once and is never
+   * second-guessed again. Without this the fix would have overruled everybody
+   * who chose English deliberately — a worse failure than the bug it removes.
+   *
+   * The statement is a `profile.locale_change` line, which PATCH /api/profile
+   * writes even when the value does not change: for these accounts that press
+   * IS the first answer, and it changes no column.
+   */
+  const raw = freshDb();
+  seedUser(raw, { locale: 'en', email: null, phone: PHONE, chat: null, stated: true });
+  seedOrder(raw);
+  await notifyOrderDelivered(env(raw), 'ORD-1');
+  assert.equal(
+    payloads(raw).whatsapp!.text,
+    'LEVONIS\nOrder ORD-1 has been delivered. Rate its products to earn points.\n' + REVIEW_URL
+  );
 });
 
 test('THE COPY — placed, confirmed and shipped name the order INSIDE the sentence and add no line for it', async () => {
