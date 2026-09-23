@@ -116,6 +116,22 @@ export interface SlicingStateApi {
   anyFresh: boolean;
   /** True when at least one stored result went stale after edits. */
   anyStale: boolean;
+  /**
+   * Which rung of the engine's three-attempt retry ladder is running, 1-based;
+   * 1 while the first (and usually only) attempt is in flight.
+   *
+   * A slice that fails is retried twice — classic walls, then economy — with a
+   * worker termination and a 5.2 MB kernel re-boot between rungs, and the
+   * engine used to report none of it. The owner's description of that silence
+   * was «بعد فترة كبيرة من الانتظار يظهر فشل». Surfacing the rung is what
+   * turns those minutes from a frozen bar into visible progress.
+   *
+   * It keeps its last value after the slice ends, so a failure message can say
+   * how many attempts were spent, and resets when the next slice starts.
+   */
+  retryAttempt: number;
+  /** How many attempts the ladder has in total (3 on the patched engine). */
+  retryTotal: number;
   /** Feed every engine ViewportEvent here (in addition to the shell's handling). */
   handleViewportEvent: (event: SlicingViewportEvent) => void;
   /** Feed the engine's onSliced payload here. */
@@ -129,6 +145,7 @@ export interface SlicingStateApi {
 export function useSlicingState(adapter: EngineAdapter | null): SlicingStateApi {
   const [instanceId] = useState(() => Symbol("levo-slice-results"));
   const [slicing, setSlicing] = useState(false);
+  const [retry, setRetry] = useState<{ attempt: number; total: number }>({ attempt: 1, total: 1 });
   const [progress, setProgress] = useState(0);
   const [layerCount, setLayerCount] = useState(0);
   const [sceneFingerprint, setSceneFingerprint] = useState("");
@@ -251,6 +268,10 @@ export function useSlicingState(adapter: EngineAdapter | null): SlicingStateApi 
       if (event.value) {
         sliceStartFingerprintRef.current = adapterRef.current?.sceneFingerprint() ?? "";
         sliceStartSettingsRevisionRef.current = settingsRevisionRef.current;
+        // The engine raises `slicing: true` ONCE for the whole ladder, not per
+        // rung, so this is the only place the counter may be reset — doing it
+        // on `false` would erase the count a failure message needs.
+        setRetry({ attempt: 1, total: 1 });
       } else {
         sliceStartFingerprintRef.current = null;
         setProgress(0);
@@ -311,6 +332,25 @@ export function useSlicingState(adapter: EngineAdapter | null): SlicingStateApi 
     setResultsVersion((value) => value + 1);
   }, [overBedPlates, results]);
 
+  /**
+   * THE RETRY LADDER, SUBSCRIBED.
+   *
+   * `patches/three-slicer+0.2.2.patch` makes the engine announce each failed
+   * attempt; the adapter turns that into `onSliceRetry`. An unpatched build
+   * never fires, so `retry` simply stays at 1/1 and the UI shows what it
+   * always did — the subscription cannot invent a retry that did not happen.
+   *
+   * `event.index` is the attempt that just FAILED, so the one now starting is
+   * `index + 1`. It is clamped to `total` because the last rung's failure is
+   * the end of the ladder, not the start of a fourth attempt.
+   */
+  useEffect(() => {
+    if (!adapter) return;
+    return adapter.onSliceRetry((event) => {
+      setRetry({ attempt: Math.min(event.index + 1, event.total), total: event.total });
+    });
+  }, [adapter]);
+
   const { storedPlateCount, anyFresh, anyStale } = useMemo(() => {
     const map = results();
     let fresh = 0;
@@ -328,6 +368,8 @@ export function useSlicingState(adapter: EngineAdapter | null): SlicingStateApi 
     slicing,
     progress,
     layerCount,
+    retryAttempt: retry.attempt,
+    retryTotal: retry.total,
     resultState,
     freshGcodeFile,
     staleGcodeFile,

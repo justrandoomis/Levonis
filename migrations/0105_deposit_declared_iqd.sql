@@ -1,0 +1,52 @@
+-- ============================================================================
+--  0105 — «كتبت ٥٠,٠٠٠ وظهر ٥٠,٠٠٨» : THE CUSTOMER'S DINARS, RECORDED.
+-- ============================================================================
+-- NONDESTRUCTIVE: two nullable ADD COLUMNs on `wallet_deposit_meta`. Nothing
+-- is dropped, no CHECK is added, and NO ROW IS BACKFILLED — a deposit filed
+-- before this applies reads NULL, which is the truth about it: nobody wrote
+-- that customer's dinar figure down, so nobody may now claim to know it.
+--
+-- ---------------------------------------------------------------------------
+--  WHY A COLUMN AND NOT A ROUNDING RULE
+-- ---------------------------------------------------------------------------
+-- The ledger unit is USD cents. migrations/0001_init.sql declares it and
+-- 0015_wallet_holds.sql states in writing that it STAYS cents, because moving
+-- a live balance to another unit is a destructive rewrite and not a migration.
+-- So the deposit form converts: 50,000 د.ع at 1,400 IQD/USD becomes
+-- ceil(5,000,000 / 1,400) = 3,572 cents, and every screen converts back with
+-- floor(3,572 * 1,400 / 100) = 50,008 د.ع. The customer, the admin panel and
+-- the Telegram review card all then show a number the customer never typed.
+--
+-- NO ROUNDING RULE CAN REPAIR THAT, and this is the point worth keeping:
+-- at 1,400 a cent is 14 د.ع, so only multiples of 14 are representable, and
+-- 50,000 is not one of them — floor(c * 14) = 50,000 needs c in
+-- [3571.43, 3571.5) and no integer lives there. Math.round does not fix it, it
+-- only flips the sign of the error: 3,571 cents reads back as 49,994, i.e. the
+-- shop would credit LESS than the customer transferred, which is worse.
+--
+-- The dinar figure is therefore not a computation. It is the customer's own
+-- CLAIM about a transfer they say they made, and a claim is recorded, not
+-- recomputed — the same contract `orders.cod_tax_iqd` carries: written once at
+-- request time, read verbatim forever, never re-derived from today's rate.
+-- `exchange_rate_snapshot` sits beside it so a reviewer can see which rate the
+-- cents were computed at without having to guess what the setting was that
+-- week.
+--
+-- ---------------------------------------------------------------------------
+--  WHAT THIS COLUMN MAY NEVER DO
+-- ---------------------------------------------------------------------------
+-- IT IS TESTIMONY, NOT A SOURCE OF MONEY. `declared_amount_cents` stays the
+-- one number a credit is computed from, and the amount-mismatch guard
+-- (`depositAmountReview`, worker/lib/walletOps.ts) keeps comparing CENTS to
+-- CENTS. If a reader ever computed cents from this column, a client could
+-- declare 50,000 د.ع alongside 900,000 cents and be credited the cents; the
+-- fallback is deliberately one-directional — display reads the dinars when
+-- they exist and converts from the cents when they do not.
+--
+-- THE CEIL STAYS, AND IT IS THE RIGHT DIRECTION. Approval still credits the
+-- 3,572 cents, so the shop over-credits by up to 13 د.ع per deposit. That is
+-- bounded, it always favours the customer, and the alternative (floor) would
+-- credit less than was transferred. It is written here rather than "fixed"
+-- because changing it would change money in, and this migration changes none.
+ALTER TABLE wallet_deposit_meta ADD COLUMN declared_amount_iqd INTEGER;
+ALTER TABLE wallet_deposit_meta ADD COLUMN exchange_rate_snapshot INTEGER;

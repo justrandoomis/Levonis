@@ -96,6 +96,21 @@
       og:title, og:description and og:image in the Worker before the HTML ever
       reaches the crawler — see worker/lib/socialPreview.ts. What stays here is
       what a share of the site ITSELF should say.
+
+      THE KEY IS MIRRORED HERE, NOT DECIDED HERE. `src/lib/siteLogo.ts` is the
+      single place the shop's mark is named; this document cannot import it,
+      because the shell is parsed before any module runs and nothing templates
+      it on the way out. So `tests/siteMedia.test.ts` holds the WebP icon link
+      below and the two absolute image tags further down to that module's
+      constants and fails when any of them drifts — a check at test time
+      standing in for an import at run time.
+
+      AND THIS IS THE ONLY PATH A REPLACED R2 OBJECT REACHES. The owner swaps
+      the bytes under this fixed name in the bucket; `/files/*` answers the
+      brand folder with a short revalidating Cache-Control rather than a year
+      of `immutable` for exactly that reason (worker/routes/uploads.ts,
+      `isRewritableMediaKey`). The three `/icons/*.png` links below do NOT come
+      from R2 — see the next comment.
     -->
     <link rel="icon" type="image/webp" href="/files/UiUx/Logo/Logo.webp" />
 
@@ -128,6 +143,21 @@
       WebP favicon decoding at all (older Safari, several embedded webviews).
       A browser that understands the WebP takes it; the rest now take a PNG
       instead of drawing a blank square.
+
+      THEY ARE A FORK OF THE LOGO, NOT A COPY THAT REFRESHES ITSELF, and that
+      is the trap this comment exists to spring. These PNGs are binaries
+      committed to the repository, produced from `/files/UiUx/Logo/Logo.webp`
+      by `scripts/build-pwa-icons.mjs`, which is deliberately not part of
+      `npm run build`. Replacing the object in R2 therefore changes the WebP
+      link and the share card above and NOTHING HERE: an iPad takes
+      `apple-touch-icon.png` for the home screen and prefers a PNG `rel=icon`
+      for the tab, and an installed Android app takes `/icons/icon-192.png`
+      and `maskable-192.png` out of the manifest. A new logo is invisible on
+      both of those devices until someone runs the generator, commits the
+      seven files and bumps `VERSION` in public/sw.js so the precached copies
+      are dropped. `src/lib/siteLogo.ts` names these paths once and
+      `tests/siteMedia.test.ts` checks that this document, the generator and
+      worker/lib/webManifest.ts are all still talking about the same files.
     -->
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />

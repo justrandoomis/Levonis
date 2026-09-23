@@ -1837,7 +1837,17 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
     // A slice is about to need the worker: never let a pending idle release
     // fire into it.
     cancelIdleWorkerRelease();
-    if (status === "slicing" || plateCount === 1) {
+    // While a slice runs, this button is CANCEL — and cancelling has to go
+    // through the adapter, not straight at the engine's own button. The
+    // engine's cancel writes into a SharedArrayBuffer it only has under
+    // cross-origin isolation, which `worker/platform.ts` withholds from every
+    // Apple UA, so clicking its button on an iPad did nothing at all. See
+    // EngineAdapter.cancelSlice.
+    if (status === "slicing") {
+      if (!adapter.cancelSlice()) setNotice(t.actionUnavailable);
+      return;
+    }
+    if (plateCount === 1) {
       if (!adapter.clickControl("slice-btn")) setNotice(t.actionUnavailable);
       return;
     }
@@ -2195,8 +2205,21 @@ export default function SlicerClient({ user = null }: { user?: { id?: string; di
   }, [quality, settings]);
 
   const displayStatus: EditorStatus = status === "ready" && !printReady ? "editing" : status;
+  /**
+   * `↻ 2/3` beside the percentage while the engine is on a RETRY.
+   *
+   * It is a glyph and two numbers on purpose, with no dictionary entry: the
+   * slicing status is already a bare percentage in all three languages, and
+   * `↻ 2/3` reads the same in Arabic, English and Sorani without a translation
+   * anyone would have to review. It appears only when a retry actually
+   * started, so an unpatched engine — and every slice that succeeds first
+   * time — shows exactly the label it showed before.
+   */
+  const retrySuffix = slicing.retryAttempt > 1
+    ? ` ↻ ${slicing.retryAttempt}/${slicing.retryTotal}`
+    : "";
   const statusLabel = status === "slicing"
-    ? `${Math.round(slicing.progress * 100)}%`
+    ? `${Math.round(slicing.progress * 100)}%${retrySuffix}`
     : printReady
       ? `${slicing.layerCount || "✓"} ${t.layers}`
       : currentStale

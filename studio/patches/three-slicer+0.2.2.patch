@@ -41,7 +41,7 @@ index 0aaf626..994863b 100644
        say('info', '[slicer.worker] core: mt (threads)')
        return M
 diff --git a/node_modules/three-slicer/viewer/dist/Viewport.js b/node_modules/three-slicer/viewer/dist/Viewport.js
-index 679c796..8585eb2 100644
+index 679c796..3119c1e 100644
 --- a/node_modules/three-slicer/viewer/dist/Viewport.js
 +++ b/node_modules/three-slicer/viewer/dist/Viewport.js
 @@ -1660,7 +1660,7 @@ function _l(e) {
@@ -49,11 +49,58 @@ index 679c796..8585eb2 100644
            E(ne), v(!1);
        };
 -      k.onerror = (ne) => F("Worker terminated (likely out of memory): " + (ne.message || "worker error")), k.onmessageerror = () => F("Worker message error (structured clone failed)"), r.current = k, typeof window < "u" && (window.__vpWorker = k);
-+      k.onerror = (ne) => F("Worker terminated (likely out of memory): " + (ne.message || "worker error")), k.onmessageerror = () => F("Worker message error (structured clone failed)"), r.current = k, typeof window < "u" && (window.__vpWorker = k, window.__vpReleaseWorker = () => { if ($.current || r.current !== k) return !1; try { k.terminate(); } catch { } return r.current = null, N.current = null, window.__vpWorker === k && (window.__vpWorker = null), !0; });
++      k.onerror = (ne) => F("Worker terminated (likely out of memory): " + (ne.message || "worker error")), k.onmessageerror = () => F("Worker message error (structured clone failed)"), r.current = k, typeof window < "u" && (window.__vpWorker = k, window.__vpReleaseWorker = () => { if ($.current || r.current !== k) return !1; try { k.terminate(); } catch { } return r.current = null, N.current = null, window.__vpWorker === k && (window.__vpWorker = null), !0; }, window.__vpCanCancel = () => !!(N.current && N.current.cancel), window.__vpAbortSlice = () => { const V = $.current; if (!V || r.current !== k) return !1; $.current = null; try { V.stop && V.stop(); } catch { } try { j(); } catch { } N.current = null; try { k.terminate(); } catch { } return r.current = null, window.__vpWorker === k && (window.__vpWorker = null), V.reject(new Error("slice canceled")), !0; });
      }
      return r.current;
    }
-@@ -1763,7 +1763,7 @@ function _l(e) {
+@@ -1737,21 +1737,45 @@ function _l(e) {
+   }
+   async function ie(k, F) {
+     const ne = (O) => String((O == null ? void 0 : O.message) || O).includes("canceled");
++    const Kt = [], Xt = (V, I, X) => {
++      const ae = ((performance.now() - I) / 1e3).toFixed(1), Ae = String((X == null ? void 0 : X.message) || X);
++      Kt.push(`${V} failed after ${ae}s: ${Ae}`), lt.info(`[vp-retry] ${Kt[Kt.length - 1]}`);
++      try {
++        typeof window < "u" && (window.__vpRungs = Kt.slice(), window.dispatchEvent(new CustomEvent("vp-retry", { detail: { rung: V, seconds: Number(ae), message: Ae, index: Kt.length, total: 3 } })));
++      } catch {
++      }
++    };
++    try {
++      typeof window < "u" && (window.__vpRungs = []);
++    } catch {
++    }
++    const Zt = performance.now();
+     try {
+       const O = await L(k, JSON.stringify(F));
+       return { r: O, economy: !!(O.stats && O.stats.economy) };
+     } catch (O) {
+       if (ne(O)) throw O;
++      Xt("1/3 full", Zt, O);
+       if (F.wall_generator !== "classic") {
+         B();
++        const Qt = performance.now();
+         try {
+           const pe = await L(k, JSON.stringify({ ...F, wall_generator: "classic", keep_stages: !1, reuse_stages: 0 }));
+           return { r: pe, economy: !!(pe.stats && pe.stats.economy), classicWalls: !0 };
+         } catch (pe) {
+           if (ne(pe)) throw pe;
++          Xt("2/3 classic-walls", Qt, pe);
+         }
+       }
+-      return B(), { r: await L(k, JSON.stringify({ ...F, economy: !0, keep_stages: !1, reuse_stages: 0 })), economy: !0, recovered: !0 };
++      B();
++      const en = performance.now();
++      try {
++        return { r: await L(k, JSON.stringify({ ...F, economy: !0, keep_stages: !1, reuse_stages: 0 })), economy: !0, recovered: !0 };
++      } catch (pe) {
++        if (ne(pe)) throw pe;
++        Xt("3/3 economy", en, pe);
++        throw new Error(`${String((pe == null ? void 0 : pe.message) || pe)} — attempts: ${Kt.join(" | ")}`);
++      }
+     }
+   }
+   async function de(k) {
+@@ -1763,7 +1787,7 @@ function _l(e) {
      }
    }
    function J(k, F) {

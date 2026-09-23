@@ -94,6 +94,20 @@ export async function searchIndexInstalled(db: D1Database): Promise<boolean> {
   }
 }
 
+/**
+ * Does the index hold anything at all?
+ *
+ * One indexed probe — the smallest question that separates "nothing matched"
+ * from "there is nothing to match against", which is the distinction
+ * `SearchResult.indexReady` carries to the caller so it can fall back instead
+ * of telling every shopper the shop is empty. Only ever run on a path that
+ * already found nothing, so it costs nothing on a built index.
+ */
+async function indexHasRows(db: D1Database): Promise<boolean> {
+  const any = await db.prepare('SELECT 1 AS n FROM search_tokens LIMIT 1').first<{ n: number }>();
+  return !!any;
+}
+
 /** The dictionary, as a map. Small enough to read whole; cached per request. */
 export async function loadSynonyms(db: D1Database): Promise<Map<string, string>> {
   const { results } = await db
@@ -146,7 +160,17 @@ export async function searchProducts(
   const limit = opts.limit ?? 50;
   const synonyms = opts.synonyms ?? (await loadSynonyms(db));
   const expanded = expandQuery(rawQuery, synonyms);
-  if (expanded.lookup.length === 0) return { ids: [], understood: [], indexReady: true };
+  /**
+   * Nothing to look up — punctuation, or two bare letters with no word between
+   * them. `indexReady` was hard-coded TRUE here, which told the caller "the
+   * index answered, and the answer is nothing" about a query the index was
+   * never asked. On a shop mid-backfill that is the difference between the
+   * substring fallback and an empty grid, so it is probed like every other
+   * empty answer in this function.
+   */
+  if (expanded.lookup.length === 0) {
+    return { ids: [], understood: [], indexReady: await indexHasRows(db) };
+  }
 
   // 1. The candidate vocabulary, by prefix. `>= p AND < p+1` is a range scan
   //    on idx_search_tokens_token; `LIKE 'p%'` would be too, but only when the
@@ -158,16 +182,41 @@ export async function searchProducts(
   for (const p of prefixes) {
     rangeParams.push(p, p.slice(0, -1) + String.fromCodePoint((p.codePointAt(p.length - 1) ?? 0) + 1));
   }
+  /**
+   * WHAT THE CAP CUTS OFF MATTERS ONCE A PREFIX IS ONE CHARACTER LONG.
+   *
+   * `SELECT DISTINCT token … LIMIT 2000` has no ORDER BY, so SQLite serves it
+   * in the range scan's own order — alphabetical. For a two-character prefix
+   * that is harmless: the range is tens of tokens and the cap never bites. A
+   * ONE-character prefix is roughly a tenth of the vocabulary, and on a real
+   * catalogue «ا» or `h` would be truncated at the two-thousandth token
+   * ALPHABETICALLY, which is to say the second half of the shelf is simply not
+   * considered. One-character prefixes are not exotic — `candidatePrefix`
+   * returns one for every token of three characters or fewer, so «اكس تو دي»
+   * has had three of them since the day it was written.
+   *
+   * So when the prefix set contains one, the same covering index is read
+   * weight-first instead: the tokens that survive the cap are the ones the
+   * catalogue says loudest, not the ones that sort earliest. Under the cap the
+   * two queries return the SAME SET — `bestMatches` sorts its own output, so
+   * the order the rows arrive in cannot change an answer — and the aggregate
+   * only costs a sort when a one-character range is in play, which is why the
+   * cheaper form is kept for everything else.
+   */
+  const wideScan = prefixes.some((p) => [...p].length === 1);
+  const vocabSql = wideScan
+    ? `SELECT token, MAX(weight) AS w FROM search_tokens WHERE ${ranges}
+        GROUP BY token ORDER BY w DESC, LENGTH(token) ASC, token ASC LIMIT ${MAX_VOCABULARY}`
+    : `SELECT DISTINCT token FROM search_tokens WHERE ${ranges} LIMIT ${MAX_VOCABULARY}`;
   const { results: vocabRows } = await db
-    .prepare(`SELECT DISTINCT token FROM search_tokens WHERE ${ranges} LIMIT ${MAX_VOCABULARY}`)
+    .prepare(vocabSql)
     .bind(...rangeParams)
     .all<{ token: string }>();
   const vocabulary = (vocabRows ?? []).map((r) => String(r.token));
   if (vocabulary.length === 0) {
     // No candidates. Is the index empty, or does this query simply match
     // nothing? One indexed probe tells the caller which, and it only runs here.
-    const any = await db.prepare('SELECT 1 AS n FROM search_tokens LIMIT 1').first<{ n: number }>();
-    return { ids: [], understood: expanded.lookup, indexReady: !!any };
+    return { ids: [], understood: expanded.lookup, indexReady: await indexHasRows(db) };
   }
 
   // 2. Which vocabulary tokens the query actually means — exact, prefix, then

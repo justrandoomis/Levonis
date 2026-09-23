@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Paperclip, X } from 'lucide-react';
 import type { Language } from '../../translations';
-import { api, ApiError } from '../../lib/api';
+import { api, ApiError, uploadTimeoutMs } from '../../lib/api';
 import { Overlay } from '../ui/Overlay';
 import type { Attachment, Device } from './types';
 import { productName } from './types';
@@ -99,7 +99,23 @@ export function DeviceClaimOverlay({
         if (count >= MAX_ATTACHMENTS) break;
         const form = new FormData();
         form.append('file', file);
-        const res = await api.post<{ key: string; url: string }>('/api/devices/claims/upload', form);
+        /**
+         * A DEADLINE SIZED FOR THE FILE — this is the «فشل في الشبكة» the
+         * owner photographed on a warranty claim.
+         *
+         * The route accepts images to 8 MB and VIDEO TO 40 MB
+         * (worker/routes/devices.ts). Without a timeout this post took
+         * `DEFAULT_TIMEOUT_MS`, 20 seconds, which a 40 MB body clears only at
+         * a sustained 2 MB/s. Everywhere else the abort is indistinguishable
+         * from a dropped socket — src/lib/api.ts turns both into "Network
+         * error — check your connection" — so a working connection was blamed
+         * for a deadline the client set itself. `uploadTimeoutMs` says so in
+         * its own words, and every other upload in the app already passes it;
+         * these two claim uploads were the ones that never did.
+         */
+        const res = await api.post<{ key: string; url: string }>('/api/devices/claims/upload', form, {
+          timeoutMs: uploadTimeoutMs(file.size),
+        });
         count += 1;
         const video = file.type.startsWith('video/');
         setAttachments((a) => (a.length >= MAX_ATTACHMENTS ? a : [...a, { key: res.key, url: res.url, name: file.name, video }]));

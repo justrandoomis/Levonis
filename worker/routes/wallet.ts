@@ -13,8 +13,10 @@ import {
 import { audit } from '../lib/audit';
 import { headMediaObject } from '../lib/mediaStorage';
 import {
+  DEFAULT_WITHDRAWAL_FEE_BPS,
   MAX_AMOUNT_CENTS,
-  WITHDRAWAL_FEE_POLICY,
+  MAX_WITHDRAWAL_FEE_BPS,
+  WITHDRAWAL_LIVE_PAYOUT,
   WITHDRAWAL_STATES,
   WITHDRAWAL_TRANSITIONS,
   advanceWithdrawal,
@@ -29,11 +31,13 @@ import {
   markWithdrawalPaid,
   operationNumber,
   requestWithdrawal,
+  normalizeWithdrawalFeeBps,
   walletReconciliationReport,
   withdrawalFeeQuote,
   type WithdrawalOpResult,
   type WithdrawalRow,
 } from '../lib/walletOps';
+import { getSetting } from '../lib/settings';
 import { notifyAdminTopic } from '../lib/telegramAdmin';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 
@@ -69,7 +73,11 @@ function withdrawalPublic(w: WithdrawalRow) {
     fee_cents: w.fee_cents,
     net_cents: w.net_cents,
     fee_policy: w.fee_policy,
-    fee_configured: WITHDRAWAL_FEE_POLICY.configured,
+    // THE ROW'S OWN POLICY, never today's setting. A request filed before the
+    // owner set a commission carries fee_cents = 0 and 'not_configured', and
+    // no screen may tell that customer a fee was charged on it just because
+    // one exists now.
+    fee_configured: w.fee_policy !== 'not_configured' && w.fee_cents > 0,
     state: w.state,
     // Explicitly NOT "paid": approving only authorises processing.
     money_sent: w.state === 'paid',
@@ -173,10 +181,19 @@ walletRoutes.get('/', async (c) => {
 
   const openReviews = new Set((reviews.results ?? []).map((r) => r.tx_id));
   const depositMeta = await c.env.DB.prepare(
-    `SELECT tx_id, provider, channel, reference, review_state FROM wallet_deposit_meta WHERE user_id = ? LIMIT 300`
+    `SELECT tx_id, provider, channel, reference, review_state, declared_amount_iqd, exchange_rate_snapshot
+       FROM wallet_deposit_meta WHERE user_id = ? LIMIT 300`
   )
     .bind(user.id)
-    .all<{ tx_id: string; provider: string; channel: string; reference: string; review_state: string }>();
+    .all<{
+      tx_id: string;
+      provider: string;
+      channel: string;
+      reference: string;
+      review_state: string;
+      declared_amount_iqd: number | null;
+      exchange_rate_snapshot: number | null;
+    }>();
   const metaById = new Map((depositMeta.results ?? []).map((m) => [m.tx_id, m]));
 
   const decorate = (t: Record<string, unknown>) => {
@@ -186,7 +203,17 @@ walletRoutes.get('/', async (c) => {
       number: operationNumber(String(t.id)),
       reviewRequested: openReviews.has(String(t.id)),
       depositContext: meta
-        ? { provider: meta.provider, channel: meta.channel, reference: meta.reference, review_state: meta.review_state }
+        ? {
+            provider: meta.provider,
+            channel: meta.channel,
+            reference: meta.reference,
+            review_state: meta.review_state,
+            // Migration 0105 — the dinars the customer typed, or null for a
+            // request filed before the column existed. The browser falls back
+            // to converting the cents for those; it never back-fills them.
+            declared_amount_iqd: meta.declared_amount_iqd,
+            exchange_rate_snapshot: meta.exchange_rate_snapshot,
+          }
         : null,
     };
   };
@@ -213,24 +240,66 @@ walletRoutes.get('/', async (c) => {
 });
 
 /**
- * Honest policy surface for the withdrawal form: no invented fee, no
- * invented limit, and no pretence that a live payout channel exists
- * (mandate §11.3 / §13.1 — an owner decision that has not been made).
+ * WHERE THE COMMISSION RATE COMES FROM, AND WHY IT IS NOT A `SettingKey`.
+ *
+ * `withdrawalFeeBps` is stored in the same `admin_settings` table as every
+ * other owner-editable number, but it is deliberately read and written here
+ * rather than through `getSetting`/`setSetting`: those are typed against
+ * SETTING_DEFAULTS, and the wallet slice does not own that file. The read
+ * below is the same one-row lookup they perform, and a row that is missing,
+ * unparseable or nonsensical falls to `DEFAULT_WITHDRAWAL_FEE_BPS` — the 3%
+ * the owner named — rather than to silence.
+ *
+ * ONE PLACE. Nothing else in the wallet reads this row; every caller goes
+ * through here, and every multiplication goes through `withdrawalFeeQuote`.
  */
-walletRoutes.get('/policy', (c) =>
-  c.json({
+async function readWithdrawalFeeBps(db: D1Database): Promise<number> {
+  const row = await db
+    .prepare("SELECT value FROM admin_settings WHERE key = 'withdrawalFeeBps'")
+    .first<{ value: string }>();
+  if (!row) return DEFAULT_WITHDRAWAL_FEE_BPS;
+  try {
+    const parsed = JSON.parse(row.value);
+    // A stored 0 is the owner switching the commission OFF and is honoured.
+    // A stored nothing is a row that says nothing, and falls to the default.
+    if (parsed === null || parsed === undefined) return DEFAULT_WITHDRAWAL_FEE_BPS;
+    return normalizeWithdrawalFeeBps(parsed);
+  } catch {
+    return DEFAULT_WITHDRAWAL_FEE_BPS;
+  }
+}
+
+/**
+ * The policy surface the withdrawal form reads BEFORE any request exists.
+ *
+ * It exists so the form never computes a percentage of its own: it prints the
+ * quote this route produced from the same function the ledger writes with.
+ * The fee is DEDUCTED from the requested amount — request 100,000, the
+ * commission is 3,000, 97,000 reaches you and 100,000 leaves your balance —
+ * and `sample` says exactly that in numbers so the semantics cannot be read
+ * two ways. There is still no live payout channel: `paid` is recorded by a
+ * human who made a transfer that already happened.
+ */
+walletRoutes.get('/policy', async (c) => {
+  const feeBps = await readWithdrawalFeeBps(c.env.DB);
+  const sampleCents = 100_000;
+  return c.json({
     success: true,
     withdrawal: {
-      fee_configured: WITHDRAWAL_FEE_POLICY.configured,
-      fee_policy: WITHDRAWAL_FEE_POLICY.policy,
-      live_payout: WITHDRAWAL_FEE_POLICY.live_payout,
+      fee_bps: feeBps,
+      fee_configured: feeBps > 0,
+      fee_policy: feeBps > 0 ? 'percent_bps' : 'not_configured',
+      /** Deducted from the requested amount, never added on top. */
+      fee_basis: 'deducted_from_amount',
+      sample: withdrawalFeeQuote(sampleCents, feeBps),
+      live_payout: WITHDRAWAL_LIVE_PAYOUT,
       min_amount_usd_cents: 100,
       max_amount_usd_cents: MAX_AMOUNT_CENTS,
       states: WITHDRAWAL_STATES,
       transitions: WITHDRAWAL_TRANSITIONS,
     },
-  })
-);
+  });
+});
 
 // ---------------------------------------------------------------- deposits
 
@@ -256,6 +325,21 @@ walletRoutes.post('/deposits', async (c) => {
   const provider = str(body.provider, 'provider', { max: 60, required: false }) || paymentMethod;
   const channel = str(body.channel, 'channel', { max: 60, required: false });
   const reference = str(body.reference, 'reference', { max: 120, required: false });
+  /**
+   * WHAT THE CUSTOMER TYPED, WHEN THEY TYPED DINARS (migration 0105).
+   *
+   * `amount_usd_cents` above stays the authoritative figure and the only one
+   * a credit is ever computed from. This is the customer's own claim about the
+   * transfer, recorded verbatim because the cents cannot be converted back to
+   * it: at 1,400 IQD/USD a cent is 14 د.ع, so 50,000 became 3,572 cents and
+   * read back as 50,008 on every screen in the company. Optional, so an older
+   * client that does not send it keeps working exactly as before.
+   */
+  const declaredAmountIqd = int(body.declared_amount_iqd, 'declared_amount_iqd', {
+    min: 0,
+    max: 10_000_000_000,
+    def: 0,
+  });
 
   if (!receiptKey.startsWith(`receipts/${user.id}/`)) {
     throw badRequest('Receipt upload is required for deposits');
@@ -267,6 +351,10 @@ walletRoutes.post('/deposits', async (c) => {
   // re-used receipt image for the reviewer; it is NOT anti-forgery proof.
   const fingerprint = (obj.checksums?.md5 ? bytesToHex(obj.checksums.md5) : obj.etag || '').slice(0, 80);
 
+  // The rate is read once, here, and stored beside the dinars — never
+  // re-read at display time, which is what made the figure drift.
+  const exchangeRate = declaredAmountIqd ? Number(await getSetting(c.env.DB, 'exchangeRate')) || 0 : 0;
+
   const created = await createDepositRequest(c.env.DB, {
     userId: user.id,
     amountCents: amount,
@@ -277,6 +365,8 @@ walletRoutes.post('/deposits', async (c) => {
     channel,
     reference,
     fingerprint,
+    declaredAmountIqd: declaredAmountIqd || undefined,
+    exchangeRateSnapshot: exchangeRate || undefined,
   });
   if (!created.ok) {
     if (created.reason === 'INVALID_AMOUNT') throw badRequest('Amount must be a whole number of cents above zero', 'INVALID_AMOUNT');
@@ -340,12 +430,17 @@ walletRoutes.post('/withdrawals', async (c) => {
   const destinationNote = str(body.destinationNote, 'destinationNote', { max: 300, required: false });
   const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { max: 80, required: false });
 
+  // The rate is read ONCE here and quoted ONCE inside the engine. The stored
+  // fee_cents/net_cents/fee_policy are the snapshot everyone else reads.
+  const feeBps = await readWithdrawalFeeBps(c.env.DB);
+
   const res = await requestWithdrawal(c.env.DB, {
     userId: user.id,
     amountCents: amount,
     destination: { kind, account, holder, note: destinationNote },
     eventKey: idempotencyKey ? `wd:${idempotencyKey}` : `wd:${newId('evt')}`,
     note,
+    feeBps,
   });
   if (!res.ok) throwForWithdrawalFailure(res);
 
@@ -376,7 +471,11 @@ walletRoutes.post('/withdrawals', async (c) => {
     announceAfterResponse(
       c,
       'wallet',
-      `🏧 New withdrawal request (pending review — no transfer made)\nOperation: ${operationNumber(res.id, 'WD')}\nUser: ${user.username || `#${user.id}`}\nAmount: $${(amount / 100).toFixed(2)}\nDestination: ${kind}`
+      `🏧 New withdrawal request (pending review — no transfer made)\nOperation: ${operationNumber(res.id, 'WD')}\nUser: ${user.username || `#${user.id}`}\nAmount: $${(amount / 100).toFixed(2)}${
+        row && row.fee_cents > 0
+          ? `\nCommission: $${(row.fee_cents / 100).toFixed(2)} (deducted) — net $${(row.net_cents / 100).toFixed(2)}`
+          : ''
+      }\nDestination: ${kind}`
     );
   }
   return c.json({
@@ -385,7 +484,7 @@ walletRoutes.post('/withdrawals', async (c) => {
     number: operationNumber(res.id, 'WD'),
     status: row?.state ?? 'requested',
     replayed: res.replayed,
-    quote: withdrawalFeeQuote(amount),
+    quote: withdrawalFeeQuote(amount, feeBps),
     withdrawal: row ? withdrawalPublic(row) : null,
   });
 });
@@ -478,6 +577,51 @@ walletRoutes.get('/review-requests', async (c) => {
 walletRoutes.get('/admin/reconciliation', requireAdmin, async (c) => {
   const report = await walletReconciliationReport(c.env.DB);
   return c.json({ success: true, report });
+});
+
+/**
+ * THE OWNER'S COMMISSION DIAL — «عمولة للسحب بقدر 3% قابله للتغيير من الادارة».
+ *
+ * GET reads it, PUT writes it, and both go through the same normalizer the
+ * quote uses, so the admin screen and the engine cannot disagree about what a
+ * typed number means. 0 is a real value and switches the commission off — the
+ * same thing `codTaxPerBlockIqd = 0` means — so it is accepted rather than
+ * rejected as "missing".
+ *
+ * CHANGING IT IS NOT RETROACTIVE, and that is the sentence worth keeping: a
+ * withdrawal stores fee_cents/net_cents/fee_policy at the moment it is filed,
+ * so raising the rate today cannot re-price a request already on the books,
+ * exactly as `orders.cod_tax_iqd` cannot re-price last month's invoices.
+ */
+walletRoutes.get('/admin/withdrawal-fee', requireAdmin, async (c) => {
+  const feeBps = await readWithdrawalFeeBps(c.env.DB);
+  return c.json({
+    success: true,
+    fee_bps: feeBps,
+    max_fee_bps: MAX_WITHDRAWAL_FEE_BPS,
+    fee_basis: 'deducted_from_amount',
+    sample: withdrawalFeeQuote(100_000, feeBps),
+  });
+});
+
+walletRoutes.put('/admin/withdrawal-fee', requireAdmin, async (c) => {
+  const admin = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  const feeBps = int(body.fee_bps, 'fee_bps', { min: 0, max: MAX_WITHDRAWAL_FEE_BPS });
+  await c.env.DB.prepare(
+    `INSERT INTO admin_settings (key, value) VALUES ('withdrawalFeeBps', ?1)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+  )
+    .bind(JSON.stringify(feeBps))
+    .run();
+  await audit(c.env.DB, admin.id, 'wallet.withdrawal_fee.changed', 'withdrawalFeeBps', { fee_bps: feeBps });
+  return c.json({
+    success: true,
+    fee_bps: feeBps,
+    fee_basis: 'deducted_from_amount',
+    sample: withdrawalFeeQuote(100_000, feeBps),
+    note: 'Applies to NEW requests only — a filed withdrawal keeps the fee it was quoted',
+  });
 });
 
 walletRoutes.get('/admin/withdrawals', requireAdmin, async (c) => {
@@ -610,6 +754,43 @@ walletRoutes.post('/admin/withdrawals/:id/reconcile/clear', requireAdmin, async 
   await audit(c.env.DB, admin.id, 'wallet.withdrawal.reconciliation_cleared', id, { finding });
   const row = await getWithdrawal(c.env.DB, id);
   return c.json({ success: true, withdrawal: row ? withdrawalPublic(row) : null });
+});
+
+/**
+ * THE DINARS THE CUSTOMER TYPED, FOR THE REVIEWER'S SCREEN (migration 0105).
+ *
+ * The admin wallet list is served by the legacy `/api/admin/wallet-requests`
+ * route, which reports the ledger row and knows nothing about the deposit
+ * context. Rather than have that screen convert the cents back — the exact
+ * arithmetic that turned a 50,000 د.ع transfer into «50,008 د.ع» on every
+ * screen in the company — it asks here for the figures that were RECORDED.
+ *
+ * Read-only, admin-only, and deliberately thin: it returns the declared
+ * dinars and the rate they were filed at, nothing else. A row filed before
+ * 0105 is simply absent from the map, and the caller keeps converting for it,
+ * which is the honest answer for a request whose dinar figure nobody wrote
+ * down.
+ */
+walletRoutes.get('/admin/deposits/declared', requireAdmin, async (c) => {
+  const ids = (c.req.query('ids') ?? '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .slice(0, 200);
+  if (ids.length === 0) return c.json({ success: true, declared: {} });
+  const placeholders = ids.map(() => '?').join(',');
+  const { results } = await c.env.DB.prepare(
+    `SELECT tx_id, declared_amount_iqd, exchange_rate_snapshot
+       FROM wallet_deposit_meta
+      WHERE tx_id IN (${placeholders}) AND declared_amount_iqd IS NOT NULL`
+  )
+    .bind(...ids)
+    .all<{ tx_id: string; declared_amount_iqd: number; exchange_rate_snapshot: number | null }>();
+  const declared: Record<string, { amount_iqd: number; exchange_rate: number | null }> = {};
+  for (const r of results ?? []) {
+    declared[r.tx_id] = { amount_iqd: r.declared_amount_iqd, exchange_rate: r.exchange_rate_snapshot };
+  }
+  return c.json({ success: true, declared });
 });
 
 /**

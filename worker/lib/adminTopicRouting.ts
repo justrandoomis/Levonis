@@ -110,9 +110,18 @@ export function orderTopic(shippingType: unknown): TopicKey {
  * stages and its private evidence, opened by
  * `POST /api/devices/units/:unitId/claims`) announces itself directly with the
  * `warranty` key in worker/routes/devices.ts, because there is nothing to
- * decide there: a claim is always a warranty claim. Both kinds of after-sale
- * conversation therefore reach «🔥 Warranty support», by two paths that each
- * say so in plain terms rather than one clever shared predicate.
+ * decide there: a claim is always a warranty claim.
+ *
+ * AND THERE IS A THIRD KIND, which this comment once forgot to count and which
+ * therefore reached the topic by no path at all. `POST /api/profile/warranty-
+ * claims` is the GENERAL claim — the one «منتج غير مرتبط كطابعة؟» opens for a
+ * customer holding something the shop never serialized, so there is no unit to
+ * hang it on and `ticketTopic` never sees it. It now announces itself with the
+ * `warranty` key too, in worker/routes/profile.ts. ALL THREE kinds of
+ * after-sale conversation therefore reach «🔥 Warranty support», by three
+ * paths that each say so in plain terms rather than one clever shared
+ * predicate — and a fourth entry point added later has to say so as well,
+ * because nothing in this file will notice that it did not.
  */
 export function ticketTopic(unitId: unknown): TopicKey {
   return unitId ? 'warranty' : 'support';

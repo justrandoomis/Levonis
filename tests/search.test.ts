@@ -52,6 +52,15 @@ async function shop(): Promise<Raw> {
     hashtags: ['3d-printer', 'x2d-combo', 'x2d', 'bambu-lab', 'multi-material', 'ams-2-pro', 'dual-nozzle', 'fdm'],
     variantNames: ['Combo', 'Dual nozzle'],
   });
+  // The shop's current flagship, and the product behind the owner's «H»
+  // report — migration 0091 seeds «اتش2دي» → `h2d` for exactly this one.
+  await add('p_h2d', 'Bambu Lab H2D Combo 3D Printer', {
+    name_ar: 'طابعة بامبو لاب H2D كومبو',
+    brandName: 'Bambu Lab',
+    categoryNames: ['Printers', 'FDM Printers'],
+    hashtags: ['3d-printer', 'h2d', 'h2d-combo', 'bambu-lab', 'dual-nozzle', 'fdm'],
+    variantNames: ['Combo'],
+  });
   await add('p_a1', 'Bambu Lab A1 Combo 3D Printer', {
     name_ar: 'طابعة بامبو لاب A1 كومبو',
     brandName: 'Bambu Lab',
@@ -117,6 +126,109 @@ test('«اكس» ON ITS OWN reaches the X2D — one spelled letter, used as a pr
   const got = await ids(raw, 'اكس');
   assert.ok(got.includes('p_x2d'), '«اكس» must reach the X2D');
   assert.ok(!got.includes('p_pla'), 'and must not drag the filament in with it');
+});
+
+test('«H» ON ITS OWN reaches the H2D — one letter is a query, not debris', async () => {
+  /**
+   * THE REPORT THAT BLOCKED SELLING. Typing a single «H» answered «لا توجد
+   * منتجات» while the front page sold an H2D.
+   *
+   * `tokenize` drops a one-character word, and it is RIGHT to — a "h" row on
+   * every product containing an H matches everything and ranks nothing, which
+   * is what the single-character case below pins. But the same function ran on
+   * the query side, so what a shopper TYPED was held to the index's floor:
+   * «H» expanded to nothing, `searchProducts` exited before reading anything,
+   * and the route painted its empty state.
+   *
+   * The engine has known what to do with a one-character term since «اكس»
+   * above: it becomes a one-character index range and is matched as a PREFIX.
+   */
+  const raw = await shop();
+  const got = await ids(raw, 'H');
+  assert.ok(got.includes('p_h2d'), '«H» must reach the H2D');
+  assert.ok(!got.includes('p_a1'), 'a letter names a shelf, not the whole catalogue');
+  assert.equal((await searchProducts(asD1(raw), 'H')).indexReady, true, 'and it is a real answer');
+});
+
+test('one letter on an ARABIC keyboard crosses into a catalogue written in Latin', async () => {
+  // «ب» is somebody one keystroke into "Bambu" with the wrong keyboard on.
+  // The romanised skeleton — the same one that puts «بامبو» and "bambu" in
+  // reach of each other — is what carries a single letter across the scripts.
+  const raw = await shop();
+  const got = await ids(raw, 'ب');
+  assert.ok(got.includes('p_h2d') || got.includes('p_x2d'), '«ب» must reach the Bambu printers');
+  assert.ok(!got.includes('p_nozzle'), 'and must not reach a product with no B in it');
+});
+
+test('a lone character INSIDE a longer query is still debris', async () => {
+  /**
+   * Coverage is a MULTIPLIER in `scoreProducts`, and that is the line holding
+   * "bambu x2d" above every other Bambu product. A bare `1` in "pla 1" would
+   * match a tenth of the vocabulary and count as a second covered word while
+   * doing it, so the one-character term is added only when it is the WHOLE
+   * query — where there is no other word for it to dilute.
+   */
+  const { expandQuery } = await import('../worker/lib/search/index');
+  const bare = new Map<string, string>();
+  assert.ok(expandQuery('h', bare).lookup.includes('h'), 'alone, it is looked up');
+  assert.ok(!expandQuery('pla 1', bare).lookup.includes('1'), 'beside a word, it is not');
+  assert.ok(!expandQuery('bambu h', bare).lookup.includes('h'));
+
+  const raw = await shop();
+  assert.equal(await first(raw, 'pla 1'), 'p_pla', 'the filament, not everything with a 1 in it');
+  assert.equal(await first(raw, 'bambu x2d'), 'p_x2d', 'the coverage multiplier is untouched');
+});
+
+test('a single letter reaches a SHELF, not the five tokens a word would', async () => {
+  // `bestMatches` returns five by default, and for a word that is generous:
+  // five completions of "pla" is already more guessing than a shopper wants.
+  // A letter is not a word — it names a whole shelf, and five tokens is at
+  // most five products, so «H» would answer with a scrap of the H shelf
+  // chosen by nothing the shopper can see.
+  const { expandQuery, resolveTokens } = await import('../worker/lib/search/index');
+  const none = new Map<string, string>();
+  const shelf = Array.from({ length: 30 }, (_, i) => `h${String(i).padStart(2, '0')}x`);
+  assert.ok(resolveTokens(expandQuery('h', none), shelf).size > 5, 'a letter opens the shelf');
+  const words = Array.from({ length: 30 }, (_, i) => `pla${i}`);
+  assert.equal(resolveTokens(expandQuery('pla', none), words).size, 5, 'a word stays at five');
+});
+
+test('a one-character prefix is cut by WEIGHT, not alphabetically', async () => {
+  /**
+   * The candidate read is capped, and what the cap throws away matters once a
+   * prefix is one character long — which is not exotic: `candidatePrefix`
+   * returns one for every token of three characters or fewer, so «اكس تو دي»
+   * has had three of them since the day it was written. `SELECT DISTINCT
+   * token … LIMIT 2000` has no ORDER BY, so SQLite serves the range scan's own
+   * order and the cap falls ALPHABETICALLY — on a real catalogue the second
+   * half of the shelf is simply never considered.
+   *
+   * Two thousand junk tokens that sort before `h2d`, and the flagship has to
+   * survive them.
+   */
+  const raw = await shop();
+  raw.prepare(
+    `INSERT INTO products (id, slug, name, description, price_iqd, status) VALUES ('p_noise', 'p_noise', 'Noise', '', 1000, 'active')`
+  ).run();
+  raw.exec(
+    `INSERT INTO search_tokens (product_id, token, weight)
+       SELECT 'p_noise', 'h0' || substr('00000000' || n, -8), 1
+       FROM (WITH RECURSIVE c(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM c WHERE n < 2400) SELECT n FROM c)`
+  );
+  const got = await ids(raw, 'H');
+  assert.ok(got.includes('p_h2d'), 'the flagship must not be buried by tokens that merely sort earlier');
+});
+
+test('a query with nothing to look up still says whether the index could answer', async () => {
+  // «!!!» normalises to nothing, so there is no lookup to run — but the
+  // caller still has to know whether that is "the index answered" or "the
+  // index was never asked", because only the second falls back to the
+  // substring scan while the backfill catches up. This return hard-coded
+  // "ready", which told a shop mid-backfill to paint an empty grid.
+  const raw = await shop();
+  assert.equal((await searchProducts(asD1(raw), '!!!')).indexReady, true, 'a built index is ready');
+  raw.exec('DELETE FROM search_tokens');
+  assert.equal((await searchProducts(asD1(raw), '!!!')).indexReady, false, 'an empty one is not');
 });
 
 test('A SPELLED LETTER THAT IS ALSO AN ARABIC WORD IS NOT READ AS A LETTER', async () => {

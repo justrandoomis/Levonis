@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useWallet, PaymentMethod } from '../WalletContext';
-import { ApiError } from '../lib/api';
-import { Check, Edit2, Plus, Trash2, Video, DollarSign, CreditCard, Save, AlertTriangle, Truck } from 'lucide-react';
+import { api, ApiError } from '../lib/api';
+import { Check, Edit2, Plus, Trash2, Video, DollarSign, CreditCard, Save, AlertTriangle, Truck, ArrowUpFromLine } from 'lucide-react';
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -51,6 +51,26 @@ export default function AdminWalletSettings() {
   const [urlInput, setUrlInput] = useState<string>('');
   const [urlState, setUrlState] = useState<SaveState>('idle');
   const [urlError, setUrlError] = useState<string | null>(null);
+
+  /**
+   * THE WITHDRAWAL COMMISSION — «عمولة للسحب بقدر 3% قابله للتغيير من الادارة».
+   *
+   * Stored in basis points so 2.5% needs no float, and read from and written
+   * to /api/wallet/admin/withdrawal-fee rather than the generic settings PUT:
+   * the wallet slice owns the rate, the validator and the quote that uses it,
+   * so there is exactly one road in and out.
+   *
+   * IT IS DEDUCTED, NOT ADDED ON TOP, and the worked example under the field
+   * says so in numbers — this is the point where that could be misread, and a
+   * sentence alone would not settle it.
+   *
+   * IT IS NOT RETROACTIVE. A withdrawal stores fee_cents/net_cents/fee_policy
+   * at the moment it is filed, exactly as an order stores cod_tax_iqd, so
+   * raising the rate today cannot re-price a request already on the books.
+   */
+  const [feeBpsInput, setFeeBpsInput] = useState<string>('');
+  const [feeState, setFeeState] = useState<SaveState>('idle');
+  const [feeError, setFeeError] = useState<string | null>(null);
 
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [methodsState, setMethodsState] = useState<SaveState>('idle');
@@ -137,6 +157,47 @@ export default function AdminWalletSettings() {
     } catch (e) {
       setCodState('error');
       setCodError(e instanceof ApiError ? e.message : 'Save failed');
+    }
+  };
+
+  // The rate lives outside the settings context, so this screen fetches it
+  // itself — once, on mount — and never guesses a value it has not been told.
+  useEffect(() => {
+    let alive = true;
+    api
+      .get<{ fee_bps: number }>('/api/wallet/admin/withdrawal-fee')
+      .then((r) => {
+        if (alive) setFeeBpsInput(String(Number(r.fee_bps) || 0));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const feeBpsParsed = parseInt(feeBpsInput, 10);
+  const feeSample =
+    Number.isFinite(feeBpsParsed) && feeBpsParsed >= 0 ? Math.floor((100_000 * feeBpsParsed) / 10_000) : 0;
+
+  /**
+   * 0 is a REAL value and switches the commission off, the same thing a
+   * cash-on-delivery charge of 0 means. It is accepted, not treated as a
+   * missing field.
+   */
+  const handleSaveFee = async () => {
+    if (!Number.isFinite(feeBpsParsed) || feeBpsParsed < 0 || feeBpsParsed > 5000) {
+      setFeeState('error');
+      setFeeError('Enter basis points between 0 and 5000 (300 = 3%; 0 switches the commission off)');
+      return;
+    }
+    setFeeState('saving');
+    setFeeError(null);
+    try {
+      await api.put('/api/wallet/admin/withdrawal-fee', { fee_bps: feeBpsParsed });
+      setFeeState('saved');
+    } catch (e) {
+      setFeeState('error');
+      setFeeError(e instanceof ApiError ? e.message : 'Save failed');
     }
   };
 
@@ -282,6 +343,51 @@ export default function AdminWalletSettings() {
               changing this affects new orders only. Set the charge to 0 to switch it off.
             </p>
             <SaveStatus state={codState} error={codError} />
+          </div>
+        </div>
+
+        {/* THE WITHDRAWAL COMMISSION. Deducted from the requested amount —
+            the worked example below is there so that cannot be read the other
+            way — and never retroactive: a filed request keeps the fee it was
+            quoted, the same contract `orders.cod_tax_iqd` carries. */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
+              <ArrowUpFromLine className="w-5 h-5 text-rose-500" />
+            </div>
+            <h3 className="text-lg font-bold text-white">Withdrawal Commission</h3>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-zinc-400">Rate in basis points (300 = 3%)</label>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 relative">
+                <input
+                  type="number"
+                  value={feeBpsInput}
+                  onChange={(e) => { setFeeBpsInput(e.target.value); setFeeState('dirty'); }}
+                  className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-[#6B46FF]/50"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">bps</span>
+              </div>
+              <button
+                onClick={handleSaveFee}
+                disabled={feeState === 'saving'}
+                className="flex items-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-black px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" /> Save
+              </button>
+            </div>
+            <p className="text-[11px] text-zinc-400 tabular-nums" dir="ltr">
+              1,000.00 USD requested → commission {(feeSample / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })},
+              net {((100_000 - feeSample) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} reaches the customer,
+              1,000.00 leaves their balance.
+            </p>
+            <p className="text-[11px] text-zinc-500">
+              Deducted from the requested amount, never added on top. Requests already filed keep
+              the commission they were quoted; changing this affects new requests only. Set it to 0
+              to switch the commission off.
+            </p>
+            <SaveStatus state={feeState} error={feeError} />
           </div>
         </div>
 

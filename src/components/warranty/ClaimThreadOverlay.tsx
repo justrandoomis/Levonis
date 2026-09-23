@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Paperclip, Send, X } from 'lucide-react';
 import type { Language } from '../../translations';
-import { api, ApiError } from '../../lib/api';
+import { api, ApiError, uploadTimeoutMs } from '../../lib/api';
 import { Overlay } from '../ui/Overlay';
 import { Skeleton, SkeletonGroup } from '../ui/Skeleton';
 import { ErrorState } from '../ui/AsyncStates';
@@ -98,7 +98,13 @@ export function ClaimThreadOverlay({
     try {
       const form = new FormData();
       form.append('file', files[0]);
-      const up = await api.post<{ key: string }>('/api/devices/claims/upload', form);
+      // Same deadline the claim form uses, and for the same reason: a
+      // 40 MB video cannot clear DEFAULT_TIMEOUT_MS, and the abort reaches the
+      // customer as "Network error" — blaming a connection that was working.
+      // See uploadTimeoutMs in src/lib/api.ts.
+      const up = await api.post<{ key: string }>('/api/devices/claims/upload', form, {
+        timeoutMs: uploadTimeoutMs(files[0].size),
+      });
       await api.post(`/api/devices/claims/${encodeURIComponent(claimId)}/messages`, { body: replyText.trim(), file_key: up.key });
       setReplyText('');
       await refresh();

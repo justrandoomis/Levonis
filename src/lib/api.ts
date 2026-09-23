@@ -1728,6 +1728,37 @@ export function iqdToUsdCents(iqd: number, exchangeRate: number): number {
   return Math.ceil((iqd * 100) / exchangeRate);
 }
 
+/**
+ * A DEPOSIT'S DINARS AS THE CUSTOMER TYPED THEM — never as the ledger
+ * re-derives them.
+ *
+ * «كتبت ٥٠,٠٠٠ وظهر ٥٠,٠٠٨.» The pair above is not a round trip and cannot be
+ * made into one: `iqdToUsdCents` rounds up so a deposit never credits less
+ * than was transferred, `usdCentsToIqd` rounds down so a balance is never
+ * over-promised, and at 1,400 IQD/USD a cent is 14 د.ع — so only multiples of
+ * 14 are representable and 50,000 is not one of them. No rounding rule
+ * repairs that; Math.round only turns +8 into −6, which is worse.
+ *
+ * So the dinar figure is READ, not computed, whenever the request recorded it
+ * (migration 0105 `wallet_deposit_meta.declared_amount_iqd`). The fallback is
+ * deliberately ONE-DIRECTIONAL: a row filed before that column existed, or
+ * one typed in dollars, still converts from the authoritative cents. Nothing
+ * ever converts the other way — the cents are the money, the dinars are the
+ * customer's testimony about the transfer, and a credit is only ever computed
+ * from the money.
+ *
+ * `??` rather than `||` matters: strictNullChecks is off, and a NULL from an
+ * old row must take the fallback for being ABSENT, not for being falsy.
+ */
+export function depositDeclaredIqd(
+  declaredAmountIqd: number | null | undefined,
+  cents: number,
+  exchangeRate: number
+): number {
+  const declared = declaredAmountIqd as number;
+  return Number.isInteger(declared) && declared > 0 ? declared : usdCentsToIqd(cents, exchangeRate);
+}
+
 let idempotencyCounter = 0;
 export function newIdempotencyKey(): string {
   idempotencyCounter += 1;

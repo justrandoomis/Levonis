@@ -6,6 +6,14 @@
  * The database-backed invariants (a serial is mandatory, two devices get two
  * receipts, a cancelled order issues nothing, a reprint creates no second
  * document) live in scripts/e2e-warranty.mjs against a running worker.
+ *
+ * ONE SECTION AT THE END IS NOT PURE, and deliberately so: the GENERAL warranty
+ * claim (`POST /api/profile/warranty-claims`) is guarded by a UNIQUE constraint
+ * and announced from a `waitUntil`, and neither of those is a function you can
+ * call. Both are proved against the real schema through tests/fixtures/app, the
+ * same harness the device claim already uses, because the two defects they pin
+ * — one press producing two claims, and a claim reaching the owner's group by
+ * no path at all — are invisible to anything that only reads a module.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,6 +34,9 @@ import {
   type WarrantyReceiptRow,
 } from '../worker/lib/warranty';
 import { renderWarrantyDoc, type WarrantyDocData } from '../worker/lib/warrantyDoc';
+import type { DatabaseSync } from 'node:sqlite';
+import { freshDb, asD1, stubApp, post, count, json, pending } from './fixtures/app';
+import { profileRoutes } from '../worker/routes/profile';
 
 // ------------------------------------------------------------ the number
 
@@ -361,4 +372,170 @@ test('migration 0042 is additive and enforces one live receipt per unit and per 
   );
   // Nothing existing is rewritten or dropped.
   assert.doesNotMatch(statements, /DROP|DELETE FROM|ALTER TABLE order_item_units|UPDATE /i);
+});
+
+// ===================================================================
+// THE GENERAL CLAIM — one press, one claim, and the owner hears about it
+// ===================================================================
+
+/**
+ * WHY THESE TWO LIVE TOGETHER. They are the two halves of one report: the
+ * owner saw «أكثر من طلب في نفس الوقت» — more than one claim for one press —
+ * and separately never saw any of them in «🔥 Warranty support». The route is
+ * the same eight lines, and a fix for either half that breaks the other (an
+ * announce on the replay, a dedupe that also swallows the announce for a real
+ * second claim) is a regression this file has to catch.
+ */
+
+const GROUP = '-1009999999999';
+const WARRANTY_THREAD = 66;
+const ENV = { TELEGRAM_ADMIN_BOT_TOKEN: '999:ADMINTOKEN' };
+const CLAIM = { productName: 'Resin printer', description: 'It stopped curing after two weeks of use.' };
+const KEY = 'idem-key-aaaaaaaa';
+
+function seedWarrantyClaimDb(): DatabaseSync {
+  const raw = freshDb();
+  raw.exec(`
+    INSERT INTO users (id,name,email,password_hash,role) VALUES ('buyer','Sara','s@x.co','h','customer');
+    INSERT INTO users (id,name,email,password_hash,role) VALUES ('other','Ali','a@x.co','h','customer');
+  `);
+  return raw;
+}
+
+/** Only the announce test binds the group; unbound, the send never leaves the isolate. */
+function bindWarrantyTopic(raw: DatabaseSync): void {
+  raw.exec(`
+    INSERT INTO telegram_admin_config (id, group_chat_id, group_title, configured_by, configured_by_tg)
+      VALUES ('singleton', '${GROUP}', 'Levonis', 'boss', 1);
+    INSERT INTO telegram_admin_topics (topic_key, message_thread_id, enabled, configured_by, configured_by_tg)
+      VALUES ('warranty', ${WARRANTY_THREAD}, 1, 'boss', 1);
+  `);
+}
+
+interface SentMessage { chat_id: string; message_thread_id?: number; text: string }
+
+function stubTelegram(): { sent: SentMessage[]; restore: () => void } {
+  const sent: SentMessage[] = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    if (!String(url).includes('api.telegram.org')) return real(url as never, init as never);
+    sent.push(JSON.parse(String(init?.body ?? '{}')) as SentMessage);
+    return new Response(
+      JSON.stringify({ ok: true, result: { message_id: 9, chat: { id: Number(GROUP) } } }),
+      { status: 200 }
+    );
+  }) as typeof fetch;
+  return { sent, restore: () => { globalThis.fetch = real; } };
+}
+
+async function drain(): Promise<void> {
+  while (pending.length) await Promise.all(pending.splice(0, pending.length));
+  await new Promise((r) => setTimeout(r, 0));
+  await new Promise((r) => setTimeout(r, 0));
+}
+
+const claimApp = (raw: DatabaseSync, id: string) =>
+  stubApp(asD1(raw), { id, role: 'customer', email: `${id}@x.co` }, (a) => a.route('/api/profile', profileRoutes), {
+    env: ENV,
+  });
+
+test('one idempotency key is one claim, however many times send is pressed', async () => {
+  const raw = seedWarrantyClaimDb();
+  try {
+    const app = claimApp(raw, 'buyer');
+    const first = await post(app, '/api/profile/warranty-claims', { ...CLAIM, idempotencyKey: KEY });
+    const second = await post(app, '/api/profile/warranty-claims', { ...CLAIM, idempotencyKey: KEY });
+    const a = await json(first);
+    const b = await json(second);
+    assert.equal(first.status, 200, JSON.stringify(a));
+    assert.equal(second.status, 200, JSON.stringify(b));
+    // The customer is shown the claim they already have, not a new one.
+    assert.equal(b.id, a.id);
+    assert.equal(b.replay, true);
+    assert.equal(a.replay, undefined);
+    assert.equal(count(raw, 'SELECT COUNT(*) n FROM warranty_claims'), 1);
+  } finally {
+    raw.close();
+  }
+});
+
+test('the replay carries the status actually stored, not a hard-coded «submitted»', async () => {
+  const raw = seedWarrantyClaimDb();
+  try {
+    const app = claimApp(raw, 'buyer');
+    const id = (await json(await post(app, '/api/profile/warranty-claims', { ...CLAIM, idempotencyKey: KEY }))).id;
+    raw.prepare("UPDATE warranty_claims SET status='in_review' WHERE id = ?").run(id);
+    const replay = await json(await post(app, '/api/profile/warranty-claims', { ...CLAIM, idempotencyKey: KEY }));
+    assert.equal(replay.status, 'in_review');
+  } finally {
+    raw.close();
+  }
+});
+
+test('a second, genuinely different claim is still recorded', async () => {
+  const raw = seedWarrantyClaimDb();
+  try {
+    const app = claimApp(raw, 'buyer');
+    await post(app, '/api/profile/warranty-claims', { ...CLAIM, idempotencyKey: KEY });
+    // A new overlay-open mints a new key, even for the same product and text.
+    const again = await json(await post(app, '/api/profile/warranty-claims', { ...CLAIM, idempotencyKey: 'idem-key-bbbbbbbb' }));
+    assert.equal(again.replay, undefined);
+    assert.equal(count(raw, 'SELECT COUNT(*) n FROM warranty_claims'), 2);
+    // And a client that sends no key at all keeps working.
+    const none = await post(app, '/api/profile/warranty-claims', CLAIM);
+    assert.equal(none.status, 200, JSON.stringify(await json(none)));
+    assert.equal(count(raw, 'SELECT COUNT(*) n FROM warranty_claims'), 3);
+  } finally {
+    raw.close();
+  }
+});
+
+test('the key is scoped to the account, so one customer cannot spend another’s', async () => {
+  /**
+   * The failure migration 0064 was written to remove: the key is minted by the
+   * CLIENT, so a globally unique one lets any account burn a key another
+   * account is about to use and deny that person their claim for ever.
+   */
+  const raw = seedWarrantyClaimDb();
+  try {
+    const mine = await json(await post(claimApp(raw, 'buyer'), '/api/profile/warranty-claims', { ...CLAIM, idempotencyKey: KEY }));
+    const theirs = await post(claimApp(raw, 'other'), '/api/profile/warranty-claims', { ...CLAIM, idempotencyKey: KEY });
+    const row2 = await json(theirs);
+    assert.equal(theirs.status, 200, JSON.stringify(row2));
+    assert.notEqual(row2.id, mine.id);
+    assert.equal(row2.replay, undefined);
+    assert.equal(count(raw, 'SELECT COUNT(*) n FROM warranty_claims'), 2);
+    assert.equal(count(raw, "SELECT COUNT(*) n FROM warranty_claims WHERE user_id='other'"), 1);
+  } finally {
+    raw.close();
+  }
+});
+
+test('the general claim reaches «🔥 Warranty support» — once, and without the description', async () => {
+  const raw = seedWarrantyClaimDb();
+  bindWarrantyTopic(raw);
+  const tg = stubTelegram();
+  try {
+    const app = claimApp(raw, 'buyer');
+    const created = await json(await post(app, '/api/profile/warranty-claims', { ...CLAIM, idempotencyKey: KEY }));
+    await drain();
+    assert.equal(tg.sent.length, 1, 'the claim the owner never heard about is announced');
+    assert.equal(tg.sent[0].chat_id, GROUP);
+    assert.equal(tg.sent[0].message_thread_id, WARRANTY_THREAD);
+    assert.match(tg.sent[0].text, new RegExp(created.id), 'the id staff open it by');
+    assert.match(tg.sent[0].text, /Resin printer/);
+    assert.match(tg.sent[0].text, /Not linked to a device/, 'staff know there is no serial before they open it');
+    assert.doesNotMatch(
+      tg.sent[0].text,
+      /stopped curing/,
+      'the 3000-character description stays in the claim, not in a group chat'
+    );
+    // A replayed double-tap must not post the message a second time.
+    await post(app, '/api/profile/warranty-claims', { ...CLAIM, idempotencyKey: KEY });
+    await drain();
+    assert.equal(tg.sent.length, 1, 'the replay announces nothing');
+  } finally {
+    tg.restore();
+    raw.close();
+  }
 });

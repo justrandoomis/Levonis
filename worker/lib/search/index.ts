@@ -127,6 +127,42 @@ export function expandQuery(raw: string, synonyms: ReadonlyMap<string, string>):
   const literal = tokenize(normalized);
   const lookup = new Set<string>(literal);
 
+  /**
+   * A ONE-LETTER QUERY IS A QUERY, NOT DEBRIS — and this is the one place the
+   * distinction has to be made.
+   *
+   * `MIN_TOKEN = 2` in ./normalize.ts is right about the INDEX: a row for "h"
+   * on every product whose name contains an H matches everything and ranks
+   * nothing, and tests/search.test.ts pins that single characters never become
+   * index rows. But `tokenize` is used on BOTH sides, so the same floor was
+   * silently applied to what a shopper TYPES: «H» tokenised to nothing,
+   * `lookup` came back empty, `searchProducts` took its empty-lookup exit, and
+   * the shop answered «لا توجد منتجات» to somebody one keystroke into the name
+   * of the printer on the front page. That is the whole of the owner's report.
+   *
+   * The engine already knows what to do with a one-character term — it has
+   * since «اكس» (see the lone-spelled-letter block below, and its test):
+   * `candidatePrefix` turns it into a one-character index range and
+   * `bestMatches` treats it as a PREFIX, so `h` reaches `h2d` the same way
+   * `x` reaches `x2d`. So the letter is added to `lookup` and deliberately NOT
+   * to `literal`: it is something to look for, not a word the query is made of.
+   *
+   * ONLY WHEN IT IS THE WHOLE QUERY, and that limit is not timidity. Coverage
+   * is a multiplier in `scoreProducts`, and a bare `1` inside "pla 1" would
+   * count as a second covered word while matching a tenth of the vocabulary —
+   * which is exactly the dilution that makes "bambu x2d" stop putting the X2D
+   * first. A lone letter has nothing to dilute: there is no other word.
+   *
+   * The romanised skeleton goes in beside it so a shop whose catalogue is
+   * written in Latin still answers an Arabic keyboard: «ب» → `b` → "Bambu".
+   */
+  const words = normalized.split(' ');
+  if (words.length === 1 && [...words[0]].length === 1) {
+    lookup.add(words[0]);
+    const skeleton = romanize(words[0]);
+    if (skeleton) lookup.add(skeleton);
+  }
+
   // A MULTI-WORD synonym has to be tried before the words are split up:
   // «بامبو لاب» and «قطع غيار» mean one thing each, and neither half means it.
   for (const [term, canonical] of synonyms) {
@@ -220,6 +256,19 @@ export function scoreProducts(
 }
 
 /**
+ * How many vocabulary tokens a ONE-CHARACTER term may resolve to.
+ *
+ * `bestMatches` defaults to five, which is right for a word: five completions
+ * of "pla" is already more guessing than a shopper wants. A single letter is
+ * not a word — it names a whole shelf, and five tokens is at most five
+ * products, so «H» would answer with a handful of the catalogue's H-words
+ * chosen by nothing the shopper can see. Forty is still a bounded set the
+ * fuzzy pass runs over in the Worker, and it is scored and ranked like any
+ * other; the `LIMIT` on the postings read is what actually caps the cost.
+ */
+const ONE_CHAR_MATCHES = 40;
+
+/**
  * Resolve each query token to the vocabulary tokens it should match.
  *
  * `vocabulary` is the bounded candidate set the prefix lookup returned, NOT
@@ -236,7 +285,7 @@ export function resolveTokens(
     // Which ORIGINAL word this expansion serves, so a synonym and its literal
     // do not count as two covered words.
     const from = expanded.literal.find((l) => l === queryToken || romanize(l) === queryToken) ?? queryToken;
-    for (const match of bestMatches(queryToken, vocabulary)) {
+    for (const match of bestMatches(queryToken, vocabulary, queryToken.length === 1 ? ONE_CHAR_MATCHES : undefined)) {
       const have = out.get(match.token);
       if (!have || match.score > have.score) out.set(match.token, { score: match.score, from });
     }

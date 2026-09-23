@@ -32,7 +32,13 @@
  */
 
 import type { Env } from './types';
-import { notifyCustomer, type CustomerMessage } from './customerNotify';
+import {
+  notifyCustomer,
+  notificationLang,
+  NOTIFY_LANG_SELECT,
+  type CustomerMessage,
+  type NotifyLangRow,
+} from './customerNotify';
 import { notify } from './notifications';
 import type { EmailLang } from './emailTemplates';
 
@@ -158,29 +164,40 @@ function iqd(n: number): string {
   return `${Math.trunc(n).toLocaleString('en-US')} IQD`;
 }
 
-interface OrderRow {
+interface OrderRow extends NotifyLangRow {
   id: string;
   user_id: string;
   locale: string | null;
+  email: string | null;
+  google_sub: string | null;
+  locale_stated: number | null;
   total_iqd: number;
   due_on_delivery_iqd: number;
 }
 
+/**
+ * ONE ORDER, ONE LANGUAGE DECISION — and it is not made here.
+ *
+ * This file used to map `u.locale` itself (`'en'→en`, `'ku'|'ckb'→ckb`, else
+ * 'ar'), which is the same mapping the fan-out in `customerNotify.ts` makes a
+ * moment later when it picks the email template. Two mappings of one column is
+ * one mapping too many: the day either learns something the other has not,
+ * the customer gets a message whose sentence and whose envelope disagree
+ * about what language they are in.
+ *
+ * So the columns the decision needs travel in this row — `NOTIFY_LANG_SELECT`
+ * names them — and `notificationLang` is the only place that reads them. See
+ * the contract on that function for WHY a stored 'en' is not always an answer.
+ */
 async function loadOrderRow(env: Env, orderId: string): Promise<OrderRow | null> {
   return env.DB.prepare(
-    `SELECT o.id, o.user_id, o.total_iqd, o.due_on_delivery_iqd, u.locale
+    `SELECT o.id, o.user_id, o.total_iqd, o.due_on_delivery_iqd, ${NOTIFY_LANG_SELECT}
        FROM orders o JOIN users u ON u.id = o.user_id
       WHERE o.id = ?`
   )
     .bind(orderId)
     .first<OrderRow>()
     .catch(() => null);
-}
-
-function langOf(locale: string | null): EmailLang {
-  if (locale === 'en') return 'en';
-  if (locale === 'ku' || locale === 'ckb') return 'ckb';
-  return 'ar';
 }
 
 /**
@@ -191,7 +208,7 @@ export async function notifyOrderPlaced(env: Env, orderId: string): Promise<void
   try {
     const row = await loadOrderRow(env, orderId);
     if (!row) return;
-    const t = COPY[langOf(row.locale)];
+    const t = COPY[notificationLang(row)];
     const msg: CustomerMessage = {
       subject: t.placedSubject(row.id),
       body: t.placedBody(row.id),
@@ -228,7 +245,7 @@ export async function notifyOrderStatus(env: Env, orderId: string, status: strin
     if (status === 'delivered') return await notifyOrderDelivered(env, orderId);
     const row = await loadOrderRow(env, orderId);
     if (!row) return;
-    const t = COPY[langOf(row.locale)];
+    const t = COPY[notificationLang(row)];
     const msg: CustomerMessage = {
       subject: t.statusSubject(row.id),
       body: t.status[status](row.id),
@@ -277,7 +294,7 @@ export async function notifyOrderDelivered(env: Env, orderId: string): Promise<v
   try {
     const row = await loadOrderRow(env, orderId);
     if (!row) return;
-    const t = COPY[langOf(row.locale)];
+    const t = COPY[notificationLang(row)];
     const eventKey = `order.status.delivered:${row.id}`;
     const url = reviewLandingUrl(env);
 

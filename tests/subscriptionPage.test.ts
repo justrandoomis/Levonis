@@ -17,6 +17,7 @@ import { translations } from '../src/translations';
 import { cardNumberFor, maskCardNumber, CARD_PLACEHOLDER } from '../src/components/subscription/cardNumber';
 import { TIER_META, membershipStateLabel, tierLabel } from '../src/components/subscription/tierMeta';
 import { bestValuePlanId } from '../src/components/subscription/PlanPicker';
+import { shoppingLines, type BenefitDiscountRule, type TierBenefits } from '../src/components/subscription/BenefitsSection';
 
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
 const COMPONENT_DIR = 'src/components/subscription';
@@ -390,4 +391,98 @@ test('the confirmation carries the displayed figures and a changed quote is show
   assert.match(confirm, /role="status" data-quote-changed/);
   // The two-reservations note is gone with the rule it described.
   assert.equal(allSource().includes('pending_tiers'), false);
+});
+
+/**
+ * A BENEFIT IS STATED ONCE, NOT ONCE PER PRODUCT.
+ *
+ * The owner's report, verbatim: «المقصود هو ميزة الاشتراك يذكر الخصم لكل منتج
+ * بدل ذكر عام». `publicBenefitSummary` publishes every live discount row,
+ * `scope: 'product'` included, so a store that prices its catalogue with
+ * per-product overrides handed this card one check-marked line per product —
+ * a list that grew with the catalogue and buried the tier-wide rule under it.
+ *
+ * These assertions pin the shape of the answer rather than its wording: the
+ * card's length must follow the number of distinct OFFERS, never the number
+ * of products, and no product may be named. §22 is re-asserted alongside,
+ * because "state it generally" must not become "state a figure nobody set".
+ */
+const discountRule = (over: Partial<BenefitDiscountRule>): BenefitDiscountRule => ({
+  rule_id: 'r', scope: 'global', target_id: null, target_name_ar: '', target_name_en: '',
+  discount_mode: 'percent', percent: 10, fixed_iqd: null, max_discount_iqd: null,
+  cap_scope: null, max_quantity: null, min_subtotal_iqd: null, label: null, ...over,
+});
+const tierBenefits = (discounts: BenefitDiscountRule[]): TierBenefits => ({
+  discounts, free_shipping: null, cod_tax_exempt: false,
+});
+// The page's own `loc`/`money`, threaded exactly as the component threads them.
+const ar: Parameters<typeof shoppingLines>[2] = (a) => a;
+const iqd: Parameters<typeof shoppingLines>[3] = (n) => `${n.toLocaleString('en-US')} د.ع`;
+
+test('a per-product discount is stated generally, never once per product', () => {
+  // One thousand products, one offer: 10% capped at 100,000 per unit.
+  const catalogue = Array.from({ length: 1000 }, (_, i) =>
+    discountRule({
+      rule_id: `p${i}`, scope: 'product', target_id: `prod-${i}`,
+      target_name_ar: `منتج ${i}`, target_name_en: `Product ${i}`,
+      max_discount_iqd: 100000, cap_scope: 'per_unit',
+    })
+  );
+  const lines = shoppingLines('pro', tierBenefits(catalogue), ar, iqd);
+
+  assert.deepEqual(lines, ['خصم 10% على المنتجات المؤهلة — حتى 100,000 د.ع لكل وحدة']);
+  // Not one product name survives — that is the defect itself.
+  assert.equal(lines.some((l) => /منتج \d|Product \d/.test(l)), false, 'a product is still named on the card');
+});
+
+test('the shopping list is bounded by the offers configured, not by the catalogue', () => {
+  const byName = (n: number) =>
+    Array.from({ length: n }, (_, i) =>
+      discountRule({
+        rule_id: `p${i}`, scope: 'product', target_id: `prod-${i}`,
+        target_name_ar: `منتج ${i}`, target_name_en: `Product ${i}`,
+        // Every product carries its OWN figure, so no two sentences match.
+        discount_mode: 'fixed', percent: null, fixed_iqd: 1000 * (i + 1),
+      })
+    );
+  // Up to the ceiling the real figures are quoted, one line per offer.
+  assert.equal(shoppingLines('pro', tierBenefits(byName(3)), ar, iqd).length, 3);
+  // Past it the card says the figure-less thing rather than a wall of prices.
+  const many = shoppingLines('pro', tierBenefits(byName(400)), ar, iqd);
+  assert.deepEqual(many, ['خصومات العضوية على المنتجات المؤهلة']);
+  // And it carries no figure at all: §22 forbids a number nobody enforces,
+  // and "up to 400,000" would be exactly that.
+  assert.equal(/\d/.test(many[0]), false, 'the fallback line quotes a figure no rule promises');
+});
+
+test('a section keeps its name, and the server\'s most-specific-first order survives the collapse', () => {
+  const lines = shoppingLines(
+    'prime',
+    tierBenefits([
+      // `publicBenefitSummary` sorts product → sub_category → category → global.
+      discountRule({ rule_id: 'a', scope: 'product', target_id: 'p1', target_name_ar: 'طابعة', target_name_en: 'Printer', percent: 5 }),
+      discountRule({ rule_id: 'b', scope: 'category', target_id: 'c1', target_name_ar: 'الطابعات', target_name_en: 'Printers', discount_mode: 'fixed', percent: null, fixed_iqd: 25000, max_discount_iqd: 25000, cap_scope: 'per_unit' }),
+      discountRule({ rule_id: 'c', scope: 'global', percent: 10, max_discount_iqd: 100000, cap_scope: 'per_unit' }),
+    ]),
+    ar,
+    iqd
+  );
+  assert.deepEqual(lines, [
+    'خصم 5% على المنتجات المؤهلة',
+    'خصم 25,000 د.ع لكل وحدة على الطابعات — حتى 25,000 د.ع لكل وحدة',
+    'خصم 10% — حتى 100,000 د.ع لكل وحدة',
+  ]);
+});
+
+test('a product rule whose product row vanished is still stated, a section rule is not', () => {
+  // The checkout applies both; only the section one becomes unsayable, because
+  // an unnamed section reads as the whole catalogue.
+  assert.deepEqual(
+    shoppingLines('pro', tierBenefits([discountRule({ scope: 'product', target_id: 'gone', percent: 7 })]), ar, iqd),
+    ['خصم 7% على المنتجات المؤهلة']
+  );
+  assert.deepEqual(
+    shoppingLines('pro', tierBenefits([discountRule({ scope: 'category', target_id: 'gone', percent: 7 })]), ar, iqd),
+    []
+  );
 });

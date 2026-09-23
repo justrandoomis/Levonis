@@ -131,13 +131,46 @@ function statesADeliveryThreshold(benefits: TierBenefits | null | undefined): bo
  */
 type Money = (iqd: number) => string;
 
+/**
+ * A BENEFIT IS STATED, NOT ENUMERATED.
+ *
+ * The owner's words: «المقصود هو ميزة الاشتراك يذكر الخصم لكل منتج بدل ذكر
+ * عام» — the card was naming the discount PER PRODUCT instead of stating it
+ * generally. That is not a copy slip; it is what the data does. The server
+ * publishes EVERY live `product_discount` row, `scope: 'product'` rows
+ * included (`publicBenefitSummary` in worker/lib/membershipBenefits.ts), and
+ * it sorts most-specific FIRST. A store that prices a few thousand products
+ * with per-product overrides therefore opened the membership card with a few
+ * thousand check-marked lines, each naming one product, with the tier-wide
+ * «خصم 10%» buried under all of them. The list grew with the catalogue, so
+ * it could only ever get worse.
+ *
+ * A per-product override is a PRICE, and a price belongs on the product — the
+ * shopper already sees the member figure there. What belongs here is the
+ * promise: the percentage, the ceiling, the quantity and the minimum. So a
+ * `scope: 'product'` rule is stated against «المنتجات المؤهلة» — the store's
+ * existing words for "whatever the rule covers", the same ones the tier
+ * headline and the printer-gift note already use — and never against the
+ * product's own name. Identical rules then collapse into one sentence for
+ * free, because `shoppingLines` keys the list on the rendered line.
+ *
+ * NOTHING IS OVERSTATED BY THIS. Dropping a name only ever makes the claim
+ * NARROWER in the reader's mind than the rule is in the engine; a figure is
+ * still never printed unless the rule carries it (§22 above).
+ */
 /** "خصم 10% على الطابعات — حتى 100,000 د.ع لكل وحدة", from the rule alone. */
 function discountLine(rule: BenefitDiscountRule, loc: Loc, money: Money): string | null {
   const ar = rule.target_name_ar.trim();
   const en = rule.target_name_en.trim();
-  const name = loc(ar || en, en || ar, ar || en);
-  // A section rule whose section no longer names itself cannot be stated
+  const name =
+    rule.scope === 'product'
+      ? loc('المنتجات المؤهلة', 'eligible products', 'بەرهەمی گونجاو')
+      : loc(ar || en, en || ar, ar || en);
+  // A SECTION rule whose section no longer names itself cannot be stated
   // honestly: "10% off" with nothing after it reads as the whole catalogue.
+  // A product rule never reaches this guard — it is not named in the first
+  // place, so a deleted `products` row costs the shopper a live benefit
+  // instead of silently withdrawing one the checkout still applies.
   if (rule.scope !== 'global' && !name) return null;
 
   let head: string;
@@ -242,11 +275,33 @@ function freeShippingLine(tier: 'prime' | 'pro', fs: BenefitFreeShipping, loc: L
 }
 
 /**
+ * HOW MANY DISTINCT PER-PRODUCT SENTENCES THE CARD WILL CARRY.
+ *
+ * Naming no product (see `discountLine`) already collapses a thousand
+ * identically-configured overrides into one line. It does NOT bound an owner
+ * who gives each product its own figure — «خصم 5,000 د.ع لكل وحدة»,
+ * «خصم 7,500 د.ع لكل وحدة», … — and that is the same unreadable list again in
+ * a different shape. Past this ceiling the card stops quoting the individual
+ * overrides and says the figure-less thing instead, which is the pattern this
+ * file already uses when it holds a benefit but not its number (the
+ * «توصيل مجاني على الطلبات المؤهلة» branch in `freeShippingLine`). The
+ * shopper loses nothing they could have acted on from here: a per-product
+ * figure is only ever true of that one product, and that product's page
+ * states it.
+ */
+const MAX_PRODUCT_DISCOUNT_LINES = 3;
+
+/**
  * The tier's shopping benefits as the rules currently stand: the discounts,
  * then the delivery, then the cash-on-delivery tax. An unconfigured benefit
  * contributes nothing — there is no default sentence to fall back to.
+ *
+ * Exported so tests can hold it to the two promises above against real rule
+ * rows: a figure only ever reaches the screen because a rule carries it, and
+ * the length of this list is bounded by the number of distinct OFFERS the
+ * owner configured, never by the size of the catalogue.
  */
-function shoppingLines(
+export function shoppingLines(
   tier: 'prime' | 'pro',
   benefits: TierBenefits | null | undefined,
   loc: Loc,
@@ -254,9 +309,29 @@ function shoppingLines(
 ): string[] {
   if (!benefits) return [];
   const out: string[] = [];
+  // Rendered in the server's order first, so the per-product group can be
+  // bounded as a group and then emitted exactly where the server put it —
+  // `publicBenefitSummary` sorts most-specific first on purpose, and a
+  // readability fix has no business quietly re-ranking the benefits.
+  const rendered: { scope: BenefitDiscountRule['scope']; line: string }[] = [];
   for (const rule of benefits.discounts) {
     const line = discountLine(rule, loc, money);
-    if (line) out.push(line);
+    if (line) rendered.push({ scope: rule.scope, line });
+  }
+  const productLines = [...new Set(rendered.filter((r) => r.scope === 'product').map((r) => r.line))];
+  const productGroup =
+    productLines.length > MAX_PRODUCT_DISCOUNT_LINES
+      ? [loc('خصومات العضوية على المنتجات المؤهلة', 'Membership discounts on eligible products', 'داشکاندنی ئەندامێتی بۆ بەرهەمی گونجاو')]
+      : productLines;
+  let productGroupEmitted = false;
+  for (const entry of rendered) {
+    if (entry.scope !== 'product') {
+      out.push(entry.line);
+      continue;
+    }
+    if (productGroupEmitted) continue;
+    productGroupEmitted = true;
+    out.push(...productGroup);
   }
   if (benefits.free_shipping) {
     const line = freeShippingLine(tier, benefits.free_shipping, loc, money);

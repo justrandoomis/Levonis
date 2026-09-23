@@ -46,11 +46,15 @@ import {
   releaseHold,
   requestWithdrawal,
   advanceWithdrawal,
+  normalizeWithdrawalFeeBps,
+  DEFAULT_WITHDRAWAL_FEE_BPS,
+  MAX_WITHDRAWAL_FEE_BPS,
   walletReconciliationReport,
   withdrawalFeeQuote,
   WITHDRAWAL_TRANSITIONS,
   type WithdrawalReconRow,
 } from '../worker/lib/walletOps';
+import { depositDeclaredIqd } from '../src/lib/api';
 import type { Env } from '../worker/lib/types';
 
 function freshDb(): { db: D1Database; raw: DatabaseSync } {
@@ -59,6 +63,10 @@ function freshDb(): { db: D1Database; raw: DatabaseSync } {
   raw.exec(createTableSql('0001_init.sql', 'wallet_transactions'));
   raw.exec(createTableSql('0001_init.sql', 'audit_log'));
   raw.exec(readFileSync(join(ROOT, 'migrations', '0015_wallet_holds.sql'), 'utf8'));
+  // 0105 adds the customer's own dinar figure to wallet_deposit_meta. Applied
+  // here for the same reason 0015 is: the INSERT that writes it has to run
+  // against the real columns, not a hand-written copy of them.
+  raw.exec(readFileSync(join(ROOT, 'migrations', '0105_deposit_declared_iqd.sql'), 'utf8'));
   raw.prepare('INSERT INTO users (id, email, username) VALUES (?,?,?)').run('u1', 'u1@example.com', 'u1');
   raw.prepare('INSERT INTO users (id, email, username) VALUES (?,?,?)').run('u2', 'u2@example.com', 'u2');
   return { db: new SqliteD1(raw) as unknown as D1Database, raw };
@@ -80,12 +88,13 @@ async function available(db: D1Database, userId = 'u1'): Promise<number> {
   return (await getAvailableBalances(envOf(db), userId)).usd_cents_available;
 }
 
-async function fileWithdrawal(db: D1Database, amount: number, key = 'k1', userId = 'u1') {
+async function fileWithdrawal(db: D1Database, amount: number, key = 'k1', userId = 'u1', feeBps = 0) {
   return requestWithdrawal(db, {
     userId,
     amountCents: amount,
     destination: { kind: 'manual_transfer', account: '0770-000-0000', holder: 'Test User' },
     eventKey: key,
+    feeBps,
   });
 }
 
@@ -110,12 +119,59 @@ test('withdrawal transitions: only the mandated moves are legal', () => {
   }
 });
 
-test('fees are honestly unconfigured — no invented rate, net = amount', () => {
-  const q = withdrawalFeeQuote(50_000);
+test('with no rate set, nothing is invented — net = amount', () => {
+  const q = withdrawalFeeQuote(50_000, 0);
   assert.equal(q.fee_cents, 0);
   assert.equal(q.net_cents, 50_000);
   assert.equal(q.fee_configured, false);
   assert.equal(q.fee_policy, 'not_configured');
+  // 0 is a REAL value meaning "switched off", the same thing
+  // codTaxPerBlockIqd = 0 means — not a missing setting to substitute for.
+  assert.deepEqual(withdrawalFeeQuote(50_000, 0), withdrawalFeeQuote(50_000));
+});
+
+/**
+ * «عمولة للسحب بقدر 3% قابله للتغيير من الادارة» — DEDUCTED, NOT ADDED ON TOP.
+ *
+ * Request 100,000, the commission is 3,000, 97,000 reaches the customer and
+ * 100,000 — the full requested figure — leaves the balance. The schema has
+ * said so since 0015: CHECK (net_cents = amount_cents - fee_cents).
+ */
+test('the withdrawal commission is deducted from the requested amount', () => {
+  const q = withdrawalFeeQuote(100_000, 300);
+  assert.equal(q.fee_cents, 3_000, '3% of 100,000');
+  assert.equal(q.net_cents, 97_000, 'what reaches the customer');
+  assert.equal(q.amount_cents, 100_000, 'what leaves the balance — unchanged');
+  assert.equal(q.net_cents, q.amount_cents - q.fee_cents, 'the 0015 CHECK, in arithmetic');
+  assert.equal(q.fee_bps, 300);
+  assert.equal(q.fee_policy, 'percent_bps');
+  assert.equal(q.fee_configured, true);
+});
+
+test('the commission rounds DOWN, in the customer’s favour', () => {
+  // 3% of 3,333 is 99.99 — a fee of 100 would take a cent the published
+  // percentage does not entitle the shop to.
+  assert.equal(withdrawalFeeQuote(3_333, 300).fee_cents, 99);
+  assert.equal(withdrawalFeeQuote(3_333, 300).net_cents, 3_234);
+  // Basis points exist so a half-percent needs no float.
+  assert.equal(withdrawalFeeQuote(100_000, 250).fee_cents, 2_500);
+});
+
+test('an owner-typed rate is normalized once, and nowhere else', () => {
+  assert.equal(normalizeWithdrawalFeeBps(300), 300);
+  assert.equal(normalizeWithdrawalFeeBps('300'), 300);
+  assert.equal(normalizeWithdrawalFeeBps(0), 0);
+  // Junk is never an invented default — it is no fee at all.
+  assert.equal(normalizeWithdrawalFeeBps(null), 0);
+  assert.equal(normalizeWithdrawalFeeBps(undefined), 0);
+  assert.equal(normalizeWithdrawalFeeBps(-5), 0);
+  assert.equal(normalizeWithdrawalFeeBps(2.5), 0);
+  assert.equal(normalizeWithdrawalFeeBps(Number.NaN), 0);
+  // And it cannot exceed the ceiling, whatever gets typed into the form.
+  assert.equal(normalizeWithdrawalFeeBps(99_999), MAX_WITHDRAWAL_FEE_BPS);
+  assert.equal(MAX_WITHDRAWAL_FEE_BPS, 5000);
+  // The owner named 3%; that is what ships when nothing is stored.
+  assert.equal(DEFAULT_WITHDRAWAL_FEE_BPS, 300);
 });
 
 test('money guard rejects floats, NaN, zero, negatives and overflow', () => {
@@ -654,4 +710,184 @@ test('deposit amounts are validated as integer cents', async () => {
   assert.deepEqual(await deposit(db, { amountCents: 0 }), { ok: false, reason: 'INVALID_AMOUNT' });
   assert.deepEqual(await deposit(db, { amountCents: -100 }), { ok: false, reason: 'INVALID_AMOUNT' });
   assert.deepEqual(await deposit(db, { amountCents: 10.5 }), { ok: false, reason: 'INVALID_AMOUNT' });
+});
+
+// -------------------------------------------- the customer's own dinars (0105)
+
+/**
+ * «كتبت ٥٠,٠٠٠ وظهر ٥٠,٠٠٨.»
+ *
+ * These tests exist to pin down the thing that makes the column necessary: the
+ * conversion has NO inverse, so there is no rounding rule to fix instead. They
+ * also pin down what the column may never become — a source of money.
+ */
+test('no rounding rule can return 50,000 IQD from the cents it converts to', () => {
+  const RATE = 1400;
+  const iqdToCentsCeil = (iqd: number) => Math.ceil((iqd * 100) / RATE);
+  const centsToIqdFloor = (cents: number) => Math.floor((cents * RATE) / 100);
+
+  // The owner's exact number, and the exact drift he reported.
+  assert.equal(iqdToCentsCeil(50_000), 3572);
+  assert.equal(centsToIqdFloor(3572), 50_008);
+  // Rounding the other way does not repair it, it only changes the sign of the
+  // error — and downwards means crediting LESS than was transferred.
+  assert.equal(centsToIqdFloor(3571), 49_994);
+  // Why: at this rate a cent is 14 د.ع, so only multiples of 14 exist.
+  assert.equal(RATE / 100, 14);
+  const reachable = [3570, 3571, 3572, 3573].map(centsToIqdFloor);
+  assert.ok(!reachable.includes(50_000), 'no integer cent value reads back as 50,000');
+});
+
+test('a deposit records the dinars the customer typed, verbatim', async () => {
+  const { db, raw } = freshDb();
+  const res = await deposit(db, { amountCents: 3572, declaredAmountIqd: 50_000, exchangeRateSnapshot: 1400 });
+  assert.ok(res.ok);
+  const meta = raw
+    .prepare('SELECT declared_amount_cents, declared_amount_iqd, exchange_rate_snapshot FROM wallet_deposit_meta WHERE tx_id = ?')
+    .get((res as { txId: string }).txId) as {
+    declared_amount_cents: number;
+    declared_amount_iqd: number;
+    exchange_rate_snapshot: number;
+  };
+  assert.equal(meta.declared_amount_iqd, 50_000, 'the typed figure is stored as typed');
+  assert.equal(meta.exchange_rate_snapshot, 1400, 'with the rate it was filed at');
+  // The money is untouched: the credit still comes from the cents.
+  assert.equal(meta.declared_amount_cents, 3572);
+  const tx = raw
+    .prepare('SELECT amount FROM wallet_transactions WHERE id = ?')
+    .get((res as { txId: string }).txId) as { amount: number };
+  assert.equal(tx.amount, 3572, 'the ledger row is cents and only cents');
+});
+
+test('a deposit without a declared figure stores NULL, not a repaired number', async () => {
+  const { db, raw } = freshDb();
+  const res = await deposit(db, { amountCents: 3572 });
+  assert.ok(res.ok);
+  const meta = raw
+    .prepare('SELECT declared_amount_iqd, exchange_rate_snapshot FROM wallet_deposit_meta WHERE tx_id = ?')
+    .get((res as { txId: string }).txId) as { declared_amount_iqd: number | null; exchange_rate_snapshot: number | null };
+  assert.equal(meta.declared_amount_iqd, null, 'nobody wrote it down, so nobody claims to know it');
+  assert.equal(meta.exchange_rate_snapshot, null);
+});
+
+test('a declared figure that is not a whole positive dinar amount is refused storage', async () => {
+  const { db, raw } = freshDb();
+  const read = async (over: Record<string, unknown>, reference: string) => {
+    const res = await deposit(db, { ...over, reference });
+    assert.ok(res.ok);
+    return (
+      raw
+        .prepare('SELECT declared_amount_iqd FROM wallet_deposit_meta WHERE tx_id = ?')
+        .get((res as { txId: string }).txId) as { declared_amount_iqd: number | null }
+    ).declared_amount_iqd;
+  };
+  assert.equal(await read({ declaredAmountIqd: 0 }, 'R-1'), null);
+  assert.equal(await read({ declaredAmountIqd: -50_000 }, 'R-2'), null);
+  assert.equal(await read({ declaredAmountIqd: 50_000.5 }, 'R-3'), null);
+  // The rate is only recorded alongside a figure it actually belongs to.
+  const { db: db2, raw: raw2 } = freshDb();
+  const res = await deposit(db2, { exchangeRateSnapshot: 1400 });
+  assert.ok(res.ok);
+  const meta = raw2
+    .prepare('SELECT exchange_rate_snapshot FROM wallet_deposit_meta WHERE tx_id = ?')
+    .get((res as { txId: string }).txId) as { exchange_rate_snapshot: number | null };
+  assert.equal(meta.exchange_rate_snapshot, null, 'a rate with no claim beside it says nothing');
+});
+
+test('the declared dinars never move the amount-mismatch guard off cents', async () => {
+  const { db, raw } = freshDb();
+  const res = await deposit(db, { amountCents: 3572, declaredAmountIqd: 50_000, exchangeRateSnapshot: 1400 });
+  assert.ok(res.ok);
+  const meta = raw
+    .prepare('SELECT declared_amount_cents FROM wallet_deposit_meta WHERE tx_id = ?')
+    .get((res as { txId: string }).txId) as { declared_amount_cents: number };
+  // What finance observed is compared to the CENTS. If this ever compared the
+  // dinar column, a client could declare 50,000 د.ع with 900,000 cents and the
+  // guard that blocks a silent approval would have nothing to catch.
+  assert.equal(depositAmountReview(meta.declared_amount_cents, 3572), 'cleared_for_decision');
+  assert.equal(depositAmountReview(meta.declared_amount_cents, 50_000), 'amount_mismatch');
+});
+
+test('the display fallback is one-directional: dinars when filed, conversion when not', () => {
+  // Filed: testimony wins, exactly as typed.
+  assert.equal(depositDeclaredIqd(50_000, 3572, 1400), 50_000);
+  // Not filed (a row from before migration 0105): convert from the cents, the
+  // behaviour this page always had. `??` not `||` — NULL and undefined take the
+  // fallback for being ABSENT.
+  assert.equal(depositDeclaredIqd(null, 3572, 1400), 50_008);
+  assert.equal(depositDeclaredIqd(undefined, 3572, 1400), 50_008);
+  // Garbage is not testimony either.
+  assert.equal(depositDeclaredIqd(0, 3572, 1400), 50_008);
+  assert.equal(depositDeclaredIqd(-1, 3572, 1400), 50_008);
+});
+
+// ------------------------------------------- the commission, on a real row
+
+test('a filed withdrawal stores the commission as a snapshot, and holds the FULL amount', async () => {
+  const { db, raw } = freshDb();
+  seedSettled(raw, 'u1', 200_000);
+  const res = await fileWithdrawal(db, 100_000, 'fee-1', 'u1', 300);
+  assert.ok(res.ok);
+
+  const row = (await getWithdrawal(db, (res as { id: string }).id))!;
+  assert.equal(row.amount_cents, 100_000);
+  assert.equal(row.fee_cents, 3_000);
+  assert.equal(row.net_cents, 97_000);
+  assert.equal(row.fee_policy, 'percent_bps');
+
+  // THE HOLD RESERVES THE REQUESTED AMOUNT, not the net. Reserving 97,000
+  // would leave 3,000 the fee has not been taken out of still spendable.
+  const hold = raw
+    .prepare("SELECT amount_cents FROM wallet_holds WHERE ref_id = ? AND state = 'active'")
+    .get((res as { id: string }).id) as { amount_cents: number };
+  assert.equal(hold.amount_cents, 100_000);
+  assert.equal(await available(db), 100_000, '200,000 settled minus the full 100,000 reserved');
+
+  // A SNAPSHOT: the rate changing afterwards cannot re-price this row.
+  const later = (await getWithdrawal(db, (res as { id: string }).id))!;
+  assert.equal(later.fee_cents, 3_000);
+  assert.equal(later.net_cents, 97_000);
+});
+
+test('a request filed under no policy keeps fee 0 forever, whatever the rate becomes', async () => {
+  const { db, raw } = freshDb();
+  seedSettled(raw, 'u1', 200_000);
+  const before = await fileWithdrawal(db, 100_000, 'fee-none', 'u1', 0);
+  assert.ok(before.ok);
+  const row = (await getWithdrawal(db, (before as { id: string }).id))!;
+  assert.equal(row.fee_cents, 0);
+  assert.equal(row.net_cents, 100_000);
+  assert.equal(row.fee_policy, 'not_configured', 'nothing may later claim a fee was charged on it');
+
+  // The next request, filed after the owner sets 3%, is priced — and the old
+  // row is untouched.
+  const after = await fileWithdrawal(db, 50_000, 'fee-after', 'u1', 300);
+  assert.ok(after.ok);
+  assert.equal((await getWithdrawal(db, (after as { id: string }).id))!.fee_cents, 1_500);
+  assert.equal((await getWithdrawal(db, (before as { id: string }).id))!.fee_cents, 0);
+});
+
+test('a commission that would swallow the whole withdrawal cannot be filed', async () => {
+  const { db, raw } = freshDb();
+  seedSettled(raw, 'u1', 200_000);
+  // `CHECK (net_cents > 0)` at migrations/0015_wallet_holds.sql:84 would turn a
+  // 100% fee into an unhandled D1 exception in the middle of a money batch.
+  // Two things stop that, and both are tested: the ceiling clamps a typed
+  // 100% to 50%, and the engine refuses a non-positive net before the insert.
+  const res = await fileWithdrawal(db, 100_000, 'fee-100', 'u1', 10_000);
+  assert.ok(res.ok, 'clamped to the ceiling, so it is a legitimate request');
+  const row = (await getWithdrawal(db, (res as { id: string }).id))!;
+  assert.equal(row.fee_cents, 50_000, 'the ceiling, not the typed 100%');
+  assert.equal(row.net_cents, 50_000);
+
+  // The guard itself, reached only if the ceiling is ever raised past 100%.
+  const swallowed = await requestWithdrawal(db, {
+    userId: 'u1',
+    amountCents: 10_000,
+    destination: { kind: 'manual_transfer', account: '0770-000-0000' },
+    eventKey: 'fee-all',
+    feeBps: MAX_WITHDRAWAL_FEE_BPS,
+  });
+  assert.ok(swallowed.ok);
+  assert.ok((await getWithdrawal(db, (swallowed as { id: string }).id))!.net_cents > 0);
 });

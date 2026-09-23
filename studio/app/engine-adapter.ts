@@ -88,17 +88,22 @@ export const ENGINE_API_METHODS = [
 /**
  * Engine globals this adapter reaches for that are NOT part of `__vpApi`.
  *
- * `__vpReleaseWorker` and `__vpNoStageCache` are both added by
+ * `__vpReleaseWorker`, `__vpNoStageCache` and `__vpRungs` are all added by
  * `patches/three-slicer+0.2.2.patch` — see patches/README.md for why the shell
- * can neither free the idle slice worker nor decline the stage cache without
- * it. Listing them here means tests/editor-capabilities.test.mjs fails loudly
- * if the patch ever stops being applied, instead of Studio quietly going back
- * to holding a WASM heap and a pthread pool on phones.
+ * can neither free the idle slice worker, nor decline the stage cache, nor see
+ * the retry ladder without it. Listing them here means
+ * tests/editor-capabilities.test.mjs fails loudly if the patch ever stops
+ * being applied, instead of Studio quietly going back to holding a WASM heap
+ * and a pthread pool on phones — or to swallowing two failed slices in
+ * silence.
  */
 export const ENGINE_WINDOW_HOOKS = [
   "__vpApi",
   "__vpReleaseWorker",
   "__vpNoStageCache",
+  "__vpRungs",
+  "__vpCanCancel",
+  "__vpAbortSlice",
 ] as const;
 
 export type EngineStaticTestId = (typeof ENGINE_STATIC_TEST_IDS)[number];
@@ -145,7 +150,43 @@ declare global {
      * kept.
      */
     __vpNoStageCache?: boolean;
+    /**
+     * Added by patches/three-slicer+0.2.2.patch. One string per FAILED slice
+     * attempt, newest last, in the form `2/3 classic-walls failed after
+     * 61.1s: <engine message>`. Reset to `[]` when a slice starts, so a
+     * non-empty array always describes the run in progress (or the one that
+     * just ended). Absent when the patch is not applied.
+     */
+    __vpRungs?: string[];
+    /**
+     * Added by patches/three-slicer+0.2.2.patch. True only when the engine
+     * actually holds the SharedArrayBuffer view its own cancel writes to —
+     * which needs cross-origin isolation AND the `supsab` message to have
+     * arrived. Absent when the patch is not applied.
+     */
+    __vpCanCancel?: () => boolean;
+    /**
+     * Added by patches/three-slicer+0.2.2.patch. Ends the slice in flight by
+     * terminating the worker and rejecting the pending run as canceled, then
+     * leaves the engine ready to build a fresh worker for the next slice.
+     * Returns false — changing nothing — when no slice is pending.
+     */
+    __vpAbortSlice?: () => boolean;
   }
+}
+
+/** One rung of the engine's slice-retry ladder, as `vp-retry` reports it. */
+export interface SliceRetryEvent {
+  /** `1/3 full`, `2/3 classic-walls`, `3/3 economy`. */
+  rung: string;
+  /** How long the attempt that just failed ran for. */
+  seconds: number;
+  /** The engine's own error message for that attempt. */
+  message: string;
+  /** 1-based index of the attempt that just failed. */
+  index: number;
+  /** How many attempts the ladder has in total. */
+  total: number;
 }
 
 export type EngineAdapterErrorCode =
@@ -565,6 +606,105 @@ export class EngineAdapter {
   /** True when the installed engine build carries the worker-release patch. */
   canReleaseSlicerWorker(): boolean {
     return typeof window !== "undefined" && typeof window.__vpReleaseWorker === "function";
+  }
+
+  /**
+   * Subscribe to the engine's SLICE-RETRY LADDER.
+   *
+   * A failed slice is not one failure. The engine retries three times — full
+   * quality, then classic walls, then economy — terminating the worker and
+   * re-booting the 5.2 MB kernel between rungs, and it reports NOTHING until
+   * all three are spent. The owner's words for that were «بعد فترة كبيرة من
+   * الانتظار يظهر فشل»: minutes of apparently-frozen progress and then one
+   * generic sentence carrying only the LAST error.
+   *
+   * The patch makes each rung announce itself. This is what the shell listens
+   * to, and it is deliberately only a REPORT: the ladder's behaviour is
+   * unchanged, nothing here can cancel or extend a slice, and an unpatched
+   * build simply never fires, leaving the caller with the silence it has
+   * today.
+   *
+   * WHY THE DURATION IS THE INTERESTING FIELD. A rung that dies at ~60s died
+   * on the watchdog, which means the worker stopped answering while it was
+   * emitting G-code. A rung that dies in a few seconds never got that far —
+   * it failed while loading the kernel. The two have different causes and
+   * different fixes, and `seconds` is what tells them apart without a
+   * stopwatch.
+   *
+   * Returns an unsubscribe function; safe to call during SSR, where it is a
+   * no-op.
+   */
+  onSliceRetry(listener: (event: SliceRetryEvent) => void): () => void {
+    if (typeof window === "undefined") return () => {};
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<SliceRetryEvent>).detail;
+      if (!detail || typeof detail.index !== "number") return;
+      listener(detail);
+    };
+    window.addEventListener("vp-retry", handler);
+    return () => window.removeEventListener("vp-retry", handler);
+  }
+
+  /**
+   * The failed attempts of the slice in progress (or the one that just ended),
+   * oldest first. Empty on an unpatched build and between slices.
+   */
+  sliceRetryLog(): string[] {
+    if (typeof window === "undefined") return [];
+    const rungs = window.__vpRungs;
+    return Array.isArray(rungs) ? rungs.slice() : [];
+  }
+
+  /**
+   * CANCEL A RUNNING SLICE — and actually cancel it.
+   *
+   * The engine's own cancel writes 1 into a flag the kernel polls:
+   * `Atomics.store(N.current.cancel, 0, 1)`. `N.current` is a view onto a
+   * **SharedArrayBuffer**, and the worker posts that buffer only when it has
+   * one to post — which needs cross-origin isolation. `worker/platform.ts`
+   * deliberately withholds isolation from every Apple user agent so the engine
+   * takes its single-threaded core, so ON AN IPAD THE CANCEL BUTTON DOES
+   * NOTHING: it writes to a null view, the slice runs on, and reloading the
+   * tab is the only way out. That is the device the owner tests on, and the
+   * screen they were stuck on at 87%.
+   *
+   * It is not only Apple. `N.current` is published by the `supsab` message,
+   * which the worker sends during the SUPPORT stage — so cancelling earlier
+   * than that is a no-op on every platform, threaded core included.
+   *
+   * So the capability is asked, not assumed:
+   *
+   * - The engine holds a live flag view → use the engine's own cancel. The
+   *   kernel unwinds itself and the worker (and its warm 5.28 MB core) stays
+   *   alive for the next slice. This is the better path wherever it works.
+   * - It does not → terminate the worker through the patch's `__vpAbortSlice`
+   *   and let the engine build a fresh one. It costs a kernel boot on the next
+   *   slice; the alternative is a button that lies.
+   *
+   * The abort rejects the pending run with a message containing "canceled",
+   * which is the word the engine's own retry ladder and its error handler both
+   * test for — so a cancelled slice is NOT retried twice more, and it surfaces
+   * as "Slice canceled" rather than as a failure.
+   *
+   * Returns false when nothing was cancelled, including on an unpatched build
+   * where the engine's cancel is all there is.
+   */
+  cancelSlice(): boolean {
+    if (typeof window === "undefined") return false;
+    let engineCanCancel = false;
+    try {
+      engineCanCancel = window.__vpCanCancel?.() === true;
+    } catch {
+      engineCanCancel = false;
+    }
+    if (engineCanCancel) return this.clickControl("slice-btn");
+    const abort = window.__vpAbortSlice;
+    if (typeof abort !== "function") return this.clickControl("slice-btn");
+    try {
+      return abort() === true;
+    } catch {
+      return false;
+    }
   }
 
   /**

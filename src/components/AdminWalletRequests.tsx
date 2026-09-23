@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, ApiError, WalletTx, formatUsdCents, formatWalletIqd } from '../lib/api';
+import { api, ApiError, WalletTx, formatIqd, formatUsdCents, formatWalletIqd } from '../lib/api';
 import { useWallet } from '../WalletContext';
 import { Check, X, Wallet, FileImage, RefreshCw } from 'lucide-react';
 
@@ -35,6 +35,24 @@ export default function AdminWalletRequests() {
     | { kind: 'wd'; action: 'approve' | 'processing' | 'paid' | 'reject' | 'fail' | 'reconcile_clear'; wdId: string };
   const [decision, setDecision] = useState<{ id: string; step: Step; note: string } | null>(null);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
+  /**
+   * THE DINARS THE CUSTOMER TYPED, per deposit id (migration 0105).
+   *
+   * This screen used to print `formatWalletIqd(t.amount, exchangeRate)` and
+   * nothing else — a conversion of the stored cents back to dinars. That
+   * conversion is not the inverse of the one the deposit form did: at 1,400
+   * IQD/USD a cent is 14 د.ع, so a customer who transferred 50,000 د.ع had
+   * their request approved against «50,008 د.ع» on this very card, and a
+   * reviewer holding the transfer slip could not match the two numbers.
+   *
+   * The recorded figure is fetched separately because the list itself comes
+   * from the legacy /api/admin/wallet-requests route, which reports the ledger
+   * row only. A request filed before 0105 is simply absent from this map and
+   * the card keeps converting — the honest answer for a dinar figure nobody
+   * ever wrote down. The ledger value and the rate stay underneath either way:
+   * approving money is a reconciliation, and both numbers belong on it.
+   */
+  const [declaredIqd, setDeclaredIqd] = useState<Record<string, { amount_iqd: number; exchange_rate: number | null }>>({});
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
@@ -42,6 +60,21 @@ export default function AdminWalletRequests() {
     try {
       const data = await api.get<{ requests: AdminWalletTx[] }>('/api/admin/wallet-requests');
       setTransactions(data.requests);
+      const depositIds = data.requests.filter((t) => t.type === 'deposit').map((t) => t.id);
+      if (depositIds.length > 0) {
+        try {
+          const meta = await api.get<{ declared: Record<string, { amount_iqd: number; exchange_rate: number | null }> }>(
+            `/api/wallet/admin/deposits/declared?ids=${encodeURIComponent(depositIds.slice(0, 200).join(','))}`
+          );
+          setDeclaredIqd(meta.declared ?? {});
+        } catch {
+          // A missing testimony map is not a failed screen: every card falls
+          // back to the conversion it has always used.
+          setDeclaredIqd({});
+        }
+      } else {
+        setDeclaredIqd({});
+      }
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : 'Failed to load wallet requests');
     } finally {
@@ -253,7 +286,12 @@ export default function AdminWalletRequests() {
 
               <div className="flex flex-col md:items-end gap-2 border-t md:border-t-0 md:border-l border-zinc-800 pt-4 md:pt-0 md:pl-6">
                 <div className="text-xl font-black text-white tabular-nums">
-                  {formatWalletIqd(t.amount, exchangeRate)}
+                  {/* Presence decides, not truthiness: a request with no
+                      recorded dinars falls back to the conversion, and a
+                      recorded figure is printed exactly as it was filed. */}
+                  {declaredIqd[t.id]
+                    ? formatIqd(declaredIqd[t.id].amount_iqd)
+                    : formatWalletIqd(t.amount, exchangeRate)}
                 </div>
                 {/* The ledger value AND the rate. A reviewer approving a
                     deposit is reconciling a bank transfer against a stored

@@ -96,6 +96,84 @@ function langOfLocale(locale: unknown): EmailLang {
   return emailLang(locale === 'ku' ? 'ckb' : locale);
 }
 
+/** What `notificationLang` needs to know about an account, and nothing else. */
+export interface NotifyLangRow {
+  locale: string | null;
+  /** The account's address — read ONLY to recognise the `@telegram.local` placeholder. */
+  email: string | null;
+  google_sub?: string | null;
+  /** 1 when the customer has ever picked a language themselves (see below). */
+  locale_stated?: number | null;
+}
+
+/**
+ * The columns `notificationLang` reads, as a SELECT fragment over `users u`.
+ *
+ * It is one exported string rather than three copies because there are two
+ * readers of the notification language in this codebase — the fan-out here and
+ * `worker/lib/orderNotify.ts`, which picks its COPY block before calling us —
+ * and they used to map `u.locale` independently. Two independent mappings are
+ * two chances to disagree about what language a message is in, inside ONE
+ * message: the Arabic sentence would have arrived under an English subject.
+ */
+export const NOTIFY_LANG_SELECT = `u.locale, u.email, u.google_sub,
+            (SELECT 1 FROM audit_log a
+              WHERE a.target = u.id AND a.action = 'profile.locale_change'
+              LIMIT 1) AS locale_stated`;
+
+/**
+ * WHICH LANGUAGE THIS CUSTOMER IS ACTUALLY READING IN — and why the stored
+ * column is not, on its own, the answer.
+ *
+ * «اللغة في رسالة إشعار التليكرام لا تطابق اللغة الافتراضية للموقع» — the notification
+ * arrived in English at a customer whose shop is in Arabic. Nothing about the
+ * template selection was broken: `users.locale` really did say 'en'.
+ *
+ * IT SAID SO BECAUSE NOBODY EVER ASKED. The column is
+ * `NOT NULL DEFAULT 'en'` (migrations/0001_init.sql), and the sign-up path
+ * that CREATES the Telegram population — the phone/Telegram signup in
+ * worker/routes/auth.ts, whose very next statement writes the
+ * `telegram_links` row — binds no locale at all, so every one of those
+ * accounts carries the default. Google sign-in omits it the same way. The
+ * column therefore cannot tell "this person chose English" apart from "this
+ * person was never asked", and on an Arabic-first, Iraq-only shop the second
+ * reading is the common one.
+ *
+ * SO THE FALLBACK IS SCOPED TO THE ACCOUNTS THAT DEMONSTRABLY WERE NEVER
+ * ASKED, and to nobody else:
+ *
+ *   - a `@telegram.local` placeholder address, minted only by the
+ *     phone/Telegram signup — which is exactly the reported population;
+ *   - `google_sub`, set only by the Google sign-in insert.
+ *
+ * An account that typed its email at sign-up sent its language with it, so a
+ * stored 'en' there IS an answer and is honoured. The WIDER rule — treat
+ * every 'en' row as unasked — was rejected on purpose: it would overrule
+ * everybody who chose English deliberately, which is a worse failure than the
+ * bug it fixes.
+ *
+ * AND AN ANSWER, ONCE GIVEN, WINS FOR EVER. `PATCH /api/profile` records a
+ * `profile.locale_change` line in `audit_log` the moment a customer picks a
+ * language — including when they pick the one the column already holds,
+ * because for these accounts that press IS the first answer and changes no
+ * value. `locale_stated` carries it here, so a Telegram customer who really
+ * wants English taps English once and is never second-guessed again.
+ *
+ * ARABIC, NOT ENGLISH, is what an unanswered account falls back to: it is the
+ * shop's own default (src/LanguageContext.tsx opens in Arabic on a first
+ * visit, «never derived from the browser locale») and the language every
+ * template in this codebase is written in first. No string is translated
+ * here — the ar/en/ckb copy already exists and this only chooses between
+ * blocks of it.
+ */
+export function notificationLang(row: NotifyLangRow): EmailLang {
+  const stored = langOfLocale(row.locale);
+  if (stored !== 'en') return stored;
+  if (row.locale_stated) return 'en';
+  const neverAsked = isPlaceholderEmail(row.email) || !!row.google_sub;
+  return neverAsked ? 'ar' : 'en';
+}
+
 /**
  * Which channels can reach this customer, in one query.
  *
@@ -105,7 +183,7 @@ function langOfLocale(locale: unknown): EmailLang {
  */
 export async function reachFor(env: Env, userId: string): Promise<CustomerReach> {
   const row = await env.DB.prepare(
-    `SELECT u.id, u.locale, u.email, u.email_verified_at, u.phone_e164, u.notify_whatsapp,
+    `SELECT u.id, ${NOTIFY_LANG_SELECT}, u.email_verified_at, u.phone_e164, u.notify_whatsapp,
             (SELECT l.chat_id FROM telegram_links l
               WHERE l.user_id = u.id AND l.revoked_at IS NULL
               ORDER BY l.verified_at DESC LIMIT 1) AS chat_id
@@ -118,10 +196,12 @@ export async function reachFor(env: Env, userId: string): Promise<CustomerReach>
   return row ? reachFromRow(row) : emptyReach(userId);
 }
 
-interface ReachRow {
+interface ReachRow extends NotifyLangRow {
   id: string;
   locale: string | null;
   email: string | null;
+  google_sub: string | null;
+  locale_stated: number | null;
   email_verified_at: string | null;
   phone_e164: string | null;
   notify_whatsapp: number | null;
@@ -139,7 +219,7 @@ function reachFromRow(row: ReachRow): CustomerReach {
   const mail = row.email && row.email_verified_at && !isPlaceholderEmail(row.email) ? row.email : null;
   return {
     user_id: row.id,
-    lang: langOfLocale(row.locale),
+    lang: notificationLang(row),
     email: mail,
     phone: isE164(row.phone_e164) ? row.phone_e164 : null,
     // A row from a database that has not run migration 0101 yet reads null,
@@ -186,7 +266,7 @@ export async function reachForMany(env: Env, userIds: string[]): Promise<Map<str
     const part = unique.slice(i, i + REACH_IN_CHUNK);
     const placeholders = part.map(() => '?').join(',');
     const res = await env.DB.prepare(
-      `SELECT u.id, u.locale, u.email, u.email_verified_at, u.phone_e164, u.notify_whatsapp, l.chat_id
+      `SELECT u.id, ${NOTIFY_LANG_SELECT}, u.email_verified_at, u.phone_e164, u.notify_whatsapp, l.chat_id
          FROM users u
          LEFT JOIN telegram_links l ON l.user_id = u.id AND l.revoked_at IS NULL
         WHERE u.id IN (${placeholders})`

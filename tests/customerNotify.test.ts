@@ -24,8 +24,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
+import { Hono } from 'hono';
 import { asD1, freshDb } from './fixtures/app';
-import { notifyCustomer, plainNotification, reachFor } from '../worker/lib/customerNotify';
+import type { AppContext } from '../worker/lib/types';
+import { profileRoutes } from '../worker/routes/profile';
+import { notifyCustomer, plainNotification, reachFor, reachForMany } from '../worker/lib/customerNotify';
 import { notifyOrderPlaced, notifyOrderStatus, isNotifiedOrderStatus } from '../worker/lib/orderNotify';
 import { processOutbox } from '../worker/lib/outbox';
 import type { Env } from '../worker/lib/types';
@@ -53,19 +56,22 @@ function seedUser(
     chat?: number | null;
     revoked?: boolean;
     locale?: string;
+    /** A verified Google sign-in — the other path that inserts no locale. */
+    google?: string | null;
   } = {}
 ) {
   const id = o.id ?? 'u_1';
   raw.prepare(
-    `INSERT INTO users (id, name, email, username, password_hash, role, phone_e164, email_verified_at, locale)
-     VALUES (?, 'Customer', ?, ?, 'h', 'customer', ?, ?, ?)`
+    `INSERT INTO users (id, name, email, username, password_hash, role, phone_e164, email_verified_at, locale, google_sub)
+     VALUES (?, 'Customer', ?, ?, 'h', 'customer', ?, ?, ?, ?)`
   ).run(
     id,
     o.email ?? ADDRESS,
     id,
     o.phone === undefined ? PHONE : o.phone,
     o.verified === false ? null : new Date().toISOString(),
-    o.locale ?? 'ar'
+    o.locale ?? 'ar',
+    o.google ?? null
   );
   if (o.chat !== null && o.chat !== undefined) {
     raw.prepare(
@@ -287,6 +293,140 @@ test('ORDER — a missing order is silence, and neither helper ever throws', asy
   await notifyOrderPlaced(e, 'ORD-nope');
   await notifyOrderStatus(e, 'ORD-nope', 'shipped');
   assert.equal(rows(raw).length, 0);
+});
+
+// =========================================================================
+// THE LANGUAGE OF THE MESSAGE
+// =========================================================================
+//
+// «اللغة في رسالة إشعار التليكرام لا تطابق اللغة الافتراضية للموقع».
+//
+// The template picking was never the defect. `users.locale` is
+// `NOT NULL DEFAULT 'en'` and the Telegram/phone signup binds no locale, so
+// the customers who HAVE Telegram are precisely the ones whose column says
+// English without anybody ever having been asked — and an Arabic shop sent
+// them English. These tests pin the two halves of the answer: an unasked
+// account is read as Arabic, and an account that ANSWERED is never
+// second-guessed.
+//
+// The narrowness is asserted as hard as the fix: a stored 'en' that somebody
+// really typed must survive, or this would just be the old bug pointing the
+// other way.
+
+/** A Telegram/phone signup exactly as worker/routes/auth.ts creates one:
+ *  the `@telegram.local` placeholder, no verified address, and the locale
+ *  column left to its default. */
+const seedTelegramSignup = (raw: DatabaseSync, id = 'u_tg', chat: number | null = 555) =>
+  seedUser(raw, { id, email: `tg-${id}@telegram.local`, verified: false, locale: 'en', chat });
+
+test('LANGUAGE — an account that was never asked is not an English speaker', async () => {
+  const raw = freshDb();
+  seedTelegramSignup(raw);
+  const r = await reachFor(env(raw), 'u_tg');
+  assert.equal(r.telegram_chat_id, 555, 'this is the population that actually has Telegram');
+  assert.equal(r.lang, 'ar', "the column's default is not an answer, and the shop's own default is Arabic");
+});
+
+test('LANGUAGE — a Google sign-in was not asked either', async () => {
+  const raw = freshDb();
+  seedUser(raw, { id: 'u_g', email: 'g@example.com', locale: 'en', google: 'google-sub-1', chat: null });
+  assert.equal((await reachFor(env(raw), 'u_g')).lang, 'ar');
+});
+
+test('LANGUAGE — English that somebody actually typed at sign-up survives', async () => {
+  // The narrow predicate IS the fix. A rule over every 'en' row would
+  // overrule everyone who chose English on purpose — a worse failure than
+  // the bug.
+  const raw = freshDb();
+  seedUser(raw, { id: 'u_typed', email: 'typed@example.com', locale: 'en', chat: null });
+  assert.equal((await reachFor(env(raw), 'u_typed')).lang, 'en');
+});
+
+test('LANGUAGE — once the customer picks a language, the answer is honoured for ever', async () => {
+  const raw = freshDb();
+  seedTelegramSignup(raw);
+  raw.prepare(
+    "INSERT INTO audit_log (actor_id, action, target, detail) VALUES (?, 'profile.locale_change', ?, '{\"to\":\"en\"}')"
+  ).run('u_tg', 'u_tg');
+  assert.equal((await reachFor(env(raw), 'u_tg')).lang, 'en', 'a stated preference outranks the fallback');
+});
+
+test('LANGUAGE — the bulk lookup gives the same answer as the single one', async () => {
+  // Two readers of one column is how a shop ends up sending one message in
+  // two languages; `reachForMany` feeds the stock-alert sweep.
+  const raw = freshDb();
+  seedTelegramSignup(raw, 'u_tg');
+  seedUser(raw, { id: 'u_typed', email: 'typed@example.com', locale: 'en', phone: null, chat: null });
+  const many = await reachForMany(env(raw), ['u_tg', 'u_typed']);
+  assert.equal(many.get('u_tg')!.lang, 'ar');
+  assert.equal(many.get('u_typed')!.lang, 'en');
+});
+
+test('LANGUAGE — THE REPORTED MESSAGE: the Telegram order notification is in Arabic', async () => {
+  // End to end, through the composer that picks the COPY block: this is the
+  // message the owner was holding.
+  const raw = freshDb();
+  seedTelegramSignup(raw, 'u_tg');
+  seedOrder(raw, 'ORD-TG', 'u_tg', 0);
+  await notifyOrderPlaced(env(raw), 'ORD-TG');
+
+  const tg = raw
+    .prepare("SELECT payload FROM outbox WHERE kind = 'telegram'")
+    .get() as { payload: string } | undefined;
+  assert.ok(tg, 'the Telegram row is queued');
+  const text = (JSON.parse(tg!.payload) as { text: string }).text;
+  assert.match(text, /استلمنا طلبك ORD-TG/, 'the sentence is the Arabic one');
+  assert.equal(text.includes('reached us'), false, 'and not the English one');
+  assert.equal(text.includes('الإجمالي'), true, 'the labels are Arabic too, not a half-translated message');
+});
+
+/** The real PATCH /api/profile route, with the stored user row as the caller —
+ *  the one place in the codebase where a customer states a language. */
+function profileApp(raw: DatabaseSync, userId: string) {
+  const a = new Hono<AppContext>();
+  a.use('*', async (c, next) => {
+    c.env = { DB: asD1(raw) } as never;
+    c.set('user', raw.prepare('SELECT * FROM users WHERE id = ?').get(userId) as never);
+    await next();
+  });
+  a.route('/api/profile', profileRoutes);
+  return a;
+}
+
+const pickLanguage = (raw: DatabaseSync, userId: string, locale: string) =>
+  profileApp(raw, userId).request('/api/profile', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
+    body: JSON.stringify({ locale }),
+  });
+
+const localeStatements = (raw: DatabaseSync, userId: string) =>
+  (raw
+    .prepare("SELECT COUNT(*) AS n FROM audit_log WHERE target = ? AND action = 'profile.locale_change'")
+    .get(userId) as { n: number }).n;
+
+test('LANGUAGE — pressing English on a defaulted account IS the answer, and it sticks', async () => {
+  // The one customer the fallback gets wrong is the Telegram signup who
+  // really does read English. Their column already says 'en', so the press
+  // changes no value — if the route only recorded CHANGES, they could never
+  // correct it.
+  const raw = freshDb();
+  seedTelegramSignup(raw);
+  assert.equal((await reachFor(env(raw), 'u_tg')).lang, 'ar', 'before: unasked');
+
+  const res = await pickLanguage(raw, 'u_tg', 'en');
+  assert.equal(res.status, 200);
+  assert.equal(localeStatements(raw, 'u_tg'), 1, 'the press is written down');
+  assert.equal((await reachFor(env(raw), 'u_tg')).lang, 'en', 'after: answered, and honoured');
+
+  // A profile saved again is not a second decision.
+  await pickLanguage(raw, 'u_tg', 'en');
+  assert.equal(localeStatements(raw, 'u_tg'), 1, 'the trail records decisions, not saves');
+
+  // A real change is.
+  await pickLanguage(raw, 'u_tg', 'ckb');
+  assert.equal(localeStatements(raw, 'u_tg'), 2);
+  assert.equal((await reachFor(env(raw), 'u_tg')).lang, 'ckb', "the API's 'ckb' is stored as the column's 'ku'");
 });
 
 // =========================================================================

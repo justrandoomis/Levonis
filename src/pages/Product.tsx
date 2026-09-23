@@ -1900,7 +1900,39 @@ export default function Product() {
       ? [...colorsForOption].sort((a, b) => Number(colorHasStock(b.id)) - Number(colorHasStock(a.id)))
       : colorsForOption;
 
+  /**
+   * THE CHIP REPORTS THE SHELF, AND A PRE-ORDER HAS NO SHELF.
+   *
+   * Every number this helper is handed — `availByColor`, `availByValue`,
+   * `variantAvailable`, `variantTotalForOption` — comes from `relations.*
+   * .available`, which `publicRelations` (worker/lib/productOverlay.ts) works
+   * out as `stock - reserved` on the colour, option-value and variant rows.
+   * That is units ON THE SHELF. A pre-order is not bought from it: it is
+   * bought against an import quota that migration 0075 put on the fulfilment
+   * cell and its routes (`product_option_fulfillment.capacity`,
+   * `product_option_transports.capacity`) and that no colour, option value or
+   * variant row carries at all. `resolveForOrderType` (worker/lib/inventory.ts)
+   * is the authority and says the same thing by sending a pre-order to
+   * `resolveCapacity` and never to `resolveStock`.
+   *
+   * SO «نفد» ON A PRE-ORDER IS A FALSE REFUSAL. The door would have accepted
+   * that line — a zero-stock colour can be pre-ordered perfectly well — while
+   * the swatch wore a red verdict about stock the buyer was never going to be
+   * served from, and the buyer walked away from an order the shop could fill.
+   * Under «طلب مسبق» the honest chip is NO CHIP, because there is no
+   * per-colour and no per-option pre-order number in this payload to put
+   * there: `availability.preorder.capacity` is resolved for the CURRENT
+   * selection only, so painting it onto every swatch would attribute one
+   * model's quota to a colour.
+   *
+   * THE GATE LIVES IN THE HELPER, NOT AT THE FOUR CALL SITES, so a fifth chip
+   * cannot reintroduce this, and so the chip and the colour ordering read the
+   * identical predicate — `orderedColors` above already refuses to sort by the
+   * shelf for exactly this reason, and the two must never contradict each
+   * other on the same row.
+   */
   const levelChip = (n: number | null | undefined): { text: string; cls: string } | null => {
+    if (requestedOrderType !== 'direct_sale') return null;
     if (n === null || n === undefined) return null;
     if (n <= 0) return { text: s.levelOut, cls: 'text-red-300' };
     if (n <= 5) return { text: s.levelLeft.replace('{n}', String(n)), cls: 'text-amber-300' };

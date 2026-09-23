@@ -3,7 +3,8 @@ import type { AppContext } from '../lib/types';
 import { publicUser, localeToDb } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, str, oneOf, username, displayName } from '../lib/http';
 import { assertDecent } from '../lib/decency';
-import { newId } from '../lib/crypto';
+import { newId, sha256Hex } from '../lib/crypto';
+import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { allCountries } from '../lib/phone';
 import { computeCompletion, nextPromptAt, shouldPromptCompletion } from '../lib/profileCompletion';
 import { rateLimit } from '../lib/ratelimit';
@@ -135,6 +136,50 @@ profileRoutes.patch('/', async (c) => {
       "INSERT INTO audit_log (actor_id, action, target, detail) VALUES (?, 'profile.username_change', ?, ?)"
     )
       .bind(user.id, user.id, JSON.stringify({ to: newUsername }))
+      .run();
+  }
+
+  /**
+   * THE LANGUAGE PRESS IS RECORDED, NOT ONLY STORED.
+   *
+   * `users.locale` is `NOT NULL DEFAULT 'en'` (migrations/0001_init.sql) and
+   * the Telegram/phone and Google sign-up paths bind no locale, so the column
+   * conflates «chose English» with «was never asked» — which is how an
+   * Arabic-reading customer came to get an English Telegram notification.
+   * `worker/lib/customerNotify.ts` (`notificationLang`) has to tell those two
+   * apart before it can send the right language, and THIS route is the only
+   * place in the codebase where a customer states one. So the statement is
+   * written down: one `profile.locale_change` line means a human chose, and
+   * from then on their 'en' is honoured without second-guessing.
+   *
+   * IT IS WRITTEN EVEN WHEN THE VALUE DOES NOT CHANGE, deliberately. An
+   * account sitting on the DEFAULTED 'en' has nothing to change — pressing
+   * «English» stores the same three letters — and that press is precisely the
+   * answer the notification path is waiting for. Without this arm, the one
+   * customer the fallback gets wrong would have no way to correct it.
+   *
+   * THE `NOT EXISTS` ARM IS WHAT KEEPS IT FROM BEING A LOG. Somebody who
+   * saves their profile every day sends `locale` every day; after the first
+   * statement only a real CHANGE adds another line, so the trail stays a
+   * record of decisions rather than of saves.
+   *
+   * A COLUMN would be the tidier home for this and is the right follow-up.
+   * `audit_log` is used meanwhile because it already exists, is never pruned,
+   * and already carries the sibling `profile.username_change` line — and
+   * because a migration cannot be squeezed between a deploy and the customers
+   * already getting the wrong language today.
+   */
+  if (body.locale !== undefined) {
+    await c.env.DB.prepare(
+      `INSERT INTO audit_log (actor_id, action, target, detail)
+       SELECT ?1, 'profile.locale_change', ?1, ?2
+        WHERE ?3 = 1
+           OR NOT EXISTS (
+                SELECT 1 FROM audit_log
+                 WHERE target = ?1 AND action = 'profile.locale_change'
+              )`
+    )
+      .bind(user.id, JSON.stringify({ to: locale }), locale !== user.locale ? 1 : 0)
       .run();
   }
 
@@ -302,12 +347,58 @@ profileRoutes.get('/warranty-claims', async (c) => {
   return c.json({ success: true, claims: results });
 });
 
+/**
+ * ONE PRESS, ONE CLAIM — «أكثر من طلب في نفس الوقت».
+ *
+ * THE DEFECT. Nothing on this route was ever a replay guard. `rateLimit` below
+ * permits ten claims an hour, which is a flood limit and not an identity, and
+ * the overlay's own `if (busy) return` only blocks a second press while the
+ * first request is still in flight — it releases the instant that request
+ * settles. A customer whose first POST appeared to fail pressed send again,
+ * which is the reasonable thing to do, and got two real claims: two rows in
+ * the admin queue and two conversations about one broken printer.
+ *
+ * THE KEY IS SCOPED BY USER, AND IT IS SCOPED INSIDE THE ID ITSELF. That is
+ * the guarantee migration 0064 wrote down for the checkout, and it is not
+ * optional: a key the CLIENT mints must never be unique GLOBALLY, or one
+ * account can spend a key another account is about to use and deny it for
+ * ever. `orders` buys that with a `(user_id, client_idempotency_key)` unique
+ * index. Here the claim id is DERIVED — `wc_` + the first 20 hex digits of
+ * SHA-256 over the caller's id and the key — so the caller's own id is part of
+ * the preimage and this table's PRIMARY KEY already IS the per-user unique
+ * index the guarantee needs. Two accounts carrying an identical key land on
+ * two different rows; the same account retrying lands back on its own. NEVER
+ * hash the key on its own: that is exactly the global uniqueness 0064 exists
+ * to remove, rebuilt by hand.
+ *
+ * THE RACE IS CLOSED BY THE DATABASE, NOT BY THE LOOKUP. `ON CONFLICT(id) DO
+ * NOTHING` plus `meta.changes === 0` is the entire test, so two taps that
+ * arrive in the same instant cannot both win — and unlike a match on the text
+ * «UNIQUE» in an error message it cannot be confused by some other constraint
+ * on the same statement, which is the cost worker/routes/orders.ts spells out
+ * at its own collision arm. The conflict target is named for the same reason.
+ *
+ * THE KEY IS OPTIONAL, AND THAT IS A DEPLOYMENT FACT RATHER THAN A CHOICE. A
+ * caller that sends none keeps the old random id and the old behaviour; making
+ * it required would 400 every browser still running the page it shipped with.
+ * The other half lives in the overlay and is stated here because this route
+ * cannot enforce it: mint ONE key per OPEN of the form — per open, never per
+ * mount — so a retry after a failure reuses it while a customer's SECOND,
+ * genuinely different claim on the same product gets a new one. A key that
+ * outlives the overlay would silently replay the first claim instead of
+ * recording the second, which is a worse bug than the duplicate it removes.
+ *
+ * A REPLAY IS SILENT. The customer is shown the claim they already have, with
+ * the status actually stored on it rather than a hard-coded 'submitted',
+ * because by the time they retry an admin may already have moved it on.
+ */
 profileRoutes.post('/warranty-claims', async (c) => {
   await rateLimit(c, 'warranty', 10, 3600);
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
   const productName = str(body.productName, 'productName', { min: 2, max: 200 });
   const description = str(body.description, 'description', { min: 10, max: 3000 });
+  const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80, required: false });
   let orderItemId: string | null = null;
   if (body.orderItemId) {
     orderItemId = str(body.orderItemId, 'orderItemId', { max: 60 });
@@ -319,11 +410,72 @@ profileRoutes.post('/warranty-claims', async (c) => {
       .first();
     if (!owned) throw badRequest('That order item does not belong to your account');
   }
-  const id = newId('wc');
-  await c.env.DB.prepare(
-    'INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description) VALUES (?, ?, ?, ?, ?)'
+  const id = idempotencyKey
+    ? `wc_${(await sha256Hex(`${user.id}\n${idempotencyKey}`)).slice(0, 20)}`
+    : newId('wc');
+  const written = await c.env.DB.prepare(
+    `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description)
+     VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`
   )
     .bind(id, user.id, orderItemId, productName, description)
     .run();
+
+  if (written.meta.changes === 0) {
+    const existing = await c.env.DB.prepare(
+      'SELECT id, status FROM warranty_claims WHERE id = ? AND user_id = ?'
+    )
+      .bind(id, user.id)
+      .first<{ id: string; status: string }>();
+    /**
+     * The replay lookup is scoped by user as well as by id, and the arm below
+     * is what that scoping is FOR. If the derived id is taken by a row that is
+     * not this caller's, something has collided across two accounts — an
+     * 80-bit second preimage, i.e. not reachable by chance and not reachable
+     * by search. It says so with its own code instead of quietly retrying
+     * under a random id, because a guard that silently stops guarding is how
+     * the duplicate comes back, and instead of returning the row, because
+     * returning it would hand one customer another customer's claim.
+     */
+    if (!existing) throw conflict('That claim could not be recorded; please try again', 'CLAIM_KEY_COLLISION');
+    return c.json({ success: true, id: existing.id, status: existing.status, replay: true });
+  }
+
+  /**
+   * «تذاكر الضمان» — THE THIRD PATH INTO THE WARRANTY TOPIC, AND THE ONE THAT
+   * WAS STILL TELLING NOBODY.
+   *
+   * worker/routes/devices.ts announces the FORMAL claim, and a support ticket
+   * that names a unit reaches the same topic through `ticketTopic`. This one —
+   * the GENERAL claim, opened from «منتج غير مرتبط كطابعة؟» by a customer who
+   * has nothing the shop ever serialized — announced nothing at all: it sat in
+   * `status='submitted'` until somebody happened to open the admin queue. It
+   * carries the weakest evidence of the three and is therefore the likeliest
+   * to be a customer who simply cannot find their device, which is precisely
+   * why it must not wait for a page refresh.
+   *
+   * WHAT IS IN IT. The claim id, the product the customer typed clipped to one
+   * lock-screen line, and the fact that no unit is attached — so staff know
+   * before opening it that there is no serial, no delivery date and no
+   * evidence to look at. NOT the description: it is up to 3000 characters the
+   * customer wrote to support, and §12.1 (minimum necessary data) holds in a
+   * group message exactly as it holds in a wallet caption.
+   *
+   * ONLY ON A GENUINE INSERT. A replayed double-tap returned above without
+   * reaching this line; announcing there would put two identical messages in
+   * the owner's group for the one claim the replay guard exists to collapse.
+   *
+   * Contained and after the response: the row has committed, the text is built
+   * from values validated above, and an unreachable Telegram must never turn a
+   * committed claim into an error for a customer whose machine is already
+   * broken.
+   */
+  announceAfterResponse(
+    c,
+    'warranty',
+    `🔥 General warranty claim ${id}` +
+      `\nProduct: ${productName.slice(0, 80)}` +
+      '\nNot linked to a device' +
+      (orderItemId ? `\nOrder item: ${orderItemId}` : '')
+  );
   return c.json({ success: true, id, status: 'submitted' });
 });

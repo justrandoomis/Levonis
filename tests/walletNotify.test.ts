@@ -313,6 +313,48 @@ test('deposit caption carries the mandated fields and no injected ones', () => {
   assert.equal(caption.includes('receipts/'), false);
 });
 
+/**
+ * «كتبت ٥٠,٠٠٠ وظهر ٥٠,٠٠٨.» The review card is one of the three places that
+ * number reached, and the one the owner reads while holding the transfer slip.
+ */
+test('the review card prints the dinars the customer typed, not the conversion', () => {
+  const base = {
+    operationNumber: 'W-ABCDEF',
+    amountUsdCents: 3572,
+    exchangeRate: 1400,
+    userName: 'عمر',
+    username: 'omar',
+    contactLabel: 'البريد',
+    contactValue: 'c1@example.com',
+    method: 'زين كاش',
+    reference: 'TRX-99',
+    reviewState: 'awaiting_review',
+    createdAt: '2026-08-29T10:00:00.000Z',
+    note: '',
+    proofAttached: true,
+  };
+
+  const filed = buildDepositCaption({ ...base, declaredAmountIqd: 50_000 });
+  assert.match(filed, /المبلغ: 50,000 د\.ع/, 'the customer typed 50,000');
+  assert.equal(filed.includes('50,008'), false, 'the drifted conversion is gone');
+  // The ledger value and the rate stay: approving is a reconciliation against
+  // the stored cents, and hiding them would make the dinars look like storage.
+  assert.match(filed, /الدفتر: \$35\.72 — سعر الصرف 1,400/);
+
+  // A request filed before migration 0105 has no dinar figure at all, and the
+  // card converts, exactly as it always did. `??` not `||`: absent, not falsy.
+  for (const missing of [null, undefined]) {
+    const old = buildDepositCaption({ ...base, declaredAmountIqd: missing });
+    assert.match(old, /المبلغ: 50,008 د\.ع/, 'an unrecorded figure is still converted');
+  }
+
+  // And the column is testimony, never money: a caption still shows the cents
+  // the ledger holds even when the claim beside them is absurd.
+  const absurd = buildDepositCaption({ ...base, declaredAmountIqd: 900_000 });
+  assert.match(absurd, /المبلغ: 900,000 د\.ع/);
+  assert.match(absurd, /الدفتر: \$35\.72/, 'the ledger value is never derived from the claim');
+});
+
 test('caption never exceeds the Telegram limit, however long the user text', () => {
   const caption = buildDepositCaption({
     operationNumber: 'W-ABCDEF',

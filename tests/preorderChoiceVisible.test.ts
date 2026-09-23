@@ -208,3 +208,75 @@ test('the page draws the chooser from `modes`, and explains a closed half', () =
   assert.match(page, /resolveOrderType\(orderType, modesArr\)/);
   assert.ok(!/availability\?\.mode ===/.test(page), 'the page reads the server echo of its own preference again');
 });
+
+/**
+ * AND ONCE THE CHOICE IS ON THE PAGE, THE CHIPS BESIDE IT MUST NOT CONTRADICT
+ * IT. «نفد» is a verdict about the SHELF. A pre-order is not served from the
+ * shelf — it draws on the import quota migration 0075 put on the fulfilment
+ * cell and its routes, which no option value, colour or variant row carries —
+ * so a chip that reads the shelf number and prints «نفد» under «طلب مسبق» is
+ * refusing an order the door would have accepted. That is the owner's A1
+ * exactly: zero on the shelf, pre-order wide open, «نفد» on the pill.
+ *
+ * The helper is not reimplemented here. It is LIFTED OUT OF THE PAGE and run
+ * against the numbers the REAL product router publishes, so the test can only
+ * pass because the shipped code behaves, never because a copy of it does.
+ */
+
+test('«نفد» is a SHELF verdict and never appears on a pre-order pill', async () => {
+  const app = shopApp(asD1(seedA1()));
+  const detail = await json(await get(app, '/api/products/a1'));
+
+  // The numbers the pills are actually handed: `relations.*.available`, which
+  // is stock − reserved on the option-value row. A1 has none; A1 Combo has 4.
+  assert.equal(detail.relations.inventory_mode, 'OPTION', 'so the OPTION pills are the authoritative ones');
+  const availByValue = new Map<string, number | null>(
+    detail.relations.option_groups.flatMap((g: { values: Array<{ id: string; available: number | null }> }) =>
+      g.values.map((v) => [v.id, v.available] as const)
+    )
+  );
+  assert.equal(availByValue.get('v_a1'), 0, 'the empty shelf the old chip was reading');
+  assert.equal(availByValue.get('v_combo'), 4);
+
+  // …and the door would take a pre-order on that very model, which is what
+  // makes the red chip a lie rather than a warning.
+  const q = await json(
+    await post(app, '/api/products/a1/quote', {
+      productId: 'p_a1', qty: 1, optionId: 'v_a1', optionValueIds: ['v_a1'],
+    })
+  );
+  assert.equal(usable(q.availability, 'pre_order'), true, 'zero on the shelf, still orderable');
+
+  const page = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
+  const m = /const levelChip = \([^)]*\)[^=]*=> \{\n([\s\S]*?)\n {2}\};/.exec(page);
+  assert.ok(m, 'levelChip is still a single arrow helper in src/pages/Product.tsx');
+  assert.match(m[1], /s\.levelOut/, 'and the lifted body is the one that prints «نفد»');
+  assert.match(
+    page,
+    /levelOut: 'نفد', levelLeft: 'بقي \{n\}', levelAvail: 'متوفر \{n\}'/,
+    'quoted from the page’s own ar table, so the pill text is not invented here'
+  );
+  const s = { levelOut: 'نفد', levelLeft: 'بقي {n}', levelAvail: 'متوفر {n}' };
+  type Chip = { text: string; cls: string } | null;
+  const chipUnder = (orderType: string) =>
+    new Function('requestedOrderType', 's', `return function (n) {\n${m[1]}\n};`)(orderType, s) as (
+      n: number | null | undefined
+    ) => Chip;
+
+  const direct = chipUnder('direct_sale');
+  const pre = chipUnder('pre_order');
+
+  assert.deepEqual(
+    direct(availByValue.get('v_a1')),
+    { text: 'نفد', cls: 'text-red-300' },
+    'on a DIRECT SALE the empty shelf is the whole truth and still says so'
+  );
+  assert.equal(
+    pre(availByValue.get('v_a1')),
+    null,
+    'but under «طلب مسبق» the honest chip is NO CHIP — the shelf is not what is being bought'
+  );
+  assert.equal(direct(availByValue.get('v_combo'))?.text, 'بقي 4', 'the low-stock count is unchanged');
+  assert.equal(pre(availByValue.get('v_combo')), null, 'and a pre-order is never told how many are on the shelf');
+  assert.equal(direct(null), null, 'untracked is still not a number, and is emphatically not zero');
+});

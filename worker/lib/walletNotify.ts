@@ -286,6 +286,20 @@ export interface DepositCaptionInput {
   operationNumber: string;
   amountUsdCents: number;
   exchangeRate: number;
+  /**
+   * THE DINARS THE CUSTOMER TYPED, when the request recorded them (migration
+   * 0105). NULL for a deposit filed before that column existed, and for one
+   * typed in dollars — both fall back to converting the cents, which is what
+   * this card always did.
+   *
+   * It is printed instead of the conversion because the conversion is not
+   * reversible: at 1,400 IQD/USD, 50,000 د.ع becomes 3,572 cents and converts
+   * back to 50,008, so the reviewer was reading a figure the customer never
+   * typed and could not match it against the transfer slip. The cents and the
+   * rate stay in the parenthetical either way — the ledger value is what a
+   * reconciliation is done against, and it is never hidden.
+   */
+  declaredAmountIqd?: number | null;
   userName: string;
   username: string | null;
   /** Minimized contact for review: a verified email, else a masked phone. */
@@ -328,7 +342,12 @@ export function buildDepositCaption(p: DepositCaptionInput): string {
   const method = sanitizeUserText(p.method, { max: 60 }) || '—';
   const reference = sanitizeUserText(p.reference, { max: 120 });
   const contact = sanitizeUserText(p.contactValue, { max: 120 }) || '—';
-  const iqd = iqdFromUsdCents(p.amountUsdCents, p.exchangeRate);
+  // `??`, not `||`: a stored 0 is impossible (the column is only written for
+  // a positive whole figure) but a NULL coerced through `||` would hide which
+  // branch is in play, and this line is the one the owner reads.
+  const declaredRaw = p.declaredAmountIqd;
+  const declared = Number.isInteger(declaredRaw) && (declaredRaw as number) > 0 ? (declaredRaw as number) : null;
+  const iqd = declared ?? iqdFromUsdCents(p.amountUsdCents, p.exchangeRate);
   const signal = REVIEW_STATE_LABELS[p.reviewState] ?? sanitizeUserText(p.reviewState, { max: 40 });
 
   const lines: string[] = [
@@ -485,6 +504,8 @@ interface DepositFacts {
   channel: string | null;
   reference: string | null;
   review_state: string | null;
+  /** Migration 0105 — the customer's own dinar figure, NULL before it existed. */
+  declared_amount_iqd: number | null;
 }
 
 /** A Telegram-signup placeholder address is not a contact channel, and an
@@ -507,7 +528,7 @@ export async function enqueueDepositAdminNotification(env: Env, requestId: strin
   const facts = await env.DB.prepare(
     `SELECT t.id, t.user_id, t.amount, t.status, t.receipt_key, t.payment_method, t.note, t.created_at,
             u.name, u.username, u.email, u.email_verified_at, u.phone_e164,
-            m.provider, m.channel, m.reference, m.review_state
+            m.provider, m.channel, m.reference, m.review_state, m.declared_amount_iqd
        FROM wallet_transactions t
        JOIN users u ON u.id = t.user_id
        LEFT JOIN wallet_deposit_meta m ON m.tx_id = t.id
@@ -553,6 +574,7 @@ export async function enqueueDepositAdminNotification(env: Env, requestId: strin
     operationNumber: operationNumber(facts.id),
     amountUsdCents: facts.amount,
     exchangeRate: rate,
+    declaredAmountIqd: facts.declared_amount_iqd,
     userName: facts.name,
     username: facts.username,
     // Minimum necessary data (§12.1): a verified email is a working contact;
@@ -1466,8 +1488,10 @@ export async function enqueueUserDepositStatusNotification(
 ): Promise<{ telegram: boolean; email: boolean; whatsapp: boolean }> {
   const row = await env.DB.prepare(
     `SELECT t.id, t.status, t.amount, t.user_id, u.locale, u.email, u.email_verified_at, u.phone_e164,
+            m.declared_amount_iqd,
             (SELECT l.chat_id FROM telegram_links l WHERE l.user_id = t.user_id AND l.revoked_at IS NULL) AS chat_id
        FROM wallet_transactions t JOIN users u ON u.id = t.user_id
+       LEFT JOIN wallet_deposit_meta m ON m.tx_id = t.id
       WHERE t.id = ? AND t.type = 'deposit'`
   )
     .bind(requestId)
@@ -1480,6 +1504,7 @@ export async function enqueueUserDepositStatusNotification(
       email: string;
       email_verified_at: string | null;
       phone_e164: string | null;
+      declared_amount_iqd: number | null;
       chat_id: number | null;
     }>();
   if (!row || (row.status !== 'approved' && row.status !== 'rejected')) {
@@ -1490,7 +1515,15 @@ export async function enqueueUserDepositStatusNotification(
   const lang = emailLang(row.locale === 'ku' ? 'ckb' : row.locale);
   const copy = STATUS_COPY[status][lang];
   const rate = Number(await getSetting(env.DB, 'exchangeRate')) || 1400;
-  const amountLine = `${groupDigits(iqdFromUsdCents(row.amount, rate))} د.ع (${formatUsdCents(row.amount)})`;
+  /**
+   * The customer's own dinar figure when the request recorded it (0105), the
+   * conversion when it did not. Telling somebody their 50,000 د.ع deposit was
+   * approved as 50,008 د.ع is the same defect as showing it in the form, and
+   * this is the message that reaches them personally.
+   */
+  const declaredRaw = row.declared_amount_iqd;
+  const declaredIqd = Number.isInteger(declaredRaw) && (declaredRaw as number) > 0 ? (declaredRaw as number) : null;
+  const amountLine = `${groupDigits(declaredIqd ?? iqdFromUsdCents(row.amount, rate))} د.ع (${formatUsdCents(row.amount)})`;
   const opNo = operationNumber(row.id);
 
   let telegram = false;

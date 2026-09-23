@@ -654,34 +654,94 @@ export function isReleasingWithdrawalState(s: WithdrawalState): boolean {
 }
 
 /**
- * Withdrawal fees and limits are an OWNER DECISION that has not been made
- * (mandate §11.3 + §13.1; the decision register has no wallet-payout row
- * yet). We refuse to invent a percentage or a cap: the quote is honest about
- * being unconfigured, the net equals the requested amount, and the whole
- * requested amount is what gets reserved.
+ * THE WITHDRAWAL COMMISSION — «عمولة للسحب بقدر 3% قابله للتغيير من الادارة».
+ *
+ * THE DECISION §11.3 SAID HAD NOT BEEN MADE HAS NOW BEEN MADE. This block used
+ * to be a frozen object declaring the opposite, and that was the right thing to
+ * say while nobody had chosen a number: we refused to invent a percentage. The
+ * owner has now named one, so the refusal is replaced rather than deleted, and
+ * the two things it protected are kept.
+ *
+ * DEDUCTED, NOT ADDED ON TOP. A commission is ON the withdrawal, and the
+ * schema settled the arithmetic years ago: `CHECK (net_cents = amount_cents -
+ * fee_cents)` in migrations/0015_wallet_holds.sql. Request 100,000 د.ع at 3%
+ * and 3,000 د.ع is the commission, 97,000 د.ع reaches the customer, and
+ * 100,000 د.ع — the full requested figure — is what leaves the balance and what
+ * the hold reserves. Adding on top would mean reserving amount+fee, which that
+ * CHECK forbids and which would let the customer's available balance be
+ * overdrawn by the fee.
+ *
+ * ONE COMPUTATION SITE. This function is the only place in the codebase that
+ * multiplies money by a percentage. The form, the admin panel and the Telegram
+ * card all READ what it produced — the form from GET /api/wallet/policy before
+ * a request exists, everyone else from the columns stored on the row — because
+ * a form doing its own 3% would show the customer one number while the ledger
+ * wrote another, and the CHECK above would not catch it: the server's own
+ * arithmetic would still be self-consistent.
+ *
+ * THE STORED QUOTE IS A SNAPSHOT, exactly like `orders.cod_tax_iqd`. The rate
+ * is read once, at the moment the request is filed, and written into
+ * fee_cents/net_cents/fee_policy. Changing the rate tomorrow must never alter
+ * a request that is already on the books — and a request filed before any rate
+ * existed keeps fee_cents = 0 and fee_policy 'not_configured', which is why
+ * every customer-facing sentence about a fee is driven off the ROW'S OWN
+ * fee_policy and never off today's setting.
+ *
+ * FLOOR, NOT CEIL. The rounding error goes to the customer, the mirror of the
+ * deposit rule: a fee is rounded down, so the shop never takes a dinar more
+ * than the percentage it published.
  */
-export const WITHDRAWAL_FEE_POLICY = {
-  configured: false,
-  policy: 'not_configured' as const,
-  /** No live payout channel is wired; paid is recorded by a human. */
-  live_payout: false,
-};
+export const DEFAULT_WITHDRAWAL_FEE_BPS = 300;
+
+/** Basis points, so 2.5% is expressible without a float. 5000 = 50% is the
+ *  ceiling: past that the "commission" is most of the money. */
+export const MAX_WITHDRAWAL_FEE_BPS = 5000;
+
+/** An owner-typed rate, reduced to something this engine will multiply by. A
+ *  missing or nonsensical value is 0 — no fee — never an invented default. */
+export function normalizeWithdrawalFeeBps(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) return 0;
+  return Math.min(n, MAX_WITHDRAWAL_FEE_BPS);
+}
+
+/** No live payout channel is wired; paid is still recorded by a human. */
+export const WITHDRAWAL_LIVE_PAYOUT = false;
+
+export type WithdrawalFeePolicy = 'not_configured' | 'percent_bps';
 
 export interface FeeQuote {
   amount_cents: number;
   fee_cents: number;
   net_cents: number;
-  fee_policy: 'not_configured';
-  fee_configured: false;
+  fee_bps: number;
+  fee_policy: WithdrawalFeePolicy;
+  fee_configured: boolean;
 }
 
-export function withdrawalFeeQuote(amountCents: number): FeeQuote {
+export function withdrawalFeeQuote(amountCents: number, feeBps: unknown = 0): FeeQuote {
+  const bps = normalizeWithdrawalFeeBps(feeBps);
+  if (bps === 0) {
+    // 0 is a real setting and means the commission is switched off — the same
+    // thing codTaxPerBlockIqd = 0 means. The row records that it was filed
+    // under no policy, so no later screen can claim a fee was charged on it.
+    return {
+      amount_cents: amountCents,
+      fee_cents: 0,
+      net_cents: amountCents,
+      fee_bps: 0,
+      fee_policy: 'not_configured',
+      fee_configured: false,
+    };
+  }
+  const fee = Math.floor((amountCents * bps) / 10_000);
   return {
     amount_cents: amountCents,
-    fee_cents: 0,
-    net_cents: amountCents,
-    fee_policy: 'not_configured',
-    fee_configured: false,
+    fee_cents: fee,
+    net_cents: amountCents - fee,
+    fee_bps: bps,
+    fee_policy: 'percent_bps',
+    fee_configured: true,
   };
 }
 
@@ -711,6 +771,12 @@ export interface RequestWithdrawalInput {
   /** Client idempotency key; the stored business key also pins the amount. */
   eventKey: string;
   note?: string;
+  /**
+   * The commission rate in basis points, read from the setting by the route
+   * and passed in ONCE. It is quoted here and written onto the row as a
+   * snapshot, so changing the rate tomorrow cannot alter a filed request.
+   */
+  feeBps?: number;
 }
 
 export type WithdrawalOpResult =
@@ -729,7 +795,14 @@ export async function requestWithdrawal(
   p: RequestWithdrawalInput
 ): Promise<WithdrawalOpResult> {
   if (!isValidAmountCents(p.amountCents)) return { ok: false, reason: 'INVALID_AMOUNT' };
-  const quote = withdrawalFeeQuote(p.amountCents);
+  const quote = withdrawalFeeQuote(p.amountCents, p.feeBps);
+  /**
+   * `CHECK (net_cents > 0)` lives in migrations/0015_wallet_holds.sql, and a
+   * fee configured at or near 100% would hit it as an unhandled D1 exception
+   * in the middle of a money batch. It is caught here instead and refused
+   * cleanly: a withdrawal whose whole value is commission is not a withdrawal.
+   */
+  if (quote.net_cents <= 0) return { ok: false, reason: 'INVALID_AMOUNT' };
   const holdId = newId('whold');
   const txId = newId('wtx');
   const wdId = newId('wd');
@@ -1116,6 +1189,19 @@ export interface CreateDepositInput {
   reference?: string;
   /** Weak attachment fingerprint (R2 md5/etag) — a review signal only. */
   fingerprint?: string;
+  /**
+   * THE DINARS THE CUSTOMER ACTUALLY TYPED (migration 0105), or undefined when
+   * they typed dollars. It is TESTIMONY, not money: nothing here derives a
+   * cent figure from it, `amountCents` stays the only thing a credit is
+   * computed from, and `depositAmountReview` keeps comparing cents to cents.
+   * It exists because the cent value cannot be converted back — at a rate of
+   * 1,400 only multiples of 14 د.ع are representable, so a customer who typed
+   * 50,000 was shown 50,008 everywhere.
+   */
+  declaredAmountIqd?: number;
+  /** The rate the cents above were computed at; stored beside the dinars so a
+   *  reviewer never has to guess what the setting was that week. */
+  exchangeRateSnapshot?: number;
   /** Test seam; production callers let this default. */
   txId?: string;
 }
@@ -1140,6 +1226,17 @@ export async function createDepositRequest(db: D1Database, p: CreateDepositInput
   const reference = (p.reference ?? '').slice(0, 120);
   const referenceNorm = normalizeDepositReference(reference);
   const fingerprint = (p.fingerprint ?? '').slice(0, 80);
+  /**
+   * Recorded only when it is a whole, positive dinar figure. Anything else is
+   * stored as NULL rather than as a repaired number: a column whose whole job
+   * is to say what the customer typed must not contain something nobody typed.
+   */
+  const declaredIqd =
+    Number.isInteger(p.declaredAmountIqd) && (p.declaredAmountIqd as number) > 0 ? p.declaredAmountIqd : null;
+  const rateSnapshot =
+    declaredIqd !== null && Number.isInteger(p.exchangeRateSnapshot) && (p.exchangeRateSnapshot as number) > 0
+      ? p.exchangeRateSnapshot
+      : null;
 
   // Signal lookup only — it decides which flag the reviewer sees, never
   // whether the row may be written, so it is not a check-then-write guard.
@@ -1186,11 +1283,24 @@ export async function createDepositRequest(db: D1Database, p: CreateDepositInput
       .prepare(
         `INSERT INTO wallet_deposit_meta
            (tx_id, user_id, provider, channel, reference, reference_norm, attachment_fingerprint,
-            declared_amount_cents, review_state, created_at, updated_at)
-         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ${NOW_SQL}, ${NOW_SQL}
+            declared_amount_cents, review_state, declared_amount_iqd, exchange_rate_snapshot,
+            created_at, updated_at)
+         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ${NOW_SQL}, ${NOW_SQL}
           WHERE EXISTS (SELECT 1 FROM wallet_transactions t WHERE t.id = ?1)`
       )
-      .bind(txId, p.userId, provider, channel, reference, referenceNorm, fingerprint, p.amountCents, reviewState),
+      .bind(
+        txId,
+        p.userId,
+        provider,
+        channel,
+        reference,
+        referenceNorm,
+        fingerprint,
+        p.amountCents,
+        reviewState,
+        declaredIqd,
+        rateSnapshot
+      ),
   ];
 
   try {

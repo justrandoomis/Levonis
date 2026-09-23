@@ -91,7 +91,18 @@ export function normalizeText(input: unknown): string {
 
 /** The longest token worth indexing. Longer strings are ids, not words. */
 const MAX_TOKEN = 32;
-/** Single characters match everything and rank nothing. */
+/**
+ * Single characters match everything and rank nothing.
+ *
+ * THIS IS A FLOOR ON THE INDEX, AND ONLY ON THE INDEX. A "h" row on every
+ * product whose name contains an H is a posting list the length of the
+ * catalogue that separates none of it. But `tokenize` runs on both sides, and
+ * for a while the same floor silently governed what a shopper TYPED — so a
+ * single «H» expanded to nothing and the shop answered "no products" to
+ * somebody one keystroke into the name of the printer on its front page. The
+ * query side now keeps a lone character as a PREFIX; see `expandQuery` in
+ * ./index.ts, which is where that exception belongs and where it is explained.
+ */
 const MIN_TOKEN = 2;
 
 /**

@@ -27,6 +27,7 @@
 import { Check, Download, Globe, Menu, MoreVertical, Plus, Share } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useStore } from '../../StoreContext';
+import { PLATFORM_APP_ICON } from '../../lib/siteLogo';
 import { Sheet } from '../ui/Overlay';
 import { useInstallApp } from '../../hooks/useInstallApp';
 import type { StepGlyph } from '../../lib/pwa';
@@ -75,7 +76,13 @@ export default function InstallAppSheet({ open, onClose }: InstallAppSheetProps)
   // The merchant's own logo where there is one, the platform mark otherwise.
   // A store logo lives at a public R2 key, so it loads for a signed-out
   // visitor exactly as it does inside the shop.
-  const icon = store?.logoUrl || '/icons/icon-192.png';
+  //
+  // The fallback is NOT spelled out here any more. `/icons/icon-192.png` is
+  // one of the seven committed PNGs that `scripts/build-pwa-icons.mjs` forks
+  // from the logo in R2, and a path typed into a component is exactly how the
+  // mark came to have three independent spellings and one of them stale —
+  // src/lib/siteLogo.ts is the only place that names it now.
+  const icon = store?.logoUrl || PLATFORM_APP_ICON;
 
   // «ليس الآن» is an ANSWER, not a close. It records the dismissal, and the
   // dismissal is READ — by every `InstallAppButton` the app volunteered

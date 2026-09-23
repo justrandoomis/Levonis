@@ -212,3 +212,165 @@ kernel to reuse stages it had already released.
 The shell sets it once per device from `app/device-profile.ts`, through
 `adapter.setStageCacheAllowed()`, and the engine reads it while building the
 next run's parameters.
+
+## `three-slicer+0.2.2.patch` — let the retry ladder be seen
+
+**Purely additive and purely a report.** It changes no parameter, no timeout
+and no decision: the three attempts the engine already made, in the order it
+already made them, now announce themselves.
+
+### The silence
+
+The owner's report was «الاستوديو يتوقف عند سبعة وثمانون وفي الأخير بعد فترة
+كبيرة من الانتظار يظهر فشل» — the bar stops at 87, a long wait follows, and
+then a failure. Every part of that is the engine working as designed, and none
+of it was visible.
+
+87% is not a hang. `Viewport.js` maps stage counts to a fraction, and the
+stage before the last — `done === layers + 2`, labelled `support-done` —
+is exactly 0.87. The bar reaching 87 means the slice *finished*: the layers are
+computed and the supports are built. What follows is `emit`, the stage that
+writes the G-code, and the only stage that allocates: measured on a 300 mm
+cube the heap is flat at 16 MB through PASS1, surfaces and supports, then
+~391 MB during emit.
+
+The long wait is the ladder. On any failure `ie()` retries twice more —
+classic walls, then economy — terminating the worker and re-booting the
+5.28 MB kernel between rungs, and reporting nothing until all three are spent:
+
+```js
+try { return await L(k, …) }                                  // 1/3 full
+catch { … try { return await L(k, {…, wall_generator: "classic"}) } catch {} // 2/3
+        return { r: await L(k, {…, economy: true}), … } }                    // 3/3
+```
+
+Three silent minutes, then one sentence — `Slice failed (economy mode failed
+too): …` — carrying only the THIRD error. The first two were caught and
+dropped, and they are the ones that say what went wrong.
+
+### What the patch adds
+
+Each failed rung is timed and recorded, `window.__vpRungs` holds the log, a
+`vp-retry` CustomEvent carries `{rung, seconds, message, index, total}`, and
+the final throw appends the whole ladder to its message:
+
+```
+watchdog: no progress for 60000ms — attempts: 1/3 full failed after 63.2s: … |
+2/3 classic-walls failed after 61.1s: … | 3/3 economy failed after 60.8s: …
+```
+
+**The durations are the diagnostic.** The watchdog interval collapses from
+300 s to 60 s at the same tick that shows 87% — `We()` returns the long
+interval only while `done` is in `[layers, layers+2)` — and every emitted
+layer kicks it. So a rung that dies at ~60 s died with the worker already
+unresponsive *during emit*; a rung that dies in a few seconds never reached
+emit at all and failed while loading the kernel. Those are different faults
+with different fixes, and before this patch nothing in the product could tell
+them apart.
+
+### Why the shell cannot do this without a patch
+
+`ie()` is a closure inside the viewer component. The rungs never cross the
+worker boundary — they are `try`/`catch` in the viewer's own code — so there
+is no message for the shell to observe, and the engine's error callback fires
+only once, after the third rung, with the third error. The only externally
+visible symptom of a retry is that `progress` restarts, which is
+indistinguishable from a slow first attempt.
+
+### What the shell does with it
+
+`app/engine-adapter.ts` exposes `onSliceRetry()` and `sliceRetryLog()`;
+`app/hooks/use-slicing-state.ts` turns the events into `retryAttempt` /
+`retryTotal`, resetting on the engine's single `slicing: true` (it fires once
+per ladder, not per rung); the header shows `↻ 2/3` beside the percentage.
+That suffix is a glyph and two numbers deliberately — the slicing status is
+already a bare percentage, and `↻ 2/3` needs no Arabic, English or Sorani
+wording for a translator to review.
+
+An unpatched build never fires the event, `retryAttempt` stays 1, and the
+header shows exactly what it shows today.
+
+`tests/engine-patch.test.mjs` pins the rung reporting in the installed build
+and the adapter's `__vpRungs` contract entry.
+
+## `three-slicer+0.2.2.patch` — give the iPad a cancel that works
+
+**Purely additive**, and it rides on the line that already publishes
+`__vpReleaseWorker`, so it replaces no further engine line.
+
+### The button that does nothing
+
+The engine cancels a slice by writing a flag the kernel polls:
+
+```js
+_ = () => { const k = N.current;
+  if (k != null && k.cancel) try { Atomics.store(k.cancel, 0, 1) } catch { k.cancel[0] = 1 } }
+```
+
+`N.current` is a view onto a **SharedArrayBuffer**, and the worker publishes
+that buffer only when it has one:
+
+```js
+if (v && v.buffer instanceof SharedArrayBuffer)
+  self.postMessage({ type: 'supsab', buf: v.buffer, ptr: v.byteOffset, cancelPtr: … })
+```
+
+A SharedArrayBuffer needs cross-origin isolation, and `worker/platform.ts`
+withholds isolation from **every Apple user agent** on purpose, so the engine
+takes its single-threaded core (WebKit's per-tab budget cannot carry the
+threaded one). The consequence was never written down: on an iPad,
+`N.current` is null, so «إلغاء» writes to nothing and the slice runs on. The
+only way out of a stuck run was reloading the tab — on the owner's own test
+device, on the screen they were stuck on at 87%.
+
+That file's header comment states this trade for Android, where it argues
+against dropping isolation *because* cancel would be lost. The same sentence
+was true for iPad all along and went unsaid.
+
+It is not only Apple. The `supsab` message is sent during the SUPPORT stage,
+so a cancel pressed before that has no flag to write on **any** platform.
+
+### What the patch adds
+
+Two functions, beside the release hook:
+
+```js
+window.__vpCanCancel  = () => !!(N.current && N.current.cancel)
+window.__vpAbortSlice = () => {
+  const V = $.current; if (!V || r.current !== k) return false;   // nothing pending
+  $.current = null; V.stop?.(); j(); N.current = null;            // watchdog + interpolators off
+  k.terminate(); r.current = null;                                // engine rebuilds on next slice
+  V.reject(new Error("slice canceled")); return true;
+}
+```
+
+The cleanup is the watchdog path's own, in the same order — that path already
+terminates the worker and nulls the refs, and `patches/README.md`'s warning
+about leaving `r.current` pointing at a dead worker is exactly what nulling it
+answers.
+
+**"canceled" is load-bearing.** Both the retry ladder and the error handler
+test the message with `.includes("canceled")`, so rejecting with that word is
+what stops a *deliberate* cancel from being retried twice more and reported as
+a failure. It surfaces as «تم إلغاء التقطيع», not as an error banner.
+
+### Why the shell cannot do this without a patch
+
+`$.current`, `r.current` and the interpolator handle are closure refs inside
+the viewer component. The shell can reach the worker through `__vpWorker` and
+terminate it, but the engine would keep a settled-looking pending run and post
+the next slice into a dead worker — a 60-second wait for a watchdog. The
+existing `__vpReleaseWorker` refuses precisely while a slice is pending,
+because releasing and aborting are different acts and it is the safe one.
+
+### What the shell does with it
+
+`EngineAdapter.cancelSlice()` asks before it acts: with a live flag view it
+clicks the engine's own control, so the kernel unwinds itself and the warm
+5.28 MB core survives for the next slice; without one it aborts. The shell's
+`triggerSlice` routes the cancel branch through it
+(`app/slicer-client.tsx`), and an unpatched build falls back to the engine
+button — the behaviour it has today.
+
+`tests/engine-patch.test.mjs` pins both hooks, the contract entries, and that
+the shell no longer clicks the engine's cancel directly.
