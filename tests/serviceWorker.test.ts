@@ -300,8 +300,12 @@ test('strategyFor routes documents, hashed assets and the install surface', () =
   assert.equal(decide('/assets/index-Bxordacj.js'), 'cache-first');
   assert.equal(decide('/assets/index-Bxordacj.css'), 'cache-first');
 
-  assert.equal(decide('/icons/icon-192.png'), 'stale-while-revalidate');
-  assert.equal(decide('/icons/maskable-512.png'), 'stale-while-revalidate');
+  assert.equal(decide('/icons/icon-192.bc80fc2b.png'), 'stale-while-revalidate');
+  assert.equal(decide('/icons/maskable-512.bc80fc2b.png'), 'stale-while-revalidate');
+  // The root favicon is NOT on the icon path: it is the one icon whose name
+  // cannot carry a revision, so it is left to the network and its
+  // revalidating Cache-Control.
+  assert.equal(decide('/favicon.ico'), 'network-only');
 
   // THE MANIFEST IS NOT A STATIC FILE, and this assertion is the tripwire that
   // stops it being treated as one again. `worker/routes/manifest.ts` builds the
@@ -541,6 +545,26 @@ test('install precaches the icons and refuses anything that is not an image', as
   assert.equal(shellStore.entries.length, 0, 'the SPA shell was stored under an icon URL');
 });
 
+test('the icon refresh keeps only an image — a renamed icon answered with the SPA shell is not stored', async () => {
+  // The icons are renamed whenever the mark changes (src/lib/siteLogo.ts), so
+  // a page still open from before a deploy can ask for a name that is gone —
+  // and the asset layer answers a missing file 200 with index.html. The
+  // stale-while-revalidate refresh used to file that under the .png key.
+  const sw = loadWorker();
+  sw.setFetch(async () => html('<!doctype html><title>SPA</title>'));
+  const gone = sw.dispatch('fetch', makeEvent(makeRequest('/icons/icon-192.png')));
+  await sw.settle(gone);
+  const store = await sw.caches.open(String(sw.internals.STATIC_CACHE));
+  assert.equal(store.entries.length, 0, 'the SPA shell was stored under an icon URL');
+
+  // And a real icon still is.
+  const url = (sw.internals.PRECACHE_URLS as string[])[0];
+  sw.setFetch(async () => png());
+  await sw.settle(sw.dispatch('fetch', makeEvent(makeRequest(url))));
+  assert.equal(store.entries.length, 1);
+  assert.equal(store.entries[0].key, `${ORIGIN}${url}`);
+});
+
 test('install does NOT skip waiting; only the page asking for it does', async () => {
   const sw = loadWorker();
   sw.setFetch(async () => png());
@@ -616,8 +640,8 @@ test('sw.js is a classic script: no module syntax, no bare specifier, no require
  * is this one line — which is the point: nobody moves the version without
  * being told what it does to the precache.
  */
-const PRECACHE_VERSION = 'v2';
-const PRECACHE_DIGEST = 'e9a3a19f9e762d0773215e9c411ee6ff5435d3f39f13af6058e07550c59f04ea';
+const PRECACHE_VERSION = 'v3';
+const PRECACHE_DIGEST = '72327c6aa8a7cca2cb60cf44be50b798c17af48c1a7619982ac52a8cafb96335';
 
 test('the precached icon bytes and the worker version move together', () => {
   const sw = loadWorker();

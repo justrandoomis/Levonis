@@ -81,7 +81,13 @@ test('the dashboard renders the count, and the card opens the queue it counts', 
   const overview = stripComments(read('src/components/AdminOverview.tsx'));
   assert.match(overview, /support_tickets_waiting: number;/, 'the stat is typed');
   assert.match(overview, /support_tickets_waiting: 0,/, 'and has an empty-state default');
-  assert.match(overview, /stats\.support_tickets_waiting\.toLocaleString\(\)/, 'and is printed');
+  // Printed as part of the console's total: tickets + order-chat messages +
+  // complaints, the same three counts the sidebar badge shows.
+  assert.match(
+    overview,
+    /\(stats\.support_tickets_waiting \|\| 0\) \+\s*\(stats\.support_chats_unread \|\| 0\) \+\s*\(stats\.support_complaints_open \|\| 0\)/,
+    'and is printed, with the other two queues beside it'
+  );
   assert.match(
     overview,
     /onNavigateTab\('support'\)/,

@@ -33,6 +33,24 @@ const emit = () => { revision += 1; for (const listener of listeners) listener()
  */
 let renderFailed = false;
 
+/**
+ * Whether the character is standing in the middle of the screen as the boot
+ * loader right now — `AppIntro`'s `loading` phase, visible, on a route that
+ * shows it.
+ *
+ * It exists for the busy overlay (src/components/ui/AppBusy.tsx). The shell's
+ * first wait — resolving the host, reading the session — is held as a `route`
+ * busy by `RouteFallback`, and a cold load on a phone takes longer than the
+ * overlay's show delay. So the overlay used to draw its dimmed spinner OVER
+ * the character, which is the site's own loading animation, on every cold
+ * load: the one screen the character exists for, replaced by a generic
+ * spinner. The overlay reads this and lets a route wait be the character's to
+ * show while it is booting. It stays false when the intro never mounted (its
+ * chunk failed, or has not arrived yet), so a route wait is never left with no
+ * indicator at all.
+ */
+let booting = false;
+
 export const characterLayout = {
   subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   snapshot: () => revision,
@@ -40,12 +58,42 @@ export const characterLayout = {
   pending: () => routeLoads > 0,
   hasPageAnchor: () => [...anchors.values()].some((a) => a.kind !== 'top-fallback'),
   renderFailed: () => renderFailed,
+  booting: () => booting,
+  serverBooting: () => false,
 };
 
 export function setCharacterRenderFailed(value: boolean): void {
   if (renderFailed === value) return;
   renderFailed = value;
   emit();
+}
+
+export function setCharacterBooting(value: boolean): void {
+  if (booting === value) return;
+  booting = value;
+  emit();
+}
+
+/**
+ * A STAGE IS APPEARED AT, NEVER FLOWN TO — AND NEVER FLOWN AWAY FROM.
+ *
+ * The confirmation panel raises a `stage`, and until now the character reached
+ * it the way it reaches every dock: a journey from the header down the page,
+ * with a wind-up that first moves AGAINST the travel, a straight descent and
+ * a growth from header size to stage size on the way. The owner's verdict on
+ * exactly that: «غير مناسب وغير مرح ويظهر الانيميشن عندما ينتقل من فوق الى
+ * الاسفل بشكل خاطئ وبشكل يظهر فيه lagging». It was also the most expensive
+ * thing the character ever does — the body is re-rasterised every frame while
+ * its scale changes — started on the same frame the checkout tree unmounts.
+ *
+ * So a journey whose destination OR origin is a stage is not a journey. The
+ * character vanishes from where it was and pops into being where it is going
+ * (`character/entrance.ts`), which is transform and opacity on a compositor
+ * layer and nothing else. A route change between two ordinary docks is still
+ * the walk it always was; this answers only for the stage.
+ */
+export function appearsInsteadOfTravelling(from: AnchorKind | null, to: AnchorKind): boolean {
+  return to === 'stage' || from === 'stage';
 }
 
 export function registerCharacterAnchor(element: HTMLElement, kind: AnchorKind, busy = false): () => void {

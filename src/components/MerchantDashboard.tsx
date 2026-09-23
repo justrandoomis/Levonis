@@ -3,6 +3,7 @@ import { useLanguage } from '../LanguageContext';
 import DashboardLayout from './DashboardLayout';
 import { Home, ShoppingBag, ListOrdered, Settings, User, Save, Plus, X, Edit, Trash2, Store, Users, Package, Image as ImageIcon, Check, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { followStoreHref, useCommunityStoreHref } from '../pages/community/access';
 import { api, ApiError, uploadFile, formatIqd } from '../lib/api';
 
 interface Merchant {
@@ -38,6 +39,9 @@ export default function MerchantDashboard() {
   const [merchant, setMerchant] = useState<Merchant | null>(null);
   const [products, setProducts] = useState<CommunityProduct[]>([]);
   const [followers, setFollowers] = useState<number | null>(null);
+  // The in-site store page is behind the community wall: while it is shut to
+  // this merchant, «زيارة الصفحة» goes to the store's own site (or is hidden).
+  const storeHref = useCommunityStoreHref(merchant?.id);
 
   // Store setup / edit form
   const [storeName, setStoreName] = useState('');
@@ -297,7 +301,8 @@ export default function MerchantDashboard() {
                 <ShoppingBag className="w-6 h-6 text-[#708238]" />
               </div>
             </SoftCard>
-            <SoftCard className="cursor-pointer hover:bg-zinc-800/70 transition-colors" onClick={() => navigate(`/community/store/${merchant.id}`)}>
+            {storeHref && (
+            <SoftCard className="cursor-pointer hover:bg-zinc-800/70 transition-colors" onClick={() => followStoreHref(storeHref, navigate)}>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-bold text-white">{dir === 'rtl' ? 'زيارة صفحة المتجر' : 'Visit Store Page'}</div>
@@ -306,6 +311,7 @@ export default function MerchantDashboard() {
                 <Store className="w-6 h-6 text-[#D4AF37]" />
               </div>
             </SoftCard>
+            )}
           </div>
         </div>
       )}
@@ -365,11 +371,13 @@ export default function MerchantDashboard() {
               <p className="text-sm text-zinc-400 mb-4">{dir === 'rtl' ? 'هذا هو الرابط الخاص بمتجرك في مجتمع ليفو' : 'This is your store link in the Levo community'}</p>
               <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
                 <code className="w-full sm:flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-[#D4AF37] text-sm overflow-x-auto" dir="ltr">
-                  /community/store/{merchant.id}
+                  {storeHref ?? `/community/store/${merchant.id}`}
                 </code>
-                <button onClick={() => navigate(`/community/store/${merchant.id}`)} className="w-full sm:w-auto bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-3 rounded-xl font-bold transition-colors whitespace-nowrap">
+                {storeHref && (
+                <button onClick={() => followStoreHref(storeHref, navigate)} className="w-full sm:w-auto bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-3 rounded-xl font-bold transition-colors whitespace-nowrap">
                   {dir === 'rtl' ? 'زيارة الصفحة' : 'Visit Page'}
                 </button>
+                )}
               </div>
             </SoftCard>
           </div>

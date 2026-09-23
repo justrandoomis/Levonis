@@ -68,11 +68,24 @@ import type { PolicyDocument } from './types';
  *     text rather than show a customer a `{{TOKEN}}`. They are still authored
  *     below, and each one returns of its own accord the moment its value is
  *     written in and the version moves again.
+ *
+ * VERSION 3 — WHY IT MOVED. The archive keeps version 2 byte for byte.
+ *   * THE FACTS. worker/lib/policies/facts.ts now states `COMPETENT_COURT`, `GOVERNING_LAW_JURISDICTION`, `LEVONIS_SUPPORT_CONTACT`,
+ *     so the clauses that carried them are published instead of withheld.
+ *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
+ *     by number, an article of this document that is itself withheld.
+ *   * THE REFERRED ACCOUNT GETS NOTHING. The owner: «الإحالة لا يحصل على أي
+ *     شيء فقط كود دعم». Articles 10.4 (a delivery waiver for the referred
+ *     friend) and 10.5 (when that waiver was spent) are replaced by ONE article
+ *     10.4: the referred account, and anyone who uses a support code, receives
+ *     no delivery waiver, no discount, no points and no membership; the code
+ *     has no effect on the order price; a delivery waiver comes only from an
+ *     active membership. The later articles of chapter 10 move up by one.
  */
 export const rewards: PolicyDocument = {
   key: 'rewards',
-  version: 2,
-  effective_at: '2026-01-01',
+  version: 3,
+  effective_at: '2026-09-23',
   title: {
     ar: 'سياسة النقاط والمراجعات والهدايا والإحالات',
     en: 'Points, Reviews, Gifts and Referrals Policy',
@@ -377,34 +390,31 @@ export const rewards: PolicyDocument = {
 ### 10.3 الإحالة الذاتية
 لا تُقبل إحالة الشخص لنفسه ولا الإحالة عبر حساب ثانٍ يفتحه المحيل. وتُعامل معاملة تعدد الحسابات وفق وثيقة التسجيل.
 
-### 10.4 برنامج الطابعة: ما يناله الصديق
-يُعفى الحساب المُحال من أجرة التوصيل في طلب واحد مؤهل يتضمن طابعة من قوائم الطابعات المعتمدة. والإعفاء لطلب واحد لا غير.
+### 10.4 الحساب المُحال لا ينال شيئاً
+لا ينال الحساب المُحال، ولا من استعمل رمز دعم في طلبه، أي منفعة من أي نوع بسبب الإحالة أو الرمز: لا إعفاء من أجرة التوصيل، ولا خصم، ولا نقاط، ولا عضوية. ورمز الدعم رمز دعم فحسب، لا أثر له على سعر الطلب. والإعفاء من أجرة التوصيل لا يأتي إلا من عضوية فعّالة وفق وثيقة العضويات.
 
-### 10.5 استهلاك الإعفاء
-يُستهلك الإعفاء بأول طلب مؤهل يحمله ولم يُلغَ، لا بانتظار تسليمه. فالطلب الذي حمل الإعفاء يُسقط الحق حتى قبل وصوله.
-
-### 10.6 برنامج الطابعة: ما يناله المحيل
+### 10.5 برنامج الطابعة: ما يناله المحيل
 يُقيَّد للمحيل استحقاق معلّق عند تسجيل تسليم الطلب المؤهل، وتُحدَّد أهليته بسبعة أيام من تاريخ التسليم المسجل.
 
-### 10.7 برنامج عضوية PRO
+### 10.6 برنامج عضوية PRO
 إذا اشترى المُحال اشتراك PRO مدفوعاً نشأ للمحيل استحقاق مؤهل لحظة تسجيل الشراء. وإلغاء ذلك الاشتراك يُلغي هذا الاستحقاق، لأن سببه هو الدفع الذي زال.
 
-### 10.8 هدية رمز الدعم
+### 10.7 هدية رمز الدعم
 من اشترى طابعة مؤهلة عبر رمز دعم أو رابط مشاركة، ثم سُلّم طلبه وسُوّي ثمنه، نشأ لصاحب الرمز استحقاق هدية خيط طباعة واحد.
 
-### 10.9 ما لا يُشترط في هدية رمز الدعم
+### 10.8 ما لا يُشترط في هدية رمز الدعم
 لا يُشترط في صاحب الرمز أن يكون عضو PRO، ولا يُشترط في المشتري أن يكون حساباً جديداً، ولا تُفرض مدة انتظار سبعة أيام. ومدة السبعة أيام إنما هي لنقاط الشراء وحدها.
 
-### 10.10 حالات التوقف للمراجعة
+### 10.9 حالات التوقف للمراجعة
 يوقف النظام الاستحقاق للمراجعة اليدوية، لا للرفض، في حالتين: أن يكون على الطلب نفسه استحقاق مقيَّد ببرنامج الطابعة القديم، وأن يكون على الطلب طلب إرجاع قائم لم يُرفض. ويُبتّ فيهما بقرار إداري معلَّل.
 
-### 10.11 مراحل استحقاق الهدية
+### 10.10 مراحل استحقاق الهدية
 يمر استحقاق هدية رمز الدعم بمراحل مسجلة: قيد الأهلية، ثم مستحق، ثم محجوز، ثم مسلَّم. وتُلغى أي مرحلة قائمة إذا زال سببها.
 
-### 10.12 ما يسقط الإحالة ومكافأتها
+### 10.11 ما يسقط الإحالة ومكافأتها
 تسقط المكافأة إذا أُلغي الطلب الذي كان سببها، أو رُدّ المنتج، أو تبيّن أن الحساب المُحال ليس لشخص مستقل، أو استُعمل تعدد الحسابات أو رموز مفتعلة للحصول عليها.
 
-### 10.13 إغلاق الحساب
+### 10.12 إغلاق الحساب
 الإحالات المقيدة تبقى وقائع مسجلة، ولا تُعاد إلى المحيل ولا تُنقل إلى غيره. ويتوقف رابط إحالة الحساب المغلق عن العمل.
 
 ## 11. عكس النقاط وسحب المكافآت
@@ -509,7 +519,7 @@ export const rewards: PolicyDocument = {
 بطلان بند لا يمس صحة سائر البنود.
 
 ### 14.5 القانون والاختصاص
-يحكم هذه الوثيقة {{GOVERNING_LAW_JURISDICTION}}، وتختص بالنزاع {{COMPETENT_COURT}}.
+تحكم هذه الوثيقة {{GOVERNING_LAW_JURISDICTION}}، والاختصاص بالنزاع ل{{COMPETENT_COURT}}.
 
 ### 14.6 التواصل
 قناة التواصل المعتمدة في شأن هذه الوثيقة: {{LEVONIS_SUPPORT_CONTACT}}، في أوقات {{LEVONIS_SUPPORT_HOURS}}.`,
@@ -812,34 +822,31 @@ A referral is not attributed to another referrer after it has been recorded, is 
 ### 10.3 Self-referral
 A referral by a person to themselves is not accepted, nor is a referral through a second account opened by the referrer. It is treated as multiple accounts under the Registration document.
 
-### 10.4 The printer programme: what the friend receives
-The referred account is exempted from the delivery charge on one qualifying order containing a printer from the approved printer catalogues. The exemption is for one order only.
+### 10.4 The referred account receives nothing
+The referred account, and anyone who uses a support code on an order, receives no benefit of any kind because of the referral or the code: no delivery waiver, no discount, no points and no membership. A support code is a support code only, and it has no effect on the price of the order. A waiver of the delivery charge comes only from an active membership, under the Memberships document.
 
-### 10.5 Consuming the exemption
-The exemption is consumed by the first qualifying order that carries it and is not cancelled, not by waiting for its delivery. An order that carried the exemption therefore spends the right even before it arrives.
-
-### 10.6 The printer programme: what the referrer receives
+### 10.5 The printer programme: what the referrer receives
 A pending entitlement is recorded for the referrer when the delivery of the qualifying order is recorded, and its eligibility is set at seven days from the recorded delivery date.
 
-### 10.7 The PRO membership programme
+### 10.6 The PRO membership programme
 If the referred person buys a paid PRO subscription, a qualified entitlement arises for the referrer at the moment the purchase is recorded. Cancelling that subscription cancels this entitlement, because its cause was the payment that has gone.
 
-### 10.8 The support-code gift
+### 10.7 The support-code gift
 A person who bought a qualifying printer through a support code or a share link, whose order was then delivered and whose price settled, gives rise to one filament-gift entitlement for the holder of that code.
 
-### 10.9 What is not required for the support-code gift
+### 10.8 What is not required for the support-code gift
 The holder of the code is not required to be a PRO member, the buyer is not required to be a new account, and no seven-day waiting period is imposed. The seven-day period belongs to purchase points alone.
 
-### 10.10 Cases held for review
+### 10.9 Cases held for review
 The system holds an entitlement for manual review, not for refusal, in two cases: where an entitlement under the older printer programme is already recorded against the same order, and where a return request on the order is open and has not been refused. Both are decided by a reasoned administrative decision.
 
-### 10.11 The stages of a gift entitlement
+### 10.10 The stages of a gift entitlement
 A support-code gift entitlement passes through recorded stages: pending eligibility, then due, then reserved, then delivered. Any live stage is cancelled if its cause falls away.
 
-### 10.12 What forfeits a referral and its reward
+### 10.11 What forfeits a referral and its reward
 The reward is forfeited if the order that caused it is cancelled, or the product is returned, or it appears that the referred account does not belong to an independent person, or multiple accounts or contrived codes were used to obtain it.
 
-### 10.13 Closing an account
+### 10.12 Closing an account
 Recorded referrals remain as recorded facts; they are neither returned to the referrer nor transferred to anyone else. The referral link of a closed account ceases to work.
 
 ## 11. Reversing points and withdrawing rewards
@@ -944,7 +951,7 @@ The Store's electronic records are the reference in proving awards, redemptions,
 The invalidity of one provision does not affect the validity of the remaining provisions.
 
 ### 14.5 Governing law and jurisdiction
-This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} has jurisdiction over disputes.
+This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} have jurisdiction over disputes.
 
 ### 14.6 Contact
 The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONTACT}}, during {{LEVONIS_SUPPORT_HOURS}}.`,
@@ -1247,34 +1254,31 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 ### 10.3 ناردنی خۆیی
 ناردنی کەسێک بۆ خۆی وەرناگیرێت، نە ناردن لە ڕێگەی هەژمارێکی دووەمەوە کە نێرەرەکە دەیکاتەوە. وەک هەژماری فرە مامەڵەی لەگەڵ دەکرێت بەپێی بەڵگەنامەی تۆمارکردن.
 
-### 10.4 پرۆگرامی چاپکەر: ئەوەی هاوڕێکە وەریدەگرێت
-هەژماری نێردراو لە تێچووی گەیاندن بێبەش دەکرێت لە یەک داواکاری شایستەدا کە چاپکەرێکی تێدا بێت لە کاتالۆگە پەسەندکراوەکانی چاپکەر. بێبەشکردنەکە تەنها بۆ یەک داواکارییە.
+### 10.4 هەژماری نێردراو هیچ وەرناگرێت
+هەژماری نێردراو، و هەر کەسێک کۆدی پشتگیری لە داواکارییەکەیدا بەکار بهێنێت، بەهۆی ناردن یان کۆدەکەوە هیچ سوودێک وەرناگرێت: نە بێبەشکردن لە تێچووی گەیاندن، نە داشکاندن، نە خاڵ، نە ئەندامێتی. کۆدی پشتگیری تەنها کۆدی پشتگیرییە و هیچ کاریگەرییەکی لەسەر نرخی داواکارییەکە نییە. بێبەشکردن لە تێچووی گەیاندن تەنها لە ئەندامێتییەکی چالاکەوە دێت، بەپێی بەڵگەنامەی ئەندامێتییەکان.
 
-### 10.5 بەکارهێنانی بێبەشکردنەکە
-بێبەشکردنەکە بە یەکەم داواکاری شایستە بەکار دەهێنرێت کە هەڵیدەگرێت و هەڵنەوەشێنراوەتەوە، نەک بە چاوەڕوانی گەیاندنی. بۆیە ئەو داواکارییەی بێبەشکردنەکەی هەڵگرتووە مافەکە بەکار دەهێنێت تەنانەت پێش گەیشتنیشی.
-
-### 10.6 پرۆگرامی چاپکەر: ئەوەی نێرەر وەریدەگرێت
+### 10.5 پرۆگرامی چاپکەر: ئەوەی نێرەر وەریدەگرێت
 شایستەییەکی هەڵپەسێردراو بۆ نێرەر تۆمار دەکرێت کاتێک گەیاندنی داواکارییە شایستەکە تۆمار دەکرێت، و شایستەییەکەی بە حەوت ڕۆژ لە بەرواری گەیاندنی تۆمارکراوەوە دیاری دەکرێت.
 
-### 10.7 پرۆگرامی ئەندامێتی PRO
+### 10.6 پرۆگرامی ئەندامێتی PRO
 ئەگەر کەسی نێردراو بەشداری PRO ی پارەدراو بکڕێت، شایستەییەکی شایستە بۆ نێرەر سەرهەڵدەدات لە ساتی تۆمارکردنی کڕینەکەدا. هەڵوەشاندنەوەی ئەو بەشدارییە ئەم شایستەییە هەڵدەوەشێنێتەوە، چونکە هۆکارەکەی ئەو پارەدانە بوو کە نەماوە.
 
-### 10.8 دیاری کۆدی پشتگیری
+### 10.7 دیاری کۆدی پشتگیری
 ئەو کەسەی چاپکەرێکی شایستەی لە ڕێگەی کۆدی پشتگیری یان بەستەری هاوبەشکردنەوە کڕیوە، و پاشان داواکارییەکەی گەیەنراوە و نرخەکەی دانراوە، یەک شایستەیی دیاری دەزووی چاپ بۆ خاوەنی ئەو کۆدە دروست دەکات.
 
-### 10.9 ئەوەی لە دیاری کۆدی پشتگیریدا داوا ناکرێت
+### 10.8 ئەوەی لە دیاری کۆدی پشتگیریدا داوا ناکرێت
 لە خاوەنی کۆدەکە داوا ناکرێت ئەندامی PRO بێت، لە کڕیارەکە داوا ناکرێت هەژمارێکی نوێ بێت، و هیچ ماوەیەکی چاوەڕوانی حەوت ڕۆژە نادرێتەسەر. ماوەی حەوت ڕۆژ تەنها هی خاڵی کڕینە.
 
-### 10.10 دۆخەکانی ڕاگرتن بۆ پێداچوونەوە
+### 10.9 دۆخەکانی ڕاگرتن بۆ پێداچوونەوە
 سیستەمەکە شایستەیی بۆ پێداچوونەوەی دەستی ڕادەگرێت، نەک بۆ ڕەتکردنەوە، لە دوو دۆخدا: کاتێک شایستەییەک بەپێی پرۆگرامی کۆنی چاپکەر لەسەر هەمان داواکاری تۆمار کرابێت، و کاتێک داواکاری گەڕاندنەوەیەک لەسەر داواکارییەکە کراوە بێت و ڕەت نەکرابێتەوە. لە هەردووکیاندا بە بڕیارێکی کارگێڕی هۆکاردار بڕیار دەدرێت.
 
-### 10.11 قۆناغەکانی شایستەیی دیاری
+### 10.10 قۆناغەکانی شایستەیی دیاری
 شایستەیی دیاری کۆدی پشتگیری بە قۆناغی تۆمارکراودا تێدەپەڕێت: لە ژێر شایستەیی، پاشان شایستە، پاشان گیراو، پاشان گەیەنراو. هەر قۆناغێکی زیندوو هەڵدەوەشێتەوە ئەگەر هۆکارەکەی نەما.
 
-### 10.12 ئەوەی ناردن و پاداشتەکەی دەفەوتێنێت
+### 10.11 ئەوەی ناردن و پاداشتەکەی دەفەوتێنێت
 پاداشتەکە دەفەوتێت ئەگەر ئەو داواکارییەی هۆکاری بوو هەڵبوەشێتەوە، یان بەرهەمەکە بگەڕێندرێتەوە، یان دەربکەوێت هەژماری نێردراو هی کەسێکی سەربەخۆ نییە، یان هەژماری فرە یان کۆدی دەستکرد بۆ بەدەستهێنانی بەکارهێنرابێت.
 
-### 10.13 داخستنی هەژمار
+### 10.12 داخستنی هەژمار
 ناردنە تۆمارکراوەکان وەک ڕووداوی تۆمارکراو دەمێننەوە؛ نە بۆ نێرەر دەگەڕێنرێنەوە و نە بۆ کەسێکی تر دەگوازرێنەوە. بەستەری ناردنی هەژمارێکی داخراو لە کارکردن دەوەستێت.
 
 ## 11. گەڕاندنەوەی خاڵ و کشاندنەوەی پاداشت

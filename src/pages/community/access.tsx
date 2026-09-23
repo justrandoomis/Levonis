@@ -31,6 +31,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Wrench } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
@@ -127,9 +128,22 @@ export function useCommunityAccess(): { access: CommunityAccess | null; error: u
  * wall of failed requests. The words are the owner's own in Arabic; the
  * Sorani is assembled from wording that already exists in this repo (see the
  * file header).
+ *
+ * TWO WAYS OUT, because two kinds of refused visitor can in fact come in:
+ *   * a SIGNED-OUT tester — the server matches the allow-list on `users.id`
+ *     only, so a guest is refused even when their account is on it. The card
+ *     offers «تسجيل الدخول» and brings them back to this same page;
+ *   * a member the admin added while this app was open — the verdict is
+ *     cached per viewer, so without a way to ask again they would keep this
+ *     card until a full reload. «إعادة المحاولة» asks the server again.
+ * Both labels are existing translation keys (`signIn`, `retry`).
  */
-export function CommunityClosedCard() {
+export function CommunityClosedCard({ onRecheck }: { onRecheck?: () => void } = {}) {
   const { loc, t } = useLanguage();
+  const { user, isLoaded } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const next = `${location.pathname}${location.search}`;
   return (
     <div className="min-h-[60vh] flex items-center justify-center px-4" data-community-closed>
       <div className="max-w-sm w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6 text-center space-y-3">
@@ -138,6 +152,28 @@ export function CommunityClosedCard() {
           {loc('ليفو كوميونيتي تحت الصيانة', 'Levo Community is under maintenance', `${t('community')} — ${t('maintenanceMain')}`)}
         </h1>
         <p className="text-[13px] text-zinc-400">{t('comingSoon')}</p>
+        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+          {isLoaded && !user && (
+            <button
+              type="button"
+              onClick={() => navigate(`/auth?next=${encodeURIComponent(next)}`)}
+              className="min-h-[44px] rounded-full bg-gold px-5 text-[13px] font-bold text-black active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              data-community-closed-signin
+            >
+              {t('signIn')}
+            </button>
+          )}
+          {onRecheck && (
+            <button
+              type="button"
+              onClick={onRecheck}
+              className="min-h-[44px] rounded-full border border-white/15 px-5 text-[13px] font-medium text-zinc-200 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              data-community-closed-recheck
+            >
+              {t('retry')}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -153,10 +189,100 @@ export function CommunityClosedCard() {
  * question is asked again here, where the visitor is, instead of inventing an
  * answer.
  */
-export function CommunityGate({ children, fallback }: { children: React.ReactNode; fallback?: React.ReactNode }) {
+export function CommunityGate({
+  children,
+  fallback,
+  closedExtra,
+}: {
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+  /**
+   * What a refused visitor still needs BELOW the card — trade already running
+   * behind the wall (the /requests route passes the customer's escrowed
+   * orders, whose routes stay open so they can finish).
+   */
+  closedExtra?: React.ReactNode;
+}) {
   const { access, error, reload } = useCommunityAccess();
   if (error !== null) return <ErrorState error={error} onRetry={reload} />;
   if (!access) return <>{fallback ?? null}</>;
-  if (!access.may_enter) return <CommunityClosedCard />;
+  if (!access.may_enter) {
+    return (
+      <>
+        <CommunityClosedCard onRecheck={reload} />
+        {closedExtra ?? null}
+      </>
+    );
+  }
   return <>{children}</>;
+}
+
+/**
+ * WHERE A «زيارة المتجر» LINK MAY GO. While this viewer may enter, the in-site
+ * page `/community/store/:id` as before. While the community is shut to them,
+ * that page is only the maintenance card — so the link goes to the store's OWN
+ * address instead (its subdomain storefront is deliberately outside the wall),
+ * resolved from `/api/storefront/by-id/:id`, which accepts a merchant id or a
+ * store id. A merchant with no storefront of its own has nowhere to send the
+ * visitor: the answer is null and the caller hides the link. An unknown
+ * verdict (still loading, or failed) keeps the old link — only an explicit
+ * `may_enter === false` changes it, as everywhere else.
+ */
+export function useCommunityStoreHref(merchantOrStoreId: string | null | undefined): string | null {
+  const { access } = useCommunityAccess();
+  const shut = access?.may_enter === false;
+  const [storeUrl, setStoreUrl] = useState<string | null>(null);
+  useEffect(() => {
+    setStoreUrl(null);
+    if (!shut || !merchantOrStoreId) return;
+    let alive = true;
+    api
+      .get<{ store?: { url?: unknown } }>(`/api/storefront/by-id/${encodeURIComponent(merchantOrStoreId)}`)
+      .then((d) => {
+        const url = typeof d?.store?.url === 'string' ? d.store.url : '';
+        if (alive && /^https?:\/\//.test(url)) setStoreUrl(url);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [shut, merchantOrStoreId]);
+  if (!merchantOrStoreId) return null;
+  if (!shut) return `/community/store/${merchantOrStoreId}`;
+  return storeUrl;
+}
+
+/** Follow an href from `useCommunityStoreHref`: a full navigation for another host, the router for ours. */
+export function followStoreHref(href: string, navigate: (to: string) => void) {
+  if (/^https?:\/\//.test(href)) window.location.assign(href);
+  else navigate(href);
+}
+
+/**
+ * A «زيارة المتجر» link that stays true while the community is shut: the
+ * in-site page, the store's own site, or — when there is neither — nothing.
+ */
+export function CommunityStoreLink({
+  id,
+  className,
+  children,
+}: {
+  id: string | null | undefined;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const href = useCommunityStoreHref(id);
+  if (!href) return null;
+  if (/^https?:\/\//.test(href)) {
+    return (
+      <a href={href} className={className} data-community-store-link="external">
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link to={href} className={className} data-community-store-link="in-site">
+      {children}
+    </Link>
+  );
 }

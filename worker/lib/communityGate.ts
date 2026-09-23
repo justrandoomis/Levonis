@@ -158,15 +158,31 @@ export function communityClosedRefusal(): HttpError {
  * merchant directory, the public request board and posting to it, the in-site
  * store page, and follows. That is the Levo Community the owner named.
  *
- * ALSO OUTSIDE, AND ON PURPOSE (no middleware is mounted on them): the
- * merchant-subdomain storefronts (`/api/storefront`, `/api/store-orders`),
- * the escrowed request marketplace (`/api/marketplace`),
- * `/api/community-reviews` — whose `/eligible` is computed from a DELIVERED
- * order and whose follow routes src/pages/Storefront.tsx calls on the
- * subdomain — and `/api/community-favorites`, which is the save button on
- * that same storefront page. Gating those would half-break shops that are
- * open by their own address: the page would render and its buttons would
- * answer 503. A shop with its own address is not the directory.
+ * ALSO OUTSIDE, AND ON PURPOSE (no router-wide middleware is mounted on
+ * them): the merchant-subdomain storefronts (`/api/storefront`,
+ * `/api/store-orders`), `/api/community-favorites`, which is the save button
+ * on that same storefront page, and the parts of `/api/marketplace` and
+ * `/api/community-reviews` that finish trade already in flight — escrowed
+ * orders, their disputes and complaints, offer acceptance, and the review of
+ * a DELIVERED order (`/eligible`, `POST /`). A shop with its own address is
+ * not the directory, and a running order is not a new one.
+ *
+ * WHAT OF THOSE ROUTERS IS INSIDE — `requireCommunityOpen`, route by route.
+ * The owner answered (2026-09-23, «نعم، أغلقه مع المجتمع») that the /requests
+ * print-request marketplace IS Levo Community and closes with it. So the
+ * same verdict is mounted on the routes that START something there: the
+ * public request board and a request's page (`GET /api/marketplace/requests`
+ * and `/requests/:id` — the same rows the walled `/api/community/requests`
+ * lists, with more detail), posting a request (`POST /api/marketplace/requests`,
+ * the print wizard's `/print/requests/:id/publish` and `/repeat`), making or
+ * editing an offer, and following a merchant
+ * (`/api/community-reviews/follow/*`, `/following` — the twin of the walled
+ * `/api/community/store/:id/follow`). Creating a NEW community merchant from
+ * `/api/community/my-store`, or a new store from `/api/merchant/onboard`, is
+ * refused inside that handler (existing merchants keep editing theirs), and
+ * the print spec of a request on the public board
+ * (`GET /api/marketplace/print/requests/:id`) is refused to everyone but the
+ * request's customer and the merchant working it.
  *
  * The match is a PREFIX match on the full request path, and anything that
  * does not match is INSIDE the wall. That is the safe direction: a route
@@ -207,3 +223,15 @@ export function communityGate(): MiddlewareHandler<AppContext> {
     await next();
   };
 }
+
+/**
+ * The same verdict as the wall, for ONE route that lives outside
+ * `/api/community` (see the enumeration above). Mounted before the route's
+ * `requireAuth`, for the reason the wall is: a guest is told the place is
+ * shut rather than asked to sign in for a page that would refuse them.
+ */
+export const requireCommunityOpen: MiddlewareHandler<AppContext> = async (c, next) => {
+  const gate = await readCommunityGate(c.env.DB);
+  if (!communityMayEnter(gate, c.get('user'))) throw communityClosedRefusal();
+  await next();
+};

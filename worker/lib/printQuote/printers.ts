@@ -309,3 +309,91 @@ export function printerEligibility(
 
   return { eligible: reasons.length === 0, reasons };
 }
+
+/**
+ * WHICH PRINTERS THE ENGINE CANNOT TELL APART — per door.
+ *
+ * «مهما اخترت الطابعة لا يغير من حساب السعر». On the live catalogue that is
+ * partly TRUE, and the honest fix is to say so rather than to invent figures
+ * that would make it false: migration 0078 leaves every model's purchase
+ * economics and wattages NULL, so two machines that also share their seeded
+ * physics are, to the engine, the same machine, and quote to the same dinar.
+ *
+ * A signature is every printer field that can reach a price through the door
+ * in question. Two printers with EQUAL signatures are guaranteed to quote the
+ * same job identically, so the screen may say «السعر لا يتغيّر بهذه الطابعة»
+ * without it ever being a lie. The converse is not promised (two different
+ * signatures can still meet on one small job), so nothing claims it.
+ *
+ *   file     the calculator's file door for ONE piece in ONE material — the
+ *            case the screen makes the claim for. Time comes from flow,
+ *            sustained fraction, layer overhead, nozzle and warm-up, then every
+ *            hourly line (power by phase, depreciation, maintenance) and the
+ *            baseline success rate. The build volume, the toolhead count and the
+ *            material-change mechanism are left out on purpose: with one piece
+ *            that fits and no material change they reach no line of the bill
+ *            (a part that does not fit is refused, not priced). With more
+ *            pieces the build volume decides the plates, and the screen then
+ *            makes no claim.
+ *   untimed  the grams door with no print time: no machine hour is billed, and
+ *            the printer reaches the price only through its baseline success
+ *            rate (the failure reserve).
+ *
+ * The day the owner enters a model's economics in the admin editor, that model
+ * leaves its file group, which is exactly how the editor shows him it worked.
+ */
+export function printerPriceSignature(m: PrinterModel, door: 'file' | 'untimed'): string {
+  const reliability = [m.technology, m.baselineSuccessRate];
+  if (door === 'untimed') return JSON.stringify(reliability);
+  return JSON.stringify([
+    ...reliability,
+    m.power.idleWatts,
+    m.power.bedHeatingWatts,
+    m.power.nozzleHeatingWatts,
+    m.power.printingWatts,
+    m.purchaseIqd,
+    m.residualIqd,
+    m.usefulPrintHours,
+    m.maintenanceIqdPerHour,
+    m.warmupMinutes,
+    m.maxVolumetricFlowMm3PerS,
+    m.sustainedFlowFraction,
+    m.layerOverheadSeconds,
+    m.defaultNozzleMm,
+  ]);
+}
+
+/**
+ * The signatures above as short, opaque group labels (`f1`, `u1`…), numbered
+ * in catalogue order. Opaque on purpose: the public catalogue may say WHICH
+ * machines price alike, never the economics that make them so (§22).
+ */
+export function printerPriceGroups(
+  models: readonly PrinterModel[],
+  /**
+   * Anything else keyed by model that reaches the price — the platform's own
+   * calibration rows (`printer_calibration_stats`), which correct time,
+   * material and failure per model. Folded into BOTH signatures, so two
+   * machines calibrated differently are never called interchangeable.
+   */
+  extraByModel: ReadonlyMap<string, string> = new Map()
+): Map<string, { file: string; untimed: string }> {
+  const label = (prefix: string) => {
+    const seen = new Map<string, string>();
+    return (sig: string) => {
+      if (!seen.has(sig)) seen.set(sig, `${prefix}${seen.size + 1}`);
+      return seen.get(sig)!;
+    };
+  };
+  const file = label('f');
+  const untimed = label('u');
+  const out = new Map<string, { file: string; untimed: string }>();
+  for (const m of models) {
+    const extra = extraByModel.get(m.id) ?? '';
+    out.set(m.id, {
+      file: file(`${printerPriceSignature(m, 'file')}|${extra}`),
+      untimed: untimed(`${printerPriceSignature(m, 'untimed')}|${extra}`),
+    });
+  }
+  return out;
+}

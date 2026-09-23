@@ -32,7 +32,8 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
-import { badRequest, forbidden, int, notFound, oneOf, requireAuth, str } from '../lib/http';
+import { badRequest, forbidden, int, notFound, oneOf, requireAdmin, requireAuth, str } from '../lib/http';
+import { audit } from '../lib/audit';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { sha256Hex } from '../lib/crypto';
@@ -53,6 +54,7 @@ import {
   MULTI_MATERIAL_DEFAULTS,
   machineIqdPerHour,
   printerEligibility,
+  printerPriceGroups,
   resolveFactor,
   resolveSuccessRate,
   type PrinterModel,
@@ -94,6 +96,7 @@ import {
   type PrintAccessory,
 } from '../lib/printAccessories';
 import { DEFAULT_PRICING } from '../lib/printPricing';
+import { DEFAULT_LINK_PROVIDERS, parseModelLink, resolveModelLink, type LinkProviderConfig } from '../lib/externalModels';
 
 export const printQuoteRoutes = new Hono<AppContext>();
 
@@ -279,6 +282,33 @@ async function sha256Bytes(bytes: Uint8Array): Promise<string> {
 // ---------------------------------------------------------------- the catalogue
 
 /**
+ * `printerPriceGroups`, with everything else that separates two models on
+ * THIS viewer's quote folded in: the platform calibration rows per model, and
+ * — for a signed-in merchant, whose own calibration and machines can price a
+ * model differently — no grouping at all, so the screen never tells a shop
+ * two of its machines are interchangeable on the strength of the platform's
+ * data.
+ */
+async function priceGroupsFor(c: Context<AppContext>, models: PrinterModel[]) {
+  const user = c.get('user');
+  const store = user ? await storeForUser(c.env.DB, user.id) : null;
+  if (store?.merchant?.id) {
+    return new Map(models.map((m) => [m.id, { file: m.id, untimed: m.id }]));
+  }
+  const { results } = await c.env.DB.prepare(
+    `SELECT printer_model_id, samples, time_factor, material_factor, success_rate, average_failure_fraction
+       FROM printer_calibration_stats
+      WHERE merchant_id IS NULL AND printer_model_id IS NOT NULL AND samples > 0`
+  ).all<Record<string, unknown>>();
+  const extra = new Map<string, string>();
+  for (const r of results ?? []) {
+    const id = String(r.printer_model_id);
+    extra.set(id, `${extra.get(id) ?? ''}${JSON.stringify(r)}`);
+  }
+  return printerPriceGroups(models, extra);
+}
+
+/**
  * The canonical printers. Public on purpose: a visitor choosing a machine for
  * an estimate needs to see what exists, and a build volume is not a secret.
  *
@@ -288,6 +318,10 @@ async function sha256Bytes(bytes: Uint8Array): Promise<string> {
  */
 printQuoteRoutes.get('/printers', async (c) => {
   const models = await loadPrinterModels(c.env.DB);
+  // Which machines the engine cannot tell apart, per door — opaque labels,
+  // never the economics behind them (see `printerPriceSignature`). The screen
+  // uses them to say, truthfully, when a printer change CANNOT move a price.
+  const groups = await priceGroupsFor(c, models);
   return c.json({
     success: true,
     printers: models.map((m) => ({
@@ -307,6 +341,8 @@ printQuoteRoutes.get('/printers', async (c) => {
       // What a comparison needs to explain itself, with no cost attached.
       change_seconds: MULTI_MATERIAL_DEFAULTS[m.multiMaterial].secondsPerChange,
       purge_mm3_per_change: MULTI_MATERIAL_DEFAULTS[m.multiMaterial].purgeMm3PerChange,
+      price_group: groups.get(m.id)?.file ?? m.id,
+      untimed_price_group: groups.get(m.id)?.untimed ?? m.id,
     })),
   });
 });
@@ -1198,13 +1234,44 @@ printQuoteRoutes.post('/grams-quote', async (c) => {
     });
   }
 
+  return c.json({
+    success: true,
+    ...(await quoteStatedWeight(c, {
+      printer,
+      rows,
+      printMinutes,
+      accessories: readAccessories(body.accessories),
+      targetMarginPercent: Number(body.target_margin_percent) || PLATFORM_TARGET_MARGIN_PERCENT,
+    })),
+  });
+});
+
+/**
+ * A STATED WEIGHT, PRICED — the one body the grams door and the link door share.
+ *
+ * Both answer «this much plastic, on this machine» and must never answer it
+ * with two numbers, so the pricing, the §22 payload choice and the coverage
+ * statement live here once. The caller has already read the rows (density from
+ * the catalogue, never the payload) and checked the printer can take them.
+ */
+async function quoteStatedWeight(
+  c: Context<AppContext>,
+  input: {
+    printer: PrinterModel;
+    rows: GramsRow[];
+    printMinutes: number;
+    accessories: AccessorySelection[];
+    targetMarginPercent: number;
+  }
+) {
+  const { printer, rows, printMinutes } = input;
   const user = c.get('user');
   const store = user ? await storeForUser(c.env.DB, user.id) : null;
   const merchantId = store?.merchant?.id ?? null;
 
   // The stated grams already describe the whole job, so the accessory counts
   // are taken as stated too — `perPart` of 1, matching the `quantity` below.
-  const accessories = await pricedAccessories(c.env.DB, readAccessories(body.accessories), 1);
+  const accessories = await pricedAccessories(c.env.DB, input.accessories, 1);
 
   const priced = await priceForPrinter(c, {
     analysis: analysisFromGrams({ printer, rows, printMinutes }),
@@ -1214,7 +1281,7 @@ printQuoteRoutes.post('/grams-quote', async (c) => {
     // The stated grams already describe the whole job, so there is nothing left
     // for a quantity to multiply — the same reading the file routes take.
     quantity: 1,
-    targetMarginPercent: Number(body.target_margin_percent) || PLATFORM_TARGET_MARGIN_PERCENT,
+    targetMarginPercent: input.targetMarginPercent,
     minimumJobIqd: await platformMinimumJobIqd(c.env.DB),
     // Read for the same reason the floor is: the file calculator and the grams
     // calculator must never answer the same question with two numbers, and an
@@ -1223,8 +1290,7 @@ printQuoteRoutes.post('/grams-quote', async (c) => {
     accessories,
   });
 
-  return c.json({
-    success: true,
+  return {
     // §22 again: the same two shapes, chosen the same way. A merchant asking
     // the counter question sees their own economics; a customer never does.
     quote: merchantId ? merchantQuote(priced.result) : publicQuote(priced.result),
@@ -1247,8 +1313,96 @@ printQuoteRoutes.post('/grams-quote', async (c) => {
     accessories_iqd: accessories.total_iqd,
     print_minutes: printMinutes,
     covers: gramsCoverage(rows, printMinutes),
+  };
+}
+
+// ------------------------------------------------------------ a pasted link
+
+/**
+ * «خيار الرابط» — PASTE A MODEL LINK, GET A PRICE WHEN ONE CAN HONESTLY BE GIVEN.
+ *
+ * A customer very often holds a MakerWorld, Printables or Thingiverse link
+ * rather than a file. This is the calculator's own door for it — open to a
+ * guest, like the upload and the grams door, because this is how somebody
+ * finds out the shop exists. (The print-REQUEST wizard's
+ * `/api/marketplace/print/link` stays what it was: a signed-in step of posting
+ * a request.)
+ *
+ * WHAT IT CAN AND CANNOT KNOW. The URL alone always says which site and which
+ * model (worker/lib/externalModels.ts, no request at all). A WEIGHT comes only
+ * from that site's own JSON API, and only when the owner configured one in
+ * `printLinkProviders` — this never scrapes a page. So:
+ *
+ *   * resolved, with a weight  → priced on the SAME engine as the grams door
+ *     (`quoteStatedWeight`), with the provider's print time when it gave one
+ *     and `covers.material_only` when it did not;
+ *   * anything else (the default today: every provider ships with no API)
+ *     → `quote: null`, the parsed link and the lookup's reason, so the screen
+ *     can name the site and the model and offer the two real ways on:
+ *     download the file and upload it here, or send it as a print request.
+ *
+ * It never invents a weight: a fabricated gram is a fabricated price.
+ */
+printQuoteRoutes.post('/link', async (c) => {
+  await rateLimit(c, 'print-quote-link', 40, 3600);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const url = str(body.url, 'url', { min: 8, max: 600 });
+
+  let providers: LinkProviderConfig[] = DEFAULT_LINK_PROVIDERS;
+  try {
+    const stored = await getSetting(c.env.DB, 'printLinkProviders');
+    if (Array.isArray(stored)) providers = stored as LinkProviderConfig[];
+  } catch {
+    // An unreadable settings row still leaves the URL shapes this file knows.
+  }
+  const link = parseModelLink(url, providers);
+  // parseModelLink accepts ANY outbound https URL (provider ''), because the
+  // print-request wizard keeps whatever the customer pasted. The calculator
+  // does not: a page on a site that is not a model library is not a model,
+  // and saying «هذا رابط من example.com» with a download button would be a lie.
+  if (!link || !link.provider) throw badRequest('That does not look like a model link', 'BAD_URL');
+  const info = await resolveModelLink(url, providers);
+
+  const grams = info.resolved ? Number(info.estimated_weight_g ?? 0) : 0;
+  if (!(grams > 0)) return c.json({ success: true, link, info, quote: null });
+
+  const printerModelId = str(body.printer_model_id, 'printer_model_id', { min: 1, max: 60 });
+  const modelRow = await c.env.DB.prepare('SELECT * FROM printer_models WHERE id = ? AND active = 1')
+    .bind(printerModelId)
+    .first<Record<string, unknown>>();
+  if (!modelRow) throw badRequest('Unknown printer', 'UNKNOWN_PRINTER');
+  const printer = printerModelFromRow(modelRow);
+
+  const materialId = str(body.material_id, 'material_id', { min: 1, max: 60 });
+  const rows = await readGramRows(c.env.DB, [{ material_id: materialId, grams }]);
+  const stated = Number(info.estimated_time_minutes ?? 0);
+  const printMinutes = stated > 0 ? Math.min(GRAMS_MAX_PRINT_MINUTES, Math.round(stated)) : 0;
+
+  const eligibility = printerEligibility(printer, {
+    boundingBoxMm: { x: 0, y: 0, z: 0 },
+    materialTypes: rows.map((r) => r.materialType),
+    simultaneousMaterials: 1,
+  });
+  if (!eligibility.eligible) {
+    throw badRequest(`This printer cannot take the job: ${eligibility.reasons.join(', ')}`, 'PRINTER_INELIGIBLE', {
+      reasons: eligibility.reasons,
+    });
+  }
+
+  return c.json({
+    success: true,
+    link,
+    info,
+    ...(await quoteStatedWeight(c, {
+      printer,
+      rows,
+      printMinutes,
+      accessories: [],
+      targetMarginPercent: PLATFORM_TARGET_MARGIN_PERCENT,
+    })),
   });
 });
+
 
 /**
  * EVERY MACHINE THIS SHOP OWNS, PRICED, WITH THE REASONS (§25, §41).
@@ -1657,3 +1811,139 @@ async function readTools(db: D1Database, v: unknown): Promise<ToolAssignment[]> 
   });
   return out;
 }
+
+// ============================================================ the admin editor
+
+/**
+ * «محرر الطابعات → اقتصاديات الطراز» — THE LEVER DOCS/DECISIONS.md POINTED AT,
+ * WHICH DID NOT EXIST.
+ *
+ * Every model card's purchase economics and wattages are NULL on the live
+ * database (migration 0078 refuses to invent them), and nothing in the app
+ * could write one: there was no `UPDATE printer_models` anywhere. So the
+ * printers the engine cannot tell apart stayed indistinguishable however much
+ * the owner knew about what each one cost him — the root of «مهما اخترت
+ * الطابعة لا يغير من حساب السعر».
+ *
+ * This is that editor's server half. It writes ONLY the columns that turn a
+ * machine hour into money (depreciation, maintenance, power by phase), the
+ * time-model physics an admin may correct (0078: «an admin raising it is a
+ * correction, never a discovery») and the baseline success rate — never the
+ * identity, the build volume or the material list, which decide what a machine
+ * can print rather than what an hour on it costs. `printerModelFromRow`
+ * already reads every one of these, so the next quote uses them with no
+ * engine change. Each field is bounded; an explicit `null` or '' clears it
+ * back to "not recorded"; an absent field is left alone. Every change writes
+ * an audit row with the before and after of what moved.
+ */
+export const adminPrintQuoteRoutes = new Hono<AppContext>();
+adminPrintQuoteRoutes.use('*', requireAdmin);
+
+/** The editable columns, their bounds, and whether they hold whole numbers. */
+export const PRINTER_MODEL_ECONOMICS: ReadonlyArray<{
+  column: string;
+  min: number;
+  max: number;
+  integer: boolean;
+  /** False for the physics a quote cannot run without (a flow of 0 is an infinite print). */
+  nullable: boolean;
+}> = [
+  { column: 'purchase_iqd', min: 0, max: 1_000_000_000, integer: true, nullable: true },
+  { column: 'residual_iqd', min: 0, max: 1_000_000_000, integer: true, nullable: true },
+  { column: 'useful_print_hours', min: 1, max: 200_000, integer: true, nullable: true },
+  { column: 'maintenance_iqd_per_hour', min: 0, max: 1_000_000, integer: true, nullable: true },
+  { column: 'idle_watts', min: 0, max: 10_000, integer: true, nullable: true },
+  { column: 'printing_watts', min: 0, max: 10_000, integer: true, nullable: true },
+  { column: 'bed_heating_watts', min: 0, max: 10_000, integer: true, nullable: true },
+  { column: 'nozzle_heating_watts', min: 0, max: 10_000, integer: true, nullable: true },
+  { column: 'max_volumetric_flow_mm3_s', min: 1, max: 200, integer: false, nullable: false },
+  { column: 'layer_overhead_seconds', min: 0, max: 60, integer: false, nullable: false },
+  { column: 'warmup_minutes', min: 0, max: 120, integer: false, nullable: false },
+  { column: 'baseline_success_rate', min: 0.5, max: 1, integer: false, nullable: true },
+];
+
+const ECONOMICS_COLUMNS = PRINTER_MODEL_ECONOMICS.map((f) => f.column);
+
+adminPrintQuoteRoutes.get('/printer-models', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, manufacturer, model, technology, enclosed, active, sort_order, updated_at,
+            ${ECONOMICS_COLUMNS.join(', ')}
+       FROM printer_models ORDER BY sort_order, id`
+  ).all<Record<string, unknown>>();
+  const models = results ?? [];
+  // The same grouping the customer's screen uses, so the owner sees which
+  // machines still quote identically — and watches a group split as he enters
+  // a model's real figures.
+  const groups = printerPriceGroups(models.map(printerModelFromRow));
+  return c.json({
+    success: true,
+    fields: PRINTER_MODEL_ECONOMICS,
+    platform_machine_hour_iqd: {
+      fdm: await platformMachineHourIqd(c.env.DB, 'fdm'),
+      resin: await platformMachineHourIqd(c.env.DB, 'resin'),
+    },
+    models: models.map((m) => ({
+      ...m,
+      price_group: groups.get(String(m.id))?.file ?? String(m.id),
+      machine_iqd_per_hour: Math.round(machineIqdPerHour(printerModelFromRow(m))),
+    })),
+  });
+});
+
+adminPrintQuoteRoutes.patch('/printer-models/:id', async (c) => {
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+
+  const before = await c.env.DB.prepare(`SELECT id, ${ECONOMICS_COLUMNS.join(', ')} FROM printer_models WHERE id = ?`)
+    .bind(id)
+    .first<Record<string, unknown>>();
+  if (!before) throw notFound('Printer model not found');
+
+  const next: Record<string, number | null> = {};
+  for (const f of PRINTER_MODEL_ECONOMICS) {
+    if (!(f.column in body)) continue;
+    const v = body[f.column];
+    if (v === null || v === '') {
+      if (!f.nullable) throw badRequest(`${f.column} cannot be empty`, 'FIELD_REQUIRED', { field: f.column });
+      next[f.column] = null;
+      continue;
+    }
+    const n = typeof v === 'number' ? v : Number(v);
+    if (!Number.isFinite(n) || (f.integer && !Number.isInteger(n)) || n < f.min || n > f.max) {
+      throw badRequest(
+        `${f.column} must be ${f.integer ? 'a whole number' : 'a number'} between ${f.min} and ${f.max}`,
+        'FIELD_OUT_OF_RANGE',
+        { field: f.column, min: f.min, max: f.max }
+      );
+    }
+    next[f.column] = n;
+  }
+  const changed = Object.keys(next).filter((k) => (before[k] ?? null) !== next[k]);
+  if (changed.length === 0) return c.json({ success: true, changed: [] });
+
+  // What the machine will be worth cannot exceed what it cost: that would be
+  // a negative depreciation, i.e. every hour on it paying the shop.
+  const purchase = 'purchase_iqd' in next ? next.purchase_iqd : (before.purchase_iqd as number | null);
+  const residual = 'residual_iqd' in next ? next.residual_iqd : (before.residual_iqd as number | null);
+  if (purchase !== null && residual !== null && residual > purchase) {
+    throw badRequest('residual_iqd cannot exceed purchase_iqd', 'RESIDUAL_ABOVE_PURCHASE');
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE printer_models SET ${changed.map((k) => `${k} = ?`).join(', ')}, updated_at = ? WHERE id = ?`
+  )
+    .bind(...changed.map((k) => next[k]), nowIso(), id)
+    .run();
+  await audit(c.env.DB, admin.id, 'print_quote.printer_model_update', id, {
+    before: Object.fromEntries(changed.map((k) => [k, before[k] ?? null])),
+    after: Object.fromEntries(changed.map((k) => [k, next[k]])),
+  });
+
+  const row = await c.env.DB.prepare(`SELECT * FROM printer_models WHERE id = ?`).bind(id).first<Record<string, unknown>>();
+  return c.json({
+    success: true,
+    changed,
+    model: row ? { ...Object.fromEntries(['id', ...ECONOMICS_COLUMNS].map((k) => [k, row[k] ?? null])) } : null,
+  });
+});

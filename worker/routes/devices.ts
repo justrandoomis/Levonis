@@ -10,24 +10,32 @@
  *   GET  /eligible                   the caller's delivered units not yet linked
  *   POST /units/:unitId/register     link one of those without typing a serial
  *   DELETE /units/:unitId/registration  unlink (the step before a transfer)
- *   GET  /claims                     the user's warranty claims (legacy incl.)
- *   GET  /claims/:id                 one claim + message thread
+ *   GET  /claims                     the user's warranty claims (legacy incl.),
+ *                                    each with its thread's size and whether the
+ *                                    warranty team wrote since the customer looked
+ *   GET  /claims/:id                 one claim + message thread (the claimant
+ *                                    opening it marks the thread seen)
  *   POST /units/:unitId/claims       open a claim from an owned device
- *   POST /claims/:id/messages        thread message (customer or staff)
+ *   POST /claims/:id/messages        thread message (customer or staff); a staff
+ *                                    message notifies the claimant
  *   POST /claims/upload              private claim attachment (image/video)
  *   GET  /claim-files/*              authorized delivery of claim attachments
  *
  * Admin surface (/api/devices/admin/..., admin role, all mutations audited):
  *   GET   /admin/orders/:orderId/units      order units + serialized items
  *   GET   /admin/units?email=|user_id=|serial=|receipt=   units by customer or identifier
+ *                                           (a customer's units: bought OR held)
+ *   GET   /admin/units/:unitId/history     who changed this unit, when, and why
  *   POST  /admin/units/:unitId/unregister    unlink from whichever account holds it
  *   POST  /admin/orders/:orderId/units/backfill   (re)create units, idempotent
+ *   POST  /admin/units/backfill-delivered  every delivered printer order with no units
  *   POST  /admin/units/:unitId/serial       assign serial (reassign = explicit)
  *   PATCH /admin/units/:unitId/delivery     correct ONE unit's delivered_at
  *   PATCH /admin/units/:unitId/warranty     change ONE unit's warranty MONTHS
  *                                           (audited; shortening needs a flag)
  *   POST  /admin/units/:unitId/replace      replacement (history preserved)
- *   GET   /admin/claims  · PATCH /admin/claims/:id   claim workflow decisions
+ *   GET   /admin/claims?stage=&after=      the queue, filtered in SQL, keyset-paged
+ *   PATCH /admin/claims/:id                 claim workflow decisions (notifies the claimant)
  *   POST  /admin/products/:id/ops-policy    explicit serialization config
  *
  * A serial is an identifier, not an authentication secret. ONE ACCOUNT PER
@@ -75,6 +83,7 @@ import { upgradeWarranty } from '../lib/productModel';
 import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
 import { chunk } from '../lib/inventory';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
+import { notifyClaimReply, notifyClaimStage } from '../lib/engagementNotify';
 import { sniff } from './uploads';
 import { getMediaObject, storeMedia } from '../lib/mediaStorage';
 import {
@@ -82,9 +91,11 @@ import {
   normalizeSerial,
   maskSerial,
   createUnitsOnDelivery,
+  sweepDeliveredOrdersWithoutUnits,
   recomputeUnitWindow,
   unitTotalMonths,
   effectiveClaimStage,
+  effectiveClaimStageSql,
   stageToLegacyStatus,
   CLAIM_STAGES,
   CLAIM_TRANSITIONS,
@@ -335,10 +346,59 @@ interface ClaimRow extends Record<string, unknown> {
   serial_raw?: string | null;
   email?: string | null;
   username?: string | null;
+  /** 0111 — when the claimant last opened the thread. Absent before 0111. */
+  customer_seen_at?: string | null;
+  /** The thread's shape, on the list queries only (`CLAIM_THREAD_COLS`). */
+  message_count?: number | null;
+  last_message_at?: string | null;
+  last_staff_message_at?: string | null;
+  last_customer_message_at?: string | null;
+}
+
+/**
+ * The thread's size and its last word from each side, per claim, for the
+ * lists. Correlated subqueries on `claim_messages (claim_id, is_staff,
+ * created_at)` (0111) — a list is at most a hundred claims, each a short
+ * index range.
+ */
+const CLAIM_THREAD_COLS = `
+            (SELECT COUNT(*) FROM claim_messages m WHERE m.claim_id = wc.id) AS message_count,
+            (SELECT MAX(m.created_at) FROM claim_messages m WHERE m.claim_id = wc.id) AS last_message_at,
+            (SELECT MAX(m.created_at) FROM claim_messages m WHERE m.claim_id = wc.id AND m.is_staff = 1) AS last_staff_message_at,
+            (SELECT MAX(m.created_at) FROM claim_messages m WHERE m.claim_id = wc.id AND m.is_staff = 0) AS last_customer_message_at`;
+
+/**
+ * «رد جديد من الفريق» — the warranty team wrote after the customer last
+ * looked. "Looked" is the later of two facts: the claimant opening the thread
+ * (`customer_seen_at`, 0111) and the claimant writing in it, because answering
+ * a message is proof of having read it. The second is what keeps a claim the
+ * customer already replied to from lighting up just because the column is new
+ * and every row reads NULL. ISO-8601 in one format on both sides, so the
+ * strings compare in time order.
+ */
+export function claimHasUnreadStaffReply(row: Pick<ClaimRow, 'last_staff_message_at' | 'customer_seen_at' | 'last_customer_message_at'>): boolean {
+  const staff = row.last_staff_message_at ?? '';
+  if (!staff) return false;
+  const seen = [row.customer_seen_at ?? '', row.last_customer_message_at ?? ''].reduce((a, b) => (a > b ? a : b), '');
+  return staff > seen;
 }
 
 function claimPublic(row: ClaimRow, opts: { admin?: boolean } = {}) {
   const evidenceKeys = safeParse<unknown[]>(row.evidence, []).filter((k): k is string => typeof k === 'string');
+  const thread =
+    row.message_count === undefined
+      ? null
+      : {
+          message_count: Number(row.message_count ?? 0),
+          last_message_at: row.last_message_at ?? null,
+          last_staff_message_at: row.last_staff_message_at ?? null,
+          // The claimant's own unread marker. On the admin queue the same
+          // fact reads the other way round — the customer spoke last — which
+          // is what `awaiting_staff` says.
+          ...(opts.admin
+            ? { awaiting_staff: !!row.last_customer_message_at && (row.last_customer_message_at ?? '') > (row.last_staff_message_at ?? '') }
+            : { unread: claimHasUnreadStaffReply(row) }),
+        };
   return {
     id: row.id,
     unit_id: row.unit_id,
@@ -355,8 +415,24 @@ function claimPublic(row: ClaimRow, opts: { admin?: boolean } = {}) {
     created_at: row.created_at,
     priority: Number(row.priority ?? 0) === 1,
     serial: row.serial_raw ? (opts.admin ? row.serial_raw : maskSerial(row.serial_raw)) : null,
+    ...(thread ?? {}),
     ...(opts.admin ? { user_id: row.user_id, email: row.email ?? null, username: row.username ?? null } : {}),
   };
+}
+
+/**
+ * Work that must outlive the response — a customer notification — through
+ * the guarded accessor. `c.executionCtx` throws in Hono when there is no
+ * context (a test harness, a composed request); the promise is started first,
+ * so it runs either way, and every function handed here is total.
+ */
+function afterResponse(c: Context<AppContext>, work: Promise<void>): void {
+  try {
+    c.executionCtx.waitUntil(work);
+  } catch {
+    // No ExecutionContext on this path. The work is already in flight and
+    // cannot reject; there is simply nothing to keep the isolate alive for.
+  }
 }
 
 // ================================================================ customer
@@ -523,10 +599,17 @@ deviceRoutes.delete('/units/:unitId/registration', async (c) => {
 
 // ----------------------------------------------------------------- claims
 
+/**
+ * «مطالباتي». Each claim carries its thread's size and whether the warranty
+ * team wrote since the customer last looked, so the card can SAY that tapping
+ * it opens a conversation and that a new answer is waiting in it — the owner
+ * found neither: «لا يوجد هنالك توضيح أو زر معين يظهر أن عند الضغط على
+ * مطالباتي … تفتح المحادثة».
+ */
 deviceRoutes.get('/claims', async (c) => {
   const user = c.get('user')!;
   const { results } = await c.env.DB.prepare(
-    `SELECT wc.*, s.serial_raw
+    `SELECT wc.*, s.serial_raw,${CLAIM_THREAD_COLS}
        FROM warranty_claims wc
        LEFT JOIN device_serials s ON s.unit_id = wc.unit_id
       WHERE wc.user_id = ?
@@ -556,6 +639,9 @@ async function loadClaimAuthorized(c: Context<AppContext>, claimId: string) {
 
 deviceRoutes.get('/claims/:id', async (c) => {
   const { claim, isAdmin } = await loadClaimAuthorized(c, c.req.param('id'));
+  // Stamped BEFORE the thread is read, so a staff message that lands while
+  // this request is in flight is later than the stamp and stays «جديد».
+  const seenAt = new Date().toISOString();
   const [{ results: messages }, unit] = await Promise.all([
     c.env.DB.prepare('SELECT id, sender_id, is_staff, body, file_key, created_at FROM claim_messages WHERE claim_id = ? ORDER BY created_at ASC LIMIT 500')
       .bind(claim.id)
@@ -565,6 +651,22 @@ deviceRoutes.get('/claims/:id', async (c) => {
       : Promise.resolve(null),
   ]);
   const cov = unit ? coverageState(unit.delivered_at, unit.warranty_end_at) : null;
+  /**
+   * THE CLAIMANT HAS NOW SEEN THE THREAD — the read marker behind «رد جديد من
+   * الفريق» on the claim card (0111). Only the claimant: an admin opening a
+   * customer's thread is not the customer reading it.
+   *
+   * Contained: a database a deploy reached before 0111 has no such column,
+   * and the one thing that must not happen is a customer being unable to
+   * open their own claim because a badge could not be cleared.
+   */
+  if (claim.user_id === c.get('user')!.id) {
+    try {
+      await c.env.DB.prepare('UPDATE warranty_claims SET customer_seen_at = ? WHERE id = ?').bind(seenAt, claim.id).run();
+    } catch (e) {
+      console.error('claim seen marker not written for', claim.id, e instanceof Error ? e.message : String(e));
+    }
+  }
   return c.json({
     success: true,
     claim: claimPublic(claim, { admin: isAdmin }),
@@ -818,10 +920,14 @@ deviceRoutes.post('/claims/:id/messages', async (c) => {
   if (!text && !fileKey) throw badRequest('Write a message or attach a file');
 
   const id = newId('cm');
+  // Stamped here rather than by the column default so the row this answers
+  // with is the row that was stored, to the millisecond, and the thread can
+  // append it instead of reloading itself.
+  const createdAt = new Date().toISOString();
   await c.env.DB.prepare(
-    'INSERT INTO claim_messages (id, claim_id, sender_id, is_staff, body, file_key) VALUES (?, ?, ?, ?, ?, ?)'
+    'INSERT INTO claim_messages (id, claim_id, sender_id, is_staff, body, file_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
   )
-    .bind(id, claim.id, user.id, isAdmin ? 1 : 0, text, fileKey)
+    .bind(id, claim.id, user.id, isAdmin ? 1 : 0, text, fileKey, createdAt)
     .run();
   /**
    * THE CUSTOMER'S SIDE OF THE CLAIM THREAD ONLY.
@@ -845,7 +951,36 @@ deviceRoutes.post('/claims/:id/messages', async (c) => {
         (fileKey ? '\nA file is attached' : '')
     );
   }
-  return c.json({ success: true, id });
+  /**
+   * AND THE STAFF SIDE REACHES THE CUSTOMER — «ولا يرسل الإشعار إلى المستخدم
+   * بأن هناك رسالة جديدة تخص الضمان».
+   *
+   * The block above was the only notification this thread ever had, and it
+   * points one way: the owner's group heard every customer message, and a
+   * staff answer went into `claim_messages` and reached the customer by no
+   * path at all. `notifyClaimReply` writes the bell row (linked to
+   * `/warranty?claim=…`, which opens this thread) and fans out to whatever
+   * channel reaches them, keyed on THIS message so a second answer is a
+   * second message.
+   *
+   * `claim.user_id !== user.id`: an admin writing on a claim they filed
+   * themselves is not news to anyone.
+   */
+  if (isAdmin && claim.user_id !== user.id) {
+    afterResponse(c, notifyClaimReply(c.env, claim.id, id));
+  }
+  return c.json({
+    success: true,
+    id,
+    message: {
+      id,
+      is_staff: isAdmin,
+      mine: true,
+      body: text,
+      file_url: fileKey ? `/api/devices/claim-files/${fileKey}` : null,
+      created_at: createdAt,
+    },
+  });
 });
 
 // Private claim attachments (photo/video). Same owner-scoped R2 pattern as
@@ -1018,6 +1153,15 @@ deviceRoutes.get('/admin/units', async (c) => {
     if (!u) return c.json({ success: true, units: [] });
     ownerId = u.id;
   }
+  /**
+   * A CUSTOMER'S DEVICES ARE THE ONES THEY BOUGHT AND THE ONES THEY HOLD.
+   *
+   * This read `WHERE u.owner_user_id = ?` alone, so the admin who typed the
+   * email of the person on the phone — a second-hand holder the buyer handed
+   * the printer to — got an empty table, while the same device answered to
+   * the BUYER's email. The holder is exactly the customer who calls about a
+   * device; a revoked link is not holding it.
+   */
   const { results } = await c.env.DB.prepare(
     `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u.owner_user_id, u.unit_index,
             u.delivered_at, u.warranty_base_months, u.warranty_ext_months, u.warranty_start_at,
@@ -1028,12 +1172,51 @@ deviceRoutes.get('/admin/units', async (c) => {
        LEFT JOIN device_serials s ON s.unit_id = u.id
        LEFT JOIN device_registrations r ON r.unit_id = u.id
        LEFT JOIN order_items oi ON oi.id = u.order_item_id
-      WHERE u.owner_user_id = ?
+      WHERE u.owner_user_id = ?1 OR (r.user_id = ?1 AND r.revoked_at IS NULL)
       ORDER BY u.created_at DESC LIMIT 200`
   )
     .bind(ownerId)
     .all<DeviceRow>();
   return c.json({ success: true, units: await adminUnitsWithAccounts(c.env.DB, results) });
+});
+
+/**
+ * «مَن غيّر ومتى» — EVERY RECORDED CHANGE TO ONE DEVICE, WITH WHO MADE IT.
+ *
+ * Every mutation on a unit has written an `audit_log` row since these routes
+ * existed — the duration lever (`device.unit_warranty_months`) with the old
+ * and new months, the old and new end and the reason; the delivery
+ * correction; serial assignment and reassignment; replacement; link and
+ * unlink — and no route ever read one back. The admin who changed a warranty
+ * could not show anyone that they had, and the next admin could not see that
+ * anybody had. Same shape as a receipt's history (worker/routes/warranty.ts),
+ * joined to the actor so the screen names a person, not an id. A customer's
+ * own link or unlink appears too, under their account: that is who did it.
+ */
+deviceRoutes.get('/admin/units/:unitId/history', async (c) => {
+  const unitId = c.req.param('unitId');
+  const unit = await c.env.DB.prepare('SELECT id FROM order_item_units WHERE id = ?').bind(unitId).first<{ id: string }>();
+  if (!unit) throw notFound('Unit not found');
+  const { results } = await c.env.DB.prepare(
+    `SELECT a.id, a.action, a.detail, a.created_at, a.actor_id, u.username, u.email, u.name
+       FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id
+      WHERE a.target = ? AND a.action LIKE 'device.%'
+      ORDER BY a.created_at DESC, a.id DESC LIMIT 100`
+  )
+    .bind(unitId)
+    .all<Record<string, unknown>>();
+  return c.json({
+    success: true,
+    history: results.map((h) => ({
+      id: h.id,
+      action: h.action,
+      created_at: h.created_at,
+      actor: h.actor_id
+        ? { id: h.actor_id, email: h.email ?? null, username: h.username ?? null, name: h.name ?? null }
+        : null,
+      detail: safeParse<Record<string, unknown>>(h.detail, {}),
+    })),
+  });
 });
 
 /**
@@ -1070,6 +1253,18 @@ deviceRoutes.post('/admin/orders/:orderId/units/backfill', async (c) => {
   const result = await createUnitsOnDelivery(c.env, orderId, order.delivered_at);
   await audit(c.env.DB, admin.id, 'device.units_backfill', orderId, result as unknown as Record<string, unknown>);
   return c.json({ success: true, ...result });
+});
+
+// The whole history at once: printer orders the courier delivered before its
+// door created units (deviceOps.sweepDeliveredOrdersWithoutUnits). The cron runs
+// the same pass every tick; this is the button for «now», and it reports
+// `has_more` so a large backlog is finished by pressing again.
+deviceRoutes.post('/admin/units/backfill-delivered', async (c) => {
+  const admin = c.get('user')!;
+  const limit = 200;
+  const result = await sweepDeliveredOrdersWithoutUnits(c.env, limit);
+  await audit(c.env.DB, admin.id, 'device.units_backfill_delivered', 'orders', result as unknown as Record<string, unknown>);
+  return c.json({ success: true, ...result, has_more: result.scanned >= limit });
 });
 
 // -------------------------------------------------------- serial assignment
@@ -1475,18 +1670,106 @@ deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
 
 // ----------------------------------------------------------- claim workflow
 
+/**
+ * The admin claims queue: filtered IN SQL, then limited, then paged.
+ *
+ * It used to be `ORDER BY … LIMIT 300` followed by a JavaScript filter on the
+ * stage, so past three hundred claims the «received» tab silently dropped
+ * every received claim below the cut — the oldest ones, which are exactly the
+ * ones still waiting. The stage is now `effectiveClaimStageSql`, the same
+ * legacy rules `effectiveClaimStage` applies to each row, so a pre-0006 claim
+ * is filtered under the stage it is listed under.
+ *
+ * `counts` is the whole queue per stage (not the page), so each filter can say
+ * how many claims it holds before the admin taps it.
+ *
+ * «عرض المزيد» pages by KEYSET, not offset: `after` is the last row's
+ * (priority, created_at, id) as the previous response's `next_cursor`. With an
+ * OFFSET, a claim that left the filtered stage while page 1 was open (another
+ * admin moved it) shifted every later row up by one and the claim at the page
+ * boundary was never shown. A keyset continues from the last row the admin
+ * actually saw, whatever moved in between. `page` still works for callers
+ * that want a numbered page.
+ */
+const ADMIN_CLAIMS_PAGE = 50;
+
+/** `after` = a previous page's `next_cursor`: JSON [priority, created_at, id]. */
+function parseClaimsCursor(raw: string | undefined): { priority: number; created_at: string; id: string } | null {
+  if (!raw) return null;
+  let v: unknown;
+  try {
+    v = JSON.parse(raw);
+  } catch {
+    throw badRequest('after must be a cursor returned by this endpoint');
+  }
+  if (
+    !Array.isArray(v) ||
+    v.length !== 3 ||
+    typeof v[0] !== 'number' ||
+    !Number.isInteger(v[0]) ||
+    typeof v[1] !== 'string' ||
+    typeof v[2] !== 'string' ||
+    v[1].length > 40 ||
+    v[2].length > 80
+  ) {
+    throw badRequest('after must be a cursor returned by this endpoint');
+  }
+  return { priority: v[0], created_at: v[1], id: v[2] };
+}
+
 deviceRoutes.get('/admin/claims', async (c) => {
-  const stageFilter = str(c.req.query('stage'), 'stage', { max: 20, required: false });
-  const { results } = await c.env.DB.prepare(
-    `SELECT wc.*, s.serial_raw, u.email, u.username
-       FROM warranty_claims wc
-       LEFT JOIN device_serials s ON s.unit_id = wc.unit_id
-       LEFT JOIN users u ON u.id = wc.user_id
-      ORDER BY wc.priority DESC, wc.created_at DESC LIMIT 300`
-  ).all<ClaimRow>();
-  let claims = results.map((r) => claimPublic(r, { admin: true }));
-  if (stageFilter) claims = claims.filter((cl) => cl.stage === stageFilter);
-  return c.json({ success: true, claims });
+  const raw = str(c.req.query('stage'), 'stage', { max: 20, required: false });
+  const stageFilter = raw === 'all' ? '' : raw;
+  if (stageFilter && !(CLAIM_STAGES as readonly string[]).includes(stageFilter)) {
+    throw badRequest(`stage must be one of: all, ${CLAIM_STAGES.join(', ')}`);
+  }
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: ADMIN_CLAIMS_PAGE });
+  const page = int(c.req.query('page'), 'page', { min: 1, max: 100_000, def: 1 });
+  const after = parseClaimsCursor(c.req.query('after'));
+  const stageSql = effectiveClaimStageSql('wc');
+  const conds: string[] = [];
+  const binds: unknown[] = [];
+  if (stageFilter) {
+    conds.push(`${stageSql} = ?`);
+    binds.push(stageFilter);
+  }
+  if (after) {
+    conds.push('(wc.priority, wc.created_at, wc.id) < (?, ?, ?)');
+    binds.push(after.priority, after.created_at, after.id);
+  }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+
+  const [{ results }, byStage] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT wc.*, s.serial_raw, u.email, u.username,${CLAIM_THREAD_COLS}
+         FROM warranty_claims wc
+         LEFT JOIN device_serials s ON s.unit_id = wc.unit_id
+         LEFT JOIN users u ON u.id = wc.user_id
+        ${where}
+        ORDER BY wc.priority DESC, wc.created_at DESC, wc.id DESC
+        LIMIT ? OFFSET ?`
+    )
+      // One row past the page tells a keyset page whether another follows.
+      .bind(...binds, limit + 1, after ? 0 : (page - 1) * limit)
+      .all<ClaimRow>(),
+    c.env.DB.prepare(`SELECT ${stageSql} AS stage, COUNT(*) AS n FROM warranty_claims wc GROUP BY 1`).all<{ stage: string; n: number }>(),
+  ]);
+  const counts: Record<string, number> = Object.fromEntries(CLAIM_STAGES.map((st) => [st, 0]));
+  for (const r of byStage.results) counts[r.stage] = Number(r.n) || 0;
+  const all = Object.values(counts).reduce((a, b) => a + b, 0);
+  const total = stageFilter ? counts[stageFilter] ?? 0 : all;
+  const rows = results.slice(0, limit);
+  const lastRow = rows[rows.length - 1];
+  return c.json({
+    success: true,
+    claims: rows.map((r) => claimPublic(r, { admin: true })),
+    page,
+    limit,
+    total,
+    has_more: results.length > limit,
+    next_cursor: lastRow ? JSON.stringify([Number(lastRow.priority) || 0, lastRow.created_at, lastRow.id]) : null,
+    counts: { all, ...counts },
+  });
 });
 
 deviceRoutes.patch('/admin/claims/:id', async (c) => {
@@ -1547,6 +1830,20 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
     user_id: claim.user_id,
     unit_id: claim.unit_id,
   });
+  /**
+   * THE CLAIMANT HEARS WHERE THEIR CLAIM NOW STANDS. A decision with its reason
+   * was recorded here and in the audit log and told to nobody; the customer
+   * found out by opening «مطالباتي» on the off chance. Only a real MOVE is
+   * news — re-saving the stage a claim already has (to amend the reason) is
+   * not a second announcement. The conditional UPDATE above already proved
+   * this request won, so a retry that raced it never reaches this line.
+   */
+  if (current !== nextStage && claim.user_id !== admin.id) {
+    afterResponse(
+      c,
+      notifyClaimStage(c.env, id, nextStage, { at: new Date().toISOString(), reason })
+    );
+  }
   return c.json({ success: true, stage: nextStage });
 });
 

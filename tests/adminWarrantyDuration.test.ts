@@ -24,6 +24,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1, stubApp, get, patch, json, row, count } from './fixtures/app';
+import { readFileSync } from 'node:fs';
 import { deviceRoutes } from '../worker/routes/devices';
 import { warrantyAdminRoutes } from '../worker/routes/warranty';
 
@@ -96,6 +97,23 @@ test('the customer-email lookup names the holder too, even when it is not the bu
   const u1 = res.units.find((u: Record<string, unknown>) => u.unit_id === 'u1');
   assert.equal(u1.holder.email, 'kawa@x.co');
   assert.equal(u1.buyer.email, 'sara@x.co');
+});
+
+test('the HOLDER\'s own email finds the device they hold — not only the buyer\'s', async () => {
+  /**
+   * The person on the phone about a transferred printer is its holder, and
+   * the admin types THEIR email. The lookup read `owner_user_id = ?` alone,
+   * so the holder's email answered with an empty table while the buyer's
+   * found the device.
+   */
+  const { raw, db } = seed();
+  const res = await json(await get(devicesApp(db), '/api/devices/admin/units?email=kawa@x.co'));
+  assert.deepEqual(res.units.map((u: Record<string, unknown>) => u.unit_id), ['u1']);
+  assert.equal(res.units[0].holder.email, 'kawa@x.co');
+  assert.equal(res.units[0].buyer.email, 'sara@x.co');
+  // A RELEASED link is not holding it.
+  raw.exec(`UPDATE device_registrations SET revoked_at = '2026-03-01T00:00:00.000Z' WHERE unit_id = 'u1'`);
+  assert.deepEqual((await json(await get(devicesApp(db), '/api/devices/admin/units?email=kawa@x.co'))).units, []);
 });
 
 test('a released link leaves a date but no holder', async () => {
@@ -292,4 +310,67 @@ test('a customer never learns who holds a device from the customer surface', asy
     assert.equal(d.holder, undefined);
     assert.equal(d.buyer, undefined);
   }
+});
+
+// ------------------------------------------------------ who changed it, when
+
+test('«مَن غيّر ومتى» — the unit\'s history names the admin, the time, the months and the reason', async () => {
+  /**
+   * The duration change was always audited; nothing ever read the audit back,
+   * so no screen could show who changed a warranty or when. This is the read.
+   */
+  const { db } = seed();
+  const app = devicesApp(db);
+  const before = await json(await get(app, '/api/devices/admin/units/u1/history'));
+  assert.deepEqual(before.history, []);
+
+  await patch(app, '/api/devices/admin/units/u1/warranty', {
+    base_months: 12,
+    ext_months: 6,
+    reason: 'منحة من المالك بعد تأخير التسليم',
+  });
+  await patch(app, '/api/devices/admin/units/u1/delivery', {
+    delivered_at: '2026-01-12T00:00:00.000Z',
+    reason: 'التسليم الفعلي كان بعد يومين',
+  });
+
+  const res = await json(await get(app, '/api/devices/admin/units/u1/history'));
+  assert.equal(res.success, true);
+  // Newest first.
+  assert.deepEqual(
+    res.history.map((h: { action: string }) => h.action),
+    ['device.unit_delivery_correct', 'device.unit_warranty_months']
+  );
+  const months = res.history[1];
+  assert.equal(months.actor.email, 'boss@x.co', 'WHO — a person, not an id');
+  assert.ok(Date.parse(months.created_at), 'WHEN');
+  assert.equal(months.detail.old_total_months, 12);
+  assert.equal(months.detail.new_total_months, 18);
+  assert.equal(months.detail.old_end_at, '2027-01-10T00:00:00.000Z');
+  assert.equal(months.detail.new_end_at, '2027-07-10T00:00:00.000Z');
+  assert.equal(months.detail.reason, 'منحة من المالك بعد تأخير التسليم');
+
+  // Another unit's history is its own.
+  assert.deepEqual((await json(await get(app, '/api/devices/admin/units/u2/history'))).history, []);
+  assert.equal((await get(app, '/api/devices/admin/units/nope/history')).status, 404);
+});
+
+test('the unit history is an admin route — a customer is refused', async () => {
+  const { db } = seed();
+  const customerApp = stubApp(db, { id: 'buyer', role: 'customer', email: 'sara@x.co' }, (a) => a.route('/api/devices', deviceRoutes));
+  const res = await get(customerApp, '/api/devices/admin/units/u1/history');
+  assert.ok(res.status === 403 || res.status === 404, `got ${res.status}`);
+});
+
+test('the admin screens draw the history, and the whole window — delivery and start as well as the end', () => {
+  const src = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+  const section = src('src/components/adminWarranty/WarrantySection.tsx');
+  assert.match(section, /<UnitHistory unitId=\{u\.id\}/);
+  assert.match(section, /\{t\.delivered\}: <span[^>]*>\{dateInput\(u\.delivered_at\)/);
+  assert.match(section, /\{t\.start\}: <span[^>]*>\{dateInput\(u\.warranty_start_at\)/);
+  const serials = src('src/components/AdminSerials.tsx');
+  assert.match(serials, /<UnitHistory unitId=\{u\.unit_id\}/);
+  assert.match(serials, /\{s\.warrantyStart\}: \{fmtDate\(u\.warranty\.start_at, lang\)\}/);
+  const history = src('src/components/adminWarranty/UnitHistory.tsx');
+  assert.match(history, /\/api\/devices\/admin\/units\/\$\{encodeURIComponent\(unitId\)\}\/history/);
 });

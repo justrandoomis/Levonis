@@ -53,7 +53,8 @@ import type { PolicyDocument } from './types';
  * PLACEHOLDERS. Delivery thresholds are configurable settings
  * (`shippingPolicy.pro_threshold_iqd` / `prime_threshold_iqd`), so they are
  * written as the same placeholders the delivery document uses rather than as
- * two numbers that would drift apart between documents.
+ * two numbers that would drift apart between documents; ./facts.ts fills all
+ * of them from one place.
  *
  * VERSION 2 — WHY IT MOVED. Two corrections a customer could see on the
  * page; the archive keeps version 1 byte for byte.
@@ -66,11 +67,24 @@ import type { PolicyDocument } from './types';
  *     text rather than show a customer a `{{TOKEN}}`. They are still authored
  *     below, and each one returns of its own accord the moment its value is
  *     written in and the version moves again.
+ *
+ * VERSION 3 — WHY IT MOVED. The archive keeps version 2 byte for byte.
+ *   * THE FACTS. worker/lib/policies/facts.ts now states `COMPETENT_COURT`, `GOVERNING_LAW_JURISDICTION`, `LEVONIS_SUPPORT_CONTACT`, `PREMIUM_FREE_DELIVERY_MIN_IQD`, `PRO_FREE_DELIVERY_MIN_IQD`,
+ *     so the clauses that carried them are published instead of withheld.
+ *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
+ *     by number, an article of this document that is itself withheld.
+ *   * THE SITE IS LIVE. 9.1 to 9.3 and 8.2 no longer describe a membership
+ *     reserved until the launch: a membership is active from its purchase,
+ *     and one reserved before the system ran starts its full term when it is
+ *     activated (worker/lib/launchActivation.ts); the definitions (1.3) and
+ *     the one-live-membership article (2.5) say the same. 12.1 says the PLUS printer
+ *     gift is granted by hand by the administration, not on purchase —
+ *     `grantPrinterGiftIfEligible` has no caller.
  */
 export const membership: PolicyDocument = {
   key: 'membership',
-  version: 2,
-  effective_at: '2026-01-01',
+  version: 3,
+  effective_at: '2026-09-23',
   title: {
     ar: 'سياسة العضويات',
     en: 'Memberships Policy',
@@ -93,8 +107,8 @@ export const membership: PolicyDocument = {
 - المزية: حق محدد تمنحه الفئة، مسجل باسمه في نظام المتجر.
 - الوراثة: أن ترث الفئة الأعلى كل مزايا الفئات التي دونها.
 - سجل العضوية: القيد الذي يحمل الفئة والمدة والمبلغ المدفوع وتاريخ الشراء وحالة العضوية.
-- الحالة: وصف سجل العضوية في النظام، وهي: بانتظار الدفع، أو محجوزة مدفوعة بانتظار الإطلاق، أو فعّالة، أو منتهية، أو ملغاة.
-- الإطلاق: القرار المعلن من المتجر ببدء تشغيل نظام العضويات، ولا يبدأ سريان العضوية المحجوزة قبله.
+- الحالة: وصف سجل العضوية في النظام، وهي: بانتظار الدفع، أو محجوزة مدفوعة قبل تشغيل نظام العضويات، أو فعّالة، أو منتهية، أو ملغاة.
+- العضوية المحجوزة: عضوية دُفع ثمنها قبل تشغيل نظام العضويات، وتُفعَّل وفق المادة 9.3.
 - العنوان الافتراضي المعتمد: العنوان الواحد الذي اعتمده المتجر لعضو PRO والمسجل في نظامه بحالة معتمد.
 - سياق الشراء الخاص بـ PRO: اجتماع الشروط التي تجعل مزايا الشراء الخاصة بـ PRO نافذة على طلب بعينه.
 - اللقطة: نسخة مجمدة من الحقائق التي بُني عليها طلب أو مكافأة، تُحفظ مع السجل ولا تُعاد حسابها بعد ذلك.
@@ -134,7 +148,7 @@ export const membership: PolicyDocument = {
 تُسمى الفئة الوسطى في كل الشاشات المعروضة للزبون باسم LEVO PREMIUM. وقد يظهر لها في سجلات قديمة أو في تصدير داخلي اسم PRIME، وهما اسمان لفئة واحدة لا لفئتين.
 
 ### 2.5 عضوية واحدة في الوقت الواحد
-لا يحمل الحساب الواحد أكثر من عضوية قائمة في وقت واحد، سواء أكانت فعّالة أم محجوزة بانتظار الإطلاق. ومحاولة شراء عضوية ثانية مع قيام الأولى تُرفض على الخادم.
+لا يحمل الحساب الواحد أكثر من عضوية قائمة في وقت واحد، سواء أكانت فعّالة أم محجوزة قبل تشغيل نظام العضويات. ومحاولة شراء عضوية ثانية مع قيام الأولى تُرفض على الخادم.
 
 ### 2.6 العضوية شخصية
 العضوية شخصية لصاحب الحساب. ولا تُنقل ولا تُباع ولا تُعار ولا تُقسَّم، ولا يُنتفع بها لحساب شخص آخر ولو من أهل بيته.
@@ -293,7 +307,7 @@ export const membership: PolicyDocument = {
 لا تُشترى العضوية إلا من داخل حساب موثّق، وتُسجَّل باسم صاحب الحساب وحده.
 
 ### 8.2 الملخص قبل التأكيد
-يُعرض على الزبون قبل التأكيد ملخص يبين الخطة وفئتها ومدتها وسعرها، وقيمة ما يُحتسب له من رصيد عضويته القائمة إن وُجد، والمبلغ المخصوم فعلاً، ورصيده المتاح، وتاريخ الانتهاء المتوقع أو كون العضوية ستُحجز حتى الإطلاق.
+يُعرض على الزبون قبل التأكيد ملخص يبين الخطة وفئتها ومدتها وسعرها، وقيمة ما يُحتسب له من رصيد عضويته القائمة إن وُجد، والمبلغ المخصوم فعلاً، ورصيده المتاح، وتاريخ الانتهاء المتوقع.
 
 ### 8.3 التأكيد هو ما يُلزم
 لا يُخصم مبلغ ولا تُنشأ عضوية قبل تأكيد الزبون للملخص. وإذا اختلف المبلغ المعاد حسابه عند التأكيد عن المبلغ المعروض، رُفض الإتمام وأُعيد العرض بالأرقام الجديدة.
@@ -327,14 +341,14 @@ export const membership: PolicyDocument = {
 
 ## 9. البدء والمدة والانتهاء والتجديد
 
-### 9.1 بدء العضوية بعد الإطلاق
-بعد إعلان الإطلاق تبدأ العضوية من لحظة اكتمال الشراء، وينتهي أجلها بانقضاء مدتها محسوبة بالأشهر التقويمية.
+### 9.1 بدء العضوية
+تبدأ العضوية من لحظة اكتمال الشراء، وينتهي أجلها بانقضاء مدتها محسوبة بالأشهر التقويمية.
 
-### 9.2 العضوية المحجوزة قبل الإطلاق
-من اشترى قبل إعلان الإطلاق حُجزت له عضويته بمدتها كاملة ولم تبدأ مدتها بعد. والحجز التزام من المتجر بالمدة كاملة، لا تنقص بطول الانتظار.
+### 9.2 التفعيل فور الشراء
+تُفعَّل العضوية فور اكتمال شرائها، ولا تُحجز بانتظار إطلاق، لأن نظام العضويات يعمل.
 
-### 9.3 بدء المدة عند الإطلاق
-تبدأ مدة العضوية المحجوزة بإعلان المتجر تفعيل الإطلاق، وهو قرار معلن ومسجل، لا يقع بمرور الوقت وحده.
+### 9.3 العضوية المحجوزة قبل تشغيل النظام
+ما حُجز من عضويات قبل تشغيل نظام العضويات يُفعَّل بمدته كاملة، وتبدأ مدته من لحظة تفعيله لا من تاريخ شرائه، فلا تنقص بطول الانتظار.
 
 ### 9.4 انتهاء المدة
 تنتهي العضوية بانقضاء مدتها من تلقاء نفسها، ويُسجَّل انتهاؤها في النظام. ولا يحتاج انتهاؤها إلى إشعار ولا إلى طلب.
@@ -412,7 +426,7 @@ export const membership: PolicyDocument = {
 ## 12. العضوية الممنوحة والهدايا المشروطة
 
 ### 12.1 عضوية PLUS الممنوحة مع شراء طابعة
-إذا شغّل المتجر هذه الميزة وحدد خطة PLUS التي تُمنح، مُنح من اشترى طابعة مؤهلة عضوية PLUS دون بدل.
+إذا شغّل المتجر هذه الميزة وحدد خطة PLUS التي تُمنح، جاز أن يُمنح من اشترى طابعة مؤهلة عضوية PLUS دون بدل. والمنح يدوي بقرار من إدارة المتجر، لا يقع تلقائياً بالشراء.
 
 ### 12.2 شرط ألا تكون للحساب عضوية قائمة
 لا تُمنح العضوية الممنوحة لحساب يحمل عضوية قائمة فعّالة كانت أو محجوزة، لأن الحساب لا يحمل أكثر من عضوية واحدة. ويُسجَّل الامتناع في سجل المتجر ليُنظر فيه يدوياً عند الاقتضاء.
@@ -481,7 +495,7 @@ export const membership: PolicyDocument = {
 يُقدَّم الخلاف أولاً إلى الدعم عبر {{LEVONIS_SUPPORT_CONTACT}}، ويُجاب عليه خلال {{DISPUTE_RESPONSE_DAYS}} يوماً.
 
 ### 14.5 القانون الواجب التطبيق والاختصاص
-يسري على هذه الوثيقة قانون {{GOVERNING_LAW_JURISDICTION}}، وتختص بنظر ما ينشأ عنها {{COMPETENT_COURT}}.
+تسري على هذه الوثيقة {{GOVERNING_LAW_JURISDICTION}}، والاختصاص بنظر ما ينشأ عنها ل{{COMPETENT_COURT}}.
 
 ### 14.6 جهة الاتصال
 جهة الاتصال المعتمدة: {{LEVONIS_SUPPORT_CONTACT}}، وأوقات العمل: {{LEVONIS_SUPPORT_HOURS}}.`,
@@ -501,8 +515,8 @@ The Store: {{LEVONIS_LEGAL_NAME}}, registered under number {{LEVONIS_REGISTRATIO
 - Benefit: a specific right granted by a tier and recorded under its own name in the Store's system.
 - Inheritance: that a higher tier holds every benefit of the tiers below it.
 - Membership record: the entry carrying the tier, the duration, the amount paid, the purchase date and the state of the membership.
-- State: the description of a membership record in the system, namely: awaiting payment, prepaid and reserved pending the launch, active, expired, or cancelled.
-- Launch: the Store's announced decision to bring the membership system into operation; a reserved membership does not begin to run before it.
+- State: the description of a membership record in the system, namely: awaiting payment, prepaid and reserved before the membership system was running, active, expired, or cancelled.
+- Reserved membership: a membership paid for before the membership system was running; it is activated under article 9.3.
 - Approved default address: the single address the Store has approved for a PRO member and recorded in its system in the approved state.
 - PRO purchase context: the conjunction of conditions that makes the PRO purchase benefits effective on a particular order.
 - Snapshot: a frozen copy of the facts an order or a reward was built on, kept with the record and not recomputed afterwards.
@@ -542,7 +556,7 @@ A higher tier inherits every benefit below it. A PREMIUM member holds the PLUS b
 The middle tier is called LEVO PREMIUM on every screen shown to a customer. It may appear as PRIME in older records or in an internal export; these are two names for one tier, not two tiers.
 
 ### 2.5 One membership at a time
-An account does not hold more than one live membership at a time, whether active or reserved pending the launch. An attempt to buy a second membership while the first is live is refused on the server.
+An account does not hold more than one live membership at a time, whether active or reserved before the membership system was running. An attempt to buy a second membership while the first is live is refused on the server.
 
 ### 2.6 A membership is personal
 A membership is personal to the account holder. It is not transferred, sold, lent or split, and it is not used for the benefit of another person, even a member of the same household.
@@ -701,7 +715,7 @@ This condition does not remove what is not a purchase benefit: the points multip
 A membership is bought only from within a verified account and is recorded in the name of that account holder alone.
 
 ### 8.2 The summary before confirmation
-Before confirmation the customer is shown a summary stating the plan, its tier, its duration and its price, the value credited from any live membership, the amount actually debited, the available balance, and the expected expiry date or the fact that the membership will be reserved until the launch.
+Before confirmation the customer is shown a summary stating the plan, its tier, its duration and its price, the value credited from any live membership, the amount actually debited, the available balance, and the expected expiry date.
 
 ### 8.3 Confirmation is what binds
 No amount is debited and no membership is created before the customer confirms the summary. If the amount recomputed at confirmation differs from the amount displayed, completion is refused and the summary is redisplayed with the new figures.
@@ -735,14 +749,14 @@ A membership granted to the customer without consideration is treated as of zero
 
 ## 9. Commencement, term, expiry and renewal
 
-### 9.1 Commencement after the launch
-After the launch has been announced, a membership begins from the moment the purchase completes and ends on the expiry of its duration counted in calendar months.
+### 9.1 Commencement
+A membership begins from the moment the purchase completes and ends on the expiry of its duration counted in calendar months.
 
-### 9.2 A membership reserved before the launch
-A member who bought before the launch was announced has their membership reserved for its full duration, and its term has not yet begun. The reservation is an undertaking by the Store as to the full duration, which is not shortened by the length of the wait.
+### 9.2 Activation on purchase
+A membership is activated as soon as its purchase completes, and is not held in reserve pending a launch, because the membership system is running.
 
-### 9.3 Commencement of the term at the launch
-The term of a reserved membership begins when the Store announces the activation of the launch, which is an announced and recorded decision and does not occur by the mere passage of time.
+### 9.3 A membership reserved before the system was running
+A membership reserved before the membership system was running is activated for its full duration, and its term begins at the moment of its activation, not on the date it was bought, so it is not shortened by the length of the wait.
 
 ### 9.4 Expiry of the term
 A membership ends of itself on the expiry of its duration, and its expiry is recorded in the system. Its expiry requires neither notice nor request.
@@ -820,7 +834,7 @@ Where an amount is deferred against the member, its repayment remains due after 
 ## 12. Granted memberships and conditional gifts
 
 ### 12.1 A PLUS membership granted with a printer purchase
-Where the Store has switched this feature on and named the PLUS plan to be granted, a customer who buys a qualifying printer is granted a PLUS membership without consideration.
+Where the Store has switched this feature on and named the PLUS plan to be granted, a customer who buys a qualifying printer may be granted a PLUS membership without consideration. The grant is made by hand, by a decision of the Store's administration, and does not happen automatically on purchase.
 
 ### 12.2 The condition that the account holds no live membership
 A granted membership is not given to an account holding a live membership, whether active or reserved, because an account does not hold more than one membership. The abstention is recorded in the Store's log so that it may be considered by hand where appropriate.
@@ -889,7 +903,7 @@ If a provision of this document is void or cannot be performed, the remainder of
 A dispute is first submitted to Support at {{LEVONIS_SUPPORT_CONTACT}} and is answered within {{DISPUTE_RESPONSE_DAYS}} days.
 
 ### 14.5 Governing law and jurisdiction
-This document is governed by the law of {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} has jurisdiction over what arises from it.
+This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} have jurisdiction over what arises from it.
 
 ### 14.6 Contact
 The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the hours of business are {{LEVONIS_SUPPORT_HOURS}}.`,
@@ -909,8 +923,8 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the hours of busi
 - سوود: مافێکی دیاریکراو کە پلەکە دەیبەخشێت، بە ناوی خۆیەوە لە سیستەمی فرۆشگادا تۆمارکراوە.
 - میرات: ئەوەی پلەی سەرەوە هەموو سوودەکانی پلەکانی ژێر خۆی بە میرات دەبات.
 - تۆماری ئەندامێتی: ئەو تۆمارەی پلە و ماوە و بڕی پارەدراو و بەرواری کڕین و دۆخی ئەندامێتی هەڵدەگرێت.
-- دۆخ: وەسفی تۆماری ئەندامێتی لە سیستەمدا، کە بریتییە لە: چاوەڕێی پارەدان، یان حیجزکراوی پارەدراو لە چاوەڕێی دەستپێکردن، یان چالاک، یان کۆتاییهاتوو، یان هەڵوەشێنراوە.
-- دەستپێکردن: بڕیاری ڕاگەیەنراوی فرۆشگا بە دەستپێکردنی کارپێکردنی سیستەمی ئەندامێتییەکان؛ ئەندامێتیی حیجزکراو پێش ئەو کار ناکات.
+- دۆخ: وەسفی تۆماری ئەندامێتی لە سیستەمدا، کە بریتییە لە: چاوەڕێی پارەدان، یان حیجزکراوی پارەدراو پێش کارکردنی سیستەمی ئەندامێتی، یان چالاک، یان کۆتاییهاتوو، یان هەڵوەشێنراوە.
+- ئەندامێتیی حیجزکراو: ئەندامێتییەک کە پێش کارکردنی سیستەمی ئەندامێتی پارەی دراوە، و بەپێی بڕگەی 9.3 چالاک دەکرێت.
 - ناونیشانی بنەڕەتیی پەسەندکراو: ئەو یەک ناونیشانەی فرۆشگا بۆ ئەندامی PRO پەسەندی کردووە و بە دۆخی پەسەندکراو لە سیستەمەکەیدا تۆمارە.
 - چوارچێوەی کڕینی تایبەت بە PRO: کۆبوونەوەی ئەو مەرجانەی کە سوودەکانی کڕینی تایبەت بە PRO لەسەر داواکارییەکی دیاریکراو کاریگەر دەکەن.
 - وێنەگرتن: کۆپییەکی بەستراوی ئەو ڕاستییانەی داواکارییەک یان خەڵاتێک لەسەریان بنیات نراوە، لەگەڵ تۆمارەکەدا هەڵدەگیرێت و دوای ئەوە دووبارە ناژمێردرێتەوە.
@@ -950,7 +964,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the hours of busi
 پلەی ناوەڕاست لە هەموو ئەو شاشانەی بۆ کڕیار پیشان دەدرێن بە ناوی LEVO PREMIUM ناو دەبرێت. لەوانەیە لە تۆماری کۆن یان لە هەناردەکردنێکی ناوخۆیی بە ناوی PRIME دەربکەوێت، و ئەو دوو ناوە بۆ یەک پلەن نەک دوو پلە.
 
 ### 2.5 یەک ئەندامێتی لە یەک کاتدا
-یەک هەژمار زیاتر لە یەک ئەندامێتیی هەبوو لە یەک کاتدا هەڵناگرێت، جا چالاک بێت یان حیجزکراو لە چاوەڕێی دەستپێکردن. هەوڵدان بۆ کڕینی ئەندامێتییەکی دووەم لەگەڵ هەبوونی یەکەمدا لەسەر ڕاژە ڕەت دەکرێتەوە.
+یەک هەژمار زیاتر لە یەک ئەندامێتیی هەبوو لە یەک کاتدا هەڵناگرێت، جا چالاک بێت یان حیجزکراو پێش کارکردنی سیستەمی ئەندامێتی. هەوڵدان بۆ کڕینی ئەندامێتییەکی دووەم لەگەڵ هەبوونی یەکەمدا لەسەر ڕاژە ڕەت دەکرێتەوە.
 
 ### 2.6 ئەندامێتی کەسییە
 ئەندامێتی کەسییە بۆ خاوەنی هەژمار. ناگوازرێتەوە، نافرۆشرێت، بە عارییەتی نادرێت و دابەش ناکرێت، و بۆ کەسێکی تر سوودی لێ وەرناگیرێت تەنانەت ئەندامی ماڵەکەی بێت.
@@ -1109,7 +1123,7 @@ PRO هەموو ئەوە دەبەخشێت کە PLUS و PREMIUM لە بەشەکا�
 ئەندامێتی تەنها لە ناو هەژمارێکی پشتڕاستکراوەوە دەکڕدرێت، و تەنها بە ناوی خاوەنی هەژمارەکە تۆمار دەکرێت.
 
 ### 8.2 کورتەکە پێش پەسەندکردن
-پێش پەسەندکردن کورتەیەک بۆ کڕیار پیشان دەدرێت کە پلانەکە و پلەکەی و ماوەکەی و نرخەکەی ڕوون دەکاتەوە، بەهای ئەوەی لە باڵانسی ئەندامێتییە هەبووەکەی بۆی دەژمێردرێت ئەگەر هەبوو، ئەو بڕەی بەکردەوە کەم دەکرێتەوە، باڵانسی بەردەستی، و بەرواری چاوەڕوانکراوی کۆتاییهاتن یان ئەوەی ئەندامێتییەکە تا دەستپێکردن حیجز دەکرێت.
+پێش پەسەندکردن کورتەیەک بۆ کڕیار پیشان دەدرێت کە پلانەکە و پلەکەی و ماوەکەی و نرخەکەی ڕوون دەکاتەوە، بەهای ئەوەی لە باڵانسی ئەندامێتییە هەبووەکەی بۆی دەژمێردرێت ئەگەر هەبوو، ئەو بڕەی بەکردەوە کەم دەکرێتەوە، باڵانسی بەردەستی، و بەرواری چاوەڕوانکراوی کۆتاییهاتن.
 
 ### 8.3 پەسەندکردن ئەوەیە کە پابەند دەکات
 هیچ بڕێک کەم ناکرێتەوە و هیچ ئەندامێتییەک دروست ناکرێت پێش پەسەندکردنی کڕیار بۆ کورتەکە. ئەگەر ئەو بڕەی لە کاتی پەسەندکردندا دووبارە ژمێردرایەوە لەگەڵ بڕە پیشاندراوەکە جیاواز بوو، تەواوکردن ڕەت دەکرێتەوە و کورتەکە بە ژمارە نوێیەکانەوە دووبارە پیشان دەدرێت.
@@ -1143,14 +1157,14 @@ PRO هەموو ئەوە دەبەخشێت کە PLUS و PREMIUM لە بەشەکا�
 
 ## 9. دەستپێکردن و ماوە و کۆتاییهاتن و نوێکردنەوە
 
-### 9.1 دەستپێکردنی ئەندامێتی دوای دەستپێکردنی سیستەم
-دوای ڕاگەیاندنی دەستپێکردن، ئەندامێتی لە ساتی تەواوبوونی کڕینەکەوە دەست پێدەکات، و کاتەکەی بە تێپەڕینی ماوەکەی بە مانگی ڕۆژژمێری کۆتایی دێت.
+### 9.1 دەستپێکردنی ئەندامێتی
+ئەندامێتی لە ساتی تەواوبوونی کڕینەکەوە دەست پێدەکات، و کاتەکەی بە تێپەڕینی ماوەکەی بە مانگی ڕۆژژمێری کۆتایی دێت.
 
-### 9.2 ئەندامێتیی حیجزکراو پێش دەستپێکردنی سیستەم
-ئەوەی پێش ڕاگەیاندنی دەستپێکردن کڕیویەتی، ئەندامێتییەکەی بە ماوەکەی تەواوی بۆ حیجز کراوە و ماوەکەی هێشتا دەستی پێنەکردووە. حیجزکردن پابەندبوونی فرۆشگایە بە ماوەکەی تەواو، و بە درێژیی چاوەڕوانی کەم نابێتەوە.
+### 9.2 چالاککردن لە کاتی کڕیندا
+ئەندامێتی هەر کە کڕینەکەی تەواو بوو چالاک دەکرێت، و بۆ چاوەڕوانی دەستپێکردنی سیستەم حیجز ناکرێت، چونکە سیستەمی ئەندامێتی کار دەکات.
 
-### 9.3 دەستپێکردنی ماوە لە کاتی دەستپێکردنی سیستەمدا
-ماوەی ئەندامێتیی حیجزکراو بە ڕاگەیاندنی فرۆشگا بۆ چالاککردنی دەستپێکردن دەست پێدەکات، کە بڕیارێکی ڕاگەیەنراو و تۆمارکراوە، و تەنها بە تێپەڕینی کات ڕوونادات.
+### 9.3 ئەندامێتیی حیجزکراو پێش کارکردنی سیستەم
+ئەو ئەندامێتییانەی پێش کارکردنی سیستەمی ئەندامێتی حیجز کراون بە ماوەی تەواوی خۆیان چالاک دەکرێن، و ماوەکەیان لە ساتی چالاککردنەوە دەست پێدەکات نەک لە بەرواری کڕینەوە، بۆیە بە درێژیی چاوەڕوانی کەم نابێتەوە.
 
 ### 9.4 کۆتاییهاتنی ماوە
 ئەندامێتی بە تێپەڕینی ماوەکەی لە خۆیەوە کۆتایی دێت، و کۆتاییهاتنەکەی لە سیستەمدا تۆمار دەکرێت. کۆتاییهاتنەکەی پێویستی بە ئاگادارکردنەوە و بە داواکاری نییە.
@@ -1228,7 +1242,7 @@ PRO هەموو ئەوە دەبەخشێت کە PLUS و PREMIUM لە بەشەکا�
 ## 12. ئەندامێتیی بەخشراو و دیارییە مەرجدارەکان
 
 ### 12.1 ئەندامێتیی PLUS ی بەخشراو لەگەڵ کڕینی چاپگەر
-ئەگەر فرۆشگا ئەم تایبەتمەندییەی چالاک کرد و ئەو پلانەی PLUS ی دیاری کرد کە دەبەخشرێت، ئەوەی چاپگەرێکی شایستە بکڕێت ئەندامێتیی PLUS ی بەبێ بەرامبەر پێدەدرێت.
+ئەگەر فرۆشگا ئەم تایبەتمەندییەی چالاک کرد و ئەو پلانەی PLUS ی دیاری کرد کە دەبەخشرێت، دەکرێت ئەوەی چاپگەرێکی شایستە بکڕێت ئەندامێتیی PLUS ی بەبێ بەرامبەر پێبدرێت. بەخشینەکە بە دەست و بە بڕیاری بەڕێوەبەرایەتیی فرۆشگا دەبێت، و بە کڕین بە شێوەی خۆکار ڕوونادات.
 
 ### 12.2 مەرجی ئەوەی هەژمارەکە ئەندامێتیی هەبووی نەبێت
 ئەندامێتیی بەخشراو بە هەژمارێک نادرێت کە ئەندامێتییەکی هەبووی هەیە، جا چالاک بێت یان حیجزکراو، چونکە هەژمار زیاتر لە یەک ئەندامێتی هەڵناگرێت. نەبەخشینەکە لە تۆماری فرۆشگادا تۆمار دەکرێت تا لە کاتی پێویستدا بە دەست سەیر بکرێت.
@@ -1297,7 +1311,7 @@ PRO هەموو ئەوە دەبەخشێت کە PLUS و PREMIUM لە بەشەکا�
 ناکۆکییەکە سەرەتا بۆ پشتگیری لە ڕێگەی {{LEVONIS_SUPPORT_CONTACT}} پێشکەش دەکرێت، و لە ماوەی {{DISPUTE_RESPONSE_DAYS}} ڕۆژ وەڵام دەدرێتەوە.
 
 ### 14.5 یاسای جێبەجێکراو و دەسەڵاتی دادوەری
-لەسەر ئەم بەڵگەنامەیە یاسای {{GOVERNING_LAW_JURISDICTION}} جێبەجێ دەبێت، و {{COMPETENT_COURT}} دەسەڵاتی سەیرکردنی ئەوەی لێیەوە سەرچاوە دەگرێت هەیە.
+لەسەر ئەم بەڵگەنامەیە {{GOVERNING_LAW_JURISDICTION}} جێبەجێ دەبێت، و {{COMPETENT_COURT}} دەسەڵاتی سەیرکردنی ئەوەی لێیەوە سەرچاوە دەگرێت هەیە.
 
 ### 14.6 خاڵی پەیوەندی
 خاڵی پەیوەندیی پەسەندکراو: {{LEVONIS_SUPPORT_CONTACT}}، و کاتەکانی کار: {{LEVONIS_SUPPORT_HOURS}}.`,

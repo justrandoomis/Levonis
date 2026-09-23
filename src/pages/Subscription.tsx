@@ -1,51 +1,64 @@
 /**
- * /subscription — the membership page.
+ * /subscription — «اختر بطاقتك».
  *
- * Open to guests: what a card costs is the first thing someone weighing one
- * wants to see. The page reads GET /api/memberships/plans (public) and, when
- * signed in, GET /api/memberships/mine and GET /api/memberships/quote for
- * the selected plan — the quote is the server saying exactly what buying that
- * plan would do for THIS account (price, upgrade credit, USD debit, balance,
- * shortfall, start-now or reserve-until-launch). Nothing shown as a number is
- * computed in the browser — the per-month figure on the cards is the server's
- * `per_month_iqd` too.
+ * Open to guests: what a card costs, and what it gives, is the first thing
+ * someone weighing one wants to see. The page reads GET /api/memberships/plans
+ * (public: the plans, the benefit rules the checkout applies, the entitlement
+ * contract) and, when signed in, GET /api/memberships/mine and
+ * GET /api/memberships/quote for the selected plan — the server saying
+ * exactly what buying it would do for THIS account. Nothing shown as a number
+ * is computed in the browser.
  *
- * Buying goes through a confirmation window (PurchaseConfirm). ONE idempotency
- * key is generated per confirmed attempt and reused only for a retry of that
- * same attempt, so a flaky network can never charge twice; a new attempt gets
- * a new key. The confirmation carries the very figures the window displayed;
- * when the server's recomputed charge differs (a day boundary, a new exchange
- * rate) it refuses with 409 QUOTE_CHANGED and the fresh quote, which the
- * window shows with a one-line notice instead of charging. The result stays
- * in the window until the person closes it.
+ * THE ORDER IS THE DECISION'S ORDER (mobile first, top to bottom):
+ *   1. who you are here — your card and its date, or the title for a guest;
+ *   2. the three cards, each with its price and what it is for, chosen in
+ *      place; the default is the tier above yours, or the first one on sale;
+ *   3. the duration, only where there is a choice (PLUS);
+ *   4. «مقارنة الخطط», a real matrix, right after the choice it informs;
+ *   5. «عضويتك» — the ledger, identity, BNPL and the store — at the end.
+ * The checkout is a bar above the navigation on a phone and a sticky aside
+ * from 1024px; the selected tier and plan live in the URL (?tier=&plan=) so
+ * a sign-in round trip or a back navigation lands on the same choice.
  *
- * Layout: the card on top; then "Choose your card" — the tier selector and
- * the duration cards — with the selected-plan summary and the CTA beside them
- * on a desktop (sticky) and below them on a phone; the ledger; the benefits.
+ * THE SITE IS LIVE. A purchase starts the membership at once — there is no
+ * reservation copy anywhere on this page. A legacy reservation still waiting
+ * for a human is shown as «قيد التفعيل», never as "until the launch".
+ *
+ * Buying goes through a confirmation window (PurchaseConfirm). ONE
+ * idempotency key is generated per confirmed attempt and reused only for a
+ * retry of that same attempt, so a flaky network can never charge twice; a
+ * new attempt gets a new key. The confirmation carries the very figures the
+ * window displayed; when the server's recomputed charge differs it refuses
+ * with 409 QUOTE_CHANGED and the fresh quote, which the window shows with a
+ * one-line notice instead of charging. The result stays until closed, and
+ * while the charge is in flight the app-wide busy screen holds every other
+ * control (src/lib/busy.ts).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'motion/react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
+import { useMoney } from '../CurrencyContext';
 import { useMotion } from '../lib/motion';
+import { useBusy } from '../lib/busy';
 import { api, ApiError, newIdempotencyKey } from '../lib/api';
-import { useSignInPrompt } from '../lib/guest';
-import { formatDate } from '../components/orders/format';
 import StoreCta from '../components/merchant/StoreCta';
 import KycSection from '../components/kyc/KycSection';
-import { LevoCard } from '../components/subscription/LevoCard';
+import { MemberHeader } from '../components/subscription/MemberHeader';
+import { TierCards, type TierStanding } from '../components/subscription/TierCards';
 import { PlanPicker } from '../components/subscription/PlanPicker';
-import { PlanSummary } from '../components/subscription/PlanSummary';
+import { CheckoutBar } from '../components/subscription/CheckoutBar';
 import { PurchaseConfirm } from '../components/subscription/PurchaseConfirm';
-import { BenefitsSection, type PlanBenefits } from '../components/subscription/BenefitsSection';
+import { CompareMatrix } from '../components/subscription/CompareMatrix';
 import { MembershipLedger } from '../components/subscription/MembershipLedger';
 import { BnplPanel } from '../components/subscription/BnplPanel';
-import { FREE_FACE, TIER_META, isPaidTier, tierLabel, type AnyTier, type PaidTier } from '../components/subscription/tierMeta';
+import { tierHighlights } from '../components/subscription/compareModel';
+import { isolatedMoney, type PlanBenefits } from '../components/subscription/benefitLines';
+import { TIER_ORDER, isPaidTier, pickDefaultTier, type AnyTier, type PaidTier } from '../components/subscription/tierMeta';
 import type {
   ApiPlan,
   ConfirmedFigures,
-  LaunchInfo,
   MineResponse,
   PlanFeatures,
   PlansResponse,
@@ -54,23 +67,34 @@ import type {
   SubscribeResponse,
 } from '../components/subscription/types';
 
+/** The tier and plan the URL carries, when they are real ones. */
+function readSelection(search: string): { tier: PaidTier | null; plan: string | null } {
+  const q = new URLSearchParams(search);
+  const tier = q.get('tier');
+  const plan = q.get('plan');
+  return { tier: isPaidTier(tier) ? tier : null, plan: plan && /^[a-z0-9_]{1,60}$/i.test(plan) ? plan : null };
+}
+
 export default function Subscription() {
-  const { t, lang } = useLanguage();
+  const { t, loc, dir } = useLanguage();
+  const { money } = useMoney();
   const m = useMotion();
   const { refreshWallet } = useWallet();
   const { user, refreshUser } = useAuth();
-  const { signIn } = useSignInPrompt();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // ------------------------------------------------------------ catalogue
   const [plans, setPlans] = useState<ApiPlan[] | null>(null);
   const [plansError, setPlansError] = useState<unknown>(null);
-  const [launch, setLaunch] = useState<LaunchInfo | null>(null);
   const [features, setFeatures] = useState<PlanFeatures | null>(null);
+  const [contract, setContract] = useState<PlansResponse['entitlement_contract'] | null>(null);
+  const [points, setPoints] = useState<PlansResponse['points_multiplier_x100'] | null>(null);
   /**
    * §22 — what the store promises PREMIUM and PRO shoppers RIGHT NOW, read
    * from `membership_benefit_rules` by the same server that applies them at
-   * the checkout. An older deployment sends no `benefits` at all, and the
-   * benefits section then states nothing rather than a figure nobody enforces.
+   * the checkout. An older deployment sends no `benefits` at all, and the page
+   * then states nothing rather than a figure nobody enforces.
    */
   const [benefits, setBenefits] = useState<PlanBenefits | null>(null);
   const [plansNonce, setPlansNonce] = useState(0);
@@ -84,9 +108,10 @@ export default function Subscription() {
       .then((data) => {
         if (cancelled) return;
         setPlans(data.plans || []);
-        setLaunch(data.launch || null);
         setFeatures(data.features ?? null);
         setBenefits(data.benefits ?? null);
+        setContract(data.entitlement_contract ?? null);
+        setPoints(data.points_multiplier_x100 ?? null);
       })
       .catch((e: unknown) => {
         // A failed fetch is an error, not an empty catalogue.
@@ -131,12 +156,12 @@ export default function Subscription() {
     : legacyActive && user?.subscription_expiry
       ? new Date(user.subscription_expiry).toISOString()
       : null;
-  const pendingLaunch = mine?.status.pending_launch ?? null;
+  const pending = mine?.status.pending_launch ?? null;
   const gatedBenefits = mine?.status.gated_benefits ?? [];
 
   // ----------------------------------------------------------- selection
   /** Tier order follows the server's own `sort` column, so the owner reorders
-   *  the selector from the memberships admin without a code change. */
+   *  the cards from the memberships admin without a code change. */
   const tiers = useMemo<PaidTier[]>(() => {
     const firstSort = new Map<PaidTier, number>();
     for (const p of plans || []) {
@@ -149,35 +174,71 @@ export default function Subscription() {
       .sort((a, b) => (firstSort.get(a) ?? 0) - (firstSort.get(b) ?? 0));
   }, [plans]);
 
-  const [activeTier, setActiveTier] = useState<PaidTier>('pro');
-  const [selectedPlanId, setSelectedPlanId] = useState('');
-
-  // Never leave the page on a tier the catalogue does not offer.
-  useEffect(() => {
-    if (tiers.length && !tiers.includes(activeTier)) setActiveTier(tiers[0]);
-  }, [tiers, activeTier]);
-
-  const tierPlans = useMemo(
-    () =>
-      (plans || [])
-        .filter((p) => p.tier === activeTier)
-        .sort((a, b) => a.sort - b.sort || a.duration_months - b.duration_months),
-    [plans, activeTier]
+  const plansOf = useCallback(
+    (tier: PaidTier) =>
+      (plans || []).filter((p) => p.tier === tier).sort((a, b) => a.duration_months - b.duration_months || a.sort - b.sort),
+    [plans]
   );
 
-  // Keep the selection valid for the visible tier; default to the longest
-  // plan, which is the one every tier sells.
-  useEffect(() => {
-    if (tierPlans.length === 0) {
-      setSelectedPlanId('');
-      return;
+  /** Where the account stands against each tier — the badge on each card. */
+  const standing = useMemo(() => {
+    const out = {} as Record<PaidTier, TierStanding>;
+    for (const tier of ['plus', 'prime', 'pro'] as const) {
+      const sellable = plansOf(tier).some((p) => p.purchasable);
+      out[tier] =
+        currentTier === tier
+          ? 'current'
+          : TIER_ORDER[tier] < TIER_ORDER[currentTier]
+            ? 'included'
+            : !sellable
+              ? 'tba'
+              : isPaidTier(currentTier)
+                ? 'upgrade'
+                : 'open';
     }
-    if (!tierPlans.some((p) => p.id === selectedPlanId)) {
-      setSelectedPlanId(tierPlans[tierPlans.length - 1].id);
-    }
-  }, [tierPlans, selectedPlanId]);
+    return out;
+  }, [currentTier, plansOf]);
 
-  const selectedPlan = tierPlans.find((p) => p.id === selectedPlanId) || null;
+  // NOT ALWAYS PRO — see pickDefaultTier.
+  const defaultTier = useMemo(
+    () => pickDefaultTier(tiers, currentTier, (tier) => plansOf(tier).some((p) => p.purchasable)),
+    [tiers, currentTier, plansOf]
+  );
+
+  const initial = useRef(readSelection(location.search));
+  const [chosenTier, setChosenTier] = useState<PaidTier | null>(initial.current.tier);
+  const [chosenPlan, setChosenPlan] = useState<string | null>(initial.current.plan);
+  const activeTier: PaidTier = (chosenTier && tiers.includes(chosenTier) ? chosenTier : defaultTier) ?? 'plus';
+  const tierPlans = useMemo(() => plansOf(activeTier), [plansOf, activeTier]);
+  // A plan the URL or a tap chose, when it belongs to this tier; otherwise the
+  // longest, which is the one every tier sells.
+  const selectedPlan =
+    tierPlans.find((p) => p.id === chosenPlan) ?? (tierPlans.length ? tierPlans[tierPlans.length - 1] : null);
+
+  /**
+   * THE CHOICE LIVES IN THE URL. Written with `replaceState` rather than the
+   * router: a router REPLACE is a new page to the shell's scroll restoration
+   * (App.tsx) and would throw the reader to the top on every tap. The router's
+   * own entry state is kept, so back and forward still work; the sign-in link
+   * below reads the same parameters.
+   */
+  const selectionSearch = selectedPlan ? `?tier=${activeTier}&plan=${encodeURIComponent(selectedPlan.id)}` : '';
+  useEffect(() => {
+    if (!selectedPlan || typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('tier') === activeTier && url.searchParams.get('plan') === selectedPlan.id) return;
+    url.searchParams.set('tier', activeTier);
+    url.searchParams.set('plan', selectedPlan.id);
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+  }, [activeTier, selectedPlan]);
+
+  const highlights = useMemo(() => {
+    const out = {} as Record<PaidTier, string[]>;
+    for (const tier of ['plus', 'prime', 'pro'] as const) {
+      out[tier] = tierHighlights(tier, { contract: contract?.tiers ?? null, benefits, points: points ?? null, loc, money: isolatedMoney(money, dir) });
+    }
+    return out;
+  }, [contract, benefits, points, loc, money, dir]);
 
   // --------------------------------------------------------------- quote
   const [quote, setQuote] = useState<PurchaseQuote | null>(null);
@@ -187,12 +248,22 @@ export default function Subscription() {
   const refreshQuote = useCallback(() => setQuoteNonce((n) => n + 1), []);
 
   const quotePlanId = user && selectedPlan && selectedPlan.purchasable ? selectedPlan.id : '';
+  const quotedPlan = useRef('');
   useEffect(() => {
     if (!quotePlanId) {
+      quotedPlan.current = '';
       setQuote(null);
       setQuoteError(null);
       setQuoteLoading(false);
       return;
+    }
+    // A NEW PLAN CLEARS THE OLD ANSWER. The previous plan's figures — or its
+    // refusal — must not sit under this plan's price while its quote loads.
+    // A refresh of the SAME plan keeps them: the QUOTE_CHANGED flow shows the
+    // fresh figures the refusal carried while the re-check runs.
+    if (quotedPlan.current !== quotePlanId) {
+      quotedPlan.current = quotePlanId;
+      setQuote(null);
     }
     let cancelled = false;
     setQuoteLoading(true);
@@ -223,13 +294,16 @@ export default function Subscription() {
   const [phase, setPhase] = useState<'review' | 'busy' | 'done'>('review');
   const [result, setResult] = useState<PurchaseResult | null>(null);
   const [quoteChanged, setQuoteChanged] = useState(false);
+  // The charge is in flight: the app-wide busy screen holds every other
+  // control, so nothing on the page can be tapped twice behind it.
+  useBusy(phase === 'busy', 'subscribe');
 
   const openConfirm = () => {
     if (!selectedPlan) return;
     // A guest may read the whole page; subscribing is where an account starts
-    // to matter. Take them to sign in and BRING THEM BACK here.
+    // to matter. Take them to sign in and BRING THEM BACK to this choice.
     if (!user) {
-      signIn();
+      navigate('/auth', { state: { from: `${location.pathname}${selectionSearch}` } });
       return;
     }
     if (!selectedPlan.purchasable) return; // honest disabled state — never a fake purchase
@@ -297,108 +371,119 @@ export default function Subscription() {
   };
 
   // ------------------------------------------------------------- render
-  const glow = isPaidTier(activeTier) ? TIER_META[activeTier].glow : FREE_FACE.glow;
-  const enter = (delay = 0) => ({
-    initial: { opacity: 0, y: m.travel(16) },
-    animate: { opacity: 1, y: 0 },
-    transition: { ...m.spring('ui'), delay },
-  });
+  const compareRef = useRef<HTMLHeadingElement | null>(null);
+  const membershipRef = useRef<HTMLHeadingElement | null>(null);
+  const goTo = (ref: React.RefObject<HTMLHeadingElement | null>) => {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: m.reduced ? 'auto' : 'smooth', block: 'start' });
+    el.focus({ preventScroll: true });
+  };
+
+  const plansReady = plans !== null && !plansError && tiers.length > 0;
 
   return (
-    <div className="w-full flex-1 text-zinc-300 pb-24 bg-[#0a0a0a] relative">
-      {/* Ambient light in the selected tier's colour. */}
-      <div
-        aria-hidden
-        className={`fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg h-[600px] ${glow} rounded-full blur-[120px] pointer-events-none z-0 transition-colors duration-700`}
-      />
+    <div className="w-full flex-1 bg-canvas text-text-secondary">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 pb-44 lg:pb-16">
+        {/* 1. Who you are here */}
+        <MemberHeader
+          user={user}
+          tier={currentTier}
+          expiresAt={currentExpiry}
+          pending={pending}
+          onManage={() => goTo(membershipRef)}
+        />
 
-      {/* 1. The card */}
-      <motion.section {...enter(0)} className="pt-8 px-4 sm:px-6 mb-10 flex flex-col items-center relative z-10">
-        <h2 className="text-xl font-bold text-gold mb-6 text-center">{t('yourLevoCard')}</h2>
-        <LevoCard user={user} tier={currentTier} expiresAt={currentExpiry} />
+        {/* 2. The cards */}
+        <section aria-labelledby="choose-card-title" className="mt-6 sm:mt-8">
+          <TierCards
+            plans={plans}
+            error={plansError}
+            onRetry={reloadPlans}
+            tiers={tiers}
+            selected={activeTier}
+            onSelect={(tier) => {
+              setChosenTier(tier);
+              setChosenPlan(null);
+            }}
+            standing={standing}
+            highlights={highlights}
+            onCompare={() => goTo(compareRef)}
+          />
+        </section>
 
-        {/* Prepaid-pending-launch state on the card holder's account */}
-        {pendingLaunch && (
-          <div data-pending-launch className="mt-4 w-full max-w-sm bg-sky-500/10 border border-sky-500/30 rounded-2xl px-4 py-3 text-center">
-            <p className="text-sky-300 text-[13px] font-bold mb-0.5">
-              {tierLabel(pendingLaunch.tier)} — {pendingLaunch.duration_months} {t('months')}
-            </p>
-            <p className="text-sky-200/80 text-[12px]">
-              {t('launchNote')}
-              {launch?.launch_at ? ` — ${formatDate(launch.launch_at, lang)}` : ''}
-            </p>
-          </div>
-        )}
+        {plansReady && (
+          <div className="mt-6 lg:mt-8 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8">
+            <div className="min-w-0 space-y-8">
+              {/* 3. The duration, where there is a choice */}
+              <PlanPicker
+                tier={activeTier}
+                tierPlans={tierPlans}
+                selectedPlanId={selectedPlan?.id ?? ''}
+                onSelectPlan={(id) => {
+                  setChosenTier(activeTier);
+                  setChosenPlan(id);
+                }}
+              />
 
-        {/* PRO identity verification (KYC) — deliberately here in the
-            membership area, never in the public profile (final phase §9). */}
-        {(currentTier === 'pro' || pendingLaunch?.tier === 'pro') && (
-          <div className="mt-4 w-full max-w-sm">
-            <KycSection />
-          </div>
-        )}
-      </motion.section>
+              {/* 4. The comparison */}
+              <CompareMatrix
+                tiers={tiers}
+                plans={plans}
+                contract={contract?.tiers ?? null}
+                benefits={benefits}
+                features={features}
+                points={points ?? null}
+                currentTier={currentTier}
+                selectedTier={activeTier}
+                loading={false}
+                headingRef={compareRef}
+              />
 
-      <div className="px-4 sm:px-6 max-w-4xl mx-auto relative z-10 space-y-10">
-        {/* 2. Choose your card + the summary/CTA. Two columns from lg. */}
-        <motion.div {...enter(0.05)} className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(18rem,20rem)] lg:gap-8 lg:items-start">
-          <div className="min-w-0">
-            <PlanPicker
-              plans={plans}
-              error={plansError}
-              onRetry={reloadPlans}
-              tiers={tiers}
-              activeTier={activeTier}
-              onTierChange={(tier) => {
-                setActiveTier(tier);
-                setSelectedPlanId('');
-              }}
-              tierPlans={tierPlans}
-              selectedPlanId={selectedPlanId}
-              onSelectPlan={setSelectedPlanId}
-              currentTier={currentTier}
-            />
-            <div className="mt-6">
-              <StoreCta />
+              {/* 5. Your membership — signed in only */}
+              {user && (
+                <section aria-labelledby="membership-title" className="space-y-4">
+                  <h2
+                    id="membership-title"
+                    ref={membershipRef}
+                    tabIndex={-1}
+                    className="text-[1.25rem] sm:text-[1.45rem] font-extrabold text-text-primary outline-none scroll-mt-4"
+                  >
+                    {t('yourMembership')}
+                  </h2>
+                  {mine && <MembershipLedger memberships={mine.memberships} gatedBenefits={gatedBenefits} />}
+                  {/* PRO identity verification (KYC) — deliberately here in the
+                      membership area, never in the public profile (final phase §9). */}
+                  {(currentTier === 'pro' || pending?.tier === 'pro') && <KycSection />}
+                  {/* Active PRO customers manage the real BNPL line here. The
+                      panel also remains visible after a downgrade only when an
+                      existing account or debt must still be reviewable. */}
+                  {mine && <BnplPanel activePro={mine.status.active && mine.status.tier === 'pro'} />}
+                  <StoreCta />
+                </section>
+              )}
+            </div>
+
+            {/* The checkout: a bar over the navigation on a phone, a sticky
+                aside from 1024px. Never inside a transformed ancestor — a
+                transform would capture its fixed position. */}
+            <div className="lg:relative">
+              <CheckoutBar
+                plan={selectedPlan}
+                standing={standing[activeTier]}
+                quote={quote}
+                quoteLoading={quoteLoading}
+                quoteError={quoteError}
+                onRetryQuote={refreshQuote}
+                isGuest={!user}
+                busy={phase === 'busy'}
+                onSubscribe={openConfirm}
+                ctaRef={ctaRef}
+                currentExpiry={currentExpiry}
+              />
             </div>
           </div>
-
-          <div className="mt-6 lg:mt-0 lg:sticky lg:top-24">
-            <PlanSummary
-              plan={selectedPlan}
-              quote={quote}
-              quoteLoading={quoteLoading}
-              quoteError={quoteError}
-              onRetryQuote={refreshQuote}
-              isGuest={!user}
-              launch={launch}
-              onSubscribe={openConfirm}
-              ctaRef={ctaRef}
-              busy={phase === 'busy'}
-            />
-          </div>
-        </motion.div>
-
-        {/* 3. The ledger and paused benefits */}
-        {user && mine && (mine.memberships.length > 0 || gatedBenefits.length > 0) && (
-          <motion.div {...enter(0.1)} className="max-w-2xl mx-auto lg:max-w-none">
-            <MembershipLedger memberships={mine.memberships} gatedBenefits={gatedBenefits} />
-          </motion.div>
         )}
-
-        {/* Active PRO customers manage the real BNPL line here. The panel
-            also remains visible after a downgrade only when an existing
-            account or debt must still be reviewable/repayable. */}
-        {user && mine && (
-          <motion.div {...enter(0.12)} className="max-w-2xl mx-auto lg:max-w-none">
-            <BnplPanel activePro={mine.status.active && mine.status.tier === 'pro'} />
-          </motion.div>
-        )}
-
-        {/* 4. What each card gives */}
-        <motion.div {...enter(0.15)}>
-          <BenefitsSection features={features} benefits={benefits} loading={plans === null && !plansError} />
-        </motion.div>
       </div>
 
       <PurchaseConfirm
@@ -415,7 +500,6 @@ export default function Subscription() {
         onConfirm={runPurchase}
         onRetry={runPurchase}
         anchor={ctaRef}
-        launch={launch}
       />
     </div>
   );

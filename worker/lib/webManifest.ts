@@ -88,7 +88,7 @@ export interface WebManifest {
 /** The platform's own identity, used on the apex, on system hosts and on every fallback. */
 export const PLATFORM_NAME = 'LEVONIS';
 export const PLATFORM_DESCRIPTION =
-  'ليفونيس — متجر الطباعة ثلاثية الأبعاد: طابعات، خيوط، قطع جاهزة وطلبات طباعة حسب الطلب.';
+  '\u2068Levonis\u2069 — متجر الطباعة ثلاثية الأبعاد: طابعات، خيوط، قطع جاهزة وطلبات طباعة حسب الطلب.';
 
 /**
  * THE DOCUMENT'S BLACK, NOT THE THEME TOKEN'S.
@@ -170,44 +170,25 @@ const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066
  * a parser, and a name that slips past it reads as «متجر <name>» — which is
  * correct, merely wordier, and never wrong the way the double noun was.
  *
- * The brand is written «ليفونيس» rather than `PLATFORM_NAME`. Latin letters in
- * the middle of an Arabic sentence flip the run direction mid-line, and this
- * string has no surrounding page to steady it; the Arabic spelling is the one
- * PLATFORM_DESCRIPTION two constants above already uses for the same reason.
- *
- * AND THE LEGAL CORPUS NOW DISAGREES WITH THIS PARAGRAPH — DELIBERATELY, AND
- * THE BOUNDARY IS WORTH WRITING DOWN. The owner photographed the policies page
- * and the mismatch on it: the English text, the logo, the domain and article
- * 11.2's own trademark clause all said «Levonis» while the Arabic and Sorani
- * bodies transliterated it. Every document in worker/lib/policies now reads
- * «Levonis» in all three languages, and tests/policyCorpus.test.ts enforces it
- * there.
- *
- * IT WAS NOT EXTENDED TO THIS FILE, OR TO THE OTHER BARE STRINGS. A policy
- * document is a PAGE: the Latin word sits inside a long paragraph with a
- * direction the surrounding block has already established, and the UBA
- * resolves it. These do not have that. A manifest description is handed to
- * Chromium's install dialog and to launchers with no page around it, a
- * sign-in email (worker/lib/emailTemplates.ts) is rendered by whatever client
- * the customer uses, and neither gives the run anything to steady it. That is
- * the reason the Arabic spelling was chosen here and it has not stopped being
- * true.
- *
- * SO THE BRAND IS SPLIT, AND THAT IS AN OWNER DECISION, NOT A BUG TO QUIETLY
- * CLOSE. Roughly 57 «ليفونيس» and 37 of the Sorani transliteration remain
- * outside the corpus, including copy a customer reads — this string, and «حسابك
- * في ليفونيس» in the sign-in email. A customer who reads the Terms and then
- * that email is shown two names for one shop. Unifying them means changing
- * what a customer sees in their inbox, which is the owner's call; it is
- * recorded as row 99 of docs/DECISIONS.md rather than decided here. Until it
- * is answered, this paragraph is the boundary: corpus in Latin, bare strings
- * in Arabic script, and neither side silently drifting into the other.
+ * THE BRAND IS «Levonis», IN LATIN LETTERS, HERE AS EVERYWHERE — the owner:
+ * «أريد اسم Levonis بالإنجليزي فقط» (docs/DECISIONS.md row 99). This string
+ * used the Arabic transliteration «ليفونيس» because a Latin run in the middle
+ * of an Arabic sentence can flip direction mid-line, and a manifest
+ * description is handed to Chromium's install dialog and to launchers with no
+ * page around it to steady it. That concern is answered, not ignored: the
+ * name is wrapped in FIRST STRONG ISOLATE … POP DIRECTIONAL ISOLATE
+ * (U+2068 … U+2069), which lays the word out as its own left-to-right island
+ * and hides it from the paragraph's first-strong direction detection, so the
+ * Arabic sentence around it reads right-to-left whatever renders it. The same
+ * isolation is used in the other plain-text channels (the sign-in email, the
+ * notification texts), and PLATFORM_DESCRIPTION above opens with the isolated
+ * name for the same reason.
  */
 const NAME_ALREADY_HAS_A_NOUN = /^(?:متجر|محل|شركة|مؤسسة|معمل|ورشة)\s/;
 
 function storeDescription(name: string): string {
   const subject = NAME_ALREADY_HAS_A_NOUN.test(name) ? name : `متجر ${name}`;
-  return `${subject} على منصة ليفونيس`;
+  return `${subject} على منصة \u2068Levonis\u2069`;
 }
 
 /**
@@ -264,11 +245,20 @@ function shortNameFrom(name: string): string {
  * crops it. One entry claiming both purposes forces a browser to use the same
  * pixels for both jobs, and one of the two then looks wrong.
  */
+/*
+ * The names carry the logo's revision (`PLATFORM_ICON_REVISION` in
+ * src/lib/siteLogo.ts). That is not decoration for this file in particular:
+ * Chrome decides whether an INSTALLED Android app's icon has changed by
+ * comparing the manifest's icon URL and re-fetching it, through the same HTTP
+ * cache that holds `/icons/*` for a week — so new pixels under an old URL
+ * were judged "unchanged" and the home-screen icon kept the previous mark. A
+ * new URL is a manifest change, and the update follows.
+ */
 const PLATFORM_ICONS: readonly WebManifestIcon[] = [
-  { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-  { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-  { src: '/icons/maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-  { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+  { src: '/icons/icon-192.bc80fc2b.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+  { src: '/icons/icon-512.bc80fc2b.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+  { src: '/icons/maskable-192.bc80fc2b.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+  { src: '/icons/maskable-512.bc80fc2b.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
 ];
 
 /**
@@ -362,7 +352,7 @@ function storeLogoIcon(logoKey: unknown): WebManifestIcon | null {
  * a generic launcher glyph, and there is no per-shortcut artwork in the repo.
  */
 const SHORTCUT_ICONS: WebManifestIcon[] = [
-  { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+  { src: '/icons/icon-192.bc80fc2b.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
 ];
 
 function shortcuts(): WebManifestShortcut[] {

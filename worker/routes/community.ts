@@ -8,7 +8,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { getTierStatus, benefits, usersWithEntitlement } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
-import { communityAdminDoor, communityGate, communityMayEnter, readCommunityGate } from '../lib/communityGate';
+import { communityAdminDoor, communityClosedRefusal, communityGate, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 
 export const communityRoutes = new Hono<AppContext>();
 
@@ -290,6 +290,10 @@ communityRoutes.post('/my-store', requireAuth, async (c) => {
       .run();
     return c.json({ success: true, id: existing.id });
   }
+  // A NEW community merchant is a way INTO the community, so it waits while
+  // the community is under maintenance (owner, 2026-09-23 — docs/DECISIONS.md).
+  // The branch above is untouched: an existing merchant keeps editing theirs.
+  if (!communityMayEnter(await readCommunityGate(c.env.DB), user)) throw communityClosedRefusal();
   // Creating a NEW merchant profile is a PLUS benefit inherited by PREMIUM
   // and PRO — server-side tier check, never a client flag.
   // server-side tier check, never a client flag. Existing merchants above

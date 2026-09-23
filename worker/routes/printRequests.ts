@@ -32,6 +32,7 @@ import { resolveModelLink, parseModelLink } from '../lib/externalModels';
 import { governorateName, normalizeGovernorate } from '../lib/iraqGovernorates';
 import { notifyStatement } from '../lib/notifications';
 import { getMediaObject, putMediaObject } from '../lib/mediaStorage';
+import { communityClosedRefusal, communityMayEnter, readCommunityGate, requireCommunityOpen } from '../lib/communityGate';
 
 /**
  * THE PRINT REQUEST JOURNEY — upload, measure, estimate, publish, notify.
@@ -649,7 +650,7 @@ export function printMatchNotification(f: PrintMatchFacts): { title: Trilingual;
  * handler inserts into `community_requests`, and the matching engine has no
  * ability to (worker/lib/printMatching.ts returns decisions, not rows).
  */
-printRequestRoutes.post('/requests/:id/publish', requireAuth, async (c) => {
+printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAuth, async (c) => {
   await rateLimit(c, 'print-publish', 20, 3600);
   const user = c.get('user')!;
   const requestId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
@@ -1090,7 +1091,12 @@ printRequestRoutes.get('/requests/:id', async (c) => {
   if (!request) throw notFound('Request not found');
 
   const isOwner = !!user && user.id === request.customer_id;
-  const openToAll = request.visibility === 'public' && ['open', 'receiving_offers'].includes(request.state);
+  const publicBoard = request.visibility === 'public' && ['open', 'receiving_offers'].includes(request.state);
+  // The public board is Levo Community and closes with it (DECISIONS 110):
+  // this is the print twin of the walled GET /api/marketplace/requests/:id.
+  // The customer and the merchant already working the job keep their view.
+  const boardShut = publicBoard && !isOwner && !communityMayEnter(await readCommunityGate(c.env.DB), user);
+  const openToAll = publicBoard && !boardShut;
   if (!isOwner && !openToAll) {
     const engaged = user
       ? await c.env.DB.prepare(
@@ -1099,7 +1105,7 @@ printRequestRoutes.get('/requests/:id', async (c) => {
             WHERE o.request_id = ? AND m.user_id = ? AND o.state = 'accepted'`
         ).bind(requestId, user.id).first()
       : null;
-    if (!engaged) throw notFound('Request not found');
+    if (!engaged) throw boardShut ? communityClosedRefusal() : notFound('Request not found');
   }
 
   const row = await c.env.DB.prepare('SELECT * FROM community_print_requests WHERE request_id = ?')
@@ -1285,7 +1291,7 @@ async function viewerToken(env: Env, raw: string | undefined) {
  * one, and a customer who repeats an order in March should not lose it because
  * they tidied up in January.
  */
-printRequestRoutes.post('/requests/:id/repeat', requireAuth, async (c) => {
+printRequestRoutes.post('/requests/:id/repeat', requireCommunityOpen, requireAuth, async (c) => {
   await rateLimit(c, 'request-repeat', 20, 3600);
   const user = c.get('user')!;
   const sourceId = str(c.req.param('id'), 'id', { min: 1, max: 60 });

@@ -22,19 +22,22 @@
  * ever mounted inside the platform admin, on the apex host.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Loader2, Search, BadgeCheck, Ban, ShieldCheck, Store, AlertTriangle, Wallet,
-  Scale, Settings2, TrendingUp, ChevronLeft, Check, ClipboardList, Star, Printer,
+  Scale, Settings2, TrendingUp, ChevronLeft, Check, ClipboardList, Star, Printer, Paperclip,
 } from 'lucide-react';
-import { ApiError } from '../../lib/api';
+import { api, ApiError, uploadFile } from '../../lib/api';
+import MessageMedia from '../adminSupport/MessageMedia';
+import { refreshSupportCounts } from '../adminSupport/supportCounts';
+import { mergeThread, pollWhileVisible, settleThread, useThreadScroll } from '../../lib/supportThread';
 import PrintPricingAdmin from './PrintPricingAdmin';
 import CommunityGatePanel from './CommunityGatePanel';
 import { newIdempotencyKey } from '../../lib/api';
 import {
   adminCommunityApi, iqd, badgeLabel,
   type CommunityOverview, type AdminMerchantRow, type AdminComplaintRow,
-  type AdminRequestRow, type AdminReviewRow, type AdminReputation,
+  type AdminRequestRow, type AdminReviewRow, type AdminReputation, type AdminComplaintMessage,
 } from '../../lib/merchant';
 
 type Section =
@@ -99,6 +102,18 @@ export default function AdminCommunity({ dir }: { dir: 'ltr' | 'rtl' }) {
 }
 
 type T = (ar: string, en: string) => string;
+
+/**
+ * «الشكاوى» in the support console (src/components/adminSupport/SupportQueue.tsx)
+ * — THIS screen, the same list and the same detail, not a copy of them. The
+ * owner looked for one place to answer customers; a complaint desk that
+ * existed only three menus deep under the community panel was not in it.
+ */
+export function ComplaintsDesk({ dir }: { dir: 'ltr' | 'rtl' }) {
+  const rtl = dir === 'rtl';
+  const t: T = (ar, en) => (rtl ? ar : en);
+  return <Disputes t={t} />;
+}
 
 // ---------------------------------------------------------------- overview
 
@@ -1119,13 +1134,18 @@ function Disputes({ t }: { t: T }) {
   }, [filter]);
   useEffect(load, [load]);
 
-  if (open) return <DisputeDetail id={open} t={t} onBack={() => { setOpen(null); load(); }} />;
+  // Back from a case re-reads the console's counts too: an answer just sent
+  // is what takes this complaint off the «الشكاوى» badge.
+  if (open) return <DisputeDetail id={open} t={t} onBack={() => { setOpen(null); load(); void refreshSupportCounts(); }} />;
   if (rows === null) return <Spin />;
 
   return (
     <div className="space-y-4">
       <div className="flex gap-1.5 overflow-x-auto hide-scrollbar pb-1">
-        {['', 'submitted', 'under_review', 'resolved', 'rejected'].map((s) => (
+        {/* Every status the desk can put a complaint in has a chip: a
+            complaint parked «بانتظار العميل» could not be listed on its own,
+            so the one the customer had just answered was hard to find. */}
+        {['', 'submitted', 'under_review', 'waiting_customer', 'waiting_merchant', 'resolved', 'rejected', 'closed'].map((s) => (
           <button
             key={s || 'all'}
             onClick={() => setFilter(s)}
@@ -1151,6 +1171,13 @@ function Disputes({ t }: { t: T }) {
               {c.merchant_name ?? t('شكوى عامة', 'General complaint')}
             </span>
             <div className="flex items-center gap-1.5 shrink-0">
+              {/* The same rule as the console's «الشكاوى» count: the reporter
+                  (or the merchant) wrote last, or nobody has answered yet. */}
+              {c.awaiting_reply === 1 && (
+                <span data-complaint-awaiting className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-300">
+                  {t('بانتظار الرد', 'Awaiting a reply')}
+                </span>
+              )}
               {c.priority === 'urgent' && (
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-300">
                   {t('عاجل', 'Urgent')}
@@ -1186,11 +1213,64 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
   const [reply, setReply] = useState('');
   const [internal, setInternal] = useState(false);
   const [replyError, setReplyError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const composerRef = useRef<HTMLDivElement | null>(null);
+  const tempCounter = useRef(0);
 
   const load = useCallback(() => {
     adminCommunityApi.complaint(id).then(setD).catch(() => {});
   }, [id]);
   useEffect(load, [load]);
+
+  /**
+   * THE THREAD RE-READS ITSELF — the reporter can answer now
+   * (POST /api/marketplace/complaints/:id/messages), and a reply that only
+   * appeared when the admin left and came back is the defect the ticket
+   * console had. Silent, merged by id, and only the thread and the status are
+   * taken from it: the escrow block above is a decision surface and must not
+   * move under the admin's finger.
+   */
+  const loaded = !!d;
+
+  /**
+   * THE REPLY BOX ON SCREEN WHEN THE CASE OPENS. The complaint text sits above
+   * the conversation, so on a phone the composer started below the fold and
+   * «أين أكتب الرد؟» was a scroll away. `nearest` moves the page only as far
+   * as needed — on a tablet where everything fits, it does not move at all.
+   */
+  useEffect(() => {
+    if (!loaded) return;
+    const frame = requestAnimationFrame(() => composerRef.current?.scrollIntoView({ block: 'nearest' }));
+    return () => cancelAnimationFrame(frame);
+  }, [loaded]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    return pollWhileVisible(() => {
+      api
+        .get<Awaited<ReturnType<typeof adminCommunityApi.complaint>>>(`/api/admin/community/complaints/${id}`, { mascot: 'silent' })
+        .then((fresh) =>
+          setD((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  complaint: prev.complaint.status === fresh.complaint.status ? prev.complaint : { ...prev.complaint, status: fresh.complaint.status },
+                  messages: mergeThread(prev.messages, fresh.messages),
+                }
+              : prev
+          )
+        )
+        .catch(() => undefined);
+    }, 12_000);
+  }, [id, loaded]);
+
+  // The newest message in view, inside the list only (never the page) — and
+  // again once an attached photo has loaded (src/lib/supportThread.ts).
+  const messageCount = d ? d.messages.length : 0;
+  const lastPending = !!d?.messages[d.messages.length - 1]?.pending;
+  useThreadScroll(listRef, `${id}:${loaded ? 1 : 0}`, messageCount, lastPending);
 
   async function settle(decision: 'release' | 'refund' | 'partial_refund') {
     if (!d?.escrow) return;
@@ -1239,22 +1319,117 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
     }
   }
 
+  /**
+   * A bubble on screen before anything leaves — the ticket console's rule. It
+   * carries the note flag it will be stored with, so an internal note looks
+   * like one from the first frame.
+   */
+  function addPending(body: string, kind: 'text' | 'image' | 'video', fileUrl: string | null, asNote: boolean): string {
+    tempCounter.current += 1;
+    const tempId = `temp-${Date.now()}-${tempCounter.current}`;
+    setD((prev) =>
+      prev
+        ? {
+            ...prev,
+            messages: [
+              ...prev.messages,
+              {
+                id: tempId,
+                complaint_id: id,
+                sender_id: '',
+                sender_role: 'admin',
+                sender_name: null,
+                body,
+                file_key: null,
+                file_url: fileUrl,
+                kind,
+                internal: asNote ? 1 : 0,
+                created_at: new Date().toISOString(),
+                pending: true,
+              },
+            ],
+          }
+        : prev
+    );
+    return tempId;
+  }
+
+  const dropPending = (tempId: string) =>
+    setD((prev) => (prev ? { ...prev, messages: prev.messages.filter((m) => m.id !== tempId) } : prev));
+
+  const settleReply = (tempId: string, message: AdminComplaintMessage | undefined) =>
+    setD((prev) =>
+      prev
+        ? {
+            ...prev,
+            messages: message
+              ? settleThread(prev.messages, tempId, { ...message, pending: false })
+              : prev.messages.map((m) => (m.id === tempId ? { ...m, pending: false } : m)),
+          }
+        : prev
+    );
+
+  /**
+   * THE REPLY APPENDS. It used to call `load()` after every send — the whole
+   * complaint, escrow and event log fetched again for one sentence. The route
+   * returns the row it wrote; that row replaces the pending bubble.
+   */
   async function send() {
     const text = reply.trim();
     if (!text || busy) return;
+    const asNote = internal;
     setBusy(true);
     setReplyError('');
+    setReply('');
+    const tempId = addPending(text, 'text', null, asNote);
     try {
-      await adminCommunityApi.replyToComplaint(id, text, internal);
-      // Cleared only after the server took it: a network failure that also
-      // ate the admin's paragraph is the one way to make this worse.
-      setReply('');
+      const r = await adminCommunityApi.replyToComplaint(id, text, asNote);
+      settleReply(tempId, r?.message);
       setInternal(false);
-      load();
+      void refreshSupportCounts();
     } catch (e) {
+      // The paragraph goes back in the box: a network failure that also ate
+      // it is the one way to make this worse.
+      dropPending(tempId);
+      setReply(text);
       setReplyError(e instanceof ApiError ? e.message : t('تعذّر الإرسال', 'Could not send'));
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * «ولا يمكن إرسال وسائط» — the photograph of the replacement part, the
+   * courier's receipt. Uploaded under THIS complaint (`purpose:'complaint'`,
+   * checked on the server before a byte is stored), then sent as the message,
+   * with whatever is in the box as its caption and the reply/note choice the
+   * admin has made.
+   */
+  async function attach(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || busy || uploading) return;
+    const caption = reply.trim();
+    const asNote = internal;
+    const kind: 'image' | 'video' = file.type.startsWith('video/') ? 'video' : 'image';
+    const localUrl = URL.createObjectURL(file);
+    setUploading(true);
+    setReplyError('');
+    setReply('');
+    const tempId = addPending(caption, kind, localUrl, asNote);
+    try {
+      const uploaded = await uploadFile(file, 'complaint', id);
+      const r = await adminCommunityApi.replyToComplaint(id, caption, asNote, uploaded.key);
+      settleReply(tempId, r?.message);
+      setInternal(false);
+      void refreshSupportCounts();
+    } catch (err) {
+      dropPending(tempId);
+      setReply(caption);
+      setReplyError(err instanceof ApiError ? err.message : t('تعذّر الإرسال', 'Could not send'));
+    } finally {
+      setUploading(false);
+      URL.revokeObjectURL(localUrl);
     }
   }
 
@@ -1285,7 +1460,11 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
             {t('لا توجد رسائل بعد — أول رد يبدأ من هنا.', 'No messages yet — the first reply starts here.')}
           </p>
         )}
-        <div className="space-y-2 mb-3">
+        {/* THE THREAD SCROLLS IN ITS OWN BOX, with the composer right under
+            it — a long dispute used to push the reply box below every message
+            and the escrow controls, so answering meant scrolling past the
+            whole case. */}
+        <div ref={listRef} className="space-y-2 mb-3 max-h-[55dvh] overflow-y-auto overscroll-contain pe-1" data-complaint-thread>
           {d.messages.map((m) => (
             <div
               key={m.id}
@@ -1295,7 +1474,7 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
                   : m.sender_role === 'admin'
                     ? 'border-olive/40 bg-olive/10'
                     : 'border-zinc-700/50 bg-zinc-800/30'
-              }`}
+              } ${m.pending ? 'opacity-60' : ''}`}
             >
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-zinc-400 text-[11px]">{m.sender_name ?? m.sender_role}</span>
@@ -1305,15 +1484,27 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
                   </span>
                 )}
               </div>
-              <p className="text-zinc-200 text-[13px] leading-relaxed whitespace-pre-wrap">{m.body}</p>
+              <MessageMedia
+                kind={m.kind ?? (m.file_key ? 'image' : 'text')}
+                url={m.file_url ?? (m.file_key ? `/files/${m.file_key}` : null)}
+                openLabel={t('فتح الصورة بالحجم الكامل', 'Open the full-size image')}
+              />
+              {!!m.body && <p className="text-zinc-200 text-[13px] leading-relaxed whitespace-pre-wrap">{m.body}</p>}
             </div>
           ))}
         </div>
 
+        {/* THE COMPOSER IS RIGHT UNDER THE NEWEST MESSAGE, and both are on
+            screen when the case opens: the thread scrolls inside its own
+            bounded box, and opening the complaint brings this box to the
+            bottom edge of the screen (see `composerRef`). It is not sticky on
+            purpose — a sticky bar here covered the newest message of the very
+            box above it on a phone (measured at 360px). */}
+        <div ref={composerRef} className="border-t border-zinc-700/50 pt-3" data-complaint-composer>
         <textarea
           value={reply}
           onChange={(e) => setReply(e.target.value)}
-          rows={3}
+          rows={2}
           maxLength={4000}
           placeholder={t('اكتب ردك على الشكوى…', 'Write your reply to the complaint…')}
           className="w-full rounded-2xl border border-zinc-700/50 bg-zinc-900/60 px-3.5 py-2.5 text-[13px] text-zinc-100 placeholder:text-zinc-600"
@@ -1342,16 +1533,29 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
           >
             {t('ملاحظة داخلية', 'Internal note')}
           </button>
+          <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={attach} data-complaint-attach-input />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={busy || uploading}
+            aria-label={t('إرفاق صورة أو فيديو', 'Attach a photo or video')}
+            title={t('إرفاق صورة أو فيديو', 'Attach a photo or video')}
+            data-complaint-attach
+            className="ms-auto flex h-10 w-10 items-center justify-center rounded-2xl border border-zinc-700/50 bg-zinc-800/40 text-zinc-300 disabled:opacity-40"
+          >
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+          </button>
           <button
             type="button"
             onClick={send}
-            disabled={busy || !reply.trim()}
-            className="ms-auto px-5 min-h-[40px] rounded-2xl bg-olive text-white font-bold text-[13px] disabled:opacity-40"
+            disabled={busy || uploading || !reply.trim()}
+            className="px-5 min-h-[40px] rounded-2xl bg-olive text-white font-bold text-[13px] disabled:opacity-40"
           >
             {t('إرسال', 'Send')}
           </button>
         </div>
         {!!replyError && <p className="text-red-300 text-[12px] mt-2">{replyError}</p>}
+        </div>
       </Section>
 
       {d.escrow && (

@@ -608,7 +608,7 @@ function MoveFundsTab({ tInvest }: { tInvest: (en: string, ar: string) => string
         <p className="text-sm text-zinc-500 max-w-sm">
           {tInvest(
             'Deposits and withdrawals are handled through your Levonis wallet. Requests are reviewed by our team before funds move.',
-            'تتم عمليات الإيداع والسحب عبر محفظة ليفونيس. تُراجع الطلبات من قبل فريقنا قبل تحريك الأموال.'
+            'تتم عمليات الإيداع والسحب عبر محفظة Levonis. تُراجع الطلبات من قبل فريقنا قبل تحريك الأموال.'
           )}
         </p>
         <button

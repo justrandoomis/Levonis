@@ -45,11 +45,17 @@ import type { PolicyDocument } from './types';
  *     text rather than show a customer a `{{TOKEN}}`. They are still authored
  *     below, and each one returns of its own accord the moment its value is
  *     written in and the version moves again.
+ *
+ * VERSION 3 — WHY IT MOVED. The archive keeps version 2 byte for byte.
+ *   * THE FACTS. worker/lib/policies/facts.ts now states `LEVONIS_SUPPORT_CONTACT`, `PREMIUM_FREE_DELIVERY_MIN_IQD`, `PRO_FREE_DELIVERY_MIN_IQD`,
+ *     so the clauses that carried them are published instead of withheld.
+ *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
+ *     by number, an article of this document that is itself withheld.
  */
 export const returns: PolicyDocument = {
   key: 'returns',
-  version: 2,
-  effective_at: '2026-01-01',
+  version: 3,
+  effective_at: '2026-09-23',
   title: {
     ar: 'سياسة الاسترجاع والاستبدال',
     en: 'Returns and Exchange Policy',
@@ -93,7 +99,7 @@ export const returns: PolicyDocument = {
 - كلفة إعادة المنتج إلى المتجر يتحملها الزبون في جميع الأحوال، بما فيها حالة المنتج المعيب فعليًا. مجانية الإرجاع تعني عدم استيفاء رسم أو غرامة على الإرجاع نفسه، لا تحمُّل المتجر أجرة النقل.
 - أجور التوصيل والضرائب المرافقة تحددها شركات التوصيل، لا Levonis. المتجر ينقل ما تطلبه الشركة ولا يزيد عليه ولا يتحكم فيه.
 - أجرة التوصيل المدفوعة في الطلب الأصلي لا تُرد عند الإرجاع، لأنها خدمة نُفّذت فعلًا.
-- جميع كلف التوصيل على الزبون، إلا لأعضاء PRO والعضوية المميزة فوق قيمة الطلب البالغة {{PRO_FREE_DELIVERY_MIN_IQD}}، حيث يتحملها المتجر وفق ما هو مبيّن في وثيقة التوصيل.
+- جميع كلف التوصيل على الزبون، إلا لعضو PRO فوق قيمة الطلب البالغة {{PRO_FREE_DELIVERY_MIN_IQD}} دينار، ولعضو PREMIUM في أجرة التوصيل الاعتيادية وحدها فوق قيمة الطلب البالغة {{PREMIUM_FREE_DELIVERY_MIN_IQD}} دينار، حيث يتحملها المتجر وفق ما هو مبيّن في وثيقة التوصيل.
 - إذا اتفق الطرفان على استلام المنتج من عنوان الزبون، فكلفة الاستلام على الزبون ما لم ينص المتجر كتابةً على غير ذلك.
 - تسليم المنتج المرتجع باليد إلى {{RETURN_DROP_OFF_LOCATION}} يُسقط كلفة النقل عن الطرفين.
 
@@ -268,7 +274,7 @@ The absence of any one of these takes the case out of the free return, and it is
 - The cost of returning the product to the store is borne by the customer in every case, including the case of a genuinely defective product. A free return means that no fee or penalty is charged for the return itself; it does not mean the store carries the carriage.
 - Delivery charges and the taxes accompanying them are set by the delivery companies, not by Levonis. The store quotes what the company charges, adds nothing to it, and does not control it.
 - The delivery charge paid on the original order is not refunded on a return, because it is a service that was actually performed.
-- All delivery costs are on the customer, except for PRO and Premium members above an order value of {{PRO_FREE_DELIVERY_MIN_IQD}}, where the store carries them, as set out in the Delivery document.
+- All delivery costs are on the customer, except for a PRO member above an order value of {{PRO_FREE_DELIVERY_MIN_IQD}} IQD, and for a PREMIUM member, as to the standard delivery fee alone, above an order value of {{PREMIUM_FREE_DELIVERY_MIN_IQD}} IQD, where the store carries them, as set out in the Delivery document.
 - Where the parties agree that the product is collected from the customer address, the cost of collection is on the customer unless the store states otherwise in writing.
 - Handing the returned product in person at {{RETURN_DROP_OFF_LOCATION}} removes the carriage cost for both parties.
 
@@ -443,7 +449,7 @@ These steps are a condition of any transport-damage claim, and omitting them for
 - تێچووی گەڕاندنەوەی بەرهەمەکە بۆ فرۆشگا لە هەموو حاڵەتێکدا لەسەر کڕیارە، لەوانەش حاڵەتی بەرهەمی بە ڕاستی کەموکووڕ. بێبەرامبەری گەڕاندنەوە واتای وەرنەگرتنی کرێ یان سزا لەسەر خودی گەڕاندنەوەکەیە، نەک هەڵگرتنی کرێی گواستنەوە لەلایەن فرۆشگاوە.
 - کرێ و باجی گەیاندن لەلایەن کۆمپانیاکانی گەیاندنەوە دیاری دەکرێن نەک لەلایەن Levonis ەوە. فرۆشگا ئەوە دەڵێت کە کۆمپانیاکە داوای دەکات، هیچی بۆ زیاد ناکات و کۆنترۆڵی ناکات.
 - ئەو کرێی گەیاندنەی لە داواکاری سەرەکیدا دراوە لە کاتی گەڕاندنەوەدا ناگەڕێندرێتەوە، چونکە خزمەتگوزارییەکە بە ڕاستی جێبەجێ کراوە.
-- هەموو تێچووەکانی گەیاندن لەسەر کڕیارن، جگە لە ئەندامانی PRO و ئەندامێتی تایبەت لە سەرووی بەهای داواکاری {{PRO_FREE_DELIVERY_MIN_IQD}}، کە فرۆشگا هەڵیدەگرێت، بەپێی ئەوەی لە بەڵگەنامەی گەیاندن هاتووە.
+- هەموو تێچووەکانی گەیاندن لەسەر کڕیارن، جگە لە ئەندامی PRO لە سەرووی بەهای داواکاری {{PRO_FREE_DELIVERY_MIN_IQD}} دینار، و ئەندامی PREMIUM تەنها بۆ کرێی گەیاندنی ئاسایی لە سەرووی بەهای داواکاری {{PREMIUM_FREE_DELIVERY_MIN_IQD}} دینار، کە فرۆشگا هەڵیدەگرێت، بەپێی ئەوەی لە بەڵگەنامەی گەیاندن هاتووە.
 - ئەگەر هەردوو لا ڕێک کەوتن کە بەرهەمەکە لە ناونیشانی کڕیارەوە وەربگیرێت، تێچووی وەرگرتن لەسەر کڕیارە مەگەر فرۆشگا بە نووسراوی پێچەوانەی بڵێت.
 - پێدانی بەرهەمە گەڕێنراوەکە بە دەست لە {{RETURN_DROP_OFF_LOCATION}} تێچووی گواستنەوە لەسەر هەردوو لا لادەبات.
 

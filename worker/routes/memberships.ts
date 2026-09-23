@@ -14,6 +14,7 @@ import { sha256Hex } from '../lib/crypto';
 import { getSetting, setSetting, SETTING_DEFAULTS } from '../lib/settings';
 import {
   ENTITLEMENT_MINIMUM_TIER,
+  dailyRewardMultiplierX100,
   entitlementSnapshot,
   benefits,
   defaultAddressOf,
@@ -27,6 +28,7 @@ import { bnplEligibility, bnplOutstanding, bnplRepaymentStatement } from '../lib
 import { addMonths, attributeReferral, onProSubscriptionPurchased } from '../lib/membershipOps';
 import { TIER_RANK } from '../lib/pricing';
 import { publicBenefitSummary } from '../lib/membershipBenefits';
+import { convertLaunchReservations, countLaunchReservations } from '../lib/launchActivation';
 import { audit } from '../lib/audit';
 import { emitEvent, eventsEnabled } from '../lib/eventBus';
 import { SubscriptionChangedV1 } from '@levonis/contracts/events/v1/SubscriptionChanged';
@@ -332,7 +334,7 @@ export async function quotePurchase(
   }
   if (pendingRows.some((m) => m.tier === plan.tier)) {
     throw badRequest(
-      `لديك بالفعل اشتراك ${target} مدفوع مسبقا بانتظار الإطلاق / You already have a prepaid ${target} membership awaiting the launch`,
+      `لديك بالفعل اشتراك ${target} مدفوع مسبقا قيد التفعيل / You already have a prepaid ${target} membership being activated`,
       'ALREADY_PREPAID'
     );
   }
@@ -340,7 +342,7 @@ export async function quotePurchase(
   if (higherPending) {
     const held = tierLabel(higherPending.tier);
     throw badRequest(
-      `لديك اشتراك ${held} مدفوع مسبقا بانتظار الإطلاق — لا يمكن شراء ${target} وهو أدنى منه / You already have a prepaid ${held} membership awaiting the launch — ${target} is below it and cannot be bought`,
+      `لديك اشتراك ${held} مدفوع مسبقا قيد التفعيل — لا يمكن شراء ${target} وهو أدنى منه / You already have a prepaid ${held} membership being activated — ${target} is below it and cannot be bought`,
       'DOWNGRADE_BLOCKED'
     );
   }
@@ -831,15 +833,12 @@ function thresholdOr(v: unknown, fallback: number): number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : fallback;
 }
 
+function statusForTier(tier: PaidTier): TierStatus {
+  return { tier, active: true, expires_at: null, pending_launch: null, gated_benefits: [] };
+}
+
 function entitlementsForTier(tier: PaidTier) {
-  const status: TierStatus = {
-    tier,
-    active: true,
-    expires_at: null,
-    pending_launch: null,
-    gated_benefits: [],
-  };
-  return entitlementSnapshot(status);
+  return entitlementSnapshot(statusForTier(tier));
 }
 
 /**
@@ -854,25 +853,16 @@ function entitlementsForTier(tier: PaidTier) {
  */
 membershipsRoutes.get('/plans', async (c) => {
   const db = c.env.DB;
-  const [{ results }, launch, printerGift, preorderGift, shippingPolicy, benefits] = await Promise.all([
+  const [{ results }, launch, preorderGift, shippingPolicy, benefits] = await Promise.all([
     db.prepare(
       'SELECT id, tier, duration_months, price_iqd, active, sort FROM membership_plans WHERE active = 1 ORDER BY sort, duration_months'
     ).all<PlanRow>(),
     getLaunchConfig(db),
-    getSetting(db, 'printerGiftConfig'),
     getSetting(db, 'preorderGiftConfig'),
     getSetting(db, 'shippingPolicy'),
     publicBenefitSummary(db, new Date().toISOString()),
   ]);
 
-  // The printer gift is granted only when the configured plan actually
-  // exists (grantPrinterGiftIfEligible refuses a missing plan) — so the page
-  // may only advertise it under the same condition.
-  let printerGiftLive = false;
-  if (printerGift.enabled && typeof printerGift.plan_id === 'string' && printerGift.plan_id) {
-    const giftPlan = await db.prepare('SELECT id FROM membership_plans WHERE id = ?').bind(printerGift.plan_id).first();
-    printerGiftLive = !!giftPlan;
-  }
   const policy = (shippingPolicy && typeof shippingPolicy === 'object' ? shippingPolicy : {}) as Record<string, unknown>;
 
   return c.json({
@@ -880,7 +870,15 @@ membershipsRoutes.get('/plans', async (c) => {
     plans: results.map(planPublic),
     launch: { launch_at: launch.launch_at, activated: launch.activated },
     features: {
-      printer_gift: printerGiftLive,
+      /**
+       * ALWAYS FALSE, AND KEPT ONLY SO A PAGE LOADED BEFORE THIS DEPLOY READS
+       * A BOOLEAN. The PLUS-with-a-printer gift is granted BY HAND now:
+       * `grantPrinterGiftIfEligible` has had no caller since the order
+       * pipeline stopped granting it, so `printerGiftConfig.enabled` had
+       * become a switch that advertised a gift nothing gave. A promise the
+       * store makes manually, case by case, is not a benefit of the card.
+       */
+      printer_gift: false,
       preorder_gift: !!(preorderGift.enabled && typeof preorderGift.product_id === 'string' && preorderGift.product_id),
     },
     delivery: {
@@ -903,6 +901,16 @@ membershipsRoutes.get('/plans', async (c) => {
         prime: entitlementsForTier('prime'),
         pro: entitlementsForTier('pro'),
       },
+    },
+    /**
+     * The daily check-in multiplier each tier earns, in hundredths — from
+     * `dailyRewardMultiplierX100`, the function the check-in itself calls, so
+     * the comparison's «×1.5» / «×2» is the server's figure and not a copy.
+     */
+    points_multiplier_x100: {
+      plus: dailyRewardMultiplierX100(statusForTier('plus')),
+      prime: dailyRewardMultiplierX100(statusForTier('prime')),
+      pro: dailyRewardMultiplierX100(statusForTier('pro')),
     },
   });
 });
@@ -1306,14 +1314,21 @@ membershipsRoutes.get('/admin/list', async (c) => {
 
 /** Every plan, active or not, for the admin Memberships panel. */
 membershipsRoutes.get('/admin/plans', async (c) => {
-  const [{ results }, launch] = await Promise.all([
+  const [{ results }, launch, reservations] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM membership_plans ORDER BY sort, duration_months').all<PlanRow>(),
     getLaunchConfig(c.env.DB),
+    countLaunchReservations(c.env.DB),
   ]);
   return c.json({
     success: true,
     plans: results.map((p) => ({ ...planPublic(p), active: !!p.active })),
     launch,
+    // Reservations still waiting. After the launch they are converted as each
+    // account is read; this is what the panel's leftover sweep would start.
+    prepaid_count: reservations.waiting,
+    // Reservations the sweep will never start (the account runs a higher
+    // tier) — a refund or a cancel by hand, not a button press.
+    deferred_count: reservations.deferred,
   });
 });
 
@@ -1365,22 +1380,18 @@ membershipsRoutes.patch('/admin/plans/:id', async (c) => {
 });
 
 /**
- * The owner's explicit, audited launch activation (mandate §8.1). Idempotent:
- * already activated → 200 no-op (it still sweeps any prepaid stragglers left
- * by a crash mid-activation, converting them exactly once).
+ * The owner's explicit, audited launch activation (mandate §8.1), and the
+ * sweep for anything left waiting after it. Idempotent: already activated →
+ * 200, and it still converts every reservation that exists — a straggler
+ * written by a legacy or racing writer, or an account nobody has opened since
+ * the deploy. The panel keeps the button enabled while `prepaid_count` > 0.
  *
- * ONE ACTIVE ROW PER ACCOUNT (migration 0052) is honoured here too, so legacy
- * data can never make the activation violate the index half-way through:
- *   - an account holding several prepaid rows activates the HIGHEST tier
- *     (tie: the latest purchase) and the others are cancelled;
- *   - an account still holding an active row of a lower or equal tier (a
- *     'migrated' row, or one bought before this rule) has that row superseded
- *     — cancelled — by the reservation it later paid for;
- *   - an account holding an active row of a HIGHER tier than its reservation
- *     (not reachable through the purchase rules; legacy admin data only) keeps
- *     the reservation pending and is written to the audit log for a human to
- *     refund or cancel — an automatic downgrade would take away what they hold.
- * Every deviation from the plain "prepaid → active" flip is audited.
+ * The conversion itself — one active row per account, highest tier wins, a
+ * lower running row superseded, a higher running row left alone and audited —
+ * is `convertLaunchReservations` (worker/lib/launchActivation.ts), the same
+ * function `getTierStatus` runs for one account on read, so the button and
+ * the automatic path can never disagree. Every row starts NOW: a straggler
+ * swept a week after the launch used to be backdated to it and lose the week.
  */
 membershipsRoutes.post('/admin/activate-launch', async (c) => {
   const admin = c.get('user')!;
@@ -1394,7 +1405,10 @@ membershipsRoutes.post('/admin/activate-launch', async (c) => {
 
   const db = c.env.DB;
   const launch = await getLaunchConfig(db);
-  const already = launch.activated;
+  // A row that says `activated` is the only proof the owner's launch was
+  // recorded; the code default being "live" does not write one.
+  const stored = await db.prepare("SELECT 1 AS x FROM admin_settings WHERE key = 'launchConfig'").first();
+  const already = launch.activated && !!stored;
   const nowIso = new Date().toISOString();
   const activatedAt = already ? (launch.activated_at ?? nowIso) : nowIso;
 
@@ -1406,76 +1420,11 @@ membershipsRoutes.post('/admin/activate-launch', async (c) => {
     });
   }
 
-  interface PrepaidRow { id: string; user_id: string; tier: PaidTier; duration_months: number; created_at: string }
-  const [{ results: prepaid }, { results: running }] = await Promise.all([
-    db
-      .prepare(
-        "SELECT id, user_id, tier, duration_months, created_at FROM memberships WHERE state = 'prepaid_pending_launch' ORDER BY user_id, created_at"
-      )
-      .all<PrepaidRow>(),
-    db
-      .prepare(
-        "SELECT id, user_id, tier FROM memberships WHERE state = 'active' AND user_id IN (SELECT user_id FROM memberships WHERE state = 'prepaid_pending_launch')"
-      )
-      .all<{ id: string; user_id: string; tier: PaidTier }>(),
-  ]);
-  const activeByUser = new Map<string, { id: string; tier: PaidTier }>();
-  for (const r of running) activeByUser.set(r.user_id, { id: r.id, tier: r.tier });
-  const byUser = new Map<string, PrepaidRow[]>();
-  for (const m of prepaid) {
-    const list = byUser.get(m.user_id) ?? [];
-    list.push(m);
-    byUser.set(m.user_id, list);
-  }
-
-  // One batch per account, so an account's flip is atomic: the rows it ends
-  // and the row it starts commit together or not at all. Conditional on state
-  // so a retry (or the straggler sweep) never double-converts.
-  let converted = 0;
-  const affectedUsers = new Set<string>();
-  const deferred: Array<{ user_id: string; membership_id: string; tier: PaidTier; active_id: string; active_tier: PaidTier }> = [];
-  for (const [userId, rows] of byUser) {
-    const ranked = [...rows].sort((x, y) => tierRank(y.tier) - tierRank(x.tier) || y.created_at.localeCompare(x.created_at));
-    const winner = ranked[0];
-    const losers = ranked.slice(1);
-    const active = activeByUser.get(userId) ?? null;
-    if (active && tierRank(active.tier) > tierRank(winner.tier)) {
-      deferred.push({ user_id: userId, membership_id: winner.id, tier: winner.tier, active_id: active.id, active_tier: active.tier });
-      continue;
-    }
-    const stmts: D1PreparedStatement[] = [];
-    for (const l of losers) {
-      stmts.push(db.prepare("UPDATE memberships SET state = 'cancelled' WHERE id = ? AND state = 'prepaid_pending_launch'").bind(l.id));
-    }
-    if (active) {
-      stmts.push(db.prepare("UPDATE memberships SET state = 'cancelled' WHERE id = ? AND state = 'active'").bind(active.id));
-    }
-    stmts.push(
-      db
-        .prepare(
-          "UPDATE memberships SET state = 'active', starts_at = ?, expires_at = ? WHERE id = ? AND state = 'prepaid_pending_launch'"
-        )
-        .bind(activatedAt, addMonths(activatedAt, winner.duration_months), winner.id)
-    );
-    const res = await db.batch(stmts);
-    const flipped = res[res.length - 1].meta.changes || 0;
-    converted += flipped;
-    if (flipped > 0) affectedUsers.add(userId);
-    if (losers.length > 0 || active) {
-      await audit(db, admin.id, 'membership.launch_dedupe', winner.id, {
-        user_id: userId,
-        activated: { id: winner.id, tier: winner.tier },
-        cancelled_prepaid: losers.map((l) => ({ id: l.id, tier: l.tier })),
-        superseded_active: active ? { id: active.id, tier: active.tier } : null,
-      });
-    }
-  }
-  for (const d of deferred) {
-    await audit(db, admin.id, 'membership.launch_activation_deferred', d.membership_id, {
-      ...d,
-      note: 'reservation is a LOWER tier than the running membership — refund or cancel it by hand',
-    });
-  }
+  const { converted, deferred, affectedUsers } = await convertLaunchReservations(db, {
+    actorId: admin.id,
+    nowIso,
+    auditDeferred: true,
+  });
   // Refresh the legacy users.* tier cache for the accounts that changed.
   for (const uid of affectedUsers) await getTierStatus(db, uid);
 
@@ -1485,9 +1434,19 @@ membershipsRoutes.post('/admin/activate-launch', async (c) => {
       converted,
       deferred: deferred.length,
       activated_at: activatedAt,
+      started_at: nowIso,
     });
   }
-  return c.json({ success: true, already_activated: already, converted, deferred: deferred.length, activated_at: activatedAt });
+  const left = await countLaunchReservations(db);
+  return c.json({
+    success: true,
+    already_activated: already,
+    converted,
+    deferred: deferred.length,
+    activated_at: activatedAt,
+    prepaid_count: left.waiting,
+    deferred_count: left.deferred,
+  });
 });
 
 /**

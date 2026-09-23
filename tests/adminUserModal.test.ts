@@ -483,7 +483,7 @@ test('no financial figure is computed before the gate in the detail handler', ()
   // THE STRUCTURAL GUARANTEE. Everything that reads money lives AFTER the
   // return, so for a restricted admin those statements are never executed —
   // there is no object to forget to strip and nothing in the raw JSON to find.
-  for (const marker of ['getBalances', 'bnplOutstanding', 'lifetime_iqd', 'lifetime_value_iqd']) {
+  for (const marker of ['getAvailableBalances', 'readWalletDust', 'walletIqdAvailable', 'bnplOutstanding', 'lifetime_iqd', 'lifetime_value_iqd']) {
     const at = handler.indexOf(marker);
     assert.ok(at > gate, `${marker} is read before the financial gate`);
   }

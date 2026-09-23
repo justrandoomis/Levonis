@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
-import { api, ApiError, uploadFile } from '../lib/api';
+import { api, ApiError, newIdempotencyKey, uploadFile } from '../lib/api';
+import { mergeThread, pollWhileVisible, settleThread, useThreadScroll } from '../lib/supportThread';
 import {
   ArrowLeft,
   ArrowRight,
@@ -136,7 +137,7 @@ const STRINGS = {
     tabAssistant: 'المساعد',
     tabTickets: 'تذاكري',
     greeting:
-      'مرحبًا! أنا مساعد ليفونيس الآلي (بدون ذكاء اصطناعي — قواعد ثابتة وبيانات حسابك الحقيقية فقط). اختر موضوعًا أو اكتب سؤالك:',
+      'مرحبًا! أنا مساعد Levonis الآلي (بدون ذكاء اصطناعي — قواعد ثابتة وبيانات حسابك الحقيقية فقط). اختر موضوعًا أو اكتب سؤالك:',
     inputPlaceholder: 'اكتب سؤالك...',
     send: 'إرسال',
     thinking: 'جارٍ البحث...',
@@ -152,7 +153,7 @@ const STRINGS = {
     next: 'متابعة',
     cancel: 'إلغاء',
     confirmTitle: 'تأكيد إرسال التذكرة',
-    confirmBody: 'ستُرسل هذه التذكرة إلى فريق ليفونيس. راجع التفاصيل ثم أكّد.',
+    confirmBody: 'ستُرسل هذه التذكرة إلى فريق Levonis. راجع التفاصيل ثم أكّد.',
     confirmSend: 'تأكيد وإرسال',
     back: 'رجوع',
     creating: 'جارٍ الإنشاء...',
@@ -171,12 +172,25 @@ const STRINGS = {
     uploading: 'جارٍ الرفع…',
     attachFailed: 'تعذر إرسال الصورة',
     you: 'أنت',
-    staff: 'فريق ليفونيس',
+    staff: 'فريق Levonis',
     loading: 'جارٍ التحميل...',
     loadError: 'تعذر التحميل — حاول مجددًا.',
     retry: 'إعادة المحاولة',
     subjectRequired: 'الموضوع مطلوب (3 أحرف على الأقل)',
     messageRequired: 'الرسالة مطلوبة (5 أحرف على الأقل)',
+    complaintsTitle: 'شكاواي',
+    complaintLabel: 'شكوى',
+    complaintOn: 'على',
+    openImage: 'فتح الصورة بالحجم الكامل',
+    complaintStatus: {
+      submitted: 'جديدة',
+      under_review: 'قيد المراجعة',
+      waiting_customer: 'بانتظار ردك',
+      waiting_merchant: 'بانتظار التاجر',
+      resolved: 'محلولة',
+      rejected: 'مرفوضة',
+      closed: 'مغلقة',
+    } as Record<string, string>,
     /* THE OPENING MENU IS CLIENT-SIDE, SO IT HAS TO MIRROR THE SERVER'S.
        The first screen is seeded locally (button-first: no round trip before
        the customer has said anything), so these rows — not
@@ -254,6 +268,19 @@ const STRINGS = {
     retry: 'Retry',
     subjectRequired: 'Subject is required (at least 3 characters)',
     messageRequired: 'Message is required (at least 5 characters)',
+    complaintsTitle: 'My complaints',
+    complaintLabel: 'Complaint',
+    complaintOn: 'about',
+    openImage: 'Open the full-size image',
+    complaintStatus: {
+      submitted: 'New',
+      under_review: 'Under review',
+      waiting_customer: 'Waiting for you',
+      waiting_merchant: 'Waiting for the merchant',
+      resolved: 'Resolved',
+      rejected: 'Rejected',
+      closed: 'Closed',
+    } as Record<string, string>,
     menu: [
       { intent: 'order_status', label: 'My order status' },
       { intent: 'delivery_estimate', label: 'Delivery estimate' },
@@ -277,7 +304,7 @@ const STRINGS = {
     tabAssistant: 'یاریدەدەر',
     tabTickets: 'تیکێتەکانم',
     greeting:
-      'سڵاو! من یاریدەدەری ليڤۆنیسم (بەبێ زیرەکی دەستکرد — تەنها یاسا نەگۆڕەکان و داتای ڕاستەقینەی هەژمارەکەت). بابەتێک هەڵبژێرە یان پرسیارەکەت بنووسە:',
+      'سڵاو! من یاریدەدەری Levonisم (بەبێ زیرەکی دەستکرد — تەنها یاسا نەگۆڕەکان و داتای ڕاستەقینەی هەژمارەکەت). بابەتێک هەڵبژێرە یان پرسیارەکەت بنووسە:',
     inputPlaceholder: 'پرسیارەکەت بنووسە...',
     send: 'ناردن',
     thinking: 'گەڕان بەردەوامە...',
@@ -293,7 +320,7 @@ const STRINGS = {
     next: 'بەردەوامبوون',
     cancel: 'هەڵوەشاندنەوە',
     confirmTitle: 'پشتڕاستکردنەوەی ناردنی تیکێت',
-    confirmBody: 'ئەم تیکێتە بۆ تیمی ليڤۆنیس دەنێردرێت. وردەکارییەکان بپشکنە و پاشان پشتڕاست بکەرەوە.',
+    confirmBody: 'ئەم تیکێتە بۆ تیمی Levonis دەنێردرێت. وردەکارییەکان بپشکنە و پاشان پشتڕاست بکەرەوە.',
     confirmSend: 'پشتڕاستکردنەوە و ناردن',
     back: 'گەڕانەوە',
     creating: 'دروستکردن بەردەوامە...',
@@ -312,12 +339,27 @@ const STRINGS = {
     uploading: 'بارکردن…',
     attachFailed: 'بارکردن سەرکەوتوو نەبوو',
     you: 'تۆ',
-    staff: 'تیمی ليڤۆنیس',
+    staff: 'تیمی Levonis',
     loading: 'بارکردن...',
     loadError: 'بارکردن سەرکەوتوو نەبوو — دووبارە هەوڵ بدەرەوە.',
     retry: 'هەوڵدانەوە',
     subjectRequired: 'بابەت پێویستە (لانیکەم 3 پیت)',
     messageRequired: 'پەیام پێویستە (لانیکەم 5 پیت)',
+    // OWNER: the complaint lines below are yours to write in Sorani by hand;
+    // they carry the Arabic, except the two states «تذاكري» already says.
+    complaintsTitle: 'شكاواي',
+    complaintLabel: 'شكوى',
+    complaintOn: 'على',
+    openImage: 'فتح الصورة بالحجم الكامل',
+    complaintStatus: {
+      submitted: 'جديدة',
+      under_review: 'قيد المراجعة',
+      waiting_customer: 'چاوەڕوانی وەڵامی تۆیە',
+      waiting_merchant: 'بانتظار التاجر',
+      resolved: 'چارەسەرکراوە',
+      rejected: 'مرفوضة',
+      closed: 'مغلقة',
+    } as Record<string, string>,
     menu: [
       { intent: 'order_status', label: 'دۆخی داواکاریم' },
       { intent: 'delivery_estimate', label: 'کاتی گەیاندن' },
@@ -521,6 +563,15 @@ function TicketForm({
       ? [{ unit_id: prefillUnitId, product: { name: prefillUnitId, name_ar: prefillUnitId }, serial: null }, ...devices]
       : devices;
 
+  /**
+   * ONE CONFIRM STEP, ONE TICKET. The key is minted when the customer reaches
+   * «تأكيد وإرسال» and reused by every press of it, so a POST that committed
+   * but came back as «خطأ في الشبكة» is recognised on the retry and answered
+   * with the ticket that already exists — not a second one in the Warranty
+   * topic. Going back to edit mints a new key, because what is confirmed next
+   * is a different ticket.
+   */
+  const idemKey = useRef('');
   const goConfirm = () => {
     if (subject.trim().length < 3) {
       setFieldErrors({ subject: s.subjectRequired });
@@ -532,6 +583,7 @@ function TicketForm({
     }
     setFieldErrors({});
     setError('');
+    idemKey.current = newIdempotencyKey();
     setStep('confirm');
   };
 
@@ -546,6 +598,7 @@ function TicketForm({
         order_id: orderId || undefined,
         unit_id: unitId || undefined,
         source: 'assistant',
+        idempotencyKey: idemKey.current || undefined,
       });
       onCreated(data.ticket);
     } catch (e) {
@@ -673,20 +726,85 @@ function TicketForm({
 
 // ------------------------------------------------------------ tickets tab
 
-function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; refreshKey: number }) {
+/**
+ * WHICH CONVERSATION TO OPEN, handed in from the page's query string — the
+ * address a notification carries (worker/lib/engagementNotify.ts
+ * `supportTicketLink` / `complaintThreadLink`). `nonce` changes on every
+ * navigation (the page re-reads the target on each `location.key`), so the
+ * same link tapped twice opens the thread twice.
+ */
+export interface ThreadTarget {
+  kind: 'ticket' | 'complaint';
+  id: string;
+  nonce: number;
+}
+
+interface Complaint {
+  id: string;
+  category: string;
+  description: string;
+  status: string;
+  resolution?: string;
+  created_at: string;
+  updated_at: string;
+  community_order_id: string | null;
+  merchant_name: string | null;
+  message_count?: number;
+}
+
+/** What the open thread is about — a ticket or a complaint, drawn alike. */
+type ThreadHead =
+  | { kind: 'ticket'; ticket: Ticket }
+  | { kind: 'complaint'; complaint: Complaint };
+
+interface OpenThread {
+  head: ThreadHead;
+  messages: TicketMsg[];
+}
+
+/** How often an open thread re-reads itself while the page is visible. */
+const THREAD_POLL_MS = 12_000;
+
+function threadPaths(kind: 'ticket' | 'complaint', id: string) {
+  return kind === 'ticket'
+    ? { read: `/api/support/tickets/${id}`, write: `/api/support/tickets/${id}/messages`, purpose: 'support' as const }
+    : { read: `/api/marketplace/complaints/${id}`, write: `/api/marketplace/complaints/${id}/messages`, purpose: 'complaint' as const };
+}
+
+function headOf(kind: 'ticket' | 'complaint', d: { ticket?: Ticket; complaint?: Complaint }): ThreadHead | null {
+  if (kind === 'ticket') return d.ticket ? { kind: 'ticket', ticket: d.ticket } : null;
+  return d.complaint ? { kind: 'complaint', complaint: d.complaint } : null;
+}
+
+function TicketsTab({
+  s,
+  lang,
+  refreshKey,
+  target,
+  onTargetOpened,
+}: {
+  s: SupportStrings;
+  lang: string;
+  refreshKey: number;
+  target?: ThreadTarget | null;
+  /** The link has been followed; the page forgets it, so switching tabs and
+   *  back does not reopen a thread the customer already closed. */
+  onTargetOpened?: () => void;
+}) {
   const { isAuthenticated } = useAuth();
   const { signIn } = useSignInPrompt();
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [thread, setThread] = useState<{ ticket: Ticket; messages: TicketMsg[] } | null>(null);
+  const [open, setOpen] = useState<{ kind: 'ticket' | 'complaint'; id: string } | null>(null);
+  const [thread, setThread] = useState<OpenThread | null>(null);
   const [threadLoading, setThreadLoading] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [replyBusy, setReplyBusy] = useState(false);
   const [replyError, setReplyError] = useState('');
   const [uploading, setUploading] = useState(false);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const tempCounter = useRef(0);
 
@@ -698,8 +816,14 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
     setLoading(true);
     setError('');
     try {
-      const d = await api.get<{ tickets: Ticket[] }>('/api/support/tickets');
+      const [d, cd] = await Promise.all([
+        api.get<{ tickets: Ticket[] }>('/api/support/tickets'),
+        // A customer who never filed a complaint gets an empty list; one whose
+        // complaints cannot be read right now still gets their tickets.
+        api.get<{ complaints: Complaint[] }>('/api/marketplace/complaints').catch(() => ({ complaints: [] as Complaint[] })),
+      ]);
       setTickets(d.tickets || []);
+      setComplaints(cd.complaints || []);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : s.loadError);
     } finally {
@@ -712,19 +836,20 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
   }, [load, refreshKey]);
 
   /**
-   * OPENING a ticket is the one moment a spinner is honest: there is nothing
+   * OPENING a thread is the one moment a spinner is honest: there is nothing
    * on screen yet and the thread has to arrive. REPLYING is not that moment,
-   * and this function is no longer called for it — see `commitReply`.
+   * and this function is not called for it — see `commitReply`.
    */
   const openThread = useCallback(
-    async (id: string) => {
-      setOpenId(id);
+    async (kind: 'ticket' | 'complaint', id: string) => {
+      setOpen({ kind, id });
       setThreadLoading(true);
       setThread(null);
       setReplyError('');
       try {
-        const d = await api.get<{ ticket: Ticket; messages: TicketMsg[] }>(`/api/support/tickets/${id}`);
-        setThread({ ticket: d.ticket, messages: d.messages || [] });
+        const d = await api.get<{ ticket?: Ticket; complaint?: Complaint; messages: TicketMsg[] }>(threadPaths(kind, id).read);
+        const head = headOf(kind, d);
+        if (head) setThread({ head, messages: d.messages || [] });
       } catch (e) {
         setReplyError(e instanceof ApiError ? e.message : s.loadError);
       } finally {
@@ -735,58 +860,69 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
   );
 
   /**
-   * THE LAST BUBBLE IS THE ONE WORTH SEEING.
-   *
-   * A ticket with a dozen messages opened at the TOP and the composer was
-   * below the fold, so the first thing the customer had to do to answer was
-   * scroll. Keyed on the message count as well as the ticket, so a reply that
-   * was just appended brings itself into view — the same sentinel pattern the
-   * order chat uses (src/pages/Chat.tsx).
+   * «افتح «تذاكري»» NOW OPENS THE TICKET. A staff reply's notification links
+   * here with the ticket (or complaint) named, and the page hands it down; it
+   * is opened once per navigation, after sign-in is known.
+   */
+  const targetKey = target && isAuthenticated ? `${target.kind}:${target.id}:${target.nonce}` : '';
+  useEffect(() => {
+    if (!targetKey || !target) return;
+    void openThread(target.kind, target.id);
+    onTargetOpened?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetKey, openThread]);
+
+  /**
+   * THE THREAD RE-READS ITSELF — the half of «الرد يُضاف» the customer could
+   * not see: support answered while the ticket was open and nothing on the
+   * screen changed until it was closed and reopened. A silent GET every few
+   * seconds while the page is visible, merged by id so a bubble being sent is
+   * never dropped or doubled (src/lib/supportThread.ts).
+   */
+  const openKey = open ? `${open.kind}:${open.id}` : '';
+  useEffect(() => {
+    if (!open || threadLoading) return;
+    const { kind, id } = open;
+    return pollWhileVisible(() => {
+      api
+        .get<{ ticket?: Ticket; complaint?: Complaint; messages: TicketMsg[] }>(threadPaths(kind, id).read, { mascot: 'silent' })
+        .then((d) => {
+          const head = headOf(kind, d);
+          if (!head) return;
+          setThread((prev) => {
+            if (!prev || prev.head.kind !== kind) return prev;
+            const prevId = prev.head.kind === 'ticket' ? prev.head.ticket.id : prev.head.complaint.id;
+            if (prevId !== id) return prev;
+            return { head, messages: mergeThread(prev.messages, d.messages || []) };
+          });
+        })
+        .catch(() => undefined);
+    }, THREAD_POLL_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openKey, threadLoading]);
+
+  /**
+   * THE LAST BUBBLE IS THE ONE WORTH SEEING — on open, on every append, and
+   * once more when a photo in the thread has loaded and made it taller.
+   * `scrollTop` on the list itself, not `scrollIntoView`, which also scrolls
+   * every ancestor and can shift the whole page on a phone.
    */
   const messageCount = thread ? thread.messages.length : 0;
-  useEffect(() => {
-    if (!openId) return;
-    bottomRef.current?.scrollIntoView({ block: 'end' });
-  }, [openId, messageCount, threadLoading]);
+  const lastPending = !!thread?.messages[thread.messages.length - 1]?.pending;
+  useThreadScroll(listRef, `${openKey}:${threadLoading ? 1 : 0}`, messageCount, lastPending);
 
   const nextTempId = () => {
     tempCounter.current += 1;
     return `temp-${Date.now()}-${tempCounter.current}`;
   };
 
-  /**
-   * A REPLY APPENDS. IT DOES NOT RELOAD THE WORLD.
-   *
-   * What this replaces: `await openThread(openId)` followed by `await load()`.
-   * `openThread` sets `thread` to null and `threadLoading` to true BEFORE its
-   * GET, so the render swapped the entire conversation for a centred
-   * «جارٍ التحميل...» — every bubble the customer had just been reading
-   * unmounted and came back — and `load()` put the ticket LIST into its own
-   * loading state behind it. Three round trips for one sent sentence, with a
-   * blank screen in the middle of them, on a tablet over Iraqi mobile data.
-   *
-   * Now: the bubble is on screen before the request leaves, the server hands
-   * back the row it wrote (id, timestamp, kind, file url) and that row
-   * replaces the temporary one in place. Nothing else is re-fetched — the
-   * ticket's own row in the list is patched from the same response, because
-   * the only three things a reply changes about it are its state, its
-   * `updated_at` and its message count, and all three are known here.
-   *
-   * ON FAILURE the bubble is REMOVED and the text is put back in the box.
-   * A message that did not reach support must not sit in the thread looking
-   * like it did.
-   */
-  const commitReply = async (
-    payload: { body?: string; fileKey?: string },
-    optimistic: { body: string; kind: 'text' | 'image' | 'video'; file_url: string | null },
-    onFailure?: () => void
-  ) => {
-    const ticketId = openId;
-    if (!ticketId) return;
+  const sameThread = (prev: OpenThread | null, kind: 'ticket' | 'complaint', id: string) =>
+    !!prev && prev.head.kind === kind && (prev.head.kind === 'ticket' ? prev.head.ticket.id : prev.head.complaint.id) === id;
+
+  const addPending = (kind: 'ticket' | 'complaint', id: string, optimistic: { body: string; kind: 'text' | 'image' | 'video'; file_url: string | null }) => {
     const tempId = nextTempId();
-    setReplyError('');
     setThread((prev) =>
-      prev && prev.ticket.id === ticketId
+      prev && sameThread(prev, kind, id)
         ? {
             ...prev,
             messages: [
@@ -804,35 +940,65 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
           }
         : prev
     );
-    try {
-      const res = await api.post<{ message?: TicketMsg; ticket_state?: Ticket['state']; updated_at?: string }>(
-        `/api/support/tickets/${ticketId}/messages`,
-        payload
-      );
-      setThread((prev) => {
-        if (!prev || prev.ticket.id !== ticketId) return prev;
-        const settled: TicketMsg = res?.message
-          ? { ...res.message, pending: false }
-          : // A Worker that predates the row-returning response still ACCEPTED
-            // the message. Keeping the local bubble and merely clearing its
-            // pending state is the truthful reading of a 200 with no body.
-            {
-              id: tempId,
-              body: optimistic.body,
-              is_staff: false,
-              created_at: new Date().toISOString(),
-              kind: optimistic.kind,
-              file_url: optimistic.file_url,
-              pending: false,
+    return tempId;
+  };
+
+  const dropPending = (kind: 'ticket' | 'complaint', id: string, tempId: string) =>
+    setThread((prev) => (prev && sameThread(prev, kind, id) ? { ...prev, messages: prev.messages.filter((m) => m.id !== tempId) } : prev));
+
+  /**
+   * A REPLY APPENDS. IT DOES NOT RELOAD THE WORLD.
+   *
+   * What this replaced: `await openThread(openId)` followed by `await load()`.
+   * `openThread` set `thread` to null and `threadLoading` to true BEFORE its
+   * GET, so the render swapped the entire conversation for a centred
+   * «جارٍ التحميل...» — every bubble the customer had just been reading
+   * unmounted and came back — and `load()` put the ticket LIST into its own
+   * loading state behind it. Three round trips for one sent sentence, with a
+   * blank screen in the middle of them, on a tablet over Iraqi mobile data.
+   *
+   * Now: the bubble is on screen before the request leaves, the server hands
+   * back the row it wrote (id, timestamp, kind, file url) and that row
+   * replaces the temporary one in place. Nothing else is re-fetched — the
+   * row in the list is patched from the same response.
+   *
+   * ON FAILURE the bubble is REMOVED (by the caller) and the text is put back
+   * in the box. A message that did not reach support must not sit in the
+   * thread looking like it did.
+   */
+  const commitReply = async (
+    kind: 'ticket' | 'complaint',
+    id: string,
+    tempId: string,
+    payload: { body?: string; fileKey?: string },
+    fallback: TicketMsg
+  ) => {
+    const res = await api.post<{ message?: TicketMsg; ticket_state?: Ticket['state']; status?: string; updated_at?: string }>(
+      threadPaths(kind, id).write,
+      payload
+    );
+    setThread((prev) => {
+      if (!prev || !sameThread(prev, kind, id)) return prev;
+      // A Worker that predates the row-returning response still ACCEPTED the
+      // message; keeping the local bubble and clearing `pending` is the
+      // truthful reading of a 200 with no body.
+      const settled: TicketMsg = res?.message ? { ...res.message, pending: false } : { ...fallback, id: tempId, pending: false };
+      const head: ThreadHead =
+        prev.head.kind === 'ticket'
+          ? {
+              kind: 'ticket',
+              ticket: { ...prev.head.ticket, state: res?.ticket_state ?? 'waiting_staff', updated_at: res?.updated_at ?? prev.head.ticket.updated_at },
+            }
+          : {
+              kind: 'complaint',
+              complaint: { ...prev.head.complaint, status: res?.status ?? prev.head.complaint.status, updated_at: res?.updated_at ?? prev.head.complaint.updated_at },
             };
-        return {
-          ticket: { ...prev.ticket, state: res?.ticket_state ?? 'waiting_staff', updated_at: res?.updated_at ?? prev.ticket.updated_at },
-          messages: prev.messages.map((m) => (m.id === tempId ? settled : m)),
-        };
-      });
+      return { head, messages: settleThread(prev.messages, tempId, settled) };
+    });
+    if (kind === 'ticket') {
       setTickets((prev) =>
         prev.map((t) =>
-          t.id === ticketId
+          t.id === id
             ? {
                 ...t,
                 state: res?.ticket_state ?? 'waiting_staff',
@@ -842,22 +1008,36 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
             : t
         )
       );
-    } catch (e) {
-      setThread((prev) =>
-        prev && prev.ticket.id === ticketId ? { ...prev, messages: prev.messages.filter((m) => m.id !== tempId) } : prev
+    } else {
+      setComplaints((prev) =>
+        prev.map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                status: res?.status ?? c.status,
+                updated_at: res?.updated_at ?? c.updated_at,
+                message_count: typeof c.message_count === 'number' ? c.message_count + 1 : c.message_count,
+              }
+            : c
+        )
       );
-      setReplyError(e instanceof ApiError ? e.message : s.netError);
-      onFailure?.();
     }
   };
 
   const sendReply = async () => {
     const text = replyText.trim();
-    if (!openId || text.length === 0 || replyBusy) return;
+    if (!open || text.length === 0 || replyBusy) return;
+    const { kind, id } = open;
     setReplyBusy(true);
     setReplyText('');
+    setReplyError('');
+    const tempId = addPending(kind, id, { body: text, kind: 'text', file_url: null });
     try {
-      await commitReply({ body: text }, { body: text, kind: 'text', file_url: null }, () => setReplyText(text));
+      await commitReply(kind, id, tempId, { body: text }, { id: tempId, body: text, is_staff: false, created_at: new Date().toISOString(), kind: 'text', file_url: null });
+    } catch (e) {
+      dropPending(kind, id, tempId);
+      setReplyText(text);
+      setReplyError(e instanceof ApiError ? e.message : s.netError);
     } finally {
       setReplyBusy(false);
     }
@@ -867,26 +1047,30 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
    * «لا توجد طريقة لإرفاق وسائط» — the photograph of the failed print.
    *
    * The bubble appears with the LOCAL object URL the instant the file is
-   * chosen, because the upload itself is the slow part and a customer who
-   * picked a photo and saw nothing happen picks it again. The object URL is
-   * revoked once the server's own `/files/…` has replaced it.
+   * chosen and BEFORE the upload starts, because the upload itself is the slow
+   * part and a customer who picked a clip and saw nothing happen picks it
+   * again. A failed upload removes it. The object URL is revoked once the
+   * server's own `/files/…` has replaced it.
    *
-   * The ticket id is passed to the upload so the object is filed under the
-   * TICKET, and the server refuses a ticket that is not this account's before
-   * a byte is stored.
+   * The ticket (or complaint) id is passed to the upload so the object is
+   * filed under IT, and the server refuses one that is not this account's
+   * before a byte is stored.
    */
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file || !openId || uploading || replyBusy) return;
+    if (!file || !open || uploading || replyBusy) return;
+    const { kind, id } = open;
     const localUrl = URL.createObjectURL(file);
-    const kind: 'image' | 'video' = file.type.startsWith('video/') ? 'video' : 'image';
+    const mediaKind: 'image' | 'video' = file.type.startsWith('video/') ? 'video' : 'image';
     setUploading(true);
     setReplyError('');
+    const tempId = addPending(kind, id, { body: '', kind: mediaKind, file_url: localUrl });
     try {
-      const uploaded = await uploadFile(file, 'support', openId);
-      await commitReply({ fileKey: uploaded.key }, { body: '', kind, file_url: localUrl });
+      const uploaded = await uploadFile(file, threadPaths(kind, id).purpose, id);
+      await commitReply(kind, id, tempId, { fileKey: uploaded.key }, { id: tempId, body: '', is_staff: false, created_at: new Date().toISOString(), kind: mediaKind, file_url: uploaded.url });
     } catch (err) {
+      dropPending(kind, id, tempId);
       setReplyError(err instanceof ApiError ? err.message : s.attachFailed);
     } finally {
       setUploading(false);
@@ -907,7 +1091,8 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
     );
   }
 
-  if (openId) {
+  if (open) {
+    const head = thread?.head;
     /**
      * THE COMPOSER IS A SIBLING OF THE SCROLLER, NOT ITS LAST CHILD.
      *
@@ -916,30 +1101,48 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
      * screen — near the TOP, with dead space under it — and on a long ticket
      * it sat below the fold. Both are the same defect: the input's position
      * was decided by how much had been said. The assistant tab on this very
-     * page and the order chat already do it the other way; this is that shape.
+     * page and the order chat already do it the other way; this is that shape,
+     * for a ticket and a complaint alike.
      */
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+        <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" data-support-thread>
           <div className="mx-auto max-w-3xl space-y-3">
-            <button onClick={() => setOpenId(null)} className="text-xs text-zinc-400 hover:text-white font-bold">
+            <button onClick={() => setOpen(null)} className="text-xs text-zinc-400 hover:text-white font-bold">
               ← {s.back}
             </button>
             {threadLoading ? (
               <div className="text-center py-8 text-zinc-500">{s.loading}</div>
-            ) : thread ? (
+            ) : head ? (
               <>
                 <div className="lv-surface p-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-white font-bold text-sm break-words">{thread.ticket.subject}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATE_STYLES[thread.ticket.state]}`}>
-                      {stateLabel(s, thread.ticket.state)}
-                    </span>
-                    {thread.ticket.priority === 1 && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/10 text-yellow-400">{s.proPriority}</span>
-                    )}
-                  </div>
-                  {thread.ticket.order_id && <div className="text-xs text-zinc-500 font-mono mt-1">{thread.ticket.order_id}</div>}
+                  {head.kind === 'ticket' ? (
+                    <>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-white font-bold text-sm break-words">{head.ticket.subject}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATE_STYLES[head.ticket.state]}`}>
+                          {stateLabel(s, head.ticket.state)}
+                        </span>
+                        {head.ticket.priority === 1 && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/10 text-yellow-400">{s.proPriority}</span>
+                        )}
+                      </div>
+                      {head.ticket.order_id && <div className="text-xs text-zinc-500 font-mono mt-1">{head.ticket.order_id}</div>}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-white font-bold text-sm">
+                          {s.complaintLabel}
+                          {head.complaint.merchant_name ? ` ${s.complaintOn} ${head.complaint.merchant_name}` : ''}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/[0.06] text-text-secondary">
+                          {s.complaintStatus[head.complaint.status] ?? head.complaint.status}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-400 whitespace-pre-wrap break-words">{head.complaint.description}</p>
+                    </>
+                  )}
                 </div>
                 <div className="space-y-2">
                   {thread.messages.map((m) => (
@@ -950,18 +1153,24 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
                         } ${m.pending ? 'opacity-60' : ''}`}
                       >
                         <div className="text-[10px] text-zinc-500 mb-0.5">
-                          {m.is_staff ? s.staff : s.you} · {fmtDate(m.created_at, lang)}
+                          {m.is_staff ? s.staff : s.you} · {m.pending && m.kind && m.kind !== 'text' ? s.uploading : fmtDate(m.created_at, lang)}
                         </div>
+                        {/* THE WHOLE PHOTOGRAPH, AND A WAY TO OPEN IT. It was
+                            `object-cover` in a 300px box with nothing to tap,
+                            so a serial number or a cracked corner in the
+                            evidence photo was cropped away. */}
                         {m.kind === 'image' && m.file_url && (
-                          <img
-                            referrerPolicy="no-referrer"
-                            src={m.file_url}
-                            alt=""
-                            className="mb-1 max-h-[300px] w-full rounded-lg object-cover"
-                          />
+                          <a href={m.file_url} target="_blank" rel="noopener noreferrer" aria-label={s.openImage} className="mb-1 block">
+                            <img
+                              referrerPolicy="no-referrer"
+                              src={m.file_url}
+                              alt=""
+                              className="max-h-[300px] w-full rounded-lg bg-black/30 object-contain"
+                            />
+                          </a>
                         )}
                         {m.kind === 'video' && m.file_url && (
-                          <video src={m.file_url} controls playsInline className="mb-1 max-h-[300px] w-full rounded-lg" />
+                          <video src={m.file_url} controls playsInline preload="metadata" className="mb-1 max-h-[300px] w-full rounded-lg bg-black" />
                         )}
                         {m.body}
                       </div>
@@ -972,12 +1181,11 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
             ) : (
               <div className="text-center py-8 text-red-400 text-sm">{replyError || s.loadError}</div>
             )}
-            <div ref={bottomRef} className="h-px shrink-0" aria-hidden="true" />
           </div>
         </div>
 
         {thread && (
-          <div className="z-40 shrink-0 border-t border-border-subtle bg-surface-raised/98 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="z-40 shrink-0 border-t border-border-subtle bg-surface-raised/98 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]" data-support-thread-composer>
             <div className="mx-auto max-w-3xl space-y-2">
               {replyError && (
                 <div role="alert" className="text-xs text-red-400">
@@ -1045,32 +1253,69 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
               {s.retry}
             </button>
           </div>
-        ) : tickets.length === 0 ? (
+        ) : tickets.length === 0 && complaints.length === 0 ? (
           <div className="lv-surface py-12 text-center text-text-muted">{s.ticketsEmpty}</div>
         ) : (
-          tickets.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => openThread(t.id)}
-              className="w-full rounded-lg bg-surface p-3 text-start transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            >
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-bold text-white break-words flex-1 min-w-0">{t.subject}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${STATE_STYLES[t.state]}`}>
-                  {stateLabel(s, t.state)}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500 flex-wrap">
-                <span>{fmtDate(t.created_at, lang)}</span>
-                {t.priority === 1 && <span className="text-yellow-400 font-bold">{s.proPriority}</span>}
-                {typeof t.message_count === 'number' && (
-                  <span className="flex items-center gap-1">
-                    <MessageSquare className="w-3 h-3" /> {t.message_count}
+          <>
+            {tickets.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => openThread('ticket', t.id)}
+                className="w-full rounded-lg bg-surface p-3 text-start transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-bold text-white break-words flex-1 min-w-0">{t.subject}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${STATE_STYLES[t.state]}`}>
+                    {stateLabel(s, t.state)}
                   </span>
-                )}
-              </div>
-            </button>
-          ))
+                </div>
+                <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500 flex-wrap">
+                  <span>{fmtDate(t.created_at, lang)}</span>
+                  {t.priority === 1 && <span className="text-yellow-400 font-bold">{s.proPriority}</span>}
+                  {typeof t.message_count === 'number' && (
+                    <span className="flex items-center gap-1">
+                      <MessageSquare className="w-3 h-3" /> {t.message_count}
+                    </span>
+                  )}
+                </div>
+              </button>
+            ))}
+            {/* «شكاواي» — a complaint filed from a community order, and the
+                shop's answers to it. It lives beside the tickets because it is
+                the same thing to the customer: a conversation with support
+                about something that went wrong. */}
+            {complaints.length > 0 && (
+              <section className="space-y-2 pt-2" aria-label={s.complaintsTitle} data-support-complaints>
+                <h2 className="px-1 text-xs font-bold text-text-muted">{s.complaintsTitle}</h2>
+                {complaints.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => openThread('complaint', c.id)}
+                    className="w-full rounded-lg bg-surface p-3 text-start transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-bold text-white break-words flex-1 min-w-0">
+                        {s.complaintLabel}
+                        {c.merchant_name ? ` ${s.complaintOn} ${c.merchant_name}` : ''}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 bg-white/[0.06] text-text-secondary">
+                        {s.complaintStatus[c.status] ?? c.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs text-zinc-400 break-words">{c.description}</p>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500 flex-wrap">
+                      <span>{fmtDate(c.created_at, lang)}</span>
+                      {typeof c.message_count === 'number' && (
+                        <span className="flex items-center gap-1">
+                          <MessageSquare className="w-3 h-3" /> {c.message_count}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </section>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -1081,7 +1326,7 @@ function TicketsTab({ s, lang, refreshKey }: { s: SupportStrings; lang: string; 
 
 export default function Support() {
   const navigate = useNavigate();
-  const { state } = useLocation();
+  const { state, key: locationKey } = useLocation();
   const { lang, dir, loc } = useLanguage();
   const { isAuthenticated } = useAuth();
   const { signIn } = useSignInPrompt();
@@ -1099,7 +1344,28 @@ export default function Support() {
         }
       : undefined;
 
-  const [tab, setTab] = useState<'assistant' | 'tickets'>('assistant');
+  /**
+   * `?tab=tickets&ticket=<id>` (or `&complaint=<id>`) — the address a support
+   * reply's notification carries. The page used to open on the assistant
+   * whatever the link said, so «افتح «تذاكري»» landed a customer in the bot.
+   * Read on mount AND on every later navigation to this page, because a tap
+   * in the bell while /support is already open does not remount it.
+   */
+  const [searchParams] = useSearchParams();
+  const qTab = searchParams.get('tab');
+  const qTicket = searchParams.get('ticket') ?? '';
+  const qComplaint = searchParams.get('complaint') ?? '';
+  const [tab, setTab] = useState<'assistant' | 'tickets'>(qTab === 'tickets' || qTicket || qComplaint ? 'tickets' : 'assistant');
+  const [threadTarget, setThreadTarget] = useState<ThreadTarget | null>(null);
+  useEffect(() => {
+    if (qTab === 'tickets' || qTicket || qComplaint) setTab('tickets');
+    if (qTicket) setThreadTarget((prev) => ({ kind: 'ticket', id: qTicket, nonce: (prev?.nonce ?? 0) + 1 }));
+    else if (qComplaint) setThreadTarget((prev) => ({ kind: 'complaint', id: qComplaint, nonce: (prev?.nonce ?? 0) + 1 }));
+    // `locationKey` and not only the values: every reply on one ticket carries
+    // the SAME link, so a second tap in the bell (after the thread was closed,
+    // or from the assistant tab) changes no search param — only the key of
+    // the navigation it made. Without it that tap did nothing at all.
+  }, [qTab, qTicket, qComplaint, locationKey]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1281,7 +1547,7 @@ export default function Support() {
            list and a `shrink-0` composer side by side inside this height —
            which is impossible while the parent is the thing that scrolls. */
         <div className="flex min-h-0 flex-1 flex-col">
-          <TicketsTab s={s} lang={lang} refreshKey={ticketsRefresh} />
+          <TicketsTab s={s} lang={lang} refreshKey={ticketsRefresh} target={threadTarget} onTargetOpened={() => setThreadTarget(null)} />
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">

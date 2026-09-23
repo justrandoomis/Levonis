@@ -52,13 +52,14 @@ import {
   requireAuth,
   requireAdmin,
   badRequest,
+  conflict,
   notFound,
   str,
   int,
   oneOf,
 } from '../lib/http';
-import { newId } from '../lib/crypto';
-import { isSafeMediaKey } from '../lib/mediaStorage';
+import { newId, sha256Hex } from '../lib/crypto';
+import { headMediaObject, isSafeMediaKey } from '../lib/mediaStorage';
 import { audit } from '../lib/audit';
 import { announceAfterResponse, ticketTopic } from '../lib/adminTopicRouting';
 import { notifySupportReply } from '../lib/engagementNotify';
@@ -486,7 +487,7 @@ const T: Record<Locale, Record<string, string>> = {
     power_unknown: 'استهلاك هذا المنتج غير مسجّل عندنا بعد، وما أريد أعطيك رقم مو مضبوط. راجعنا وننطيك الجواب.',
     c_policies: 'السياسات المنشورة',
     c_ticket: 'فتح تذكرة دعم',
-    c_human: 'التحدث مع فريق ليفونيس',
+    c_human: 'التحدث مع فريق Levonis',
     orders_none: 'لا توجد طلبات في حسابك بعد.',
     orders_pick: 'اختر أحد طلباتك:',
     order_not_found: 'لم أجد هذا الطلب في حسابك. اختر أحد طلباتك أو تواصل مع الدعم.',
@@ -542,15 +543,15 @@ const T: Record<Locale, Record<string, string>> = {
     policies_none: 'لا توجد سياسات منشورة بعد — ستظهر هنا فور نشرها من المالك.',
     policies_pick: 'السياسات المنشورة:',
     policy_read: 'قراءة السياسة كاملة',
-    ticket_prompt: 'أستطيع فتح تذكرة دعم حقيقية لفريق ليفونيس. ستراجع وتؤكد قبل الإرسال.',
+    ticket_prompt: 'أستطيع فتح تذكرة دعم حقيقية لفريق Levonis. ستراجع وتؤكد قبل الإرسال.',
     human_prompt:
-      'سيجيبك موظف من فريق ليفونيس داخل تذكرة دعم — هذه هي قناة التواصل البشري المباشرة. ستراجع وتؤكد قبل إنشائها.',
+      'سيجيبك موظف من فريق Levonis داخل تذكرة دعم — هذه هي قناة التواصل البشري المباشرة. ستراجع وتؤكد قبل إنشائها.',
     pro_priority_note: 'تذاكر أعضاء PRO الفعالين تحصل على أولوية حقيقية في قائمة الانتظار.',
     // ───────────────────────────── ما أضافته هذه الجولة
-    greeting_reply: 'هلا بيك في ليفونيس. شنو تحتاج؟',
+    greeting_reply: 'هلا بيك في Levonis. شنو تحتاج؟',
     thanks_reply: 'العفو. إذا تحتاج شي ثاني آني هنا.',
     bot_identity_reply:
-      'آني المساعد الآلي لليفونيس — برنامج، مو شخص. أجاوب من بيانات الموقع نفسه: طلباتك، أجهزتك، الأسعار، السياسات المنشورة. إذا تريد تحچي وية موظف من الفريق، اضغط الزر تحت.',
+      'آني المساعد الآلي لـ Levonis — برنامج، مو شخص. أجاوب من بيانات الموقع نفسه: طلباتك، أجهزتك، الأسعار، السياسات المنشورة. إذا تريد تحچي وية موظف من الفريق، اضغط الزر تحت.',
     c_greeting: 'شلون أبدأ؟',
     c_choose_printer: 'ساعدني باختيار طابعة',
     c_price: 'سعر منتج',
@@ -587,7 +588,7 @@ const T: Record<Locale, Record<string, string>> = {
     offers_reply:
       'إذا عندك كود خصم، اكتبه بخانة كود الخصم بصفحة السلة أو عند الدفع، والسيرفر يتأكد منه قبل ما تدفع. نقاطك تنخصم من المبلغ عند الدفع، وأي تخفيض على منتج يظهر على بطاقة المنتج نفسها.',
     contact_reply:
-      'التواصل مع فريق ليفونيس يكون من داخل تذكرة دعم بالموقع — هاي القناة الرسمية وتنحفظ بيها كل الردود. ما عندي عنوان ولا رقم هاتف منشور بالموقع، وما أريد أعطيك معلومة مو مسجلة.',
+      'التواصل مع فريق Levonis يكون من داخل تذكرة دعم بالموقع — هاي القناة الرسمية وتنحفظ بيها كل الردود. ما عندي عنوان ولا رقم هاتف منشور بالموقع، وما أريد أعطيك معلومة مو مسجلة.',
     pickup_map: 'موقع الاستلام على الخريطة',
     fee_free: 'مجاناً',
   },
@@ -757,7 +758,7 @@ const T: Record<Locale, Record<string, string>> = {
     power_unknown: 'ڕاکێشانی کارەبای ئەمە هێشتا لای ئێمە تۆمار نەکراوە، و ناتوانم ژمارەیەکت بدەمێ کە پشتی پێ نەبەستم. پەیوەندیمان پێوە بکە.',
     c_policies: 'سیاسەتە بڵاوکراوەکان',
     c_ticket: 'کردنەوەی تیکێتی پشتگیری',
-    c_human: 'قسەکردن لەگەڵ ستافی ليڤۆنیس',
+    c_human: 'قسەکردن لەگەڵ ستافی Levonis',
     orders_none: 'هێشتا هیچ داواکارییەک لە هەژمارەکەتدا نییە.',
     orders_pick: 'یەکێک لە داواکارییەکانت هەڵبژێرە:',
     order_not_found: 'ئەم داواکارییەم لە هەژمارەکەتدا نەدۆزییەوە. یەکێک لە داواکارییەکانت هەڵبژێرە یان پەیوەندی بە پشتگیری بکە.',
@@ -813,15 +814,15 @@ const T: Record<Locale, Record<string, string>> = {
     policies_none: 'هێشتا هیچ سیاسەتێک بڵاونەکراوەتەوە — کاتێک خاوەن بڵاویان دەکاتەوە لێرە دەردەکەون.',
     policies_pick: 'سیاسەتە بڵاوکراوەکان:',
     policy_read: 'خوێندنەوەی سیاسەتەکە بە تەواوی',
-    ticket_prompt: 'دەتوانم تیکێتێکی پشتگیری ڕاستەقینە بۆ تیمی ليڤۆنیس بکەمەوە. پێش ناردن پێداچوونەوە و پشتڕاستکردنەوە دەکەیت.',
+    ticket_prompt: 'دەتوانم تیکێتێکی پشتگیری ڕاستەقینە بۆ تیمی Levonis بکەمەوە. پێش ناردن پێداچوونەوە و پشتڕاستکردنەوە دەکەیت.',
     human_prompt:
-      'کارمەندێکی ليڤۆنیس لە ناو تیکێتی پشتگیریدا وەڵامت دەداتەوە — ئەمە کەناڵی مرۆیی ڕاستەوخۆیە. پێش دروستکردنی پێداچوونەوە و پشتڕاستکردنەوە دەکەیت.',
+      'کارمەندێکی Levonis لە ناو تیکێتی پشتگیریدا وەڵامت دەداتەوە — ئەمە کەناڵی مرۆیی ڕاستەوخۆیە. پێش دروستکردنی پێداچوونەوە و پشتڕاستکردنەوە دەکەیت.',
     pro_priority_note: 'تیکێتی ئەندامە چالاکەکانی PRO پێشینەیی ڕاستەقینەیان هەیە لە ڕیزەکەدا.',
     // ───────────────────────────── ئەمانە لەم خولەدا زیادکران
-    greeting_reply: 'بەخێربێیت بۆ ليڤۆنیس. چی دەخوازیت؟',
+    greeting_reply: 'بەخێربێیت بۆ Levonis. چی دەخوازیت؟',
     thanks_reply: 'شایانی نییە. ئەگەر شتێکی تریت پێویست بوو، لێرەم.',
     bot_identity_reply:
-      'من یاریدەدەری ئۆتۆماتیکی ليڤۆنیسم — بەرنامەیەکم، نەک کەسێک. لە داتای ماڵپەڕەکەوە وەڵام دەدەمەوە: داواکاریەکانت، ئامێرەکانت، نرخەکان و سیاسەتە بڵاوکراوەکان. ئەگەر دەتەوێت لەگەڵ کارمەندێک قسە بکەیت، دوگمەی خوارەوە بەکاربهێنە.',
+      'من یاریدەدەری ئۆتۆماتیکی Levonisم — بەرنامەیەکم، نەک کەسێک. لە داتای ماڵپەڕەکەوە وەڵام دەدەمەوە: داواکاریەکانت، ئامێرەکانت، نرخەکان و سیاسەتە بڵاوکراوەکان. ئەگەر دەتەوێت لەگەڵ کارمەندێک قسە بکەیت، دوگمەی خوارەوە بەکاربهێنە.',
     c_greeting: 'لە کوێوە دەست پێ بکەم؟',
     c_choose_printer: 'یارمەتیم بدە پرینتەر هەڵبژێرم',
     c_price: 'نرخی بەرهەمێک',
@@ -843,7 +844,7 @@ const T: Record<Locale, Record<string, string>> = {
     wallet_reply: 'باڵانسەکەت و هەموو پڕکردنەوە و دەرهێنانێک لە پەڕەی جزداندان.',
     wallet_open: 'کردنەوەی جزدان',
     studio_reply:
-      'ستوودیۆی ليڤۆ سلایسەری ئێمەیە و لە وێبگەڕدا کاردەکات: فایلی STL یان 3MF باربکە، پرینتەرەکەت هەڵبژێرە، G-code وەربگرە. هەژماری ليڤۆنیست چوونەژوورەوەت بۆ دەکات.',
+      'ستوودیۆی ليڤۆ سلایسەری ئێمەیە و لە وێبگەڕدا کاردەکات: فایلی STL یان 3MF باربکە، پرینتەرەکەت هەڵبژێرە، G-code وەربگرە. هەژماری Levonisت چوونەژوورەوەت بۆ دەکات.',
     studio_open: 'کردنەوەی ستوودیۆی ليڤۆ',
     account_reply: 'لە پەڕەی چوونەژوورەوە دەتوانیت هەژمارێکی نوێ دروست بکەیت، بچیتە ژوورەوە، یان ئیمەیڵەکەت پشتڕاست بکەیتەوە.',
     account_open: 'پەڕەی چوونەژوورەوە',
@@ -859,7 +860,7 @@ const T: Record<Locale, Record<string, string>> = {
     offers_reply:
       'ئەگەر کۆدی داشکاندنت هەیە، لە خانەی کۆدی داشکاندن لە سەبەتە یان لە کاتی پارەدان بینووسە، و سێرڤەر پێش پارەدان پشتڕاستی دەکاتەوە. خاڵەکانت لە کاتی پارەدان لە بڕەکە کەم دەکرێنەوە، و هەر داشکاندنێکی بەرهەم لەسەر کارتی بەرهەمەکەدا دەردەکەوێت.',
     contact_reply:
-      'پەیوەندی بە تیمی ليڤۆنیسەوە لە ناو تیکێتی پشتگیری ماڵپەڕەکەدا دەکرێت — ئەمە کەناڵە فەرمییەکەیە و هەموو وەڵامێک تێیدا دەپارێزرێت. هیچ ناونیشان یان ژمارەی تەلەفۆن لە ماڵپەڕەکەدا بڵاو نەکراوەتەوە، و زانیاری تۆمارنەکراوت پێ ناڵێم.',
+      'پەیوەندی بە تیمی Levonisەوە لە ناو تیکێتی پشتگیری ماڵپەڕەکەدا دەکرێت — ئەمە کەناڵە فەرمییەکەیە و هەموو وەڵامێک تێیدا دەپارێزرێت. هیچ ناونیشان یان ژمارەی تەلەفۆن لە ماڵپەڕەکەدا بڵاو نەکراوەتەوە، و زانیاری تۆمارنەکراوت پێ ناڵێم.',
     pickup_map: 'شوێنی وەرگرتن لەسەر نەخشە',
     fee_free: 'بەخۆڕایی',
   },
@@ -2518,6 +2519,23 @@ function ticketMessageInput(body: Record<string, unknown>, ticketId: string): { 
   return { body: text, kind: folder === 'video' ? 'video' : 'image', fileKey: key };
 }
 
+/**
+ * THE KEY NAMES A FILE THAT IS ACTUALLY THERE.
+ *
+ * `ticketMessageInput` proves the key is shaped like this ticket's and sits in
+ * a folder the upload route writes to; it cannot prove the upload happened. A
+ * key built by hand — or one whose upload died half way — used to be accepted
+ * and saved as a message that renders as a broken picture in both consoles
+ * for ever. The order chat has asked R2 the same question since its image
+ * messages shipped (worker/routes/chats.ts); a ticket now asks it too, before
+ * anything is written.
+ */
+export async function assertAttachmentStored(c: { env: Parameters<typeof headMediaObject>[0] }, fileKey: string | null): Promise<void> {
+  if (!fileKey) return;
+  const head = await headMediaObject(c.env, 'private', fileKey);
+  if (!head) throw badRequest('That attachment was not uploaded — attach it again', 'ATTACHMENT_NOT_FOUND');
+}
+
 supportRoutes.get('/tickets', requireAuth, async (c) => {
   const user = c.get('user')!;
   const { results } = await c.env.DB.prepare(
@@ -2544,13 +2562,33 @@ supportRoutes.post('/tickets', requireAuth, async (c) => {
   const orderId = str(body.order_id, 'order_id', { max: 40, required: false }).toUpperCase();
   const unitId = str(body.unit_id, 'unit_id', { max: 40, required: false });
   const source = body.source === 'manual' ? 'manual' : 'assistant';
+  const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80, required: false });
 
   if (orderId) {
     const own = await c.env.DB.prepare('SELECT id FROM orders WHERE id = ? AND user_id = ?').bind(orderId, user.id).first();
     if (!own) throw badRequest('That order was not found in your account', 'ORDER_NOT_FOUND');
   }
   if (unitId) {
-    const own = await c.env.DB.prepare('SELECT id FROM order_item_units WHERE id = ? AND owner_user_id = ?').bind(unitId, user.id).first();
+    /**
+     * THE BUYER, OR WHOEVER HOLDS THE PRINTER NOW.
+     *
+     * This read `owner_user_id = ?` and nothing else, and `owner_user_id` is
+     * the BUYER. A printer that changed hands is held through its active
+     * `device_registrations` row, which is exactly how the device card and
+     * the formal claim route (worker/routes/devices.ts) already recognise the
+     * second-hand owner — so «تواصل مع الدعم» on that very card answered the
+     * person holding the machine with «That device was not found in your
+     * account». Two warranty doors, disagreeing about who owns the printer.
+     * A revoked registration is history, not a holder.
+     */
+    const own = await c.env.DB.prepare(
+      `SELECT u.id FROM order_item_units u
+         LEFT JOIN device_registrations r ON r.unit_id = u.id
+        WHERE u.id = ?1 AND (u.owner_user_id = ?2 OR (r.user_id = ?2 AND r.revoked_at IS NULL))
+        LIMIT 1`
+    )
+      .bind(unitId, user.id)
+      .first();
     if (!own) throw badRequest('That device was not found in your account', 'UNIT_NOT_FOUND');
   }
 
@@ -2559,22 +2597,54 @@ supportRoutes.post('/tickets', requireAuth, async (c) => {
   const tier = await getTierStatus(c.env.DB, user.id);
   const priority = benefits.priorityService(tier) ? 1 : 0;
 
-  const ticketId = newId('tkt');
+  /**
+   * ONE CONFIRMATION, ONE TICKET — the warranty claim's rule, on the ticket
+   * door the device card opens.
+   *
+   * A ticket carrying a device is announced to the Warranty topic below, and
+   * the owner's report of that topic is «تكرار الطلب عند الإرسال أكثر من مرة».
+   * `rateLimit` above allows five an hour, which is a flood limit and not an
+   * identity: a POST that committed while the phone's deadline fired came back
+   * as «خطأ في الشبكة», the customer pressed «تأكيد وإرسال» again — the
+   * reasonable thing to do — and staff got two tickets about one printer.
+   *
+   * The id is DERIVED from the caller and the key the confirm step minted
+   * (worker/routes/devices.ts writes the full argument for the claim), so the
+   * primary key is the per-user replay memory and `ON CONFLICT DO NOTHING`
+   * closes the race between two taps. The FIRST MESSAGE's id is derived from
+   * the ticket's, so a replay cannot add a second copy of it either. With no
+   * key — a page still running the old bundle — the old random id and the old
+   * behaviour stay.
+   */
+  const ticketId = idempotencyKey
+    ? `tkt_${(await sha256Hex(`${user.id}\n${idempotencyKey}`)).slice(0, 20)}`
+    : newId('tkt');
+  const firstMessageId = idempotencyKey ? `tkm_${(await sha256Hex(`${ticketId}\nfirst`)).slice(0, 20)}` : newId('tkm');
   const now = new Date().toISOString();
-  await c.env.DB.batch([
+  const [written] = await c.env.DB.batch([
     c.env.DB.prepare(
       `INSERT INTO support_tickets (id, user_id, subject, order_id, unit_id, priority, state, source, created_at, updated_at, last_customer_msg_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`
     ).bind(ticketId, user.id, subject, orderId || null, unitId || null, priority, source, now, now, now),
-    c.env.DB.prepare('INSERT INTO support_ticket_messages (id, ticket_id, sender_id, is_staff, body) VALUES (?, ?, ?, 0, ?)').bind(
-      newId('tkm'),
-      ticketId,
-      user.id,
-      message
-    ),
+    c.env.DB.prepare(
+      'INSERT INTO support_ticket_messages (id, ticket_id, sender_id, is_staff, body) VALUES (?, ?, ?, 0, ?) ON CONFLICT(id) DO NOTHING'
+    ).bind(firstMessageId, ticketId, user.id, message),
   ]);
 
-  const ticket = (await c.env.DB.prepare('SELECT * FROM support_tickets WHERE id = ?').bind(ticketId).first<TicketRow>())!;
+  const ticket = await c.env.DB.prepare('SELECT * FROM support_tickets WHERE id = ? AND user_id = ?')
+    .bind(ticketId, user.id)
+    .first<TicketRow>();
+  // A derived id held by somebody else's row is an 80-bit collision, not a
+  // replay: refused by name rather than answered with their ticket.
+  if (!ticket) throw conflict('That ticket could not be recorded; please try again', 'TICKET_KEY_COLLISION');
+  /**
+   * A REPLAY IS SILENT, AND IT RETURNS BEFORE THE ANNOUNCEMENT. The customer is
+   * shown the ticket they already have — in whatever state staff have since
+   * moved it to — and the group hears about it once.
+   */
+  if (!written?.meta?.changes) {
+    return c.json({ success: true, ticket: ticketPublic(ticket), replay: true });
+  }
 
   /**
    * THE TICKET DESK IS TOLD A TICKET EXISTS.
@@ -2635,6 +2705,7 @@ supportRoutes.post('/tickets/:id/messages', requireAuth, async (c) => {
   if (!ticket) throw notFound('Ticket not found');
   const body = await c.req.json().catch(() => ({}));
   const input = ticketMessageInput(body, ticket.id);
+  await assertAttachmentStored(c, input.fileKey);
   const message = input.body;
   const now = new Date().toISOString();
   /**
@@ -2787,6 +2858,7 @@ supportRoutes.post('/admin/tickets/:id/messages', async (c) => {
   if (!ticket) throw notFound('Ticket not found');
   const body = await c.req.json().catch(() => ({}));
   const input = ticketMessageInput(body, ticket.id);
+  await assertAttachmentStored(c, input.fileKey);
   const message = input.body;
   const now = new Date().toISOString();
   // The id is minted into a variable rather than inline because the

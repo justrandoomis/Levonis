@@ -12,6 +12,7 @@ import { api, newIdempotencyKey } from '../../lib/api';
 import { apiRefusal, refusalText } from '../../lib/refusalStrings';
 import { formatDate } from '../orders/format';
 import { useMoney } from '../../CurrencyContext';
+import { useBusy } from '../../lib/busy';
 
 interface Eligibility {
   eligible: boolean;
@@ -101,6 +102,9 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<'request' | 'repay' | null>(null);
+  // A repayment moves wallet money: while it (or a limit request) is in
+  // flight, the app-wide busy screen holds every other control.
+  useBusy(busy !== null, 'subscribe');
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [amount, setAmount] = useState('');
   const repaymentKey = useRef<string | null>(null);
@@ -168,7 +172,7 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
 
   if (loading && !data) {
     return activePro ? (
-      <div data-bnpl-panel className="rounded-[24px] border border-amber-300/20 bg-zinc-900/50 p-6 flex items-center justify-center gap-2 text-sm text-zinc-400" aria-busy="true">
+      <div data-bnpl-panel className="lv-surface p-6 flex items-center justify-center gap-2 text-sm text-text-muted" aria-busy="true">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> {s.title}
       </div>
     ) : null;
@@ -209,11 +213,11 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
     eligibility.reason !== 'BNPL_RESTRICTED';
 
   return (
-    <section data-bnpl-panel className="overflow-hidden rounded-[26px] border border-amber-300/25 bg-gradient-to-br from-amber-300/[0.09] via-zinc-950 to-red-950/35 shadow-[0_20px_70px_rgba(0,0,0,0.28)]">
+    <section data-bnpl-panel className="lv-surface overflow-hidden">
       <div className="p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-200/30 bg-gradient-to-br from-amber-200 to-amber-500 text-zinc-950 shadow-lg shadow-amber-600/10">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border-subtle bg-surface-raised text-text-primary">
               <CreditCard className="h-5 w-5" aria-hidden />
             </span>
             <div className="min-w-0">
@@ -231,9 +235,9 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
               [s.available, eligibility.available_iqd],
               [s.outstanding, eligibility.outstanding_iqd],
             ].map(([label, value]) => (
-              <div key={String(label)} className="rounded-2xl border border-white/8 bg-black/25 p-3">
+              <div key={String(label)} className="rounded-xl border border-border-subtle bg-surface-raised p-3">
                 <dt className="text-[10px] font-bold text-zinc-500">{label}</dt>
-                <dd className="mt-1 text-sm font-black text-white" dir="ltr">{money(Number(value))}</dd>
+                <dd className="mt-1 text-sm font-bold text-text-primary tabular-nums">{money(Number(value))}</dd>
               </div>
             ))}
           </dl>
@@ -254,7 +258,7 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
             {eligibility.account_state === 'requested' ? (
               <p className="mt-3 flex items-center gap-2 text-xs text-amber-100"><Clock3 className="h-4 w-4" aria-hidden /> {s.requestedNote}</p>
             ) : canRequest ? (
-              <button type="button" disabled={busy !== null} onClick={() => void requestLimit()} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 to-amber-500 px-4 text-xs font-black text-black disabled:opacity-50 sm:w-auto">
+              <button type="button" disabled={busy !== null} onClick={() => void requestLimit()} className="mt-4 lv-button lv-button-primary lv-button-sm w-full sm:w-auto">
                 {busy === 'request' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <ShieldCheck className="h-4 w-4" aria-hidden />}
                 {busy === 'request' ? s.requesting : s.request}
               </button>
@@ -301,7 +305,7 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
         {note && <p role={note.ok ? 'status' : 'alert'} className={`mt-4 text-xs font-bold ${note.ok ? 'text-emerald-300' : 'text-red-300'}`}>{note.text}</p>}
       </div>
 
-      <details className="border-t border-white/8 bg-black/15 px-5 py-4 sm:px-6">
+      <details className="border-t border-border-subtle/70 px-5 py-4 sm:px-6">
         <summary className="cursor-pointer select-none text-xs font-black text-zinc-300">{s.history} ({data.ledger.length})</summary>
         {data.ledger.length === 0 ? (
           <p className="py-4 text-xs text-zinc-500">{s.empty}</p>

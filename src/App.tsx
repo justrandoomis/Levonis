@@ -1,5 +1,13 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation, useNavigationType } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigationType } from 'react-router-dom';
+/**
+ * BrowserRouter, reporting whether a navigation is still pending — the one
+ * thing BrowserRouter cannot say. A tap on a page whose code has not arrived
+ * used to leave the old page live and silent for as long as the download
+ * took; now it is held as a `route` busy wait. The whole argument is in the
+ * component.
+ */
+import NavigationRouter from './components/NavigationRouter';
 import { StoreProvider, useStore } from './StoreContext';
 import ChunkBoundary from './components/ChunkBoundary';
 /**
@@ -61,6 +69,9 @@ const ModelViewer = React.lazy(() => import('./pages/ModelViewer'));
  */
 const MerchantDashboardPage = React.lazy(() => import('./pages/MerchantDashboardPage'));
 const Requests = React.lazy(() => import('./pages/Requests'));
+const RunningCommunityOrders = React.lazy(() =>
+  import('./pages/Requests').then((m) => ({ default: m.RunningCommunityOrders }))
+);
 const Admin = React.lazy(() => import('./pages/Admin'));
 const Invest = React.lazy(() => import('./pages/Invest'));
 const InvestAdmin = React.lazy(() => import('./pages/InvestAdmin'));
@@ -95,7 +106,12 @@ const BundleDetail = React.lazy(() => import('./pages/BundleDetail'));
 const RouteFallback = () => {
   useCharacterBusy(true);
   /**
-   * AND IT TAKES THE SCREEN, not just the routed rectangle.
+   * AND IT TAKES THE SCREEN, not just the routed rectangle — on the waits that
+   * mount it: a cold boot, a session still loading, a shell switch. An
+   * in-shell navigation to a page not yet downloaded never mounts it (the
+   * router keeps the old page during a pending transition), and is held by
+   * `NavigationRouter` instead. During boot the character's own intro is the
+   * indicator and the overlay stands down (AppBusy, `introBooting`).
    *
    * This element is `min-h-dvh` and covers the page content — but BottomNav,
    * the header and the back gesture render OUTSIDE every Suspense boundary
@@ -105,9 +121,8 @@ const RouteFallback = () => {
    *
    * `route` is the lowest-ranked reason on purpose (src/lib/busy.ts): an
    * order or a re-quote in flight keeps its own sentence, and a chunk that
-   * lands inside BUSY_DELAY_MS paints nothing at all. This is also the one
-   * place the reason is taken — it was declared, ranked and given a label in
-   * all three languages while nothing in the application ever held it.
+   * lands inside ROUTE_BUSY_DELAY_MS paints nothing at all. This and
+   * `NavigationRouter` are the only two places the reason is taken.
    */
   useBusy(true, 'route');
   return (
@@ -728,8 +743,14 @@ function AppContent() {
               (§57); the storefront reports its canonical subdomain URL. */}
           <Route path="/community/store/:slug/p/:productSlug" element={<CommunityGate><StorefrontProduct /></CommunityGate>} />
           {/* The customer-request marketplace. Browsable signed out; acting
-              on it needs an account, which each control handles itself. */}
-          <Route path="/requests" element={<Requests />} />
+              on it needs an account, which each control handles itself.
+              It IS part of Levo Community (owner, 2026-09-23: «نعم، أغلقه مع
+              المجتمع»), so it is behind the same gate: the server refuses
+              its board, new requests and new offers while the community is
+              shut (docs/DECISIONS.md). A customer's ESCROWED orders stay
+              under the card (closedExtra) so they can still confirm or
+              cancel — /api/marketplace/orders is outside the wall. */}
+          <Route path="/requests" element={<CommunityGate closedExtra={<RunningCommunityOrders />}><Requests /></CommunityGate>} />
           <Route path="/merchant/start" element={<ProtectedRoute><MerchantStart /></ProtectedRoute>} />
           <Route path="/merchant" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
           <Route path="/merchant/*" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
@@ -821,7 +842,7 @@ export default function App() {
               served to every visitor by /api/settings/public. Outside the
               Router, because a reading preference is not a route. */}
           <CurrencyProvider>
-          <Router>
+          <NavigationRouter>
             <StoreProvider>
               {/* THE TWO THINGS THAT MUST RENDER ON EVERY SHELL are siblings
                   of AppContent rather than children of it: the intro, for the
@@ -840,7 +861,7 @@ export default function App() {
               <AppBusy />
               <AppContent />
             </StoreProvider>
-          </Router>
+          </NavigationRouter>
           </CurrencyProvider>
         </WalletProvider>
       </LanguageProvider>

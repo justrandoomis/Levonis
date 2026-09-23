@@ -26,8 +26,8 @@ import {
   disputeEscrow,
   getEscrow,
   merchantBalance,
-  iqdToUsdCents,
 } from '../worker/lib/escrowOps';
+import { createDepositRequest, readWalletDust, walletIqdAvailable, availableUsdSql } from '../worker/lib/walletOps';
 
 const RATE = 1400;
 
@@ -53,11 +53,14 @@ function setup(balanceIqd = 1_000_000) {
   `);
   // Fund the customer's wallet with an approved deposit, the way a real
   // balance arises — not by writing a balance column, because there isn't one.
+  // A zero balance is no funding row at all: `CHECK (amount > 0)`.
   const cents = Math.ceil((balanceIqd * 100) / RATE);
-  raw.exec(
-    `INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status,note)
-     VALUES ('wt1','buyer','deposit','USD',${cents},'approved','test funding')`
-  );
+  if (cents > 0) {
+    raw.exec(
+      `INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status,note)
+       VALUES ('wt1','buyer','deposit','USD',${cents},'approved','test funding')`
+    );
+  }
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
 
@@ -327,12 +330,108 @@ test('every movement leaves an append-only event, and history is never rewritten
   assert.equal(release.actor_role, 'admin', 'who decided is part of the record');
 });
 
-test('the currency conversion never under-reserves', () => {
-  // Rounding UP matters: a hold short by one cent is a hold that does not
-  // cover the debit it exists to guarantee.
-  for (const iqd of [1, 999, 1_000, 49_999, 50_000, 1_234_567]) {
-    const cents = iqdToUsdCents(iqd, RATE);
-    assert.ok((cents * RATE) / 100 >= iqd, `holding ${cents} cents does not cover ${iqd} IQD`);
-    assert.ok(Number.isInteger(cents));
-  }
+/**
+ * «الدينار هو الأساس» ON THE COMMUNITY BOARD.
+ *
+ * The hold used to be `iqdToUsdCents(gross)` — a CEIL: a 50,000 د.ع offer
+ * asked for 3,572 cents, and a customer whose wallet read exactly 50,000 د.ع
+ * (a typed 50,000 deposit: 3,571 cents plus its six-dinar remainder, 0108)
+ * was told «Your wallet balance does not cover this offer». The hold now asks
+ * the dinar question and reserves `walletSpendCents` — floored, capped at the
+ * cents on hand — exactly as a checkout does, and the settlement debit records
+ * the dinars it spent, so the wallet then reads 0, not 6.
+ */
+function setupTyped(typedIqd: number) {
+  const { raw, db } = setup(0);
+  raw.exec("DELETE FROM wallet_transactions WHERE id = 'wt1'");
+  return { raw, db, typedIqd };
+}
+
+async function depositTyped(db: D1Database, raw: DatabaseSync, typedIqd: number, ref: string) {
+  const cents = Math.floor((typedIqd * 100) / RATE); // the browser's own floor
+  const res = await createDepositRequest(db, {
+    userId: 'buyer',
+    amountCents: cents,
+    receiptKey: 'receipts/buyer/x.png',
+    provider: 'zaincash',
+    channel: 'app',
+    reference: ref,
+    declaredAmountIqd: typedIqd,
+    exchangeRateSnapshot: RATE,
+    txId: `wtx_${ref}`,
+  });
+  assert.equal(res.ok, true);
+  raw.prepare("UPDATE wallet_transactions SET status = 'approved' WHERE id = ?").run(`wtx_${ref}`);
+}
+
+const dinarBalance = async (db: D1Database, raw: DatabaseSync) => {
+  const cents = Number((raw.prepare(`SELECT ${availableUsdSql('?1')} AS c`).get('buyer') as { c: number }).c);
+  return walletIqdAvailable(cents, (await readWalletDust(db, 'buyer')).dust_iqd, RATE);
+};
+
+test('a wallet that reads 50,000 د.ع accepts a 50,000 د.ع offer, and then reads zero', async () => {
+  const { raw, db } = setupTyped(50_000);
+  await depositTyped(db, raw, 50_000, 'T1');
+  assert.equal(await dinarBalance(db, raw), 50_000, 'the balance the customer sees');
+
+  const r = await hold(db);
+  assert.equal(r.ok, true, `refused a wallet showing exactly the offer: ${JSON.stringify(r)}`);
+  const esc = (await getEscrow(db, (r as { escrowId: string }).escrowId))!;
+  const heldCents = (raw.prepare('SELECT amount_cents FROM wallet_holds WHERE id = ?').get(esc.hold_id) as { amount_cents: number })
+    .amount_cents;
+  assert.equal(heldCents, 3571, 'floored and capped at the cents on hand — never the 3,572 the ceil asked for');
+  assert.equal(await dinarBalance(db, raw), 0, 'the hold takes the whole balance while it stands');
+
+  const rel = await releaseEscrow(db, { escrowId: esc.id, actorId: 'buyer', actorRole: 'customer', idempotencyKey: 'rel-t1' });
+  assert.equal(rel.ok, true);
+  const debit = raw
+    .prepare("SELECT amount, amount_iqd, exchange_rate_snapshot FROM wallet_transactions WHERE type = 'withdrawal' AND user_id = 'buyer'")
+    .get() as { amount: number; amount_iqd: number; exchange_rate_snapshot: number };
+  assert.deepEqual({ ...debit }, { amount: 3571, amount_iqd: 50_000, exchange_rate_snapshot: RATE }, 'the debit records the dinars it spent');
+  assert.equal((await readWalletDust(db, 'buyer')).dust_iqd, 0, 'the deposit remainder is cancelled by the debit that spent it');
+  assert.equal((await merchantBalance(db, 'm1')).available_iqd, 45_000, 'the merchant is paid in dinars, untouched by the cents');
+});
+
+test('two 25,000 deposits (3,570 cents) still cover a 50,000 offer — the hold is capped at the cents on hand', async () => {
+  const { raw, db } = setupTyped(0);
+  await depositTyped(db, raw, 25_000, 'T2a');
+  await depositTyped(db, raw, 25_000, 'T2b');
+  assert.equal(await dinarBalance(db, raw), 50_000);
+  const r = await hold(db);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const esc = (await getEscrow(db, (r as { escrowId: string }).escrowId))!;
+  const heldCents = (raw.prepare('SELECT amount_cents FROM wallet_holds WHERE id = ?').get(esc.hold_id) as { amount_cents: number })
+    .amount_cents;
+  assert.equal(heldCents, 3570, 'an uncapped 3,571 would have been refused by the hold');
+});
+
+test('a wallet genuinely short of the offer is still refused, and nothing is reserved', async () => {
+  const { raw, db } = setupTyped(0);
+  await depositTyped(db, raw, 49_000, 'T3');
+  const r = await hold(db);
+  assert.equal(r.ok, false);
+  assert.equal((r as { reason: string }).reason, 'INSUFFICIENT_FUNDS');
+  assert.equal(
+    (raw.prepare('SELECT COUNT(*) AS n FROM wallet_holds').get() as { n: number }).n,
+    0,
+    'a refused offer reserves nothing'
+  );
+});
+
+test('a partial refund credits exactly the refunded dinars', async () => {
+  const { raw, db } = setupTyped(0);
+  await depositTyped(db, raw, 50_000, 'T4');
+  const r = await hold(db);
+  const escrowId = (r as { escrowId: string }).escrowId;
+  const rf = await refundEscrow(db, { escrowId, actorId: 'boss', actorRole: 'admin', amountIqd: 20_000, idempotencyKey: 'prf-t4' });
+  assert.equal(rf.ok, true, JSON.stringify(rf));
+  const credit = raw
+    .prepare("SELECT amount, amount_iqd, exchange_rate_snapshot FROM wallet_transactions WHERE id = ?")
+    .get(`wtx_escrow_refund_${escrowId}`) as { amount: number; amount_iqd: number; exchange_rate_snapshot: number };
+  assert.deepEqual(
+    { ...credit },
+    { amount: Math.floor((20_000 * 100) / RATE), amount_iqd: 20_000, exchange_rate_snapshot: RATE },
+    'floored at the hold’s rate, with the dinars beside the cents'
+  );
+  assert.equal(await dinarBalance(db, raw), 20_000, 'the customer reads exactly what came back — not 20,006');
 });

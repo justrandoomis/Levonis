@@ -50,6 +50,11 @@ import {
   processWalletNotifications,
   type CallbackQueryInput,
 } from '../lib/walletNotify';
+import {
+  handleOrderConfirmCallback,
+  isOrderConfirmData,
+  type OrderConfirmCallback,
+} from '../lib/orderTelegramConfirm';
 
 /**
  * Telegram phone-ownership linking, OTP verification and the secured
@@ -463,7 +468,7 @@ interface TgCallbackQuery {
   id?: string;
   from?: { id?: number };
   data?: string;
-  message?: { message_id?: number; chat?: { id?: number; type?: string } };
+  message?: { message_id?: number; chat?: { id?: number; type?: string }; text?: string };
 }
 interface TgUpdate {
   update_id?: number;
@@ -516,6 +521,13 @@ async function handleUpdate(env: Env, update: TgUpdate): Promise<void> {
   const cb = update.callback_query;
   if (cb) {
     if (typeof cb.id !== 'string' || !cb.id) return;
+    // «تم تأكيد الطلب» on an order message the legacy ladder sent through this
+    // bot (no admin group bound yet). Its own namespace, its own checks —
+    // worker/lib/orderTelegramConfirm.ts; everything else is a wallet button.
+    if (isOrderConfirmData(cb.data)) {
+      await handleOrderConfirmCallback(env, cb as OrderConfirmCallback, 'customer');
+      return;
+    }
     await handleAdminActionCallback(env, cb as CallbackQueryInput);
     return;
   }
@@ -1036,7 +1048,7 @@ interface AdminUpdate {
     id?: string;
     from?: { id?: number };
     data?: string;
-    message?: { message_id?: number; chat?: { id?: number } };
+    message?: { message_id?: number; chat?: { id?: number }; text?: string };
   };
 }
 
@@ -1056,6 +1068,15 @@ async function handleAdminUpdate(env: Env, update: AdminUpdate): Promise<void> {
       await auditAdminBot(env.DB, null, 'telegram_admin.callback.denied', `tg:${from ?? 'unknown'}`, typeof from === 'number' ? from : null, {
         reason: 'not_in_allow_list',
       });
+      return;
+    }
+    // THE ORDER BUTTON — «تم تأكيد الطلب» on the «📝 Orders» topic message.
+    // Past door 1 like every button here; door 2 (a live site admin behind this
+    // Telegram id) and the group check are inside the handler. Dispatched
+    // BEFORE the wallet handler, which answers anything it cannot parse as a
+    // wallet token with «زر غير صالح».
+    if (isOrderConfirmData(cb.data)) {
+      await handleOrderConfirmCallback(env, cb as OrderConfirmCallback, 'admin');
       return;
     }
     await handleAdminActionCallback(env, cb as CallbackQueryInput, 'admin');

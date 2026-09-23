@@ -10,6 +10,7 @@ import {
   Package,
   Printer,
   RotateCw,
+  ShieldCheck,
   Tag,
 } from 'lucide-react';
 import { useAuth } from '../../AuthContext';
@@ -126,6 +127,11 @@ function kindIcon(kind: string) {
     // not make the customer learn a second glyph for "somebody replied to me".
     case 'complaint_reply':
       return LifeBuoy;
+    // The warranty team answering, or a claim moving a stage: the shield the
+    // warranty centre itself wears, so the row says which conversation it is.
+    case 'warranty_reply':
+    case 'warranty_stage':
+      return ShieldCheck;
     default:
       return Bell;
   }
@@ -138,9 +144,11 @@ interface RowProps {
    *  is a plain dialog, where the role would be a lie. */
   asMenu: boolean;
   onOpen: (n: NotificationRow) => void;
+  /** A row with no link shows its whole body instead of two lines of it. */
+  expanded?: boolean;
 }
 
-function Row({ n, asMenu, onOpen }: RowProps) {
+function Row({ n, asMenu, onOpen, expanded = false }: RowProps) {
   const { lang, loc } = useLanguage();
   // Sorani falls back to the ARABIC text, never to English: Arabic is the
   // source language the server stored, and it is the closer of the two.
@@ -155,6 +163,7 @@ function Row({ n, asMenu, onOpen }: RowProps) {
       data-notif-item={n.id}
       data-notif-read={n.read ? '1' : '0'}
       onClick={() => onOpen(n)}
+      aria-expanded={n.link ? undefined : expanded}
       className={`flex w-full items-start gap-2.5 px-3 py-3 text-start transition-colors hover:bg-white/[0.06] focus-visible:bg-white/[0.06] focus-visible:outline-none ${
         n.read ? '' : 'bg-gold/[0.06]'
       }`}
@@ -171,7 +180,11 @@ function Row({ n, asMenu, onOpen }: RowProps) {
         <span className={`block text-[13px] leading-5 ${n.read ? 'text-zinc-300' : 'font-bold text-white'}`}>
           {title}
         </span>
-        {body && <span className="mt-0.5 line-clamp-2 text-[12px] leading-5 text-zinc-400">{body}</span>}
+        {body && (
+          <span className={`mt-0.5 text-[12px] leading-5 text-zinc-400 ${expanded ? 'whitespace-pre-wrap break-words' : 'line-clamp-2'}`}>
+            {body}
+          </span>
+        )}
         <time dateTime={n.created_at} className="mt-1 block text-[11px] text-zinc-500">
           {relTime(n.created_at, loc)}
         </time>
@@ -201,6 +214,14 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [rows, setRows] = useState<NotificationRow[]>([]);
+  /**
+   * THE ROW WITH NOWHERE TO GO OPENS IN PLACE. A notification whose whole
+   * content is its body — an older complaint answer, written before the
+   * complaint had a thread to link to — was clamped to two lines, and tapping
+   * it closed the panel and did nothing. A reply longer than two lines could
+   * be read by nobody. Such a row now expands under the tap instead.
+   */
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   /**
@@ -305,7 +326,8 @@ export default function NotificationBell() {
 
   const openItem = useCallback(
     (n: NotificationRow) => {
-      close(false);
+      if (n.link) close(false);
+      else setExpandedId((cur) => (cur === n.id ? null : n.id));
       if (!n.read) {
         setRows((prev) => prev.map((r) => (r.id === n.id ? { ...r, read: true } : r)));
         setUnread((u) => Math.max(0, u - 1));
@@ -394,7 +416,7 @@ export default function NotificationBell() {
         )}
 
         {rows.map((n) => (
-          <Row key={n.id} n={n} asMenu={!phone} onOpen={openItem} />
+          <Row key={n.id} n={n} asMenu={!phone} onOpen={openItem} expanded={expandedId === n.id} />
         ))}
       </div>
     </div>

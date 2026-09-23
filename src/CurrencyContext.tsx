@@ -78,11 +78,22 @@ function writeStored(currency: DisplayCurrency): void {
   }
 }
 
-/** IQD → US cents, at the administrator's rate. Cents, not dollars, so the
- *  rounding happens once and in one place. */
+/**
+ * IQD → US cents, at the administrator's rate. Cents, not dollars, so the
+ * rounding happens once and in one place.
+ *
+ * FLOORED — THE ONE DOLLAR-READING RULE THE WALLET ALREADY USES. The owner's
+ * «وعند الدولار يقرب الى عدد صحيح اقل — مثلا 35.71 = 50,000» is what
+ * `iqdToUsdCents` (src/lib/api.ts) and the wallet header apply; this used
+ * `Math.round`, so the same dinar figure read one cent differently on a
+ * product page than in the wallet (50,007 د.ع: $35.72 here, $35.71 there).
+ * Integer arithmetic, as there: `(iqd / rate) * 100` in floating point can
+ * land a hair under a whole cent (1,400 → 99.99…) and floor would then lose
+ * it. Dinars that are not whole are floored to the dinar first.
+ */
 export function iqdToUsdCentsAt(iqd: number, rate: number): number {
   if (!Number.isFinite(iqd) || !Number.isFinite(rate) || rate <= 0) return 0;
-  return Math.round((iqd / rate) * 100);
+  return Math.floor((Math.floor(iqd) * 100) / rate);
 }
 
 /** «$1,234.56» — a real figure to the cent, in LTR digits. */

@@ -25,6 +25,7 @@ import { useAuth } from '../AuthContext';
 import { ApiError } from '../lib/api';
 import { merchantApi, slugMessage, type MerchantMe, type SlugRejection } from '../lib/merchant';
 import { GOVERNORATES } from '../lib/governorates';
+import { CommunityClosedCard, useCommunityAccess } from './community/access';
 
 type SlugState =
   | { kind: 'idle' }
@@ -36,6 +37,7 @@ export default function MerchantStart() {
   const { loc, lang } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { access: communityAccess, reload: recheckCommunity } = useCommunityAccess();
 
   const [me, setMe] = useState<MerchantMe | null>(null);
   const [loading, setLoading] = useState(true);
@@ -147,6 +149,13 @@ export default function MerchantStart() {
         label={loc('عرض الاشتراكات', 'View plans', 'بینینی پلانەکان')}
       />
     );
+  }
+
+  // A new store is a new community merchant, and the server refuses it while
+  // Levo Community is shut to this member (DECISIONS 110). Say so here rather
+  // than showing a form whose submit would be refused.
+  if (communityAccess?.may_enter === false) {
+    return <CommunityClosedCard onRecheck={recheckCommunity} />;
   }
 
   return (

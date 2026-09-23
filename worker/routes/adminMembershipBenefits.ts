@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, notFound, int, str, oneOf } from '../lib/http';
+import { requireAdmin, badRequest, conflict, notFound, int, str, oneOf } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { getSettings } from '../lib/settings';
 import { shippingConfigFrom } from './orders';
@@ -22,7 +22,8 @@ import {
   type RuleWrite,
 } from '../lib/membershipBenefits';
 import type { TierStatus } from '../lib/entitlements';
-import type { BenefitRule, DeliveryMethodId } from '@levonis/pricing/membershipBenefits';
+import { auditStatements } from '../lib/audit';
+import { selectRule, type BenefitRule, type DeliveryMethodId } from '@levonis/pricing/membershipBenefits';
 
 /**
  * THE OWNER'S CONTROL PANEL FOR WHAT A MEMBERSHIP IS WORTH.
@@ -279,6 +280,13 @@ const RECOMMENDED: Array<{
   slugs: string[];
   tier: 'pro' | 'prime';
   label: string;
+  /**
+   * Only the owner's own two printer figures are created LIVE. Every other
+   * suggestion is this file's guess, not the owner's decision, so it lands
+   * switched off: it is on the screen to be read, and it discounts nothing
+   * until the owner turns it on.
+   */
+  enabled: boolean;
   fields: Partial<RuleWrite>;
 }> = [
   {
@@ -286,6 +294,7 @@ const RECOMMENDED: Array<{
     slugs: ['printers', '3d-printers'],
     tier: 'pro',
     label: 'PRO — طابعات',
+    enabled: true,
     fields: { discount_mode: 'percent', percent: 10, max_discount_iqd: 100_000, cap_scope: 'per_unit' },
   },
   {
@@ -293,6 +302,7 @@ const RECOMMENDED: Array<{
     slugs: ['materials', 'filament'],
     tier: 'pro',
     label: 'PRO — مواد',
+    enabled: false,
     fields: { discount_mode: 'percent', percent: 15 },
   },
   {
@@ -300,14 +310,25 @@ const RECOMMENDED: Array<{
     slugs: ['accessories', 'printer-accessories'],
     tier: 'pro',
     label: 'PRO — إكسسوارات',
+    enabled: false,
     fields: { discount_mode: 'percent', percent: 10 },
   },
+  /**
+   * THE OWNER'S FIGURE: «البريميوم خصم حتى 25,000 لكل وحدة على الطابعات فقط».
+   * A FIXED 25,000 per unit, not "100% capped at 25,000": `unitDiscountIqd`
+   * already never takes more than the unit costs, so a fixed amount IS "up to
+   * 25,000 per unit", while a 100% rule would read as a free printer to anyone
+   * who opens it. The ceiling is written too (25,000, per unit) so the row
+   * passes the same validation as one typed in the dialog, and the public
+   * line prints it once (a ceiling equal to the amount is not repeated).
+   */
   {
     key: 'premium-printers',
     slugs: ['printers', '3d-printers'],
     tier: 'prime',
     label: 'PREMIUM — طابعات',
-    fields: { discount_mode: 'fixed', fixed_iqd: 15_000, cap_scope: null },
+    enabled: true,
+    fields: { discount_mode: 'fixed', fixed_iqd: 25_000, max_discount_iqd: 25_000, cap_scope: 'per_unit' },
   },
 ];
 
@@ -333,24 +354,35 @@ const BLANK_RULE: Omit<RuleWrite, 'id' | 'tier' | 'benefit_type' | 'scope' | 'la
   notes: null,
 };
 
-adminMembershipBenefitRoutes.post('/recommended', async (c) => {
-  const user = c.get('user')!;
+/** One suggestion as the confirmation dialog lists it, and as POST writes it. */
+export interface RecommendedPlanEntry {
+  key: string;
+  category_name_ar: string;
+  category_name_en: string;
+  rule: RuleWrite;
+}
+
+async function planRecommended(db: D1Database): Promise<{
+  entries: RecommendedPlanEntry[];
+  skipped: Array<{ key: string; reason: 'NO_MATCHING_SECTION' | 'ALREADY_CONFIGURED' }>;
+}> {
   const [existing, { results: catalogs }] = await Promise.all([
-    allBenefitRules(c.env.DB),
-    c.env.DB.prepare('SELECT id, slug FROM catalogs WHERE parent_id IS NULL').all<{ id: string; slug: string }>(),
+    allBenefitRules(db),
+    db
+      .prepare('SELECT id, slug, name_ar, name_en FROM catalogs WHERE parent_id IS NULL')
+      .all<{ id: string; slug: string; name_ar: string | null; name_en: string | null }>(),
   ]);
-  const bySlug = new Map((catalogs ?? []).map((row) => [String(row.slug), String(row.id)]));
+  const bySlug = new Map((catalogs ?? []).map((row) => [String(row.slug), row]));
 
-  const created: RuleWrite[] = [];
-  const skipped: Array<{ key: string; reason: string }> = [];
-  let versionId = (await currentBenefitVersionId(c.env.DB)) ?? 0;
-
+  const entries: RecommendedPlanEntry[] = [];
+  const skipped: Array<{ key: string; reason: 'NO_MATCHING_SECTION' | 'ALREADY_CONFIGURED' }> = [];
   for (const rec of RECOMMENDED) {
-    const categoryId = rec.slugs.map((slug) => bySlug.get(slug)).find((id) => !!id) ?? null;
-    if (!categoryId) {
+    const section = rec.slugs.map((slug) => bySlug.get(slug)).find((row) => !!row) ?? null;
+    if (!section) {
       skipped.push({ key: rec.key, reason: 'NO_MATCHING_SECTION' });
       continue;
     }
+    const categoryId = String(section.id);
     // An owner who already wrote a rule for this tier and section keeps it.
     // This action offers a starting point; it never overwrites a decision.
     const taken = existing.some(
@@ -360,21 +392,452 @@ adminMembershipBenefitRoutes.post('/recommended', async (c) => {
       skipped.push({ key: rec.key, reason: 'ALREADY_CONFIGURED' });
       continue;
     }
-    const rule: RuleWrite = {
-      ...BLANK_RULE,
-      ...rec.fields,
-      id: newId('mbr'),
-      tier: rec.tier,
-      benefit_type: 'product_discount',
-      scope: 'category',
-      category_id: categoryId,
-      label: rec.label,
-    };
-    versionId = await saveBenefitRule(c.env, user.id, rule, 'create');
-    created.push(rule);
+    entries.push({
+      key: rec.key,
+      category_name_ar: section.name_ar ?? '',
+      category_name_en: section.name_en ?? '',
+      rule: {
+        ...BLANK_RULE,
+        ...rec.fields,
+        id: newId('mbr'),
+        tier: rec.tier,
+        benefit_type: 'product_discount',
+        scope: 'category',
+        category_id: categoryId,
+        label: rec.label,
+        enabled: rec.enabled,
+      },
+    });
+  }
+  return { entries, skipped };
+}
+
+/**
+ * WHAT THE BUTTON WOULD WRITE, BEFORE IT WRITES IT. The rules screen shows
+ * this list — tier, section, figure, and whether each lands live or switched
+ * off — in a confirmation dialog; nothing is created by opening it.
+ */
+adminMembershipBenefitRoutes.get('/recommended', async (c) => {
+  const { entries, skipped } = await planRecommended(c.env.DB);
+  return c.json({ success: true, entries, skipped });
+});
+
+/**
+ * Creates the suggestions the admin CONFIRMED: the body names their keys, as
+ * the dialog listed them. A key the plan no longer offers (a rule was added
+ * for that section in the meantime) is skipped, never overwritten.
+ */
+adminMembershipBenefitRoutes.post('/recommended', async (c) => {
+  const user = c.get('user')!;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!Array.isArray(body.keys) || body.keys.length === 0) {
+    throw badRequest('Choose the recommended rules to add', 'RECOMMENDED_KEYS_REQUIRED');
+  }
+  const confirmed = new Set(body.keys.map((k) => String(k)));
+  const { entries, skipped } = await planRecommended(c.env.DB);
+
+  const created: RuleWrite[] = [];
+  let versionId = (await currentBenefitVersionId(c.env.DB)) ?? 0;
+  for (const entry of entries) {
+    if (!confirmed.has(entry.key)) continue;
+    versionId = await saveBenefitRule(c.env, user.id, entry.rule, 'create');
+    created.push(entry.rule);
   }
 
   return c.json({ success: true, created, skipped, version_id: versionId });
+});
+
+/* -------------------------------------------- per-product rules -> one section rule */
+
+/**
+ * «تحويل إلى قاعدة قسم» — THE PER-PRODUCT LIST, FOLDED BACK INTO ONE SENTENCE.
+ *
+ * The owner states a discount on a section: «خصم 10% حتى 100,000 لكل وحدة»
+ * on printers. The product editor and the import both write PRODUCT rules,
+ * so a store priced that way ends up with one row per printer, all saying the
+ * same thing. This groups the enabled per-product discount rules by tier, by
+ * the section their product is filed under and by the exact terms they make
+ * (mode, figure, ceiling and its scope, quantity, minimum order, window), and
+ * offers each group as ONE section rule.
+ *
+ * A SECTION RULE REACHES MORE THAN THE PRODUCTS IT REPLACES — every product
+ * filed under the section. So each group is priced before and after on every
+ * active product in the section with the checkout's own `selectRule`, and the
+ * screen is told how many other products the section rule would start (or
+ * stop) discounting. A product whose price the conversion would CHANGE — a
+ * sub-section rule would win once its product rule is gone, say — is left out
+ * of the group and keeps its own rule.
+ *
+ * Refused, with the reason, where one section rule cannot say the same thing:
+ *   SECTION_RULE_EXISTS — the section already has a rule for this tier with
+ *     different terms; two section rules would compete on priority.
+ *   ORDER_WIDE_LIMIT    — a per-order ceiling or a quantity limit is spent once
+ *     per RULE per order (`orderLineBenefits`); folding N rules into one
+ *     would turn N budgets into one.
+ * When the section already has a rule with exactly these terms the product
+ * rules are redundant, and the action only deletes them.
+ */
+interface ConsolidationTerms {
+  discount_mode: BenefitRule['discount_mode'];
+  percent: number | null;
+  fixed_iqd: number | null;
+  max_discount_iqd: number | null;
+  cap_scope: BenefitRule['cap_scope'];
+  max_quantity: number | null;
+  min_subtotal_iqd: number | null;
+  valid_from: string | null;
+  valid_until: string | null;
+}
+
+export interface ConsolidationGroup {
+  key: string;
+  tier: 'prime' | 'pro';
+  category_id: string;
+  category_name_ar: string;
+  category_name_en: string;
+  terms: ConsolidationTerms;
+  /** The product rules the action deletes. */
+  rule_ids: string[];
+  /** Product rules in the group whose product would be priced differently
+   *  without them; they are left alone. */
+  kept_rule_ids: string[];
+  /** Other active products in the section whose discount the section rule
+   *  would change (almost always: products that had none and would get one). */
+  other_products_affected: number;
+  mode: 'create' | 'delete_only' | 'blocked';
+  reason: 'SECTION_RULE_EXISTS' | 'ORDER_WIDE_LIMIT' | null;
+  existing_rule_id: string | null;
+}
+
+const termsOf = (r: BenefitRule): ConsolidationTerms => ({
+  discount_mode: r.discount_mode,
+  percent: r.discount_mode === 'percent' ? r.percent : null,
+  fixed_iqd: r.discount_mode === 'fixed' ? r.fixed_iqd : null,
+  max_discount_iqd: r.max_discount_iqd,
+  cap_scope: r.max_discount_iqd === null ? null : r.cap_scope,
+  max_quantity: r.max_quantity,
+  min_subtotal_iqd: r.min_subtotal_iqd,
+  valid_from: r.valid_from,
+  valid_until: r.valid_until,
+});
+const termsKey = (t: ConsolidationTerms): string => JSON.stringify(Object.values(t));
+/** What a rule does to a price — `null` for no rule — so before and after compare. */
+const effectOf = (r: BenefitRule | null): string => (r ? termsKey(termsOf(r)) : 'none');
+
+async function planConsolidation(db: D1Database, nowIso: string): Promise<{ groups: ConsolidationGroup[]; product_rule_count: number; rules: BenefitRule[] }> {
+  const [rules, tree, { results: productRows }, { results: catalogRows }] = await Promise.all([
+    allBenefitRules(db),
+    catalogAncestry(db),
+    db
+      .prepare("SELECT id, category_id, sub_category_id FROM products WHERE status = 'active'")
+      .all<{ id: string; category_id: string | null; sub_category_id: string | null }>(),
+    db.prepare('SELECT id, name_ar, name_en FROM catalogs').all<{ id: string; name_ar: string; name_en: string }>(),
+  ]);
+  const names = new Map((catalogRows ?? []).map((r) => [String(r.id), r]));
+  const products = (productRows ?? []).map((p) => ({
+    id: String(p.id),
+    category_id: p.category_id ? String(p.category_id) : null,
+    sub_category_id: p.sub_category_id ? String(p.sub_category_id) : null,
+    ancestry: ancestryFor(tree, p.category_id ? String(p.category_id) : null, p.sub_category_id ? String(p.sub_category_id) : null),
+  }));
+  const productById = new Map(products.map((p) => [p.id, p]));
+
+  const productRules = rules.filter((r) => r.benefit_type === 'product_discount' && r.scope === 'product' && r.product_id);
+  const buckets = new Map<string, BenefitRule[]>();
+  for (const rule of productRules) {
+    if (!rule.enabled || (rule.tier !== 'pro' && rule.tier !== 'prime')) continue;
+    const product = productById.get(rule.product_id!);
+    if (!product?.category_id) continue;
+    const key = `${rule.tier}|${product.category_id}|${termsKey(termsOf(rule))}`;
+    buckets.set(key, [...(buckets.get(key) ?? []), rule]);
+  }
+
+  // Unknown order value: a minimum-order rule is compared as if reached, so
+  // the before/after test sees every rule that can ever apply.
+  const priceOf = (set: readonly BenefitRule[], tier: 'pro' | 'prime', p: (typeof products)[number]) =>
+    selectRule(set, {
+      tier,
+      tierActive: true,
+      benefitType: 'product_discount',
+      target: { product_id: p.id, category_id: p.category_id, sub_category_id: p.sub_category_id, ancestry: p.ancestry },
+      nowIso,
+      subtotalIqd: Number.MAX_SAFE_INTEGER,
+    });
+
+  const groups: ConsolidationGroup[] = [];
+  for (const [key, members] of buckets) {
+    const first = members[0]!;
+    const tier = first.tier as 'pro' | 'prime';
+    const categoryId = productById.get(first.product_id!)!.category_id!;
+    const terms = termsOf(first);
+    // Only a LIVE section rule competes with the one this would write: a
+    // switched-off rule prices nothing, so it neither blocks the conversion
+    // nor makes the product rules redundant. An enabled rule with exactly
+    // these terms makes them redundant wherever it sits in the list; only a
+    // different enabled rule blocks.
+    const sectionRules = rules.filter(
+      (r) =>
+        r.enabled &&
+        r.tier === tier &&
+        r.benefit_type === 'product_discount' &&
+        r.scope === 'category' &&
+        r.category_id === categoryId
+    );
+    const same = sectionRules.find((r) => termsKey(termsOf(r)) === termsKey(terms)) ?? null;
+    const different = sectionRules.find((r) => termsKey(termsOf(r)) !== termsKey(terms)) ?? null;
+    const existing = same ?? different;
+    const orderWide = terms.max_quantity !== null || (terms.cap_scope === 'per_order' && terms.max_discount_iqd !== null);
+    const mode: ConsolidationGroup['mode'] = orderWide ? 'blocked' : same ? 'delete_only' : different ? 'blocked' : 'create';
+
+    const candidate: BenefitRule = {
+      ...first,
+      id: '__consolidated__',
+      scope: 'category',
+      category_id: categoryId,
+      sub_category_id: null,
+      product_id: null,
+      priority: 0,
+    };
+    const memberIds = new Set(members.map((r) => r.id));
+    // A blocked group is still priced as if converted, so the screen can list
+    // it with the reason rather than drop it.
+    const after = [...rules.filter((r) => !memberIds.has(r.id)), ...(mode === 'delete_only' ? [] : [candidate])];
+
+    const ruleIds: string[] = [];
+    const kept: string[] = [];
+    let others = 0;
+    const inSection = products.filter((p) => p.category_id === categoryId || (p.ancestry ?? []).includes(categoryId));
+    const memberProducts = new Set(members.map((r) => r.product_id!));
+    for (const rule of members) {
+      const p = productById.get(rule.product_id!)!;
+      const was = priceOf(rules, tier, p);
+      // A product whose current price does not come from this rule, or whose
+      // price would change without it, keeps it.
+      if (was?.id !== rule.id || effectOf(priceOf(after, tier, p)) !== effectOf(was)) kept.push(rule.id);
+      else ruleIds.push(rule.id);
+    }
+    for (const p of inSection) {
+      if (memberProducts.has(p.id)) continue;
+      if (effectOf(priceOf(rules, tier, p)) !== effectOf(priceOf(after, tier, p))) others += 1;
+    }
+    if (ruleIds.length === 0) continue;
+
+    const name = names.get(categoryId);
+    groups.push({
+      key,
+      tier,
+      category_id: categoryId,
+      category_name_ar: name?.name_ar ?? '',
+      category_name_en: name?.name_en ?? '',
+      terms,
+      rule_ids: ruleIds.sort(),
+      kept_rule_ids: kept.sort(),
+      other_products_affected: mode === 'blocked' ? 0 : others,
+      mode,
+      reason: orderWide ? 'ORDER_WIDE_LIMIT' : mode === 'blocked' ? 'SECTION_RULE_EXISTS' : null,
+      existing_rule_id: existing?.id ?? null,
+    });
+  }
+  groups.sort((a, b) => b.rule_ids.length - a.rule_ids.length || a.key.localeCompare(b.key));
+  return { groups, product_rule_count: productRules.length, rules };
+}
+
+adminMembershipBenefitRoutes.get('/consolidation', async (c) => {
+  const { groups, product_rule_count } = await planConsolidation(c.env.DB, new Date().toISOString());
+  return c.json({ success: true, product_rule_count, groups });
+});
+
+/**
+ * ONE BATCH: the section rule, every deleted product rule, ONE version row
+ * for the whole conversion and an audit row per rule, plus one audit row
+ * naming the conversion. All of it lands or none of it does, so the store is
+ * never left with the product rules gone and no section rule in their place.
+ *
+ * The request carries the group key AND the exact rule ids the admin was
+ * shown; if the plan has moved since (a rule edited, a product re-filed), the
+ * answer is 409 and nothing is written. The same holds when it moves DURING
+ * the request — a second admin converting the same group, an edit landing
+ * between the plan and the batch — because the batch itself is fenced.
+ */
+adminMembershipBenefitRoutes.post('/consolidation', async (c) => {
+  const user = c.get('user')!;
+  const db = c.env.DB;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const key = str(body.key, 'key', { max: 2000 });
+  const sent = Array.isArray(body.rule_ids) ? body.rule_ids.map((x) => String(x)).sort() : [];
+
+  const { groups, rules } = await planConsolidation(db, new Date().toISOString());
+  const group = groups.find((g) => g.key === key);
+  if (!group || JSON.stringify(group.rule_ids) !== JSON.stringify(sent)) {
+    throw conflict('These product rules have changed since the list was loaded. Reload and try again.', 'CONSOLIDATION_STALE');
+  }
+  if (group.mode === 'blocked') {
+    throw conflict(
+      group.reason === 'ORDER_WIDE_LIMIT'
+        ? 'A per-order ceiling or a quantity limit cannot be folded into one section rule without changing what an order saves.'
+        : 'This section already has a rule for this tier with different terms. Edit that rule instead.',
+      group.reason ?? 'CONSOLIDATION_BLOCKED'
+    );
+  }
+
+  const tierLabel = group.tier === 'pro' ? 'PRO' : 'PREMIUM';
+  const created: RuleWrite | null =
+    group.mode === 'create'
+      ? {
+          ...BLANK_RULE,
+          ...group.terms,
+          id: newId('mbr'),
+          tier: group.tier,
+          benefit_type: 'product_discount',
+          scope: 'category',
+          category_id: group.category_id,
+          label: `${tierLabel} — ${group.category_name_ar || group.category_name_en || group.category_id}`,
+          notes: `حُوّلت من ${group.rule_ids.length} قاعدة منتج / consolidated from ${group.rule_ids.length} product rules`,
+        }
+      : null;
+
+  const { results: beforeRows } = await db
+    .prepare("SELECT * FROM membership_benefit_rules WHERE scope = 'product' AND benefit_type = 'product_discount'")
+    .all<Record<string, unknown>>();
+  const beforeById = new Map((beforeRows ?? []).map((r) => [String(r.id), r]));
+  const deleted = group.rule_ids.map((id) => beforeById.get(id));
+  if (deleted.some((row) => !row)) {
+    throw conflict('These product rules have changed since the list was loaded. Reload and try again.', 'CONSOLIDATION_STALE');
+  }
+
+  const statements: D1PreparedStatement[] = [];
+  const sectionTaken = `EXISTS (SELECT 1 FROM membership_benefit_rules
+                                 WHERE tier = ? AND benefit_type = 'product_discount' AND scope = 'category'
+                                   AND category_id = ? AND enabled = 1 AND id <> ?)`;
+
+  if (created) {
+    // Conditional on the section still having no live rule for this tier: a
+    // second admin (or a second tab) converting the same group at the same
+    // moment inserts nothing here, and the fence below rolls its batch back.
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO membership_benefit_rules
+             (id, tier, benefit_type, scope, category_id, sub_category_id, product_id, discount_mode, percent,
+              fixed_iqd, max_discount_iqd, cap_scope, max_quantity, min_subtotal_iqd, free_shipping_threshold_iqd,
+              shipping_methods, max_shipping_subsidy_iqd, cod_tax_exempt, enabled, priority, valid_from, valid_until,
+              label, notes, updated_at, updated_by)
+           SELECT ?,?,?,?,?,NULL,NULL,?,?,?,?,?,?,?,NULL,NULL,NULL,NULL,1,0,?,?,?,?,datetime('now'),?
+            WHERE NOT ${sectionTaken}`
+        )
+        .bind(
+          created.id, created.tier, created.benefit_type, created.scope, created.category_id,
+          created.discount_mode, created.percent, created.fixed_iqd, created.max_discount_iqd, created.cap_scope,
+          created.max_quantity, created.min_subtotal_iqd, created.valid_from, created.valid_until,
+          created.label, created.notes, user.id,
+          created.tier, created.category_id, created.id
+        )
+    );
+  }
+  // Each product rule is deleted only if it is still the row that was planned
+  // on: the same terms, the same last edit. One edited in the meantime is left
+  // in place, and the fence below refuses the whole batch.
+  for (const row of deleted as Array<Record<string, unknown>>) {
+    statements.push(
+      db
+        .prepare(
+          `DELETE FROM membership_benefit_rules
+            WHERE id = ? AND scope = 'product' AND enabled = 1 AND tier IS ? AND product_id IS ?
+              AND discount_mode IS ? AND percent IS ? AND fixed_iqd IS ? AND max_discount_iqd IS ? AND cap_scope IS ?
+              AND max_quantity IS ? AND min_subtotal_iqd IS ? AND valid_from IS ? AND valid_until IS ?
+              AND updated_at IS ?`
+        )
+        .bind(
+          row.id, row.tier, row.product_id, row.discount_mode, row.percent, row.fixed_iqd, row.max_discount_iqd,
+          row.cap_scope, row.max_quantity, row.min_subtotal_iqd, row.valid_from, row.valid_until, row.updated_at ?? null
+        )
+    );
+  }
+
+  /**
+   * ONE VERSION ROW for the whole conversion, carrying the rule set as it
+   * stands AFTER it — the only set any order can ever be priced under. It is
+   * also THE FENCE: `rules_json` is NOT NULL, and it is written NULL (so the
+   * whole batch rolls back) unless every planned product rule is gone and
+   * the section holds exactly the live rule this conversion relies on.
+   */
+  const createdAsRule: BenefitRule | null = created
+    ? (({ notes: _notes, ...rule }) => rule)({ ...created, enabled: true, priority: 0 })
+    : null;
+  const snapshot: BenefitRule[] = [
+    ...rules.filter((r) => !group.rule_ids.includes(r.id)),
+    ...(createdAsRule ? [createdAsRule] : []),
+  ];
+  const idMarks = group.rule_ids.map(() => '?').join(',');
+  const sectionHolds = created
+    ? `EXISTS (SELECT 1 FROM membership_benefit_rules WHERE id = ?) AND NOT ${sectionTaken}`
+    : `EXISTS (SELECT 1 FROM membership_benefit_rules WHERE id = ? AND enabled = 1)`;
+  const sectionBinds = created
+    ? [created.id, created.tier, created.category_id, created.id]
+    : [group.existing_rule_id];
+  statements.push(
+    db
+      .prepare(
+        `INSERT INTO membership_benefit_versions (actor_user_id, action, rule_id, before_json, after_json, rules_json)
+         SELECT ?, 'consolidate', ?, ?, ?,
+                CASE WHEN NOT EXISTS (SELECT 1 FROM membership_benefit_rules WHERE id IN (${idMarks}))
+                       AND ${sectionHolds}
+                     THEN ? ELSE NULL END`
+      )
+      .bind(
+        user.id,
+        created?.id ?? group.existing_rule_id,
+        JSON.stringify(deleted),
+        created ? JSON.stringify(created) : null,
+        ...group.rule_ids,
+        ...sectionBinds,
+        JSON.stringify(snapshot)
+      )
+  );
+
+  // The audit trail keeps one row per rule, as an ordinary edit would.
+  if (created) {
+    const audited = await auditStatements(db, user.id, 'membership_benefit.create', created.id, {
+      before: null,
+      after: created,
+      via: 'consolidation',
+    });
+    statements.push(...audited.statements);
+  }
+  for (const row of deleted) {
+    const audited = await auditStatements(db, user.id, 'membership_benefit.delete', String(row!.id), {
+      before: row,
+      after: null,
+      via: 'consolidation',
+    });
+    statements.push(...audited.statements);
+  }
+  const summary = await auditStatements(db, user.id, 'membership_benefit.consolidate', created?.id ?? group.existing_rule_id ?? group.key, {
+    tier: group.tier,
+    category_id: group.category_id,
+    created_rule_id: created?.id ?? null,
+    existing_rule_id: group.existing_rule_id,
+    deleted_rule_ids: group.rule_ids,
+    terms: group.terms,
+  });
+  statements.push(...summary.statements);
+  try {
+    await db.batch(statements);
+  } catch (e) {
+    // The fence (or a concurrent write it guards against) rolled the batch
+    // back: nothing was written.
+    if (/NOT NULL constraint failed/i.test(e instanceof Error ? e.message : String(e))) {
+      throw conflict('These product rules have changed since the list was loaded. Reload and try again.', 'CONSOLIDATION_STALE');
+    }
+    throw e;
+  }
+
+  return c.json({
+    success: true,
+    created_rule_id: created?.id ?? null,
+    deleted_rule_ids: group.rule_ids,
+    version_id: (await currentBenefitVersionId(db)) ?? 0,
+  });
 });
 
 /* ------------------------------------------------------------ simulator */

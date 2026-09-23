@@ -82,8 +82,18 @@ export function editBudget(token: string): number {
  * "creality"/"crealty", and it is an index range scan either way.
  */
 export function candidatePrefix(token: string): string {
+  // A skeleton-only key (`~` + skeleton, see SKELETON_MARK in ./index.ts)
+  // narrows on the SKELETON's own prefix, with the mark kept in front: `~` on
+  // its own would be a range over every Latin skeleton in the shop.
+  if (token.startsWith(SKELETON_MARK)) return SKELETON_MARK + candidatePrefix(token.slice(SKELETON_MARK.length));
   return token.slice(0, token.length <= 3 ? 1 : 2);
 }
+
+/**
+ * The mark in front of a Latin word's skeleton in the index. Defined here, not
+ * in ./index.ts, because this module is the lower one: ./index.ts imports it.
+ */
+export const SKELETON_MARK = '~';
 
 export interface TokenMatch {
   token: string;
@@ -92,32 +102,70 @@ export interface TokenMatch {
 }
 
 /**
+ * How good a guess a completion is. Longer completions are weaker: "pla"
+ * completing to "plas" is a better guess than "pla" completing to "plastic".
+ */
+export const prefixScore = (queryToken: string, candidate: string): number =>
+  0.75 - Math.min(0.2, (candidate.length - queryToken.length) * 0.02);
+
+export interface MatchOptions {
+  /**
+   * The shopper is still typing this token (it is the query's last word), so
+   * an exact hit does not end the search: its completions are offered too.
+   */
+  complete?: boolean;
+  /**
+   * The heaviest field weight each candidate carries in the index. When
+   * given, the candidates kept are the ones worth the most to a product's
+   * score — weight × quality — rather than simply the closest strings.
+   */
+  weights?: ReadonlyMap<string, number>;
+}
+
+/**
  * Pick the vocabulary tokens a query token should be treated as.
  *
- * An EXACT hit wins outright and stops the search: if the shopper typed a word
- * the shop uses, they meant that word, and offering its neighbours as well
- * would dilute the ranking with near-misses nobody asked for.
+ * An EXACT hit wins outright and stops the search — for a FINISHED word. If
+ * the shopper typed a word the shop uses and then moved on, they meant that
+ * word, and offering its neighbours as well would dilute the ranking with
+ * near-misses nobody asked for. An exact hit is never "corrected" into a
+ * typo-neighbour either way.
+ *
+ * FOR THE WORD STILL BEING TYPED (`complete`) the exact hit is kept AND its
+ * completions are offered beside it. "hard" is an exact word in some
+ * description, and the shopper typing it is on their way to "Hardened"; the
+ * exact-hit rule used to answer with the description and never look at the
+ * nozzle. Ranking by `weights` is what then puts the NAMED completion first:
+ * "hardened" in a name (10 × 0.71) outweighs "hard" in prose (1 × 1).
  *
  * A PREFIX hit — "bas" for "basic" — scores below exact and above fuzzy,
  * because a prefix is usually somebody still typing rather than somebody
  * making a mistake. That is what makes «pla bas» find "PLA Basic".
  */
-export function bestMatches(queryToken: string, vocabulary: readonly string[], limit = 5): TokenMatch[] {
-  if (vocabulary.includes(queryToken)) return [{ token: queryToken, score: 1 }];
+export function bestMatches(
+  queryToken: string,
+  vocabulary: readonly string[],
+  limit = 5,
+  opts: MatchOptions = {}
+): TokenMatch[] {
+  const exact = vocabulary.includes(queryToken);
+  if (exact && !opts.complete) return [{ token: queryToken, score: 1 }];
 
-  const budget = editBudget(queryToken);
+  // The mark on a skeleton key is not a letter anybody typed.
+  const budget = editBudget(queryToken.startsWith(SKELETON_MARK) ? queryToken.slice(SKELETON_MARK.length) : queryToken);
   const out: TokenMatch[] = [];
   for (const candidate of vocabulary) {
+    if (candidate === queryToken) continue;
     if (candidate.startsWith(queryToken)) {
-      // Longer completions are weaker: "pla" completing to "plate" is a worse
-      // guess than "pla" completing to "plas".
-      out.push({ token: candidate, score: 0.75 - Math.min(0.2, (candidate.length - queryToken.length) * 0.02) });
+      out.push({ token: candidate, score: prefixScore(queryToken, candidate) });
       continue;
     }
-    if (budget === 0) continue;
+    if (exact || budget === 0) continue;
     const d = boundedDistance(queryToken, candidate, budget);
     if (d <= budget) out.push({ token: candidate, score: 0.55 - (d - 1) * 0.15 });
   }
-  out.sort((a, b) => b.score - a.score || a.token.localeCompare(b.token));
-  return out.slice(0, limit);
+  const worth = (m: TokenMatch) => (opts.weights?.get(m.token) ?? 1) * m.score;
+  out.sort((a, b) => worth(b) - worth(a) || b.score - a.score || a.token.localeCompare(b.token));
+  const picked = out.slice(0, limit);
+  return exact ? [{ token: queryToken, score: 1 }, ...picked] : picked;
 }

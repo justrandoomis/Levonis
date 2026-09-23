@@ -9,10 +9,9 @@
  *
  * So the answer is recorded in THREE places that must agree, and this file is
  * what makes them agree: the register row, the constant, and the rounding
- * pair the question was actually about («سياسة التقريب الحالية (سقف
- * للسنتات)»). The owner confirmed the policy AS IT STANDS, which means the
- * conservative lean is now a ratified rule rather than an implementation
- * detail somebody could "simplify" to a single Math.round.
+ * the question was actually about («سياسة التقريب الحالية (سقف للسنتات)»).
+ * The owner has since amended the rounding — the dinar is the source and the
+ * dollar floors («الدينار هو الأساس») — and the register says so.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,8 +19,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import { SETTING_DEFAULTS } from '../worker/lib/settings';
-import { iqdToUsdCents, usdCentsToIqd } from '../worker/lib/escrowOps';
-import { corroboratedDeclaredIqd } from '../worker/lib/walletOps';
+import * as escrowOps from '../worker/lib/escrowOps';
+import { usdCentsToIqd } from '../worker/lib/escrowOps';
+import { corroboratedDeclaredIqd, walletSpendCents } from '../worker/lib/walletOps';
+import { iqdToUsdCents } from '../src/lib/api';
 
 const RATE = 1400;
 
@@ -43,28 +44,33 @@ test('the decision register records row 6 as answered, not as a default', () => 
 });
 
 /**
- * THE PAIR LEANS ONE WAY. Not a style choice: `iqdToUsdCents` rounding UP is
- * what stops a hold under-reserving, and `usdCentsToIqd` rounding DOWN is what
- * stops a wallet balance being advertised as covering a cart the hold would
- * then refuse. Both rounding up, or both rounding to nearest, reintroduces
- * exactly that last-dinar promise.
+ * THE ROUNDING, AS THE OWNER LATER AMENDED IT — «الدينار هو الأساس» and
+ * «وعند الدولار يقرب الى عدد صحيح اقل». The ceil this row used to ratify
+ * (`iqdToUsdCents` in escrowOps, «a hold never under-reserves») asked for
+ * 3,572 cents to pay a 50,000 د.ع offer out of the 3,571 that same 50,000 put
+ * in. The dollar is now derived from the dinar and FLOORED everywhere, and a
+ * wallet spend is floored AND capped at the cents on hand (`walletSpendCents`).
  */
-test('the rounding the owner ratified: up into cents, down into dinars', () => {
-  // 1 IQD is a fraction of a cent: it must not vanish on the reserving side.
-  assert.equal(iqdToUsdCents(1, RATE), 1);
+test('the rounding the owner ratified: the dinar is the source, the dollar floors', () => {
+  // The typed figure into cents floors: 50,000 د.ع is $35.71, never $35.72.
+  assert.equal(iqdToUsdCents(50_000, RATE), 3571);
+  assert.equal(iqdToUsdCents(13, RATE), 0);
   assert.equal(iqdToUsdCents(14, RATE), 1);
-  assert.equal(iqdToUsdCents(15, RATE), 2);
-  // ...and must not be invented on the spendable side.
+  // ...and cents back into dinars floors too (a row that recorded no dinars).
   assert.equal(usdCentsToIqd(1, RATE), 14);
   assert.equal(usdCentsToIqd(0, RATE), 0);
+
+  // No ceil survives on the escrow side: the export is gone, so nothing can
+  // quietly go back to asking for the extra cent.
+  assert.equal((escrowOps as Record<string, unknown>).iqdToUsdCents, undefined);
+
+  // A wallet holding exactly what 50,000 put in can spend 50,000.
+  assert.equal(walletSpendCents(50_000, 3571, RATE), 3571);
 
   // The round trip never grows: a balance converted out and back cannot come
   // back larger than it went in.
   for (const iqd of [1, 13, 14, 15, 999, 1400, 75_000, 499_000]) {
-    assert.ok(
-      usdCentsToIqd(iqdToUsdCents(iqd, RATE), RATE) <= iqd + RATE / 100,
-      `round trip inflated ${iqd}`
-    );
+    assert.ok(usdCentsToIqd(iqdToUsdCents(iqd, RATE), RATE) <= iqd, `round trip inflated ${iqd}`);
   }
 });
 

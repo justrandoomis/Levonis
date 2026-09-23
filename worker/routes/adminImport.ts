@@ -82,7 +82,17 @@ import {
   type ExistingRouteRow,
   type ExistingShape,
   type ImportMaps,
+  ambiguousMessage,
 } from '../lib/importApply';
+import {
+  createPendingBrand,
+  inactiveBrandWarning,
+  loadRefRows,
+  matchRef,
+  planBrandCreate,
+} from '../lib/templateRefs';
+import { normalizeText } from '../lib/search/normalize';
+import type { PendingBrand } from '../lib/template';
 import {
   existingCellsFrom,
   parseFulfillmentPayload,
@@ -1067,11 +1077,10 @@ async function buildMaps(db: D1Database, images: Map<string, string>): Promise<I
     ambiguous.catalogs
   );
 
-  const { results: brandRows } = await db
-    .prepare('SELECT id, slug, name_en, name_ar FROM brands WHERE active = 1')
-    .all<{ id: string; slug: string; name_en: string; name_ar: string }>();
+  // Brands are NOT read here: `brandResolver` below matches them the TXT way
+  // (every row, three names, normalizeText) and plans the ones to create. The
+  // empty map is the resolver's fallback for callers that pass no matcher.
   const brands = new Map<string, string>();
-  registerAliases(brandRows, (b) => b.id, brands, ambiguous.brands);
 
   const { results: facetRows } = await db
     .prepare('SELECT id, slug, name_en, name_ar FROM facets WHERE active = 1')
@@ -1089,6 +1098,44 @@ async function buildMaps(db: D1Database, images: Map<string, string>): Promise<I
     (slugRows ?? []).map((r) => [String(r.slug).toLowerCase(), String(r.id)])
   );
   return { brands, catalogs, facets, familyOf: familyMap(rows), images, productSlugs, ambiguous };
+}
+
+/**
+ * BRANDS IN THE CSV/ZIP LANE RESOLVE THE WAY THE TXT LANE RESOLVES THEM.
+ *
+ * The owner: «عند استيراد منتج يرفض بسبب أن البراند غير موجود اجعل ينشئ
+ * البراند بدل أن يرفض ... بالرغم من هذا فإن البراند موجود مثل بامبو لاب وليفو
+ * لكنه يرفض». The TXT import was fixed on both halves; this lane still read
+ * `brands WHERE active = 1` through `normKey` (no hamza/ta-marbuta folding, no
+ * Sorani name) and refused every miss with «أضفها أولًا».
+ *
+ * Now: every brand row (inactive included — skipping it would mint a second
+ * «Bambu Lab») is matched by `matchRef`, the TXT import's own rule. A name
+ * nothing answers to is PLANNED here, once per distinct name, so every row
+ * naming it shares one pending id; the confirm writes it (`createPendingBrand`)
+ * before any product. Nothing is written by the preview.
+ */
+async function brandResolver(
+  db: D1Database,
+  names: string[]
+): Promise<{ match: NonNullable<ImportMaps['brandMatch']>; pending: Map<string, PendingBrand> }> {
+  const rows = await loadRefRows(db, 'brands');
+  const pending = new Map<string, PendingBrand>();
+  const pendingKey = (value: string) => normalizeText(value) || normKey(value);
+  for (const name of names) {
+    const value = name.trim();
+    if (!value || matchRef(rows, value).kind !== 'miss') continue;
+    const key = pendingKey(value);
+    if (!pending.has(key)) pending.set(key, await planBrandCreate(db, value));
+  }
+  const match: NonNullable<ImportMaps['brandMatch']> = (value) => {
+    const hit = matchRef(rows, value);
+    if (hit.kind === 'hit') return { kind: 'hit', id: hit.id, warning: inactiveBrandWarning(rows, hit, value.trim()) };
+    if (hit.kind === 'ambiguous') return hit;
+    const planned = pending.get(pendingKey(value.trim()));
+    return planned ? { kind: 'pending', pending: planned } : { kind: 'miss' };
+  };
+  return { match, pending };
 }
 
 /** The existing product a `key` refers to: SKU first, then slug. */
@@ -1297,6 +1344,8 @@ adminImportRoutes.post('/preview', async (c) => {
 
   const { map: imageMap, issues: imageIssues } = await resolveImages(c.env, parsed, file.assets);
   const maps = await buildMaps(c.env.DB, imageMap);
+  const brands = await brandResolver(c.env.DB, parsed.products.map((p) => p.brand ?? ''));
+  maps.brandMatch = brands.match;
   const existing = await loadExisting(c.env.DB, parsed.products.map((p) => p.key));
 
   // Which product each LINE belongs to, read from the raw rows rather than
@@ -1374,11 +1423,17 @@ adminImportRoutes.post('/preview', async (c) => {
   }
   for (const row of rows) if (row.errors.length) row.action = 'failed';
 
+  const importable = resolved.filter((r) => (byKey.get(r.key as string)?.errors.length ?? 0) === 0);
+  // Only the brands a row that WILL be written points at: a row refused for
+  // another reason must not leave its new brand behind on confirm.
+  const usedBrandIds = new Set(importable.map((r) => String((r.doc as { brand_id?: unknown }).brand_id ?? '')));
+  const brandsToCreate = [...brands.pending.values()].filter((b) => usedBrandIds.has(b.id));
   const payload = {
     category_id: categoryId,
     family: shape.family,
     section_slugs: shape.sectionSlugs,
-    products: resolved.filter((r) => (byKey.get(r.key as string)?.errors.length ?? 0) === 0),
+    products: importable,
+    brands_to_create: brandsToCreate,
   };
   const importId = newId('imp');
   const payloadJson = JSON.stringify(payload);
@@ -1422,6 +1477,8 @@ adminImportRoutes.post('/preview', async (c) => {
     file_issues: fileIssues,
     rows,
     summary: { total: rows.length, create: willCreate, update: willUpdate, failed },
+    // The same disclosure the TXT check returns: the brands confirm will add.
+    brands_to_create: brandsToCreate.map((b) => ({ name: b.name, slug: b.slug })),
     // Said plainly so nobody reads a preview as a save.
     note: 'هذه معاينة فقط — لم تُكتب أي بيانات. اضغط «تأكيد الاستيراد» للتنفيذ.',
   });
@@ -1674,11 +1731,41 @@ adminImportRoutes.post('/confirm', async (c) => {
 
     const payload = JSON.parse(String(rec.payload || '{}')) as {
       products?: Array<Record<string, unknown>>;
+      brands_to_create?: PendingBrand[];
     };
     const products = payload.products ?? [];
     const previewSkipped = previewSkippedRows(rec.report);
     const checkpoints = await loadImportItemCheckpoints(c.env.DB, importId);
     const reviewNeeded: string[] = [];
+
+    /**
+     * THE BRANDS THE PREVIEW DISCLOSED ARE WRITTEN HERE, BEFORE ANY PRODUCT.
+     *
+     * `createPendingBrand` re-resolves by name first, so a brand somebody added
+     * by hand since the preview — or this same confirm resumed after a crash —
+     * is found, not inserted twice. Each product's `brand_id` is re-pointed
+     * from the id the preview reserved to the row that actually exists. A name
+     * that became ambiguous in between fails only the rows naming it.
+     */
+    const brandRemap = new Map<string, string>();
+    const brandRefused = new Map<string, string>();
+    const brandsCreated: Array<{ id: string; name: string; slug: string; created: boolean }> = [];
+    const pendingInUse = new Set(
+      products
+        .filter((_, index) => !checkpoints.has(index))
+        .map((item) => String((item.doc as { brand_id?: unknown } | undefined)?.brand_id ?? ''))
+    );
+    for (const pending of payload.brands_to_create ?? []) {
+      if (!pendingInUse.has(pending.id)) continue;
+      await requireImportApplyLease(c.env.DB, importId, lease.token);
+      const made = await createPendingBrand(c.env.DB, pending, { adminId: admin.id, via: 'product.import.confirm' });
+      if ('ambiguous' in made) {
+        brandRefused.set(pending.id, `${ambiguousMessage('brand', pending.name)} — ${made.ambiguous.join('، ')}`);
+        continue;
+      }
+      brandRemap.set(pending.id, made.id);
+      brandsCreated.push({ id: made.id, name: pending.name, slug: made.slug, created: made.created });
+    }
 
     /**
      * PRE-FLIGHT THE COMPLETE SET, THEN RE-VERIFY EACH ITEM JUST IN TIME.
@@ -1699,7 +1786,12 @@ adminImportRoutes.post('/confirm', async (c) => {
       if (checkpoints.has(index)) continue;
       await requireImportApplyLease(c.env.DB, importId, lease.token);
       try {
-        const doc = validateProductDoc(item.doc as Record<string, unknown>);
+        const stored = item.doc as Record<string, unknown>;
+        const reserved = String(stored.brand_id ?? '');
+        const refused = brandRefused.get(reserved);
+        if (refused) throw new Error(refused);
+        const remapped = brandRemap.get(reserved);
+        const doc = validateProductDoc(remapped ? { ...stored, brand_id: remapped } : stored);
         doc.id = String(item.productId ?? '');
         const relationsBody = item.relations && typeof item.relations === 'object'
           ? (item.relations as Record<string, unknown>)
@@ -1890,6 +1982,7 @@ adminImportRoutes.post('/confirm', async (c) => {
       ...summary,
       cost_written: money,
       generation: lease.generation,
+      brands_created: brandsCreated.filter((b) => b.created).map((b) => b.id),
     });
 
     return c.json({
@@ -1898,6 +1991,7 @@ adminImportRoutes.post('/confirm', async (c) => {
       summary,
       rows: report,
       translation_review_needed: reviewNeeded,
+      brands_created: brandsCreated,
     });
   } catch (error) {
     if (

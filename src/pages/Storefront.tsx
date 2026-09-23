@@ -418,7 +418,7 @@ export default function Storefront({
           <div dir="rtl" className="flex gap-4 mb-4">
             <ContactButton merchantId={store.merchant.id} signedIn={!!user} onHost={!!hostStore} loc={loc} accentBtn={accent.btn} profileOnly={profileOnly} />
             <div className="relative flex-[1.08] min-w-0">
-              <FollowButton merchantId={store.merchant.id} signedIn={!!user} loc={loc} accentChip={accent.chip} />
+              <FollowButton merchantId={store.merchant.id} signedIn={!!user} loc={loc} accentChip={accent.chip} closed={communityAccess?.may_enter === false} />
               <SharePin url={store.url} name={store.name} loc={loc} />
             </div>
           </div>
@@ -1028,6 +1028,11 @@ function ServicesTab({
   const { user } = useAuth();
   const navigate = useNavigate();
   const requestsHref = onHost ? `${MAIN_SITE}/requests` : '/requests';
+  // The request board IS Levo Community and closes with it (DECISIONS 110):
+  // while it is shut to this viewer the quote door would open onto the
+  // maintenance card, so only the conversation is offered.
+  const { access: communityAccess } = useCommunityAccess();
+  const quotes = accepts && communityAccess?.may_enter !== false;
 
   async function openChat() {
     if (!user) {
@@ -1089,7 +1094,7 @@ function ServicesTab({
       {/* The real doors to buying a service: a priced quote through the
           request board (escrow-protected), or a direct conversation. */}
       <div className="grid grid-cols-2 gap-2">
-        {accepts && (
+        {quotes && (
           <a
             href={requestsHref}
             className="h-10 rounded-xl bg-olive text-white font-bold text-[12px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
@@ -1100,16 +1105,16 @@ function ServicesTab({
         )}
         <button
           onClick={openChat}
-          className={`h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-200 font-bold text-[12px] flex items-center justify-center gap-1.5 ${accepts ? '' : 'col-span-2'}`}
+          className={`h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-200 font-bold text-[12px] flex items-center justify-center gap-1.5 ${quotes ? '' : 'col-span-2'}`}
         >
           <MessageCircle className="w-3.5 h-3.5" />
           {loc('مراسلة المتجر', 'Message the store', 'نامە بۆ فرۆشگا')}
         </button>
       </div>
-      {accepts && (
+      {quotes && (
         <p className="text-zinc-600 text-[10.5px] text-center">
           {loc(
-            'عروض الأسعار تمر عبر منصة ليفونيس والمبلغ يبقى محجوزًا حتى استلامك.',
+            'عروض الأسعار تمر عبر منصة Levonis والمبلغ يبقى محجوزًا حتى استلامك.',
             'Quotes go through Levonis and your money stays held until you receive the work.',
             'نرخەکان بە ڕێگای LEVONIS دەبن و پارەکەت پارێزراوە.'
           )}
@@ -1393,7 +1398,7 @@ function AboutTab({ store }: { store: MerchantStore }) {
 
       {store.created_at && (
         <p className="text-zinc-600 text-[11px] text-center pt-1">
-          {loc('على ليفونيس منذ', 'On Levonis since', 'لەسەر LEVONIS لە')}{' '}
+          {loc('على Levonis منذ', 'On Levonis since', 'لەسەر LEVONIS لە')}{' '}
           {new Date(store.created_at).toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-IQ', {
             year: 'numeric',
             month: 'long',
@@ -1411,11 +1416,18 @@ function FollowButton({
   signedIn,
   loc,
   accentChip,
+  closed,
 }: {
   merchantId: string;
   signedIn: boolean;
   loc: (ar: string, en: string, ckb?: string) => string;
   accentChip: string;
+  /**
+   * Levo Community is under maintenance for this viewer. Follows are part of
+   * it and the server refuses them (/api/community-reviews/follow*), so the
+   * pill stays in place — the share link lives inside it — but is inert.
+   */
+  closed?: boolean;
 }) {
   const [following, setFollowing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1423,7 +1435,7 @@ function FollowButton({
   // Hydrated from the server: a visitor who already follows this shop must
   // see "Following", not a button that lies until it is pressed.
   useEffect(() => {
-    if (!signedIn) return;
+    if (!signedIn || closed) return;
     let alive = true;
     api
       .get<{ following: Array<{ merchant_id: string }> }>('/api/community-reviews/following')
@@ -1432,7 +1444,7 @@ function FollowButton({
     return () => {
       alive = false;
     };
-  }, [signedIn, merchantId]);
+  }, [signedIn, merchantId, closed]);
 
   async function toggle() {
     if (!signedIn) {
@@ -1459,7 +1471,7 @@ function FollowButton({
   return (
     <button
       onClick={toggle}
-      disabled={busy}
+      disabled={busy || closed}
       className={`w-full h-[30px] rounded-full font-medium text-[13px] flex items-center justify-center gap-1.5 px-9 active:scale-[0.98] transition-all disabled:opacity-50 ${
         following ? accentChip : 'border border-white/15 bg-transparent text-zinc-200'
       }`}

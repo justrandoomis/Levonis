@@ -104,6 +104,8 @@ export interface NotifyLangRow {
   google_sub?: string | null;
   /** 1 when the customer has ever picked a language themselves (see below). */
   locale_stated?: number | null;
+  /** 1 when the account was created by the phone/Telegram signup (see below). */
+  telegram_signup?: number | null;
 }
 
 /**
@@ -119,7 +121,10 @@ export interface NotifyLangRow {
 export const NOTIFY_LANG_SELECT = `u.locale, u.email, u.google_sub,
             (SELECT 1 FROM audit_log a
               WHERE a.target = u.id AND a.action = 'profile.locale_change'
-              LIMIT 1) AS locale_stated`;
+              LIMIT 1) AS locale_stated,
+            (SELECT 1 FROM audit_log a
+              WHERE a.target = 'user:' || u.id AND a.action = 'auth.telegram_signup'
+              LIMIT 1) AS telegram_signup`;
 
 /**
  * WHICH LANGUAGE THIS CUSTOMER IS ACTUALLY READING IN — and why the stored
@@ -146,6 +151,16 @@ export const NOTIFY_LANG_SELECT = `u.locale, u.email, u.google_sub,
  *     phone/Telegram signup — which is exactly the reported population;
  *   - `google_sub`, set only by the Google sign-in insert.
  *
+ * AND THE PLACEHOLDER WAS NOT ENOUGH ON ITS OWN. A Telegram account may add a
+ * real address later (`/change-email` is open to exactly these accounts), and
+ * the moment it did, the placeholder test stopped matching and the same
+ * never-asked 'en' started producing English. So the SIGNUP ITSELF is the
+ * marker too: the `auth.telegram_signup` audit line is written once, when the
+ * account is created, and survives any later change of address. Since this
+ * change that signup also binds the reader's own site language and records it
+ * as stated (worker/routes/auth.ts), so the marker only ever speaks for the
+ * accounts created before it.
+ *
  * An account that typed its email at sign-up sent its language with it, so a
  * stored 'en' there IS an answer and is honoured. The WIDER rule — treat
  * every 'en' row as unasked — was rejected on purpose: it would overrule
@@ -170,7 +185,7 @@ export function notificationLang(row: NotifyLangRow): EmailLang {
   const stored = langOfLocale(row.locale);
   if (stored !== 'en') return stored;
   if (row.locale_stated) return 'en';
-  const neverAsked = isPlaceholderEmail(row.email) || !!row.google_sub;
+  const neverAsked = isPlaceholderEmail(row.email) || !!row.google_sub || !!row.telegram_signup;
   return neverAsked ? 'ar' : 'en';
 }
 

@@ -20,6 +20,7 @@ import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, forbidden, notFound, conflict, str, int, oneOf , pickFrom } from '../lib/http';
+import { communityClosedRefusal, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
@@ -38,6 +39,7 @@ import { checkSlug, suggestSlug, SLUG_RESERVATION_DAYS } from '../lib/merchantOp
 import { parseCsv, toCsv } from '../lib/importCsv';
 import { merchantBalance } from '../lib/escrowOps';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
+import { notifyOrderStatus } from '../lib/orderNotify';
 
 export const merchantRoutes = new Hono<AppContext>();
 
@@ -176,6 +178,11 @@ merchantRoutes.get('/me', async (c) => {
 merchantRoutes.post('/onboard', async (c) => {
   await rateLimit(c, 'merchant-onboard', 5, 3600);
   const user = c.get('user')!;
+  // A NEW store is a new community merchant — a way INTO Levo Community — so
+  // it waits while the community is under maintenance, exactly like a new
+  // merchant from /api/community/my-store (owner, 2026-09-23; DECISIONS 110).
+  // A store that already exists is untouched: it runs on its own address.
+  if (!communityMayEnter(await readCommunityGate(c.env.DB), user)) throw communityClosedRefusal();
   const tier = await getTierStatus(c.env.DB, user.id);
   if (!benefits.merchantStore(tier)) {
     throw forbidden('An active LEVO PLUS subscription is required to open a store');
@@ -1352,15 +1359,38 @@ merchantRoutes.post('/orders/:id/status', async (c) => {
           WHERE order_id = ? AND merchant_id = ? AND kind = 'sale_credit' AND state = 'pending'`
       ).bind(id, ctx.merchant.id)
     );
+    /*
+     * THE COMPLETION IS COUNTED ONCE, EVEN WHEN TWO TAPS BOTH READ `shipped`.
+     *
+     * Both taps pass the flow check above on the same stale read. The flip is
+     * conditional on that status, so the second one matches zero rows — but
+     * these two statements used to be unconditional, and the loser still
+     * inserted a second «order_completed» reputation row and added a second
+     * completed order. The ledger line above was always safe (it is fenced on
+     * `state = 'pending'`); these were not.
+     *
+     * Both are now fenced on the one fact this batch establishes: the order IS
+     * delivered and no completion has been recorded for it yet. The counter
+     * runs FIRST because its guard reads the reputation row the next statement
+     * writes; in the losing batch both guards see the winner's row and both
+     * statements change nothing. One transaction, so there is no window between
+     * them.
+     */
+    const notYetCounted = `EXISTS (SELECT 1 FROM orders WHERE id = ? AND merchant_id = ? AND status = 'delivered')
+           AND NOT EXISTS (SELECT 1 FROM merchant_reputation_events
+                            WHERE order_id = ? AND merchant_id = ? AND kind = 'order_completed')`;
+    stmts.push(
+      c.env.DB.prepare(
+        `UPDATE community_merchants SET completed_orders = completed_orders + 1
+          WHERE id = ? AND ${notYetCounted}`
+      ).bind(ctx.merchant.id, id, ctx.merchant.id, id, ctx.merchant.id)
+    );
     stmts.push(
       c.env.DB.prepare(
         `INSERT INTO merchant_reputation_events (id, merchant_id, kind, points, order_id)
-         VALUES (?,?,'order_completed',10,?)`
-      ).bind(newId('rep'), ctx.merchant.id, id)
-    );
-    stmts.push(
-      c.env.DB.prepare('UPDATE community_merchants SET completed_orders = completed_orders + 1 WHERE id = ?')
-        .bind(ctx.merchant.id)
+         SELECT ?, ?, 'order_completed', 10, ?
+          WHERE ${notYetCounted}`
+      ).bind(newId('rep'), ctx.merchant.id, id, id, ctx.merchant.id, id, ctx.merchant.id)
     );
   }
 
@@ -1375,8 +1405,33 @@ merchantRoutes.post('/orders/:id/status', async (c) => {
     );
   }
 
-  await c.env.DB.batch(stmts);
+  const results = await c.env.DB.batch(stmts);
+  // A double tap is a lost race, and the loser says so rather than reporting a
+  // transition it did not make — and, above all, rather than telling the
+  // customer twice. Nothing else in its batch changed anything (see above).
+  if ((results[0]?.meta?.changes ?? 0) === 0) {
+    throw conflict('The order changed while you were editing — reload and retry');
+  }
   await audit(c.env.DB, ctx.store.user_id, 'merchant.order_status', id, { from: order.status, to });
+  /*
+   * THE BUYER IS TOLD, AS THE PLATFORM'S OWN DOORS TELL THEM.
+   *
+   * This route flipped a store order's status and notified nobody, so a
+   * customer who bought from a community store heard nothing between «تم
+   * استلام طلبك» and the parcel at the door. `notifyOrderStatus` is the one
+   * writer the admin doors use: the same copy, the in-app row, the same event
+   * key (so a replay is silent), and nothing for `processing`. After the
+   * response, and flushed straight away rather than at the next cron.
+   */
+  try {
+    c.executionCtx.waitUntil(
+      notifyOrderStatus(c.env, id, to, { defer: (work) => c.executionCtx.waitUntil(work) })
+    );
+  } catch {
+    // No ExecutionContext on this call path (a test harness): the notice is
+    // still queued, just not kept alive past the response.
+    void notifyOrderStatus(c.env, id, to);
+  }
   return c.json({ success: true, status: to });
 });
 

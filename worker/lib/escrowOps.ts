@@ -19,7 +19,11 @@
  * agreed and what the merchant is owed. The wallet holds USD cents, so the
  * hold is taken in USD at the authoritative rate and that rate is SNAPSHOT on
  * the escrow. A later rate change must not alter what either party owes for a
- * deal already struck (§31).
+ * deal already struck (§31). Since «الدينار هو الأساس» the customer is asked
+ * whether their DINAR balance covers the offer, the cents are floored and
+ * capped exactly as a checkout's are (`walletSpendCents`), and the settlement
+ * debit records the dinars it spent (migration 0108) — so a wallet that read
+ * 50,000 د.ع accepts a 50,000 د.ع offer and then reads zero, not six.
  *
  * IDEMPOTENCY. Every money-moving function takes an idempotency key and
  * writes it to a UNIQUE column. A retried request — a double tap, a network
@@ -30,12 +34,17 @@
 import { newId } from './crypto';
 import {
   assertHoldStateStatement,
+  availableUsdSql,
   commitHoldStatements,
   createPurchaseHold,
   holdDebitTxId,
   holdSettledEventStatements,
   isConstraintAbort,
+  readWalletDust,
   releaseHoldStatement,
+  walletIqdAvailable,
+  walletLedgerDinarsReady,
+  walletSpendCents,
   type HoldState,
 } from './walletOps';
 
@@ -81,23 +90,57 @@ export type EscrowResult<T = { escrowId: string }> =
 
 const NOW = () => new Date().toISOString();
 
-/** IQD → USD cents, rounding UP so a hold never under-reserves. */
-export function iqdToUsdCents(iqd: number, rate: number): number {
-  return Math.ceil((iqd * 100) / Math.max(1, rate));
-}
-
 /**
- * USD cents → IQD, rounding DOWN — the mirror of the rule above.
+ * USD cents → IQD, rounding DOWN — what a row that recorded no dinars reads as.
  *
- * The pair has to lean the same way or a balance would be reported as
- * covering a total it cannot actually pay: `iqdToUsdCents` rounds UP, so a
- * spendable balance converted back must never round up too, or the last IQD
- * of a cart would be promised and then refused by the hold. This is the
- * number shown to a customer as "what your wallet can pay", so it is the
- * conservative one by construction.
+ * ITS PARTNER IS GONE, AND WHY. `iqdToUsdCents` stood above this and rounded
+ * UP «so a hold never under-reserves». It was the last ceil on a wallet path,
+ * and it refused the owner's rule on the community board: a wallet showing
+ * 50,000 د.ع — 3,571 cents plus the remainder its deposit recorded (0108) —
+ * accepting a 50,000 د.ع offer was asked for ceil(5,000,000 / 1,400) = 3,572
+ * cents and told «Your wallet balance does not cover this offer». The hold now
+ * asks the dinar question and pays with `walletSpendCents` (floored, capped at
+ * the cents on hand), exactly as checkout does — see `holdEscrow`.
  */
 export function usdCentsToIqd(cents: number, rate: number): number {
   return Math.floor((cents * Math.max(1, rate)) / 100);
+}
+
+/**
+ * The dinar pair a settlement debit records (see `commitHoldStatements`), or
+ * nothing at all: only on a database that carries 0108's columns, and only
+ * beside the rate the hold was actually taken at.
+ */
+async function settlementDinars(
+  db: D1Database,
+  esc: EscrowRow,
+  iqd: number
+): Promise<{ amountIqd: number | null; exchangeRateSnapshot: number | null }> {
+  const none = { amountIqd: null, exchangeRateSnapshot: null };
+  if (!(Number.isInteger(iqd) && iqd > 0) || !(await walletLedgerDinarsReady(db))) return none;
+  const rate = await heldAtRate(db, esc.id);
+  return rate ? { amountIqd: iqd, exchangeRateSnapshot: rate } : none;
+}
+
+/**
+ * The rate an escrow's hold was taken at, read back off its own `held` event.
+ *
+ * `holdEscrow` has written `rate=<n>;cents=<n>` into that event's reason since
+ * the first escrow, and it is the only place the hold-time rate is recorded —
+ * `community_escrows` has no rate column. The settlement debit needs it to
+ * record its dinars against the SAME rate its cents were computed at (0108's
+ * remainder is `amount_iqd − floor(cents × rate / 100)`; today's rate would be
+ * the wrong rate the day the owner moves it). No recognisable rate → null, and
+ * the debit is written without dinars, exactly as before.
+ */
+async function heldAtRate(db: D1Database, escrowId: string): Promise<number | null> {
+  const ev = await db
+    .prepare("SELECT reason FROM community_escrow_events WHERE escrow_id = ? AND kind = 'held' ORDER BY created_at LIMIT 1")
+    .bind(escrowId)
+    .first<{ reason: string | null }>();
+  const m = /(?:^|;)rate=(\d+)(?:;|$)/.exec(ev?.reason ?? '');
+  const n = m ? Number(m[1]) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : null;
 }
 
 /** The authoritative rate, from the same setting the rest of checkout reads. */
@@ -163,15 +206,56 @@ export async function holdEscrow(db: D1Database, p: HoldEscrowInput): Promise<Es
   const existing = await escrowForOrder(db, p.communityOrderId);
   if (existing) return { ok: false, reason: 'ALREADY_EXISTS', detail: existing.id };
 
-  const rate = await exchangeRate(db);
-  const cents = iqdToUsdCents(p.grossIqd, rate);
+  const rate = Math.trunc(await exchangeRate(db));
+  /**
+   * THE DINAR QUESTION FIRST, THEN THE CENTS — the order checkout, the store
+   * cart and the membership purchase already ask it in.
+   *
+   * «الدينار هو الأساس»: a wallet that reads 50,000 د.ع must be able to accept a
+   * 50,000 د.ع offer. The affordability test is therefore made in dinars,
+   * against `walletIqdAvailable` — the one function every balance screen
+   * reads — and the reservation is `walletSpendCents`: floored, and capped at
+   * the cents on hand, so the hold can never ask for the cent the dinar
+   * balance holds as a recorded remainder rather than as money. At least one
+   * cent, because `wallet_holds` refuses a zero reservation and an escrow
+   * with nothing held behind it is not an escrow.
+   *
+   * WHO CARRIES THE DIFFERENCE is what 0108 says for every spend: the shop, at
+   * most one cent per order, out of remainders it was transferred and floored
+   * away. The merchant is unaffected — they are paid `merchant_receivable_iqd`
+   * in dinars from `merchant_payout_ledger`, never from these cents.
+   */
+  //
+  // A RETRY AFTER THE HOLD BUT BEFORE THE ESCROW ROW (a crash between the two
+  // writes below) finds its own reservation already subtracted from the
+  // balance, so it must not be re-asked the dinar question — it re-asks for
+  // the SAME cents and `createPurchaseHold` replays the hold it placed.
+  const holdKey = `escrow:${p.idempotencyKey}`;
+  const priorHold = await db
+    .prepare("SELECT amount_cents FROM wallet_holds WHERE user_id = ? AND kind = 'purchase' AND event_key = ?")
+    .bind(p.customerId, holdKey)
+    .first<{ amount_cents: number }>();
+  let cents: number;
+  if (priorHold) {
+    cents = priorHold.amount_cents;
+  } else {
+    const [availableRow, dust] = await Promise.all([
+      db.prepare(`SELECT ${availableUsdSql('?1')} AS cents`).bind(p.customerId).first<{ cents: number }>(),
+      readWalletDust(db, p.customerId),
+    ]);
+    const availableCents = Number(availableRow?.cents) || 0;
+    if (walletIqdAvailable(availableCents, dust.dust_iqd, rate) < p.grossIqd) {
+      return { ok: false, reason: 'INSUFFICIENT_FUNDS', detail: 'INSUFFICIENT_AVAILABLE' };
+    }
+    cents = Math.max(1, walletSpendCents(p.grossIqd, availableCents, rate));
+  }
 
   // The hold's own event key is derived from the escrow's, so a retry of this
   // whole function re-finds the same hold instead of reserving twice.
   const hold = await createPurchaseHold(db, {
     userId: p.customerId,
     amountCents: cents,
-    eventKey: `escrow:${p.idempotencyKey}`,
+    eventKey: holdKey,
     refType: 'community_order',
     refId: p.communityOrderId,
     note: 'Community order escrow',
@@ -287,6 +371,7 @@ export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<Esc
 
   const ts = NOW();
   const debitTx = holdDebitTxId(esc.hold_id);
+  const debitDinars = await settlementDinars(db, esc, esc.gross_iqd);
   const statements = [
     db
       .prepare(
@@ -299,6 +384,7 @@ export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<Esc
       holdId: esc.hold_id,
       note: 'Community order payment',
       ref: esc.community_order_id,
+      ...debitDinars,
     }),
     // §3.9's settlement event, guarded by the debit this batch posts. Nothing
     // at all while the bus is off.
@@ -427,28 +513,56 @@ export async function refundEscrow(db: D1Database, p: RefundInput): Promise<Escr
         .bind(newId('ese'), esc.id, amount, p.actorId, p.actorRole, p.reason ?? '', p.idempotencyKey, ts)
     );
   } else {
-    const rate = await exchangeRate(db);
     const debitTx = holdDebitTxId(esc.hold_id);
     const keptGross = esc.gross_iqd - amount;
     const keptReceivable = Math.max(0, Math.min(esc.merchant_receivable_iqd, keptGross));
+    const debitDinars = await settlementDinars(db, esc, esc.gross_iqd);
+    /**
+     * THE RETURNED PART, IN THE DINARS THAT WERE RETURNED.
+     *
+     * It used to be `iqdToUsdCents(amount, today's rate)` — a CEIL, at a rate
+     * the hold was not taken at, recording no dinars — so a customer refunded
+     * 20,000 د.ع read the credit as its cents converted back (20,006 at 1,400).
+     * Now the cents are floored at the HOLD's rate and the dinars ride beside
+     * them (0108), so the credit reads exactly `amount`. Two bounds: at least
+     * one cent (`CHECK (amount > 0)` would abort the whole refund batch on a
+     * zero), and never more than the hold itself — a PARTIAL refund can never
+     * give back more cents than were taken.
+     */
+    const rate = debitDinars.exchangeRateSnapshot ?? Math.trunc(await exchangeRate(db));
+    const holdRow = await db
+      .prepare('SELECT amount_cents FROM wallet_holds WHERE id = ?')
+      .bind(esc.hold_id)
+      .first<{ amount_cents: number }>();
+    const holdCents = Number(holdRow?.amount_cents) || 0;
+    const refundCents = Math.max(1, Math.min(Math.floor((amount * 100) / Math.max(1, rate)), holdCents || Number.MAX_SAFE_INTEGER));
+    const refundDinars = debitDinars.exchangeRateSnapshot !== null;
     statements.push(
       ...commitHoldStatements(db, {
         holdId: esc.hold_id,
         note: 'Community order payment',
         ref: esc.community_order_id,
+        ...debitDinars,
       }),
       ...(await holdSettledEventStatements(db, esc.hold_id)),
       // The returned part comes back as its own approved credit — only once
       // the full debit is posted, so the two movements always appear together.
       db
         .prepare(
-          `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
-           SELECT ?3, ?4, 'deposit', 'USD', ?5, 'approved', 'Community order partial refund', ?6, 'system', ?7
+          `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at${
+            refundDinars ? ', amount_iqd, exchange_rate_snapshot' : ''
+          })
+           SELECT ?3, ?4, 'deposit', 'USD', ?5, 'approved', 'Community order partial refund', ?6, 'system', ?7${
+             refundDinars ? ', ?8, ?9' : ''
+           }
             WHERE ${FUNDED_BY_HOLD}`
         )
         .bind(
-          esc.hold_id, debitTx,
-          `wtx_escrow_refund_${esc.id}`, esc.customer_id, iqdToUsdCents(amount, rate), esc.community_order_id, ts
+          ...[
+            esc.hold_id, debitTx,
+            `wtx_escrow_refund_${esc.id}`, esc.customer_id, refundCents, esc.community_order_id, ts,
+            ...(refundDinars ? [amount, rate] : []),
+          ]
         ),
       db
         .prepare(

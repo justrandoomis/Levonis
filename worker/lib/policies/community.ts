@@ -51,11 +51,17 @@ import type { PolicyDocument } from './types';
  *     text rather than show a customer a `{{TOKEN}}`. They are still authored
  *     below, and each one returns of its own accord the moment its value is
  *     written in and the version moves again.
+ *
+ * VERSION 3 — WHY IT MOVED. The archive keeps version 2 byte for byte.
+ *   * THE FACTS. worker/lib/policies/facts.ts now states `COMPETENT_COURT`, `GOVERNING_LAW_JURISDICTION`, `LEVONIS_SUPPORT_CONTACT`,
+ *     so the clauses that carried them are published instead of withheld.
+ *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
+ *     by number, an article of this document that is itself withheld.
  */
 export const community: PolicyDocument = {
   key: 'community',
-  version: 2,
-  effective_at: '2026-01-01',
+  version: 3,
+  effective_at: '2026-09-23',
   title: {
     ar: 'سياسة مجتمع ليفو',
     en: 'Levo Community Policy',
@@ -559,7 +565,7 @@ export const community: PolicyDocument = {
 ما لم يرد فيه نص هنا يُرجع فيه إلى الشروط والأحكام العامة وإلى السياسة المختصة بموضوعه.
 
 ### 14.5 القانون والاختصاص
-تخضع هذه الوثيقة لقوانين {{GOVERNING_LAW_JURISDICTION}}، والاختصاص لمحاكم {{COMPETENT_COURT}}.
+تخضع هذه الوثيقة ل{{GOVERNING_LAW_JURISDICTION}}، والاختصاص ل{{COMPETENT_COURT}}.
 
 ### 14.6 نقطة الاتصال
 نقطة الاتصال المعتمدة {{LEVONIS_SUPPORT_CONTACT}}، وأوقات العمل {{LEVONIS_SUPPORT_HOURS}}، والعنوان {{LEVONIS_ADDRESS}}.`,
@@ -1060,7 +1066,7 @@ Where the three versions differ, the Arabic text governs under Article 1.4.
 Anything not provided for here is referred to the General Terms and Conditions and to the policy competent for its subject matter.
 
 ### 14.5 Governing law and jurisdiction
-This document is governed by the laws of {{GOVERNING_LAW_JURISDICTION}}, and jurisdiction lies with the courts of {{COMPETENT_COURT}}.
+This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and jurisdiction lies with {{COMPETENT_COURT}}.
 
 ### 14.6 Contact point
 The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, business hours {{LEVONIS_SUPPORT_HOURS}}, address {{LEVONIS_ADDRESS}}.`,
@@ -1561,7 +1567,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, business hours {{LEVO
 ئەوەی لێرەدا دەقی لەسەر نەهاتووە بۆ مەرج و ڕێساکانی گشتی و بۆ ئەو سیاسەتەی بابەتەکەی دەگرێتەوە دەگەڕێندرێتەوە.
 
 ### 14.5 یاسا و دەسەڵاتی دادوەری
-ئەم بەڵگەنامەیە بەپێی یاساکانی {{GOVERNING_LAW_JURISDICTION}} دەبێت، و دەسەڵاتی دادوەری بۆ دادگاکانی {{COMPETENT_COURT}}ـە.
+ئەم بەڵگەنامەیە بەپێی {{GOVERNING_LAW_JURISDICTION}} دەبێت، و دەسەڵاتی دادوەری بۆ {{COMPETENT_COURT}}یە.
 
 ### 14.6 خاڵی پەیوەندی
 خاڵی پەیوەندی پەسەندکراو {{LEVONIS_SUPPORT_CONTACT}}ـە، کاتی کارکردن {{LEVONIS_SUPPORT_HOURS}}ـە، و ناونیشان {{LEVONIS_ADDRESS}}ـە.`,

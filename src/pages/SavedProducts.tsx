@@ -18,11 +18,13 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
 import { communityFavoritesApi, type SavedProduct } from '../lib/merchant';
+import { useCommunityAccess } from './community/access';
 import { ArrowLeft, ArrowRight, ShoppingBag, Heart } from 'lucide-react';
 
 export default function SavedProducts() {
   const navigate = useNavigate();
   const { dir, loc } = useLanguage();
+  const { access: communityAccess } = useCommunityAccess();
   const [items, setItems] = useState<SavedProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -81,7 +83,10 @@ export default function SavedProducts() {
     if (p.store_url && /^https?:\/\//.test(p.store_url)) {
       // The store's own site opens in its own tab; the saved list stays put.
       window.open(`${p.store_url.replace(/\/$/, '')}/p/${p.slug}`, '_blank', 'noopener,noreferrer');
-    } else {
+    } else if (communityAccess?.may_enter !== false) {
+      // The in-site store page is behind the community wall. While it is
+      // shut to this viewer it would only show the maintenance card, so a
+      // store with no address of its own has nowhere to open.
       navigate(`/community/store/${p.store_slug}/p/${p.slug}`);
     }
   };
@@ -132,7 +137,7 @@ export default function SavedProducts() {
                   {dir === 'rtl' && p.name_ar ? p.name_ar : p.name}
                 </h3>
                 <div className="text-[12px] text-zinc-400 truncate">
-                  {p.store_name || loc('متجر ليفونيس', 'Levonis store', 'فرۆشگای لیڤۆنیس')}
+                  {p.store_name || loc('متجر Levonis', 'Levonis store', 'فرۆشگای Levonis')}
                 </div>
                 <div className="text-[12px] text-zinc-300 mt-0.5" dir="ltr">
                   {Number(p.price_iqd).toLocaleString('en-US')} IQD

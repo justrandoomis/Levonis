@@ -9,6 +9,9 @@ export type MediaDomain =
   | 'users'
   | 'chat'
   | 'support'
+  /** A community-marketplace complaint's thread: `complaints/<complaint id>/…`,
+   *  private, read through the gate in worker/routes/uploads.ts. */
+  | 'complaints'
   | 'reviews'
   | 'reviews-evidence'
   | 'orders'
@@ -47,7 +50,10 @@ const SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/;
  * `lvm` is the derived preview mesh the 3D viewer serves, and it is on the same
  * footing: a real object with a real key that the taxonomy has to admit exists.
  */
-const EXTENSION = /^(?:3mf|amf|avif|csv|gif|glb|gltf|jpg|jpeg|json|lvm|mp4|obj|pdf|png|step|stl|stp|webp)$/i;
+// `mp3`, `ogg` and `webm` are a chat VOICE NOTE (worker/routes/uploads.ts
+// `sniffChat`): the three containers a browser's MediaRecorder or a phone's
+// recorder produces, admitted by magic bytes before a key is ever built.
+const EXTENSION = /^(?:3mf|amf|avif|csv|gif|glb|gltf|jpg|jpeg|json|lvm|mp3|mp4|obj|ogg|pdf|png|step|stl|stp|webm|webp)$/i;
 
 function safeSegment(value: string, field: string): string {
   const v = value.trim();
@@ -208,13 +214,27 @@ async function readThroughLegacy<T>(
   return legacy;
 }
 
+/**
+ * A BYTE RANGE OF THE OBJECT, NOT THE WHOLE OF IT.
+ *
+ * `options.range` is R2's own `{ offset, length }` and is passed through
+ * untouched, so a 40 MB support clip answers a player's `Range: bytes=…` with
+ * the bytes it asked for instead of the file. Safari on iPhone and iPad will
+ * not play a `<video>` at all from a server that cannot do this: it opens
+ * with `bytes=0-1`, and a 200 carrying forty megabytes is read as "this
+ * server does not stream". The caller validates the range against the size
+ * first (worker/routes/uploads.ts, `parseByteRange`), so R2 is never asked for
+ * bytes past the end.
+ */
 export async function getMediaObject(
   env: MediaEnv,
   visibility: MediaVisibility,
-  key: string
+  key: string,
+  options?: { range?: { offset: number; length: number } }
 ): Promise<R2ObjectBody | null> {
   if (!isSafeMediaKey(key)) return null;
-  return readThroughLegacy(env, visibility, key, 'get', (bucket) => bucket.get(key));
+  const range = options?.range;
+  return readThroughLegacy(env, visibility, key, 'get', (bucket) => (range ? bucket.get(key, { range }) : bucket.get(key)));
 }
 
 export async function headMediaObject(

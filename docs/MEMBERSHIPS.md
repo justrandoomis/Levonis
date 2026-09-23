@@ -34,28 +34,73 @@ active: bool}`); an empty price field in that panel means unpriced.
 and the "best value" badge read it, so no figure is worked out in the
 browser — and:
 
-- `features.printer_gift` — `printerGiftConfig.enabled` AND its `plan_id`
-  exists; `features.preorder_gift` — `preorderGiftConfig.enabled` AND a
-  `product_id` is set. The /subscription page lists those two gifts ONLY
-  when the flag is true, so a switched-off gift is never advertised.
+- `features.preorder_gift` — `preorderGiftConfig.enabled` AND a
+  `product_id` is set; the comparison lists the gift ONLY when it is true.
+  `features.printer_gift` is always `false`: the PLUS-with-a-printer gift is
+  granted by hand now (`grantPrinterGiftIfEligible` has no caller), so the
+  card does not advertise it. The key stays for pages loaded before.
 - `delivery.pro_threshold_iqd` / `delivery.prime_threshold_iqd` from the
-  `shippingPolicy` setting (defaults 75,000 / 150,000), so the benefit copy
-  quotes the same numbers the quote engine applies.
+  `shippingPolicy` setting (defaults 75,000 / 150,000).
+- `benefits` — `publicBenefitSummary` (worker/lib/membershipBenefits.ts): the
+  live `membership_benefit_rules`, per tier. A discount is stated ON ITS
+  SECTION, never per product — per-product rules are grouped by the section
+  their product is filed under and by the offer they make, and published as
+  one line with the section's name and `product_count`; no product name
+  leaves the server, and the read is one join with no bound parameters (D1
+  refuses more than 100). The delivery and tax lines are chosen by the
+  checkout's own `selectRule`. The page phrases them in the owner's template:
+  «خصم 10% حتى 100,000 د.ع لكل وحدة على الطابعات».
+- `entitlement_contract.tiers` — ENTITLEMENT_MINIMUM_TIER resolved for each
+  tier; the comparison's ticks are read from here.
+- `points_multiplier_x100` — `dailyRewardMultiplierX100` per tier (PLUS 100,
+  PREMIUM 150, PRO 200).
 
 ## Lifecycle & launch (mandate §8.1)
 
-States: `pending_payment → prepaid_pending_launch | active → expired`,
-plus `cancelled`. While `launchConfig.activated` is false, a paid purchase
-becomes **prepaid_pending_launch**: full duration reserved, clock NOT
-started, honest UI ("card reserved — activates at launch"). Launch
-activation is an explicit, audited, idempotent admin action
-(`POST /api/memberships/admin/activate-launch` with `{confirm:"ACTIVATE"}`,
-reachable from the Plans & launch panel, which asks for the word to be
-typed in an in-app window) that starts every prepaid membership at the
-activation timestamp. Expiry is calendar months (month-end clamped),
-stored as ISO UTC, displayed in the viewer's locale. No auto-renewal exists
-(needs explicit consent and a supported payment flow — not implemented by
-design).
+States: `pending_payment → active → expired`, plus `cancelled`, and the
+legacy `prepaid_pending_launch`.
+
+**The site is live, so a purchase starts at once.** `launchConfig.activated`
+still gates every writer (`quotePurchase`, the admin grant, the printer gift),
+but the gate is open: the code default is `activated: true`
+(`DEFAULT_LAUNCH`, worker/lib/entitlements.ts, and `SETTING_DEFAULTS`), and
+migration 0109 writes the stored row as activated on every database that had
+not been — keeping any `launch_at` / `activated_at` it already carried. A
+purchase is `active` with `starts_at = now` and `expires_at =
+addMonths(now, duration)`. No customer screen mentions a launch; the quote's
+`activate_now` is always true.
+
+**Reservations left from before are converted without an admin.** A
+`prepaid_pending_launch` row still waiting is converted the first time its
+account is read (`getTierStatus` → `convertLaunchReservations`,
+worker/lib/launchActivation.ts), with the same per-account dedupe the admin
+sweep uses: the highest tier wins (tie: the latest purchase), the other
+reservations are cancelled, a running row of a lower or equal tier is
+superseded; a reservation LOWER than a running higher membership stays
+waiting for a human. The clock starts at the conversion — never backdated to
+the launch, so a late conversion costs the customer no days. Every automatic
+conversion is audited (`membership.launch_converted`, plus
+`membership.launch_dedupe` when rows were ended); a deferral is not audited on
+read (it would be re-read on every page view) but is reported by the sweep.
+
+**The admin button stays for leftovers.** `POST
+/api/memberships/admin/activate-launch` with `{confirm:"ACTIVATE"}` records the
+launch when it is not recorded yet and converts every reservation that exists
+(same function, all accounts, `membership.launch_activation_deferred` for each
+deferral). `GET /api/memberships/admin/plans` returns `prepaid_count`, and the
+Plans & launch panel keeps the button enabled while it is above zero, labelled
+«تفعيل الحجوزات المتبقية (N)». `prepaid_count` counts only what the sweep can
+start: a reservation under a higher running tier (and that account's other
+reservations) is `deferred_count` instead, shown under the button as a refund or
+cancel by hand — otherwise the button would stay lit at «(1)» over a sweep that
+always starts 0.
+
+Expiry is calendar months (month-end clamped), stored as ISO UTC, displayed in
+the viewer's locale. No auto-renewal exists (needs explicit consent and a
+supported payment flow — not implemented by design). An owner who genuinely
+wants a pre-launch gate again writes `activated: false` into the setting on
+purpose; the reservation machinery still works for that, and the customer
+copy then reads «قيد التفعيل».
 
 ### One membership at a time (`quotePurchase` / `subscribeUser`)
 
@@ -95,8 +140,11 @@ day charged 29,000 + 70,000 + 129,000 = 228,000; it now charges
 
 `GET /api/memberships/quote?planId=` runs the same code without writing and
 returns the exact charge (`price_iqd`, `credit_iqd`, `charge_iqd`,
-`charge_usd_cents` at the current `exchangeRate`), the spendable
-`balance_usd_cents`, the `shortfall_usd_cents`, `activate_now`,
+`charge_usd_cents` at the current `exchangeRate`), the spendable balance and
+the shortfall IN DINARS (`balance_iqd`, `shortfall_iqd` — computed in dinars,
+the unit /wallet prints, migration 0108; /subscription shows these and keeps
+the dollar debit as one quiet line in the confirmation) and in cents
+(`balance_usd_cents`, `shortfall_usd_cents`), `activate_now`,
 `expires_at` (preview) and `upgrade_from_tier` (the active row OR the
 reservation this purchase ends); refusals come back as `{ok:false, code,
 message}`. An inactive plan is **404** — the quote never carries the price of
@@ -122,33 +170,42 @@ attempt.
 
 ## Entitlements (server-enforced)
 
-What /subscription promises is exactly this table — nothing without an
-enforcement point is listed as live.
+The single source is `ENTITLEMENT_MINIMUM_TIER` (worker/lib/entitlements.ts):
+a benefit is introduced at the lowest tier that owns it and every higher tier
+inherits it (`TIER_INHERITANCE`: PLUS ⊂ PREMIUM ⊂ PRO). `GET /plans` sends it
+resolved per tier as `entitlement_contract.tiers`, and «مقارنة الخطط» on
+/subscription draws its ticks from that — so what the page promises is this
+table and nothing else.
 
-| Benefit | Tier | Enforcement point |
+| Entitlement | From | Enforcement point |
 | --- | --- | --- |
-| Storefront with its own subdomain, dashboard, orders, community offers, analytics, merchant profile | PLUS + PRO | `benefits.merchant*` / `communityOffers` / `merchantProfile` (merchant.ts, merchantAuth.ts, community.ts, marketplace.ts) |
-| Bundles section | PLUS + PRIME + PRO | `benefits.exclusiveSections` (bundles.ts) |
-| Tier-required coupons | PLUS / PRIME / PRO | `validateCoupon`: `benefits.exclusiveCoupons` AND `pricing.TIER_RANK` ladder (pro > prime > plus) |
-| Free PLUS gift on a printer purchase | — | `grantPrinterGiftIfEligible`, only while `printerGiftConfig.enabled`; advertised only when `features.printer_gift` — and as "how to get PLUS free" under the PLUS card, not as a PLUS benefit. An account already holding a live membership receives no second row: the skip is audited (`membership.gift_skipped`) for an admin to comp by hand |
-| PRIME prices where a product states one | PRIME | price resolver |
-| Free ordinary delivery strictly above `prime_threshold_iqd` after coupons and points | PRIME | shipping.ts `primeDeliveryEligible` |
-| PRO prices where a product states one | PRO (approved default address) | price resolver, orders.ts `proContext` |
-| Free standard + protected delivery strictly above `pro_threshold_iqd` | PRO (approved default address) | shipping.ts `freeDelivery` |
-| No shipping-type surcharge (pre-order commission; direct-sale premium) | PRO (approved default address) | pricing.ts `noPreorderCommission` |
-| Priority service on warranty claims and support | PRO | devices.ts, support.ts `priorityService` |
-| Double daily check-in points | PRO | rewards.ts `checkinPoints` |
-| Referral reward when an invited friend buys PRO | PRO | `onProSubscriptionPurchased` |
-| Free filament on a fully prepaid pre-order | PRO | `preorderGiftFor`, only while `preorderGiftConfig` is enabled with a product; advertised only when `features.preorder_gift` |
-| Verified-merchant badge | PRO | community.ts `proVerifiedOwners`: `verified = admin flag OR active PRO with benefits.verifiedMerchant` on every merchant payload |
-| BNPL | — | **disabled** — ledger structure only (DECISIONS #10); shown as "coming soon" |
-| 12-hour delivery promise | — | **not built** — shown as "coming soon" (DECISIONS #9) |
-| Custom-domain storefront | — | **not built** (DECISIONS #12); shown as "coming soon" |
+| `merchantProfile`, `merchantStore`, `merchantProducts`, `merchantOrders`, `merchantAnalytics`, `merchantSubdomain` — storefront with its own subdomain, dashboard, orders, analytics | PLUS | merchant.ts, merchantAuth.ts, marketplace.ts |
+| `communityOffers` — offers on Community requests | PLUS | community.ts |
+| `exclusiveSections` — Bundles | PLUS | bundles.ts |
+| `exclusiveCoupons` — tier-required coupons | PLUS | `validateCoupon` + `pricing.TIER_RANK` ladder |
+| `memberOffers` — member offers | PLUS | offers.ts |
+| `premiumPricing` — PREMIUM prices and PREMIUM discount rules | PREMIUM | price resolver + `membership_benefit_rules` |
+| `premiumDelivery` — PREMIUM free-delivery rule (after coupons AND points) | PREMIUM | shipping + `membership_benefit_rules` |
+| `premiumRewards` — daily check-in ×1.5 (PRO ×2) | PREMIUM | `dailyRewardMultiplierX100` (pointsMultiplier.ts) |
+| `codTaxExemption` — MAY be exempt; the rule decides (PREMIUM ships "no") | PREMIUM | `membership_benefit_rules` `cod_tax_exemption` |
+| `proPricing` — PRO prices and PRO discount rules | PRO (approved default address) | price resolver, `pricingTierContext` |
+| `freeDelivery` — PRO free-delivery rule | PRO (approved default address) | shipping + `membership_benefit_rules` |
+| `noPreorderCommission` — no shipping-type surcharge | PRO (approved default address) | pricing.ts |
+| `proMerchantBadge` — PRO merchant badge | PRO | community.ts `usersWithEntitlement` |
+| `priorityService` — priority on warranty and support | PRO | devices.ts, support.ts |
+| `priorityDelivery12h` — 12-hour preparation and delivery, where the method, shipping type, area and address qualify | PRO | priorityDelivery.ts |
+| `bnpl` — buy now, pay later (approved account, verified identity, approved address, credit limit) | PRO | bnpl.ts, `/api/memberships/bnpl*` |
+| `proExclusive` | PRO | defined; nothing reads it, so the page does not list it |
+
+Conditional perks the page lists only when switched on: the pre-order
+filament gift (`features.preorder_gift`, `preorderGiftFor`). The PLUS gift
+with a printer is granted by hand and not advertised. The PRO referral reward
+is not a PRO entitlement (it is recorded for the referrer whatever their
+tier), so the PRO card does not list it.
 
 Removed from the page as having no code behind them: daily game tickets
-(×1 / ×5), "PRO-only products and offers" (`benefits.proExclusive` is
-defined but nothing reads it), "advertising eligibility", the "special
-offers / random filament" sections, and the "tangible physical card /
+(×1 / ×5), "PRO-only products and offers", "advertising eligibility", the
+"special offers / random filament" sections, and the "tangible physical card /
 3D-printable Levo ID" block.
 
 An active restriction case (support.ts) pauses individual benefit flags;
@@ -162,10 +219,19 @@ persistent per-user codes (`referral_codes`), attribution
 `UNIQUE(referred_id, campaign)`, and rewards `UNIQUE(campaign, source_ref)`
 so retries/status replays can never double-award. Self-referrals rejected.
 
+**The referred account gets nothing.** The owner: «الإحالة لا يحصل على أي
+شيء فقط كود دعم». Signing up with a code (worded «كود الدعم» / "Support code"
+/ «کۆدی پاڵپشتی» on /auth) only records the attribution: no delivery waiver,
+discount, points or membership reaches the new account. A delivery waiver
+comes only from an active membership's `free_shipping` rule (PRO: standard and
+personal; PREMIUM: standard only), through `resolveOrderBenefits` — the
+checkout passes `independentFreeDelivery = false` to `quoteShipping`, and the
+former referral waiver (`referralFreeDeliveryApplies`) no longer exists.
+
 **9.1 Printer referral** — referred friend's qualifying printer purchase
 (printer = product in a catalog flagged `is_printer_catalog`, never name
-matching): the friend's qualifying order gets free delivery at checkout
-(`referralFreeDeliveryApplies`); the referrer's reward row is created when
+matching) is recorded for the REFERRER only; the friend's order is priced and
+delivered like anyone else's. The referrer's reward row is created when
 the order is marked **delivered** (admin action records `delivered_at`),
 with `eligible_at = delivered_at + 7 days`. Rewards lazily promote
 pending→qualified after `eligible_at` on read (no browser timers, no lost

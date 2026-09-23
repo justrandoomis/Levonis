@@ -3,6 +3,7 @@ import { useLanguage } from '../LanguageContext';
 
 import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Barcode, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
+import { supportTotal, useSupportCounts } from '../components/adminSupport/supportCounts';
 import { useAuth } from '../AuthContext';
 
 /**
@@ -143,10 +144,27 @@ type AdminTab =
   | 'printer_farm';
 
 
+/**
+ * THE TABS A TELEGRAM BUTTON MAY OPEN DIRECTLY — «🔗 فتح في لوحة الإدارة» on
+ * an order message (`?tab=orders&order=…`) and on a wallet request
+ * (`?tab=wallet_requests&op=…`). Read once, for the first render only; anything
+ * else, or nothing, opens the overview exactly as before.
+ */
+const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests'];
+
+function initialAdminTab(): AdminTab {
+  try {
+    const tab = new URLSearchParams(window.location.search).get('tab') ?? '';
+    return (DEEP_LINK_TABS as readonly string[]).includes(tab) ? (tab as AdminTab) : 'overview';
+  } catch {
+    return 'overview';
+  }
+}
+
 export default function Admin() {
   const { t, dir, loc } = useLanguage();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialAdminTab);
 
   /**
    * A COURTESY, NOT THE GATE. The three finance endpoints refuse an assistant
@@ -157,6 +175,9 @@ export default function Admin() {
    * "no" would take the owner's own numbers away from them.
    */
   const canSeeFinance = user?.can_view_financials !== false;
+
+  /** People waiting in the support console, for the sidebar badge. */
+  const supportWaiting = supportTotal(useSupportCounts());
 
   const section = (id: string, ar: string, en: string, ckb?: string) => ({ section: id, sectionLabel: loc(ar, en, ckb) });
   const sidebarItems = [
@@ -188,7 +209,11 @@ export default function Admin() {
        other administrative errand under it. The Kurdish label is the queue's
        OWN existing wording (adminMemberships/strings.ts `tabQueue`), not a new
        translation. */
-    { id: 'support', icon: LifeBuoy, label: loc('الدعم والتذاكر', 'Support & tickets', 'ڕیزی پشتگیری'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
+    /* «الرسائل» joined «التذاكر» and «الشكاوى» in this one console, so the
+       label names what the owner went looking for — messages — and the badge
+       says how many people are waiting across all three
+       (components/adminSupport/supportCounts.ts). */
+    { id: 'support', icon: LifeBuoy, label: loc('الدعم والرسائل', 'Support inbox', 'ڕیزی پشتگیری'), badge: supportWaiting, ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     { id: 'users', icon: Users, label: t('adminUsers'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') },
     { id: 'kyc', icon: ShieldCheck, label: loc('التحقق والعناوين', 'KYC & addresses'), ...section('administration', 'الإدارة', 'Administration') },
     { id: 'serials', icon: Barcode, label: loc('الأجهزة والتسلسلات', 'Serials & devices'), ...section('administration', 'الإدارة', 'Administration') },

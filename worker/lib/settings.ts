@@ -126,6 +126,73 @@ export interface ManualPaymentMethod {
   name: string;
   details: string;
 }
+/**
+ * A WITHDRAWAL PAYOUT CHANNEL — «كي كارد، الرافدين، زين كاش، استلام كاش».
+ *
+ * SEPARATE FROM `paymentMethods`, deliberately. Those are the SHOP's accounts a
+ * customer transfers INTO, each with the shop's own account number and a copy
+ * button; the withdrawal step used to borrow them, so the only way for the
+ * owner to offer Ki Card as a payout was to publish it as a deposit account
+ * too, and cash pickup could not exist at all — a deposit method is an account
+ * number by definition. A payout channel is where the CUSTOMER receives money,
+ * so it carries no shop account, only a name and one question:
+ *
+ * `requires_account` — does paying through it need the customer's own account
+ * or card number? «استلام كاش» does not: the customer collects the cash, and
+ * the request is filed without one (worker/routes/wallet.ts). Every other seed
+ * does, and the route refuses those without an account of at least 3
+ * characters, exactly as it always has.
+ *
+ * The NAME is the owner's own text, in the owner's language, like every
+ * `paymentMethods` name — not trilingual, never machine translated. It is
+ * snapshotted onto each request as `destination_label` at filing (migration
+ * 0112), so renaming a channel cannot rewrite what an outstanding request says.
+ */
+export interface PayoutMethod {
+  id: string;
+  name: string;
+  requires_account: boolean;
+}
+
+/** The four channels the owner named, in the owner's words and order. */
+export const DEFAULT_PAYOUT_METHODS: PayoutMethod[] = [
+  { id: 'ki_card', name: 'كي كارد', requires_account: true },
+  { id: 'rafidain', name: 'مصرف الرافدين', requires_account: true },
+  { id: 'zaincash', name: 'زين كاش', requires_account: true },
+  { id: 'cash_pickup', name: 'استلام كاش', requires_account: false },
+];
+
+/**
+ * THE ONE READER OF A STORED `payoutMethods` VALUE — the admin PUT validates
+ * through it on the way in and `getSetting` normalises through it on the way
+ * out, so what is stored is what the withdrawal step and the route see.
+ *
+ * An entry needs a non-empty id (≤ 40, the width `destination_kind` is cut to)
+ * and a non-empty name (≤ 60); a duplicate id keeps its first occurrence;
+ * `requires_account` is TRUE unless it is literally `false`, because the safe
+ * mistake is to ask a customer for an account number the channel did not need,
+ * never to file a transfer with no destination for one that did.
+ *
+ * AN EMPTY RESULT READS AS THE DEFAULTS. A withdrawal screen with no channel
+ * cannot file anything at all, and the four seeds are the owner's own named
+ * channels — so a stored `[]` (or garbage) is not honoured as "no way to be
+ * paid". The admin PUT refuses to store an empty list in the first place.
+ */
+export function normalizePayoutMethods(value: unknown): PayoutMethod[] {
+  if (!Array.isArray(value)) return DEFAULT_PAYOUT_METHODS.map((m) => ({ ...m }));
+  const out: PayoutMethod[] = [];
+  const seen = new Set<string>();
+  for (const raw of value.slice(0, 20)) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const r = raw as Record<string, unknown>;
+    const id = typeof r.id === 'string' ? r.id.trim().slice(0, 40) : '';
+    const name = typeof r.name === 'string' ? r.name.trim().slice(0, 60) : '';
+    if (!id || !name || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, name, requires_account: r.requires_account !== false });
+  }
+  return out.length > 0 ? out : DEFAULT_PAYOUT_METHODS.map((m) => ({ ...m }));
+}
 
 export const SETTING_DEFAULTS = {
   /**
@@ -144,13 +211,23 @@ export const SETTING_DEFAULTS = {
    * finds a bare literal on a money path and has no way to tell a decision
    * from a guess, which is how the same question gets asked a fourth time.
    *
-   * THE ROUNDING IS A PAIR AND IT LEANS ONE WAY ON PURPOSE.
-   * `iqdToUsdCents` rounds UP and `usdCentsToIqd` rounds DOWN
-   * (worker/lib/escrowOps.ts), so a hold never under-reserves and a spendable
-   * balance is never reported as covering a total it cannot actually pay.
-   * `corroboratedDeclaredIqd` (worker/lib/walletOps.ts) accepts both `floor`
-   * and `floor + 1` so a client that has not reloaded since the rate moved is
-   * not refused. None of that is changed by this decision; it is ratified.
+   * THE ROUNDING, AS IT STANDS NOW — the dinar is the source, the dollar is
+   * derived from it and FLOORED («وعند الدولار يقرب الى عدد صحيح اقل»).
+   * `iqdToUsdCents` (src/lib/api.ts) floors a typed amount into cents, so
+   * 50,000 د.ع is 3,571 cents = $35.71; the typed dinars are recorded beside
+   * the cents (migrations 0105/0106/0108) and every balance is read back as
+   * dinars by `walletIqdAvailable`, never by converting the cents alone. Every
+   * dinar-priced WALLET SPEND — checkout, store cart, membership, BNPL
+   * repayment, and the community-offer escrow hold — costs
+   * `walletSpendCents(iqd)`: floored, and capped at the cents on hand, so a
+   * wallet showing 50,000 can pay 50,000. The ceil that used to stand here
+   * (`iqdToUsdCents` in worker/lib/escrowOps.ts, «a hold never
+   * under-reserves») is gone from every money path: it asked for 3,572 cents
+   * to pay a 50,000 د.ع offer out of the 3,571 that same 50,000 put in.
+   * `usdCentsToIqd` still floors, and is now only the fallback for a row that
+   * recorded no dinars. `corroboratedDeclaredIqd` (worker/lib/walletOps.ts)
+   * accepts both `floor` and `floor + 1` so a client that has not reloaded
+   * since the rate moved is not refused.
    *
    * IT IS STILL A SETTING, and confirming it did not freeze it. The admin
    * writes it through `PATCH` with `int(value, …, { min: 1, max: 1_000_000 })`
@@ -179,6 +256,9 @@ export const SETTING_DEFAULTS = {
   currency: 'IQD' as 'IQD' | 'USD',
   adVideoUrl: '',
   paymentMethods: [] as ManualPaymentMethod[],
+  // Where a WITHDRAWAL is paid — see `PayoutMethod` above for why this is not
+  // `paymentMethods`. Seeded with the four channels the owner named.
+  payoutMethods: DEFAULT_PAYOUT_METHODS as PayoutMethod[],
   checkoutDeliveryMethods: [
     { id: 'standard', titleAr: 'توصيل عادي', titleEn: 'Standard Delivery', descAr: '2-3 أيام عمل', descEn: '2-3 business days', price_iqd: 5000, icon: 'Truck', home_delivery: true },
     { id: 'personal', titleAr: 'توصيل شخصي', titleEn: 'Personal Delivery', descAr: 'نفس اليوم', descEn: 'Same day delivery', price_iqd: 10000, icon: 'User', home_delivery: true },
@@ -311,8 +391,12 @@ export const SETTING_DEFAULTS = {
   // when a human says so.
   communityAutoCompleteDays: 7,
   communityRequestExpiryDays: 30,
-  // Owner-configured launch event for memberships (mandate §8.1).
-  launchConfig: { launch_at: null, activated: false, activated_at: null } as {
+  // Owner-configured launch event for memberships (mandate §8.1). LIVE by
+  // default — the site is running, and a default of `false` sold every card as
+  // a reservation that granted nothing (see DEFAULT_LAUNCH in entitlements.ts,
+  // which is what the membership code actually reads; migration 0109 writes
+  // the stored row).
+  launchConfig: { launch_at: null, activated: true, activated_at: null } as {
     launch_at: string | null; activated: boolean; activated_at: string | null;
   },
   // PLUS gift on printer purchase: owner decisions pending (duration/milestone).
@@ -534,6 +618,9 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   'currency',
   'adVideoUrl',
   'paymentMethods',
+  // The withdrawal step draws the channel list before any request exists.
+  // Names and one boolean — no account number of anybody's is in it.
+  'payoutMethods',
   'checkoutDeliveryMethods',
   'checkoutPaymentMethods',
   'cartShippingMethods',
@@ -593,6 +680,9 @@ function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeo
   // clamp belongs to the policy, so the read side calls it.
   if (key === 'deliveryDayPolicy') {
     return resolveDeliveryDayPolicy(value) as (typeof SETTING_DEFAULTS)[K];
+  }
+  if (key === 'payoutMethods') {
+    return normalizePayoutMethods(value) as (typeof SETTING_DEFAULTS)[K];
   }
   /**
    * Merged like `bnplPolicy`, and then once more one level down. The stored

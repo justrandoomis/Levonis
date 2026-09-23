@@ -79,6 +79,12 @@ export interface Claim {
   created_at: string;
   priority: boolean;
   serial: string | null;
+  /** The thread's size — present on the list (GET /api/devices/claims). */
+  message_count?: number;
+  last_message_at?: string | null;
+  last_staff_message_at?: string | null;
+  /** The warranty team wrote after the customer last opened or answered the thread. */
+  unread?: boolean;
 }
 
 export interface ClaimMessage {

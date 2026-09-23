@@ -22,6 +22,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { badgeFor } from '../lib/merchantOps';
+import { requireCommunityOpen } from '../lib/communityGate';
 
 export const communityReviewRoutes = new Hono<AppContext>();
 
@@ -235,7 +236,12 @@ communityReviewRoutes.patch('/:id', requireAuth, async (c) => {
 
 // ---------------------------------------------------------------- follows
 
-communityReviewRoutes.post('/follow/:merchantId', requireAuth, async (c) => {
+// Behind Levo Community's maintenance switch (worker/lib/communityGate.ts):
+// these are the twins of the walled /api/community/store/:id/follow, and a
+// follow while the community is shut went around the wall. Reviews of a
+// DELIVERED order above stay open — they finish trade already done.
+
+communityReviewRoutes.post('/follow/:merchantId', requireCommunityOpen, requireAuth, async (c) => {
   await rateLimit(c, 'follow', 60, 3600);
   const user = c.get('user')!;
   const merchantId = str(c.req.param('merchantId'), 'merchantId', { min: 1, max: 60 });
@@ -249,7 +255,7 @@ communityReviewRoutes.post('/follow/:merchantId', requireAuth, async (c) => {
   return c.json({ success: true, following: true });
 });
 
-communityReviewRoutes.delete('/follow/:merchantId', requireAuth, async (c) => {
+communityReviewRoutes.delete('/follow/:merchantId', requireCommunityOpen, requireAuth, async (c) => {
   const user = c.get('user')!;
   await c.env.DB.prepare('DELETE FROM follows WHERE user_id = ? AND merchant_id = ?')
     .bind(user.id, str(c.req.param('merchantId'), 'merchantId', { min: 1, max: 60 }))
@@ -258,7 +264,7 @@ communityReviewRoutes.delete('/follow/:merchantId', requireAuth, async (c) => {
 });
 
 /** Notification preferences per followed store (§38). */
-communityReviewRoutes.patch('/follow/:merchantId', requireAuth, async (c) => {
+communityReviewRoutes.patch('/follow/:merchantId', requireCommunityOpen, requireAuth, async (c) => {
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
   const sets: string[] = [];
@@ -276,7 +282,7 @@ communityReviewRoutes.patch('/follow/:merchantId', requireAuth, async (c) => {
   return c.json({ success: true });
 });
 
-communityReviewRoutes.get('/following', requireAuth, async (c) => {
+communityReviewRoutes.get('/following', requireCommunityOpen, requireAuth, async (c) => {
   const user = c.get('user')!;
   const { results } = await c.env.DB.prepare(
     `SELECT m.id, m.name, m.verified, m.badge, m.badge_override, m.rating_avg_x100, m.rating_count,

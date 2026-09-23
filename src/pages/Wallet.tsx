@@ -4,13 +4,16 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
 import { useMoney } from '../CurrencyContext';
-import { api, uploadFile, usdCentsToIqd, iqdToUsdCents, depositDeclaredIqd } from '../lib/api';
+import { api, uploadFile, usdCentsToIqd, iqdToUsdCents, depositDeclaredIqd, type PayoutMethod } from '../lib/api';
+import { withdrawalClaim } from '../lib/walletWithdrawClaim';
 import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../components/ui/AsyncStates';
 import { Segmented } from '../components/ui/Segmented';
 import { Overlay } from '../components/ui/Overlay';
 import Spinner from '../components/ui/Spinner';
+import { useBusy } from '../lib/busy';
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ArrowUp,
@@ -404,6 +407,13 @@ interface TxView {
   receiptUrl: string | null;
   number: string;
   reviewRequested: boolean;
+  /**
+   * The dinars this LEDGER ROW recorded (migration 0108), for any kind of row
+   * — a checkout debit, a refund, a membership charge, an admin credit, not
+   * only a deposit or a withdrawal request. Null when it recorded none.
+   */
+  amount_iqd?: number | null;
+  exchange_rate_snapshot?: number | null;
   depositContext: {
     provider: string;
     channel: string;
@@ -438,7 +448,9 @@ interface WithdrawalView {
   state: WithdrawalState;
   money_sent: boolean;
   needs_reconciliation: boolean;
-  destination: { kind: string; account: string; holder: string; note: string; frozen_at: string };
+  /** `label` is the channel's name frozen at filing (migration 0112), or null
+   *  for an older request — then the name is looked up by `kind`. */
+  destination: { kind: string; label?: string | null; account: string; holder: string; note: string; frozen_at: string };
   /**
    * The dinars the customer typed (migration 0106), or null for a request
    * filed before the column existed — or one whose claim the server could not
@@ -449,6 +461,9 @@ interface WithdrawalView {
    */
   declared_amount_iqd: number | null;
   exchange_rate_snapshot: number | null;
+  /** The dinar commission and payout quoted at filing (migration 0112). */
+  fee_iqd?: number | null;
+  net_iqd?: number | null;
   payout_reference: string | null;
   outcome_reason: string | null;
   created_at: string;
@@ -470,6 +485,16 @@ interface Balances {
   usd_cents_available: number;
   /** The same available balance in DINARS, computed server-side (0108). */
   iqd_available: number;
+  /**
+   * The other four figures in DINARS, summed on the server from what each row
+   * RECORDED (`getWalletDinarBreakdown`, worker/lib/walletOps.ts). Optional:
+   * a server older than them leaves them out, and the tile falls back to
+   * converting its cents rather than printing a zero it was never sent.
+   */
+  iqd_settled?: number;
+  iqd_held?: number;
+  iqd_pending_deposits?: number;
+  iqd_pending_withdrawals?: number;
   usd_cents_pending_deposits: number;
   usd_cents_pending_withdrawals: number;
   points_settled: number;
@@ -497,13 +522,85 @@ const EMPTY_BALANCES: Balances = {
 
 const PAYOUT_KINDS = ['manual_transfer', 'zaincash', 'fib', 'bank_account'] as const;
 
+interface PayoutChannelView {
+  id: string;
+  name: string;
+  /** False for a channel that pays without the customer's account (cash pickup). */
+  requires_account: boolean;
+}
+
+/**
+ * THE CHANNELS THE WITHDRAWAL STEP OFFERS — «كي كارد، الرافدين، زين كاش،
+ * استلام كاش». The owner's `payoutMethods` when the server sends them (it
+ * always does since that setting exists: an empty or broken stored list reads
+ * as the four seeds). Older servers fall back to what this step offered
+ * before — the deposit accounts, then the four legacy ids — so nothing is
+ * worse than it was.
+ */
+/**
+ * The wallet's type filter asks for the width its longest label needs, per
+ * language, at the compact size's 12px bold plus each option's px-2 — three
+ * equal columns, so the widest of «الكل / إيداع / سحب», "All / Deposits /
+ * Withdrawals" or «هەموو / دانان / کێشانەوە» decides. From `sm` it stops
+ * growing and sits at that width.
+ */
+const TYPE_FILTER_BASIS: Record<Lang, string> = {
+  ar: 'basis-36 sm:basis-60',
+  ckb: 'basis-56',
+  en: 'basis-[17rem]',
+};
+
+function payoutChannelsFrom(
+  payoutMethods: PayoutMethod[],
+  paymentMethods: { id: string; name: string }[],
+  lang: string
+): PayoutChannelView[] {
+  if (payoutMethods.length > 0) {
+    return payoutMethods.map((m) => ({ id: m.id, name: m.name, requires_account: m.requires_account !== false }));
+  }
+  if (paymentMethods.length > 0) return paymentMethods.map((m) => ({ id: m.id, name: m.name, requires_account: true }));
+  return PAYOUT_KINDS.map((k) => ({ id: k, name: legacyPayoutLabel(k, lang), requires_account: true }));
+}
+
+/**
+ * A withdrawal channel's NAME — never its raw id. A request filed since
+ * migration 0112 carries its own frozen `label`; an older one is looked up by
+ * id in the owner's payout list, then the deposit list, then the legacy
+ * names. The customer's row used to print `kind` itself: «pm_1726…».
+ */
+function payoutName(
+  kind: string,
+  label: string | null | undefined,
+  lang: string,
+  payoutMethods: PayoutMethod[],
+  paymentMethods: { id: string; name: string }[]
+): string {
+  if (label && label.trim()) return label;
+  const payout = payoutMethods.find((m) => m.id === kind);
+  if (payout) return payout.name;
+  const deposit = paymentMethods.find((m) => m.id === kind);
+  if (deposit) return deposit.name;
+  return legacyPayoutLabel(kind, lang);
+}
+
+function legacyPayoutLabel(kind: string, lang: string): string {
+  return PAYOUT_KIND_LABELS[kind]?.[lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar'] ?? kind;
+}
+
 export default function Wallet() {
   const navigate = useNavigate();
   const { lang, dir } = useLanguage();
   const s = STRINGS[(lang as Lang) in STRINGS ? (lang as Lang) : 'ar'];
   const isRtl = dir === 'rtl';
 
-  const { paymentMethods, currency: defaultCurrency, exchangeRate, refreshWallet } = useWallet();
+  const { paymentMethods, currency: defaultCurrency, exchangeRate, refreshWallet, settings } = useWallet();
+  /**
+   * WHERE A WITHDRAWAL IS PAID — the owner's own `payoutMethods` (Ki Card,
+   * Rafidain, Zain Cash, cash pickup), not the deposit accounts. A server
+   * older than the setting sends none; `payoutChannelsFrom` then falls back to
+   * the deposit list and the legacy ids exactly as the step did before.
+   */
+  const payoutMethods = useMemo(() => settings?.payoutMethods ?? [], [settings]);
   const { currency: siteCurrency } = useMoney();
 
   /**
@@ -534,6 +631,8 @@ export default function Wallet() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  // On a phone the search field is behind an icon (see the filter row).
+  const [searchOpen, setSearchOpen] = useState(false);
 
   /**
    * WHY THE WINDOWS ARE NOT MOUNTED BY THEIR OWN STATE ANY MORE.
@@ -726,9 +825,40 @@ export default function Wallet() {
     [balances.iqd_available, balances.usd_cents_available, currency, exchangeRate, fmt]
   );
 
+  /**
+   * AN AGGREGATE THE SERVER SENT IN DINARS — held, deposits under review, open
+   * withdrawals, settled (`getWalletDinarBreakdown`). The same reading rule as
+   * `fmtAvailable`: the dinars are printed as sent, and the dollar is derived
+   * from them and floored. Unlike the header, 0 here is a real answer (nothing
+   * held is IQD 0), so only an ABSENT figure — an older server — falls back to
+   * converting the cents.
+   */
+  const fmtDinars = useCallback(
+    (iqd: number | undefined, fallbackCents: number) => {
+      const n = Number(iqd);
+      if (iqd === undefined || iqd === null || !Number.isFinite(n) || n < 0) return fmt(fallbackCents);
+      if (currency === 'IQD') return `IQD ${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+      const cents = iqdToUsdCents(n, exchangeRate);
+      return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    },
+    [currency, exchangeRate, fmt]
+  );
+
+  /**
+   * ONE ROW, IN THE DINARS IT RECORDED. The row's own `amount_iqd` (0108)
+   * first, for EVERY kind of row: this used to know only a deposit's and a
+   * withdrawal request's typed figure, so a 50,000 د.ع checkout payment, a
+   * refund or an admin credit printed its cents converted back — «−IQD 49,994»
+   * under a header that said 50,000. Then the request testimony (0105/0106);
+   * then, for a row that recorded nothing, the cents.
+   */
   const fmtOperation = useCallback(
     (op: Operation) => {
       if (currency !== 'IQD') return fmt(op.amount);
+      const recorded = Number(op.tx?.amount_iqd);
+      if (Number.isInteger(recorded) && recorded > 0) {
+        return `IQD ${recorded.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+      }
       const declared =
         op.kind === 'deposit' ? op.tx?.depositContext?.declared_amount_iqd : op.withdrawal?.declared_amount_iqd;
       if (declared === null || declared === undefined) return fmt(op.amount);
@@ -810,7 +940,7 @@ export default function Wallet() {
   return (
     <div dir={dir} className="w-full bg-black min-h-screen font-sans flex flex-col pb-24">
       {/* ---------------------------------------------------------- header */}
-      <div className="bg-gradient-to-b from-olive to-olive-dark rounded-b-[36px] pt-12 pb-8 px-5 sm:px-8 flex flex-col items-center relative border-b border-gold/10">
+      <div className="bg-gradient-to-b from-olive to-olive-dark rounded-b-[32px] pt-12 pb-5 px-4 sm:px-8 flex flex-col items-center relative border-b border-gold/10">
         <button
           onClick={() => navigate(-1)}
           aria-label={s.back}
@@ -834,12 +964,12 @@ export default function Wallet() {
 
         <h1 className="text-zinc-400 text-xs font-bold uppercase tracking-widest mt-1">{s.title}</h1>
 
-        <div className="mt-6 flex flex-col items-center">
+        <div className="mt-4 flex flex-col items-center">
           <span className="text-zinc-400 text-[12px] font-bold">{s.available}</span>
           {loading ? (
-            <Skeleton className="h-12 w-52 mt-2 rounded-2xl" />
+            <Skeleton className="h-11 w-52 mt-2 rounded-2xl" />
           ) : (
-            <span dir="ltr" className="text-[40px] sm:text-[52px] font-black text-gold tracking-tight leading-none mt-1">
+            <span dir="ltr" className="text-[36px] sm:text-[48px] font-black text-gold tracking-tight leading-none mt-1 tabular-nums">
               {/* A failed load shows a dash, never a fabricated zero balance. */}
               {loadError ? '—' : fmtAvailable()}
             </span>
@@ -847,76 +977,96 @@ export default function Wallet() {
           <span className="text-zinc-500 text-[11px] mt-1">{s.availableHint}</span>
         </div>
 
-        {/* THE THREE NUMBERS THE MANDATE REQUIRES SEPARATELY — «تظهر بسطرين».
-            The labels are not the defect and are not shortened: «إيداعات قيد
-            المراجعة» is the tile that must not be mistakable for money you can
-            spend, and cutting it to «إيداعات» deletes the part doing the work.
-            The GEOMETRY was the defect. A 3-up grid on a 390px phone left each
-            label about 69px of text box — 20 Arabic characters at 10px cannot
-            fit that — so below `sm` each tile is a full-width row with the
-            label at the inline start and the number at the inline end, and the
-            3-up returns at `sm`, where it already fitted. `truncate` +
-            `whitespace-nowrap` are the belt-and-braces guard for a future
-            longer string; with the stack they never engage.
+        {/* THE OTHER FOUR NUMBERS — «إيداعات قيد المراجعة» و«سحوبات مفتوحة»
+            و«الرصيد المسوى» و«النقاط» بسطرين بدل سطر، والصفحة ضخمة.
 
-            The hint stays only where it carries an honesty claim. The
-            withdrawals tile used to repeat the HELD tile's sentence — «محجوز
-            لطلب سحب أو شراء قائم» is the definition of *held*, not of *open
-            withdrawals* — which made two of three mandated-distinct numbers
-            read as the same thing. 9px is also below legibility for Arabic. */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 w-full max-w-2xl mt-5">
+            ONE LINE PER LABEL, ONE LINE PER VALUE, TWO BY TWO. The phone layout
+            used to stack three full-width tiles, two of them with a hint
+            sentence underneath, then a settled/points sentence and a points
+            note on lines of their own — seven lines of header before the first
+            operation. It is now a 2×2 grid below `sm` (4-up above it): at a
+            360px phone each tile is ~150px, which holds «إيداعات قيد المراجعة»
+            on one line at 11px with room to spare, so `whitespace-nowrap` is a
+            guard, not a crop. The labels are NOT shortened: the one that must
+            not be mistaken for money you can spend keeps the words that say so.
+
+            The two hint sentences are not deleted either — they are the tile's
+            accessible description and its tooltip, which is where a definition
+            belongs once the label is on screen. The points note moved to where
+            it is actually a decision: the withdrawal form, which is the one
+            place a customer might expect points to become cash.
+
+            EVERY FIGURE IS THE CUSTOMER'S DINARS. Each value is summed on the
+            server from what its rows recorded (`getWalletDinarBreakdown`) —
+            the tiles used to convert their cents, so «إيداعات قيد المراجعة»
+            read 49,994 the moment a customer typed 50,000. */}
+        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 w-full max-w-2xl mt-4">
           {[
-            { label: s.held, hint: s.heldHint, value: balances.usd_cents_held, icon: <Lock className="w-3.5 h-3.5" /> },
             {
+              key: 'held',
+              label: s.held,
+              hint: s.heldHint,
+              value: fmtDinars(balances.iqd_held, balances.usd_cents_held),
+              icon: <Lock className="w-3 h-3" />,
+            },
+            {
+              key: 'pending-deposits',
               label: s.pendingDeposits,
               hint: s.pendingHint,
-              value: balances.usd_cents_pending_deposits,
-              icon: <Clock className="w-3.5 h-3.5" />,
+              value: fmtDinars(balances.iqd_pending_deposits, balances.usd_cents_pending_deposits),
+              icon: <Clock className="w-3 h-3" />,
             },
             {
+              key: 'pending-withdrawals',
               label: s.pendingWithdrawals,
               hint: '',
-              value: balances.usd_cents_pending_withdrawals,
-              icon: <ArrowUp className="w-3.5 h-3.5" />,
+              value: fmtDinars(balances.iqd_pending_withdrawals, balances.usd_cents_pending_withdrawals),
+              icon: <ArrowUp className="w-3 h-3" />,
+            },
+            {
+              key: 'settled',
+              label: s.settled,
+              hint: '',
+              value: fmtDinars(balances.iqd_settled, balances.usd_cents_settled),
+              icon: <CheckCircle className="w-3 h-3" />,
             },
           ].map((card) => (
-            <div key={card.label} className="bg-black/30 border border-white/10 rounded-2xl p-2.5 sm:text-center">
-              <div className="flex items-center justify-between gap-3 sm:block">
-                <div className="flex items-center gap-1 min-w-0 text-zinc-400 text-[10px] font-bold sm:justify-center">
-                  <span className="shrink-0">{card.icon}</span>
-                  <span className="truncate whitespace-nowrap">{card.label}</span>
-                </div>
+            <div
+              key={card.key}
+              data-wallet-figure={card.key}
+              title={card.hint || undefined}
+              className="min-w-0 bg-black/30 border border-white/10 rounded-xl px-2.5 py-2 text-start"
+            >
+              <dt className="flex items-center gap-1 min-w-0 text-zinc-400 text-[11px] font-bold leading-4">
+                {/* The icon yields its 16px below 400px, where the longest
+                    label («Deposits under review», and the Sorani one) needs
+                    the whole tile to stay on one line without an ellipsis. */}
+                <span className="shrink-0 hidden min-[400px]:inline" aria-hidden>
+                  {card.icon}
+                </span>
+                <span className="truncate whitespace-nowrap">{card.label}</span>
+                {card.hint ? <span className="sr-only">. {card.hint}</span> : null}
+              </dt>
+              <dd className="mt-0.5">
                 {loading ? (
-                  <Skeleton className="h-5 w-16 rounded sm:mx-auto sm:mt-2" />
+                  <Skeleton className="h-4 w-16 rounded" />
                 ) : (
-                  <div dir="ltr" className="text-white font-bold text-[15px] shrink-0 sm:mt-1">
-                    {loadError ? '—' : fmt(card.value)}
-                  </div>
+                  <span dir="ltr" className="block text-white font-bold text-[14px] leading-5 tabular-nums truncate text-start">
+                    {loadError ? '—' : card.value}
+                  </span>
                 )}
-              </div>
-              {card.hint ? (
-                <div className="text-zinc-500 text-[10px] mt-1 leading-snug">{card.hint}</div>
-              ) : null}
+              </dd>
             </div>
           ))}
-        </div>
+        </dl>
 
-        {/* «الرصيد المسوّى» SPLIT ACROSS TWO LINES because the whole sentence —
-            two label/value pairs plus the points note — was one run of
-            space-separated text, so the break landed wherever it landed,
-            including between «الرصيد» and «المسوّى». Each pair is now its own
-            non-breaking unit and the note has its own line. The line may still
-            wrap BETWEEN the pairs; what it can no longer do is split a label
-            from itself. */}
-        <div className="text-zinc-500 text-[10px] mt-3 text-center max-w-md leading-relaxed">
-          <span className="whitespace-nowrap">
-            {s.settled}: <span dir="ltr">{loadError ? '—' : fmt(balances.usd_cents_settled)}</span>
+        {/* Points: a separate balance, so a separate, quiet line — label and
+            value one non-breaking pair. */}
+        <div className="mt-2 text-zinc-400 text-[11px] font-bold whitespace-nowrap" data-wallet-figure="points">
+          {s.points}:{' '}
+          <span dir="ltr" className="text-zinc-200 tabular-nums">
+            {loadError ? '—' : balances.points_settled.toLocaleString('en-US')}
           </span>
-          <span aria-hidden className="mx-1.5">·</span>
-          <span className="whitespace-nowrap">
-            {s.points}: <span dir="ltr">{loadError ? '—' : balances.points_settled.toLocaleString('en-US')}</span>
-          </span>
-          <span className="block mt-0.5">{s.pointsNote}</span>
         </div>
       </div>
 
@@ -970,29 +1120,38 @@ export default function Wallet() {
             </button>
           </div>
 
-          {/* «الفلاتر كبيرة». Three things made this row loud, and none of
-              them was the declared font size.
+          {/* «الأزرار (الكل/إيداع/سحب/الحالات) كبيرة». ONE ROW, AT EVERY WIDTH.
 
-              The chips were `bg-gold text-black border-gold` — gold fill, gold
-              border AND inverted text, three cues at once on one control, which
-              the project's own apple-design skill forbids (§3, §7). They are
-              the shared `Segmented` primitive now: equal columns, ONE moving
-              indicator, real radiogroup semantics, RTL-aware arrow keys, and a
-              44px minimum per option — which the hand-rolled chips only reached
-              by accident of flex stretch.
+              It used to be three stacked full-width rows on a phone — a 44px
+              segmented control, a 44px select, a 44px search field — so the
+              toolbar was taller than the first operation it filtered. Now the
+              type filter and the status filter sit side by side, and search is
+              behind an icon on a phone (always inline from `sm`):
 
-              The row had no `align-items`, so it stretched every item to the
-              tallest on its line. The tallest is the select, which src/index.css
-              raises to 16px under `(pointer: coarse)` — the deliberate anti-zoom
-              floor with tests/inputZoom.test.ts behind it. `items-center` is the
-              load-bearing token that stops the select inflating its neighbours;
-              lowering that floor to "fix" the size would bring the typing-zoom
-              bug back and is not on the table.
+                • the type filter is the house `Segmented` in its `sm` size —
+                  36px, 12px bold — still the radiogroup with the moving
+                  indicator and the RTL-aware arrow keys;
+                • the status filter stays a native <select> (a picker a phone
+                  already knows how to present), drawn as a 36px chip. Its
+                  12px is what a mouse sees; on a touch device src/index.css
+                  lifts every select to 16px — the anti-zoom floor with
+                  tests/inputZoom.test.ts behind it — and 36px holds that too;
+                • search opens on its own row only when asked for, or when a
+                  query is active so the customer can see what is filtering.
 
-              `text-[12px]` is dropped from both fields for the same reason: on
-              every touch device the floor overrides it, so the number was a lie
-              to the next reader. `min-h-11` states the real target instead. */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+              `items-center` is still load-bearing: without it the tallest item
+              stretches its neighbours.
+
+              THE TYPE FILTER'S WIDTH IS ITS LONGEST LABEL'S, PER LANGUAGE
+              (`TYPE_FILTER_BASIS`). With a bare `flex-1` it took whatever the
+              select left — at 360px, with the select at its touch 16px, about
+              30–38px of text per option — so «کێشانەوە» and "Withdrawals" were
+              cut to an ellipsis. It now asks for the width its three labels
+              need and grows from there; when that and the select do not fit
+              on one line, the row wraps (select and search move under it)
+              instead of truncating a label. Arabic's short labels still fit
+              on one row at 360px. */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-3">
             <Segmented
               group="wallet-type"
               label={s.operations}
@@ -1003,32 +1162,56 @@ export default function Wallet() {
                 { id: 'deposit', label: s.filterDeposit },
                 { id: 'withdrawal', label: s.filterWithdrawal },
               ]}
-              className="w-full sm:w-auto sm:min-w-[220px]"
+              size="sm"
+              className={`grow min-w-0 sm:grow-0 ${TYPE_FILTER_BASIS[(lang as Lang) in TYPE_FILTER_BASIS ? (lang as Lang) : 'ar']}`}
             />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-              className="min-h-11 w-full sm:w-auto bg-zinc-900/60 border border-zinc-800 rounded-xl px-3 text-zinc-200 font-bold focus:outline-none focus:border-zinc-600"
+            <div className="relative shrink-0">
+              <select
+                aria-label={s.statusAll}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+                className="h-9 appearance-none bg-zinc-900/60 border border-white/10 rounded-xl ps-2.5 pe-7 text-[12px] font-bold text-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/70"
+              >
+                <option value="all">{s.statusAll}</option>
+                <option value="pending">{s.statusPending}</option>
+                <option value="approved">{s.statusApproved}</option>
+                <option value="rejected">{s.statusRejected}</option>
+              </select>
+              <ChevronDown
+                aria-hidden
+                className="w-3.5 h-3.5 text-zinc-500 absolute end-2 top-1/2 -translate-y-1/2 pointer-events-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setSearchOpen((v) => !v)}
+              aria-label={s.searchPlaceholder}
+              aria-expanded={searchOpen || !!search}
+              aria-controls="wallet-search"
+              className={`sm:hidden h-9 w-9 shrink-0 rounded-xl border flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/70 ${
+                searchOpen || search ? 'bg-zinc-800 border-white/20 text-white' : 'bg-zinc-900/60 border-white/10 text-zinc-400'
+              }`}
             >
-              <option value="all">{s.statusAll}</option>
-              <option value="pending">{s.statusPending}</option>
-              <option value="approved">{s.statusApproved}</option>
-              <option value="rejected">{s.statusRejected}</option>
-            </select>
+              <Search className="w-4 h-4" />
+            </button>
             <form
+              id="wallet-search"
+              role="search"
               onSubmit={(e) => {
                 e.preventDefault();
                 setSearch(searchInput.trim());
               }}
-              className="flex items-center gap-2 w-full sm:flex-1 sm:w-auto sm:min-w-[160px]"
+              className={`${searchOpen || search ? 'flex' : 'hidden'} sm:flex basis-full sm:basis-auto sm:flex-1 sm:min-w-[160px] items-center`}
             >
               <div className="relative flex-1">
                 <Search className="w-3.5 h-3.5 text-zinc-500 absolute top-1/2 -translate-y-1/2 start-3" />
                 <input
+                  type="search"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   placeholder={s.searchPlaceholder}
-                  className="min-h-11 w-full bg-zinc-900/60 border border-zinc-800 rounded-xl ps-9 pe-3 text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+                  aria-label={s.searchPlaceholder}
+                  className="h-10 sm:h-9 w-full bg-zinc-900/60 border border-white/10 rounded-xl ps-9 pe-3 text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
                 />
               </div>
             </form>
@@ -1127,7 +1310,18 @@ export default function Wallet() {
                           {w && (
                             <div className="text-zinc-500 text-[11px] mt-1.5 space-y-0.5">
                               <div>
-                                {s.destination}: <span dir="ltr">{w.destination.kind} · {w.destination.account}</span>
+                                {/* The channel by NAME — the raw id («pm_1726…»)
+                                    is what this line used to print — and the
+                                    account only when there is one: a cash
+                                    pickup is filed without. */}
+                                {s.destination}:{' '}
+                                {payoutName(w.destination.kind, w.destination.label, lang, payoutMethods, paymentMethods)}
+                                {w.destination.account ? (
+                                  <>
+                                    {' · '}
+                                    <span dir="ltr">{w.destination.account}</span>
+                                  </>
+                                ) : null}
                               </div>
                               {w.payout_reference && (
                                 <div>
@@ -1193,7 +1387,10 @@ export default function Wallet() {
           currency={currency}
           exchangeRate={exchangeRate}
           available={balances.usd_cents_available}
+          availableIqd={Number(balances.iqd_available) || 0}
+          availableLabel={fmtAvailable()}
           paymentMethods={paymentMethods}
+          payoutMethods={payoutMethods}
           feeBps={feeBps}
           minAmountCents={minAmountCents}
           fmt={fmt}
@@ -1276,7 +1473,10 @@ function RequestModal({
   currency,
   exchangeRate,
   available,
+  availableIqd,
+  availableLabel,
   paymentMethods,
+  payoutMethods,
   feeBps,
   minAmountCents,
   fmt,
@@ -1289,8 +1489,20 @@ function RequestModal({
   lang: string;
   currency: 'IQD' | 'USD';
   exchangeRate: number;
+  /** Spendable cents — the money, and what a DOLLAR amount is compared with. */
   available: number;
+  /**
+   * The same balance in the customer's DINARS, as the server computed it
+   * (`balances.iqd_available`, migration 0108) — what a typed dinar amount is
+   * compared with, and what «الرصيد المتاح» prints. 0 when the server sent
+   * none; the cents then decide, as they always did.
+   */
+  availableIqd: number;
+  /** The header's own reading of the balance, so the form cannot disagree with it. */
+  availableLabel: string;
   paymentMethods: { id: string; name: string; details: string }[];
+  /** The owner's withdrawal channels (`payoutMethods`); empty on an older server. */
+  payoutMethods: PayoutMethod[];
   /** Commission in basis points, as the server reports it. Display only. */
   feeBps: number;
   /** The smallest amount the server will accept, in cents, as the server
@@ -1311,11 +1523,15 @@ function RequestModal({
    * otherwise. NOT prefilled with `m.details`: that is the SHOP's account
    * number, and a withdrawal goes to the CUSTOMER's.
    */
-  const [destinationKind, setDestinationKind] = useState<string>(paymentMethods[0]?.id ?? PAYOUT_KINDS[0]);
+  const payoutChannels = payoutChannelsFrom(payoutMethods, paymentMethods, lang);
+  const [destinationKind, setDestinationKind] = useState<string>(payoutChannels[0]?.id ?? PAYOUT_KINDS[0]);
   const [destinationAccount, setDestinationAccount] = useState('');
   const [copied, setCopied] = useState('');
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // A deposit or withdrawal on its way to the server holds the WHOLE screen,
+  // not only this form's button (src/lib/busy.ts, `payment`).
+  useBusy(submitting, 'payment');
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   // One key per open form: retrying a failed submit must not create a second
@@ -1398,35 +1614,51 @@ function RequestModal({
   const amountLabel = typedIqd ? iqdLabel(typedIqd) : fmt(amountCents);
   const feeLabel = typedIqd ? iqdLabel(feeIqd) : fmt(feeCents);
   const netLabel = typedIqd ? iqdLabel(netIqd) : fmt(netCents);
-  const overBalance = kind === 'withdrawal' && amountCents > available;
   /**
-   * THE WITHDRAWAL CHANNELS ARE THE DEPOSIT CHANNELS — «نفس قنوات الإيداع».
+   * OVER THE BALANCE IS ASKED IN THE UNIT THE CUSTOMER TYPED.
    *
-   * The payout list used to be a four-item array compiled into this file, so
-   * the owner could add Ki Card or Rafidain to the deposit screen and the
-   * withdrawal screen would never hear about it. It now reads the SAME
-   * admin-authored `paymentMethods` the deposit step reads, and falls back to
-   * the four legacy ids only when the owner has published nothing.
+   * Two typed deposits of 25,000 are 3,570 cents that the header reads as
+   * 50,000 د.ع. Typing 50,000 to withdraw floors to 3,571 cents, and the old
+   * cents comparison said «المبلغ يتجاوز رصيدك المتاح» about the customer's own
+   * whole balance. A typed dinar figure is now compared with the DINAR balance;
+   * the cents are still sent exactly as floored, and the SERVER reserves at
+   * most the cents on hand (`withdrawalReserveCents`, worker/lib/walletOps.ts)
+   * — it has to be the server, because the typed claim is corroborated against
+   * the cents the browser derived from it, and a browser-capped figure would
+   * no longer corroborate.
    *
-   * The channel NAME is one free-text string the admin typed, so it is not
-   * trilingual — the same as the deposit list, and the same as an admin's own
-   * content everywhere else. Everything around it stays in STRINGS.
+   * A DOLLAR AMOUNT IS COMPARED WITH THE DOLLARS SHOWN, not the raw cents. The
+   * same two deposits read $35.71 in USD — one cent over the 3,570 held — and
+   * typing that figure was refused on both sides. `withdrawalClaim`
+   * (src/lib/walletWithdrawClaim.ts) compares with the displayed dollars and,
+   * for a figure above the ledger cents, sends the dinars it stands for so the
+   * server caps it the same way it caps a typed 50,000.
    */
-  const payoutChannels: { id: string; name: string }[] =
-    paymentMethods.length > 0
-      ? paymentMethods.map((m) => ({ id: m.id, name: m.name }))
-      : PAYOUT_KINDS.map((k) => ({ id: k, name: payoutLabel(k) }));
+  const claim = withdrawalClaim({
+    currency,
+    rawAmount,
+    amountCents,
+    availableCents: available,
+    availableIqd,
+    exchangeRate,
+  });
+  const declaredIqd = kind === 'withdrawal' ? claim.declaredIqd : typedIqd;
+  const overBalance = kind === 'withdrawal' && claim.overBalance;
+  const availableAfterLabel =
+    'iqd' in claim.remaining ? iqdLabel(claim.remaining.iqd) : fmt(claim.remaining.cents);
   /**
-   * A HISTORIC ROW STILL READS AS A NAME. A withdrawal filed as 'zaincash'
-   * keeps that id forever, so the legacy labels stay even after the owner's
-   * own list replaces them as the CHOICE — otherwise an old request would
-   * render a raw id.
+   * THE WITHDRAWAL CHANNELS — «كي كارد، الرافدين، زين كاش، استلام كاش». They
+   * used to be the admin's DEPOSIT methods («نفس قنوات الإيداع»), which meant a
+   * payout channel existed only if it was also published as an account to pay
+   * INTO, and cash pickup could not exist at all. They are the owner's own
+   * `payoutMethods` now (`payoutChannelsFrom`, above). A channel marked
+   * `requires_account: false` — cash pickup — asks for no account number; the
+   * server resolves the same flag from the same setting, so the form cannot
+   * waive an account the server would then demand, or the other way round.
    */
-  function payoutLabel(k: string): string {
-    const configured = paymentMethods.find((m) => m.id === k);
-    if (configured) return configured.name;
-    return PAYOUT_KIND_LABELS[k]?.[lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar'] ?? k;
-  }
+  const selectedChannel = payoutChannels.find((ch) => ch.id === destinationKind) ?? null;
+  const requiresAccount = selectedChannel?.requires_account !== false;
+  const payoutLabel = (k: string) => payoutName(k, null, lang, payoutMethods, paymentMethods);
 
   const onAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value.replace(/[^0-9.]/g, '');
@@ -1458,6 +1690,8 @@ function RequestModal({
   const stepProblem = (n: number): string => {
     if (n === 1) {
       if (kind === 'deposit') return method ? '' : s.channelRequired;
+      if (!selectedChannel) return s.channelRequired;
+      if (!requiresAccount) return '';
       return destinationAccount.trim().length >= 3 ? '' : s.accountRequired2;
     }
     if (n === 2) {
@@ -1525,11 +1759,15 @@ function RequestModal({
         await api.post('/api/wallet/withdrawals', {
           amount_usd_cents: amountCents,
           // Testimony alongside the money, never instead of it: the server
-          // records it and reserves the cents (migration 0106).
-          declared_amount_iqd: typedIqd || undefined,
+          // records it and reserves the cents (migration 0106). In USD this is
+          // the dinars a figure above the ledger cents stands for (`claim`).
+          declared_amount_iqd: declaredIqd || undefined,
           note: note || undefined,
           destinationKind,
-          destinationAccount: destinationAccount.trim(),
+          // No account for a channel that needs none (cash pickup) — a
+          // half-typed number from a channel the customer switched away from
+          // must not be frozen onto the request.
+          destinationAccount: requiresAccount ? destinationAccount.trim() : undefined,
           idempotencyKey: idempotencyKeyRef.current,
         });
         await onDone(s.withdrawSubmitted);
@@ -1685,16 +1923,18 @@ function RequestModal({
                   ))}
                 </div>
               </Field>
-              <Field label={`${s.accountForChannel} *`} hint={s.destinationFrozen}>
-                <input
-                  dir="ltr"
-                  value={destinationAccount}
-                  onChange={(e) => setDestinationAccount(e.target.value)}
-                  className={inputClass}
-                  autoComplete="off"
-                  required
-                />
-              </Field>
+              {requiresAccount && (
+                <Field label={`${s.accountForChannel} *`} hint={s.destinationFrozen}>
+                  <input
+                    dir="ltr"
+                    value={destinationAccount}
+                    onChange={(e) => setDestinationAccount(e.target.value)}
+                    className={inputClass}
+                    autoComplete="off"
+                    required
+                  />
+                </Field>
+              )}
             </div>
           )}
 
@@ -1704,7 +1944,9 @@ function RequestModal({
               {kind === 'withdrawal' && (
                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between">
                   <span className="text-zinc-400 font-medium text-sm">{s.available}</span>
-                  <span dir="ltr" className="text-white font-bold text-lg">{fmt(available)}</span>
+                  {/* The header's own figure — the customer's dinars — not the
+                      cents converted back (which read 49,994 for 50,000). */}
+                  <span dir="ltr" className="text-white font-bold text-lg">{availableLabel}</span>
                 </div>
               )}
               <Field
@@ -1741,7 +1983,7 @@ function RequestModal({
                   </div>
                   <div className="flex justify-between text-xs text-zinc-400">
                     <span>{s.availableAfter}</span>
-                    <span dir="ltr">{fmt(Math.max(available - amountCents, 0))}</span>
+                    <span dir="ltr">{availableAfterLabel}</span>
                   </div>
                   {/* The rate is stated when there is one and refused when
                       there is not — the old sentence is kept for feeBps === 0
@@ -1749,6 +1991,9 @@ function RequestModal({
                   <p className="text-zinc-500 text-[10px] leading-snug">
                     {feeBps > 0 ? s.feeDeducted : s.feeNotConfigured}
                   </p>
+                  {/* Moved here from the page header: this form is the one
+                      place a customer might expect points to become cash. */}
+                  <p className="text-zinc-500 text-[10px] leading-snug">{s.pointsNote}</p>
                   {overBalance && <p className="text-[#e4899a] text-[11px] font-bold">{s.insufficient}</p>}
                 </div>
               )}
@@ -1801,7 +2046,7 @@ function RequestModal({
                     {kind === 'deposit' ? method || '—' : payoutLabel(destinationKind)}
                   </span>
                 </div>
-                {kind === 'withdrawal' && (
+                {kind === 'withdrawal' && requiresAccount && (
                   <div className="flex justify-between text-zinc-400">
                     <span>{s.destinationAccount}</span>
                     <span dir="ltr" className="text-white font-mono">{destinationAccount || '—'}</span>

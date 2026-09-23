@@ -30,7 +30,9 @@
  *   editable by the owner, that turns «طابعة» into "printer".
  *
  *   Every token is stored TWICE: as itself, and as its romanised skeleton
- *   (./translit.ts), so «بامبو» and "bambu" meet in one place.
+ *   (./translit.ts), so «بامبو» and "bambu" meet in one place. A Latin word's
+ *   skeleton carries SKELETON_MARK (`~alaga` for "elegoo") so that only a
+ *   query typed in Arabic letters ever looks it up — see `buildIndexRows`.
  *
  * THE QUERY, in one pass:
  *   normalise → tokenise → expand through synonyms and romanisation → look up
@@ -39,7 +41,9 @@
  */
 
 import { isUsefulToken, normalizeText, tokenize } from './normalize';
-import { bestMatches, candidatePrefix } from './match';
+import { bestMatches, candidatePrefix, prefixScore, SKELETON_MARK, type TokenMatch } from './match';
+
+export { SKELETON_MARK };
 import { collapseSpelledLetters, hasArabicScript, loneSpelledLetter, romanize } from './translit';
 
 /**
@@ -92,11 +96,36 @@ export function buildIndexRows(doc: SearchDoc): IndexRow[] {
     for (const value of values ?? []) {
       for (const token of tokenize(value)) {
         add(token, weight);
-        // The romanised skeleton, so an Arabic query can reach a Latin name
-        // and the other way round. Stored at the same weight — it is the same
-        // word, not a weaker signal.
-        const skeleton = romanize(token);
-        if (skeleton && skeleton !== token) add(skeleton, weight);
+        // The romanised skeleton, so a Latin query can reach an Arabic name
+        // («بامبو» is stored as `bamba` beside itself, and "bambu" reaches it).
+        // Stored at the same weight — it is the same word, not a weaker signal.
+        //
+        // ONLY FOR A WORD WRITTEN IN ARABIC SCRIPT. A Latin word's skeleton is
+        // not a bridge to anything — it is the same word with its vowels
+        // flattened, and flattening vowels is what makes different English
+        // words collide: "heat" and "hot" are both `hat`, "plate" is `plata`
+        // beside "pla". Those collisions put the Heatbed ABOVE the Hotend for
+        // "hot", let the description word "how" (`ha`) answer "Ha" instead of
+        // "Hardened", and counted "plate" twice against "pla". An Arabic
+        // query still reaches a Latin name through its OWN skeleton (`bamba`
+        // is one edit from "bambu"), which is where cross-script matching
+        // actually happens.
+        if (hasArabicScript(token)) {
+          const skeleton = romanize(token);
+          if (skeleton && skeleton !== token) add(skeleton, weight);
+        } else {
+          // …BUT AN ARABIC QUERY STILL NEEDS TO MEET IT. «اليجو» romanises to
+          // `alaga`, and "elegoo" is `alaga` only once ITS vowels are flattened
+          // too — as a bare word it is three edits away and no fuzzy budget
+          // reaches it. So the Latin skeleton is stored under SKELETON_MARK,
+          // `~alaga`: a key no Latin query can open (normalizeText turns `~`
+          // into a space, and every range a Latin token opens stops below it),
+          // and one `expandQuery` looks up ONLY for a word typed in Arabic
+          // letters. Latin never meets Latin through it, which is the collision
+          // above; Arabic reaches every brand, dictionary or not.
+          const skeleton = romanize(token);
+          if (/[a-z]/.test(skeleton) && isUsefulToken(skeleton)) add(SKELETON_MARK + skeleton, weight);
+        }
       }
     }
   }
@@ -113,6 +142,30 @@ export interface ExpandedQuery {
   literal: string[];
   /** Everything worth looking up: literals, synonyms, skeletons, collapses. */
   lookup: string[];
+  /**
+   * Which typed word each lookup token SERVES — a literal serves itself, its
+   * skeleton and its synonyms serve it. Coverage counts typed words, and a
+   * synonym found beside its own literal is one word found twice, not two
+   * words found: «طابعه» matching both «طابعه» and "printer" used to read as
+   * full coverage of a two-word query.
+   */
+  origin: ReadonlyMap<string, string>;
+  /**
+   * The lookup tokens the shopper is STILL TYPING — the last word and its
+   * skeleton, unless the query ends in a space. These are matched as prefixes
+   * even when the vocabulary holds them exactly; see `bestMatches`.
+   */
+  completing: ReadonlySet<string>;
+}
+
+export interface ExpandOptions {
+  /**
+   * False when the raw query ended in whitespace: the shopper finished the
+   * last word and said so, so nothing is being typed and nothing is completed.
+   * The route passes this because its validator trims the parameter before
+   * this function sees it. Defaults to "the last word is still being typed".
+   */
+  completeLast?: boolean;
 }
 
 /**
@@ -121,11 +174,21 @@ export interface ExpandedQuery {
  * `synonyms` is the loaded dictionary, term → canonical. It is passed in
  * rather than read here so this stays pure and the caller can cache it.
  */
-export function expandQuery(raw: string, synonyms: ReadonlyMap<string, string>): ExpandedQuery {
+export function expandQuery(
+  raw: string,
+  synonyms: ReadonlyMap<string, string>,
+  opts: ExpandOptions = {}
+): ExpandedQuery {
   const normalized = normalizeText(raw);
-  if (!normalized) return { literal: [], lookup: [] };
+  if (!normalized) return { literal: [], lookup: [], origin: new Map(), completing: new Set() };
   const literal = tokenize(normalized);
   const lookup = new Set<string>(literal);
+  const origin = new Map<string, string>(literal.map((l) => [l, l]));
+  /** Look `token` up on behalf of the typed word `from`. First claim wins. */
+  const serve = (token: string, from: string) => {
+    lookup.add(token);
+    if (!origin.has(token)) origin.set(token, from);
+  };
 
   /**
    * A ONE-LETTER QUERY IS A QUERY, NOT DEBRIS — and this is the one place the
@@ -158,31 +221,46 @@ export function expandQuery(raw: string, synonyms: ReadonlyMap<string, string>):
    */
   const words = normalized.split(' ');
   if (words.length === 1 && [...words[0]].length === 1) {
-    lookup.add(words[0]);
-    const skeleton = romanize(words[0]);
-    if (skeleton) lookup.add(skeleton);
+    serve(words[0], words[0]);
+    // Only an ARABIC letter needs a skeleton to cross scripts. romanize() on a
+    // Latin vowel flattens it — "e" becomes `a` — so a shopper typing «E»
+    // would have been answered with the A shelf.
+    if (hasArabicScript(words[0])) {
+      const skeleton = romanize(words[0]);
+      if (skeleton) serve(skeleton, words[0]);
+    }
   }
 
   // A MULTI-WORD synonym has to be tried before the words are split up:
   // «بامبو لاب» and «قطع غيار» mean one thing each, and neither half means it.
   for (const [term, canonical] of synonyms) {
-    if (term.includes(' ') && normalized.includes(term)) lookup.add(canonical);
+    if (term.includes(' ') && normalized.includes(term)) serve(canonical, term);
   }
 
   for (const token of literal) {
     const canonical = synonyms.get(token);
-    if (canonical) for (const t of tokenize(canonical)) lookup.add(t);
-    const skeleton = romanize(token);
-    if (skeleton && isUsefulToken(skeleton)) lookup.add(skeleton);
+    if (canonical) for (const t of tokenize(canonical)) serve(t, token);
+    // The skeleton is the bridge from ARABIC letters to a Latin name, and only
+    // that — see `buildIndexRows` for what a Latin word's skeleton did instead.
+    // Looked up twice: bare, against Arabic names' skeletons and within a typo
+    // of a Latin word («بامبو» `bamba` → "bambu"), and marked, against Latin
+    // words' own skeletons («اليجو» `alaga` → `~alaga` → "Elegoo").
+    if (hasArabicScript(token)) {
+      const skeleton = romanize(token);
+      if (skeleton && isUsefulToken(skeleton)) {
+        serve(skeleton, token);
+        serve(SKELETON_MARK + skeleton, token);
+      }
+    }
   }
 
   // «اكس تو دي» → "x2d": Latin letters read aloud in Arabic, which no
   // romanisation can recover. Only attempted on an Arabic-script query.
   if (hasArabicScript(normalized)) {
     for (const collapsed of collapseSpelledLetters(literal)) {
-      if (isUsefulToken(collapsed)) lookup.add(collapsed);
+      if (isUsefulToken(collapsed)) serve(collapsed, collapsed);
       const viaSynonym = synonyms.get(collapsed);
-      if (viaSynonym) lookup.add(viaSynonym);
+      if (viaSynonym) serve(viaSynonym, collapsed);
     }
     /**
      * A SINGLE spelled-out letter, which a run of three never sees. The owner
@@ -198,11 +276,37 @@ export function expandQuery(raw: string, synonyms: ReadonlyMap<string, string>):
      */
     for (const token of literal) {
       const letter = loneSpelledLetter(token);
-      if (letter) lookup.add(letter);
+      if (letter) serve(letter, token);
     }
   }
 
-  return { literal, lookup: [...lookup] };
+  /**
+   * THE WORD STILL BEING TYPED. «هنالك منتجات تبدأ بحرف H» — and "Hard",
+   * "Hot" and "Heat" are the same complaint one keystroke later: each is an
+   * exact word SOMEWHERE in the shop (a description that says "hard", "hot",
+   * "heat"), and an exact hit used to end the search, so the Hardened nozzle,
+   * the Hotend and the Heatbed were never looked at. The last word is marked
+   * here so `bestMatches` keeps the exact hit AND its completions for it. The
+   * words before it were finished — a space followed them — and keep the
+   * exact-hit rule, which is what stops "pla basic" from wandering into
+   * "plate".
+   */
+  const completing = new Set<string>();
+  if (opts.completeLast !== false && !/\s$/u.test(raw)) {
+    const last = words[words.length - 1];
+    for (const token of tokenize(last)) {
+      completing.add(token);
+      if (hasArabicScript(token)) {
+        const skeleton = romanize(token);
+        if (skeleton && isUsefulToken(skeleton)) {
+          completing.add(skeleton);
+          completing.add(SKELETON_MARK + skeleton);
+        }
+      }
+    }
+  }
+
+  return { literal, lookup: [...lookup], origin, completing };
 }
 
 /** The distinct prefixes a candidate-vocabulary lookup needs. */
@@ -219,76 +323,130 @@ export interface ScoredProduct {
  * Score every product against the expanded query.
  *
  * `rows` is the index slice for the matched tokens — the caller fetched it in
- * one read. The score is the summed field weight of the tokens a product
- * matched, times how good each match was, and then:
+ * one read. Each typed word contributes the BEST match the product has for it
+ * (field weight × match quality), and then:
  *
  *   COVERAGE IS A MULTIPLIER, NOT A BONUS. A product matching two of the
  *   query's two words beats one matching one of them however heavily
  *   weighted — otherwise "bambu x2d" ranks every Bambu product above the X2D.
  *   That is the single most important line in this function.
+ *
+ * THE BEST MATCH PER WORD, NOT THE SUM. This summed every row a word reached,
+ * so a product was rewarded for how many ways it could be reached rather than
+ * how well: "plate" and its skeleton `plata` were both prefixes of "pl" and
+ * together outscored "pla" itself, which put a PEI plate above every PLA
+ * filament for «PL»; and a letter reaching "Hotend" and "Holder" in one name
+ * counted twice. One word typed, one contribution.
  */
 export function scoreProducts(
   expanded: ExpandedQuery,
   matchedTokens: ReadonlyMap<string, { score: number; from: string }>,
   rows: readonly IndexRow[]
 ): ScoredProduct[] {
-  const byProduct = new Map<string, { score: number; covered: Set<string> }>();
+  const byProduct = new Map<string, Map<string, number>>();
   for (const row of rows) {
     const match = matchedTokens.get(row.token);
     if (!match) continue;
-    let entry = byProduct.get(row.product_id);
-    if (!entry) {
-      entry = { score: 0, covered: new Set() };
-      byProduct.set(row.product_id, entry);
+    const value = row.weight * match.score;
+    if (!(value > 0)) continue;
+    let perWord = byProduct.get(row.product_id);
+    if (!perWord) {
+      perWord = new Map();
+      byProduct.set(row.product_id, perWord);
     }
-    entry.score += row.weight * match.score;
-    entry.covered.add(match.from);
+    if (value > (perWord.get(match.from) ?? 0)) perWord.set(match.from, value);
   }
 
   const wanted = Math.max(1, expanded.literal.length);
   const out: ScoredProduct[] = [];
-  for (const [product_id, entry] of byProduct) {
-    const coverage = Math.min(1, entry.covered.size / wanted);
-    out.push({ product_id, score: entry.score * (0.25 + 0.75 * coverage) * (coverage === 1 ? 1.6 : 1) });
+  for (const [product_id, perWord] of byProduct) {
+    let score = 0;
+    for (const v of perWord.values()) score += v;
+    const coverage = Math.min(1, perWord.size / wanted);
+    out.push({ product_id, score: score * (0.25 + 0.75 * coverage) * (coverage === 1 ? 1.6 : 1) });
   }
   out.sort((a, b) => b.score - a.score || a.product_id.localeCompare(b.product_id));
   return out;
 }
 
 /**
- * How many vocabulary tokens a ONE-CHARACTER term may resolve to.
- *
- * `bestMatches` defaults to five, which is right for a word: five completions
- * of "pla" is already more guessing than a shopper wants. A single letter is
- * not a word — it names a whole shelf, and five tokens is at most five
- * products, so «H» would answer with a handful of the catalogue's H-words
- * chosen by nothing the shopper can see. Forty is still a bounded set the
- * fuzzy pass runs over in the Worker, and it is scored and ranked like any
- * other; the `LIMIT` on the postings read is what actually caps the cost.
+ * How many vocabulary tokens a ONE-CHARACTER term may resolve to when the
+ * caller could not say how heavily each one is weighted (a unit test handing
+ * `resolveTokens` a bare word list). With weights, see `LETTER_MIN_WEIGHT`.
  */
 const ONE_CHAR_MATCHES = 40;
+
+/**
+ * WHICH WORDS A SINGLE LETTER MEANS: the ones the catalogue says out loud.
+ *
+ * «H» returned 115 products on a realistic catalogue and not one of the four
+ * named Hardened, Heatbed, Hotend and Holder. The letter used to keep the
+ * forty SHORTEST h-words, whatever field they came from, and a shop's
+ * descriptions are full of short h-words — "how", "has", "hot", "hub" — so the
+ * forty slots went to prose and the product names never made the cut. The
+ * candidate read already arrives weight-first; this used to throw that order
+ * away.
+ *
+ * So a letter matches the words that NAME things — a product name (10), a
+ * brand (8), a model or colour (6), a hashtag (5) — and every one of them, not
+ * the first forty: a letter names a shelf. Section names and descriptions are
+ * words ABOUT a product, and a letter is too little to go on to reach one.
+ * Only when no naming word starts with the letter at all do the rest get a
+ * look, so a letter that exists only in prose still answers something.
+ *
+ * `LETTER_MAX` is a sanity bound, not a ranking decision: the candidate read
+ * is capped at 2000 rows and the postings read at 4000.
+ */
+export const LETTER_MIN_WEIGHT = FIELD_WEIGHT.hashtag;
+const LETTER_MAX = 400;
 
 /**
  * Resolve each query token to the vocabulary tokens it should match.
  *
  * `vocabulary` is the bounded candidate set the prefix lookup returned, NOT
- * the whole index — that is what keeps the fuzzy pass affordable. The result
- * maps an index token to how good a match it is and WHICH query token it came
- * from, because coverage above counts distinct query words, not hits.
+ * the whole index — that is what keeps the fuzzy pass affordable. `weights` is
+ * the heaviest field weight each of those tokens carries anywhere in the
+ * index, which the prefix read returns for free; it decides which completions
+ * are worth keeping, so a word the shop NAMES outranks one it merely mentions.
+ *
+ * The result maps an index token to how good a match it is and WHICH typed
+ * word it serves, because coverage counts distinct typed words, not hits.
  */
 export function resolveTokens(
   expanded: ExpandedQuery,
-  vocabulary: readonly string[]
+  vocabulary: readonly string[],
+  weights?: ReadonlyMap<string, number>
 ): Map<string, { score: number; from: string }> {
   const out = new Map<string, { score: number; from: string }>();
   for (const queryToken of expanded.lookup) {
-    // Which ORIGINAL word this expansion serves, so a synonym and its literal
-    // do not count as two covered words.
-    const from = expanded.literal.find((l) => l === queryToken || romanize(l) === queryToken) ?? queryToken;
-    for (const match of bestMatches(queryToken, vocabulary, queryToken.length === 1 ? ONE_CHAR_MATCHES : undefined)) {
+    const from = expanded.origin.get(queryToken) ?? queryToken;
+    const matches =
+      [...queryToken].length === 1
+        ? letterMatches(queryToken, vocabulary, weights)
+        : bestMatches(queryToken, vocabulary, undefined, {
+            complete: expanded.completing.has(queryToken),
+            weights,
+          });
+    for (const match of matches) {
       const have = out.get(match.token);
       if (!have || match.score > have.score) out.set(match.token, { score: match.score, from });
     }
   }
   return out;
+}
+
+/** A one-character term as a prefix over the candidate vocabulary. */
+function letterMatches(letter: string, vocabulary: readonly string[], weights?: ReadonlyMap<string, number>): TokenMatch[] {
+  const ranked = (tokens: readonly string[]) =>
+    tokens
+      .map((token) => ({ token, score: prefixScore(letter, token) }))
+      .sort(
+        (a, b) =>
+          (weights?.get(b.token) ?? 1) * b.score - (weights?.get(a.token) ?? 1) * a.score ||
+          a.token.localeCompare(b.token)
+      );
+  const prefixed = vocabulary.filter((t) => t !== letter && t.startsWith(letter));
+  if (!weights) return ranked(prefixed).slice(0, ONE_CHAR_MATCHES);
+  const naming = prefixed.filter((t) => (weights.get(t) ?? 0) >= LETTER_MIN_WEIGHT);
+  return naming.length > 0 ? ranked(naming).slice(0, LETTER_MAX) : ranked(prefixed).slice(0, ONE_CHAR_MATCHES);
 }

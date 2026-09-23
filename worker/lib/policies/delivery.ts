@@ -18,8 +18,10 @@ import type { PolicyDocument } from './types';
  *   * The PRO / PREMIUM waiver, the approved-default-address condition and
  *     the subsidy ceiling are quoteShipping() in packages/shipping/src.
  *     Both thresholds are owner configuration and an admin benefit rule can
- *     replace them outright, so they are placeholders here rather than the
- *     75,000 / 150,000 that happen to be seeded today.
+ *     replace them outright, so they stay tokens here and ./facts.ts states
+ *     them once for every document — the figures the seeded benefit rules
+ *     apply (migration 0074). An admin edit of those rules is therefore a
+ *     re-publication: change the figure in ./facts.ts and bump the versions.
  *   * The cash-on-delivery tax in 3.22 is ADMIN-EDITABLE exactly like the
  *     delivery fees above: codTaxPerBlockIqd / codTaxBlockIqd are
  *     `admin_settings` rows in worker/lib/settings.ts, both published in
@@ -63,11 +65,20 @@ import type { PolicyDocument } from './types';
  *     text rather than show a customer a `{{TOKEN}}`. They are still authored
  *     below, and each one returns of its own accord the moment its value is
  *     written in and the version moves again.
+ *
+ * VERSION 4 — WHY IT MOVED. The archive keeps version 3 byte for byte.
+ *   * THE FACTS. worker/lib/policies/facts.ts now states `COMPETENT_COURT`, `GOVERNING_LAW_JURISDICTION`, `LEVONIS_SUPPORT_CONTACT`, `PREMIUM_FREE_DELIVERY_MIN_IQD`, `PRO_FREE_DELIVERY_MIN_IQD`,
+ *     so the clauses that carried them are published instead of withheld.
+ *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
+ *     by number, an article of this document that is itself withheld.
+ *   * NO REFERRAL WAIVER. 3.16 no longer lists "a referral" beside a
+ *     promotion as an exception to the customer paying delivery — a referral
+ *     earns the referred account nothing (rewards 10.4).
  */
 export const delivery: PolicyDocument = {
   key: 'delivery',
-  version: 3,
-  effective_at: '2026-01-01',
+  version: 4,
+  effective_at: '2026-09-23',
   title: {
     ar: 'سياسة التوصيل والشحن والرسوم',
     en: 'Delivery, Shipping and Fees Policy',
@@ -190,12 +201,12 @@ export const delivery: PolicyDocument = {
 - الأصل أن جميع كلف التوصيل على الزبون: أجرة المسافة الأخيرة، وأجرة الطريقة التي اختارها، وما يترتب على التحصيل النقدي من ضريبة، وكلفة إعادة التوصيل، وكلفة الإعادة عند الرفض بغير سبب معتبر.
 - كلفة إرجاع منتج معيب تُعالج في وثيقة الإرجاع والاستبدال، وأجرة الشحن في الإرجاع على الزبون وفق ما نصت عليه تلك الوثيقة.
 - لا يُفهم من عرض أجرة صفرية على طريقة الاستلام من المخزن أن التوصيل مجاني، بل أن لا مسافة أخيرة في تلك الطريقة أصلاً.
-- يُستثنى من أصل هذه المادة ما ورد في المادة 3.17 حصراً، وما يقرره المتجر من عرض ترويجي أو إحالة يظهر أثره في شاشة الدفع.
+- يُستثنى من أصل هذه المادة ما ورد في المادة 3.17 حصراً، وما يقرره المتجر من عرض ترويجي يظهر أثره في شاشة الدفع.
 
 ### 3.17 استثناء العضوية: PRO و LEVO PREMIUM
 - يتحمل المتجر كلف التوصيل عن العضو فوق قيمة طلب محددة، على التفصيل الآتي.
-- عضو LEVO PRO الفعّال: يتحمل المتجر عنه أجرة التوصيل إذا تجاوزت قيمة البضاعة المؤهلة الحدّ المعلن لعضويته وقدره {{PRO_FREE_DELIVERY_MIN_IQD}}، والتجاوز يكون بالزيادة حصراً فلا يكفي بلوغ الحدّ. ويشمل ما يتحمله المتجر عنه التوصيل الاعتيادي والتغليف المحمي.
-- عضو LEVO PREMIUM الفعّال: يتحمل المتجر عنه أجرة التوصيل الاعتيادية وحدها إذا تجاوزت قيمة البضاعة المؤهلة الحدّ المعلن لعضويته وقدره {{PREMIUM_FREE_DELIVERY_MIN_IQD}}، بالزيادة حصراً. ولا يمتد هذا الإعفاء إلى التغليف المحمي ولا إلى الرسوم الإضافية في المادة 3.20.
+- عضو LEVO PRO الفعّال: يتحمل المتجر عنه أجرة التوصيل إذا تجاوزت قيمة البضاعة المؤهلة الحدّ المعلن لعضويته وقدره {{PRO_FREE_DELIVERY_MIN_IQD}} دينار، والتجاوز يكون بالزيادة حصراً فلا يكفي بلوغ الحدّ. ويشمل ما يتحمله المتجر عنه التوصيل الاعتيادي والتغليف المحمي.
+- عضو LEVO PREMIUM الفعّال: يتحمل المتجر عنه أجرة التوصيل الاعتيادية وحدها إذا تجاوزت قيمة البضاعة المؤهلة الحدّ المعلن لعضويته وقدره {{PREMIUM_FREE_DELIVERY_MIN_IQD}} دينار، بالزيادة حصراً. ولا يمتد هذا الإعفاء إلى التغليف المحمي ولا إلى الرسوم الإضافية في المادة 3.20.
 - قيمة البضاعة المؤهلة تُحسب على البضاعة بعد الحسومات والقسائم والنقاط وقبل أجرة التوصيل، ولا تدخل فيها أجرة التوصيل نفسها.
 - إذا اجتمع في عضو وصفان، قُدّم حكم PRO لأنه الأوسع.
 - الإعفاء يسقط بانتهاء العضوية أو توقفها، ويعود بعودتها، ولا أثر رجعي له على طلب سابق.
@@ -373,7 +384,7 @@ export const delivery: PolicyDocument = {
 - ما ورد في هذه الوثيقة من أحكام التوصيل والأجور مقدَّم على ما ورد عرضاً في غيرها من الوثائق.
 - ما ورد في وثيقة الضمان ووثيقة الإرجاع والاستبدال من أحكام العيب والإرجاع مقدَّم على ما ورد عرضاً هنا.
 - تثبيت الطلب قبول بما في هذه الوثيقة بنسختها النافذة وقت التثبيت، والنسخة المحفوظة بتاريخها هي الحجة.
-- يسري على هذه الوثيقة قانون {{GOVERNING_LAW_JURISDICTION}}، وتختص بالنزاع الناشئ عنها {{COMPETENT_COURT}}.
+- تسري على هذه الوثيقة {{GOVERNING_LAW_JURISDICTION}}، والاختصاص بالنزاع الناشئ عنها ل{{COMPETENT_COURT}}.
 - للاستفسار والمطالبات: {{LEVONIS_SUPPORT_CONTACT}}.
 `,
     en: `## Delivery, Shipping and Fees Document — Article 3
@@ -492,12 +503,12 @@ The difference in period between air, land and sea is not a marketing choice; it
 - The principle is that all delivery costs are on the customer: the last-mile fee, the fee of the method they selected, the tax arising on cash collection, the cost of redelivery, and the cost of return where the parcel is refused without a recognised reason.
 - The cost of returning a defective product is dealt with in the Returns and Exchange Policy, and return shipping is on the customer as that document provides.
 - The display of a zero fee on warehouse pickup is not to be understood as delivery being free, but as there being no last mile in that method at all.
-- Excepted from the principle of this article is what is stated in article 3.17 exclusively, together with any promotion or referral the Store determines, the effect of which appears at checkout.
+- Excepted from the principle of this article is what is stated in article 3.17 exclusively, together with any promotion the Store determines, the effect of which appears at checkout.
 
 ### 3.17 The membership exception: PRO and LEVO PREMIUM
 - The Store bears the delivery costs of the member above a stated order value, on the following detail.
-- An active LEVO PRO member: the Store bears their delivery fee where the eligible merchandise value exceeds the declared threshold for their membership, being {{PRO_FREE_DELIVERY_MIN_IQD}}; the excess must be strictly above it, so reaching the threshold does not suffice. What the Store bears for them covers standard delivery and protected packing.
-- An active LEVO PREMIUM member: the Store bears their standard delivery fee alone where the eligible merchandise value exceeds the declared threshold for their membership, being {{PREMIUM_FREE_DELIVERY_MIN_IQD}}, strictly above. This waiver extends neither to protected packing nor to the additional charges in article 3.20.
+- An active LEVO PRO member: the Store bears their delivery fee where the eligible merchandise value exceeds the declared threshold for their membership, being {{PRO_FREE_DELIVERY_MIN_IQD}} IQD; the excess must be strictly above it, so reaching the threshold does not suffice. What the Store bears for them covers standard delivery and protected packing.
+- An active LEVO PREMIUM member: the Store bears their standard delivery fee alone where the eligible merchandise value exceeds the declared threshold for their membership, being {{PREMIUM_FREE_DELIVERY_MIN_IQD}} IQD, strictly above. This waiver extends neither to protected packing nor to the additional charges in article 3.20.
 - The eligible merchandise value is calculated on the merchandise after discounts, coupons and points and before the delivery fee, and does not include the delivery fee itself.
 - Where two descriptions meet in one member, the PRO provision prevails as the wider of the two.
 - The waiver lapses on the membership ending or being suspended and returns on its return, and has no retrospective effect on an earlier order.
@@ -675,7 +686,7 @@ The Store does not bear transit damage; it nevertheless does the following by wa
 - What is stated in this document as to delivery and charges prevails over what is stated incidentally in the other documents.
 - What is stated in the Warranty Policy and the Returns and Exchange Policy as to defects and returns prevails over what is stated incidentally here.
 - Placing an order is acceptance of what is in this document in the version in force at the time of placing it, and the archived version bearing its date is the authority.
-- This document is governed by the law of {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} has jurisdiction over any dispute arising from it.
+- This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} have jurisdiction over any dispute arising from it.
 - For enquiries and claims: {{LEVONIS_SUPPORT_CONTACT}}.
 `,
     ckb: `## بەڵگەنامەی گەیاندن و ناردن و کرێیەکان — بڕگەی 3
@@ -794,12 +805,12 @@ The Store does not bear transit damage; it nevertheless does the following by wa
 - بنەما ئەوەیە کە هەموو تێچووەکانی گەیاندن لەسەر کڕیارن: کرێی دوا مەودا، و کرێی ئەو ڕێگایەی هەڵیبژاردووە، و ئەو باجەی لە کۆکردنەوەی پارەی نەقدەوە دێت، و تێچووی دووبارە گەیاندن، و تێچووی گەڕاندنەوە لە کاتی ڕەتکردنەوە بەبێ هۆکارێکی دانپێدانراو.
 - تێچووی گەڕاندنەوەی بەرهەمێکی عەیبدار لە سیاسەتی گەڕاندنەوە و ئاڵوگۆڕدا چارەسەر دەکرێت، و کرێی ناردن لە گەڕاندنەوەدا لەسەر کڕیارە بەپێی ئەوەی ئەو بەڵگەنامەیە دەیڵێت.
 - لە پیشاندانی کرێی سفر لەسەر ڕێگای وەرگرتن لە کۆگا، نابێت تێبگەیەنرێت کە گەیاندن خۆڕاییە، بەڵکو ئەوەی لەو ڕێگایەدا لە بنەڕەتدا دوا مەودا نییە.
-- لە بنەمای ئەم بڕگەیە تەنها ئەوە جیا دەکرێتەوە کە لە بڕگەی 3.17دا هاتووە، و ئەو پێشکەشکردن یان ڕەوانەکردنەی فرۆشگا بڕیاری لەسەر دەدات و کاریگەرییەکەی لە شاشەی پارەداندا دەردەکەوێت.
+- لە بنەمای ئەم بڕگەیە تەنها ئەوە جیا دەکرێتەوە کە لە بڕگەی 3.17دا هاتووە، و ئەو پێشکەشکردنەی فرۆشگا بڕیاری لەسەر دەدات و کاریگەرییەکەی لە شاشەی پارەداندا دەردەکەوێت.
 
 ### 3.17 جیاکردنەوەی ئەندامێتی: PRO و LEVO PREMIUM
 - فرۆشگا تێچووەکانی گەیاندن لە جیاتی ئەندام دەگرێتە ئەستۆ سەروو بڕێکی دیاریکراوی داواکاری، بەم وردەکارییەی خوارەوە.
-- ئەندامی چالاکی LEVO PRO: فرۆشگا کرێی گەیاندنی لە ئەستۆ دەگرێت ئەگەر بەهای کاڵای شایستە لە سنووری ڕاگەیەنراوی ئەندامێتییەکەی تێپەڕی، کە {{PRO_FREE_DELIVERY_MIN_IQD}}ە، و تێپەڕاندن دەبێت بە زیادبوون بێت تەنها، بۆیە گەیشتن بە سنوورەکە بەس نییە. ئەوەی فرۆشگا لە جیاتی دەیگرێتە ئەستۆ، گەیاندنی ئاسایی و پێچانەوەی پارێزراو دەگرێتەوە.
-- ئەندامی چالاکی LEVO PREMIUM: فرۆشگا تەنها کرێی گەیاندنی ئاسایی لە ئەستۆ دەگرێت ئەگەر بەهای کاڵای شایستە لە سنووری ڕاگەیەنراوی ئەندامێتییەکەی تێپەڕی، کە {{PREMIUM_FREE_DELIVERY_MIN_IQD}}ە، بە زیادبوون تەنها. ئەم بەخشینە نە پێچانەوەی پارێزراو دەگرێتەوە و نە ئەو کرێیە زیادانەی لە بڕگەی 3.20دان.
+- ئەندامی چالاکی LEVO PRO: فرۆشگا کرێی گەیاندنی لە ئەستۆ دەگرێت ئەگەر بەهای کاڵای شایستە لە سنووری ڕاگەیەنراوی ئەندامێتییەکەی تێپەڕی، کە {{PRO_FREE_DELIVERY_MIN_IQD}} دینارە، و تێپەڕاندن دەبێت بە زیادبوون بێت تەنها، بۆیە گەیشتن بە سنوورەکە بەس نییە. ئەوەی فرۆشگا لە جیاتی دەیگرێتە ئەستۆ، گەیاندنی ئاسایی و پێچانەوەی پارێزراو دەگرێتەوە.
+- ئەندامی چالاکی LEVO PREMIUM: فرۆشگا تەنها کرێی گەیاندنی ئاسایی لە ئەستۆ دەگرێت ئەگەر بەهای کاڵای شایستە لە سنووری ڕاگەیەنراوی ئەندامێتییەکەی تێپەڕی، کە {{PREMIUM_FREE_DELIVERY_MIN_IQD}} دینارە، بە زیادبوون تەنها. ئەم بەخشینە نە پێچانەوەی پارێزراو دەگرێتەوە و نە ئەو کرێیە زیادانەی لە بڕگەی 3.20دان.
 - بەهای کاڵای شایستە لەسەر کاڵاکە دوای داشکاندن و کۆپۆن و خاڵەکان و پێش کرێی گەیاندن دەژمێردرێت، و کرێی گەیاندن خۆی تێیدا نییە.
 - ئەگەر لە ئەندامێکدا دوو وەسف کۆببوونەوە، یاسای PRO پێشخراوە چونکە فراوانترە.
 - بەخشینەکە بە کۆتاییهاتن یان ڕاگرتنی ئەندامێتییەکە دەڕوخێت و بە گەڕانەوەی دەگەڕێتەوە، و هیچ کاریگەرییەکی دواوەی نییە لەسەر داواکارییەکی پێشوو.
@@ -977,7 +988,7 @@ The Store does not bear transit damage; it nevertheless does the following by wa
 - ئەوەی لەم بەڵگەنامەیەدا لە یاساکانی گەیاندن و کرێیەکان هاتووە، پێش ئەوە دەخرێت کە بە لاوەکی لە بەڵگەنامەکانی دیکەدا هاتووە.
 - ئەوەی لە سیاسەتی گەرەنتی و سیاسەتی گەڕاندنەوە و ئاڵوگۆڕدا لە یاساکانی عەیب و گەڕاندنەوە هاتووە، پێش ئەوە دەخرێت کە بە لاوەکی لێرەدا هاتووە.
 - جێگیرکردنی داواکارییەکە پەسەندکردنی ئەوەیە کە لەم بەڵگەنامەیەدایە بەو وەشانەی لە کاتی جێگیرکردندا کاری پێدەکرێت، و ئەو وەشانە پارێزراوەی بەرواری لەسەرە بەڵگەیە.
-- ئەم بەڵگەنامەیە ملکەچی یاسای {{GOVERNING_LAW_JURISDICTION}}ە، و {{COMPETENT_COURT}} دەسەڵاتداری ئەو ناکۆکییەیە کە لێی دەخوڵقێت.
+- ئەم بەڵگەنامەیە ملکەچی {{GOVERNING_LAW_JURISDICTION}}ە، و {{COMPETENT_COURT}} دەسەڵاتداری ئەو ناکۆکییەیە کە لێی دەخوڵقێت.
 - بۆ پرسیار و داواکاری: {{LEVONIS_SUPPORT_CONTACT}}.
 `,
   },

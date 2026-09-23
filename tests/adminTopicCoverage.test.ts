@@ -416,7 +416,9 @@ test('TICKET PROMISE — a staff reply actually reaches the customer, in-app and
     );
     assert.ok(n, 'the in-app row exists — it is the floor the nudge rests on');
     assert.equal(n!.user_id, 'buyer', 'it goes to the person who opened the ticket, not the staff member');
-    assert.equal(n!.link, '/support');
+    // The ticket itself, not the page: /support opens on the assistant, and
+    // «افتح «تذاكري»» used to land the customer in the bot.
+    assert.equal(n!.link, '/support?tab=tickets&ticket=tkt_1');
     assert.match(n!.body_ar, /tkt_1/);
     assert.doesNotMatch(
       n!.body_ar,

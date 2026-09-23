@@ -27,8 +27,12 @@ import {
   depositAmountReview,
   flagWithdrawalForReconciliation,
   getWalletBreakdown,
+  getWalletDinarBreakdown,
+  getAvailableBalances,
   readWalletDust,
+  resolvePayoutChannel,
   walletIqdAvailable,
+  withdrawalReserveCents,
   getWithdrawal,
   markWithdrawalPaid,
   operationNumber,
@@ -42,6 +46,8 @@ import {
 import { getSetting } from '../lib/settings';
 import { notifyAdminTopic } from '../lib/telegramAdmin';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
+import { availableUsdSql, isConstraintAbort } from '../lib/walletOps';
+import { assertFinancialScope } from '../lib/walletAdjust';
 
 /**
  * Wallet API (integrated mandate §11.1–§11.4).
@@ -86,6 +92,13 @@ function withdrawalPublic(w: WithdrawalRow) {
     needs_reconciliation: w.needs_reconciliation === 1,
     destination: {
       kind: w.destination_kind,
+      /**
+       * The channel's NAME at filing (migration 0112) — «زين كاش», «استلام
+       * كاش» — or null for a request filed before it existed, which the
+       * screens resolve by id. The customer's row, the admin card and the
+       * Telegram line used to print `kind`, a raw id like «pm_1726…».
+       */
+      label: w.destination_label ?? null,
       account: w.destination_account,
       holder: w.destination_holder,
       note: w.destination_note,
@@ -103,6 +116,10 @@ function withdrawalPublic(w: WithdrawalRow) {
      */
     declared_amount_iqd: w.declared_amount_iqd ?? null,
     exchange_rate_snapshot: w.exchange_rate_snapshot ?? null,
+    /** Migration 0112 — the commission and the payout AS QUOTED, in the typed
+     *  dinars; null when the request recorded no corroborated dinar figure. */
+    fee_iqd: w.fee_iqd ?? null,
+    net_iqd: w.net_iqd ?? null,
     payout_reference: w.payout_reference || null,
     payout_at: w.payout_at,
     outcome_reason: w.outcome_reason || null,
@@ -110,6 +127,52 @@ function withdrawalPublic(w: WithdrawalRow) {
     created_at: w.created_at,
     updated_at: w.updated_at,
   };
+}
+
+const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+const dinar = (iqd: number) => `${iqd.toLocaleString('en-US')} د.ع`;
+
+/**
+ * THE LINE THE ADMIN GROUP READS WHEN A WITHDRAWAL IS FILED.
+ *
+ * DINARS FIRST, THE LEDGER IN BRACKETS — the register the deposit review card
+ * already uses («المبلغ: X د.ع (الدفتر: $Y)»). The amount gained its typed
+ * dinars with 0106; the commission and the net stayed dollars, so the group
+ * read «50,000 د.ع» and then «Commission: $1.07 … net $34.64» — a reviewer
+ * about to make a DINAR transfer handed a dollar figure to do it with. Since
+ * migration 0112 the request records the dinar commission and payout it
+ * quoted the customer, and those are what this line prints.
+ *
+ * AND THE CHANNEL BY NAME. «Destination: pm_1726…» was the raw id of an admin
+ * deposit method; the line now names the channel as the owner wrote it. The
+ * customer's account number stays OUT of a group chat that gets screenshotted
+ * — it is on the admin card, which is where a payout is made from.
+ *
+ * A request with no dinar testimony (typed in dollars, or a claim the server's
+ * rate did not corroborate) keeps the dollar line it always had: there is no
+ * dinar figure anybody typed to print.
+ */
+export function withdrawalAnnouncement(p: {
+  number: string;
+  user: string;
+  amountCents: number;
+  row: WithdrawalRow | null;
+  channelLabel: string;
+}): string {
+  const row = p.row;
+  const declared = row?.declared_amount_iqd ?? null;
+  const amountLine = declared ? `${dinar(declared)} (ledger ${usd(p.amountCents)})` : usd(p.amountCents);
+  let commissionLine = '';
+  if (row && row.fee_cents > 0) {
+    const feeIqd = row.fee_iqd ?? null;
+    const netIqd = row.net_iqd ?? null;
+    commissionLine =
+      declared && feeIqd !== null && netIqd !== null
+        ? `\nCommission: ${dinar(feeIqd)} (ledger ${usd(row.fee_cents)}) — deducted\nTo transfer: ${dinar(netIqd)} (ledger ${usd(row.net_cents)})`
+        : `\nCommission: ${usd(row.fee_cents)} (deducted) — net ${usd(row.net_cents)}`;
+  }
+  const destination = (row?.destination_label ?? '').trim() || p.channelLabel;
+  return `🏧 New withdrawal request (pending review — no transfer made)\nOperation: ${p.number}\nUser: ${p.user}\nAmount: ${amountLine}${commissionLine}\nDestination: ${destination}`;
 }
 
 /** Maps an engine result to an honest HTTP error (no invented success). */
@@ -250,6 +313,14 @@ walletRoutes.get('/', async (c) => {
    */
   const exchangeRate = Number(exchangeRateSetting) || 0;
   const balanceIqd = walletIqdAvailable(breakdown.usd_cents_available, dust.dust_iqd, exchangeRate);
+  /**
+   * AND THE OTHER FOUR FIGURES ON THE PAGE, THE SAME WAY. «إيداعات قيد
+   * المراجعة» read IQD 49,994 the moment a customer typed 50,000, and
+   * «الرصيد المسوّى» read 49,994 under a header saying 50,000 — the page
+   * converted each aggregate's cents. `getWalletDinarBreakdown` sums what the
+   * rows recorded instead (worker/lib/walletOps.ts has the rule per figure).
+   */
+  const dinars = await getWalletDinarBreakdown(c.env.DB, user.id, exchangeRate);
 
   return c.json({
     success: true,
@@ -264,6 +335,10 @@ walletRoutes.get('/', async (c) => {
       usd_cents_held: breakdown.usd_cents_held,
       usd_cents_available: breakdown.usd_cents_available,
       iqd_available: balanceIqd,
+      iqd_settled: dinars.iqd_settled,
+      iqd_held: dinars.iqd_held,
+      iqd_pending_deposits: dinars.iqd_pending_deposits,
+      iqd_pending_withdrawals: dinars.iqd_pending_withdrawals,
       usd_cents_pending_deposits: breakdown.usd_cents_pending_deposits,
       usd_cents_pending_withdrawals: breakdown.usd_cents_pending_withdrawals,
       points_settled: breakdown.points_settled,
@@ -457,10 +532,32 @@ walletRoutes.post('/withdrawals', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const amount = int(body.amount_usd_cents, 'amount_usd_cents', { min: 100, max: MAX_AMOUNT_CENTS });
   const note = str(body.note, 'note', { max: 500, required: false });
+  const kind = str(body.destinationKind, 'destinationKind', { max: 40, required: false }) || 'manual_transfer';
+  /**
+   * THE CHANNEL, RESOLVED HERE AND NOT TAKEN FROM THE BODY — «كي كارد،
+   * الرافدين، زين كاش، استلام كاش». The body names an id; its NAME and whether
+   * it needs the customer's account number come from the owner's own
+   * `payoutMethods` (worker/lib/settings.ts), so a client can neither invent a
+   * channel nor waive the account of one that needs it. The name is frozen
+   * onto the request (`destination_label`, migration 0112): the customer's
+   * row, the admin card and the Telegram line all printed a raw id before.
+   */
+  // Only the owner's current list: a channel removed in the admin editor is
+  // refused here, whatever a stale tab still offers.
+  const channel = resolvePayoutChannel(kind, await getSetting(c.env.DB, 'payoutMethods'));
+  if (!channel) {
+    throw badRequest('Choose one of the listed payout channels', 'UNKNOWN_PAYOUT_METHOD');
+  }
   // `accountNumber` is the pre-existing field name; it is accepted as the
   // destination account of a manual transfer so older clients keep working.
-  const account = str(body.destinationAccount ?? body.accountNumber, 'destinationAccount', { min: 3, max: 120 });
-  const kind = str(body.destinationKind, 'destinationKind', { max: 40, required: false }) || 'manual_transfer';
+  // «استلام كاش» needs none — the customer collects the cash — so for a
+  // channel the owner marked `requires_account: false` the account is
+  // optional; every other channel still refuses one under 3 characters.
+  const account = str(body.destinationAccount ?? body.accountNumber, 'destinationAccount', {
+    min: channel.requires_account ? 3 : 0,
+    max: 120,
+    required: channel.requires_account,
+  });
   const holder = str(body.destinationHolder, 'destinationHolder', { max: 120, required: false });
   const destinationNote = str(body.destinationNote, 'destinationNote', { max: 300, required: false });
   const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { max: 80, required: false });
@@ -496,12 +593,53 @@ walletRoutes.post('/withdrawals', async (c) => {
    * converts the cents instead. The withdrawal itself is never refused for it.
    */
   const exchangeRate = declaredAmountIqd ? Number(await getSetting(c.env.DB, 'exchangeRate')) || 0 : 0;
+  const eventKey = idempotencyKey ? `wd:${idempotencyKey}` : `wd:${newId('evt')}`;
+
+  /**
+   * THE WHOLE DISPLAYED BALANCE MAY BE WITHDRAWN. Two typed deposits of 25,000
+   * are 3,570 cents that read as 50,000 د.ع (0108); typing 50,000 back out
+   * floors to 3,571 cents, one more than the wallet holds, and the hold
+   * refused the customer's own balance. `withdrawalReserveCents` reserves the
+   * cents on hand instead — only when the typed dinars corroborate the cents
+   * sent AND are within the dinar balance — exactly as `walletSpendCents` caps
+   * a checkout. The typed claim is still what is recorded (`claimCents` tells
+   * the engine which cents it was converted to).
+   *
+   * A RETRY OF A CAPPED REQUEST must replay it, not collide with it: the same
+   * idempotency key is looked up first and, when it already reserved at or
+   * under what is asked now, that reservation is asked for again — so the
+   * engine answers "already filed" instead of "same key, different amount".
+   */
+  let reserveCents = amount;
+  if (declaredAmountIqd && exchangeRate > 0) {
+    const prior = await c.env.DB.prepare(
+      "SELECT amount_cents FROM wallet_holds WHERE user_id = ? AND kind = 'withdrawal' AND event_key = ?"
+    )
+      .bind(user.id, eventKey)
+      .first<{ amount_cents: number }>();
+    if (prior) {
+      if (prior.amount_cents > 0 && prior.amount_cents <= amount) reserveCents = prior.amount_cents;
+    } else {
+      const [available, dust] = await Promise.all([
+        getAvailableBalances(c.env, user.id),
+        readWalletDust(c.env.DB, user.id),
+      ]);
+      reserveCents = withdrawalReserveCents({
+        requestedCents: amount,
+        declaredIqd: declaredAmountIqd,
+        availableCents: available.usd_cents_available,
+        dustIqd: dust.dust_iqd,
+        exchangeRate,
+      });
+    }
+  }
 
   const res = await requestWithdrawal(c.env.DB, {
     userId: user.id,
-    amountCents: amount,
-    destination: { kind, account, holder, note: destinationNote },
-    eventKey: idempotencyKey ? `wd:${idempotencyKey}` : `wd:${newId('evt')}`,
+    amountCents: reserveCents,
+    claimCents: amount,
+    destination: { kind: channel.id, account, holder, note: destinationNote, label: channel.label },
+    eventKey,
     note,
     feeBps,
     declaredAmountIqd: declaredAmountIqd || undefined,
@@ -511,8 +649,9 @@ walletRoutes.post('/withdrawals', async (c) => {
 
   const row = await getWithdrawal(c.env.DB, res.id);
   await audit(c.env.DB, user.id, 'wallet.withdrawal.requested', res.id, {
-    amount_usd_cents: amount,
-    destination_kind: kind,
+    amount_usd_cents: reserveCents,
+    ...(reserveCents !== amount ? { requested_usd_cents: amount } : {}),
+    destination_kind: channel.id,
     replayed: res.replayed,
   });
   if (!res.replayed) {
@@ -536,19 +675,13 @@ walletRoutes.post('/withdrawals', async (c) => {
     announceAfterResponse(
       c,
       'wallet',
-      `🏧 New withdrawal request (pending review — no transfer made)\nOperation: ${operationNumber(res.id, 'WD')}\nUser: ${user.username || `#${user.id}`}\nAmount: ${
-        // The typed dinars FIRST when the request recorded them, with the
-        // ledger value named beside it — the register the deposit review card
-        // already uses («المبلغ: X د.ع (الدفتر: $Y)»). This line was dollars
-        // only, so it is gaining a figure, not swapping one.
-        row?.declared_amount_iqd
-          ? `${row.declared_amount_iqd.toLocaleString('en-US')} د.ع (ledger $${(amount / 100).toFixed(2)})`
-          : `$${(amount / 100).toFixed(2)}`
-      }${
-        row && row.fee_cents > 0
-          ? `\nCommission: $${(row.fee_cents / 100).toFixed(2)} (deducted) — net $${(row.net_cents / 100).toFixed(2)}`
-          : ''
-      }\nDestination: ${kind}`
+      withdrawalAnnouncement({
+        number: operationNumber(res.id, 'WD'),
+        user: user.username || `#${user.id}`,
+        amountCents: row?.amount_cents ?? reserveCents,
+        row,
+        channelLabel: channel.label,
+      })
     );
   }
   return c.json({
@@ -557,7 +690,7 @@ walletRoutes.post('/withdrawals', async (c) => {
     number: operationNumber(res.id, 'WD'),
     status: row?.state ?? 'requested',
     replayed: res.replayed,
-    quote: withdrawalFeeQuote(amount, feeBps),
+    quote: withdrawalFeeQuote(reserveCents, feeBps),
     withdrawal: row ? withdrawalPublic(row) : null,
   });
 });
@@ -678,6 +811,10 @@ walletRoutes.get('/admin/withdrawal-fee', requireAdmin, async (c) => {
 });
 
 walletRoutes.put('/admin/withdrawal-fee', requireAdmin, async (c) => {
+  // The commission is money taken from every payout: owner / financial scope
+  // only, as /api/admin/wallet/credit — an assistant admin could change it.
+  assertFinancialScope(c);
+  await rateLimit(c, 'admin-withdrawal-fee', 20, 3600);
   const admin = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
   const feeBps = int(body.fee_bps, 'fee_bps', { min: 0, max: MAX_WITHDRAWAL_FEE_BPS });
@@ -975,6 +1112,11 @@ walletRoutes.post('/admin/deposits/:id/reject', requireAdmin, async (c) => {
  * double click cannot credit twice.
  */
 walletRoutes.post('/admin/transactions/:id/adjustment', requireAdmin, async (c) => {
+  // It MINTS or REMOVES money: financial scope and a per-admin rate limit, the
+  // guards /api/admin/wallet/credit carries. It had only `requireAdmin`, so an
+  // assistant admin could credit any member who had one USD row.
+  assertFinancialScope(c);
+  await rateLimit(c, 'admin-wallet-adjustment', 30, 3600);
   const admin = c.get('user')!;
   const originalId = c.req.param('id') ?? '';
   const body = await c.req.json().catch(() => ({}));
@@ -1006,8 +1148,13 @@ walletRoutes.post('/admin/transactions/:id/adjustment', requireAdmin, async (c) 
   const txId = newId('wtx');
   const statements = [
     c.env.DB.prepare(
+      // A DEBIT carries the spendable-balance guard (`usdSpendStatement`'s
+      // CASE): one the balance does not cover writes -1, CHECK (amount > 0)
+      // aborts the batch, and the wallet can no longer be pushed negative.
       `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at, decided_by)
-       VALUES (?1, ?2, ?3, 'USD', ?4, 'approved', ?5, ?6, 'admin', strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?7)`
+       SELECT ?1, ?2, ?3, 'USD',
+         ${direction === 'debit' ? `CASE WHEN ${availableUsdSql('?2')} >= ?4 THEN ?4 ELSE -1 END` : '?4'},
+         'approved', ?5, ?6, 'admin', strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?7`
     ).bind(
       txId,
       original.user_id,
@@ -1025,7 +1172,19 @@ walletRoutes.post('/admin/transactions/:id/adjustment', requireAdmin, async (c) 
   ];
   try {
     await c.env.DB.batch(statements);
-  } catch {
+  } catch (e) {
+    if (!isConstraintAbort(e)) throw e;
+    // Either a concurrent submit won the (original, key) slot — a replay — or
+    // the debit guard fired.
+    const raced = await c.env.DB.prepare(
+      'SELECT id, adjustment_tx_id FROM wallet_adjustments WHERE original_tx_id = ? AND event_key = ?'
+    )
+      .bind(originalId, eventKey)
+      .first<{ id: string; adjustment_tx_id: string }>();
+    if (raced) return c.json({ success: true, id: raced.id, tx_id: raced.adjustment_tx_id, replayed: true });
+    if (direction === 'debit') {
+      throw conflict("The debit exceeds the member's available balance", 'INSUFFICIENT_BALANCE');
+    }
     throw conflict('This adjustment key was already used for this operation');
   }
   await audit(c.env.DB, admin.id, 'wallet.adjustment', originalId, { direction, amount, reason, tx_id: txId });

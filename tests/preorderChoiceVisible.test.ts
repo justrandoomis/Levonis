@@ -280,3 +280,50 @@ test('«نفد» is a SHELF verdict and never appears on a pre-order pill', asyn
   assert.equal(pre(availByValue.get('v_combo')), null, 'and a pre-order is never told how many are on the shelf');
   assert.equal(direct(null), null, 'untracked is still not a number, and is emphatically not zero');
 });
+
+/**
+ * THE PAGE-LEVEL GATE IS NOT ENOUGH ON ITS OWN. While the buyer holds the
+ * direct-sale A1 Combo, the page IS in direct sale — and a sibling model that
+ * is sold only by pre-order, with 0 stored on its option row, would still wear
+ * «نفد» on its pill. Each pill now asks its OWN model whether it sells direct.
+ */
+test('a pre-order-only model beside a direct one never wears «نفد», even while the page is on direct sale', async () => {
+  const raw = seedA1();
+  raw.exec(`
+    INSERT INTO product_option_values
+      (id,product_id,group_id,name_en,name_ar,sort,active,stock,availability_type,variant_key,variant_label) VALUES
+      ('v_pre','p_a1','g','A1 Mini','A1 ميني',2,1,0,'','a1-mini','A1 Mini');
+    INSERT INTO product_option_fulfillment (id,product_id,option_id,fulfillment_type,enabled,capacity) VALUES
+      ('f_pre_p','p_a1','v_pre','pre_order',1,NULL);
+    INSERT INTO product_option_transports (id,product_id,fulfillment_id,method,enabled,surcharge_iqd) VALUES
+      ('t_pre_land','p_a1','f_pre_p','land',1,25000);
+  `);
+  const app = shopApp(asD1(raw));
+  const detail = await json(await get(app, '/api/products/a1'));
+  const options = detail.product.options as Array<{ id: string; fulfillments?: unknown[]; availability_type?: string }>;
+  const mini = options.find((o) => o.id === 'v_pre');
+  const combo = options.find((o) => o.id === 'v_combo');
+  assert.ok(mini && combo, 'both models reach the page');
+  assert.equal(detail.initial_selection?.fulfillment_type, 'direct_sale', 'the page opens on direct sale');
+
+  const page = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
+  const m = /const optionSellsDirect = \([^)]*\): boolean => \{\n([\s\S]*?)\n {2}\};/.exec(page);
+  assert.ok(m, 'optionSellsDirect is a single arrow helper in src/pages/Product.tsx');
+  const sellsDirect = new Function(`return function (opt) {\n${m[1]}\n};`)() as (o: unknown) => boolean;
+  assert.equal(sellsDirect(mini), false, 'the pre-order-only model has no shelf to judge');
+  assert.equal(sellsDirect(combo), true, 'the direct model still does');
+  assert.equal(sellsDirect({ id: 'legacy', availability_type: 'pre_order' }), false, 'legacy pre-order option');
+  assert.equal(sellsDirect({ id: 'legacy', availability_type: '' }), true, 'legacy inherit option is unchanged');
+  assert.equal(
+    sellsDirect({ id: 'x', fulfillments: [{ fulfillment_type: 'direct_sale', enabled: false }, { fulfillment_type: 'pre_order', enabled: true }] }),
+    false,
+    'a disabled direct cell is not a direct sale'
+  );
+
+  // Every option/model pill that prints a shelf chip goes through that gate,
+  // and the «طلب مسبق» button of the legacy chooser never prints one.
+  const chipSites = page.match(/const chip = [^;]*?levelChip\(availByValue\.get\((?:value|opt)\.id\)\)/g) ?? [];
+  assert.equal(chipSites.length, 3, 'three option/model pill sites');
+  for (const site of chipSites) assert.match(site, /optionSellsDirect\((?:option|opt)\)/, site);
+  assert.match(page, /const chip = isPre \|\| !optionSellsDirect\(opt\)/);
+});

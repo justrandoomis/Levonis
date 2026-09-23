@@ -392,7 +392,10 @@ test('the window is mounted after an order, a request and a ticket — and nowhe
 
   // Checkout: inside the `placedOrder` success branch, so it cannot exist
   // before the order does.
-  assert.match(checkout, /<ChannelNudge context="order" active \/>/);
+  // Activated once the order celebration has finished moving, so its channel
+  // read does not land on the same frames as the character's entrance.
+  assert.match(checkout, /<ChannelNudge context="order" active=\{celebrated\} \/>/);
+  assert.match(checkout, /if \(!placedOrder\) return;\s*const timer = window\.setTimeout\(\(\) => setCelebrated\(true\), CELEBRATION_MOTION_MS\);/);
   const successBranch = checkout.indexOf('if (placedOrder) {');
   assert.ok(successBranch > 0);
   assert.ok(checkout.indexOf('<ChannelNudge context="order"') > successBranch);

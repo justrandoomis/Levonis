@@ -15,9 +15,11 @@ import { isMascotHiddenRoute } from './MotionCharacterAnchor';
 import { POSES, type Pose } from './character/expressions';
 import { isTravelWorthAnimating, planTravel, sampleTravel, type TravelFrame, type TravelPlan, type TravelSample } from './character/travel';
 import {
-  CHARACTER_CANVAS, bootstrapCharacterFrame, characterLayout, characterTransform, layoutViewport,
-  measureCharacterAnchor, setCharacterRenderFailed, visibleViewport, type CharacterFrame,
+  CHARACTER_CANVAS, appearsInsteadOfTravelling, bootstrapCharacterFrame, characterLayout, characterTransform, layoutViewport,
+  measureCharacterAnchor, setCharacterBooting, setCharacterRenderFailed, visibleViewport,
+  type AnchorKind, type CharacterAnchor, type CharacterFrame,
 } from './anchors';
+import { ENTRANCE_ORIGIN, playEntrance } from './character/entrance';
 export { signalBloub } from './events';
 export { measureHomeTarget } from './anchors';
 
@@ -110,19 +112,18 @@ class CharacterBoundary extends React.Component<{ children: React.ReactNode; onF
 
 type Phase = 'loading' | 'travelling' | 'docked' | 'hidden';
 
+/**
+ * A journey is only ever between two ORDINARY docks. A stage is never the end
+ * of one — nor the start — because a stage is appeared at rather than flown
+ * to (`appearsInsteadOfTravelling` in anchors.ts, and `appear` below). The
+ * journey used to carry a `stage` flag so a descent onto the order
+ * confirmation could celebrate when it landed; that descent is exactly what
+ * the owner rejected, so the flag went with it.
+ */
 interface Journey {
   plan: TravelPlan;
   startedAt: number;
   boot: boolean;
-  /**
-   * TRUE WHEN THE DESTINATION IS A STAGE, carried on the journey because by
-   * the time it lands the anchor that started it may not be the one
-   * `measureCharacterAnchor()` would answer with any more. A stage exists to
-   * be reacted to — the order-confirmation panel raises one — so the arrival
-   * plays `celebrate` rather than the 320ms `arrival` punctuation a route
-   * change gets. See `mascot.navigationComplete`.
-   */
-  stage: boolean;
 }
 
 /**
@@ -153,6 +154,10 @@ export default function AppIntro({ ready }: { ready: boolean }) {
   const [pageVisible, setPageVisible] = React.useState(() => typeof document === 'undefined' || !document.hidden);
 
   const character = React.useRef<HTMLDivElement>(null);
+  /** The wrapper the entrances animate — never the node above, whose
+   *  `transform` is the character's position and has exactly one writer. */
+  const pose = React.useRef<HTMLDivElement>(null);
+  const entrance = React.useRef<Animation | null>(null);
   const handle = React.useRef<CharacterHandle>(null);
   const frameRef = React.useRef<CharacterFrame>(centerFrame());
   const journeyRef = React.useRef<Journey | null>(null);
@@ -231,6 +236,19 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     return () => setCharacterRenderFailed(false);
   }, [failed]);
 
+  /**
+   * AND WHETHER IT IS THE BOOT LOADER RIGHT NOW. While it is, a `route` busy
+   * wait is the character's to show — the overlay stands down rather than
+   * drawing a spinner over it (see `booting` in anchors.ts). Not while the
+   * route hides the character: the admin panel shows no intro at all, and a
+   * wait there must still get an indicator.
+   */
+  const routeHidden = isMascotHiddenRoute(location.pathname);
+  React.useLayoutEffect(() => {
+    setCharacterBooting(!failed && phase === 'loading' && !routeHidden);
+  }, [failed, phase, routeHidden]);
+  React.useLayoutEffect(() => () => setCharacterBooting(false), []);
+
   // The expression the controller has selected, noted the moment it changes so
   // the engine can blend out of the previous one. `sequence` is part of the
   // key: two errors in a row are two reactions, and the second must replay.
@@ -259,6 +277,13 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     let rafId = 0;
     let animateNext = false;
     let occupied: HTMLElement | null = null;
+    /**
+     * The KIND of the dock the character last committed to. Sticky on
+     * purpose: when the confirmation stage unmounts, `occupied` is cleared the
+     * moment its element leaves the document, and the next dock must still be
+     * able to tell that it is being arrived at FROM a stage.
+     */
+    let occupiedKind: AnchorKind | null = null;
     let observed: HTMLElement | null = null;
     let running = false;
     const epoch = performance.now();
@@ -309,7 +334,8 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     let viewportSize = layoutViewport();
     const refreshViewport = () => { viewportSize = layoutViewport(); };
 
-    const occupy = (element: HTMLElement | null) => {
+    const occupy = (element: HTMLElement | null, kind?: AnchorKind) => {
+      if (element && kind) occupiedKind = kind;
       if (occupied === element) return;
       occupied?.removeAttribute('data-bloub-occupied');
       occupied = element;
@@ -317,10 +343,9 @@ export default function AppIntro({ ready }: { ready: boolean }) {
     };
 
     const finishJourney = () => {
-      const landed = journeyRef.current;
       journeyRef.current = null;
       setPhase('docked');
-      mascot.navigationComplete(landed?.stage ? 'stage' : 'route');
+      mascot.navigationComplete();
       // Any sub-journey drift the anchor accumulated while the character was
       // in the air is applied now, at rest, where a few pixels are invisible.
       // Applying it mid-flight would have meant replacing the plan, and
@@ -479,6 +504,27 @@ export default function AppIntro({ ready }: { ready: boolean }) {
      * browser is asked before `writeFrame` below, and before this pass writes
      * anything either: reads first, then writes, in that order, always.
      */
+    /**
+     * ARRIVING WITHOUT A JOURNEY — the only way the character reaches a stage
+     * or leaves one (`appearsInsteadOfTravelling`).
+     *
+     * One write of the destination frame, then an entrance played on the pose
+     * wrapper by the compositor: transform and opacity, nothing that can be
+     * held up by the main thread that is at this very moment unmounting a
+     * checkout and mounting its confirmation. Landing on a stage is what the
+     * stage was raised for, so it celebrates (`navigationComplete('stage')`);
+     * landing back on a dock is ordinary punctuation.
+     */
+    const appear = (target: CharacterAnchor & { frame: CharacterFrame }) => {
+      journeyRef.current = null;
+      writeFrame(target.frame);
+      setPhase('docked');
+      mascot.activity('anchor-travel', null);
+      const stage = target.kind === 'stage';
+      if (!document.hidden) entrance.current = playEntrance(pose.current, stage ? 'stage' : 'dock', reducedRef.current, entrance.current);
+      mascot.navigationComplete(stage ? 'stage' : 'route');
+    };
+
     const measure = () => {
       const animate = animateNext;
       animateNext = false;
@@ -494,7 +540,17 @@ export default function AppIntro({ ready }: { ready: boolean }) {
           if (centre) { noticed.x = centre.x; noticed.y = centre.y; }
         }
       }
-      if (occupied && !occupied.isConnected) occupy(null);
+      if (occupied && !occupied.isConnected) {
+        // THE STAGE WENT AWAY — the customer left the confirmation. It is not
+        // left standing where the stage used to be, on top of whatever page
+        // comes next, while that page's own dock is still loading: it goes,
+        // and `appear` brings it back on the next dock.
+        if (occupiedKind === 'stage') {
+          journeyRef.current = null;
+          setPhase('hidden');
+        }
+        occupy(null);
+      }
       const target = measureCharacterAnchor();
       if (observed !== (target?.element ?? null)) {
         if (observed) resizeObserver?.unobserve(observed);
@@ -573,7 +629,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
         // journey — a first dock would plan a 0.34s wind-up and a cross-screen
         // travel, and a mascot barging into a page the viewer has been reading
         // for ten seconds is worse than one that was merely late.
-        occupy(target.element);
+        occupy(target.element, target.kind);
         writeFrame(target.frame);
         journeyRef.current = null;
         completedRef.current = true;
@@ -583,7 +639,18 @@ export default function AppIntro({ ready }: { ready: boolean }) {
         return;
       }
       waitingSince = 0;
-      occupy(target.element);
+      const previous = occupied;
+      const previousKind = occupiedKind;
+      occupy(target.element, target.kind);
+
+      // A STAGE IS APPEARED AT. Decided before anything below can plan a
+      // journey, and only when the DOCK changed: a stage that merely scrolled
+      // is re-positioned by the ordinary path, never popped again.
+      if (target.element !== previous && appearsInsteadOfTravelling(previousKind, target.kind)) {
+        completedRef.current = true;
+        appear(target);
+        return;
+      }
 
       const next = target.frame;
       const last = frameRef.current;
@@ -620,11 +687,7 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       // replaces only the destination, so it still lands, on the new anchor.
       // A route change (animate) is a genuinely new intention and still plans.
       if (inFlight && !animate) {
-        // Retargeting keeps the clock and replaces the destination — so it
-        // must also replace what that destination is WORTH. A journey
-        // retargeted onto the confirmation stage still celebrates when it
-        // lands; one retargeted off it no longer does.
-        journeyRef.current = { ...inFlight, plan: retargetTravel(inFlight.plan, next), stage: target.kind === 'stage' };
+        journeyRef.current = { ...inFlight, plan: retargetTravel(inFlight.plan, next) };
         return;
       }
 
@@ -646,16 +709,9 @@ export default function AppIntro({ ready }: { ready: boolean }) {
         next.x + next.size / 2 - last.x - last.size / 2,
         next.y + next.size / 2 - last.y - last.size / 2,
       );
-      journeyRef.current = { plan, startedAt: performance.now(), boot, stage: target.kind === 'stage' };
+      journeyRef.current = { plan, startedAt: performance.now(), boot };
       setPhase('travelling');
-      // Arriving on a stage is not navigation. The page that raised it says
-      // what the character should feel there (the confirmation panel signals
-      // `celebrate`), so the journey itself stays unlabelled rather than
-      // announcing a page change that is not happening.
-      mascot.activity(
-        'anchor-travel',
-        target.kind === 'stage' ? null : target.kind === 'bottom-home' ? 'returning' : 'navigating'
-      );
+      mascot.activity('anchor-travel', target.kind === 'bottom-home' ? 'returning' : 'navigating');
       start();
     };
 
@@ -800,6 +856,8 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       window.clearTimeout(settleTimer);
       measurePending = false;
       journeyRef.current = null;
+      entrance.current?.cancel();
+      entrance.current = null;
       mascot.activity('anchor-loading', null);
       mascot.activity('anchor-travel', null);
       occupied?.removeAttribute('data-bloub-occupied');
@@ -857,9 +915,11 @@ export default function AppIntro({ ready }: { ready: boolean }) {
       <div className="lv-app-intro__veil" aria-hidden="true" />
       <div ref={character} className="lv-app-intro__character"
         style={{ width: CHARACTER_CANVAS, height: CHARACTER_CANVAS }}>
-        <CharacterBoundary onFailure={() => setFailed(true)}>
-          <BloubHome ref={handle} state={expression.state} reduced={reduced} className="h-full w-full" />
-        </CharacterBoundary>
+        <div ref={pose} className="lv-app-intro__pose" style={{ transformOrigin: ENTRANCE_ORIGIN }}>
+          <CharacterBoundary onFailure={() => setFailed(true)}>
+            <BloubHome ref={handle} state={expression.state} reduced={reduced} className="h-full w-full" />
+          </CharacterBoundary>
+        </div>
       </div>
       {!failed && phase === 'loading' ? <span className="sr-only">{loc('جارٍ تجهيز Levonis…', 'Preparing Levonis…', 'Levonis ئامادە دەکرێت…')}</span> : null}
     </div>

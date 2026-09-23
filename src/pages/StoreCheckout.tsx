@@ -1,4 +1,5 @@
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
+import OrderCelebration from '../components/bloub/OrderCelebration';
 /**
  * Checkout for a MERCHANT-STORE cart — /store-checkout on both apps.
  *
@@ -26,6 +27,7 @@ import { useFreshOnReturn } from '../lib/useFreshOnReturn';
 import AddressForm from '../components/address/AddressForm';
 import { useStore } from '../StoreContext';
 import { useBusy } from '../lib/busy';
+import { mascot } from '../lib/mascot';
 
 export default function StoreCheckout() {
   const { loc, dir } = useLanguage();
@@ -57,25 +59,54 @@ export default function StoreCheckout() {
   const [placeError, setPlaceError] = useState('');
   const [done, setDone] = useState<string | null>(null);
 
+  /**
+   * THE RE-QUOTE HAD NO WAIT AT ALL, AND «تأكيد الطلب» STAYED LIVE THROUGH IT.
+   *
+   * Applying or removing a coupon, and the refresh on return, all re-price
+   * the cart through `loadQuote` — and nothing marked the request in flight.
+   * The Place button was enabled on the OLD quote, and `place()` sends the
+   * `coupon` state, which only changes once the new quote lands: a customer
+   * could confirm the total on screen while the server was about to price a
+   * different one. Now the request is a state. While it is out, Place and the
+   * coupon buttons are refused, and a re-quote the CUSTOMER asked for (the
+   * coupon controls — never the silent refresh, which polls while the tab is
+   * open) holds the screen as a `quote` wait, the same rule the platform
+   * checkout follows.
+   *
+   * The sequence number is the other half: a refresh that set off before a
+   * coupon was applied and answers after it must not put the old total back.
+   */
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteAskedFor, setQuoteAskedFor] = useState(false);
+  const quoteSeq = useRef(0);
+  useBusy(quoteLoading && quote !== null && quoteAskedFor, 'quote');
+
   // One key per visit: refreshing mints a new one, retrying does not.
   const idemKey = useRef(`sc-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`);
 
   const loadQuote = useCallback(
-    async (code: string) => {
+    async (code: string, askedFor = false) => {
+      const seq = ++quoteSeq.current;
+      setQuoteLoading(true);
+      setQuoteAskedFor(askedFor);
       setCouponError('');
       try {
         const d = await storeCheckoutApi.quote(code);
+        if (seq !== quoteSeq.current) return false;
         setQuote(d.quote);
         setCoupon(code);
         setQuoteError('');
         return true;
       } catch (e) {
+        if (seq !== quoteSeq.current) return false;
         if (e instanceof ApiError && e.code === 'COUPON_INVALID') {
           setCouponError(loc('هذا الكود غير صالح لهذا الطلب', 'This code cannot be used on this order', 'ئەم کۆدە بەکارناهێت'));
           return false;
         }
         setQuoteError(e instanceof ApiError ? e.message : loc('تعذّر تسعير السلة', 'Could not price the cart', 'نەتوانرا'));
         return false;
+      } finally {
+        if (seq === quoteSeq.current) setQuoteLoading(false);
       }
     },
     [loc]
@@ -97,19 +128,25 @@ export default function StoreCheckout() {
   // screen, for the same reason the platform checkout is: the total on the
   // button is the number they are about to agree to, and a shop that changed
   // a price while the tab sat open must not be held to the old one. The
-  // coupon in force is carried through, and nothing runs mid-submit.
+  // coupon in force is carried through, and nothing runs mid-submit — nor
+  // while a quote is already out: the refresh would take the newest sequence
+  // number with the OLD coupon and silently discard the one being applied.
   const couponRef = useRef('');
   couponRef.current = coupon;
+  const quoteLoadingRef = useRef(false);
+  quoteLoadingRef.current = quoteLoading;
   useFreshOnReturn(async () => {
+    if (quoteLoadingRef.current) return;
     await loadQuote(couponRef.current);
   }, {
-    enabled: !placing,
+    enabled: !placing && !quoteLoading,
     minIntervalMs: 8_000,
     pollWhileVisibleMs: 60_000,
   });
 
   async function place() {
-    if (!addressId || !quote) return;
+    // `quoteLoading` too: the total on the button is about to change.
+    if (!addressId || !quote || quoteLoading) return;
     setPlacing(true);
     setPlaceError('');
     try {
@@ -119,6 +156,9 @@ export default function StoreCheckout() {
         ...(coupon ? { couponCode: coupon } : {}),
       });
       setDone(String((r.order as Record<string, unknown>).id));
+      // The same moment the platform checkout names: the order went through.
+      // The confirmation below raises the stage the character appears on.
+      mascot.outcome('ordered');
     } catch (e) {
       if (e instanceof ApiError && e.code === 'INSUFFICIENT_FUNDS') {
         setPlaceError(
@@ -166,8 +206,12 @@ export default function StoreCheckout() {
     return (
       <div className="h-full min-h-0 overflow-y-auto bg-canvas flex items-center justify-center px-6">
         <div className="text-center max-w-sm">
-          <div className="w-14 h-14 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
-            <Check className="w-7 h-7 text-success" />
+          {/* The same success moment as the platform checkout: the character
+              appears on this stage and celebrates, with the burst behind it
+              (src/components/bloub/OrderCelebration.tsx). It replaces a static
+              green tick — the heading below still says it in words. */}
+          <div className="mb-6 flex items-center justify-center">
+            <OrderCelebration />
           </div>
           <h1 className="text-white font-bold text-[17px] mb-1.5">
             {loc('تم استلام طلبك', 'Your order is in', 'داواکاریەکەت وەرگیرا')}
@@ -358,8 +402,9 @@ export default function StoreCheckout() {
                   <button
                     onClick={() => {
                       setCouponInput('');
-                      loadQuote('');
+                      loadQuote('', true);
                     }}
+                    disabled={quoteLoading}
                     className="text-zinc-500 text-[11.5px] font-bold"
                   >
                     {loc('إزالة', 'Remove', 'لابردن')}
@@ -380,8 +425,8 @@ export default function StoreCheckout() {
                     className="lv-input flex-1 min-w-0 text-[13px] font-mono"
                   />
                   <button
-                    onClick={() => couponInput.trim() && loadQuote(couponInput.trim())}
-                    disabled={!couponInput.trim()}
+                    onClick={() => couponInput.trim() && loadQuote(couponInput.trim(), true)}
+                    disabled={!couponInput.trim() || quoteLoading}
                     className="lv-button lv-button-secondary text-[12.5px]"
                   >
                     {loc('تطبيق', 'Apply', 'جێبەجێ')}
@@ -441,10 +486,11 @@ export default function StoreCheckout() {
                 after it. */}
             <button
               onClick={place}
-              disabled={placing || !addressId || !quote.wallet_covers}
+              disabled={placing || quoteLoading || !addressId || !quote.wallet_covers}
+              aria-busy={placing || quoteLoading}
               className="lv-button lv-button-primary w-full min-h-12 text-[14px]"
             >
-              {placing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              {placing || quoteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               {loc('تأكيد الطلب', 'Place the order', 'دووپاتکردنەوە')}
               <span dir="ltr">· {iqd(quote.total_iqd)}</span>
             </button>

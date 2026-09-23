@@ -14,11 +14,12 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ShieldCheck, Barcode, RefreshCw, Printer, FileText, Eye, AlertTriangle, Check, Copy,
+  ShieldCheck, Barcode, RefreshCw, Printer, FileText, Eye, AlertTriangle, Check, Copy, History,
 } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { openWarrantyDoc, popupBlockedMessage } from './printDoc';
+import UnitHistory from './UnitHistory';
 
 export interface WarrantyUnitRow {
   id: string;
@@ -72,7 +73,13 @@ const STR = {
   ar: {
     title: 'الضمان والأرقام التسلسلية',
     subtitle: 'وصل ضمان مستقل لكل جهاز، مربوط برقمه التسلسلي.',
-    none: 'لا توجد وحدات قابلة للضمان في هذا الطلب. تُنشأ الوحدات من حدث التسليم للمنتجات المُرقّمة.',
+    none: 'لا توجد وحدات قابلة للضمان في هذا الطلب. تُنشأ الوحدات عند تسليم الطلب للمنتجات المُرقّمة (الطابعات).',
+    // A delivered order with no units is an order delivered before the courier
+    // door created them (Al-Waseet / cron). One click creates them now.
+    noneDelivered: 'الطلب مُسلَّم لكن لم تُنشأ وحدات أجهزته بعد (طلب سُلِّم قبل أن يُنشئها التسليم عبر شركة التوصيل). أنشئها الآن ليبدأ ضمانها من تاريخ التسليم ويستطيع الزبون ربطها.',
+    backfill: 'إنشاء الوحدات',
+    backfilling: 'جارٍ الإنشاء…',
+    backfillNone: 'لا يحتوي هذا الطلب على منتجات مُرقّمة (طابعات) — لا وحدات لإنشائها.',
     unit: 'وحدة',
     serial: 'الرقم التسلسلي',
     serialPlaceholder: 'أدخل الرقم كما هو على ملصق الجهاز',
@@ -122,11 +129,18 @@ const STR = {
     shorterConfirm: 'نعم، قصّر التغطية',
     carriedEnd: 'وحدة بديلة تحمل تاريخ نهاية الجهاز الأصلي — عدّل ضمان الوحدة الأصلية.',
     cancel: 'إلغاء',
+    delivered: 'التسليم',
+    history: 'سجل التعديلات',
+    hideHistory: 'إخفاء السجل',
   },
   en: {
     title: 'Warranty & Serial Numbers',
     subtitle: 'One warranty receipt per device, tied to its serial number.',
-    none: 'This order has no warranty-eligible units. Units are created from the delivery event for serialized products.',
+    none: 'This order has no warranty-eligible units. Units are created when the order is delivered, for serialized products (printers).',
+    noneDelivered: 'The order is delivered but its device units were never created (it was delivered before courier deliveries created them). Create them now so the warranty starts from the delivery date and the customer can link the device.',
+    backfill: 'Create units',
+    backfilling: 'Creating…',
+    backfillNone: 'This order has no serialized products (printers) — there are no units to create.',
     unit: 'Unit',
     serial: 'Serial number',
     serialPlaceholder: 'Enter it exactly as printed on the device',
@@ -176,6 +190,9 @@ const STR = {
     shorterConfirm: 'Yes, shorten the coverage',
     carriedEnd: 'A replacement unit carrying the original device’s end date — change the original unit’s warranty instead.',
     cancel: 'Cancel',
+    delivered: 'Delivered',
+    history: 'Change history',
+    hideHistory: 'Hide history',
   },
 };
 
@@ -209,12 +226,17 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
   const [durationFor, setDurationFor] = useState<string | null>(null);
   const [duration, setDuration] = useState({ base: '', ext: '', reason: '', shorter: false });
   const [durationNote, setDurationNote] = useState('');
+  // «مَن غيّر ومتى»: the per-unit history, open per row, refetched after every
+  // reload of the section so a change just saved appears in it at once.
+  const [historyOpen, setHistoryOpen] = useState<Record<string, boolean>>({});
+  const [historyTick, setHistoryTick] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get<OrderWarrantyResponse>(`/api/admin/warranties/orders/${orderId}`);
       setData(res);
+      setHistoryTick((n) => n + 1);
       setDrafts((prev) => {
         const next = { ...prev };
         for (const u of res.units) {
@@ -240,6 +262,27 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // A delivered order with no units (delivered through the courier before the
+  // courier door created them): the same idempotent backfill AdminSerials
+  // offers, one click from where the admin noticed it.
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillNone, setBackfillNone] = useState(false);
+  const backfillUnits = async () => {
+    setBackfilling(true);
+    try {
+      const res = await api.post<{ serialized_items: number; created: number }>(
+        `/api/devices/admin/orders/${orderId}/units/backfill`
+      );
+      if (!res.serialized_items) setBackfillNone(true);
+      setErr(null);
+      await load();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setBackfilling(false);
+    }
+  };
 
   const setDraft = (unitId: string, patch: Partial<{ serial: string; months: string; start: string }>) =>
     setDrafts((d) => ({ ...d, [unitId]: { ...d[unitId], ...patch } }));
@@ -408,7 +451,23 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
       {loading && !data ? (
         <p className="text-zinc-500 text-[13px]">{t.loading}</p>
       ) : !data || data.units.length === 0 ? (
-        <p className="text-zinc-500 text-[13px]">{t.none}</p>
+        data && data.order.status === 'delivered' && data.order.delivered_at ? (
+          <div className="space-y-2">
+            <p className="text-zinc-400 text-[13px]">{backfillNone ? t.backfillNone : t.noneDelivered}</p>
+            {!backfillNone && (
+              <button
+                type="button"
+                onClick={() => void backfillUnits()}
+                disabled={backfilling}
+                className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[12px] font-bold text-emerald-300 disabled:opacity-50"
+              >
+                {backfilling ? t.backfilling : t.backfill}
+              </button>
+            )}
+          </div>
+        ) : (
+          <p className="text-zinc-500 text-[13px]">{t.none}</p>
+        )
       ) : (
         <>
           {data.order.status === 'cancelled' && !data.order.delivered_at && (
@@ -554,7 +613,16 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                         {u.open_claims} {t.openClaims}
                       </span>
                     )}
-                    <span className="text-zinc-500">
+                    {/* The whole window, not only its end: the delivery it was
+                        measured from and the day it started — which differ
+                        for a replacement unit or a corrected delivery. The
+                        start used to appear only as the draft input before a
+                        receipt existed, and vanished once one did. */}
+                    <span className="text-zinc-500" data-warranty-window={u.id}>
+                      {t.delivered}: <span className="text-zinc-300" dir="ltr">{dateInput(u.delivered_at) || '—'}</span>
+                      {' · '}
+                      {t.start}: <span className="text-zinc-300" dir="ltr">{dateInput(u.warranty_start_at) || '—'}</span>
+                      {' · '}
                       {t.months}: <span className="text-zinc-300" dir="ltr">{u.months ?? '—'}</span>
                       {' · '}
                       {t.end}: <span className="text-zinc-300" dir="ltr">{dateInput(u.warranty_end_at) || '—'}</span>
@@ -573,7 +641,23 @@ export default function WarrantySection({ orderId }: { orderId: string }) {
                         </button>
                       )
                     )}
+                    <button
+                      type="button"
+                      onClick={() => setHistoryOpen((h) => ({ ...h, [u.id]: !h[u.id] }))}
+                      aria-expanded={!!historyOpen[u.id]}
+                      data-warranty-history-toggle={u.id}
+                      className="inline-flex items-center gap-1 text-zinc-400 hover:text-white underline underline-offset-2"
+                    >
+                      <History className="w-3 h-3" aria-hidden />
+                      {historyOpen[u.id] ? t.hideHistory : t.history}
+                    </button>
                   </div>
+
+                  {historyOpen[u.id] && (
+                    <div className="mt-2">
+                      <UnitHistory unitId={u.id} lang={lang} refreshKey={historyTick} />
+                    </div>
+                  )}
 
                   {durationFor === u.id && (
                     <div className="mt-2 rounded-xl border border-zinc-700 bg-zinc-900/70 p-3 space-y-2">

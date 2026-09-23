@@ -404,6 +404,9 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'print_analyses.orientation_key': 'which orientation was measured, e.g. z-up',
   'print_analyses.file_sha256': 'the content hash of the analysed model, not its location',
   'wallet_deposit_meta.attachment_fingerprint': 'a hash used to detect a re-used receipt image, not its key',
+  // Migration 0110. Classified in the same change as the column: left unknown,
+  // it would refuse the WHOLE guarded sweep (see `verifyMediaCoverage`).
+  'chat_messages.attachment_kind': "'image' | 'video' | 'audio' | 'file' — what `file_key` holds, not a key",
 
   // -- the game. every *_key here names a game asset, not an R2 object ------
   'farm_achievements.key': 'the achievement id',

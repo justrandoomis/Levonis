@@ -51,6 +51,9 @@ export interface GramsPrinterOption {
   manufacturer: string;
   model: string;
   materials: string[];
+  /** The Worker's label for "prices a grams job with no stated time the same"
+   *  (`printerPriceSignature`). Read only to tell the customer so. */
+  untimed_price_group?: string;
 }
 export interface GramsFilamentOption {
   id: string;
@@ -72,6 +75,15 @@ interface FormRow {
 }
 
 const MAX_ROWS = 8;
+
+/** What was PRICED, apart from the printer — read from the server's echo, so
+ *  a comparison is shown only between two answers to the same job. */
+export const pricedJob = (r: Pick<GramsQuoteResponse, 'rows' | 'print_minutes' | 'accessories'>): string =>
+  JSON.stringify([
+    r.rows.map((x) => [x.material_id, x.grams, x.color_hex]),
+    r.print_minutes,
+    (r.accessories ?? []).map((a) => [a.id, a.qty]),
+  ]);
 const newRow = (materialId: string, colorHex = '#D9D9D9'): FormRow => ({
   key: `r${Math.random().toString(36).slice(2, 9)}`,
   materialId,
@@ -100,6 +112,16 @@ export default function GramsQuotePanel({
   const [error, setError] = useState('');
   const [result, setResult] = useState<GramsQuoteResponse | null>(null);
   /**
+   * «مهما اخترت الطابعة لا يغير من حساب السعر» — the same answer the file door
+   * gives (src/pages/Tools.tsx). A printer change on a priced job prices it
+   * again straight away and keeps the previous printer's figure beside the
+   * new one, so the customer compares two numbers the engine produced instead
+   * of a number and a memory. Any other change to the job drops the
+   * comparison: it is only ever the same job on two machines.
+   */
+  const [comparison, setComparison] = useState<{ name: string; price: number; job: string } | null>(null);
+  const [autoRecalc, setAutoRecalc] = useState(false);
+  /**
    * The hardware catalogue and the customer's picks. Fetched once, and a
    * failure is SILENT on purpose: the accessories are an addition to this
    * screen, not its subject, and a shop whose weight calculator refuses to
@@ -110,6 +132,11 @@ export default function GramsQuotePanel({
   const [accessoryRows, setAccessoryRows] = useState<AccessoryRow[]>([]);
 
   const printer = printers.find((p) => p.id === printerId) ?? printers[0] ?? null;
+  const statedMinutes = knowsTime ? Math.round((Number(hours) || 0) * 60 + (Number(minutes) || 0)) : 0;
+  const printerCannotMovePrice =
+    statedMinutes === 0 &&
+    printers.length > 1 &&
+    printers.every((p) => !!p.untimed_price_group && p.untimed_price_group === printers[0].untimed_price_group);
 
   /**
    * Only the filaments this machine can run. A printer that cannot take ABS is
@@ -151,6 +178,8 @@ export default function GramsQuotePanel({
     if (rows.every((r) => allowed.has(r.materialId))) return;
     setRows((current) => current.map((r) => (allowed.has(r.materialId) ? r : { ...r, materialId: defaultMaterialId })));
     setResult(null);
+    // The material changed with the printer: no longer the same job.
+    setComparison(null);
   }, [usable, rows, defaultMaterialId]);
 
   /** Any change to the inputs invalidates the answer — a price that stays on
@@ -158,6 +187,8 @@ export default function GramsQuotePanel({
   const invalidate = useCallback(() => {
     setResult(null);
     setError('');
+    setComparison(null);
+    setAutoRecalc(false);
   }, []);
 
   const patchRow = (key: string, patch: Partial<FormRow>) => {
@@ -229,6 +260,15 @@ export default function GramsQuotePanel({
     }
   }, [printer, effectiveRows, knowsTime, hours, minutes, accessoryRows, loc]);
 
+  useEffect(() => {
+    if (!autoRecalc || busy || !printer) return;
+    // Wait for a material the new machine cannot run to be swapped (above).
+    const allowed = new Set(usable.map((m) => m.id));
+    if (!effectiveRows.every((r) => allowed.has(r.materialId))) return;
+    setAutoRecalc(false);
+    void submit();
+  }, [autoRecalc, busy, printer, usable, effectiveRows, submit]);
+
   const t = {
     lead: loc(
       'تعرف كم غرام تحتاج؟ اكتب الوزن واللون — أو أكثر من لون — ونعطيك تقديرًا بدون ملف.',
@@ -292,8 +332,13 @@ export default function GramsQuotePanel({
             value={printer?.id ?? ''}
             disabled={busy || !printers.length}
             onChange={(e) => {
+              const priced = result && result.quote.confidence !== 'insufficient' && printer ? result : null;
               setPrinterId(e.target.value);
               invalidate();
+              if (priced && printer) {
+                setComparison({ name: `${printer.manufacturer} ${printer.model}`, price: priced.quote.price_iqd, job: pricedJob(priced) });
+                setAutoRecalc(true);
+              }
             }}
             className="max-w-[16rem] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[13px] leading-snug focus:outline-none focus:border-[#BAA369] disabled:opacity-40 transition-colors truncate"
           >
@@ -304,6 +349,20 @@ export default function GramsQuotePanel({
             ))}
           </select>
         </div>
+        {/* «مهما اخترت الطابعة لا يغير من حساب السعر» — and with no print
+            time, on this door, it genuinely cannot: no machine hour is billed,
+            so every printer the Worker puts in one `untimed_price_group` quotes
+            the same dinar. Said beside the select, before the customer goes
+            looking for a difference that is not there — and only when it is
+            true of every printer offered. */}
+        {printerCannotMovePrice && (
+          <p className="px-4 py-2.5 text-[11px] leading-relaxed text-zinc-500" data-grams-printer-untimed>
+            {loc(
+              'بدون زمن الطباعة لا تغيّر الطابعة هذا السعر: يُحسب ثمن المادة والتجهيز فقط. اذكر زمن الطباعة ليدخل وقت الطابعة في الحساب.',
+              'Without a print time the printer does not change this price: only the material and handling are priced. Give the print time to have machine time counted.'
+            )}
+          </p>
+        )}
       </section>
 
       {/* -------------------------------------------- the rows: «بلون واحد أو أكثر» */}
@@ -545,6 +604,13 @@ export default function GramsQuotePanel({
           {result.quote.range_iqd.high > result.quote.range_iqd.low && (
             <p className="text-zinc-400 text-[12px] leading-snug mt-1 tabular-nums" dir="ltr">
               {t.range}: {money(result.quote.range_iqd.low)} – {money(result.quote.range_iqd.high)}
+            </p>
+          )}
+          {comparison && comparison.job === pricedJob(result) && (
+            <p className="text-zinc-400 text-[12px] leading-snug mt-2" dir="auto" data-grams-price-comparison>
+              {comparison.price === result.quote.price_iqd
+                ? loc(`السعر نفسه مع ${comparison.name}.`, `The same price as on ${comparison.name}.`, `${comparison.name}: ${money(comparison.price)}`)
+                : loc(`مع ${comparison.name}: ${money(comparison.price)}`, `On ${comparison.name}: ${money(comparison.price)}`, `${comparison.name}: ${money(comparison.price)}`)}
             </p>
           )}
 

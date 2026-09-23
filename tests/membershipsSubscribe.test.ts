@@ -22,7 +22,7 @@ import { walletSpendCents } from '../worker/lib/walletOps';
 import { classifyHost } from '../worker/lib/hosts';
 import { membershipsRoutes } from '../worker/routes/memberships';
 import { subscriptionRoutes } from '../worker/routes/subscription';
-import { validateCoupon } from '../worker/lib/membershipOps';
+import { addMonths, validateCoupon } from '../worker/lib/membershipOps';
 import type { Env } from '../worker/lib/types';
 
 const RATE = 1400; // the shipped exchangeRate default: IQD per USD
@@ -124,13 +124,122 @@ test('/plans reports the conditional gifts and the delivery thresholds from sett
   body = await json(await a.request('/api/memberships/plans'));
   assert.deepEqual(body.features, { printer_gift: false, preorder_gift: false });
 
-  // Configured properly, both are live — and the page may say so.
+  // Configured properly, the pre-order gift is live — and the page may say so.
+  // The printer gift is NOT, whatever its switch says: it is granted by hand
+  // now (nothing calls grantPrinterGiftIfEligible), so advertising it on the
+  // card would promise something no code gives.
   raw.exec(`INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('preorderGiftConfig','{"enabled":true,"product_id":"p1","label_ar":"بكرة","qty":1}')`);
   raw.exec(`INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('printerGiftConfig','{"enabled":true,"plan_id":"plus_1mo","milestone":"delivered"}')`);
   raw.exec(`INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('shippingPolicy','{"pro_threshold_iqd":80000}')`);
   body = await json(await a.request('/api/memberships/plans'));
-  assert.deepEqual(body.features, { printer_gift: true, preorder_gift: true });
+  assert.deepEqual(body.features, { printer_gift: false, preorder_gift: true });
   assert.deepEqual(body.delivery, { pro_threshold_iqd: 80000, prime_threshold_iqd: 150000 }, 'a partial policy keeps the shipped default');
+});
+
+/**
+ * D1 REFUSES MORE THAN 100 BOUND PARAMETERS; node:sqlite ALLOWS 999. A
+ * statement built with one `?` per row passes every test here and fails in
+ * production at 101 (tests/d1ParameterCeilings.test.ts). This adapter holds
+ * the suite to the production ceiling.
+ */
+class CeilingD1 extends SqliteD1 {
+  override prepare(sql: string) {
+    const stmt = super.prepare(sql);
+    const bind = stmt.bind.bind(stmt);
+    stmt.bind = (...values: unknown[]) => {
+      if (values.length > 100) throw new Error(`D1_ERROR: too many SQL variables (${values.length})`);
+      return bind(...values);
+    };
+    return stmt;
+  }
+}
+
+function seedCatalogue(raw: DatabaseSync, printers: number) {
+  raw.exec(`
+    INSERT INTO catalogs (id,parent_id,slug,name_ar,name_en,is_printer_catalog) VALUES
+      ('sb_printers',NULL,'sb-printers','الطابعات','Printers',1),
+      ('sb_filament',NULL,'sb-filament','الفلمنت','Filament',0);
+  `);
+  const product = raw.prepare(
+    `INSERT INTO products (id,slug,name,name_ar,price_iqd,status,stock,options,colors,selling_type,sale_types,preorder_transports,images,category_id,sub_category_id)
+     VALUES (?,?,?,?,?,?,20,'[]','[]','direct_sale','["direct_sale"]','[]','[]',?,NULL)`
+  );
+  const rule = raw.prepare(
+    `INSERT INTO membership_benefit_rules (id,tier,benefit_type,scope,product_id,discount_mode,percent,fixed_iqd,max_discount_iqd,cap_scope,enabled,priority,label)
+     VALUES (?,?,'product_discount','product',?,?,?,?,?,?,1,0,?)`
+  );
+  for (let i = 0; i < printers; i++) {
+    product.run(`pp${i}`, `sb-printer-${i}`, `Printer Model ${i}`, `طابعة موديل ${i}`, 1_000_000, 'active', 'sb_printers');
+    rule.run(`r-pro-p${i}`, 'pro', `pp${i}`, 'percent', 10, null, 100000, 'per_unit', `PRO on printer ${i}`);
+    rule.run(`r-prime-p${i}`, 'prime', `pp${i}`, 'fixed', null, 25000, null, null, null);
+  }
+  // Filament: two products share one offer, a third has its own.
+  for (const [id, pct] of [['pf1', 5], ['pf2', 5], ['pf3', 7]] as const) {
+    product.run(id, `sb-${id}`, `Filament ${id}`, `فلمنت ${id}`, 25_000, 'active', 'sb_filament');
+    rule.run(`r-pro-${id}`, 'pro', id, 'percent', pct, null, null, null, null);
+  }
+  // A product filed under no section, and one that is not for sale.
+  product.run('loose', 'sb-loose', 'Loose Nozzle', 'فوهة مفردة', 10_000, 'active', null);
+  rule.run('r-pro-loose', 'pro', 'loose', 'percent', 3, null, null, null, null);
+  product.run('hid', 'sb-hid', 'Hidden Printer', 'طابعة مخفية', 1_000_000, 'hidden', 'sb_printers');
+  rule.run('r-pro-hid', 'pro', 'hid', 'percent', 50, null, null, null, null);
+}
+
+test('/plans states a product discount on its section — never per product, never with a product name — and answers past the D1 bind ceiling', async () => {
+  const { raw } = setup();
+  seedCatalogue(raw, 150);
+  const res = await app(new CeilingD1(raw) as unknown as D1Database, null).request('/api/memberships/plans');
+  assert.equal(res.status, 200, 'a store with 150 per-product rules can still open the subscription page');
+  const text = await res.text();
+  assert.equal(/Printer Model|طابعة موديل|Filament pf|فلمنت pf|Loose Nozzle|Hidden Printer/.test(text), false, 'no product name leaves the server');
+  const benefits = (JSON.parse(text) as { benefits: Record<string, { discounts: Array<Record<string, unknown>> }> }).benefits;
+
+  const pro = benefits.pro.discounts;
+  const printers = pro.filter((d) => d.target_id === 'sb_printers');
+  assert.equal(printers.length, 1, '150 identical per-printer rules are one line');
+  assert.equal(printers[0].scope, 'category');
+  assert.equal(printers[0].target_name_ar, 'الطابعات');
+  assert.equal(printers[0].percent, 10);
+  assert.equal(printers[0].max_discount_iqd, 100000);
+  assert.equal(printers[0].cap_scope, 'per_unit');
+  assert.equal(printers[0].product_count, 150, 'the hidden printer is not counted — nobody can buy it');
+  assert.equal(printers[0].label, null, 'a per-product label does not speak for 150 products');
+
+  const filament = pro.filter((d) => d.target_id === 'sb_filament').map((d) => [d.percent, d.product_count]);
+  assert.deepEqual(filament, [[5, 2], [7, 1]]);
+  const loose = pro.filter((d) => d.target_id === null);
+  assert.deepEqual(loose.map((d) => [d.scope, d.percent, d.target_name_ar]), [['category', 3, '']]);
+  assert.equal(pro.some((d) => d.percent === 50), false, 'the hidden product\'s rule promises nothing');
+
+  const premium = benefits.prime.discounts;
+  assert.equal(premium.length, 1);
+  assert.equal(premium[0].discount_mode, 'fixed');
+  assert.equal(premium[0].fixed_iqd, 25000);
+  assert.equal(premium[0].target_name_ar, 'الطابعات');
+});
+
+test('/plans advertises the delivery rule the checkout would choose — priority, then id — not the last one in row order', async () => {
+  const { db, raw } = setup();
+  raw.exec(`
+    INSERT INTO membership_benefit_rules (id,tier,benefit_type,scope,free_shipping_threshold_iqd,shipping_methods,enabled,priority,label) VALUES
+      ('fs-a','pro','free_shipping','global',50000,'["standard","personal"]',1,5,'high'),
+      ('fs-b','pro','free_shipping','global',60000,'["standard"]',1,1,'low, but written last');
+  `);
+  const body = await json(await app(db, null).request('/api/memberships/plans'));
+  const fs = (body.benefits as Record<string, Record<string, Record<string, unknown>>>).pro.free_shipping;
+  assert.equal(fs.rule_id, 'fs-a');
+  assert.equal(fs.threshold_iqd, 50000);
+
+  // The checkout's own selector over the same rows says the same thing.
+  const { resolveOrderBenefits, activeBenefitRules } = await import('../worker/lib/membershipBenefits');
+  const order = resolveOrderBenefits({
+    rules: await activeBenefitRules(db),
+    status: { tier: 'pro', active: true, expires_at: null, pending_launch: null, gated_benefits: [] },
+    shippingBasisIqd: 55000,
+    deliveryMethod: 'personal',
+    nowIso: new Date().toISOString(),
+  });
+  assert.equal(order.shipping.rule_id, 'fs-a');
 });
 
 // ------------------------------------------------------- a plain purchase
@@ -307,32 +416,154 @@ test('PREMIUM → PLUS is a downgrade and is refused', async () => {
   assert.match(String(r.error), /PLUS/);
 });
 
-// --------------------------------------------------------------- pre-launch
+// ------------------------------------------------------------ the launch
 
-test('before the launch a purchase is reserved at full price and a lower tier cannot sit under a prepaid higher one', async () => {
-  const { db, raw } = setup(false);
+/**
+ * «الموقع يعمل — اجعل البطاقات والاشتراكات تعمل». A database nobody has ever
+ * configured is the one the owner's live site had: no launchConfig row, and a
+ * code default that said "not launched", so every card was sold as a
+ * reservation that granted nothing. This runs every migration and writes NO
+ * setting of its own — exactly that database, after this deploy.
+ */
+function setupFresh() {
+  const raw = new DatabaseSync(':memory:');
+  raw.exec('PRAGMA foreign_keys = ON;');
+  const dir = join(ROOT, 'migrations');
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) {
+    raw.exec(readFileSync(join(dir, f), 'utf8'));
+  }
+  raw.exec("INSERT INTO users (id,name,email,password_hash) VALUES ('u1','Sara','s@x.co','h'), ('boss','Admin','ad@x.co','h')");
+  return { raw, db: new SqliteD1(raw) as unknown as D1Database };
+}
+
+test('on a fresh database the site is live: /plans says so, the quote starts now, and a purchase runs for its full duration', async () => {
+  const { db, raw } = setupFresh();
+  const stored = raw.prepare("SELECT value FROM admin_settings WHERE key = 'launchConfig'").get() as { value: string };
+  assert.equal(JSON.parse(stored.value).activated, true, 'migration 0109 writes the launch as activated');
+
+  const plans = await json(await app(db, null).request('/api/memberships/plans'));
+  assert.equal((plans.launch as Record<string, unknown>).activated, true);
+
   seedBalance(raw, 'u1', 1_000_000);
   const a = app(db, 'u1');
-  const b = await json(await subscribe(a, 'prime_12mo', 'pre-prime-0001'));
-  assert.equal((b.membership as Record<string, unknown>).state, 'prepaid_pending_launch');
-  assert.equal(b.credit_iqd, 0);
-
-  const again = await json(await subscribe(a, 'prime_12mo', 'pre-prime-0002'));
-  assert.equal(again.code, 'ALREADY_PREPAID');
-  const lower = await json(await subscribe(a, 'plus_12mo', 'pre-plus-0001'));
-  assert.equal(lower.code, 'DOWNGRADE_BLOCKED');
-
-  // The quote for a higher tier says it will be reserved — and that it
-  // REPLACES the PREMIUM reservation, crediting its whole value: one
-  // reservation per account, never two waiting for the launch.
-  const q = (await json(await a.request('/api/memberships/quote?planId=pro_12mo'))).quote as Record<string, unknown>;
+  const q = (await json(await a.request('/api/memberships/quote?planId=prime_12mo'))).quote as Record<string, unknown>;
   assert.equal(q.ok, true);
-  assert.equal(q.activate_now, false);
-  assert.equal(q.expires_at, null);
-  assert.equal(q.upgrade_from_tier, 'prime');
-  assert.equal(q.credit_iqd, 99000);
-  assert.equal(q.charge_iqd, 400000);
-  assert.deepEqual(q.pending_tiers, [], 'kept for pages loaded before the rule — always empty now');
+  assert.equal(q.activate_now, true, 'nothing is reserved any more');
+  assert.equal(typeof q.expires_at, 'string');
+
+  const before = new Date().toISOString();
+  const b = await json(await subscribe(a, 'prime_12mo', 'live-prime-0001'));
+  const m = b.membership as Record<string, unknown>;
+  assert.equal(m.state, 'active');
+  assert.ok(String(m.starts_at) >= before, 'the clock starts at the purchase');
+  assert.equal(m.expires_at, addMonths(String(m.starts_at), 12), 'and runs the whole twelve months');
+
+  const mine = await json(await a.request('/api/memberships/mine'));
+  const status = mine.status as Record<string, unknown>;
+  assert.equal(status.active, true);
+  assert.equal(status.tier, 'prime', 'the benefit exists the moment the card is bought');
+  assert.equal(status.pending_launch, null);
+});
+
+test('with no launch setting stored at all, the code default is live too', async () => {
+  const { db, raw } = setupFresh();
+  raw.exec("DELETE FROM admin_settings WHERE key = 'launchConfig'");
+  seedBalance(raw, 'u1', 1_000_000);
+  const a = app(db, 'u1');
+  assert.equal(((await json(await a.request('/api/memberships/plans'))).launch as Record<string, unknown>).activated, true);
+  const q = (await json(await a.request('/api/memberships/quote?planId=plus_12mo'))).quote as Record<string, unknown>;
+  assert.equal(q.activate_now, true);
+  const b = await json(await subscribe(a, 'plus_12mo', 'nodefault-0001'));
+  assert.equal((b.membership as Record<string, unknown>).state, 'active');
+});
+
+test('migration 0109 turns an unlaunched store live, keeps a launched one exactly as it was, and can run twice', () => {
+  const run = (seed: string | null) => {
+    const raw = new DatabaseSync(':memory:');
+    const dir = join(ROOT, 'migrations');
+    const files = readdirSync(dir).filter((x) => x.endsWith('.sql')).sort();
+    const live = files.find((f) => f.startsWith('0109_'))!;
+    for (const f of files) if (f < live) raw.exec(readFileSync(join(dir, f), 'utf8'));
+    if (seed !== null) raw.prepare("INSERT INTO admin_settings (key, value) VALUES ('launchConfig', ?)").run(seed);
+    const sql = readFileSync(join(dir, live), 'utf8');
+    raw.exec(sql);
+    raw.exec(sql);
+    return JSON.parse((raw.prepare("SELECT value FROM admin_settings WHERE key = 'launchConfig'").get() as { value: string }).value);
+  };
+  const none = run(null);
+  assert.equal(none.activated, true);
+  assert.match(String(none.activated_at), /^\d{4}-\d{2}-\d{2}T/);
+
+  const off = run('{"launch_at":"2026-08-01T00:00:00.000Z","activated":false,"activated_at":null}');
+  assert.equal(off.activated, true, 'the owner\'s live store is live');
+  assert.equal(off.launch_at, '2026-08-01T00:00:00.000Z', 'an announced date is kept');
+  assert.match(String(off.activated_at), /^\d{4}-/);
+
+  const on = run('{"launch_at":"2026-01-01T00:00:00.000Z","activated":true,"activated_at":"2026-01-02T00:00:00.000Z"}');
+  assert.deepEqual(on, { launch_at: '2026-01-01T00:00:00.000Z', activated: true, activated_at: '2026-01-02T00:00:00.000Z' });
+});
+
+test('a reservation left from before the launch starts the first time its account is read — now, not backdated — and supersedes a lower running row', async () => {
+  const { db, raw } = setup(false);
+  raw.exec(`
+    INSERT INTO memberships (id, user_id, plan_id, tier, state, duration_months, price_paid_iqd, starts_at, expires_at, source) VALUES
+      ('legacy_plus', 'u1', 'plus_12mo', 'plus', 'active', 12, 0, '2026-01-01T00:00:00.000Z', '2099-01-01T00:00:00.000Z', 'migrated'),
+      ('res_prime', 'u1', 'prime_12mo', 'prime', 'prepaid_pending_launch', 12, 99000, NULL, NULL, 'purchase');
+  `);
+  const a = app(db, 'u1');
+  // Before the launch the reservation waits — the gate still means what it says.
+  let status = (await json(await a.request('/api/memberships/mine'))).status as Record<string, unknown>;
+  assert.equal(status.tier, 'plus');
+  assert.deepEqual(status.pending_launch, { tier: 'prime', duration_months: 12 });
+
+  // The launch was recorded months ago; nobody pressed the sweep since.
+  raw.exec(`INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('launchConfig','{"launch_at":"2026-01-01T00:00:00.000Z","activated":true,"activated_at":"2026-01-01T00:00:00.000Z"}')`);
+  const before = new Date().toISOString();
+  status = (await json(await a.request('/api/memberships/mine'))).status as Record<string, unknown>;
+  assert.equal(status.active, true);
+  assert.equal(status.tier, 'prime', 'what was paid for is what the account now holds');
+  assert.equal(status.pending_launch, null);
+
+  const byId = Object.fromEntries(rows(raw, 'u1').map((m) => [m.id, m]));
+  assert.equal(byId.res_prime.state, 'active');
+  assert.equal(byId.legacy_plus.state, 'cancelled', 'one membership at a time');
+  assert.ok(String(byId.res_prime.starts_at) >= before, 'starts now — the months since the launch are not lost');
+  assert.equal(byId.res_prime.expires_at, addMonths(String(byId.res_prime.starts_at), 12));
+  const cache = raw.prepare('SELECT membership_tier FROM users WHERE id = ?').get('u1') as { membership_tier: string };
+  assert.equal(cache.membership_tier, 'prime');
+
+  const audits = () =>
+    raw.prepare("SELECT action FROM audit_log WHERE action LIKE 'membership.launch%' ORDER BY action").all().map((r) => (r as { action: string }).action);
+  assert.deepEqual(audits(), ['membership.launch_converted', 'membership.launch_dedupe']);
+  // Read again: nothing left to convert, nothing written twice.
+  await a.request('/api/memberships/mine');
+  assert.deepEqual(audits(), ['membership.launch_converted', 'membership.launch_dedupe']);
+});
+
+test('a reservation below a running higher membership is left for a human, silently on read', async () => {
+  const { db, raw } = setup();
+  raw.exec(`
+    INSERT INTO memberships (id, user_id, plan_id, tier, state, duration_months, price_paid_iqd, starts_at, expires_at, source) VALUES
+      ('run_pro', 'u1', 'pro_12mo', 'pro', 'active', 12, 0, '2026-01-01T00:00:00.000Z', '2099-01-01T00:00:00.000Z', 'admin'),
+      ('res_plus', 'u1', 'plus_12mo', 'plus', 'prepaid_pending_launch', 12, 29000, NULL, NULL, 'purchase');
+  `);
+  const a = app(db, 'u1');
+  for (let i = 0; i < 3; i++) {
+    const status = (await json(await a.request('/api/memberships/mine'))).status as Record<string, unknown>;
+    assert.equal(status.tier, 'pro', 'nobody is downgraded automatically');
+  }
+  const states = Object.fromEntries(rows(raw, 'u1').map((m) => [m.id, m.state]));
+  assert.deepEqual(states, { run_pro: 'active', res_plus: 'prepaid_pending_launch' });
+  const n = raw.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action LIKE 'membership.launch%'").get() as { n: number };
+  assert.equal(Number(n.n), 0, 'a page view is not an audit event');
+  // The admin panel still sees it — as work by hand, not as sweep work — and
+  // the sweep reports it.
+  const admin = app(db, 'boss', 'admin');
+  const listed = await json(await admin.request('/api/memberships/admin/plans'));
+  assert.equal(listed.prepaid_count, 0);
+  assert.equal(listed.deferred_count, 1);
+  const sweep = await json(await post(admin, '/api/memberships/admin/activate-launch', { confirm: 'ACTIVATE' }));
+  assert.equal(sweep.deferred, 1);
 });
 
 // ------------------------------------------------------------------ quote
@@ -476,6 +707,52 @@ test('the admin plan list shows inactive plans too, and only to admins', async (
   assert.equal(plan.price_iqd, null);
   assert.equal(plan.purchasable, false);
   assert.equal(plan.active, true);
+});
+
+test('after the launch the panel still reaches a leftover reservation: it is counted, and the sweep starts it NOW', async () => {
+  const { db, raw } = setup();
+  raw.exec(`INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('launchConfig','{"launch_at":"2026-01-01T00:00:00.000Z","activated":true,"activated_at":"2026-01-01T00:00:00.000Z"}')`);
+  // A straggler written by a legacy or racing writer after the launch.
+  raw.exec(`
+    INSERT INTO memberships (id, user_id, plan_id, tier, state, duration_months, price_paid_iqd, starts_at, expires_at, source) VALUES
+      ('late', 'u2', 'plus_12mo', 'plus', 'prepaid_pending_launch', 12, 29000, NULL, NULL, 'purchase');
+  `);
+  const admin = app(db, 'boss', 'admin');
+  const listed = await json(await admin.request('/api/memberships/admin/plans'));
+  assert.equal(listed.prepaid_count, 1, 'the panel can see there is something to sweep');
+
+  const before = new Date().toISOString();
+  const r = await json(await post(admin, '/api/memberships/admin/activate-launch', { confirm: 'ACTIVATE' }));
+  assert.equal(r.already_activated, true);
+  assert.equal(r.converted, 1);
+  assert.equal(r.prepaid_count, 0);
+  assert.equal(r.activated_at, '2026-01-01T00:00:00.000Z', 'the launch keeps its own date');
+  const late = rows(raw, 'u2')[0];
+  assert.equal(late.state, 'active');
+  assert.ok(String(late.starts_at) >= before, 'not backdated to the launch — the customer loses no days');
+  assert.equal(late.expires_at, addMonths(String(late.starts_at), 12));
+});
+
+test('a reservation under a higher running tier is counted as deferred, not as sweep work, so the button can go dark', async () => {
+  const { db, raw } = setup();
+  raw.exec(`INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('launchConfig','{"launch_at":"2026-01-01T00:00:00.000Z","activated":true,"activated_at":"2026-01-01T00:00:00.000Z"}')`);
+  raw.exec(`
+    INSERT INTO memberships (id, user_id, plan_id, tier, state, duration_months, price_paid_iqd, starts_at, expires_at, source) VALUES
+      ('run-pro', 'u2', 'pro_12mo', 'pro', 'active', 12, 499000, '2026-01-01T00:00:00.000Z', '2099-01-01T00:00:00.000Z', 'purchase'),
+      ('stuck',   'u2', 'plus_12mo', 'plus', 'prepaid_pending_launch', 12, 29000, NULL, NULL, 'purchase'),
+      ('go',      'u3', 'plus_12mo', 'plus', 'prepaid_pending_launch', 12, 29000, NULL, NULL, 'purchase');
+  `);
+  const admin = app(db, 'boss', 'admin');
+  const listed = await json(await admin.request('/api/memberships/admin/plans'));
+  assert.equal(listed.prepaid_count, 1, 'only the reservation the sweep can start');
+  assert.equal(listed.deferred_count, 1);
+
+  const r = await json(await post(admin, '/api/memberships/admin/activate-launch', { confirm: 'ACTIVATE' }));
+  assert.equal(r.converted, 1);
+  assert.equal(r.deferred, 1);
+  assert.equal(r.prepaid_count, 0, 'nothing left the sweep could start — the button goes dark instead of «(1)» forever');
+  assert.equal(r.deferred_count, 1, 'the stuck one is still named, as work by hand');
+  assert.equal(rows(raw, 'u2').find((m) => m.id === 'stuck')?.state, 'prepaid_pending_launch');
 });
 
 test('the memberships admin surface exists only on the main host — a merchant subdomain answers 404 even to an admin', async () => {

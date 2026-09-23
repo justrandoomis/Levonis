@@ -39,11 +39,17 @@ import type { PolicyDocument } from './types';
  *     text rather than show a customer a `{{TOKEN}}`. They are still authored
  *     below, and each one returns of its own accord the moment its value is
  *     written in and the version moves again.
+ *
+ * VERSION 3 — WHY IT MOVED. The archive keeps version 2 byte for byte.
+ *   * THE FACTS. worker/lib/policies/facts.ts now states `LEVONIS_SUPPORT_CONTACT`, `PRO_FREE_DELIVERY_MIN_IQD`,
+ *     so the clauses that carried them are published instead of withheld.
+ *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
+ *     by number, an article of this document that is itself withheld.
  */
 export const warranty: PolicyDocument = {
   key: 'warranty',
-  version: 2,
-  effective_at: '2026-01-01',
+  version: 3,
+  effective_at: '2026-09-23',
   title: {
     ar: 'ضمان القطع',
     en: 'Parts Warranty',
@@ -155,7 +161,7 @@ export const warranty: PolicyDocument = {
 - إعادة القطعة أو الجهاز من المتجر إلى الزبون بعد قبول المطالبة كعيب تصنيعي: على حساب المتجر.
 - إذا رُفضت المطالبة لخروجها عن التغطية أو لسقوط الضمان فأجور الإعادة على الزبون كذلك، ويُضاف إليها أجر الفحص المنصوص عليه في المادة 5.15.
 - أجور الشحن ورسومه تحددها شركات التوصيل لا المتجر، وفق ما هو مبيّن في وثيقة التوصيل.
-- لا يُستعمل الشحن المجاني الممنوح لأعضاء PRO فوق حد {{PRO_FREE_DELIVERY_MIN_IQD}} لتغطية شحن المطالبات إلا إذا نص المتجر على ذلك كتابةً.
+- لا يُستعمل الشحن المجاني الممنوح لأعضاء PRO فوق حد {{PRO_FREE_DELIVERY_MIN_IQD}} دينار لتغطية شحن المطالبات إلا إذا نص المتجر على ذلك كتابةً.
 
 ### 5.12 القطعة المتوقفة عن الإنتاج
 إذا كانت القطعة المعيبة قد توقف إنتاجها أو تعذر الحصول عليها:
@@ -311,7 +317,7 @@ A claim passes through the following recorded stages, and moves from one stage t
 - Returning the part or device from the store to the customer after a claim is accepted as a manufacturing fault is at the store expense.
 - Where a claim is rejected as outside cover or because the warranty is void, the return leg is likewise at the customer expense, together with the inspection fee stated in Article 5.15.
 - Shipping charges and fees are set by the delivery companies, not by the store, as stated in the Delivery document.
-- Free shipping granted to PRO members above the {{PRO_FREE_DELIVERY_MIN_IQD}} threshold is not applied to claim shipping unless the store states so in writing.
+- Free shipping granted to PRO members above the {{PRO_FREE_DELIVERY_MIN_IQD}} IQD threshold is not applied to claim shipping unless the store states so in writing.
 
 ### 5.12 A part that is out of production
 Where the faulty part is out of production or cannot be obtained:
@@ -467,7 +473,7 @@ The warranty attaches to the unit, not to the person, and continues its original
 - گەڕاندنەوەی پارچە یان ئامێر لە فرۆشگاوە بۆ کڕیار دوای پەسەندکردنی داواکاری وەک کەموکووڕی بەرهەمهێنان لەسەر فرۆشگایە.
 - ئەگەر داواکارییەکە ڕەت کرایەوە بەهۆی دەرەوەی داپۆشین بوون یان پووچبوونەوەی گەرەنتی، تێچووی گەڕاندنەوەش لەسەر کڕیارە، لەگەڵ ئەو کرێی پشکنینەی لە ماددەی 5.15 هاتووە.
 - کرێ و باجی گواستنەوە لەلایەن کۆمپانیاکانی گەیاندنەوە دیاری دەکرێن نەک لەلایەن فرۆشگاوە، بەپێی ئەوەی لە بەڵگەنامەی گەیاندن هاتووە.
-- ئەو گواستنەوە بێبەرامبەرەی بۆ ئەندامانی PRO لە سەرووی سنووری {{PRO_FREE_DELIVERY_MIN_IQD}} دەدرێت بۆ گواستنەوەی داواکارییەکان بەکار نایەت مەگەر فرۆشگا بە نووسراوی ئەوە بڵێت.
+- ئەو گواستنەوە بێبەرامبەرەی بۆ ئەندامانی PRO لە سەرووی سنووری {{PRO_FREE_DELIVERY_MIN_IQD}} دینار دەدرێت بۆ گواستنەوەی داواکارییەکان بەکار نایەت مەگەر فرۆشگا بە نووسراوی ئەوە بڵێت.
 
 ### 5.12 پارچەیەک کە بەرهەمهێنانی وەستاوە
 ئەگەر پارچە کەموکووڕەکە بەرهەمهێنانی وەستابێت یان دەست نەکەوێت:

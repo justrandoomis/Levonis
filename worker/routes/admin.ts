@@ -1,7 +1,13 @@
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import { asDocument } from '../lib/securityPolicy';
-import { approvableWithdrawalSql, decideDeposit } from '../lib/walletOps';
+import {
+  approvableWithdrawalSql,
+  decideDeposit,
+  getAvailableBalances,
+  readWalletDust,
+  walletIqdAvailable,
+} from '../lib/walletOps';
 import { closeDepositNotification, enqueueUserDepositStatusNotification } from '../lib/walletNotify';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -11,7 +17,7 @@ import { newId, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { canViewFinancials, isOwner, normalizeAdminScope, userPatchRefusal } from '../lib/adminScope';
-import { degradeIfSchemaMissing } from '../lib/membershipBenefits';
+import { degradeIfSchemaMissing, isSchemaMissing } from '../lib/membershipBenefits';
 import { normalizeText } from '../lib/search/normalize';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import {
@@ -31,11 +37,10 @@ import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
 import { deleteCancelledOrder, OrderDeletionRefusal } from '../lib/orderDeletion';
 import { reclaimOrderRedemptionsStatement } from '../lib/offers';
 import { resolveOrderExpiry } from '../lib/orderExpiry';
-import { getSetting, getSettings, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
-import { onOrderDelivered } from '../lib/membershipOps';
-import { createUnitsOnDelivery, type CreateUnitsResult } from '../lib/deviceOps';
-import { awardOrderPoints } from '../lib/pointsOps';
-import { getBalances, walletTxPublic } from '../lib/wallet';
+import { getSetting, getSettings, normalizePayoutMethods, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
+import type { CreateUnitsResult } from '../lib/deviceOps';
+import { runOrderDeliveredEffects } from '../lib/orderDeliveredEffects';
+import { walletTxPublic } from '../lib/wallet';
 // The member detail reports a BNPL debt, and the sign convention for that sum
 // (charge positive, repayment negative, adjustment signed) lives in one place.
 // Re-deriving it here would give the owner a second, quietly different number.
@@ -96,6 +101,7 @@ import {
   invalidateMediaCache,
 } from '../lib/productDeletion';
 import { runGuardedMediaCleanupJobs } from '../lib/mediaRefs';
+import { supportInboxCounts } from './adminChats';
 
 export const adminRoutes = new Hono<AppContext>();
 adminRoutes.use('*', requireAdmin);
@@ -251,21 +257,25 @@ adminRoutes.get('/overview', async (c) => {
          COALESCE(SUM(CASE WHEN currency='USD' AND type='withdrawal' AND status='approved' THEN amount ELSE 0 END),0) AS outgoing_usd_cents
        FROM wallet_transactions`
     ).first<Record<string, number>>(),
-    db.prepare(
-      `SELECT wt.*, u.email, u.username,
-              w.id AS withdrawal_id, w.state AS withdrawal_state,
-              w.needs_reconciliation AS withdrawal_needs_reconciliation,
-              w.payout_reference AS withdrawal_payout_reference,
-              w.declared_amount_iqd AS withdrawal_declared_iqd,
-              w.fee_cents AS withdrawal_fee_cents,
-              w.net_cents AS withdrawal_net_cents,
-              m.declared_amount_iqd AS deposit_declared_iqd
-         FROM wallet_transactions wt
-         LEFT JOIN users u ON u.id = wt.user_id
-         LEFT JOIN wallet_withdrawals w ON w.tx_id = wt.id
-         LEFT JOIN wallet_deposit_meta m ON m.tx_id = wt.id
-        WHERE wt.status = 'pending' ORDER BY wt.created_at DESC LIMIT 10`
-    ).all<Record<string, unknown>>(),
+    withWithdrawalPayoutColumns((payout) =>
+      db.prepare(
+        `SELECT wt.*, u.email, u.username,
+                w.id AS withdrawal_id, w.state AS withdrawal_state,
+                w.needs_reconciliation AS withdrawal_needs_reconciliation,
+                w.payout_reference AS withdrawal_payout_reference,
+                w.declared_amount_iqd AS withdrawal_declared_iqd,
+                w.fee_cents AS withdrawal_fee_cents,
+                w.net_cents AS withdrawal_net_cents,
+                w.destination_kind AS withdrawal_destination_kind,
+                w.exchange_rate_snapshot AS withdrawal_rate_snapshot${withdrawalPayoutColumns(payout)},
+                m.declared_amount_iqd AS deposit_declared_iqd
+           FROM wallet_transactions wt
+           LEFT JOIN users u ON u.id = wt.user_id
+           LEFT JOIN wallet_withdrawals w ON w.tx_id = wt.id
+           LEFT JOIN wallet_deposit_meta m ON m.tx_id = wt.id
+          WHERE wt.status = 'pending' ORDER BY wt.created_at DESC LIMIT 10`
+      ).all<Record<string, unknown>>()
+    ),
     db.prepare("SELECT COUNT(*) AS n FROM community_requests WHERE status = 'open'").first<{ n: number }>(),
     /**
      * HOW MANY PEOPLE ARE WAITING ON US, on the dashboard the owner opens
@@ -279,9 +289,10 @@ adminRoutes.get('/overview', async (c) => {
      * neither is `resolved`. A badge that counts tickets the shop cannot act
      * on is a badge people learn to ignore.
      */
-    db
-      .prepare("SELECT COUNT(*) AS n FROM support_tickets WHERE state IN ('open','waiting_staff')")
-      .first<{ n: number }>(),
+    // Tickets, order-chat messages and complaints — the three queues of the
+    // support console (worker/routes/adminChats.ts), counted by the one
+    // function its badges use, so the tile and the sidebar cannot disagree.
+    supportInboxCounts(db),
     db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 10').all<Record<string, unknown>>(),
   ]);
 
@@ -308,7 +319,9 @@ adminRoutes.get('/overview', async (c) => {
         : {}),
       pending_wallet_requests: pendingWallet.results.length,
       open_community_requests: pendingCommunity?.n ?? 0,
-      support_tickets_waiting: waitingTickets?.n ?? 0,
+      support_tickets_waiting: waitingTickets.tickets_waiting,
+      support_chats_unread: waitingTickets.chats_unread,
+      support_complaints_open: waitingTickets.complaints_open,
     },
     pending_wallet_requests: money
       ? pendingWallet.results.map((t) => ({
@@ -814,7 +827,7 @@ adminRoutes.get('/users/:id/detail', async (c) => {
     return c.json({ success: true, can_view_financials: false, member });
   }
 
-  const [value, wallet, outstanding] = await Promise.all([
+  const [value, wallet, walletDust, exchangeRateSetting, outstanding] = await Promise.all([
     c.env.DB
       .prepare(
         // A CANCELLED ORDER IS NOT LIFETIME VALUE. Including it would inflate
@@ -828,7 +841,19 @@ adminRoutes.get('/users/:id/detail', async (c) => {
       )
       .bind(id)
       .first<{ lifetime_iqd: number; delivered_iqd: number }>(),
-    getBalances(c.env.DB, id),
+    /**
+     * THE BALANCE THE MEMBER SEES, NOT THE SETTLED SUM CONVERTED.
+     *
+     * This read `getBalances` — the SETTLED cents, holds not subtracted — and
+     * the screen converted them at today's rate: a member who typed 50,000 د.ع
+     * read 49,994 here while their own wallet said 50,000, and a member with
+     * a withdrawal on hold read money they cannot spend. It is now the same
+     * two numbers GET /api/wallet serves: the SPENDABLE cents, and their
+     * dinars from `walletIqdAvailable` (migration 0108).
+     */
+    getAvailableBalances(c.env, id),
+    readWalletDust(c.env.DB, id),
+    getSetting(c.env.DB, 'exchangeRate'),
     degradeIfSchemaMissing('bnpl ledger (0002)', () => bnplOutstanding(c.env.DB, id), 0),
   ]);
 
@@ -839,8 +864,9 @@ adminRoutes.get('/users/:id/detail', async (c) => {
     financial: {
       lifetime_value_iqd: Number(value?.lifetime_iqd) || 0,
       delivered_value_iqd: Number(value?.delivered_iqd) || 0,
-      wallet_usd_cents: wallet.usd_cents,
-      wallet_points: wallet.points,
+      wallet_usd_cents: wallet.usd_cents_available,
+      wallet_iqd: walletIqdAvailable(wallet.usd_cents_available, walletDust.dust_iqd, Number(exchangeRateSetting) || 0),
+      wallet_points: wallet.points_available,
       bnpl_credit_limit_iqd: Number(bnpl?.credit_limit_iqd) || 0,
       bnpl_outstanding_iqd: outstanding,
     },
@@ -1252,8 +1278,58 @@ function withdrawalRef(t: Record<string, unknown>) {
       net_cents: t.withdrawal_net_cents === null || t.withdrawal_net_cents === undefined
         ? null
         : Number(t.withdrawal_net_cents),
+      /**
+       * WHICH CHANNEL TO PAY THROUGH — the reviewer making the transfer could
+       * see the account number and nothing else, so a Zain Cash wallet and a
+       * Ki Card number looked the same. `destination_label` is the channel's
+       * name frozen at filing (migration 0112); `destination_kind` is its id,
+       * for a request filed before the name was recorded.
+       */
+      destination_kind: t.withdrawal_destination_kind ? String(t.withdrawal_destination_kind) : null,
+      destination_label: t.withdrawal_destination_label ? String(t.withdrawal_destination_label) : null,
+      /**
+       * WHAT THE CUSTOMER WAS PROMISED, in the dinars they typed (migration
+       * 0112): the form said «commission 1,500 · net 48,500» for a typed
+       * 50,000 at 3%, and this card converted `net_cents` back at today's
+       * rate and said 48,496. Null for a request with no recorded dinar quote,
+       * which the card converts at `exchange_rate_snapshot` — the rate the
+       * request was filed at — rather than at today's.
+       */
+      fee_iqd: nullableNumber(t.withdrawal_fee_iqd),
+      net_iqd: nullableNumber(t.withdrawal_net_iqd),
+      exchange_rate_snapshot: nullableNumber(t.withdrawal_rate_snapshot),
     },
   };
+}
+
+const nullableNumber = (v: unknown): number | null =>
+  v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v);
+
+/**
+ * Migration 0112's three `wallet_withdrawals` columns, for the two admin
+ * lists that join the table. Separate, and retried without, because a Worker
+ * can reach production before its migration: naming a column that is not
+ * there fails the WHOLE list — the approve buttons included — and a payout
+ * queue that 500s is worse than one missing the channel's name for an hour.
+ */
+const withdrawalPayoutColumns = (on: boolean) =>
+  on
+    ? `,
+                    w.destination_label AS withdrawal_destination_label,
+                    w.fee_iqd AS withdrawal_fee_iqd,
+                    w.net_iqd AS withdrawal_net_iqd`
+    : '';
+
+async function withWithdrawalPayoutColumns<T>(run: (payout: boolean) => Promise<T>): Promise<T> {
+  try {
+    return await run(true);
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+    console.error(
+      `wallet_withdrawals is behind the deployment (0112 not applied): ${e instanceof Error ? e.message : String(e)}`
+    );
+    return run(false);
+  }
 }
 
 adminRoutes.get('/wallet-requests', async (c) => {
@@ -1262,24 +1338,29 @@ adminRoutes.get('/wallet-requests', async (c) => {
   // wallet_withdrawals row: its state machine, not the ledger row's status,
   // is what an admin acts on. The join lets the panel show that state and
   // drive the workflow routes; the legacy decide below refuses such rows.
-  let sql = `SELECT wt.*, u.email, u.username,
+  const sqlFor = (payout: boolean) => `SELECT wt.*, u.email, u.username,
                     w.id AS withdrawal_id, w.state AS withdrawal_state,
                     w.needs_reconciliation AS withdrawal_needs_reconciliation,
                     w.payout_reference AS withdrawal_payout_reference,
                     w.declared_amount_iqd AS withdrawal_declared_iqd,
                     w.fee_cents AS withdrawal_fee_cents,
-                    w.net_cents AS withdrawal_net_cents
+                    w.net_cents AS withdrawal_net_cents,
+                    w.destination_kind AS withdrawal_destination_kind,
+                    w.exchange_rate_snapshot AS withdrawal_rate_snapshot${withdrawalPayoutColumns(payout)}
                FROM wallet_transactions wt
                LEFT JOIN users u ON u.id = wt.user_id
                LEFT JOIN wallet_withdrawals w ON w.tx_id = wt.id
               WHERE wt.currency = 'USD'`;
+  let tail = '';
   const params: unknown[] = [];
   if (status && ['pending', 'approved', 'rejected'].includes(status)) {
-    sql += ' AND wt.status = ?';
+    tail += ' AND wt.status = ?';
     params.push(status);
   }
-  sql += ' ORDER BY wt.created_at DESC LIMIT 300';
-  const { results } = await c.env.DB.prepare(sql).bind(...params).all<Record<string, unknown>>();
+  tail += ' ORDER BY wt.created_at DESC LIMIT 300';
+  const { results } = await withWithdrawalPayoutColumns((payout) =>
+    c.env.DB.prepare(sqlFor(payout) + tail).bind(...params).all<Record<string, unknown>>()
+  );
   return c.json({
     success: true,
     requests: results.map((t) => ({ ...walletTxPublic(t), ...withdrawalRef(t), email: t.email, username: t.username, userId: t.user_id })),
@@ -1904,7 +1985,21 @@ adminRoutes.get('/orders', async (c) => {
   // played by the SCOPE, because «تم التسليم» and «ملغاة» are the two options
   // the second select offers there.
   const statusDim = scope === 'delivered' || scope === 'cancelled' ? scope : status;
-  const typeMatches = (t: string): boolean => (type ? t === type : true);
+  /**
+   * THE JOURNEY THE SCOPE ALREADY IMPLIES IS PART OF "THE OTHER SELECT".
+   *
+   * The board's default view («مباشر») sends `scope=open` and NO `type` — on
+   * purpose, see the `+shipping_type` note above — so reading only `type` here
+   * made the status vector count every pre-order too, and the dropdown said
+   * «قيد الانتظار ٣» over a board showing one row. `open` is direct and
+   * `preorder` is everything else exactly as the row WHERE spells them; `all`
+   * and the archive scopes imply no journey. The facet QUERY is unchanged (it
+   * must still count both journeys for the type vector); only this fold reads
+   * the scope.
+   */
+  const scopeJourney = (t: string): boolean =>
+    scope === 'open' ? t === 'direct' : scope === 'preorder' ? t !== 'direct' : true;
+  const typeMatches = (t: string): boolean => scopeJourney(t) && (type ? t === type : true);
   const statusMatches = (st: string): boolean => (statusDim ? st === statusDim : true);
   const options = pierces
     ? null
@@ -2267,53 +2362,23 @@ async function deliveredEffects(
   c: Context<AppContext>,
   id: string
 ): Promise<{ deviceUnits: CreateUnitsResult | null; deviceUnitsWarning: string | null }> {
-  let deviceUnits: CreateUnitsResult | null = null;
-  let deviceUnitsWarning: string | null = null;
-
-  // Mandate §4: create one device record per PHYSICAL unit of every
-  // serialized product, clocked to the delivered_at just stamped. Awaited
-  // (warranty clocks are account state, not a fire-and-forget message) and
-  // idempotent via UNIQUE(order_item_id, unit_index) — a replayed
-  // transition can never duplicate units or restart coverage.
-  const deliveredRow = await c.env.DB.prepare('SELECT delivered_at FROM orders WHERE id = ?')
-    .bind(id)
-    .first<{ delivered_at: string | null }>();
-  try {
-    deviceUnits = await createUnitsOnDelivery(c.env, id, deliveredRow?.delivered_at ?? new Date().toISOString());
-  } catch (e) {
-    console.error('device unit creation failed for order', id, e);
-    // Honest partial outcome: the order IS delivered, units are missing.
-    deviceUnitsWarning =
-      'Device units were not created — retry from Admin → Serials & Devices (backfill), otherwise warranty clocks for this order are missing.';
-  }
-
-  // Purchase points (decision row 20 defaults): floor(qualifying merchandise
-  // / 1000) at the delivered event. Awaited — points are account state —
-  // and idempotent via points_awards UNIQUE(order_id), so a replayed
-  // delivered transition can never double-award.
-  try {
-    await awardOrderPoints(c.env, id);
-  } catch (e) {
-    console.error('points award failed for order', id, e);
-  }
-
-  // Referral 9.1 milestone: records delivered_at-based eligibility (idempotent).
-  c.executionCtx.waitUntil(onOrderDelivered(c.env, id));
   /*
-   * NO AUTOMATIC PRINTER-GIFT MEMBERSHIP AT DELIVERY EITHER — «الهديه تعطى
-   * يدويا وليس تلقائيا». The same decision that removed the 'paid' door in
-   * worker/routes/orders.ts removes this one: a membership somebody did not
-   * buy and nobody granted is a subscriber by the ledger and not by anyone's
-   * intent, and every benefit in the shop believes the ledger.
-   * The administrator who marks this order delivered is already looking at it;
-   * granting the gift is one more deliberate click on the memberships screen.
+   * THE GRANTS LIVE IN worker/lib/orderDeliveredEffects.ts NOW — device units
+   * and their warranty clocks, purchase points, the referral milestone — and
+   * `moveOrderStage` runs the same function for EVERY door that moves an
+   * order into `delivered`: the courier sync, the cron, Telegram, and both
+   * admin doors. They used to live only here, so an order Al-Waseet reported
+   * delivered earned none of them. This call stays because the admin doors
+   * report the unit warning to the admin who pressed the button; the second
+   * run inside the stage move is a no-op by construction (every step is
+   * idempotent per order).
    */
+  const effects = await runOrderDeliveredEffects(c.env, id, { defer: (work) => c.executionCtx.waitUntil(work) });
   /*
    * THE MESSAGE LEAVES FROM THE SAME PLACE THE GRANTS DO. `deliveredEffects`
-   * is where both delivered doors converge, and its own docstring says that is
-   * why it exists — «the day those two granted different things would be the
-   * day a customer's warranty depended on which button was pressed». The same
-   * argument applies to telling them at all.
+   * is where both admin delivered doors converge — «the day those two granted
+   * different things would be the day a customer's warranty depended on which
+   * button was pressed». The same argument applies to telling them at all.
    *
    * `waitUntil`, because an admin pressing a button must not wait on three
    * providers. The event key is the status, so the stage door's own call for
@@ -2321,7 +2386,7 @@ async function deliveredEffects(
    */
   c.executionCtx.waitUntil(notifyOrderDelivered(c.env, id));
 
-  return { deviceUnits, deviceUnitsWarning };
+  return effects;
 }
 
 const ORDER_TRANSITIONS: Record<string, string[]> = {
@@ -3068,6 +3133,9 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
     source: 'manual',
     changedBy: adminUser.id,
     note,
+    // The customer's message about this move leaves right after the response
+    // rather than at the next outbox cron (worker/lib/orderNotify.ts).
+    defer: (work) => c.executionCtx.waitUntil(work),
   });
   if (!res.moved) {
     if (res.reason === 'NOT_FOUND') throw notFound('Order not found');
@@ -3327,7 +3395,11 @@ adminRoutes.patch('/orders/:id', async (c) => {
   // notification for a transition that did not happen is worse than none.
   // Queued, so the admin's request does not wait on three providers, and
   // silent for `processing` — see NOTIFIED_ORDER_STATUSES.
-  c.executionCtx.waitUntil(notifyOrderStatus(c.env, id, next));
+  // `defer` sends the rows this call queued straight after the response, by
+  // event-key prefix, instead of leaving them for the fifteen-minute cron.
+  c.executionCtx.waitUntil(
+    notifyOrderStatus(c.env, id, next, { defer: (work) => c.executionCtx.waitUntil(work) })
+  );
 
   return c.json({
     success: true,
@@ -3598,6 +3670,24 @@ adminRoutes.put('/settings/:key', async (c) => {
         throw badRequest(`Every ${key} entry needs a string id`);
       }
     }
+  } else if (key === 'payoutMethods') {
+    // THE WITHDRAWAL CHANNELS. Normalised by the SAME function the setting is
+    // read back through (worker/lib/settings.ts), so what survives here is
+    // exactly what the withdrawal step offers and the route resolves. An entry
+    // without an id or a name is dropped; an empty list is refused rather than
+    // stored — a withdrawal screen with no channel cannot file anything.
+    if (!Array.isArray(value)) throw badRequest('payoutMethods must be an array');
+    const methods = normalizePayoutMethods(value);
+    const kept = value.filter(
+      (m) =>
+        typeof m === 'object' && m !== null &&
+        typeof (m as { id?: unknown }).id === 'string' && (m as { id: string }).id.trim() !== '' &&
+        typeof (m as { name?: unknown }).name === 'string' && (m as { name: string }).name.trim() !== ''
+    );
+    if (kept.length === 0) {
+      throw badRequest('Keep at least one payout channel, each with a name', 'PAYOUT_METHODS_EMPTY');
+    }
+    value = methods;
   } else if (key === 'homeBanners' || key === 'homeSectionItems') {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) throw badRequest(`${key} must be an object`);
     if (JSON.stringify(value).length > 100_000) throw badRequest(`${key} is too large`);

@@ -76,6 +76,7 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/marketplace/print': 'MARKETPLACE',
   '/api/marketplace': 'MARKETPLACE',
   '/api/print-quote': 'MARKETPLACE',
+  '/api/admin/print-quote': 'MARKETPLACE',
   '/api/notifications': 'NOTIFICATIONS',
   '/api/store-orders': 'MARKETPLACE',
   '/api/community-reviews': 'MARKETPLACE',

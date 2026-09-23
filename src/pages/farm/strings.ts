@@ -812,7 +812,7 @@ const ar: FarmStrings = {
   hubProfile: 'ملف المزرعة',
   hubProfileDesc: 'مستواك وإحصاءاتك وسمعتك.',
   hubRedeem: 'تحويل العملات',
-  hubRedeemDesc: 'قواعد تحويل عملات المزرعة إلى نقاط ليفونيس.',
+  hubRedeemDesc: 'قواعد تحويل عملات المزرعة إلى نقاط Levonis.',
 
   shelved: {
     badge: 'قريبا',
@@ -848,11 +848,11 @@ const ar: FarmStrings = {
   notSent: '—',
 
   redeemTitle: 'تحويل العملات',
-  redeemIntro: 'عملات المزرعة عملة داخل اللعبة. نقاط ليفونيس هي عملة المكافآت الحقيقية في المتجر، ولا تُصدَر إلا من الخادم وفق حدود يحدّدها الفريق.',
+  redeemIntro: 'عملات المزرعة عملة داخل اللعبة. نقاط Levonis هي عملة المكافآت الحقيقية في المتجر، ولا تُصدَر إلا من الخادم وفق حدود يحدّدها الفريق.',
   redeemClosedTitle: 'التحويل غير مفتوح حاليًا',
-  redeemClosedBody: 'الخادم يفيد بأن تحويل عملات المزرعة إلى نقاط ليفونيس غير مُفعَّل. عملاتك تبقى في اللعبة وتُستخدم لتنمية المزرعة.',
+  redeemClosedBody: 'الخادم يفيد بأن تحويل عملات المزرعة إلى نقاط Levonis غير مُفعَّل. عملاتك تبقى في اللعبة وتُستخدم لتنمية المزرعة.',
   redeemRulesTitle: 'القواعد كما يرسلها الخادم',
-  redeemRuleRate: (n) => `${n} عملة مزرعة لكل نقطة ليفونيس`,
+  redeemRuleRate: (n) => `${n} عملة مزرعة لكل نقطة Levonis`,
   redeemRuleDaily: (n) => `حد يومي: ${n} نقطة`,
   redeemRuleWeekly: (n) => `حد أسبوعي: ${n} نقطة`,
   redeemRuleLevel: (n) => `المستوى المطلوب: ${n}`,
@@ -1427,7 +1427,7 @@ const ckb: FarmStrings = {
   hubProfile: 'پرۆفایلی کێڵگە',
   hubProfileDesc: 'ئاست و ئامار و ناوبانگت.',
   hubRedeem: 'گۆڕینی دراو',
-  hubRedeemDesc: 'ڕێساکانی گۆڕینی دراوی کێڵگە بۆ خاڵی لیڤۆنیس.',
+  hubRedeemDesc: 'ڕێساکانی گۆڕینی دراوی کێڵگە بۆ خاڵی Levonis.',
 
   // THE ARABIC TEXT, ON PURPOSE. The shelving notice is new copy and the
   // Sorani for it is the owner's to write by hand — machine-written Kurdish is
@@ -1468,11 +1468,11 @@ const ckb: FarmStrings = {
   notSent: '—',
 
   redeemTitle: 'گۆڕینی دراو',
-  redeemIntro: 'دراوی کێڵگە دراوی ناو یارییە. خاڵی لیڤۆنیس دراوی خەڵاتی ڕاستەقینەی فرۆشگایە و تەنها لە ڕاژەکارەوە دەردەچێت، لە سنووری ئەو ڕێسایانەی تیم دیاری دەکات.',
+  redeemIntro: 'دراوی کێڵگە دراوی ناو یارییە. خاڵی Levonis دراوی خەڵاتی ڕاستەقینەی فرۆشگایە و تەنها لە ڕاژەکارەوە دەردەچێت، لە سنووری ئەو ڕێسایانەی تیم دیاری دەکات.',
   redeemClosedTitle: 'گۆڕین ئێستا کراوە نییە',
-  redeemClosedBody: 'ڕاژەکار ڕاپۆرت دەکات کە گۆڕینی دراوی کێڵگە بۆ خاڵی لیڤۆنیس چالاک نییە. دراوەکانت لە یاری دەمێننەوە و کێڵگە گەشە پێ دەدەن.',
+  redeemClosedBody: 'ڕاژەکار ڕاپۆرت دەکات کە گۆڕینی دراوی کێڵگە بۆ خاڵی Levonis چالاک نییە. دراوەکانت لە یاری دەمێننەوە و کێڵگە گەشە پێ دەدەن.',
   redeemRulesTitle: 'ڕێساکان وەک ڕاژەکار دەیاننێرێت',
-  redeemRuleRate: (n) => `${n} دراوی کێڵگە بۆ هەر خاڵێکی لیڤۆنیس`,
+  redeemRuleRate: (n) => `${n} دراوی کێڵگە بۆ هەر خاڵێکی Levonis`,
   redeemRuleDaily: (n) => `سنووری ڕۆژانە: ${n} خاڵ`,
   redeemRuleWeekly: (n) => `سنووری هەفتانە: ${n} خاڵ`,
   redeemRuleLevel: (n) => `ئاستی پێویست: ${n}`,

@@ -13,6 +13,10 @@ import Countdown from '../components/ui/Countdown';
 import { productPrimaryImage } from '../lib/productImage';
 import { readPageCache, writePageCache } from '../lib/pageCache';
 import DirectStockEdge from '../components/DirectStockEdge';
+import LiveSearch from '../components/search/LiveSearch';
+
+/** One page of the listing. The route's own ceiling (`limit` max 50). */
+const PAGE_SIZE = 50;
 
 export default function Products() {
   const { t, dir, loc } = useLanguage();
@@ -46,6 +50,23 @@ export default function Products() {
   // Monotonic request id: when the query changes mid-flight, the stale
   // response is ignored so a previous query's results never flash in.
   const reqIdRef = useRef(0);
+  /**
+   * THE REST OF A LONG ANSWER. The grid asked for fifty and stopped there, so a
+   * search for a brand with more products than that silently ended at fifty
+   * with nothing to say there were more. `exhausted` is "the last page came
+   * back short"; until then a «عرض المزيد» asks for the next fifty at the
+   * route's `offset`, which keeps the search ranking across pages.
+   */
+  const [exhausted, setExhausted] = useState(true);
+  const [more, setMore] = useState<'idle' | 'loading' | 'error'>('idle');
+  /**
+   * WHAT IS IN THE SEARCH FIELD ON THIS PAGE. The results page had no field at
+   * all — the header only exists on Home — so refining «H» into «H2D» meant
+   * going back first. It starts as the query being shown and follows the URL
+   * when the shopper searches again from here.
+   */
+  const [draft, setDraft] = useState(search);
+  useEffect(() => setDraft(search), [search]);
 
   const fetchProducts = useCallback(async () => {
     const reqId = ++reqIdRef.current;
@@ -68,15 +89,17 @@ export default function Products() {
     }
     setLoading(!snapshot);
     setError(null);
+    setMore('idle');
     try {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       if (category) params.set('category', category);
-      params.set('limit', '50');
+      params.set('limit', String(PAGE_SIZE));
       const data = await api.get<ProductsListResponse>(`/api/products?${params.toString()}`);
       if (reqIdRef.current !== reqId) return;
       const resolved = category ? data.category ?? null : null;
       setProducts(data.products || []);
+      setExhausted((data.products || []).length < PAGE_SIZE);
       setCategoryRef(resolved);
       writePageCache(cacheKey, { products: data.products || [], category: resolved });
     } catch (err) {
@@ -101,6 +124,31 @@ export default function Products() {
       reqIdRef.current += 1;
     };
   }, [fetchProducts]);
+
+  const loadMore = async () => {
+    const reqId = reqIdRef.current;
+    setMore('loading');
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      if (category) params.set('category', category);
+      params.set('limit', String(PAGE_SIZE));
+      params.set('offset', String(products.length));
+      const data = await api.get<ProductsListResponse>(`/api/products?${params.toString()}`);
+      // A new query started while this page was in flight: it is not ours.
+      if (reqIdRef.current !== reqId) return;
+      const next = data.products || [];
+      setProducts((have) => {
+        const seen = new Set(have.map((p) => p.id));
+        return [...have, ...next.filter((p) => !seen.has(p.id))];
+      });
+      setExhausted(next.length < PAGE_SIZE);
+      setMore('idle');
+    } catch (err) {
+      console.error(err);
+      if (reqIdRef.current === reqId) setMore('error');
+    }
+  };
 
   // The word above the heading — «القسم», the same word «تصفّح حسب القسم» uses
   // on the board the customer just tapped. One shop, one word for one thing.
@@ -130,10 +178,30 @@ export default function Products() {
         >
           {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
         </button>
-        {/* `min-w-0` on the flex CHILD is what makes `truncate` work at all:
+        {search ? (
+          <>
+            {/* The page still has a heading for a screen reader; the field IS
+                the heading visually, holding the words that were searched. */}
+            <h1 className="sr-only">{`${loc('نتائج البحث', 'Search results', 'ئەنجامەکانی گەڕان')}: ${search}`}</h1>
+            <LiveSearch
+              value={draft}
+              onChange={setDraft}
+              onSubmit={(query) =>
+                // REPLACE, so the back button leaves search the way it came
+                // rather than stepping through every refinement.
+                navigate(`/products?search=${encodeURIComponent(query)}`, { replace: true })
+              }
+              size="compact"
+              tone="bar"
+              openOnFocus={false}
+              className="min-w-0 flex-1"
+            />
+          </>
+        ) : (
+        /* `min-w-0` on the flex CHILD is what makes `truncate` work at all:
             without it the item's automatic minimum size is its content, the row
             overflows instead of truncating, and in RTL it is the back button
-            that leaves the screen. */}
+            that leaves the screen. */
         <div className="min-w-0 flex-1">
           {kicker && <span className="block text-[11px] font-medium text-zinc-500 leading-tight truncate">{kicker}</span>}
           {headingPending ? (
@@ -146,6 +214,7 @@ export default function Products() {
             <h1 className="text-white font-bold text-lg leading-tight truncate">{heading}</h1>
           )}
         </div>
+        )}
       </div>
 
       <div className="p-4">
@@ -239,6 +308,20 @@ export default function Products() {
               );
             })}
           </div>
+          {!exhausted && !loading && (
+            <div className="mt-5 flex justify-center">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={more === 'loading'}
+                aria-busy={more === 'loading'}
+                className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border-subtle bg-surface px-5 text-[13px] font-semibold text-text-primary transition-colors hover:bg-surface-raised disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              >
+                {more === 'loading' && <Spinner size="sm" />}
+                {more === 'error' ? t('retry') : loc('عرض المزيد', 'Load more', 'زیاتر پیشان بدە')}
+              </button>
+            </div>
+          )}
           </div>
         )}
       </div>

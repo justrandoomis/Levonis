@@ -82,26 +82,30 @@ test('a merchant with no tagline still gets a sentence, naming their own shop', 
   // is the only assertion that can see that, and this is the exact name that
   // exposed it.
   const m = buildWebManifest({ name: 'متجر علي', tagline: '', logoKey: null });
-  assert.equal(m.description, 'متجر علي على منصة ليفونيس');
+  assert.equal(m.description, 'متجر علي على منصة \u2068Levonis\u2069');
 
   // A bare name still gets the noun — that is what the prefix is for.
   assert.equal(
     buildWebManifest({ name: 'علي', tagline: '', logoKey: null }).description,
-    'متجر علي على منصة ليفونيس'
+    'متجر علي على منصة \u2068Levonis\u2069'
   );
 
   // The other nouns merchants actually use, none of which may double either.
   for (const name of ['محل الرافدين', 'شركة بغداد', 'مؤسسة النهرين', 'ورشة الموصل']) {
     assert.equal(
       buildWebManifest({ name, tagline: '', logoKey: null }).description,
-      `${name} على منصة ليفونيس`
+      `${name} على منصة \u2068Levonis\u2069`
     );
   }
 
-  // The brand is spelled in Arabic in this sentence on purpose: a Latin run in
-  // the middle of an Arabic line flips direction mid-sentence, and a manifest
-  // description has no surrounding page to steady it.
+  // The brand is «Levonis» in Latin letters (the owner: «أريد اسم Levonis
+  // بالإنجليزي فقط»), and it is ISOLATED (U+2068 … U+2069): a manifest
+  // description has no surrounding page to steady a Latin run in the middle
+  // of an Arabic line, and the isolate keeps it from flipping the sentence.
   assert.ok(!m.description.includes(PLATFORM_NAME));
+  assert.ok(!/ليفونيس|لیڤۆنیس|لێڤۆنیس/.test(m.description), 'the transliteration is back');
+  assert.ok(!/ليفونيس|لیڤۆنیس|لێڤۆنیس/.test(buildWebManifest().description), 'the platform description transliterates');
+  assert.ok(buildWebManifest().description.startsWith('\u2068Levonis\u2069 — '), 'the platform description opens with the isolated name');
 });
 
 test('a long name is cut at a word boundary, never mid-word, and never to nothing', () => {
@@ -171,10 +175,10 @@ test('a merchant with no logo gets exactly the four platform icons', () => {
   assert.deepEqual(
     m.icons.map((i) => `${i.src} ${i.sizes} ${i.purpose}`),
     [
-      '/icons/icon-192.png 192x192 any',
-      '/icons/icon-512.png 512x512 any',
-      '/icons/maskable-192.png 192x192 maskable',
-      '/icons/maskable-512.png 512x512 maskable',
+      '/icons/icon-192.bc80fc2b.png 192x192 any',
+      '/icons/icon-512.bc80fc2b.png 512x512 any',
+      '/icons/maskable-192.bc80fc2b.png 192x192 maskable',
+      '/icons/maskable-512.bc80fc2b.png 512x512 maskable',
     ]
   );
 });

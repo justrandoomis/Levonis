@@ -199,7 +199,29 @@ export default function OrdersBoard() {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
 
-  const [openOrderId, setOpenOrderId] = useState<string | null>(null);
+  // «🔗 فتح في لوحة الإدارة» on the Telegram order message lands here as
+  // `/admin?tab=orders&order=<id>` and opens that order straight away — the
+  // admin tapped a button about ONE order, not a request to browse the board.
+  const [openOrderId, setOpenOrderId] = useState<string | null>(() => {
+    try {
+      const id = new URLSearchParams(window.location.search).get('order') ?? '';
+      return /^[A-Za-z0-9_-]{1,64}$/.test(id) ? id : null;
+    } catch {
+      return null;
+    }
+  });
+  // …once. The parameter is taken off the address after it has been read, so
+  // coming back to this tab later opens the board, not that order again.
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has('order')) return;
+      url.searchParams.delete('order');
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      /* no history API — the modal still opened */
+    }
+  }, []);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
@@ -554,6 +576,7 @@ export default function OrdersBoard() {
                 onAdvance={advance}
                 advancing={advancing === o.id}
                 deleting={deletingId === o.id}
+                latin={latin}
               />
             ))}
           </div>

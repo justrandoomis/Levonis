@@ -73,7 +73,7 @@ const STRINGS = {
     passwordShow: 'إظهار كلمة المرور',
     passwordHide: 'إخفاء كلمة المرور',
     passwordTooShort: 'كلمة المرور يجب أن تكون 8 محارف على الأقل، أو اتركها فارغة.',
-    referralApplied: 'كود الإحالة المرفق:',
+    referralApplied: 'كود الدعم المرفق:',
   },
   en: {
     introSignin: 'Sign in with your Telegram-verified phone number — no password.',
@@ -123,7 +123,7 @@ const STRINGS = {
     passwordShow: 'Show password',
     passwordHide: 'Hide password',
     passwordTooShort: 'The password must be at least 8 characters, or left empty.',
-    referralApplied: 'Referral code attached:',
+    referralApplied: 'Support code attached:',
   },
   ckb: {
     introSignin: 'بە ژمارە تەلەفۆنە پشتڕاستکراوەکەت لە ڕێگەی تەلەگرامەوە بچۆرەژوورەوە — بەبێ وشەی نهێنی.',
@@ -173,7 +173,7 @@ const STRINGS = {
     passwordShow: 'پیشاندانی وشەی نهێنی',
     passwordHide: 'شاردنەوەی وشەی نهێنی',
     passwordTooShort: 'وشەی نهێنی دەبێت لانیکەم ٨ نووسە بێت، یان بەتاڵی بهێڵەرەوە.',
-    referralApplied: 'کۆدی بانگهێشتی هاوپێچ:',
+    referralApplied: 'کۆدی پاڵپشتی هاوپێچ:',
   },
 } as const;
 
@@ -492,6 +492,10 @@ export default function TelegramAuth({ mode, onSuccess, onSwitchMode, referralCo
         if (password) body.password = password;
         const ref = (referralCode ?? '').trim();
         if (ref) body.referralCode = ref;
+        // The language this page is being read in becomes the account's own,
+        // so its Telegram and WhatsApp notices arrive in it. Without this the
+        // server stored the column's English default for every phone account.
+        body.lang = lang;
       }
       await api.post('/api/auth/telegram/complete', body);
       await finish();

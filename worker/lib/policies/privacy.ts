@@ -65,11 +65,17 @@ import type { PolicyDocument } from './types';
  *     text rather than show a customer a `{{TOKEN}}`. They are still authored
  *     below, and each one returns of its own accord the moment its value is
  *     written in and the version moves again.
+ *
+ * VERSION 3 — WHY IT MOVED. The archive keeps version 2 byte for byte.
+ *   * THE FACTS. worker/lib/policies/facts.ts now states `BREACH_NOTIFICATION_HOURS`, `COMPETENT_COURT`, `GOVERNING_LAW_JURISDICTION`, `LEVONIS_SUPPORT_CONTACT`,
+ *     so the clauses that carried them are published instead of withheld.
+ *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
+ *     by number, an article of this document that is itself withheld.
  */
 export const privacy: PolicyDocument = {
   key: 'privacy',
-  version: 2,
-  effective_at: '2026-01-01',
+  version: 3,
+  effective_at: '2026-09-23',
   title: {
     ar: 'سياسة الخصوصية',
     en: 'Privacy Policy',
@@ -285,7 +291,7 @@ export const privacy: PolicyDocument = {
 لا تُحفظ كلمة المرور نصاً صريحاً، ولا يستطيع الموظف قراءتها.
 
 ### 11.5 حدود ما يُوعد به
-لا يوجد نظام محصَّن مطلقاً. ويلتزم المتجر عند وقوع خرق يمس بيانات الزبائن بإبلاغ المتأثرين خلال {{BREACH_NOTIFICATION_HOURS}} من العلم به، مع بيان ما وقع وما يُنصح به.
+لا يوجد نظام محصَّن مطلقاً. ويلتزم المتجر عند وقوع خرق يمس بيانات الزبائن بإبلاغ المتأثرين خلال {{BREACH_NOTIFICATION_HOURS}} ساعة من العلم به، مع بيان ما وقع وما يُنصح به.
 
 ## 12. ملفات تعريف الارتباط والتخزين المحلي
 
@@ -328,7 +334,7 @@ export const privacy: PolicyDocument = {
 عند التعارض في مسألة بيانات بين هذه الوثيقة وغيرها من وثائق المتجر، تسري هذه الوثيقة.
 
 ### 13.4 القانون والاختصاص
-يسري {{GOVERNING_LAW_JURISDICTION}}، وتختص {{COMPETENT_COURT}}.`,
+تسري على هذه الوثيقة {{GOVERNING_LAW_JURISDICTION}}، والاختصاص ل{{COMPETENT_COURT}}.`,
     en: `## 1. Preliminary
 
 ### 1.1 Purpose
@@ -538,7 +544,7 @@ The session is shared between the main domain and merchant domains so that purch
 A password is never stored in clear and cannot be read by a staff member.
 
 ### 11.5 The limit of what is promised
-No system is absolutely secure. Should a breach affecting customer data occur, the Store undertakes to notify those affected within {{BREACH_NOTIFICATION_HOURS}} of becoming aware, stating what happened and what is advised.
+No system is absolutely secure. Should a breach affecting customer data occur, the Store undertakes to notify those affected within {{BREACH_NOTIFICATION_HOURS}} hours of becoming aware, stating what happened and what is advised.
 
 ## 12. Cookies and local storage
 
@@ -581,7 +587,7 @@ This document is amended by a new version; acceptance of the new version is requ
 On a data question, this document prevails over the Store's other documents.
 
 ### 13.4 Governing law and forum
-{{GOVERNING_LAW_JURISDICTION}} applies and {{COMPETENT_COURT}} has jurisdiction.`,
+This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} have jurisdiction.`,
     ckb: `## 1. پێشەکی
 
 ### 1.1 مەبەستی ئەم بەڵگەنامەیە
@@ -791,7 +797,7 @@ On a data question, this document prevails over the Store's other documents.
 وشەی نهێنی هەرگیز بە دەقی ڕوون هەڵناگیرێت و کارمەند ناتوانێت بیخوێنێتەوە.
 
 ### 11.5 سنووری ئەوەی بەڵێنی پێدەدرێت
-هیچ سیستەمێک بە تەواوی پارێزراو نییە. ئەگەر پێشێلکارییەک ڕوویدا کە کاریگەری لەسەر داتای کڕیاران هەبێت، فرۆشگا پابەندە بە ئاگادارکردنەوەی کاریگەربووەکان لە ماوەی {{BREACH_NOTIFICATION_HOURS}} لە ئاگاداربوونیەوە، لەگەڵ ڕوونکردنەوەی ئەوەی ڕوویداوە و ئەوەی ڕاسپاردە دەکرێت.
+هیچ سیستەمێک بە تەواوی پارێزراو نییە. ئەگەر پێشێلکارییەک ڕوویدا کە کاریگەری لەسەر داتای کڕیاران هەبێت، فرۆشگا پابەندە بە ئاگادارکردنەوەی کاریگەربووەکان لە ماوەی {{BREACH_NOTIFICATION_HOURS}} کاتژمێر لە ئاگاداربوونیەوە، لەگەڵ ڕوونکردنەوەی ئەوەی ڕوویداوە و ئەوەی ڕاسپاردە دەکرێت.
 
 ## 12. کوکی و هەڵگرتنی ناوخۆیی
 

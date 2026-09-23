@@ -85,6 +85,7 @@ import {
 import { conditionKindLabel, type ConditionEntry } from '../lib/condition';
 import { resolveOrderType, resolveTransport, routeIsUsable } from '../lib/productSelection';
 import { useMoney } from '../CurrencyContext';
+import { CommunityStoreLink } from './community/access';
 
 // ------------------------------------------------------------------ strings
 
@@ -1938,6 +1939,20 @@ export default function Product() {
     if (n <= 5) return { text: s.levelLeft.replace('{n}', String(n)), cls: 'text-amber-300' };
     return { text: s.levelAvail.replace('{n}', String(n)), cls: 'text-emerald-300' };
   };
+  /**
+   * AND PER VALUE, NOT ONLY PER PAGE. `levelChip` is gated on the order type
+   * the page is in, but a pill labels ONE model: while the buyer holds a
+   * direct-sale model, a sibling that is sold only by pre-order would still
+   * read its empty shelf and wear «نفد» — a verdict about a shelf that model
+   * is never sold from. So a value whose own cells (or legacy
+   * `availability_type`) offer no enabled direct sale gets no shelf chip.
+   */
+  const optionSellsDirect = (opt: OptionItem | undefined): boolean => {
+    if (!opt) return true;
+    const cells = opt.fulfillments ?? [];
+    if (cells.length > 0) return cells.some((c) => c.fulfillment_type === 'direct_sale' && c.enabled !== false);
+    return opt.availability_type !== 'pre_order';
+  };
   // The plans priced for the CURRENT selection once a quote landed, else the
   // base-selection list the detail endpoint priced. Either way the dinar beside
   // each option is the server's.
@@ -2778,11 +2793,13 @@ export default function Product() {
                     const selected = groupSelected === value.id;
                     const option = options.find((item) => item.id === value.id);
                     const label = option ? pickName(option.name_en, option.name, option.name_ar) : value.name_en || value.id;
-                    const chip = invMode === 'OPTION'
-                      ? levelChip(availByValue.get(value.id))
-                      : invMode === 'VARIANT_COMBINATION'
-                        ? levelChip(variantTotalForOption(value.id))
-                        : null;
+                    const chip = !optionSellsDirect(option)
+                      ? null
+                      : invMode === 'OPTION'
+                        ? levelChip(availByValue.get(value.id))
+                        : invMode === 'VARIANT_COMBINATION'
+                          ? levelChip(variantTotalForOption(value.id))
+                          : null;
                     return (
                       <button
                         key={value.id}
@@ -2905,11 +2922,15 @@ export default function Product() {
                 {activeModel.options.map((opt) => {
                   const selected = optionId === opt.id;
                   const isPre = opt.availability_type === 'pre_order';
-                  const chip = invMode === 'OPTION'
-                    ? levelChip(availByValue.get(opt.id))
-                    : invMode === 'VARIANT_COMBINATION'
-                      ? levelChip(variantTotalForOption(opt.id))
-                      : null;
+                  // The «طلب مسبق» button never carries a shelf verdict, even
+                  // while the page itself is on the direct sibling.
+                  const chip = isPre || !optionSellsDirect(opt)
+                    ? null
+                    : invMode === 'OPTION'
+                      ? levelChip(availByValue.get(opt.id))
+                      : invMode === 'VARIANT_COMBINATION'
+                        ? levelChip(variantTotalForOption(opt.id))
+                        : null;
                   const wait = pick(lang as Lang, opt.lead_time_text_ar, opt.lead_time_text, opt.lead_time_text_ckb);
                   return (
                     <button
@@ -2982,11 +3003,13 @@ export default function Product() {
             {options.map((opt) => {
               const selected = optionId === opt.id;
               const label = pickName(opt.name_en, opt.name, opt.name_ar) || opt.id;
-              const chip = invMode === 'OPTION'
-                ? levelChip(availByValue.get(opt.id))
-                : invMode === 'VARIANT_COMBINATION'
-                  ? levelChip(variantTotalForOption(opt.id))
-                  : null;
+              const chip = !optionSellsDirect(opt)
+                ? null
+                : invMode === 'OPTION'
+                  ? levelChip(availByValue.get(opt.id))
+                  : invMode === 'VARIANT_COMBINATION'
+                    ? levelChip(variantTotalForOption(opt.id))
+                    : null;
               return (
                 <button
                   key={opt.id}
@@ -3540,9 +3563,11 @@ export default function Product() {
                 {source === 'community' && product.merchant ? (
                   <>
                     {s.communityStore} · {product.merchant.name}
-                    <Link to={`/community/store/${product.merchant.id}`} className="underline underline-offset-2 ms-1">
+                    {/* The in-site store page is behind the community wall;
+                        while it is shut this goes to the store's own site. */}
+                    <CommunityStoreLink id={product.merchant.id} className="underline underline-offset-2 ms-1">
                       {s.visitStore}
-                    </Link>
+                    </CommunityStoreLink>
                   </>
                 ) : (
                   <>{s.officialStore} · Levonis</>

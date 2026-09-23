@@ -1,8 +1,8 @@
 import React from 'react';
-import { Crown } from 'lucide-react';
+import { ChevronRight, Crown, MessageSquare } from 'lucide-react';
 import type { Language } from '../../translations';
 import type { Claim } from './types';
-import { fmtDate, stageStep } from './types';
+import { fmtDate, fmtInt, stageStep } from './types';
 import type { WarrantyStrings } from './strings';
 import { CARD, FOCUS } from './ui';
 
@@ -78,6 +78,17 @@ export function PriorityBadge({ s }: { s: WarrantyStrings }) {
   );
 }
 
+/**
+ * One claim in «مطالباتي» — and, above all, a DOOR TO ITS CONVERSATION.
+ *
+ * The owner: «لا يوجد هنالك توضيح أو زر معين يظهر أن عند الضغط على مطالباتي …
+ * تفتح المحادثة». The whole card always opened the thread, but nothing on it
+ * said so: it read as a status panel, and a customer waiting for the warranty
+ * team had no reason to tap it. The last row now says what the tap does
+ * («فتح المحادثة»), how much is in there, and — the part that makes it worth
+ * tapping today — «رد جديد من الفريق» when the team wrote since the customer
+ * last looked (the server's `unread`, never guessed here).
+ */
 export function ClaimCard({
   claim,
   lang,
@@ -89,12 +100,18 @@ export function ClaimCard({
   s: WarrantyStrings;
   onOpen: (claim: Claim, trigger: HTMLElement) => void;
 }) {
+  const count = claim.message_count ?? 0;
+  const unread = claim.unread === true;
   return (
     <button
       type="button"
       onClick={(e) => onOpen(claim, e.currentTarget)}
-      className={`w-full text-start ${CARD} p-4 hover:border-zinc-700 transition-colors ${FOCUS}`}
+      className={`w-full text-start ${CARD} p-4 hover:border-zinc-700 transition-colors ${FOCUS} ${
+        unread ? 'border-[#BAA369]/50' : ''
+      }`}
       data-claim-id={claim.id}
+      data-claim-unread={unread ? '1' : '0'}
+      aria-label={`${claim.subject} — ${s.openThread}${unread ? ` · ${s.newReply}` : ''}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -125,6 +142,26 @@ export function ClaimCard({
           <span className="text-zinc-400 font-bold">{s.decisionReason}:</span> {claim.decision_reason}
         </p>
       )}
+
+      <span className="mt-3 pt-3 border-t border-zinc-800/80 flex items-center gap-2 min-h-[28px]" data-claim-open-thread={claim.id}>
+        <MessageSquare aria-hidden="true" className="w-4 h-4 text-[#BAA369] shrink-0" />
+        <span className="text-[13px] font-bold text-[#BAA369] whitespace-nowrap">{s.openThread}</span>
+        {claim.message_count !== undefined && (
+          <span className="text-[12px] text-zinc-500 tabular-nums truncate">· {s.messagesCount(count, fmtInt(count, lang))}</span>
+        )}
+        <span className="ms-auto flex items-center gap-2 shrink-0">
+          {unread && (
+            <span
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#BAA369] text-black text-[11px] font-bold whitespace-nowrap"
+              data-claim-new-reply={claim.id}
+            >
+              <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-black/70" />
+              {s.newReply}
+            </span>
+          )}
+          <ChevronRight aria-hidden="true" className="w-4 h-4 text-zinc-600 rtl:rotate-180" />
+        </span>
+      </span>
     </button>
   );
 }

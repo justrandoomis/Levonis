@@ -28,9 +28,9 @@ const MESSAGES: Record<string, { ar: string; en: string; ckb: string }> = {
     ckb: 'ئاستێکی بەرزترت هەیە — دوای بەسەرچوونی ئەندامێتیی ئێستات دەتوانیت بۆ ئاستی نزمتر بگۆڕیت.',
   },
   ALREADY_PREPAID: {
-    ar: 'لديك بالفعل حجز مدفوع مسبقًا لهذه الفئة بانتظار الإطلاق.',
-    en: 'You already hold a prepaid reservation of this tier awaiting the launch.',
-    ckb: 'پێشتر پارێزگاریی پێشپارەدراوت بۆ ئەم ئاستە هەیە کە چاوەڕێی دەستپێکردنە.',
+    ar: 'لديك بالفعل اشتراك مدفوع مسبقًا لهذه الفئة قيد التفعيل.',
+    en: 'You already hold a prepaid membership of this tier that is being activated.',
+    ckb: 'پێشتر ئەندامێتیی پێشپارەدراوت بۆ ئەم ئاستە هەیە — لە چالاککردندایە.',
   },
   PLAN_UNPRICED: {
     ar: 'هذه الخطة غير متاحة للشراء بعد — لم يُحدد سعرها.',

@@ -738,8 +738,8 @@ test('the index STAMP is unreachable from the search side', async () => {
    * The stamp is a row in the same table the shopper's query scans, so the one
    * thing it must never do is turn up as a result. `normalizeText` drops
    * everything that is not a letter or a digit, so no typed query can produce
-   * a token beginning with U+0000 and no prefix range built from those tokens
-   * can reach one.
+   * a token beginning with '#' and no prefix range built from those tokens
+   * can reach one — '#' sorts below every digit and letter a range starts at.
    */
   const raw = await shop();
   const db = asD1(raw);
@@ -747,10 +747,14 @@ test('the index STAMP is unreachable from the search side', async () => {
     n: number;
   };
   assert.ok(stamped.n > 0, 'the fixture is stamped, so this test is asking a real question');
-  // The stamp's only letters and digits survive normalisation; the U+0000
-  // that makes it unreachable does not, so no typed query can spell it.
-  assert.equal(normalizeText(INDEX_STAMP), 'doc 2', 'a query can never carry the stamp’s own shape');
-  for (const q of [INDEX_STAMP, '\u0000', '\u0000doc', 'doc:2']) {
+  // The stamp's only letters and digits survive normalisation; the '#' that
+  // makes it unreachable does not, so no typed query can spell it.
+  assert.equal(normalizeText(INDEX_STAMP), `doc ${INDEX_STAMP.slice('#doc:'.length)}`, 'a query can never carry the stamp’s own shape');
+  assert.ok(INDEX_STAMP < '0', 'and it sorts below every range a query token can open');
+  // A one-letter query opens the widest range there is, and still never
+  // reaches it: the stamp is not a word anybody's letter can complete.
+  assert.ok(!(await searchProducts(db, 'd')).understood.includes(INDEX_STAMP), 'a letter never completes to the stamp');
+  for (const q of [INDEX_STAMP, '#', '#doc', 'doc:3', 'doc:4', '\u0000doc:2']) {
     const got = await searchProducts(db, q);
     assert.deepEqual(got.ids, [], `«${JSON.stringify(q)}» must match nothing through the stamp`);
   }

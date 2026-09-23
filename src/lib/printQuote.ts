@@ -67,6 +67,15 @@ export interface QuotePrinter {
   multi_material: string;
   enclosed: boolean;
   materials: string[];
+  /**
+   * Opaque labels from the Worker (`printerPriceSignature`): two printers with
+   * the same `price_group` quote ONE piece in ONE material identically on the
+   * file door, and two with the same `untimed_price_group` quote a grams job
+   * with no stated time identically. Used only to say so honestly — never to
+   * compute a price.
+   */
+  price_group?: string;
+  untimed_price_group?: string;
 }
 
 export interface QuoteMaterial {

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, ClipboardList, Crown, Printer } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, ClipboardList, Crown, MessageSquare, Printer } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
 import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
@@ -39,12 +39,19 @@ import { CARD, FOCUS, OK_BOX } from '../components/warranty/ui';
  * Every window is the house Overlay/Sheet: it arrives from the control that
  * raised it and leaves the same way. Data flows one way — the server says what
  * the coverage is, and this page draws exactly that.
+ *
+ * `?claim=<id>` OPENS THAT CLAIM'S CONVERSATION. It is the address every
+ * warranty notification carries (worker/lib/engagementNotify.ts
+ * `warrantyClaimLink`) — «رد من فريق الضمان» in the bell lands the customer IN
+ * the thread, not on a list they then have to search.
  */
 
 export default function Warranty() {
   const navigate = useNavigate();
   const { lang, dir } = useLanguage();
   const s = WARRANTY_STRINGS[lang];
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepClaim = searchParams.get('claim');
 
   const goBack = () => {
     // navigate(-1) is a no-op when the page was opened directly (deep link,
@@ -77,6 +84,7 @@ export default function Warranty() {
   const threadAnchor = useRef<HTMLElement | null>(null);
   const [claimForDevice, setClaimForDevice] = useState<Device | null>(null);
   const [openClaimId, setOpenClaimId] = useState<string | null>(null);
+  const [threadNotice, setThreadNotice] = useState('');
 
   const [unlinkDevice, setUnlinkDevice] = useState<Device | null>(null);
   const [unlinkOpen, setUnlinkOpen] = useState(false);
@@ -112,6 +120,15 @@ export default function Warranty() {
     loadDevices();
     loadClaims();
   }, [loadDevices, loadClaims]);
+
+  // A notification's link: open the thread it names. Keyed on the id, so a
+  // second notification tapped while this page is open opens its own claim.
+  useEffect(() => {
+    if (!deepClaim) return;
+    threadAnchor.current = null;
+    setClaims((prev) => prev.map((cl) => (cl.id === deepClaim ? { ...cl, unread: false } : cl)));
+    setOpenClaimId(deepClaim);
+  }, [deepClaim]);
 
   // Success notices are transient: they confirm, then get out of the way.
   useEffect(() => {
@@ -176,8 +193,43 @@ export default function Warranty() {
     }
   };
 
-  const onClaimSubmitted = () => {
-    setClaimsNotice(s.claimSubmitted);
+  /**
+   * Opening a thread is READING it: the card drops «رد جديد» at once, and the
+   * server records the same when the thread loads (GET /claims/:id stamps
+   * `customer_seen_at`), so the next list agrees.
+   */
+  const openThread = (claimId: string, trigger: HTMLElement | null) => {
+    threadAnchor.current = trigger;
+    setClaims((prev) => prev.map((cl) => (cl.id === claimId ? { ...cl, unread: false } : cl)));
+    setThreadNotice('');
+    setOpenClaimId(claimId);
+  };
+
+  const closeThread = () => {
+    setOpenClaimId(null);
+    setThreadNotice('');
+    // The link that opened it is spent: a refresh must not open it again.
+    if (searchParams.has('claim')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('claim');
+      setSearchParams(next, { replace: true });
+    }
+    // The thread may have grown while it was open.
+    loadClaims();
+  };
+
+  const onClaimSubmitted = (result: { id: string; replay: boolean }) => {
+    if (result.replay) {
+      // The stored claim kept its FIRST version; what the customer added on
+      // the retry was not saved. Say so, and open the one place it can still
+      // be sent — the claim's own conversation.
+      setClaimsNotice(s.claimReplayNotice);
+      setThreadNotice(s.claimReplayNotice);
+      threadAnchor.current = claimAnchor.current;
+      setOpenClaimId(result.id);
+    } else {
+      setClaimsNotice(s.claimSubmitted);
+    }
     loadClaims();
     // open_claims on the card changes too.
     loadDevices();
@@ -284,6 +336,14 @@ export default function Warranty() {
             </h2>
             {claims.length > 0 && <span className="text-zinc-500 text-[12px] tabular-nums">{fmtInt(claims.length, lang)}</span>}
           </div>
+          {/* WHAT A TAP ON A CLAIM DOES, said before anyone has to guess —
+              «لا يوجد هنالك توضيح … أن عند الضغط على مطالباتي تفتح المحادثة». */}
+          {claims.length > 0 && (
+            <p className="text-zinc-400 text-[12px] leading-relaxed flex items-start gap-1.5" data-claims-hint>
+              <MessageSquare aria-hidden="true" className="w-3.5 h-3.5 mt-0.5 text-[#BAA369] shrink-0" />
+              <span>{s.claimsHint}</span>
+            </p>
+          )}
           {claimsNotice && (
             <div role="status" className={OK_BOX}>
               {claimsNotice}
@@ -323,10 +383,7 @@ export default function Warranty() {
                   claim={cl}
                   lang={lang}
                   s={s}
-                  onOpen={(claim, trigger) => {
-                    threadAnchor.current = trigger;
-                    setOpenClaimId(claim.id);
-                  }}
+                  onOpen={(claim, trigger) => openThread(claim.id, trigger)}
                 />
               ))}
             </div>
@@ -343,7 +400,14 @@ export default function Warranty() {
         onClose={() => setClaimForDevice(null)}
         onSubmitted={onClaimSubmitted}
       />
-      <ClaimThreadOverlay claimId={openClaimId} anchor={threadAnchor} lang={lang} s={s} onClose={() => setOpenClaimId(null)} />
+      <ClaimThreadOverlay
+        claimId={openClaimId}
+        anchor={threadAnchor}
+        lang={lang}
+        s={s}
+        onClose={closeThread}
+        notice={threadNotice}
+      />
       <UnlinkSheet
         device={unlinkDevice}
         open={unlinkOpen}

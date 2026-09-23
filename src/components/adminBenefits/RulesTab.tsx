@@ -13,7 +13,7 @@
  * percentage.
  */
 import { useMemo, useRef, useState } from 'react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
 import * as T from '../adminProducts/theme';
 import { api } from '../../lib/api';
 import {
@@ -25,11 +25,13 @@ import {
   Table,
   Toolbar,
   cell,
+  errMsg,
   useLoc,
   type CatalogNode,
   type NoticeState,
 } from '../adminTaxonomy/shared';
 import RuleDialog from './RuleDialog';
+import ConsolidationPanel from './ConsolidationPanel';
 import {
   CAP_LABEL,
   FIELD_LABEL,
@@ -46,6 +48,17 @@ import {
   type BenefitSchema,
   type BenefitType,
 } from './shared';
+
+/** One suggestion from GET /recommended, as the confirmation lists it. */
+interface RecommendedEntry {
+  key: string;
+  category_name_ar: string;
+  category_name_en: string;
+  rule: Pick<
+    BenefitRule,
+    'tier' | 'category_id' | 'discount_mode' | 'percent' | 'fixed_iqd' | 'max_discount_iqd' | 'cap_scope' | 'enabled'
+  >;
+}
 
 interface Props {
   rules: BenefitRule[];
@@ -72,6 +85,71 @@ export default function RulesTab({ rules, schema, catalogs, productNames, notes,
   // The deleted row takes the button the dialog would restore focus to with
   // it, so the "new rule" button is where focus lands instead of the body.
   const addRef = useRef<HTMLButtonElement>(null);
+  const [seeding, setSeeding] = useState(false);
+  const [suggest, setSuggest] = useState<RecommendedEntry[] | null>(null);
+
+  /**
+   * «إضافة القيم المقترحة» — the owner's starting section rules (PRO printers
+   * 10% up to 100,000 per unit, PREMIUM printers 25,000 per unit, …) against
+   * the sections that exist in THIS store. Nothing is written on the click:
+   * GET /recommended lists what would be created, a dialog shows each rule
+   * (tier, section, figure, live or switched off), and only the confirmed
+   * list is POSTed. The server never overwrites a tier and section that
+   * already have a rule, and creates every non-printer suggestion switched off.
+   */
+  const previewRecommended = async () => {
+    setSeeding(true);
+    try {
+      const out = await api.get<{ entries: RecommendedEntry[] }>('/api/admin/membership-benefits/recommended');
+      const entries = out.entries ?? [];
+      if (entries.length === 0) {
+        notify(
+          'info',
+          loc(
+            'لا شيء لإضافته: كل قسم مقترح له قاعدة بالفعل، أو لا يوجد قسم مطابق في المتجر.',
+            'Nothing to add: every suggested section already has a rule, or the store has no matching section.'
+          )
+        );
+      } else {
+        setSuggest(entries);
+      }
+    } catch (e) {
+      notify('bad', errMsg(e));
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const addRecommended = async (entries: RecommendedEntry[]) => {
+    const out = await api.post<{ created: Array<{ id: string }> }>('/api/admin/membership-benefits/recommended', {
+      keys: entries.map((e) => e.key),
+    });
+    await reload();
+    setSuggest(null);
+    const created = out.created?.length ?? 0;
+    notify(
+      created > 0 ? 'ok' : 'info',
+      created > 0
+        ? loc(`أُضيفت ${created} قاعدة مقترحة.`, `${created} recommended rules added.`)
+        : loc(
+            'لم يُضف شيء: أُضيفت قاعدة لهذه الأقسام في الأثناء.',
+            'Nothing added: these sections were given a rule in the meantime.'
+          )
+    );
+  };
+
+  /** A suggested rule's figure, with the server's units. */
+  const suggestedFigure = (rule: RecommendedEntry['rule']): string => {
+    const parts: string[] = [];
+    if (rule.discount_mode === 'percent' && rule.percent !== null) parts.push(fmtValue(schema, 'percent', rule.percent, loc));
+    if (rule.discount_mode === 'fixed' && rule.fixed_iqd !== null) parts.push(fmtValue(schema, 'fixed_iqd', rule.fixed_iqd, loc));
+    // A ceiling equal to the fixed amount says nothing the amount did not.
+    if (rule.max_discount_iqd !== null && !(rule.discount_mode === 'fixed' && rule.fixed_iqd === rule.max_discount_iqd)) {
+      parts.push(`${loc('حتى', 'up to')} ${fmtValue(schema, 'max_discount_iqd', rule.max_discount_iqd, loc)}`);
+    }
+    if (rule.cap_scope) parts.push(phrase(CAP_LABEL[rule.cap_scope], loc, rule.cap_scope));
+    return parts.join(' · ');
+  };
 
   /** The section, sub-section or product a rule names, in words. */
   const targetOf = (rule: BenefitRule): string | null => {
@@ -176,13 +254,25 @@ export default function RulesTab({ rules, schema, catalogs, productNames, notes,
     <div className="space-y-5" data-mb-panel="rules">
       <Toolbar>
         <SearchBox value={q} onChange={setQ} placeholder={loc('بحث في القواعد…', 'Search rules…')} testId="benefits" />
-        <div className="ms-auto">
+        <div className="ms-auto flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={T.btnSecondary}
+            onClick={() => void previewRecommended()}
+            disabled={seeding}
+            data-mb-recommended
+          >
+            <Sparkles className="w-4 h-4" aria-hidden />
+            {loc('إضافة القيم المقترحة', 'Add recommended values')}
+          </button>
           <button ref={addRef} type="button" className={T.btnPrimary} onClick={() => setEdit('new')} data-mb-add>
             <Plus className="w-4 h-4" aria-hidden />
             {loc('قاعدة جديدة', 'New rule')}
           </button>
         </div>
       </Toolbar>
+
+      <ConsolidationPanel rules={rules} schema={schema} reload={reload} notify={notify} />
 
       {tiers.map((tier) => {
         const mine = visible.filter((r) => r.tier === tier);
@@ -338,6 +428,43 @@ export default function RulesTab({ rules, schema, catalogs, productNames, notes,
             );
           }}
         />
+      )}
+
+      {suggest && (
+        <Dialog
+          titleAr="إضافة القيم المقترحة"
+          titleEn="Add recommended values"
+          saveLabel={loc('إضافة', 'Add')}
+          onClose={() => setSuggest(null)}
+          onSave={() => addRecommended(suggest)}
+          testId="add-recommended-benefit-rules"
+        >
+          <p className="text-[13px] text-[var(--ap-text-1)]">
+            {loc('ستُنشأ هذه القواعد على أقسام المتجر:', 'These rules will be created on the store’s sections:')}
+          </p>
+          <ul className="space-y-1.5" data-mb-recommended-list>
+            {suggest.map((e) => (
+              <li key={e.key} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px]" data-mb-recommended-entry={e.key}>
+                <span className={`${T.badgeBase} ${tierChip(e.rule.tier)}`}>{tierName(e.rule.tier)}</span>
+                <span className="font-semibold text-[var(--ap-text-1)]">
+                  {loc(e.category_name_ar || e.rule.category_id || '', e.category_name_en || e.rule.category_id || '')}
+                </span>
+                <span className="tabular-nums text-[var(--ap-text-2)]">{suggestedFigure(e.rule)}</span>
+                {e.rule.enabled ? (
+                  <Badge tone="warn">{loc('تُطبَّق فورًا', 'Applies immediately')}</Badge>
+                ) : (
+                  <Badge tone="info">{loc('معطّلة — فعّلها بنفسك', 'Off — turn it on yourself')}</Badge>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="text-[12px] text-[var(--ap-text-3)]">
+            {loc(
+              'قاعدتا الطابعات هما أرقامك وتُطبَّقان على الطلبات الجديدة فور الإضافة. أي اقتراح آخر يُنشأ معطّلًا ولا يخصم شيئًا حتى تراجعه وتفعّله. كل قاعدة قابلة للتعديل أو الحذف لاحقًا.',
+              'The two printer rules are your figures and apply to new orders as soon as they are added. Any other suggestion is created switched off and discounts nothing until you review and enable it. Every rule can be edited or deleted later.'
+            )}
+          </p>
+        </Dialog>
       )}
 
       {del && (

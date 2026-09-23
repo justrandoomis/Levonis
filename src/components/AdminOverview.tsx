@@ -35,6 +35,11 @@ interface OverviewStats {
   /** Tickets whose ball is on THIS side of the desk: `open` + `waiting_staff`
    *  (worker/routes/admin.ts). `waiting_customer` is not a queue. */
   support_tickets_waiting: number;
+  /** Order threads with a customer line no staff member has seen, and
+   *  complaints still `submitted`/`under_review` (worker/routes/adminChats.ts).
+   *  Absent from an older Worker, hence optional. */
+  support_chats_unread?: number;
+  support_complaints_open?: number;
 }
 
 interface RecentOrder {
@@ -287,9 +292,17 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
             tab with no count anywhere on the dashboard, so a waiting customer
             was invisible until somebody thought to open the tab. It is also a
             DOOR: the card navigates straight into the queue it counts. */}
+        {/* Tickets, order-chat messages and complaints — the console has
+            three queues now, and a tile counting one of them would call a
+            waiting customer "nothing waiting". The number is the SUM of the
+            same three counts the sidebar badge shows. */}
         {statCard(
-          dir === 'rtl' ? 'تذاكر بانتظار الرد' : 'Tickets awaiting a reply',
-          stats.support_tickets_waiting.toLocaleString(),
+          dir === 'rtl' ? 'بانتظار رد الدعم' : 'Awaiting a support reply',
+          (
+            (stats.support_tickets_waiting || 0) +
+            (stats.support_chats_unread || 0) +
+            (stats.support_complaints_open || 0)
+          ).toLocaleString(),
           <LifeBuoy className="w-5 h-5 text-sky-400" />,
           'bg-sky-500/10',
           onNavigateTab ? () => onNavigateTab('support') : undefined

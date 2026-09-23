@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 import {
   Barcode, RefreshCw, Search, ShieldCheck, AlertTriangle, Repeat, CalendarClock,
-  MessageSquare, Send, ChevronDown, ChevronUp, PackageCheck, Unlink, X, Crown,
+  MessageSquare, Send, ChevronDown, ChevronUp, PackageCheck, Unlink, X, Crown, History,
 } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import { Overlay } from './ui/Overlay';
 import { dateLocale } from './orders/format';
+import UnitHistory from './adminWarranty/UnitHistory';
 
 /**
  * Admin — serialized devices: order-units view with serial entry, per-unit
@@ -29,6 +30,10 @@ const STRINGS = {
     notSerialized: 'لا يحتوي هذا الطلب على منتجات مُرقّمة (ops_policy.serialized).',
     backfill: 'إنشاء الوحدات (إعادة المحاولة آمنة)',
     backfillDone: (n: number) => `تم إنشاء ${n} وحدة.`,
+    backfillAll: 'إنشاء وحدات كل الطلبات المُسلَّمة الناقصة',
+    backfillAllHint: 'طابعات سُلِّمت عبر شركة التوصيل قبل أن يُنشئ التسليم وحداتها. يُصلحها النظام تلقائيًا كل دورة، وهذا الزر يُصلحها الآن.',
+    backfillAllDone: (orders: number, units: number) => `تم إنشاء ${units} وحدة في ${orders} طلب.`,
+    backfillAllMore: 'بقيت طلبات أخرى — اضغط مرة أخرى.',
     orderNotDelivered: 'تُنشأ الوحدات من حدث التسليم — هذا الطلب غير مُسلَّم بعد.',
     unit: 'وحدة',
     serial: 'الرقم التسلسلي',
@@ -101,6 +106,12 @@ const STRINGS = {
     carriedEnd: 'هذه وحدة بديلة تحمل تاريخ نهاية الجهاز الأصلي — عدّل ضمان الوحدة الأصلية.',
     cancel: 'إلغاء',
     close: 'إغلاق',
+    warrantyStart: 'البداية',
+    history: 'سجل التعديلات',
+    hideHistory: 'إخفاء السجل',
+    loadMore: 'عرض المزيد',
+    awaitingStaff: 'الزبون ينتظر الرد',
+    messagesN: (n: number) => `${n} رسالة`,
   },
   en: {
     title: 'Serials & Devices',
@@ -114,6 +125,10 @@ const STRINGS = {
     notSerialized: 'This order has no serialized products (ops_policy.serialized).',
     backfill: 'Create units (safe to retry)',
     backfillDone: (n: number) => `${n} unit(s) created.`,
+    backfillAll: 'Create missing units for all delivered orders',
+    backfillAllHint: 'Printers the courier delivered before deliveries created their units. The system repairs them on every cron run; this button repairs them now.',
+    backfillAllDone: (orders: number, units: number) => `${units} ${units === 1 ? 'unit' : 'units'} created across ${orders} ${orders === 1 ? 'order' : 'orders'}.`,
+    backfillAllMore: 'More orders remain — press again.',
     orderNotDelivered: 'Units are created from the delivery event — this order is not delivered yet.',
     unit: 'Unit',
     serial: 'Serial',
@@ -186,6 +201,12 @@ const STRINGS = {
     carriedEnd: 'This is a replacement unit carrying the original device’s end date — change the original unit’s warranty instead.',
     cancel: 'Cancel',
     close: 'Close',
+    warrantyStart: 'Start',
+    history: 'Change history',
+    hideHistory: 'Hide history',
+    loadMore: 'Load more',
+    awaitingStaff: 'Customer waiting for a reply',
+    messagesN: (n: number) => (n === 1 ? '1 message' : `${n} messages`),
   },
   ckb: {
     title: 'ئامێرەکان و ژمارە زنجیرەییەکان',
@@ -199,6 +220,10 @@ const STRINGS = {
     notSerialized: 'ئەم داواکارییە بەرهەمی ژمارە زنجیرەیی تێدا نییە (ops_policy.serialized).',
     backfill: 'دروستکردنی یەکەکان (دووبارەکردنەوە سەلامەتە)',
     backfillDone: (n: number) => `${n} یەکە دروستکرا.`,
+    backfillAll: 'إنشاء وحدات كل الطلبات المُسلَّمة الناقصة', // OWNER: Sorani to be written by hand.
+    backfillAllHint: 'طابعات سُلِّمت عبر شركة التوصيل قبل أن يُنشئ التسليم وحداتها. يُصلحها النظام تلقائيًا كل دورة، وهذا الزر يُصلحها الآن.', // OWNER: Sorani to be written by hand.
+    backfillAllDone: (orders: number, units: number) => `تم إنشاء ${units} وحدة في ${orders} طلب.`, // OWNER: Sorani to be written by hand.
+    backfillAllMore: 'بقيت طلبات أخرى — اضغط مرة أخرى.', // OWNER: Sorani to be written by hand.
     orderNotDelivered: 'یەکەکان لە ڕووداوی گەیاندنەوە دروستدەکرێن — ئەم داواکارییە هێشتا نەگەیەنراوە.',
     unit: 'یەکە',
     serial: 'ژمارە زنجیرەیی',
@@ -277,6 +302,14 @@ const STRINGS = {
     carriedEnd: 'هذه وحدة بديلة تحمل تاريخ نهاية الجهاز الأصلي — عدّل ضمان الوحدة الأصلية.', // OWNER: Sorani to be written by hand.
     cancel: 'هەڵوەشاندنەوە',
     close: 'داخستن',
+    // OWNER: the six labels below carry the ARABIC text on purpose, like the
+    // warranty-duration block above — Sorani to be written by hand.
+    warrantyStart: 'البداية', // OWNER: Sorani to be written by hand.
+    history: 'سجل التعديلات', // OWNER: Sorani to be written by hand.
+    hideHistory: 'إخفاء السجل', // OWNER: Sorani to be written by hand.
+    loadMore: 'عرض المزيد', // OWNER: Sorani to be written by hand.
+    awaitingStaff: 'الزبون ينتظر الرد', // OWNER: Sorani to be written by hand.
+    messagesN: (n: number) => `${n} رسالة`, // OWNER: Sorani to be written by hand.
   },
 } as const;
 
@@ -347,6 +380,18 @@ interface AdminClaim {
   evidence: Array<{ key: string; url: string }>;
   /** PRO membership's priority service, snapshotted when the claim was filed; the queue is sorted by it. */
   priority: boolean;
+  message_count?: number;
+  /** The customer wrote last — the thread is waiting on the warranty team. */
+  awaiting_staff?: boolean;
+}
+
+interface AdminClaimsPage {
+  claims: AdminClaim[];
+  has_more?: boolean;
+  /** The last row's keyset — passed back as `after` for «عرض المزيد». */
+  next_cursor?: string | null;
+  /** The whole queue per stage (not the page) — each filter says what it holds. */
+  counts?: Record<string, number>;
 }
 
 interface ClaimMessage {
@@ -425,6 +470,10 @@ export default function AdminSerials() {
   const [unitsNotice, setUnitsNotice] = useState('');
   const [serialDrafts, setSerialDrafts] = useState<Record<string, string>>({});
   const [busyUnit, setBusyUnit] = useState<string | null>(null);
+  // «مَن غيّر ومتى» — a unit's audit trail, opened per row, refetched after
+  // every change this screen makes so the row just written is in it.
+  const [historyOpen, setHistoryOpen] = useState<Record<string, boolean>>({});
+  const [historyTick, setHistoryTick] = useState(0);
 
   // Unlink-from-account confirmation (an in-app window, never window.confirm).
   const [unlinkTarget, setUnlinkTarget] = useState<AdminDevice | null>(null);
@@ -503,6 +552,7 @@ export default function AdminSerials() {
   }, [s.error]);
 
   const refreshCurrent = useCallback(() => {
+    setHistoryTick((n) => n + 1);
     if (orderData) loadOrder(orderData.order.id);
     else if (customerUnits && emailQuery) loadCustomer(emailQuery);
     else if (serialUnits && serialQuery) loadBySerial(serialQuery);
@@ -545,6 +595,24 @@ export default function AdminSerials() {
       await loadOrder(orderData.order.id);
     } catch (e) {
       setUnitsError(e instanceof ApiError ? e.message : s.error);
+    }
+  };
+
+  // Every delivered printer order the courier left without units, at once —
+  // the same pass the cron runs (POST /admin/units/backfill-delivered).
+  const [backfillAllBusy, setBackfillAllBusy] = useState(false);
+  const backfillAll = async () => {
+    setUnitsError('');
+    setUnitsNotice('');
+    setBackfillAllBusy(true);
+    try {
+      const res = await api.post<{ orders: number; created: number; has_more: boolean }>('/api/devices/admin/units/backfill-delivered');
+      setUnitsNotice(`${s.backfillAllDone(res.orders, res.created)}${res.has_more ? ` ${s.backfillAllMore}` : ''}`);
+      if (orderData) await loadOrder(orderData.order.id);
+    } catch (e) {
+      setUnitsError(e instanceof ApiError ? e.message : s.error);
+    } finally {
+      setBackfillAllBusy(false);
     }
   };
 
@@ -664,19 +732,33 @@ export default function AdminSerials() {
   const [claimsLoading, setClaimsLoading] = useState(false);
   const [claimsError, setClaimsError] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('all');
+  // The queue is paged by the server and filtered there too (it used to be
+  // cut at 300 rows and THEN filtered, so older claims at a stage vanished).
+  // Keyset, not page number: a claim moved to another stage while page 1 is
+  // open would otherwise shift the next page and fall between the two.
+  const [claimsCursor, setClaimsCursor] = useState<string | null>(null);
+  const [claimsHasMore, setClaimsHasMore] = useState(false);
+  const [claimCounts, setClaimCounts] = useState<Record<string, number> | null>(null);
   const [openClaim, setOpenClaim] = useState<string | null>(null);
   const [thread, setThread] = useState<ClaimMessage[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [claimBusy, setClaimBusy] = useState(false);
 
-  const loadClaims = useCallback(async () => {
+  const loadClaims = useCallback(async (after: string | null = null) => {
     setClaimsLoading(true);
     setClaimsError('');
     try {
-      const qs = stageFilter === 'all' ? '' : `?stage=${stageFilter}`;
-      const data = await api.get<{ claims: AdminClaim[] }>(`/api/devices/admin/claims${qs}`);
-      setClaims(data.claims);
+      const qs = new URLSearchParams();
+      if (after) qs.set('after', after);
+      if (stageFilter !== 'all') qs.set('stage', stageFilter);
+      const data = await api.get<AdminClaimsPage>(`/api/devices/admin/claims?${qs.toString()}`);
+      setClaims((prev) =>
+        !after ? data.claims : [...prev, ...data.claims.filter((cl) => !prev.some((p) => p.id === cl.id))]
+      );
+      setClaimsCursor(data.next_cursor ?? null);
+      setClaimsHasMore(data.has_more === true);
+      setClaimCounts(data.counts ?? null);
     } catch (e) {
       setClaimsError(e instanceof ApiError ? e.message : s.error);
     } finally {
@@ -685,7 +767,7 @@ export default function AdminSerials() {
   }, [stageFilter, s.error]);
 
   useEffect(() => {
-    if (tab === 'claims') loadClaims();
+    if (tab === 'claims') loadClaims(null);
   }, [tab, loadClaims]);
 
   const openThread = async (claimId: string) => {
@@ -720,7 +802,7 @@ export default function AdminSerials() {
     setClaimsError('');
     try {
       await api.patch(`/api/devices/admin/claims/${claim.id}`, { stage: next, reason: reason.trim() || undefined });
-      await loadClaims();
+      await loadClaims(null);
     } catch (e) {
       setClaimsError(e instanceof ApiError ? e.message : s.error);
     } finally {
@@ -761,7 +843,8 @@ export default function AdminSerials() {
           </thead>
           <tbody>
             {units.map((u) => (
-              <tr key={u.unit_id} className="border-b border-zinc-800 hover:bg-zinc-800/30 transition-colors align-top">
+              <React.Fragment key={u.unit_id}>
+              <tr className="border-b border-zinc-800 hover:bg-zinc-800/30 transition-colors align-top">
                 <td className="py-3 px-4">
                   <div className="text-sm text-white font-bold">{u.product.name_ar || u.product.name || '—'}</div>
                   <div className="text-[11px] text-zinc-500 font-mono">#{u.unit_index} · {u.unit_id}</div>
@@ -814,6 +897,9 @@ export default function AdminSerials() {
                 </td>
                 <td className="py-3 px-4">
                   <div className="text-sm text-zinc-300 whitespace-nowrap">{fmtDate(u.warranty.end_at, lang)}</div>
+                  <div className="text-[11px] text-zinc-500 whitespace-nowrap" data-unit-start={u.unit_id}>
+                    {s.warrantyStart}: {fmtDate(u.warranty.start_at, lang)}
+                  </div>
                   <div className="text-[11px] text-zinc-500">
                     {u.warranty.base_months !== null ? `${u.warranty.base_months}m` : '—'}
                     {u.warranty.ext_months > 0 ? ` +${u.warranty.ext_months}m` : ''}
@@ -879,9 +965,27 @@ export default function AdminSerials() {
                         <Unlink className="w-3 h-3" aria-hidden="true" />{s.unlink}
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => setHistoryOpen((h) => ({ ...h, [u.unit_id]: !h[u.unit_id] }))}
+                      aria-expanded={!!historyOpen[u.unit_id]}
+                      data-unit-history-toggle={u.unit_id}
+                      className="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
+                    >
+                      <History className="w-3 h-3" aria-hidden="true" />
+                      {historyOpen[u.unit_id] ? s.hideHistory : s.history}
+                    </button>
                   </div>
                 </td>
               </tr>
+              {historyOpen[u.unit_id] && (
+                <tr className="border-b border-zinc-800 bg-zinc-950/30">
+                  <td colSpan={7} className="px-4 py-3">
+                    <UnitHistory unitId={u.unit_id} lang={lang} refreshKey={historyTick} />
+                  </td>
+                </tr>
+              )}
+              </React.Fragment>
             ))}
             {units.length === 0 && (
               <tr><td colSpan={7} className="py-10 text-center text-zinc-500 font-medium">{s.noUnits}</td></tr>
@@ -950,6 +1054,18 @@ export default function AdminSerials() {
                 <Barcode className="w-4 h-4" aria-hidden="true" />{s.load}
               </button>
             </form>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+            <button
+              type="button"
+              onClick={() => void backfillAll()}
+              disabled={backfillAllBusy}
+              className="inline-flex items-center gap-1.5 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-xl px-3 py-2 text-xs font-bold hover:bg-zinc-700 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            >
+              <PackageCheck className="w-4 h-4" aria-hidden="true" />{backfillAllBusy ? s.loading : s.backfillAll}
+            </button>
+            <span>{s.backfillAllHint}</span>
           </div>
 
           {unitsError && <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-3 text-sm font-medium">{unitsError}</div>}
@@ -1244,11 +1360,16 @@ export default function AdminSerials() {
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize whitespace-nowrap transition-colors ${stageFilter === st ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                 >
                   {st === 'all' ? s.all : st}
+                  {claimCounts && claimCounts[st] !== undefined && (
+                    <span className="ms-1.5 tabular-nums text-zinc-500" data-claims-count={st}>
+                      {claimCounts[st]}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
             <button
-              onClick={loadClaims}
+              onClick={() => loadClaims(null)}
               className="p-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-zinc-300 hover:text-white transition-colors"
               title={s.refreshed}
             >
@@ -1270,7 +1391,14 @@ export default function AdminSerials() {
                     <div className="text-white font-bold text-sm">{cl.subject}</div>
                     <div className="text-[11px] text-zinc-500 mt-0.5">
                       {cl.product_name} · {cl.email || '—'} · {cl.serial ? <span className="font-mono">{cl.serial}</span> : '—'} · {fmtDate(cl.created_at, lang)}
+                      {cl.message_count !== undefined && <> · {s.messagesN(cl.message_count)}</>}
                     </div>
+                    {cl.awaiting_staff && (
+                      <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-amber-300" data-claim-awaiting={cl.id}>
+                        <MessageSquare className="w-3 h-3" aria-hidden="true" />
+                        {s.awaitingStaff}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {cl.priority && (
@@ -1354,6 +1482,17 @@ export default function AdminSerials() {
               </div>
             ))}
           </div>
+          {claimsHasMore && (
+            <button
+              type="button"
+              onClick={() => loadClaims(claimsCursor)}
+              disabled={claimsLoading}
+              data-claims-load-more
+              className="w-full min-h-[44px] rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 text-sm font-bold hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+            >
+              {claimsLoading ? s.loading : s.loadMore}
+            </button>
+          )}
         </div>
       )}
     </div>

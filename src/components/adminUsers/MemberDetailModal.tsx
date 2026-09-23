@@ -71,6 +71,7 @@ import { api, ApiError, formatIqd, formatUsdCents, formatWalletIqd } from '../..
 import { useWallet } from '../../WalletContext';
 import { useUsersStrings } from './strings';
 import { useModalFocus } from './useModalFocus';
+import { WalletAdjustPanel } from './WalletAdjustPanel';
 import { Pill, Row, Section, Stat, dayLabelOf, whenLabel } from './ui';
 import type { MemberDetailResponse } from './types';
 
@@ -82,6 +83,18 @@ export interface MemberDetailModalProps {
   onClose: () => void;
   /** Opens the existing role/plan editor for this member. */
   onEdit: (userId: string) => void;
+}
+
+/**
+ * THE MEMBER'S BALANCE AS THE MEMBER SEES IT — the server's dinars
+ * (`wallet_iqd`, the same `walletIqdAvailable` their wallet page reads), not
+ * the cents converted at today's rate: a member who typed 50,000 د.ع read
+ * 49,994 here. A server older than the field still converts the cents.
+ */
+function memberWalletIqd(f: { wallet_iqd?: number; wallet_usd_cents: number }, exchangeRate: number): string {
+  return typeof f.wallet_iqd === 'number' && Number.isFinite(f.wallet_iqd)
+    ? formatIqd(f.wallet_iqd)
+    : formatWalletIqd(f.wallet_usd_cents, exchangeRate);
 }
 
 const ROLE_ICON: Record<string, React.ReactNode> = {
@@ -241,7 +254,7 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
                 <Stat label={s.fLifetime} value={<Lock className="h-4 w-4 text-zinc-600" />} sub={s.fScope} />
               )}
               {view.financial ? (
-                <Stat label={s.fWalletUsd} value={formatWalletIqd(view.financial.wallet_usd_cents, exchangeRate)} tone="money" sub={`${formatUsdCents(view.financial.wallet_usd_cents)} · ${s.fWalletPoints}: ${view.financial.wallet_points.toLocaleString()}`} />
+                <Stat label={s.fWalletUsd} value={memberWalletIqd(view.financial, exchangeRate)} tone="money" sub={`${formatUsdCents(view.financial.wallet_usd_cents)} · ${s.fWalletPoints}: ${view.financial.wallet_points.toLocaleString()}`} />
               ) : (
                 <Stat label={s.fWalletUsd} value={<Lock className="h-4 w-4 text-zinc-600" />} sub={s.fScope} />
               )}
@@ -317,7 +330,7 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
                   <Row label={s.fDeliveredValue} value={formatIqd(view.financial.delivered_value_iqd)} mono />
                   <Row
                     label={s.fWalletUsd}
-                    value={`${formatWalletIqd(view.financial.wallet_usd_cents, exchangeRate)} · ${formatUsdCents(view.financial.wallet_usd_cents)}`}
+                    value={`${memberWalletIqd(view.financial, exchangeRate)} · ${formatUsdCents(view.financial.wallet_usd_cents)}`}
                     mono
                   />
                   <Row
@@ -336,6 +349,29 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
               ) : (
                 <Section title={s.secMoney} icon={<Lock className="h-3.5 w-3.5" />} testId="financial-denied">
                   <p className="text-xs leading-relaxed text-zinc-500">{s.moneyHidden}</p>
+                </Section>
+              )}
+
+              {/* «تعديل الرصيد والنقاط» — behind the same server decision as
+                  the figures above: no `financial`, no control. */}
+              {view.financial && (
+                <Section
+                  title={s.adjTitle}
+                  icon={<Coins className="h-3.5 w-3.5" />}
+                  className="sm:col-span-2"
+                  testId="wallet-adjust-section"
+                >
+                  <WalletAdjustPanel
+                    key={m.identity.id}
+                    userId={m.identity.id}
+                    balanceIqd={
+                      typeof view.financial.wallet_iqd === 'number' && Number.isFinite(view.financial.wallet_iqd)
+                        ? view.financial.wallet_iqd
+                        : Math.floor((view.financial.wallet_usd_cents * exchangeRate) / 100)
+                    }
+                    points={view.financial.wallet_points}
+                    onDone={() => void load(m.identity.id)}
+                  />
                 </Section>
               )}
 

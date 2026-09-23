@@ -690,3 +690,56 @@ test('REVOKED LINK — a SIGN-IN on that number goes to support, not into a loop
     t.restore();
   }
 });
+
+// =========================================================================
+// THE LANGUAGE THE ACCOUNT IS CREATED IN
+// =========================================================================
+//
+// «لغة إشعار التليغرام إنجليزية رغم أن لغة المستخدم عربية». The signup INSERT
+// named no locale, so every phone account took the column's English default
+// and its order notices arrived in English. The form now sends the language
+// the page was read in, and nothing sent means ARABIC.
+
+async function signUpWith(extra: Record<string, unknown>): Promise<{ raw: DatabaseSync; id: string }> {
+  const raw = freshDb();
+  const { a, f, t } = await reachContactStep(raw, 'signup');
+  try {
+    await hook(a, privateMsg({ contact: ownContact() }));
+    const done = await post(a, '/api/auth/telegram/complete', { token: f.token, code: t.code(), username: 'langcase', ...extra });
+    assert.equal(done.status, 200, JSON.stringify(await json(done)));
+  } finally {
+    t.restore();
+  }
+  const u = row<{ id: string }>(raw, 'SELECT id FROM users');
+  return { raw, id: u!.id };
+}
+
+const localeOf = (raw: DatabaseSync, id: string) => row<{ locale: string }>(raw, 'SELECT locale FROM users WHERE id = ?', id)!.locale;
+const stated = (raw: DatabaseSync, id: string) =>
+  (raw.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'profile.locale_change' AND target = ?").get(id) as { n: number }).n;
+
+test('SIGN-UP LANGUAGE — an Arabic reader gets an Arabic account', async () => {
+  const { raw, id } = await signUpWith({ lang: 'ar' });
+  assert.equal(localeOf(raw, id), 'ar');
+});
+
+test('SIGN-UP LANGUAGE — English chosen on the page is an ANSWER, and is recorded as one', async () => {
+  // Recorded as stated, so the placeholder fallback in `notificationLang`
+  // cannot overrule a person who really reads English.
+  const { raw, id } = await signUpWith({ lang: 'en' });
+  assert.equal(localeOf(raw, id), 'en');
+  assert.equal(stated(raw, id), 1);
+});
+
+test('SIGN-UP LANGUAGE — Sorani is stored as the column spells it', async () => {
+  const { raw, id } = await signUpWith({ lang: 'ckb' });
+  assert.equal(localeOf(raw, id), 'ku');
+});
+
+test('SIGN-UP LANGUAGE — a client that sends nothing gets the SHOP\'s default, Arabic, and states nothing', async () => {
+  const { raw, id } = await signUpWith({});
+  assert.equal(localeOf(raw, id), 'ar', 'never the column\'s English');
+  assert.equal(stated(raw, id), 0, 'the shop chose, not the person');
+  const junk = await signUpWith({ lang: 'fr' });
+  assert.equal(localeOf(junk.raw, junk.id), 'ar', 'a value that is not one of the three counts as nothing sent');
+});

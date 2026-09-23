@@ -68,6 +68,14 @@ export const FOLD: Record<string, string> = {
   'يّ': 'ي',
 };
 
+/**
+ * A word as a person reads it, minus the marks search ignores: the harakat and
+ * the tatweel. Nothing is folded and nothing is lower-cased — «طابعة» stays
+ * «طابعة» — because this is for DISPLAYING a word (the grey completion in the
+ * search box, ./complete.ts), not for comparing one.
+ */
+export const stripArabicMarks = (s: string): string => s.replace(ARABIC_DIACRITICS, '').replace(TATWEEL, '');
+
 /** Latin letters that carry accents in brand names ("Créality" typed either way). */
 const LATIN_FOLD = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
 

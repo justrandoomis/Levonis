@@ -45,6 +45,7 @@ import {
   resolveDurations,
   scheduleFrom,
   spreadFor,
+  stageForLegacyStatus,
   stagesFor,
 } from './orderStages';
 import { deductOrderStock, returnOrderStock, stockReturnNote } from './orderInventory';
@@ -55,6 +56,7 @@ import { deliversToHome, getSetting } from './settings';
 import { reachedMilestones, revealStampStatement } from './mysteryReveal';
 import { reclaimOrderRedemptionsStatement } from './offers';
 import { notifyOrderStatus } from './orderNotify';
+import { runOrderDeliveredEffects } from './orderDeliveredEffects';
 
 /** Mirrors STOCK_DEDUCTED_STATES in the admin route — the same four statuses. */
 const STOCK_DEDUCTED_STATES = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
@@ -124,6 +126,13 @@ export interface MoveOptions {
   force?: boolean;
   /** Injected so tests can move an order through weeks in milliseconds. */
   now?: string;
+  /**
+   * The request's `waitUntil`, when there is a request. The customer's message
+   * about this move is then SENT right after the response instead of waiting
+   * for the fifteen-minute outbox cron (`notifyOrderStatus`'s `defer`).
+   * Absent for the sweep and the courier sync, which keep the cron.
+   */
+  defer?: (work: Promise<unknown>) => void;
 }
 
 export function newHistoryId(orderId: string, at: string): string {
@@ -268,7 +277,28 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
     return { moved: false, from: 'received', to: opts.to, legacy_from: '', legacy_to: '', next_stage: null, next_stage_at: null, notes: [], reason: 'NOT_FOUND' };
   }
   const order = stageRowFrom(row);
-  const from = order.stage;
+  /**
+   * A STAGE THAT IS NOT ON THIS ORDER'S OWN PATH IS JUDGED BY ITS STATUS.
+   *
+   * `orders.stage` can hold a stage from the OTHER journey — a shipping type
+   * edited after the fact leaves `at_origin_warehouse` on a direct order — and
+   * `canMoveStage` finds no index for it on the direct path and refuses every
+   * move. The board's quick button (`quickNextOf`, worker/routes/admin.ts) and
+   * the customer's tracker both read such a row through
+   * `stageForLegacyStatus`, so the button offered «جارٍ تجهيز الطلب» and this
+   * door answered ILLEGAL_STAGE_MOVE: a button whose only effect was a red
+   * line. The two readings now agree.
+   *
+   * THE FENCE STAYS ON THE RAW STORED STRING (`storedStage` below). The derived
+   * stage is only how legality is judged; the conditional flip must still match
+   * the row exactly as it was read, or two movers could both win. `cancelled`
+   * is left alone — it is on no path by design, and `canMoveStage` has its own
+   * rule for leaving it.
+   */
+  const storedStage = String(row.stage ?? '');
+  const onPath =
+    storedStage === 'cancelled' || (stagesFor(order.shipping_type) as readonly string[]).includes(storedStage);
+  const from: OrderStage = onPath ? order.stage : stageForLegacyStatus(order.status, order.shipping_type);
   const legacyFrom = order.status;
   const legacyTo = STAGE_LEGACY_STATUS[opts.to];
 
@@ -313,7 +343,9 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
     schedule.next_stage ?? '', schedule.next_stage_at, legacyTo,
     opts.to, nowIso, nowIso,
     ...dayPatch.binds,
-    order.id, from, legacyFrom
+    // The STORED stage, never the derived `from` — see the note where `from`
+    // is computed.
+    order.id, storedStage, legacyFrom
   );
 
   /**
@@ -401,6 +433,19 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   }
 
   /*
+   * WHAT `delivered` EARNS — device units and their warranty clocks, purchase
+   * points, the referral milestone — for EVERY door, not only the admin's.
+   * `delivered` is a courier stage: Al-Waseet's sync, the cron sweep and the
+   * Telegram door all arrive here and nowhere else, and before this line an
+   * order they delivered created no device unit at all, so the printer never
+   * appeared under «من طلباتي» and could not carry a warranty claim.
+   * Outside the `eventsEnabled` switch for the reason given below. Total and
+   * idempotent (worker/lib/orderDeliveredEffects.ts): the admin doors run it
+   * again and nothing is granted twice.
+   */
+  if (opts.to === 'delivered') await runOrderDeliveredEffects(env, order.id, { defer: opts.defer });
+
+  /*
    * THE STAGE DOOR TELLS THE CUSTOMER — and the courier sync with it, because
    * this is the function `worker/lib/delivery/sync.ts` calls.
    *
@@ -435,7 +480,7 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
    * carries the status, so an order that legitimately reaches `shipped` twice
    * — reversed and re-shipped — still notifies once.
    */
-  if (legacyFrom !== legacyTo) await notifyOrderStatus(env, order.id, legacyTo);
+  if (legacyFrom !== legacyTo) await notifyOrderStatus(env, order.id, legacyTo, { defer: opts.defer });
 
   const notes: string[] = [];
   const wasDeducted = STOCK_DEDUCTED_STATES.has(legacyFrom);

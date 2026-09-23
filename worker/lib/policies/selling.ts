@@ -32,11 +32,17 @@ import type { PolicyDocument } from './types';
  *     text rather than show a customer a `{{TOKEN}}`. They are still authored
  *     below, and each one returns of its own accord the moment its value is
  *     written in and the version moves again.
+ *
+ * VERSION 3 — WHY IT MOVED. The archive keeps version 2 byte for byte.
+ *   * THE FACTS. worker/lib/policies/facts.ts now states `COMPETENT_COURT`, `GOVERNING_LAW_JURISDICTION`, `LEVONIS_SUPPORT_CONTACT`,
+ *     so the clauses that carried them are published instead of withheld.
+ *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
+ *     by number, an article of this document that is itself withheld.
  */
 export const selling: PolicyDocument = {
   key: 'selling',
-  version: 2,
-  effective_at: '2026-01-01',
+  version: 3,
+  effective_at: '2026-09-23',
   title: {
     ar: 'سياسة البيع',
     en: 'Selling Policy',
@@ -304,7 +310,7 @@ export const selling: PolicyDocument = {
 يُقدَّم النزاع إلى الدعم مع رقم الطلب والمستندات، وتُبذل المحاولة الودية خلال {{DISPUTE_RESPONSE_DAYS}} يوماً.
 
 ### 11.4 القانون والاختصاص
-تخضع هذه الوثيقة لقوانين {{GOVERNING_LAW_JURISDICTION}}، والاختصاص لمحاكم {{COMPETENT_COURT}}.
+تخضع هذه الوثيقة ل{{GOVERNING_LAW_JURISDICTION}}، والاختصاص ل{{COMPETENT_COURT}}.
 
 ### 11.5 جهة الاتصال
 جهة الاتصال المعتمدة {{LEVONIS_SUPPORT_CONTACT}}، وأوقات العمل {{LEVONIS_SUPPORT_HOURS}}.`,
@@ -570,7 +576,7 @@ The invalidity of one article does not affect the remaining articles.
 A dispute is submitted to support with the order number and the documents, and an amicable resolution is attempted within {{DISPUTE_RESPONSE_DAYS}} days.
 
 ### 11.4 Law and jurisdiction
-This document is governed by the laws of {{GOVERNING_LAW_JURISDICTION}}, and the courts of {{COMPETENT_COURT}} have jurisdiction.
+This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} have jurisdiction.
 
 ### 11.5 Contact
 The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours are {{LEVONIS_SUPPORT_HOURS}}.`,
@@ -836,7 +842,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 ناکۆکی بە ژمارەی داواکاری و بەڵگەنامەکانەوە پێشکەشی پشتیوانی دەکرێت، و لە ماوەی {{DISPUTE_RESPONSE_DAYS}} ڕۆژدا هەوڵی چارەسەری دۆستانە دەدرێت.
 
 ### 11.4 یاسا و دەسەڵاتی دادوەری
-ئەم بەڵگەنامەیە بەپێی یاساکانی {{GOVERNING_LAW_JURISDICTION}} دەبێت، و دەسەڵاتی دادوەری بۆ دادگاکانی {{COMPETENT_COURT}}ـە.
+ئەم بەڵگەنامەیە بەپێی {{GOVERNING_LAW_JURISDICTION}} دەبێت، و دەسەڵاتی دادوەری بۆ {{COMPETENT_COURT}}یە.
 
 ### 11.5 خاڵی پەیوەندی
 خاڵی پەیوەندی پەسەندکراو {{LEVONIS_SUPPORT_CONTACT}}ـە، و کاتی کارکردن {{LEVONIS_SUPPORT_HOURS}}ـە.`,

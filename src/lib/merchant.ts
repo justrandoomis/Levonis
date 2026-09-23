@@ -624,6 +624,9 @@ export interface AdminComplaintRow {
   priority: string;
   resolution: string;
   created_at: string;
+  /** 1 when the reporter or the merchant wrote last (or nobody has answered
+   *  yet) — worker/routes/adminChats.ts `COMPLAINT_AWAITS_DESK_SQL`. */
+  awaiting_reply?: number;
 }
 
 export interface AdminEscrow {
@@ -731,8 +734,13 @@ export interface AdminComplaintMessage {
   sender_name: string | null;
   body: string;
   file_key: string | null;
+  /** `/files/<key>` and the element it renders as, composed by the server. */
+  file_url?: string | null;
+  kind?: 'text' | 'image' | 'video';
   internal: number;
   created_at: string;
+  /** Client only: on screen, not yet acknowledged by the server. */
+  pending?: boolean;
 }
 
 export const adminCommunityApi = {
@@ -804,10 +812,12 @@ export const adminCommunityApi = {
    * call, never left to a default, because the difference between the two is
    * whether the person who complained reads it.
    */
-  replyToComplaint: (id: string, body: string, internal: boolean) =>
+  replyToComplaint: (id: string, body: string, internal: boolean, fileKey?: string) =>
     api.post<{ message: AdminComplaintMessage }>(`/api/admin/community/complaints/${id}/messages`, {
       body,
       internal,
+      // An attachment uploaded with purpose 'complaint' — see the route.
+      ...(fileKey ? { fileKey } : {}),
     }),
 
   /** The settlement decision. Appends events; never rewrites amounts. */

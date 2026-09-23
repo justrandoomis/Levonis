@@ -128,7 +128,7 @@ const DOC: WarrantyDocData = {
   },
   warranty: {
     months: 12,
-    type: 'ضمان ليفونيس',
+    type: 'ضمان Levonis',
     coverage: 'يغطي عيوب التصنيع.',
     start_at: '2026-09-02T00:00:00.000Z',
     end_at: '2027-09-02T00:00:00.000Z',

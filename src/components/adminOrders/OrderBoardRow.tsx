@@ -42,7 +42,38 @@
 import { ChevronsRight, Loader2, Trash2 } from 'lucide-react';
 import { formatIqd, type AdminOrderRow, type OrderStatus } from '../../lib/api';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
-import { DayChip, ProBadge, TypeBadge } from './OrderBoardBadges';
+import { DayChip, ProBadge, TypeBadge, countText } from './OrderBoardBadges';
+
+/**
+ * «يظهر بشكل صغير سطر بجانب رقم الطلب المنتجات التي طلبها» — WHAT IS IN THE
+ * BOX, ON ONE LINE, WITHOUT OPENING IT.
+ *
+ * The items were ALREADY on this payload: `GET /api/admin/orders` fetches every
+ * page row's lines in one IN query and `orderPublic` maps them to
+ * `{name, variant, qty}`. The row simply never read them, so the person packing
+ * had to open every order to learn whether it was the printer or the spool.
+ *
+ * TOP-LEVEL LINES ONLY. A bundle is one line here — the thing the customer
+ * bought — and its `bundle.components` are never spelled out: they are the
+ * modal's detail, and four component names on a one-line summary would push
+ * the thing actually sold off the edge of a phone. A mystery line prints the
+ * name the admin projection already returns for it.
+ *
+ * The quantity is written in the digits of the language being read, the same
+ * `countText` the header counts use, so «×٢» never sits beside Latin digits.
+ */
+export function itemsSummary(order: Pick<AdminOrderRow, 'items'>, latin: boolean): string {
+  const items = Array.isArray(order.items) ? order.items : [];
+  return items
+    .filter((it) => it && String(it.name ?? '').trim())
+    .map((it) => {
+      const qty = Number(it.qty);
+      const n = Number.isFinite(qty) && qty > 0 ? Math.trunc(qty) : 1;
+      const variant = String(it.variant ?? '').trim();
+      return `${String(it.name).trim()}${variant ? ` (${variant})` : ''} ×${countText(n, latin)}`;
+    })
+    .join(' · ');
+}
 
 const STATUS_TEXT: Record<OrderStatus, { ar: string; en: string; ckb: string }> = {
   pending: { ar: 'قيد الانتظار', en: 'Pending', ckb: 'چاوەڕوان' },
@@ -67,6 +98,7 @@ export default function OrderBoardRow({
   onAdvance,
   advancing,
   deleting,
+  latin = false,
 }: {
   order: AdminOrderRow;
   loc: (ar: string, en: string, ckb?: string) => string;
@@ -75,12 +107,15 @@ export default function OrderBoardRow({
   onAdvance: (order: AdminOrderRow) => void;
   advancing: boolean;
   deleting: boolean;
+  /** English reads Latin digits; Arabic and Sorani read ٠-٩. */
+  latin?: boolean;
 }) {
   const gov = order.address?.governorate ? GOVERNORATE_LABELS[order.address.governorate] : undefined;
   const govLabel = gov ? loc(gov.ar, gov.en, gov.ckb) : '';
   // The parcel's name, then the account holder's, then nothing — never the
   // email, which is what this row used to lead with.
   const name = order.address?.name || order.customer_name || '';
+  const items = itemsSummary(order, latin);
 
   return (
     <article
@@ -114,6 +149,21 @@ export default function OrderBoardRow({
         <p className="truncate font-mono text-[11px] leading-[1.5] text-text-muted" dir="ltr">
           {order.id}
         </p>
+
+        {/* The products, small and on one line. Truncated at the card's edge
+            with the whole list in `title`, so a long order is still readable
+            by hovering — and nothing at all is drawn for an order with no
+            lines, rather than an empty row of height. */}
+        {items && (
+          <p
+            data-order-items
+            className="truncate text-[11px] leading-[1.5] text-text-muted"
+            dir="auto"
+            title={items}
+          >
+            {items}
+          </p>
+        )}
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-2">

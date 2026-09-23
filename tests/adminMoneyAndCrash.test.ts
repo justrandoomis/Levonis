@@ -122,7 +122,9 @@ test('no admin screen shows a wallet amount as the ledger’s raw dollars', () =
     ['src/components/AdminOverview.tsx', 'stats.outgoing_usd_cents'],
     ['src/components/AdminOverview.tsx', 'req.amount'],
     ['src/components/AdminWalletRequests.tsx', 't.amount'],
-    ['src/components/adminUsers/MemberDetailModal.tsx', 'view.financial.wallet_usd_cents'],
+    // The member detail prints the SERVER's dinars (`wallet_iqd`, 0108) and
+    // converts the cents only for a server older than that field.
+    ['src/components/adminUsers/MemberDetailModal.tsx', 'f.wallet_usd_cents'],
   ] as const) {
     const src = read(file);
     assert.ok(
@@ -130,6 +132,10 @@ test('no admin screen shows a wallet amount as the ledger’s raw dollars', () =
       `${file}: ${field} is not shown in dinars`
     );
   }
+
+  const member = read('src/components/adminUsers/MemberDetailModal.tsx');
+  assert.match(member, /formatIqd\(f\.wallet_iqd\)/, 'the member detail stopped printing the server’s dinar balance');
+  assert.match(member, /memberWalletIqd\(view\.financial, exchangeRate\)/);
 
   // The conversion goes through ONE helper so the four screens cannot drift.
   const api = read('src/lib/api.ts');
@@ -144,7 +150,7 @@ test('no admin screen shows a wallet amount as the ledger’s raw dollars', () =
     'src/components/adminUsers/MemberDetailModal.tsx',
   ]) {
     const src = read(file);
-    assert.match(src, /const \{ exchangeRate \} = useWallet\(\);/, `${file} invents its own rate`);
+    assert.match(src, /const \{ exchangeRate(?:, [\w, ]+)? \} = useWallet\(\);/, `${file} invents its own rate`);
     // Comments stripped — a component may NAME the default in prose; what it
     // must not do is compute with a number of its own.
     const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');

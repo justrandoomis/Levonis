@@ -64,6 +64,27 @@ function isMp4(bytes: Uint8Array): boolean {
   return brand !== 'avif' && brand !== 'avis';
 }
 
+/**
+ * A conversation also carries a WebM clip, a voice note and a PDF
+ * (worker/routes/uploads.ts `sniffChat`), and those travel through here
+ * untouched too. Their ceilings are the SERVER'S, not a picture's: 40 MB for a
+ * clip (`VIDEO_MAX`), 10 MB for a voice note or a document
+ * (`CHAT_DOCUMENT_MAX`). Checking them against the 8 MB picture limit refused a
+ * 9 MB scanned PDF in the browser that the server would have stored. A purpose
+ * that does not admit the type is still refused by the server, by name.
+ */
+export const CHAT_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+
+function passthroughLimit(b: Uint8Array): number {
+  const isWebm = b.length >= 4 && b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3;
+  if (isMp4(b) || isWebm) return PRODUCT_VIDEO_MAX_BYTES;
+  const isPdf = b.length >= 5 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46 && b[4] === 0x2d;
+  const isOgg = b.length >= 4 && b[0] === 0x4f && b[1] === 0x67 && b[2] === 0x67 && b[3] === 0x53;
+  const isMp3 = b.length >= 3 && ((b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0 && (b[1] & 0x06) !== 0));
+  if (isPdf || isOgg || isMp3) return CHAT_DOCUMENT_MAX_BYTES;
+  return PRODUCT_IMAGE_MAX_BYTES;
+}
+
 export function webpFilename(name: string): string {
   const clean = name.split(/[\\/]/).pop()?.trim() || 'image';
   const stem = clean.replace(/\.[^.]+$/, '').replace(/[^\p{L}\p{N}._ -]/gu, '').trim() || 'image';
@@ -274,6 +295,8 @@ export const UPLOAD_MAX_EDGE: Record<string, number> = {
   // a bubble, on a phone — and it is the evidence for a complaint, so it gets
   // the conversation edge rather than the catalogue's.
   support: 2_048,
+  // A complaint's evidence is read the same way, in the same kind of thread.
+  complaint: 2_048,
 };
 
 /**
@@ -328,7 +351,7 @@ export async function prepareProductImage(file: File, encoder: WebpEncoder = enc
    * a modern compressed format and arrives from vendor CDNs rather than from a
    * camera. Both are stored honestly under their own type.
    */
-  const limit = isMp4(signature) ? PRODUCT_VIDEO_MAX_BYTES : PRODUCT_IMAGE_MAX_BYTES;
+  const limit = passthroughLimit(signature);
   if (file.size > limit) {
     throw new Error(`الملف ${megabytes(file.size)} — الحد ${megabytes(limit)} / file exceeds the limit`);
   }

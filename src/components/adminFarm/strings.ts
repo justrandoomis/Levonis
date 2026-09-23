@@ -328,7 +328,7 @@ const ar: FarmAdminStrings = {
   dash: '—',
 
   grantTitle: 'منح عملات مزرعة',
-  grantBody: 'عملات المزرعة فقط — لا تُلمس نقاط ليفونيس هنا. القيمة السالبة خصم، ويرفضه الخادم إن لم يكفِ الرصيد. كل عملية تُسجَّل في التدقيق.',
+  grantBody: 'عملات المزرعة فقط — لا تُلمس نقاط Levonis هنا. القيمة السالبة خصم، ويرفضه الخادم إن لم يكفِ الرصيد. كل عملية تُسجَّل في التدقيق.',
   amount: 'المبلغ (عملات مزرعة)',
   amountHint: 'عدد صحيح غير صفري؛ السالب خصم',
   amountInvalid: 'أدخل عددًا صحيحًا غير صفري',
@@ -676,7 +676,7 @@ const ckb: FarmAdminStrings = {
   dash: '—',
 
   grantTitle: 'بەخشینی دراوی کێڵگە',
-  grantBody: 'تەنها دراوی کێڵگە — خاڵەکانی لیڤۆنیس لێرە دەست لێ نادرێت. بڕی نەرێنی کەمکردنەوەیە و سێرڤەر ڕەتی دەکاتەوە ئەگەر باڵانس بەش نەکات. هەموو جوڵەیەک تۆمار دەکرێت.',
+  grantBody: 'تەنها دراوی کێڵگە — خاڵەکانی Levonis لێرە دەست لێ نادرێت. بڕی نەرێنی کەمکردنەوەیە و سێرڤەر ڕەتی دەکاتەوە ئەگەر باڵانس بەش نەکات. هەموو جوڵەیەک تۆمار دەکرێت.',
   amount: 'بڕ (دراوی کێڵگە)',
   amountHint: 'ژمارەی تەواوی ناسفر؛ نەرێنی = کەمکردنەوە',
   amountInvalid: 'ژمارەیەکی تەواوی ناسفر بنووسە',
@@ -755,7 +755,7 @@ export const LABELS: Record<string, FieldLabel> = {
   locations: L('المواقع', 'Locations', 'شوێنەکان', ['الغرف التي ينمو فيها اللاعب: سعة الطابعات والمخزون والسعر ومستوى الفتح.', 'The rooms a player grows through: printer slots, storage, price and unlock level.', 'ئەو ژوورانەی یاریزان تێیاندا گەشە دەکات: شوێنی چاپکەر، کۆگا، نرخ و ئاستی کردنەوە.']),
   starter: L('حزمة البداية', 'Starter kit', 'پاکێجی دەستپێک', ['ما يستلمه اللاعب الجديد: الطابعة والبكرة وأول طلب. كل مرجع هنا يجب أن يوجد في كتالوجه.', 'What a new player receives: printer, spool and first job. Every reference here must exist in its catalog.', 'ئەوەی یاریزانی نوێ وەریدەگرێت: چاپکەر، بۆبین و یەکەم کار. هەر ئاماژەیەک لێرە دەبێت لە کاتالۆگەکەی هەبێت.']),
   limits: L('الحدود (خاص)', 'Limits (private)', 'سنوورەکان (تایبەت)', ['سقوف مكافحة الإساءة اليومية — لا تصل إلى العميل أبدًا.', 'Daily anti-abuse caps — never sent to the client.', 'سنوورە ڕۆژانەکانی دژە-خراپبەکارهێنان — هەرگیز بۆ کڕیار نانێردرێن.']),
-  rewards: L('المكافآت (خاص)', 'Rewards (private)', 'خەڵاتەکان (تایبەت)', ['تحويل عملات المزرعة إلى نقاط ليفونيس — المرحلة ٥. المفتاح enabled لا يُقبل true في هذه المرحلة لأن لا مسار يسكّ النقاط.', 'Farm Coins → Levonis Points conversion — Phase 5. `enabled` cannot be true in this phase: no code path mints Points.', 'گۆڕینی دراوی کێڵگە بۆ خاڵی لیڤۆنیس — قۆناغی ٥. `enabled` لەم قۆناغە نابێت true بێت: هیچ ڕێڕەوێک خاڵ دروست ناکات.']),
+  rewards: L('المكافآت (خاص)', 'Rewards (private)', 'خەڵاتەکان (تایبەت)', ['تحويل عملات المزرعة إلى نقاط Levonis — المرحلة ٥. المفتاح enabled لا يُقبل true في هذه المرحلة لأن لا مسار يسكّ النقاط.', 'Farm Coins → Levonis Points conversion — Phase 5. `enabled` cannot be true in this phase: no code path mints Points.', 'گۆڕینی دراوی کێڵگە بۆ خاڵی Levonis — قۆناغی ٥. `enabled` لەم قۆناغە نابێت true بێت: هیچ ڕێڕەوێک خاڵ دروست ناکات.']),
 
   // time
   'time.time_scale': L('مقياس الوقت', 'Time scale', 'پێوانەی کات', ['ثوانٍ لعب لكل ثانية حقيقية؛ 20 يجعل ساعة اللعبة ≈ 3 دقائق حقيقية.', 'Game seconds per real second; 20 makes a game hour ≈ 3 real minutes.', 'چرکەی یاری بۆ هەر چرکەیەکی ڕاستەقینە؛ ٢٠ کاتژمێری یاری ≈ ٣ خولەکی ڕاستەقینە دەکات.']),
@@ -928,7 +928,7 @@ export const LABELS: Record<string, FieldLabel> = {
   'limits.mutations_per_hour': L('التعديلات في الساعة', 'Mutations per hour', 'گۆڕانکاری لە کاتژمێرێک', ['حدّ المعدّل لكل لاعب على كل حركة كتابة.', 'Per-player rate limit on every write.', 'سنووری ڕێژە بۆ هەر یاریزان لەسەر هەر نووسینێک.']),
 
   // rewards
-  'rewards.levonis_points': L('نقاط ليفونيس', 'Levonis Points', 'خاڵەکانی لیڤۆنیس'),
+  'rewards.levonis_points': L('نقاط Levonis', 'Levonis Points', 'خاڵەکانی Levonis'),
   'rewards.levonis_points.enabled': L('التحويل مفتوح', 'Conversion open', 'گۆڕین کراوەیە', ['لا يُقبل true في هذه المرحلة.', 'Cannot be true in this phase.', 'لەم قۆناغە نابێت true بێت.']),
   'rewards.levonis_points.coins_per_point': L('عملات لكل نقطة', 'Coins per point', 'دراو بۆ هەر خاڵ'),
   'rewards.levonis_points.daily_cap_points': L('سقف النقاط اليومي', 'Daily points cap', 'سنووری ڕۆژانەی خاڵ'),

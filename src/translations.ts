@@ -21,7 +21,7 @@ export const translations = {
     freeTierUpgrade: "Free Tier - Upgrade for more",
     freeTier: "Free Tier",
     yourLevoCard: "Your Levo Card",
-    planComparisons: "Plan Comparisons",
+    planComparisons: "Compare plans",
     subscribeNow: "Subscribe Now",
     search: "Search products...",
     community: "Community",
@@ -144,7 +144,7 @@ export const translations = {
     // Memberships & referrals
     membership: "Membership",
     activeUntil: "Active until",
-    pendingLaunch: "Reserved — activates at site launch",
+    pendingActivation: "Being activated",
     referralProgram: "Referral Program",
     referralCode: "Referral code",
     copyLink: "Copy link",
@@ -152,7 +152,6 @@ export const translations = {
     rewards: "Rewards",
     priceTBA: "Price to be announced",
     subscribeDisabled: "Not available for purchase yet",
-    launchNote: "Your card is reserved and activates when the site launches",
     comingSoon: "Coming soon",
     // ---- Membership page (/subscription). Every key exists in all three blocks.
     levoId: "Levo ID",
@@ -182,7 +181,6 @@ export const translations = {
     quoteFailed: "Could not check the price — try again",
     confirmPurchase: "Confirm purchase",
     confirmAndPay: "Confirm and pay",
-    confirmAndReserve: "Confirm and reserve",
     cancel: "Cancel",
     close: "Close",
     retry: "Try again",
@@ -195,6 +193,12 @@ export const translations = {
     pausedBenefits: "Paused benefits",
     pausedBenefitsNote: "An account review has paused these benefits. Your membership itself is unchanged.",
     primeBenefits: "PREMIUM benefits",
+    upgradeBadge: "Upgrade — unused time credited",
+    includedInYours: "Included in your membership",
+    yourCurrentPlan: "Your current plan",
+    compareLink: "Compare",
+    differencesOnly: "Differences only",
+    yourMembership: "Your membership",
     expired: "Expired",
 
     // LEVO Studio entry (plain navigation to the standalone subdomain —
@@ -301,7 +305,7 @@ export const translations = {
     freeTierUpgrade: "المستوى المجاني - الترقية للمزيد",
     freeTier: "المستوى المجاني",
     yourLevoCard: "بطاقة Levo الخاصة بك",
-    planComparisons: "مقارنات الخطط",
+    planComparisons: "مقارنة الخطط",
     subscribeNow: "اشترك الآن",
     search: "ابحث عن المنتجات...",
     community: "المجتمع",
@@ -419,12 +423,12 @@ export const translations = {
     amount: "المبلغ",
     date: "التاريخ",
     // App
-    levonis3d: "ليفونيس 3D",
+    levonis3d: "Levonis 3D",
 
     // Memberships & referrals
     membership: "العضوية",
     activeUntil: "فعّالة حتى",
-    pendingLaunch: "محجوزة — تُفعّل عند إطلاق الموقع",
+    pendingActivation: "قيد التفعيل",
     referralProgram: "برنامج الإحالة",
     referralCode: "رمز الإحالة",
     copyLink: "نسخ الرابط",
@@ -432,7 +436,6 @@ export const translations = {
     rewards: "المكافآت",
     priceTBA: "السعر يُعلن قريبًا",
     subscribeDisabled: "غير متاح للشراء بعد",
-    launchNote: "بطاقتك محجوزة وتُفعّل عند إطلاق الموقع",
     comingSoon: "قريبًا",
     // ---- صفحة العضوية (/subscription). كل مفتاح موجود في الكتل الثلاث.
     levoId: "Levo ID",
@@ -462,7 +465,6 @@ export const translations = {
     quoteFailed: "تعذر التحقق من السعر — حاول مرة أخرى",
     confirmPurchase: "تأكيد الشراء",
     confirmAndPay: "تأكيد والدفع",
-    confirmAndReserve: "تأكيد والحجز",
     cancel: "إلغاء",
     close: "إغلاق",
     retry: "إعادة المحاولة",
@@ -475,6 +477,12 @@ export const translations = {
     pausedBenefits: "مزايا موقوفة مؤقتًا",
     pausedBenefitsNote: "أوقفت مراجعةٌ للحساب هذه المزايا مؤقتًا. اشتراكك نفسه لم يتغير.",
     primeBenefits: "مزايا PREMIUM",
+    upgradeBadge: "ترقية — يُخصم المتبقي",
+    includedInYours: "مشمولة في اشتراكك",
+    yourCurrentPlan: "اشتراكك الحالي",
+    compareLink: "قارن",
+    differencesOnly: "الفروقات فقط",
+    yourMembership: "عضويتك",
     expired: "منتهية",
 
     // مدخل LEVO Studio (تنقّل عادي إلى النطاق الفرعي المستقل —
@@ -698,7 +706,7 @@ export const translations = {
     // Memberships & referrals
     membership: "ئەندامێتی",
     activeUntil: "چالاکە تا",
-    pendingLaunch: "پارێزراوە — لەگەڵ دەستپێکردنی سایتەکە چالاک دەبێت",
+    pendingActivation: "لە چالاککردندایە",
     referralProgram: "پرۆگرامی بانگهێشتکردن",
     referralCode: "کۆدی بانگهێشتکردن",
     copyLink: "کۆپیکردنی لینک",
@@ -706,7 +714,6 @@ export const translations = {
     rewards: "خەڵاتەکان",
     priceTBA: "نرخەکە بەم زووانە ڕادەگەیەنرێت",
     subscribeDisabled: "هێشتا بۆ کڕین بەردەست نییە",
-    launchNote: "کارتەکەت پارێزراوە و لەگەڵ دەستپێکردنی سایتەکە چالاک دەبێت",
     comingSoon: "بەم زووانە",
     // ---- پەڕەی ئەندامێتی (/subscription). هەر کلیلێک لە هەر سێ بلۆکەکە هەیە.
     levoId: "Levo ID",
@@ -736,7 +743,6 @@ export const translations = {
     quoteFailed: "نەتوانرا نرخ بپشکنرێت — دووبارە هەوڵبدەرەوە",
     confirmPurchase: "پشتڕاستکردنەوەی کڕین",
     confirmAndPay: "پشتڕاستکردنەوە و پارەدان",
-    confirmAndReserve: "پشتڕاستکردنەوە و پارێزگاری",
     cancel: "پاشگەزبوونەوە",
     close: "داخستن",
     retry: "دووبارە هەوڵبدەرەوە",
@@ -749,6 +755,12 @@ export const translations = {
     pausedBenefits: "سوودە ڕاگیراوەکان",
     pausedBenefitsNote: "پێداچوونەوەی هەژمار ئەم سوودانە ڕاگرتووە. ئەندامێتیەکەت خۆی نەگۆڕاوە.",
     primeBenefits: "سوودەکانی PREMIUM",
+    upgradeBadge: "نوێکردنەوە",
+    includedInYours: "لە ئەندامێتییەکەتدایە",
+    yourCurrentPlan: "پلانی ئێستات",
+    compareLink: "بەراورد",
+    differencesOnly: "تەنها جیاوازییەکان",
+    yourMembership: "ئەندامێتییەکەت",
     expired: "بەسەرچووە",
 
     // دەروازەی LEVO Studio (گواستنەوەیەکی ئاسایی بۆ ساب-دۆمەینی سەربەخۆ —
@@ -767,7 +779,7 @@ export const translations = {
     browseCategories: "بەپێی بەش بگەڕێ",
     topBrands: "باشترین براندەکان",
     openBoxTitle: "Open Box و بەکارهاتوو",
-    openBoxNote: "ئامێری پشکنراو بە نرخێکی کەمتر — بە زەمانەتی لیڤۆنیس، و دوای وەرگرتن ناگەڕێندرێتەوە.",
+    openBoxNote: "ئامێری پشکنراو بە نرخێکی کەمتر — بە زەمانەتی Levonis، و دوای وەرگرتن ناگەڕێندرێتەوە.",
     couponsOffers: "کۆپۆن و ئۆفەر",
     productCount: "بەرهەم",
     seeAll: "هەمووی ببینە",

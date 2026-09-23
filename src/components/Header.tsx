@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Check, Globe, ShieldCheck } from 'lucide-react';
+import { Check, Globe, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { tierLabel, tierMetaFor } from './subscription/tierMeta';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { Anchored } from './ui/Overlay';
 import NotificationBell from './notifications/NotificationBell';
+import LiveSearch from './search/LiveSearch';
 
 export default function Header() {
   const { lang, setLang, t, dir } = useLanguage();
@@ -264,39 +265,23 @@ export default function Header() {
 
       {/* Search Bar — a real form: submits on Enter/Go on mobile keyboards
           AND via the (44px) icon button, and lands on the products page
-          with the query actually applied (?search=). */}
-      <form
-        role="search"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (searchQuery.trim()) {
-            navigate('/products?search=' + encodeURIComponent(searchQuery.trim()));
-            setSearchQuery('');
-          }
+          with the query actually applied (?search=). While the shopper types
+          it answers in a panel that grows down out of the field, and completes
+          the word under the caret in grey (Space takes it) — see
+          src/components/search/LiveSearch.tsx. The header is
+          pointer-events-none so the page scrolls under it; the field and its
+          panel opt back in. */}
+      <LiveSearch
+        value={searchQuery}
+        onChange={setSearchQuery}
+        onSubmit={(query) => {
+          navigate('/products?search=' + encodeURIComponent(query));
+          setSearchQuery('');
         }}
-          className={`relative w-full max-w-4xl mx-auto pointer-events-auto transition-all duration-500 ease-in-out ${isScrolled ? 'mt-0' : 'mt-1'}`}
-      >
-        <button
-          type="submit"
-          aria-label={t('search')}
-          className="absolute top-1/2 -translate-y-1/2 start-0 w-11 h-11 flex items-center justify-center text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg transition-colors"
-        >
-          <Search className={`transition-all duration-500 ${isScrolled ? 'w-4 h-4' : 'w-5 h-5'}`} strokeWidth={2.5} aria-hidden="true" />
-        </button>
-        <input
-          type="search"
-          enterKeyHint="search"
-          placeholder={t('search')}
-          aria-label={t('search')}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className={`w-full border border-border-subtle rounded-xl pe-4 text-text-primary placeholder-text-muted focus:border-focus focus:ring-2 focus:ring-focus/20 focus:outline-none transition-all duration-500 font-medium shadow-sm ${
-            isScrolled
-              ? 'h-[44px] ps-11 text-[14px] bg-surface/95 focus:bg-surface-raised'
-              : 'h-[50px] ps-12 text-[15px] bg-surface/86 focus:bg-surface-raised'
-          }`}
-        />
-      </form>
+        onPick={() => setSearchQuery('')}
+        size={isScrolled ? 'compact' : 'regular'}
+        className={`w-full max-w-4xl mx-auto pointer-events-auto transition-[margin] duration-500 ease-in-out ${isScrolled ? 'mt-0' : 'mt-1'}`}
+      />
 
       {/* Subscription-based border line when scrolled */}
       <div className={`absolute bottom-0 left-0 right-0 h-[2px] w-full overflow-hidden transition-opacity duration-500 ${isScrolled ? 'opacity-100' : 'opacity-0'}`}>

@@ -42,7 +42,7 @@ import { stockAlertRoutes } from './routes/stockAlerts';
 import { compareRoutes } from './routes/compare';
 import { priceReportRoutes, adminPriceReportRoutes } from './routes/priceReports';
 import { merchantPrinterRoutes } from './routes/merchantPrinters';
-import { printQuoteRoutes } from './routes/printQuote';
+import { adminPrintQuoteRoutes, printQuoteRoutes } from './routes/printQuote';
 import { membershipsRoutes } from './routes/memberships';
 import { telegramRoutes } from './routes/telegram';
 import { invoiceRoutes } from './routes/invoices';
@@ -62,6 +62,8 @@ import { storeOrderRoutes } from './routes/storeOrders';
 import { communityReviewRoutes } from './routes/merchantReviews';
 import { communityFavoriteRoutes } from './routes/communityFavorites';
 import { adminCommunityRoutes } from './routes/adminCommunity';
+import { adminChatRoutes } from './routes/adminChats';
+import { adminWalletAdjustRoutes } from './routes/adminWalletAdjust';
 import { bundlesRoutes } from './routes/bundles';
 // The bundles PANEL is its own router (docs/BUNDLES_MYSTERY.md §11): a bundle
 // is a `products` row now, so the admin side rides productPersistence rather
@@ -286,6 +288,15 @@ app.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes);
 app.route('/api/warranty', warrantyPublicRoutes);
 app.route('/api/admin/warranties', warrantyAdminRoutes);
 app.route('/api/admin/community', adminCommunityRoutes);
+// The printer-model economics editor (Admin → مجتمع ليفو → تسعير الطباعة).
+app.route('/api/admin/print-quote', adminPrintQuoteRoutes);
+// «الرسائل» in the support console: the shop's order threads and the three
+// waiting counts. Under /api/admin/* so the apex-only guard covers it, with its
+// own requireAdmin inside.
+app.route('/api/admin/chats', adminChatRoutes);
+// «تعديل الرصيد والنقاط» and «فحص فروقات التقريب»: a member's wallet by hand.
+// Financial scope, rate limit, idempotency and audit inside the router.
+app.route('/api/admin/wallet-adjust', adminWalletAdjustRoutes);
 app.route('/api/admin/import', adminImportRoutes);
 // Mounted on the same prefix as adminProductsRoutes; the paths are distinct
 // (/:id/relations, /:id/stock) so neither router shadows the other.

@@ -66,15 +66,18 @@ test('only the public branch reads from or writes to the shared edge cache', () 
   const src = readFileSync(join(ROOT, 'worker/routes/uploads.ts'), 'utf8');
   // The match is guarded on publicPrefix — and on the cache existing at all,
   // because `caches` is absent in the Node runtime these route tests use.
+  // (A `Range` request additionally bypasses the cache in both directions: a
+  // stored full body must not answer a byte range, nor a partial body be
+  // stored as the file — tests/fileRangeDelivery.test.ts.)
   assert.ok(
-    /if \(publicPrefix && cache\) \{\s*const hit = await cache\.match\(c\.req\.raw\);/.test(src),
+    /if \(publicPrefix && cache(?: && !rangeHeader)?\) \{\s*const hit = await cache\.match\((?:c\.req\.raw|edgeCacheKey\(c\.req\.raw, key\))\);/.test(src),
     'cache.match is not gated on publicPrefix'
   );
   // So is the write.
   const putIdx = src.indexOf('cache.put(');
   assert.ok(putIdx > 0, 'the response is never written to the edge cache');
   const before = src.slice(Math.max(0, putIdx - 600), putIdx);
-  assert.ok(before.includes('if (publicPrefix && cache)'), 'cache.put is not gated on publicPrefix');
+  assert.ok(before.includes('if (publicPrefix && cache'), 'cache.put is not gated on publicPrefix');
   // A private object keeps its private, short-lived header.
   assert.ok(
     src.includes("headers.set('Cache-Control', 'private, max-age=300');"),

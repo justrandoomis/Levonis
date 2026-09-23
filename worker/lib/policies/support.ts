@@ -55,11 +55,17 @@ import type { PolicyDocument } from './types';
  *     text rather than show a customer a `{{TOKEN}}`. They are still authored
  *     below, and each one returns of its own accord the moment its value is
  *     written in and the version moves again.
+ *
+ * VERSION 3 — WHY IT MOVED. The archive keeps version 2 byte for byte.
+ *   * THE FACTS. worker/lib/policies/facts.ts now states `COMPETENT_COURT`, `GOVERNING_LAW_JURISDICTION`, `LEVONIS_SUPPORT_CONTACT`,
+ *     so the clauses that carried them are published instead of withheld.
+ *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
+ *     by number, an article of this document that is itself withheld.
  */
 export const support: PolicyDocument = {
   key: 'support',
-  version: 2,
-  effective_at: '2026-01-01',
+  version: 3,
+  effective_at: '2026-09-23',
   title: {
     ar: 'سياسة الدعم والتواصل والشكاوى',
     en: 'Support, Contact and Complaints Policy',
@@ -416,7 +422,7 @@ export const support: PolicyDocument = {
 بطلان بند لا يمس صحة سائر البنود.
 
 ### 14.4 القانون والاختصاص
-يحكم هذه الوثيقة {{GOVERNING_LAW_JURISDICTION}}، وتختص بالنزاع {{COMPETENT_COURT}}.
+تحكم هذه الوثيقة {{GOVERNING_LAW_JURISDICTION}}، والاختصاص بالنزاع ل{{COMPETENT_COURT}}.
 
 ### 14.5 التواصل
 قناة التواصل المعتمدة: {{LEVONIS_SUPPORT_CONTACT}}، في أوقات {{LEVONIS_SUPPORT_HOURS}}. والعنوان: {{LEVONIS_ADDRESS}}.`,
@@ -771,7 +777,7 @@ Where the text of this document conflicts with an oral promise, a message from a
 The invalidity of one provision does not affect the validity of the remaining provisions.
 
 ### 14.4 Governing law and jurisdiction
-This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} has jurisdiction over disputes.
+This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} have jurisdiction over disputes.
 
 ### 14.5 Contact
 The approved channel of contact: {{LEVONIS_SUPPORT_CONTACT}}, during {{LEVONIS_SUPPORT_HOURS}}. The address: {{LEVONIS_ADDRESS}}.`,

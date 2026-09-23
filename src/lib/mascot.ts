@@ -49,8 +49,11 @@ export const MASCOT_STATES: Record<MascotState, { priority: number; duration: nu
   returning: { priority: 70, duration: 480, loop: false },
   // An order is the largest thing that happens in this app, so it outranks
   // both the notification it will produce and the ordinary success it is a
-  // kind of. It is also the longest: 1.5s of being pleased, then calm.
-  celebrate: { priority: 65, duration: 1500, loop: false },
+  // kind of. It is also the longest, and it has to outlast the body: the pop
+  // and the two hops of the stage entrance take CELEBRATION_MOTION_MS, and a
+  // face that went calm while the body was still bouncing would read as the
+  // character losing interest in its own news.
+  celebrate: { priority: 65, duration: 2200, loop: false },
   notify: { priority: 60, duration: 720, loop: false },
   // Surprise is brief by nature. Held any longer it stops being a reaction
   // and becomes a mood, and the character has no business being in a mood.
@@ -64,6 +67,19 @@ export const MASCOT_STATES: Record<MascotState, { priority: number; duration: nu
   idle: { priority: 0, duration: 0, loop: true },
   sleep: { priority: -1, duration: 0, loop: false },
 };
+/**
+ * HOW LONG THE ORDER CELEBRATION MOVES — the stage entrance's pop and hops
+ * (src/components/bloub/character/entrance.ts) and the burst behind it
+ * (src/components/bloub/OrderCelebration.tsx), which both finish inside it.
+ *
+ * Work that nobody is waiting for — re-reading the wallet balance, asking
+ * whether to offer the notification channels — is started AFTER this, not on
+ * the same frame as the confirmation mounting. Those used to start alongside
+ * the character's journey, on the same main thread, which is one source of the
+ * «lagging» the owner saw at exactly this moment.
+ */
+export const CELEBRATION_MOTION_MS = 1300;
+
 const ZERO: MascotDirection = Object.freeze({ x: 0, y: 0 });
 export function movementDirection(dx: number, dy: number): MascotDirection {
   const length = Math.hypot(dx, dy);
@@ -200,12 +216,11 @@ export function createMascotController(clock: MascotClock = CLOCK) {
      *
      * It is wrong for a STAGE. A stage is not a dock the character happens to
      * end up at; it is a destination a page raised for the express purpose of
-     * being reacted to — today, the order-confirmation panel. Triggering
-     * `celebrate` at the moment the HTTP response resolved spent the whole
-     * 1.5s window in transit: the character was still somewhere in the middle
-     * of the screen when the happiest thing it does was over, and it touched
-     * down wearing `arrival`. The reaction belongs to the arrival, because the
-     * arrival is what the reaction is about.
+     * being reacted to — today, the order-confirmation panel. The character
+     * no longer flies there (it appears there — see
+     * `appearsInsteadOfTravelling` in src/components/bloub/anchors.ts), so the
+     * arrival and the news are the same frame, and the reaction is timed from
+     * that frame rather than from the HTTP response.
      *
      * `'route'` stays the default deliberately. Every other caller — a route
      * change, a silent dock past its deadline, a tab that came back mid-flight

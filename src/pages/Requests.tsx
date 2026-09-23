@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   Plus, Loader2, PackageSearch, Clock, MapPin, Star, BadgeCheck, ShieldCheck,
   ChevronLeft, Send, X,
@@ -41,6 +41,7 @@ import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
  * customer just wrote sits there collecting answers nobody tells them about.
  */
 import ChannelNudge from '../components/notify/ChannelNudge';
+import { CommunityStoreLink } from './community/access';
 
 interface RequestRow {
   id: string;
@@ -87,10 +88,22 @@ export default function Requests() {
   const { loc } = useLanguage();
   const { user } = useAuth();
   const { signIn } = useSignInPrompt();
-  const [view, setView] = useState<View>('board');
+  /**
+   * A model link carried over from the price calculator (src/pages/Tools.tsx,
+   * «أرسله طلب طباعة»): a signed-in customer lands straight in the wizard with
+   * it filled in, instead of on the board with nothing.
+   */
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  // A guest is sent through sign-in first, and router state does not survive
+  // that trip — so the link also rides in `?link=` (Tools.tsx).
+  const carriedLink =
+    typeof (location.state as { printLink?: unknown } | null)?.printLink === 'string'
+      ? String((location.state as { printLink: string }).printLink)
+      : params.get('link') ?? '';
+  const [view, setView] = useState<View>(() => (carriedLink && user ? 'new' : 'board'));
   const [me, setMe] = useState<MerchantMe | null>(null);
   const [open, setOpen] = useState<RequestRow | null>(null);
-  const [params, setParams] = useSearchParams();
   const [deepLinkError, setDeepLinkError] = useState('');
   /**
    * A REQUEST WAS JUST PUBLISHED BY THIS PERSON, in this session. Latched
@@ -270,6 +283,7 @@ export default function Requests() {
                  print side hangs off it, and publishing is what notifies the
                  merchants who can make it. */
               <PrintRequestWizard
+                initialLink={carriedLink || undefined}
                 onCreated={(id) => {
                   setView('mine');
                   openRequestId(id);
@@ -615,12 +629,12 @@ function OfferCard({
 
       <div className="flex gap-2 mt-3">
         {m?.store_slug && (
-          <Link
-            to={`/community/store/${m.store_slug}`}
+          <CommunityStoreLink
+            id={m.store_slug}
             className="flex-1 min-h-[40px] rounded-xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[12px] font-semibold flex items-center justify-center"
           >
             {loc('زيارة المتجر', 'View store', 'بینینی فرۆشگا')}
-          </Link>
+          </CommunityStoreLink>
         )}
         {canAccept && (
           <button
@@ -795,7 +809,7 @@ function StateChip({ state }: { state: string }) {
  * that belongs to the buyer. Confirming receipt is the ONLY thing that
  * releases the merchant's money (§33), which is why that button asks twice.
  */
-function MyCommunityOrders() {
+function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = {}) {
   const { loc } = useLanguage();
   const [orders, setOrders] = useState<CommunityOrderRow[] | null>(null);
   const [busy, setBusy] = useState('');
@@ -807,6 +821,10 @@ function MyCommunityOrders() {
       .catch(() => setOrders([]));
   }, []);
   useEffect(load, [load]);
+
+  // Under the maintenance card there is nothing to wait for and nothing to
+  // say when this customer has no running order — only the orders themselves.
+  if (whileClosed && (orders === null || !orders.length)) return null;
 
   if (orders === null) {
     return (
@@ -843,13 +861,16 @@ function MyCommunityOrders() {
           : s === 'completed'
             ? loc('مكتمل', 'Completed', 'تەواو')
             : s === 'disputed'
-              ? loc('نزاع — بيد ليفونيس', 'Disputed — with Levonis', 'ناکۆکی')
+              ? loc('نزاع — بيد Levonis', 'Disputed — with Levonis', 'ناکۆکی')
               : s === 'cancelled'
                 ? loc('ملغي ومسترجع', 'Cancelled and refunded', 'هەڵوەشێنراوە')
                 : s;
 
   return (
     <div className="space-y-3">
+      {whileClosed && (
+        <h2 className="text-gold font-bold text-[14px]">{loc('تنفيذ طلباتي', 'My custom orders', 'داواکاریە تایبەتەکانم')}</h2>
+      )}
       {orders.map((o) => (
         <div key={o.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5">
           <div className="flex items-start justify-between gap-2 mb-1.5">
@@ -861,7 +882,7 @@ function MyCommunityOrders() {
           <p className="text-zinc-500 text-[11.5px] mb-2">
             {o.merchant_name} · <span className="text-white font-semibold" dir="ltr">{iqd(o.price_iqd)}</span>
             {' '}
-            {loc('(محجوز لدى ليفونيس)', '(held by Levonis)', '(لای LEVONIS پارێزراوە)')}
+            {loc('(محجوز لدى Levonis)', '(held by Levonis)', '(لای LEVONIS پارێزراوە)')}
           </p>
 
           {o.state === 'merchant_marked_delivered' && (
@@ -922,7 +943,7 @@ function MyCommunityOrders() {
                 disabled={busy === o.id}
                 onClick={async () => {
                   const description = prompt(loc(
-                    'صف المشكلة (١٠ أحرف على الأقل). سيُجمّد المبلغ حتى تفصل إدارة ليفونيس.',
+                    'صف المشكلة (١٠ أحرف على الأقل). سيُجمّد المبلغ حتى تفصل إدارة Levonis.',
                     'Describe the problem (at least 10 characters). The money freezes until Levonis decides.',
                     'کێشەکە باس بکە.'
                   ));
@@ -944,6 +965,74 @@ function MyCommunityOrders() {
             </div>
           )}
         </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * WHAT /requests STILL SHOWS WHILE LEVO COMMUNITY IS SHUT.
+ *
+ * The board, new requests and new offers close with the community (owner,
+ * 2026-09-23 — docs/DECISIONS.md), but a customer whose money is already held
+ * in escrow must still be able to confirm the delivery, or cancel, from the
+ * one screen that has those buttons. So the maintenance card on this route
+ * carries the running orders underneath it — the /api/marketplace/orders
+ * routes they call are deliberately outside the wall.
+ */
+export function RunningCommunityOrders() {
+  const { user } = useAuth();
+  if (!user) return null;
+  return (
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 pb-28" data-requests="running-orders">
+      <PendingOffersWhileClosed />
+      <MyCommunityOrders whileClosed />
+    </div>
+  );
+}
+
+/**
+ * OFFERS ALREADY MADE ON THIS CUSTOMER'S OWN REQUESTS. No new offer can be made
+ * while the community is shut, but one that arrived before it closed is trade
+ * in flight: the customer can still read it and accept it (the offers list
+ * and `/offers/:id/accept` stay outside the wall — DECISIONS 110). Only the
+ * customer's own requests that are receiving offers are listed; there is no
+ * board here.
+ */
+function PendingOffersWhileClosed() {
+  const { loc } = useLanguage();
+  const [rows, setRows] = useState<RequestRow[]>([]);
+  const [open, setOpen] = useState<RequestRow | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api
+      .get<{ requests: RequestRow[] }>('/api/marketplace/my-requests')
+      .then((d) => {
+        if (alive) setRows((d.requests ?? []).filter((r) => r.state === 'receiving_offers' && r.offer_count > 0));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (open) return <RequestDetail request={open} me={null} onBack={() => setOpen(null)} />;
+  if (!rows.length) return null;
+  return (
+    <div className="space-y-2 mb-4" data-requests="pending-offers">
+      {rows.map((r) => (
+        <button
+          key={r.id}
+          type="button"
+          onClick={() => setOpen(r)}
+          className="w-full text-start rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-h-[44px] active:scale-[0.99] transition-transform"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="text-white font-semibold text-[14px] leading-snug">{r.title}</h3>
+            <span className="shrink-0 text-gold/80 font-semibold text-[11.5px]">
+              {loc(`${r.offer_count} عرض`, `${r.offer_count} offers`, `${r.offer_count} ئۆفەر`)}
+            </span>
+          </div>
+        </button>
       ))}
     </div>
   );

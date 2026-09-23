@@ -68,6 +68,16 @@ The worker supplies the product's ancestry from the `catalogs` tree.
 The resolver reports which happened per line as `applied_at: 'unit' | 'line'`.
 A caller must subtract `total_iqd` exactly once, and only for `'line'`.
 
+**A per-order limit is spent once per ORDER, not once per line.** A rule's
+`max_discount_iqd` with `cap_scope: 'per_order'`, and its `max_quantity`, are
+budgets shared by every cart line that rule covers (`orderLineBenefits`): two
+different printers under one rule capped at 100,000 per order save 100,000
+between them. The budget goes to the lines with the largest per-unit saving
+first (ties in cart order), and each line carries the part it received, so
+the per-line figures in `orders.benefit_snapshot` and `order_items` add up to
+the clamped total. The cart says «الخصم بحد أقصى لكل طلب» and the subscription
+page «حتى X لكل طلب» — the same meaning. Two different rules keep two budgets.
+
 ### The ladder
 
 A typed `pro_price_iqd` or `prime_price_iqd` on any rung (product, option,
@@ -231,8 +241,43 @@ day one:
 **No product-discount rule is seeded.** A global "PRO 10% off" would discount
 the entire catalogue on the first deploy, and a section rule cannot be seeded
 because it must name sections whose ids a migration cannot know. The admin
-screen offers a "recommended starting values" action that creates them against
-the sections that actually exist.
+screen offers a "recommended starting values" action («إضافة القيم المقترحة»
+on the rules tab, `POST /api/admin/membership-benefits/recommended`) that
+creates them against the sections that actually exist: PRO printers 10% up to
+100,000 per unit, PRO materials 15%, PRO accessories 10%, and PREMIUM printers
+a FIXED 25,000 per unit — the owner's «البريميوم خصم حتى 25,000 لكل وحدة على
+الطابعات». Fixed, not "100% capped at 25,000": a fixed amount never exceeds the
+unit's price anyway, so it already means "up to", and a 100% rule would read
+as a free printer. It never overwrites a tier and section that has a rule.
+Nothing is written on the click: `GET …/recommended` lists each rule (tier,
+section, figure, live or off) in a confirmation dialog, and the POST carries
+the keys the admin confirmed (a bare POST is refused). Only the two printer
+rules — the owner's own figures — are created enabled; materials and
+accessories are this file's guesses, so they are created DISABLED and
+discount nothing until the owner turns them on.
+
+**Per-product rules folded into one section rule.** The product editor and
+the import write PRODUCT rules, so a store priced per printer ends up with one
+row per printer saying the same thing. The rules tab lists them grouped by
+tier, section and identical terms (`GET …/consolidation`) and offers
+«تحويل إلى قاعدة قسم» (`POST …/consolidation` with the group key and the exact
+rule ids shown). The conversion creates one section rule and deletes the
+product rules in ONE batch with ONE version row (action `consolidate`, whose
+`rules_json` is the set after the conversion, `before_json` the deleted
+product rows and `after_json` the new section rule), an audit row per rule and
+one `membership_benefit.consolidate` audit row. The batch is fenced: the
+section rule is inserted only while the section has no live rule for that
+tier, each product rule is deleted only if unchanged since it was read, and
+the version row writes NULL into its NOT NULL `rules_json` (rolling the batch
+back, answered 409 `CONSOLIDATION_STALE`) unless every planned rule is gone
+and the section holds exactly the expected live rule. Every active product in the
+section is priced before and after with `selectRule`: a product whose price
+would change keeps its product rule, and the dialog says how many other
+products in the section the new rule reaches. Refused when the section
+already has a different ENABLED rule for that tier (a disabled one does not
+count; an enabled identical one anywhere in the list makes the product rules
+redundant and the action only deletes them), or when the terms carry a
+per-order ceiling or quantity limit (N budgets would become one).
 
 Every one of these numbers is editable, and none of them is a constant anywhere
 in the code.

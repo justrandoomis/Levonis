@@ -269,14 +269,29 @@ export function directStockCombinations(
       .map((v) => v.id)
   );
   const isDirect = (ids: string[]) => ids.some((id) => directIds.has(id));
-  const coloured = linkedColorCombinations(rel).filter((combo) => isDirect(combo.option_value_ids));
-  if (coloured.length === 0) return [];
+  const linked = linkedColorCombinations(rel).filter((combo) => isDirect(combo.option_value_ids));
+  // The same two ways `deriveInventoryMode` lands on exact combinations.
+  const exact = linked.length > 0 || (rel.inventory_mode === 'VARIANT_COMBINATION' && rel.variants.length > 0);
+  if (!exact) return [];
   const groups = rel.groups
     .filter((g) => g.active)
     .map((g) => g.values.filter((v) => v.active))
     .filter((values) => values.length > 0);
   let choices: string[][] = [[]];
   for (const values of groups) choices = choices.flatMap((chosen) => values.map((v) => [...chosen, v.id]));
+  // A GLOBAL colour (linked to no model) is offered with every model, and
+  // under exact combinations the order door resolves Small+Black to
+  // `o:small|c:black` with no fallback to the colour-less row. The save
+  // planner (worker/lib/productPersistence.ts planProductSave) therefore
+  // demands that exact shelf for every direct model, so the grid must show it.
+  const global = rel.colors.filter((c) => c.active && c.option_value_ids.length === 0);
+  const coloured = [
+    ...linked,
+    ...(choices.length === 1 && choices[0].length === 0 ? [] : choices)
+      .filter(isDirect)
+      .flatMap((ids) => global.map((c) => ({ option_value_ids: [...ids].sort(), color_id: c.id }))),
+  ];
+  if (coloured.length === 0) return [];
   const colouredSelections = new Set(coloured.map((x) => [...x.option_value_ids].sort().join('|')));
   return [
     ...coloured,

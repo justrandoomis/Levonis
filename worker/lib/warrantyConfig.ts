@@ -56,7 +56,7 @@ export interface WarrantyConfig {
  */
 export const DEFAULT_WARRANTY_CONFIG: WarrantyConfig = {
   default_months: 12,
-  type_ar: 'ضمان ليفونيس',
+  type_ar: 'ضمان Levonis',
   type_en: 'Levonis Warranty',
   coverage_ar:
     'يغطي عيوب التصنيع وأعطال الأجزاء تحت الاستعمال الطبيعي. لا يشمل الضرر الفيزيائي وسوء الاستعمال والسوائل والحروق والأضرار الكهربائية الناتجة عن مصدر طاقة غير مناسب والإصلاح أو التعديل غير المُصرَّح به والعبث بالرقم التسلسلي والضرر الناتج عن تركيب خاطئ أو استعمال خارج مواصفات المُصنِّع والمشاكل البرمجية وحدها ما لم يُنص على تغطيتها.',
@@ -72,7 +72,7 @@ export const DEFAULT_WARRANTY_CONFIG: WarrantyConfig = {
       en: 'The serial number on the device must match the one on this receipt.',
     },
     {
-      ar: 'لليفونيس أن تفحص الجهاز وتُشخّصه قبل الموافقة على الإصلاح أو الاستبدال.',
+      ar: 'لـ Levonis أن تفحص الجهاز وتُشخّصه قبل الموافقة على الإصلاح أو الاستبدال.',
       en: 'Levonis may inspect and diagnose the product before approving repair or replacement.',
     },
     {

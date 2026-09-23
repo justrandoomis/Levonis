@@ -118,6 +118,35 @@ export function useUsersStrings() {
     assistantBadge: loc('مساعد أدمن', 'Assistant admin', 'یاریدەدەری بەڕێوەبەر'),
     fullBadge: loc('أدمن مالي كامل', 'Full financial admin', 'بەڕێوەبەری دارایی تەواو'),
 
+    // ------------------------------------------- balance & points by hand
+    // «خصم رصيد وإضافة رصيد يدوي أو خصم النقاط وإضافة نقاط». Sentences carry
+    // no Sorani on purpose — `loc` falls back to the Arabic; only the short
+    // labels do, built from words this file already uses.
+    adjTitle: loc('تعديل الرصيد والنقاط', 'Adjust balance and points', 'دەستکاری باڵانس و خاڵ'),
+    adjKindLabel: loc('ما الذي تعدّله', 'What to adjust'),
+    adjDirLabel: loc('نوع التعديل', 'Adjustment type'),
+    adjBalance: loc('الرصيد', 'Balance', 'باڵانس'),
+    adjAdd: loc('إضافة', 'Add', 'زیادکردن'),
+    adjDeduct: loc('خصم', 'Deduct', 'کەمکردنەوە'),
+    adjAmountIqd: loc('المبلغ بالدينار', 'Amount in IQD'),
+    adjAmountPoints: loc('عدد النقاط', 'Number of points'),
+    adjPointsUnit: loc('نقطة', 'pts', 'خاڵ'),
+    adjReason: loc('السبب (إلزامي)', 'Reason (required)', 'هۆکار (پێویستە)'),
+    adjReasonHint: loc(
+      'يُحفظ في سجل التدقيق مع اسمك والرصيد قبل وبعد، ويظهر للعضو في كشف محفظته.',
+      'Saved in the audit log with your name and the balance before and after, and shown to the member on their wallet statement.'
+    ),
+    adjReasonShort: loc('اكتب سببًا من 5 أحرف على الأقل', 'Write a reason of at least 5 characters'),
+    adjOverBalance: loc('الخصم أكبر من الرصيد الحالي', 'The deduction is larger than the current balance'),
+    adjReview: loc('مراجعة التعديل', 'Review'),
+    adjConfirmTitle: loc('تأكيد التعديل', 'Confirm the adjustment'),
+    adjCurrent: loc('الحالي', 'Now'),
+    adjAfter: loc('بعد التعديل', 'After'),
+    adjConfirm: loc('تأكيد وتنفيذ', 'Confirm'),
+    adjBack: loc('رجوع', 'Back'),
+    adjWorking: loc('جارٍ التنفيذ...', 'Working...'),
+    adjDone: loc('تم تسجيل التعديل', 'Adjustment recorded'),
+
     // ------------------------------------------------------ assistant grant
     grantTitle: loc('منح صلاحية مساعد أدمن بالبريد', 'Grant assistant admin access by email', 'دانی دەسەڵاتی یاریدەدەر بە ئیمەیل'),
     grantIntro: loc(

@@ -158,13 +158,13 @@ test('every reply is audited', async () => {
 /**
  * THE HALF THE LAST TWO ROUNDS KEPT MISSING: does the answer REACH anybody?
  *
- * `src/` contains no screen that reads `community_complaint_messages` on the
- * customer side — the only customer touch on a complaint is the POST that
- * files one (worker/routes/marketplace.ts). So a row in that table is, by
- * itself, a sentence in a room with no door. `user_notifications` is where the
- * reporter actually reads it, behind their own login, and these tests are the
- * ones that would fail if a future change quietly removed the delivery and
- * left the write.
+ * The reporter now has a thread of their own (GET/POST
+ * /api/marketplace/complaints/:id, drawn in «تذاكري» on the Support page), and
+ * the notification is its door: it carries the answer as a preview AND links
+ * to the thread where it is read in full. Before that screen existed the link
+ * was '' and the bell clamped the body to two lines, so a longer answer could
+ * be read by nobody. These tests fail if a future change quietly removes the
+ * delivery and leaves the write, or points the door back at nothing.
  */
 test('a public reply reaches the reporter, carrying the text', async () => {
   const { raw, db } = setup();
@@ -182,10 +182,14 @@ test('a public reply reaches the reporter, carrying the text', async () => {
     .get() as Record<string, unknown> | undefined;
   assert.ok(row, 'the reporter must be told at all');
   assert.equal(row.user_id, 'buyer', 'the person who complained, not the admin');
-  assert.match(String(row.body_ar), /سنرسل بديلًا اليوم/, 'and the answer itself, since there is nowhere else to read it');
+  assert.match(String(row.body_ar), /سنرسل بديلًا اليوم/, 'and the answer itself, as the preview the bell shows');
   assert.equal(row.entity_type, 'complaint');
   assert.equal(row.entity_id, 'ct1');
-  assert.equal(row.link, '', 'no link: there is no complaint screen, and a link to one would be a lie');
+  assert.equal(
+    row.link,
+    '/support?tab=tickets&complaint=ct1',
+    'the row opens the reporter\'s own thread — the page reads exactly these parameters'
+  );
 });
 
 /** An internal note is the desk writing to ITSELF. Mailing it to the person it

@@ -83,6 +83,10 @@ function setup() {
       VALUES ('s1','m1','owner','ali3d','Ali 3D');
     INSERT INTO community_requests (id,customer_id,title,description,state,visibility)
       VALUES ('r1','buyer','Print a bracket','I need a bracket printed','receiving_offers','public');
+    -- This suite is about file privacy, not Levo Community's maintenance
+    -- switch: the request board closes with the community (docs/DECISIONS.md),
+    -- so it runs with the community open. tests/communityGate.test.ts owns the gate.
+    INSERT INTO admin_settings (key, value) VALUES ('communityGate', '{"open":true}');
   `);
   return { raw, db: new SqliteD1(raw) as unknown as D1Database, bucket: new MemoryBucket() };
 }

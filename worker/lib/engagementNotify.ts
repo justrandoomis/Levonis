@@ -86,7 +86,7 @@ const COPY = {
     offerTitle: 'عرض جديد على طلبك',
     priceLabel: 'السعر',
     complaintSubject: (id: string) => `رد على شكواك ${id}`,
-    complaintShort: (id: string) => `وصلك رد من إدارة ليفونيس على شكواك ${id}. افتح الإشعارات في التطبيق لقراءته.`,
+    complaintShort: (id: string) => `وصلك رد من إدارة \u2068Levonis\u2069 على شكواك ${id}. افتح «تذاكري» في صفحة الدعم لقراءته.`,
     complaintTitle: 'رد على شكواك',
   },
   en: {
@@ -98,7 +98,7 @@ const COPY = {
     offerTitle: 'A new offer on your request',
     priceLabel: 'Price',
     complaintSubject: (id: string) => `Reply on your complaint ${id}`,
-    complaintShort: (id: string) => `Levonis answered your complaint ${id}. Open your notifications in the app to read it.`,
+    complaintShort: (id: string) => `Levonis answered your complaint ${id}. Open "My tickets" on the Support page to read it.`,
     complaintTitle: 'A reply on your complaint',
   },
   ckb: {
@@ -115,10 +115,24 @@ const COPY = {
     // choice src/components/notifications/NotificationBell.tsx already makes
     // when it falls back).
     complaintSubject: (id: string) => `رد على شكواك ${id}`, // OWNER: Sorani by hand.
-    complaintShort: (id: string) => `وصلك رد من إدارة ليفونيس على شكواك ${id}. افتح الإشعارات في التطبيق لقراءته.`, // OWNER: Sorani by hand.
+    complaintShort: (id: string) => `وصلك رد من إدارة \u2068Levonis\u2069 على شكواك ${id}. افتح «تذاكري» في صفحة الدعم لقراءته.`, // OWNER: Sorani by hand.
     complaintTitle: 'رد على شكواك', // OWNER: Sorani by hand.
   },
 } as const;
+
+/**
+ * WHERE A SUPPORT CONVERSATION LIVES, AS A LINK A NOTIFICATION CAN CARRY.
+ *
+ * Both open the «تذاكري» tab of /support with the thread already open; the
+ * page reads exactly these parameter names. One spelling each, here, so the
+ * bell and the page cannot drift into two ideas of the same address.
+ */
+export function supportTicketLink(ticketId: string): string {
+  return `/support?tab=tickets&ticket=${encodeURIComponent(ticketId)}`;
+}
+export function complaintThreadLink(complaintId: string): string {
+  return `/support?tab=tickets&complaint=${encodeURIComponent(complaintId)}`;
+}
 
 /**
  * «رد الدعم» — staff answered a ticket, so the person who opened it hears about it.
@@ -129,9 +143,11 @@ const COPY = {
  * every one after it — `notifyCustomer` appends the channel and the uniqueness
  * lives in `outbox`, so a repeated key is a no-op, not a second send.
  *
- * `/support` and not a per-ticket path: the Support page opens its «تذاكري» tab
- * from the page itself and there is no deep link to one ticket today. A link to
- * a screen that exists beats a link to a route that does not.
+ * THE LINK OPENS THE TICKET, not the page. It was `/support`, and the Support
+ * page opens on the ASSISTANT — so a customer told «افتح «تذاكري»» landed in
+ * the bot, had to find the tab, and then find the ticket in a list. The page
+ * now reads `tab` and `ticket` from the query (src/pages/Support.tsx) and opens
+ * the thread itself; `supportTicketLink` is the one spelling of that address.
  */
 export async function notifySupportReply(env: Env, ticketId: string, messageId: string): Promise<void> {
   try {
@@ -149,7 +165,7 @@ export async function notifySupportReply(env: Env, ticketId: string, messageId: 
       title_en: COPY.en.supportTitle,
       body_ar: COPY.ar.supportBody(ticket.id),
       body_en: COPY.en.supportBody(ticket.id),
-      link: '/support',
+      link: supportTicketLink(ticket.id),
       entity_type: 'ticket',
       entity_id: ticket.id,
       meta: { title_ckb: COPY.ckb.supportTitle, body_ckb: COPY.ckb.supportBody(ticket.id) },
@@ -230,21 +246,18 @@ export async function notifyOfferReceived(env: Env, offerId: string): Promise<vo
  *
  * WHY THIS HAD TO EXIST BEFORE THE REPLY ROUTE COULD BE CALLED FINISHED.
  * `community_complaint_messages` has existed since migration 0031 and nothing
- * in the repository ever inserted into it; a reply route closed that half. But
- * there is still NO CUSTOMER-FACING SCREEN anywhere in `src/` that reads that
- * table — the only customer touch on a complaint is `POST
- * /api/marketplace/orders/:id/dispute`, which files one and never reads it
- * back. So a reply written into the thread would have been a sentence typed
- * into a room with no door: an admin believing they had answered, and a
- * customer still waiting.
+ * in the repository ever inserted into it; a reply route closed that half. The
+ * other half is the reporter's own thread — GET/POST
+ * /api/marketplace/complaints/:id, drawn on the Support page — which this
+ * notification now links to, so an answer is a door and not a dead end.
  *
  * THE IN-APP ROW CARRIES THE TEXT, AND THE OUTBOUND CHANNELS DO NOT. That
  * split is deliberate and it follows the rule stated on the COPY table above:
  * WhatsApp and Telegram are carried by third parties and a complaint answer
  * can name an amount, an address or another person, so the outbound line says
  * only that an answer arrived. `user_notifications` is behind the customer's
- * own login, exactly as a page on the site would be, so that is where the
- * answer itself lives — and it is the only place it currently CAN live.
+ * own login, exactly as a page on the site would be, so the bell may preview
+ * the answer; the thread it opens is where it is read in full.
  *
  * AN INTERNAL NOTE IS NEVER SENT. The caller only reaches this function for a
  * public reply; the column exists so a dispute desk can write to itself, and
@@ -280,12 +293,18 @@ export async function notifyComplaintReply(
       kind: 'complaint_reply',
       title_ar: COPY.ar.complaintTitle,
       title_en: COPY.en.complaintTitle,
-      // The answer itself. There is nowhere else the reporter can read it.
-      body_ar: replyText,
-      body_en: replyText,
-      // No link: a link to a screen that does not exist is the failure this
-      // function was written to avoid, one level down.
-      link: '',
+      // The answer itself, as a preview the bell can show whole. An
+      // attachment-only reply has no text, so it says an answer arrived.
+      body_ar: replyText || COPY.ar.complaintShort(complaint.id),
+      body_en: replyText || COPY.en.complaintShort(complaint.id),
+      /**
+       * THE THREAD, NOW THAT THERE IS ONE. This was '' because no customer
+       * screen read a complaint, and the bell clamps a body to two lines — so
+       * a multi-sentence answer could be read by nobody. The reporter's thread
+       * lives on the Support page («تذاكري»), where they can read every
+       * answer in full and reply with text, a photo or a clip.
+       */
+      link: complaintThreadLink(complaint.id),
       entity_type: 'complaint',
       entity_id: complaint.id,
       eventKey: `complaint.reply:${messageId}`,
@@ -298,5 +317,214 @@ export async function notifyComplaintReply(
     await notifyCustomer(env, complaint.reporter_id, `complaint.reply:${messageId}`, msg);
   } catch (e) {
     console.error('notifyComplaintReply failed for', complaintId, e instanceof Error ? e.message : String(e));
+  }
+}
+
+// ===================================================================
+// WARRANTY CLAIMS — «ولا يرسل الإشعار إلى المستخدم بأن هناك رسالة جديدة تخص الضمان»
+// ===================================================================
+
+/**
+ * WHERE A WARRANTY CLAIM'S CONVERSATION LIVES, AS A LINK A NOTIFICATION CAN
+ * CARRY. The Warranty page reads `claim` from the query and opens that thread
+ * itself (src/pages/Warranty.tsx), so the bell lands the customer IN the
+ * conversation and not on a page with a list they must search. One spelling,
+ * here, for the same reason `supportTicketLink` has one.
+ */
+export function warrantyClaimLink(claimId: string): string {
+  return `/warranty?claim=${encodeURIComponent(claimId)}`;
+}
+
+/**
+ * The stage names are the ones the claim card already draws
+ * (src/components/warranty/strings.ts `stageLabels`), so the message and the
+ * screen it opens say the same word for the same step.
+ */
+const CLAIM_STAGE_LABEL: Record<'ar' | 'en', Record<string, string>> = {
+  ar: {
+    received: 'مُستلَمة',
+    diagnosing: 'قيد الفحص',
+    approved: 'مقبولة',
+    rejected: 'مرفوضة',
+    repairing: 'قيد الإصلاح',
+    replaced: 'استبدال',
+    resolved: 'منتهية',
+  },
+  en: {
+    received: 'Received',
+    diagnosing: 'Diagnosing',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    repairing: 'Repairing',
+    replaced: 'Replacement',
+    resolved: 'Resolved',
+  },
+};
+
+/**
+ * THE PRODUCT, NOT THE CLAIM ID, NAMES THE CLAIM. A support ticket's id is
+ * printed on the customer's own ticket list; a claim's `wc_…` id is printed
+ * nowhere the customer looks — the card under «مطالباتي» is headed by the
+ * subject and the printer. The printer's name is the identifier they will
+ * recognise on a lock screen, and unlike the subject it is not their own
+ * prose travelling through a third party.
+ *
+ * Sorani carries the ARABIC text on purpose, exactly as the complaint lines
+ * above do: no Kurdish sentence is generated here. OWNER: Sorani by hand.
+ */
+const CLAIM_COPY = {
+  ar: {
+    replyTitle: 'رد من فريق الضمان',
+    replyBody: (p: string) => `وصلك رد من فريق الضمان على مطالبتك الخاصة بـ«${p}». افتح «مطالباتي» في مركز الضمان لقراءته والرد عليه.`,
+    replySubject: (p: string) => `رد على مطالبة الضمان — ${p}`,
+    stageTitle: 'تحديث على مطالبة الضمان',
+    stageBody: (p: string, label: string) => `مطالبتك الخاصة بـ«${p}» صارت: ${label}.`,
+    stageOpen: 'افتح «مطالباتي» في مركز الضمان للتفاصيل.',
+    stageSubject: (p: string) => `تحديث على مطالبة الضمان — ${p}`,
+    reasonLabel: 'السبب',
+  },
+  en: {
+    replyTitle: 'The warranty team replied',
+    replyBody: (p: string) => `The warranty team replied on your claim for “${p}”. Open "My claims" in the Warranty centre to read it and answer.`,
+    replySubject: (p: string) => `Reply on your warranty claim — ${p}`,
+    stageTitle: 'Your warranty claim was updated',
+    stageBody: (p: string, label: string) => `Your claim for “${p}” is now: ${label}.`,
+    stageOpen: 'Open "My claims" in the Warranty centre for the details.',
+    stageSubject: (p: string) => `Warranty claim update — ${p}`,
+    reasonLabel: 'Reason',
+  },
+} as const;
+
+/** 'ckb' reads the Arabic copy — see CLAIM_COPY. */
+const claimCopyFor = (lang: EmailLang) => (lang === 'en' ? CLAIM_COPY.en : CLAIM_COPY.ar);
+const claimStageLabelFor = (lang: EmailLang, stage: string) =>
+  (lang === 'en' ? CLAIM_STAGE_LABEL.en : CLAIM_STAGE_LABEL.ar)[stage] ?? stage;
+
+interface ClaimHead {
+  id: string;
+  user_id: string;
+  product_name: string | null;
+}
+
+async function claimHead(env: Env, claimId: string): Promise<ClaimHead | null> {
+  return env.DB.prepare('SELECT id, user_id, product_name FROM warranty_claims WHERE id = ?')
+    .bind(claimId)
+    .first<ClaimHead>();
+}
+
+/** One lock-screen line: the printer's name, clipped. */
+function claimProduct(head: ClaimHead): string {
+  const name = String(head.product_name ?? '').trim();
+  return name.length > 60 ? `${name.slice(0, 59)}…` : name || '—';
+}
+
+/**
+ * «رد من فريق الضمان» — staff wrote in a warranty claim's thread, so the
+ * customer who filed it hears about it.
+ *
+ * THE MIRROR OF THE LINE THAT ALREADY EXISTED. POST
+ * /api/devices/claims/:id/messages has announced every CUSTOMER message to the
+ * owner's «🔥 Warranty support» topic since the claim thread was built; the
+ * staff message went into `claim_messages` and reached the customer by no path
+ * at all — not the bell, not WhatsApp, not Telegram, not email. They learned
+ * that the warranty team had asked for a photo of the nozzle by coming back
+ * and looking.
+ *
+ * THE EVENT KEY CARRIES THE MESSAGE ID, not the claim id — a claim is a
+ * conversation, and the second question from the team is as much news as the
+ * first. Keying on the claim would deliver one reply and swallow every one
+ * after it.
+ *
+ * THE TEXT OF THE REPLY IS NEVER IN IT, on either door: the in-app row says an
+ * answer arrived and opens the thread, and the outbound channels (carried by
+ * third parties) say the same. What the team wrote can name a serial, an
+ * address or a repair cost, and it stays behind the customer's own login.
+ *
+ * TOTAL. Called after the message row has committed; neither a D1 blip nor a
+ * provider outage may turn a staff member's sent reply into an error.
+ */
+export async function notifyClaimReply(env: Env, claimId: string, messageId: string): Promise<void> {
+  try {
+    const head = await claimHead(env, claimId);
+    if (!head) return;
+    const product = claimProduct(head);
+    const eventKey = `claim.reply:${messageId}`;
+    // The in-app row first and unconditionally — the floor for a customer with
+    // no linked channel. Sorani falls back to the Arabic in the bell.
+    await notify(env.DB, {
+      userId: head.user_id,
+      kind: 'warranty_reply',
+      title_ar: CLAIM_COPY.ar.replyTitle,
+      title_en: CLAIM_COPY.en.replyTitle,
+      body_ar: CLAIM_COPY.ar.replyBody(product),
+      body_en: CLAIM_COPY.en.replyBody(product),
+      link: warrantyClaimLink(head.id),
+      entity_type: 'claim',
+      entity_id: head.id,
+      eventKey,
+    });
+    const t = claimCopyFor(await localeOf(env, head.user_id));
+    const msg: CustomerMessage = { subject: t.replySubject(product), body: t.replyBody(product) };
+    await notifyCustomer(env, head.user_id, eventKey, msg);
+  } catch (e) {
+    console.error('notifyClaimReply failed for', claimId, e instanceof Error ? e.message : String(e));
+  }
+}
+
+/**
+ * «تحديث على مطالبة الضمان» — the claim moved a stage, so its customer is told
+ * where it now stands.
+ *
+ * THE DECISION REASON IS IN THE IN-APP ROW AND NOT IN THE OUTBOUND LINE. The
+ * admin queue labels that field «سيُبلَّغ للزبون», so the customer is owed it —
+ * behind their own login, where the claim card shows it too. WhatsApp and
+ * Telegram get the stage and where to read the rest, by the same rule as
+ * every other message in this file.
+ *
+ * THE EVENT KEY CARRIES THE MOMENT OF THE MOVE (`at`), not just the stage. A
+ * claim can legitimately reach the same stage twice — rejected, reopened for
+ * another look, rejected again — and the second decision is news. The caller
+ * reaches this only after its conditional UPDATE won, so a retried request
+ * that lost the race never gets here and cannot announce twice.
+ */
+export async function notifyClaimStage(
+  env: Env,
+  claimId: string,
+  stage: string,
+  opts: { at: string; reason?: string }
+): Promise<void> {
+  try {
+    const head = await claimHead(env, claimId);
+    if (!head) return;
+    const product = claimProduct(head);
+    const reason = String(opts.reason ?? '').trim();
+    const eventKey = `claim.stage:${head.id}:${stage}:${opts.at}`;
+    const inApp = (lang: 'ar' | 'en') => {
+      const c = CLAIM_COPY[lang];
+      const line = c.stageBody(product, CLAIM_STAGE_LABEL[lang][stage] ?? stage);
+      return reason ? `${line} ${c.reasonLabel}: ${reason}` : line;
+    };
+    await notify(env.DB, {
+      userId: head.user_id,
+      kind: 'warranty_stage',
+      title_ar: CLAIM_COPY.ar.stageTitle,
+      title_en: CLAIM_COPY.en.stageTitle,
+      body_ar: inApp('ar'),
+      body_en: inApp('en'),
+      link: warrantyClaimLink(head.id),
+      entity_type: 'claim',
+      entity_id: head.id,
+      meta: { stage },
+      eventKey,
+    });
+    const lang = await localeOf(env, head.user_id);
+    const t = claimCopyFor(lang);
+    const msg: CustomerMessage = {
+      subject: t.stageSubject(product),
+      body: `${t.stageBody(product, claimStageLabelFor(lang, stage))} ${t.stageOpen}`,
+    };
+    await notifyCustomer(env, head.user_id, eventKey, msg);
+  } catch (e) {
+    console.error('notifyClaimStage failed for', claimId, e instanceof Error ? e.message : String(e));
   }
 }

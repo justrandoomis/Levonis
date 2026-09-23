@@ -69,7 +69,7 @@
     -->
     <meta
       name="description"
-      content="متجر ليفونيس للطباعة ثلاثية الأبعاد في العراق: طابعات FDM وراتنج، خيوط فلامنت، قطع غيار وملحقات، وخدمة طباعة حسب الطلب مع توصيل داخل العراق."
+      content="متجر Levonis للطباعة ثلاثية الأبعاد في العراق: طابعات FDM وراتنج، خيوط فلامنت، قطع غيار وملحقات، وخدمة طباعة حسب الطلب مع توصيل داخل العراق."
     />
 
     <!--
@@ -112,7 +112,7 @@
       `isRewritableMediaKey`). The three `/icons/*.png` links below do NOT come
       from R2 — see the next comment.
     -->
-    <link rel="icon" type="image/webp" href="/files/UiUx/Logo/Logo.webp" />
+    <link rel="icon" type="image/webp" href="/files/UiUx/Logo/Logo.webp?v=bc80fc2b" />
 
     <!--
       THE HOME-SCREEN ICON, AND WHY IT IS A PNG NOW.
@@ -123,7 +123,7 @@
       reports nothing — it gives up and uses A SCREENSHOT OF THE PAGE as the
       home-screen icon. Every iPhone that ever added this shop to its home
       screen got a picture of whatever page happened to be open instead of the
-      mark. `public/icons/apple-touch-icon.png` has existed since the icons
+      mark. `public/icons/apple-touch-icon.<rev>.png` has existed since the icons
       were generated; until now nothing pointed at it.
 
       180x180 is the size iOS asks for, and `sizes` is declared because iOS
@@ -151,17 +151,27 @@
       `npm run build`. Replacing the object in R2 therefore changes the WebP
       link and the share card above and NOTHING HERE: an iPad takes
       `apple-touch-icon.png` for the home screen and prefers a PNG `rel=icon`
-      for the tab, and an installed Android app takes `/icons/icon-192.png`
+      for the tab, and an installed Android app takes `/icons/icon-192.<rev>.png`
       and `maskable-192.png` out of the manifest. A new logo is invisible on
       both of those devices until someone runs the generator, commits the
       seven files and bumps `VERSION` in public/sw.js so the precached copies
       are dropped. `src/lib/siteLogo.ts` names these paths once and
       `tests/siteMedia.test.ts` checks that this document, the generator and
       worker/lib/webManifest.ts are all still talking about the same files.
+
+      THE NAMES CARRY THE LOGO'S REVISION (`.bc80fc2b.`, and `?v=bc80fc2b`
+      on the R2 URLs above and below). A fixed name is a promise every cache
+      keeps: `/icons/*` is served for a week and answered from Cloudflare's
+      edge, the browser keeps a tab icon per URL, Android decides whether an
+      installed app's icon changed by fetching the SAME URL through its HTTP
+      cache, and Telegram and WhatsApp keep a link preview for as long as its
+      `og:image` URL is unchanged. So a new mark is a new URL.
+      `scripts/build-pwa-icons.mjs` refuses to write new pixels under an old
+      revision and prints the new one to rename to.
     -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.bc80fc2b.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.bc80fc2b.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.bc80fc2b.png" />
 
     <meta property="og:site_name" content="LEVONIS" />
     <meta property="og:type" content="website" />
@@ -172,14 +182,14 @@
       content="طابعات وخيوط وقطع الطباعة ثلاثية الأبعاد في العراق، مع خدمة طباعة حسب الطلب."
     />
     <meta property="og:url" content="https://levonis-iq.com/" />
-    <meta property="og:image" content="https://levonis-iq.com/files/UiUx/Logo/Logo.webp" />
+    <meta property="og:image" content="https://levonis-iq.com/files/UiUx/Logo/Logo.webp?v=bc80fc2b" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="LEVONIS — متجر الطباعة ثلاثية الأبعاد" />
     <meta
       name="twitter:description"
       content="طابعات وخيوط وقطع الطباعة ثلاثية الأبعاد في العراق، مع خدمة طباعة حسب الطلب."
     />
-    <meta name="twitter:image" content="https://levonis-iq.com/files/UiUx/Logo/Logo.webp" />
+    <meta name="twitter:image" content="https://levonis-iq.com/files/UiUx/Logo/Logo.webp?v=bc80fc2b" />
 
     <!--
       INSTALLING THE SHOP AS AN APP.

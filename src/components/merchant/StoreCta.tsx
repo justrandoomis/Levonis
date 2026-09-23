@@ -158,7 +158,7 @@ function reasonText(reason: string, loc: (ar: string, en: string, ckb?: string) 
     case 'store_suspended':
     case 'merchant_suspended':
       return loc(
-        'المتجر موقوف من إدارة ليفونيس. تواصل مع الدعم لمعرفة التفاصيل.',
+        'المتجر موقوف من إدارة Levonis. تواصل مع الدعم لمعرفة التفاصيل.',
         'This store is suspended by Levonis. Contact support for details.',
         'فرۆشگاکە لەلایەن LEVONIS ڕاگیراوە. پەیوەندی بە پشتیوانییەوە بکە.'
       );

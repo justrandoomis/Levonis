@@ -36,11 +36,17 @@ import type { PolicyDocument } from './types';
  *     text rather than show a customer a `{{TOKEN}}`. They are still authored
  *     below, and each one returns of its own accord the moment its value is
  *     written in and the version moves again.
+ *
+ * VERSION 3 — WHY IT MOVED. The archive keeps version 2 byte for byte.
+ *   * THE FACTS. worker/lib/policies/facts.ts now states `COMPETENT_COURT`, `GOVERNING_LAW_JURISDICTION`, `LEVONIS_SUPPORT_CONTACT`, `MIN_PURCHASE_AGE_YEARS`, `PREMIUM_FREE_DELIVERY_MIN_IQD`, `PRO_FREE_DELIVERY_MIN_IQD`,
+ *     so the clauses that carried them are published instead of withheld.
+ *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
+ *     by number, an article of this document that is itself withheld.
  */
 export const terms: PolicyDocument = {
   key: 'terms',
-  version: 2,
-  effective_at: '2026-01-01',
+  version: 3,
+  effective_at: '2026-09-23',
   title: {
     ar: 'الشروط والأحكام العامة',
     en: 'General Terms and Conditions',
@@ -538,7 +544,7 @@ export const terms: PolicyDocument = {
 ## 18. القانون الواجب التطبيق وتسوية النزاع
 
 ### 18.1 القانون الواجب التطبيق
-يسري على هذه الشروط وعلى كل علاقة ناشئة عنها قانون {{GOVERNING_LAW_JURISDICTION}}.
+تسري على هذه الشروط وعلى كل علاقة ناشئة عنها {{GOVERNING_LAW_JURISDICTION}}.
 
 ### 18.2 التسوية الودية أولاً
 يلتزم الطرفان قبل اللجوء إلى القضاء بعرض النزاع على الدعم لتسويته ودياً، عبر {{LEVONIS_SUPPORT_CONTACT}}، وفق إجراءات سياسة الدعم والتواصل والشكاوى.
@@ -547,7 +553,7 @@ export const terms: PolicyDocument = {
 يردّ المتجر على الشكوى المكتوبة خلال {{DISPUTE_RESPONSE_DAYS}} يوماً من تسلّمها مستوفية لمستنداتها. ولا يُعدّ انقضاء المهلة قبولاً بالمطالبة.
 
 ### 18.4 الاختصاص القضائي
-إذا تعذرت التسوية الودية، تختص {{COMPETENT_COURT}} بنظر النزاع.
+إذا تعذرت التسوية الودية، يكون الاختصاص بنظر النزاع ل{{COMPETENT_COURT}}.
 
 ### 18.5 لغة الإجراءات
 تُقدَّم المستندات والمرافعات باللغة العربية، وتُعتمد النسخة العربية من وثائق المتجر وفق المادة 1.6. وللزبون تقديم ترجمة على نفقته.
@@ -1051,7 +1057,7 @@ Periods stated in the Store documents are computed in calendar days unless other
 ## 18. Governing law and dispute resolution
 
 ### 18.1 Governing law
-These Terms and every relationship arising from them are governed by the law of {{GOVERNING_LAW_JURISDICTION}}.
+These Terms and every relationship arising from them are governed by {{GOVERNING_LAW_JURISDICTION}}.
 
 ### 18.2 Amicable settlement first
 Before resorting to the courts, the parties undertake to put the dispute to support for amicable settlement, via {{LEVONIS_SUPPORT_CONTACT}}, following the procedures of the Support, Contact and Complaints Policy.
@@ -1564,7 +1570,7 @@ Every notice, claim or complaint is addressed to {{LEVONIS_SUPPORT_CONTACT}}, or
 ## 18. یاسای جێبەجێکراو و یەکلاییکردنەوەی ناکۆکی
 
 ### 18.1 یاسای جێبەجێکراو
-لەسەر ئەم مەرجانە و لەسەر هەر پەیوەندییەک کە لێیانەوە سەرچاوە دەگرێت یاسای {{GOVERNING_LAW_JURISDICTION}} جێبەجێ دەبێت.
+لەسەر ئەم مەرجانە و لەسەر هەر پەیوەندییەک کە لێیانەوە سەرچاوە دەگرێت {{GOVERNING_LAW_JURISDICTION}} جێبەجێ دەبێت.
 
 ### 18.2 یەکلاییکردنەوەی دۆستانە سەرەتا
 هەردوو لایەن پێش ڕووکردنە دادگا پابەندن بە پێشکەشکردنی ناکۆکییەکە بۆ پشتگیری بۆ یەکلاییکردنەوەی دۆستانە، لە ڕێگەی {{LEVONIS_SUPPORT_CONTACT}}، بەپێی ڕێکارەکانی سیاسەتی پشتگیری و پەیوەندی و سکاڵاکان.

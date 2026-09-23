@@ -43,6 +43,7 @@ import { printerWarrantyRules, readOpsWarranty } from './warrantyPlans';
 import { parseConditionDoc, type ConditionDoc } from './condition';
 import { DIMENSION_FIELDS, parseDimensions } from './productModel';
 import { isOwnedMediaUrl } from './mediaStorage';
+import type { PendingBrand } from './template';
 
 export interface CatalogRef {
   id: string;
@@ -109,9 +110,33 @@ export interface ExistingShape {
   fulfillments?: ExistingCellRow[];
 }
 
+/**
+ * HOW ONE BRAND CELL RESOLVES, decided by the route that holds the database.
+ *
+ *   hit        an existing row (slug, id, or any of its three names —
+ *              `matchRef`, worker/lib/templateRefs.ts, the TXT import's rule);
+ *              `warning` is set when that row is deactivated
+ *   pending    no row answers; the confirm will CREATE this brand, and every
+ *              row naming it shares the one pending id
+ *   ambiguous  a name more than one row answers to — refused, never guessed
+ */
+export type BrandResolution =
+  | { kind: 'hit'; id: string; warning: string | null }
+  | { kind: 'pending'; pending: PendingBrand }
+  | { kind: 'ambiguous'; candidates: string[] }
+  | { kind: 'miss' };
+
 export interface ImportMaps {
   /** normalized brand name or slug -> brand id */
   brands: Map<string, string>;
+  /**
+   * The owner's «اجعل ينشئ البراند بدل أن يرفض», for the CSV/ZIP lane. When
+   * present it REPLACES the `brands` map lookup: the preview route builds it
+   * from every brand row (inactive included, Sorani names included) and from
+   * the brands it has planned to create. A caller that does not pass it keeps
+   * the old refuse-on-miss behaviour.
+   */
+  brandMatch?: (value: string) => BrandResolution;
   /** normalized catalog slug, English name or Arabic name -> catalog */
   catalogs: Map<string, CatalogRef>;
   /** normalized facet slug or English name -> facet id */
@@ -263,7 +288,24 @@ export function resolveProduct(
 
   // ---- brand -------------------------------------------------------------
   let brandId: string | null = (existing?.doc.brand_id as string | null) ?? null;
-  if (p.brand) {
+  const brandMatched = p.brand && maps.brandMatch ? maps.brandMatch(p.brand) : null;
+  if (brandMatched) {
+    if (brandMatched.kind === 'hit') {
+      brandId = brandMatched.id;
+      if (brandMatched.warning) issues.push(warn(p.line, brandMatched.warning));
+    } else if (brandMatched.kind === 'pending') {
+      // Not an error: the confirm creates it (once, however many rows name
+      // it). Said on the row so the owner reads «سيُنشأ» before confirming.
+      brandId = brandMatched.pending.id;
+      issues.push(
+        warn(p.line, `brand: سيُنشأ براند جديد "${brandMatched.pending.name}" ← ${brandMatched.pending.slug} / a new brand will be created`)
+      );
+    } else if (brandMatched.kind === 'ambiguous') {
+      issues.push(err(p.line, `${ambiguousMessage('brand', p.brand)} — ${brandMatched.candidates.join('، ')}`));
+    } else {
+      issues.push(err(p.line, `brand: لا توجد علامة تجارية باسم "${p.brand}" — أضفها أولًا من إدارة العلامات`));
+    }
+  } else if (p.brand) {
     const found = maps.brands.get(normKey(p.brand));
     if (!found) {
       // §4 takes the brand from a managed list. Inventing one from a

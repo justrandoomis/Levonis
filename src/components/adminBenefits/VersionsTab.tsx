@@ -111,6 +111,20 @@ export default function VersionsTab({ versions, schema, catalogs, productNames }
     // rule on either side — the point at which the store had a configuration
     // at all.
     seed: { ar: 'القيم الابتدائية', en: 'Initial values', tone: 'info' },
+    // «تحويل إلى قاعدة قسم»: ONE row for the whole conversion. `after_json`
+    // is the section rule it created (none when one already existed) and
+    // `before_json` the LIST of product rules it deleted.
+    consolidate: { ar: 'تحويل إلى قاعدة قسم', en: 'Converted to a section rule', tone: 'info' },
+  };
+
+  /** How many product rules a conversion row deleted (its `before_json` is a list). */
+  const foldedCount = (raw: string | null): number => {
+    try {
+      const parsed: unknown = raw ? JSON.parse(raw) : null;
+      return Array.isArray(parsed) ? parsed.length : 0;
+    } catch {
+      return 0;
+    }
   };
 
   return (
@@ -128,7 +142,8 @@ export default function VersionsTab({ versions, schema, catalogs, productNames }
         // A creation has no "before" and a deletion has no "after": showing a
         // diff of one side against nothing would print the whole rule as
         // twenty arrows. The rule as it stood is the honest summary.
-        const snapshot = v.action === 'create' ? after : v.action === 'delete' ? before : null;
+        const consolidated = v.action === 'consolidate';
+        const snapshot = v.action === 'create' || consolidated ? after : v.action === 'delete' ? before : null;
         return (
           <article key={v.id} className={`${T.surface} p-3.5 space-y-2`} data-mb-version={v.id}>
             <header className="flex flex-wrap items-center gap-2">
@@ -149,7 +164,15 @@ export default function VersionsTab({ versions, schema, catalogs, productNames }
               {v.rule_id && <span>{v.rule_id}</span>}
             </div>
 
-            {snapshot ? (
+            {consolidated && (
+              <p className="text-[12.5px] text-[var(--ap-text-2)]" data-mb-version-folded>
+                {loc(
+                  `حُذفت ${foldedCount(v.before_json)} قاعدة منتج${after ? ' وحلّت محلها قاعدة القسم أدناه' : ' تغطيها قاعدة القسم الموجودة'}.`,
+                  `${foldedCount(v.before_json)} product rules deleted${after ? ', replaced by the section rule below' : ', covered by the existing section rule'}.`
+                )}
+              </p>
+            )}
+            {consolidated && !snapshot ? null : snapshot ? (
               <ul className="grid gap-x-4 gap-y-0.5 sm:grid-cols-2">
                 {RULE_FIELDS.filter((f) => !EMPTY(snapshot[f])).map((f) => (
                   <li key={f} className="flex flex-wrap items-baseline gap-x-1.5 text-[12.5px]">

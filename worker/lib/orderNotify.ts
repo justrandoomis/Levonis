@@ -15,12 +15,15 @@
  *               notification that says nothing the customer can act on is a
  *               notification that trains them to ignore the next one.
  *
+ * EVERY STATUS WRITES AN IN-APP ROW whatever the channels say — it is the one
+ * notice a customer with no verified channel at all still receives.
+ *
  * DELIVERED IS A STATUS WITH A THIRD HALF, which is why it has a function of
  * its own (`notifyOrderDelivered`) that `notifyOrderStatus` hands off to: it
- * writes the in-app row whatever the channels say, and it carries the one
- * button in this file — «قيّم منتجاتك», pointing at the orders that still
- * want a rating. Both spellings share one event key, so the customer is asked
- * once however many doors the order reaches `delivered` through.
+ * carries the one button in this file — «قيّم منتجاتك», pointing at the orders
+ * that still want a rating. Both spellings share one event key, so the
+ * customer is asked once however many doors the order reaches `delivered`
+ * through.
  *
  * The copy is deliberately SHORT. These arrive on WhatsApp and Telegram as
  * well as email, and on a phone the lock-screen preview is often the whole
@@ -40,6 +43,7 @@ import {
   type NotifyLangRow,
 } from './customerNotify';
 import { notify } from './notifications';
+import { processOutbox } from './outbox';
 import type { EmailLang } from './emailTemplates';
 
 /** The transitions worth telling a customer about. `processing` is not one. */
@@ -230,31 +234,101 @@ export async function notifyOrderPlaced(env: Env, orderId: string): Promise<void
 }
 
 /**
+ * HOW A CALLER WITH A REQUEST GETS THE MESSAGE OUT NOW, NOT AT THE NEXT CRON.
+ *
+ * `notifyCustomer` only ENQUEUES. The rows then waited for the fifteen-minute
+ * cron, and that cron drains the outbox oldest-first — so an owner who changed a status
+ * and watched their phone for the Telegram message saw nothing for up to a
+ * quarter of an hour and concluded, reasonably, that it was broken. A caller
+ * that has an ExecutionContext passes its `waitUntil` here, and the rows this
+ * ONE event produced are sent straight after the response — by prefix, so an
+ * older backlog at the head of the queue cannot hold them up.
+ *
+ * Optional, and absent on every path with no request behind it (the courier
+ * sync, the sweeps): those keep the cron, which is what they always had.
+ */
+export interface NotifyDelivery {
+  defer?: (work: Promise<unknown>) => void;
+}
+
+/** The outbox rows of ONE order-status event, sent now. Never throws. */
+export async function flushOrderStatusNotice(env: Env, orderId: string, status: string): Promise<void> {
+  try {
+    await processOutbox(env, 5, { eventKeyPrefix: `order.status.${status}:${orderId}:` });
+  } catch (e) {
+    console.error('flushOrderStatusNotice failed for', orderId, status, e instanceof Error ? e.message : String(e));
+  }
+}
+
+/**
  * "Your order moved." The event key carries the STATUS, so an order that
  * legitimately reaches `shipped` twice (reversed and re-shipped) notifies
  * once — which is the honest reading: the customer already knows it shipped.
  */
-export async function notifyOrderStatus(env: Env, orderId: string, status: string): Promise<void> {
+export async function notifyOrderStatus(
+  env: Env,
+  orderId: string,
+  status: string,
+  delivery: NotifyDelivery = {}
+): Promise<void> {
   try {
     if (!isNotifiedOrderStatus(status)) return;
     // ONE WRITER OF THE DELIVERED MESSAGE. Delivery is the only status that
-    // also owes the customer an in-app row and a button, and both doors that
-    // reach it share this event key — so if this function built its own
-    // version, which of the two arrived first would decide whether the
-    // customer got the button, for ever (the loser's enqueue is a no-op).
-    if (status === 'delivered') return await notifyOrderDelivered(env, orderId);
-    const row = await loadOrderRow(env, orderId);
-    if (!row) return;
-    const t = COPY[notificationLang(row)];
-    const msg: CustomerMessage = {
-      subject: t.statusSubject(row.id),
-      body: t.status[status](row.id),
-      // Only the cancelled line keeps the number on a line of its own, because
-      // only the cancelled SENTENCE was left unchanged — see the copy note.
-      // The subject is no substitute: WhatsApp and Telegram never see it.
-      ...(status === 'cancelled' ? { details: [{ label: t.orderLabel, value: row.id }] } : {}),
-    };
-    await notifyCustomer(env, row.user_id, `order.status.${status}:${row.id}`, msg);
+    // also owes the customer a button, and both doors that reach it share this
+    // event key — so if this function built its own version, which of the two
+    // arrived first would decide whether the customer got the button, for ever
+    // (the loser's enqueue is a no-op).
+    if (status === 'delivered') {
+      await notifyOrderDelivered(env, orderId);
+    } else {
+      const row = await loadOrderRow(env, orderId);
+      if (!row) return;
+      const t = COPY[notificationLang(row)];
+      const eventKey = `order.status.${status}:${row.id}`;
+
+      /*
+       * THE FLOOR, FOR EVERY STATUS — not only for `delivered`.
+       *
+       * «الإشعارات لا تصل للمستخدم عند تحديث حالة طلبه». The outbox rows below
+       * exist only for a customer with a verified email, a verified WhatsApp
+       * or a linked Telegram; a customer with none of the three was told
+       * nothing at all about confirmed, shipped or cancelled, and their bell
+       * stayed empty. The in-app row needs no channel. Same shape and same
+       * reasons as the delivered row below: a PATH for the link, ar/en titles
+       * (the bell falls back to Arabic for Sorani), and the status in the
+       * event key so a reversed-and-repeated status is one row, not two.
+       *
+       * The cancelled sentence carries no number, so the in-app title adds it:
+       * a bell entry reading «تم إلغاء طلبك» beside three orders says nothing.
+       */
+      await notify(env.DB, {
+        userId: row.user_id,
+        kind: 'order_update',
+        title_ar:
+          status === 'cancelled'
+            ? `${COPY.ar.status.cancelled(row.id)} (${COPY.ar.orderLabel} ${row.id})`
+            : COPY.ar.status[status](row.id),
+        title_en:
+          status === 'cancelled'
+            ? `${COPY.en.status.cancelled(row.id)} (${COPY.en.orderLabel} ${row.id})`
+            : COPY.en.status[status](row.id),
+        link: `/orders/${encodeURIComponent(row.id)}`,
+        entity_type: 'order',
+        entity_id: row.id,
+        eventKey,
+      });
+
+      const msg: CustomerMessage = {
+        subject: t.statusSubject(row.id),
+        body: t.status[status](row.id),
+        // Only the cancelled line keeps the number on a line of its own, because
+        // only the cancelled SENTENCE was left unchanged — see the copy note.
+        // The subject is no substitute: WhatsApp and Telegram never see it.
+        ...(status === 'cancelled' ? { details: [{ label: t.orderLabel, value: row.id }] } : {}),
+      };
+      await notifyCustomer(env, row.user_id, eventKey, msg);
+    }
+    if (delivery.defer) delivery.defer(flushOrderStatusNotice(env, orderId, status));
   } catch (e) {
     console.error('notifyOrderStatus failed for', orderId, status, e instanceof Error ? e.message : String(e));
   }

@@ -727,6 +727,23 @@ export default function Cart() {
         : (item.stock ?? null);
 
   /**
+   * THE NUMBER THE «تغيير الخيارات» SHEET PRINTS BESIDE «المخزون», or null for
+   * no line at all. That sheet printed `item.stock` — the product's base row —
+   * so a pre-order line read «المخزون: 0» and an option/colour product read a
+   * number belonging to no selection. Same source as `lineRemaining`: the
+   * server's per-selection shelf, tracked only, and nothing on a pre-order
+   * (by its journey, `transport_method`, or by its resolved mode).
+   */
+  const sheetShelf = (item: CartItem): number | null => {
+    const a = item.availability;
+    // A pre-order line never draws from the shelf, whatever `mode` its
+    // availability resolved to (`unavailable` too): its stated journey says so.
+    if (!a || item.composition || item.transport_method || a.mode === 'preorder') return null;
+    const st = a.stock;
+    return st && st.tracked && st.available !== null ? st.available : null;
+  };
+
+  /**
    * WHAT IS LEFT, ON THE COUNTER THIS LINE ACTUALLY CONSUMES.
    *
    * The order type decides which counter answers — `preorder` for a pre-order
@@ -1098,8 +1115,9 @@ export default function Cart() {
   const savedTotal = otherDiscounts + memberNamedSaving;
 
   // Shipping preview only — the standard delivery method's configured price,
-  // a server setting. The final figure, and every waiver (PRO, PRIME, a
-  // referred friend's printer), is the checkout quote's: the thresholds live
+  // a server setting. The final figure, and every waiver (an active
+  // membership's rule — a referral or support code waives nothing), is the
+  // checkout quote's: the thresholds live
   // in the server's shipping policy and are not repeated here, because a
   // browser-side copy of them had already drifted from the real rule once.
   const standardDelivery =
@@ -2449,9 +2467,16 @@ export default function Cart() {
                 )}
                 <div>
                   <p className="text-white font-bold text-lg tabular-nums">{money(variantView.unit_price_iqd)}</p>
-                  {variantView.stock !== null && (
-                    <p className="text-sm text-zinc-400">{loc('المخزون', 'Stock', 'کۆگا')}: {variantView.stock}</p>
-                  )}
+                  {(() => {
+                    // The SHELF for this exact selection — `availability.stock`,
+                    // never the legacy `stock` (the base row, a different number
+                    // for an option/colour/combination product). A pre-order line
+                    // is not served from a shelf, so it prints no stock at all.
+                    const shelf = sheetShelf(variantView);
+                    return shelf === null ? null : (
+                      <p className="text-sm text-zinc-400" data-variant-sheet-stock>{loc('المخزون', 'Stock', 'کۆگا')}: {shelf}</p>
+                    );
+                  })()}
                 </div>
               </div>
               <button type="button" onClick={() => setVariantModalOpen(false)} className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 text-zinc-300">

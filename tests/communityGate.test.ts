@@ -51,6 +51,10 @@ import {
 } from '../worker/lib/communityGate';
 import { communityRoutes } from '../worker/routes/community';
 import { adminCommunityRoutes } from '../worker/routes/adminCommunity';
+import { marketplaceRoutes } from '../worker/routes/marketplace';
+import { printRequestRoutes } from '../worker/routes/printRequests';
+import { communityReviewRoutes } from '../worker/routes/merchantReviews';
+import { merchantRoutes } from '../worker/routes/merchant';
 import { communityAccessOf } from '../src/pages/community/access';
 
 // ------------------------------------------------------------------ harness
@@ -65,6 +69,8 @@ function setup() {
       ('u1','Sara','sara@x.co','h','customer','sara'),
       ('u2','Ali','ali@x.co','h','customer','ali'),
       ('boss','Owner','a@x.co','h','admin','boss');
+    INSERT INTO users (id,name,email,password_hash,role,username,phone_e164) VALUES
+      ('u_phone','Tester','p_964770@phone.levonis.invalid','h','customer',NULL,'+9647701234567');
     INSERT INTO community_merchants (id,user_id,name,bio) VALUES ('cm1','u2','Ali Prints','bio');
     INSERT INTO community_products (id,merchant_id,slug,name,price_iqd) VALUES ('cp1','cm1','thing','Thing',5000);
     INSERT INTO community_requests (id,customer_id,title) VALUES ('creq1','u1','Need a bracket');
@@ -87,6 +93,10 @@ function appAs(db: D1Database, userId: string | null, role = 'customer', host = 
   a.use('/api/admin/*', requireMainHost);
   a.route('/api/admin/community', adminCommunityRoutes);
   a.route('/api/community', communityRoutes);
+  a.route('/api/marketplace/print', printRequestRoutes);
+  a.route('/api/marketplace', marketplaceRoutes);
+  a.route('/api/community-reviews', communityReviewRoutes);
+  a.route('/api/merchant', merchantRoutes);
   a.onError((err, c) => {
     if (err instanceof HttpError) {
       return c.json(
@@ -124,11 +134,22 @@ const GATED_READS = [
   '/api/community/requests',
   '/api/community/store/cm1',
   '/api/community/followed',
+  // The /requests print-request marketplace IS Levo Community (owner,
+  // 2026-09-23: «نعم، أغلقه مع المجتمع») — the same rows, around the wall.
+  '/api/marketplace/requests',
+  '/api/marketplace/requests/creq1',
+  // The twin of the walled /followed.
+  '/api/community-reviews/following',
 ];
 const GATED_WRITES: Array<[string, Record<string, unknown>]> = [
   ['/api/community/requests', { title: 'A new bracket' }],
   ['/api/community/store/cm1/follow', {}],
   ['/api/community/requests/creq1/close', {}],
+  ['/api/marketplace/requests', { title: 'A new bracket', description: 'A bracket for the shelf, please' }],
+  ['/api/marketplace/requests/creq1/offers', { price_iqd: 5000 }],
+  ['/api/marketplace/print/requests/creq1/publish', {}],
+  ['/api/marketplace/print/requests/creq1/repeat', {}],
+  ['/api/community-reviews/follow/cm1', {}],
 ];
 
 // ------------------------------------------------------- the server refuses
@@ -158,10 +179,20 @@ test('shipped closed: with no settings row every gated route refuses a customer 
   }
   const res = await customer.request('/api/community/store/cm1/follow', { method: 'DELETE' });
   assert.equal(res.status, 503);
+  for (const [method, path] of [
+    ['DELETE', '/api/community-reviews/follow/cm1'],
+    ['PATCH', '/api/community-reviews/follow/cm1'],
+    ['PATCH', '/api/marketplace/offers/off1'],
+  ] as const) {
+    const r = await customer.request(path, { method, headers: { 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(r.status, 503, `${method} ${path} answered ${r.status}`);
+  }
 
   // A refused request created nothing.
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM community_requests WHERE title = 'A new bracket'"), 0);
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM follows'), 0);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_requests'), 1, 'no request was posted around the wall');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_offers'), 0, 'no offer was made around the wall');
   assert.equal(
     (raw.prepare("SELECT status FROM community_requests WHERE id='creq1'").get() as { status: string }).status,
     'open',
@@ -302,6 +333,69 @@ test('a merchant keeps running their own shop while the community is shut', asyn
   assert.equal(del.status, 200);
 });
 
+test('running trade finishes: marketplace orders and complaints answer while the community is shut', async () => {
+  const { db } = setup();
+  const customer = appAs(db, 'u1');
+  // Nothing new starts, but whatever is already in escrow must be able to
+  // finish — a customer waiting on a delivery is not browsing the community.
+  for (const path of ['/api/marketplace/orders', '/api/marketplace/complaints', '/api/marketplace/my-requests']) {
+    const res = await customer.request(path);
+    assert.equal(res.status, 200, `${path} answered ${res.status} with the wall up`);
+  }
+});
+
+test('a NEW community merchant waits for the community; an existing one keeps editing', async () => {
+  const { db, raw } = setup();
+  // u1 has no merchant and is not on the list: creating one is a way in.
+  const refused = await post(appAs(db, 'u1'), '/api/community/my-store', { name: 'Sara Prints', bio: '' });
+  assert.equal(refused.status, 503);
+  assert.equal((await json(refused)).code, 'COMMUNITY_CLOSED');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM community_merchants WHERE user_id = 'u1'"), 0);
+
+  // u2 already owns cm1: renaming it is running a shop, not entering one.
+  const kept = await post(appAs(db, 'u2'), '/api/community/my-store', { name: 'Ali Prints 2', bio: '' });
+  assert.equal(kept.status, 200);
+  assert.equal((raw.prepare("SELECT name FROM community_merchants WHERE id='cm1'").get() as { name: string }).name, 'Ali Prints 2');
+
+  // An allow-listed tester gets past the gate (and on to the tier check,
+  // which is the server's answer, not the gate's).
+  setSwitch(raw, '{"open":false,"allowed_user_ids":["u1"]}');
+  const listed = await post(appAs(db, 'u1'), '/api/community/my-store', { name: 'Sara Prints', bio: '' });
+  assert.notEqual(listed.status, 503);
+});
+
+test('a NEW store from /merchant/start waits for the community too — the path the app actually uses', async () => {
+  const { db, raw } = setup();
+  const body = { name: 'Sara Prints', slug: 'sara-prints' };
+  const before = count(raw, 'SELECT COUNT(*) AS n FROM community_merchants');
+  const refused = await post(appAs(db, 'u1'), '/api/merchant/onboard', body);
+  assert.equal(refused.status, 503);
+  assert.equal((await json(refused)).code, 'COMMUNITY_CLOSED');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_merchants'), before, 'no merchant row was created');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM merchant_stores'), 0, 'no store was created');
+
+  // An allow-listed member is past the gate and on to the membership check —
+  // the server's own answer, not the gate's.
+  setSwitch(raw, '{"open":false,"allowed_user_ids":["u1"]}');
+  const listed = await post(appAs(db, 'u1'), '/api/merchant/onboard', body);
+  assert.notEqual(listed.status, 503);
+});
+
+test('the print spec of a request on the public board is walled too; its customer keeps it', async () => {
+  const { db, raw } = setup();
+  const path = '/api/marketplace/print/requests/creq1';
+  for (const [who, a] of [['another customer', appAs(db, 'u2')], ['a guest', appAs(db, null)]] as const) {
+    const res = await a.request(path);
+    assert.equal(res.status, 503, `${who} read the print spec of a board request while the community is shut`);
+    assert.equal((await json(res)).code, 'COMMUNITY_CLOSED');
+  }
+  // u1 posted creq1: their own request is trade in flight, not the board.
+  assert.equal((await appAs(db, 'u1').request(path)).status, 200);
+  assert.equal((await appAs(db, 'boss', 'admin').request(path)).status, 200);
+  setSwitch(raw, '{"open":true}');
+  assert.equal((await appAs(db, null).request(path)).status, 200, 'reopened, the board is public again');
+});
+
 test('the enumeration of what is outside the wall is exact, and anything unknown is INSIDE it', () => {
   for (const p of [
     '/api/community/access',
@@ -387,6 +481,34 @@ test('one audited settings write opens the community and adds a member — no de
   // And which way it went, so the record answers "when did the community open?"
   assert.deepEqual(JSON.parse(audits[1].detail).before_open, false);
   assert.deepEqual(JSON.parse(audits[1].detail).after_open, true);
+});
+
+test('the admin finds a phone-only tester by phone number or exact id, and adds them', async () => {
+  const { db, raw } = setup();
+  const admin = appAs(db, 'boss', 'admin');
+  // The account's email is a placeholder and it has no username: before the
+  // lookup, the only thing the owner knows about this tester — the phone
+  // number — matched nothing.
+  for (const typed of ['07701234567', '+964 770 123 4567', '9647701234567', '٠٧٧٠١٢٣٤٥٦٧', 'u_phone']) {
+    const res = await admin.request(`/api/admin/community/gate/lookup?q=${encodeURIComponent(typed)}`);
+    assert.equal(res.status, 200);
+    const body = await json(res);
+    assert.equal(body.users[0]?.id, 'u_phone', `"${typed}" must find the phone-only tester`);
+    // Recognisable, not a phone directory.
+    assert.equal(body.users[0].phone_masked, '+9647******567');
+    assert.ok(!JSON.stringify(body).includes('7701234567'), 'the full number never leaves the server');
+  }
+  // Names still work, and nonsense finds nobody.
+  assert.equal((await json(await admin.request('/api/admin/community/gate/lookup?q=sara'))).users[0].id, 'u1');
+  assert.deepEqual((await json(await admin.request('/api/admin/community/gate/lookup?q=zzzz'))).users, []);
+
+  const added = await put(admin, '/api/admin/community/gate', { open: false, allowed_user_ids: ['u_phone'] });
+  assert.equal(added.status, 200);
+  assert.equal((await appAs(db, 'u_phone').request('/api/community/products')).status, 200);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action = 'community.gate_update'"), 1);
+
+  // Admin-only, like the switch.
+  assert.equal((await appAs(db, 'u1').request('/api/admin/community/gate/lookup?q=u1')).status, 403);
 });
 
 test('the admin switch refuses a list it cannot honour rather than storing a typo', async () => {
@@ -497,6 +619,7 @@ test('the entry points reflect the server, and none of them hard-codes the verdi
     'src/components/home/ServicesGrid.tsx',
     'src/components/DashboardLayout.tsx',
     'src/pages/Storefront.tsx',
+    'src/pages/Profile.tsx',
   ]) {
     const src = readFileSync(join(ROOT, f), 'utf8');
     assert.match(src, /useCommunityAccess/, `${f} must ask the server`);
@@ -506,7 +629,7 @@ test('the entry points reflect the server, and none of them hard-codes the verdi
   }
   // The three community routes are wrapped in the gate.
   const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
-  for (const path of ['/community"', '/community/store/:id"', '/community/store/:slug/p/:productSlug"']) {
+  for (const path of ['/community"', '/community/store/:id"', '/community/store/:slug/p/:productSlug"', '/requests"']) {
     const line = app.split('\n').find((l) => l.includes(`path="${path}`) && l.includes('Route'));
     assert.ok(line, `no route line for ${path}`);
     assert.match(String(line), /CommunityGate/, `${path} is not behind the gate`);
@@ -523,4 +646,106 @@ test('the ckb on the maintenance card is wording this repo already had, not a ne
   ] as const) {
     assert.ok(tr.includes(`${key}: "${ckb}"`), `${key} must still carry the existing Sorani "${ckb}"`);
   }
+});
+
+test('the maintenance card offers a way in to the two refused visitors who can in fact enter', () => {
+  const src = readFileSync(join(ROOT, 'src/pages/community/access.tsx'), 'utf8');
+  // A signed-out tester: the server matches ids only, so the card offers a
+  // sign-in that returns to this page — with the EXISTING `signIn` key.
+  assert.match(src, /!user && \(/);
+  assert.match(src, /\/auth\?next=\$\{encodeURIComponent\(next\)\}/);
+  assert.match(src, /t\('signIn'\)/);
+  // A member added while the app was open: the card asks the server again.
+  assert.match(src, /<CommunityClosedCard onRecheck=\{reload\} \/>/);
+  assert.match(src, /t\('retry'\)/);
+});
+
+test('Profile drops its community chips and skips /followed while the community is shut', () => {
+  const src = readFileSync(join(ROOT, 'src/pages/Profile.tsx'), 'utf8');
+  assert.match(src, /\{!communityShut && \(\s*<button type="button" onClick=\{\(\) => navigate\('\/followed-stores'\)\}/);
+  assert.match(src, /\.\.\.\(communityShut\s*\? \[\]/);
+  // The request is only made once the server said this viewer may enter.
+  const effect = src.slice(src.indexOf('const mayAskFollowed'), src.indexOf("'/api/community/followed'"));
+  assert.match(effect, /!mayAskFollowed/);
+});
+
+test('the gate panel searches by phone or id and can retry a failed first load', () => {
+  const src = readFileSync(join(ROOT, 'src/components/adminCommunity/CommunityGatePanel.tsx'), 'utf8');
+  assert.match(src, /\/api\/admin\/community\/gate\/lookup\?q=/);
+  assert.ok(!src.includes('/api/admin/users?search='), 'the name-and-email-only search is gone');
+  assert.match(src, /رقم الهاتف أو المعرّف/);
+  // The retry sits OUTSIDE the `open !== null` block that holds everything else.
+  assert.match(src, /open === null && note\?\.ok === false && \(/);
+  assert.match(src, /data-community-gate-retry/);
+});
+
+test('the storefront follow pill is inert while follows are shut', () => {
+  const src = readFileSync(join(ROOT, 'src/pages/Storefront.tsx'), 'utf8');
+  assert.match(src, /closed=\{communityAccess\?\.may_enter === false\}/);
+  assert.match(src, /disabled=\{busy \|\| closed\}/);
+});
+
+test('/merchant/start says the community is shut instead of showing a form the server refuses', () => {
+  const src = readFileSync(join(ROOT, 'src/pages/MerchantStart.tsx'), 'utf8');
+  assert.match(src, /communityAccess\?\.may_enter === false\) \{\s*return <CommunityClosedCard onRecheck=\{recheckCommunity\} \/>/);
+});
+
+test('per-store links go to the store\'s own site while the community is shut, never to the maintenance card', () => {
+  const access = readFileSync(join(ROOT, 'src/pages/community/access.tsx'), 'utf8');
+  assert.match(access, /\/api\/storefront\/by-id\//);
+  assert.match(access, /if \(!shut\) return `\/community\/store\/\$\{merchantOrStoreId\}`;/);
+  const product = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
+  assert.ok(!product.includes('to={`/community/store/${product.merchant.id}`}'), 'Product still hard-links the in-site store page');
+  assert.match(product, /<CommunityStoreLink id=\{product\.merchant\.id\}/);
+  const dash = readFileSync(join(ROOT, 'src/components/MerchantDashboard.tsx'), 'utf8');
+  assert.ok(!dash.includes('navigate(`/community/store/${merchant.id}`)'), 'MerchantDashboard still navigates to the in-site store page');
+  assert.match(dash, /useCommunityStoreHref\(merchant\?\.id\)/);
+  const saved = readFileSync(join(ROOT, 'src/pages/SavedProducts.tsx'), 'utf8');
+  assert.match(saved, /else if \(communityAccess\?\.may_enter !== false\) \{[^}]*navigate\(`\/community\/store\//);
+  const requests = readFileSync(join(ROOT, 'src/pages/Requests.tsx'), 'utf8');
+  assert.ok(!requests.includes('to={`/community/store/'), 'an offer card still hard-links the in-site store page');
+});
+
+test('no other door into /requests is left open while the community is shut', () => {
+  const store = readFileSync(join(ROOT, 'src/pages/Storefront.tsx'), 'utf8');
+  assert.match(store, /const quotes = accepts && communityAccess\?\.may_enter !== false;/);
+  assert.match(store, /\{quotes && \(\s*<a\s*href=\{requestsHref\}/);
+  for (const f of ['src/pages/MerchantDashboardPage.tsx', 'src/components/merchant/dashboard/SalesTabs.tsx']) {
+    const src = readFileSync(join(ROOT, f), 'utf8');
+    assert.match(src, /\{communityAccess\?\.may_enter !== false && \(\s*<a\s*href=\{mainHref\('\/requests'\)\}/, `${f} still links the board unconditionally`);
+  }
+});
+
+test('offers that arrived before the community shut can still be read and accepted under the card', () => {
+  const src = readFileSync(join(ROOT, 'src/pages/Requests.tsx'), 'utf8');
+  const running = src.slice(src.indexOf('export function RunningCommunityOrders'));
+  assert.match(running, /<PendingOffersWhileClosed \/>/);
+  assert.match(running, /\/api\/marketplace\/my-requests/);
+  assert.match(running, /r\.state === 'receiving_offers'/);
+  assert.match(running, /<RequestDetail request=\{open\} me=\{null\}/);
+});
+
+test('the offers list and acceptance really are outside the wall', async () => {
+  const { db, raw } = setup();
+  raw.exec(`
+    INSERT INTO community_offers (id, request_id, merchant_id, price_iqd, state) VALUES ('off1','creq1','cm1',5000,'pending');
+    UPDATE community_requests SET state = 'receiving_offers', offer_count = 1 WHERE id = 'creq1';
+  `);
+  const customer = appAs(db, 'u1');
+  const mine = await customer.request('/api/marketplace/my-requests');
+  assert.equal(mine.status, 200);
+  assert.equal((await json(mine)).requests[0].state, 'receiving_offers');
+  const offers = await customer.request('/api/marketplace/requests/creq1/offers');
+  assert.equal(offers.status, 200, 'the customer can read the offers with the wall up');
+  assert.equal((await json(offers)).offers.length, 1);
+  const accept = await post(customer, '/api/marketplace/offers/off1/accept');
+  assert.notEqual(accept.status, 503, 'accepting an existing offer is not refused by the wall');
+});
+
+test('a guest who sends a link as a print request signs in and comes back with the link', () => {
+  const tools = readFileSync(join(ROOT, 'src/pages/Tools.tsx'), 'utf8');
+  assert.match(tools, /else navigate\(`\/auth\?next=\$\{encodeURIComponent\(`\/requests\?link=\$\{encodeURIComponent\(url\)\}`\)\}`\)/);
+  assert.match(tools, /onClick=\{\(\) => sendLinkAsRequest\(linkResult\.link\.canonical_url\)\}/);
+  const requests = readFileSync(join(ROOT, 'src/pages/Requests.tsx'), 'utf8');
+  assert.match(requests, /: params\.get\('link'\) \?\? ''/);
 });

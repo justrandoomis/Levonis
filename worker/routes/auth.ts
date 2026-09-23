@@ -1709,13 +1709,27 @@ authRoutes.post('/telegram/complete', async (c) => {
   // verified session — a phone + password account cannot exist without
   // ownership proof. NULL = OTP-only account (no password forced on it).
   const passwordHash = rawPassword === null ? null : await hashPassword(rawPassword);
+  /**
+   * THE LANGUAGE THE PERSON WAS READING WHEN THEY SIGNED UP.
+   *
+   * This INSERT used to name no locale, so every Telegram account took the
+   * column's `DEFAULT 'en'` and its order notifications arrived in English at
+   * a customer reading the shop in Arabic («لغة إشعار التليغرام إنجليزية رغم
+   * أن لغة المستخدم عربية»). The sign-up form now sends the site language
+   * (src/components/auth/TelegramAuth.tsx); a client that sends nothing gets
+   * ARABIC, the shop's own default, never the column's English. A value that
+   * is not one of the three languages counts as nothing sent.
+   */
+  const claimedLang = typeof (body.locale ?? body.lang) === 'string' ? String(body.locale ?? body.lang) : '';
+  const langStated = ['ar', 'en', 'ckb', 'ku'].includes(claimedLang);
+  const signupLocale = localeToDb(langStated ? claimedLang : 'ar');
 
   let results: D1Result[];
   try {
     results = await c.env.DB.batch([
       c.env.DB.prepare(
-        `INSERT INTO users (id, email, username, name, password_hash, phone_e164)
-         SELECT ?1, ?2, ?3, ?4, ?9, ?7
+        `INSERT INTO users (id, email, username, name, password_hash, phone_e164, locale)
+         SELECT ?1, ?2, ?3, ?4, ?9, ?7, ?10
           WHERE EXISTS (
              SELECT 1 FROM link_challenges
               WHERE id = ?5 AND consumed_at IS NULL AND state = 'phone_verified' AND expires_at > ?6
@@ -1723,7 +1737,7 @@ authRoutes.post('/telegram/complete', async (c) => {
            AND NOT EXISTS (SELECT 1 FROM telegram_links WHERE phone_e164 = ?7 AND revoked_at IS NULL)
            AND NOT EXISTS (SELECT 1 FROM telegram_links WHERE telegram_user_id = ?8 AND revoked_at IS NULL)
            AND NOT EXISTS (SELECT 1 FROM users WHERE phone_e164 = ?7)`
-      ).bind(id, accountEmail, uname, name, ch.id, now, ch.phone_entered, ch.telegram_user_id, passwordHash),
+      ).bind(id, accountEmail, uname, name, ch.id, now, ch.phone_entered, ch.telegram_user_id, passwordHash, signupLocale),
       c.env.DB.prepare(
         `INSERT INTO telegram_links (user_id, telegram_user_id, chat_id, phone_e164, verified_at)
          SELECT ?1, ?2, ?3, ?4, ?5
@@ -1766,12 +1780,19 @@ authRoutes.post('/telegram/complete', async (c) => {
     );
   }
 
+  // A language the person actually sent is an ANSWER, recorded exactly as the
+  // profile route records one (`profile.locale_change`), so the notification
+  // path honours it even when it is English on a placeholder address — see
+  // `notificationLang` in worker/lib/customerNotify.ts. Nothing is recorded
+  // for the Arabic default: that was the shop's choice, not the person's.
+  if (langStated) {
+    await audit(c.env.DB, id, 'profile.locale_change', id, { to: signupLocale, via: 'telegram_signup' });
+  }
+
   await emitUserCreated(c, {
     userId: id,
     method: 'telegram',
-    // The Telegram signup INSERT names no locale, so the account carries the
-    // column's default rather than a guess made here.
-    localeDb: 'en',
+    localeDb: signupLocale,
     referrerCode: referralCodeFrom(body),
     emailVerified: false,
     createdAt: now,

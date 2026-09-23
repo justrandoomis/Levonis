@@ -8,6 +8,7 @@ import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import {
   buildMediaKey,
   getMediaObject,
+  headMediaObject,
   isAnonymousPublicMediaKey,
   isRewritableMediaKey,
   isSafeMediaKey,
@@ -179,6 +180,69 @@ export function sniff(buf: Uint8Array): { ext: string; mime: string } | null {
   return null;
 }
 
+/**
+ * «كاميرا/ملف/بصمة صوتية» — WHAT A CONVERSATION CARRIES BEYOND A PICTURE OR A
+ * CLIP: a voice note, and a document.
+ *
+ * Magic bytes again, never the declared type, and only formats a browser can
+ * play or show without a plug-in:
+ *
+ *   %PDF-        application/pdf   a document (an invoice, a spec sheet)
+ *   OggS         audio/ogg         Firefox's MediaRecorder (Opus)
+ *   1A 45 DF A3  audio/webm        Chrome and Android's MediaRecorder (Opus)
+ *   ID3 / sync   audio/mpeg        an MP3 picked from the phone
+ *   ftyp (MP4)   audio/mp4         Safari's MediaRecorder, or an .m4a
+ *
+ * THE DECLARED TYPE CHOOSES ONLY A LABEL, never admission. WebM and MP4 are
+ * containers that hold sound or picture, and telling a voice note from a clip
+ * would mean parsing their track tables. The bytes have already been proven to
+ * be one of those two containers, both labels are equally inert when served
+ * (`nosniff`, a sandboxing CSP), and the label only decides whether the chat
+ * draws an <audio> or a <video>. An M4A brand is audio whatever it declares.
+ */
+export function sniffChat(buf: Uint8Array, declared: string): { ext: string; mime: string } | null {
+  const saysAudio = /^audio\//i.test(declared);
+  const base = sniff(buf);
+  if (base) {
+    if (base.mime === 'video/mp4') {
+      const brand = isoBrand(buf);
+      if (saysAudio || brand === 'M4A ' || brand === 'M4B ') return { ext: 'mp4', mime: 'audio/mp4' };
+    }
+    return base;
+  }
+  if (buf.length < 5) return null;
+  if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46 && buf[4] === 0x2d) {
+    return { ext: 'pdf', mime: 'application/pdf' };
+  }
+  if (buf[0] === 0x4f && buf[1] === 0x67 && buf[2] === 0x67 && buf[3] === 0x53) return { ext: 'ogg', mime: 'audio/ogg' };
+  if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) {
+    return /^video\//i.test(declared) ? { ext: 'webm', mime: 'video/webm' } : { ext: 'webm', mime: 'audio/webm' };
+  }
+  if (buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33) return { ext: 'mp3', mime: 'audio/mpeg' };
+  // An MPEG audio frame: eleven set sync bits, and a layer that is not the
+  // reserved 00 (which is also what keeps AAC's ADTS header out).
+  if (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0 && (buf[1] & 0x06) !== 0) return { ext: 'mp3', mime: 'audio/mpeg' };
+  return null;
+}
+
+/** A voice note or a document in a conversation. Ten minutes of speech is
+ *  two or three megabytes in any of the containers above; the headroom is for
+ *  a scanned PDF. */
+const CHAT_DOCUMENT_MAX = 10 * 1024 * 1024;
+
+/**
+ * The folder a chat attachment is filed in, and therefore what the message
+ * route (worker/routes/chats.ts `chatAttachmentKind`) reads it back as —
+ * `chat/<chatId>/<folder>/<id>.<ext>`. The folder, not a client claim, is the
+ * record of what the bytes were sniffed as.
+ */
+function chatKeyKind(mime: string): string {
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('audio/')) return 'audio';
+  if (mime === 'application/pdf') return 'files';
+  return 'attachments';
+}
+
 export const uploadRoutes = new Hono<AppContext>();
 uploadRoutes.use('*', requireAuth);
 
@@ -188,7 +252,7 @@ uploadRoutes.post('/', async (c) => {
 
   const form = await c.req.formData().catch(() => null);
   if (!form) throw badRequest('Expected multipart form data');
-  const purpose = oneOf(form.get('purpose'), 'purpose', ['receipt', 'avatar', 'chat', 'product', 'community', 'support'] as const);
+  const purpose = oneOf(form.get('purpose'), 'purpose', ['receipt', 'avatar', 'chat', 'product', 'community', 'support', 'complaint'] as const);
   const file = form.get('file');
   if (!(file instanceof File)) throw badRequest('No file uploaded');
 
@@ -217,14 +281,16 @@ uploadRoutes.post('/', async (c) => {
    * a support agent, and it is the same forty-megabyte ceiling a chat clip
    * already has. The image ceiling below still applies to images.
    */
-  const allowVideo = purpose === 'product' || purpose === 'chat' || purpose === 'support';
+  const allowVideo = purpose === 'product' || purpose === 'chat' || purpose === 'support' || purpose === 'complaint';
   const maxSize = allowVideo ? VIDEO_MAX : IMAGE_MAX;
   if (file.size > maxSize) {
     throw badRequest(`File is too large (max ${Math.round(maxSize / 1024 / 1024)} MB)`);
   }
 
   let buf = new Uint8Array(await file.arrayBuffer());
-  const kind = sniff(buf);
+  // A conversation may also carry a voice note or a PDF (`sniffChat`); every
+  // other purpose keeps the picture-and-clip sniff it always had.
+  const kind = purpose === 'chat' ? sniffChat(buf, file.type || '') : sniff(buf);
   /**
    * NAME THE FORMAT BEFORE SAYING "UNSUPPORTED".
    *
@@ -236,7 +302,15 @@ uploadRoutes.post('/', async (c) => {
    * and the export that fixes it.
    */
   if (!kind && isHeifBytes(buf)) throw badRequest(HEIF_REFUSAL, 'IMAGE_HEIC_UNSUPPORTED');
-  if (!kind) throw badRequest('Unsupported file type — please upload a JPEG, PNG, WebP or GIF image' + (allowVideo ? ' or MP4 video' : ''));
+  if (!kind) {
+    throw badRequest(
+      'Unsupported file type — please upload a JPEG, PNG, WebP or GIF image' +
+        (purpose === 'chat' ? ', an MP4 video, a voice note or a PDF' : allowVideo ? ' or MP4 video' : '')
+    );
+  }
+  if ((kind.mime.startsWith('audio/') || kind.mime === 'application/pdf') && file.size > CHAT_DOCUMENT_MAX) {
+    throw badRequest(`File is too large (max ${Math.round(CHAT_DOCUMENT_MAX / 1024 / 1024)} MB)`);
+  }
   if (kind.mime.startsWith('video/') && !allowVideo) {
     throw badRequest('Videos are not allowed here');
   }
@@ -419,11 +493,33 @@ uploadRoutes.post('/', async (c) => {
     }
   }
 
+  /**
+   * A COMPLAINT'S EVIDENCE BELONGS TO THE COMPLAINT — the ticket rule above,
+   * one table over. The person who filed it may attach to it (the photograph
+   * of the print that arrived broken is the whole of most disputes), staff may
+   * attach to any, and nobody else may name it: the check runs before a byte
+   * is stored, so a key under `complaints/<id>/` always names a complaint the
+   * uploader was entitled to write to.
+   */
+  let complaintEntity = '';
+  if (purpose === 'complaint') {
+    complaintEntity = str(form.get('entity_id'), 'entity_id', { max: 64 });
+    const allowed = await c.env.DB.prepare(
+      user.role === 'admin'
+        ? 'SELECT 1 AS x FROM community_complaints WHERE id = ? LIMIT 1'
+        : 'SELECT 1 AS x FROM community_complaints WHERE id = ? AND reporter_id = ? LIMIT 1'
+    )
+      .bind(...(user.role === 'admin' ? [complaintEntity] : [complaintEntity, user.id]))
+      .first();
+    if (!allowed) throw forbidden('Not your complaint');
+  }
+
   const target: { visibility: MediaVisibility; domain: MediaDomain; entityId: string; keyKind: string } =
     purpose === 'receipt' ? { visibility: 'private', domain: 'receipts', entityId: user.id, keyKind: 'evidence' } :
     purpose === 'support' ? { visibility: 'private', domain: 'support', entityId: supportEntity, keyKind: storedMime.startsWith('video/') ? 'video' : 'attachments' } :
+    purpose === 'complaint' ? { visibility: 'private', domain: 'complaints', entityId: complaintEntity, keyKind: storedMime.startsWith('video/') ? 'video' : 'attachments' } :
     purpose === 'avatar' ? { visibility: 'public', domain: 'users', entityId: user.id, keyKind: 'avatar' } :
-    purpose === 'chat' ? { visibility: 'private', domain: 'chat', entityId: chatEntity, keyKind: storedMime.startsWith('video/') ? 'video' : 'attachments' } :
+    purpose === 'chat' ? { visibility: 'private', domain: 'chat', entityId: chatEntity, keyKind: chatKeyKind(storedMime) } :
     purpose === 'community' ? { visibility: 'public', domain: 'merchants', entityId: user.id, keyKind: 'public' } :
     { visibility: 'public', domain: 'products', entityId: 'catalog', keyKind: storedMime.startsWith('video/') ? 'video' : 'gallery' };
   // `storedMime` / `storedExt`, never the sniffed pair: after a conversion they
@@ -461,6 +557,70 @@ uploadRoutes.post('/', async (c) => {
     height: dimensions?.height ?? null,
   });
 });
+
+/**
+ * `Range: bytes=…` → the one byte span to serve, `'unsatisfiable'` for a 416,
+ * or null to IGNORE the header and serve the whole file (RFC 9110 §14.2: a
+ * range a server does not understand — another unit, several spans, a
+ * backwards pair — is ignored, not refused).
+ *
+ * The three forms a player actually sends: `a-b` (clamped to the last byte),
+ * `a-` (to the end) and `-n` (the last n bytes, the whole file when n exceeds
+ * it). A start at or past the end, or any range of an empty file, cannot be
+ * satisfied.
+ */
+export function parseByteRange(header: string, size: number): { offset: number; length: number } | 'unsatisfiable' | null {
+  const m = /^\s*bytes\s*=\s*(\d*)\s*-\s*(\d*)\s*$/i.exec(header);
+  if (!m) return null;
+  const [, a, b] = m;
+  if (a === '' && b === '') return null;
+  if (a === '') {
+    const suffix = Number(b);
+    if (!Number.isSafeInteger(suffix)) return null;
+    if (suffix === 0 || size === 0) return 'unsatisfiable';
+    const offset = Math.max(0, size - suffix);
+    return { offset, length: size - offset };
+  }
+  const start = Number(a);
+  const end = b === '' ? size - 1 : Number(b);
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end)) return null;
+  if (b !== '' && end < start) return null;
+  if (start >= size) return 'unsatisfiable';
+  const last = Math.min(end, size - 1);
+  return { offset: start, length: last - start + 1 };
+}
+
+/**
+ * THE EDGE-CACHE ENTRY A PUBLIC FILE IS STORED AND LOOKED UP UNDER.
+ *
+ * «الشعار الجديد في R2 لكن الموقع يظهر القديم». Measured on the live site
+ * after the Cache-Control fix below had shipped: from the IAD colo,
+ * `/files/UiUx/Logo/Logo.webp` still answered `cf-cache-status: HIT`,
+ * `age: 391111`, `cache-control: public, max-age=31536000, immutable`, etag
+ * `4112c29c…` and 70,084 bytes — the OLD mark — while R2 holds 51,518 bytes
+ * under etag `6b711a1e…`. The entry was written into `caches.default` before
+ * rewritable keys stopped being `immutable`, with a one-year TTL, and the
+ * Cache API keeps honouring that TTL: correcting the header only governs
+ * entries written from now on. `caches.default.delete` reaches one colo.
+ *
+ * So a rewritable key (`isRewritableMediaKey`: the brand folder, brands,
+ * services) is cached under a key carrying `REWRITABLE_EDGE_GENERATION`.
+ * Every entry written under the plain URL — at every colo, by any past
+ * deploy — is simply never asked for again and ages out. Bump the
+ * generation if a rewritable policy ever has to be abandoned the same way.
+ * Minted keys keep the request itself as the key: their bytes never change,
+ * and moving them would only throw away a year of warm cache.
+ *
+ * The request's headers are carried over, so conditional requests behave as
+ * before; only the URL the cache files it under changes.
+ */
+export const REWRITABLE_EDGE_GENERATION = '2';
+export function edgeCacheKey(request: Request, key: string): Request {
+  if (!isRewritableMediaKey(key)) return request;
+  const url = new URL(request.url);
+  url.searchParams.set('__edge', REWRITABLE_EDGE_GENERATION);
+  return new Request(url.toString(), request);
+}
 
 /**
  * File delivery with the access policy above. Mounted at /files/* (outside
@@ -525,6 +685,30 @@ fileRoutes.get('/*', async (c) => {
           .first();
         if (!own) throw forbidden('Not your file');
       }
+    } else if (key.startsWith('complaints/')) {
+      /**
+       * IS THIS YOUR COMPLAINT — AND IS THIS FILE PART OF WHAT YOU WERE SENT.
+       *
+       * The ticket question, plus one clause the ticket does not need: a
+       * complaint thread carries INTERNAL notes the reporter never sees
+       * (migration 0031, `internal`), and staff can attach a file to one. The
+       * key never reaches the reporter's screen for such a row, but "they
+       * would have to guess it" is not a rule, so a file an internal note
+       * names is refused to everyone but staff.
+       */
+      const complaintId = key.split('/')[1] ?? '';
+      if (user.role !== 'admin') {
+        const own = await c.env.DB.prepare(
+          `SELECT 1 AS x FROM community_complaints ct
+            WHERE ct.id = ? AND ct.reporter_id = ?
+              AND NOT EXISTS (SELECT 1 FROM community_complaint_messages cm
+                               WHERE cm.complaint_id = ct.id AND cm.file_key = ? AND cm.internal = 1)
+            LIMIT 1`
+        )
+          .bind(complaintId, user.id, key)
+          .first();
+        if (!own) throw forbidden('Not your file');
+      }
     } else {
       throw notFound();
     }
@@ -559,12 +743,62 @@ fileRoutes.get('/*', async (c) => {
   // does not.)
   const cache =
     typeof caches !== 'undefined' ? (caches as unknown as { default?: Cache }).default ?? null : null;
-  if (publicPrefix && cache) {
-    const hit = await cache.match(c.req.raw);
+  /**
+   * A RANGE REQUEST IS ANSWERED FROM R2, NEVER FROM THE SHARED CACHE, in both
+   * directions: a stored full body must not be handed to a player that asked
+   * for two bytes, and a partial body must never be stored as if it were the
+   * file. Ranges are what `<video>` sends, and the objects that need them are
+   * private clips that were never cached in the first place.
+   */
+  const rangeHeader = c.req.header('Range') ?? '';
+  if (publicPrefix && cache && !rangeHeader) {
+    const hit = await cache.match(edgeCacheKey(c.req.raw, key));
     if (hit) return hit;
   }
 
-  const obj = await getMediaObject(c.env, publicPrefix ? 'public' : 'private', key);
+  const visibility = publicPrefix ? 'public' : 'private';
+  /**
+   * «لا يمكن إرسال وسائط مثل صور أو فيديو» — AND A VIDEO THAT WAS SENT HAS TO
+   * PLAY.
+   *
+   * This route answered every request with the whole object and a 200, and
+   * said nothing about ranges. Safari on an iPhone or an iPad — the owner's
+   * own device — does not play a `<video>` from such a server: it opens with
+   * `Range: bytes=0-1`, and a 200 carrying the full clip is its signal that the
+   * server cannot stream. A support clip of a print failing arrived, was
+   * stored, and showed as a dead player on exactly the screens it was sent to.
+   *
+   * THE ANSWER IS 206 WITH THE BYTES ASKED FOR, 416 FOR A RANGE PAST THE END,
+   * and every response now says `Accept-Ranges: bytes`. The size comes from a
+   * HEAD first so an unsatisfiable range is refused without reading a byte,
+   * and all of it runs AFTER the authorisation above — a range is a way of
+   * reading a file, not a way around the question of whether you may.
+   *
+   * `If-Range` is honoured: a player resuming against a file that has since
+   * changed gets the whole new file, not a splice of two.
+   */
+  let range: { offset: number; length: number } | null = null;
+  let totalSize = 0;
+  if (rangeHeader) {
+    const head = await headMediaObject(c.env, visibility, key);
+    if (!head) throw notFound();
+    const ifRange = c.req.header('If-Range');
+    if (!ifRange || ifRange === head.httpEtag) {
+      const parsed = parseByteRange(rangeHeader, head.size);
+      if (parsed === 'unsatisfiable') {
+        return new Response(null, {
+          status: 416,
+          headers: { 'Content-Range': `bytes */${head.size}`, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' },
+        });
+      }
+      if (parsed) {
+        range = parsed;
+        totalSize = head.size;
+      }
+    }
+  }
+
+  const obj = await getMediaObject(c.env, visibility, key, range ? { range } : undefined);
   if (!obj) throw notFound();
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
@@ -603,19 +837,27 @@ fileRoutes.get('/*', async (c) => {
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
 
+  headers.set('Accept-Ranges', 'bytes');
+
   // A revalidation should cost a header, not a body. The etag is R2's own.
   if (c.req.header('If-None-Match') === obj.httpEtag) {
     return new Response(null, { status: 304, headers });
   }
 
+  if (range) {
+    headers.set('Content-Range', `bytes ${range.offset}-${range.offset + range.length - 1}/${totalSize}`);
+    headers.set('Content-Length', String(range.length));
+    return new Response(obj.body, { status: 206, headers });
+  }
+
   const res = new Response(obj.body, { headers });
-  if (publicPrefix && cache) {
+  if (publicPrefix && cache && !rangeHeader) {
     // `clone()` before the body is streamed to the client, and `waitUntil` so
     // the write never delays the response. `executionCtx` throws when there is
     // none (again, the Node test harness), and a cache write is never worth
     // failing a response that is otherwise complete.
     try {
-      c.executionCtx.waitUntil(cache.put(c.req.raw, res.clone()));
+      c.executionCtx.waitUntil(cache.put(edgeCacheKey(c.req.raw, key), res.clone()));
     } catch {
       // No execution context: serve the response, skip the cache write.
     }

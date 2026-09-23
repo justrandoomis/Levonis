@@ -44,6 +44,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCommunityAccess } from './community/access';
+import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
 import {
   AlertCircle,
@@ -53,7 +55,9 @@ import {
   Box,
   Check,
   FileUp,
+  ExternalLink,
   Layers,
+  Link2,
   Loader2,
   RefreshCw,
   Ruler,
@@ -79,6 +83,7 @@ import {
   type QuotePrinter,
 } from '../lib/printQuote';
 import GramsQuotePanel from '../components/tools/GramsQuotePanel';
+import { providerName, quoteByLink, type LinkQuoteResponse } from '../components/tools/linkQuoteApi';
 import { useMoney } from '../CurrencyContext';
 
 type Lang = 'ar' | 'en' | 'ckb';
@@ -148,6 +153,22 @@ const STRINGS = {
     zeroVolume: 'الملف لا يحتوي على مجسم مصمت يمكن قياسه.',
     modeFile: 'من ملف',
     modeGrams: 'من الغرامات',
+    linkLabel: 'أو الصق رابط المجسم',
+    linkHint: 'MakerWorld · Printables · Thingiverse',
+    linkBad: 'هذا لا يبدو رابط مجسم. انسخ رابط صفحة المجسم كما هو.',
+    linkUnresolved: (site: string, id: string) =>
+      id
+        ? `هذا المجسم رقم ${id} على ${site}. الموقع لا يعطينا وزن المجسم، فلا يمكن حساب السعر من الرابط وحده.`
+        : `هذا رابط من ${site}. الموقع لا يعطينا وزن المجسم، فلا يمكن حساب السعر من الرابط وحده.`,
+    linkDownload: 'نزّل الملف (STL أو 3MF) من الموقع',
+    linkThenUpload: 'ثم ارفعه هنا',
+    linkFromSite: 'الوزن من الموقع',
+    linkMaterialOnly: 'السعر للمادة والتجهيز فقط: الموقع لم يذكر زمن الطباعة.',
+    printerAllSame: 'السعر لا يعتمد على الطابعة حاليًا: كل الطابعات متطابقة في ما يدخل في الحساب (السرعة، التسخين، كلفة ساعة التشغيل).',
+    printerSameAs: (names: string) =>
+      `السعر هنا مطابق لـ ${names}: لا تختلف عنها حاليًا في أي شيء يدخل في الحساب (السرعة، التسخين، كلفة ساعة التشغيل).`,
+    priceWas: (name: string, price: string) => `مع ${name}: ${price}`,
+    priceSame: (name: string) => `السعر نفسه مع ${name}.`,
   },
   en: {
     title: 'Print price calculator',
@@ -209,6 +230,22 @@ const STRINGS = {
     zeroVolume: 'The file contains no solid body to measure.',
     modeFile: 'From a file',
     modeGrams: 'By grams',
+    linkLabel: 'or paste a model link',
+    linkHint: 'MakerWorld · Printables · Thingiverse',
+    linkBad: 'That does not look like a model link. Copy the model page’s address as it is.',
+    linkUnresolved: (site: string, id: string) =>
+      id
+        ? `This is model ${id} on ${site}. The site does not share the model’s weight, so a price cannot be worked out from the link alone.`
+        : `This is a ${site} link. The site does not share the model’s weight, so a price cannot be worked out from the link alone.`,
+    linkDownload: 'Download the file (STL or 3MF) from the site',
+    linkThenUpload: 'then upload it here',
+    linkFromSite: 'Weight from the site',
+    linkMaterialOnly: 'Material and handling only: the site gave no print time.',
+    printerAllSame: 'The price does not depend on the printer right now: every printer is identical in what the price is built from (speed, warm-up, the machine-hour cost).',
+    printerSameAs: (names: string) =>
+      `This price is the same as on ${names}: they do not differ right now in anything the price is built from (speed, warm-up, the machine-hour cost).`,
+    priceWas: (name: string, price: string) => `On ${name}: ${price}`,
+    priceSame: (name: string) => `The same price as on ${name}.`,
   },
   ckb: {
     title: 'ژمێرەری نرخی چاپ',
@@ -270,6 +307,25 @@ const STRINGS = {
     zeroVolume: 'فایلەکە هیچ جەستەیەکی ڕەقی تێدا نییە بۆ پێوان.',
     modeFile: 'لە فایلەوە',
     modeGrams: 'بە گرام',
+    // NO NEW SORANI PROSE (project rule): the one short label is literal, and
+    // every sentence below is the Arabic source text — the same fallback
+    // `loc(ar, en)` applies across the app when no hand-written ckb exists.
+    linkLabel: 'یان بەستەری مۆدێل دابنێ',
+    linkHint: 'MakerWorld · Printables · Thingiverse',
+    linkBad: 'هذا لا يبدو رابط مجسم. انسخ رابط صفحة المجسم كما هو.',
+    linkUnresolved: (site: string, id: string) =>
+      id
+        ? `هذا المجسم رقم ${id} على ${site}. الموقع لا يعطينا وزن المجسم، فلا يمكن حساب السعر من الرابط وحده.`
+        : `هذا رابط من ${site}. الموقع لا يعطينا وزن المجسم، فلا يمكن حساب السعر من الرابط وحده.`,
+    linkDownload: 'نزّل الملف (STL أو 3MF) من الموقع',
+    linkThenUpload: 'ثم ارفعه هنا',
+    linkFromSite: 'الوزن من الموقع',
+    linkMaterialOnly: 'السعر للمادة والتجهيز فقط: الموقع لم يذكر زمن الطباعة.',
+    printerAllSame: 'السعر لا يعتمد على الطابعة حاليًا: كل الطابعات متطابقة في ما يدخل في الحساب (السرعة، التسخين، كلفة ساعة التشغيل).',
+    printerSameAs: (names: string) =>
+      `السعر هنا مطابق لـ ${names}: لا تختلف عنها حاليًا في أي شيء يدخل في الحساب (السرعة، التسخين، كلفة ساعة التشغيل).`,
+    priceWas: (name: string, price: string) => `${name}: ${price}`,
+    priceSame: (name: string) => `السعر نفسه مع ${name}.`,
   },
 } as const;
 
@@ -388,8 +444,18 @@ export default function Tools() {
     setError('');
   }, []);
 
+  /**
+   * ONE UPLOAD SPEAKS AT A TIME. A second file dropped while the first was
+   * still going up used to let the FIRST upload finish last: its analysis id
+   * landed under the second file's name, its `finally` flipped the page back
+   * to idle while the second was still uploading, and the price computed next
+   * was the wrong model's. Every pick takes a ticket; only the newest ticket
+   * may write the analysis, the error or the stage.
+   */
+  const pickSeq = useRef(0);
   const pickFile = useCallback(
     async (chosen: File) => {
+      const seq = ++pickSeq.current;
       invalidate();
       setFile(chosen);
       setAnalysisId('');
@@ -397,15 +463,21 @@ export default function Tools() {
       setError('');
       try {
         const up = await uploadModel(chosen);
-        setAnalysisId(up.analysis_id);
+        if (seq === pickSeq.current) setAnalysisId(up.analysis_id);
       } catch (e) {
-        setError(failureText(e, s.uploading));
+        if (seq === pickSeq.current) setError(failureText(e, s.uploading));
       } finally {
-        setStage('idle');
+        if (seq === pickSeq.current) setStage('idle');
       }
     },
     [invalidate, s.uploading]
   );
+
+  // A different analysis is a different model: nothing computed for the last
+  // one may stay on screen under this one's name.
+  useEffect(() => {
+    invalidate();
+  }, [analysisId, invalidate]);
 
   const calculate = useCallback(async () => {
     if (!analysisId || !printerId || !materialId) return;
@@ -435,6 +507,86 @@ export default function Tools() {
   }, [analysisId, printerId, materialId, quality, strength, supports, quantity, invalidate, s]);
 
   const busy = stage !== 'idle';
+
+  /**
+   * «مهما اخترت الطابعة لا يغير من حساب السعر» — A PRINTER CHANGE THE CUSTOMER
+   * CAN SEE.
+   *
+   * Changing the printer used to wipe the price and wait for another press of
+   * «احسب السعر», so the customer compared a number with a memory of one. Now a
+   * printer change on a priced model prices it again straight away and keeps
+   * the previous printer's figure beside the new one — for exactly the same
+   * job (same model, material, quality, strength, supports and quantity), or
+   * not at all. The comparison is only ever two numbers the engine produced.
+   */
+  const jobKey = `${analysisId}|${materialId}|${quality}|${strength}|${supports}|${quantity}`;
+  const [comparison, setComparison] = useState<{ name: string; price: number; jobKey: string } | null>(null);
+  const [autoRecalc, setAutoRecalc] = useState(false);
+  useEffect(() => {
+    if (!autoRecalc || busy || !analysisId || !printerId) return;
+    // A printer that cannot run the current material swaps it first (the
+    // effect above); price only once the pair is one this machine can take.
+    if (!usableMaterials.some((m) => m.id === materialId)) return;
+    setAutoRecalc(false);
+    void calculate();
+  }, [autoRecalc, busy, analysisId, printerId, usableMaterials, materialId, calculate]);
+
+  /**
+   * WHEN THE PRINTER GENUINELY CANNOT MOVE THIS PRICE, SAY SO. `price_group`
+   * comes from the Worker: printers sharing one are identical in every input
+   * the engine prices one piece in one material with (speed, warm-up, the
+   * machine-hour cost), so they quote to the same dinar. On the live catalogue
+   * most do — no model carries its own purchase economics yet — and a screen
+   * that let the customer keep switching printers in search of a difference
+   * that cannot exist would be the bug the owner reported, only quieter. With
+   * more than one piece the build volume decides the plates, so no claim.
+   */
+  const printerHonesty = useMemo(() => {
+    if (!printer?.price_group || quantity !== 1) return '';
+    const groups = new Set(printers.map((p) => p.price_group ?? p.id));
+    if (groups.size === 1 && printers.length > 1) return s.printerAllSame;
+    const twins = printers.filter((p) => p.id !== printer.id && p.price_group === printer.price_group);
+    if (!twins.length) return '';
+    const names = twins.slice(0, 3).map((p) => p.model).join(L === 'en' ? ', ' : '، ') + (twins.length > 3 ? '…' : '');
+    return s.printerSameAs(names);
+  }, [printer, printers, quantity, s, L]);
+
+  // ---------------------------------------------------------------- a link
+  const { access: communityAccess } = useCommunityAccess();
+  /** /requests closes with Levo Community (docs/DECISIONS.md); only an explicit
+   *  refusal hides the way there — an answer still on its way does not. */
+  const requestsClosed = communityAccess?.may_enter === false;
+  const { user } = useAuth();
+  /** The wizard needs an account. A guest signs in first and comes back to
+   *  /requests with the link still filled in: router state does not survive
+   *  the sign-in, so the link rides in `?link=` (read by Requests.tsx). */
+  const sendLinkAsRequest = (url: string) => {
+    if (user) navigate('/requests', { state: { printLink: url } });
+    else navigate(`/auth?next=${encodeURIComponent(`/requests?link=${encodeURIComponent(url)}`)}`);
+  };
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkError, setLinkError] = useState('');
+  const [linkResult, setLinkResult] = useState<(LinkQuoteResponse & { pricedFor: string }) | null>(null);
+  const linkSeq = useRef(0);
+  const checkLink = useCallback(async () => {
+    const url = linkUrl.trim();
+    if (!url) return;
+    const seq = ++linkSeq.current;
+    setLinkBusy(true);
+    setLinkError('');
+    setLinkResult(null);
+    try {
+      const r = await quoteByLink({ url, printer_model_id: printerId, material_id: materialId });
+      if (seq === linkSeq.current) setLinkResult({ ...r, pricedFor: `${printerId}|${materialId}` });
+    } catch (e) {
+      if (seq !== linkSeq.current) return;
+      const code = (e as { code?: string } | null)?.code ?? '';
+      setLinkError(code === 'BAD_URL' ? s.linkBad : failureText(e, s.pricing));
+    } finally {
+      if (seq === linkSeq.current) setLinkBusy(false);
+    }
+  }, [linkUrl, printerId, materialId, s]);
   /** The first leg on its own: it is the only one that runs before the
    *  Calculate button exists, so it is the only one with nowhere else to show
    *  itself. Measuring and pricing already have that button's spinner. */
@@ -496,7 +648,9 @@ export default function Tools() {
         {/* ---------------------------------------------------------- 1. file */}
         <section
           onDragOver={(e) => {
-            if (!e.dataTransfer.types.includes('Files')) return;
+            // Mid-upload the drop target is shut: a second file would race the
+            // first (see `pickSeq`), and the buttons are disabled for the same reason.
+            if (busy || !e.dataTransfer.types.includes('Files')) return;
             e.preventDefault();
             setDragging(true);
           }}
@@ -504,6 +658,7 @@ export default function Tools() {
           onDrop={(e) => {
             e.preventDefault();
             setDragging(false);
+            if (busy) return;
             const dropped = e.dataTransfer.files?.[0];
             if (dropped) void pickFile(dropped);
           }}
@@ -592,6 +747,147 @@ export default function Tools() {
           )}
         </section>
 
+        {/* -------------------------------------------------- 1b. or a link
+            «خيار الرابط». A customer often holds a MakerWorld / Printables /
+            Thingiverse link rather than a file. The Worker reads the link and,
+            when the owner configured that site's API and it gives a weight,
+            prices it on the grams engine. Otherwise — the default today — the
+            screen says which model it is and why there is no price, and
+            offers the two real ways on: download it and upload it here, or
+            send it to merchants as a print request (only while that is open). */}
+        {!file && (
+          <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 space-y-3" data-link-door>
+            <label htmlFor="tools-link" className="flex items-center gap-2 text-[13px] text-zinc-300">
+              <Link2 className="w-4 h-4 text-[#BAA369]" aria-hidden />
+              {s.linkLabel}
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="tools-link"
+                type="url"
+                inputMode="url"
+                dir="ltr"
+                autoComplete="off"
+                value={linkUrl}
+                onChange={(e) => {
+                  setLinkUrl(e.target.value);
+                  setLinkResult(null);
+                  setLinkError('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void checkLink();
+                  }
+                }}
+                placeholder="https://makerworld.com/…"
+                className="min-w-0 flex-1 h-11 bg-zinc-900 border border-zinc-800 rounded-xl px-3 text-white text-[13px] focus:outline-none focus:border-[#BAA369] transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => void checkLink()}
+                disabled={linkBusy || !linkUrl.trim()}
+                className="shrink-0 h-11 px-4 rounded-xl bg-[#BAA369] text-black text-[13px] font-semibold flex items-center gap-1.5 disabled:opacity-40 active:scale-[0.98] transition-transform"
+              >
+                {linkBusy ? <Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+                {linkBusy ? s.pricing : s.calculate}
+              </button>
+            </div>
+            <p className="text-zinc-600 text-[11px]" dir="ltr">{s.linkHint}</p>
+
+            {linkError && <Notice tone="error">{linkError}</Notice>}
+
+            {linkResult && linkResult.quote === null && (
+              <div className="space-y-3" data-link-unresolved>
+                <p className="text-zinc-300 text-[12.5px] leading-relaxed">
+                  {s.linkUnresolved(providerName(linkResult.link.provider, linkResult.link.host), linkResult.link.external_id)}
+                </p>
+                <div className="grid gap-2">
+                  <a
+                    href={linkResult.link.canonical_url}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    className="h-11 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-white text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4 text-[#BAA369]" aria-hidden />
+                    {s.linkDownload}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => fileInput.current?.click()}
+                    className="h-11 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-white text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <FileUp className="w-4 h-4 text-[#BAA369]" aria-hidden />
+                    {s.linkThenUpload}
+                  </button>
+                  {!requestsClosed && (
+                    <button
+                      type="button"
+                      onClick={() => sendLinkAsRequest(linkResult.link.canonical_url)}
+                      className="h-11 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-white text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
+                      data-link-as-request
+                    >
+                      <Users className="w-4 h-4 text-[#BAA369]" aria-hidden />
+                      {s.sendRequest}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {linkResult && linkResult.quote !== null && (
+              <div className="space-y-3" data-link-priced>
+                {linkResult.info.name && <p className="text-white text-[13px] font-medium truncate">{linkResult.info.name}</p>}
+                <div className="-mx-4 divide-y divide-zinc-800/70 border-y border-zinc-800/70">
+                <Field label={s.printer}>
+                  <Select
+                    value={printerId}
+                    onChange={setPrinterId}
+                    disabled={linkBusy}
+                    options={printers.map((p) => ({ value: p.id, label: `${p.manufacturer} ${p.model}` }))}
+                  />
+                </Field>
+                <Field label={s.material}>
+                  <Select
+                    value={materialId}
+                    onChange={setMaterialId}
+                    disabled={linkBusy}
+                    options={usableMaterials.map((m) => ({ value: m.id, label: m.name || m.material_type }))}
+                  />
+                </Field>
+                </div>
+                {linkResult.quote.confidence === 'insufficient' ? (
+                  <Notice tone="warn">{s.insufficient}</Notice>
+                ) : (
+                  <div className="rounded-xl border border-[#BAA369]/30 bg-[#BAA369]/[0.06] p-4">
+                    <p className="text-[11px] text-zinc-500">
+                      {s.linkFromSite}: <span dir="ltr" className="tabular-nums text-zinc-300">{formatGrams(linkResult.grams_total ?? 0)}</span>
+                    </p>
+                    <p className="text-white font-bold text-[26px] leading-tight mt-1 tabular-nums" dir="ltr" data-link-price>
+                      {money(linkResult.quote.price_iqd)}
+                    </p>
+                    {linkResult.covers?.material_only && (
+                      <p className="text-amber-300/90 text-[11px] leading-relaxed mt-2">{s.linkMaterialOnly}</p>
+                    )}
+                    <p className="text-zinc-500 text-[11px] leading-relaxed mt-2">{s.estimateBadge}</p>
+                  </div>
+                )}
+                {linkResult.pricedFor !== `${printerId}|${materialId}` && (
+                  <button
+                    type="button"
+                    onClick={() => void checkLink()}
+                    disabled={linkBusy}
+                    className="w-full h-11 rounded-xl bg-[#BAA369] text-black text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
+                  >
+                    <RefreshCw className="w-4 h-4" aria-hidden />
+                    {s.recalc}
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* ------------------------------------------------------ 2. settings */}
         {analysisId && (
           <section className="rounded-2xl border border-zinc-800 bg-zinc-950 divide-y divide-zinc-800/70">
@@ -601,6 +897,12 @@ export default function Tools() {
               <Select
                 value={printerId}
                 onChange={(v) => {
+                  if (quote && printer && quote.confidence !== 'insufficient') {
+                    setComparison({ name: printer.model, price: quote.price_iqd, jobKey });
+                    setAutoRecalc(true);
+                  } else {
+                    setComparison(null);
+                  }
                   setPrinterId(v);
                   invalidate();
                 }}
@@ -611,6 +913,11 @@ export default function Tools() {
                 }))}
               />
             </Field>
+            {printerHonesty && (
+              <p className="px-4 pb-3 -mt-1 text-[11px] leading-relaxed text-zinc-500" data-printer-honesty>
+                {printerHonesty}
+              </p>
+            )}
 
             <Field label={s.material}>
               <Select
@@ -789,7 +1096,7 @@ export default function Tools() {
                 <ul className="flex flex-wrap gap-1.5">
                   {analysis.unmeasured.map((u) => (
                     <li key={u} className="text-[11px] text-zinc-400 bg-zinc-900 border border-zinc-800 rounded-full px-2.5 py-1">
-                      {(s as Record<string, string>)[u] ?? u}
+                      {(s as unknown as Record<string, string>)[u] ?? u}
                     </li>
                   ))}
                 </ul>
@@ -822,14 +1129,26 @@ export default function Tools() {
               <AlertCircle className="w-3 h-3" aria-hidden />
               {quote.confidence === 'exact' ? s.exactBadge : s.estimateBadge}
             </p>
+            {comparison && comparison.jobKey === jobKey && printer && (
+              <p className="text-zinc-400 text-[12px] mt-2" data-price-comparison>
+                {comparison.price === quote.price_iqd ? (
+                  s.priceSame(comparison.name)
+                ) : (
+                  <span dir="auto">{s.priceWas(comparison.name, money(comparison.price))}</span>
+                )}
+              </p>
+            )}
             {quote.confidence !== 'exact' && (
               <p className="text-zinc-500 text-[11px] leading-relaxed mt-3">{s.why}</p>
             )}
           </section>
         )}
 
-        {/* --------------------------------------- 6. the step that ends in a print */}
-        {quote && (
+        {/* --------------------------------------- 6. the step that ends in a print
+            The print-request marketplace is part of Levo Community and closes
+            with it; while it is shut to this viewer the way there is not
+            offered at all, rather than leading to a maintenance card. */}
+        {quote && !requestsClosed && (
           <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
             <button
               type="button"

@@ -29,18 +29,15 @@
  * Arabic and, critically, no new Kurdish: the hand-written corpus stays the
  * only author of every word a customer sees.
  *
- * WHY WITHHOLDING AND NOT SUBSTITUTION. Five of the seventy tokens do have a
- * live source in `admin_settings` — the PRO and PRIME free-delivery
- * thresholds, the review base points, the two delivery-day limits. Resolving
- * those at read time was considered and rejected twice over. delivery.ts
- * already refused to quote an admin-editable figure in legal text, because the
- * figure that is seeded today is not the figure the owner will set tomorrow
- * and the document would go on promising the old one — that is the exact
- * regression the cash-on-delivery tax caused. And ./types.ts hashes the bytes
- * a customer accepted, so a body that changes whenever an admin edits a
- * setting cannot be hashed once: the accepted document and the displayed
- * document would silently diverge. Uniform withholding keeps ONE text per
- * version — the same bytes are rendered, archived, hashed and accepted.
+ * WHAT IS FILLED FIRST. ./facts.ts holds the values the owner has decided
+ * or the code enforces (the governing law, the court, the support page, the
+ * membership delivery thresholds …), and ./index.ts substitutes them into the
+ * source BEFORE this pass runs. So this pass only ever sees the tokens that
+ * still have no value — and those it withholds. The values are constants, not
+ * reads of `admin_settings`, because ./types.ts hashes the bytes a customer
+ * accepted: a body that moved whenever an admin edited a setting could not be
+ * hashed once. One text per version — the same bytes are rendered, archived,
+ * hashed and accepted.
  *
  * WHY IT LIVES BELOW ./index.ts RATHER THAN IN THE ROUTE. The route is not the
  * only reader. worker/lib/policySync.ts mirrors the corpus into the archive
@@ -52,18 +49,21 @@
  * modules are reachable as `POLICY_SOURCE_DOCUMENTS` for exactly one purpose,
  * which is asserting that the to-do list still exists.
  *
- * WHAT WITHHOLDING COSTS, STATED PLAINLY. A surviving clause can still point
- * at an article that went — terms/ar 8.3 says «ما لم ينطبق استثناء المادة 8.4
- * أدناه» and 8.4 is one of the articles held back. That is a dangling
- * reference, it is a smaller defect than the template token it replaced, and
- * it is self-healing: the article returns with its value. It is NOT pinned by
- * a test, because a test that enumerated today's dangling references would
- * have to be edited every time the owner answered a question, which is the
- * opposite of what this design is for.
+ * A WITHHELD ARTICLE TAKES ITS REFERENCES WITH IT. A surviving clause used
+ * to go on pointing at an article that went — terms/ar 8.3 said «ما لم ينطبق
+ * استثناء المادة 8.4 أدناه» while 8.4 itself was held back, and support sent
+ * the customer to «المادة 14.4», which was not on the page either. A pointer
+ * to nothing is the same defect as the token in smaller print, so a line that
+ * cites, by article number, an article of the SAME document that was withheld
+ * is withheld too, and the sweep repeats until nothing more moves. A citation
+ * that names another document («من سياسة التوصيل», 'of the Delivery Policy',
+ * «ی سیاسەتی …») is left alone: that article lives elsewhere and its number
+ * says nothing about this document.
  *
  * FILLING A TOKEN IS THEREFORE A PUBLICATION. Write the owner's answer into
- * the module, bump that document's `version`, and the withheld clause comes
- * back on its own. Nothing else has to be remembered.
+ * ./facts.ts, bump the `version` of every document that uses the token, and
+ * the withheld clause comes back on its own — with every line that cited it.
+ * Nothing else has to be remembered.
  */
 
 /** A `{{TOKEN}}` the corpus has not yet been given a value for. */
@@ -101,21 +101,78 @@ function sweepHeadings(lines: string[], drop: boolean[], prefix: string, stops: 
 }
 
 /**
+ * An article citation: the word for "article(s)" in any of the three
+ * languages, then one number or a list / range of them («المادتين 3.35
+ * و3.36», 'articles 3.17, 3.18 and 3.19', «ماددەکانی 2.2 تا 2.8»).
+ */
+const CITATION =
+  /(?:\barticles?|[\u0600-\u06FF]*(?:مادة|مادتين|مادتان|مواد)|ماددەی|ماددەکانی|بڕگەی|بڕگەکانی)\s+(\d+\.\d+(?:(?:\s*[,،]\s*|\s+(?:and|to|و|تا|إلى)\s*|\s*و)\d+\.\d+)*)/giu;
+
+/**
+ * A citation that points into ANOTHER document, which is written two ways:
+ * the document named right after the numbers («… من سياسة التوصيل», 'of the
+ * Delivery Policy'), or right before them, as the FAQ's references are
+ * ('Reference: the Delivery document, articles 3.8 and 3.9'). Only the few
+ * words touching the citation are read, so a sentence that merely mentions
+ * another policy elsewhere does not excuse a citation of this one.
+ */
+const OTHER_DOCUMENT =
+  /^\S*\s*(?:of (?:the|this|that) (?!document\b)|in the (?!document\b)|from the |من (?:سياسة|وثيقة|الشروط|شروط)|في (?:سياسة|وثيقة)|ی (?:سیاسەت|بەڵگەنامە|مەرج)|لە (?:سیاسەت|بەڵگەنامە))/iu;
+
+const NAMED_BEFORE = /(?:document|policy|terms|وثيقة|سياسة|الشروط|بەڵگەنامە|سیاسەت)[^.:،,]{0,30}[،,]\s*$/iu;
+
+/** Article numbers this line cites within its own document. */
+function citedArticles(line: string): string[] {
+  const out: string[] = [];
+  for (const match of line.matchAll(CITATION)) {
+    const start = match.index ?? 0;
+    const after = line.slice(start + match[0].length, start + match[0].length + 40);
+    const before = line.slice(Math.max(0, start - 40), start);
+    if (OTHER_DOCUMENT.test(after) || NAMED_BEFORE.test(before)) continue;
+    for (const n of match[1].matchAll(/\d+\.\d+/g)) out.push(n[0]);
+  }
+  return out;
+}
+
+/** `### 8.4 …` → `8.4`. */
+function articleNumber(line: string): string | null {
+  return line.startsWith(ARTICLE) ? (line.slice(ARTICLE.length).split(' ')[0] ?? null) : null;
+}
+
+/**
  * The published text of one body: the source minus every line that still
- * states an unknown, minus the headings those lines emptied.
+ * states an unknown, minus every line that cites an article so withheld, minus
+ * the headings those lines emptied.
  *
  * Blank lines are not tracked structurally — removing a line leaves a run of
  * them behind, and collapsing runs at the end preserves the paragraph spacing
  * of everything that was NOT touched, byte for byte. A body with no
  * placeholder comes back identical to its source, which is what keeps the
- * hash of an untouched document stable across this change.
+ * hash of an untouched document stable across this change — nothing can
+ * dangle where nothing was withheld.
  */
 export function publishedPolicyBody(body: string): string {
   if (!PLACEHOLDER.test(body)) return body;
   const lines = body.split('\n');
   const drop = lines.map((line) => line.trim().length > 0 && !line.startsWith(PART) && PLACEHOLDER.test(line));
-  sweepHeadings(lines, drop, ARTICLE, [ARTICLE, PART]);
-  sweepHeadings(lines, drop, PART, [PART]);
+  const cites = lines.map((line) => (line.startsWith('#') ? [] : citedArticles(line)));
+  for (;;) {
+    sweepHeadings(lines, drop, ARTICLE, [ARTICLE, PART]);
+    sweepHeadings(lines, drop, PART, [PART]);
+    const withheld = new Set<string>();
+    lines.forEach((line, i) => {
+      const n = drop[i] ? articleNumber(line) : null;
+      if (n) withheld.add(n);
+    });
+    let moved = false;
+    cites.forEach((numbers, i) => {
+      if (!drop[i] && numbers.some((n) => withheld.has(n))) {
+        drop[i] = true;
+        moved = true;
+      }
+    });
+    if (!moved) break;
+  }
   return lines
     .filter((_, i) => !drop[i])
     .join('\n')

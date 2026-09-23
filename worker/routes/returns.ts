@@ -49,6 +49,8 @@ import { parseProductRow } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
 import { applyRelations, loadRelationsView } from '../lib/productOverlay';
 import { reversePointsForOrder, unitMerchandiseIqd } from '../lib/pointsOps';
+import { walletCreditStatement } from '../lib/wallet';
+import { walletLedgerDinarsReady } from '../lib/walletOps';
 import { planInventory, planReservationFence, chunk, IN_CHUNK } from '../lib/inventory';
 import { restoreMovesForItem } from '../lib/orderInventory';
 import { isRevealed, loadAllocations, paidOrderIds } from '../lib/mysteryReveal';
@@ -680,18 +682,29 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       const giniPaidIqd = Math.max(0, Math.trunc(Number(order.gini_paid_iqd) || 0));
       const settledByGini = giniPaidIqd > 0;
       const walletRefundIqd = settledByGini ? 0 : refundIqd;
-      const rate = Number(order.exchange_rate) || 1400; // the ORDER's historical rate
-      const cents = Math.round((walletRefundIqd * 100) / rate);
+      const rate = Math.trunc(Number(order.exchange_rate)) || 1400; // the ORDER's historical rate
+      // THE REFUNDED DINARS ARE THE DINARS THE CUSTOMER SEES (migration 0108).
+      // `Math.round` over the order's rate turned a 50,000 د.ع return into
+      // 3,571 cents and recorded nothing else, so the wallet showed «+49,994»
+      // for a refund of 50,000. The cents are floored — never more cents than
+      // the dinars are worth — and the dinars ride beside them at the rate
+      // they were converted at, so the credit reads exactly `walletRefundIqd`.
+      const cents = Math.floor((walletRefundIqd * 100) / rate);
 
       let credited = false;
       if (cents > 0) {
+        const ledgerDinars = await walletLedgerDinarsReady(c.env.DB);
         try {
-          await c.env.DB.prepare(
-            `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
-             VALUES (?, ?, 'deposit', 'USD', ?, 'approved', ?, ?, 'admin', ?)`
-          )
-            .bind(`wtx_ret_${id}`, kase.user_id, cents, `Refund for approved return ${id} (order ${kase.order_id})`, kase.order_id, nowIso)
-            .run();
+          await walletCreditStatement(c.env.DB, ledgerDinars, {
+            id: `wtx_ret_${id}`,
+            userId: kase.user_id,
+            cents,
+            note: `Refund for approved return ${id} (order ${kase.order_id})`,
+            ref: kase.order_id,
+            nowIso,
+            amountIqd: walletRefundIqd,
+            rate,
+          }).run();
           credited = true;
           // `RefundCompleted` (03-EVENTS.md §3.11) — keyed on the same
           // deterministic ledger id, so a redelivery is a replay everywhere.
@@ -1257,18 +1270,26 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, async (c) =
   const order = await c.env.DB.prepare('SELECT exchange_rate FROM orders WHERE id = ?')
     .bind(claim.order_id)
     .first<{ exchange_rate: number }>();
-  const rate = Number(order?.exchange_rate) || 1400;
-  const cents = Math.round((credit * 100) / rate);
+  const rate = Math.trunc(Number(order?.exchange_rate)) || 1400;
+  // Floored, with the credited dinars recorded beside the cents (0108) — the
+  // same rule as the return refund above, so the customer reads exactly the
+  // compensation that was approved, not its cents converted back.
+  const cents = Math.floor((credit * 100) / rate);
 
   let credited = false;
   if (cents > 0) {
+    const ledgerDinars = await walletLedgerDinarsReady(c.env.DB);
     try {
-      await c.env.DB.prepare(
-        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
-         VALUES (?, ?, 'deposit', 'USD', ?, 'approved', ?, ?, 'admin', ?)`
-      )
-        .bind(`wtx_pp_${id}`, claim.user_id, cents, `Price-protection credit for claim ${id} (order ${claim.order_id})`, claim.order_id, nowIso)
-        .run();
+      await walletCreditStatement(c.env.DB, ledgerDinars, {
+        id: `wtx_pp_${id}`,
+        userId: claim.user_id,
+        cents,
+        note: `Price-protection credit for claim ${id} (order ${claim.order_id})`,
+        ref: claim.order_id,
+        nowIso,
+        amountIqd: credit,
+        rate,
+      }).run();
       credited = true;
       if (eventsEnabled(c.env)) {
         await emitFromRequest(

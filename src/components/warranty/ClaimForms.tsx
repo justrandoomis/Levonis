@@ -72,7 +72,11 @@ export function DeviceClaimOverlay({
   lang: Language;
   s: WarrantyStrings;
   onClose: () => void;
-  onSubmitted: () => void;
+  /**
+   * `replay` is the route's own word that this press landed on a claim
+   * ALREADY recorded under this window's key — see `submit` below.
+   */
+  onSubmitted: (result: { id: string; replay: boolean }) => void;
 }) {
   // The window must keep its contents while it animates OUT: `device` is the
   // open flag AND the data, so the last one is held for the exit.
@@ -161,13 +165,25 @@ export function DeviceClaimOverlay({
     setBusy(true);
     setError('');
     try {
-      await api.post(`/api/devices/units/${encodeURIComponent(device.unit_id)}/claims`, {
+      const res = await api.post<{ id: string; replay?: boolean }>(`/api/devices/units/${encodeURIComponent(device.unit_id)}/claims`, {
         subject: subject.trim(),
         description: description.trim(),
         attachments: attachments.map((a) => a.key),
         idempotencyKey: claimKey.current,
       });
-      onSubmitted();
+      /**
+       * A REPLAY IS NOT A SUBMIT, AND THE CUSTOMER IS TOLD SO.
+       *
+       * The route keeps the FIRST version of a claim when a retry carries the
+       * same key (worker/routes/devices.ts, «WHAT A REPLAY COSTS»): the
+       * customer whose first press timed out, who then added the photo of the
+       * cracked nozzle and pressed again, has a claim WITHOUT that photo. This
+       * screen used to read that 200 as a fresh submit and say «تم إرسال
+       * المطالبة». The flag goes up to the page, which says what happened and
+       * opens the claim's conversation — the one place the missing evidence
+       * can still be sent.
+       */
+      onSubmitted({ id: res.id, replay: res.replay === true });
       onClose();
     } catch (e2) {
       setError(e2 instanceof ApiError ? e2.message : s.error);

@@ -66,11 +66,17 @@ import type { PolicyDocument } from './types';
  *     text rather than show a customer a `{{TOKEN}}`. They are still authored
  *     below, and each one returns of its own accord the moment its value is
  *     written in and the version moves again.
+ *
+ * VERSION 3 — WHY IT MOVED. The archive keeps version 2 byte for byte.
+ *   * THE FACTS. worker/lib/policies/facts.ts now states `COMPETENT_COURT`, `GOVERNING_LAW_JURISDICTION`, `LEVONIS_SUPPORT_CONTACT`,
+ *     so the clauses that carried them are published instead of withheld.
+ *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
+ *     by number, an article of this document that is itself withheld.
  */
 export const site_terms: PolicyDocument = {
   key: 'site_terms',
-  version: 2,
-  effective_at: '2026-01-01',
+  version: 3,
+  effective_at: '2026-09-23',
   title: {
     ar: 'شروط استخدام الموقع',
     en: 'Website Terms of Use',
@@ -247,7 +253,7 @@ export const site_terms: PolicyDocument = {
 بطلان بند لا يبطل سواه.
 
 ### 11.3 القانون والاختصاص
-يسري {{GOVERNING_LAW_JURISDICTION}}، وتختص {{COMPETENT_COURT}}.
+تسري على هذه الوثيقة {{GOVERNING_LAW_JURISDICTION}}، والاختصاص ل{{COMPETENT_COURT}}.
 
 ### 11.4 القناة المعتمدة
 {{LEVONIS_SUPPORT_CONTACT}} — أوقات العمل {{LEVONIS_SUPPORT_HOURS}}. العنوان: {{LEVONIS_ADDRESS}}.`,
@@ -421,7 +427,7 @@ This document is amended by publishing a new version, which applies to use after
 The invalidity of one provision does not invalidate the others.
 
 ### 11.3 Governing law and forum
-{{GOVERNING_LAW_JURISDICTION}} applies and {{COMPETENT_COURT}} has jurisdiction.
+This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} have jurisdiction.
 
 ### 11.4 Approved channel
 {{LEVONIS_SUPPORT_CONTACT}} — working hours {{LEVONIS_SUPPORT_HOURS}}. Address: {{LEVONIS_ADDRESS}}.`,

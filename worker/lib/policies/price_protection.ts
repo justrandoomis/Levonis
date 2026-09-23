@@ -31,11 +31,17 @@ import type { PolicyDocument } from './types';
  *     text rather than show a customer a `{{TOKEN}}`. They are still authored
  *     below, and each one returns of its own accord the moment its value is
  *     written in and the version moves again.
+ *
+ * VERSION 3 — WHY IT MOVED. The archive keeps version 2 byte for byte.
+ *   * THE FACTS. worker/lib/policies/facts.ts now states `COMPETENT_COURT`, `GOVERNING_LAW_JURISDICTION`, `LEVONIS_SUPPORT_CONTACT`,
+ *     so the clauses that carried them are published instead of withheld.
+ *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
+ *     by number, an article of this document that is itself withheld.
  */
 export const price_protection: PolicyDocument = {
   key: 'price_protection',
-  version: 2,
-  effective_at: '2026-01-01',
+  version: 3,
+  effective_at: '2026-09-23',
   title: {
     ar: 'سياسة الأسعار وتغييرها وإلغاء الطلب',
     en: 'Pricing, Price Changes and Order Cancellation Policy',
@@ -294,7 +300,7 @@ export const price_protection: PolicyDocument = {
 بطلان بند لا يمس باقي البنود.
 
 ### 13.3 القانون والاختصاص
-تخضع هذه الوثيقة لقوانين {{GOVERNING_LAW_JURISDICTION}}، والاختصاص لمحاكم {{COMPETENT_COURT}}.
+تخضع هذه الوثيقة ل{{GOVERNING_LAW_JURISDICTION}}، والاختصاص ل{{COMPETENT_COURT}}.
 
 ### 13.4 جهة الاتصال
 جهة الاتصال المعتمدة {{LEVONIS_SUPPORT_CONTACT}}، وأوقات العمل {{LEVONIS_SUPPORT_HOURS}}.`,
@@ -551,7 +557,7 @@ The Store may amend this policy by issuing a new version with a number and an ef
 The invalidity of one article does not affect the remaining articles.
 
 ### 13.3 Law and jurisdiction
-This document is governed by the laws of {{GOVERNING_LAW_JURISDICTION}}, and the courts of {{COMPETENT_COURT}} have jurisdiction.
+This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} have jurisdiction.
 
 ### 13.4 Contact
 The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours are {{LEVONIS_SUPPORT_HOURS}}.`,
@@ -808,7 +814,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 پووچبوونەوەی بڕگەیەک کاریگەری لەسەر بڕگەکانی دیکە نییە.
 
 ### 13.3 یاسا و دەسەڵاتی دادوەری
-ئەم بەڵگەنامەیە بەپێی یاساکانی {{GOVERNING_LAW_JURISDICTION}} دەبێت، و دەسەڵاتی دادوەری بۆ دادگاکانی {{COMPETENT_COURT}}ـە.
+ئەم بەڵگەنامەیە بەپێی {{GOVERNING_LAW_JURISDICTION}} دەبێت، و دەسەڵاتی دادوەری بۆ {{COMPETENT_COURT}}یە.
 
 ### 13.4 خاڵی پەیوەندی
 خاڵی پەیوەندی پەسەندکراو {{LEVONIS_SUPPORT_CONTACT}}ـە، و کاتی کارکردن {{LEVONIS_SUPPORT_HOURS}}ـە.`,

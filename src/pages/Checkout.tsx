@@ -1,4 +1,5 @@
-import { MotionCharacterAnchor, MotionCharacterHome, useCharacterBusy } from '../components/bloub/MotionCharacterAnchor';
+import { MotionCharacterHome, useCharacterBusy } from '../components/bloub/MotionCharacterAnchor';
+import OrderCelebration from '../components/bloub/OrderCelebration';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 // The standalone `loc` — this helper runs outside the component, and the
@@ -68,9 +69,9 @@ import AddressForm from '../components/address/AddressForm';
  */
 import ChannelNudge from '../components/notify/ChannelNudge';
 import { apiRefusal } from '../lib/refusalStrings';
-import { mascot } from '../lib/mascot';
+import { CELEBRATION_MOTION_MS, mascot } from '../lib/mascot';
 import { duringBackgroundRefresh } from '../lib/mascotRequest';
-import { useBusy } from '../lib/busy';
+import { createIntentMark, useBusy } from '../lib/busy';
 import { useMotion } from '../lib/motion';
 import { motion } from 'motion/react';
 /**
@@ -643,6 +644,14 @@ export default function Checkout() {
   const [loadError, setLoadError] = useState('');
 
   const [placedOrder, setPlacedOrder] = useState<ApiOrder | null>(null);
+  /** True once the confirmation's celebration has finished MOVING. Work that
+   *  nobody is waiting for starts after it, not on top of it. */
+  const [celebrated, setCelebrated] = useState(false);
+  useEffect(() => {
+    if (!placedOrder) return;
+    const timer = window.setTimeout(() => setCelebrated(true), CELEBRATION_MOTION_MS);
+    return () => window.clearTimeout(timer);
+  }, [placedOrder]);
   const [submitting, setSubmitting] = useState(false);
   // True once a line's price moved while this screen was open, so the customer
   // is told rather than left to spot the total changing on its own.
@@ -708,19 +717,23 @@ export default function Checkout() {
    * `placeOrder`, it does not touch `idempotencyKeyRef`, and if it failed to
    * mount entirely every order would still be placeable.
    *
-   * THE RE-QUOTE, AND ONLY THE RE-QUOTE. `quote !== null` is what separates
-   * the two cases. The FIRST quote is a page-load state — it belongs to the
-   * loading screen below, and there is nothing yet for a customer to be
-   * protected from. Every quote after it was caused by a switch the customer
-   * just flipped, and it is re-pricing the total the Place-order button is
-   * about to commit them to. `canCompleteOrder` already refuses during it;
-   * this is what makes that refusal visible instead of leaving a dimmed
-   * button and a total quietly changing underneath it. The 140ms threshold
-   * swallows the fast ones, so flipping a switch on a good connection still
-   * shows nothing at all.
+   * THE RE-QUOTE THE CUSTOMER ASKED FOR, AND ONLY THAT ONE. `quote !== null`
+   * separates the first quote — a page-load state that belongs to the loading
+   * screen below — from the re-quotes. But not every re-quote was asked for:
+   * this page moves the payment method to the wallet BY ITSELF once the first
+   * quote shows the balance covers the cart, and a price refresh on return
+   * re-quotes too. Those used to take the whole screen with «جارٍ حساب
+   * التوصيل...» on page load, for a switch nobody had touched. So the controls
+   * that re-price the cart mark their change (`customerQuote.mark()`), the
+   * quote effect takes the mark into `quoteAskedFor`, and only a marked quote
+   * holds the screen. `canCompleteOrder` still refuses during EVERY quote —
+   * the button's own dimmed state is enough for a change the page made — and
+   * the 140ms threshold still swallows the fast ones.
    */
+  const [customerQuote] = useState(createIntentMark);
+  const [quoteAskedFor, setQuoteAskedFor] = useState(false);
   useBusy(submitting, 'order');
-  useBusy(quoteLoading && quote !== null, 'quote');
+  useBusy(quoteLoading && quote !== null && quoteAskedFor, 'quote');
   // Versioned-policy consent: ALWAYS starts unchecked; any material quote
   // change (totals / shipping / required versions) resets it.
   const [policyAccepted, setPolicyAccepted] = useState(false);
@@ -887,11 +900,17 @@ export default function Checkout() {
   const itemIdsKey = items.map((i) => `${i.id}:${i.qty}:${i.unit_price_iqd}`).join(',');
   useEffect(() => {
     if (!selectedAddressId || !deliveryMethod || items.length === 0) {
+      // No request, so nothing to hold the screen for — and a mark left
+      // standing here would be taken by whatever quote comes next.
+      customerQuote.take();
       setQuote(null);
       return;
     }
     const seq = ++quoteSeqRef.current;
     setQuoteLoading(true);
+    // Taken HERE and nowhere else, so the mark belongs to exactly the quote
+    // it caused and cannot leak onto the next one.
+    setQuoteAskedFor(customerQuote.take());
     setQuoteError('');
     api
       .post<{ quote: CheckoutQuoteDto }>('/api/orders/quote', {
@@ -1511,8 +1530,19 @@ export default function Checkout() {
        * promise starts later. It is preferred to adding `/api/wallet` to the
        * silent list: the wallet page's own refresh IS foreground work and
        * should keep its loading face.
+       *
+       * AND IT WAITS FOR THE CELEBRATION. Started here, it ran its request,
+       * its JSON parse and a WalletProvider re-render on the same frames as
+       * the confirmation mounting and the character popping onto its stage —
+       * main-thread work nobody was waiting for, at the one moment the owner
+       * saw «lagging». Nothing on the confirmation shows the balance, so it
+       * loses nothing by starting CELEBRATION_MOTION_MS later. Not cancelled
+       * on unmount: the provider it refreshes outlives this page, and a
+       * customer who taps «طلباتي» straight away still gets a fresh balance.
        */
-      duringBackgroundRefresh(() => refreshWallet()).catch(() => {});
+      window.setTimeout(() => {
+        duringBackgroundRefresh(() => refreshWallet()).catch(() => {});
+      }, CELEBRATION_MOTION_MS);
       /**
        * §15 — THE ONE MOMENT THAT DESERVES MORE THAN THE HOUSE SUCCESS.
        *
@@ -1671,44 +1701,36 @@ export default function Checkout() {
       <div className="h-full min-h-0 w-full overflow-y-auto bg-canvas text-text-primary flex flex-col font-sans selection:bg-white/20">
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           {/*
-            THE CHARACTER ARRIVES; THE CHECKMARK DOES NOT PULSE.
+            THE CHARACTER APPEARS; NOTHING FLIES DOWN THE PAGE.
 
-            This was a white disc with a `animate-ping` ring behind it — a
-            decorative loop that ran for as long as the screen was open, which
-            is exactly the kind of motion the motion system rules out: it says
-            nothing, it cannot be interrupted, and it goes on saying nothing
-            after the news has been read.
+            This was first a white disc with an `animate-ping` ring — a loop
+            that said nothing and never stopped — and then a `stage` anchor the
+            character FLEW to: a journey from the header down the page, with a
+            wind-up against the direction of travel and a growth from header
+            size to stage size on the way. The owner's verdict on that descent:
+            «غير مناسب وغير مرح ويظهر الانيميشن عندما ينتقل من فوق الى الاسفل
+            بشكل خاطئ وبشكل يظهر فيه lagging».
 
-            A `stage` anchor replaces it. The character is docked in the header
-            when the order is placed, so registering a destination HERE makes
-            it travel down the page — the existing journey, with its wind-up,
-            its deceleration and its settle squash, none of it written twice.
-            The descent is the animation the owner asked for, and it is the
-            mechanism the character already uses to go anywhere.
+            So the stage is now APPEARED AT (`appearsInsteadOfTravelling` in
+            src/components/bloub/anchors.ts): the character leaves the header
+            and pops into being here, overshoots, and hops twice for joy, while
+            a burst of confetti goes off behind it — all of it transform and
+            opacity on the compositor (OrderCelebration, character/entrance.ts).
+            It lands on the frame this panel mounts, so `celebrate` is played
+            by the arrival (`mascot.navigationComplete('stage')`) and the
+            news and the joy are the same moment.
 
-            THIS SLOT HAS NO ENTRANCE OF ITS OWN, deliberately. It is the
-            destination the character is measuring and flying towards; a panel
-            that moved its own anchor mid-flight would retarget the journey it
-            started. Everything BELOW it animates instead, and `y` is a
+            THIS SLOT STILL HAS NO ENTRANCE OF ITS OWN. It is the box the
+            character measures; a panel that moved it would move the character
+            with it. Everything BELOW it animates instead, and `y` is a
             transform, so none of it changes where this box is.
 
-            WHAT `celebrate` NOW MEANS HERE. `mascot.outcome('ordered')` in
-            `placeOrder` raises the mood at the moment the server answered; the
-            journey's ARRIVAL is what plays it (`mascot.navigationComplete`
-            takes the destination kind and a `stage` celebrates). It used to be
-            played on the HTTP response alone, and a header-to-stage descent
-            takes about 1.3s — so the 1.5s window was two thirds spent before
-            the character was anywhere near this page, and it touched down
-            wearing the 320ms `arrival` face instead.
-
-            UNDER REDUCED MOTION the character still travels: the engine
-            flattens the wind-up, the stretch, the trail and the settle squash
-            and shortens the journey to a flat 200ms glide, which is not the
-            same claim as "it cross-fades and is simply already here" — that
-            sentence used to be here and was not true of the code.
+            UNDER REDUCED MOTION there is no burst, no pop and no hop: the
+            character fades in on the stage wearing its celebrate face, and the
+            heading says the rest.
           */}
           <div className="mb-8 flex items-center justify-center">
-            <MotionCharacterAnchor kind="stage" />
+            <OrderCelebration />
           </div>
 
           {/*
@@ -1830,8 +1852,12 @@ export default function Checkout() {
             document.body, carries no scrim and takes no scroll lock, so the
             order number above stays readable and copyable underneath it. It
             decides for itself whether to appear at all — a customer who
-            already has Telegram linked never sees it. */}
-        <ChannelNudge context="order" active />
+            already has Telegram linked never sees it.
+
+            Activated only once the celebration has finished moving: `active`
+            is what starts its channel read, and that request and its render
+            used to land on the same frames as the character's entrance. */}
+        <ChannelNudge context="order" active={celebrated} />
       </div>
     );
   }
@@ -1921,7 +1947,7 @@ export default function Checkout() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {addresses.map(addr => (
                 <label key={addr.id} data-selected={selectedAddressId === addr.id} className="lv-choice relative flex cursor-pointer flex-col gap-2 p-4">
-                  <input type="radio" name="address" className="sr-only" checked={selectedAddressId === addr.id} onChange={() => setSelectedAddressId(addr.id)} />
+                  <input type="radio" name="address" className="sr-only" checked={selectedAddressId === addr.id} onChange={() => { customerQuote.mark(); setSelectedAddressId(addr.id); }} />
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-text-muted" strokeWidth={1.5} />
@@ -1963,6 +1989,7 @@ export default function Checkout() {
                     // the step whose absence was the whole defect.
                     const d = await api.get<{ addresses: ApiAddress[] }>('/api/addresses');
                     setAddresses(d.addresses || []);
+                    customerQuote.mark();
                     setSelectedAddressId(id);
                     setAddingAddress(false);
                   }}
@@ -2018,7 +2045,7 @@ export default function Checkout() {
                 return (
                 <React.Fragment key={method.id}>
                 <label data-selected={selected} className="lv-choice relative flex cursor-pointer items-center gap-3 p-4 sm:gap-4">
-                  <input type="radio" name="delivery" className="sr-only" checked={selected} onChange={() => setDeliveryMethod(method.id)} />
+                  <input type="radio" name="delivery" className="sr-only" checked={selected} onChange={() => { customerQuote.mark(); setDeliveryMethod(method.id); }} />
                   <div className="flex-1 flex justify-between items-center">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black/35 text-text-secondary">
@@ -2150,6 +2177,7 @@ export default function Checkout() {
                       // From here on the wallet-first default has no opinion:
                       // the buyer has one.
                       paymentPickedRef.current = true;
+                      customerQuote.mark();
                       setPaymentMethod(method.id);
                     }}
                   />
@@ -2200,7 +2228,12 @@ export default function Checkout() {
                       // The same two lines the radios above run: the buyer has
                       // an opinion now, so the wallet-first default stops
                       // having one.
+                      // Only a tap that CHANGES the method marks it: the row
+                      // fires again when Gini is already chosen, and that
+                      // starts no quote to take the mark — the next background
+                      // re-quote would, and hold the screen for nothing.
                       paymentPickedRef.current = true;
+                      if (paymentMethod !== 'gini') customerQuote.mark();
                       setPaymentMethod('gini');
                     }}
                     strings={{
@@ -2563,7 +2596,10 @@ export default function Checkout() {
                   type="checkbox"
                   className="mt-1 shrink-0 accent-[#ef233c]"
                   checked={protectedDelivery}
-                  onChange={(e) => setProtectedDelivery(e.target.checked)}
+                  onChange={(e) => {
+                    customerQuote.mark();
+                    setProtectedDelivery(e.target.checked);
+                  }}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2">
@@ -2813,6 +2849,10 @@ export default function Checkout() {
                     showLabel={false}
                     onApplied={(code) => {
                       setCouponError('');
+                      // Only a code that CHANGES the quote marks it: re-applying
+                      // the code already in force starts no request, and a mark
+                      // left standing would be taken by the next background one.
+                      if (code !== couponCode) customerQuote.mark();
                       setCouponCode(code);
                     }}
                   />
@@ -2867,7 +2907,10 @@ export default function Checkout() {
                         role="switch"
                         aria-checked={isWalletActive}
                         disabled={isAdvanceRequired || walletBalanceShown === 0}
-                        onClick={() => setUseWalletBalance(!useWalletBalance)}
+                        onClick={() => {
+                            customerQuote.mark();
+                            setUseWalletBalance(!useWalletBalance);
+                        }}
                         className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                             isWalletActive ? 'bg-white' : 'bg-zinc-800'
                         } ${(isAdvanceRequired || walletBalanceShown === 0) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
@@ -2931,7 +2974,10 @@ export default function Checkout() {
                     type="checkbox"
                     className="peer sr-only"
                     checked={usePoints}
-                    onChange={() => setUsePoints((v) => !v)}
+                    onChange={() => {
+                      customerQuote.mark();
+                      setUsePoints((v) => !v);
+                    }}
                     disabled={(quote?.points.balance ?? pointBalance) === 0}
                   />
                   {/* The knob is a CHILD of the track, so `peer-checked:`

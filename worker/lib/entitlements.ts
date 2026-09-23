@@ -4,15 +4,21 @@
  *
  * States (mandate §8.1):
  *   pending_payment          — created, wallet charge not completed
- *   prepaid_pending_launch   — paid before the owner-configured launch event;
- *                              reserves the full duration, clock not started
+ *   prepaid_pending_launch   — paid before the owner's launch event; reserves
+ *                              the full duration, clock not started. LEGACY
+ *                              since the site went live: nothing writes one
+ *                              while the launch is activated, and one left
+ *                              over is converted on its account's next read
  *   active                   — running; expires_at set
  *   expired / cancelled      — terminal
  *
  * Launch: admin_settings key `launchConfig` = {launch_at: ISO|null,
- * activated: bool, activated_at}. Activation is an explicit, audited,
- * idempotent admin action (POST /api/admin/memberships/activate-launch) —
- * never an automatic clock during staging tests.
+ * activated: bool, activated_at}. THE SITE IS LIVE: a missing row means
+ * "activated" (DEFAULT_LAUNCH below), migration 0109 writes the row as
+ * activated on every database that had not been, and a reservation still
+ * waiting from before is converted the first time its account is read
+ * (`getTierStatus` → worker/lib/launchActivation.ts). The admin button
+ * (POST /api/memberships/admin/activate-launch) remains for any leftovers.
  */
 
 import type { Env, SessionUser } from './types';
@@ -26,7 +32,16 @@ export interface LaunchConfig {
   activated_at: string | null;
 }
 
-export const DEFAULT_LAUNCH: LaunchConfig = { launch_at: null, activated: false, activated_at: null };
+/**
+ * «الموقع يعمل» — THE DEFAULT IS LIVE. This used to say `activated: false`, so
+ * a database nobody had pressed the launch button on sold every card as a
+ * reservation that granted nothing (`getTierStatus` counts only `active`
+ * rows) and told the customer «تُفعّل عند إطلاق الموقع» on a site that was
+ * already running. An owner who genuinely wants a pre-launch gate again writes
+ * `activated: false` into the setting on purpose; forgetting to write it can
+ * no longer switch the memberships off.
+ */
+export const DEFAULT_LAUNCH: LaunchConfig = { launch_at: null, activated: true, activated_at: null };
 
 export interface MembershipRow {
   id: string;
@@ -232,8 +247,12 @@ export async function getTierStatus(db: D1Database, userId: string): Promise<Tie
     .bind(userId)
     .all<MembershipRow>();
 
-  const active = results.find((m) => m.state === 'active');
-  const pending = results.find((m) => m.state === 'prepaid_pending_launch');
+  let rows = results;
+  if (rows.some((m) => m.state === 'prepaid_pending_launch')) {
+    rows = await convertReservationOnRead(db, userId, rows, nowIso);
+  }
+  const active = rows.find((m) => m.state === 'active');
+  const pending = rows.find((m) => m.state === 'prepaid_pending_launch');
 
   // Active restriction cases gate specific benefits (admin decision with
   // reason + audit, worker/routes/support.ts). Merged here — the single
@@ -280,6 +299,50 @@ export async function getTierStatus(db: D1Database, userId: string): Promise<Tie
     .run();
 
   return status;
+}
+
+/**
+ * A RESERVATION MET AFTER THE LAUNCH STARTS HERE, ON ITS OWN.
+ *
+ * The owner's option 1b: rather than asking anyone to press a button, the one
+ * place every tier question passes through turns a waiting reservation into a
+ * running membership the first time the account is read once the launch is
+ * live — the customer who paid opens the site and has what they paid for. The
+ * dedupe is the admin sweep's own (`convertLaunchReservations`), so the two
+ * paths can never disagree about which row wins.
+ *
+ * Only when a reservation exists, which is a SELECT this function already
+ * made; an account without one pays nothing extra. A failure here never fails
+ * the read it rides on — the tier is then answered from the rows as they
+ * stand, which is exactly the answer before this existed.
+ */
+async function convertReservationOnRead(
+  db: D1Database,
+  userId: string,
+  rows: MembershipRow[],
+  nowIso: string
+): Promise<MembershipRow[]> {
+  try {
+    const launch = await getLaunchConfig(db);
+    if (!launch.activated) return rows;
+    // Lazily, because launchActivation needs addMonths from membershipOps,
+    // and membershipOps imports this module.
+    const { convertLaunchReservations } = await import('./launchActivation');
+    const res = await convertLaunchReservations(db, { actorId: null, nowIso, userId, auditDeferred: false });
+    if (res.converted === 0) return rows;
+    const { results } = await db
+      .prepare(
+        `SELECT * FROM memberships
+          WHERE user_id = ? AND state IN ('active','prepaid_pending_launch')
+          ORDER BY CASE tier WHEN 'pro' THEN 0 WHEN 'prime' THEN 1 ELSE 2 END, expires_at DESC`
+      )
+      .bind(userId)
+      .all<MembershipRow>();
+    return results;
+  } catch (e) {
+    console.error('reservation conversion on read failed', userId, e instanceof Error ? e.message : String(e));
+    return rows;
+  }
 }
 
 /** Convenience for routes that already loaded the session user. */

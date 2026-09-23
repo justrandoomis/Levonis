@@ -119,6 +119,18 @@ export interface WarrantyStrings {
   decisionStep: string;
   submittedAt: string;
   claimSubmitted: string;
+  /** The retried submit landed on the claim already recorded (`replay: true`):
+   *  its edits were NOT saved, and the thread is where to add them. */
+  claimReplayNotice: string;
+  /** One line under «مطالباتي»: tapping a claim opens its conversation. */
+  claimsHint: string;
+  /** The row on every claim card that says it is a door to a conversation. */
+  openThread: string;
+  messagesCount: (n: number, formatted: string) => string;
+  /** The warranty team wrote since the customer last looked. */
+  newReply: string;
+  /** One line at the top of the thread: who is on the other side. */
+  threadIntro: string;
 }
 
 const ar: WarrantyStrings = {
@@ -239,7 +251,19 @@ const ar: WarrantyStrings = {
   },
   decisionStep: 'القرار',
   submittedAt: 'تاريخ التقديم',
-  claimSubmitted: 'تم إرسال المطالبة.',
+  claimSubmitted: 'تم إرسال المطالبة. محادثتها مع فريق الضمان في «مطالباتي» أدناه — اضغط على المطالبة لفتحها، ويصلك إشعار عند كل رد.',
+  claimReplayNotice: 'هذه المطالبة مسجّلة من قبل، ولم تُحفظ تعديلاتك الأخيرة عليها. أضف الصور أو التصحيح في المحادثة المفتوحة الآن.',
+  claimsHint: 'اضغط على المطالبة لفتح المحادثة مع فريق الضمان — هناك تصلك ردودهم، ومنها ترسل الصور والتوضيحات.',
+  openThread: 'فتح المحادثة',
+  messagesCount: (n, f) => {
+    if (n === 0) return 'لا توجد رسائل بعد';
+    if (n === 1) return 'رسالة واحدة';
+    if (n === 2) return 'رسالتان';
+    if (n >= 3 && n <= 10) return `${f} رسائل`;
+    return `${f} رسالة`;
+  },
+  newReply: 'رد جديد من الفريق',
+  threadIntro: 'هنا تتحدث مع فريق الضمان، ويصلك إشعار عند كل رد منهم.',
 };
 
 const en: WarrantyStrings = {
@@ -355,7 +379,13 @@ const en: WarrantyStrings = {
   },
   decisionStep: 'Decision',
   submittedAt: 'Submitted',
-  claimSubmitted: 'Claim submitted.',
+  claimSubmitted: 'Claim submitted. Its conversation with the warranty team is under “My claims” below — tap the claim to open it; you will be notified of every reply.',
+  claimReplayNotice: 'This claim was already recorded, and your latest edits were not saved to it. Add the photos or the correction in the conversation now open.',
+  claimsHint: 'Tap a claim to open its conversation with the warranty team — their replies arrive there, and you can send photos and details from it.',
+  openThread: 'Open conversation',
+  messagesCount: (n, f) => (n === 0 ? 'No messages yet' : n === 1 ? '1 message' : `${f} messages`),
+  newReply: 'New reply from the team',
+  threadIntro: 'This is your conversation with the warranty team; you are notified of every reply.',
 };
 
 const ckb: WarrantyStrings = {
@@ -471,7 +501,20 @@ const ckb: WarrantyStrings = {
   },
   decisionStep: 'بڕیار',
   submittedAt: 'بەرواری پێشکەشکردن',
-  claimSubmitted: 'داواکارییەکە نێردرا.',
+  // OWNER: the sentence that follows «داواکارییەکە نێردرا.» (where the
+  // conversation lives) carries the ARABIC text until the Sorani is written by
+  // hand — without it a Sorani reader never learns where the reply will be.
+  claimSubmitted: 'داواکارییەکە نێردرا. محادثتها مع فريق الضمان في «مطالباتي» أدناه — اضغط على المطالبة لفتحها، ويصلك إشعار عند كل رد.',
+  // OWNER: the three sentences below carry the ARABIC text on purpose — no
+  // Sorani prose is generated here. Sorani to be written by hand.
+  claimReplayNotice: 'هذه المطالبة مسجّلة من قبل، ولم تُحفظ تعديلاتك الأخيرة عليها. أضف الصور أو التصحيح في المحادثة المفتوحة الآن.',
+  claimsHint: 'اضغط على المطالبة لفتح المحادثة مع فريق الضمان — هناك تصلك ردودهم، ومنها ترسل الصور والتوضيحات.',
+  threadIntro: 'هنا تتحدث مع فريق الضمان، ويصلك إشعار عند كل رد منهم.',
+  openThread: 'کردنەوەی گفتوگۆ',
+  // Zero reads the Arabic «no messages yet» (OWNER: Sorani to be written by
+  // hand) rather than «0 نامە».
+  messagesCount: (n, f) => (n === 0 ? 'لا توجد رسائل بعد' : `${f} نامە`),
+  newReply: 'وەڵامی نوێ',
 };
 
 export const WARRANTY_STRINGS: Record<Language, WarrantyStrings> = { ar, en, ckb };

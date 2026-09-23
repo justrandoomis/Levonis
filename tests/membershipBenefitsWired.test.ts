@@ -528,6 +528,47 @@ test('an order-scoped rule is deducted once, after the subtotal, and the totals 
   assert.equal(q.total_iqd, expected, 'the on-screen arithmetic adds up');
 });
 
+/**
+ * ONE PER-ORDER CEILING FOR THE WHOLE ORDER. The admin's `per_order` and the
+ * cart's «الخصم بحد أقصى لكل طلب» mean the order; the engine used to apply
+ * the ceiling to each line, so two printers under one rule got it twice.
+ */
+test('a per-order ceiling over two different printers is spent once, and the snapshot adds up to it', async () => {
+  const { raw, db } = setup();
+  raw.exec(`INSERT INTO products (id,slug,name,name_ar,price_iqd,status,stock,options,colors,selling_type,sale_types,preorder_transports,images,category_id,sub_category_id)
+    VALUES ('p_x1','mb-x1','Bambu X1','بامبو X1',1000000,'active',20,'[]','[]','direct_sale','["direct_sale"]','[]','[]','mb_printers','mb_bambu')`);
+  const admin = appAs(db, 'boss', 'admin');
+  const created = await json(
+    await send(admin, 'POST', '/api/admin/membership-benefits', { ...PRINTER_RULE, max_discount_iqd: 150_000, cap_scope: 'per_order' })
+  );
+  assert.equal(created.success, true, JSON.stringify(created));
+
+  cartLine(raw, 'ci_big', 'promem', 'p_a1', 1);
+  cartLine(raw, 'ci_small', 'promem', 'p_x1', 1);
+  const pro = appAs(db, 'promem', 'customer');
+
+  const cart = await json(await send(pro, 'GET', '/api/cart'));
+  // Line by line this was min(185,000, 150,000) + min(100,000, 150,000) = 250,000.
+  assert.equal(cart.membership.discount_total_iqd, 150_000, 'one ceiling, not one per printer');
+  assert.equal(cart.membership.order_discount_iqd, 150_000);
+
+  const quote = await json(await send(pro, 'POST', '/api/orders/quote', checkoutBody('a_pro')));
+  const q = quote.quote;
+  assert.equal(q.membership_benefits.order_discount_iqd, 150_000);
+  assert.equal(q.total_iqd, q.subtotal_iqd - 150_000 + q.shipping.total_iqd + q.cod_tax_iqd);
+
+  const placed = await json(await send(pro, 'POST', '/api/orders', orderBody('a_pro')));
+  assert.equal(placed.success, true, JSON.stringify(placed));
+  await Promise.all(pending.splice(0));
+  const order = raw.prepare('SELECT * FROM orders WHERE id = ?').get(placed.order.id) as Record<string, unknown>;
+  assert.equal(order.membership_discount_iqd, 150_000);
+  const snap = JSON.parse(String(order.benefit_snapshot));
+  const lineSum = (snap.lines as Array<{ total_iqd: number }>).reduce((n, l) => n + l.total_iqd, 0);
+  assert.equal(lineSum, 150_000, 'the per-line figures the order froze reconcile with its total');
+  const items = raw.prepare('SELECT membership_discount_iqd AS d FROM order_items WHERE order_id = ?').all(placed.order.id) as Array<{ d: number }>;
+  assert.equal(items.reduce((n, r) => n + Number(r.d ?? 0), 0), 150_000, 'and so do the order items');
+});
+
 test('the cash-on-delivery tax is calculated in full, then exempted, and BOTH numbers survive', async () => {
   const { raw, db } = setup();
   cartLine(raw, 'ci_tax', 'promem', 'p_a1', 1);
@@ -730,7 +771,20 @@ test('the recommended starting values are a starting point, not a decision', asy
   // owner's real taxonomy, which is why it cannot live in a migration.
   const admin = appAs(db, 'boss', 'admin');
 
-  const first = await json(await send(admin, 'POST', '/api/admin/membership-benefits/recommended'));
+  // Opening the list writes nothing: the dialog is a preview.
+  const preview = await json(await send(admin, 'GET', '/api/admin/membership-benefits/recommended'));
+  assert.equal(preview.success, true, JSON.stringify(preview));
+  assert.ok(preview.entries.length > 0);
+  const countRules = () =>
+    (raw.prepare("SELECT COUNT(*) AS n FROM membership_benefit_rules WHERE benefit_type = 'product_discount'").get() as { n: number }).n;
+  assert.equal(countRules(), 0, 'the preview created nothing');
+  // A bare POST — the old one-click path — is refused and writes nothing.
+  const bare = await send(admin, 'POST', '/api/admin/membership-benefits/recommended');
+  assert.equal(bare.status, 400);
+  assert.equal(countRules(), 0);
+
+  const keys = preview.entries.map((e: { key: string }) => e.key);
+  const first = await json(await send(admin, 'POST', '/api/admin/membership-benefits/recommended', { keys }));
   assert.equal(first.success, true, JSON.stringify(first));
   assert.ok(first.created.length > 0, 'the seeded taxonomy has printers and materials');
   const printers = first.created.find((r: { label: string }) => r.label.includes('PRO'));
@@ -738,7 +792,7 @@ test('the recommended starting values are a starting point, not a decision', asy
   assert.equal(printers.benefit_type, 'product_discount');
 
   // Run it twice: it offers, it does not overwrite.
-  const again = await json(await send(admin, 'POST', '/api/admin/membership-benefits/recommended'));
+  const again = await json(await send(admin, 'POST', '/api/admin/membership-benefits/recommended', { keys }));
   assert.equal(again.created.length, 0);
   assert.ok(again.skipped.every((s: { reason: string }) => s.reason !== 'UNKNOWN'));
   const rows = raw.prepare("SELECT COUNT(*) AS n FROM membership_benefit_rules WHERE benefit_type = 'product_discount'").get() as { n: number };
@@ -752,7 +806,7 @@ test('the recommended starting values are a starting point, not a decision', asy
     })
   );
   assert.equal(edited.success, true);
-  await send(admin, 'POST', '/api/admin/membership-benefits/recommended');
+  await send(admin, 'POST', '/api/admin/membership-benefits/recommended', { keys });
   const after = raw.prepare('SELECT percent FROM membership_benefit_rules WHERE id = ?').get(printers.id) as { percent: number };
   assert.equal(after.percent, 3, 'the action never overwrites a decision');
 });
@@ -817,4 +871,252 @@ test('a scheduled offer is not credited to the membership either', async () => {
     0,
     'the offer is the offer’s saving; the membership took nothing further off'
   );
+});
+
+/* ------------------------------------ the owner's figures, and one section rule */
+
+test('the recommended PREMIUM printers rule is the owner’s 25,000 per unit', async () => {
+  const { db } = setup();
+  const admin = appAs(db, 'boss', 'admin');
+  const keys = (await json(await send(admin, 'GET', '/api/admin/membership-benefits/recommended'))).entries.map(
+    (e: { key: string }) => e.key
+  );
+  const out = await json(await send(admin, 'POST', '/api/admin/membership-benefits/recommended', { keys }));
+  const premium = out.created.find((r: { tier: string; label: string }) => r.tier === 'prime' && r.label.includes('طابعات'));
+  assert.ok(premium, JSON.stringify(out));
+  assert.equal(premium.discount_mode, 'fixed');
+  assert.equal(premium.fixed_iqd, 25_000);
+  assert.equal(premium.max_discount_iqd, 25_000);
+  assert.equal(premium.cap_scope, 'per_unit');
+});
+
+test('only the owner’s printer figures go live; every other suggestion lands switched off', async () => {
+  const { raw, db } = setup();
+  const admin = appAs(db, 'boss', 'admin');
+  const preview = await json(await send(admin, 'GET', '/api/admin/membership-benefits/recommended'));
+  const byKey = new Map(preview.entries.map((e: { key: string; rule: { enabled: boolean } }) => [e.key, e]));
+  assert.ok(byKey.has('pro-printers') && byKey.has('pro-accessories'), JSON.stringify(preview));
+  // The dialog names the section in words, from the store's own taxonomy.
+  assert.ok((byKey.get('pro-printers') as { category_name_ar: string }).category_name_ar);
+
+  // Confirm ONLY the accessories suggestion: nothing else is written.
+  const out = await json(await send(admin, 'POST', '/api/admin/membership-benefits/recommended', { keys: ['pro-accessories'] }));
+  assert.deepEqual(out.created.map((r: { label: string }) => r.label), ['PRO — إكسسوارات']);
+  const rows = raw
+    .prepare("SELECT label, enabled FROM membership_benefit_rules WHERE benefit_type = 'product_discount'")
+    .all() as Array<{ label: string; enabled: number }>;
+  assert.deepEqual(rows.map((r) => [r.label, r.enabled]), [['PRO — إكسسوارات', 0]], 'a guess is created switched off, and alone');
+
+  const rest = await json(
+    await send(admin, 'POST', '/api/admin/membership-benefits/recommended', { keys: ['pro-printers', 'premium-printers'] })
+  );
+  assert.ok(rest.created.every((r: { enabled: boolean }) => r.enabled === true), 'the owner’s two figures are live');
+});
+
+/** A PRO product rule with the owner's printer terms, as the product editor writes it. */
+const productRule = (productId: string, over: Record<string, unknown> = {}) => ({
+  ...PRINTER_RULE,
+  scope: 'product',
+  category_id: null,
+  product_id: productId,
+  label: null,
+  ...over,
+});
+
+function withSecondPrinter(raw: DatabaseSync) {
+  raw.exec(`INSERT INTO products (id,slug,name,name_ar,price_iqd,status,stock,options,colors,selling_type,sale_types,preorder_transports,images,category_id,sub_category_id)
+    VALUES ('p_x1','mb-x1','Bambu X1','بامبو X1',1000000,'active',20,'[]','[]','direct_sale','["direct_sale"]','[]','[]','mb_printers','mb_fdm')`);
+}
+
+test('identical per-product rules in one section become ONE section rule, in one audited batch', async () => {
+  const { raw, db } = setup();
+  withSecondPrinter(raw);
+  const admin = appAs(db, 'boss', 'admin');
+  const a = await json(await send(admin, 'POST', '/api/admin/membership-benefits', productRule('p_a1')));
+  const b = await json(await send(admin, 'POST', '/api/admin/membership-benefits', productRule('p_x1')));
+  // A different offer on another section is a different group.
+  await send(admin, 'POST', '/api/admin/membership-benefits', productRule('p_pla', { percent: 20, max_discount_iqd: null, cap_scope: null }));
+
+  cartLine(raw, 'ci_a', 'promem', 'p_a1', 1);
+  const pro = appAs(db, 'promem', 'customer');
+  const priceBefore = (await json(await send(pro, 'GET', '/api/cart'))).items[0].unit_price_iqd;
+  assert.equal(priceBefore, 1_750_000);
+
+  const plan = await json(await send(admin, 'GET', '/api/admin/membership-benefits/consolidation'));
+  assert.equal(plan.success, true, JSON.stringify(plan));
+  assert.equal(plan.product_rule_count, 3);
+  const printers = plan.groups.find((g: { category_id: string }) => g.category_id === 'mb_printers');
+  assert.deepEqual(printers.rule_ids, [a.rule.id, b.rule.id].sort());
+  assert.equal(printers.mode, 'create');
+  assert.equal(printers.category_name_ar, 'طابعات');
+  assert.deepEqual(
+    [printers.terms.percent, printers.terms.max_discount_iqd, printers.terms.cap_scope],
+    [10, 100_000, 'per_unit']
+  );
+
+  const versionsBefore = (raw.prepare('SELECT COUNT(*) AS n FROM membership_benefit_versions').get() as { n: number }).n;
+  const done = await json(
+    await send(admin, 'POST', '/api/admin/membership-benefits/consolidation', { key: printers.key, rule_ids: printers.rule_ids })
+  );
+  assert.equal(done.success, true, JSON.stringify(done));
+
+  const left = raw
+    .prepare("SELECT id, scope, category_id, percent, max_discount_iqd, cap_scope FROM membership_benefit_rules WHERE benefit_type = 'product_discount' ORDER BY scope")
+    .all() as Array<Record<string, unknown>>;
+  assert.deepEqual(
+    left.map((r) => [r.scope, r.category_id]),
+    [['category', 'mb_printers'], ['product', null]],
+    'one section rule for the printers; the filament rule is untouched'
+  );
+  assert.equal(left[0]!.id, done.created_rule_id);
+  const versionsAfter = (raw.prepare('SELECT COUNT(*) AS n FROM membership_benefit_versions').get() as { n: number }).n;
+  assert.equal(versionsAfter - versionsBefore, 1, 'ONE configuration version for the whole conversion');
+  const version = raw.prepare('SELECT * FROM membership_benefit_versions ORDER BY id DESC LIMIT 1').get() as Record<string, string>;
+  assert.equal(version.action, 'consolidate');
+  assert.equal(version.rule_id, done.created_rule_id);
+  assert.equal(JSON.parse(version.before_json).length, 2, 'the product rules it deleted');
+  // The snapshot IS the rule set now in force — not an intermediate one, and
+  // the new rule is the row actually inserted, not a copy of a product rule.
+  const snap = JSON.parse(version.rules_json) as Array<Record<string, unknown>>;
+  const live = raw.prepare('SELECT id FROM membership_benefit_rules').all() as Array<{ id: string }>;
+  assert.deepEqual(snap.map((r) => r.id).sort(), live.map((r) => r.id).sort());
+  const snapRule = snap.find((r) => r.id === done.created_rule_id)!;
+  assert.equal(snapRule.scope, 'category');
+  assert.equal('notes' in snapRule, false, 'no product rule’s note carried over');
+  assert.deepEqual(
+    [snapRule.percent, snapRule.max_discount_iqd, snapRule.cap_scope, snapRule.enabled],
+    [10, 100_000, 'per_unit', true]
+  );
+  const summary = raw.prepare("SELECT * FROM audit_log WHERE action = 'membership_benefit.consolidate'").all();
+  assert.equal(summary.length, 1);
+  const perRule = raw.prepare("SELECT action FROM audit_log WHERE action IN ('membership_benefit.create','membership_benefit.delete') AND detail LIKE '%consolidation%'").all();
+  assert.equal(perRule.length, 3, 'an audit row per rule changed');
+
+  // The price a PRO member pays did not move.
+  const priceAfter = (await json(await send(pro, 'GET', '/api/cart'))).items[0].unit_price_iqd;
+  assert.equal(priceAfter, priceBefore);
+
+  // A second press, with the list it was shown, is refused and writes nothing.
+  const again = await send(admin, 'POST', '/api/admin/membership-benefits/consolidation', { key: printers.key, rule_ids: printers.rule_ids });
+  assert.equal(again.status, 409);
+  assert.equal((await json(again)).code, 'CONSOLIDATION_STALE');
+});
+
+test('a product a sub-section rule would reprice keeps its own rule, and order-wide limits are not folded', async () => {
+  const { raw, db } = setup();
+  withSecondPrinter(raw);
+  const admin = appAs(db, 'boss', 'admin');
+  const a = await json(await send(admin, 'POST', '/api/admin/membership-benefits', productRule('p_a1')));
+  const b = await json(await send(admin, 'POST', '/api/admin/membership-benefits', productRule('p_x1')));
+  // p_a1 is filed under mb_bambu: without its product rule this 5% would win.
+  await send(admin, 'POST', '/api/admin/membership-benefits', {
+    ...PRINTER_RULE, scope: 'sub_category', category_id: 'mb_printers', sub_category_id: 'mb_bambu', percent: 5,
+  });
+  const plan = await json(await send(admin, 'GET', '/api/admin/membership-benefits/consolidation'));
+  const printers = plan.groups.find((g: { category_id: string }) => g.category_id === 'mb_printers');
+  assert.deepEqual(printers.rule_ids, [b.rule.id]);
+  assert.deepEqual(printers.kept_rule_ids, [a.rule.id]);
+
+  // A per-order ceiling is one budget per rule: folding two into one would halve it.
+  const { raw: raw2, db: db2 } = setup();
+  withSecondPrinter(raw2);
+  const admin2 = appAs(db2, 'boss', 'admin');
+  const perOrder = { max_discount_iqd: 150_000, cap_scope: 'per_order' };
+  await send(admin2, 'POST', '/api/admin/membership-benefits', productRule('p_a1', perOrder));
+  await send(admin2, 'POST', '/api/admin/membership-benefits', productRule('p_x1', perOrder));
+  const plan2 = await json(await send(admin2, 'GET', '/api/admin/membership-benefits/consolidation'));
+  const blocked = plan2.groups.find((g: { category_id: string }) => g.category_id === 'mb_printers');
+  assert.equal(blocked.mode, 'blocked');
+  assert.equal(blocked.reason, 'ORDER_WIDE_LIMIT');
+  const refused = await send(admin2, 'POST', '/api/admin/membership-benefits/consolidation', { key: blocked.key, rule_ids: blocked.rule_ids });
+  assert.equal(refused.status, 409);
+  const count = (raw2.prepare("SELECT COUNT(*) AS n FROM membership_benefit_rules WHERE scope = 'product'").get() as { n: number }).n;
+  assert.equal(count, 2, 'nothing was written');
+});
+
+test('a switched-off section rule neither blocks the conversion nor hides an identical live one', async () => {
+  const { raw, db } = setup();
+  withSecondPrinter(raw);
+  const admin = appAs(db, 'boss', 'admin');
+  await send(admin, 'POST', '/api/admin/membership-benefits', productRule('p_a1'));
+  await send(admin, 'POST', '/api/admin/membership-benefits', productRule('p_x1'));
+  // An old, disabled section rule with other figures: it prices nothing.
+  const off = await json(await send(admin, 'POST', '/api/admin/membership-benefits', { ...PRINTER_RULE, percent: 3, enabled: false }));
+  assert.equal(off.success, true, JSON.stringify(off));
+  const plan = await json(await send(admin, 'GET', '/api/admin/membership-benefits/consolidation'));
+  const printers = plan.groups.find((g: { category_id: string }) => g.category_id === 'mb_printers');
+  assert.equal(printers.mode, 'create', JSON.stringify(printers));
+  assert.equal(printers.reason, null);
+  const done = await send(admin, 'POST', '/api/admin/membership-benefits/consolidation', { key: printers.key, rule_ids: printers.rule_ids });
+  assert.equal(done.status, 200);
+
+  // A live DIFFERENT rule listed before a live IDENTICAL one: the identical
+  // one makes the product rules redundant; the conversion only deletes them.
+  const { raw: raw2, db: db2 } = setup();
+  withSecondPrinter(raw2);
+  const admin2 = appAs(db2, 'boss', 'admin');
+  await send(admin2, 'POST', '/api/admin/membership-benefits', productRule('p_a1'));
+  await send(admin2, 'POST', '/api/admin/membership-benefits', productRule('p_x1'));
+  // (An offer whose window has closed: enabled, different, and pricing nothing.)
+  raw2.exec(`INSERT INTO membership_benefit_rules (id,tier,benefit_type,scope,category_id,discount_mode,percent,valid_until,enabled,priority)
+    VALUES ('mbr_a_other','pro','product_discount','category','mb_printers','percent',20,'2000-01-01T00:00:00.000Z',1,0)`);
+  raw2.exec(`INSERT INTO membership_benefit_rules (id,tier,benefit_type,scope,category_id,discount_mode,percent,max_discount_iqd,cap_scope,enabled,priority)
+    VALUES ('mbr_z_same','pro','product_discount','category','mb_printers','percent',10,100000,'per_unit',1,0)`);
+  const plan2 = await json(await send(admin2, 'GET', '/api/admin/membership-benefits/consolidation'));
+  const g2 = plan2.groups.find((g: { category_id: string }) => g.category_id === 'mb_printers');
+  assert.equal(g2.mode, 'delete_only', JSON.stringify(g2));
+  assert.equal(g2.existing_rule_id, 'mbr_z_same');
+});
+
+test('two admins converting the same group at once leave ONE section rule', async () => {
+  const { raw, db } = setup();
+  withSecondPrinter(raw);
+  const admin = appAs(db, 'boss', 'admin');
+  const a = await json(await send(admin, 'POST', '/api/admin/membership-benefits', productRule('p_a1')));
+  await send(admin, 'POST', '/api/admin/membership-benefits', productRule('p_x1'));
+  const plan = await json(await send(admin, 'GET', '/api/admin/membership-benefits/consolidation'));
+  const printers = plan.groups.find((g: { category_id: string }) => g.category_id === 'mb_printers');
+  const versionsBefore = (raw.prepare('SELECT COUNT(*) AS n FROM membership_benefit_versions').get() as { n: number }).n;
+
+  // The other admin's conversion lands between this request's plan and its
+  // batch: a live section rule appears, and the product rules are gone.
+  const d1 = db as unknown as { batch: (s: unknown[]) => Promise<unknown> };
+  const realBatch = d1.batch.bind(d1);
+  d1.batch = async (statements) => {
+    d1.batch = realBatch;
+    raw.exec(`INSERT INTO membership_benefit_rules (id,tier,benefit_type,scope,category_id,discount_mode,percent,max_discount_iqd,cap_scope,enabled,priority)
+      VALUES ('mbr_other_admin','pro','product_discount','category','mb_printers','percent',10,100000,'per_unit',1,0)`);
+    raw.exec("DELETE FROM membership_benefit_rules WHERE scope = 'product'");
+    return realBatch(statements);
+  };
+  const res = await send(admin, 'POST', '/api/admin/membership-benefits/consolidation', { key: printers.key, rule_ids: printers.rule_ids });
+  assert.equal(res.status, 409, await res.clone().text());
+  assert.equal((await json(res)).code, 'CONSOLIDATION_STALE');
+  const sections = raw.prepare("SELECT id FROM membership_benefit_rules WHERE scope = 'category' AND category_id = 'mb_printers'").all();
+  assert.deepEqual(sections.map((r) => r.id), ['mbr_other_admin'], 'no second section rule');
+  const versionsAfter = (raw.prepare('SELECT COUNT(*) AS n FROM membership_benefit_versions').get() as { n: number }).n;
+  assert.equal(versionsAfter, versionsBefore, 'the whole batch rolled back');
+
+  // A product rule EDITED in the meantime is not deleted under its new terms.
+  const { raw: raw2, db: db2 } = setup();
+  withSecondPrinter(raw2);
+  const admin2 = appAs(db2, 'boss', 'admin');
+  const b1 = await json(await send(admin2, 'POST', '/api/admin/membership-benefits', productRule('p_a1')));
+  await send(admin2, 'POST', '/api/admin/membership-benefits', productRule('p_x1'));
+  const plan2 = await json(await send(admin2, 'GET', '/api/admin/membership-benefits/consolidation'));
+  const g2 = plan2.groups.find((g: { category_id: string }) => g.category_id === 'mb_printers');
+  const d2 = db2 as unknown as { batch: (s: unknown[]) => Promise<unknown> };
+  const realBatch2 = d2.batch.bind(d2);
+  d2.batch = async (statements) => {
+    d2.batch = realBatch2;
+    raw2.prepare('UPDATE membership_benefit_rules SET percent = 12 WHERE id = ?').run(b1.rule.id);
+    return realBatch2(statements);
+  };
+  const res2 = await send(admin2, 'POST', '/api/admin/membership-benefits/consolidation', { key: g2.key, rule_ids: g2.rule_ids });
+  assert.equal(res2.status, 409);
+  const kept = raw2.prepare('SELECT percent FROM membership_benefit_rules WHERE id = ?').get(b1.rule.id) as { percent: number };
+  assert.equal(kept.percent, 12, 'the edited rule survives');
+  const sections2 = raw2.prepare("SELECT COUNT(*) AS n FROM membership_benefit_rules WHERE scope = 'category'").get() as { n: number };
+  assert.equal(sections2.n, 0, 'and no section rule was left behind');
+  void a;
 });

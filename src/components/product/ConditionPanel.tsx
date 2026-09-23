@@ -64,7 +64,7 @@ const STRINGS = {
     grade: 'دۆخ',
     hours: 'کاتژمێری بەکارهێنان',
     hoursUnit: 'کاتژمێر',
-    warranty: 'زەمانەتی لیڤۆنیس',
+    warranty: 'زەمانەتی Levonis',
     months: (n: number) => (n === 1 ? 'مانگێک' : `${n} مانگ`),
     fault: 'کێشەکەی چی بوو',
     repair: 'چی کرا',

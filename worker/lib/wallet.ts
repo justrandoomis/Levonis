@@ -73,6 +73,57 @@ export async function credit(
   return id;
 }
 
+/**
+ * An approved USD CREDIT that records the dinars it was worth (migration 0108)
+ * — the shape a return refund and a price-protection credit write.
+ *
+ * WHY THE DINARS TRAVEL. A refund of 50,000 د.ع is 3,571 cents at 1,400, and
+ * 3,571 cents read back as 49,994: the customer was shown «+49,994» for a
+ * refund of 50,000, and — because the order's wallet debit had recorded its
+ * dinars — ended the round trip six dinars poorer than before they ordered.
+ * With `amount_iqd` beside the cents, 0108's remainder term restores the six,
+ * and the row reads exactly what was refunded.
+ *
+ * `ledgerDinars` is `walletLedgerDinarsReady(db)`, asked by the caller: on a
+ * database behind on 0108 the two columns are left out entirely rather than
+ * aborting the insert. A plain VALUES insert with a deterministic id, so a
+ * retried credit fails on the PRIMARY KEY and the caller reads that as the
+ * replay it is. The pair travels together or not at all.
+ */
+export function walletCreditStatement(
+  db: D1Database,
+  ledgerDinars: boolean,
+  p: {
+    id: string;
+    userId: string;
+    cents: number;
+    note: string;
+    ref: string;
+    nowIso: string;
+    amountIqd: number;
+    rate: number;
+    createdBy?: 'admin' | 'system';
+  }
+): D1PreparedStatement {
+  const withDinars =
+    ledgerDinars && Number.isInteger(p.amountIqd) && p.amountIqd > 0 && Number.isInteger(p.rate) && p.rate > 0;
+  const createdBy = p.createdBy ?? 'admin';
+  if (!withDinars) {
+    return db
+      .prepare(
+        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
+         VALUES (?, ?, 'deposit', 'USD', ?, 'approved', ?, ?, ?, ?)`
+      )
+      .bind(p.id, p.userId, p.cents, p.note, p.ref, createdBy, p.nowIso);
+  }
+  return db
+    .prepare(
+      `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at, amount_iqd, exchange_rate_snapshot)
+       VALUES (?, ?, 'deposit', 'USD', ?, 'approved', ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(p.id, p.userId, p.cents, p.note, p.ref, createdBy, p.nowIso, p.amountIqd, p.rate);
+}
+
 export function walletTxPublic(t: Record<string, unknown>) {
   return {
     id: t.id,
@@ -88,5 +139,27 @@ export function walletTxPublic(t: Record<string, unknown>) {
     hasReceipt: !!t.receipt_key,
     receiptUrl: t.receipt_key ? `/files/${t.receipt_key}` : null,
     ref: t.ref,
+    /**
+     * THE DINARS THIS ROW RECORDED (migration 0108) and the rate beside them,
+     * or null for a row that recorded none — and on a database that has not
+     * run 0108, where `SELECT *` simply has no such key.
+     *
+     * Every kind of row, not only the two the wallet list used to know about:
+     * a 50,000 د.ع checkout debit, a return refund, a membership charge and an
+     * admin credit all record their dinars now, and the list printed each of
+     * them as its cents converted back — «−IQD 49,994» beside a header that
+     * said 50,000. A reader prints this when it is present and converts the
+     * cents only when it is not; the pair travels together or not at all.
+     */
+    amount_iqd: positiveInt(t.amount_iqd) !== null && positiveInt(t.exchange_rate_snapshot) !== null ? positiveInt(t.amount_iqd) : null,
+    exchange_rate_snapshot:
+      positiveInt(t.amount_iqd) !== null && positiveInt(t.exchange_rate_snapshot) !== null
+        ? positiveInt(t.exchange_rate_snapshot)
+        : null,
   };
+}
+
+function positiveInt(v: unknown): number | null {
+  const n = typeof v === 'number' ? v : v === null || v === undefined || v === '' ? NaN : Number(v);
+  return Number.isInteger(n) && n > 0 ? n : null;
 }

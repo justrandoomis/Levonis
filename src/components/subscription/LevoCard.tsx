@@ -1,139 +1,111 @@
 /**
- * The membership card at the top of /subscription.
+ * The Levo card — drawn small, as the object it is.
+ *
+ * Two sizes of the same face. `CardArt` is the tier's card at a glance (the
+ * tier cards, the checkout bar, the success state): the tier's own face, its
+ * mark, a hairline where the number goes — no chip drawing, no glass layers,
+ * no glow. `LevoCard` is the member's own card in the header: the same face
+ * with their name, the twelve-digit Levo ID behind an eye toggle, and the tier.
  *
  * Cosmetic, and honest about it: the number is derived from the account id
- * (twelve digits in three groups — see cardNumber.ts), the tier and the
- * expiry come from the memberships ledger, and a guest's card carries no name
- * and no number so it cannot look like an account they already have.
+ * (twelve digits in three groups — see cardNumber.ts), the tier comes from
+ * the memberships ledger, and nothing here is sent anywhere.
  */
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
-import { dateLocale } from '../orders/format';
-import { cardNumberFor, maskCardNumber, CARD_PLACEHOLDER } from './cardNumber';
-import { FREE_FACE, TIER_META, isPaidTier, type AnyTier } from './tierMeta';
+import { cardNumberFor, maskCardNumber } from './cardNumber';
+import { TIER_META, type PaidTier } from './tierMeta';
 
-export interface LevoCardProps {
-  user: { id: string; name?: string | null; username?: string | null } | null;
-  tier: AnyTier;
-  expiresAt: string | null;
+const ART_SIZE = {
+  xs: 'w-9 h-[23px] rounded-[5px]',
+  sm: 'w-14 h-[35px] rounded-[7px]',
+  md: 'w-[4.5rem] h-[2.85rem] rounded-[9px]',
+  lg: 'w-44 h-[6.95rem] rounded-[14px]',
+} as const;
+
+/** A tier's card face at a glance. Decorative: the name is always said beside it. */
+export function CardArt({ tier, size = 'sm', className = '' }: { tier: PaidTier; size?: keyof typeof ART_SIZE; className?: string }) {
+  const meta = TIER_META[tier];
+  const big = size === 'lg';
+  return (
+    <span
+      aria-hidden
+      data-card-art={tier}
+      className={`relative block shrink-0 overflow-hidden border ${ART_SIZE[size]} ${meta.cardFace} ${className}`}
+      style={{ borderColor: `${meta.hex}59` }}
+    >
+      <meta.Icon className={`absolute ${big ? 'top-3 start-3 w-5 h-5' : 'top-[18%] start-[12%] w-[26%] h-[40%]'}`} style={{ color: meta.hex }} />
+      {big && (
+        // No dir here: on a positioned element `end` follows the element's own
+        // direction, and an LTR label would land on the icon in Arabic.
+        <span className="absolute top-3 end-3 text-[11px] font-extrabold text-white/85">{meta.label}</span>
+      )}
+      <span className="absolute bottom-[18%] start-[12%] end-[34%] h-[6%] min-h-[2px] rounded-full bg-white/20" />
+    </span>
+  );
 }
 
-export function LevoCard({ user, tier, expiresAt }: LevoCardProps) {
-  const { t, loc, lang } = useLanguage();
+export interface LevoCardProps {
+  user: { id: string; name?: string | null; username?: string | null };
+  tier: PaidTier;
+}
+
+/** The member's own card, compact. */
+export function LevoCard({ user, tier }: LevoCardProps) {
+  const { t } = useLanguage();
   const m = useMotion();
   const [show, setShow] = useState(false);
-
-  const full = user ? cardNumberFor(user.id) : CARD_PLACEHOLDER;
-  const masked = user ? maskCardNumber(full) : CARD_PLACEHOLDER;
-  const meta = isPaidTier(tier) ? TIER_META[tier] : null;
-  const face = meta ? meta.cardFace : FREE_FACE.cardFace;
-  const dot = meta ? meta.dot : FREE_FACE.dot;
-
-  const validThru = (() => {
-    if (!expiresAt || !meta) return '';
-    const d = new Date(expiresAt);
-    if (Number.isNaN(d.getTime())) return '';
-    return new Intl.DateTimeFormat(dateLocale(lang), { month: '2-digit', year: '2-digit' }).format(d);
-  })();
+  const meta = TIER_META[tier];
+  const full = cardNumberFor(user.id);
+  const masked = maskCardNumber(full);
 
   return (
-    <div className="w-full max-w-sm">
-      <div
-        data-levo-card={tier}
-        className={`relative border border-white/20 rounded-[24px] p-5 sm:p-6 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] overflow-hidden aspect-[1.58/1] flex flex-col justify-between w-full ${face}`}
-        style={meta ? { boxShadow: `0 20px 40px -15px rgba(0,0,0,0.5), 0 0 0 1px ${meta.hex}22 inset` } : undefined}
-      >
-        {/* Glass reflections */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
-        <div className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent opacity-50 rounded-t-[24px] pointer-events-none" />
+    <div
+      data-levo-card={tier}
+      className={`relative shrink-0 w-[10.5rem] sm:w-[15.5rem] aspect-[1.58/1] rounded-[14px] sm:rounded-[18px] border p-3 sm:p-3.5 flex flex-col justify-between overflow-hidden ${meta.cardFace}`}
+      style={{ borderColor: `${meta.hex}59` }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="flex items-center gap-1.5 min-w-0">
+          <meta.Icon className="w-4 h-4 shrink-0" style={{ color: meta.hex }} aria-hidden />
+          <span className="text-[13px] font-extrabold text-white" dir="ltr">
+            {meta.label}
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={() => setShow((v) => !v)}
+          aria-pressed={show}
+          aria-label={show ? t('hideCardNumber') : t('showCardNumber')}
+          className="shrink-0 -m-2 w-11 h-11 flex items-center justify-center text-white/70 hover:text-white rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          {show ? <EyeOff className="w-4 h-4" aria-hidden /> : <Eye className="w-4 h-4" aria-hidden />}
+        </button>
+      </div>
 
-        <div className="flex justify-between items-start z-10 gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-olive-light to-black flex items-center justify-center text-white font-bold text-sm shadow-[inset_0_2px_4px_rgba(255,255,255,0.2)]">
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'L'}
-            </div>
-            {/* A guest reads this page to decide whether to join, so the card
-                must not wear a name — an invented handle looks like an account
-                they already have. */}
-            <span className="font-bold text-white text-[17px] drop-shadow-sm truncate">
-              {user?.name || loc('بطاقة العضوية', 'Membership card', 'کارتی ئەندامێتی')}
-            </span>
-          </div>
-          {user && (
-            <button
-              type="button"
-              onClick={() => setShow((v) => !v)}
-              aria-pressed={show}
-              aria-label={show ? t('hideCardNumber') : t('showCardNumber')}
-              className="shrink-0 w-10 h-10 flex items-center justify-center text-zinc-300 hover:text-white transition-colors rounded-full bg-white/5 hover:bg-white/10 press-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/70"
-            >
-              {show ? <EyeOff className="w-5 h-5" aria-hidden /> : <Eye className="w-5 h-5" aria-hidden />}
-            </button>
-          )}
-        </div>
-
-        <div className="z-10 mt-3 flex items-center justify-between">
-          <svg viewBox="0 0 40 30" className="w-10 h-8 opacity-80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-            <rect width="40" height="30" rx="4" fill="#D4AF37" fillOpacity="0.8" />
-            <path d="M10 0V30 M20 0V30 M30 0V30 M0 10H40 M0 20H40" stroke="#B8860B" strokeWidth="1" />
-            <path d="M5 5 H15 V15 H5 Z" stroke="#B8860B" strokeWidth="1" fill="none" />
-          </svg>
-        </div>
-
+      <div>
         {/* Twelve digits in three groups: fits the card at 360px with room to spare. */}
-        <div className="z-10 mt-3 relative h-8 flex items-center" dir="ltr">
+        <div className="relative h-6" dir="ltr">
           <AnimatePresence mode="wait" initial={false}>
             <motion.p
               key={show ? 'full' : 'masked'}
               data-card-number
-              initial={{ opacity: 0, y: m.travel(8) }}
+              initial={{ opacity: 0, y: m.travel(6) }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: m.travel(-8) }}
+              exit={{ opacity: 0, y: m.travel(-6) }}
               transition={m.spring('quick')}
-              className="font-mono text-[clamp(17px,5.2vw,22px)] tracking-[0.12em] whitespace-nowrap text-white absolute inset-x-0 drop-shadow-md tabular-nums"
+              className="absolute inset-x-0 font-mono text-[13px] sm:text-[15px] whitespace-nowrap text-white tabular-nums"
             >
               {show ? full : masked}
             </motion.p>
           </AnimatePresence>
         </div>
-        <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1 z-10" dir="ltr">
-          {t('levoId')}
+        <p className="mt-0.5 text-[11px] text-white/60 truncate">
+          {user.name || (user.username ? `@${user.username}` : t('levoId'))}
         </p>
-
-        <div className="flex justify-between items-end z-10 mt-auto gap-3">
-          <div className="min-w-0">
-            <p className="text-white font-bold text-[15px] mb-1 drop-shadow-sm truncate">
-              {user?.username ? `@${user.username}` : loc('لست مشتركًا بعد', 'Not a member yet', 'هێشتا ئەندام نیت')}
-            </p>
-            <div className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${dot}`} aria-hidden />
-              <p className="text-xs text-zinc-400 font-medium">
-                {t('tierWord')}: <span className={meta ? `${meta.text} font-bold` : 'text-zinc-300'}>{meta ? meta.label : t('freeLabel')}</span>
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-2 shrink-0">
-            {validThru && (
-              <div className="flex flex-col items-end">
-                <p className="text-zinc-400 text-[9px] font-bold uppercase tracking-[0.1em] mb-0.5 opacity-80">{t('validThru')}</p>
-                <p className="text-white font-mono text-[11px] tracking-wider tabular-nums" dir="ltr">{validThru}</p>
-              </div>
-            )}
-            <div className="flex flex-col items-end">
-              <p className="text-zinc-400 text-[9px] font-bold uppercase tracking-[0.2em] mb-0.5">{t('status')}</p>
-              <p
-                className={`text-[11px] font-bold px-2 py-0.5 rounded-md border shadow-sm ${
-                  meta ? 'bg-white/10 text-white border-white/20' : 'bg-zinc-800/50 text-zinc-400 border-zinc-700/50'
-                }`}
-              >
-                {meta ? t('active') : t('freeLabel')}
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -30,6 +30,7 @@ import {
 import { useLanguage } from '../LanguageContext';
 import { ApiError } from '../lib/api';
 import { merchantApi, iqd, type MerchantMe } from '../lib/merchant';
+import { useCommunityAccess } from './community/access';
 import {
   Btn, Card, Empty, Notice, Spinner, Stat, Toggle, useMainSiteHref,
 } from '../components/merchant/dashboard/ui';
@@ -239,6 +240,9 @@ export default function MerchantDashboardPage() {
 function OverviewTab({ canSell, go }: { canSell: boolean; go: (t: Tab) => void }) {
   const { loc } = useLanguage();
   const mainHref = useMainSiteHref();
+  // The request board is Levo Community (DECISIONS 110): while it is shut to
+  // this merchant the link would land on the maintenance card, so it hides.
+  const { access: communityAccess } = useCommunityAccess();
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [custom, setCustom] = useState<{ to_start: number; in_progress: number; awaiting_customer: number } | null>(null);
   const [error, setError] = useState('');
@@ -327,13 +331,15 @@ function OverviewTab({ canSell, go }: { canSell: boolean; go: (t: Tab) => void }
               <Hammer className="w-3.5 h-3.5" />
               {loc('خدماتك', 'Your services', 'خزمەتگوزاریەکانت')}
             </Btn>
-            <a
-              href={mainHref('/requests')}
-              className="h-9 rounded-xl border border-white/10 bg-white/[0.03] flex items-center justify-center gap-1.5 text-[12.5px] font-bold text-zinc-300"
-            >
-              <ClipboardList className="w-3.5 h-3.5" />
-              {loc('طلبات الزبائن', 'Customer requests', 'داواکاری کڕیاران')}
-            </a>
+            {communityAccess?.may_enter !== false && (
+              <a
+                href={mainHref('/requests')}
+                className="h-9 rounded-xl border border-white/10 bg-white/[0.03] flex items-center justify-center gap-1.5 text-[12.5px] font-bold text-zinc-300"
+              >
+                <ClipboardList className="w-3.5 h-3.5" />
+                {loc('طلبات الزبائن', 'Customer requests', 'داواکاری کڕیاران')}
+              </a>
+            )}
             <a
               href={mainHref('/chats')}
               className="h-9 rounded-xl border border-white/10 bg-white/[0.03] flex items-center justify-center gap-1.5 text-[12.5px] font-bold text-zinc-300"

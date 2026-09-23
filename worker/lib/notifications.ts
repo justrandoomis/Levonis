@@ -59,7 +59,23 @@ export type NotificationKind =
    * into a thread the reporter cannot open is not an answer, so this row is
    * where they actually read it — behind their own login, carrying the text.
    */
-  | 'complaint_reply';
+  | 'complaint_reply'
+  /**
+   * «رد من فريق الضمان» — staff wrote in a warranty claim's thread
+   * (worker/routes/devices.ts → worker/lib/engagementNotify.ts). Added for the
+   * owner's own sentence: «لا يرسل الإشعار إلى المستخدم بأن هناك رسالة جديدة
+   * تخص الضمان». The claim thread had the same silence the ticket thread had
+   * before `support_reply`: the ADMIN group heard every customer reply, and
+   * the customer heard nothing back.
+   */
+  | 'warranty_reply'
+  /**
+   * «تحديث على مطالبة الضمان» — the claim moved a stage (diagnosing, a
+   * decision, repair, replacement, closed). A decision with its reason is the
+   * one message a claimant is waiting for, and the admin queue recorded it in
+   * the audit log and nowhere the claimant could see without looking.
+   */
+  | 'warranty_stage';
 
 export interface NotificationInput {
   userId: string;
@@ -79,9 +95,9 @@ export interface NotificationInput {
    * customer is being told to go and buy. 'product' is here because
    * 'stock_back' is above, and 'complaint' because 'complaint_reply' is —
    * widened in the same commit as the kind, which is what this paragraph
-   * asks for.
+   * asks for. 'claim' arrived with 'warranty_reply' and 'warranty_stage'.
    */
-  entity_type?: 'request' | 'offer' | 'order' | 'review' | 'product' | 'ticket' | 'complaint' | '';
+  entity_type?: 'request' | 'offer' | 'order' | 'review' | 'product' | 'ticket' | 'complaint' | 'claim' | '';
   entity_id?: string;
   meta?: Record<string, unknown>;
   /** Unique per user. Empty means "no replay protection wanted". */

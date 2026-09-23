@@ -304,9 +304,17 @@ function minutesLabel(mins: number, loc: Loc): string {
 export default function PrintRequestWizard({
   onCreated,
   onCancel,
+  initialLink,
 }: {
   onCreated: (requestId: string) => void;
   onCancel: () => void;
+  /**
+   * A model link the customer already pasted into the price calculator
+   * (src/pages/Tools.tsx, «أرسله طلب طباعة»). The wizard opens on the link
+   * source with it filled in and checks it straight away, instead of making
+   * them paste it a second time.
+   */
+  initialLink?: string;
 }) {
   const { loc, lang } = useLanguage();
 
@@ -434,13 +442,13 @@ export default function PrintRequestWizard({
     if (fileInput.current) fileInput.current.value = '';
   }
 
-  async function checkLink() {
-    if (!linkUrl.trim()) return;
+  async function checkLink(raw: string = linkUrl) {
+    if (!raw.trim()) return;
     setLinkBusy(true);
     setError('');
     try {
       const d = await api.post<{ link: ParsedLink; info: LinkInfo }>('/api/marketplace/print/link', {
-        url: linkUrl.trim(),
+        url: raw.trim(),
       });
       setLink(d);
       setCoverFailed(false);
@@ -454,6 +462,20 @@ export default function PrintRequestWizard({
       setLinkBusy(false);
     }
   }
+
+  // The calculator's link, taken once: the wizard starts on the link source
+  // with it filled in and already checked.
+  const initialLinkTaken = useRef(false);
+  useEffect(() => {
+    if (initialLinkTaken.current || !initialLink?.trim()) return;
+    initialLinkTaken.current = true;
+    setSource('link');
+    setLinkUrl(initialLink.trim());
+    void checkLink(initialLink.trim());
+    // Once, on arrival — `checkLink` is re-created every render and the link
+    // must not be re-checked each time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLink]);
 
   // ------------------------------------------------------- create + measure
 
@@ -929,7 +951,7 @@ export default function PrintRequestWizard({
                 <button
                   type="button"
                   data-wizard="link-check"
-                  onClick={checkLink}
+                  onClick={() => void checkLink()}
                   disabled={linkBusy || !linkUrl.trim() || !!requestId}
                   className="shrink-0 px-4 min-h-[48px] rounded-2xl bg-olive text-white text-[12.5px] font-bold flex items-center gap-1.5 disabled:opacity-40"
                 >

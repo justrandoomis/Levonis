@@ -17,6 +17,7 @@ import {
 import { useLanguage } from '../../../LanguageContext';
 import { api, ApiError } from '../../../lib/api';
 import { useStore } from '../../../StoreContext';
+import { useCommunityAccess } from '../../../pages/community/access';
 import {
   merchantApi, communityOrdersApi, iqd,
   type CommunityOrderRow, type MerchantCoupon,
@@ -299,7 +300,7 @@ function communityStateLabel(k: string, loc: Loc): string {
     case 'in_progress': return loc('قيد التنفيذ', 'In progress', 'لە جێبەجێکردندایە');
     case 'merchant_marked_delivered': return loc('بانتظار تأكيد الزبون', 'Awaiting customer confirmation', 'چاوەڕوانی کڕیار');
     case 'completed': return loc('مكتمل — تم تحويل المبلغ', 'Completed — funds released', 'تەواو');
-    case 'disputed': return loc('نزاع — بيد ليفونيس', 'Disputed — with Levonis', 'ناکۆکی');
+    case 'disputed': return loc('نزاع — بيد Levonis', 'Disputed — with Levonis', 'ناکۆکی');
     case 'cancelled': return loc('ملغي', 'Cancelled', 'هەڵوەشێنراوە');
     case 'refunded': return loc('مسترجع', 'Refunded', 'گەڕێنراوەتەوە');
     case 'accepted': return loc('مقبول', 'Accepted', 'پەسەندکراو');
@@ -315,6 +316,10 @@ function communityStateLabel(k: string, loc: Loc): string {
 export function CustomOrdersTab() {
   const { loc } = useLanguage();
   const mainHref = useMainSiteHref();
+  // The request board is Levo Community (DECISIONS 110): while it is shut to
+  // this merchant, browsing it would land on the maintenance card. Funded
+  // orders below keep running — their routes stay open.
+  const { access: communityAccess } = useCommunityAccess();
   const [orders, setOrders] = useState<CommunityOrderRow[] | null>(null);
   const [busy, setBusy] = useState('');
 
@@ -330,14 +335,16 @@ export function CustomOrdersTab() {
 
   return (
     <div className="space-y-3">
-      <a
-        href={mainHref('/requests')}
-        className="w-full h-10 rounded-xl border border-gold/30 bg-gold/10 text-gold font-bold text-[12.5px] flex items-center justify-center gap-2"
-      >
-        <Hammer className="w-4 h-4" />
-        {loc('تصفح طلبات الزبائن وقدّم عروضك', 'Browse customer requests and make offers', 'داواکاریەکان ببینە و ئۆفەر بدە')}
-        <ExternalLink className="w-3.5 h-3.5" />
-      </a>
+      {communityAccess?.may_enter !== false && (
+        <a
+          href={mainHref('/requests')}
+          className="w-full h-10 rounded-xl border border-gold/30 bg-gold/10 text-gold font-bold text-[12.5px] flex items-center justify-center gap-2"
+        >
+          <Hammer className="w-4 h-4" />
+          {loc('تصفح طلبات الزبائن وقدّم عروضك', 'Browse customer requests and make offers', 'داواکاریەکان ببینە و ئۆفەر بدە')}
+          <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      )}
 
       {!orders.length && (
         <Empty

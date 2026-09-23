@@ -1,0 +1,48 @@
+-- ============================================================================
+--  0110 — A CONVERSATION CAN CARRY A VOICE NOTE AND A DOCUMENT, AND SAY WHICH.
+-- ============================================================================
+-- NONDESTRUCTIVE: one nullable ADD COLUMN on `chat_messages`. Nothing is
+-- dropped, no existing CHECK is touched, and NO ROW IS BACKFILLED — every
+-- message written before this applies reads `attachment_kind IS NULL`, which
+-- the read path already answers from the `kind` column it always had.
+--
+-- ---------------------------------------------------------------------------
+--  WHY
+-- ---------------------------------------------------------------------------
+-- «كاميرا/ملف/بصمة صوتية في المحادثة» — the owner asked for all three in the
+-- order chat. The camera already worked. The other two could not be stored
+-- honestly: `chat_messages.kind` carries `CHECK (kind IN ('text','image'))`
+-- from 0001_init, so a voice note or a PDF had exactly two homes — refused, or
+-- written as `kind='image'`, which is a lie every reader then renders as a
+-- broken picture. (A chat VIDEO has been in that second home since the upload
+-- route began admitting clips for `purpose='chat'`.)
+--
+-- ---------------------------------------------------------------------------
+--  WHY A SECOND COLUMN AND NOT A WIDER CHECK
+-- ---------------------------------------------------------------------------
+-- SQLite cannot alter a CHECK in place. Widening it means rebuilding the table
+-- — copy, drop, rename — on live rows that every conversation on the platform
+-- reads, and this project does not rebuild live tables to add a value. A new
+-- nullable column with its own CHECK is additive: SQLite evaluates an ADD
+-- COLUMN's CHECK against new writes only, and NULL satisfies it.
+--
+-- So `kind` keeps its two old meanings — 'image' for anything the legacy
+-- readers should draw from `file_key`, 'text' otherwise — and this column says
+-- what the attachment REALLY is:
+--
+--   image  a picture                        (kind = 'image')
+--   video  a clip                           (kind = 'image', as before)
+--   audio  a voice note                     (kind = 'text', body = '')
+--   file   a document, PDF today            (kind = 'text', body = '')
+--
+-- An old client that reads only `kind` therefore shows a voice note or a PDF
+-- as an empty text bubble — never as a broken image — and the current clients
+-- read `attachment_kind` (worker/routes/chats.ts returns it as the message's
+-- kind).
+--
+-- `file_key` keeps the 0001 contract: the R2 KEY, never a URL, filed under
+-- `chat/<chat_id>/…` so the delivery route's one membership check covers it.
+-- ============================================================================
+
+ALTER TABLE chat_messages
+  ADD COLUMN attachment_kind TEXT CHECK (attachment_kind IN ('image','video','audio','file'));

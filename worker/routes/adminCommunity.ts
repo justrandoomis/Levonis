@@ -35,7 +35,10 @@ import {
 import { canMoveOffer, type OfferState } from '../lib/communityStates';
 import { chunk } from '../lib/inventory';
 import { notifyComplaintReply } from '../lib/engagementNotify';
+import { headMediaObject, isSafeMediaKey } from '../lib/mediaStorage';
+import { maskPhone, normalizePhone } from '../lib/phone';
 import { refreshMerchantRating } from './merchantReviews';
+import { COMPLAINT_AWAITS_DESK_SQL } from './adminChats';
 
 export const adminCommunityRoutes = new Hono<AppContext>();
 adminCommunityRoutes.use('*', requireAdmin);
@@ -210,6 +213,45 @@ adminCommunityRoutes.get('/gate', async (c) => {
     allowed_user_ids: gate.allowed,
     members,
     key: COMMUNITY_GATE_SETTING_KEY,
+  });
+});
+
+/**
+ * FIND THE TESTER — by name, username, email, PHONE or the exact user id.
+ *
+ * The panel used GET /api/admin/users?search=, which matches email, username
+ * and name only. A phone-registered account carries a placeholder email and
+ * keeps its number solely in `users.phone_e164`, so the one tester the owner
+ * knows by phone number could not be found, and a pasted `usr_…` id matched
+ * nothing either. This answers all of those in one bounded query: the typed
+ * phone goes through the same normaliser sign-in uses (07xx…, +964…, 964…,
+ * Arabic-Indic digits), and the number comes back MASKED — enough for the
+ * owner to recognise the person, not a directory of phone numbers.
+ */
+adminCommunityRoutes.get('/gate/lookup', async (c) => {
+  const q = (c.req.query('q') ?? '').trim().slice(0, 120);
+  if (q.length < 2) return c.json({ success: true, users: [] });
+  const phone = normalizePhone(q);
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, username, name, email, phone_e164 FROM users
+      WHERE id = ?1
+         OR lower(email) = lower(?1)
+         OR (?2 <> '' AND phone_e164 = ?2)
+         OR ${sqlLikeClause(['email', 'username', 'name'], '?3')}
+      ORDER BY (id = ?1) DESC, (?2 <> '' AND phone_e164 = ?2) DESC, created_at DESC
+      LIMIT 20`
+  )
+    .bind(q, phone ?? '', likePattern(q))
+    .all<{ id: string; username: string | null; name: string | null; email: string | null; phone_e164: string | null }>();
+  return c.json({
+    success: true,
+    users: results.map((u) => ({
+      id: u.id,
+      username: u.username,
+      name: u.name,
+      email: u.email,
+      phone_masked: u.phone_e164 ? maskPhone(u.phone_e164) : null,
+    })),
   });
 });
 
@@ -726,11 +768,27 @@ adminCommunityRoutes.post('/merchants/:id/reputation', async (c) => {
 
 // -------------------------------------------------------------- complaints
 
+/**
+ * The address and the element a complaint attachment renders as, beside the
+ * raw row. Staff may read every `complaints/` key (worker/routes/uploads.ts),
+ * so the key itself stays on the admin payload; `file_url` and `kind` spare
+ * the console from re-deriving what the reporter's thread is already told.
+ */
+function withComplaintFile(m: Record<string, unknown>): Record<string, unknown> {
+  const key = typeof m.file_key === 'string' && m.file_key ? m.file_key : null;
+  return {
+    ...m,
+    file_url: key ? `/files/${key}` : null,
+    kind: !key ? 'text' : key.split('/')[2] === 'video' ? 'video' : 'image',
+  };
+}
+
 adminCommunityRoutes.get('/complaints', async (c) => {
   const status = c.req.query('status') || '';
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 50 });
   const { results } = await c.env.DB.prepare(
-    `SELECT ct.*, r.name AS reporter_name, m.name AS merchant_name
+    `SELECT ct.*, r.name AS reporter_name, m.name AS merchant_name,
+            CASE WHEN ${COMPLAINT_AWAITS_DESK_SQL} THEN 1 ELSE 0 END AS awaiting_reply
        FROM community_complaints ct
        JOIN users r ON r.id = ct.reporter_id
        LEFT JOIN community_merchants m ON m.id = ct.merchant_id
@@ -773,7 +831,7 @@ adminCommunityRoutes.get('/complaints/:id', async (c) => {
   return c.json({
     success: true,
     complaint,
-    messages: messages.results,
+    messages: messages.results.map(withComplaintFile),
     escrow,
     escrow_events: events.results,
   });
@@ -834,7 +892,18 @@ adminCommunityRoutes.post('/complaints/:id/messages', async (c) => {
   const admin = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const text = str(body.body, 'body', { min: 1, max: 4000 });
+  /**
+   * A PHOTOGRAPH IS AN ANSWER TOO. `file_key` has been on this table since
+   * migration 0031 and nothing ever wrote it, so the desk could not send back
+   * the picture of the replacement part or the courier's receipt — the thing
+   * that settles most disputes faster than a paragraph. The key must be THIS
+   * complaint's (`complaints/<id>/…`, filed there by the upload route after
+   * it checked the complaint exists) and actually stored; with a file the text
+   * becomes optional, without one it is required as before.
+   */
+  const rawKey = body.fileKey;
+  const hasFile = rawKey !== undefined && rawKey !== null && rawKey !== '';
+  const text = str(body.body, 'body', { min: hasFile ? 0 : 1, max: 4000, required: !hasFile });
   const internal = body.internal === true;
 
   const complaint = await c.env.DB.prepare('SELECT id, status FROM community_complaints WHERE id = ?')
@@ -842,12 +911,25 @@ adminCommunityRoutes.post('/complaints/:id/messages', async (c) => {
     .first<{ id: string; status: string }>();
   if (!complaint) throw notFound('Complaint not found');
 
+  let fileKey: string | null = null;
+  if (hasFile) {
+    if (!isSafeMediaKey(rawKey) || !rawKey.startsWith(`complaints/${id}/`)) {
+      throw badRequest('That file does not belong to this complaint');
+    }
+    const folder = rawKey.split('/')[2] ?? '';
+    if (folder !== 'attachments' && folder !== 'video') throw badRequest('Invalid file reference');
+    if (!(await headMediaObject(c.env, 'private', rawKey))) {
+      throw badRequest('That attachment was not uploaded — attach it again', 'ATTACHMENT_NOT_FOUND');
+    }
+    fileKey = rawKey;
+  }
+
   const messageId = newId('cmsg');
   await c.env.DB.prepare(
-    `INSERT INTO community_complaint_messages (id, complaint_id, sender_id, sender_role, body, internal)
-     VALUES (?,?,?,'admin',?,?)`
+    `INSERT INTO community_complaint_messages (id, complaint_id, sender_id, sender_role, body, file_key, internal)
+     VALUES (?,?,?,'admin',?,?,?)`
   )
-    .bind(messageId, id, admin.id, text, internal ? 1 : 0)
+    .bind(messageId, id, admin.id, text, fileKey, internal ? 1 : 0)
     .run();
 
   // The complaint itself moved in the sense that matters to a queue sorted by
@@ -856,7 +938,7 @@ adminCommunityRoutes.post('/complaints/:id/messages', async (c) => {
     .bind(nowIso(), id)
     .run();
 
-  await audit(c.env.DB, admin.id, 'admin.complaint_message', id, { internal, length: text.length });
+  await audit(c.env.DB, admin.id, 'admin.complaint_message', id, { internal, length: text.length, file: !!fileKey });
 
   /**
    * AND THE PERSON IS TOLD — WHICH IS THE HALF THAT MAKES THIS A REPLY.
@@ -896,7 +978,7 @@ adminCommunityRoutes.post('/complaints/:id/messages', async (c) => {
     .bind(messageId)
     .first<Record<string, unknown>>();
 
-  return c.json({ success: true, message });
+  return c.json({ success: true, message: message ? withComplaintFile(message) : message });
 });
 
 // ------------------------------------------------------------- settlement

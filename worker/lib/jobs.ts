@@ -11,6 +11,7 @@ import { sweepDueStages } from './orderStageOps';
 import type { SweepReport } from './orderStageOps';
 import { alwaseetDriver } from './delivery/alwaseet';
 import { sweepDeliveryStatuses } from './delivery/sync';
+import { sweepDeliveredOrdersWithoutUnits, type DeliveredUnitsSweep } from './deviceOps';
 import { getSetting } from './settings';
 import { sweepExpiredOrders } from './orderExpirySweep';
 import type { OrderExpiryReport } from './orderExpirySweep';
@@ -30,14 +31,7 @@ import {
 } from './stockAlerts';
 import { runGuardedMediaCleanup } from './mediaRefs';
 import { checkSchemaDrift, type DriftAlarmReport } from './schemaDriftAlarm';
-import {
-  INDEX_STAMP,
-  planSearchIndex,
-  SEARCH_INDEX_STALE_SQL,
-  searchDocColumns,
-  searchDocsForRows,
-  searchIndexInstalled,
-} from './search/store';
+import { backfillSearchIndex, searchIndexInstalled } from './search/store';
 
 /**
  * Durable scheduled jobs (final-phase §11): one entrypoint the Worker wires
@@ -120,6 +114,12 @@ export interface DurableJobsReport {
    * owner has mapped that status.
    */
   delivery_sync: { configured: boolean; scanned: number; moved: number; unmapped: number; errors: number };
+  /**
+   * Delivered printer orders that never got device units (delivered by the
+   * courier before its door created them) — deviceOps.ts
+   * `sweepDeliveredOrdersWithoutUnits`. Empty once the history is repaired.
+   */
+  delivered_units: DeliveredUnitsSweep;
   /** PRO BNPL accounts whose oldest unpaid instalment passed its due date. */
   bnpl_overdue: BnplOverdueReport;
   /** Seven-day system ratings; these never create reward records. */
@@ -209,6 +209,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     gini_holds: { scanned: 0, cancelled: 0, skipped: 0, errors: 0 },
     cancelled_order_retention: { retention_days: 30, scanned: 0, deleted: 0, skipped: 0, errors: 0 },
     delivery_sync: { configured: false, scanned: 0, moved: 0, unmapped: 0, errors: 0 },
+    delivered_units: { scanned: 0, orders: 0, created: 0, errors: 0 },
     bnpl_overdue: { scanned: 0, overdue: 0, suspended: 0 },
     automatic_reviews: { scanned: 0, created: 0, skipped: 0 },
     stock_alerts: { scanned: 0, matched: 0, notified: 0, dead: 0, deferred: 0 },
@@ -329,28 +330,17 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     // cron run until the migration lands, which is noise in the one place an
     // operator looks for real failures.
     if (!(await searchIndexInstalled(env.DB))) return;
-    const { results } = await env.DB.prepare(
-      `SELECT ${searchDocColumns('p')}
-         FROM products p
-        WHERE p.status = 'active'
-          AND ${SEARCH_INDEX_STALE_SQL}
-        ORDER BY p.id
-        LIMIT 50`
-    )
-      .bind(INDEX_STAMP)
-      .all<Record<string, unknown>>();
-    if (!results || results.length === 0) return;
-
-    // THE SAME DOCUMENT THE SAVE PATH WRITES, from the same builder. This
-    // step used to compose its own, and the copy it composed had no
-    // `variantNames` — so a product the cron indexed carried no option or
-    // colour names, and «كومبو» (an OPTION name here, never part of a product
-    // name) found only the products the owner had re-saved by hand since the
-    // index shipped. Two writers of one index must not be two documents.
-    const stmts: D1PreparedStatement[] = [];
-    for (const doc of await searchDocsForRows(env.DB, results)) stmts.push(...planSearchIndex(env.DB, doc));
-    if (stmts.length > 0) await env.DB.batch(stmts);
-    report.search_indexed = results.length;
+    // THE SAME DOCUMENT THE SAVE PATH WRITES, from the same builder — see
+    // `backfillSearchIndex`. It commits in small groups and marks a product it
+    // cannot write, so ONE bad product is reported here and skipped rather
+    // than failing the whole fifty and being selected first again next run,
+    // which is how a single row could have stopped the backfill for good.
+    const run = await backfillSearchIndex(env.DB, { limit: 50 });
+    report.search_indexed = run.indexed;
+    for (const f of run.failed) {
+      console.error(`search index: product ${f.id} could not be indexed:`, f.error);
+      report.errors.push(`search_index_backfill: ${f.id}: ${f.error.slice(0, 160)}`);
+    }
   });
 
   // 4. Prune consumed/long-expired email-verification tokens.
@@ -506,6 +496,14 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     report.delivery_sync = {
       configured: true, scanned: r.scanned, moved: r.moved, unmapped: r.unmapped, errors: r.errors,
     };
+  });
+
+  // 12b. After the courier sync: any delivered printer order still without
+  //      device units gets them, clocked from its recorded delivered_at — the
+  //      orders delivered before the courier door created units, which the
+  //      sync itself never revisits. Bounded; an empty pass once repaired.
+  await step('delivered_units', async () => {
+    report.delivered_units = await sweepDeliveredOrdersWithoutUnits(env, 50);
   });
 
   // 13. Enforce overdue PRO BNPL balances. This is an account-credit action,

@@ -285,7 +285,9 @@ test('the «!» is a disclosure, not a tooltip, because the owner works on an iP
 test('the points control kept every guard it had when it was a card', () => {
   const block = CHECKOUT.slice(at(CHECKOUT, "loc('استخدام النقاط', 'Use points', 'بەکارهێنانی خاڵ')"));
   assert.ok(block.includes('checked={usePoints}'));
-  assert.ok(block.includes('onChange={() => setUsePoints((v) => !v)}'));
+  // The toggle also marks the re-quote it causes as the customer's own, so
+  // that wait may hold the screen (src/lib/busy.ts, `createIntentMark`).
+  assert.match(block, /onChange=\{\(\) => \{\s*customerQuote\.mark\(\);\s*setUsePoints\(\(v\) => !v\);\s*\}\}/);
   assert.ok(
     block.includes('disabled={(quote?.points.balance ?? pointBalance) === 0}'),
     'an empty balance must still refuse the switch'

@@ -359,6 +359,8 @@ interface PreviewResponse {
   file_issues: Array<{ line: number; severity: string; message: string }>;
   rows: PreviewRow[];
   summary: { total: number; create: number; update: number; failed: number };
+  /** Brands the confirm will ADD rather than refuse the rows naming them. */
+  brands_to_create?: Array<{ name: string; slug: string }>;
   note: string;
 }
 
@@ -596,7 +598,7 @@ export default function ImportPanel({
     if (!file && !pasted.trim()) { setErr(t.pickFileFirst); return; }
     setBusy('check');
     try {
-      setCheck(isTable ? await checkTable(file!, sectionId) : await checkTxt(file, pasted, t));
+      setCheck(isTable ? await checkTable(file!, sectionId, t) : await checkTxt(file, pasted, t));
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : String(e));
       setCheck(null);
@@ -991,7 +993,7 @@ export default function ImportPanel({
 // -------------------------------------------------------------- lane: table
 
 /** CSV and ZIP: one POST to the preview endpoint, normalised. */
-async function checkTable(file: File, sectionId: string): Promise<CheckResult> {
+async function checkTable(file: File, sectionId: string, t: Strings): Promise<CheckResult> {
   const form = new FormData();
   form.set('file', file);
   form.set('category', sectionId);
@@ -1001,7 +1003,9 @@ async function checkTable(file: File, sectionId: string): Promise<CheckResult> {
     format: file.name.toLowerCase().endsWith('.zip') ? 'zip' : 'csv',
     importId: res.import_id,
     unknownColumns: res.unknown_columns ?? [],
-    notes: [],
+    // The same line the TXT check shows for a brand it will add — once per
+    // brand at the top, however many rows name it (each row also says so).
+    notes: (res.brands_to_create ?? []).map((b) => `${t.create}: ${t.lkBrand} «${b.name}» → ${b.slug}`),
     fileIssues: (res.file_issues ?? []).map((i) =>
       readIssueText(i.message, { severity: i.severity === 'warning' ? 'warning' : 'error', columns, line: i.line })
     ),

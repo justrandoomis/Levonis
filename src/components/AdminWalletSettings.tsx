@@ -1,7 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useWallet, PaymentMethod } from '../WalletContext';
-import { api, ApiError } from '../lib/api';
-import { Check, Edit2, Plus, Trash2, Video, DollarSign, CreditCard, Save, AlertTriangle, Truck, ArrowUpFromLine } from 'lucide-react';
+import RoundingDriftTool from './adminWallet/RoundingDriftTool';
+import { api, ApiError, formatIqd, type PayoutMethod } from '../lib/api';
+import { Check, Edit2, Plus, Trash2, Video, DollarSign, CreditCard, Save, AlertTriangle, Truck, ArrowUpFromLine, Banknote } from 'lucide-react';
+
+/**
+ * THE OWNER TYPES A PERCENT — «عمولة سحب 3% قابلة للتغيير من لوحة الإدارة».
+ *
+ * The engine stores basis points (300 = 3%) so 2.5% needs no float, and that
+ * stays true; what changes is what a human is asked to type. «300 bps» is a
+ * unit nobody in the shop uses, and a 3 typed into a basis-point box is a
+ * 0.03% commission nobody notices until the payouts are wrong. So the box
+ * takes «3» or «2.5», and this converts: at most two decimals (the resolution
+ * basis points have), 0 switches the commission off, 50% is the ceiling the
+ * server enforces (`MAX_WITHDRAWAL_FEE_BPS`). Anything else is null — refused
+ * in the form, never rounded into a number the owner did not type.
+ */
+export function feePercentToBps(input: string): number | null {
+  const t = input.trim().replace(',', '.').replace(/%$/, '').trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
+  const bps = Math.round(Number(t) * 100);
+  return Number.isInteger(bps) && bps >= 0 && bps <= 5000 ? bps : null;
+}
+
+/** 300 → «3», 250 → «2.5», 0 → «0» — the inverse the box is seeded with. */
+export function feeBpsToPercent(bps: number): string {
+  const n = Number(bps);
+  if (!Number.isFinite(n) || n < 0) return '0';
+  return String(Math.round(n) / 100);
+}
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -35,6 +62,7 @@ export default function AdminWalletSettings() {
     codTaxPerBlockIqd, codTaxBlockIqd, setCodTaxRate,
     adVideoUrl, setAdVideoUrl,
     paymentMethods, updatePaymentMethods,
+    settings, refreshSettings,
     isLoaded,
   } = useWallet();
 
@@ -68,9 +96,25 @@ export default function AdminWalletSettings() {
    * at the moment it is filed, exactly as an order stores cod_tax_iqd, so
    * raising the rate today cannot re-price a request already on the books.
    */
-  const [feeBpsInput, setFeeBpsInput] = useState<string>('');
+  const [feePctInput, setFeePctInput] = useState<string>('');
   const [feeState, setFeeState] = useState<SaveState>('idle');
   const [feeError, setFeeError] = useState<string | null>(null);
+
+  /**
+   * THE WITHDRAWAL CHANNELS — «كي كارد، الرافدين، زين كاش، استلام كاش».
+   *
+   * A list of their own, not the deposit methods: a deposit method is the
+   * SHOP's account a customer pays into, with a number and a copy button; a
+   * payout channel is where the CUSTOMER is paid, and «استلام كاش» has no
+   * account at all. Each row is a name and one switch — does paying through
+   * it need the customer's account or card number? The server resolves the
+   * same flag from the same setting when a request is filed, and freezes the
+   * name onto it (migration 0112), so renaming a channel here never rewrites
+   * a request already on the books.
+   */
+  const [payouts, setPayouts] = useState<PayoutMethod[]>([]);
+  const [payoutState, setPayoutState] = useState<SaveState>('idle');
+  const [payoutError, setPayoutError] = useState<string | null>(null);
 
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [methodsState, setMethodsState] = useState<SaveState>('idle');
@@ -88,7 +132,8 @@ export default function AdminWalletSettings() {
     setCodBlockInput(String(codTaxBlockIqd));
     setUrlInput(adVideoUrl);
     setMethods(paymentMethods);
-  }, [isLoaded, exchangeRate, adVideoUrl, paymentMethods]);
+    setPayouts(settings?.payoutMethods ?? []);
+  }, [isLoaded, exchangeRate, adVideoUrl, paymentMethods, settings]);
 
   // Keep untouched sections in sync when the context refreshes (e.g. after a save elsewhere).
   useEffect(() => {
@@ -110,6 +155,10 @@ export default function AdminWalletSettings() {
     if (!hydratedRef.current) return;
     if (methodsState === 'idle' || methodsState === 'saved') setMethods(paymentMethods);
   }, [paymentMethods]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (payoutState === 'idle' || payoutState === 'saved') setPayouts(settings?.payoutMethods ?? []);
+  }, [settings?.payoutMethods]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSaveRate = async () => {
     const parsed = parseInt(rateInput, 10);
@@ -167,7 +216,7 @@ export default function AdminWalletSettings() {
     api
       .get<{ fee_bps: number }>('/api/wallet/admin/withdrawal-fee')
       .then((r) => {
-        if (alive) setFeeBpsInput(String(Number(r.fee_bps) || 0));
+        if (alive) setFeePctInput(feeBpsToPercent(Number(r.fee_bps) || 0));
       })
       .catch(() => undefined);
     return () => {
@@ -175,9 +224,11 @@ export default function AdminWalletSettings() {
     };
   }, []);
 
-  const feeBpsParsed = parseInt(feeBpsInput, 10);
-  const feeSample =
-    Number.isFinite(feeBpsParsed) && feeBpsParsed >= 0 ? Math.floor((100_000 * feeBpsParsed) / 10_000) : 0;
+  const feeBpsParsed = feePctInput.trim() === '' ? null : feePercentToBps(feePctInput);
+  // The worked example in DINARS, the unit the owner and the customer both
+  // think in — the same floor the server applies to the typed figure.
+  const SAMPLE_IQD = 100_000;
+  const feeSample = feeBpsParsed !== null ? Math.floor((SAMPLE_IQD * feeBpsParsed) / 10_000) : 0;
 
   /**
    * 0 is a REAL value and switches the commission off, the same thing a
@@ -185,9 +236,9 @@ export default function AdminWalletSettings() {
    * missing field.
    */
   const handleSaveFee = async () => {
-    if (!Number.isFinite(feeBpsParsed) || feeBpsParsed < 0 || feeBpsParsed > 5000) {
+    if (feeBpsParsed === null) {
       setFeeState('error');
-      setFeeError('Enter basis points between 0 and 5000 (300 = 3%; 0 switches the commission off)');
+      setFeeError('Enter a percent between 0 and 50, at most two decimals (3 = 3%; 0 switches the commission off)');
       return;
     }
     setFeeState('saving');
@@ -199,6 +250,44 @@ export default function AdminWalletSettings() {
       setFeeState('error');
       setFeeError(e instanceof ApiError ? e.message : 'Save failed');
     }
+  };
+
+  const savePayouts = async (next: PayoutMethod[]) => {
+    const cleaned = next
+      .map((m) => ({ ...m, name: m.name.trim() }))
+      .filter((m) => m.name !== '');
+    if (cleaned.length === 0) {
+      setPayoutState('error');
+      setPayoutError('Keep at least one payout channel with a name — customers cannot withdraw without one.');
+      return;
+    }
+    setPayoutState('saving');
+    setPayoutError(null);
+    try {
+      await api.put('/api/admin/settings/payoutMethods', { value: cleaned });
+      await refreshSettings();
+      setPayouts(cleaned);
+      setPayoutState('saved');
+    } catch (e) {
+      setPayoutState('error');
+      setPayoutError(e instanceof ApiError ? e.message : 'Save failed');
+    }
+  };
+
+  const updatePayout = (id: string, patch: Partial<PayoutMethod>) => {
+    setPayouts((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+    setPayoutState('dirty');
+  };
+
+  const addPayout = () => {
+    setPayouts((ps) => [...ps, { id: `po_${Date.now().toString(36)}`, name: '', requires_account: true }]);
+    setPayoutState('dirty');
+  };
+
+  const removePayout = (id: string) => {
+    if (!window.confirm('Remove this payout channel? Requests already filed through it keep its name.')) return;
+    setPayouts((ps) => ps.filter((p) => p.id !== id));
+    setPayoutState('dirty');
   };
 
   const handleSaveUrl = async () => {
@@ -358,16 +447,18 @@ export default function AdminWalletSettings() {
             <h3 className="text-lg font-bold text-white">Withdrawal Commission</h3>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-bold text-zinc-400">Rate in basis points (300 = 3%)</label>
+            <label htmlFor="withdrawal-fee-percent" className="text-sm font-bold text-zinc-400">Commission (percent of the requested amount)</label>
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">
                 <input
-                  type="number"
-                  value={feeBpsInput}
-                  onChange={(e) => { setFeeBpsInput(e.target.value); setFeeState('dirty'); }}
+                  id="withdrawal-fee-percent"
+                  type="text"
+                  inputMode="decimal"
+                  value={feePctInput}
+                  onChange={(e) => { setFeePctInput(e.target.value); setFeeState('dirty'); }}
                   className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-[#6B46FF]/50"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">bps</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">%</span>
               </div>
               <button
                 onClick={handleSaveFee}
@@ -378,9 +469,8 @@ export default function AdminWalletSettings() {
               </button>
             </div>
             <p className="text-[11px] text-zinc-400 tabular-nums" dir="ltr">
-              1,000.00 USD requested → commission {(feeSample / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })},
-              net {((100_000 - feeSample) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} reaches the customer,
-              1,000.00 leaves their balance.
+              {formatIqd(SAMPLE_IQD)} requested → commission {formatIqd(feeSample)}, net {formatIqd(SAMPLE_IQD - feeSample)} reaches
+              the customer, {formatIqd(SAMPLE_IQD)} leaves their balance.
             </p>
             <p className="text-[11px] text-zinc-500">
               Deducted from the requested amount, never added on top. Requests already filed keep
@@ -420,6 +510,82 @@ export default function AdminWalletSettings() {
             <SaveStatus state={urlState} error={urlError} />
           </div>
         </div>
+      </div>
+
+      {/* WITHDRAWAL PAYOUT CHANNELS — where a customer's withdrawal is paid.
+          Not the deposit methods below: those are the shop's own accounts. */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm" data-admin="payout-methods">
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+              <Banknote className="w-5 h-5 text-emerald-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">Withdrawal Payout Channels</h3>
+              <p className="text-xs text-zinc-400">
+                What a customer can choose to be paid through when they withdraw. Names are shown to customers exactly as typed.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={addPayout}
+              disabled={!isLoaded}
+              className="flex items-center gap-1 bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
+            >
+              <Plus className="w-4 h-4" /> Add Channel
+            </button>
+            <button
+              onClick={() => savePayouts(payouts)}
+              disabled={payoutState === 'saving' || !isLoaded || payoutState === 'idle' || payoutState === 'saved'}
+              className="flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-black px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" /> Save
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {payouts.map((p) => (
+            <div
+              key={p.id}
+              className="flex flex-col sm:flex-row sm:items-center gap-3 bg-zinc-800/50 border border-zinc-700/50 p-3 rounded-2xl"
+            >
+              <input
+                type="text"
+                value={p.name}
+                onChange={(e) => updatePayout(p.id, { name: e.target.value })}
+                placeholder="Channel name, e.g. زين كاش"
+                aria-label="Channel name"
+                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 text-white px-3 py-2 rounded-lg"
+              />
+              <label className="flex items-center gap-2 text-sm text-zinc-300 shrink-0 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={p.requires_account}
+                  onChange={(e) => updatePayout(p.id, { requires_account: e.target.checked })}
+                  className="w-4 h-4 accent-[#2CE59B]"
+                />
+                Needs the customer&apos;s account / card number
+              </label>
+              <button
+                onClick={() => removePayout(p.id)}
+                aria-label={`Remove ${p.name || 'channel'}`}
+                className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-500 transition-colors self-end sm:self-auto"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          {payouts.length === 0 && (
+            <div className="text-center text-zinc-500 py-6 text-sm">{isLoaded ? 'No payout channels.' : 'Loading...'}</div>
+          )}
+        </div>
+        <p className="text-[11px] text-zinc-500 mt-3">
+          Untick the account box for a channel paid without one, such as cash pickup («استلام كاش»). Each request keeps
+          the channel name it was filed with, so renaming or removing a channel does not change requests already filed.
+        </p>
+        <SaveStatus state={payoutState} error={payoutError} />
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
@@ -520,6 +686,7 @@ export default function AdminWalletSettings() {
           )}
         </div>
       </div>
+      <RoundingDriftTool />
     </div>
   );
 }

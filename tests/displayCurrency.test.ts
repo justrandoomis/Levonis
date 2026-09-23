@@ -30,6 +30,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { iqdToUsdCentsAt, formatUsdFromIqd, DEFAULT_DISPLAY_CURRENCY } from '../src/CurrencyContext';
+import { iqdToUsdCents as walletIqdToUsdCents } from '../src/lib/api';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -42,8 +43,23 @@ test('1400 dinars is a dollar, at the administrator’s own rate', () => {
   // A real printer price, at the shop's default rate.
   assert.equal(formatUsdFromIqd(1_750_000, 1400), '$1,250.00');
   // And at a rate the administrator changed: the conversion follows the
-  // setting, which is the whole of what was asked for.
-  assert.equal(formatUsdFromIqd(1_750_000, 1500), '$1,166.67');
+  // setting, which is the whole of what was asked for. 1,166.666… FLOORS —
+  // «وعند الدولار يقرب الى عدد صحيح اقل» — the rule the wallet reads with.
+  assert.equal(formatUsdFromIqd(1_750_000, 1500), '$1,166.66');
+});
+
+test('one dollar-reading rule: the shop floors exactly as the wallet does', () => {
+  // 50,007 د.ع at 1,400 is 3,571.9 cents. `Math.round` read it as $35.72 on a
+  // product page while the wallet (iqdToUsdCents, floor) read $35.71.
+  assert.equal(iqdToUsdCentsAt(50_007, 1400), 3571);
+  assert.equal(formatUsdFromIqd(50_007, 1400), '$35.71');
+  for (const rate of [1, 7, 1300, 1400, 1450, 1500, 1600]) {
+    for (const iqd of [0, 1, 13, 14, 15, 999, 1400, 49_999, 50_000, 50_007, 1_750_000, 99_999_999]) {
+      assert.equal(iqdToUsdCentsAt(iqd, rate), walletIqdToUsdCents(iqd, rate), `${iqd} at ${rate}`);
+    }
+  }
+  // Integer arithmetic: an exact dollar is never a hair short of itself.
+  assert.equal(iqdToUsdCentsAt(1400 * 3, 1400), 300);
 });
 
 test('the cent is kept — a price is not rounded twice', () => {
@@ -178,7 +194,9 @@ test('the four contexts nest in the order the conversion needs', () => {
   // a reading preference is not a route, so it is outside the Router.
   const wallet = app.indexOf('<WalletProvider>');
   const currency = app.indexOf('<CurrencyProvider>');
-  const router = app.indexOf('<Router>');
+  // The router is NavigationRouter — BrowserRouter's own shape, reporting a
+  // pending navigation as a busy wait (src/components/NavigationRouter.tsx).
+  const router = app.indexOf('<NavigationRouter>');
   assert.ok(wallet >= 0 && currency > wallet, 'CurrencyProvider must be inside WalletProvider');
   assert.ok(router > currency, 'CurrencyProvider must wrap the Router, not sit inside it');
 });

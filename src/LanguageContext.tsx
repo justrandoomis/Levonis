@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { Language, translations } from './translations';
+import { useOptionalAuth } from './AuthContext';
+import { api } from './lib/api';
 
 interface LanguageContextType {
   lang: Language;
@@ -56,12 +58,40 @@ export function loc(ar: string, en: string, ckb?: string): string {
   return ar;
 }
 
+/**
+ * A SIGNED-IN READER'S CHOICE IS THE ACCOUNT'S, NOT ONLY THIS BROWSER'S.
+ *
+ * «لغة إشعار التليغرام إنجليزية رغم أن لغة المستخدم عربية». The switchers in
+ * the header, the dashboard, the auth shell and the welcome page all call
+ * `setLang`, and `setLang` wrote localStorage and nothing else — only the
+ * Settings page PATCHed the profile. So a customer reading the whole site in
+ * Arabic kept whatever `users.locale` said, and every Telegram, WhatsApp and
+ * email notice (worker/lib/customerNotify.ts) was written in THAT language.
+ *
+ * Fire-and-forget and silent: the screen has already changed, a failed save
+ * costs nothing but the notification language, and the next switch retries.
+ * The server records the press as a stated language (`profile.locale_change`),
+ * which is exactly what the notification path waits for. Signed out, there is
+ * no account to write to and nothing is sent.
+ */
+export function persistLocale(next: Language): Promise<void> {
+  return api
+    .patch('/api/profile', { locale: next }, { mascot: 'silent' })
+    .then(() => undefined)
+    .catch(() => undefined);
+}
+
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Language>(() => {
     const initial = initialLang();
     currentLang = initial;
     return initial;
   });
+  // Optional, never `useAuth`: the browser fixtures render this provider with
+  // no AuthProvider above it, and a language switch must not need one.
+  const signedIn = !!useOptionalAuth()?.user;
+  const signedInRef = useRef(signedIn);
+  signedInRef.current = signedIn;
 
   const setLang = (next: Language) => {
     currentLang = next;
@@ -71,6 +101,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     } catch {
       /* storage unavailable */
     }
+    if (signedInRef.current) void persistLocale(next);
   };
 
   const t = (key: keyof typeof translations['en']) => {

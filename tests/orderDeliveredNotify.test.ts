@@ -327,7 +327,15 @@ test('ONCE — an order reversed and re-delivered notifies exactly once, on ever
     'order.status.shipped:ORD-1:telegram',
     'order.status.shipped:ORD-1:whatsapp',
   ]);
-  assert.equal(notifications(raw).length, 1, 'and the bell does not fill up with the same ask');
+  // Every notified status now writes its own in-app row (the floor for a
+  // customer with no channel), so the bell holds the one «shipped» line too —
+  // but the DELIVERED ask is still there exactly once.
+  const bell = notifications(raw).map((n) => n.event_key).sort();
+  assert.deepEqual(
+    bell,
+    ['order.status.delivered:ORD-1', 'order.status.shipped:ORD-1'],
+    'and the bell does not fill up with the same ask'
+  );
 });
 
 test('ONCE — the legacy status door and the delivered door are the SAME event, with the same words', async () => {

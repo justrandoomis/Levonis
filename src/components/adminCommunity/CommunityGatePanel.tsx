@@ -35,6 +35,8 @@ interface Member {
   username: string | null;
   name: string | null;
   email: string | null;
+  /** Only on a lookup result: `+9647******567`, so a phone-only tester is recognisable. */
+  phone_masked?: string | null;
 }
 
 const btn =
@@ -74,7 +76,11 @@ export default function CommunityGatePanel({ t }: { t: T }) {
     if (!term) return;
     setSearching(true);
     try {
-      const d = await api.get<{ users: Member[] }>(`/api/admin/users?search=${encodeURIComponent(term)}&limit=20`);
+      // The gate's own lookup, not /api/admin/users: that one matches name,
+      // username and email only, and a phone-registered tester keeps their
+      // number solely in users.phone_e164 — so they, and a pasted user id,
+      // could not be found at all.
+      const d = await api.get<{ users: Member[] }>(`/api/admin/community/gate/lookup?q=${encodeURIComponent(term)}`);
       setFound(d.users);
     } catch (e) {
       setNote({ ok: false, text: e instanceof ApiError ? e.message : t('تعذّر البحث', 'Search failed') });
@@ -125,8 +131,8 @@ export default function CommunityGatePanel({ t }: { t: T }) {
           <h3 className="text-[13.5px] font-bold text-white">{t('صيانة المجتمع', 'Community maintenance')}</h3>
           <p className="text-[12px] text-zinc-400 leading-relaxed mt-0.5">
             {t(
-              'عند الإغلاق يرفض الخادم كل طلبات المجتمع لمن ليس مسؤولاً وليس في القائمة. الإغلاق لا يحذف أي متجر أو منتج أو طلب، والتجار يواصلون إدارة متاجرهم.',
-              'While it is shut the SERVER refuses every community request from anyone who is not an admin and not on the list. Closing deletes no store, product or request, and merchants keep running their shops.'
+              'عند الإغلاق يرفض الخادم كل طلبات المجتمع — ومنها لوحة طلبات الطباعة والعروض والمتابعة — لمن ليس مسؤولاً وليس في القائمة. الإغلاق لا يحذف أي متجر أو منتج أو طلب، والتجار يواصلون إدارة متاجرهم، والطلبات الجارية تكتمل.',
+              'While it is shut the SERVER refuses every community request — the print-request board, offers and follows included — from anyone who is not an admin and not on the list. Closing deletes no store, product or request, merchants keep running their shops, and orders already running finish.'
             )}
           </p>
         </div>
@@ -136,6 +142,25 @@ export default function CommunityGatePanel({ t }: { t: T }) {
         <p role="status" className="text-[12.5px] text-zinc-400 py-2">
           {t('جارٍ التحميل…', 'Loading…')}
         </p>
+      )}
+
+      {/* A first read that failed left nothing to click: every control sits
+          under `open !== null`. The retry lives outside it. */}
+      {open === null && note?.ok === false && (
+        <button
+          type="button"
+          onClick={() => {
+            setNote(null);
+            load().catch((e: unknown) =>
+              setNote({ ok: false, text: e instanceof ApiError ? e.message : t('تعذّر القراءة', 'Could not load') })
+            );
+          }}
+          className={`${btn} bg-zinc-800 text-zinc-200`}
+          data-community-gate-retry
+        >
+          <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+          {t('إعادة المحاولة', 'Retry')}
+        </button>
       )}
 
       {open !== null && (
@@ -216,7 +241,7 @@ export default function CommunityGatePanel({ t }: { t: T }) {
                     void search();
                   }
                 }}
-                placeholder={t('ابحث بالاسم أو البريد', 'Search by name or email')}
+                placeholder={t('ابحث بالاسم أو البريد أو رقم الهاتف أو المعرّف', 'Search by name, email, phone number or id')}
                 className="flex-1 min-w-[180px] bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-white text-[12.5px] focus:outline-none focus:border-gold"
               />
               <button type="button" onClick={() => void search()} disabled={searching} className={`${btn} bg-zinc-800 text-zinc-200`}>
@@ -233,7 +258,13 @@ export default function CommunityGatePanel({ t }: { t: T }) {
                   return (
                     <li key={u.id} className="flex items-center gap-2 text-[12px] text-zinc-300">
                       <span className="truncate flex-1">
-                        {label(u)} <span className="text-zinc-600">{u.id}</span>
+                        {label(u)}{' '}
+                        {u.phone_masked && (
+                          <span dir="ltr" className="text-zinc-500">
+                            {u.phone_masked}{' '}
+                          </span>
+                        )}
+                        <span className="text-zinc-600">{u.id}</span>
                       </span>
                       <button
                         type="button"

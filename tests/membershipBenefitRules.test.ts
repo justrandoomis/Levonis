@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   SCOPE_RANK,
   lineBenefit,
+  orderLineBenefits,
   selectRule,
   shippingAfterBenefit,
   shippingBenefit,
@@ -77,6 +78,68 @@ test('PRO printer: the cap is PER UNIT, so two capped printers save 200,000 and 
   const capped = lineBenefit({ regularUnitIqd: 1_850_000, qty: 2, rule: perOrder });
   assert.equal(capped.total_iqd, 100_000, 'the same numbers, capped per order, stop at one ceiling');
   assert.equal(capped.capped_by, 'per_order');
+});
+
+/* ------------------------------------- a per-order limit is ONE per order */
+
+test('a per-order ceiling is shared by every line of the rule, not granted once per line', () => {
+  // Two DIFFERENT printers under one rule capped at 150,000 per order. Applied
+  // line by line this gave 150,000 + 100,000 = 250,000.
+  const perOrder = rule({ percent: 10, max_discount_iqd: 150_000, cap_scope: 'per_order' });
+  const [big, small] = orderLineBenefits([
+    { regularUnitIqd: 1_850_000, qty: 1, rule: perOrder },
+    { regularUnitIqd: 1_000_000, qty: 1, rule: perOrder },
+  ]);
+  assert.equal(big!.total_iqd + small!.total_iqd, 150_000, 'one ceiling for the whole order');
+  assert.equal(big!.total_iqd, 150_000, 'the larger saving draws on the budget first');
+  assert.equal(big!.capped_by, 'per_order');
+  assert.equal(small!.total_iqd, 0);
+  assert.equal(small!.capped_by, 'per_order', 'the line says why it saved nothing');
+  assert.equal(small!.rule_id, 'r');
+});
+
+test('a per-order ceiling the lines do not reach leaves every line whole', () => {
+  const perOrder = rule({ percent: 10, max_discount_iqd: 500_000, cap_scope: 'per_order' });
+  const lines = orderLineBenefits([
+    { regularUnitIqd: 1_850_000, qty: 1, rule: perOrder },
+    { regularUnitIqd: 1_000_000, qty: 2, rule: perOrder },
+  ]);
+  assert.deepEqual(lines.map((l) => l.total_iqd), [185_000, 200_000]);
+  assert.ok(lines.every((l) => l.capped_by === 'none'));
+});
+
+test('max_quantity counts units across the order, not per line', () => {
+  const firstTwo = rule({ percent: 10, max_discount_iqd: 100_000, cap_scope: 'per_unit', max_quantity: 2 });
+  const lines = orderLineBenefits([
+    { regularUnitIqd: 500_000, qty: 2, rule: firstTwo },
+    { regularUnitIqd: 1_850_000, qty: 2, rule: firstTwo },
+  ]);
+  // The two most valuable units are the two capped printers on the second line.
+  assert.equal(lines[1]!.eligible_qty, 2);
+  assert.equal(lines[1]!.total_iqd, 200_000);
+  assert.equal(lines[0]!.eligible_qty, 0);
+  assert.equal(lines[0]!.total_iqd, 0);
+  assert.equal(lines[0]!.capped_by, 'quantity');
+  assert.equal(lines.reduce((n, l) => n + l.eligible_qty, 0), 2, 'two units in the whole order');
+});
+
+test('two different rules keep two budgets, and a rule without an order limit is untouched', () => {
+  const a = rule({ id: 'a', percent: 10, max_discount_iqd: 100_000, cap_scope: 'per_order' });
+  const b = rule({ id: 'b', percent: 10, max_discount_iqd: 100_000, cap_scope: 'per_order' });
+  const plain = rule({ id: 'c', percent: 20 });
+  const lines = orderLineBenefits([
+    { regularUnitIqd: 1_850_000, qty: 1, rule: a },
+    { regularUnitIqd: 1_850_000, qty: 1, rule: b },
+    { regularUnitIqd: 25_000, qty: 4, rule: plain },
+  ]);
+  assert.deepEqual(lines.map((l) => l.total_iqd), [100_000, 100_000, 20_000]);
+  assert.equal(lines[2]!.applied_at, 'unit');
+});
+
+test('a single line answers the same through lineBenefit and orderLineBenefits', () => {
+  const perOrder = rule({ percent: 10, max_discount_iqd: 100_000, cap_scope: 'per_order', max_quantity: 3 });
+  const input = { regularUnitIqd: 1_850_000, qty: 5, rule: perOrder };
+  assert.deepEqual(lineBenefit(input), orderLineBenefits([input])[0]);
 });
 
 /* ---------------------------------------------- PRO — filament and parts */

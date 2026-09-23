@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Landmark, Truck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Star, CheckCircle2, ShieldCheck, ExternalLink, ChevronRight, Landmark, Truck, MessageSquare } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useWallet } from '../WalletContext';
 import { api } from '../lib/api';
@@ -27,6 +27,7 @@ import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
 import { apiRefusal } from '../lib/refusalStrings';
 import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, statusLabel, statusStyle } from '../components/orders/format';
 import { useMoney } from '../CurrencyContext';
+import type { Claim } from '../components/warranty/types';
 
 /**
  * ONE order, everything the customer can know or do about it.
@@ -84,6 +85,8 @@ const STRINGS = {
     dayChanged: 'تم تغيير يوم التوصيل.',
     dayFailed: 'تعذّر تغيير يوم التوصيل.',
     notFoundBack: 'رجوع إلى الطلبات',
+    claimThread: 'محادثة مطالبة الضمان',
+    claimNewReply: 'رد جديد',
   },
   en: {
     title: 'Order details',
@@ -118,6 +121,8 @@ const STRINGS = {
     dayChanged: 'The delivery day was changed.',
     dayFailed: 'The delivery day could not be changed.',
     notFoundBack: 'Back to orders',
+    claimThread: 'Warranty claim conversation',
+    claimNewReply: 'New reply',
   },
   ckb: {
     title: 'وردەکاری داواکاری',
@@ -152,6 +157,8 @@ const STRINGS = {
     dayChanged: 'ڕۆژی گەیاندن گۆڕدرا.',
     dayFailed: 'ڕۆژی گەیاندن نەگۆڕدرا.',
     notFoundBack: 'گەڕانەوە بۆ داواکارییەکان',
+    claimThread: 'گفتوگۆی داواکاری گەرەنتی',
+    claimNewReply: 'وەڵامی نوێ',
   },
 };
 
@@ -279,6 +286,33 @@ export default function OrderDetail() {
       alive = false;
     };
   }, [delivered]);
+
+  /**
+   * THE WARRANTY CONVERSATIONS ABOUT THIS ORDER'S DEVICES. A customer who
+   * filed a claim on a printer from this order looks for it HERE, on the
+   * order — «عند الضغط على مطالباتي في الطلبات تفتح المحادثة» — and found only
+   * a generic «مركز الضمان» tile. Each claim on one of these units is now its
+   * own row that opens the thread (`/warranty?claim=…`, the page opens it),
+   * marked when the warranty team has written since the customer last looked.
+   * The customer's own claims list is the source; nothing is inferred here.
+   */
+  const [orderClaims, setOrderClaims] = useState<Claim[]>([]);
+  const unitKey = (units ?? []).map((u) => u.unit_id).join(',');
+  useEffect(() => {
+    if (!unitKey) {
+      setOrderClaims([]);
+      return;
+    }
+    const ids = new Set(unitKey.split(','));
+    let alive = true;
+    api
+      .get<{ claims: Claim[] }>('/api/devices/claims')
+      .then((r) => alive && setOrderClaims((r.claims || []).filter((cl) => !!cl.unit_id && ids.has(cl.unit_id)).slice(0, 5)))
+      .catch(() => alive && setOrderClaims([]));
+    return () => {
+      alive = false;
+    };
+  }, [unitKey]);
 
   const unitsByItem = useMemo(() => {
     const m = new Map<string, OrderUnitPublic[]>();
@@ -658,6 +692,25 @@ export default function OrderDetail() {
                       {s.unitsFailed}
                     </p>
                   )}
+                  {orderClaims.map((cl) => (
+                    <Link
+                      key={cl.id}
+                      to={`/warranty?claim=${encodeURIComponent(cl.id)}`}
+                      className={TILE}
+                      data-order-claim={cl.id}
+                    >
+                      <MessageSquare className="w-4 h-4 text-[#BAA369] shrink-0" aria-hidden />
+                      <span className="flex-1 min-w-0 text-[13px] text-zinc-300 truncate">
+                        {s.claimThread}: <span className="text-white">{cl.subject}</span>
+                      </span>
+                      {cl.unread && (
+                        <span className="shrink-0 px-2 py-0.5 rounded-full bg-[#BAA369] text-black text-[11px] font-bold whitespace-nowrap">
+                          {s.claimNewReply}
+                        </span>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-zinc-600 rtl:rotate-180 shrink-0" aria-hidden />
+                    </Link>
+                  ))}
                   {units && units.length > 0 && (
                     <Link to="/warranty" className={TILE} data-warranty-centre>
                       <ShieldCheck className="w-4 h-4 text-[#BAA369] shrink-0" aria-hidden />

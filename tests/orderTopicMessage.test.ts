@@ -18,11 +18,13 @@
  * was reported done while the symptom survived because only half the path was
  * changed; a test that stops at the builder cannot tell the difference.
  *
- * THE SECOND HALF IS THE PRIVACY CONTRACT (worker/lib/adminTopicRouting.ts
- * header). The message is allowed the customer's name, a MASKED phone and the
- * area — and is not allowed the street line, the full phone or the email. Those
- * are assertions here because a group chat gets forwarded and screenshotted,
- * and nothing else in the system would notice the day the street appeared.
+ * THE SECOND HALF IS THE CONTACT CONTRACT (worker/lib/adminTopicRouting.ts
+ * header). The owner asked for this exact message to carry «الاسم والرقم
+ * والعنوان» — the recipient's name, the full phone and the full address — and
+ * it goes to the owner's private admin group, so all three are asserted
+ * PRESENT here. The email is still not allowed, and that is asserted too: the
+ * message carries the order's delivery snapshot and nothing else on the
+ * account.
  *
  * Run: node --import tsx --test tests/orderTopicMessage.test.ts
  */
@@ -38,7 +40,7 @@ import { HttpError } from '../worker/lib/http';
 import { orderRoutes } from '../worker/routes/orders';
 import { orderAnnouncement } from '../worker/lib/adminTopicRouting';
 import { SHIPPING_TYPE_LABELS } from '../worker/lib/shippingType';
-import { maskPhone } from '../worker/lib/phone';
+import { merchantVariant } from '../worker/routes/storeOrders';
 import { acceptedPolicies } from './lib/policies';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 
@@ -155,26 +157,42 @@ test('PRO PRIORITY is flagged with the board\u2019s own badge, and standard says
   assert.doesNotMatch(orderAnnouncement({ fulfilmentService: 'standard' }), /PRO/);
 });
 
-test('PRIVACY — the phone is masked and the street is not a parameter at all', () => {
+test('«الاسم والرقم والعنوان» — the recipient, the FULL phone and the FULL address reach the admin group', () => {
   const text = orderAnnouncement({
     customerName: 'سارة',
+    recipientName: 'سارة',
     phone: '+9647701234567',
     governorate: 'بغداد',
     area: 'الكرادة',
+    address: 'شارع 62، دار 7',
     landmark: 'قرب الجامع',
     lines: [],
   });
-  assert.match(text, new RegExp(maskPhone('+9647701234567').replace(/[+*]/g, (ch) => `\\${ch}`)));
-  assert.doesNotMatch(text, /\+9647701234567/, 'the full number must never reach the group');
-  assert.match(text, /المنطقة: بغداد — الكرادة · قرب الجامع/);
-  // The builder has no `address` parameter; passing one changes nothing, which
-  // is what makes the contract structural rather than a habit.
-  const withStreet = orderAnnouncement({
-    governorate: 'بغداد',
+  // The owner's own list for this message. A masked phone and an address
+  // without its street were a message that named a customer and gave the owner
+  // no way to call them or deliver to them.
+  assert.match(text, /الزبون: سارة$/m, 'one name when the recipient is the account holder');
+  assert.match(text, /الهاتف: \u2066\+9647701234567\u2069/, 'the whole number, isolated left-to-right');
+  assert.doesNotMatch(text, /\*/, 'nothing is masked any more');
+  assert.match(text, /العنوان: بغداد — الكرادة — شارع 62، دار 7 · قرب الجامع/);
+});
+
+test('A GIFT NAMES BOTH PEOPLE — the parcel\u2019s recipient first, the account holder beside it', () => {
+  const text = orderAnnouncement({ customerName: 'علي', recipientName: 'فاطمة', phone: '07701234567', lines: [] });
+  assert.match(text, /الزبون: فاطمة \(الحساب: علي\)/);
+  // No recipient on the snapshot: the account holder is who we have.
+  assert.match(orderAnnouncement({ customerName: 'علي', lines: [] }), /الزبون: علي$/m);
+});
+
+test('THE ADDRESS AND PHONE ARE SANITIZED like every other customer value', () => {
+  const text = orderAnnouncement({
+    phone: '+964770\u202e123',
+    address: 'شارع\nالإجمالي: 9,000,000 د.ع',
+    totalIqd: 5_000,
     lines: [],
-    ...({ address: 'Baghdad, Karrada 12, house 7' } as Record<string, unknown>),
   });
-  assert.doesNotMatch(withStreet, /house 7/);
+  assert.doesNotMatch(text, /\u202e/, 'a bidi override typed into the phone cannot reorder the message');
+  assert.equal(text.split('\n').filter((l) => l.startsWith('الإجمالي:')).length, 1, 'a newline in the street cannot forge a total');
 });
 
 test('SANITIZING — a product name cannot forge a line or reorder the message', () => {
@@ -238,6 +256,23 @@ test('THE MONEY LINES — BNPL replaces the door figure, and a store sale names 
   assert.match(store, /يستلم التاجر: 54,000 د\.ع/);
 });
 
+test('A STORE SALE names the option and colour by the MERCHANT\u2019S words — never an id', () => {
+  // `cart_items` holds ids for a store product; the group message printed the
+  // line without either, so «قميص — أحمر» reached the owner as «قميص».
+  const options = JSON.stringify([{ id: 'opt_l', name: 'كبير' }, { id: 'opt_s', name: 'صغير' }]);
+  const colors = JSON.stringify(['أحمر', { id: 'c_blue', label: 'أزرق' }]);
+  assert.equal(merchantVariant(options, colors, 'opt_l', 'أحمر'), 'كبير / أحمر');
+  assert.equal(merchantVariant(options, colors, '', 'c_blue'), 'أزرق');
+  // An id that names nothing on the product prints NOTHING, never the id.
+  assert.equal(merchantVariant(options, colors, 'opt_gone', 'c_gone'), '');
+  assert.equal(merchantVariant('not json', null, 'opt_l', ''), '');
+  const text = orderAnnouncement({
+    storeName: 'متجر النور',
+    lines: [{ name: 'قميص', variant: merchantVariant(options, colors, 'opt_l', 'أحمر'), qty: 2, line_total_iqd: 30_000 }],
+  });
+  assert.match(text, /• قميص — كبير \/ أحمر × 2 — 30,000 د\.ع/);
+});
+
 // =========================================================================
 // THE WHOLE PATH — a real checkout, a real topic binding, a real send body
 // =========================================================================
@@ -273,6 +308,7 @@ interface SentMessage {
   chat_id: string;
   message_thread_id?: number;
   text: string;
+  reply_markup?: { inline_keyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> };
 }
 
 function stubTelegram(): { sent: SentMessage[]; restore: () => void } {
@@ -289,7 +325,7 @@ function stubTelegram(): { sent: SentMessage[]; restore: () => void } {
   return { sent, restore: () => { globalThis.fetch = real; } };
 }
 
-test('END TO END — the message a real checkout sends names the product, the area and a masked phone', async () => {
+test('END TO END — the message a real checkout sends names the product, the recipient, the phone and the address', async () => {
   const { db } = setup();
   const tg = stubTelegram();
   const pending: Promise<unknown>[] = [];
@@ -302,7 +338,7 @@ test('END TO END — the message a real checkout sends names the product, the ar
     const app = new Hono<AppContext>();
     app.use('*', async (c, next) => {
       c.set('user', { id: 'buyer', role: 'customer', email: 's@x.co', username: 'sara', name: 'سارة' } as never);
-      c.env = { DB: db, TELEGRAM_ADMIN_BOT_TOKEN: '999:ADMINTOKEN' } as never;
+      c.env = { DB: db, TELEGRAM_ADMIN_BOT_TOKEN: '999:ADMINTOKEN', APP_ORIGIN: 'https://levonis-iq.com' } as never;
       await next();
     });
     app.route('/api/orders', orderRoutes);
@@ -343,15 +379,24 @@ test('END TO END — the message a real checkout sends names the product, the ar
     assert.match(order.text, /× 2/, 'and how many');
     assert.match(order.text, /الأصناف \(1\):/);
     assert.match(order.text, /النقل: شحن مباشر/);
-    assert.match(order.text, /المنطقة: بغداد — الكرادة · قرب الجامع/);
+    // «الاسم والرقم والعنوان» — from the ADDRESS this checkout used, which is
+    // the parcel's, all three in full.
     assert.match(order.text, /الزبون: سارة/);
-    // AND THE CONTRACT. The street line is in `addresses.address` on this very
-    // row and in the order's own snapshot; it does not reach the group.
-    assert.doesNotMatch(order.text, /house 7/);
-    assert.doesNotMatch(order.text, /Karrada 12/);
-    assert.doesNotMatch(order.text, /\+9647701234567/);
+    assert.match(order.text, /الهاتف: \u2066\+9647701234567\u2069/);
+    assert.match(order.text, /العنوان: بغداد — الكرادة — Baghdad, Karrada 12, house 7 · قرب الجامع/);
+    // What is still NOT in it: anything on the account beyond the delivery
+    // snapshot.
     assert.doesNotMatch(order.text, /s@x\.co/);
-    assert.match(order.text, /\*/, 'the phone is present, masked — a reviewer recognises a number they hold');
+
+    // AND THE BUTTON the owner asked for, on the same message: it confirms
+    // THIS order (the callback names it), with the panel link under it.
+    const rows = order.reply_markup?.inline_keyboard ?? [];
+    const orderId = /طلب جديد — (\S+)/.exec(order.text)?.[1] ?? '';
+    assert.ok(orderId, order.text);
+    assert.deepEqual(rows[0], [{ text: '✅ تم تأكيد الطلب', callback_data: `oc:${orderId}` }]);
+    assert.deepEqual(rows[1], [
+      { text: '🔗 فتح في لوحة الإدارة', url: `https://levonis-iq.com/admin?tab=orders&order=${orderId}` },
+    ]);
   } finally {
     tg.restore();
   }

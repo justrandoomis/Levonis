@@ -138,7 +138,10 @@ export function tierMetaFor(tier: unknown): TierMeta | null {
  */
 export const MEMBERSHIP_STATE_LABELS: Record<string, { ar: string; en: string; ckb: string }> = {
   active: { ar: 'فعالة', en: 'Active', ckb: 'چالاکە' },
-  prepaid_pending_launch: { ar: 'محجوزة حتى الإطلاق', en: 'Reserved until launch', ckb: 'پارێزراوە تا دەستپێک' },
+  // The site is live: a reservation left from before it is converted on its
+  // account's next read, so the ledger can only meet one for a moment — or one
+  // an admin still has to resolve. Neither is "until the launch".
+  prepaid_pending_launch: { ar: 'قيد التفعيل', en: 'Being activated', ckb: 'لە چالاککردندایە' },
   pending_payment: { ar: 'بانتظار الدفع', en: 'Pending payment', ckb: 'چاوەڕێی پارەدان' },
   expired: { ar: 'منتهية', en: 'Expired', ckb: 'بەسەرچووە' },
   cancelled: { ar: 'ملغاة', en: 'Cancelled', ckb: 'هەڵوەشێنراوەتەوە' },
@@ -149,4 +152,76 @@ export function membershipStateLabel(state: string, lang: string): string {
   const l = MEMBERSHIP_STATE_LABELS[state];
   if (!l) return state;
   return lang === 'en' ? l.en : lang === 'ckb' ? l.ckb : l.ar;
+}
+
+/**
+ * The member-facing names of the entitlements (ENTITLEMENT_MINIMUM_TIER in
+ * worker/lib/entitlements.ts), shared by the paused-benefits list and the
+ * plan comparison so one benefit is never called two things. Short labels;
+ * the Sorani ones are the store's existing words.
+ */
+export const ENTITLEMENT_LABELS: Record<string, { ar: string; en: string; ckb: string }> = {
+  proPricing: { ar: 'أسعار PRO', en: 'PRO prices', ckb: 'نرخەکانی PRO' },
+  freeDelivery: { ar: 'التوصيل المجاني', en: 'Free delivery', ckb: 'گەیاندنی بێبەرامبەر' },
+  noPreorderCommission: { ar: 'إعفاء رسوم الشحن', en: 'Shipping surcharge waiver', ckb: 'لێبوردنی زیادکراوی گەیاندن' },
+  priorityService: { ar: 'أولوية الخدمة والدعم', en: 'Priority service and support', ckb: 'پێشینەی خزمەتگوزاری و پشتیوانی' },
+  proExclusive: { ar: 'عروض PRO', en: 'PRO offers', ckb: 'ئۆفەرەکانی PRO' },
+  merchantProfile: { ar: 'ملف التاجر', en: 'Merchant profile', ckb: 'پرۆفایلی بازرگان' },
+  merchantStore: { ar: 'المتجر', en: 'Storefront', ckb: 'فرۆشگا' },
+  merchantProducts: { ar: 'نشر المنتجات', en: 'Publishing products', ckb: 'بڵاوکردنەوەی بەرهەم' },
+  merchantOrders: { ar: 'طلبات المتجر', en: 'Store orders', ckb: 'داواکارییەکانی فرۆشگا' },
+  communityOffers: { ar: 'عروض المجتمع', en: 'Community offers', ckb: 'ئۆفەرەکانی کۆمەڵگە' },
+  merchantAnalytics: { ar: 'تحليلات المتجر', en: 'Store analytics', ckb: 'شیکاری فرۆشگا' },
+  merchantSubdomain: { ar: 'رابط المتجر الفرعي', en: 'Store subdomain', ckb: 'ژێردۆمەینی فرۆشگا' },
+  exclusiveCoupons: { ar: 'كوبونات الأعضاء', en: 'Member coupons', ckb: 'کۆپۆنی ئەندامان' },
+  exclusiveSections: { ar: 'الأقسام الحصرية', en: 'Exclusive sections', ckb: 'بەشە تایبەتەکان' },
+  memberOffers: { ar: 'عروض الأعضاء', en: 'Member offers', ckb: 'ئۆفەری ئەندامان' },
+  verifiedMerchant: { ar: 'شارة التاجر PRO', en: 'PRO merchant badge', ckb: 'نیشانەی بازرگانی PRO' },
+  proMerchantBadge: { ar: 'شارة التاجر PRO', en: 'PRO merchant badge', ckb: 'نیشانەی بازرگانی PRO' },
+  primeDeliveryEligible: { ar: 'توصيل PREMIUM المجاني', en: 'PREMIUM free delivery', ckb: 'گەیاندنی بێبەرامبەری PREMIUM' },
+  premiumDelivery: { ar: 'توصيل PREMIUM المجاني', en: 'PREMIUM free delivery', ckb: 'گەیاندنی بێبەرامبەری PREMIUM' },
+  bnpl: { ar: 'اشترِ الآن وادفع لاحقًا', en: 'Buy now, pay later', ckb: 'ئێستا بکڕە و دواتر بدە' },
+  priorityDelivery12h: { ar: 'تجهيز وتوصيل خلال 12 ساعة', en: '12-hour preparation and delivery', ckb: 'خزمەتی ١٢ کاتژمێر' },
+};
+
+/**
+ * What stands between a figure and its duration. A middle dot beside
+ * Arabic-Indic digits reads as a zero — «PLUS · ١٢ شهرًا» looks like «١٢٠» —
+ * so Arabic and Sorani take the Arabic comma, which no digit resembles.
+ */
+export function durationSep(lang: string): string {
+  return lang === 'en' ? ' · ' : '، ';
+}
+
+/** Arabic counts its months: شهر واحد، شهران، 3–10 أشهر، 11+ شهرًا. */
+export function durationLabel(months: number, lang: string): string {
+  // The same digits the prices beside it use (`formatIqd` formats with the
+  // device's locale), so «١٢ شهرًا» never sits next to «٢٩٬٠٠٠ د.ع» as «12».
+  const n = months.toLocaleString();
+  if (lang === 'en') return `${n} ${months === 1 ? 'month' : 'months'}`;
+  if (lang === 'ckb') return `${n} مانگ`;
+  if (months === 1) return 'شهر واحد';
+  if (months === 2) return 'شهران';
+  if (months >= 3 && months <= 10) return `${n} أشهر`;
+  return `${n} شهرًا`;
+}
+
+/**
+ * THE CARD THE PAGE OPENS ON — not always PRO.
+ *
+ * A member lands on the tier above theirs, because an upgrade is what this
+ * page can still sell them; a guest or a free account on the lowest tier that
+ * is actually on sale; a member of the top tier (or of a tier with nothing on
+ * sale above it) on their own card. `tiers` is the catalogue's order.
+ */
+export function pickDefaultTier(tiers: PaidTier[], current: AnyTier, onSale: (tier: PaidTier) => boolean): PaidTier | null {
+  if (tiers.length === 0) return null;
+  const byRank = [...tiers].sort((a, b) => TIER_ORDER[a] - TIER_ORDER[b]);
+  if (isPaidTier(current)) {
+    return (
+      byRank.find((x) => TIER_ORDER[x] > TIER_ORDER[current] && onSale(x)) ??
+      (tiers.includes(current) ? current : byRank[byRank.length - 1])
+    );
+  }
+  return byRank.find(onSale) ?? byRank[0];
 }

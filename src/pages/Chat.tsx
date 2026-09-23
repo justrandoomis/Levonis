@@ -6,16 +6,27 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { api, ApiError, uploadFile } from '../lib/api';
+import { formatElapsed, useVoiceRecorder } from '../lib/voiceRecorder';
+import ChatAttachment, {
+  attachmentErrorText,
+  attachmentKindOfFile,
+  CHAT_FILE_ACCEPT,
+  isAttachmentKind,
+  type ChatAttachmentKind,
+} from '../components/chat/ChatAttachment';
 import {
-  ArrowLeft, ArrowRight, Mic, Smile, Plus,
+  ArrowLeft, ArrowRight, Mic, Smile, Plus, X, FileText,
   Image as ImageIcon, Camera, Store as StoreIcon, Gift, MapPin, UserCircle, Wallet, Send, MessageSquare
 } from 'lucide-react';
+
+/** 'text', or the attachment's real kind (worker/routes/chats.ts `chatMessagePublic`). */
+type MessageKind = 'text' | ChatAttachmentKind;
 
 interface ChatMessage {
   id: string;
   sender_id: string;
   mine: boolean;
-  kind: 'text' | 'image';
+  kind: MessageKind;
   body: string | null;
   fileUrl: string | null;
   created_at: string;
@@ -24,7 +35,7 @@ interface ChatMessage {
 interface PendingMessage {
   tempId: string;
   serverId: string | null;
-  kind: 'text' | 'image';
+  kind: MessageKind;
   body: string | null;
   fileUrl: string | null;
   created_at: string;
@@ -65,12 +76,15 @@ export default function Chat() {
   const [uploading, setUploading] = useState(false);
 
   const presence = useChatPresence(id, !!user && !notFound);
+  // «بصمة صوتية» — the microphone that used to say «قريباً».
+  const voice = useVoiceRecorder();
   useCharacterBusy(loading || uploading);
   const seenRemote = useRef<{ chat: string | undefined; ids: Set<string> | null }>({ chat: id, ids: null });
   useEffect(() => { seenRemote.current = { chat: id, ids: null }; }, [id]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const tempCounter = useRef(0);
 
@@ -179,35 +193,67 @@ export default function Chat() {
     sendText(inputText);
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    setIsPlusMenuOpen(false);
-    if (!file || !id || uploading) return;
+  /**
+   * ONE PATH FOR EVERY ATTACHMENT — a photo, a clip, a document or a voice
+   * note. The bubble appears at once from the local file and is replaced by
+   * the server's copy on the next poll; the kind sent is only a hint, the
+   * server reads the real one from where it filed the bytes.
+   */
+  const sendAttachment = async (file: File) => {
+    if (!id || uploading) return;
     setSendError(null);
     setUploading(true);
     const tempId = nextTempId();
+    const kind = attachmentKindOfFile(file);
     const localUrl = URL.createObjectURL(file);
     setPending((prev) => [
       ...prev,
-      { tempId, serverId: null, kind: 'image', body: null, fileUrl: localUrl, created_at: new Date().toISOString(), failed: false },
+      { tempId, serverId: null, kind, body: null, fileUrl: localUrl, created_at: new Date().toISOString(), failed: false },
     ]);
     try {
       // The conversation, not the sender: a chat file is filed under the chat
       // so one thread's pictures sit in one folder, and the server checks that
       // this account is in it before storing anything.
       const uploaded = await uploadFile(file, 'chat', id);
-      const res = await api.post<{ id: string }>(`/api/chats/${id}/messages`, { kind: 'image', fileKey: uploaded.key });
+      const res = await api.post<{ id: string }>(`/api/chats/${id}/messages`, { kind, fileKey: uploaded.key });
       setPending((prev) => prev.map((p) => (p.tempId === tempId ? { ...p, serverId: res.id } : p)));
     } catch (err) {
       setPending((prev) => prev.filter((p) => p.tempId !== tempId));
       setSendError(
-        (err instanceof ApiError && err.message) || (dir === 'rtl' ? 'تعذر إرسال الصورة' : 'Failed to send image')
+        attachmentErrorText(err, dir === 'rtl' ? 'تعذر إرسال المرفق' : 'Failed to send the attachment')
       );
     } finally {
       setUploading(false);
     }
   };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    setIsPlusMenuOpen(false);
+    if (!file) return;
+    await sendAttachment(file);
+  };
+
+  /** Tap the microphone to record; ✕ throws it away, send uploads it. */
+  const startVoice = async () => {
+    if (!id || uploading) return;
+    setSendError(null);
+    setIsPlusMenuOpen(false);
+    setShowEmojiPicker(false);
+    presence.onStop();
+    await voice.start();
+  };
+  const sendVoice = async () => {
+    const file = await voice.stop();
+    if (file) await sendAttachment(file);
+  };
+  const voiceError =
+    voice.error === 'denied'
+      ? dir === 'rtl' ? 'لم يُسمح باستخدام الميكروفون — فعّله من إعدادات المتصفح' : 'Microphone access was refused — allow it in your browser settings'
+      : voice.error === 'failed'
+        ? dir === 'rtl' ? 'تعذّر بدء التسجيل الصوتي' : 'The voice recording could not start'
+        : '';
 
   const suggestions = dir === 'rtl' ? [
     "شكراً 🙏", "تمام 👍", "كم السعر؟", "متى يكون جاهزاً؟"
@@ -285,6 +331,13 @@ export default function Chat() {
       label: dir === 'rtl' ? 'تصوير' : 'Camera',
       onClick: () => cameraInputRef.current?.click(),
     },
+    // A document or an audio file — «ملف». The server admits PDFs and sound
+    // by magic bytes (worker/routes/uploads.ts `sniffChat`).
+    {
+      icon: FileText,
+      label: dir === 'rtl' ? 'ملف' : 'File',
+      onClick: () => documentInputRef.current?.click(),
+    },
     // Three of these were disabled with "قريباً" on them and did not need to
     // be: each is a message with a link in it, which the existing pipeline
     // already sends. They are sent as ordinary text so the other side reads
@@ -333,8 +386,20 @@ export default function Chat() {
   const myInitial = (user?.name || user?.username || '?').charAt(0).toUpperCase();
   const otherInitial = (otherName || '?').charAt(0).toUpperCase();
 
-  const renderBubble = (kind: 'text' | 'image', body: string | null, fileUrl: string | null, mine: boolean, faded = false) => {
-    if (kind === 'image') {
+  const renderBubble = (kind: MessageKind, body: string | null, fileUrl: string | null, mine: boolean, faded = false) => {
+    if ((kind === 'audio' || kind === 'video' || kind === 'file') && fileUrl) {
+      // A voice note, a clip or a document, drawn by the same component the
+      // admin's order panel uses — so what one side sends, the other can play.
+      return (
+        <div
+          className={`${mine ? 'bg-surface-selected ltr:rounded-tr-sm rtl:rounded-tl-sm' : 'bg-surface ltr:rounded-tl-sm rtl:rounded-tr-sm'} rounded-lg max-w-[min(80%,24rem)] mt-1 p-2 text-[14px] text-text-primary ${faded ? 'opacity-60' : ''}`}
+        >
+          <ChatAttachment kind={kind} url={fileUrl} loc={loc} />
+          {body && <p dir="auto" className="mt-1 px-1 whitespace-pre-wrap break-words">{body}</p>}
+        </div>
+      );
+    }
+    if (isAttachmentKind(kind)) {
       return (
         <div className={`${mine ? 'ltr:rounded-tr-sm rtl:rounded-tl-sm' : 'ltr:rounded-tl-sm rtl:rounded-tr-sm'} rounded-lg max-w-[min(76%,24rem)] mt-1 overflow-hidden bg-surface ${faded ? 'opacity-60' : ''}`}>
           {fileUrl ? (
@@ -367,6 +432,7 @@ export default function Chat() {
     <div data-chat-layout className="h-full min-h-0 w-full bg-canvas flex flex-col font-sans text-text-secondary">
       <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
       <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileSelect} />
+      <input type="file" accept={CHAT_FILE_ACCEPT} className="hidden" ref={documentInputRef} onChange={handleFileSelect} data-chat-document-input />
 
       {/* Header */}
       <header className="lv-character-header shrink-0 bg-canvas px-3 sm:px-4 py-2 items-center border-b border-border-subtle/70">
@@ -433,8 +499,8 @@ export default function Chat() {
             ))}
           </>
         )}
-        {sendError && (
-          <div role="alert" className="lv-alert lv-alert-danger self-center text-xs">{sendError}</div>
+        {(sendError || voiceError) && (
+          <div role="alert" className="lv-alert lv-alert-danger self-center text-xs">{sendError || voiceError}</div>
         )}
         {actionNotice && (
           <div role="status" className="text-center text-xs text-text-muted font-medium">{actionNotice}</div>
@@ -481,17 +547,50 @@ export default function Chat() {
         )}
 
         {/* Input Bar */}
+        {voice.recording ? (
+          /* RECORDING REPLACES THE BAR: one thing to do — send it, or throw it
+             away — and the running time says the microphone is live. */
+          <div data-chat-recording className="px-3 sm:px-4 py-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={voice.cancel}
+              aria-label={dir === 'rtl' ? 'إلغاء التسجيل' : 'Discard the recording'}
+              className="min-w-11 min-h-11 inline-flex items-center justify-center rounded-md text-text-secondary hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <X className="w-5 h-5" strokeWidth={1.5} />
+            </button>
+            <p role="status" aria-live="polite" className="flex-1 min-h-11 flex items-center gap-2 text-sm text-text-primary">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" aria-hidden="true" />
+              {dir === 'rtl' ? 'جارٍ التسجيل' : 'Recording'}
+              <span className="tabular-nums" dir="ltr">{formatElapsed(voice.elapsed, lang === 'en')}</span>
+            </p>
+            <button
+              type="button"
+              onClick={sendVoice}
+              aria-label={dir === 'rtl' ? 'إرسال الرسالة الصوتية' : 'Send the voice message'}
+              data-mascot="send"
+              className="min-w-11 min-h-11 inline-flex items-center justify-center text-[#101114] bg-[#ece8dc] rounded-md hover:bg-[#fffaf0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <Send className="w-4 h-4 rtl:-scale-x-100" strokeWidth={2.2} />
+            </button>
+          </div>
+        ) : (
         <div className="px-3 sm:px-4 py-2 flex items-end gap-2">
-          {/* Voice messages have no backend yet — shown honestly as disabled. */}
-          <button
-            type="button"
-            disabled
-            aria-label={dir === 'rtl' ? 'الرسائل الصوتية غير متاحة بعد' : 'Voice messages are not available yet'}
-            title={dir === 'rtl' ? 'الرسائل الصوتية قريباً' : `Voice messages ${comingSoon.toLowerCase()}`}
-            className="min-w-11 min-h-11 inline-flex items-center justify-center text-text-muted opacity-45 cursor-not-allowed"
-          >
-            <Mic className="w-5 h-5" strokeWidth={1.5} />
-          </button>
+          {/* A browser with no recorder gets no microphone, rather than one
+              that fails on every tap. */}
+          {voice.supported && (
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={startVoice}
+              data-chat-voice
+              aria-label={dir === 'rtl' ? 'تسجيل رسالة صوتية' : 'Record a voice message'}
+              title={dir === 'rtl' ? 'تسجيل رسالة صوتية' : 'Record a voice message'}
+              className="min-w-11 min-h-11 inline-flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-raised disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <Mic className="w-5 h-5" strokeWidth={1.5} />
+            </button>
+          )}
 
           <div className="flex-1 min-h-11 bg-surface-raised rounded-lg flex items-center px-3 border border-border-subtle relative">
             <input
@@ -548,6 +647,7 @@ export default function Chat() {
             </button>
           )}
         </div>
+        )}
 
         {/* Plus Menu Grid */}
         {isPlusMenuOpen && (

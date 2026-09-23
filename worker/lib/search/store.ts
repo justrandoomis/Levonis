@@ -34,6 +34,7 @@ import {
   expandQuery,
   resolveTokens,
   scoreProducts,
+  SKELETON_MARK,
   type IndexRow,
   type SearchDoc,
   type ScoredProduct,
@@ -77,13 +78,54 @@ const MAX_POSTINGS = 4000;
  *
  * IT CAN NEVER BE SEARCHED FOR. `normalizeText` reduces everything that is
  * not `\p{L}` or `\p{N}` to a space (worker/lib/search/normalize.ts), so no
- * query token can begin with U+0000 and no prefix range scan
- * (`token >= p AND token < p+1`, built from those tokens) can reach it.
+ * query token can begin with '#' and no prefix range scan
+ * (`token >= p AND token < p+1`, built from those tokens) can reach it: '#'
+ * sorts below every digit and letter a range could start from.
  * Weight 0 means it would score nothing even if one did. `DELETE FROM
  * search_tokens WHERE product_id = ?` above takes it with the rest of the
  * product's rows, so it is never stale.
  */
-export const INDEX_STAMP = '\u0000doc:2';
+export const INDEX_STAMP = '#doc:4';
+
+/*
+ * THE STAMP'S HISTORY, because each bump rewrote the whole catalogue and the
+ * reason is worth keeping:
+ *
+ *   doc:2  (U+0000-prefixed) — the document started carrying option and
+ *          colour names (the «كومبو» repair above).
+ *   #doc:3 — Latin words stopped being stored with a romanised skeleton beside
+ *          them (./index.ts `buildIndexRows`: "hot" and "heat" were both `hat`).
+ *          The prefix also changed from U+0000 to '#'. A NUL inside a bound
+ *          string is handled by SQLite's length-aware binding and never ran
+ *          against real D1 in a test; if anything on that path truncated at
+ *          NUL, every product would look permanently stale and be rewritten on
+ *          every cron run for ever. '#' is just as unreachable — it sorts below
+ *          every letter and digit, so no prefix range built from a query can
+ *          start at it — and it is an ordinary character everywhere. The old
+ *          stamp rows go with the rest of each product's rows the first time
+ *          the backfill rewrites it.
+ *   #doc:4 — a Latin word's skeleton is back, under SKELETON_MARK (`~alaga`
+ *          for "elegoo"), where only an Arabic-letter query looks: without it
+ *          «اليجو», «سونلو» and every brand outside the synonym dictionary
+ *          stopped reaching their Latin names.
+ */
+
+/**
+ * THE MARK OF A PRODUCT THE BACKFILL COULD NOT INDEX, so the next run moves
+ * past it instead of retrying it first, for ever, ahead of everything else.
+ *
+ * The backfill takes the stale products `ORDER BY id`. If one of them cannot
+ * be written — a statement D1 refuses, a batch over some limit — it is the
+ * FIRST row of the next run's selection too, and of the one after that: one
+ * bad product would have kept every product after it unindexed for good. A
+ * product carrying this mark (for the current `INDEX_STAMP` version) is left
+ * out of the selection; its OLD rows, if it had any, stay in place and keep it
+ * findable; the failure is reported on the cron report; and the next save of
+ * that product — `planSearchIndex` deletes every row it owns — clears the mark.
+ * Bumping `INDEX_STAMP` retries every marked product, because the mark names
+ * the version it failed on.
+ */
+export const INDEX_FAILED_MARK = `#fail:${INDEX_STAMP.slice('#doc:'.length)}`;
 
 /**
  * The `WHERE` fragment that selects products whose index is missing OR was
@@ -95,6 +137,10 @@ export const INDEX_STAMP = '\u0000doc:2';
  */
 export const SEARCH_INDEX_STALE_SQL =
   'NOT EXISTS (SELECT 1 FROM search_tokens t WHERE t.product_id = p.id AND t.token = ?)';
+
+/** Same shape, for `INDEX_FAILED_MARK`: a product the backfill gave up on. */
+const SEARCH_INDEX_FAILED_SQL =
+  'NOT EXISTS (SELECT 1 FROM search_tokens f WHERE f.product_id = p.id AND f.token = ?)';
 
 /**
  * Replace a product's index rows with exactly these.
@@ -330,11 +376,11 @@ export interface SearchResult {
 export async function searchProducts(
   db: D1Database,
   rawQuery: string,
-  opts: { limit?: number; synonyms?: ReadonlyMap<string, string> } = {}
+  opts: { limit?: number; synonyms?: ReadonlyMap<string, string>; completeLast?: boolean } = {}
 ): Promise<SearchResult> {
   const limit = opts.limit ?? 50;
   const synonyms = opts.synonyms ?? (await loadSynonyms(db));
-  const expanded = expandQuery(rawQuery, synonyms);
+  const expanded = expandQuery(rawQuery, synonyms, { completeLast: opts.completeLast });
   /**
    * Nothing to look up — punctuation, or two bare letters with no word between
    * them. `indexReady` was hard-coded TRUE here, which told the caller "the
@@ -378,16 +424,26 @@ export async function searchProducts(
    * only costs a sort when a one-character range is in play, which is why the
    * cheaper form is kept for everything else.
    */
-  const wideScan = prefixes.some((p) => [...p].length === 1);
+  const wideScan = prefixes.some((p) => [...p.replace(SKELETON_MARK, '')].length === 1);
+  /**
+   * EVERY CANDIDATE COMES BACK WITH ITS WEIGHT — the heaviest field it appears
+   * in anywhere in the index. The wide scan always computed it and then threw
+   * it away; `resolveTokens` now needs it, because which completions of "hot"
+   * are worth keeping depends on whether "hotend" is a product NAME or a word
+   * in somebody's description. `GROUP BY token` walks the covering index in
+   * token order, so the narrow form pays nothing for it.
+   */
   const vocabSql = wideScan
     ? `SELECT token, MAX(weight) AS w FROM search_tokens WHERE ${ranges}
         GROUP BY token ORDER BY w DESC, LENGTH(token) ASC, token ASC LIMIT ${MAX_VOCABULARY}`
-    : `SELECT DISTINCT token FROM search_tokens WHERE ${ranges} LIMIT ${MAX_VOCABULARY}`;
+    : `SELECT token, MAX(weight) AS w FROM search_tokens WHERE ${ranges} GROUP BY token LIMIT ${MAX_VOCABULARY}`;
   const { results: vocabRows } = await db
     .prepare(vocabSql)
     .bind(...rangeParams)
-    .all<{ token: string }>();
-  const vocabulary = (vocabRows ?? []).map((r) => String(r.token));
+    .all<{ token: string; w: number }>();
+  const weights = new Map<string, number>();
+  for (const r of vocabRows ?? []) weights.set(String(r.token), Number(r.w) || 0);
+  const vocabulary = [...weights.keys()];
   if (vocabulary.length === 0) {
     // No candidates. Is the index empty, or does this query simply match
     // nothing? One indexed probe tells the caller which, and it only runs here.
@@ -396,17 +452,30 @@ export async function searchProducts(
 
   // 2. Which vocabulary tokens the query actually means — exact, prefix, then
   //    a bounded edit distance over this handful only.
-  const matched = resolveTokens(expanded, vocabulary);
+  const matched = resolveTokens(expanded, vocabulary, weights);
   if (matched.size === 0) return { ids: [], understood: expanded.lookup, indexReady: true };
 
+  /**
+   * ONE BOUND PARAMETER, HOWEVER MANY TOKENS MATCHED.
+   *
+   * This was `token IN (?, ?, …)` with a placeholder per matched token. D1
+   * refuses a statement with more than 100 bound parameters (the rule
+   * worker/lib/financeReport.ts §7 writes down), and a single letter now
+   * resolves to every naming word it starts — far more than a hundred on a
+   * real catalogue. `json_each` turns one JSON array into the same `IN` list,
+   * and SQLite still answers `token IN (subquery)` from the covering index.
+   *
+   * HEAVIEST FIRST, so that when the cap bites it drops description rows, not
+   * the product names the letter was typed for.
+   */
   const tokens = [...matched.keys()];
-  const ph = tokens.map(() => '?').join(',');
   const { results: postings } = await db
     .prepare(
       `SELECT product_id, token, weight FROM search_tokens
-        WHERE token IN (${ph}) LIMIT ${MAX_POSTINGS}`
+        WHERE token IN (SELECT value FROM json_each(?))
+        ORDER BY weight DESC LIMIT ${MAX_POSTINGS}`
     )
-    .bind(...tokens)
+    .bind(JSON.stringify(tokens))
     .all<IndexRow>();
 
   const scored: ScoredProduct[] = scoreProducts(expanded, matched, postings ?? []);
@@ -443,4 +512,119 @@ export async function reindexChunk(
   for (const doc of docsFor(rows)) stmts.push(...planSearchIndex(db, doc));
   if (stmts.length > 0) await db.batch(stmts);
   return { indexed: rows.length, lastId: String(rows[rows.length - 1].id) };
+}
+
+/** What one backfill pass did. `failed` is reported, never thrown. */
+export interface BackfillResult {
+  indexed: number;
+  failed: { id: string; error: string }[];
+}
+
+/**
+ * How many products share one `db.batch`. Small on purpose: a batch is all or
+ * nothing, and a product with a long description is a couple of thousand
+ * statements on its own. Ten keeps a healthy chunk cheap and a bad one's blast
+ * radius at nine innocent products, which are then retried one by one.
+ */
+const BACKFILL_GROUP = 10;
+
+/**
+ * INDEX THE PRODUCTS WHOSE ROWS ARE MISSING OR STALE, a bounded pass at a time.
+ *
+ * The cron runs it over the whole catalogue (fifty per run); a brand or
+ * section rename runs it over the products that carry that name (`scope`), so
+ * the new name is findable the moment the rename returns rather than at the
+ * next cron tick.
+ *
+ * ONE FAILURE CANNOT STALL THE REST. This used to be a single all-or-nothing
+ * `db.batch` over fifty products, taken `ORDER BY id` — so one product that
+ * could not be written failed the whole batch, the next run selected the same
+ * fifty, and every product after them was never indexed. Now the products go
+ * in groups of `BACKFILL_GROUP`; a group that throws is retried product by
+ * product; and a product that still throws is marked with `INDEX_FAILED_MARK`
+ * so the next selection moves past it, and returned in `failed` for the cron
+ * report. Its old rows, if it had any, are untouched — a batch is atomic — so
+ * it stays findable by whatever it was findable by before.
+ */
+export async function backfillSearchIndex(
+  db: D1Database,
+  opts: { limit?: number; scope?: { sql: string; params: unknown[] } } = {}
+): Promise<BackfillResult> {
+  const limit = opts.limit ?? 50;
+  const scope = opts.scope;
+  const { results } = await db
+    .prepare(
+      `SELECT ${searchDocColumns('p')}
+         FROM products p
+        WHERE p.status = 'active'
+          AND ${SEARCH_INDEX_STALE_SQL}
+          AND ${SEARCH_INDEX_FAILED_SQL}
+          ${scope ? `AND (${scope.sql})` : ''}
+        ORDER BY p.id
+        LIMIT ?`
+    )
+    .bind(INDEX_STAMP, INDEX_FAILED_MARK, ...(scope?.params ?? []), limit)
+    .all<Record<string, unknown>>();
+  const rows = results ?? [];
+  const out: BackfillResult = { indexed: 0, failed: [] };
+  if (rows.length === 0) return out;
+
+  // THE SAME DOCUMENT THE SAVE PATH WRITES, from the same builder. The cron
+  // once composed its own and dropped the option names; two writers of one
+  // index must not be two documents.
+  const docs = await searchDocsForRows(db, rows);
+  for (let i = 0; i < docs.length; i += BACKFILL_GROUP) {
+    const group = docs.slice(i, i + BACKFILL_GROUP);
+    try {
+      await db.batch(group.flatMap((doc) => planSearchIndex(db, doc)));
+      out.indexed += group.length;
+      continue;
+    } catch {
+      // Fall through to one product at a time, to find the one that failed.
+    }
+    for (const doc of group) {
+      try {
+        await db.batch(planSearchIndex(db, doc));
+        out.indexed += 1;
+      } catch (e) {
+        const error = e instanceof Error ? e.message : String(e);
+        out.failed.push({ id: doc.productId, error });
+        try {
+          await db
+            .prepare('INSERT OR REPLACE INTO search_tokens (product_id, token, weight) VALUES (?, ?, 0)')
+            .bind(doc.productId, INDEX_FAILED_MARK)
+            .run();
+        } catch {
+          // Could not even mark it. It will be selected again next run, and
+          // reported again — which is noisy, and still honest.
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * THE STATEMENT THAT MAKES A RENAME REACH THE INDEX.
+ *
+ * The index stores brand and section NAMES on each product (./document.ts),
+ * because a shopper types «بامبو لاب», never `brd_1c09…`. So renaming a brand
+ * changed nothing a search could see: its products kept the current stamp, the
+ * backfill never selected them, the old name kept matching and the new one
+ * found nothing until each product was re-saved by hand.
+ *
+ * This deletes the STAMP of every product `scope` selects (`p` is `products`),
+ * which is exactly "indexed by an older document" — the backfill's own
+ * predicate. Put it in the same batch as the rename, so the two cannot
+ * disagree, then run `backfillSearchIndex` with the same scope to rewrite them
+ * straight away; anything that pass does not reach, the cron does.
+ */
+export function planSearchRestamp(db: D1Database, scope: { sql: string; params: unknown[] }): D1PreparedStatement {
+  return db
+    .prepare(
+      `DELETE FROM search_tokens
+        WHERE token = ?
+          AND product_id IN (SELECT p.id FROM products p WHERE ${scope.sql})`
+    )
+    .bind(INDEX_STAMP, ...scope.params);
 }

@@ -1333,6 +1333,17 @@ export interface WalletWithdrawalRef {
    *  DEDUCTED from the requested amount, so this — not `amount` — is the
    *  figure a human transfers. */
   net_cents?: number | null;
+  /** The payout channel's id and its NAME as frozen at filing (migration
+   *  0112) — «زين كاش», «استلام كاش». The label is null for an older request,
+   *  which a screen resolves by id. */
+  destination_kind?: string | null;
+  destination_label?: string | null;
+  /** The commission and the payout AS QUOTED to the customer, in the dinars
+   *  they typed (migration 0112); null when no dinar figure was recorded. */
+  fee_iqd?: number | null;
+  net_iqd?: number | null;
+  /** The rate the request was filed at (0106) — what a fallback converts at. */
+  exchange_rate_snapshot?: number | null;
 }
 
 export interface WalletTx {
@@ -1349,6 +1360,11 @@ export interface WalletTx {
   hasReceipt: boolean;
   receiptUrl: string | null;
   ref: string;
+  /** The dinars this ledger row recorded (migration 0108) and the rate beside
+   *  them — any kind of row: a deposit, a checkout debit, a refund, an admin
+   *  credit. Null when it recorded none; then the cents are converted. */
+  amount_iqd?: number | null;
+  exchange_rate_snapshot?: number | null;
   withdrawal?: WalletWithdrawalRef | null;
   /** A DEPOSIT's own testimony (migration 0105), on the routes that join it.
    *  Absent on the routes that do not — `undefined` means "not carried here",
@@ -1392,12 +1408,16 @@ export interface DeliveryMethod {
 export interface CheckoutPaymentMethod { id: string; titleAr: string; titleEn: string; icon: string }
 export interface CartShippingMethod { id: string; titleAr: string; titleEn: string; descAr: string; descEn: string }
 export interface ManualPaymentMethod { id: string; name: string; details: string }
+/** A withdrawal payout channel (worker/lib/settings.ts `PayoutMethod`). */
+export interface PayoutMethod { id: string; name: string; requires_account: boolean }
 
 export interface PublicSettings {
   exchangeRate: number;
   currency: 'IQD' | 'USD';
   adVideoUrl: string;
   paymentMethods: ManualPaymentMethod[];
+  /** Where a withdrawal is paid — absent on a server older than the setting. */
+  payoutMethods?: PayoutMethod[];
   checkoutDeliveryMethods: DeliveryMethod[];
   checkoutPaymentMethods: CheckoutPaymentMethod[];
   cartShippingMethods: CartShippingMethod[];
@@ -1888,7 +1908,7 @@ export function newIdempotencyKey(): string {
 /** Upload a file; returns its key + URL. */
 export async function uploadFile(
   file: File,
-  purpose: 'receipt' | 'avatar' | 'chat' | 'product' | 'community' | 'support',
+  purpose: 'receipt' | 'avatar' | 'chat' | 'product' | 'community' | 'support' | 'complaint',
   /**
    * The thing this file belongs to, when it is not the uploader.
    *
@@ -1900,7 +1920,8 @@ export async function uploadFile(
    *
    * A SUPPORT attachment is filed under the TICKET for the same reason and
    * checked the same way: `purpose:'support'` must name the ticket, and the
-   * server refuses a ticket that is not yours before storing anything.
+   * server refuses a ticket that is not yours before storing anything. A
+   * `complaint` attachment names the complaint, on the same terms.
    */
   entityId?: string
 ): Promise<{ key: string; url: string; mime?: string; bytes?: number; width?: number | null; height?: number | null; visibility?: 'public' | 'private' }> {

@@ -20,7 +20,7 @@ import {
   NO_SHIPPING_BENEFIT,
   NO_TAX_BENEFIT,
   isUnitExpressible,
-  lineBenefit,
+  orderLineBenefits,
   SCOPE_RANK,
   selectRule,
   shippingAfterBenefit,
@@ -496,8 +496,16 @@ export function resolveProductBenefits(input: {
 }): ProductBenefits {
   const { rules, status, nowIso } = input;
   const merchandise = input.lines.reduce((n, l) => n + Math.max(0, l.applied_unit_iqd) * Math.max(0, l.qty), 0);
-  const lines = input.lines.map((line) => {
-    const rule = ruleFor(
+  /**
+   * ONE ORDER, ONE BUDGET PER RULE. The rules are chosen line by line, but the
+   * money is worked out for all the lines together (`orderLineBenefits`), so
+   * a rule's per-order ceiling and its `max_quantity` are spent once across
+   * the order: two printers under one rule capped at 100,000 per order save
+   * 100,000 between them, and the per-line figures below — which the order
+   * snapshot freezes — add up to exactly that.
+   */
+  const ruleOf = input.lines.map((line) =>
+    ruleFor(
       rules,
       status,
       'product_discount',
@@ -509,8 +517,13 @@ export function resolveProductBenefits(input: {
       },
       nowIso,
       merchandise
-    );
-    const computed = lineBenefit({ regularUnitIqd: line.regular_unit_iqd, qty: line.qty, rule });
+    )
+  );
+  const computedOf = orderLineBenefits(
+    input.lines.map((line, i) => ({ regularUnitIqd: line.regular_unit_iqd, qty: line.qty, rule: ruleOf[i] ?? null }))
+  );
+  const lines = input.lines.map((line, i) => {
+    const computed = computedOf[i]!;
 
     /**
      * A LINE IS ONLY CREDITED WITH WHAT ITS PRICE ACTUALLY MOVED.
@@ -1032,12 +1045,21 @@ async function appendVersion(
 /* ------------------------------------------------------- the public view */
 
 export interface PublicDiscountRule {
+  /** A stable key: the rule's id, or for a group of product rules the lowest id in it. */
   rule_id: string;
-  scope: BenefitRule['scope'];
-  /** The section, sub-section or product the rule covers, named. */
+  /**
+   * `global`, `sub_category` or `category`. A group of PRODUCT rules is
+   * published as `category` — the section its products are filed under — with
+   * `product_count` set, and NEVER names a product (see `publicBenefitSummary`).
+   */
+  scope: Exclude<BenefitRule['scope'], 'product'>;
+  /** The section the line is about; null for `global`, and for product rules
+   *  whose products are filed under no section. */
   target_id: string | null;
   target_name_ar: string;
   target_name_en: string;
+  /** The section's Sorani name when the owner wrote one; '' otherwise. */
+  target_name_ckb: string;
   discount_mode: BenefitRule['discount_mode'];
   percent: number | null;
   fixed_iqd: number | null;
@@ -1046,6 +1068,13 @@ export interface PublicDiscountRule {
   max_quantity: number | null;
   min_subtotal_iqd: number | null;
   label: string | null;
+  /**
+   * null for a rule written on a section (or the whole store). A number when
+   * the line stands for that many per-product rules that share one offer in
+   * one section — the owner's «خصم 10% حتى 100,000 لكل وحدة على الطابعات»
+   * rather than one line per printer.
+   */
+  product_count: number | null;
 }
 
 export interface PublicTierBenefits {
@@ -1060,6 +1089,35 @@ export interface PublicTierBenefits {
 }
 
 /**
+ * The rules that can actually decide a price for ONE target, in the order the
+ * checkout tries them (`selectRule`: priority descending, then id). The first
+ * rule without a minimum order applies to every order, so nothing after it
+ * ever runs; a higher-priority rule WITH a minimum order applies to the orders
+ * that reach it, so it is kept, and says so in its own line.
+ */
+function reachableRules(rules: BenefitRule[]): BenefitRule[] {
+  const ordered = [...rules].sort((a, b) => b.priority - a.priority || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const out: BenefitRule[] = [];
+  for (const rule of ordered) {
+    out.push(rule);
+    if (rule.min_subtotal_iqd === null) break;
+  }
+  return out;
+}
+
+/** The offer a product rule makes, without the product: what collapses. */
+function offerKey(rule: BenefitRule): string {
+  return JSON.stringify([
+    rule.discount_mode,
+    rule.discount_mode === 'fixed' ? rule.fixed_iqd : rule.percent,
+    rule.max_discount_iqd,
+    rule.cap_scope,
+    rule.max_quantity,
+    rule.min_subtotal_iqd,
+  ]);
+}
+
+/**
  * WHAT THE STORE CURRENTLY PROMISES EACH TIER — the same rows the checkout
  * reads, named and stripped of anything internal.
  *
@@ -1071,6 +1129,29 @@ export interface PublicTierBenefits {
  * `notes` never leaves the server — it is the owner's note to themselves.
  * Rules that are switched off or outside their window are omitted, because
  * this is a list of what a member gets TODAY.
+ *
+ * A DISCOUNT IS STATED ON ITS SECTION, NEVER PER PRODUCT. The owner: «عرض
+ * الخصم لكل منتج خطأ؛ الصحيح خصم 10% حتى 100,000 لكل وحدة على الفئة». The
+ * owner prices printers with per-product rules (the product editor and the
+ * import both write them), so this used to publish one entry per product —
+ * with the product's name in the public payload — and the page could only
+ * hide the name after the fact. Product rules are now grouped by the section
+ * their product is filed under and by the offer they make (mode, figure,
+ * ceiling, quantity, minimum), and published as ONE line per group with the
+ * section's name and `product_count`. No product name leaves the server.
+ *
+ * CONSTANT BIND COUNT. The products were read with `WHERE id IN (?,?,…)`, one
+ * parameter per product rule, and D1 refuses more than 100: a store with 101
+ * per-product rules answered GET /plans with a 500 and nobody could reach the
+ * subscribe button. The section of each product rule is now read with ONE
+ * join and no parameters at all, whatever the number of rules.
+ *
+ * THE SAME CHOICE AS THE CHECKOUT. Of several rules on one target only the
+ * ones the checkout can reach are published (`reachableRules`); the delivery
+ * and tax lines are chosen by `selectRule` itself — the checkout's own
+ * function — so the page cannot advertise a threshold or a method the quote
+ * then does not use. (This used to keep whichever priority>0 rule came last
+ * in row order.)
  */
 export async function publicBenefitSummary(
   db: D1Database,
@@ -1078,66 +1159,151 @@ export async function publicBenefitSummary(
 ): Promise<Record<'prime' | 'pro', PublicTierBenefits>> {
   const [rules, { results: catalogRows }] = await Promise.all([
     activeBenefitRules(db),
-    db.prepare('SELECT id, name_ar, name_en FROM catalogs').all<{ id: string; name_ar: string; name_en: string }>(),
+    db
+      .prepare('SELECT id, name_ar, name_en, name_ckb, sort FROM catalogs')
+      .all<{ id: string; name_ar: string; name_en: string; name_ckb: string | null; sort: number | null }>(),
   ]);
   const names = new Map((catalogRows ?? []).map((r) => [String(r.id), r]));
 
-  const productIds = [...new Set(rules.filter((r) => r.scope === 'product' && r.product_id).map((r) => r.product_id!))];
-  const products = new Map<string, { name_ar: string; name: string }>();
-  if (productIds.length) {
+  // The section of every product a live product rule points at — one query,
+  // no bound parameters. A product that is not for sale (draft, hidden,
+  // deleted) is priced for nobody, so its rule promises nothing.
+  const sectionOf = new Map<string, string | null>();
+  if (rules.some((r) => r.scope === 'product' && r.product_id)) {
     const { results } = await db
-      .prepare(`SELECT id, name_ar, name FROM products WHERE id IN (${productIds.map(() => '?').join(',')})`)
-      .bind(...productIds)
-      .all<{ id: string; name_ar: string; name: string }>();
-    for (const row of results ?? []) products.set(String(row.id), { name_ar: row.name_ar, name: row.name });
+      .prepare(
+        `SELECT DISTINCT p.id AS id, p.category_id AS category_id, p.sub_category_id AS sub_category_id
+           FROM membership_benefit_rules r JOIN products p ON p.id = r.product_id
+          WHERE r.scope = 'product' AND r.enabled = 1 AND p.status = 'active'`
+      )
+      .all<{ id: string; category_id: string | null; sub_category_id: string | null }>();
+    for (const row of results ?? []) {
+      sectionOf.set(String(row.id), row.category_id ? String(row.category_id) : row.sub_category_id ? String(row.sub_category_id) : null);
+    }
   }
 
   const empty = (): PublicTierBenefits => ({ discounts: [], free_shipping: null, cod_tax_exempt: false });
   const out: Record<'prime' | 'pro', PublicTierBenefits> = { prime: empty(), pro: empty() };
+  const nameOf = (id: string | null) => {
+    const row = id ? names.get(id) : undefined;
+    return { ar: row?.name_ar ?? '', en: row?.name_en ?? '', ckb: row?.name_ckb ?? '' };
+  };
 
-  for (const rule of rules) {
-    if (rule.tier !== 'prime' && rule.tier !== 'pro') continue;
-    if (!withinWindow(rule, nowIso)) continue;
-    const bucket = out[rule.tier];
-    if (rule.benefit_type === 'product_discount') {
-      const targetId = rule.scope === 'product' ? rule.product_id : rule.scope === 'sub_category' ? rule.sub_category_id : rule.category_id;
-      const catalog = targetId ? names.get(targetId) : undefined;
-      const product = targetId ? products.get(targetId) : undefined;
-      bucket.discounts.push({
-        rule_id: rule.id,
-        scope: rule.scope,
-        target_id: targetId ?? null,
-        target_name_ar: product?.name_ar ?? catalog?.name_ar ?? '',
-        target_name_en: product?.name ?? catalog?.name_en ?? '',
-        discount_mode: rule.discount_mode,
-        percent: rule.percent,
-        fixed_iqd: rule.fixed_iqd,
-        max_discount_iqd: rule.max_discount_iqd,
-        cap_scope: rule.cap_scope,
-        max_quantity: rule.max_quantity,
-        min_subtotal_iqd: rule.min_subtotal_iqd,
-        label: rule.label,
-      });
-    } else if (rule.benefit_type === 'free_shipping') {
-      // The most specific live rule wins here for the same reason it does at
-      // the checkout — `selectRule`'s specificity order, of which free
-      // shipping only ever uses priority.
-      if (!bucket.free_shipping || rule.priority > 0) {
-        bucket.free_shipping = {
-          rule_id: rule.id,
-          threshold_iqd: rule.free_shipping_threshold_iqd,
-          methods: rule.shipping_methods,
-          max_subsidy_iqd: rule.max_shipping_subsidy_iqd,
-        };
-      }
-    } else if (rule.benefit_type === 'cod_tax_exemption') {
-      bucket.cod_tax_exempt = rule.cod_tax_exempt === true;
-    }
-  }
-  // Most specific first, so a page listing them reads "printers, filament,
-  // then everything else" rather than in insertion order.
   for (const tier of ['prime', 'pro'] as const) {
-    out[tier].discounts.sort((a, b) => SCOPE_RANK[b.scope] - SCOPE_RANK[a.scope]);
+    const live = rules.filter((r) => r.tier === tier && withinWindow(r, nowIso));
+    const discounts = live.filter((r) => r.benefit_type === 'product_discount');
+
+    // Section and store-wide rules: every target keeps the rules the checkout
+    // can reach on it.
+    const byTarget = new Map<string, BenefitRule[]>();
+    for (const rule of discounts) {
+      if (rule.scope === 'product') continue;
+      const targetId = rule.scope === 'sub_category' ? rule.sub_category_id : rule.scope === 'category' ? rule.category_id : null;
+      const key = `${rule.scope}:${targetId ?? ''}`;
+      byTarget.set(key, [...(byTarget.get(key) ?? []), rule]);
+    }
+    const lines: PublicDiscountRule[] = [];
+    for (const group of byTarget.values()) {
+      for (const rule of reachableRules(group)) {
+        const scope = rule.scope as PublicDiscountRule['scope'];
+        const targetId = scope === 'sub_category' ? rule.sub_category_id : scope === 'category' ? rule.category_id : null;
+        const name = nameOf(targetId);
+        lines.push({
+          rule_id: rule.id,
+          scope,
+          target_id: targetId ?? null,
+          target_name_ar: name.ar,
+          target_name_en: name.en,
+          target_name_ckb: name.ckb,
+          discount_mode: rule.discount_mode,
+          percent: rule.percent,
+          fixed_iqd: rule.fixed_iqd,
+          max_discount_iqd: rule.max_discount_iqd,
+          cap_scope: rule.cap_scope,
+          max_quantity: rule.max_quantity,
+          min_subtotal_iqd: rule.min_subtotal_iqd,
+          label: rule.label,
+          product_count: null,
+        });
+      }
+    }
+
+    // Product rules: the reachable rules per product, then one line per
+    // (section, offer). The product itself is never named.
+    const byProduct = new Map<string, BenefitRule[]>();
+    for (const rule of discounts) {
+      if (rule.scope !== 'product' || !rule.product_id || !sectionOf.has(rule.product_id)) continue;
+      byProduct.set(rule.product_id, [...(byProduct.get(rule.product_id) ?? []), rule]);
+    }
+    const groups = new Map<string, { rule: BenefitRule; ids: string[]; products: Set<string>; section: string | null }>();
+    for (const [productId, group] of byProduct) {
+      const section = sectionOf.get(productId) ?? null;
+      for (const rule of reachableRules(group)) {
+        const key = `${section ?? ''}|${offerKey(rule)}`;
+        const g = groups.get(key) ?? { rule, ids: [], products: new Set<string>(), section };
+        g.ids.push(rule.id);
+        g.products.add(productId);
+        groups.set(key, g);
+      }
+    }
+    for (const g of groups.values()) {
+      const name = nameOf(g.section);
+      const known = !!(name.ar || name.en);
+      lines.push({
+        rule_id: [...g.ids].sort()[0],
+        scope: 'category',
+        target_id: known ? g.section : null,
+        target_name_ar: known ? name.ar : '',
+        target_name_en: known ? name.en : '',
+        target_name_ckb: known ? name.ckb : '',
+        discount_mode: g.rule.discount_mode,
+        percent: g.rule.percent,
+        fixed_iqd: g.rule.fixed_iqd,
+        max_discount_iqd: g.rule.max_discount_iqd,
+        cap_scope: g.rule.cap_scope,
+        max_quantity: g.rule.max_quantity,
+        min_subtotal_iqd: g.rule.min_subtotal_iqd,
+        // A label is written for one rule; a group of many says nothing it
+        // cannot say for all of them.
+        label: g.ids.length === 1 ? g.rule.label : null,
+        product_count: g.products.size,
+      });
+    }
+
+    // Most specific first — the per-product offers (printers, as the owner
+    // prices them), then sub-sections, sections and the store-wide rule — in
+    // the store's own section order, and every line about one section next
+    // to the others about it.
+    const rank = (l: PublicDiscountRule) => (l.product_count !== null ? SCOPE_RANK.product : SCOPE_RANK[l.scope]);
+    const sortOf = (l: PublicDiscountRule) => Number((l.target_id ? names.get(l.target_id)?.sort : null) ?? 0);
+    const firstSeen = new Map<string, number>();
+    lines.forEach((l, i) => {
+      const k = l.target_id ?? `:${l.scope}`;
+      if (!firstSeen.has(k)) firstSeen.set(k, i);
+    });
+    lines.sort(
+      (a, b) =>
+        rank(b) - rank(a) ||
+        sortOf(a) - sortOf(b) ||
+        (firstSeen.get(a.target_id ?? `:${a.scope}`) ?? 0) - (firstSeen.get(b.target_id ?? `:${b.scope}`) ?? 0)
+    );
+    out[tier].discounts = lines;
+
+    // Delivery and the cash-on-delivery tax: the checkout's own selector, on
+    // the same empty target the checkout passes (`resolveOrderBenefits`). An
+    // unknown order value fails a minimum-order rule closed, as it does there.
+    const ctx = { tier, tierActive: true, target: {}, nowIso } as const;
+    const shipping = selectRule(live, { ...ctx, benefitType: 'free_shipping' });
+    if (shipping) {
+      out[tier].free_shipping = {
+        rule_id: shipping.id,
+        threshold_iqd: shipping.free_shipping_threshold_iqd,
+        methods: shipping.shipping_methods,
+        max_subsidy_iqd: shipping.max_shipping_subsidy_iqd,
+      };
+    }
+    const cod = selectRule(live, { ...ctx, benefitType: 'cod_tax_exemption' });
+    out[tier].cod_tax_exempt = cod?.cod_tax_exempt === true;
   }
   return out;
 }

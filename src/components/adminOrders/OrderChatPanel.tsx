@@ -1,10 +1,13 @@
 import { useChatPresence } from '../../lib/useChatPresence';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, Paperclip, Send } from 'lucide-react';
+import { Camera, Mic, Paperclip, Send, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { api, ApiError, uploadFile } from '../../lib/api';
+import { formatElapsed, useVoiceRecorder } from '../../lib/voiceRecorder';
+import ChatAttachment, { attachmentErrorText, attachmentKindOfFile, CHAT_FILE_ACCEPT, isAttachmentKind } from '../chat/ChatAttachment';
 import Spinner from '../ui/Spinner';
 import { ErrorState } from '../ui/AsyncStates';
+import { mergeThread, pollWhileVisible } from '../../lib/supportThread';
 
 /**
  * `fileUrl`, AND THAT NAME IS THE WHOLE OF A BUG THIS PANEL SHIPPED WITH.
@@ -22,7 +25,9 @@ import { ErrorState } from '../ui/AsyncStates';
 interface ChatMessage {
   id: string;
   sender_id: string;
-  kind: 'text' | 'image';
+  /** The attachment's real kind when there is one (worker/routes/chats.ts
+   *  `chatMessagePublic`), else 'text'. */
+  kind: 'text' | 'image' | 'video' | 'audio' | 'file';
   body: string;
   created_at: string;
   fileUrl?: string | null;
@@ -43,30 +48,32 @@ interface ChatMessage {
  * stays findable months later.
  *
  * ---------------------------------------------------------------------------
- *  ATTACHMENTS: CAMERA AND FILE. THERE IS NO MICROPHONE, AND THAT IS NOT AN
- *  OVERSIGHT.
+ *  ATTACHMENTS: CAMERA, FILE AND VOICE — «كاميرا/ملف/بصمة صوتية»
  * ---------------------------------------------------------------------------
- * «كاميرا/ملف/صوت». Two of the three are here, and they are one code path:
- * both inputs hand a `File` to `uploadFile(file, 'chat', chatId)`, which files
- * it under the CONVERSATION — the owner's own ordering, «الثاني الاسهل في فتح
- * المحادثه» — and the send then names the stored key. The camera input is the
- * same picker with `capture`, because on a phone that is the difference
- * between "take a photo of the damaged box" and "go find it in your gallery",
- * and on a desktop the attribute is simply ignored.
+ * All three are one code path: a `File` goes to `uploadFile(file, 'chat',
+ * chatId)`, which files it under the CONVERSATION — the owner's own ordering,
+ * «الثاني الاسهل في فتح المحادثه» — and the send then names the stored key.
  *
- * A VOICE NOTE CANNOT BE STORED BY THIS SCHEMA. `chat_messages.kind` carries
- * `CHECK (kind IN ('text','image'))` from migrations/0001_init.sql:306, and
- * SQLite cannot alter a CHECK without rewriting the table — which this project
- * does not do to live rows. `worker/routes/uploads.ts` would refuse the bytes
- * first in any case: it sniffs magic numbers and admits images and MP4 only,
- * so a WebM or M4A recording is «Unsupported file type» before it reaches the
- * message. Both halves are outside this screen and both would have to change
- * together; a microphone button that produced a red line on every tap would be
- * a worse answer than none, and a voice note silently stored as `kind='image'`
- * would be a lie in the database. It is reported as BLOCKED rather than faked.
+ *  * CAMERA is the picker with `capture`, because on a phone that is the
+ *    difference between "take a photo of the damaged box" and "go find it in
+ *    your gallery"; on a desktop the attribute is simply ignored.
+ *  * FILE takes a picture, a clip, an audio file or a PDF — what the upload
+ *    route admits by magic bytes (`sniffChat`), and nothing it would refuse.
+ *  * VOICE is recorded here (src/lib/voiceRecorder.ts): tap to record, the
+ *    elapsed time while it runs, ✕ to throw it away, send to upload it. It is
+ *    stored as what it is — migration 0110's `attachment_kind = 'audio'` —
+ *    never disguised as an image, which is why this was blocked until that
+ *    column existed. Where the browser has no recorder, no microphone is drawn.
+ *
+ * The server says what each attachment IS (the folder the upload was sniffed
+ * into), and `ChatAttachment` draws it: a picture, a player, or a document
+ * link. The customer's /chats page renders through the same component.
  */
+const CHAT_POLL_MS = 8_000;
+
 export default function OrderChatPanel({ orderId, active }: { orderId: string; active: boolean }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
+  const voice = useVoiceRecorder();
   const [chatId, setChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [meId, setMeId] = useState<string | null>(null);
@@ -123,6 +130,40 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length, active]);
 
+  /**
+   * THE OPEN THREAD REFRESHES ITSELF. Without this a customer line that
+   * arrived while the admin had the thread open (the order modal, or the
+   * support console's «الرسائل») stayed invisible until somebody went back
+   * and reopened it — and because this GET is what stamps `last_read_at`,
+   * it also stayed counted as unread. Silent, only while the tab is shown
+   * and the page visible, merged by id so a reply being sent is not lost.
+   */
+  useEffect(() => {
+    if (!active || !chatId || error != null) return;
+    return pollWhileVisible(() => {
+      api
+        .get<{ messages: ChatMessage[] }>(`/api/chats/${chatId}/messages`, { mascot: 'silent' })
+        .then((d) => setMessages((prev) => mergeThread(prev, d.messages || [])))
+        .catch(() => {});
+    }, CHAT_POLL_MS);
+  }, [active, chatId, error]);
+
+  /**
+   * THE REPLY IS APPENDED, NOT RE-FETCHED. The send route answers with the
+   * stored message in the read path's own shape, so the thread grows by one
+   * bubble instead of reloading every message behind a spinner. A server that
+   * predates that answer still gets the old full re-read.
+   */
+  const appendSent = async (res: { message?: ChatMessage }) => {
+    if (res && res.message && res.message.id) {
+      const sent = res.message;
+      setMessages((prev) => (prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]));
+      return;
+    }
+    const msgs = await api.get<{ messages: ChatMessage[] }>(`/api/chats/${chatId}/messages`);
+    setMessages(msgs.messages || []);
+  };
+
   const send = async () => {
     const body = draft.trim();
     if (!body || !chatId || sending) return;
@@ -130,10 +171,9 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
     setSending(true);
     setSendError(null);
     try {
-      await api.post(`/api/chats/${chatId}/messages`, { kind: 'text', body });
+      const res = await api.post<{ message?: ChatMessage }>(`/api/chats/${chatId}/messages`, { kind: 'text', body });
       setDraft('');
-      const msgs = await api.get<{ messages: ChatMessage[] }>(`/api/chats/${chatId}/messages`);
-      setMessages(msgs.messages || []);
+      await appendSent(res);
     } catch (e) {
       // The draft is deliberately KEPT so a failed send does not lose what
       // the admin typed.
@@ -156,25 +196,51 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
    * its own sentence in three languages, and «تعذّر الإرسال» in place of it
    * would hide the one instruction that fixes it (export as JPEG).
    */
-  const attach = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || !chatId || attaching) return;
+  const sendFile = async (file: File) => {
+    if (!chatId || attaching) return;
     setAttaching(true);
     setSendError(null);
     try {
       const uploaded = await uploadFile(file, 'chat', chatId);
-      await api.post(`/api/chats/${chatId}/messages`, { kind: 'image', fileKey: uploaded.key });
-      const msgs = await api.get<{ messages: ChatMessage[] }>(`/api/chats/${chatId}/messages`);
-      setMessages(msgs.messages || []);
+      // The kind is a HINT; the server reads the real one from where it filed
+      // the bytes.
+      const res = await api.post<{ message?: ChatMessage }>(`/api/chats/${chatId}/messages`, {
+        kind: attachmentKindOfFile(file),
+        fileKey: uploaded.key,
+      });
+      await appendSent(res);
     } catch (err) {
       setSendError(
-        err instanceof ApiError ? err.message : loc('تعذّر إرسال الصورة', 'Could not send the image') /* OWNER: Sorani by hand; loc() falls back to ar. */
+        attachmentErrorText(err, loc('تعذّر إرسال المرفق', 'Could not send the attachment')) /* OWNER: Sorani by hand; loc() falls back to ar. */
       );
     } finally {
       setAttaching(false);
     }
   };
+
+  const attach = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    await sendFile(file);
+  };
+
+  /** The microphone: the first tap records, send uploads it, ✕ discards it. */
+  const startVoice = async () => {
+    if (!chatId || attaching || sending) return;
+    setSendError(null);
+    await voice.start();
+  };
+  const sendVoice = async () => {
+    const file = await voice.stop();
+    if (file) await sendFile(file);
+  };
+  const voiceError =
+    voice.error === 'denied'
+      ? loc('لم يُسمح باستخدام الميكروفون — فعّله من إعدادات المتصفح.', 'Microphone access was refused — allow it in the browser settings.')
+      : voice.error === 'failed'
+        ? loc('تعذّر بدء التسجيل الصوتي.', 'The voice recording could not start.')
+        : null;
 
   if (loading) {
     return (
@@ -212,18 +278,11 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
                   mine ? 'bg-olive text-white' : 'bg-zinc-800 text-zinc-100'
                 }`}
               >
-                {m.kind === 'image' && m.fileUrl ? (
-                  <a href={m.fileUrl} target="_blank" rel="noopener noreferrer">
-                    {/* Tapping opens the full object. The bubble is 75% of a
-                        modal column, which is too small to read a serial
-                        number or a damaged corner off. */}
-                    <img
-                      src={m.fileUrl}
-                      alt={loc('صورة مرفقة', 'Attached image') /* OWNER: Sorani by hand. */}
-                      className="rounded-lg max-w-full"
-                      referrerPolicy="no-referrer"
-                    />
-                  </a>
+                {isAttachmentKind(m.kind) && m.fileUrl ? (
+                  <>
+                    <ChatAttachment kind={m.kind} url={m.fileUrl} loc={loc} />
+                    {m.body && <span className="mt-1 block whitespace-pre-wrap break-words">{m.body}</span>}
+                  </>
                 ) : (
                   <span className="whitespace-pre-wrap break-words">{m.body}</span>
                 )}
@@ -238,7 +297,40 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
 
       <div className="border-t border-zinc-800 p-3 shrink-0">
         {presence.typing && <p role="status" className="text-xs text-text-secondary mb-2">{loc('يكتب الآن…', 'Typing…', 'دەنووسێت…')}</p>}
-        {sendError && <p className="text-[12px] text-red-400 mb-2">{sendError}</p>}
+        {(sendError || voiceError) && <p className="text-[12px] text-red-400 mb-2">{sendError || voiceError}</p>}
+        {voice.recording ? (
+          /* RECORDING REPLACES THE COMPOSER, so there is one thing to do: send
+             it or throw it away. The time runs so the admin can see the
+             microphone is live. */
+          <div className="flex items-center gap-2" data-order-chat-recording>
+            <button
+              type="button"
+              onClick={voice.cancel}
+              data-order-chat-voice-cancel
+              aria-label={loc('إلغاء التسجيل', 'Discard the recording')}
+              title={loc('إلغاء التسجيل', 'Discard the recording')}
+              className="w-11 h-11 shrink-0 rounded-xl border border-zinc-700 text-zinc-300 flex items-center justify-center hover:bg-zinc-800 transition-colors"
+            >
+              <X className="w-4 h-4" aria-hidden />
+            </button>
+            <p role="status" aria-live="polite" className="flex-1 flex items-center gap-2 text-sm text-zinc-200">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" aria-hidden />
+              {loc('جارٍ التسجيل', 'Recording')}{' '}
+              <span className="tabular-nums" dir="ltr">
+                {formatElapsed(voice.elapsed, lang === 'en')}
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={sendVoice}
+              data-order-chat-voice-send
+              aria-label={loc('إرسال الرسالة الصوتية', 'Send the voice message')}
+              className="w-11 h-11 shrink-0 rounded-xl bg-olive text-white flex items-center justify-center hover:bg-olive-light transition-colors"
+            >
+              <Send className="w-4 h-4 rtl:-scale-x-100" aria-hidden />
+            </button>
+          </div>
+        ) : (
         <form
           className="flex items-end gap-2"
           onSubmit={(e) => {
@@ -265,7 +357,7 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept={CHAT_FILE_ACCEPT}
             className="hidden"
             data-order-chat-file
             onChange={attach}
@@ -292,6 +384,19 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
           >
             <Paperclip className="w-4 h-4" aria-hidden />
           </button>
+          {voice.supported && (
+            <button
+              type="button"
+              disabled={attaching || sending}
+              onClick={startVoice}
+              data-order-chat-voice
+              title={loc('تسجيل رسالة صوتية', 'Record a voice message')}
+              aria-label={loc('تسجيل رسالة صوتية', 'Record a voice message')}
+              className="w-11 h-11 shrink-0 rounded-xl border border-zinc-700 text-zinc-300 flex items-center justify-center disabled:opacity-40 hover:bg-zinc-800 transition-colors"
+            >
+              <Mic className="w-4 h-4" aria-hidden />
+            </button>
+          )}
           <textarea
             value={draft}
             onChange={(e) => { setDraft(e.target.value); presence.onEdit(e.target.value); }}
@@ -317,6 +422,7 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
             {sending ? <Spinner size="sm" /> : <Send className="w-4 h-4" />}
           </button>
         </form>
+        )}
       </div>
     </div>
   );

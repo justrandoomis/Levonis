@@ -51,7 +51,7 @@ export function verifyEmail(to: string, verifyUrl: string, locale: 'ar' | 'en' |
   return simpleEmail(
     to,
     ar ? 'تأكيد بريدك الإلكتروني' : 'Confirm your email address',
-    ar ? 'مرحبًا بك في ليفونيس' : 'Welcome to Levonis',
+    ar ? 'مرحبًا بك في \u2068Levonis\u2069' : 'Welcome to Levonis',
     ar ? 'اضغط على الرابط لتأكيد بريدك الإلكتروني.' : 'Follow the link to confirm your email address.',
     { href: verifyUrl, label: ar ? 'تأكيد البريد' : 'Confirm email' }
   );

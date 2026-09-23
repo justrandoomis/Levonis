@@ -46,7 +46,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, get, post, json } from './fixtures/app';
+import { freshDb, asD1, stubApp, get, post, patch, json, pending } from './fixtures/app';
 import { adminRoutes } from '../worker/routes/admin';
 import { chatRoutes } from '../worker/routes/chats';
 import { moveOrderStage } from '../worker/lib/orderStageOps';
@@ -217,6 +217,28 @@ test('(ب) each vector honours the OTHER select and ignores its own', async () =
   assert.equal(body.options.status.any, 5);
 });
 
+test('(ب) THE DEFAULT VIEW — on «مباشر» the status numbers count DIRECT orders, not pre-orders too', async () => {
+  // The board's opening screen sends `scope=open` and NO `type` (the partial
+  // index note in admin.ts). The status vector used to read only `type`, so it
+  // counted every pre-order as well: «قيد الانتظار ٣» over a board of one row.
+  const { app } = seed([
+    { id: 'D-1', shipping_type: 'direct', status: 'pending' },
+    { id: 'A-1', shipping_type: 'preorder_air', status: 'pending' },
+    { id: 'S-1', shipping_type: 'preorder_sea', status: 'pending' },
+  ]);
+  const open = await at(NOON, () => board(app, 'scope=open'));
+  assert.equal(open.counts.total, 1, 'the board shows the one direct order');
+  assert.equal(open.options.status.pending, open.counts.total, 'the number beside «قيد الانتظار» is the board');
+  assert.equal(open.options.status.any, open.counts.total, '«كل الحالات» is the board');
+  // …while the JOURNEY select still counts both journeys, which is its job.
+  assert.equal(open.options.type.direct, 1);
+  assert.equal(open.options.type.preorder_air, 1);
+  // And the pre-order scope with no chosen transport counts pre-orders only.
+  const pre = await at(NOON, () => board(app, 'scope=preorder'));
+  assert.equal(pre.options.status.pending, 2);
+  assert.equal(pre.options.status.pending, pre.counts.total);
+});
+
 test('(ب) the ARCHIVE select reports BOTH of its options while the board shows one', async () => {
   const { app } = seed(MIXED);
   const body = await at(NOON, () => board(app, 'scope=delivered'));
@@ -305,6 +327,58 @@ test('(ج) a stage that is not on THIS order\'s path falls back to what its STAT
   assert.equal(quick(body, 'MIX-1')!.stage, 'preparing', 'confirmed → preparing on the direct path');
 });
 
+test('(ج) …and the stage door ACCEPTS the move the button offers on such a row', async () => {
+  // The button and the door used to read the off-path row two ways: the button
+  // from the STATUS (confirmed → preparing), the door from the raw stage
+  // (`at_origin_warehouse`, not on the direct path → every move refused). So
+  // the one tap produced ILLEGAL_STAGE_MOVE — «a button whose only effect is a
+  // red line», which this suite's own header says was prevented.
+  const { raw, app } = seed([
+    { id: 'MIX-2', status: 'confirmed', stage: 'at_origin_warehouse', shipping_type: 'direct' },
+  ]);
+  const offered = quick(await at(NOON, () => board(app, 'scope=all')), 'MIX-2')!.stage;
+  const res = await patch(app, '/api/admin/orders/MIX-2/stage', { stage: offered });
+  const body = await json(res);
+  assert.equal(res.status, 200, JSON.stringify(body));
+  const row = raw.prepare('SELECT stage, status FROM orders WHERE id = ?').get('MIX-2') as { stage: string; status: string };
+  assert.deepEqual({ ...row }, { stage: 'preparing', status: 'processing' });
+});
+
+test('(ج) the off-path fence is still the STORED stage — a row changed underneath is RACED, not overwritten', async () => {
+  const raw = notifyDb();
+  notifyOrder(raw, 'MIX-3', 'direct', 'at_origin_warehouse', 'confirmed');
+  const e = env(raw);
+  // Another mover changes the stored stage after this one's read: simulated by
+  // reading through a D1 whose first SELECT returns the old row.
+  const d1 = asD1(raw);
+  const racing = {
+    ...(e as object),
+    DB: {
+      prepare: (sql: string) => {
+        const stmt = d1.prepare(sql);
+        if (!/^SELECT \* FROM orders WHERE id = \?/.test(sql.trim())) return stmt;
+        return {
+          bind: (...v: unknown[]) => {
+            const bound = stmt.bind(...v);
+            return {
+              first: async () => {
+                const r = await bound.first();
+                raw.prepare("UPDATE orders SET stage = 'confirmed' WHERE id = 'MIX-3'").run();
+                return r;
+              },
+            };
+          },
+        };
+      },
+      batch: (stmts: D1PreparedStatement[]) => d1.batch(stmts),
+    },
+  };
+  const moved = await moveOrderStage(racing as never, { orderId: 'MIX-3', to: 'preparing', source: 'manual', changedBy: 'boss' } as never);
+  assert.equal(moved.moved, false);
+  assert.equal(moved.reason, 'RACED');
+  assert.equal((raw.prepare("SELECT stage FROM orders WHERE id = 'MIX-3'").get() as { stage: string }).stage, 'confirmed');
+});
+
 test('(ج) the button marks a move that is normally the courier\'s or the clock\'s', async () => {
   const { app } = seed([{ id: 'D-PREP', status: 'processing', stage: 'preparing', shipping_type: 'direct' }]);
   const body = await at(NOON, () => board(app, 'scope=all'));
@@ -391,6 +465,79 @@ test('(د) FIVE pre-order stages all mean `shipped`, and the customer is told ON
     await moveOrderStage(e, { orderId: 'ORD-SEA', to, source: 'manual', changedBy: 'boss' } as never);
   }
   assert.deepEqual(eventKeys(raw), ['order.status.shipped:ORD-SEA:email'], 'one journey, one message');
+});
+
+test('(د) THE FLOOR — a customer with NO channel at all still finds «تم تأكيد طلبك» in the bell', async () => {
+  // «الإشعارات لا تصل للمستخدم عند تحديث حالة طلبه». Only `delivered` wrote an
+  // in-app row, so a customer with no verified email, WhatsApp or Telegram —
+  // most of them — heard nothing whatever about confirmed, shipped or
+  // cancelled.
+  const raw = freshDb();
+  raw.prepare("INSERT INTO users (id,name,email,password_hash,role) VALUES ('u1','زبون','u1@x.co','h','customer')").run();
+  notifyOrder(raw, 'ORD-B');
+  await moveOrderStage(env(raw), { orderId: 'ORD-B', to: 'confirmed', source: 'manual', changedBy: 'boss' } as never);
+  assert.deepEqual(eventKeys(raw), [], 'no channel, so no outbox row — the floor is all there is');
+  const bell = raw.prepare('SELECT title_ar, title_en, link, event_key FROM user_notifications WHERE user_id = ?').all('u1') as Array<{
+    title_ar: string; title_en: string; link: string; event_key: string;
+  }>;
+  assert.equal(bell.length, 1);
+  assert.match(bell[0].title_ar, /تم تأكيد طلبك ORD-B/);
+  assert.match(bell[0].title_en, /Order ORD-B is confirmed/);
+  assert.equal(bell[0].link, '/orders/ORD-B');
+  assert.equal(bell[0].event_key, 'order.status.confirmed:ORD-B');
+  // A cancellation names the order in the bell, because its sentence does not.
+  notifyOrder(raw, 'ORD-B2');
+  await moveOrderStage(env(raw), { orderId: 'ORD-B2', to: 'cancelled', source: 'manual', changedBy: 'boss' } as never);
+  const cancelled = raw.prepare("SELECT title_ar FROM user_notifications WHERE event_key = 'order.status.cancelled:ORD-B2'").get() as { title_ar: string };
+  assert.match(cancelled.title_ar, /ORD-B2/);
+});
+
+test('(د) THE LATENCY — the stage door hands the send to the request, which sends THIS order\u2019s rows now', async () => {
+  // The rows used to wait for the fifteen-minute cron, and the cron drains
+  // oldest-first. The route now passes its waitUntil, and the flush is by
+  // event-key prefix, so an older backlog cannot hold this message up.
+  const raw = notifyDb();
+  notifyOrder(raw, 'ORD-F');
+  // A backlog row that is OLDER and would be first in a FIFO drain.
+  raw.prepare(
+    `INSERT INTO outbox (id, kind, event_key, recipient, payload, state, created_at)
+     VALUES ('obx_old','email','old.event:1:email','a@x.co','{"kind":"email","to":"a@x.co","subject":"s","html":"h","text":"t"}','pending','2020-01-01T00:00:00.000Z')`
+  ).run();
+  const deferred: Promise<unknown>[] = [];
+  const sent: string[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+    sent.push(String(init?.body ?? ''));
+    return new Response(JSON.stringify({ id: 'em_1' }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const moved = await moveOrderStage(env(raw), {
+      orderId: 'ORD-F', to: 'confirmed', source: 'manual', changedBy: 'boss',
+      defer: (p: Promise<unknown>) => { deferred.push(p); },
+    } as never);
+    assert.equal(moved.moved, true);
+    assert.equal(deferred.length, 1, 'the send was handed to the request');
+    await Promise.all(deferred);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  const rows = raw.prepare('SELECT event_key, state FROM outbox ORDER BY event_key').all() as Array<{ event_key: string; state: string }>;
+  assert.deepEqual(rows.map((r) => ({ ...r })), [
+    { event_key: 'old.event:1:email', state: 'pending' },
+    { event_key: 'order.status.confirmed:ORD-F:email', state: 'sent' },
+  ]);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /ORD-F/);
+});
+
+test('(د) the admin STAGE route passes its waitUntil — the flush is wired where the owner presses', async () => {
+  const { raw, app } = seed([{ id: 'D-W', shipping_type: 'direct', status: 'pending' }]);
+  const before = pending.length;
+  const res = await patch(app, '/api/admin/orders/D-W/stage', { stage: 'confirmed' });
+  assert.equal(res.status, 200, JSON.stringify(await json(res)));
+  assert.ok(pending.length > before, 'a flush was registered with the request');
+  await Promise.all(pending.splice(before));
+  assert.ok(raw.prepare("SELECT 1 FROM user_notifications WHERE event_key = 'order.status.confirmed:D-W'").get());
 });
 
 test('(د) `processing` is a warehouse fact and is NOT a notification', async () => {

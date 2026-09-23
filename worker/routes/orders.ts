@@ -170,6 +170,7 @@ import type { ShippingType } from '../lib/shippingType';
 import type { PolicyRef } from '../lib/policyOps';
 import { createInvoiceForOrder } from '../lib/invoices';
 import { announceAfterResponse, orderAnnouncement, orderTopic } from '../lib/adminTopicRouting';
+import { orderConfirmKeyboard } from '../lib/orderTelegramConfirm';
 import { notifyOrderPlaced } from '../lib/orderNotify';
 
 export const orderRoutes = new Hono<AppContext>();
@@ -4711,21 +4712,28 @@ orderRoutes.post('/', async (c) => {
    * names, the resolved «option / colour» text and the per-line money, and
    * `comp.address` is the row this checkout already read. Nothing here queries.
    *
-   * `comp.address.address` — the street line — is deliberately NOT passed, and
-   * the builder does not accept it: see the privacy contract in the header of
-   * adminTopicRouting.ts for exactly what this message may say about a person —
-   * name, MASKED phone, governorate/area/landmark — and why the door is not on
-   * that list.
+   * «الاسم والرقم والعنوان» — the owner's own list for this message. The
+   * delivery RECIPIENT (the address's own name), the full phone and the full
+   * address, street line included, go to the private admin group; the account
+   * holder rides beside the recipient when they differ. See the contract in
+   * the header of adminTopicRouting.ts and docs/DECISIONS.md.
+   *
+   * AND THE BUTTON. «تم تأكيد الطلب» under the message confirms the order
+   * through the same stage door as the panel (worker/lib/orderTelegramConfirm.ts),
+   * with the panel link beneath it.
    */
+  const confirmKeyboard = orderConfirmKeyboard(c.env, orderId);
   announceAfterResponse(
     c,
     orderTopic(orderShippingType),
     orderAnnouncement({
       orderId,
       customerName: user.name || user.username || `#${user.id}`,
+      recipientName: comp.address?.name,
       phone: comp.address?.phone,
       governorate: comp.address?.governorate,
       area: comp.address?.area,
+      address: comp.address?.address,
       landmark: comp.address?.landmark,
       shippingType: orderShippingType,
       paymentMethodId: input.paymentMethodId,
@@ -4735,7 +4743,8 @@ orderRoutes.post('/', async (c) => {
       bnplDueAt: comp.bnplDueAt,
       dueOnDeliveryIqd: comp.dueOnDelivery,
       lines: comp.lines,
-    })
+    }),
+    confirmKeyboard ? { reply_markup: confirmKeyboard } : {}
   );
   const data = (await loadOrder(c.env.DB, orderId))!;
   const snaps = await getOrderPointsSnapshots(c.env, [orderId]);

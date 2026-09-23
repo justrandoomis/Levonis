@@ -20,7 +20,7 @@ import { Btn, Card, Chip, ChipListEditor, Input, Notice, TextArea, Toggle } from
 /** The accent presets, with an honest swatch for each. Classes only — the
  *  merchant picks a NAME; no colour value they type can reach a style rule. */
 const ACCENT_SWATCHES: Array<{ id: string; cls: string; ar: string; en: string }> = [
-  { id: 'default', cls: 'bg-[#BAA369]', ar: 'ليفونيس', en: 'Levonis' },
+  { id: 'default', cls: 'bg-[#BAA369]', ar: 'Levonis', en: 'Levonis' },
   { id: 'olive', cls: 'bg-[#6b7d43]', ar: 'زيتوني', en: 'Olive' },
   { id: 'gold', cls: 'bg-yellow-500', ar: 'ذهبي', en: 'Gold' },
   { id: 'slate', cls: 'bg-slate-400', ar: 'رمادي', en: 'Slate' },
@@ -468,7 +468,7 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
         {suspended ? (
           <Notice
             text={loc(
-              'المتجر موقوف من إدارة ليفونيس ولا يمكن إعادة فتحه من هنا. تواصل مع الدعم.',
+              'المتجر موقوف من إدارة Levonis ولا يمكن إعادة فتحه من هنا. تواصل مع الدعم.',
               'This store is suspended by Levonis and cannot be re-opened from here. Contact support.',
               'فرۆشگاکە لەلایەن LEVONIS ڕاگیراوە.'
             )}

@@ -24,6 +24,7 @@ export interface LaunchInfo {
 
 /** Conditional perks, as the server reports them switched on right now. */
 export interface PlanFeatures {
+  /** Always false since the printer gift became a manual grant; kept for the wire shape. */
   printer_gift: boolean;
   preorder_gift: boolean;
 }
@@ -39,11 +40,17 @@ export interface PlansResponse {
   launch: LaunchInfo;
   features?: PlanFeatures;
   delivery?: DeliveryThresholds;
-  /** Public capability contract generated from the canonical server matrix. */
+  /**
+   * The canonical capability matrix (ENTITLEMENT_MINIMUM_TIER), resolved per
+   * tier on the server. The comparison reads its ticks from here, so an
+   * inherited benefit is a tick in every higher column by construction.
+   */
   entitlement_contract?: {
     minimum_tier: Record<string, PaidTier>;
     tiers: Record<PaidTier, Record<string, boolean>>;
   };
+  /** Daily check-in points multiplier per tier, in hundredths (150 = ×1.5). */
+  points_multiplier_x100?: Record<PaidTier, number>;
 }
 
 export interface ApiMembership {
@@ -89,6 +96,13 @@ export type PurchaseQuote =
       charge_usd_cents: number;
       balance_usd_cents: number;
       shortfall_usd_cents: number;
+      /**
+       * THE WALLET IN DINARS — what /wallet prints, and what the purchase's
+       * affordability is decided in (quotePayload, migration 0108). Absent
+       * only from a server older than that.
+       */
+      balance_iqd?: number;
+      shortfall_iqd?: number;
       activate_now: boolean;
       launch_at: string | null;
       expires_at: string | null;

@@ -211,6 +211,9 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/store-orders', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'auth', rateClass: 'money' },
   { prefix: '/api/marketplace', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'write', note: '/api/marketplace/print extends the same requests' },
   { prefix: '/api/admin/community', hosts: 'main', owner: 'MARKETPLACE', flipPhase: 6, requires: 'admin', rateClass: 'admin-write' },
+  // The printer-model economics editor (worker/routes/printQuote.ts `adminPrintQuoteRoutes`) —
+  // the admin half of the print quote engine, so it moves with /api/print-quote.
+  { prefix: '/api/admin/print-quote', hosts: 'main', owner: 'MARKETPLACE', flipPhase: 6, requires: 'admin', rateClass: 'admin-write' },
   // The print quote engine (migration 0078). It answers «احسب سعر طباعتك» for a
   // GUEST — the calculator is how somebody finds out the shop exists, so
   // `requires: 'none'` is the point of it, and the route's own per-bucket rate

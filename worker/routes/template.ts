@@ -63,7 +63,7 @@ import {
   type ProductSavePlan,
 } from '../lib/productPersistence';
 import { resolveTemplateFamilies, type CatalogRow } from './adminTaxonomy';
-import { createPendingBrand, loadRefRows, matchRef, planBrandCreate } from '../lib/templateRefs';
+import { createPendingBrand, inactiveBrandWarning, loadRefRows, matchRef, planBrandCreate } from '../lib/templateRefs';
 import { ambiguousMessage } from '../lib/importApply';
 import { canViewFinancials, projectForAdmin } from '../lib/adminScope';
 import { getSetting } from '../lib/settings';
@@ -804,7 +804,7 @@ export function buildBlankTemplate(): { text: string; disabled: DisabledLine[]; 
  * and the name says so in three languages.
  */
 const EXAMPLE_TEMPLATE = `# ============================================================
-# مثال قالب ليفونيس — منتج نموذجي صالح للمعاينة
+# مثال قالب Levonis — منتج نموذجي صالح للمعاينة
 # Levonis product template — filled EXAMPLE (valid, ready to preview)
 # ============================================================
 # تطبيق هذا الملف يُنشئ **مسودة** فقط ولا يُنشر أبداً كمنتج حقيقي تلقائياً.
@@ -863,7 +863,9 @@ product_cost_iqd=__NULL__
 # membership.premium.max_quantity=
 
 # ------------------------------ التصنيف / classification
-# لا علامة ولا كتالوج في المثال: أي قيمة غير موجودة توقف الاستيراد للمراجعة
+# لا علامة ولا كتالوج في المثال. العلامة تُطابَق بالاسم أو الـ slug أو المعرّف؛
+# وإن لم توجد تُنشأ علامة جديدة بهذا الاسم عند التطبيق (وتظهر في الفحص قبل ذلك).
+# الكتالوج غير الموجود ما زال يوقف الاستيراد للمراجعة.
 brand=__NULL__
 catalogs=
 hashtags=مثال,example
@@ -872,6 +874,8 @@ display_order=0
 
 # ------------------------------ البيع والمخزون / selling & stock
 selling_type=mixed
+# يوجد لون مرتبط بخيار، لذلك مخزون البيع المباشر يُحفظ على التوليفة الدقيقة خيار×لون.
+inventory_mode=VARIANT_COMBINATION
 payment_options=
 
 # ------------------------------ الحالة (Open Box / مستعمل / مجدّد)
@@ -920,7 +924,8 @@ options.1.regular_price_iqd=__NULL__
 options.1.availability_type=
 options.1.direct.enabled=true
 options.1.direct.price_iqd=+2000
-options.1.stock=5
+# عند وجود ألوان مرتبطة لا يُكتب مخزون مباشر على الخيار نفسه؛ انظر variants أدناه.
+options.1.stock=__NULL__
 options.1.preorder.enabled=true
 options.1.preorder.transports.1.method=sea
 options.1.preorder.transports.1.enabled=true
@@ -934,8 +939,8 @@ options.2.regular_price_iqd=+20000
 options.2.availability_type=
 options.2.direct.enabled=true
 options.2.direct.price_iqd=+3000
-# البيع المباشر يوجب رقماً: 0 = منتهي، وأي رقم موجب = الكمية المتاحة.
-options.2.stock=0
+# مخزون Large موزع على تركيبات الألوان أدناه.
+options.2.stock=__NULL__
 options.2.low_stock_threshold=__NULL__
 # الطلب المسبق لا يملك مخزونًا أو سعة؛ هو متوفر أو غير متوفر، ولكل طريق زيادة.
 options.2.preorder.enabled=true
@@ -949,8 +954,10 @@ colors.1.id=col_example_black
 colors.1.name_ar=أسود
 colors.1.name_en=Black
 colors.1.hex=#111111
-# __NULL__ = متاح لكل الخيارات
-colors.1.option_id=__NULL__
+# option_index=1 يربط الأسود بالخيار options.1 (Small) فقط.
+# (option_id=__NULL__ يجعل اللون متاحًا لكل الخيارات، وعندها تحتاج كل خيار×لون
+# توليفة دقيقة بمخزونها في قسم variants أدناه.)
+colors.1.option_index=1
 colors.1.active=true
 colors.2.id=col_example_gold
 colors.2.name_ar=ذهبي
@@ -961,6 +968,24 @@ colors.2.option_index=2
 # +15000 فوق سعر الخيار الكبير (120000) = 135000 للزبون
 colors.2.regular_price_iqd=+15000
 colors.2.active=true
+
+# ------------------------------ التوليفات الدقيقة / exact combinations
+# الأسود مربوط بـ Small، والذهبي مربوط بـ Large.
+# مخزون البيع المباشر مصدره الوحيد هنا عند وجود لون مرتبط:
+# 0 = منتهي، وأي رقم موجب = الكمية المتاحة.
+variants.1.id=var_example_small_black
+variants.1.option_value_ids=opt_example_small
+variants.1.color_id=col_example_black
+variants.1.active=true
+variants.1.stock=5
+variants.1.low_stock_threshold=__NULL__
+
+variants.2.id=var_example_large_gold
+variants.2.option_value_ids=opt_example_large
+variants.2.color_id=col_example_gold
+variants.2.active=true
+variants.2.stock=0
+variants.2.low_stock_threshold=__NULL__
 
 # ------------------------------ المواصفات / specifications
 spec_groups.1.id=sg_example_general
@@ -1160,9 +1185,13 @@ async function resolveRefs(db: D1Database, parsed: ParsedTemplate): Promise<Reso
     if (!v) {
       refs.brand_id = null;
     } else {
-      const match = matchRef(await loadRefRows(db, 'brands'), v);
-      if (match.kind === 'hit') refs.brand_id = match.id;
-      else if (match.kind === 'ambiguous')
+      const brandRows = await loadRefRows(db, 'brands');
+      const match = matchRef(brandRows, v);
+      if (match.kind === 'hit') {
+        refs.brand_id = match.id;
+        const inactive = inactiveBrandWarning(brandRows, match, v);
+        if (inactive) (refs.warnings ??= []).push(inactive);
+      } else if (match.kind === 'ambiguous')
         refs.needs_review!.push({
           key: 'brand', line: brandField.line, value: v,
           message: `${ambiguousMessage('brand', v)} — ${match.candidates.join('، ')}`,
@@ -2681,7 +2710,7 @@ templateRoutes.post('/apply', async (c) => {
    * inserted, or the one somebody added between the check and this apply.
    */
   for (const pending of a.refs.brands_to_create ?? []) {
-    const made = await createPendingBrand(c.env.DB, pending);
+    const made = await createPendingBrand(c.env.DB, pending, { adminId: adminUser.id, via: 'template.apply' });
     if ('ambiguous' in made) {
       return c.json({
         success: false,
@@ -2697,7 +2726,7 @@ templateRoutes.post('/apply', async (c) => {
       }, 400);
     }
     if (doc.brand_id === pending.id) doc.brand_id = made.id;
-    brandsCreated.push({ id: made.id, name: pending.name, slug: pending.slug, created: made.created });
+    brandsCreated.push({ id: made.id, name: pending.name, slug: made.slug, created: made.created });
   }
 
   const fingerprintClaim = await claimApplyFingerprint(c.env.DB, fingerprint);

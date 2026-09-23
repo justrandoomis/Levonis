@@ -84,13 +84,12 @@ test('a withdrawal row prints the typed dinars, not the cents converted back', (
   );
   // Presence decides, not truthiness: a recorded 0 is not a reason to convert.
   assert.match(src, /if \(declared === null \|\| declared === undefined\) return fmt\(op\.amount\);/);
-  // And the typed figure is actually SENT on the withdrawal branch.
-  assert.equal(
-    (src.match(/declared_amount_iqd: typedIqd \|\| undefined,/g) ?? []).length,
-    2,
-    'the declared dinars are posted on only one of the two kinds'
-  );
-  assert.match(src, /await api\.post\('\/api\/wallet\/withdrawals', \{[\s\S]{0,400}declared_amount_iqd: typedIqd/);
+  // And the typed figure is actually SENT on both branches. The withdrawal
+  // sends `declaredIqd` — the typed dinars in IQD (`withdrawalClaim` returns
+  // them unchanged there), and in USD the dinars a figure above the ledger
+  // cents stands for (tests/walletDinarFigures.test.ts).
+  assert.match(src, /await api\.post\('\/api\/wallet\/deposits', \{[\s\S]{0,400}declared_amount_iqd: typedIqd \|\| undefined/);
+  assert.match(src, /await api\.post\('\/api\/wallet\/withdrawals', \{[\s\S]{0,400}declared_amount_iqd: declaredIqd \|\| undefined/);
 });
 
 /**
@@ -198,8 +197,17 @@ test('the admin card states what to TRANSFER, which is not what was requested', 
   );
   assert.match(admin, /net_cents: t\.withdrawal_net_cents === null/, 'the mapper must expose it by presence, not truthiness');
 
-  assert.match(card, /formatWalletIqd\(t\.withdrawal\.net_cents, exchangeRate\)/, 'the card stopped showing the payout');
-  assert.match(card, /commission \{formatWalletIqd\(t\.withdrawal\.fee_cents, exchangeRate\)\} withheld/, 'the card must say where the difference went');
+  // Since migration 0112 the card prints the dinar payout the customer was
+  // QUOTED (`net_iqd`/`fee_iqd`), and only converts the cents — at the rate
+  // the request was filed at, never today's — for a request that recorded none.
+  assert.match(card, /formatIqd\(t\.withdrawal\.net_iqd\)/, 'the card stopped showing the payout');
+  assert.match(
+    card,
+    /formatWalletIqd\(t\.withdrawal\.net_cents, t\.withdrawal\.exchange_rate_snapshot \|\| exchangeRate\)/,
+    'an older request converts at its own rate'
+  );
+  assert.match(card, /formatIqd\(t\.withdrawal\.fee_iqd\)/, 'the card must say where the difference went');
+  assert.match(card, /withheld ·/, 'the commission is named as withheld');
 
   // Presence, never truthiness: a route that does not carry net_cents must not
   // render «0 د.ع» as an instruction to transfer nothing.

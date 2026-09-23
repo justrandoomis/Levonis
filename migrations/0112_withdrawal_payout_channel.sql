@@ -1,0 +1,71 @@
+-- ============================================================================
+--  0112 — «كي كارد، الرافدين، زين كاش، استلام كاش» : WHICH CHANNEL THE
+--         CUSTOMER CHOSE, AND WHAT THEY WERE PROMISED, WRITTEN ON THE REQUEST.
+-- ============================================================================
+-- NONDESTRUCTIVE: three nullable ADD COLUMNs on `wallet_withdrawals`. Nothing
+-- is dropped, no CHECK is added, no existing CHECK is touched, and NO ROW IS
+-- BACKFILLED — every request that exists when this applies reads NULL on all
+-- three, which is the truth about it: nobody wrote the channel's name or the
+-- dinar payout down at the time, so nobody may now claim to know them.
+--
+-- ---------------------------------------------------------------------------
+--  THE REPORT
+-- ---------------------------------------------------------------------------
+--   «السحب: وسائل الاستلام نفس القنوات (كي كارد، الرافدين، زين كاش، استلام
+--    كاش) مع عمولة سحب 3% قابلة للتغيير من لوحة الإدارة.»
+--
+-- Three defects stood behind that sentence, and two of them are what these
+-- columns are for.
+--
+-- 1. THE CHANNEL WAS A RAW ID. The withdrawal step offered the admin's DEPOSIT
+--    methods, whose ids are minted as 'pm_' + Date.now(). `destination_kind`
+--    stored that id, and it is all any later reader had: the customer's own
+--    row printed «pm_1726…», the Telegram line printed «Destination: pm_1726…»,
+--    and the admin payout card did not print the channel at all. The reviewer
+--    making the transfer could not tell Zain Cash from Ki Card.
+--
+--    `destination_label` is the channel's NAME AS IT WAS WHEN THE REQUEST WAS
+--    FILED, resolved on the server from the admin's own `payoutMethods`
+--    setting (worker/lib/settings.ts). A snapshot, like every other column the
+--    destination is frozen into at confirmation (0015): renaming or deleting
+--    the channel tomorrow must not change which channel an outstanding request
+--    says it is owed through. `destination_kind` keeps the id beside it.
+--
+-- 2. THE PAYOUT FIGURE DISAGREED WITH ITSELF. For a typed 50,000 د.ع at the
+--    default 3%, the form told the customer «commission 1,500 · net 48,500»
+--    (arithmetic over the typed figure — src/pages/Wallet.tsx), while the admin
+--    «Transfer» box converted the stored cents back at TODAY's rate and read
+--    «48,496», commission «1,498». Two screens, one request, the customer
+--    promised one number and the reviewer about to make the transfer reading
+--    another — and the admin's number moved every time the owner moved the
+--    rate.
+--
+--    `fee_iqd` and `net_iqd` are the dinar commission and the dinar payout
+--    AS QUOTED TO THE CUSTOMER at filing: fee = floor(declared × bps / 10000),
+--    net = declared − fee, at the SAME basis points the cent quote used
+--    (`withdrawalFeeQuote`, worker/lib/walletOps.ts). Written once, never
+--    recomputed, read verbatim by the admin card and the Telegram line.
+--
+-- ---------------------------------------------------------------------------
+--  WHAT THESE COLUMNS MAY NEVER DO
+-- ---------------------------------------------------------------------------
+-- THEY ARE NOT MONEY. The hold, the ledger debit and `CHECK (net_cents =
+-- amount_cents − fee_cents)` stay on the cents, exactly as 0106 left them.
+-- `fee_iqd`/`net_iqd` exist only beside a CORROBORATED `declared_amount_iqd`
+-- (0106) — a request whose typed figure the server refused carries NULL on all
+-- three dinar columns, and every reader falls back to converting the cents at
+-- the rate recorded on the row, never a dinar figure nobody typed.
+--
+-- NO CHECK CONSTRAINT, ON PURPOSE — the same choice 0105, 0106 and 0108 made:
+-- a CHECK on a testimony column would turn a client bug into a D1 constraint
+-- abort in the middle of the batch that reserves the customer's money, where
+-- `requestWithdrawal`'s rollback path would misreport it as an insufficient
+-- balance.
+--
+-- THE DEPLOY WINDOW. A Worker can reach production before this file runs;
+-- `requestWithdrawal` drops these three columns FIRST on its retry ladder
+-- (they are the newest), so a request still files, with the 0106/0108
+-- testimony intact, until the migration lands.
+ALTER TABLE wallet_withdrawals ADD COLUMN destination_label TEXT;
+ALTER TABLE wallet_withdrawals ADD COLUMN fee_iqd INTEGER;
+ALTER TABLE wallet_withdrawals ADD COLUMN net_iqd INTEGER;

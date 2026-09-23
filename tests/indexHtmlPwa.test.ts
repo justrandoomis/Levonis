@@ -117,8 +117,10 @@ test('every icon href in the document is a file that will actually be served', (
 test('the iOS home-screen icon is the 180x180 PNG, declared with its size', () => {
   const apple = links().find((l) => (l.rel || '').toLowerCase() === 'apple-touch-icon');
   assert.ok(apple, 'an apple-touch-icon link');
-  assert.equal(apple?.href, '/icons/apple-touch-icon.png');
-  assert.ok(existsSync(publicFile('/icons/apple-touch-icon.png')));
+  // Under the logo's revision (src/lib/siteLogo.ts): iOS keeps a touch icon
+  // per URL, so a new mark has to arrive under a new one.
+  assert.equal(apple?.href, '/icons/apple-touch-icon.bc80fc2b.png');
+  assert.ok(existsSync(publicFile('/icons/apple-touch-icon.bc80fc2b.png')));
   // iOS chooses between several apple-touch-icon links by comparing `sizes`;
   // a link without one is only the fallback.
   assert.equal(apple?.sizes, '180x180');
@@ -136,7 +138,9 @@ test('the PNG favicons are there for the browsers that never shipped WebP favico
 test('the WebP tab icon is kept, not replaced', () => {
   // Removing it would be a behaviour change nobody asked for, and
   // tests/socialPreview.test.ts pins the shop having a tab icon of its own.
-  assert.match(MARKUP, /<link rel="icon" type="image\/webp" href="\/files\/UiUx\/Logo\/Logo\.webp"/i);
+  // The query is the logo's revision: the Worker reads the key from the path,
+  // and the browser's favicon store is keyed on the whole URL.
+  assert.match(MARKUP, /<link rel="icon" type="image\/webp" href="\/files\/UiUx\/Logo\/Logo\.webp\?v=[0-9a-f]{8}"/i);
 });
 
 // ------------------------------------------------------------- the Apple meta

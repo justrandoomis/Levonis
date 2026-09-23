@@ -2729,8 +2729,25 @@ export async function planProductSave(
       const activeColors = relations.requested.colors.filter((color) => color.active !== 0);
       const activeVariants = relations.requested.variants.filter((variant) => variant.active !== 0);
       const stockErrors: string[] = [];
+      /**
+       * A GLOBAL COLOUR (linked to no option) IS OFFERED WITH EVERY OPTION.
+       *
+       * The product page lists it under each option, and the order door
+       * (inventory.resolveStock, VARIANT_COMBINATION) resolves Small+Black to
+       * `o:small|c:black` and answers VARIANT_NOT_MODELLED when that row is
+       * absent — it never falls back to the colour-less row. So under exact
+       * combinations a global colour needs its own shelf per option, exactly
+       * like a linked one; demanding the colour-less shelf instead let a save
+       * succeed whose Small+Black selection could never be sold direct. In the
+       * other modes the colour is not a stock dimension and nothing changes.
+       */
+      const globalColors = activeColors.filter((color) => color.linked.length === 0);
       for (const value of relations.requested.values.filter((row) => row.active !== 0 && directIds.has(row.id))) {
-        const linked = activeColors.filter((color) => color.linked.includes(value.id));
+        const linked = activeColors.filter(
+          (color) =>
+            color.linked.includes(value.id) ||
+            (relations.mode === 'VARIANT_COMBINATION' && globalColors.includes(color))
+        );
         if (linked.length === 0) {
           if (relations.mode === 'VARIANT_COMBINATION') {
             const shelf = activeVariants.find(

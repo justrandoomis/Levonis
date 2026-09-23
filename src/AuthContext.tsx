@@ -19,7 +19,7 @@ interface AuthContextType {
   isLoaded: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<ApiUser | null>(null);
@@ -115,4 +115,13 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+}
+
+/**
+ * The same context, or `undefined` outside an AuthProvider — for a provider
+ * that sits under this one in the app but is also rendered alone (the
+ * LanguageProvider in the browser fixtures), where `useAuth` would throw.
+ */
+export function useOptionalAuth(): AuthContextType | undefined {
+  return useContext(AuthContext);
 }

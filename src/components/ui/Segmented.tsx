@@ -50,11 +50,23 @@ export interface SegmentedProps {
   className?: string;
   /** Stamps every option with this data attribute = its id, for probes. */
   dataAttr?: string;
+  /**
+   * `md` (the default, unchanged): 44px options, 13px black — the tier picker
+   * and every control that is the main decision on its screen.
+   * `sm`: a 36px TRACK (border and padding included), 12px bold — for a
+   * FILTER that sits beside other controls on one row (the wallet's «الكل /
+   * إيداع / سحب»), where a 44px pill per option made the list's toolbar
+   * taller than the rows it filters. The height is the track's, not the
+   * option's: a 36px option inside the 2px padding and 1px border drew a 42px
+   * control beside the 36px (`h-9`) select and search button it sits with.
+   * The options fill the track, so all three line up.
+   */
+  size?: 'md' | 'sm';
 }
 
 const DEFAULT_ACCENT = { indicator: 'bg-white/10 border-white/20', text: 'text-white' };
 
-export function Segmented({ items, value, onChange, label, group, className = '', dataAttr }: SegmentedProps) {
+export function Segmented({ items, value, onChange, label, group, className = '', dataAttr, size = 'md' }: SegmentedProps) {
   const m = useMotion();
   const { dir } = useLanguage();
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -101,7 +113,7 @@ export function Segmented({ items, value, onChange, label, group, className = ''
       aria-label={label}
       data-segmented={group}
       onKeyDown={onKeyDown}
-      className={`grid gap-1 p-1 rounded-2xl border border-white/10 bg-zinc-900/60 ${className}`}
+      className={`grid ${size === 'sm' ? 'h-9 box-border gap-0.5 p-0.5 rounded-xl' : 'gap-1 p-1 rounded-2xl'} border border-white/10 bg-zinc-900/60 ${className}`}
       style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}
     >
       {items.map((it, idx) => {
@@ -121,7 +133,9 @@ export function Segmented({ items, value, onChange, label, group, className = ''
             disabled={it.disabled}
             onClick={() => onChange(it.id)}
             {...stamp}
-            className={`relative min-h-11 min-w-0 rounded-xl px-2 flex items-center justify-center gap-1.5 text-[13px] font-black press-scale transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/70 disabled:opacity-40 ${
+            className={`relative min-w-0 px-2 flex items-center justify-center gap-1.5 press-scale transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/70 disabled:opacity-40 ${
+              size === 'sm' ? 'h-full rounded-[10px] text-[12px] font-bold' : 'min-h-11 rounded-xl text-[13px] font-black'
+            } ${
               checked ? accent.text : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -133,7 +147,7 @@ export function Segmented({ items, value, onChange, label, group, className = ''
                 layoutId={`segmented-${group}`}
                 data-segmented-indicator
                 aria-hidden
-                className={`absolute inset-0 rounded-xl border ${accent.indicator}`}
+                className={`absolute inset-0 ${size === 'sm' ? 'rounded-[10px]' : 'rounded-xl'} border ${accent.indicator}`}
                 transition={m.reduced ? { duration: 0 } : m.spring('quick')}
               />
             )}

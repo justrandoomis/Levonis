@@ -6,7 +6,7 @@ import { Overlay } from '../ui/Overlay';
 import { Skeleton, SkeletonGroup } from '../ui/Skeleton';
 import { ErrorState } from '../ui/AsyncStates';
 import { ClaimProgress, PriorityBadge } from './ClaimCard';
-import type { ClaimDetail } from './types';
+import type { ClaimDetail, ClaimMessage } from './types';
 import { fmtDate, fmtDateTime, isVideoUrl } from './types';
 import type { WarrantyStrings } from './strings';
 import { ERROR_BOX, FOCUS, INPUT } from './ui';
@@ -27,12 +27,16 @@ export function ClaimThreadOverlay({
   lang,
   s,
   onClose,
+  notice = '',
 }: {
   claimId: string | null;
   anchor: React.RefObject<HTMLElement | null>;
   lang: Language;
   s: WarrantyStrings;
   onClose: () => void;
+  /** Said at the top of the thread — the replayed-submit warning, which the
+   *  page cannot show behind this window. */
+  notice?: string;
 }) {
   const [detail, setDetail] = useState<ClaimDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -76,14 +80,28 @@ export function ClaimThreadOverlay({
     setDetail(res);
   };
 
+  /**
+   * THE SENT MESSAGE IS APPENDED, NOT THE THREAD RELOADED. The route answers
+   * with the row it stored, so the bubble appears where the customer is
+   * looking instead of the whole conversation being fetched again behind it.
+   * A server that predates that answer (no `message`) still gets the reload.
+   */
+  const appendOrRefresh = async (res: { message?: ClaimMessage }) => {
+    const m = res.message;
+    if (m) setDetail((d) => (d ? { ...d, messages: [...d.messages, m] } : d));
+    else await refresh();
+  };
+
   const send = async () => {
     if (!claimId || replyBusy || !replyText.trim()) return;
     setReplyBusy(true);
     setReplyError('');
     try {
-      await api.post(`/api/devices/claims/${encodeURIComponent(claimId)}/messages`, { body: replyText.trim() });
+      const res = await api.post<{ message?: ClaimMessage }>(`/api/devices/claims/${encodeURIComponent(claimId)}/messages`, {
+        body: replyText.trim(),
+      });
       setReplyText('');
-      await refresh();
+      await appendOrRefresh(res);
     } catch (e) {
       setReplyError(e instanceof ApiError ? e.message : s.error);
     } finally {
@@ -105,9 +123,12 @@ export function ClaimThreadOverlay({
       const up = await api.post<{ key: string }>('/api/devices/claims/upload', form, {
         timeoutMs: uploadTimeoutMs(files[0].size),
       });
-      await api.post(`/api/devices/claims/${encodeURIComponent(claimId)}/messages`, { body: replyText.trim(), file_key: up.key });
+      const res = await api.post<{ message?: ClaimMessage }>(`/api/devices/claims/${encodeURIComponent(claimId)}/messages`, {
+        body: replyText.trim(),
+        file_key: up.key,
+      });
       setReplyText('');
-      await refresh();
+      await appendOrRefresh(res);
     } catch (e) {
       setReplyError(e instanceof ApiError ? e.message : s.error);
     } finally {
@@ -170,8 +191,20 @@ export function ClaimThreadOverlay({
           </SkeletonGroup>
         )}
         {error != null && !loading && <ErrorState error={error} onRetry={() => claimId && load(claimId)} compact />}
+        {notice && (
+          <div
+            role="status"
+            className="bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[13px] font-medium rounded-xl p-3"
+            data-claim-thread-notice
+          >
+            {notice}
+          </div>
+        )}
         {detail && (
           <>
+            <p className="text-zinc-500 text-[12px] leading-relaxed" data-claim-thread-intro>
+              {s.threadIntro}
+            </p>
             <ClaimProgress stage={detail.claim.stage} s={s} className="mb-4" />
             <div className="bg-zinc-900/70 rounded-xl px-3 py-2 text-sm text-zinc-300 whitespace-pre-wrap">{detail.claim.description}</div>
             {detail.claim.evidence.length > 0 && (

@@ -351,6 +351,25 @@ test('LANGUAGE — once the customer picks a language, the answer is honoured fo
   assert.equal((await reachFor(env(raw), 'u_tg')).lang, 'en', 'a stated preference outranks the fallback');
 });
 
+test('LANGUAGE — a Telegram account that later adds a REAL address is still Arabic', async () => {
+  // `/change-email` is open to exactly these accounts, and the placeholder
+  // test stopped matching the moment one used it: the same never-asked 'en'
+  // then produced English. The SIGNUP is the marker now — the
+  // `auth.telegram_signup` line written once, when the account was created.
+  const raw = freshDb();
+  seedUser(raw, { id: 'u_tg2', email: 'ali@gmail.com', locale: 'en', chat: 777 });
+  raw.prepare(
+    "INSERT INTO audit_log (actor_id, action, target, detail) VALUES ('u_tg2', 'auth.telegram_signup', 'user:u_tg2', '{}')"
+  ).run();
+  assert.equal((await reachFor(env(raw), 'u_tg2')).lang, 'ar');
+  assert.equal((await reachForMany(env(raw), ['u_tg2'])).get('u_tg2')!.lang, 'ar', 'the bulk reader agrees');
+  // …and an English that account actually CHOSE is still honoured.
+  raw.prepare(
+    "INSERT INTO audit_log (actor_id, action, target, detail) VALUES ('u_tg2', 'profile.locale_change', 'u_tg2', '{\"to\":\"en\"}')"
+  ).run();
+  assert.equal((await reachFor(env(raw), 'u_tg2')).lang, 'en');
+});
+
 test('LANGUAGE — the bulk lookup gives the same answer as the single one', async () => {
   // Two readers of one column is how a shop ends up sending one message in
   // two languages; `reachForMany` feeds the stock-alert sweep.

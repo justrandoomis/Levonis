@@ -1,5 +1,10 @@
 /**
- * REFERENCE MATCHING FOR THE TXT IMPORT — SLUG, ID, **AND THE NAME A PERSON TYPES**.
+ * REFERENCE MATCHING FOR THE IMPORTS — SLUG, ID, **AND THE NAME A PERSON TYPES**.
+ *
+ * Used by the TXT import (worker/routes/template.ts) for brands and sections,
+ * and by the CSV/ZIP import (worker/routes/adminImport.ts) for brands: the
+ * owner's «البراند موجود مثل بامبو لاب وليفو لكنه يرفض» named no lane, so
+ * every lane matches a brand the same way and creates the one it cannot find.
  *
  * WHAT WENT WRONG. `resolveRefs` (worker/routes/template.ts) asked
  * `WHERE slug = ? OR id = ?` and nothing else. The owner's التصنيفات screen
@@ -40,16 +45,18 @@
  * (./search/translit.ts, ./search/match.ts). Those exist to find something
  * plausible for a shopper; an import must be certain or say that it is not.
  *
- * INACTIVE ROWS MATCH TOO. The CSV import reads `WHERE active = 1`, which is
- * right for it: it can only ever refuse, and «أضفها أولًا» is a fair answer.
- * This resolver CREATES a brand it cannot find, so skipping a deactivated row
- * would answer a file naming it by minting a SECOND «Bambu Lab» at slug
- * `bambu-lab-2` — the exact split that the create rule below exists to avoid.
+ * INACTIVE ROWS MATCH TOO. Both importers CREATE a brand they cannot find,
+ * so skipping a deactivated row would answer a file naming it by minting a
+ * SECOND «Bambu Lab» at slug `bambu-lab-2` — the exact split that the create
+ * rule below exists to avoid. The match is not silent, though: the shop reads
+ * a brand `WHERE active = 1`, so a product filed under a deactivated one shows
+ * no brand at all, and the check step says so (`inactiveBrandWarning`).
  */
 import { newId } from './crypto';
 import { normalizeText } from './search/normalize';
 import { normKey } from './importApply';
 import { slugify, uniqueSlug } from '../routes/adminTaxonomy';
+import { audit } from './audit';
 import type { PendingBrand } from './template';
 
 /** The columns every taxonomy row this module matches against must carry. */
@@ -59,6 +66,8 @@ export interface RefRow {
   name_ar: string;
   name_en: string;
   name_ckb: string;
+  /** 0/1 as stored. Optional so a hand-built row list (tests) reads as active. */
+  active?: number | boolean | null;
 }
 
 export type RefMatch =
@@ -72,8 +81,29 @@ export type RefMatch =
  *  itself lists them with `LIMIT 500`), and one read replaced one query per
  *  reference — a `catalogs=` line with eight entries made eight round trips. */
 export async function loadRefRows(db: D1Database, table: 'brands' | 'catalogs'): Promise<RefRow[]> {
-  const { results } = await db.prepare(`SELECT id, slug, name_ar, name_en, name_ckb FROM ${table}`).all<RefRow>();
+  const { results } = await db
+    .prepare(`SELECT id, slug, name_ar, name_en, name_ckb, active FROM ${table}`)
+    .all<RefRow>();
   return results ?? [];
+}
+
+/** Whether a matched row is switched off (`active = 0`). */
+export const isInactiveRef = (row: RefRow | undefined): boolean =>
+  !!row && row.active !== undefined && row.active !== null && Number(row.active) === 0;
+
+/**
+ * THE WARNING A MATCH ON A DEACTIVATED BRAND EARNS — or null.
+ *
+ * Not an error: the brand exists and the owner may be re-enabling it. But the
+ * product page reads the brand `WHERE id = ? AND active = 1`, so without this
+ * line the import reports success and the shop shows the product with no
+ * brand, with nothing on the check screen to explain why.
+ */
+export function inactiveBrandWarning(rows: RefRow[], match: RefMatch, value: string): string | null {
+  if (match.kind !== 'hit') return null;
+  const row = rows.find((r) => r.id === match.id);
+  if (!isInactiveRef(row)) return null;
+  return `brand: "${value}" يطابق علامة معطّلة (${row!.slug}) — لن تظهر في المتجر حتى تُفعَّل من إدارة العلامات / matched a deactivated brand (${row!.slug}); it will not show in the shop until re-enabled`;
 }
 
 export function matchRef(rows: RefRow[], raw: string): RefMatch {
@@ -139,15 +169,38 @@ export async function planBrandCreate(db: D1Database, name: string): Promise<Pen
  */
 export async function createPendingBrand(
   db: D1Database,
-  pending: PendingBrand
-): Promise<{ id: string; created: boolean } | { ambiguous: string[] }> {
-  const again = matchRef(await loadRefRows(db, 'brands'), pending.name);
-  if (again.kind === 'hit') return { id: again.id, created: false };
+  pending: PendingBrand,
+  actor?: { adminId: string; via: string }
+): Promise<{ id: string; created: boolean; slug: string } | { ambiguous: string[] }> {
+  const rows = await loadRefRows(db, 'brands');
+  const again = matchRef(rows, pending.name);
+  if (again.kind === 'hit') {
+    return { id: again.id, created: false, slug: rows.find((r) => r.id === again.id)?.slug ?? pending.slug };
+  }
   if (again.kind === 'ambiguous') return { ambiguous: again.candidates };
   const slug = await uniqueSlug(db, 'brands', pending.slug, null);
   await db
     .prepare('INSERT INTO brands (id, slug, name_ar, name_en, name_ckb, active) VALUES (?, ?, ?, ?, ?, 1)')
     .bind(pending.id, slug, pending.name_ar, pending.name_en, '')
     .run();
-  return { id: pending.id, created: true };
+  /**
+   * THE SAME AUDIT ROW THE MANUAL «إضافة علامة» WRITES (adminProducts.ts,
+   * `brand.create`), plus the door it came through. A brand an import made is
+   * a catalogue change like any other and must be traceable to an admin.
+   *
+   * A brand created here stays if the apply is refused later (a media fetch
+   * or a verify rollback): the owner asked for the brand to be created, the
+   * row is valid on its own, and a re-run of the same file finds it by name
+   * instead of creating a second one. The audit row is what makes that
+   * orphan explainable.
+   */
+  if (actor) {
+    await audit(db, actor.adminId, 'brand.create', pending.id, {
+      slug,
+      name_ar: pending.name_ar,
+      name_en: pending.name_en,
+      via: actor.via,
+    });
+  }
+  return { id: pending.id, created: true, slug };
 }

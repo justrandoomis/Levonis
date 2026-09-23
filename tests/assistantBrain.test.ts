@@ -388,7 +388,7 @@ test('a greeting is met with a greeting, not a fourteen-item menu’s worth of n
   for (const hello of ['هلو', 'السلام عليكم', 'hi', 'سڵاو']) {
     const reply = await ask(db, { text: hello });
     assert.equal(reply.intent, 'greeting', hello);
-    assert.equal(reply.text, 'هلا بيك في ليفونيس. شنو تحتاج؟');
+    assert.equal(reply.text, 'هلا بيك في Levonis. شنو تحتاج؟');
   }
 });
 

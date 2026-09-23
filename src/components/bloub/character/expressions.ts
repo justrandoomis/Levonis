@@ -345,9 +345,12 @@ export const POSES: Record<MascotState, Pose> = {
    * THE ORDER WENT THROUGH.
    *
    * The same grammar as `success` — eyes squeezed to arcs, tops converging —
-   * pushed one notch further and held four times as long, because an order is
-   * not an add-to-cart. It is still an arc and a smile, not a jump: the brief
-   * asks for stronger, and then asks twice for restrained.
+   * pushed one notch further and held far longer, because an order is not an
+   * add-to-cart. The FACE stays an arc and a smile. The jump the owner asked
+   * for («غير مرح») is the body's, and it is not drawn here: it is the stage
+   * entrance in `entrance.ts`, a compositor animation on the wrapper around
+   * this drawing, so the pose table stays a set of constants the geometry
+   * tests can walk and the hop cannot push the outline out of its box.
    */
   celebrate: make({
     gaze: { yaw: 3, pitch: 14, roll: 0 },

@@ -1,8 +1,8 @@
 /**
  * Serialized-device operations (final-phase mandate §4): per-PHYSICAL-unit
  * records, per-unit delivery + warranty clocks, serial normalization and
- * coverage math. Consumed by worker/routes/devices.ts and by the admin
- * order-delivery hook in worker/routes/admin.ts.
+ * coverage math. Consumed by worker/routes/devices.ts and by the delivered
+ * hook every door shares (worker/lib/orderDeliveredEffects.ts).
  *
  * Eligibility is EXPLICIT configuration, never name-substring inference: a
  * product is serialized only when its products.ops_policy JSON says
@@ -278,6 +278,75 @@ export async function createUnitsOnDelivery(
   return { serialized_items: serializedItems, planned_units: planned, created };
 }
 
+/**
+ * DELIVERED ORDERS THAT NEVER GOT THEIR UNITS — the history the courier door
+ * left behind. Until orderDeliveredEffects ran from `moveOrderStage`, a printer
+ * order Al-Waseet (or the cron) moved to `delivered` got no order_item_units at
+ * all, and the courier sync never revisits it: an order already at `delivered`
+ * is `unchanged` to it. Those customers find nothing under «من طلباتي» and the
+ * admin's warranty section says there are no units. This finds them and
+ * creates the units from the RECORDED delivered_at, so the clock starts where
+ * it would have.
+ *
+ * The selection is the SQL twin of the rule `createUnitsOnDelivery` applies
+ * per line (`effectiveDevicePolicy`): ops_policy says serialized:true, or the
+ * product sits in a printer catalog and ops_policy does not say false. It must
+ * match exactly — a candidate that yields no unit would be picked again every
+ * run. Only orders with NO unit rows at all are candidates; an order with some
+ * units has already been through `createUnitsOnDelivery`, and the per-order
+ * backfill in Admin → Serials covers anything odder than that.
+ *
+ * Units only. Purchase points and referral milestones the same deliveries
+ * skipped are money granted months late — an owner call, not a repair.
+ *
+ * Bounded and idempotent (UNIQUE(order_item_id, unit_index)); each order is
+ * contained on its own so one bad row cannot stall the rest.
+ */
+export interface DeliveredUnitsSweep {
+  scanned: number;
+  orders: number;
+  created: number;
+  errors: number;
+}
+
+export async function sweepDeliveredOrdersWithoutUnits(env: Env, limit = 50): Promise<DeliveredUnitsSweep> {
+  const serialized = `(CASE WHEN json_valid(p.ops_policy) THEN json_extract(p.ops_policy, '$.serialized') END)`;
+  const { results } = await env.DB.prepare(
+    `SELECT o.id, o.delivered_at
+       FROM orders o
+      WHERE o.status = 'delivered'
+        AND o.delivered_at IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM order_item_units u WHERE u.order_id = o.id)
+        AND EXISTS (
+          SELECT 1
+            FROM order_items oi
+            JOIN products p ON p.id = oi.product_id
+           WHERE oi.order_id = o.id
+             AND oi.qty > 0
+             AND (${serialized} = 1
+                  OR (${serialized} IS NOT 0
+                      AND EXISTS (SELECT 1 FROM product_catalogs pc
+                                    JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
+                                   WHERE pc.product_id = oi.product_id))))
+      ORDER BY o.delivered_at DESC
+      LIMIT ?`
+  )
+    .bind(Math.min(Math.max(Math.trunc(limit), 1), 500))
+    .all<{ id: string; delivered_at: string }>();
+  const out: DeliveredUnitsSweep = { scanned: results.length, orders: 0, created: 0, errors: 0 };
+  for (const o of results) {
+    try {
+      const r = await createUnitsOnDelivery(env, o.id, o.delivered_at);
+      out.created += r.created;
+      if (r.created > 0) out.orders++;
+    } catch (e) {
+      out.errors++;
+      console.error('delivered-units sweep failed for order', o.id, e instanceof Error ? e.message : String(e));
+    }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- corrections
 
 export interface UnitRow extends Record<string, unknown> {
@@ -360,6 +429,26 @@ export function effectiveClaimStage(stage: unknown, legacyStatus: unknown): Clai
     default:
       return 'received';
   }
+}
+
+/**
+ * `effectiveClaimStage`, spelled in SQL, for a WHERE clause.
+ *
+ * The admin queue filtered by stage in JavaScript AFTER `LIMIT 300`, so once
+ * there were more than three hundred claims, choosing «received» silently
+ * omitted every received claim past the first three hundred rows. The filter
+ * has to run in the database, before the limit — and it has to apply the SAME
+ * legacy rules as the function above, or a pre-0006 claim (stage NULL,
+ * status 'in_review') would be listed under one stage and filtered under
+ * another. Built from `CLAIM_STAGES` so the two cannot drift apart.
+ */
+export function effectiveClaimStageSql(alias: string): string {
+  const known = CLAIM_STAGES.map((s) => `'${s}'`).join(',');
+  return `(CASE WHEN ${alias}.stage IN (${known}) THEN ${alias}.stage
+       WHEN ${alias}.status = 'in_review' THEN 'diagnosing'
+       WHEN ${alias}.status = 'approved' THEN 'approved'
+       WHEN ${alias}.status = 'rejected' THEN 'rejected'
+       ELSE 'received' END)`;
 }
 
 /** Coarse mapping into the CHECK-constrained legacy status column (0001). */

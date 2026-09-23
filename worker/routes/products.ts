@@ -29,6 +29,7 @@ import { activeBenefitRules, ancestryFor, catalogAncestry, degradeIfSchemaMissin
 import { isConditionColumnMissing } from '../lib/conditionProjection';
 import { catalogSubtreeFilter, homeCategoryTree } from '../lib/catalogMembership';
 import { searchProducts } from '../lib/search/store';
+import { suggestCompletion } from '../lib/search/complete';
 import {
   SHELF_LIMIT,
   bestSellerIds,
@@ -2993,10 +2994,18 @@ productRoutes.get('/', async (c) => {
    * than the substring scan it replaces, so that one case falls back.
    */
   let searchOrder: string[] | null = null;
+  /**
+   * WHETHER THE SHOPPER IS STILL TYPING THE LAST WORD. `str()` trims, so the
+   * one signal that says "that word is finished" — a trailing space — is read
+   * off the raw parameter. "hot" is still on its way to "Hotend"; "hot " is
+   * the word hot. See `completing` in worker/lib/search/index.ts.
+   */
+  const rawSearch = typeof q.search === 'string' ? q.search : '';
+  const typingLastWord = !/\s$/u.test(rawSearch);
   if (search) {
     const hits = await degradeIfSchemaMissing(
       'search index (migration 0089)',
-      () => searchProducts(c.env.DB, search, { limit: 200 }),
+      () => searchProducts(c.env.DB, search, { limit: 200, completeLast: typingLastWord }),
       null as { ids: string[]; indexReady: boolean } | null
     );
     // A missing TABLE, or a table that exists and is still empty because the
@@ -3010,9 +3019,22 @@ productRoutes.get('/', async (c) => {
       // The category block rides this exit as well — see the note above.
       return c.json({ success: true, products: [], ...categoryField });
     } else {
+      /**
+       * ONE BOUND PARAMETER FOR THE WHOLE HIT LIST — and the same again for
+       * the ORDER BY below.
+       *
+       * This bound every id twice, once here and once in the `CASE` that keeps
+       * the ranking, and the engine returns up to 200 ids. D1 refuses a
+       * statement with more than 100 bound parameters, so any search that
+       * ranked fifty products or more — «H», a brand the home tiles link to,
+       * "hotend" on a real catalogue — answered 500 and the page showed its
+       * error card instead of results. node:sqlite allows 32766, which is why
+       * nothing in the suite noticed. `json_each` keeps the count constant
+       * however many products match.
+       */
       searchOrder = hits.ids;
-      sql += ` AND id IN (${hits.ids.map(() => '?').join(',')})`;
-      params.push(...hits.ids);
+      sql += ' AND id IN (SELECT value FROM json_each(?))';
+      params.push(JSON.stringify(hits.ids));
     }
   }
   if (category) {
@@ -3089,8 +3111,10 @@ productRoutes.get('/', async (c) => {
    * shelf order it always had.
    */
   if (searchOrder) {
-    sql += ` ORDER BY CASE id ${searchOrder.map((_, i) => `WHEN ? THEN ${i}`).join(' ')} ELSE ${searchOrder.length} END LIMIT ? OFFSET ?`;
-    params.push(...searchOrder);
+    // The id's position in the engine's ranking — `key` is the array index
+    // `json_each` reports — rather than a `CASE` with one bound id per branch.
+    sql += ' ORDER BY (SELECT CAST(r.key AS INTEGER) FROM json_each(?) r WHERE r.value = products.id) LIMIT ? OFFSET ?';
+    params.push(JSON.stringify(searchOrder));
   } else {
     sql += ' ORDER BY display_order ASC, created_at DESC LIMIT ? OFFSET ?';
   }
@@ -3136,9 +3160,27 @@ productRoutes.get('/', async (c) => {
   const compositions = compositionJoined.length
     ? (await resolveCompositionPageWithMystery(c.env.DB, compositionJoined, ctx)).resolved
     : new Map<string, ResolvedBundle>();
+  /**
+   * THE GREY COMPLETION IN THE SEARCH BOX («اقتراحات بلون رصاصي في الشريط
+   * الكتابي نفسه»): the word the shopper is still typing, completed from the
+   * names of the products this very answer ranked first — so the grey word
+   * always names something on the list under it. Only on a search, and never
+   * after a trailing space. worker/lib/search/complete.ts.
+   */
+  const suggestion = search
+    ? {
+        suggestion: typingLastWord
+          ? suggestCompletion(
+              search,
+              results.flatMap((r) => [r.name, r.name_ar, r.name_ku])
+            )
+          : null,
+      }
+    : {};
   return c.json({
     success: true,
     ...categoryField,
+    ...suggestion,
     products: results.map((p) => {
       const b = compositions.get(String(p.id));
       // A composition card has its own narrow shape, and a LOCKED one has its

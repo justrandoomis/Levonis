@@ -247,7 +247,7 @@ export default function TradeIn() {
               {loc(
                 'سيراجعه فريق ليفو ويرد عليك في محادثة الدعم.',
                 'The LEVONIS team will review it and reply in your support thread.',
-                'تیمی لیڤۆنیس پێداچوونەوەی بۆ دەکات و لە گفتوگۆی پشتگیری وەڵامت دەداتەوە.'
+                'تیمی Levonis پێداچوونەوەی بۆ دەکات و لە گفتوگۆی پشتگیری وەڵامت دەداتەوە.'
               )}
             </p>
             <p className="text-[12px] leading-5 text-zinc-500">

@@ -18,6 +18,7 @@ import QrCodeModal from '../components/profile/QrCodeModal';
 import DirectStockEdge from '../components/DirectStockEdge';
 import InstallAppButton from '../components/pwa/InstallAppButton';
 import { useMoney } from '../CurrencyContext';
+import { useCommunityAccess } from './community/access';
 
 interface FavoriteItem {
   id: string;
@@ -172,11 +173,28 @@ export default function Profile() {
       .then((res) => setFavorites(res.favorites || []))
       .catch(() => setFavorites([]))
       .finally(() => setFavoritesLoaded(true));
+  }, [isAuthenticated, user?.id]);
+
+  // «متاجر أتابعها» is Levo Community, and /api/community/followed sits behind
+  // its maintenance wall — so it is asked only once the server has said this
+  // viewer may enter, instead of answering 503 on every profile load.
+  const { access: communityAccess } = useCommunityAccess();
+  const communityShut = communityAccess?.may_enter === false;
+  const mayAskFollowed = communityAccess?.may_enter === true;
+  useEffect(() => {
+    if (!isAuthenticated || !mayAskFollowed) {
+      setFollowedStoreCount(null);
+      return;
+    }
+    let alive = true;
     api
       .get<{ merchants: unknown[] }>('/api/community/followed')
-      .then((res) => setFollowedStoreCount(Array.isArray(res.merchants) ? res.merchants.length : 0))
-      .catch(() => setFollowedStoreCount(null));
-  }, [isAuthenticated, user?.id]);
+      .then((res) => alive && setFollowedStoreCount(Array.isArray(res.merchants) ? res.merchants.length : 0))
+      .catch(() => alive && setFollowedStoreCount(null));
+    return () => {
+      alive = false;
+    };
+  }, [isAuthenticated, user?.id, mayAskFollowed]);
 
   // Real membership + referral state from the memberships ledger.
   useEffect(() => {
@@ -378,14 +396,16 @@ export default function Profile() {
                     )}
                     {memPendingLaunch && (
                       <button type="button" onClick={() => navigate('/subscription')} className="hidden h-6 items-center rounded-sm bg-sky-500/10 px-1.5 text-[10px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:flex text-sky-300">
-                        <span>{tierLabel(memPendingLaunch.tier) + ' — ' + t('pendingLaunch')}</span>
+                        <span>{tierLabel(memPendingLaunch.tier) + ' — ' + t('pendingActivation')}</span>
                       </button>
                     )}
-                    <button type="button" onClick={() => navigate('/followed-stores')} className="flex h-6 min-w-0 items-center gap-1 rounded-sm px-1 text-[10px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus text-zinc-400 hover:bg-white/[0.06]">
-                      <Store className="h-3 w-3 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-                      {followedStoreCount !== null && <span className="shrink-0 font-semibold tabular-nums text-zinc-200">{followedStoreCount}</span>}
-                      <span className="truncate whitespace-nowrap">{loc('متاجر أتابعها', 'Following', 'شوێنکەوتن')}</span>
-                    </button>
+                    {!communityShut && (
+                      <button type="button" onClick={() => navigate('/followed-stores')} className="flex h-6 min-w-0 items-center gap-1 rounded-sm px-1 text-[10px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus text-zinc-400 hover:bg-white/[0.06]">
+                        <Store className="h-3 w-3 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+                        {followedStoreCount !== null && <span className="shrink-0 font-semibold tabular-nums text-zinc-200">{followedStoreCount}</span>}
+                        <span className="truncate whitespace-nowrap">{loc('متاجر أتابعها', 'Following', 'شوێنکەوتن')}</span>
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -520,7 +540,11 @@ export default function Profile() {
           {[
             { key: 'shipping', icon: Package, label: loc('الشحن', 'Shipping', 'گەیاندن'), onClick: () => go('/orders?status=to_ship') },
             { key: 'favorites', icon: Star, label: loc('المفضلة', 'Favorites', 'دڵخوازەکان'), onClick: showFavoritesTab },
-            { key: 'stores', icon: Store, label: loc('متاجري', 'My stores', 'فرۆشگاکانم'), onClick: () => go('/followed-stores') },
+            // Followed community stores — dropped, not dead-ended on the
+            // maintenance card, while Levo Community is shut to this viewer.
+            ...(communityShut
+              ? []
+              : [{ key: 'stores', icon: Store, label: loc('متاجري', 'My stores', 'فرۆشگاکانم'), onClick: () => go('/followed-stores') }]),
             { key: 'saved', icon: Heart, label: loc('المحفوظات', 'Saved', 'پاشەکەوتەکان'), onClick: () => go('/saved-items') },
             { key: 'history', icon: Clock, label: loc('الطلبات السابقة', 'Order history', 'داواکارییە پێشووەکان'), onClick: () => go('/orders') },
           ].map((a) => (

@@ -25,6 +25,7 @@ import {
   siteMediaKey,
 } from '../lib/siteMedia';
 import { normalizeText } from '../lib/search/normalize';
+import { backfillSearchIndex, planSearchRestamp, searchIndexInstalled } from '../lib/search/store';
 import { degradeIfSchemaMissing } from '../lib/membershipBenefits';
 
 /**
@@ -269,6 +270,51 @@ adminTaxonomyRoutes.get('/catalogs', async (c) => {
   });
 });
 
+/**
+ * A RENAME IS ALSO A SEARCH-INDEX WRITE.
+ *
+ * The index stores brand and section NAMES on every product filed under them
+ * (worker/lib/search/document.ts) — a shopper types «بامبو لاب», never an id.
+ * A rename used to be a bare UPDATE, so the products kept their current index
+ * stamp, the backfill never looked at them again, the OLD name kept finding
+ * them and the NEW one found nothing until each product was re-saved by hand.
+ *
+ * Now the rename and the stamp deletion for every affected product land in ONE
+ * batch (either both or neither), and those products are re-indexed straight
+ * after, so the new name works when this request returns. That second step is
+ * best-effort on purpose: the rename has already committed, and anything it
+ * does not reach — more than fifty products, a failed write — is unstamped and
+ * therefore the cron backfill's next job. A shop whose index table is not
+ * there yet (one deploy path ships the Worker before its migrations) gets the
+ * plain UPDATE it always got.
+ */
+async function renameAndReindex(
+  db: D1Database,
+  update: D1PreparedStatement,
+  renamed: boolean,
+  scope: { sql: string; params: unknown[] }
+): Promise<void> {
+  if (!renamed || !(await searchIndexInstalled(db))) {
+    await update.run();
+    return;
+  }
+  await db.batch([update, planSearchRestamp(db, scope)]);
+  try {
+    await backfillSearchIndex(db, { limit: 50, scope });
+  } catch (e) {
+    console.error('search reindex after rename failed; the cron backfill will finish it:', e instanceof Error ? e.message : e);
+  }
+}
+
+/** True when a save changes any of the three names a search could see. */
+const namesChanged = (
+  before: { name_ar: string; name_en: string; name_ckb: string },
+  after: { name_ar: string; name_en: string; name_ckb: string }
+): boolean =>
+  (before.name_ar ?? '') !== after.name_ar ||
+  (before.name_en ?? '') !== after.name_en ||
+  (before.name_ckb ?? '') !== after.name_ckb;
+
 adminTaxonomyRoutes.post('/catalogs', async (c) => {
   const admin = c.get('user')!;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -339,14 +385,20 @@ adminTaxonomyRoutes.post('/catalogs', async (c) => {
   const slug = await uniqueSlug(c.env.DB, 'catalogs', wantedSlug, existing ? id : null);
 
   if (existing) {
-    await c.env.DB
-      .prepare(
-        `UPDATE catalogs SET parent_id = ?, slug = ?, name_ar = ?, name_en = ?, name_ckb = ?,
-                sort = ?, is_printer_catalog = ?, active = ?, template_family = ?
-          WHERE id = ?`
-      )
-      .bind(parentId, slug, nameAr, nameEn, nameCkb, sort, isPrinter, active, family, id)
-      .run();
+    await renameAndReindex(
+      c.env.DB,
+      c.env.DB
+        .prepare(
+          `UPDATE catalogs SET parent_id = ?, slug = ?, name_ar = ?, name_en = ?, name_ckb = ?,
+                  sort = ?, is_printer_catalog = ?, active = ?, template_family = ?
+            WHERE id = ?`
+        )
+        .bind(parentId, slug, nameAr, nameEn, nameCkb, sort, isPrinter, active, family, id),
+      namesChanged(existing, { name_ar: nameAr, name_en: nameEn, name_ckb: nameCkb }),
+      // The two columns the index reads a section name through
+      // (`searchDocsForRows`): the main section and the sub-section.
+      { sql: 'p.category_id = ? OR p.sub_category_id = ?', params: [id, id] }
+    );
   } else {
     await c.env.DB
       .prepare(
@@ -690,10 +742,14 @@ adminTaxonomyRoutes.post('/brands', async (c) => {
   const slug = await uniqueSlug(c.env.DB, 'brands', wantedSlug, existing ? id : null);
 
   if (existing) {
-    await c.env.DB
-      .prepare('UPDATE brands SET slug = ?, name_ar = ?, name_en = ?, name_ckb = ?, active = ? WHERE id = ?')
-      .bind(slug, nameAr, nameEn, nameCkb, active, id)
-      .run();
+    await renameAndReindex(
+      c.env.DB,
+      c.env.DB
+        .prepare('UPDATE brands SET slug = ?, name_ar = ?, name_en = ?, name_ckb = ?, active = ? WHERE id = ?')
+        .bind(slug, nameAr, nameEn, nameCkb, active, id),
+      namesChanged(existing, { name_ar: nameAr, name_en: nameEn, name_ckb: nameCkb }),
+      { sql: 'p.brand_id = ?', params: [id] }
+    );
   } else {
     await c.env.DB
       .prepare('INSERT INTO brands (id, slug, name_ar, name_en, name_ckb, active) VALUES (?, ?, ?, ?, ?, ?)')

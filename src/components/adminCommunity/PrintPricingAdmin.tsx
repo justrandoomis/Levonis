@@ -27,8 +27,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle, Boxes, Check, Link2, Loader2, Plus, RotateCcw, Scale, Sliders, Trash2,
+  AlertTriangle, Boxes, Check, Link2, Loader2, Plus, Printer, RotateCcw, Scale, Sliders, Trash2,
 } from 'lucide-react';
+import PrinterModelsEditor from './PrinterModelsEditor';
 import { api, ApiError, formatIqd } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import type { PrintProcess, PrintQuality } from '../../lib/printApi';
@@ -513,7 +514,10 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
   const rtl = (dir ?? ctxDir) === 'rtl';
   const t = useCallback<T>((ar: string, en: string) => (rtl ? ar : en), [rtl]);
 
-  const [tab, setTab] = useState<Tab>('pricing');
+  // 'printers' is not a settings key: the model cards are rows of their own,
+  // written one model at a time by an audited route, so the tab sits outside
+  // the four-keys save machinery below.
+  const [tab, setTab] = useState<Tab | 'printers'>('pricing');
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState('');
   /** The last state read from the server — the yardstick the dirty flag uses. */
@@ -600,8 +604,9 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
     [load, t]
   );
 
-  const TABS: Array<{ id: Tab; label: string; icon: React.ElementType }> = [
+  const TABS: Array<{ id: Tab | 'printers'; label: string; icon: React.ElementType }> = [
     { id: 'pricing', label: t('التسعير', 'Pricing'), icon: Sliders },
+    { id: 'printers', label: t('الطابعات', 'Printers'), icon: Printer },
     { id: 'materials', label: t('المواد', 'Materials'), icon: Boxes },
     { id: 'weights', label: t('أوزان المطابقة', 'Match weights'), icon: Scale },
     { id: 'providers', label: t('مواقع الموديلات', 'Model sites'), icon: Link2 },
@@ -636,7 +641,7 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
           >
             <s.icon className="w-4 h-4" />
             {s.label}
-            {dirty(s.id) && <span className="w-1.5 h-1.5 rounded-full bg-gold" aria-hidden="true" />}
+            {s.id !== 'printers' && dirty(s.id) && <span className="w-1.5 h-1.5 rounded-full bg-gold" aria-hidden="true" />}
           </button>
         ))}
       </div>
@@ -649,6 +654,7 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
           bar={bar('pricing')}
         />
       )}
+      {tab === 'printers' && <PrinterModelsEditor t={t} />}
       {tab === 'materials' && (
         <MaterialsPanel
           t={t}
@@ -1393,11 +1399,11 @@ function ProvidersPanel({
 
       <div className="rounded-2xl border border-gold/25 bg-gold/[0.06] p-3">
         <p className="text-gold text-[12.5px] font-bold mb-1.5">
-          {t('ليفونيس لا يكشط الصفحات', 'Levonis never scrapes a page')}
+          {t('Levonis لا يكشط الصفحات', 'Levonis never scrapes a page')}
         </p>
         <p className="text-zinc-300 text-[11.5px] leading-relaxed">
           {t(
-            'بدون رابط API يظل ليفونيس يفهم الرابط نفسه — يعرف الموقع ويستخرج معرّف الموديل — لكنه لا يقرأ تفاصيل التصميم: لا أبعاد ولا حجم ولا صور. مع رابط API يسأل الموقع سؤالًا مباشرًا عبر واجهته المعلنة، ولا يفتح صفحة العرض ليقرأها.',
+            'بدون رابط API يظل Levonis يفهم الرابط نفسه — يعرف الموقع ويستخرج معرّف الموديل — لكنه لا يقرأ تفاصيل التصميم: لا أبعاد ولا حجم ولا صور. مع رابط API يسأل الموقع سؤالًا مباشرًا عبر واجهته المعلنة، ولا يفتح صفحة العرض ليقرأها.',
             'With no API URL Levonis still understands the link itself — it knows the site and pulls out the model id — but it cannot read the design’s details: no dimensions, no volume, no images. With an API URL it asks that site a direct question through its published interface; it never opens the listing page to read it.'
           )}
         </p>
@@ -1455,7 +1461,7 @@ function ProvidersPanel({
 
       <p className="text-zinc-500 text-[11px] leading-relaxed">
         {t(
-          'لا تُضاف مواقع جديدة من هنا: ليفونيس يحتاج أولًا أن يعرف شكل روابط الموقع ليستخرج معرّف الموديل منها، وذلك يُضاف في الكود لا في الإعدادات.',
+          'لا تُضاف مواقع جديدة من هنا: Levonis يحتاج أولًا أن يعرف شكل روابط الموقع ليستخرج معرّف الموديل منها، وذلك يُضاف في الكود لا في الإعدادات.',
           'New sites are not added here: Levonis must first know the shape of that site’s links to pull a model id out of them, and that lives in code rather than in a setting.'
         )}
       </p>

@@ -28,6 +28,21 @@
  *   `UI_LAYERS.overlay` so it also covers an open sheet, the header and the
  *   bottom navigation.
  *
+ *   AND IT IS NOT A MODAL, SO IT TAKES NO MODAL LOCK. It used to share
+ *   `acquireModalLock` with `Overlay`, and that lock does three things this
+ *   layer does not need and was paying for: it sets `overflow: hidden` on the
+ *   body and on #main-scroll-container (a layout change on the way in AND on
+ *   the way out — on a desktop, a scrollbar vanishing and the page reflowing
+ *   sideways under the scrim), it slides the bottom navigation away, and it
+ *   sets `html[data-overlay-open]`, which src/index.css turns into
+ *   `opacity: 0` on the character. So every wait hid the character — the
+ *   site's own loading animation — behind a generic spinner, and every order
+ *   ended with the lock's release restoring two overflows and fading the
+ *   character back in on exactly the frame its celebration had to start. The
+ *   layer does not need any of it: `touch-action: none` and the swallowed
+ *   pointer events are what stop a finger from scrolling or tapping through,
+ *   and a wheel over a portal on <body> has no ancestor that scrolls.
+ *
  * THE TWO CLOCKS.
  *
  *   THE DELAY. Nothing is drawn for the first `BUSY_DELAY_MS`, the same
@@ -49,19 +64,34 @@
  * spinner. Nothing on this screen is generated, in any of the three languages.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
-import { UI_LAYERS, acquireModalLock } from './Overlay';
+import { UI_LAYERS } from './Overlay';
 import Spinner from './Spinner';
-import { useBusySnapshot, type BusyReason } from '../../lib/busy';
+import { COMMITS, useBusySnapshot, type BusyReason } from '../../lib/busy';
 import { DEFAULT_TIMEOUT_MS } from '../../lib/api';
+import { characterLayout } from '../bloub/anchors';
 
 /** Long enough that a fast response never flashes, short enough that a slow
  *  one is covered before a second tap can land. */
 export const BUSY_DELAY_MS = 140;
+
+/**
+ * A ROUTE WAIT WAITS LONGER BEFORE IT SAYS ANYTHING.
+ *
+ * Every navigation is now watched (src/components/NavigationRouter.tsx), not
+ * only the ones that mount a Suspense fallback — and most navigations are not
+ * waits at all. A page whose code is already here still takes a render, and on
+ * a weak phone a heavy page renders for longer than 140ms: covering THAT with
+ * a scrim for a few frames would flash on ordinary taps, which is the one
+ * thing a takeover must never do. A chunk still downloading takes hundreds of
+ * milliseconds to seconds; 250 covers it just as surely and lets a render
+ * finish unannounced.
+ */
+export const ROUTE_BUSY_DELAY_MS = 250;
 
 /**
  * After this, the layer lets go no matter what the store says.
@@ -87,14 +117,34 @@ export const BUSY_CEILING_MS = DEFAULT_TIMEOUT_MS + BUSY_CEILING_MARGIN_MS;
 /**
  * One hand-written sentence per reason, per language. `order` is the
  * Place-order button's own busy label (src/pages/Checkout.tsx), `quote` is
- * `S.quoteLoading` — the sentence the delivery row already shows — and
- * `route` is the inline spinner's generic trio. No Sorani was written for
- * this file; all of it already existed.
+ * `S.quoteLoading` — the sentence the delivery row already shows — `route`
+ * is the inline spinner's generic trio, `payment` is the wallet form's own
+ * «submitting» label (src/pages/Wallet.tsx), and `subscribe` is the
+ * membership screen's «working» label (src/translations.ts). No Sorani was
+ * written for this file; all of it already existed.
  */
-const LABELS: Record<BusyReason, Record<'ar' | 'en' | 'ckb', string>> = {
+export const LABELS: Record<BusyReason, Record<'ar' | 'en' | 'ckb', string>> = {
   order: { ar: 'جارٍ تأكيد الطلب…', en: 'Placing order…', ckb: 'داواکاری دەنێردرێت…' },
+  payment: { ar: 'جارٍ الإرسال…', en: 'Submitting…', ckb: 'دەنێردرێت…' },
+  subscribe: { ar: 'جارٍ التنفيذ…', en: 'Working…', ckb: 'جێبەجێ دەکرێت…' },
   quote: { ar: 'جارٍ حساب التوصيل...', en: 'Calculating delivery...', ckb: 'حسابکردنی گەیاندن...' },
   route: { ar: 'جارٍ التحميل…', en: 'Loading…', ckb: 'باردەکرێت…' },
+};
+
+/**
+ * HOW THE SCRIM LEAVES, decided at the moment it leaves.
+ *
+ * After a quote or a route it fades, as it came. After an ORDER it is simply
+ * gone: the page behind it is no longer the checkout but the confirmation,
+ * whose character is popping onto its stage and whose confetti is going off on
+ * that very frame. A full-screen fade on top of that is a second animation
+ * competing with the one the customer is owed, over the one moment the owner
+ * called «lagging». Passed through `AnimatePresence`'s `custom`, because a
+ * child that is being removed can no longer receive new props.
+ */
+const SCRIM = {
+  shown: { opacity: 1 },
+  hidden: (instant: boolean) => (instant ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0 }),
 };
 
 /** Every pointer event that reaches this layer stops here. That is the fix. */
@@ -104,11 +154,20 @@ function swallow(event: React.SyntheticEvent) {
 }
 
 export default function AppBusy() {
-  const { reason, session } = useBusySnapshot();
+  const { reason, session, opener, ended } = useBusySnapshot();
   const { lang, dir } = useLanguage();
   const m = useMotion();
   const [shown, setShown] = useState(false);
   const [released, setReleased] = useState(false);
+  /**
+   * THE CHARACTER IS THE BOOT LOADER, AND A ROUTE WAIT DURING BOOT IS ITS TO
+   * SHOW. The shell's first wait (the host, the session) is held as `route`,
+   * and on a phone it outlasts the show delay — so this layer used to draw its
+   * spinner over the character's centred intro on every cold load. While the
+   * intro is booting (`booting` in src/components/bloub/anchors.ts) a route
+   * wait stands down; an order, a payment or a quote never does.
+   */
+  const introBooting = useSyncExternalStore(characterLayout.subscribe, characterLayout.booting, characterLayout.serverBooting);
 
   /**
    * Both clocks run from the SESSION, not from the reason. A re-quote that is
@@ -123,15 +182,16 @@ export default function AppBusy() {
       setReleased(false);
       return;
     }
-    const show = window.setTimeout(() => setShown(true), BUSY_DELAY_MS);
+    const show = window.setTimeout(() => setShown(true), opener === 'route' ? ROUTE_BUSY_DELAY_MS : BUSY_DELAY_MS);
     const ceiling = window.setTimeout(() => setReleased(true), BUSY_CEILING_MS);
     return () => {
       window.clearTimeout(show);
       window.clearTimeout(ceiling);
     };
-  }, [idle, session]);
+  }, [idle, session, opener]);
 
-  const visible = !idle && shown && !released;
+  const standsDown = reason === 'route' && introBooting;
+  const visible = !idle && shown && !released && !standsDown;
 
   /**
    * ESCAPE LETS GO. Not because dismissing a wait makes sense, but because a
@@ -147,24 +207,21 @@ export default function AppBusy() {
     return () => window.removeEventListener('keydown', onKey);
   }, [visible]);
 
-  /** The app scrolls in #main-scroll-container. Share the one counter. */
-  useEffect(() => {
-    if (visible) return acquireModalLock();
-  }, [visible]);
-
   /**
-   * ONLY THE ORDER, AND FROM THE FIRST MILLISECOND.
+   * ONLY THE COMMITS, AND FROM THE FIRST MILLISECOND.
    *
-   * A reload during `POST /api/orders` is the one wait where leaving costs the
-   * customer something they cannot see — the request is already with the
-   * server. It is deliberately NOT gated on `visible`: the risk exists before
-   * the delay has elapsed, and a page that is about to unload is not going to
-   * wait 140ms to object. Equally deliberately, it is not armed for a quote:
-   * an app that argues with people who are simply leaving a price calculation
-   * has taught them to ignore it by the time it matters.
+   * A reload during `POST /api/orders` — or a wallet deposit, or a
+   * subscription — is the one kind of wait where leaving costs the customer
+   * something they cannot see: the request is already with the server
+   * (`COMMITS` in src/lib/busy.ts). It is deliberately NOT gated on
+   * `visible`: the risk exists before the delay has elapsed, and a page that
+   * is about to unload is not going to wait 140ms to object. Equally
+   * deliberately, it is not armed for a quote or a route: an app that argues
+   * with people who are simply leaving a price calculation has taught them to
+   * ignore it by the time it matters.
    */
   useEffect(() => {
-    if (reason !== 'order') return;
+    if (reason === null || !COMMITS.has(reason)) return;
     /**
      * AND IT LETS GO WHEN THE LAYER DOES. `released` is in the dependency
      * list — not `visible`, which is also false during the first 140ms while
@@ -190,7 +247,7 @@ export default function AppBusy() {
   const label = LABELS[reason ?? 'route'][lang as 'ar' | 'en' | 'ckb'] ?? LABELS[reason ?? 'route'].ar;
 
   return createPortal(
-    <AnimatePresence>
+    <AnimatePresence custom={ended === 'order'}>
       {visible && (
         <motion.div
           dir={dir}
@@ -203,7 +260,12 @@ export default function AppBusy() {
           onClick={swallow}
           onContextMenu={swallow}
           onTouchStart={swallow}
-          className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-[3px] cursor-progress"
+          // NO BACKDROP BLUR. A full-viewport `backdrop-filter` is re-filtered
+          // on every frame anything beneath it changes — and beneath it, a
+          // page is loading or the character is moving — which on a weak phone
+          // is the most expensive pixel in the app spent on a wait. The 70%
+          // black already says «not now»; the blur added nothing but frames.
+          className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 cursor-progress"
           // Above `UI_LAYERS.overlay`, so an open sheet is covered too, and
           // above `.lv-app-intro` (z-index 121) so the character cannot be
           // tapped into a journey while the page is unavailable.
@@ -212,9 +274,11 @@ export default function AppBusy() {
           // layer appears because something is slow, and a surface that
           // performs an entrance while the app is stalled is the interface
           // talking about itself.
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          variants={SCRIM}
+          custom={ended === 'order'}
+          initial="hidden"
+          animate="shown"
+          exit="hidden"
           transition={m.spring('quick')}
         >
           {/* `decorative`, because the sentence below is the status text and

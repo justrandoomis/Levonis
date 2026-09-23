@@ -35,11 +35,21 @@ import type { PolicyDocument } from './types';
  *     text rather than show a customer a `{{TOKEN}}`. They are still authored
  *     below, and each one returns of its own accord the moment its value is
  *     written in and the version moves again.
+ *
+ * VERSION 4 — WHY IT MOVED. The archive keeps version 3 byte for byte.
+ *   * THE FACTS. worker/lib/policies/facts.ts now states `COMPETENT_COURT`, `GOVERNING_LAW_JURISDICTION`, `LEVONIS_SUPPORT_CONTACT`, `MIN_PURCHASE_AGE_YEARS`, `PRIME_FREE_DELIVERY_MIN_IQD`, `PRO_FREE_DELIVERY_MIN_IQD`,
+ *     so the clauses that carried them are published instead of withheld.
+ *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
+ *     by number, an article of this document that is itself withheld. 10.3
+ *     (be present or authorise a recipient) no longer cites the still-withheld
+ *     9.7, so that obligation stays published.
+ *   * ONE NAME PER TIER. 6.6 calls the middle tier LEVO PREMIUM, as membership
+ *     2.4 says every customer screen does; `PRIME_` survives only as the token.
  */
 export const purchase: PolicyDocument = {
   key: 'purchase',
-  version: 3,
-  effective_at: '2026-01-01',
+  version: 4,
+  effective_at: '2026-09-23',
   title: {
     ar: 'سياسة الشراء',
     en: 'Purchase Policy',
@@ -208,7 +218,7 @@ export const purchase: PolicyDocument = {
 أجرة التوصيل والضريبة المرتبطة بها تحددهما شركات التوصيل، لا Levonis. المتجر ينقل إلى الزبون ما تفرضه الشركة الناقلة ولا يضيف إليه ولا يتحكم به، وأي تغيير في تعرفة الشركة ينعكس على ما يُعرض عند الطلب.
 
 ### 6.6 كلف التوصيل على الزبون
-كل كلف التوصيل على الزبون. ويُستثنى من ذلك أعضاء PRO و LEVO PRIME فوق قيمة طلب محددة، حيث يتحملها المتجر: الإعفاء لعضو PRO الفعّال عند تجاوز قيمة البضاعة المؤهلة حدّ {{PRO_FREE_DELIVERY_MIN_IQD}} دينار حصراً بالزيادة، ويشمل التوصيل الاعتيادي والتغليف المحمي. أما LEVO PRIME فيُعفى من أجرة التوصيل الاعتيادية وحدها عند تجاوز حدّ {{PRIME_FREE_DELIVERY_MIN_IQD}} دينار حصراً بالزيادة. والرقم المعتمد في كل طلب هو المعروض في شاشة الدفع لذلك الطلب، وتفصيل الشروط في سياسة التوصيل.
+كل كلف التوصيل على الزبون. ويُستثنى من ذلك أعضاء PRO و LEVO PREMIUM فوق قيمة طلب محددة، حيث يتحملها المتجر: الإعفاء لعضو PRO الفعّال عند تجاوز قيمة البضاعة المؤهلة حدّ {{PRO_FREE_DELIVERY_MIN_IQD}} دينار حصراً بالزيادة، ويشمل التوصيل الاعتيادي والتغليف المحمي. أما LEVO PREMIUM فيُعفى من أجرة التوصيل الاعتيادية وحدها عند تجاوز حدّ {{PRIME_FREE_DELIVERY_MIN_IQD}} دينار حصراً بالزيادة. والرقم المعتمد في كل طلب هو المعروض في شاشة الدفع لذلك الطلب، وتفصيل الشروط في سياسة التوصيل.
 
 ### 6.7 ضريبة الدفع عند الاستلام
 عند اختيار الدفع عند الاستلام مع التوصيل إلى عنوان، تُضاف ضريبة بمقدار مقرر عن كل شريحة كاملة من المبلغ المستحق عند الباب. ومقدار الضريبة ومقدار الشريحة كلاهما قابلان للتعديل من إدارة المتجر، والرقم المعتمد في كل طلب هو المعروض في شاشة الدفع لذلك الطلب. ولا تُفرض هذه الضريبة على الاستلام من المخزن ولا على الطلب المدفوع مسبقاً. وقد تُعفى منها بعض مستويات العضوية، ويُعرض مقدار الضريبة والإعفاء رقمين منفصلين على الفاتورة.
@@ -312,7 +322,7 @@ export const purchase: PolicyDocument = {
 يلتزم الزبون بعنوان دقيق يشمل المحافظة والمنطقة وأقرب نقطة دالّة. والمحافظة تُختار من القائمة المعتمدة لأن التوزيع يُبنى عليها، والعنوان الناقص أو الخاطئ يجعل كلفة التسليم الفاشل على الزبون.
 
 ### 10.3 الحضور أو تفويض مستلم
-يلتزم الزبون بأن يكون حاضراً في العنوان في وقت التسليم أو أن يفوّض من يستلم عنه. وغياب الطرفين تسليم فاشل يخضع للمادة 9.7.
+يلتزم الزبون بأن يكون حاضراً في العنوان في وقت التسليم أو أن يفوّض من يستلم عنه. وغياب الطرفين تسليم فاشل.
 
 ### 10.4 الرد على شركة التوصيل
 يلتزم الزبون بالرد على اتصال شركة التوصيل وبالتنسيق معها. وعدم الرد المتكرر يُعامل معاملة تعذر التسليم.
@@ -381,7 +391,7 @@ export const purchase: PolicyDocument = {
 يُقدَّم النزاع أولاً إلى الدعم مع رقم الطلب والمستندات، وتُبذل المحاولة الودية خلال {{DISPUTE_RESPONSE_DAYS}} يوماً قبل اللجوء إلى غير ذلك.
 
 ### 13.5 القانون الواجب التطبيق والاختصاص
-يخضع تفسير هذه الوثيقة وتنفيذها لقوانين {{GOVERNING_LAW_JURISDICTION}}، ويكون الاختصاص لمحاكم {{COMPETENT_COURT}}.
+يخضع تفسير هذه الوثيقة وتنفيذها ل{{GOVERNING_LAW_JURISDICTION}}، ويكون الاختصاص ل{{COMPETENT_COURT}}.
 
 ### 13.6 جهة الاتصال
 جهة الاتصال المعتمدة للشكاوى والمراجعات هي {{LEVONIS_SUPPORT_CONTACT}}، وأوقات العمل {{LEVONIS_SUPPORT_HOURS}}.`,
@@ -548,7 +558,7 @@ If the customer selects an extension of a printer's warranty, its fee is added t
 The delivery fee and the tax attached to it are set by the delivery companies, not by LEVONIS. The Store passes on what the carrier charges, adds nothing to it and does not control it, and any change in the carrier's tariff is reflected in what is displayed at the time of the order.
 
 ### 6.6 Delivery costs are on the customer
-All delivery costs are on the customer. PRO and LEVO PRIME members above a stated order value are excepted, and there the Store carries them: the waiver for an active PRO member applies where the eligible merchandise value is strictly more than {{PRO_FREE_DELIVERY_MIN_IQD}} dinars, and covers ordinary delivery and protected packing. LEVO PRIME is waived the ordinary delivery fee alone where the value is strictly more than {{PRIME_FREE_DELIVERY_MIN_IQD}} dinars. The figure that governs a given order is the one displayed on that order's checkout screen, and the conditions are detailed in the Delivery Policy.
+All delivery costs are on the customer. PRO and LEVO PREMIUM members above a stated order value are excepted, and there the Store carries them: the waiver for an active PRO member applies where the eligible merchandise value is strictly more than {{PRO_FREE_DELIVERY_MIN_IQD}} dinars, and covers ordinary delivery and protected packing. LEVO PREMIUM is waived the ordinary delivery fee alone where the value is strictly more than {{PRIME_FREE_DELIVERY_MIN_IQD}} dinars. The figure that governs a given order is the one displayed on that order's checkout screen, and the conditions are detailed in the Delivery Policy.
 
 ### 6.7 The cash-on-delivery tax
 Where cash on delivery is chosen with delivery to an address, a tax is added at a stated amount for every complete block of the amount payable at the door. The amount of the tax and the size of the block may both be amended by the Store's administration, and the figure that governs a given order is the one displayed on that order's checkout screen. It is not charged on warehouse pickup nor on a prepaid order. Certain membership levels may be exempt from it, and the tax and the exemption are shown as two separate figures on the invoice.
@@ -652,7 +662,7 @@ The customer undertakes to register a correct, callable number belonging to them
 The customer undertakes to give a precise address including the governorate, the area and the nearest landmark. The governorate is chosen from the approved list because dispatch is built on it, and an incomplete or wrong address places the cost of a failed delivery on the customer.
 
 ### 10.3 Being present or authorising a recipient
-The customer undertakes to be present at the address at the time of delivery or to authorise someone to receive on their behalf. The absence of both is a failed delivery governed by article 9.7.
+The customer undertakes to be present at the address at the time of delivery or to authorise someone to receive on their behalf. The absence of both is a failed delivery.
 
 ### 10.4 Answering the delivery company
 The customer undertakes to answer the delivery company's call and to coordinate with it. Repeated failure to answer is treated as failure of delivery.
@@ -721,7 +731,7 @@ The invalidity or unenforceability of one article does not affect the remaining 
 A dispute is first submitted to support with the order number and the documents, and an amicable resolution is attempted within {{DISPUTE_RESPONSE_DAYS}} days before any other recourse.
 
 ### 13.5 Governing law and jurisdiction
-The interpretation and performance of this document are governed by the laws of {{GOVERNING_LAW_JURISDICTION}}, and the courts of {{COMPETENT_COURT}} have jurisdiction.
+The interpretation and performance of this document are governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} have jurisdiction.
 
 ### 13.6 Contact
 The approved contact point for complaints and enquiries is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours are {{LEVONIS_SUPPORT_HOURS}}.`,
@@ -888,7 +898,7 @@ The approved contact point for complaints and enquiries is {{LEVONIS_SUPPORT_CON
 کرێی گەیاندن و ئەو باجەی پێوەی بەستراوە لەلایەن کۆمپانیاکانی گەیاندنەوە دیاری دەکرێن، نەک لەلایەن Levonisەوە. فرۆشگا ئەوە دەگوازێتەوە بۆ کڕیار کە کۆمپانیای گواستنەوە داوای دەکات، هیچی بۆ زیاد ناکات و کۆنترۆڵی ناکات، و هەر گۆڕانێک لە تەعریفەی کۆمپانیاکە ڕەنگدانەوەی دەبێت لەوەی لە کاتی داواکاریدا پیشان دەدرێت.
 
 ### 6.6 تێچووی گەیاندن لەسەر کڕیارە
-هەموو تێچووەکانی گەیاندن لەسەر کڕیارن. ئەندامانی PRO و LEVO PRIME لە سەرووی بەهایەکی دیاریکراوی داواکاری لەمە دەردەچن، و لەوێدا فرۆشگا هەڵیدەگرێت: بەخشینەکە بۆ ئەندامی PRO ی چالاک کاتێک جێبەجێ دەبێت کە بەهای کاڵای شایستە بە تەواوی زیاتر بێت لە {{PRO_FREE_DELIVERY_MIN_IQD}} دینار، و گەیاندنی ئاسایی و پاکەتکردنی پارێزراو دەگرێتەوە. بەڵام LEVO PRIME تەنها لە کرێی گەیاندنی ئاسایی دەبەخشرێت کاتێک بەهاکە بە تەواوی زیاتر بێت لە {{PRIME_FREE_DELIVERY_MIN_IQD}} دینار. ئەو ژمارەیەی بۆ هەر داواکارییەک کاری پێدەکرێت ئەوەیە لە شاشەی پارەدانی ئەو داواکارییەدا پیشان دەدرێت، و مەرجەکان لە سیاسەتی گەیاندندا وردتر کراون.
+هەموو تێچووەکانی گەیاندن لەسەر کڕیارن. ئەندامانی PRO و LEVO PREMIUM لە سەرووی بەهایەکی دیاریکراوی داواکاری لەمە دەردەچن، و لەوێدا فرۆشگا هەڵیدەگرێت: بەخشینەکە بۆ ئەندامی PRO ی چالاک کاتێک جێبەجێ دەبێت کە بەهای کاڵای شایستە بە تەواوی زیاتر بێت لە {{PRO_FREE_DELIVERY_MIN_IQD}} دینار، و گەیاندنی ئاسایی و پاکەتکردنی پارێزراو دەگرێتەوە. بەڵام LEVO PREMIUM تەنها لە کرێی گەیاندنی ئاسایی دەبەخشرێت کاتێک بەهاکە بە تەواوی زیاتر بێت لە {{PRIME_FREE_DELIVERY_MIN_IQD}} دینار. ئەو ژمارەیەی بۆ هەر داواکارییەک کاری پێدەکرێت ئەوەیە لە شاشەی پارەدانی ئەو داواکارییەدا پیشان دەدرێت، و مەرجەکان لە سیاسەتی گەیاندندا وردتر کراون.
 
 ### 6.7 باجی پارەدان لە کاتی وەرگرتن
 لە کاتی هەڵبژاردنی پارەدان لە کاتی وەرگرتن لەگەڵ گەیاندن بۆ ناونیشانێک، باجێک بە بڕێکی دیاریکراو زیاد دەکرێت بۆ هەر بڕێکی تەواو لەو بڕەی لە بەردەرگا دەدرێت. هەردوو بڕەکە دەکرێت لەلایەن بەڕێوەبەرایەتیی فرۆشگاوە بگۆڕدرێن، و ئەو ژمارەیەی بۆ هەر داواکارییەک کاری پێدەکرێت ئەوەیە لە شاشەی پارەدانی ئەو داواکارییەدا پیشان دەدرێت. لەسەر وەرگرتن لە کۆگا و لەسەر داواکاری پێشەکی دراو زیاد ناکرێت. لەوانەیە هەندێک ئاستی ئەندامێتی لێی ببەخشرێن، و بڕی باج و بەخشین وەک دوو ژمارەی جیاواز لەسەر پسووڵەکە پیشان دەدرێن.
@@ -992,7 +1002,7 @@ The approved contact point for complaints and enquiries is {{LEVONIS_SUPPORT_CON
 کڕیار پابەندە بە دانی ناونیشانێکی ورد کە پارێزگا و ناوچە و نزیکترین نیشانە لەخۆ بگرێت. پارێزگا لە لیستە پەسەندکراوەکە هەڵدەبژێردرێت چونکە دابەشکردن لەسەری بنیات دەنرێت، و ناونیشانی ناتەواو یان هەڵە تێچووی گەیاندنی شکستخواردوو دەخاتە سەر کڕیار.
 
 ### 10.3 ئامادەبوون یان ڕێپێدان بە وەرگرێک
-کڕیار پابەندە بەوەی لە کاتی گەیاندندا لە ناونیشانەکەدا ئامادە بێت یان ڕێ بە کەسێک بدات لە جیاتی وەری بگرێت. نەبوونی هەردووکیان گەیاندنێکی شکستخواردووە کە بڕگەی 9.7 لەسەری جێبەجێ دەبێت.
+کڕیار پابەندە بەوەی لە کاتی گەیاندندا لە ناونیشانەکەدا ئامادە بێت یان ڕێ بە کەسێک بدات لە جیاتی وەری بگرێت. نەبوونی هەردووکیان گەیاندنێکی شکستخواردووە.
 
 ### 10.4 وەڵامدانەوەی کۆمپانیای گەیاندن
 کڕیار پابەندە بە وەڵامدانەوەی پەیوەندی کۆمپانیای گەیاندن و ڕێکخستن لەگەڵی. وەڵامنەدانەوەی دووبارە وەک شکستی گەیاندن مامەڵەی لەگەڵ دەکرێت.
@@ -1061,7 +1071,7 @@ The approved contact point for complaints and enquiries is {{LEVONIS_SUPPORT_CON
 ناکۆکی سەرەتا بە ژمارەی داواکاری و بەڵگەنامەکانەوە پێشکەشی پشتیوانی دەکرێت، و لە ماوەی {{DISPUTE_RESPONSE_DAYS}} ڕۆژدا هەوڵی چارەسەری دۆستانە دەدرێت پێش هەر ڕێگەیەکی دیکە.
 
 ### 13.5 یاسای جێبەجێکراو و دەسەڵاتی دادوەری
-لێکدانەوە و جێبەجێکردنی ئەم بەڵگەنامەیە بەپێی یاساکانی {{GOVERNING_LAW_JURISDICTION}} دەبێت، و دادگاکانی {{COMPETENT_COURT}} دەسەڵاتیان هەیە.
+لێکدانەوە و جێبەجێکردنی ئەم بەڵگەنامەیە بەپێی {{GOVERNING_LAW_JURISDICTION}} دەبێت، و {{COMPETENT_COURT}} دەسەڵاتیان هەیە.
 
 ### 13.6 خاڵی پەیوەندی
 خاڵی پەیوەندی پەسەندکراو بۆ سکاڵا و پرسیارەکان {{LEVONIS_SUPPORT_CONTACT}}ـە، و کاتی کارکردن {{LEVONIS_SUPPORT_HOURS}}ـە.`,

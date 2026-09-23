@@ -1,4 +1,5 @@
 import type { Env } from './types';
+import type { PayoutMethod } from './settings';
 import { newId } from './crypto';
 import { audit } from './audit';
 import { busFor, emitEvent, outboxStatement } from './eventBus';
@@ -163,7 +164,16 @@ const settledPointsSql = (u: string) => `(SELECT COALESCE(SUM(CASE WHEN t.type='
  * advance comparison; it moves no money and it appears in no WHERE clause
  * that does.
  */
-export const walletDustIqdSql = (u: string) => `(SELECT COALESCE(SUM(
+export const walletDustIqdSql = (
+  u: string,
+  /**
+   * `settledOnly` reads the remainders of APPROVED rows alone — the dinar
+   * refinement of `settledUsdSql`, for the «الرصيد المسوّى» figure, which does
+   * not subtract holds and so must not subtract a pending withdrawal's dinars
+   * either. The default is the AVAILABLE reading every spend decision uses.
+   */
+  opts: { settledOnly?: boolean } = {}
+) => `(SELECT COALESCE(SUM(
          (CASE WHEN t.type = 'deposit' THEN 1 ELSE -1 END) *
          CASE WHEN t.type = 'deposit' AND m.tx_id IS NOT NULL
               THEN MIN(
@@ -178,9 +188,13 @@ export const walletDustIqdSql = (u: string) => `(SELECT COALESCE(SUM(
        FROM wallet_transactions t
        LEFT JOIN wallet_deposit_meta m ON m.tx_id = t.id
       WHERE t.user_id = ${u} AND t.currency = 'USD'
-        AND (t.status = 'approved'
+        AND (t.status = 'approved'${
+          opts.settledOnly
+            ? ''
+            : `
              OR EXISTS (SELECT 1 FROM wallet_holds h
-                         WHERE h.tx_id = t.id AND h.user_id = t.user_id AND h.state = 'active'))
+                         WHERE h.tx_id = t.id AND h.user_id = t.user_id AND h.state = 'active')`
+        })
         AND COALESCE(t.amount_iqd, m.declared_amount_iqd) > 0
         AND COALESCE(t.exchange_rate_snapshot, m.exchange_rate_snapshot) > 0)`;
 
@@ -378,6 +392,48 @@ export function walletSpendCents(
   const available = Number.isFinite(availableCents) ? Math.trunc(availableCents) : 0;
   if (available <= 0) return 0;
   return Math.min(cost, available);
+}
+
+/**
+ * WHAT A WITHDRAWAL OF THE DISPLAYED BALANCE RESERVES — the withdrawal-side
+ * twin of `walletSpendCents`' cap.
+ *
+ * THE CASE. Two typed deposits of 25,000 د.ع are 1,785 cents each: 3,570
+ * cents, carrying two ten-dinar remainders, so the wallet reads exactly 50,000
+ * (0108). The customer types 50,000 to withdraw it. The browser floors that to
+ * 3,571 cents — one cent MORE than the wallet holds — and the hold refused the
+ * customer's whole balance with «المبلغ يتجاوز رصيدك المتاح». Checkout already
+ * caps the same way (`walletSpendCents`); the withdrawal did not.
+ *
+ * So, when and only when:
+ *   * the customer typed dinars and the claim corroborates the cents they sent
+ *     (`corroboratedDeclaredIqd` — the same check the testimony must pass),
+ *   * those cents exceed the cents on hand, and
+ *   * the typed dinars are still within the DINAR balance the page showed
+ *     (`walletIqdAvailable` over the same cents and remainders),
+ * the reservation is the cents on hand. Anything else returns the requested
+ * cents unchanged and the hold refuses it exactly as before — a withdrawal
+ * that is genuinely over the balance is still over the balance.
+ *
+ * WHO CARRIES THE DIFFERENCE is the same answer 0108 gives for a spend: the
+ * shop, bounded by the remainders it floored away when the deposits came in —
+ * money it was transferred and never credited. The typed figure is still what
+ * the request records and what the payout card states.
+ */
+export function withdrawalReserveCents(p: {
+  requestedCents: number;
+  declaredIqd: number | null | undefined;
+  availableCents: number;
+  dustIqd: number;
+  exchangeRate: number;
+}): number {
+  const requested = p.requestedCents;
+  const available = Number.isFinite(p.availableCents) ? Math.trunc(p.availableCents) : 0;
+  if (!isValidAmountCents(requested) || requested <= available || available <= 0) return requested;
+  const claim = corroboratedDeclaredIqd(p.declaredIqd, requested, p.exchangeRate);
+  if (claim.declared_amount_iqd === null) return requested;
+  if (claim.declared_amount_iqd > walletIqdAvailable(available, p.dustIqd, p.exchangeRate)) return requested;
+  return available;
 }
 
 const NOW_SQL = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
@@ -618,6 +674,113 @@ export async function getWalletBreakdown(db: D1Database, userId: string): Promis
     points_settled: row?.points_settled ?? 0,
     points_pending: row?.points_pending ?? 0,
   };
+}
+
+/**
+ * THE OTHER FOUR FIGURES ON THE WALLET PAGE, IN THE CUSTOMER'S DINARS.
+ *
+ * «إيداعات قيد المراجعة» showed IQD 49,994 the moment a customer typed 50,000
+ * and pressed send — and «الرصيد المسوّى» showed 49,994 after approval, right
+ * under a header that (since 0108) said 50,000. The page ran each of these
+ * aggregates through `usdCentsToIqd(cents, rate)`, which is the conversion
+ * 0108 exists to stop being the source: at 1,400 a cent is 14 د.ع and 50,000
+ * has no cent value that reads back as 50,000.
+ *
+ * So each figure is summed from what its rows RECORDED, by the one rule 0108
+ * states («a row's dinars are the dinars recorded on it; a row that recorded
+ * none converts from its cents»):
+ *
+ *   pending deposits    Σ COALESCE(amount_iqd, declared_amount_iqd (0105),
+ *                                  floor(cents × rate / 100))
+ *   open withdrawals    Σ COALESCE(declared_amount_iqd (0106), floor(cents × rate / 100))
+ *   held                Σ over the holds `effectiveHoldsUsdSql` counts, each
+ *                       as its withdrawal's declared dinars, or its escrow's
+ *                       `gross_iqd` — what the customer agreed to — or its
+ *                       cents converted
+ *   settled             `walletIqdAvailable(settled cents, the remainders of
+ *                       APPROVED rows, rate)` — the same function the header
+ *                       uses, over the settled sum instead of the spendable one
+ *
+ * DISPLAY ONLY. Nothing here reaches a spend guard; every guard still runs on
+ * `availableUsdSql` and cents. A database behind on 0108 (no `amount_iqd`) or
+ * one without `community_escrows` answers with the pre-0108 reading — every
+ * figure converted from its cents — rather than failing the wallet page.
+ */
+export interface WalletDinarBreakdown {
+  iqd_settled: number;
+  iqd_held: number;
+  iqd_pending_deposits: number;
+  iqd_pending_withdrawals: number;
+}
+
+export async function getWalletDinarBreakdown(
+  db: D1Database,
+  userId: string,
+  exchangeRate: number
+): Promise<WalletDinarBreakdown> {
+  const rate = Number.isFinite(exchangeRate) && exchangeRate > 0 ? Math.trunc(exchangeRate) : 0;
+  const converted = (cents: number) => (rate ? Math.floor((Math.max(0, Number(cents) || 0) * rate) / 100) : 0);
+  // `?2` is the rate for rows that recorded no dinars. Every CASE below keeps
+  // a recorded figure only when it is a whole positive number — a NULL or a 0
+  // falls through to the conversion rather than reading as "nothing".
+  const sql = `SELECT
+      ${settledUsdSql('?1')} AS settled_cents,
+      ${walletDustIqdSql('?1', { settledOnly: true })} AS settled_dust,
+      (SELECT COALESCE(SUM(COALESCE(
+                CASE WHEN t.amount_iqd > 0 AND t.exchange_rate_snapshot > 0 THEN t.amount_iqd END,
+                CASE WHEN m.declared_amount_iqd > 0 THEN m.declared_amount_iqd END,
+                (t.amount * ?2) / 100)), 0)
+         FROM wallet_transactions t
+         LEFT JOIN wallet_deposit_meta m ON m.tx_id = t.id
+        WHERE t.user_id = ?1 AND t.currency = 'USD' AND t.type = 'deposit' AND t.status = 'pending')
+        AS pending_deposits_iqd,
+      (SELECT COALESCE(SUM(COALESCE(
+                CASE WHEN w.declared_amount_iqd > 0 THEN w.declared_amount_iqd END,
+                (w.amount_cents * ?2) / 100)), 0)
+         FROM wallet_withdrawals w
+        WHERE w.user_id = ?1 AND w.state IN ('requested','approved','processing'))
+        AS pending_withdrawals_iqd,
+      (SELECT COALESCE(SUM(COALESCE(
+                (SELECT CASE WHEN w.declared_amount_iqd > 0 THEN w.declared_amount_iqd END
+                   FROM wallet_withdrawals w WHERE w.hold_id = hx.id),
+                (SELECT CASE WHEN e.gross_iqd > 0 THEN e.gross_iqd END
+                   FROM community_escrows e WHERE e.hold_id = hx.id),
+                (hx.amount_cents * ?2) / 100)), 0)
+         FROM wallet_holds hx
+         LEFT JOIN wallet_transactions htx ON htx.id = hx.tx_id
+        WHERE hx.user_id = ?1 AND hx.state = 'active'
+          AND (hx.tx_id IS NULL OR htx.status <> 'approved'))
+        AS held_iqd`;
+  try {
+    const row = await db
+      .prepare(sql)
+      .bind(userId, rate)
+      .first<{
+        settled_cents: number;
+        settled_dust: number;
+        pending_deposits_iqd: number;
+        pending_withdrawals_iqd: number;
+        held_iqd: number;
+      }>();
+    return {
+      iqd_settled: walletIqdAvailable(Number(row?.settled_cents) || 0, Number(row?.settled_dust) || 0, rate),
+      iqd_held: Number(row?.held_iqd) || 0,
+      iqd_pending_deposits: Number(row?.pending_deposits_iqd) || 0,
+      iqd_pending_withdrawals: Number(row?.pending_withdrawals_iqd) || 0,
+    };
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+    console.error(
+      `the wallet schema is behind the deployment (dinar breakdown degraded): ${e instanceof Error ? e.message : String(e)}`
+    );
+    const b = await getWalletBreakdown(db, userId);
+    return {
+      iqd_settled: converted(b.usd_cents_settled),
+      iqd_held: converted(b.usd_cents_held),
+      iqd_pending_deposits: converted(b.usd_cents_pending_deposits),
+      iqd_pending_withdrawals: converted(b.usd_cents_pending_withdrawals),
+    };
+  }
 }
 
 // ---------------------------------------------------------------- holds
@@ -898,25 +1061,52 @@ export const holdDebitTxId = (holdId: string) => `wtx_hold_${holdId}`;
  */
 export function commitHoldStatements(
   db: D1Database,
-  p: { holdId: string; note: string; ref: string }
+  p: {
+    holdId: string;
+    note: string;
+    ref: string;
+    /**
+     * THE DINARS THIS SETTLEMENT WAS DENOMINATED IN (migration 0108), and the
+     * rate the hold's cents were computed at — the same pair `usdSpendStatement`
+     * records on a checkout debit, for the same reason: a debit that records
+     * the dinars it spent cancels the remainders of the credits that funded it,
+     * so a wallet reads exactly its dinars after a community offer is paid.
+     *
+     * Pass them ONLY when the caller knows the database carries 0108's columns
+     * (`walletLedgerDinarsReady`) — naming a column that is not there aborts
+     * the whole settlement batch. Omit them and the statement is the one this
+     * file has always written, byte for byte. Testimony, never money: the
+     * debit's `amount` is still the hold's own cents.
+     */
+    amountIqd?: number | null;
+    exchangeRateSnapshot?: number | null;
+  }
 ): D1PreparedStatement[] {
   const txId = holdDebitTxId(p.holdId);
+  const iqd = Number.isInteger(p.amountIqd) && (p.amountIqd as number) > 0 ? (p.amountIqd as number) : null;
+  const rate =
+    iqd !== null && Number.isInteger(p.exchangeRateSnapshot) && (p.exchangeRateSnapshot as number) > 0
+      ? (p.exchangeRateSnapshot as number)
+      : null;
+  const dinars = iqd !== null && rate !== null;
   return [
     // `hh` — never `h`: the balance fragments alias wallet_holds as `h`
     // internally, and a same-named outer alias would make their correlation
     // bind to the inner table and sum every user's holds.
     db
       .prepare(
-        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
+        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at${
+          dinars ? ', amount_iqd, exchange_rate_snapshot' : ''
+        })
          SELECT ?1, hh.user_id, 'withdrawal', 'USD',
                 CASE WHEN hh.state = 'active' AND hh.tx_id IS NULL AND hh.kind = 'purchase'
                           AND ${availableUsdSql('hh.user_id')} + hh.amount_cents >= hh.amount_cents
                      THEN hh.amount_cents ELSE -1 END,
-                'approved', ?3, ?4, 'system', ${NOW_SQL}
+                'approved', ?3, ?4, 'system', ${NOW_SQL}${dinars ? ', ?5, ?6' : ''}
            FROM wallet_holds hh
           WHERE hh.id = ?2`
       )
-      .bind(txId, p.holdId, p.note.slice(0, 500), p.ref.slice(0, 120)),
+      .bind(...[txId, p.holdId, p.note.slice(0, 500), p.ref.slice(0, 120), ...(dinars ? [iqd, rate] : [])]),
     db
       .prepare(
         `UPDATE wallet_holds
@@ -1172,6 +1362,13 @@ export interface WithdrawalDestination {
   account: string;
   holder?: string;
   note?: string;
+  /**
+   * The channel's NAME as the owner configured it at the moment of filing
+   * («زين كاش», «استلام كاش» …), resolved server-side from `payoutMethods` —
+   * never from the request body. Frozen with the rest of the destination
+   * (migration 0112) so a renamed channel cannot rewrite an open request.
+   */
+  label?: string;
 }
 
 export interface RequestWithdrawalInput {
@@ -1204,11 +1401,54 @@ export interface RequestWithdrawalInput {
    *  beside a figure it corroborates. Written once here, never recomputed at
    *  display time. */
   exchangeRateSnapshot?: number;
+  /**
+   * The cents the customer's OWN conversion produced, when the route reserved
+   * fewer (`withdrawalReserveCents` — the whole-balance cap). The typed claim
+   * is corroborated against THESE, because that is the number the browser
+   * derived from it; `amountCents` stays what is held and debited. Never
+   * below `amountCents`: a claim may only ever be reserved at or under what
+   * it asked for. Absent means "the same as `amountCents`".
+   */
+  claimCents?: number;
 }
 
 export type WithdrawalOpResult =
   | { ok: true; id: string; replayed: boolean }
   | { ok: false; reason: WithdrawalFailure; id?: string };
+
+export interface PayoutChannel {
+  id: string;
+  /** The name to freeze onto the request as `destination_label`. */
+  label: string;
+  /** False only for a channel the owner marked as needing no account (cash pickup). */
+  requires_account: boolean;
+}
+
+/**
+ * WHICH CHANNEL A WITHDRAWAL IS PAID THROUGH, resolved on the SERVER from the
+ * owner's own settings — the request body names an id and nothing else, so a
+ * client can neither invent a channel name nor waive the account number of a
+ * channel that needs one.
+ *
+ * ONLY the owner's `payoutMethods`. This used to fall back to the deposit
+ * `paymentMethods` and to four legacy ids (manual_transfer, zaincash, fib,
+ * bank_account), so a channel the owner DELETED in the admin editor — or FIB,
+ * which the shop never offered — could still be filed from a stale tab or a
+ * hand-made request. `normalizePayoutMethods` never returns an empty list, so
+ * there is always something to choose. Old requests keep the name frozen on
+ * them (`destination_label`) and the pages name older ones by id for display
+ * only; that lookup never decides what may be FILED.
+ *
+ * An id not on the list is `null`, and the route refuses it: a transfer
+ * through a channel the owner no longer pays through is not a request a human
+ * can pay.
+ */
+export function resolvePayoutChannel(kind: string, payoutMethods: ReadonlyArray<PayoutMethod>): PayoutChannel | null {
+  const id = (kind ?? '').trim();
+  if (!id) return null;
+  const payout = payoutMethods.find((m) => m.id === id);
+  return payout ? { id, label: payout.name, requires_account: payout.requires_account !== false } : null;
+}
 
 /**
  * File a withdrawal request: reserve the money, open the pending ledger row
@@ -1240,11 +1480,28 @@ export async function requestWithdrawal(
    * something nobody typed, and must not carry a claim nothing backs. The
    * rate follows the figure and never travels alone.
    */
+  const claimCents =
+    isValidAmountCents(p.claimCents) && (p.claimCents as number) >= p.amountCents ? (p.claimCents as number) : p.amountCents;
   const { declared_amount_iqd: declaredIqd, exchange_rate_snapshot: rateSnapshot } = corroboratedDeclaredIqd(
     p.declaredAmountIqd,
-    p.amountCents,
+    claimCents,
     p.exchangeRateSnapshot
   );
+  /**
+   * WHAT THE CUSTOMER WAS PROMISED, IN THE DINARS THEY TYPED (migration 0112).
+   *
+   * The form shows «commission 1,500 · net 48,500» for a typed 50,000 at 3% —
+   * arithmetic over the typed figure at the same basis points this quote used.
+   * The admin «Transfer» box converted `net_cents` back at TODAY's rate and
+   * read 48,496. The payout is now written down in the customer's own terms,
+   * once, here, beside the cents: fee = floor(declared × bps / 10000), the
+   * same floor `withdrawalFeeQuote` applies to the cents, so the rounding
+   * still goes to the customer. Only beside a corroborated figure — a request
+   * with no testimony has no dinar promise to record.
+   */
+  const feeIqd =
+    declaredIqd === null ? null : quote.fee_policy === 'percent_bps' ? Math.floor((declaredIqd * quote.fee_bps) / 10_000) : 0;
+  const netIqd = declaredIqd === null || feeIqd === null ? null : declaredIqd - feeIqd;
   const holdId = newId('whold');
   const txId = newId('wtx');
   const wdId = newId('wd');
@@ -1274,7 +1531,7 @@ export async function requestWithdrawal(
    * reads before making a transfer — because an unrelated migration was a
    * deploy late.
    */
-  const buildStatements = (withDeclared: boolean, withLedgerDinars: boolean) => [
+  const buildStatements = (withDeclared: boolean, withLedgerDinars: boolean, withPayoutChannel: boolean) => [
     holdInsertStatement(db, holdId, 'withdrawal', holdInput),
     // Ledger row: pending until an actual payout is recorded. Dependent on
     // the hold having been created by the statement above.
@@ -1315,10 +1572,11 @@ export async function requestWithdrawal(
            (id, user_id, tx_id, hold_id, amount_cents, fee_cents, net_cents, fee_policy,
             destination_kind, destination_account, destination_holder, destination_note,
             ${withDeclared ? 'declared_amount_iqd, exchange_rate_snapshot,' : ''}
+            ${withPayoutChannel ? 'destination_label, fee_iqd, net_iqd,' : ''}
             destination_frozen_at, state, created_at, updated_at)
          SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ${
            withDeclared ? '?13, ?14, ' : ''
-         }${NOW_SQL}, 'requested', ${NOW_SQL}, ${NOW_SQL}
+         }${withPayoutChannel ? (withDeclared ? '?15, ?16, ?17, ' : '?13, ?14, ?15, ') : ''}${NOW_SQL}, 'requested', ${NOW_SQL}, ${NOW_SQL}
           WHERE EXISTS (SELECT 1 FROM wallet_holds h WHERE h.id = ?4 AND h.state = 'active')
             AND EXISTS (SELECT 1 FROM wallet_transactions t WHERE t.id = ?3)`
       )
@@ -1337,6 +1595,9 @@ export async function requestWithdrawal(
           (p.destination.holder ?? '').slice(0, 120),
           (p.destination.note ?? '').slice(0, 300),
           ...(withDeclared ? [declaredIqd, rateSnapshot] : []),
+          ...(withPayoutChannel
+            ? [(p.destination.label ?? '').trim().slice(0, 60) || null, feeIqd, netIqd]
+            : []),
         ]
       ),
     // Link the hold to its ledger row, so committing the payout and posting
@@ -1379,24 +1640,26 @@ export async function requestWithdrawal(
    */
   const runMoneyBatch = async (): Promise<D1Result[] | null> => {
     /**
-     * THE LADDER: full testimony, then without 0108's ledger columns, then
-     * without 0106's request columns either. Each rung is tried only when the
+     * THE LADDER: full testimony, then without 0112's channel name and dinar
+     * payout, then without 0108's ledger columns, then without 0106's request
+     * columns either — newest first, always. Each rung is tried only when the
      * one above failed for a MISSING COLUMN — a UNIQUE race or a D1 outage
      * stops the ladder immediately, because retrying a money batch that failed
      * for any other reason is how one request becomes two payouts.
      */
-    const rungs: Array<[boolean, boolean]> = [
-      [true, true],
-      [true, false],
-      [false, false],
+    const rungs: Array<[boolean, boolean, boolean]> = [
+      [true, true, true],
+      [true, true, false],
+      [true, false, false],
+      [false, false, false],
     ];
     for (let i = 0; i < rungs.length; i += 1) {
       try {
-        return await db.batch(buildStatements(rungs[i][0], rungs[i][1]));
+        return await db.batch(buildStatements(rungs[i][0], rungs[i][1], rungs[i][2]));
       } catch (e) {
         if (!isSchemaMissing(e)) return null; // UNIQUE race → classify below.
         console.error(
-          `the wallet schema is behind the deployment (0106/0108 not applied): ${
+          `the wallet schema is behind the deployment (0106/0108/0112 not applied): ${
             e instanceof Error ? e.message : String(e)
           }`
         );
@@ -1441,6 +1704,13 @@ export interface WithdrawalRow {
    *  never converted back into money. */
   declared_amount_iqd: number | null;
   exchange_rate_snapshot: number | null;
+  /** Migration 0112 — the channel's name at filing, and the dinar commission
+   *  and payout the customer was quoted. NULL on a row filed before 0112, or
+   *  (the two figures) beside no corroborated dinar claim; `undefined` on a
+   *  database that has not run 0112 at all. */
+  destination_label?: string | null;
+  fee_iqd?: number | null;
+  net_iqd?: number | null;
   state: WithdrawalState;
   needs_reconciliation: number;
   reconciliation_note: string;

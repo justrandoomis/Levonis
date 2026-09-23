@@ -65,6 +65,52 @@ interface PricedLine {
   line_total_iqd: number;
   option_id: string;
   color_id: string;
+  /**
+   * The chosen option and colour as the merchant NAMED them, «خيار / لون» —
+   * for the admin group's order message only (`merchantVariant`). Empty when
+   * nothing was chosen or the id no longer names anything on the product.
+   */
+  variant: string;
+}
+
+/**
+ * THE MERCHANT'S OWN WORDS FOR WHAT WAS CHOSEN.
+ *
+ * `cart_items` stores the option and colour as IDS, and the admin message used
+ * to print this line without either («an id in a group message is noise»), so
+ * a store sale of «قميص — أحمر» reached the group as «قميص». The product row
+ * already carries both lists (`community_products.options` / `.colors`, 0030),
+ * so the name is one lookup in memory.
+ *
+ * DEFENSIVE BY NECESSITY: those two columns are merchant-authored JSON with no
+ * schema of their own (merchant.ts stores what the form sends). An entry may be
+ * a plain string — the value IS its name — or an object whose id matches and
+ * whose display name sits under one of the usual keys. Anything else yields
+ * nothing, never an id: the rule the old comment gave still holds.
+ */
+function namedEntry(listJson: unknown, id: string): string {
+  if (!id) return '';
+  const list = safeParse<unknown[]>(listJson, []);
+  if (!Array.isArray(list)) return '';
+  for (const entry of list) {
+    if (typeof entry === 'string') {
+      if (entry === id) return entry;
+      continue;
+    }
+    if (!entry || typeof entry !== 'object') continue;
+    const e = entry as Record<string, unknown>;
+    if (String(e.id ?? e.value ?? '') !== id) continue;
+    for (const key of ['name_ar', 'name', 'label', 'title', 'value']) {
+      const v = e[key];
+      if (typeof v === 'string' && v.trim() && v !== id) return v.trim();
+    }
+    return '';
+  }
+  return '';
+}
+
+export function merchantVariant(optionsJson: unknown, colorsJson: unknown, optionId: string, colorId: string): string {
+  return [namedEntry(optionsJson, optionId), namedEntry(colorsJson, colorId)].filter(Boolean).join(' / ');
 }
 
 interface PricedCart {
@@ -127,6 +173,7 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode = ''): Promi
   const { results } = await c.env.DB.prepare(
     `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.color_id,
             p.id, p.name, p.images, p.price_iqd, p.stock, p.track_stock, p.lifecycle, p.status,
+            p.options, p.colors,
             s.id AS store_id, s.slug AS store_slug, s.name AS store_name,
             s.status AS store_status, s.delivery_settings,
             m.id AS merchant_id, m.status AS merchant_status
@@ -171,6 +218,7 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode = ''): Promi
       line_total_iqd: line,
       option_id: String(r.option_id ?? ''),
       color_id: String(r.color_id ?? ''),
+      variant: merchantVariant(r.options, r.colors, String(r.option_id ?? ''), String(r.color_id ?? '')),
     });
   }
 
@@ -548,9 +596,11 @@ storeOrderRoutes.post('/', async (c) => {
       orderId,
       storeName: cart.store_name,
       customerName: user.name || user.username || `#${user.id}`,
+      recipientName: address?.name,
       phone: address?.phone,
       governorate: address?.governorate,
       area: address?.area,
+      address: address?.address,
       landmark: address?.landmark,
       shippingType: 'direct',
       paymentMethodId: 'wallet',
@@ -560,10 +610,11 @@ storeOrderRoutes.post('/', async (c) => {
       // line — an absent figure reads as "unknown", which is worse here.
       dueOnDeliveryIqd: 0,
       merchantReceivableIqd: split.merchant_receivable_iqd,
-      // `PricedLine` has no `variant`: this path stores option and colour as
-      // IDS (see the `order_items` INSERT above), and an id in a group message
-      // is noise. The builder prints the line without one rather than showing
-      // the owner a uuid.
+      // `PricedLine.variant` is the option and colour by the MERCHANT'S names
+      // (`merchantVariant`), never the ids this path stores — an id in a group
+      // message is noise, and a missing name prints no variant at all. No
+      // «تم تأكيد الطلب» button here: a store sale is confirmed by the
+      // merchant who fulfils it, not by the platform's group.
       lines: cart.lines,
     })
   );

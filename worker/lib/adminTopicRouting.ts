@@ -59,13 +59,14 @@
  * acceptable in a message that exists only to say "something arrived".
  *
  * AND THE ONE MESSAGE THAT IS NOT «SOMETHING ARRIVED». The order notification
- * is not read to be informed, it is read to DECIDE: whether today's run can
- * carry it, whether the thing is in the room, whether to confirm it now. For
- * as long as it carried seven facts and no product names it could not be read
- * that way at all — it said «Items: 3» and the owner opened the admin panel
- * every single time, which is the panel doing the notification's job.
- * `orderAnnouncement` below is therefore allowed MORE than the paragraph above
- * allows, and this is the exact list of what more:
+ * is not read to be informed, it is read to ACT ON: whether today's run can
+ * carry it, whether the thing is in the room, whether to confirm it now — and
+ * then to call the customer and send the parcel. For as long as it carried
+ * seven facts and no product names it could not be read that way at all — it
+ * said «Items: 3» and the owner opened the admin panel every single time,
+ * which is the panel doing the notification's job. `orderAnnouncement` below
+ * is therefore allowed MORE than the paragraph above allows, and this is the
+ * exact list of what more:
  *
  *   • THE PRODUCT LINES — name, the already-resolved «option / colour» text,
  *     quantity and line total — because they are the whole reason the message
@@ -73,24 +74,26 @@
  *     drawn product, so §8.2 is not defeated by the one surface that is handed
  *     the in-memory line instead of the stored row.
  *   • THE TRANSPORT, read from `SHIPPING_TYPE_LABELS` and never re-worded.
- *   • THE CUSTOMER'S NAME, and the phone MASKED — `maskPhone`, the same
- *     function and the same shape `worker/lib/walletNotify.ts` uses in the
- *     wallet caption, where the reviewer genuinely has to call.
- *   • THE DELIVERY AREA at governorate / area / landmark granularity.
+ *   • THE RECIPIENT'S NAME, THE FULL PHONE AND THE FULL ADDRESS — the owner's
+ *     own words for this exact message: «تفاصيل الطلب (المنتجات مع الخيار
+ *     واللون والعدد، جوي/بحري/بري، الاسم والرقم والعنوان)». This message used
+ *     to print the phone MASKED and refused the street line on a privacy rule
+ *     this file had set for itself; the owner then had a message that named the
+ *     customer and gave them no way to call or deliver. The destination is the
+ *     owner's PRIVATE admin group (an admin-bot binding `isGroupChatId`
+ *     proves is a group), the same people who read the full address in the
+ *     admin panel. Recorded in docs/DECISIONS.md.
+ *   • The ACCOUNT holder's name beside the recipient's when they differ — a
+ *     gift or an office address is exactly when the two are different people.
  *
- * WHAT IT STILL REFUSES, which is the part of the paragraph above that did not
- * move: the street line (`addresses.address`) is not in the message, the full
- * phone is not in the message, and the email is not in the message. A courier
- * needs a door; somebody deciding whether to confirm an order does not, and a
- * group export holding every customer's street is a different kind of document
- * from one holding «بغداد — الكرادة». `orderAnnouncement` does not even take
- * the street as a parameter, so a later caller cannot pass it by accident.
+ * WHAT IT STILL REFUSES: the email is not in the message, and neither is
+ * anything on the account beyond the order's own delivery snapshot. Every
+ * OTHER message in this file keeps the paragraph above unchanged.
  */
 
 import type { Env } from './types';
 import { notifyAdminTopic, type NotifyOutcome, type TopicKey } from './telegramAdmin';
 import { SHIPPING_TYPES, SHIPPING_TYPE_LABELS, isPreorder, type ShippingType } from './shippingType';
-import { maskPhone } from './phone';
 import { groupDigits, sanitizeUserText } from './walletNotify';
 
 /**
@@ -240,11 +243,16 @@ export interface OrderAnnouncementInput {
   /** Set only for a community-store sale; it changes the headline, because the
    *  first question about a store order is always whose store it was. */
   storeName?: unknown;
+  /** The ACCOUNT holder. Printed beside the recipient only when different. */
   customerName?: unknown;
-  /** Printed MASKED. See the header. */
+  /** The person on the delivery address — who the parcel is FOR. */
+  recipientName?: unknown;
+  /** The delivery phone, printed IN FULL. See the header. */
   phone?: unknown;
   governorate?: unknown;
   area?: unknown;
+  /** The street line (`addresses.address`), printed in full. See the header. */
+  address?: unknown;
   landmark?: unknown;
   /** A `ShippingType`, normalised the same way `orderTopic` normalises it. */
   shippingType?: unknown;
@@ -327,26 +335,34 @@ export function orderAnnouncement(input: OrderAnnouncementInput = {}): string {
   out.push(storeName ? `🛒 طلب متجر جديد — ${orderId}` : `🛒 طلب جديد — ${orderId}`);
   if (storeName) out.push(`المتجر: ${storeName}`);
 
-  const customer = sanitizeUserText(input.customerName, { max: 60 });
-  // `maskPhone` is the wallet caption's own function, used on the wallet's own
-  // terms: five leading digits, three trailing, stars in between. A reviewer
-  // can recognise a number they already hold; nobody can read one off a
-  // forwarded screenshot.
-  const phoneRaw = sanitizeUserText(input.phone, { max: 24 });
-  const phone = phoneRaw ? maskPhone(phoneRaw) : '';
-  if (customer || phone) out.push(`الزبون: ${[customer, phone].filter(Boolean).join(' · ')}`);
+  // THE PARCEL'S PERSON FIRST — the name on the delivery address, which is who
+  // answers the phone below — and the account holder only when it is someone
+  // else, so a gift is visibly a gift instead of a wrong-name call.
+  const account = sanitizeUserText(input.customerName, { max: 60 });
+  const recipient = sanitizeUserText(input.recipientName, { max: 60 }) || account;
+  if (recipient) {
+    out.push(`الزبون: ${recipient}${account && account !== recipient ? ` (الحساب: ${account})` : ''}`);
+  }
+  // IN FULL, and ISOLATED LEFT-TO-RIGHT. A bare «+9647…» inside an Arabic line
+  // is laid out by the bidi algorithm with the plus sign on the wrong end,
+  // which is a number the owner then misdials. U+2066/U+2069 (LRI/PDI) pin the
+  // run's direction without changing a digit; `sanitizeUserText` has already
+  // stripped any direction control the customer typed.
+  const phone = sanitizeUserText(input.phone, { max: 24 });
+  if (phone) out.push(`الهاتف: \u2066${phone}\u2069`);
 
-  // AREA, NOT ADDRESS. `addresses.address` — the street line — is deliberately
-  // not a parameter of this function, so no later caller can pass it by
-  // accident. See the header contract.
-  const area = [
+  // THE WHOLE ADDRESS, in the order a courier reads it: governorate, area,
+  // the street line, then the landmark. See the header for why the street is
+  // in this message and in no other.
+  const place = [
     sanitizeUserText(input.governorate, { max: 40 }),
     sanitizeUserText(input.area, { max: 40 }),
+    sanitizeUserText(input.address, { max: 160 }),
   ]
     .filter(Boolean)
     .join(' — ');
-  const landmark = sanitizeUserText(input.landmark, { max: 60 });
-  if (area || landmark) out.push(`المنطقة: ${[area, landmark].filter(Boolean).join(' · ')}`);
+  const landmark = sanitizeUserText(input.landmark, { max: 80 });
+  if (place || landmark) out.push(`العنوان: ${[place, landmark].filter(Boolean).join(' · ')}`);
 
   // The transport NAME is owner-authored and lives in one place. Re-wording it
   // here would be a second copy to keep in step with the storefront's.
@@ -422,10 +438,16 @@ export type AnnounceResult = NotifyOutcome | { ok: false; reason: 'threw'; error
 export async function announceToAdmins(
   env: Env,
   topic: TopicKey,
-  text: string
+  text: string,
+  /**
+   * Send fields beside the text — in practice a `reply_markup` keyboard, the
+   * order message's «تم تأكيد الطلب» button. Handed to `notifyAdminTopic`
+   * untouched; the routing never reads it.
+   */
+  extra: Record<string, unknown> = {}
 ): Promise<AnnounceResult> {
   try {
-    return await notifyAdminTopic(env, topic, text);
+    return await notifyAdminTopic(env, topic, text, extra);
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
     console.error(
@@ -464,9 +486,10 @@ export async function announceToAdmins(
 export function announceAfterResponse(
   c: { env: Env },
   topic: TopicKey,
-  text: string
+  text: string,
+  extra: Record<string, unknown> = {}
 ): void {
-  const promise = announceToAdmins(c.env, topic, text);
+  const promise = announceToAdmins(c.env, topic, text, extra);
   try {
     const ctx = (c as { executionCtx?: ExecutionContext }).executionCtx;
     if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(promise);

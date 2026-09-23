@@ -79,6 +79,7 @@ interface TemplateBody {
   code?: string;
   product_id?: string;
   errors?: unknown[];
+  warnings?: unknown[];
   needs_review?: { message?: unknown }[];
   brands_to_create?: { name?: string; slug?: string }[];
   brands_created?: { id?: string; name?: string; slug?: string; created?: boolean }[];
@@ -160,6 +161,33 @@ test('the apply creates it, with the slug the check promised', async () => {
   assert.equal(rowOf(raw, 'SELECT brand_id FROM products WHERE id = ?', body.product_id).brand_id, made.id);
 });
 
+test('the brand an apply creates is audited like the manual one, naming the import', async () => {
+  const { raw, app } = setup();
+  const { status, body } = await apply(app, file('Elegoo'));
+  assert.equal(status, 200, JSON.stringify(body));
+  const audits = all(raw, "SELECT actor_id, target, detail FROM audit_log WHERE action = 'brand.create'");
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].target, body.brands_created?.[0]?.id);
+  assert.equal(audits[0].actor_id, OWNER.id);
+  assert.match(String(audits[0].detail), /template\.apply/);
+  assert.match(String(audits[0].detail), /"slug":"elegoo"/);
+});
+
+test('a deactivated brand resolves (never a second «Qidi») and the check says it will not show in the shop', async () => {
+  const { raw, app } = setup();
+  raw.prepare("UPDATE brands SET active = 0 WHERE id = 'brd_qidi'").run();
+  const { body } = await parse(app, file('Qidi'));
+  assert.equal(body.preview?.brand_id, 'brd_qidi');
+  assert.deepEqual(body.brands_to_create, []);
+  assert.ok(
+    (body.warnings ?? []).some((w) => /\(qidi\)/.test(String(w)) && /deactivated/.test(String(w))),
+    JSON.stringify(body.warnings)
+  );
+  // An active brand earns no such line.
+  const active = await parse(app, file('Levo'));
+  assert.ok(!(active.body.warnings ?? []).some((w) => /deactivated/.test(String(w))));
+});
+
 test('an Arabic-only new brand keeps its Arabic name and leaves name_en for the owner', async () => {
   const { raw, app } = setup();
   const text = file('انيكيوبك');
@@ -223,8 +251,8 @@ test('createPendingBrand itself writes once however often it is called', async (
 
   const first = await createPendingBrand(db, pending);
   const second = await createPendingBrand(db, pending);
-  assert.deepEqual(first, { id: pending.id, created: true });
-  assert.deepEqual(second, { id: pending.id, created: false }, 're-resolved by name, not inserted again');
+  assert.deepEqual(first, { id: pending.id, created: true, slug: 'elegoo' });
+  assert.deepEqual(second, { id: pending.id, created: false, slug: 'elegoo' }, 're-resolved by name, not inserted again');
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM brands'), 6);
 
   // And a name that became ambiguous in the gap is refused, not written.

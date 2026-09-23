@@ -289,60 +289,118 @@ export const NO_LINE_BENEFIT: LineBenefit = {
 };
 
 /**
- * WHAT A WHOLE LINE SAVES.
+ * WHAT A WHOLE LINE SAVES — one line on its own. The same arithmetic as
+ * `orderLineBenefits` for a cart of one line, which is what it is.
+ */
+export function lineBenefit(input: LineBenefitInput): LineBenefit {
+  return orderLineBenefits([input])[0]!;
+}
+
+export interface LineBenefitInput {
+  regularUnitIqd: number;
+  qty: number;
+  rule: BenefitRule | null;
+}
+
+/** Whether a rule carries a limit that belongs to the ORDER, not to a line. */
+function hasOrderWideLimit(rule: BenefitRule): boolean {
+  return rule.max_quantity !== null || (rule.cap_scope === 'per_order' && rule.max_discount_iqd !== null);
+}
+
+/**
+ * WHAT EVERY LINE OF ONE ORDER SAVES.
  *
  * Quantity and the per-order ceiling live here rather than in
  * `resolveUnitPrice` because neither is a property of a unit: a rule that
  * covers the first two printers cannot be expressed as a unit price at all,
  * and pretending otherwise is how a product page ends up promising a discount
  * the cart then takes back.
+ *
+ * A PER-ORDER LIMIT IS SPENT ONCE PER ORDER, NOT ONCE PER LINE. `per_order`
+ * is what the admin chose and what the cart says («الخصم بحد أقصى لكل طلب»),
+ * so a rule's `max_discount_iqd` with `cap_scope: 'per_order'`, and its
+ * `max_quantity`, are budgets shared by every line the rule covers. This used
+ * to be applied to each line separately, so two different printers under one
+ * rule capped at 100,000 per order saved 200,000.
+ *
+ * The budget goes to the rule's lines with the LARGEST per-unit saving first
+ * (ties in cart order), so the customer gets the most the rule allows and the
+ * answer does not change when the cart is reordered. Each line then carries
+ * the part it actually received, so the per-line figures an order snapshots
+ * add up to the clamped total exactly.
+ *
+ * Answers in input order, one entry per input.
  */
-export function lineBenefit(input: {
-  regularUnitIqd: number;
-  qty: number;
-  rule: BenefitRule | null;
-}): LineBenefit {
-  const { rule } = input;
-  const qty = Math.max(0, Math.trunc(input.qty));
-  if (!rule || qty === 0) return NO_LINE_BENEFIT;
-  const appliedAt: LineBenefit['applied_at'] = isUnitExpressible(rule) ? 'unit' : 'line';
+export function orderLineBenefits(inputs: readonly LineBenefitInput[]): LineBenefit[] {
+  const out: LineBenefit[] = inputs.map(() => NO_LINE_BENEFIT);
+  const budgets = new Map<string, { qty: number; iqd: number }>();
+  const perUnitOf = inputs.map((i) => unitDiscountIqd(i.regularUnitIqd, i.rule));
 
-  const perUnit = unitDiscountIqd(input.regularUnitIqd, rule);
-  if (perUnit <= 0) return { ...NO_LINE_BENEFIT, rule_id: rule.id, scope: rule.scope, applied_at: appliedAt };
+  // Largest saving first, then cart order: who draws on a shared budget first.
+  const order = inputs.map((_, i) => i).sort((a, b) => perUnitOf[b]! - perUnitOf[a]! || a - b);
 
-  const limit = rule.max_quantity === null ? qty : Math.max(0, Math.trunc(rule.max_quantity));
-  const eligible = Math.min(qty, limit);
-  if (eligible === 0) {
-    return { ...NO_LINE_BENEFIT, rule_id: rule.id, scope: rule.scope, capped_by: 'quantity', applied_at: appliedAt };
-  }
+  for (const i of order) {
+    const input = inputs[i]!;
+    const { rule } = input;
+    const qty = Math.max(0, Math.trunc(input.qty));
+    if (!rule || qty === 0) continue;
+    const appliedAt: LineBenefit['applied_at'] = isUnitExpressible(rule) ? 'unit' : 'line';
 
-  let total = perUnit * eligible;
-  let cappedBy: LineBenefit['capped_by'] = 'none';
-  if (rule.cap_scope === 'per_unit' && rule.max_discount_iqd !== null) {
-    // Whether the per-unit ceiling actually bit is decided by comparing the
-    // raw calculation with what was charged, not by the ceiling's presence.
-    const uncapped = unitDiscountIqd(input.regularUnitIqd, { ...rule, max_discount_iqd: null });
-    if (uncapped > perUnit) cappedBy = 'per_unit';
-  }
-  if (rule.cap_scope === 'per_order' && rule.max_discount_iqd !== null) {
-    const ceiling = Math.max(0, Math.trunc(rule.max_discount_iqd));
-    if (total > ceiling) {
-      total = ceiling;
+    const perUnit = perUnitOf[i]!;
+    if (perUnit <= 0) {
+      out[i] = { ...NO_LINE_BENEFIT, rule_id: rule.id, scope: rule.scope, applied_at: appliedAt };
+      continue;
+    }
+
+    // The rule's shared budget, opened by the first of its lines to arrive.
+    let budget = hasOrderWideLimit(rule) ? budgets.get(rule.id) : undefined;
+    if (hasOrderWideLimit(rule) && !budget) {
+      budget = {
+        qty: rule.max_quantity === null ? Infinity : Math.max(0, Math.trunc(rule.max_quantity)),
+        iqd:
+          rule.cap_scope === 'per_order' && rule.max_discount_iqd !== null
+            ? Math.max(0, Math.trunc(rule.max_discount_iqd))
+            : Infinity,
+      };
+      budgets.set(rule.id, budget);
+    }
+
+    const eligible = Math.min(qty, budget ? budget.qty : qty);
+    if (eligible === 0) {
+      out[i] = { ...NO_LINE_BENEFIT, rule_id: rule.id, scope: rule.scope, capped_by: 'quantity', applied_at: appliedAt };
+      continue;
+    }
+
+    let total = perUnit * eligible;
+    let cappedBy: LineBenefit['capped_by'] = 'none';
+    if (rule.cap_scope === 'per_unit' && rule.max_discount_iqd !== null) {
+      // Whether the per-unit ceiling actually bit is decided by comparing the
+      // raw calculation with what was charged, not by the ceiling's presence.
+      const uncapped = unitDiscountIqd(input.regularUnitIqd, { ...rule, max_discount_iqd: null });
+      if (uncapped > perUnit) cappedBy = 'per_unit';
+    }
+    if (budget && total > budget.iqd) {
+      total = budget.iqd;
       cappedBy = 'per_order';
     }
-  }
-  if (cappedBy === 'none' && eligible < qty) cappedBy = 'quantity';
+    if (cappedBy === 'none' && eligible < qty) cappedBy = 'quantity';
+    if (budget) {
+      budget.qty -= eligible;
+      budget.iqd -= total;
+    }
 
-  return {
-    rule_id: rule.id,
-    scope: rule.scope,
-    discount_mode: rule.discount_mode,
-    per_unit_iqd: perUnit,
-    eligible_qty: eligible,
-    total_iqd: Math.max(0, total),
-    capped_by: cappedBy,
-    applied_at: appliedAt,
-  };
+    out[i] = {
+      rule_id: rule.id,
+      scope: rule.scope,
+      discount_mode: rule.discount_mode,
+      per_unit_iqd: perUnit,
+      eligible_qty: eligible,
+      total_iqd: Math.max(0, total),
+      capped_by: cappedBy,
+      applied_at: appliedAt,
+    };
+  }
+  return out;
 }
 
 /* ---------------------------------------------------------- the shipping */

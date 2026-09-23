@@ -22,10 +22,13 @@ import {
 } from '../worker/lib/mediaStorage';
 import {
   PLATFORM_ICONS,
+  PLATFORM_ICON_REVISION,
+  ROOT_FAVICON,
   SITE_LOGO_KEY,
   SITE_LOGO_SHARE_URL,
   SITE_LOGO_SLOT,
   SITE_LOGO_URL,
+  SITE_LOGO_VERSIONED_URL,
   SITE_ORIGIN,
   resolveSiteLogoUrl,
 } from '../src/lib/siteLogo';
@@ -178,12 +181,16 @@ function shellMeta(attr: 'property' | 'name', key: string): string | null {
 
 test('the shop mark has ONE spelling — the shell repeats the module, it does not invent', () => {
   assert.equal(SITE_LOGO_URL, `/files/${SITE_LOGO_KEY}`);
-  assert.equal(SITE_LOGO_SHARE_URL, `${SITE_ORIGIN}${SITE_LOGO_URL}`);
+  // The shell names the object UNDER ITS REVISION: the Worker reads the key
+  // from the path, so the query only changes what URL-keyed caches (the
+  // browser's favicon store, Telegram's and WhatsApp's link previews) see.
+  assert.equal(SITE_LOGO_VERSIONED_URL, `${SITE_LOGO_URL}?v=${PLATFORM_ICON_REVISION}`);
+  assert.equal(SITE_LOGO_SHARE_URL, `${SITE_ORIGIN}${SITE_LOGO_VERSIONED_URL}`);
 
   // The tab icon, relative because the browser resolves it against the page.
   const icon = /<link\s+rel="icon"\s+type="image\/webp"\s+href="([^"]*)"/i.exec(SHELL_MARKUP);
   assert.ok(icon, 'index.html has no WebP tab icon');
-  assert.equal(icon![1], SITE_LOGO_URL);
+  assert.equal(icon![1], SITE_LOGO_VERSIONED_URL);
 
   // The share card, absolute because a relative og:image is silently dropped.
   assert.equal(shellMeta('property', 'og:image'), SITE_LOGO_SHARE_URL);
@@ -191,7 +198,7 @@ test('the shop mark has ONE spelling — the shell repeats the module, it does n
 
   // And no FOURTH copy: every /files/ path in the shell is this one.
   for (const [, path] of SHELL_MARKUP.matchAll(/(?:https:\/\/[a-z0-9.-]+)?(\/files\/[^"'\s]*)/gi)) {
-    assert.equal(path, SITE_LOGO_URL, `index.html names ${path}, which src/lib/siteLogo.ts does not`);
+    assert.equal(path, SITE_LOGO_VERSIONED_URL, `index.html names ${path}, which src/lib/siteLogo.ts does not`);
   }
 });
 
@@ -217,7 +224,7 @@ test('the committed PNG icons are a fork of THIS object, and every reference nam
   );
 
   const forked = Object.values(PLATFORM_ICONS);
-  for (const href of forked) {
+  for (const [role, href] of Object.entries(PLATFORM_ICONS)) {
     assert.ok(href.startsWith('/icons/'), href);
     // `public/` is copied byte-for-byte into `dist/`, so "in public/" is "served".
     assert.ok(
@@ -225,7 +232,9 @@ test('the committed PNG icons are a fork of THIS object, and every reference nam
       `${href} is named by src/lib/siteLogo.ts but is not in public/`
     );
     // The generator must actually write it, or it is a path nobody maintains.
-    assert.ok(GENERATOR.includes(href.slice('/icons/'.length)), `${href} is not produced by the generator`);
+    // It reads the NAMES from src/lib/siteLogo.ts and keeps its own table of
+    // what each ROLE is (tile size, how much of it the mark fills).
+    assert.match(GENERATOR, new RegExp(`\\b${role}: \\{ size: \\d+, fraction: [\\d.]+ \\}`), `${role} (${href}) is not produced by the generator`);
   }
 
   // Every PNG icon the shell asks for is one of the forked seven.
@@ -237,6 +246,69 @@ test('the committed PNG icons are a fork of THIS object, and every reference nam
   for (const [, href] of MANIFEST.matchAll(/src: '(\/icons\/[^']*)'/g)) {
     assert.ok(forked.includes(href as (typeof forked)[number]), `webManifest.ts points at ${href}, which the fork does not contain`);
   }
+});
+
+/**
+ * A NEW MARK IS A NEW URL.
+ *
+ * The owner replaced the logo and kept seeing the old one, and the committed
+ * PNGs were not even stale — regenerating them from the live object gives the
+ * same bytes. What was stale was every cache keyed on a name that never
+ * changed: `/icons/*` is served for a week and answered from Cloudflare's edge,
+ * the service worker precached it, the browser keeps a tab icon per URL, and
+ * Android re-fetches an installed app's icon through its HTTP cache to decide
+ * whether it changed. So each icon's NAME carries the revision of the logo it
+ * was cut from, and the generator refuses new pixels under an old revision.
+ */
+test('every icon name carries the logo revision, and the folder holds nothing else', () => {
+  assert.match(PLATFORM_ICON_REVISION, /^[0-9a-f]{8}$/, 'the revision is 8 hex digits of the logo\'s SHA-256');
+  const names = Object.values(PLATFORM_ICONS).map((href) => href.slice('/icons/'.length));
+  for (const name of names) {
+    assert.ok(name.endsWith(`.${PLATFORM_ICON_REVISION}.png`), `${name} does not carry .${PLATFORM_ICON_REVISION}.png`);
+  }
+  // An unversioned or previous-revision PNG left in the folder is a stale mark
+  // something may still point at. The generator deletes them; this holds it.
+  const onDisk = readdirSync(fileURLToPath(new URL('../public/icons', import.meta.url))).filter((f) => f.endsWith('.png'));
+  assert.deepEqual([...onDisk].sort(), [...names].sort());
+
+  // The generator checks the live logo against the revision before writing a
+  // byte, and reads both the revision and the names out of the module.
+  assert.match(GENERATOR, /createHash\('sha256'\)\.update\(src\)/);
+  assert.match(GENERATOR, /if \(logo\.revision !== revision\) \{/);
+  assert.match(GENERATOR, /export const PLATFORM_ICON_REVISION = /);
+
+  // And the service worker precaches exactly these names.
+  const sw = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
+  const precache = /const PRECACHE_URLS = \[([\s\S]*?)\];/.exec(sw)?.[1] ?? '';
+  assert.deepEqual(
+    [...precache.matchAll(/'([^']+)'/g)].map((m) => m[1]).sort(),
+    Object.values(PLATFORM_ICONS).slice().sort()
+  );
+});
+
+test('/favicon.ico is a real ICO of the mark, not the SPA shell', () => {
+  // Every client with no <link> to read — crawlers, bookmark tools, a browser
+  // on a bare origin — asks for exactly this path, and the SPA fallback used
+  // to answer it with index.html at 200.
+  assert.equal(ROOT_FAVICON, '/favicon.ico');
+  const ico = readFileSync(new URL(`../public${ROOT_FAVICON}`, import.meta.url));
+  const view = new DataView(ico.buffer, ico.byteOffset, ico.byteLength);
+  assert.equal(view.getUint16(0, true), 0, 'reserved');
+  assert.equal(view.getUint16(2, true), 1, 'type 1 = icon');
+  const count = view.getUint16(4, true);
+  const sizes: number[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const entry = 6 + i * 16;
+    const size = view.getUint8(entry) || 256;
+    const length = view.getUint32(entry + 8, true);
+    const offset = view.getUint32(entry + 12, true);
+    sizes.push(size);
+    // Each image is a PNG, and it lies inside the file.
+    assert.ok(offset + length <= ico.length, `image ${i} runs past the end of the file`);
+    assert.deepEqual([...ico.subarray(offset, offset + 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  }
+  assert.deepEqual(sizes, [16, 32, 48]);
+  assert.match(GENERATOR, /const FAVICON_ICO = 'public\/favicon\.ico';/);
 });
 
 test('the settings-driven reader prefers an uploaded logo and falls back to the fixed key', () => {

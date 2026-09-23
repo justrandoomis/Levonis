@@ -1,11 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Gift, X, ChevronDown } from 'lucide-react';
+import { AtSign, UserCheck, X, ChevronDown } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 
 /**
- * ReferralBar — the compact "لديك كود إحالة؟" expander on signup
+ * ReferralBar — the compact «لديك كود دعم؟» expander on signup
  * (integrated mandate §2.6).
+ *
+ * ONLY A SUPPORT CODE. The owner: «الإحالة لا يحصل على أي شيء فقط كود دعم».
+ * The code records who brought the account and gives the new account nothing
+ * — no delivery waiver, discount, points or membership — so the bar is worded
+ * «كود الدعم» and carries a neutral icon, never a gift.
  *
  * - Optional: an empty code never blocks account creation.
  * - An invalid/unknown code shows a clear error but the user can ALWAYS
@@ -20,34 +25,35 @@ import { useLanguage } from '../../LanguageContext';
 
 const STRINGS = {
   ar: {
-    toggle: 'لديك كود إحالة؟',
-    label: 'كود الإحالة',
-    optionalNote: 'اختياري — تركه فارغًا لا يمنع إنشاء الحساب.',
+    toggle: 'لديك كود دعم؟',
+    label: 'كود الدعم',
+    optionalNote: 'اختياري — لا يمنح حسابك أي خصم أو ميزة، وتركه فارغًا لا يمنع إنشاء الحساب.',
     checking: 'جارٍ التحقق من الكود…',
-    invited: (name: string, code: string) => `دعوة من ${name} (@${code})`,
+    supportOf: (name: string, code: string) => `كود الدعم: ${name} (@${code})`,
     notFound: 'هذا الكود غير موجود. يمكنك المتابعة بدونه.',
     checkFailed: 'تعذر التحقق من الكود الآن — يمكنك المتابعة، وسيتحقق الخادم منه عند التسجيل.',
-    remove: 'إزالة كود الإحالة',
+    remove: 'إزالة كود الدعم',
   },
   en: {
-    toggle: 'Have a referral code?',
-    label: 'Referral code',
-    optionalNote: 'Optional — leaving it empty never blocks sign-up.',
+    toggle: 'Have a support code?',
+    label: 'Support code',
+    optionalNote: 'Optional — it gives your account no discount or perk, and leaving it empty never blocks sign-up.',
     checking: 'Checking the code…',
-    invited: (name: string, code: string) => `Invited by ${name} (@${code})`,
+    supportOf: (name: string, code: string) => `Support code: ${name} (@${code})`,
     notFound: 'This code was not found. You can continue without it.',
     checkFailed: "Couldn't verify the code right now — you can continue; the server re-checks it on sign-up.",
-    remove: 'Remove referral code',
+    remove: 'Remove support code',
   },
   ckb: {
-    toggle: 'کۆدی بانگهێشتت هەیە؟',
-    label: 'کۆدی بانگهێشت',
-    optionalNote: 'ئارەزوومەندانەیە — بەجێهێشتنی بەتاڵ ڕێگری لە دروستکردنی هەژمار ناکات.',
+    toggle: 'کۆدی پاڵپشتیت هەیە؟',
+    label: 'کۆدی پاڵپشتی',
+    // «ئەم کۆدە هیچ داشکاندنێک ناکات» is PromoCodeField's own sentence, reused.
+    optionalNote: 'ئارەزوومەندانەیە — ئەم کۆدە هیچ داشکاندنێک ناکات. بەجێهێشتنی بەتاڵ ڕێگری لە دروستکردنی هەژمار ناکات.',
     checking: 'کۆدەکە پشکنین دەکرێت…',
-    invited: (name: string, code: string) => `بانگهێشت لە ${name} (@${code})`,
+    supportOf: (name: string, code: string) => `کۆدی پاڵپشتی: ${name} (@${code})`,
     notFound: 'ئەم کۆدە نەدۆزرایەوە. دەتوانیت بەبێ ئەو بەردەوام بیت.',
     checkFailed: 'ئێستا ناتوانرێت کۆدەکە بپشکنرێت — دەتوانیت بەردەوام بیت؛ ڕاژەکار لە کاتی تۆمارکردن پشکنینی دەکاتەوە.',
-    remove: 'لابردنی کۆدی بانگهێشت',
+    remove: 'لابردنی کۆدی پاڵپشتی',
   },
 };
 
@@ -143,7 +149,7 @@ export default function ReferralBar({ code, onCodeChange, fromLink, disabled }: 
         className="lv-refbar__toggle"
       >
         <span className="inline-flex items-center gap-2">
-          <Gift className="lv-refbar__toggle-icon" aria-hidden />
+          <AtSign className="lv-refbar__toggle-icon" aria-hidden />
           {s.toggle}
         </span>
         <ChevronDown aria-hidden className="lv-refbar__chev" />
@@ -157,8 +163,8 @@ export default function ReferralBar({ code, onCodeChange, fromLink, disabled }: 
             {status === 'found' && info ? (
               <div className="lv-refbar__found">
                 <span className="lv-refbar__found-text">
-                  <Gift aria-hidden />
-                  <span>{s.invited(info.name, info.code)}</span>
+                  <UserCheck aria-hidden />
+                  <span>{s.supportOf(info.name, info.code)}</span>
                 </span>
                 <button
                   type="button"

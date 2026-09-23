@@ -1,5 +1,6 @@
 import type { PolicyDocument, PolicyText } from './types';
 import { publishedPolicyBody } from './render';
+import { fillPolicyFacts } from './facts';
 
 import { purchase } from './purchase';
 import { selling } from './selling';
@@ -69,8 +70,8 @@ export const POLICY_KEYS = Object.keys(MODULES) as readonly PolicyKey[];
 export const POLICY_SOURCE_DOCUMENTS: readonly PolicyDocument[] = POLICY_KEYS.map((key) => MODULES[key]);
 
 /**
- * The PUBLISHED text: the source with every clause that still states an
- * unknown withheld. ./render.ts carries the reasoning; what matters here is
+ * The PUBLISHED text: the source with every known fact filled in from
+ * ./facts.ts and every clause that still states an unknown withheld. ./render.ts carries the reasoning; what matters here is
  * that this is the only corpus the rest of the worker can see, so the bytes
  * that are rendered, archived, hashed and accepted are one and the same.
  *
@@ -89,10 +90,13 @@ function publishedDocument(doc: PolicyDocument): PolicyDocument {
     title: doc.title,
     get body(): PolicyText {
       if (!body) {
+        // Fill first, withhold second: a token ./facts.ts has a value for
+        // is stated, and only one with no value is left for the render pass
+        // to hold back.
         body = {
-          ar: publishedPolicyBody(doc.body.ar),
-          en: publishedPolicyBody(doc.body.en),
-          ckb: publishedPolicyBody(doc.body.ckb),
+          ar: publishedPolicyBody(fillPolicyFacts(doc.body.ar, 'ar')),
+          en: publishedPolicyBody(fillPolicyFacts(doc.body.en, 'en')),
+          ckb: publishedPolicyBody(fillPolicyFacts(doc.body.ckb, 'ckb')),
         };
       }
       return body;

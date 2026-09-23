@@ -142,10 +142,11 @@ test('/sw.js still carries the full security policy of every other page', () => 
 });
 
 test('/icons/* is cacheable for a week, and never immutable', () => {
-  // The icon names are fixed (`icon-192.png`) — the manifest and index.html
-  // name them literally — so they are NOT content-hashed and `immutable` would
-  // pin a changed mark on installed home screens for a year.
-  const headers = served(assetHeadersFile(), '/icons/icon-192.png');
+  // The icon names carry the logo's revision (`icon-192.bc80fc2b.png`), but
+  // that is a promise a person keeps by running the generator, not one the
+  // build enforces on every byte — so they are still not `immutable`: a
+  // regeneration that forgot the rename must not be pinned for a year.
+  const headers = served(assetHeadersFile(), '/icons/icon-192.bc80fc2b.png');
   const cacheControl = String(headers.get('cache-control'));
   assert.equal(cacheControl, ICON_CACHE_CONTROL);
   assert.doesNotMatch(cacheControl, /immutable/);
@@ -159,6 +160,20 @@ test('/icons/* is cacheable for a week, and never immutable', () => {
   assert.equal(headers.get('strict-transport-security'), STRICT_TRANSPORT_SECURITY);
   assert.equal(headers.get('content-security-policy'), spaCsp());
   for (const [name, value] of headers) assert.doesNotMatch(value, /^(.+), \1$/, `${name} shipped twice`);
+});
+
+test('/favicon.ico revalidates — the one icon whose name cannot carry the logo revision', () => {
+  // Every icon under /icons/ is renamed when the mark changes, so a week of
+  // caching there is safe. /favicon.ico is probed under exactly that path by
+  // every client that has no <link> to read, so its name can never change —
+  // a week here would be the stale-logo bug all over again. It takes the
+  // document's `no-cache` (one cheap 304 per revalidation) and no rule of its
+  // own; this pins that nobody hands it the icons' week by pattern.
+  const file = assetHeadersFile();
+  const headers = served(file, '/favicon.ico');
+  assert.equal(headers.get('cache-control'), 'no-cache');
+  assert.equal(headers.get('strict-transport-security'), STRICT_TRANSPORT_SECURITY);
+  assert.ok(!parseRules(file).some((r) => r.path !== '/*' && matches(r.path, '/favicon.ico')));
 });
 
 test('the catch-all and /assets/* are untouched by the PWA rules', () => {

@@ -101,7 +101,11 @@ export interface MemberDetail {
 export interface MemberFinancial {
   lifetime_value_iqd: number;
   delivered_value_iqd: number;
+  /** SPENDABLE cents (settled minus holds) — what the member can use. */
   wallet_usd_cents: number;
+  /** The same balance in the member's dinars (migration 0108), as their own
+   *  wallet page shows it; absent from a server older than the field. */
+  wallet_iqd?: number;
   wallet_points: number;
   bnpl_credit_limit_iqd: number;
   bnpl_outstanding_iqd: number;

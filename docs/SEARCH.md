@@ -56,8 +56,14 @@ search_tokens(product_id, token, weight)     PRIMARY KEY (product_id, token)
 search_synonyms(term, canonical, owner_added, created_at)
 ```
 
-**Every token is stored twice**: as itself, and as its romanised skeleton. That
-is the one line that lets «بامبو» and "bambu" meet.
+**Every Arabic-script token is stored twice**: as itself, and as its romanised
+skeleton. That is the one line that lets «بامبو» and "bambu" meet. A LATIN
+token's skeleton is stored under a `~` mark (`~alaga` for "elegoo", stamp
+`#doc:4`) that only a query typed in Arabic letters looks up: bare, it made
+Latin words collide ("heat" and "hot" were both `hat`, "plate" was `plata`
+beside "pla"); without it, «اليجو» and «سونلو» found nothing unless the brand
+was in the synonym dictionary. `~` never survives `normalizeText`, and no
+range a Latin query opens reaches it.
 
 ### What is indexed, and how heavily
 
@@ -95,8 +101,12 @@ one — the classic failure of a naive index, and the reason weights exist.
                    (اكس → x → x2d, x1c) — only for the words that are not
                    also Arabic words, since «في» is "in" and «ال» is "the"
   → candidates   ONE indexed range scan per 2-char prefix
-  → match        exact > prefix > bounded edit distance, over that set only
-  → score        Σ (field weight × match quality), × coverage
+  → match        exact > prefix > bounded edit distance, over that set only;
+                 the LAST word (unless a space follows it) keeps its exact hit
+                 AND its completions, ranked by field weight — "hot" is on its
+                 way to "Hotend", and the description word "hot" must not stop it
+  → score        Σ over typed words of the BEST (field weight × match quality)
+                 per product, × coverage
 ```
 
 **Coverage is a multiplier, not a bonus.** A product matching both query words
@@ -142,6 +152,27 @@ reached production before migration 0089: answering "no results" for every
 search on a live shop is worse than the scan it replaces, and a missing TABLE
 is the sanctioned degrade in `worker/lib/membershipBenefits.ts`.
 
+### One letter, and the word still being typed
+
+«H» names a shelf, not a word. It matches every word that NAMES a product —
+name, brand, option, hashtag (weight ≥ 5) — and never prose, unless nothing
+names anything with that letter. The old rule kept the forty SHORTEST h-words
+of the whole vocabulary, which on a real catalogue were all description words.
+
+The listing also returns `suggestion`: the word the shopper is typing,
+completed from the names of the products it ranked first
+(`worker/lib/search/complete.ts`). The storefront draws the rest of it in grey
+inside the field; Space (only while it is showing), Tab or the arrow toward
+the end of the text takes it (`src/components/search/`).
+
+### The hit list is ONE bound parameter
+
+`GET /api/products?search=` binds the ranked ids as one JSON array
+(`json_each`) for both the `IN` and the ranking `ORDER BY`. It bound every id
+twice, and D1 refuses more than 100 parameters — any query ranking fifty
+products or more answered 500. `tests/searchLive.test.ts` runs the route on a
+D1 stand-in that refuses what D1 refuses.
+
 ---
 
 ## 6. Keeping the index true
@@ -167,7 +198,12 @@ is the sanctioned degrade in `worker/lib/membershipBenefits.ts`.
 * **The backfill is a cron job, not the migration.** Indexing needs the brand
   and section *names* and the tokeniser — work SQL cannot do — and a shop with
   thousands of products cannot be indexed inside one invocation. `runDurableJobs`
-  takes fifty unindexed products per run and reports `search_indexed`.
+  takes fifty unindexed products per run and reports `search_indexed`. It
+  commits in groups of ten; a product it cannot write is marked `#fail:<v>`,
+  reported, and skipped, so one bad row cannot stall the rest.
+* **A brand or section rename reindexes its products.** The index holds the
+  NAMES; the rename deletes the affected products' stamps in the same batch and
+  rewrites the first fifty at once — the cron does the rest.
 
 ---
 
@@ -203,6 +239,7 @@ Both sides are stored **normalised**, which is why one row covers «طابعة»
 | `worker/lib/search/match.ts` | Bounded edit distance and the budget |
 | `worker/lib/search/index.ts` | Index rows, query expansion, scoring |
 | `worker/lib/search/document.ts` | What of a product is searchable |
+| `worker/lib/search/complete.ts` | The grey completion: which word, and how much of it is left |
 | `worker/lib/search/store.ts` | The only part that touches D1 |
 | `migrations/0089_search_index.sql` | The two tables and the seed |
 | `tests/search.test.ts` | The owner's own examples, as acceptance criteria |

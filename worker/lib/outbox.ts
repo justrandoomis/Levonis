@@ -290,13 +290,27 @@ async function deliver(env: Env, payload: OutboxMessage, eventKey: string): Prom
  * Processes a batch of pending outbox rows (call via ctx.waitUntil after an
  * enqueue, from the admin retry endpoint, or a scheduled job). Claims rows
  * with a conditional state flip so concurrent processors never double-send.
+ *
+ * `eventKeyPrefix` narrows the batch to ONE business event's rows — how a
+ * route flushes the message it has just queued (an order-status change) without
+ * first working through whatever older backlog sits at the head of the FIFO.
+ * The claim below is the same either way, so a targeted flush and the cron can
+ * never both send one row.
  */
-export async function processOutbox(env: Env, limit = 10): Promise<{ sent: number; failed: number }> {
-  const { results } = await env.DB.prepare(
-    "SELECT id, kind, event_key, recipient, payload, attempts FROM outbox WHERE state IN ('pending','failed') AND attempts < ? ORDER BY created_at LIMIT ?"
-  )
-    .bind(MAX_ATTEMPTS, limit)
-    .all<{ id: string; kind: string; event_key: string; recipient: string; payload: string; attempts: number }>();
+export async function processOutbox(
+  env: Env,
+  limit = 10,
+  opts: { eventKeyPrefix?: string } = {}
+): Promise<{ sent: number; failed: number }> {
+  const prefix = opts.eventKeyPrefix ?? '';
+  const { results } = await (prefix
+    ? env.DB.prepare(
+        "SELECT id, kind, event_key, recipient, payload, attempts FROM outbox WHERE state IN ('pending','failed') AND attempts < ? AND substr(event_key, 1, ?) = ? ORDER BY created_at LIMIT ?"
+      ).bind(MAX_ATTEMPTS, prefix.length, prefix, limit)
+    : env.DB.prepare(
+        "SELECT id, kind, event_key, recipient, payload, attempts FROM outbox WHERE state IN ('pending','failed') AND attempts < ? ORDER BY created_at LIMIT ?"
+      ).bind(MAX_ATTEMPTS, limit)
+  ).all<{ id: string; kind: string; event_key: string; recipient: string; payload: string; attempts: number }>();
 
   let sent = 0;
   let failed = 0;

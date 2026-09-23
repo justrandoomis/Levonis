@@ -13,6 +13,13 @@ import {
 } from '../worker/lib/policies';
 import { POLICY_LANGS, policyDocHash } from '../worker/lib/policies/types';
 import { publishedPolicyBody } from '../worker/lib/policies/render';
+import {
+  POLICY_FACTS,
+  PREMIUM_FREE_DELIVERY_MIN_IQD,
+  PRO_FREE_DELIVERY_MIN_IQD,
+  fillPolicyFacts,
+} from '../worker/lib/policies/facts';
+import { SETTING_DEFAULTS } from '../worker/lib/settings';
 import { CHECKOUT_POLICY_KEYS } from '../worker/lib/policyOps';
 import { asD1, freshDb } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
@@ -105,10 +112,10 @@ test('nothing about this shop is invented: every unknown fact is a named placeho
   // `{{PLACEHOLDER}}`. This pins the FORM of them, so a half-substituted or
   // lowercase template token is caught rather than shipped as prose.
   //
-  // POLICY_SOURCE_DOCUMENTS, not POLICY_DOCUMENTS: the placeholders are the
-  // owner's to-do list and they stay in the modules, but a customer never sees
-  // one — worker/lib/policies/render.ts withholds the line that carries it,
-  // and the test below is what proves that.
+  // POLICY_SOURCE_DOCUMENTS, not POLICY_DOCUMENTS: the placeholders stay in
+  // the modules, but a customer never sees one — worker/lib/policies/facts.ts
+  // fills the ones the owner has answered and worker/lib/policies/render.ts
+  // withholds the line that carries any other, and the tests below prove both.
   const seen = new Set<string>();
   for (const doc of POLICY_SOURCE_DOCUMENTS) {
     for (const lang of POLICY_LANGS) {
@@ -384,4 +391,255 @@ test('a draft row does not count as present, and checkout is not blocked for eve
     .prepare("SELECT COUNT(*) AS n FROM policy_documents WHERE key='terms' AND version=? AND lang='ar' AND status='published'")
     .get(doc.version) as { n: number };
   assert.equal(published.n, 1, 'the sync must leave a PUBLISHED terms row behind, not stop at the draft');
+});
+
+// =========================================================================
+// THE BLANKS ARE FILLED — «فراغات مثل "يسري ... government law" و
+// {{BREACH_NOTIFICAYION_HOURS}} يجب ملؤها»
+// =========================================================================
+
+const published = (key: string) => POLICY_DOCUMENTS.find((d) => d.key === key)!;
+
+/**
+ * Withholding stopped the braces from showing, but it left the Terms with no
+ * governing law and no court — the two lines the owner photographed. They are
+ * now STATED, from worker/lib/policies/facts.ts, in all three languages.
+ */
+test('the governing law, the court and the breach deadline are stated, not withheld', () => {
+  const article = (body: string, n: string) => {
+    const lines = body.split('\n');
+    const i = lines.findIndex((l) => l.startsWith(`### ${n} `));
+    assert.ok(i >= 0, `article ${n} is not published`);
+    let j = i + 1;
+    while (j < lines.length && !lines[j].startsWith('#')) j++;
+    return lines.slice(i + 1, j).join('\n');
+  };
+  const terms = published('terms');
+  assert.match(article(terms.body.ar, '18.1'), /قوانين جمهورية العراق/);
+  assert.match(article(terms.body.en, '18.1'), /the laws of the Republic of Iraq/);
+  assert.match(article(terms.body.ckb, '18.1'), /یاساکانی کۆماری عێراق/);
+  assert.match(article(terms.body.ar, '18.4'), /لمحاكم بغداد المختصة/);
+  assert.match(article(terms.body.en, '18.4'), /the competent courts of Baghdad/);
+  assert.match(article(terms.body.ckb, '18.4'), /دادگا تایبەتمەندەکانی بەغدا/);
+
+  // «… خلال 72 ساعة من العلم به»: the token was once spelled
+  // BREACH_NOTIFICAYION_HOURS and could never have resolved.
+  const privacy = published('privacy');
+  assert.match(privacy.body.ar, /خلال 72 ساعة من العلم/);
+  assert.match(privacy.body.en, /within 72 hours of becoming aware/);
+  assert.match(privacy.body.ckb, /لە ماوەی 72 کاتژمێر/);
+  for (const doc of POLICY_SOURCE_DOCUMENTS) {
+    for (const lang of POLICY_LANGS) assert.ok(!doc.body[lang].includes('NOTIFICAYION'), `${doc.key}/${lang}: misspelled token`);
+  }
+
+  // The age of purchase and the support page.
+  assert.match(published('purchase').body.en, /A person under 18 years of age/);
+  assert.match(published('terms').body.ar, /صفحة الدعم \(levonis-iq\.com\/support\)/);
+
+  // No sentence reads the law or the court twice («لقوانين قوانين …»,
+  // 'the laws of the laws of …', 'the courts of the competent courts …').
+  for (const doc of POLICY_DOCUMENTS) {
+    assert.ok(!/قانون قوانين|لقوانين قوانين|لمحاكم محاكم|قوانين قوانين/.test(doc.body.ar), `${doc.key}/ar doubles a fact`);
+    assert.ok(!/(law|laws) of the laws|courts of the competent courts/.test(doc.body.en), `${doc.key}/en doubles a fact`);
+    assert.ok(!/یاسای یاساکانی|یاساکانی یاساکانی|دادگاکانی دادگا/.test(doc.body.ckb), `${doc.key}/ckb doubles a fact`);
+  }
+});
+
+test('every fact is trilingual, used by the corpus, and carries no token of its own', () => {
+  const used = new Set<string>();
+  for (const doc of POLICY_SOURCE_DOCUMENTS) {
+    for (const m of doc.body.ar.matchAll(/\{\{([A-Z0-9_]+)\}\}/g)) used.add(m[1]);
+  }
+  for (const [name, value] of Object.entries(POLICY_FACTS)) {
+    assert.ok(used.has(name), `facts.ts fills {{${name}}}, which no document uses — a misspelled key fills nothing`);
+    for (const lang of POLICY_LANGS) {
+      assert.ok(value[lang] && value[lang].trim(), `{{${name}}} has no ${lang} value`);
+      assert.ok(!/[{}]/.test(value[lang]), `{{${name}}}/${lang} carries a brace`);
+    }
+  }
+  // Business facts nobody has given are NOT in the table: inventing a
+  // registration number or an address is worse than a silent clause.
+  for (const name of ['LEVONIS_LEGAL_NAME', 'LEVONIS_REGISTRATION_NO', 'LEVONIS_ADDRESS', 'LEVONIS_SUPPORT_HOURS']) {
+    assert.ok(!(name in POLICY_FACTS), `${name} was filled without the owner`);
+  }
+  // Substitution leaves an unknown token exactly as written, for render.ts.
+  assert.equal(fillPolicyFacts('a {{LEVONIS_ADDRESS}} b', 'en'), 'a {{LEVONIS_ADDRESS}} b');
+  assert.equal(fillPolicyFacts('{{MIN_PURCHASE_AGE_YEARS}} سنة', 'ar'), '18 سنة');
+});
+
+/**
+ * The membership delivery thresholds are the figures the checkout applies:
+ * `membership_benefit_rules` seeded by migration 0074 (and, for PRO, the
+ * `shippingPolicy` fallback agrees). A new seed that left the documents on
+ * the old figure is the cash-on-delivery-tax regression over again.
+ */
+test('the membership free-delivery thresholds are the seeded rules, and terms 8.4 is back', () => {
+  const seed = readFileSync(join(ROOT, 'migrations/0074_membership_benefit_rules.sql'), 'utf8');
+  const threshold = (id: string) => {
+    const m = seed.match(new RegExp(`'${id}',\\s*'\\w+',\\s*'free_shipping',\\s*'global',\\s*(\\d+)`));
+    assert.ok(m, `seed ${id} not found`);
+    return Number(m![1]);
+  };
+  assert.equal(PRO_FREE_DELIVERY_MIN_IQD, threshold('seed-pro-free-shipping'));
+  assert.equal(PREMIUM_FREE_DELIVERY_MIN_IQD, threshold('seed-premium-free-shipping'));
+  assert.equal(PRO_FREE_DELIVERY_MIN_IQD, SETTING_DEFAULTS.shippingPolicy.pro_threshold_iqd);
+
+  // The exception 8.3 points at is published, with its figures, so the Terms
+  // no longer say that every delivery cost falls on every customer.
+  const terms = published('terms');
+  assert.match(terms.body.ar, /### 8\.4 [^\n]*\n[^\n]*75,000 دينار[^\n]*100,000 دينار/);
+  assert.match(terms.body.en, /### 8\.4 [^\n]*\n[^\n]*above 75,000 IQD[^\n]*above 100,000 IQD/);
+  assert.match(published('delivery').body.ckb, /### 3\.17 /);
+});
+
+/**
+ * A POINTER TO NOTHING GOES WITH ITS TARGET. Terms 8.3 used to promise «ما لم
+ * ينطبق استثناء المادة 8.4 أدناه» while 8.4 was withheld; support 13.x sent the
+ * customer to «المادة 14.4», also withheld.
+ */
+test('a line citing a withheld article of the same document is withheld too', () => {
+  const body = [
+    '## 1. عنوان',
+    '',
+    '### 1.1 الأصل',
+    'الأصل كذا، ما لم ينطبق استثناء المادة 1.2 أدناه.',
+    '',
+    '### 1.2 الاستثناء',
+    'يُستثنى ما فوق {{UNKNOWN_FIGURE}}.',
+    '',
+    '### 1.3 إحالة إلى وثيقة أخرى',
+    'وفق المادة 1.2 من سياسة التوصيل.',
+    '',
+    '### 1.4 مرجع',
+    'المرجع: وثيقة الشراء، المادة 1.2.',
+  ].join('\n');
+  const out = publishedPolicyBody(body);
+  assert.ok(!out.includes('1.2 الاستثناء'), 'the withheld article is gone');
+  assert.ok(!out.includes('### 1.1'), 'the article whose only line cited it went with it');
+  assert.ok(out.includes('وفق المادة 1.2 من سياسة التوصيل'), 'a citation of ANOTHER document is not this one');
+  assert.ok(out.includes('المرجع: وثيقة الشراء، المادة 1.2.'), 'a reference naming its document first is kept');
+
+  // The English and Sorani forms, and a list of articles.
+  assert.equal(
+    publishedPolicyBody('### 2.1 A\nSee articles 2.3 and 2.2.\n\n### 2.2 B\n{{X}}\n\n### 2.3 C\nKept.'),
+    '### 2.3 C\nKept.'
+  );
+  assert.equal(publishedPolicyBody('### 3.1 ئا\nبڕگەی 3.2 جێبەجێ دەبێت.\n\n### 3.2 ب\n{{X}}\n\n### 3.3 ج\nمایەوە.'), '### 3.3 ج\nمایەوە.');
+
+  // The corpus as published: support's 14.4 is on the page it is cited from.
+  const support = published('support');
+  for (const lang of POLICY_LANGS) {
+    if (support.body[lang].match(/(المادة|article|ماددەی) 14\.4/)) {
+      assert.match(support.body[lang], /^### 14\.4 /m, `support/${lang} cites 14.4 without publishing it`);
+    }
+  }
+  assert.match(published('terms').body.ar, /استثناء المادة 8\.4 أدناه/);
+});
+
+// =========================================================================
+// THE TEXT CHANGES HANDED TO THIS DOCUMENT SET BY THE OWNER'S REPORT
+// =========================================================================
+
+test('a referral or a support code gives the referred account nothing — rewards 10.4, delivery 3.16', () => {
+  // «الإحالة لا يحصل على أي شيء فقط كود دعم».
+  const rewards = published('rewards');
+  assert.match(rewards.body.ar, /### 10\.4 الحساب المُحال لا ينال شيئاً\n[^\n]*لا إعفاء من أجرة التوصيل، ولا خصم، ولا نقاط، ولا عضوية/);
+  assert.match(rewards.body.en, /### 10\.4 The referred account receives nothing\n[^\n]*no delivery waiver, no discount, no points and no membership/);
+  assert.match(rewards.body.ckb, /### 10\.4 [^\n]*\n[^\n]*نە بێبەشکردن لە تێچووی گەیاندن، نە داشکاندن، نە خاڵ، نە ئەندامێتی/);
+  for (const lang of POLICY_LANGS) {
+    assert.ok(!/^### 10\.13 /m.test(rewards.body[lang]), `rewards/${lang}: chapter 10 was not renumbered`);
+  }
+  assert.ok(!rewards.body.ar.includes('يُعفى الحساب المُحال من أجرة التوصيل'));
+  assert.ok(!/what the friend receives/i.test(rewards.body.en));
+
+  const delivery = published('delivery');
+  const clause = (body: string, marker: RegExp) => body.split('\n').find((l) => marker.test(l)) ?? '';
+  assert.ok(!clause(delivery.body.ar, /المادة 3\.17 حصراً/).includes('إحالة'), 'delivery/ar 3.16 still names a referral');
+  assert.ok(!/referral/i.test(clause(delivery.body.en, /article 3\.17 exclusively/)), 'delivery/en 3.16 still names a referral');
+  assert.ok(!clause(delivery.body.ckb, /بڕگەی 3\.17دا هاتووە/).includes('ڕەوانەکردن'), 'delivery/ckb 3.16 still names a referral');
+});
+
+test('memberships are active on purchase, and the PLUS printer gift is granted by hand — membership 8.2, 9.x, 12.1', () => {
+  const membership = published('membership');
+  for (const lang of POLICY_LANGS) {
+    const body = membership.body[lang];
+    assert.ok(!/ستُحجز حتى الإطلاق|reserved until the launch|تا دەستپێکردن حیجز دەکرێت/.test(body), `membership/${lang} 8.2 reserves until launch`);
+    assert.ok(!/بعد إعلان الإطلاق تبدأ|After the launch has been announced|دوای ڕاگەیاندنی دەستپێکردن/.test(body), `membership/${lang} 9.1 waits for the launch`);
+  }
+  assert.match(membership.body.ar, /### 9\.2 التفعيل فور الشراء/);
+  assert.match(membership.body.en, /### 9\.2 Activation on purchase/);
+  assert.match(membership.body.ar, /والمنح يدوي بقرار من إدارة المتجر، لا يقع تلقائياً بالشراء/);
+  assert.match(membership.body.en, /The grant is made by hand/);
+  assert.match(membership.body.ckb, /بە شێوەی خۆکار ڕوونادات/);
+});
+
+/**
+ * ONE FIGURE PER TIER. Returns 5.x once said «PRO والعضوية المميزة فوق ...
+ * {{PRO_FREE_DELIVERY_MIN_IQD}}» — while the token was withheld nobody read
+ * it, but filling it would have promised PREMIUM members the PRO threshold
+ * (75,000) when checkout, delivery 3.17, terms 8.4 and membership all give
+ * PREMIUM 100,000, standard delivery only. The PRO figure must always belong
+ * to the PRO tier: the tier named nearest before it, on its own line, is PRO.
+ */
+test('the PRO threshold is never attached to PREMIUM — returns, purchase and every other document', () => {
+  const pro = PRO_FREE_DELIVERY_MIN_IQD.toLocaleString('en-US');
+  const premium = PREMIUM_FREE_DELIVERY_MIN_IQD.toLocaleString('en-US');
+  const TIER = /\bPRO\b|PREMIUM|Premium|PRIME|المميزة|ئەندامێتی تایبەت/g;
+  let checked = 0;
+  for (const key of POLICY_KEYS) {
+    for (const lang of POLICY_LANGS) {
+      for (const line of published(key).body[lang].split('\n')) {
+        let at = line.indexOf(pro);
+        while (at >= 0) {
+          const names = line.slice(0, at).match(TIER);
+          if (names) {
+            checked++;
+            assert.equal(names[names.length - 1], 'PRO', `${key}/${lang}: ${pro} is given to ${names[names.length - 1]}: ${line}`);
+          }
+          at = line.indexOf(pro, at + 1);
+        }
+      }
+    }
+  }
+  assert.ok(checked > 0, 'no threshold line was inspected at all');
+  const returns = published('returns');
+  assert.match(returns.body.ar, new RegExp(`لعضو PREMIUM في أجرة التوصيل الاعتيادية وحدها فوق قيمة الطلب البالغة ${premium} دينار`));
+  assert.match(returns.body.en, new RegExp(`PREMIUM member, as to the standard delivery fee alone, above an order value of ${premium} IQD`));
+  assert.match(returns.body.ckb, new RegExp(`ئەندامی PREMIUM[^\\n]*${premium} دینار`));
+});
+
+test('the middle tier is LEVO PREMIUM to the customer — PRIME appears only in the membership legacy-name article', () => {
+  for (const key of POLICY_KEYS) {
+    for (const lang of POLICY_LANGS) {
+      const lines = published(key).body[lang].split('\n').filter((l) => /\bPRIME\b/.test(l));
+      if (key === 'membership') {
+        assert.ok(lines.length <= 1, `membership/${lang}: PRIME outside article 2.4`);
+        for (const l of lines) assert.match(l, /LEVO PREMIUM/);
+      } else {
+        assert.deepEqual(lines, [], `${key}/${lang} names the tier PRIME`);
+      }
+    }
+  }
+  assert.match(published('purchase').body.en, /LEVO PREMIUM is waived the ordinary delivery fee alone where the value is strictly more than 100,000 dinars/);
+});
+
+test('membership no longer defines a state reserved pending the launch', () => {
+  const membership = published('membership');
+  for (const lang of POLICY_LANGS) {
+    const body = membership.body[lang];
+    assert.ok(!/بانتظار الإطلاق|pending the launch|چاوەڕێی دەستپێکردن/.test(body), `membership/${lang} still reserves pending the launch`);
+    assert.ok(!/^- (الإطلاق|Launch|دەستپێکردن):/m.test(body), `membership/${lang} still defines the launch`);
+  }
+  assert.match(membership.body.en, /^- Reserved membership: [^\n]*article 9\.3\.$/m);
+  assert.match(membership.body.ar, /^- العضوية المحجوزة: [^\n]*المادة 9\.3\.$/m);
+});
+
+test('purchase 10.3 — be present or authorise a recipient — is published while 9.7 is withheld', () => {
+  const purchase = published('purchase');
+  const src = POLICY_SOURCE_DOCUMENTS.find((d) => d.key === 'purchase')!;
+  for (const lang of POLICY_LANGS) {
+    assert.match(src.body[lang], /^### 9\.7 /m);
+    assert.match(purchase.body[lang], /^### 10\.3 /m, `purchase/${lang} 10.3 was withheld`);
+  }
+  assert.match(purchase.body.en, /### 10\.3 [^\n]*\n[^\n]*The absence of both is a failed delivery\./);
 });

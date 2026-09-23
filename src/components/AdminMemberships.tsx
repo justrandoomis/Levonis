@@ -298,6 +298,11 @@ const PLAN_STRINGS = {
     working: 'جارٍ التنفيذ…',
     activated: (n: number) => `تم التفعيل — ${n} اشتراكًا بدأ الآن.`,
     alreadyActivated: (n: number) => `الإطلاق كان مُفعّلًا مسبقًا — ${n} اشتراكًا متأخرًا بدأ الآن.`,
+    sweep: (n: number) => `تفعيل الحجوزات المتبقية (${n})`,
+    sweepNone: 'لا توجد حجوزات متبقية — كل اشتراك مدفوع يعمل الآن.',
+    sweepTitle: 'تفعيل الحجوزات المتبقية',
+    deferred: (n: number) => `${n} حجزًا لن يبدأ بالتفعيل — الحساب يملك فئة أعلى تعمل الآن. استرجعه أو ألغِه يدويًا.`,
+    sweepBody: 'يبدأ عدّاد كل حجز متبقٍّ من هذه اللحظة، بنفس قواعد الإطلاق (أعلى فئة للحساب، ويُلغى الأدنى). اكتب ACTIVATE للتأكيد.',
   },
   en: {
     tab: 'Plans & launch',
@@ -332,6 +337,11 @@ const PLAN_STRINGS = {
     working: 'Working…',
     activated: (n: number) => `Activated — ${n} memberships started now.`,
     alreadyActivated: (n: number) => `The launch was already active — ${n} straggling memberships started now.`,
+    sweep: (n: number) => `Activate remaining reservations (${n})`,
+    sweepNone: 'No reservations left — every paid membership is running.',
+    sweepTitle: 'Activate remaining reservations',
+    deferred: (n: number) => `${n} reservations will never start — the account already runs a higher tier. Refund or cancel them by hand.`,
+    sweepBody: 'Starts the clock on every remaining reservation from this moment, with the launch rules (highest tier per account, lower ones cancelled). Type ACTIVATE to confirm.',
   },
   ckb: {
     tab: 'پلان و دەستپێکردن',
@@ -366,6 +376,11 @@ const PLAN_STRINGS = {
     working: 'جێبەجێ دەکرێت…',
     activated: (n: number) => `چالاک کرا — ${n} ئەندامێتی ئێستا دەستی پێکرد.`,
     alreadyActivated: (n: number) => `دەستپێکردن پێشتر چالاک بوو — ${n} ئەندامێتیی دواکەوتوو ئێستا دەستی پێکرد.`,
+    sweep: (n: number) => `چالاککردنی پارێزراوە ماوەکان (${n})`,
+    sweepNone: 'هیچ پارێزراوێک نەماوە.',
+    sweepTitle: 'چالاککردنی پارێزراوە ماوەکان',
+    deferred: (n: number) => `${n} — refund / cancel`,
+    sweepBody: 'ACTIVATE بنووسە بۆ پشتڕاستکردنەوە.',
   },
 };
 
@@ -390,6 +405,13 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
   const ps: PS = PLAN_STRINGS[lang] ?? PLAN_STRINGS.ar;
   const [plans, setPlans] = useState<AdminPlan[] | null>(null);
   const [launch, setLaunch] = useState<AdminLaunch | null>(null);
+  // Reservations still waiting (GET /admin/plans). After the launch they are
+  // converted as each account is read; this is what the sweep would start.
+  const [prepaidCount, setPrepaidCount] = useState(0);
+  // Reservations the sweep leaves alone because the account runs a higher
+  // tier. They are not in `prepaidCount`, so the button goes dark once the
+  // sweep has done all it can, and these are named as work by hand.
+  const [deferredCount, setDeferredCount] = useState(0);
   const [loadError, setLoadError] = useState('');
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [rowBusy, setRowBusy] = useState<string | null>(null);
@@ -403,7 +425,11 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
   const load = useCallback(async () => {
     setLoadError('');
     try {
-      const d = await api.get<{ plans: AdminPlan[]; launch: AdminLaunch }>('/api/memberships/admin/plans');
+      const d = await api.get<{ plans: AdminPlan[]; launch: AdminLaunch; prepaid_count?: number; deferred_count?: number }>(
+        '/api/memberships/admin/plans'
+      );
+      setPrepaidCount(Number(d.prepaid_count) || 0);
+      setDeferredCount(Number(d.deferred_count) || 0);
       setPlans(d.plans);
       setLaunch(d.launch);
       const next: Record<string, string> = {};
@@ -619,12 +645,16 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
             setConfirmText('');
             setActivateOpen(true);
           }}
-          disabled={!launch || launch.activated}
+          // Before the launch: the launch. After it: the leftover sweep, which
+          // used to be unreachable once the launch was on.
+          disabled={!launch || (launch.activated && prepaidCount === 0)}
           aria-haspopup="dialog"
           className="min-h-[40px] px-4 rounded-xl bg-[#B03142] text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {ps.activate}
+          {launch?.activated ? ps.sweep(prepaidCount) : ps.activate}
         </button>
+        {launch?.activated && prepaidCount === 0 && deferredCount === 0 && <p className="text-[12px] text-zinc-500">{ps.sweepNone}</p>}
+        {deferredCount > 0 && <p className="text-[12px] text-amber-300">{ps.deferred(deferredCount)}</p>}
         {launchNote && (
           <p className={`text-[12.5px] ${launchNote.ok ? 'text-emerald-400' : 'text-red-400'}`}>{launchNote.text}</p>
         )}
@@ -636,7 +666,7 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
           if (!activating) setActivateOpen(false);
         }}
         labelledBy="activate-launch-title"
-        label={ps.activateTitle}
+        label={launch?.activated ? ps.sweepTitle : ps.activateTitle}
         anchor={activateBtnRef}
         dismissOnEscape={!activating}
         dismissOnScrim={!activating}
@@ -645,9 +675,9 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
       >
         <div className="p-5 sm:p-6">
           <h2 id="activate-launch-title" className="text-white font-bold text-lg flex items-center gap-2">
-            <Rocket className="w-5 h-5 text-[#e06070]" aria-hidden /> {ps.activateTitle}
+            <Rocket className="w-5 h-5 text-[#e06070]" aria-hidden /> {launch?.activated ? ps.sweepTitle : ps.activateTitle}
           </h2>
-          <p className="text-zinc-300 text-sm mt-2 leading-relaxed">{ps.activateBody}</p>
+          <p className="text-zinc-300 text-sm mt-2 leading-relaxed">{launch?.activated ? ps.sweepBody : ps.activateBody}</p>
           <input
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}

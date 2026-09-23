@@ -8,7 +8,24 @@ type AdminWalletTx = WalletTx & { email?: string; username?: string; userId?: st
 export default function AdminWalletRequests() {
   /** Dinars are the headline here too — this is the screen where a human
    *  approves money, so it also carries the rate it was converted at. */
-  const { exchangeRate } = useWallet();
+  const { exchangeRate, settings, paymentMethods } = useWallet();
+  /**
+   * WHICH CHANNEL TO PAY THROUGH, BY NAME. A request filed since migration
+   * 0112 carries the name it was filed with; an older one carries only the
+   * id, which is resolved against the owner's payout and deposit lists — the
+   * card used to show the account number and nothing else, so a Zain Cash
+   * wallet and a Ki Card number were indistinguishable to the person paying.
+   */
+  const channelName = (w: NonNullable<AdminWalletTx['withdrawal']>): string | null => {
+    if (w.destination_label) return w.destination_label;
+    const kind = w.destination_kind;
+    if (!kind) return null;
+    return (
+      settings?.payoutMethods?.find((m) => m.id === kind)?.name ??
+      paymentMethods.find((m) => m.id === kind)?.name ??
+      kind
+    );
+  };
   const [transactions, setTransactions] = useState<AdminWalletTx[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -259,6 +276,12 @@ export default function AdminWalletRequests() {
                         <span className="uppercase">{t.paymentMethod}</span>
                       </>
                     )}
+                    {t.withdrawal && channelName(t.withdrawal) && (
+                      <>
+                        <span className="text-zinc-600">•</span>
+                        <span className="text-zinc-100 font-bold" data-withdrawal-channel>{channelName(t.withdrawal)}</span>
+                      </>
+                    )}
                     {t.accountNumber && (
                       <>
                         <span className="text-zinc-600">•</span>
@@ -332,6 +355,16 @@ export default function AdminWalletRequests() {
                   * filed and held together by `CHECK (net_cents = amount_cents
                   * - fee_cents)`, so changing the commission tomorrow cannot
                   * restate what an outstanding request is worth.
+                  *
+                  * AND IN THE CUSTOMER'S DINARS. The form promised «commission
+                  * 1,500 · net 48,500» for a typed 50,000 at 3%, while this box
+                  * converted `net_cents` back at TODAY's rate and said 48,496 —
+                  * the reviewer about to make the transfer read a different
+                  * number from the one the customer was quoted, and it moved
+                  * whenever the owner moved the rate. Since migration 0112 the
+                  * request records the dinar commission and payout it quoted,
+                  * and they are printed as recorded; an older request converts
+                  * its cents at the rate IT was filed at, never today's.
                   */}
                 {t.withdrawal
                   && typeof t.withdrawal.net_cents === 'number'
@@ -340,13 +373,18 @@ export default function AdminWalletRequests() {
                   <div className="w-full md:w-auto rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2 mt-1">
                     <div className="flex items-baseline justify-between gap-4 md:justify-end">
                       <span className="text-[10px] uppercase tracking-wide text-amber-200/70">Transfer</span>
-                      <span className="text-base font-bold text-amber-100 tabular-nums">
-                        {formatWalletIqd(t.withdrawal.net_cents, exchangeRate)}
+                      <span className="text-base font-bold text-amber-100 tabular-nums" data-withdrawal-transfer>
+                        {typeof t.withdrawal.net_iqd === 'number'
+                          ? formatIqd(t.withdrawal.net_iqd)
+                          : formatWalletIqd(t.withdrawal.net_cents, t.withdrawal.exchange_rate_snapshot || exchangeRate)}
                       </span>
                     </div>
                     <div className="text-[10px] text-zinc-500 tabular-nums mt-0.5 md:text-right" dir="ltr">
-                      commission {formatWalletIqd(t.withdrawal.fee_cents, exchangeRate)} withheld ·{' '}
-                      {formatUsdCents(t.withdrawal.net_cents)}
+                      commission{' '}
+                      {typeof t.withdrawal.fee_iqd === 'number'
+                        ? formatIqd(t.withdrawal.fee_iqd)
+                        : formatWalletIqd(t.withdrawal.fee_cents, t.withdrawal.exchange_rate_snapshot || exchangeRate)}{' '}
+                      withheld · {formatUsdCents(t.withdrawal.net_cents)}
                     </div>
                   </div>
                 )}

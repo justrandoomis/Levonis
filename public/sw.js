@@ -75,8 +75,14 @@
  * tests/serviceWorker.test.ts pins this version together with a digest of the
  * precached bytes, so the next regeneration of the icons cannot be committed
  * without moving this line with it.
+ *
+ * v3: the icons now carry the logo's revision in their NAMES
+ * (`icon-192.bc80fc2b.png`, see src/lib/siteLogo.ts), so a new mark is a new
+ * URL and the precache can no longer serve an old one under it. The bump
+ * drops v2's store, which still holds the seven unversioned names nothing
+ * asks for any more.
  */
-const VERSION = 'v2';
+const VERSION = 'v3';
 
 const DOCUMENT_CACHE = 'levonis-document-' + VERSION;
 const ASSET_CACHE = 'levonis-assets-' + VERSION;
@@ -123,13 +129,13 @@ const ASSET_CACHE_LIMIT = 500;
  * not.
  */
 const PRECACHE_URLS = [
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/maskable-192.png',
-  '/icons/maskable-512.png',
-  '/icons/apple-touch-icon.png',
-  '/icons/favicon-32.png',
-  '/icons/favicon-16.png',
+  '/icons/icon-192.bc80fc2b.png',
+  '/icons/icon-512.bc80fc2b.png',
+  '/icons/maskable-192.bc80fc2b.png',
+  '/icons/maskable-512.bc80fc2b.png',
+  '/icons/apple-touch-icon.bc80fc2b.png',
+  '/icons/favicon-32.bc80fc2b.png',
+  '/icons/favicon-16.bc80fc2b.png',
 ];
 
 // ------------------------------------------------------------ offline shell
@@ -542,6 +548,14 @@ async function handleNavigation(event) {
   return response;
 }
 
+function isImage(response) {
+  try {
+    return (response.headers.get('content-type') || '').toLowerCase().indexOf('image/') === 0;
+  } catch {
+    return false;
+  }
+}
+
 function isHtml(response) {
   try {
     const type = response.headers.get('content-type') || '';
@@ -566,12 +580,20 @@ async function handleAsset(event) {
   return response;
 }
 
-/** /icons/* — instant from cache, refreshed behind it. */
+/**
+ * /icons/* — instant from cache, refreshed behind it.
+ *
+ * Only an IMAGE is kept, the same test `install` applies. The icons are
+ * renamed whenever the mark changes, so a page still open from before a
+ * deploy can ask for a name that no longer exists — and a missing asset is
+ * answered 200 with the SPA shell, which `cacheable` alone would happily file
+ * under a `.png` key.
+ */
 async function handleStatic(event) {
   const request = event.request;
   const cached = await matchSafely(STATIC_CACHE, request);
   const refresh = fetch(request).then((response) => {
-    if (cacheable(response)) {
+    if (cacheable(response) && isImage(response)) {
       const copy = copyOf(response);
       if (copy) later(event, putSafely(STATIC_CACHE, request, copy));
     }

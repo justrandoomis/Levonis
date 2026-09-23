@@ -37,6 +37,7 @@ import {
 } from '../worker/lib/template';
 import { validateProductDoc } from '../worker/lib/productModel';
 import { narrowGroups, PRODUCT_TYPES } from '../worker/lib/templateFamilies';
+import { freshDb, asD1, stubApp, post, all } from './fixtures/app';
 
 // --------------------------------------------------------------- harness
 
@@ -266,6 +267,60 @@ test('example demonstrates the owner\'s form: the base is the cheapest, options 
   // …and the last form section is in the file too.
   assert.equal(doc.usage_guide.steps.length, 1);
   assert.equal(doc.usage_guide.steps[0].kind, 'setup');
+});
+
+test('example writes linked-colour direct stock as exact combinations', () => {
+  const text = buildExampleTemplate();
+  const parsed = parseTemplate(text);
+  assert.deepEqual(parsed.errors, []);
+  assert.deepEqual(parsed.unknown_keys, []);
+  assert.equal(parsed.fields.inventory_mode?.value, 'VARIANT_COMBINATION');
+
+  const variants = parsed.groups.variants ?? [];
+  assert.equal(variants.length, 2);
+  assert.deepEqual(
+    variants.map((row) => row.fields.stock?.value),
+    [5, 0],
+    'Small×Black and Large×Gold each carry their own direct stock'
+  );
+  assert.deepEqual(
+    variants.map((row) => row.fields.color_id?.value),
+    ['col_example_black', 'col_example_gold']
+  );
+});
+
+/**
+ * The checks above read the PARSER only, and the example once passed every
+ * one of them while `/parse` answered RELATIONS_VALIDATION and `/apply` 400:
+ * the save planner is where "linked colour ⇒ exact-combination stock" lives.
+ * This runs the example through the real routes on a real migrated database.
+ */
+test('the example passes the save planner: /parse has no validation_error and /apply saves the exact shelves', async () => {
+  const raw = freshDb();
+  const app = stubApp(asD1(raw), { id: 'usr_owner', role: 'admin', email: 'boss@x.co', admin_scope: null }, (a) => {
+    a.route('/api/admin/template', templateRoutes);
+  });
+  const parsedRes = await post(app, '/api/admin/template/parse', { text: buildExampleTemplate() });
+  const parsed = (await parsedRes.json()) as { validation_error?: unknown; errors?: unknown[] };
+  assert.equal(parsedRes.status, 200);
+  assert.deepEqual(parsed.errors, []);
+  assert.equal(parsed.validation_error ?? null, null, JSON.stringify(parsed.validation_error));
+
+  const applied = await post(app, '/api/admin/template/apply', { text: buildExampleTemplate(), mode: 'draft', confirm: true });
+  const appliedBody = (await applied.json()) as { product_id?: string };
+  assert.equal(applied.status, 200, JSON.stringify(appliedBody));
+  const shelves = all(
+    raw,
+    'SELECT combo_key, stock FROM product_variants WHERE product_id = ? ORDER BY combo_key',
+    appliedBody.product_id
+  );
+  assert.deepEqual(
+    shelves.map((r) => [r.combo_key, r.stock]),
+    [
+      ['o:opt_example_large|c:col_example_gold', 0],
+      ['o:opt_example_small|c:col_example_black', 5],
+    ]
+  );
 });
 
 test('example never ships an active image URL (no broken-image product)', () => {

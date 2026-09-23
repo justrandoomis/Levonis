@@ -39,8 +39,11 @@ import { requireSellingPrivileges, storeForUser } from '../lib/merchantAuth';
 import { feeFor, autoCompleteDays } from '../lib/merchantOps';
 import { holdEscrow, escrowForOrder, releaseEscrow, refundEscrow, disputeEscrow } from '../lib/escrowOps';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
+// Levo Community's maintenance switch, on the routes that START trade here
+// (the owner closed /requests with the community — docs/DECISIONS.md).
+import { requireCommunityOpen } from '../lib/communityGate';
 import { notifyOfferReceived } from '../lib/engagementNotify';
-import { deleteMediaObject, getMediaObject, putMediaObject } from '../lib/mediaStorage';
+import { deleteMediaObject, getMediaObject, headMediaObject, isSafeMediaKey, putMediaObject } from '../lib/mediaStorage';
 import {
   REQUEST_OPEN_STATES,
   canMoveRequest,
@@ -125,7 +128,7 @@ function offerShape(o: Record<string, unknown>, proBadges: Set<string> = new Set
 // -------------------------------------------------------------- requests
 
 /** The public board. Only states a merchant can still act on. */
-marketplaceRoutes.get('/requests', async (c) => {
+marketplaceRoutes.get('/requests', requireCommunityOpen, async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 50, def: 20 });
   const cursor = c.req.query('cursor') || '';
   const category = c.req.query('category') || '';
@@ -154,7 +157,7 @@ marketplaceRoutes.get('/requests', async (c) => {
   });
 });
 
-marketplaceRoutes.get('/requests/:id', async (c) => {
+marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const user = c.get('user');
   const r = await c.env.DB.prepare(
@@ -406,7 +409,7 @@ marketplaceRoutes.delete('/requests/:id/files/:fileId', requireAuth, async (c) =
   return c.json({ success: true });
 });
 
-marketplaceRoutes.post('/requests', requireAuth, async (c) => {
+marketplaceRoutes.post('/requests', requireCommunityOpen, requireAuth, async (c) => {
   await rateLimit(c, 'request-create', 10, 3600);
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
@@ -531,7 +534,7 @@ marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
   return c.json({ success: true, offers: results.map((row) => offerShape(row, proBadges)), is_customer: isCustomer });
 });
 
-marketplaceRoutes.post('/requests/:id/offers', requireAuth, async (c) => {
+marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth, async (c) => {
   await rateLimit(c, 'offer-create', 30, 3600);
   const user = c.get('user')!;
   const ctx = await requireSellingPrivileges(c);
@@ -627,7 +630,7 @@ marketplaceRoutes.post('/offers/:id/withdraw', requireAuth, async (c) => {
 });
 
 /** Edit an offer — pending only. After acceptance it is the contract (§26). */
-marketplaceRoutes.patch('/offers/:id', requireAuth, async (c) => {
+marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async (c) => {
   const ctx = await requireSellingPrivileges(c);
   const body = await c.req.json().catch(() => ({}));
   const sets: string[] = [];
@@ -1103,4 +1106,212 @@ marketplaceRoutes.get('/orders', requireAuth, async (c) => {
       ORDER BY o.created_at DESC LIMIT 50`
   ).bind(user.id, user.id, user.id).all();
   return c.json({ success: true, orders: results });
+});
+
+// ------------------------------------------------------ complaints (reporter)
+
+/**
+ * «الشكاوى» FROM THE OTHER SIDE OF THE DESK — the reporter's own thread.
+ *
+ * WHAT WAS MISSING. A complaint could be FILED (the dispute route above) and
+ * ANSWERED (POST /api/admin/community/complaints/:id/messages), and nothing
+ * between the two let the person who filed it read the answer or say anything
+ * back. The admin's reply reached them as one row in the bell, clamped to two
+ * lines, with no link — a paragraph about their frozen money that could not be
+ * read in full anywhere on the site, and a conversation that could only go one
+ * way.
+ *
+ * WHO MAY READ IT: THE REPORTER. The complaint is their account of a dispute,
+ * and the admin console labels a public reply «رد يراه صاحب الشكوى» — the
+ * reporter, not the party complained about. Widening that to the other party
+ * would change what every past reply meant after it was written, so it is not
+ * done here; it is an owner decision (docs/DECISIONS.md).
+ *
+ * WHAT IT SHOWS: every message except the INTERNAL notes (migration 0031,
+ * "admin-only note, never shown to parties"), filtered in the SQL rather than
+ * in a map, so a note cannot reach this response by a forgotten field. Staff
+ * identity stays internal; a row says only whether it came from the shop.
+ * The key never ships — the URL does, and /files/ decides who may read it.
+ */
+interface ComplaintMsgRow extends Record<string, unknown> {
+  id: string;
+  sender_id: string;
+  sender_role: string;
+  body: string;
+  file_key: string | null;
+  created_at: string;
+}
+
+function complaintFileKind(key: string | null): 'text' | 'image' | 'video' {
+  if (!key) return 'text';
+  return key.split('/')[2] === 'video' ? 'video' : 'image';
+}
+
+export function complaintMessagePublic(m: ComplaintMsgRow, viewerId: string) {
+  const fileKey = typeof m.file_key === 'string' && m.file_key ? m.file_key : null;
+  return {
+    id: m.id,
+    body: m.body ?? '',
+    is_staff: m.sender_role === 'admin',
+    mine: m.sender_id === viewerId,
+    created_at: m.created_at,
+    kind: complaintFileKind(fileKey),
+    file_url: fileKey ? `/files/${fileKey}` : null,
+  };
+}
+
+async function ownComplaint(c: Context<AppContext>, id: string) {
+  const user = c.get('user')!;
+  const row = await c.env.DB.prepare(
+    `SELECT ct.id, ct.category, ct.description, ct.status, ct.resolution, ct.created_at, ct.updated_at,
+            ct.community_order_id, ct.merchant_id, m.name AS merchant_name, m.user_id AS merchant_user_id
+       FROM community_complaints ct
+       LEFT JOIN community_merchants m ON m.id = ct.merchant_id
+      WHERE ct.id = ? AND ct.reporter_id = ?`
+  )
+    .bind(id, user.id)
+    .first<Record<string, unknown>>();
+  // Not theirs and not there are the same answer: an id reveals nothing.
+  if (!row) throw notFound('Complaint not found');
+  return row;
+}
+
+function complaintPublic(r: Record<string, unknown>) {
+  return {
+    id: r.id,
+    category: r.category,
+    description: r.description,
+    status: r.status,
+    resolution: r.resolution ?? '',
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+    community_order_id: r.community_order_id ?? null,
+    merchant_name: r.merchant_name ?? null,
+    message_count: typeof r.message_count === 'number' ? r.message_count : undefined,
+  };
+}
+
+marketplaceRoutes.get('/complaints', requireAuth, async (c) => {
+  const user = c.get('user')!;
+  const { results } = await c.env.DB.prepare(
+    `SELECT ct.id, ct.category, ct.description, ct.status, ct.resolution, ct.created_at, ct.updated_at,
+            ct.community_order_id, m.name AS merchant_name,
+            (SELECT COUNT(*) FROM community_complaint_messages cm
+              WHERE cm.complaint_id = ct.id AND cm.internal = 0) AS message_count
+       FROM community_complaints ct
+       LEFT JOIN community_merchants m ON m.id = ct.merchant_id
+      WHERE ct.reporter_id = ?
+      ORDER BY ct.updated_at DESC
+      LIMIT 50`
+  )
+    .bind(user.id)
+    .all<Record<string, unknown>>();
+  return c.json({ success: true, complaints: results.map(complaintPublic) });
+});
+
+marketplaceRoutes.get('/complaints/:id', requireAuth, async (c) => {
+  const user = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const complaint = await ownComplaint(c, id);
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, sender_id, sender_role, body, file_key, created_at
+       FROM community_complaint_messages
+      WHERE complaint_id = ? AND internal = 0
+      ORDER BY created_at, rowid
+      LIMIT 500`
+  )
+    .bind(id)
+    .all<ComplaintMsgRow>();
+  return c.json({
+    success: true,
+    complaint: complaintPublic(complaint),
+    messages: results.map((m) => complaintMessagePublic(m, user.id)),
+  });
+});
+
+/**
+ * THE REPORTER ANSWERS BACK — text, a photograph, or a clip.
+ *
+ * The same contract as a ticket reply (worker/routes/support.ts): text or a
+ * file, never neither; the key must be THIS complaint's, in a folder the
+ * upload route writes to, and actually stored; and the response is the row
+ * that was written, so the thread appends one bubble instead of reloading.
+ *
+ * THE BALL COMES BACK TO STAFF. A complaint parked «بانتظار العميل» /
+ * «بانتظار التاجر» moves to «قيد المراجعة» when the party answers — the
+ * admin's filter chips are how the desk finds work, and a reply that left the
+ * complaint marked as waiting on the customer would be invisible there. A
+ * decided complaint keeps its status: re-opening a settled escrow dispute is
+ * a decision, not a side effect of a message.
+ *
+ * THE DESK IS TOLD IN «❗ Report», the topic the dispute itself was announced
+ * to — but only when this message is news: a second line typed right after
+ * the first says nothing the first did not. The text is never in it.
+ */
+marketplaceRoutes.post('/complaints/:id/messages', requireAuth, async (c) => {
+  await rateLimit(c, 'complaint-msg', 30, 3600);
+  const user = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const complaint = await ownComplaint(c, id);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const text = str(body.body, 'body', { min: 0, max: 4000, required: false });
+  let fileKey: string | null = null;
+  const rawKey = body.fileKey;
+  if (rawKey !== undefined && rawKey !== null && rawKey !== '') {
+    if (!isSafeMediaKey(rawKey) || !rawKey.startsWith(`complaints/${id}/`)) {
+      throw badRequest('That file does not belong to this complaint');
+    }
+    const folder = rawKey.split('/')[2] ?? '';
+    if (folder !== 'attachments' && folder !== 'video') throw badRequest('Invalid file reference');
+    if (!(await headMediaObject(c.env, 'private', rawKey))) {
+      throw badRequest('That attachment was not uploaded — attach it again', 'ATTACHMENT_NOT_FOUND');
+    }
+    fileKey = rawKey;
+  } else if (text.trim().length === 0) {
+    throw badRequest('Message is empty');
+  }
+
+  const previous = await c.env.DB.prepare(
+    `SELECT sender_id FROM community_complaint_messages
+      WHERE complaint_id = ? AND internal = 0
+      ORDER BY created_at DESC, rowid DESC LIMIT 1`
+  )
+    .bind(id)
+    .first<{ sender_id: string }>();
+
+  const role = complaint.merchant_user_id && complaint.merchant_user_id === user.id ? 'merchant' : 'user';
+  const status = String(complaint.status);
+  const nextStatus = status === 'waiting_customer' || status === 'waiting_merchant' ? 'under_review' : status;
+  const messageId = newId('cmsg');
+  const ts = nowIso();
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO community_complaint_messages (id, complaint_id, sender_id, sender_role, body, file_key, internal, created_at)
+       VALUES (?,?,?,?,?,?,0,?)`
+    ).bind(messageId, id, user.id, role, text, fileKey, ts),
+    c.env.DB.prepare('UPDATE community_complaints SET status = ?, updated_at = ? WHERE id = ?').bind(nextStatus, ts, id),
+  ]);
+  await audit(c.env.DB, user.id, 'community.complaint_message', id, { kind: complaintFileKind(fileKey), length: text.length });
+
+  const closed = status === 'resolved' || status === 'rejected' || status === 'closed';
+  if (!previous || previous.sender_id !== user.id || nextStatus !== status) {
+    announceAfterResponse(
+      c,
+      'report',
+      `❗ Reply on complaint ${id}` +
+        `\nFrom: ${role === 'merchant' ? 'merchant' : 'customer'}` +
+        (fileKey ? '\nWith an attachment' : '') +
+        (closed ? `\nThe complaint is already ${status}` : '')
+    );
+  }
+
+  return c.json({
+    success: true,
+    message: complaintMessagePublic(
+      { id: messageId, sender_id: user.id, sender_role: role, body: text, file_key: fileKey, created_at: ts },
+      user.id
+    ),
+    status: nextStatus,
+    updated_at: ts,
+  });
 });

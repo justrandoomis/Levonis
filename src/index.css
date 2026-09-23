@@ -1043,6 +1043,92 @@ html[data-overlay-open='true'] .lv-app-intro__character {
   360px phone.
 */
 .lv-character-anchor[data-bloub-anchor='stage'] { width: var(--lv-stage-visual); height: var(--lv-stage-visual); }
+
+/*
+  THE ORDER CELEBRATION (src/components/bloub/OrderCelebration.tsx).
+
+  A ring and fourteen pieces of confetti, going off once behind the character
+  as it pops onto the stage. Every property animated below is `transform` or
+  `opacity`, and every keyframe value is a literal: the direction of each piece
+  is the STATIC rotation of the arm it rides, so all fourteen share three
+  keyframe tracks and the browser can hand every one of them to the
+  compositor. Nothing here loops; `both` leaves each piece invisible at its
+  end, so the finished screen is exactly as still as it was before.
+*/
+.lv-celebration { position: relative; display: grid; place-items: center; }
+.lv-celebration__burst { position: absolute; inset: 0; pointer-events: none; }
+.lv-celebration__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid color-mix(in oklab, var(--color-gold) 70%, transparent);
+  opacity: 0;
+  animation: lv-celebration-ring 700ms cubic-bezier(0.2, 0.7, 0.3, 1) 110ms both;
+}
+.lv-celebration__arm { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.lv-celebration__bit {
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--color-gold);
+  opacity: 0;
+  animation-duration: 900ms;
+  animation-timing-function: cubic-bezier(0.15, 0.75, 0.35, 1);
+  animation-fill-mode: both;
+}
+.lv-celebration__bit--strip { left: -2px; top: -5px; width: 4px; height: 10px; border-radius: 2px; }
+.lv-celebration__bit--near { animation-name: lv-celebration-near; }
+.lv-celebration__bit--mid { animation-name: lv-celebration-mid; }
+.lv-celebration__bit--far { animation-name: lv-celebration-far; }
+.lv-celebration__bit[data-tone='glow'] { background: #e8c97a; }
+.lv-celebration__bit[data-tone='cream'] { background: #f2ead3; }
+.lv-celebration__bit[data-tone='success'] { background: var(--color-success); }
+
+/* Invisible at 0%: `both` holds the first keyframe through the delay, and a
+   bare ring standing on the stage before the character arrives reads as a
+   placeholder, not as the start of a burst. */
+@keyframes lv-celebration-ring {
+  0% { opacity: 0; transform: scale(0.55); }
+  12% { opacity: 0.8; }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+@keyframes lv-celebration-near {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg) scale(0.4); }
+  14% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(0, -76px, 0) rotate(140deg) scale(1); }
+}
+@keyframes lv-celebration-mid {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg) scale(0.4); }
+  14% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(0, -94px, 0) rotate(-170deg) scale(1); }
+}
+@keyframes lv-celebration-far {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg) scale(0.4); }
+  14% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(0, -112px, 0) rotate(210deg) scale(0.9); }
+}
+
+/* The celebration is SAID under reduced motion (the heading, the character's
+   face, its fade onto the stage); it is not performed. A burst of pieces
+   flying outwards is precisely the motion the preference asks to remove. */
+@media (prefers-reduced-motion: reduce) {
+  .lv-celebration__burst { display: none; }
+}
+
+/*
+  THE POSE WRAPPER. The character's POSITION is the transform on
+  `.lv-app-intro__character`, written by AppIntro alone. Its ENTRANCES (the pop
+  and hops onto the order stage, character/entrance.ts) animate this wrapper
+  instead, whose resting transform is the identity — so the two never fight
+  over one property. The pivot is set inline from `ENTRANCE_ORIGIN`.
+*/
+.lv-app-intro__pose { width: 100%; height: 100%; }
 .lv-character-bottom-home { display: grid; place-items: center; width: var(--lv-home-hit); height: var(--lv-home-hit); }
 .lv-character-fallback { color: var(--color-text-secondary); font-size: 24px; font-weight: 800; }
 .lv-character-home { display: grid; place-items: center; width: var(--lv-header-hit); height: var(--lv-header-hit); border-radius: 8px; }

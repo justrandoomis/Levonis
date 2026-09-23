@@ -41,6 +41,10 @@ interface SidebarItem {
    *  routes, permissions or the stable data-tab hooks. */
   section?: string;
   sectionLabel?: string;
+  /** How many things behind this entry are waiting on the person reading the
+   *  sidebar (the support console's queues, for one). Zero or absent draws
+   *  nothing; a count nobody can act on is a count people learn to ignore. */
+  badge?: number;
 }
 
 function sidebarSections(items: SidebarItem[]): Array<{ id: string; label: string; items: SidebarItem[] }> {
@@ -330,8 +334,18 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                         : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
                     }`}
                   >
-                    <item.icon className="w-5 h-5 shrink-0" />
+                    <span className="relative shrink-0">
+                      <item.icon className="w-5 h-5 shrink-0" />
+                      {collapsed && !!item.badge && (
+                        <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-sky-400 ring-2 ring-[#18181b]" aria-hidden="true" />
+                      )}
+                    </span>
                     {!collapsed && <span className="text-[13px] truncate min-w-0">{item.label}</span>}
+                    {!!item.badge && (
+                      <span className={`${collapsed ? 'sr-only' : 'ms-auto shrink-0 min-w-5 rounded-full bg-sky-500/20 px-1.5 text-center text-[11px] font-bold tabular-nums text-sky-300'}`}>
+                        {item.badge}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -638,6 +652,11 @@ function MobileDrawer({
                   >
                     <item.icon className="w-5 h-5 shrink-0" />
                     <span className="text-sm truncate min-w-0">{item.label}</span>
+                    {!!item.badge && (
+                      <span className="ms-auto shrink-0 min-w-5 rounded-full bg-sky-500/20 px-1.5 text-center text-[11px] font-bold tabular-nums text-sky-300">
+                        {item.badge}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
