@@ -18,7 +18,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { asD1, freshDb } from './fixtures/app';
+import { asD1, dbThrough, freshDb } from './fixtures/app';
+import { runDurableJobs } from '../worker/lib/jobs';
+import { rewriteHashtag } from '../worker/lib/hashtags';
+import type { Env } from '../worker/lib/types';
 import { normalizeText, tokenize } from '../worker/lib/search/normalize';
 import { collapseSpelledLetters, romanize } from '../worker/lib/search/translit';
 import { boundedDistance, editBudget } from '../worker/lib/search/match';
@@ -463,6 +466,140 @@ test('deleting a product takes its index rows with it', async () => {
     n: number;
   };
   assert.equal(left.n, 0, 'ON DELETE CASCADE, like every other product-scoped table');
+});
+
+// =========================================================================
+// TWO WRITERS, ONE INDEX
+//
+// A product save writes the index rows; the cron backfill writes them for
+// everything that predates migration 0089; a hashtag rename rewrites the tag
+// arrays under both. Every one of those is a writer of the SAME index, and
+// the moment they disagree about what a document contains, whether a product
+// can be found depends on which of them happened to touch it last. These
+// cases are here because two of them did disagree, and real products were
+// unfindable for it.
+// =========================================================================
+
+/** One product row as the catalogue actually stores it: the option and colour
+ *  names live in the JSON mirror, never in a name column. */
+function seed(
+  raw: Raw,
+  id: string,
+  name: string,
+  over: { hashtags?: string[]; options?: unknown[]; colors?: unknown[] } = {}
+): void {
+  raw
+    .prepare(
+      `INSERT INTO products (id, slug, name, description, price_iqd, status, hashtags, options, colors)
+         VALUES (?, ?, ?, '', 1000, 'active', ?, ?, ?)`
+    )
+    .run(
+      id,
+      id,
+      name,
+      JSON.stringify(over.hashtags ?? []),
+      JSON.stringify(over.options ?? []),
+      JSON.stringify(over.colors ?? [])
+    );
+}
+
+const cron = (db: D1Database) => runDurableJobs({ DB: db } as unknown as Env);
+
+test('the CRON BACKFILL indexes option and colour names, exactly as a save does', async () => {
+  /**
+   * «كومبو» is an OPTION name on this shop's products — "X2D Combo" is a
+   * selection under "Bambu Lab X2D", not a product of its own — and the
+   * acceptance case above pins it. The save path passed those names to the
+   * document; the backfill built its own document and passed none, so every
+   * product the owner had not re-saved by hand since the index shipped was
+   * indexed WITHOUT the one word half of them are sold under. Both now go
+   * through the same builder, which is the only thing that keeps them equal.
+   */
+  const raw = freshDb();
+  const db = asD1(raw);
+  seed(raw, 'p_x2d', 'Bambu Lab X2D 3D Printer', {
+    hashtags: ['x2d', 'bambu-lab'],
+    options: [{ id: 'opt_combo', name_en: 'Combo', name_ar: '', name_ckb: '' }],
+    colors: [{ id: 'col_jade', name_en: 'Jade White', name_ar: '', name_ckb: '' }],
+  });
+
+  const report = await cron(db);
+  assert.deepEqual(report.errors, [], 'the backfill step ran clean');
+  assert.equal(report.search_indexed, 1);
+
+  assert.deepEqual((await searchProducts(db, 'كومبو')).ids, ['p_x2d'], 'the option name, romanised');
+  assert.deepEqual((await searchProducts(db, 'combo')).ids, ['p_x2d']);
+  assert.deepEqual((await searchProducts(db, 'jade white')).ids, ['p_x2d'], 'and the colour name');
+  // The option name is a MODEL match, not a name match: it must not outweigh
+  // the product's own name, which is what the field weights are for.
+  assert.equal(
+    (await searchProducts(db, 'bambu')).ids[0],
+    'p_x2d',
+    'and none of that displaced what was already indexed'
+  );
+});
+
+test('RENAMING A HASHTAG reindexes the products it rewrote, in the same batch', async () => {
+  /**
+   * Hashtags are weight 5 — the index's own header calls this shop's tags
+   * among the best signals it has. `UPDATE products SET hashtags` on its own
+   * left `search_tokens` carrying the OLD tag for ever and never taught it
+   * the new one: the shop stayed findable only under a word that no longer
+   * exists anywhere a shopper can see it.
+   */
+  const raw = freshDb();
+  const db = asD1(raw);
+  seed(raw, 'p_x2d', 'Bambu Lab X2D 3D Printer', { hashtags: ['x2d', 'multi-material'] });
+  seed(raw, 'p_pla', 'PLA Basic Filament', { hashtags: ['pla'] });
+  await cron(db);
+  assert.deepEqual((await searchProducts(db, 'material')).ids, ['p_x2d'], 'the tag is indexed to begin with');
+
+  assert.equal(await rewriteHashtag(db, 'multi-material', 'mmu'), 1);
+
+  assert.deepEqual(
+    JSON.parse(String((raw.prepare("SELECT hashtags FROM products WHERE id = 'p_x2d'").get() as { hashtags: string }).hashtags)),
+    ['x2d', 'mmu'],
+    'the product array is rewritten, as it always was'
+  );
+  assert.deepEqual((await searchProducts(db, 'material')).ids, [], 'and the old tag is GONE from the index');
+  assert.deepEqual((await searchProducts(db, 'mmu')).ids, ['p_x2d'], 'and the new one is in it');
+  assert.deepEqual(
+    (await searchProducts(db, 'bambu')).ids,
+    ['p_x2d'],
+    'the rest of the document survived the rewrite — this replaces rows, it does not thin them'
+  );
+  assert.deepEqual((await searchProducts(db, 'pla')).ids, ['p_pla'], 'and a product the rename never touched is untouched');
+});
+
+test('DELETING A HASHTAG takes the word out of the index too', async () => {
+  const raw = freshDb();
+  const db = asD1(raw);
+  seed(raw, 'p_a1', 'Bambu Lab A1 3D Printer', { hashtags: ['a1', 'fdm'] });
+  await cron(db);
+  assert.deepEqual((await searchProducts(db, 'fdm')).ids, ['p_a1']);
+
+  assert.equal(await rewriteHashtag(db, 'fdm', null), 1);
+  assert.deepEqual((await searchProducts(db, 'fdm')).ids, [], 'a tag removed everywhere is a word the index must forget');
+  assert.deepEqual((await searchProducts(db, 'bambu')).ids, ['p_a1'], 'the product itself is still findable');
+});
+
+test('a hashtag rename still works on a database that has not run 0089', async () => {
+  /**
+   * The same window `searchIndexInstalled` exists for on the save path: one of
+   * this shop's two deploy paths ships a Worker without applying migrations.
+   * An admin who cannot rename a tag because of a search index they never
+   * asked about is the failure being prevented; the backfill cron indexes the
+   * product as soon as the table lands.
+   */
+  const raw = dbThrough('0088');
+  const db = asD1(raw);
+  seed(raw, 'p_x2d', 'Bambu Lab X2D 3D Printer', { hashtags: ['x2d', 'multi-material'] });
+
+  assert.equal(await rewriteHashtag(db, 'multi-material', 'mmu'), 1);
+  assert.deepEqual(
+    JSON.parse(String((raw.prepare("SELECT hashtags FROM products WHERE id = 'p_x2d'").get() as { hashtags: string }).hashtags)),
+    ['x2d', 'mmu']
+  );
 });
 
 // =========================================================================

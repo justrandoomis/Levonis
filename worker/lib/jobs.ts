@@ -30,8 +30,7 @@ import {
 } from './stockAlerts';
 import { runGuardedMediaCleanup } from './mediaRefs';
 import { checkSchemaDrift, type DriftAlarmReport } from './schemaDriftAlarm';
-import { planSearchIndex, searchIndexInstalled } from './search/store';
-import { toSearchDoc } from './search/document';
+import { planSearchIndex, searchDocColumns, searchDocsForRows, searchIndexInstalled } from './search/store';
 
 /**
  * Durable scheduled jobs (final-phase §11): one entrypoint the Worker wires
@@ -307,8 +306,7 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     // operator looks for real failures.
     if (!(await searchIndexInstalled(env.DB))) return;
     const { results } = await env.DB.prepare(
-      `SELECT p.id, p.name, p.name_ar, p.name_ku, p.description, p.hashtags, p.sku, p.brand_id,
-              p.category_id, p.sub_category_id
+      `SELECT ${searchDocColumns('p')}
          FROM products p
         WHERE p.status = 'active'
           AND NOT EXISTS (SELECT 1 FROM search_tokens t WHERE t.product_id = p.id)
@@ -317,43 +315,14 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
     ).all<Record<string, unknown>>();
     if (!results || results.length === 0) return;
 
-    const nameIds = [
-      ...new Set(
-        results.flatMap((r) => [r.brand_id, r.category_id, r.sub_category_id]).filter((x): x is string => typeof x === 'string' && x !== '')
-      ),
-    ];
-    const names = new Map<string, string>();
-    if (nameIds.length > 0) {
-      const ph = nameIds.map(() => '?').join(',');
-      const { results: rows } = await env.DB.prepare(
-        `SELECT id, COALESCE(NULLIF(name_en,''), name_ar) AS n FROM brands WHERE id IN (${ph})
-         UNION ALL
-         SELECT id, COALESCE(NULLIF(name_en,''), name_ar) AS n FROM catalogs WHERE id IN (${ph})`
-      )
-        .bind(...nameIds, ...nameIds)
-        .all<{ id: string; n: string }>();
-      for (const r of rows ?? []) names.set(String(r.id), String(r.n ?? ''));
-    }
-
+    // THE SAME DOCUMENT THE SAVE PATH WRITES, from the same builder. This
+    // step used to compose its own, and the copy it composed had no
+    // `variantNames` — so a product the cron indexed carried no option or
+    // colour names, and «كومبو» (an OPTION name here, never part of a product
+    // name) found only the products the owner had re-saved by hand since the
+    // index shipped. Two writers of one index must not be two documents.
     const stmts: D1PreparedStatement[] = [];
-    for (const r of results) {
-      stmts.push(
-        ...planSearchIndex(
-          env.DB,
-          toSearchDoc({
-            id: String(r.id),
-            name: r.name,
-            name_ar: r.name_ar,
-            name_ku: r.name_ku,
-            description: r.description,
-            hashtags: r.hashtags,
-            sku: r.sku,
-            brandName: names.get(String(r.brand_id ?? '')) ?? null,
-            categoryNames: [names.get(String(r.category_id ?? '')) ?? '', names.get(String(r.sub_category_id ?? '')) ?? ''].filter(Boolean),
-          })
-        )
-      );
-    }
+    for (const doc of await searchDocsForRows(env.DB, results)) stmts.push(...planSearchIndex(env.DB, doc));
     if (stmts.length > 0) await env.DB.batch(stmts);
     report.search_indexed = results.length;
   });

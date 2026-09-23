@@ -78,3 +78,49 @@ export function toSearchDoc(p: IndexableProduct): SearchDoc {
     },
   };
 }
+
+/** An array column that holds objects, read defensively: it is the JSON
+ *  mirror on `products`, written by the save path and by nothing else. */
+function objectList(v: unknown): Record<string, unknown>[] {
+  const arr: unknown = Array.isArray(v)
+    ? v
+    : typeof v === 'string' && v.trim().startsWith('[')
+      ? (() => {
+          try {
+            return JSON.parse(v) as unknown;
+          } catch {
+            return [];
+          }
+        })()
+      : [];
+  return Array.isArray(arr) ? arr.filter((x): x is Record<string, unknown> => !!x && typeof x === 'object') : [];
+}
+
+/**
+ * The option and colour names of a stored product row — `variantNames` for
+ * `toSearchDoc`, read straight out of the `options` / `colors` JSON mirror.
+ *
+ * WHY THIS EXISTS AT ALL. «كومبو» is an OPTION name on this shop's products,
+ * not part of any product's name: "X2D Combo" is a selection under
+ * "Bambu Lab X2D". A document built without these finds nothing for it. The
+ * product save path had them and the cron backfill did not, so every product
+ * the owner had not re-saved since the index landed was unfindable by the one
+ * word half of them are sold under. One reader now, used by both.
+ *
+ * THE LEGACY SPELLINGS ARE READ TOO (`name`, `name_ku`). They are what
+ * `upgradeOptions` falls back to for a row written before 0055 named the
+ * three languages apart — and a backfill exists precisely for the rows nobody
+ * has re-saved since, which are the rows most likely to be in the old shape.
+ * Nothing is translated or invented here: only what is written down is
+ * indexed.
+ */
+export function variantNamesFrom(options: unknown, colors: unknown): string[] {
+  const out: string[] = [];
+  for (const item of [...objectList(options), ...objectList(colors)]) {
+    for (const key of ['name_en', 'name_ar', 'name_ckb', 'name', 'name_ku']) {
+      const v = item[key];
+      if (typeof v === 'string' && v.trim() !== '') out.push(v);
+    }
+  }
+  return out;
+}

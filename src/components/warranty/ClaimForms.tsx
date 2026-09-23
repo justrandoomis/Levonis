@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Paperclip, X } from 'lucide-react';
 import type { Language } from '../../translations';
-import { api, ApiError, uploadTimeoutMs } from '../../lib/api';
+import { api, ApiError, newIdempotencyKey, uploadTimeoutMs } from '../../lib/api';
 import { Overlay } from '../ui/Overlay';
 import type { Attachment, Device } from './types';
 import { productName } from './types';
@@ -9,12 +9,21 @@ import type { WarrantyStrings } from './strings';
 import { BTN_PRIMARY, ERROR_BOX, FOCUS, INPUT } from './ui';
 
 /**
- * The two claim forms. Both are `Overlay`, not `Sheet`: a drag-to-dismiss
- * gesture over a form with typed text and freshly uploaded evidence is a way
- * to lose work, not a way to close a window. Each grows out of the control
- * that raised it (`anchor`) so, in a stack of near-identical device cards,
- * the window itself says which printer it is about. The scrim is inert for
- * the same reason; Escape and the X close.
+ * The claim form. `Overlay`, not `Sheet`: a drag-to-dismiss gesture over a
+ * form with typed text and freshly uploaded evidence is a way to lose work,
+ * not a way to close a window. It grows out of the control that raised it
+ * (`anchor`) so, in a stack of near-identical device cards, the window itself
+ * says which printer it is about. The scrim is inert for the same reason;
+ * Escape and the X close.
+ *
+ * THERE WAS A SECOND FORM HERE, AND THE OWNER REMOVED IT: «يحذف — فالضمان
+ * للطابعات فقط». `LegacyClaimOverlay` raised «منتج غير مرتبط كطابعة؟ قدّم
+ * مطالبة عامة» and posted the free-form claim at POST
+ * /api/profile/warranty-claims. Only the AFFORDANCE is gone. That route still
+ * exists and is not sealed: it is the only writer of `warranty_claims` rows
+ * with `unit_id IS NULL`, and both GET /api/devices/claims and the admin queue
+ * LIST those rows — the general claims customers already filed must stay
+ * visible and answerable. Nothing new opens one.
  */
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,video/mp4';
@@ -78,6 +87,24 @@ export function DeviceClaimOverlay({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  /**
+   * ONE KEY PER OPEN — the overlay's half of the replay guard the route
+   * describes (worker/routes/devices.ts, POST /units/:unitId/claims).
+   *
+   * `busy` above stops a second press only while the first request is still
+   * in flight; it releases the moment that request settles, so a customer
+   * whose submit appeared to fail pressed send again and got two claims about
+   * one printer. The key is what makes the retry land back on the claim
+   * already recorded.
+   *
+   * It is seeded HERE, where the form resets, and not at mount and not per
+   * keystroke: this effect runs on every OPEN of the window, which is exactly
+   * the boundary the route asks for. A key that outlived the overlay would
+   * silently replay the first claim instead of recording a genuine SECOND
+   * claim on the same printer — a worse bug than the duplicate it removes —
+   * and a key reminted per keystroke or per press would guard nothing at all.
+   */
+  const claimKey = useRef('');
   const unitId = device?.unit_id ?? null;
   useEffect(() => {
     // A fresh form for every device the window opens on.
@@ -86,6 +113,7 @@ export function DeviceClaimOverlay({
       setDescription('');
       setAttachments([]);
       setError('');
+      claimKey.current = newIdempotencyKey();
     }
   }, [unitId]);
 
@@ -137,6 +165,7 @@ export function DeviceClaimOverlay({
         subject: subject.trim(),
         description: description.trim(),
         attachments: attachments.map((a) => a.key),
+        idempotencyKey: claimKey.current,
       });
       onSubmitted();
       onClose();
@@ -253,107 +282,6 @@ export function DeviceClaimOverlay({
             )}
           </div>
           <button type="submit" disabled={busy || uploadBusy} className={`${BTN_PRIMARY} w-full`}>
-            {busy ? s.submitting : s.submit}
-          </button>
-        </form>
-      </div>
-    </Overlay>
-  );
-}
-
-// ------------------------------------------------------- legacy claim form
-
-export function LegacyClaimOverlay({
-  open,
-  anchor,
-  s,
-  onClose,
-  onSubmitted,
-}: {
-  open: boolean;
-  anchor: React.RefObject<HTMLElement | null>;
-  s: WarrantyStrings;
-  onClose: () => void;
-  onSubmitted: () => void;
-}) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (open) setError('');
-  }, [open]);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (busy) return;
-    setBusy(true);
-    setError('');
-    try {
-      const productName = name.trim();
-      // The route reads `productName`; `product_name` is sent too so either
-      // spelling of the contract is satisfied.
-      await api.post('/api/profile/warranty-claims', { productName, product_name: productName, description: description.trim() });
-      setName('');
-      setDescription('');
-      onSubmitted();
-      onClose();
-    } catch (e2) {
-      setError(e2 instanceof ApiError ? e2.message : s.error);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Overlay
-      open={open}
-      onClose={onClose}
-      labelledBy="warranty-legacy-claim-title"
-      anchor={anchor}
-      dismissOnScrim={false}
-      z={60}
-      testId="warranty-legacy-claim"
-      panelClassName="w-full max-w-md max-h-[90vh] overflow-y-auto"
-    >
-      <div className="p-6">
-        <CloseX onClick={onClose} label={s.close} />
-        <h2 id="warranty-legacy-claim-title" className="text-white text-lg font-bold mb-4 pe-10">
-          {s.newClaimTitle}
-        </h2>
-        <form onSubmit={submit} className="space-y-4">
-          {error && (
-            <div role="alert" className={ERROR_BOX}>
-              {error}
-            </div>
-          )}
-          <Field id="warranty-legacy-name" label={s.productName}>
-            <input
-              id="warranty-legacy-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              minLength={2}
-              maxLength={200}
-              required
-              autoComplete="off"
-              className={INPUT}
-            />
-          </Field>
-          <Field id="warranty-legacy-description" label={s.description}>
-            <textarea
-              id="warranty-legacy-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              minLength={10}
-              maxLength={3000}
-              required
-              rows={4}
-              placeholder={s.descriptionPh}
-              className={`${INPUT} resize-none`}
-            />
-          </Field>
-          <button type="submit" disabled={busy} className={`${BTN_PRIMARY} w-full`}>
             {busy ? s.submitting : s.submit}
           </button>
         </form>

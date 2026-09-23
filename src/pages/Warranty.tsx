@@ -11,7 +11,7 @@ import { fmtInt } from '../components/warranty/types';
 import { AddDevicePanel } from '../components/warranty/AddDevicePanel';
 import { DeviceCard } from '../components/warranty/DeviceCard';
 import { ClaimCard } from '../components/warranty/ClaimCard';
-import { DeviceClaimOverlay, LegacyClaimOverlay } from '../components/warranty/ClaimForms';
+import { DeviceClaimOverlay } from '../components/warranty/ClaimForms';
 import { ClaimThreadOverlay } from '../components/warranty/ClaimThreadOverlay';
 import { UnlinkSheet } from '../components/warranty/UnlinkSheet';
 import { CARD, FOCUS, OK_BOX } from '../components/warranty/ui';
@@ -27,8 +27,14 @@ import { CARD, FOCUS, OK_BOX } from '../components/warranty/ui';
  *   3. "My printers" — one card per unit with the coverage timeline and the
  *      actions that belong to a unit (claim, support, receipt, order, and
  *      "remove from my account" behind a confirmation sheet);
- *   4. "My claims" — the claims list, the thread, the per-device claim form
- *      and the legacy free-form claim for products never linked as a device.
+ *   4. "My claims" — the claims list, the thread and the per-device claim form.
+ *
+ * THE FREE-FORM «مطالبة عامة» LINK IS GONE BY THE OWNER'S DECISION: «يحذف —
+ * فالضمان للطابعات فقط». Warranty is for printers, so the only way to open a
+ * claim is from a linked device. The route behind the old link is untouched —
+ * the general claims already filed have `unit_id IS NULL`, and the list above
+ * and the admin queue both still show and answer them; there is simply no
+ * longer a control that files a new one.
  *
  * Every window is the house Overlay/Sheet: it arrives from the control that
  * raised it and leaves the same way. Data flows one way — the server says what
@@ -68,10 +74,8 @@ export default function Warranty() {
   // near-identical rows, so the origin of the arrival is what says which row
   // is being acted on while the window is on its way in.
   const claimAnchor = useRef<HTMLElement | null>(null);
-  const legacyAnchor = useRef<HTMLElement | null>(null);
   const threadAnchor = useRef<HTMLElement | null>(null);
   const [claimForDevice, setClaimForDevice] = useState<Device | null>(null);
-  const [showLegacy, setShowLegacy] = useState(false);
   const [openClaimId, setOpenClaimId] = useState<string | null>(null);
 
   const [unlinkDevice, setUnlinkDevice] = useState<Device | null>(null);
@@ -327,16 +331,6 @@ export default function Warranty() {
               ))}
             </div>
           )}
-          <button
-            type="button"
-            onClick={(e) => {
-              legacyAnchor.current = e.currentTarget;
-              setShowLegacy(true);
-            }}
-            className={`text-[12px] text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors rounded min-h-[32px] ${FOCUS}`}
-          >
-            {s.legacyClaimLink}
-          </button>
         </section>
       </div>
 
@@ -349,7 +343,6 @@ export default function Warranty() {
         onClose={() => setClaimForDevice(null)}
         onSubmitted={onClaimSubmitted}
       />
-      <LegacyClaimOverlay open={showLegacy} anchor={legacyAnchor} s={s} onClose={() => setShowLegacy(false)} onSubmitted={onClaimSubmitted} />
       <ClaimThreadOverlay claimId={openClaimId} anchor={threadAnchor} lang={lang} s={s} onClose={() => setOpenClaimId(null)} />
       <UnlinkSheet
         device={unlinkDevice}

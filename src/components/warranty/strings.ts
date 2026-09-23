@@ -114,8 +114,6 @@ export interface WarrantyStrings {
   removeAttachment: string;
   decisionReason: string;
   adminNote: string;
-  legacyClaimLink: string;
-  productName: string;
   priorityBadge: string;
   stageLabels: Record<string, string>;
   decisionStep: string;
@@ -229,8 +227,6 @@ const ar: WarrantyStrings = {
   removeAttachment: 'إزالة المرفق',
   decisionReason: 'سبب القرار',
   adminNote: 'ملاحظة الفريق',
-  legacyClaimLink: 'منتج غير مرتبط كطابعة؟ قدّم مطالبة عامة',
-  productName: 'اسم المنتج',
   priorityBadge: 'أولوية PRO',
   stageLabels: {
     received: 'مُستلَمة',
@@ -347,8 +343,6 @@ const en: WarrantyStrings = {
   removeAttachment: 'Remove attachment',
   decisionReason: 'Decision reason',
   adminNote: 'Team note',
-  legacyClaimLink: 'Product not linked as a printer? Submit a general claim',
-  productName: 'Product name',
   priorityBadge: 'PRO priority',
   stageLabels: {
     received: 'Received',
@@ -465,8 +459,6 @@ const ckb: WarrantyStrings = {
   removeAttachment: 'لابردنی هاوپێچ',
   decisionReason: 'هۆکاری بڕیار',
   adminNote: 'تێبینی تیم',
-  legacyClaimLink: 'بەرهەمەکە وەک پرینتەر نەبەستراوە؟ داواکاری گشتی پێشکەش بکە',
-  productName: 'ناوی بەرهەم',
   priorityBadge: 'پێشینەی PRO',
   stageLabels: {
     received: 'وەرگیراوە',

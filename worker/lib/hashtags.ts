@@ -9,13 +9,19 @@
  *   registerHashtags   a product save or import adds its tags to the table
  *                      (INSERT OR IGNORE — never a failure for the save)
  *   rewriteHashtag     a rename or removal in the admin rewrites every
- *                      product array that carries the tag
+ *                      product array that carries the tag — and reindexes
+ *                      those products in the same batch, because hashtags are
+ *                      weight 5 in the search index and a rewritten array the
+ *                      index never heard about is a shop findable only under
+ *                      a tag that no longer exists
  *   hashtagUsage       counts, so the admin sees what deleting would touch
  *
  * Tags keep the spelling they were typed with; equality is case-insensitive
  * ("PLA" and "pla" are one tag), which is what the UNIQUE NOCASE index on the
  * table enforces too.
  */
+
+import { planSearchIndex, searchDocColumns, searchDocsForRows, searchIndexInstalled } from './search/store';
 
 /**
  * `#My Tag ` -> `My-Tag`; the same rule the product form applies.
@@ -174,15 +180,64 @@ export async function rewriteHashtag(db: D1Database, from: string, to: string | 
   if (!fromKey) return 0;
   const target = to === null ? null : normalizeHashtag(to);
   const { results } = await db.prepare(TAGGED_PRODUCTS).all<{ id: string; hashtags: string }>();
-  const updates: D1PreparedStatement[] = [];
+  const changed: Array<{ id: string; hashtags: string }> = [];
   for (const row of results) {
     const tags = parseHashtagsCell(row.hashtags);
     if (!tags.some((t) => t.toLowerCase() === fromKey)) continue;
     const next = dedupeHashtags(
       tags.flatMap((t) => (t.toLowerCase() === fromKey ? (target ? [target] : []) : [t]))
     );
-    updates.push(db.prepare('UPDATE products SET hashtags = ? WHERE id = ?').bind(JSON.stringify(next), row.id));
+    changed.push({ id: String(row.id), hashtags: JSON.stringify(next) });
   }
-  for (let i = 0; i < updates.length; i += 50) await db.batch(updates.slice(i, i + 50));
-  return updates.length;
+  if (changed.length === 0) return 0;
+
+  /**
+   * AND THE SEARCH INDEX, IN THE SAME BATCH AS THE UPDATE.
+   *
+   * A hashtag is weight 5 — the search index's own header calls this shop's
+   * tags among the best signals it has, because the owner writes them by hand
+   * as the exact words a customer would type. `UPDATE products SET hashtags`
+   * alone left `search_tokens` holding the OLD tag for ever and never taught
+   * it the new one: rename `#x2d-combo` and the shop stays findable only
+   * under a tag that no longer exists anywhere the shopper can see, while the
+   * one the admin just typed finds nothing. Deleting a tag was worse — the
+   * word stayed in the index after it was gone from every product.
+   *
+   * The rows are read and the documents built with the NEW array already
+   * substituted in, so what the index describes is the row that is landing
+   * beside it rather than the one being replaced; and both statements go into
+   * one `batch`, for the same reason the product save path does it — an index
+   * written in a second transaction is an index that disagrees with the
+   * catalogue every time the second one fails.
+   *
+   * ONLY WHEN THE TABLE IS THERE. A Worker reaches production without its
+   * migrations on one of this shop's two deploy paths, and an admin who
+   * cannot rename a tag because of a search index they never asked about is
+   * the same failure the save path guards against. The backfill cron picks
+   * the product up once the migration lands.
+   */
+  const reindex = await searchIndexInstalled(db);
+  const nextById = new Map(changed.map((c) => [c.id, c.hashtags]));
+  // Chunked by PRODUCT, not by statement: a product's UPDATE and its own index
+  // rows have to be in one batch for either of them to mean anything.
+  for (let i = 0; i < changed.length; i += 50) {
+    const chunk = changed.slice(i, i + 50);
+    const stmts = chunk.map((c) =>
+      db.prepare('UPDATE products SET hashtags = ? WHERE id = ?').bind(c.hashtags, c.id)
+    );
+    if (reindex) {
+      const ph = chunk.map(() => '?').join(',');
+      const { results: rows } = await db
+        .prepare(`SELECT ${searchDocColumns()} FROM products WHERE id IN (${ph})`)
+        .bind(...chunk.map((c) => c.id))
+        .all<Record<string, unknown>>();
+      const docs = await searchDocsForRows(
+        db,
+        (rows ?? []).map((r) => ({ ...r, hashtags: nextById.get(String(r.id)) ?? r.hashtags }))
+      );
+      for (const doc of docs) stmts.push(...planSearchIndex(db, doc));
+    }
+    await db.batch(stmts);
+  }
+  return changed.length;
 }

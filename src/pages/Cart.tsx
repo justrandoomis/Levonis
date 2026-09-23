@@ -1671,18 +1671,62 @@ export default function Cart() {
                            * do next.
                            */
                           if (lineBlocked(item) && !item.composition) {
-                            const soldOut = item.availability?.mode === 'unavailable' || rem?.left === 0;
+                            /**
+                             * «ألوان الحجز المسبق تظهر نفد» — THE SAME UNTRUTH, IN THE CART.
+                             *
+                             * «نفد المخزون» is a verdict about a SHELF, and a
+                             * pre-order does not come off one: it consumes the
+                             * IMPORT QUOTA 0075 put on the fulfilment cell and
+                             * its routes. A full quota is a different wait —
+                             * another route, or later — not an empty shop, so
+                             * printing the shelf's sentence over it refuses an
+                             * order the door would still have taken and tells
+                             * the customer to give up on a product that is
+                             * there. The product page was taught this
+                             * (`levelChip` prints no shelf verdict under
+                             * «طلب مسبق»); this line was not.
+                             *
+                             * WHICH COUNTER PRODUCED THE ZERO is already
+                             * answered twice over and neither answer was read:
+                             * `lineRemaining` marks its figure `preorder` when
+                             * the quota is what it counted, and the server
+                             * names the counter that closed in
+                             * `availability.reason`. Both are consulted,
+                             * because they arrive on different lines — a
+                             * tracked quota at zero still resolves to
+                             * `mode: 'preorder'`, while an exhausted route
+                             * resolves to `mode: 'unavailable'` with the code.
+                             *
+                             * THE SENTENCE IS NOT A NEW ONE. It is the Arabic
+                             * `stockRefusal` already prints for this code at
+                             * the cart and checkout doors
+                             * (src/lib/refusalStrings.ts), so every screen
+                             * says one thing about one counter. No Sorani is
+                             * invented: `loc` falls back to the Arabic, which
+                             * is the documented choice for every 0075 sentence
+                             * in this file and in `counterNamed` above.
+                             */
+                            const quotaFull =
+                              item.availability?.reason === 'PREORDER_CAPACITY_EXHAUSTED' ||
+                              (rem?.preorder === true && rem.left === 0);
+                            const soldOut =
+                              !quotaFull && (item.availability?.mode === 'unavailable' || rem?.left === 0);
                             return (
                               <span className="text-danger text-[12px] font-medium" data-line-blocked={item.id}>
-                                {soldOut
-                                  ? loc('نفد المخزون', 'Out of stock', 'کۆگا بەتاڵە')
-                                  : typeof cap === 'number'
-                                    ? loc(
-                                        `بقي ${cap} فقط — قلّل الكمية`,
-                                        `Only ${cap} left — lower the quantity`,
-                                        `تەنها ${cap} ماوە — بڕەکە کەم بکەرەوە`
-                                      )
-                                    : loc('الكمية المطلوبة غير متوفرة', 'That quantity is not available', 'ئەو بڕە بەردەست نییە')}
+                                {quotaFull
+                                  ? loc(
+                                      'اكتملت حصة الطلب المسبق لهذا الاختيار — وهذا ليس نفادًا للمخزون.',
+                                      'The pre-order quota for this selection is full — this is not a sold-out shelf.'
+                                    )
+                                  : soldOut
+                                    ? loc('نفد المخزون', 'Out of stock', 'کۆگا بەتاڵە')
+                                    : typeof cap === 'number'
+                                      ? loc(
+                                          `بقي ${cap} فقط — قلّل الكمية`,
+                                          `Only ${cap} left — lower the quantity`,
+                                          `تەنها ${cap} ماوە — بڕەکە کەم بکەرەوە`
+                                        )
+                                      : loc('الكمية المطلوبة غير متوفرة', 'That quantity is not available', 'ئەو بڕە بەردەست نییە')}
                               </span>
                             );
                           }

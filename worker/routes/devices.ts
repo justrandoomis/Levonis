@@ -57,7 +57,7 @@ import {
   str,
   int,
 } from '../lib/http';
-import { newId } from '../lib/crypto';
+import { newId, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit, rateLimitKey } from '../lib/ratelimit';
 import { getTierStatus, benefits } from '../lib/entitlements';
@@ -523,6 +523,7 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const subject = str(body.subject, 'subject', { min: 3, max: 200 });
   const description = str(body.description, 'description', { min: 10, max: 5000 });
+  const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80, required: false });
 
   const unit = await c.env.DB.prepare(
     `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u.owner_user_id, u.unit_index,
@@ -561,14 +562,95 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
     attachments.push(k);
   }
 
-  const id = newId('wc');
+  /**
+   * ONE PRESS, ONE CLAIM — «مطالبة الضمان … وتتكرر عند إعادة الإرسال».
+   *
+   * THE SAME DEFECT AS THE GENERAL CLAIM, AND THE SAME FIX. The reasoning is
+   * written out in full at POST /warranty-claims in worker/routes/profile.ts
+   * and is not repeated here; what matters is that this route — the FORMAL
+   * claim, the one with stages and evidence — was left with none of it.
+   * `rateLimit` above permits ten claims an hour, which is a flood limit and
+   * not an identity, and the overlay's own `if (busy) return` only blocks a
+   * second press while the first request is still in flight. A customer whose
+   * POST appeared to fail pressed send again, which is the reasonable thing to
+   * do, and got two claims and two conversations about one broken printer.
+   *
+   * SCOPED BY USER, INSIDE THE ID ITSELF. The id is DERIVED — `wc_` plus the
+   * first 20 hex digits of SHA-256 over the caller's id and the key — so the
+   * caller's own id is part of the preimage and this table's PRIMARY KEY
+   * already IS the per-user unique index migration 0064's guarantee requires.
+   * Two accounts carrying an identical key land on two different rows. NEVER
+   * hash the key on its own: that is the global uniqueness 0064 exists to
+   * remove, rebuilt by hand.
+   *
+   * THE RACE IS CLOSED BY THE DATABASE. `ON CONFLICT(id) DO NOTHING` plus
+   * `meta.changes === 0` is the entire test, so two taps that arrive in the
+   * same instant cannot both win, and unlike a match on the text «UNIQUE» it
+   * cannot be confused by some other constraint on the same statement.
+   *
+   * THE KEY IS OPTIONAL, which is a deployment fact rather than a choice: a
+   * caller that sends none keeps the old random id and the old behaviour, and
+   * requiring it would 400 every browser still running the page it shipped
+   * with. The other half lives in the overlay — mint ONE key per OPEN of the
+   * form, never per mount — because a key that outlives the overlay would
+   * replay the first claim instead of recording a genuine SECOND claim on the
+   * same printer, which is worse than the duplicate it removes.
+   */
+  const id = idempotencyKey
+    ? `wc_${(await sha256Hex(`${user.id}\n${idempotencyKey}`)).slice(0, 20)}`
+    : newId('wc');
   const productName = String(unit.name_snapshot || unit.p_name_ar || unit.p_name || 'Device');
-  await c.env.DB.prepare(
+  const written = await c.env.DB.prepare(
     `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, subject, evidence, stage, status, priority)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'received', 'submitted', ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'received', 'submitted', ?) ON CONFLICT(id) DO NOTHING`
   )
     .bind(id, user.id, unit.order_item_id, productName, description, unit.id, subject, JSON.stringify(attachments), priority)
     .run();
+
+  // The coverage the customer is shown is read from the unit, so it is the
+  // same answer on a first submit and on a replay of it.
+  const cov = coverageState(unit.delivered_at, unit.warranty_end_at);
+  const warrantyFacts = {
+    // The buyer's order id is the buyer's to see; a later holder gets the
+    // coverage facts alone.
+    order_id: unit.owner_user_id === user.id ? unit.order_id : null,
+    delivered_at: unit.delivered_at,
+    warranty_end_at: unit.warranty_end_at,
+    state: cov.state,
+    remaining_days: cov.remaining_days,
+  };
+
+  /**
+   * A REPLAY IS SILENT, AND IT RETURNS BEFORE THE ANNOUNCE BELOW. The customer
+   * is shown the claim they already have, carrying the stage and the priority
+   * actually stored on it rather than a hard-coded 'received' — by the time
+   * they retry, staff may already have moved it on.
+   */
+  if (written.meta.changes === 0) {
+    const existing = await c.env.DB.prepare(
+      'SELECT id, stage, priority FROM warranty_claims WHERE id = ? AND user_id = ?'
+    )
+      .bind(id, user.id)
+      .first<{ id: string; stage: string; priority: number }>();
+    /**
+     * The replay lookup is scoped by user as well as by id, and this arm is
+     * what that scoping is FOR. A derived id taken by a row that is not this
+     * caller's is an 80-bit second preimage — not reachable by chance and not
+     * reachable by search. It says so with its own code instead of quietly
+     * retrying under a random id, because a guard that silently stops guarding
+     * is how the duplicate comes back, and instead of returning the row,
+     * because returning it would hand one customer another customer's claim.
+     */
+    if (!existing) throw conflict('That claim could not be recorded; please try again', 'CLAIM_KEY_COLLISION');
+    return c.json({
+      success: true,
+      id: existing.id,
+      stage: existing.stage,
+      priority: existing.priority === 1,
+      replay: true,
+      warranty_facts: warrantyFacts,
+    });
+  }
 
   /**
    * «تذاكر الضمان» — THE THING THE OWNER ASKED FOR BY NAME, AND THE ONE
@@ -590,6 +672,13 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
    * that they are served only through the authorized route. A key pasted into a
    * group chat is a key in everyone's screenshot.
    *
+   * ONLY ON A GENUINE INSERT, WHICH IS WHY IT SITS BELOW THE REPLAY RETURN AND
+   * NOT ABOVE THE INSERT. A replayed double-tap returned above without
+   * reaching this line; announcing before that return would put two identical
+   * messages in the owner's group for the one claim the replay guard exists to
+   * collapse — the duplicate moved from the admin queue into Telegram rather
+   * than removed.
+   *
    * Contained and after the response: the claim row has committed, and an
    * unreachable Telegram must never turn it into an error for a customer whose
    * printer is already broken.
@@ -605,20 +694,7 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
       `\nAttachments: ${attachments.length}`
   );
 
-  const cov = coverageState(unit.delivered_at, unit.warranty_end_at);
-  return c.json({
-    success: true,
-    id,
-    stage: 'received',
-    priority: priority === 1,
-    warranty_facts: {
-      order_id: unit.owner_user_id === user.id ? unit.order_id : null,
-      delivered_at: unit.delivered_at,
-      warranty_end_at: unit.warranty_end_at,
-      state: cov.state,
-      remaining_days: cov.remaining_days,
-    },
-  });
+  return c.json({ success: true, id, stage: 'received', priority: priority === 1, warranty_facts: warrantyFacts });
 });
 
 deviceRoutes.post('/claims/:id/messages', async (c) => {

@@ -7,13 +7,17 @@
  * receipts, a cancelled order issues nothing, a reprint creates no second
  * document) live in scripts/e2e-warranty.mjs against a running worker.
  *
- * ONE SECTION AT THE END IS NOT PURE, and deliberately so: the GENERAL warranty
- * claim (`POST /api/profile/warranty-claims`) is guarded by a UNIQUE constraint
- * and announced from a `waitUntil`, and neither of those is a function you can
- * call. Both are proved against the real schema through tests/fixtures/app, the
- * same harness the device claim already uses, because the two defects they pin
- * — one press producing two claims, and a claim reaching the owner's group by
- * no path at all — are invisible to anything that only reads a module.
+ * TWO SECTIONS AT THE END ARE NOT PURE, and deliberately so: both claim routes
+ * — the GENERAL claim (`POST /api/profile/warranty-claims`) and the DEVICE
+ * claim (`POST /api/devices/units/:unitId/claims`) — are guarded by a UNIQUE
+ * constraint and announced from a `waitUntil`, and neither of those is a
+ * function you can call. They are proved against the real schema through
+ * tests/fixtures/app, because the defects they pin — one press producing two
+ * claims, and a claim reaching the owner's group by no path at all, or by two
+ * — are invisible to anything that only reads a module. The two routes carry
+ * ONE guard written twice, so they are pinned in one file: a change to either
+ * that the other does not get is the duplicate coming back on the half nobody
+ * re-read.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -37,6 +41,7 @@ import { renderWarrantyDoc, type WarrantyDocData } from '../worker/lib/warrantyD
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1, stubApp, post, count, json, pending } from './fixtures/app';
 import { profileRoutes } from '../worker/routes/profile';
+import { deviceRoutes } from '../worker/routes/devices';
 
 // ------------------------------------------------------------ the number
 
@@ -538,4 +543,207 @@ test('the general claim reaches «🔥 Warranty support» — once, and without 
     tg.restore();
     raw.close();
   }
+});
+
+// ===================================================================
+// THE DEVICE CLAIM — the same guard, on the route that has the evidence
+// ===================================================================
+
+/**
+ * «مطالبة الضمان … وتتكرر عند إعادة الإرسال». The general claim above was
+ * fixed first and this route — POST /api/devices/units/:unitId/claims, the
+ * FORMAL claim with stages and up to six private attachments — was left with
+ * the identical defect: a flood limit instead of an identity, and an overlay
+ * `busy` flag that releases the instant the first request settles. It is the
+ * route the owner's customers actually use, so the duplicate the report
+ * describes was still happening after the first fix shipped.
+ *
+ * The announce is the second half, exactly as it is above: it sits BELOW the
+ * replay return, and a fix that moves it back would turn one duplicated row
+ * into two identical Telegram messages instead of removing it.
+ */
+
+const DEVICE_CLAIM = { subject: 'Nozzle clog', description: 'It stopped extruding after two prints.' };
+
+function seedDeviceClaimDb(): DatabaseSync {
+  const raw = seedWarrantyClaimDb();
+  raw.exec(`
+    INSERT INTO products (id,slug,name,price_iqd) VALUES ('p1','a1','Bambu A1',899000);
+    INSERT INTO orders (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot,
+       payment_method_id, subtotal_iqd, shipping_iqd, exchange_rate, total_iqd, due_on_delivery_iqd, delivered_at)
+     VALUES ('ORD-1','buyer','delivered','{}','standard','{}','cash',899000,0,1400,899000,0,'2026-01-04T10:00:00.000Z');
+    INSERT INTO order_items (id, order_id, product_id, name_snapshot, qty, unit_price_iqd, line_total_iqd)
+     VALUES ('oi1','ORD-1','p1','Bambu A1',1,899000,899000);
+    INSERT INTO order_item_units (id, order_id, order_item_id, product_id, owner_user_id, unit_index,
+       delivered_at, warranty_base_months, warranty_start_at, warranty_end_at)
+     VALUES ('u1','ORD-1','oi1','p1','buyer',1,'2026-01-04T10:00:00.000Z',12,'2026-01-04T10:00:00.000Z','2099-01-04T10:00:00.000Z');
+    INSERT INTO device_registrations (unit_id, user_id) VALUES ('u1','buyer');
+  `);
+  return raw;
+}
+
+const deviceApp = (raw: DatabaseSync, id: string) =>
+  stubApp(asD1(raw), { id, role: 'customer', email: `${id}@x.co` }, (a) => a.route('/api/devices', deviceRoutes), {
+    env: ENV,
+  });
+
+test('the device claim: one idempotency key is one claim, however many times send is pressed', async () => {
+  const raw = seedDeviceClaimDb();
+  try {
+    const app = deviceApp(raw, 'buyer');
+    const first = await json(await post(app, '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: KEY }));
+    const second = await json(await post(app, '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: KEY }));
+    assert.equal(second.id, first.id, JSON.stringify(second));
+    assert.equal(second.replay, true);
+    assert.equal(first.replay, undefined);
+    assert.equal(count(raw, 'SELECT COUNT(*) n FROM warranty_claims'), 1);
+    // The replay is still a full answer: the coverage facts come off the unit,
+    // so the overlay that retried shows the same claim and the same warranty.
+    assert.equal(second.warranty_facts.warranty_end_at, first.warranty_facts.warranty_end_at);
+    assert.equal(second.warranty_facts.state, first.warranty_facts.state);
+  } finally {
+    raw.close();
+  }
+});
+
+test('the device replay carries the stage actually stored, not a hard-coded «received»', async () => {
+  const raw = seedDeviceClaimDb();
+  try {
+    const app = deviceApp(raw, 'buyer');
+    const id = (await json(await post(app, '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: KEY }))).id;
+    raw.prepare("UPDATE warranty_claims SET stage='diagnosing' WHERE id = ?").run(id);
+    const replay = await json(await post(app, '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: KEY }));
+    assert.equal(replay.stage, 'diagnosing');
+  } finally {
+    raw.close();
+  }
+});
+
+test('a second, genuinely different device claim is recorded, and a client with no key still works', async () => {
+  const raw = seedDeviceClaimDb();
+  try {
+    const app = deviceApp(raw, 'buyer');
+    await post(app, '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: KEY });
+    // A new overlay-open mints a new key, even for the same printer and text.
+    const again = await json(await post(app, '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: 'idem-key-bbbbbbbb' }));
+    assert.equal(again.replay, undefined);
+    assert.equal(count(raw, 'SELECT COUNT(*) n FROM warranty_claims'), 2);
+    const none = await post(app, '/api/devices/units/u1/claims', DEVICE_CLAIM);
+    assert.equal(none.status, 200, JSON.stringify(await json(none)));
+    assert.equal(count(raw, 'SELECT COUNT(*) n FROM warranty_claims'), 3);
+  } finally {
+    raw.close();
+  }
+});
+
+test('the device key is scoped to the account, so one customer cannot spend another’s', async () => {
+  const raw = seedDeviceClaimDb();
+  try {
+    // 'other' is the account that HOLDS a device of its own; without the
+    // per-user scoping in the derived id, 'buyer' spending KEY first would
+    // deny this claim for ever.
+    raw.exec(`
+      INSERT INTO order_item_units (id, order_id, order_item_id, product_id, owner_user_id, unit_index,
+         delivered_at, warranty_base_months, warranty_start_at, warranty_end_at)
+       VALUES ('u2','ORD-1','oi1','p1','buyer',2,'2026-01-04T10:00:00.000Z',12,'2026-01-04T10:00:00.000Z','2099-01-04T10:00:00.000Z');
+      INSERT INTO device_registrations (unit_id, user_id) VALUES ('u2','other');
+    `);
+    const mine = await json(await post(deviceApp(raw, 'buyer'), '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: KEY }));
+    const theirs = await post(deviceApp(raw, 'other'), '/api/devices/units/u2/claims', { ...DEVICE_CLAIM, idempotencyKey: KEY });
+    const row2 = await json(theirs);
+    assert.equal(theirs.status, 200, JSON.stringify(row2));
+    assert.notEqual(row2.id, mine.id);
+    assert.equal(row2.replay, undefined);
+    assert.equal(count(raw, "SELECT COUNT(*) n FROM warranty_claims WHERE user_id='other'"), 1);
+  } finally {
+    raw.close();
+  }
+});
+
+test('the device claim announces once — the replay does not re-announce to «🔥 Warranty support»', async () => {
+  const raw = seedDeviceClaimDb();
+  bindWarrantyTopic(raw);
+  const tg = stubTelegram();
+  try {
+    const app = deviceApp(raw, 'buyer');
+    const created = await json(await post(app, '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: KEY }));
+    await drain();
+    assert.equal(tg.sent.length, 1, 'the claim is announced');
+    assert.equal(tg.sent[0].message_thread_id, WARRANTY_THREAD);
+    assert.match(tg.sent[0].text, new RegExp(created.id), 'the id staff open it by');
+    assert.doesNotMatch(
+      tg.sent[0].text,
+      /stopped extruding/,
+      'the 5000-character description stays in the claim, not in a group chat'
+    );
+    // This is the line that fails if announceAfterResponse moves back above
+    // the replay return: one duplicated row becomes two identical messages.
+    await post(app, '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: KEY });
+    await drain();
+    assert.equal(tg.sent.length, 1, 'the replay announces nothing');
+  } finally {
+    tg.restore();
+    raw.close();
+  }
+});
+
+// ===================================================================
+// THE OVERLAY'S HALF — the key is minted per OPEN, and the general form is gone
+// ===================================================================
+
+/**
+ * The route guard is only half the fix, and the half that cannot enforce
+ * itself. Both claim routes accept a MISSING key so old browsers keep working,
+ * so a client that simply stops sending one turns the guard off silently and
+ * the owner's «وتتكرر عند إعادة الإرسال» comes back with nothing failing. That
+ * is what these read the source for.
+ *
+ * PER OPEN is the part worth pinning. `useState(newIdempotencyKey())` or a
+ * module-level constant would mint ONE key for the life of the mounted page:
+ * the customer's genuine SECOND claim on the same printer would come back as a
+ * replay of the first — a worse bug than the duplicate. Seeding it inside the
+ * effect that resets the form ties the key to the window opening, which is the
+ * boundary the route's contract asks for.
+ */
+
+const srcFile = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+
+test('the claim overlay mints one key per OPEN of the window, and sends it', () => {
+  const form = srcFile('src/components/warranty/ClaimForms.tsx');
+  assert.match(form, /idempotencyKey: claimKey\.current/, 'the key reaches the route');
+  // Held in a ref and seeded where the form resets — the effect keyed on the
+  // unit the window opened on.
+  assert.match(form, /const claimKey = useRef\(''\)/);
+  assert.match(
+    form,
+    /if \(unitId\) \{[\s\S]*?claimKey\.current = newIdempotencyKey\(\);[\s\S]*?\}\n\s*\}, \[unitId\]\);/,
+    'the key is seeded in the open-the-window effect, not at mount'
+  );
+  // The two ways to get this wrong: one key for the life of the mount, or a
+  // fresh key on every press (which guards nothing).
+  assert.doesNotMatch(form, /useState\(\(?\)? ?=?>? ?newIdempotencyKey/);
+  assert.doesNotMatch(form, /idempotencyKey: newIdempotencyKey\(\)/);
+});
+
+test('«منتج غير مرتبط كطابعة؟» is gone from the UI — and the route behind it is not', () => {
+  // «يحذف — فالضمان للطابعات فقط»: no control opens a general claim any more.
+  const form = srcFile('src/components/warranty/ClaimForms.tsx');
+  const page = srcFile('src/pages/Warranty.tsx');
+  const strings = srcFile('src/components/warranty/strings.ts');
+  assert.doesNotMatch(form, /export function LegacyClaimOverlay/);
+  assert.doesNotMatch(page, /LegacyClaimOverlay|legacyClaimLink|showLegacy/);
+  assert.doesNotMatch(strings, /legacyClaimLink/);
+  assert.doesNotMatch(form, /api\.post\('\/api\/profile\/warranty-claims'/);
+
+  /**
+   * THE ROUTE STAYS. It is the only writer of `warranty_claims` rows with
+   * `unit_id IS NULL`, and the claims list and the admin queue both LIST those
+   * rows: sealing or 410-ing it would not remove one duplicate, it would make
+   * the general claims customers already filed unanswerable. Removing the
+   * affordance is the whole change.
+   */
+  const route = srcFile('worker/routes/profile.ts');
+  assert.match(route, /profileRoutes\.post\('\/warranty-claims'/);
+  assert.doesNotMatch(route, /410/);
+  assert.match(srcFile('worker/routes/devices.ts'), /unit_id IS NULL|c\.unit_id/);
 });

@@ -27,6 +27,7 @@
  */
 
 import { normalizeText } from './normalize';
+import { toSearchDoc, variantNamesFrom } from './document';
 import {
   buildIndexRows,
   candidatePrefixes,
@@ -68,6 +69,95 @@ export function planSearchIndex(db: D1Database, doc: SearchDoc): D1PreparedState
     );
   }
   return stmts;
+}
+
+/**
+ * THE COLUMNS A SEARCH DOCUMENT IS BUILT FROM — one list, named once.
+ *
+ * Every field `toSearchDoc` reads has to be in the SELECT that feeds it, and
+ * a caller that forgets one does not fail: it quietly writes a thinner index
+ * than the save path does, and the products it touched become unfindable by
+ * whatever that column held. That is not hypothetical — the cron backfill
+ * omitted `options`/`colors` and so indexed no option names at all, while the
+ * save path indexed them, which meant «كومبو» found only the products the
+ * owner happened to have re-saved. A shared list is what makes the two
+ * writers the same writer.
+ */
+export const SEARCH_DOC_COLUMNS = [
+  'id',
+  'name',
+  'name_ar',
+  'name_ku',
+  'description',
+  'hashtags',
+  'sku',
+  'brand_id',
+  'category_id',
+  'sub_category_id',
+  'options',
+  'colors',
+] as const;
+
+/** `SEARCH_DOC_COLUMNS` as a SELECT list, optionally under a table alias. */
+export function searchDocColumns(alias = ''): string {
+  return SEARCH_DOC_COLUMNS.map((c) => (alias ? `${alias}.${c}` : c)).join(', ');
+}
+
+/**
+ * `products` rows -> the documents to index them under.
+ *
+ * ONE READ FOR THE WHOLE CHUNK. The index holds NAMES, not ids — a shopper
+ * types «الطابعات» and "Bambu Lab", never `cat_printers` — so the brand and
+ * the two section names have to be resolved before the document is built.
+ * Doing that per product would be a read per product; one `IN` over the
+ * distinct ids of the chunk is one read for all of them.
+ *
+ * The rows must come from `searchDocColumns()`. Pass them with a field
+ * already overwritten when the batch is about to change it (a hashtag rename
+ * does exactly that), so the index describes the row that is landing rather
+ * than the one being replaced.
+ */
+export async function searchDocsForRows(
+  db: D1Database,
+  rows: Record<string, unknown>[]
+): Promise<SearchDoc[]> {
+  if (rows.length === 0) return [];
+  const nameIds = [
+    ...new Set(
+      rows
+        .flatMap((r) => [r.brand_id, r.category_id, r.sub_category_id])
+        .filter((x): x is string => typeof x === 'string' && x !== '')
+    ),
+  ];
+  const names = new Map<string, string>();
+  if (nameIds.length > 0) {
+    const ph = nameIds.map(() => '?').join(',');
+    const { results } = await db
+      .prepare(
+        `SELECT id, COALESCE(NULLIF(name_en,''), name_ar) AS n FROM brands WHERE id IN (${ph})
+         UNION ALL
+         SELECT id, COALESCE(NULLIF(name_en,''), name_ar) AS n FROM catalogs WHERE id IN (${ph})`
+      )
+      .bind(...nameIds, ...nameIds)
+      .all<{ id: string; n: string }>();
+    for (const r of results ?? []) names.set(String(r.id), String(r.n ?? ''));
+  }
+  return rows.map((r) =>
+    toSearchDoc({
+      id: String(r.id),
+      name: r.name,
+      name_ar: r.name_ar,
+      name_ku: r.name_ku,
+      description: r.description,
+      hashtags: r.hashtags,
+      sku: r.sku,
+      brandName: names.get(String(r.brand_id ?? '')) ?? null,
+      categoryNames: [names.get(String(r.category_id ?? '')) ?? '', names.get(String(r.sub_category_id ?? '')) ?? ''].filter(
+        Boolean
+      ),
+      variantNames: variantNamesFrom(r.options, r.colors),
+    })
+  );
 }
 
 /**
