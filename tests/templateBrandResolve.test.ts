@@ -102,14 +102,14 @@ test('the owner\'s file — brand="Bambu Lab" against an existing bambu-lab — 
   const { body } = await parse(app, file('Bambu Lab'));
   assert.deepEqual(body.needs_review, [], JSON.stringify(body.needs_review));
   assert.deepEqual(body.brands_to_create, [], 'an existing brand is never "to create"');
-  assert.equal(body.preview.brand_id, 'brd_bambu');
+  assert.equal(body.preview?.brand_id, 'brd_bambu');
 });
 
 test('«بامبو لاب» — the Arabic display name — resolves to the same brand', async () => {
   const { app } = setup();
   const { body } = await parse(app, file('بامبو لاب'));
   assert.deepEqual(body.needs_review, []);
-  assert.equal(body.preview.brand_id, 'brd_bambu');
+  assert.equal(body.preview?.brand_id, 'brd_bambu');
 });
 
 test('«ليفو» and the slug and the id all reach the same row', async () => {
@@ -117,7 +117,7 @@ test('«ليفو» and the slug and the id all reach the same row', async () => 
   for (const spelling of ['ليفو', 'Levo', 'levo', 'LEVO', ' levo ', 'brd_levo']) {
     const { body } = await parse(app, file(spelling));
     assert.deepEqual(body.needs_review, [], `${spelling}: ${JSON.stringify(body.needs_review)}`);
-    assert.equal(body.preview.brand_id, 'brd_levo', spelling);
+    assert.equal(body.preview?.brand_id, 'brd_levo', spelling);
   }
 });
 
@@ -128,7 +128,7 @@ test('an Arabic name typed with a different hamza/ta-marbuta still resolves', as
   const app = stubApp(db, OWNER, mount, { env: productMediaFixtureEnv().env });
   const { body } = await parse(app, file('طابعه الشرق'));
   assert.deepEqual(body.needs_review, []);
-  assert.equal(body.preview.brand_id, 'brd_tab');
+  assert.equal(body.preview?.brand_id, 'brd_tab');
 });
 
 // ------------------------------------------------- create, disclosed first
@@ -148,8 +148,8 @@ test('the apply creates it, with the slug the check promised', async () => {
   const { status, body } = await apply(app, text);
   assert.equal(status, 200, JSON.stringify(body));
   assert.deepEqual(
-    body.brands_created.map((b) => ({ name: b.name, slug: b.slug, created: b.created })),
-    [{ name: 'Elegoo', slug: pre.body.brands_to_create[0].slug, created: true }]
+    body.brands_created?.map((b) => ({ name: b.name, slug: b.slug, created: b.created })),
+    [{ name: 'Elegoo', slug: pre.body.brands_to_create?.[0]?.slug, created: true }]
   );
   const made = rowOf(raw, 'SELECT * FROM brands WHERE slug = ?', 'elegoo');
   assert.ok(made, 'the brand exists in التصنيفات now');
@@ -165,7 +165,7 @@ test('an Arabic-only new brand keeps its Arabic name and leaves name_en for the 
   const text = file('انيكيوبك');
   const { status, body } = await apply(app, text);
   assert.equal(status, 200, JSON.stringify(body));
-  const made = rowOf(raw, 'SELECT * FROM brands WHERE id = ?', body.brands_created[0].id);
+  const made = rowOf(raw, 'SELECT * FROM brands WHERE id = ?', body.brands_created?.[0]?.id);
   assert.equal(made.name_ar, 'انيكيوبك');
   assert.equal(made.name_en, '');
   assert.equal(made.name_ckb, '');
@@ -175,7 +175,7 @@ test('re-running the same import does not make a second brand', async () => {
   const { raw, app } = setup();
   const first = await apply(app, file('Elegoo'));
   assert.equal(first.status, 200, JSON.stringify(first.body));
-  assert.equal(first.body.brands_created[0].created, true);
+  assert.equal(first.body.brands_created?.[0]?.created, true);
 
   // A second file naming the same new brand — a different product, so the
   // confirm-once fingerprint does not swallow it.
@@ -246,7 +246,7 @@ test('a new brand never collides with an existing slug', async () => {
   const app = stubApp(db, OWNER, mount, { env: productMediaFixtureEnv().env });
   const { status, body } = await apply(app, file('Elegoo!'));
   assert.equal(status, 200, JSON.stringify(body));
-  assert.equal(body.brands_created[0].slug, 'elegoo-2');
+  assert.equal(body.brands_created?.[0]?.slug, 'elegoo-2');
   assert.equal(rowOf(raw, "SELECT id FROM brands WHERE slug = 'elegoo'").id, 'brd_other');
 });
 
@@ -255,7 +255,7 @@ test('a brand deactivated in التصنيفات is matched, not duplicated', asy
   raw.prepare("UPDATE brands SET active = 0 WHERE id = 'brd_levo'").run();
   const { body } = await parse(app, file('Levo'));
   assert.deepEqual(body.brands_to_create, [], 'reviving one row beats minting levo-2');
-  assert.equal(body.preview.brand_id, 'brd_levo');
+  assert.equal(body.preview?.brand_id, 'brd_levo');
 });
 
 test('matchRef keeps model numbers apart — folding never merges two brands', () => {
@@ -293,8 +293,8 @@ test('a name claimed by two brands is refused, naming both slugs', async () => {
   const app = stubApp(db, OWNER, mount, { env: productMediaFixtureEnv().env });
 
   const { body } = await parse(app, file('بامبو لاب'));
-  assert.equal(body.needs_review.length, 1, JSON.stringify(body.needs_review));
-  const message = String(body.needs_review[0].message);
+  assert.equal(body.needs_review?.length, 1, JSON.stringify(body.needs_review));
+  const message = String(body.needs_review?.[0]?.message);
   assert.match(message, /bambu-lab/);
   assert.match(message, /bambu-lab-cn/);
   assert.deepEqual(body.brands_to_create, [], 'ambiguity is not a reason to invent a third brand');
@@ -313,7 +313,7 @@ test('an exact slug still wins over a name another row claims', async () => {
   const app = stubApp(db, OWNER, mount, { env: productMediaFixtureEnv().env });
   const { body } = await parse(app, file('bambu-lab'));
   assert.deepEqual(body.needs_review, []);
-  assert.equal(body.preview.brand_id, 'brd_bambu', 'the slug is authoritative');
+  assert.equal(body.preview?.brand_id, 'brd_bambu', 'the slug is authoritative');
 });
 
 // ------------------------------------------------- sections: the other arm
@@ -324,15 +324,15 @@ test('a section resolves by its Arabic or English name too', async () => {
   for (const spelling of ['printers', 'Printers', 'cat_printers']) {
     const { body } = await parse(app, file('Levo', `category=${spelling}`));
     assert.deepEqual(body.needs_review, [], `${spelling}: ${JSON.stringify(body.needs_review)}`);
-    assert.equal(body.preview.category_id, 'cat_printers', spelling);
+    assert.equal(body.preview?.category_id, 'cat_printers', spelling);
   }
 });
 
 test('an unknown section is still REFUSED — a section carries a parent and a family a name cannot supply', async () => {
   const { raw, app } = setup();
   const { body } = await parse(app, file('Levo', 'category=قسم لا وجود له'));
-  assert.equal(body.needs_review.length, 1);
-  assert.match(String(body.needs_review[0].message), /never silently created/);
+  assert.equal(body.needs_review?.length, 1);
+  assert.match(String(body.needs_review?.[0]?.message), /never silently created/);
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM catalogs WHERE name_ar = 'قسم لا وجود له'"), 0);
 });
 
@@ -344,10 +344,10 @@ test('two sections sharing a name are refused with their slugs, not filed under 
     .run('cat_b', 'printers-resin', 'الطابعات', 'Resin');
   const app = stubApp(db, OWNER, mount, { env: productMediaFixtureEnv().env });
   const { body } = await parse(app, file('Levo', 'category=الطابعات'));
-  assert.equal(body.needs_review.length, 1);
-  assert.match(String(body.needs_review[0].message), /printers-fdm/);
-  assert.match(String(body.needs_review[0].message), /printers-resin/);
-  assert.equal(body.preview.category_id, null);
+  assert.equal(body.needs_review?.length, 1);
+  assert.match(String(body.needs_review?.[0]?.message), /printers-fdm/);
+  assert.match(String(body.needs_review?.[0]?.message), /printers-resin/);
+  assert.equal(body.preview?.category_id, null);
 });
 
 // ------------------------------------------------- the round trip
@@ -368,7 +368,7 @@ test('EXPORT -> IMPORT of an unchanged product survives, brand and section inclu
   assert.deepEqual(back.body.errors, [], JSON.stringify(back.body.errors));
   assert.deepEqual(back.body.needs_review, [], JSON.stringify(back.body.needs_review));
   assert.deepEqual(back.body.brands_to_create, [], 'a round trip must never invent a brand');
-  assert.equal(back.body.preview.brand_id, 'brd_bambu');
+  assert.equal(back.body.preview?.brand_id, 'brd_bambu');
 
   const reapplied = await post(app, '/api/admin/template/apply', { text, mode: 'update', confirm: true });
   const reapplyBody = (await reapplied.json()) as TemplateBody;
