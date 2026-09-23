@@ -116,6 +116,16 @@ const productionName = cfg.name;
 // in the failing build). Read it from whichever variable carries it; fall back
 // to an explicit override, and only then to a documented default.
 const ciWorkerName =
+  // WRANGLER_CI_OVERRIDE_NAME IS THE ONE WRANGLER ITSELF READS, and it is
+  // first because it is the only name on this list that has been traced to
+  // source rather than guessed. node_modules/wrangler/wrangler-dist/cli.js
+  // reads it to override the config's Worker name, and it is what produces
+  // the exact "Failed to match Worker name … but the CI system expected …"
+  // warning quoted at the head of this file. Without it the four names below
+  // all missed, `ciWorkerName` was always empty, and the "refusing to guess
+  // which database" branch below could never fire — the target fell through
+  // to the hard-coded default every single build.
+  process.env.WRANGLER_CI_OVERRIDE_NAME ||
   process.env.CLOUDFLARE_WORKERS_SCRIPT_NAME ||
   process.env.WORKERS_CI_SCRIPT_NAME ||
   process.env.WORKERS_SCRIPT_NAME ||
@@ -166,7 +176,30 @@ if (target) {
   // The same is true of every key here — the list IS the contract between
   // wrangler.jsonc's environments and the bare `wrangler deploy` this build
   // ends with.
-  for (const key of ['name', 'd1_databases', 'r2_buckets', 'images', 'vars', 'assets', 'observability', 'triggers']) {
+  // EVERY NON-INHERITABLE KIND, not only the ones an environment happens to
+  // use today. `services` is the one that will bite: env.dark already declares
+  // four service bindings, and the day the live environment gains one, a fold
+  // list that omits it would deploy a Worker whose binding simply is not there
+  // — a runtime `undefined`, not a build error. Adding a kind here is free;
+  // discovering it is missing costs an outage. (02-MIGRATION-PLAN.md §44.)
+  for (const key of [
+    'name',
+    'd1_databases',
+    'r2_buckets',
+    'images',
+    'vars',
+    'assets',
+    'observability',
+    'triggers',
+    'services',
+    'durable_objects',
+    'queues',
+    'kv_namespaces',
+    'ratelimits',
+    'workflows',
+    'workers_dev',
+    'preview_urls',
+  ]) {
     if (block[key] !== undefined) cfg[key] = structuredClone(block[key]);
   }
   console.log(`  top-level config now describes: ${cfg.name}`);
@@ -190,18 +223,41 @@ function resolveDbId(name) {
   }
 }
 
-for (const db of cfg.d1_databases ?? []) {
-  if (typeof db.database_id === 'string' && !db.database_id.includes('PLACEHOLDER')) continue;
-  const id = resolveDbId(db.database_name);
-  if (!id) {
-    console.error(
-      `prepare-deploy-config: could not resolve the id of D1 database "${db.database_name}".\n` +
-        '  The deploy credentials must be able to list D1 databases in this account.'
-    );
-    process.exit(1);
+/**
+ * THE ENVIRONMENT BLOCK IS RESOLVED TOO, AND THAT IS THE POINT.
+ *
+ * The fold above copies env.staging onto the top level, so a bare
+ * `wrangler deploy` is correct. But the COPY is what gets the resolved uuid —
+ * `cfg.env.staging.d1_databases` is a different array, and it was still being
+ * written back to disk carrying `STAGING-DB-ID-PLACEHOLDER`.
+ *
+ * That made one obvious command fail for a reason nobody could see. A migrate
+ * step copied from the GitHub workflow —
+ *
+ *     npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
+ *
+ * — reads the env block, not the top level, and sent the placeholder verbatim
+ * to the API: "binding DB of type d1 must have a valid `database_id`". The
+ * command is right; the config it read was the half nothing had filled in.
+ *
+ * Resolving both halves means either spelling works, which matters because the
+ * command lives in the Cloudflare dashboard where this file cannot correct it.
+ */
+const dbBlocks = [cfg.d1_databases, ...(target && cfg.env?.[target] ? [cfg.env[target].d1_databases] : [])];
+for (const list of dbBlocks) {
+  for (const db of list ?? []) {
+    if (typeof db.database_id === 'string' && !db.database_id.includes('PLACEHOLDER')) continue;
+    const id = resolveDbId(db.database_name);
+    if (!id) {
+      console.error(
+        `prepare-deploy-config: could not resolve the id of D1 database "${db.database_name}".\n` +
+          '  The deploy credentials must be able to list D1 databases in this account.'
+      );
+      process.exit(1);
+    }
+    db.database_id = id;
+    console.log(`  resolved database_id for "${db.database_name}" (from its name)`);
   }
-  db.database_id = id;
-  console.log(`  resolved database_id for "${db.database_name}" (from its name)`);
 }
 
 // ------------------------------------------------- keep the live plain vars
@@ -222,6 +278,13 @@ const fromEnv = {
   // merchant subdomain resolves, and — before adminAllowedOn — the whole
   // admin API answered 404 on the apex.
   STORE_ROOT_DOMAIN: process.env.STORE_ROOT_DOMAIN,
+  // Workflow 7 sets this with --var and this path could not, so it was the one
+  // name that became unsettable the moment deploys moved to Cloudflare: a
+  // build variable of this name was read by nothing and silently discarded.
+  // The live value survives either way (keep_vars), but "survives" is not
+  // "can be changed" — worker/routes/studio.ts reads it to decide which
+  // destinations a Studio hand-off may reach.
+  STUDIO_ALLOWED_DESTINATIONS: process.env.STUDIO_ALLOWED_DESTINATIONS,
 };
 
 const live = await liveVars(cfg.name).catch(() => null);

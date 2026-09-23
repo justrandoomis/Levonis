@@ -99,11 +99,41 @@ When importing the repository (2.1 last row):
   that the executable reports the installed Wrangler package version and
   intentionally fails if a silent `process.exit(0)` stub is present.
 - Build command: `npm run build`
-- Deploy command: `npx wrangler d1 migrations apply levonis-db --remote && npx wrangler deploy`
-  (this applies pending migrations, then deploys — safe to re-run; already-
-  applied migrations are skipped)
-- Build variables: `VITE_GOOGLE_CLIENT_ID` = your Google client ID (only if
-  using Google login)
+- Deploy command:
+  `npx wrangler d1 migrations apply levonis-db-staging --remote && npx wrangler deploy`
+
+  **Read the two details in that line before copying it — an earlier version of
+  this page got both wrong, and each one is an outage.**
+
+  1. **`levonis-db-staging`, not `levonis-db`.** `levonis-db` is the
+     *production* database name (`wrangler.jsonc` top level). The live site is
+     served by the Worker `levonis-staging` bound to `levonis-db-staging`
+     (`docs/WORKERS.md`); the Worker named `levonis` does not exist on the
+     account. Naming `levonis-db` migrates a database nothing serves, reports
+     success, and lets the deploy ship the new code onto an unmigrated live
+     database — which is precisely the 2026-09-17 outage, where a Worker
+     carrying 0085 met a database at 0083 and `/api/home` went dark.
+  2. **No `--env staging`.** `scripts/prepare-deploy-config.mjs` folds the
+     staging environment onto the TOP LEVEL during the build, so a bare command
+     reads the block it already resolved. (Since the same script now also
+     resolves the id inside `env.staging`, adding `--env staging` no longer
+     breaks — but the bare form is the one to use, because it reads the exact
+     config the `wrangler deploy` beside it will read.)
+
+  Applying migrations here is what closes the gap this page used to leave open:
+  the build command alone never touches the schema. It is idempotent, so it is
+  safe to re-run and a no-op on a commit that adds no migration.
+- Build variables:
+  - `LEVONIS_CI_ENV` = `staging` — makes the environment choice explicit rather
+    than resting on the default in `prepare-deploy-config.mjs`. Do **not** set
+    `CLOUDFLARE_ENV`: wrangler reads that as `--env`, which changes which block
+    `wrangler deploy` itself reads.
+  - `VITE_GOOGLE_CLIENT_ID` is **no longer needed for the bundle** — the client
+    id now comes from `/api/auth/capabilities` at runtime (`src/main.tsx`). Set
+    it only if you want `prepare-deploy-config.mjs` to carry it into the
+    Worker's `GOOGLE_CLIENT_ID` var.
+  - Node version comes from `.nvmrc` (22.22.2). `scripts/write-asset-headers.mjs`
+    imports a `.ts` file under bare `node`, which needs Node ≥ 22.18.
 
 The first deploy will fail until `database_id` is filled in `wrangler.jsonc`
 (2.1). Edit the file directly on GitHub from a tablet: open the file → pencil
@@ -181,8 +211,9 @@ further problems worth fixing at the same time:
 
 ### Fix — automatic, no dashboard change required
 
-The deploy command (`npx wrangler deploy`) is fixed by the dashboard, but the
-build command (`npm run build`) is ours — so the build now leaves behind a
+The deploy command is set in the Cloudflare dashboard — this repository cannot
+change it, which is why §2.3-B spells it out and why it must apply migrations.
+The build command (`npm run build`) is ours — so the build now leaves behind a
 config that a bare deploy can use correctly. `npm run build` runs
 `scripts/prepare-deploy-config.mjs` first, which does nothing at all unless it
 detects the Workers Builds container (GitHub Actions and local builds are

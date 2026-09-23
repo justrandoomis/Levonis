@@ -85,8 +85,23 @@ export async function syncPolicyCorpus(db: D1Database): Promise<PolicyCorpusSync
   // few dozen short rows even after years of corrections, and reading the
   // whole (key, version, lang) index is cheaper than binding 54 parameters —
   // D1 caps bound parameters per query, and the corpus will keep growing.
+  // `status = 'published'` IS THE WHOLE POINT OF THIS QUERY.
+  //
+  // It used to read every row regardless of status, and a row is not only ever
+  // created here: worker/lib/policyPublication.ts writes a version as 'draft'
+  // and promotes it afterwards. A draft therefore counted as PRESENT, this
+  // function skipped the document, and `INSERT OR IGNORE` below could never
+  // create the published row because the draft already occupied that
+  // (key, version, lang).
+  //
+  // What that costs is the whole shop. `preparePolicyAcceptance` refuses
+  // unless it can read a PUBLISHED row for the required version, so checkout
+  // answered POLICY_ACCEPTANCE_REQUIRED to a customer who had just ticked the
+  // box — on every attempt, for ever, with no way out from inside the
+  // application. And a fresh database never reproduces it, which is why the
+  // suites stayed green while the live shop could not take an order.
   const { results } = await db
-    .prepare('SELECT key, version, lang FROM policy_documents')
+    .prepare("SELECT key, version, lang FROM policy_documents WHERE status = 'published'")
     .all<{ key: string; version: number; lang: string }>();
   const present = new Set((results || []).map((r) => `${r.key}@${Number(r.version)}:${r.lang}`));
   if (present.size >= CORPUS_ROW_COUNT && POLICY_DOCUMENTS.every((doc) =>
@@ -122,6 +137,37 @@ export async function syncPolicyCorpus(db: D1Database): Promise<PolicyCorpusSync
     // unit that must land whole — a half-written version could be accepted.
     const written = await db.batch(statements);
     summary.inserted += written.reduce((n, r) => n + (r.meta.changes || 0), 0);
+
+    /**
+     * AND THE INSERT IS NOT ENOUGH ON ITS OWN.
+     *
+     * `INSERT OR IGNORE` is ignored when a row for this (key, version, lang)
+     * already exists in ANY status, so a document stuck at 'draft' would still
+     * have no published row after the batch above and the shop would still be
+     * unable to take an order.
+     *
+     * Promoting it is the same transition `policyPublication.ts` performs, and
+     * it is fenced the same way — `AND status = 'draft'`, so a row that is
+     * already published is untouched and migration 0070's immutability of a
+     * PUBLISHED version is respected. The hash is rewritten from the registry
+     * text at the same moment, because a draft may carry a stale one and an
+     * acceptance is recorded against that hash.
+     */
+    const promotions: D1PreparedStatement[] = [];
+    for (const lang of missing as PolicyLang[]) {
+      const title = doc.title[lang];
+      const body = doc.body[lang];
+      promotions.push(
+        db.prepare(
+          `UPDATE policy_documents
+              SET status = 'published', hash = ?, published_at = COALESCE(published_at, ?), effective_at = COALESCE(effective_at, ?)
+            WHERE key = ? AND version = ? AND lang = ? AND status = 'draft'`
+        ).bind(await policyDocHash(doc.key, doc.version, lang, title, body), at, at, doc.key, doc.version, lang)
+      );
+    }
+    const promoted = await db.batch(promotions);
+    summary.inserted += promoted.reduce((n, r) => n + (r.meta.changes || 0), 0);
+
     summary.keys.push(doc.key);
   }
   return summary;

@@ -751,3 +751,70 @@ test('a non-printer cart never carries the note, and the public settings expose 
   assert.equal(q.lines[0].is_printer, false);
   assert.equal(q.notes.printer_home_delivery_iqd, null);
 });
+
+// =========================================================================
+// THE CONSENT SIGNATURE — «وافقت على السياسة وضغطت تأكيد الطلب فإنه يفشل»
+// =========================================================================
+
+test('two identical quotes produce an identical consent signature', async () => {
+  /**
+   * THE REPORTED FAILURE, AND WHY IT IS THIS.
+   *
+   * src/pages/Checkout.tsx builds a signature out of the quote —
+   *
+   *     [total_iqd, shipping.total_iqd, due_on_delivery_iqd, policies].join('~')
+   *
+   * — and REVOKES the customer's policy consent whenever it changes between
+   * two responses, showing «تغيّر ملخص الطلب — يرجى تأكيد الموافقة مجدداً».
+   *
+   * The checkout does not only quote when the customer changes something. It
+   * re-reads its cart lines every 60 seconds while the page is visible, and
+   * again whenever the page regains focus — which is exactly what happens when
+   * the customer taps «شروط الاستخدام والبيع» to READ the policy they are
+   * being asked to accept, and comes back.
+   *
+   * So if two byte-identical requests can produce two different signatures,
+   * the consent box unticks itself under the customer, the confirm button
+   * greys out, and the order can never be placed however many times they
+   * agree. That is the screenshot: box unchecked, amber "confirm again", red
+   * "accepting the published policies is required".
+   *
+   * This test is the guard on that invariant. It does NOT assert any
+   * particular total — only that asking twice answers the same, which is what
+   * the consent reset depends on being true.
+   */
+  const { db, raw } = setup();
+  cartLine(raw, 'ci_sig', 'buyer', 'p_x1', '');
+  const a = appAs(db, 'buyer');
+
+  const sig = (q: Record<string, unknown>): string => {
+    const shipping = q.shipping as { total_iqd: number };
+    const policies = (q.policies as Array<{ key: string; version: number }>) ?? [];
+    return [
+      q.total_iqd,
+      shipping.total_iqd,
+      q.due_on_delivery_iqd,
+      policies.map((p) => `${p.key}:${p.version}`).join('|'),
+    ].join('~');
+  };
+
+  const raw1 = await json(await post(a, '/api/orders/quote', quoteBody('addr_b', 'cash')));
+  assert.ok(raw1.quote, `quote #1 failed: ${JSON.stringify(raw1)}`);
+  const first = raw1.quote;
+  const second = (await json(await post(a, '/api/orders/quote', quoteBody('addr_b', 'cash')))).quote;
+  const third = (await json(await post(a, '/api/orders/quote', quoteBody('addr_b', 'cash')))).quote;
+
+  assert.equal(sig(second), sig(first), 'the second identical quote moved the consent signature');
+  assert.equal(sig(third), sig(first), 'the third identical quote moved the consent signature');
+
+  // And the part the customer is actually asked to agree to must be present
+  // and stable — an empty list would mean the box never renders while the
+  // server still demands consent at the door.
+  const policies = (first.policies as Array<{ key: string; version: number }>) ?? [];
+  assert.ok(policies.length > 0, 'the quote must tell the client which policies to show');
+  assert.deepEqual(
+    (second.policies as Array<{ key: string; version: number }>).map((p) => `${p.key}:${p.version}`),
+    policies.map((p) => `${p.key}:${p.version}`),
+    'the required policy versions must not move between two identical quotes'
+  );
+});

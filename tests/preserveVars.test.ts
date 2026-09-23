@@ -141,6 +141,93 @@ test('prepare-deploy-config.mjs uses the extracted module and kept everything el
   // deploys a Worker where `env.IMAGES` is undefined and every upload quietly
   // stops being converted. The list IS the contract between wrangler.jsonc's
   // environments and the bare `wrangler deploy` this build ends with.
-  assert.match(src, /for \(const key of \['name', 'd1_databases', 'r2_buckets', 'images', 'vars', 'assets', 'observability', 'triggers'\]\)/, 'it still folds the target environment into the top level, now including images');
+  // The fold list is a CONTRACT, not a formatting detail, so it is asserted by
+  // MEMBERSHIP rather than as one literal line — the old assertion pinned the
+  // exact eight-element source text and would fail on any addition, which is
+  // the opposite of what it should do: adding a binding kind is always safe,
+  // and dropping one is the outage.
+  for (const key of ['name', 'd1_databases', 'r2_buckets', 'images', 'vars', 'assets', 'observability', 'triggers']) {
+    assert.match(src, new RegExp(`'${key}',`), `the fold list dropped "${key}"`);
+  }
   assert.match(src, /mergeVars\(cfg\.vars, live, fromEnv\)/, 'the merge is the shared one');
+});
+
+// =========================================================================
+// THE CLOUDFLARE PATH'S OWN CONTRACT
+// =========================================================================
+
+test('the fold carries every non-inheritable binding kind, not only the ones in use today', () => {
+  /**
+   * `services` is the one that will bite. wrangler does NOT inherit these keys
+   * into a named environment: an environment that does not name one deploys a
+   * Worker where that binding is simply absent — a runtime `undefined` at the
+   * first call site, not a build error anyone would see.
+   *
+   * env.dark already declares four service bindings. The day the live
+   * environment gains one, a fold list that omitted `services` would ship a
+   * Worker without it. Adding a kind here costs nothing; discovering one is
+   * missing costs an outage, so this test asserts the WIDE list.
+   */
+  const src = readFileSync(new URL('../scripts/prepare-deploy-config.mjs', import.meta.url), 'utf8');
+  for (const key of ['services', 'durable_objects', 'queues', 'kv_namespaces', 'ratelimits', 'workflows']) {
+    assert.match(src, new RegExp(`'${key}',`), `the fold list must carry "${key}" — wrangler does not inherit it`);
+  }
+});
+
+test('the Worker name is read from the variable wrangler itself uses', () => {
+  /**
+   * WRANGLER_CI_OVERRIDE_NAME is the only name on that list traced to source
+   * (node_modules/wrangler reads it to override the config's Worker name).
+   * The four that preceded it were guesses, they all missed, and the effect
+   * was silent: `ciWorkerName` was empty on every build, so the "refusing to
+   * guess which database this Worker should bind to" branch could never fire
+   * and the target fell through to a hard-coded default.
+   */
+  const src = readFileSync(new URL('../scripts/prepare-deploy-config.mjs', import.meta.url), 'utf8');
+  assert.match(src, /process\.env\.WRANGLER_CI_OVERRIDE_NAME/, 'the variable wrangler actually sets must be read');
+  assert.ok(
+    src.indexOf('WRANGLER_CI_OVERRIDE_NAME') < src.indexOf('CLOUDFLARE_WORKERS_SCRIPT_NAME'),
+    'it must come first — it is the one that is known rather than guessed'
+  );
+});
+
+test('the D1 id is resolved in the environment block too, not only in the fold', () => {
+  /**
+   * The fold COPIES env.staging onto the top level, so the copy is what gets
+   * the resolved uuid; `cfg.env.staging.d1_databases` is a different array and
+   * was written back to disk still carrying the placeholder. A migrate command
+   * spelled `--env staging` — the obvious copy from the GitHub workflow — read
+   * that block and sent "STAGING-DB-ID-PLACEHOLDER" to the API.
+   *
+   * The command lives in the Cloudflare dashboard, where this repository
+   * cannot correct it, so both spellings have to work.
+   */
+  const src = readFileSync(new URL('../scripts/prepare-deploy-config.mjs', import.meta.url), 'utf8');
+  assert.match(src, /cfg\.env\?\.\[target\]/, 'the environment block must be resolved as well as the top level');
+});
+
+test('STUDIO_ALLOWED_DESTINATIONS can be set from the Cloudflare path', () => {
+  // Workflow 7 sets it with --var. Until it was added to `fromEnv` a build
+  // variable of this name was read by nothing and silently discarded, so the
+  // value became unsettable the moment deploys moved to Cloudflare. The live
+  // value survived (keep_vars) — but "survives" is not "can be changed".
+  const src = readFileSync(new URL('../scripts/prepare-deploy-config.mjs', import.meta.url), 'utf8');
+  assert.match(src, /STUDIO_ALLOWED_DESTINATIONS: process\.env\.STUDIO_ALLOWED_DESTINATIONS/);
+});
+
+test('the documented Workers Builds deploy command migrates the database the site actually uses', () => {
+  /**
+   * docs/CLOUDFLARE_SETUP.md used to hand the owner
+   * `wrangler d1 migrations apply levonis-db --remote`. `levonis-db` is the
+   * PRODUCTION database name; the live site runs on `levonis-db-staging`. That
+   * command migrates a database nothing serves, reports success, and lets the
+   * deploy beside it ship new code onto an unmigrated live database — exactly
+   * the shape of the 2026-09-17 outage, written down as an instruction.
+   */
+  const doc = readFileSync(new URL('../docs/CLOUDFLARE_SETUP.md', import.meta.url), 'utf8');
+  assert.match(doc, /wrangler d1 migrations apply levonis-db-staging --remote/, 'the setup doc must name the live database');
+  assert.ok(
+    !/migrations apply levonis-db --remote/.test(doc),
+    'the setup doc must not tell the owner to migrate the production database name'
+  );
 });

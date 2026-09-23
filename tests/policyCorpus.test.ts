@@ -10,6 +10,8 @@ import {
 } from '../worker/lib/policies';
 import { POLICY_LANGS, policyDocHash } from '../worker/lib/policies/types';
 import { CHECKOUT_POLICY_KEYS } from '../worker/lib/policyOps';
+import { asD1, freshDb } from './fixtures/app';
+import { ensurePolicyCorpus, resetPolicyCorpusMemo } from '../worker/lib/policySync';
 
 /**
  * THE CORPUS ITSELF — successor to tests/policyDrafts.test.ts.
@@ -218,4 +220,49 @@ test('no policy quotes a figure for the cash-on-delivery tax — it is an admin 
       );
     }
   }
+});
+
+// =========================================================================
+// A DRAFT ROW MUST NOT LOOK LIKE A PUBLISHED ONE
+// =========================================================================
+
+test('a draft row does not count as present, and checkout is not blocked for ever', async () => {
+  /**
+   * THE REPORTED FAILURE: «وافقت على السياسة وضغطت تأكيد الطلب فإنه يفشل».
+   *
+   * `preparePolicyAcceptance` refuses unless it can read a row for the
+   * required (key, version) with status='published'. `ensurePolicyCorpus`
+   * runs immediately before it to make sure that row exists.
+   *
+   * But the sync's presence set was built from
+   *     SELECT key, version, lang FROM policy_documents
+   * with NO status filter — so a row sitting at status='draft' (which
+   * worker/lib/policyPublication.ts writes before promoting) counted as
+   * present. The sync then skipped the document, and `INSERT OR IGNORE`
+   * could never create the published row because the draft already occupies
+   * that (key, version, lang).
+   *
+   * The result is a checkout that refuses consent the customer really gave,
+   * on every attempt, for ever — and a fresh database never reproduces it,
+   * which is why every existing test passed while the live shop failed.
+   */
+  const raw = freshDb();
+  const db = asD1(raw);
+  resetPolicyCorpusMemo();
+
+  // The shape the live database can be in: the row EXISTS, but as a draft.
+  const doc = getPolicyDocument('terms')!;
+  raw
+    .prepare(
+      `INSERT INTO policy_documents (id, key, version, lang, title, body, hash, status, published_at, effective_at)
+       VALUES (?, 'terms', ?, 'ar', ?, ?, 'stale-hash', 'draft', NULL, NULL)`
+    )
+    .run('pol_draft_terms', doc.version, doc.title.ar, doc.body.ar);
+
+  await ensurePolicyCorpus(db);
+
+  const published = raw
+    .prepare("SELECT COUNT(*) AS n FROM policy_documents WHERE key='terms' AND version=? AND lang='ar' AND status='published'")
+    .get(doc.version) as { n: number };
+  assert.equal(published.n, 1, 'the sync must leave a PUBLISHED terms row behind, not stop at the draft');
 });
