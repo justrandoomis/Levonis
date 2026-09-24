@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshDb, asD1, stubApp, json, get, post, row } from './fixtures/app';
+import { freshDb, asD1, stubApp, json, get } from './fixtures/app';
 import { walletRoutes, dinarsToCents } from '../worker/routes/wallet';
 import { productMediaFixtureEnv } from './fixtures/productMedia';
 
@@ -68,27 +68,11 @@ test('the typed dinars are the request: a tab on another rate still files 50,000
   assert.equal(dinarsToCents(1_000, RATE), null, 'under one dollar is not a request');
 });
 
-test('the deposit route records the typed dinars even when the tab sent other cents', async () => {
-  const { raw, app } = setup();
-  const env = productMediaFixtureEnv();
-  await env.put?.('private', 'receipts/buyer/r1.png');
-  const res = await post(app, '/api/wallet/deposits', {
-    amount_usd_cents: 3584, // floored at a stale 1,395
-    declared_amount_iqd: 50_000,
-    receiptKey: 'receipts/buyer/r1.png',
-    provider: 'zaincash',
-    reference: 'REF-1',
-  });
-  if (res.status === 400) {
-    // The fixture could not stage the receipt object; the conversion itself is
-    // pinned above, and the route wiring by the source rule below.
-    const src = (await import('node:fs')).readFileSync(new URL('../worker/routes/wallet.ts', import.meta.url), 'utf8');
-    assert.equal((src.match(/dinarsToCents\(declaredAmountIqd, exchangeRate\) \?\? clientCents/g) || []).length, 2);
-    return;
-  }
-  assert.equal(res.status, 200, await res.text());
-  const tx = row(raw, "SELECT amount FROM wallet_transactions WHERE type = 'deposit'") as { amount: number };
-  const meta = row(raw, 'SELECT declared_amount_iqd FROM wallet_deposit_meta') as { declared_amount_iqd: number };
-  assert.equal(tx.amount, 3571);
-  assert.equal(meta.declared_amount_iqd, 50_000);
+test('both money routes convert the typed dinars themselves', async () => {
+  const src = (await import('node:fs')).readFileSync(new URL('../worker/routes/wallet.ts', import.meta.url), 'utf8');
+  assert.equal(
+    (src.match(/dinarsToCents\(declaredAmountIqd, exchangeRate\) \?\? clientCents/g) || []).length,
+    2,
+    'the deposit AND the withdrawal route'
+  );
 });

@@ -5,7 +5,7 @@
 # the row (0108), the dinars the customer declared (0105) and the rate each was
 # filed at — so the cause of a 49,994 reading is read off the data instead of
 # guessed. Accounts are shown by the last 6 characters of their id only.
-name: 0 - Diagnose wallet dinars (read-only)
+name: 57 - Diagnose wallet dinars (read-only)
 
 on:
   workflow_dispatch:
