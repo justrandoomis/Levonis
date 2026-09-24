@@ -44,8 +44,10 @@ function meta(html: string, attr: 'property' | 'name', key: string): string | nu
 
 test('the shipped shell carries a card and an icon of its own', () => {
   // The owner reported both symptoms — a generic tab icon and an empty
-  // unfurl — and both were the same absence.
-  assert.match(SHELL, /<link rel="icon"[^>]*Logo\.webp/i);
+  // unfurl — and both were the same absence. The tab icon is now PER HOST
+  // (`/store-icon/*`, merchant platform W2-D: a store's own icon on its host,
+  // the platform's elsewhere); tests/indexHtmlPwa.test.ts owns its details.
+  assert.match(SHELL, /<link rel="icon"[^>]*href="\/store-icon\//i);
   // THE HOME-SCREEN ICON IS NO LONGER THAT WEBP, and the change is the fix
   // rather than a regression this line should have caught. iOS does not
   // accept WebP for `apple-touch-icon`: it ignores the link entirely and uses
@@ -119,7 +121,11 @@ test('the four product paths are recognised, and the referral query is irrelevan
   assert.equal(productSlugFromPath('/product/bambu-a1-mini'), 'bambu-a1-mini');
 });
 
-test('nothing else in the app pays for a lookup', () => {
+test('nothing else in the app pays for a PRODUCT lookup', () => {
+  // `/` (a store's home, on its own host only) and `/community/store/<ref>`
+  // pay for a STORE lookup instead — the store's own card (merchant platform
+  // W2-D, `storeHomeRef`; tests/storeShareKit.test.ts pins that the apex's
+  // `/` reads nothing at all).
   for (const path of [
     '/',
     '/products',
@@ -227,7 +233,7 @@ test('the shop keeps everything that is not the identity of the shared thing', (
   assert.equal(meta(html, 'property', 'og:type'), 'website');
   assert.equal(meta(html, 'property', 'og:locale'), 'ar_IQ');
   assert.equal(meta(html, 'name', 'twitter:card'), 'summary_large_image');
-  assert.match(html, /<link rel="icon"[^>]*Logo\.webp/);
+  assert.match(html, /<link rel="icon"[^>]*href="\/store-icon\//);
   assert.match(html, /<script type="module" src="\/src\/main\.tsx">/);
   assert.match(html, /<html lang="ar" dir="rtl"/);
   // The anti-flash rules and the font links are untouched.
@@ -404,7 +410,10 @@ test('the fallback injects, strips the stale validator, and cannot break a page 
   const fn = /async function assetWithPreview[\s\S]*?\n}\n/.exec(index)?.[0] ?? '';
   assert.ok(fn, 'assetWithPreview not found');
   assert.match(fn, /catch\s*{[\s\S]*return asset;/);
-  assert.match(fn, /if \(!slug \|\| !asset\.ok\) return asset;/);
+  // A path that names neither a product nor a store's own page (the store's
+  // home on its host, `/community/store/<ref>` on the main site — W2-D) is
+  // the asset as it came, with no read.
+  assert.match(fn, /if \(\(!slug && !storeHome\) \|\| !asset\.ok\) return asset;/);
   // Only HTML is rewritten — a JSON or binary asset served on these prefixes
   // must pass through untouched.
   assert.match(fn, /text\\\/html/);

@@ -28,6 +28,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { PLATFORM_ICON_FOR_ROLE, STORE_ICON_PATHS } from '../worker/lib/storeIcons';
 
 const SHELL = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
@@ -87,60 +88,70 @@ test('NO apple-touch-icon is a WebP — iOS silently uses a screenshot instead',
   }
 });
 
-test('every icon href in the document is a file that will actually be served', () => {
+/**
+ * THE ICON LINKS ARE PER HOST NOW (merchant platform W2-D), AND THIS IS THE
+ * DELIBERATE UPDATE OF WHAT THESE TESTS PIN.
+ *
+ * They pinned `/icons/*.png` — files in public/ — and that was the defect on
+ * every merchant host: this document is shared, so iOS «إضافة إلى الشاشة
+ * الرئيسية» on ali3d.levonis-iq.com installed the LEVONIS mark under the
+ * shop's name. Each icon link now names a stable `/store-icon/<name>` path
+ * the Worker answers per Host (worker/routes/manifest.ts `storeIconRoute`):
+ * the store's own PNG rendition on its host, the platform's committed PNG
+ * everywhere else. What "will actually be served" therefore means for them:
+ * a name the route knows, a platform fallback that exists as a real PNG, and
+ * the path in `run_worker_first` in all three environments — without that
+ * last one the asset layer answers with index.html at 200.
+ */
+test('every icon href in the document is served — a per-host Worker path with a real PNG behind it', () => {
   const iconRels = ['icon', 'apple-touch-icon', 'apple-touch-icon-precomposed', 'shortcut icon', 'mask-icon'];
   const icons = links().filter((l) => iconRels.includes((l.rel || '').toLowerCase()));
-  assert.ok(icons.length >= 3, 'the WebP tab icon plus the PNG fallbacks and the Apple one');
+  assert.ok(icons.length >= 3, 'the Apple icon and the tab icons');
+
+  const wrangler = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+  const blocks = wrangler.match(/"run_worker_first"\s*:\s*\[[^\]]*\]/g) ?? [];
+  assert.equal(blocks.length, 3);
+  for (const block of blocks) assert.ok(block.includes('"/store-icon/*"'), `/store-icon/* missing from ${block}`);
 
   for (const link of icons) {
     const href = link.href || '';
-    // `/files/*` is the Worker's R2 route, not a static file — it is checked
-    // by tests/socialPreview.test.ts and is not this file's business.
-    if (href.startsWith('/files/')) continue;
-    assert.ok(href.startsWith('/'), `${href} must be root-relative`);
-    const file = publicFile(href);
-    assert.ok(
-      existsSync(file),
-      `${href} is declared in index.html but is not in public/ — a missing asset is answered with index.html at HTTP 200, so the browser gets HTML where it asked for an image and draws nothing`
-    );
-    // And it is genuinely a PNG, not an HTML shell or a renamed WebP. The
-    // eight-byte PNG signature.
-    const head = readFileSync(file).subarray(0, 8);
-    assert.deepEqual(
-      [...head],
-      [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
-      `${href} is not a PNG`
-    );
+    assert.ok(href.startsWith('/store-icon/'), `${href} is not per host — on a merchant's shop it would show the platform's icon`);
+    const role = STORE_ICON_PATHS[href.slice('/store-icon/'.length)];
+    assert.ok(role, `${href} is not a name the Worker's icon route answers`);
+    // The platform fallback behind it is a committed PNG — the eight-byte
+    // signature, not an HTML shell or a renamed WebP.
+    const file = publicFile(PLATFORM_ICON_FOR_ROLE[role]);
+    assert.ok(existsSync(file), `${PLATFORM_ICON_FOR_ROLE[role]} (the fallback for ${href}) is not in public/`);
+    assert.deepEqual([...readFileSync(file).subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], `${href}`);
   }
 });
 
-test('the iOS home-screen icon is the 180x180 PNG, declared with its size', () => {
+test('the iOS home-screen icon is the 180x180 PNG, per host, declared with its size', () => {
   const apple = links().find((l) => (l.rel || '').toLowerCase() === 'apple-touch-icon');
   assert.ok(apple, 'an apple-touch-icon link');
-  // Under the logo's revision (src/lib/siteLogo.ts): iOS keeps a touch icon
-  // per URL, so a new mark has to arrive under a new one.
-  assert.equal(apple?.href, '/icons/apple-touch-icon.bc80fc2b.png');
-  assert.ok(existsSync(publicFile('/icons/apple-touch-icon.bc80fc2b.png')));
+  assert.equal(apple?.href, '/store-icon/apple-touch.png');
+  assert.equal(STORE_ICON_PATHS['apple-touch.png'], 'apple180', 'the 180 px rendition — the size iOS asks for');
   // iOS chooses between several apple-touch-icon links by comparing `sizes`;
   // a link without one is only the fallback.
   assert.equal(apple?.sizes, '180x180');
+  assert.equal(links().filter((l) => (l.rel || '').toLowerCase().startsWith('apple-touch-icon')).length, 1);
 });
 
-test('the PNG favicons are there for the browsers that never shipped WebP favicons', () => {
-  const pngIcons = links().filter(
-    (l) => (l.rel || '').toLowerCase() === 'icon' && (l.type || '') === 'image/png'
-  );
-  const sizes = pngIcons.map((l) => l.sizes).sort();
-  assert.deepEqual(sizes, ['16x16', '32x32']);
-  for (const icon of pngIcons) assert.ok(existsSync(publicFile(icon.href)), icon.href);
+test('the tab icons are PNG, per host: 32 px for the tab, 192 px for tiles that ask for more', () => {
+  const tabIcons = links().filter((l) => (l.rel || '').toLowerCase() === 'icon');
+  assert.ok(tabIcons.every((l) => (l.type || '') === 'image/png'), 'every tab icon is a PNG every browser decodes');
+  assert.deepEqual(tabIcons.map((l) => l.sizes).sort(), ['192x192', '32x32']);
+  assert.deepEqual(tabIcons.map((l) => l.href).sort(), ['/store-icon/192.png', '/store-icon/favicon-32.png']);
 });
 
-test('the WebP tab icon is kept, not replaced', () => {
-  // Removing it would be a behaviour change nobody asked for, and
-  // tests/socialPreview.test.ts pins the shop having a tab icon of its own.
-  // The query is the logo's revision: the Worker reads the key from the path,
-  // and the browser's favicon store is keyed on the whole URL.
-  assert.match(MARKUP, /<link rel="icon" type="image\/webp" href="\/files\/UiUx\/Logo\/Logo\.webp\?v=[0-9a-f]{8}"/i);
+test('no platform-only icon link is left beside the per-host ones', () => {
+  // The WebP `rel="icon"` pointed at the platform logo in R2. A browser picks
+  // among several `rel="icon"` links by its own rules (by `sizes` in
+  // Chromium, by document order elsewhere), so a platform link beside the
+  // per-host ones would put the LEVONIS mark in some browsers' tab on a
+  // merchant's shop. The share card still names the logo — that is og:image,
+  // and tests/siteMedia.test.ts holds it.
+  assert.doesNotMatch(MARKUP, /<link[^>]+rel="(?:icon|apple-touch-icon)"[^>]+href="\/(?:files|icons)\//i);
 });
 
 // ------------------------------------------------------------- the Apple meta

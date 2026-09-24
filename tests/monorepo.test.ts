@@ -17,8 +17,10 @@ import { importSpecifiers, tsFiles } from './lib/boundaries';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
-const PURE_PACKAGES = ['pricing', 'shipping'];
-const ALL_PACKAGES = ['platform-kit', 'contracts', 'pricing', 'shipping'];
+// `storeLayout` (wave 2, W2-C): the store-page schema shared by the Worker and the
+// storefront; pure for the same reason the pricing engine is.
+const PURE_PACKAGES = ['pricing', 'shipping', 'storeLayout'];
+const ALL_PACKAGES = ['platform-kit', 'contracts', 'pricing', 'shipping', 'storeLayout'];
 
 test('root workspaces and per-package manifests', () => {
   const pkg = JSON.parse(read('package.json')) as { workspaces?: string[]; scripts: Record<string, string> };
@@ -52,7 +54,7 @@ test('root workspaces and per-package manifests', () => {
   assert.deepEqual(readdirSync(join(ROOT, 'packages')).sort(), [...ALL_PACKAGES].sort(), 'a new package needs a row in this test and in 02-MIGRATION-PLAN.md §1.1');
 });
 
-test('pricing and shipping are pure: relative imports only, no bindings, no fetch, no framework', () => {
+test('pricing, shipping and storeLayout are pure: relative imports only, no bindings, no fetch, no framework', () => {
   for (const name of PURE_PACKAGES) {
     for (const file of tsFiles(join(ROOT, 'packages', name, 'src'))) {
       const src = readFileSync(file, 'utf8');

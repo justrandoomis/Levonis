@@ -34,7 +34,8 @@ import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { sniff } from './uploads';
 import { deductOrderStock, planOrderReturn, stockReturnNote } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
-import { cancelStoreOrder, notifyMerchantOfStoreOrder } from '../lib/storeOrderOps';
+import { cancelStoreOrder, notifyMerchantOfStoreOrder, storeCancelMovesMoney } from '../lib/storeOrderOps';
+import { assertFinancialScope } from '../lib/walletAdjust';
 import { deleteCancelledOrder, OrderDeletionRefusal } from '../lib/orderDeletion';
 import { reclaimOrderRedemptionsStatement } from '../lib/offers';
 import { resolveOrderExpiry } from '../lib/orderExpiry';
@@ -2425,6 +2426,12 @@ async function adminStoreOrderMove(
   }
   if (nextStatus !== 'cancelled' || from === 'cancelled') return false;
   const admin = c.get('user')!;
+  // MOVING MONEY IS THE FINANCIAL SCOPE'S (review S6). This cancel refunds a
+  // paid order and claws back a merchant credit that was already released —
+  // the same kind of act the community payout and escrow routes refuse an
+  // assistant-scope admin. A store-order move that moves no money (a status
+  // correction, an unpaid order) stays open to the assistant desk.
+  if (await storeCancelMovesMoney(c.env.DB, order)) assertFinancialScope(c);
   const res = await cancelStoreOrder(c.env, { order, actor: 'admin', actorUserId: admin.id, reason: note || undefined });
   if (!res.ok) throw badRequest('The order changed while you were editing — reload and retry');
   if (note) {
@@ -3293,10 +3300,17 @@ adminRoutes.patch('/orders/:id', async (c) => {
   // forward again re-stamped it to today, which silently re-opened a return
   // window that had already closed and moved the warranty's end a month out.
   // The customer received the goods once; there is one date.
+  //
+  // EXCEPT ON A COMMUNITY-STORE ORDER (review F5), whose `delivered_at` is
+  // neither a warranty nor a return window (store orders are returned through
+  // support) but the start of the three days after which the merchant is paid.
+  // A store order walked back from delivered was NOT delivered; the clock
+  // starts again from the delivery that really happened.
   const flipStmt = c.env.DB.prepare(
     next === 'delivered'
       ? `UPDATE orders SET status = ?, admin_note = ?,
-           delivered_at = COALESCE(NULLIF(delivered_at,''), strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+           delivered_at = CASE WHEN seller_type = 'merchant' THEN strftime('%Y-%m-%dT%H:%M:%fZ','now')
+                               ELSE COALESCE(NULLIF(delivered_at,''), strftime('%Y-%m-%dT%H:%M:%fZ','now')) END,
            updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
           WHERE id = ? AND status = ?`
       : `UPDATE orders SET status = ?, admin_note = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')

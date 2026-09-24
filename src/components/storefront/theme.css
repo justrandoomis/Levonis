@@ -1,0 +1,328 @@
+/*
+ * STORE THEMES — every token value a merchant can pick, as CSS this file
+ * defines. Imported (through ./styles.ts) by the pages that render a store,
+ * so it arrives with their lazy chunks and costs the main site's
+ * render-blocking stylesheet nothing.
+ *
+ * The root `[data-store-theme]` element carries one data attribute per token
+ * (StoreTheme.tsx maps each through a closed table, so only the enum values
+ * below can appear there). No merchant string is ever a selector, a value or a
+ * class. `classic` is the storefront as it was before themes, value for value
+ * (#0a0a0a ground, white/3 % cards, 10 px product tiles, the accent glow).
+ *
+ * Dark grounds only: the app has no light theme (tests/darkOnlyTheme.test.ts).
+ */
+
+[data-store-theme] {
+  /* surface: glow (classic) */
+  --sf-bg: #0a0a0a;
+  --sf-bg-fade: oklab(14.4788% 0 0 / 0.3);
+  --sf-card: rgb(242 243 245 / 0.03);
+  --sf-line: rgb(242 243 245 / 0.1);
+  --sf-tile: rgb(242 243 245 / 0.04);
+  --sf-fact: rgb(242 243 245 / 0.05);
+  --sf-well: rgb(11 12 15 / 0.4);
+  --sf-raised: #15171b;
+  --sf-menu: #131417;
+  /* radius: soft (classic) */
+  --sf-r-sm: 10px;
+  --sf-r-md: 0.75rem;
+  --sf-r-lg: 1rem;
+  /* density: comfortable (classic) */
+  --sf-pad: 0.875rem;
+  --sf-grid-gap: 0.625rem;
+  --sf-tile-pad: 0.5rem;
+  /* section spacing: normal (classic) */
+  --sf-section-gap: 1rem;
+  /* typography: standard (classic) */
+  --sf-strong: 700;
+  --sf-scale: 1;
+  /* width: standard (classic) */
+  --sf-col: 48rem;
+
+  background-color: var(--sf-bg);
+}
+
+/* ---------------------------------------------------------------- surfaces */
+[data-store-theme][data-sf-surface='ink'] {
+  --sf-bg: #0a0a0a;
+}
+[data-store-theme][data-sf-surface='graphite'] {
+  --sf-bg: #111317;
+  --sf-bg-fade: rgb(17 19 23 / 0.3);
+  --sf-card: #16191e;
+  --sf-line: rgb(242 243 245 / 0.08);
+  --sf-tile: #171a1f;
+  --sf-fact: #1b1f25;
+  --sf-well: #0c0e11;
+  --sf-raised: #1c2027;
+  --sf-menu: #1a1d22;
+}
+[data-store-theme][data-sf-surface='carbon'] {
+  --sf-bg: #050505;
+  --sf-bg-fade: rgb(5 5 5 / 0.3);
+  --sf-card: rgb(242 243 245 / 0.025);
+  --sf-line: rgb(242 243 245 / 0.085);
+  --sf-tile: rgb(242 243 245 / 0.03);
+  --sf-fact: rgb(242 243 245 / 0.045);
+  --sf-well: #000000;
+  --sf-raised: #111111;
+  --sf-menu: #121212;
+}
+[data-store-theme][data-sf-surface='midnight'] {
+  --sf-bg: #090d15;
+  --sf-bg-fade: rgb(9 13 21 / 0.3);
+  --sf-card: #0f1522;
+  --sf-line: rgb(148 163 184 / 0.14);
+  --sf-tile: #111827;
+  --sf-fact: #131b2b;
+  --sf-well: #070a10;
+  --sf-raised: #141c2c;
+  --sf-menu: #121a29;
+}
+
+/* ------------------------------------------------------------------ radius */
+[data-store-theme][data-sf-radius='sharp'] {
+  --sf-r-sm: 4px;
+  --sf-r-md: 6px;
+  --sf-r-lg: 8px;
+}
+[data-store-theme][data-sf-radius='round'] {
+  --sf-r-sm: 14px;
+  --sf-r-md: 1.125rem;
+  --sf-r-lg: 1.5rem;
+}
+
+/* ----------------------------------------------------------------- density */
+[data-store-theme][data-sf-density='compact'] {
+  --sf-pad: 0.625rem;
+  --sf-grid-gap: 0.5rem;
+  --sf-tile-pad: 0.375rem;
+}
+[data-store-theme][data-sf-density='airy'] {
+  --sf-pad: 1.125rem;
+  --sf-grid-gap: 0.875rem;
+  --sf-tile-pad: 0.625rem;
+}
+
+/* --------------------------------------------------------- section spacing */
+[data-store-theme][data-sf-spacing='tight'] {
+  --sf-section-gap: 0.75rem;
+}
+[data-store-theme][data-sf-spacing='loose'] {
+  --sf-section-gap: 1.75rem;
+}
+
+/* -------------------------------------------------------------- typography */
+/* Weight and scale of Cairo only — never letter-spacing, which breaks Arabic. */
+[data-store-theme][data-sf-type='bold'] {
+  --sf-strong: 800;
+  --sf-scale: 1.06;
+}
+[data-store-theme][data-sf-type='refined'] {
+  --sf-strong: 600;
+  --sf-scale: 1.04;
+}
+[data-store-theme][data-sf-type='compact'] {
+  --sf-strong: 700;
+  --sf-scale: 0.94;
+}
+
+/* ------------------------------------------------------------------- width */
+[data-store-theme][data-sf-width='wide'] {
+  --sf-col: 72rem;
+}
+
+/* ------------------------------------------------------------ the classes */
+.sf-col {
+  max-width: var(--sf-col);
+  margin-inline: auto;
+}
+
+.sf-stack > * + * {
+  margin-top: var(--sf-section-gap);
+}
+
+.sf-name {
+  font-size: calc(17px * var(--sf-scale));
+  font-weight: var(--sf-strong);
+}
+.sf-display {
+  font-size: calc(22px * var(--sf-scale));
+  font-weight: var(--sf-strong);
+}
+.sf-display-sm {
+  font-size: calc(20px * var(--sf-scale));
+  font-weight: var(--sf-strong);
+}
+/*
+ * These rules are unlayered, so they outrank Tailwind's layered utilities:
+ * never pair an sf-* class with a utility that sets the same property.
+ */
+.sf-title {
+  font-size: calc(16px * var(--sf-scale));
+  font-weight: var(--sf-strong);
+}
+.sf-subtitle {
+  font-size: calc(15px * var(--sf-scale));
+  font-weight: var(--sf-strong);
+}
+
+.sf-cover-fade {
+  background-image: linear-gradient(to top in oklab, var(--sf-bg) 0%, var(--sf-bg-fade) 50%, transparent 100%);
+}
+
+/* A card: services, showcase works, about panels, reviews, the install card. */
+.sf-card {
+  background-color: var(--sf-card);
+  border: 1px solid var(--sf-line);
+  border-radius: var(--sf-r-lg);
+}
+.sf-card-pad {
+  padding: var(--sf-pad);
+}
+/* A row: the collection list, the showcase's printers and materials. */
+.sf-row {
+  background-color: var(--sf-card);
+  border: 1px solid var(--sf-line);
+  border-radius: var(--sf-r-md);
+}
+[data-sf-card='flat'] :is(.sf-card, .sf-row) {
+  background-color: var(--sf-fact);
+  border-color: transparent;
+}
+[data-sf-card='raised'] :is(.sf-card, .sf-row) {
+  background-color: var(--sf-raised);
+  border-color: transparent;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 12px 28px -18px rgb(0 0 0 / 0.85);
+}
+
+/* The three info cards under the profile. */
+.sf-fact {
+  background-color: var(--sf-fact);
+  border-radius: var(--sf-r-sm);
+}
+
+.sf-well {
+  background-color: var(--sf-well);
+}
+.sf-menu {
+  background-color: var(--sf-menu);
+}
+.sf-r-sm {
+  border-radius: var(--sf-r-sm);
+}
+.sf-r-md {
+  border-radius: var(--sf-r-md);
+}
+.sf-r-lg {
+  border-radius: var(--sf-r-lg);
+}
+
+.sf-grid {
+  gap: var(--sf-grid-gap);
+}
+
+/* ------------------------------------------------------------ product card */
+.sf-tile {
+  display: block;
+  overflow: hidden;
+  background-color: var(--sf-tile);
+  border-radius: var(--sf-r-sm);
+}
+.sf-tile-body {
+  padding: var(--sf-tile-pad);
+}
+[data-sf-pcard='bordered'] .sf-tile {
+  background-color: var(--sf-card);
+  border: 1px solid var(--sf-line);
+  border-radius: var(--sf-r-md);
+}
+[data-sf-pcard='minimal'] .sf-tile {
+  background-color: transparent;
+  border-radius: 0;
+}
+[data-sf-pcard='minimal'] .sf-tile .sf-media {
+  border-radius: var(--sf-r-sm);
+}
+[data-sf-pcard='minimal'] .sf-tile-body {
+  padding-inline: 0.125rem;
+}
+[data-sf-pcard='overlay'] .sf-tile {
+  position: relative;
+  border-radius: var(--sf-r-md);
+}
+[data-sf-pcard='overlay'] .sf-tile-body {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  padding: 1.75rem var(--sf-tile-pad) var(--sf-tile-pad);
+  background-image: linear-gradient(to top, rgb(0 0 0 / 0.78), rgb(0 0 0 / 0.35) 60%, transparent);
+}
+[data-sf-pcard='overlay'] .sf-tile-body :is(p, span) {
+  color: #f2f3f5;
+}
+/* The names cover the picture's lower edge, so the «unavailable» flag moves
+   up, under the heart, where nothing covers it. */
+[data-sf-pcard='overlay'] .sf-tile-flag {
+  top: 2rem;
+  bottom: auto;
+}
+
+/* Every product and gallery picture takes the theme's ratio. */
+.sf-media {
+  aspect-ratio: 1 / 1;
+}
+[data-sf-ratio='portrait'] .sf-media {
+  aspect-ratio: 4 / 5;
+}
+[data-sf-ratio='landscape'] .sf-media {
+  aspect-ratio: 4 / 3;
+}
+
+/* A horizontal shelf: snap, no scrollbar, the page edge as its gutter. */
+.sf-shelf {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(9.5rem, 42%);
+  gap: var(--sf-grid-gap);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.sf-shelf::-webkit-scrollbar {
+  display: none;
+}
+.sf-shelf > * {
+  scroll-snap-align: start;
+}
+@container (min-width: 40rem) {
+  .sf-shelf {
+    grid-auto-columns: minmax(10rem, 24%);
+  }
+}
+
+/* The classic ground's accent glow; other surfaces have none. */
+.sf-glow {
+  display: none;
+}
+[data-sf-surface='glow'] > .sf-glow {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-shelf {
+    scroll-behavior: auto;
+  }
+}
+
+/* A stack of rows whose last one leaves the spacing to the block below. */
+.sf-flush > :last-child {
+  margin-bottom: 0;
+}
+.sf-bg {
+  background-color: var(--sf-bg);
+}

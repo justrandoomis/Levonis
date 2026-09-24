@@ -11,7 +11,11 @@ function setup(user: string | null = 'me', role = 'customer') {
   const raw=newSqlite();
   raw.exec(`CREATE TABLE chat_participants(chat_id TEXT,user_id TEXT,PRIMARY KEY(chat_id,user_id));
     INSERT INTO chat_participants VALUES ('c','me'),('c','peer');
-    CREATE TABLE rate_limits(key TEXT PRIMARY KEY,window_start INTEGER,count INTEGER);`);
+    CREATE TABLE rate_limits(key TEXT PRIMARY KEY,window_start INTEGER,count INTEGER);
+    -- The write door also asks whether this is a store order's thread (review S3); 'c' is not.
+    CREATE TABLE chats(id TEXT PRIMARY KEY,order_id TEXT); INSERT INTO chats VALUES ('c',NULL);
+    CREATE TABLE orders(id TEXT PRIMARY KEY,user_id TEXT,merchant_id TEXT);
+    CREATE TABLE community_merchants(id TEXT PRIMARY KEY,user_id TEXT);`);
   raw.exec(readFileSync(new URL('../migrations/0071_chat_typing_presence.sql',import.meta.url),'utf8'));
   const app=new Hono<AppContext>();
   app.use('*', async(c,next)=>{c.env={DB:new SqliteD1(raw)} as never; c.set('user', user ? {id:user,role} as never : null);await next();});

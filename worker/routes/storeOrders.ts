@@ -378,7 +378,7 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode = ''): Promi
  * wallet's answer and the fingerprint to confirm — and nothing of the
  * commission, which is the merchant's and the platform's business.
  */
-async function publicQuote(c: Context<AppContext>, cart: PricedCart) {
+async function publicQuote(c: Context<AppContext>, cart: PricedCart, checkoutKey = '') {
   const user = c.get('user')!;
   // PREPAID ONLY. On this path the wallet is not one payment method among
   // several — it is the only one — so whether it covers this total decides
@@ -397,12 +397,16 @@ async function publicQuote(c: Context<AppContext>, cart: PricedCart) {
   // contradicted the wallet page by six dinars. Both figures now come from
   // `walletIqdAvailable`, the one function that turns a balance into dinars,
   // so this screen and the wallet screen cannot disagree at all.
-  const [rate, balances, dust] = await Promise.all([
+  const [rate, balances, dust, ownHoldCents] = await Promise.all([
     exchangeRate(c.env.DB),
     getAvailableBalances(c.env, user.id),
     readWalletDust(c.env.DB, user.id),
+    // The checkout's own attempt key, when the page sends it: a reservation
+    // that attempt left behind is money this very order can still use
+    // (review F6), so it must not read as "your wallet does not cover this".
+    activeCheckoutHoldCents(c.env.DB, user.id, checkoutKey),
   ]);
-  const walletAvailableIqd = walletIqdAvailable(balances.usd_cents_available, dust.dust_iqd, rate);
+  const walletAvailableIqd = walletIqdAvailable(balances.usd_cents_available + ownHoldCents, dust.dust_iqd, rate);
   return {
     store_id: cart.store_id,
     store_name: cart.store_name,
@@ -455,8 +459,32 @@ storeOrderRoutes.post('/quote', async (c) => {
   await rateLimit(c, 'store-quote', 120, 300);
   const body = await c.req.json().catch(() => ({}));
   const cart = await priceMerchantCart(c, typeof body.couponCode === 'string' ? body.couponCode : '');
-  return c.json({ success: true, quote: await publicQuote(c, cart) });
+  // Optional: the attempt key the checkout will place with (review F6). Only
+  // a well-formed key is read — anything else is simply no key.
+  const key = typeof body.idempotencyKey === 'string' && /^[\w:.-]{8,80}$/.test(body.idempotencyKey)
+    ? body.idempotencyKey
+    : '';
+  return c.json({ success: true, quote: await publicQuote(c, cart, key) });
 });
+
+/** The event key of the wallet hold one checkout attempt places — server-minted from the user and their key. */
+const checkoutHoldKey = (userId: string, idempotencyKey: string) => `store-order:${userId}:${idempotencyKey}`;
+
+/**
+ * The cents this checkout key's OWN hold still reserves: an active purchase
+ * hold not yet settled into an order (review F6). Zero when there is none.
+ */
+async function activeCheckoutHoldCents(db: D1Database, userId: string, idempotencyKey: string): Promise<number> {
+  if (!idempotencyKey) return 0;
+  const row = await db
+    .prepare(
+      `SELECT amount_cents FROM wallet_holds
+        WHERE user_id = ? AND kind = 'purchase' AND event_key = ? AND state = 'active' AND tx_id IS NULL`
+    )
+    .bind(userId, checkoutHoldKey(userId, idempotencyKey))
+    .first<{ amount_cents: number }>();
+  return Math.max(0, Number(row?.amount_cents) || 0);
+}
 
 /** The customer's own order, as they may see it — for a replay of a placed order. */
 async function placedOrder(c: Context<AppContext>, idempotencyKey: string) {
@@ -573,11 +601,21 @@ storeOrderRoutes.post('/', async (c) => {
    */
   const walletDust = await readWalletDust(db, user.id);
   const walletBalances = await getAvailableBalances(c.env, user.id);
-  const walletBalanceIqd = walletIqdAvailable(
-    walletBalances.usd_cents_available,
-    walletDust.dust_iqd,
-    rate
-  );
+  /**
+   * A RETRY WITH THE SAME KEY PAYS WITH ITS OWN RESERVATION (review F6).
+   *
+   * The hold this key placed survives a transient batch failure on purpose, so
+   * the retry reuses it rather than reserving twice. But the balance read
+   * above has that very hold SUBTRACTED — and on a wallet that holds exactly
+   * the order, the retry was refused INSUFFICIENT_FUNDS by the reservation it
+   * came to use, the money locked until the orphan sweep. The key's own
+   * active, unsettled hold is added back before the question is asked, as
+   * `reserveEscrowFunds` does for an acceptance; `createPurchaseHold` then
+   * replays it (same key, same cents) and the debit's guard adds it back too.
+   */
+  const ownHoldCents = await activeCheckoutHoldCents(db, user.id, idempotencyKey);
+  const spendableCents = walletBalances.usd_cents_available + ownHoldCents;
+  const walletBalanceIqd = walletIqdAvailable(spendableCents, walletDust.dust_iqd, rate);
   if (cart.total_iqd > walletBalanceIqd) {
     throw badRequest('Your wallet balance does not cover this order', 'INSUFFICIENT_FUNDS', {
       required_iqd: cart.total_iqd,
@@ -598,7 +636,7 @@ storeOrderRoutes.post('/', async (c) => {
    * one cent behind it). The customer pays at most one cent — 13 د.ع — more
    * than the quoted dinars, once, on a price smaller than that.
    */
-  const walletCents = Math.max(1, walletSpendCents(cart.total_iqd, walletBalances.usd_cents_available, rate));
+  const walletCents = Math.max(1, walletSpendCents(cart.total_iqd, spendableCents, rate));
   const hold = await createPurchaseHold(db, {
     userId: user.id,
     amountCents: walletCents,
@@ -607,7 +645,7 @@ storeOrderRoutes.post('/', async (c) => {
     // buyer's hold — the same cross-user denial 0064 closes on `orders`.
     // The hold is created before the order id exists, so the key is the
     // user plus their key, which is exactly the pair 0064 makes unique.
-    eventKey: `store-order:${user.id}:${idempotencyKey}`,
+    eventKey: checkoutHoldKey(user.id, idempotencyKey),
     refType: 'store_order',
     refId: `${user.id}:${idempotencyKey}`,
     note: `Order from ${cart.store_name}`,
@@ -671,9 +709,27 @@ storeOrderRoutes.post('/', async (c) => {
    * condition holds, which aborts the whole batch: the order, the debit, the
    * credit, everything. They run BEFORE the decrements, against the rows as
    * they stand inside this transaction, and a missing product aborts too.
-   *   · stock / availability → `orders.status`      → 409 OUT_OF_STOCK
-   *   · the coupon's cap     → `orders.coupon_code` → 409 COUPON_EXHAUSTED
+   *   · stock / availability → `orders.status`           → 409 OUT_OF_STOCK
+   *   · the coupon's cap     → `orders.coupon_code`      → 409 COUPON_EXHAUSTED
+   *   · the priced lines     → `orders.address_snapshot` → 409 CART_CHANGED
+   *
+   * THE CART ITSELF IS FENCED TOO (review F7). Two checkout tabs on one cart,
+   * each with its own key, both priced the same lines and both committed —
+   * two debits for one cart, the second order paying for lines the first had
+   * already taken. Every line this order priced must still be in the cart,
+   * inside this transaction, or nothing is written.
    */
+  stmts.push(
+    db.prepare(
+      `UPDATE orders
+          SET address_snapshot = CASE WHEN (
+                SELECT COUNT(*) FROM cart_items ci
+                 WHERE ci.user_id = ?2 AND ci.seller_type = 'merchant'
+                   AND ci.id IN (SELECT value FROM json_each(?3))
+              ) = ?4 THEN address_snapshot ELSE NULL END
+        WHERE id = ?1`
+    ).bind(orderId, user.id, JSON.stringify(cart.lines.map((l) => l.cart_item_id)), cart.lines.length)
+  );
   for (const need of cart.products) {
     stmts.push(
       db.prepare(
@@ -795,8 +851,8 @@ storeOrderRoutes.post('/', async (c) => {
   // that same reservation instead of taking a second one out of their balance
   // (tests/walletHoldSettlement.test.ts pins it). This catch therefore does not
   // release it — the orphan sweep does, if no retry ever comes
-  // (worker/lib/storeOrderOps.ts `releaseOrphanStoreHolds`). A stock or coupon
-  // REFUSAL is not transient, and is handed back below.
+  // (worker/lib/storeOrderOps.ts `releaseOrphanStoreHolds`). A stock, coupon
+  // or cart REFUSAL is not transient, and is handed back below.
   try {
     await db.batch(stmts);
   } catch (e) {
@@ -820,7 +876,12 @@ storeOrderRoutes.post('/', async (c) => {
       ? await stockRefusal(db, cart)
       : /NOT NULL constraint failed: orders\.coupon_code/i.test(msg)
         ? refuse('This coupon has just been used up', 'COUPON_EXHAUSTED', { code: cart.coupon_code })
-        : null;
+        : /NOT NULL constraint failed: orders\.address_snapshot/i.test(msg)
+          ? refuse(
+              'Your cart changed while you were checking out — it may have been ordered from another tab. Check your orders.',
+              'CART_CHANGED'
+            )
+          : null;
     if (!refusal) throw e;
     // A failed release is not the customer's problem and does not change the
     // answer: the orphan sweep returns the reservation after its TTL.

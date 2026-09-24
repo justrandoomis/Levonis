@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { AppContext, Env } from '../lib/types';
+import type { AppContext, Env, SessionUser } from '../lib/types';
 import { requireAuth, badRequest, notFound, conflict, str, int, HttpError } from '../lib/http';
 import { newId, randomToken, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
@@ -1443,16 +1443,21 @@ async function viewerToken(env: Env, raw: string | undefined) {
   const token = str(raw, 'token', { min: 20, max: 120 });
   const hash = await sha256Hex(token);
   const row = await env.DB.prepare(
-    `SELECT t.token_hash, t.file_id, t.request_id, t.expires_at, t.revoked_at, r.state AS request_state
+    `SELECT t.token_hash, t.file_id, t.request_id, t.expires_at, t.revoked_at, t.created_at, t.created_by,
+            r.state AS request_state, r.customer_id, r.visibility, r.expires_at AS request_expires_at,
+            u.role AS creator_role
        FROM model_view_tokens t
        JOIN community_requests r ON r.id = t.request_id
+       LEFT JOIN users u ON u.id = t.created_by
       WHERE t.token_hash = ?`
   )
     .bind(hash)
     .first<{
       token_hash: string; file_id: string; request_id: string; expires_at: string;
-      revoked_at: string | null; request_state: string;
+      revoked_at: string | null; created_at: string; created_by: string; request_state: string;
+      customer_id: string; visibility: string; request_expires_at: string | null; creator_role: string | null;
     }>();
+  const invalid = () => notFound('This link is no longer valid');
   // One answer for "wrong", "expired", "revoked" and "the request is closed":
   // a viewer link that has stopped working must not tell a stranger which of
   // them it was. The request's state is re-read on every use as well as the
@@ -1464,8 +1469,35 @@ async function viewerToken(env: Env, raw: string | undefined) {
     !(Date.parse(row.expires_at) > Date.now()) ||
     VIEWER_CLOSED_STATES.includes(row.request_state)
   ) {
-    throw notFound('This link is no longer valid');
+    throw invalid();
   }
+  /**
+   * A LINK MINTED BEFORE THE 60-MINUTE RULE KEEPS NONE OF ITS WEEK (review
+   * S8). The mint used to accept `hours` up to 168; migration 0119 revokes
+   * every such link it finds, and this refuses any that slipped past it (one
+   * minted between the migration and the deploy): whatever `expires_at`
+   * says, a link lives `VIEWER_TOKEN_TTL_MINUTES` from its own minting.
+   */
+  const minted = Date.parse(row.created_at);
+  if (!(Number.isFinite(minted) && minted + VIEWER_TOKEN_TTL_MINUTES * 60_000 > Date.now())) throw invalid();
+  /**
+   * AND IT GRANTS NO MORE THAN ITS CREATOR STILL HAS (review S8). A link is
+   * the creator's access, handed on — re-derived here on every use by the same
+   * rule the mint applied: the request's owner, the engaged merchant, or a
+   * merchant who could quote on it right now. A merchant Levonis has since
+   * restricted, a request that left the board, a plan that lapsed: the link
+   * stops with the access it stood on.
+   */
+  const creator = { id: row.created_by, role: row.creator_role ?? 'customer' } as SessionUser;
+  const request: RequestForAccess = {
+    id: row.request_id,
+    customer_id: row.customer_id,
+    state: row.request_state,
+    visibility: row.visibility,
+    expires_at: row.request_expires_at,
+  };
+  const { access } = await requestFileAccess(env, request, creator, { allowAdmin: false });
+  if (!access || (access === 'board' && !(await mayQuoteOnBoard(env.DB, row.created_by)))) throw invalid();
   return row;
 }
 

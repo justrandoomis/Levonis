@@ -48,6 +48,8 @@ const CART_REMEDY = new Set([
   'CART_EMPTY',
   'STORE_CLOSED',
   'OWN_STORE_PURCHASE',
+  // Another tab placed (or emptied) this cart while this one was confirming.
+  'CART_CHANGED',
 ]);
 
 export default function StoreCheckout() {
@@ -138,7 +140,10 @@ export default function StoreCheckout() {
       setQuoteAskedFor(askedFor);
       setCouponError('');
       try {
-        const d = await storeCheckoutApi.quote(code);
+        // The attempt's own key rides along: a reservation a failed attempt
+        // left behind is still this checkout's money, and the server counts
+        // it back so the button is not disabled by it (review F6).
+        const d = await storeCheckoutApi.quote(code, attempt.current?.key ?? '');
         if (seq !== quoteSeq.current) return false;
         setQuote(d.quote);
         // A total that moved on its own is named; one the customer moved with

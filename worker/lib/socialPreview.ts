@@ -52,6 +52,8 @@
 import { primaryMedia, upgradeMedia } from './productModel';
 import { isAnonymousPublicMediaKey } from './mediaStorage';
 import { loadAuthoritativeProductImages } from './productSelectionImage';
+import { logoSourceKey, readStoreIconsQuietly, servableStoreIcons } from './storeIcons';
+import { cleanIdentityText, storeDescription } from './webManifest';
 
 /** The four things a chat app reads off a link, already absolute and escaped. */
 export interface SocialPreview {
@@ -62,6 +64,18 @@ export interface SocialPreview {
   image: string;
   /** Absolute URL of the page itself. */
   url: string;
+  /**
+   * `og:site_name` — whose site this card is on. Absent keeps the document's
+   * «LEVONIS»; on a store's own host the site IS the store (see
+   * `resolveStorePreview`).
+   */
+  siteName?: string;
+  /**
+   * `twitter:card`. A store card's picture is its square logo, which the
+   * shell's `summary_large_image` would crop into a 2:1 banner; `summary`
+   * shows it whole. Absent keeps the document's value.
+   */
+  twitterCard?: 'summary' | 'summary_large_image';
 }
 
 /**
@@ -244,6 +258,8 @@ export function injectSocialPreview(html: string, preview: SocialPreview): strin
     out = setMeta(out, 'name', 'twitter:image', preview.image);
   }
   if (preview.url) out = setMeta(out, 'property', 'og:url', preview.url);
+  if (preview.siteName) out = setMeta(out, 'property', 'og:site_name', preview.siteName);
+  if (preview.twitterCard) out = setMeta(out, 'name', 'twitter:card', preview.twitterCard);
   return out;
 }
 
@@ -383,4 +399,128 @@ export function previewStoreRef(path: string): string | null {
   } catch {
     return null;
   }
+}
+
+// ===========================================================================
+//  THE STORE'S OWN CARD — decision 11: «every merchant has an independent
+//  store — identity, subdomain, PWA» (docs/MERCHANT_PLATFORM.md §2, §4.5)
+// ===========================================================================
+
+/**
+ * The store a `/community/store/<ref>` path names — the store's own page on
+ * the main site (`CommunityStorePage`, which accepts a slug, a store id or a
+ * merchant id) — or null. Only the page itself: `/community/store/<ref>/p/…`
+ * is a product and is `previewStoreRef`'s.
+ */
+export function storeHomeRef(path: string): string | null {
+  const m = /^\/community\/store\/([^/]+)\/?$/.exec(path);
+  if (!m) return null;
+  try {
+    const ref = decodeURIComponent(m[1]);
+    return ref && ref.length <= 64 && !ref.includes('.') ? ref : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A store's own card: what its home unfurls as, and the frame of its products' cards. */
+export type StoreCard = Required<Pick<SocialPreview, 'title' | 'description' | 'image' | 'siteName' | 'twitterCard'>>;
+
+interface StoreCardRow {
+  id: string;
+  name: unknown;
+  tagline: unknown;
+  description: unknown;
+  logo_key: string | null;
+  accent: string | null;
+}
+
+/**
+ * A STORE LINK UNFURLS AS THE STORE.
+ *
+ * Before this, `https://ali3d.levonis-iq.com/` — the link a merchant shares
+ * more than any other, and the one the share kit hands them — unfurled in
+ * every chat as LEVONIS, with the platform's logo and the platform's
+ * description of itself, because the shell's defaults were all a crawler ever
+ * read on a store's home.
+ *
+ *   title        the store's name (cleaned like the manifest's: no bidi
+ *                overrides, no zero-width characters, a whole character cut);
+ *   description  its tagline, else its own description cut for a card, else
+ *                the manifest's sentence «متجر X على منصة Levonis» — never the
+ *                platform's description of the PLATFORM;
+ *   image        its 512 px app-icon rendition when that is cut for the
+ *                current logo (a PNG every crawler decodes), else the logo
+ *                itself when a crawler may fetch it, else the shell's own
+ *                image — the platform mark only as a true fallback;
+ *   site name    the store: on its own host, the site IS the store.
+ *
+ * Scoped exactly like `resolveProductPreview`: a store HOST by slug only; the
+ * main site's `/community/store/<ref>` by slug, store id or merchant id. A
+ * sanctioned store (suspended, or its merchant suspended) gives NO card —
+ * its page is «المتجر غير متاح حاليًا», and its name or logo may be what it
+ * was suspended for. A paused store still does: that is the merchant's own
+ * switch, and its page still renders under its own name.
+ */
+export async function resolveStorePreview(
+  db: D1Database,
+  origin: string,
+  scope: { storeSlug?: string | null; storeRef?: string | null }
+): Promise<StoreCard | null> {
+  const storeKey = scope.storeSlug || scope.storeRef || '';
+  if (!storeKey) return null;
+  const store = await db
+    .prepare(
+      `SELECT s.id, s.name, s.tagline, s.description, s.logo_key, s.accent
+         FROM merchant_stores s
+         JOIN community_merchants m ON m.id = s.merchant_id
+        WHERE (s.slug = ?1 OR (?2 = 1 AND (s.id = ?1 OR s.merchant_id = ?1)))
+          AND s.status <> 'suspended' AND m.status <> 'suspended'
+        LIMIT 1`
+    )
+    .bind(storeKey, scope.storeSlug ? 0 : 1)
+    .first<StoreCardRow>();
+  if (!store) return null;
+
+  const title = cleanIdentityText(store.name, 60);
+  if (!title) return null;
+  const description =
+    cleanIdentityText(store.tagline, 200) ||
+    shortDescription(cleanIdentityText(store.description, 4000)) ||
+    storeDescription(title);
+
+  // The rendition, read quietly: before migration 0123 reaches the database
+  // (or on any read failure) the card simply uses the logo.
+  const icons = servableStoreIcons(store, await readStoreIconsQuietly(db, store.id));
+  const logo = logoSourceKey(store.logo_key);
+  const image = icons
+    ? absoluteImageUrl(`/files/${icons.keys.icon512}`, origin)
+    : logo
+      ? absoluteImageUrl(`/files/${logo}`, origin)
+      : '';
+
+  return { title, description, image, siteName: title, twitterCard: 'summary' };
+}
+
+/**
+ * A PRODUCT CARD ON A STORE'S HOST IS FRAMED BY THE STORE.
+ *
+ * The product keeps its own title, picture and description — that is what
+ * the owner asked of product links. What changes on a store's host is the
+ * frame: `og:site_name` names the store rather than LEVONIS, and where the
+ * product has no description or no picture of its own the card falls back to
+ * the STORE's line and logo, not the platform's — the rule «keep the shop's
+ * default» applied to the shop the link is actually on.
+ */
+export function framedByStore(
+  product: Pick<SocialPreview, 'title' | 'description' | 'image'>,
+  store: StoreCard | null
+): Pick<SocialPreview, 'title' | 'description' | 'image' | 'siteName'> {
+  if (!store) return product;
+  return {
+    title: product.title,
+    description: product.description || store.description,
+    image: product.image || store.image,
+    siteName: store.siteName,
+  };
 }

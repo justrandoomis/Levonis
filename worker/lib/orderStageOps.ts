@@ -342,17 +342,23 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   // and `deductOrderStock` then runs against units that were already released
   // — eating another order's reservation where one exists. Fencing on the
   // status the caller actually read collapses all of that into a clean RACED.
+  // `delivered_at` is stamped ONCE on a platform order (the warranty and the
+  // return window start there) and on EVERY move into delivered on a
+  // community-store order, where it starts the three days before the merchant
+  // is paid — a store delivery walked back was not a delivery (review F5).
   const flipStatement = env.DB.prepare(
     `UPDATE orders
         SET stage = ?, stage_changed_at = ?, stage_source = ?,
             next_stage = ?, next_stage_at = ?, status = ?,
-            delivered_at = CASE WHEN ? = 'delivered' THEN COALESCE(NULLIF(delivered_at,''), ?) ELSE delivered_at END,
+            delivered_at = CASE WHEN ? = 'delivered'
+                                THEN CASE WHEN seller_type = 'merchant' THEN ? ELSE COALESCE(NULLIF(delivered_at,''), ?) END
+                                ELSE delivered_at END,
             updated_at = ?${dayPatch.sql}
       WHERE id = ? AND stage = ? AND status = ?`
   ).bind(
     opts.to, nowIso, opts.source === 'system' ? 'manual' : opts.source,
     schedule.next_stage ?? '', schedule.next_stage_at, legacyTo,
-    opts.to, nowIso, nowIso,
+    opts.to, nowIso, nowIso, nowIso,
     ...dayPatch.binds,
     // The STORED stage, never the derived `from` — see the note where `from`
     // is computed.

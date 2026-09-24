@@ -30,12 +30,26 @@
  *   cross-fades in place. Both still change, so the tab change is still legible
  *   without anything travelling.
  *
+ *   THE KEYBOARD (WAI-ARIA tabs). The strip is ONE Tab stop — the selected tab
+ *   (a roving `tabIndex`) — and the arrow keys move along it in the WRITING
+ *   direction (→ goes back in Arabic, as in `Segmented`), wrapping; Home / End
+ *   jump to the ends. Selection follows focus. With `panels`, each tab names
+ *   the panel it controls (`aria-controls`) and `TabPanels` given the same
+ *   `group` is that `role="tabpanel"`, labelled by its tab.
+ *
+ *   LINK MODE. When the tabs ARE the URL (a workspace section's sub-pages),
+ *   give items an `href`: the strip becomes a `<nav>` of real links, the
+ *   current one `aria-current="page"` — middle-click, copy-link and Back all
+ *   work — with the same travelling indicator and the same arrow keys.
+ *
  * The indicator's `layoutId` must be unique per strip, or two strips on one
  * screen animate their underlines into each other. `group` is that id.
  */
 
 import React, { useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
+import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
 
 export interface TabItem {
@@ -44,12 +58,15 @@ export interface TabItem {
   /** A count or dot rendered after the label. */
   badge?: React.ReactNode;
   show?: boolean;
+  /** Link mode: the tab is this in-app URL. */
+  href?: string;
 }
 
 export interface TabStripProps {
   items: TabItem[];
   value: string;
-  onChange: (id: string) => void;
+  /** Called when a tab is chosen. Optional in link mode, where the link navigates. */
+  onChange?: (id: string) => void;
   /** Unique per strip — it namespaces the shared-layout indicator. */
   group: string;
   /** Accent classes for the moving indicator. */
@@ -62,7 +79,13 @@ export interface TabStripProps {
   /** Equal-width tabs (a three-tab row) vs natural width (a scrolling row). */
   fill?: boolean;
   label?: string;
+  /** Wire each tab to its `TabPanels` panel (same `group`) with aria-controls. */
+  panels?: boolean;
 }
+
+/** The ids that tie a tab to its panel. */
+export const tabId = (group: string, id: string) => `tab-${group}-${id}`;
+export const panelId = (group: string, id: string) => `tabpanel-${group}-${id}`;
 
 export function TabStrip({
   items,
@@ -75,45 +98,111 @@ export function TabStrip({
   className = '',
   fill = true,
   label,
+  panels = false,
 }: TabStripProps) {
   const m = useMotion();
+  const { dir } = useLanguage();
   const shown = items.filter((t) => t.show !== false);
+  const links = shown.length > 0 && shown.every((t) => !!t.href);
+  const refs = useRef<Array<HTMLElement | null>>([]);
 
+  const onKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    const count = shown.length;
+    if (count === 0) return;
+    const at = Math.max(
+      0,
+      refs.current.findIndex((el) => el === document.activeElement)
+    );
+    // "Forward" is the writing direction: ArrowRight goes back in Arabic.
+    const forward = dir === 'rtl' ? 'ArrowLeft' : 'ArrowRight';
+    const back = dir === 'rtl' ? 'ArrowRight' : 'ArrowLeft';
+    let next = -1;
+    if (e.key === forward) next = (at + 1) % count;
+    else if (e.key === back) next = (at - 1 + count) % count;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = count - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    refs.current[next]?.focus();
+    // Links move focus only (Enter follows one); tabs select as they focus.
+    if (!links) onChange?.(shown[next].id);
+  };
+
+  const strip = shown.map((t, i) => {
+    const active = t.id === value;
+    const classes = `relative ${fill ? 'flex-1' : 'shrink-0 px-3'} py-3 text-sm font-medium text-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus ${
+      active ? activeClassName : idleClassName
+    }`;
+    const inner = (
+      <>
+        <span className="inline-flex items-center gap-1.5">
+          {t.label}
+          {t.badge}
+        </span>
+        {active && (
+          <motion.span
+            // ONE element, shared across every tab in this strip: motion
+            // animates it from its old box to its new one instead of
+            // fading one out and another in.
+            layoutId={`tab-indicator-${group}`}
+            data-tab-indicator
+            className={`absolute bottom-0 start-0 end-0 h-0.5 rounded-t-full ${indicatorClassName}`}
+            transition={m.reduced ? { duration: 0 } : m.spring('move')}
+          />
+        )}
+      </>
+    );
+    const setRef = (el: HTMLElement | null) => {
+      refs.current[i] = el;
+    };
+    if (links) {
+      return (
+        <Link
+          key={t.id}
+          ref={setRef}
+          to={t.href!}
+          aria-current={active ? 'page' : undefined}
+          data-tab={t.id}
+          data-tab-active={active || undefined}
+          onClick={() => onChange?.(t.id)}
+          className={classes}
+        >
+          {inner}
+        </Link>
+      );
+    }
+    return (
+      <button
+        key={t.id}
+        ref={setRef}
+        type="button"
+        role="tab"
+        id={tabId(group, t.id)}
+        aria-selected={active}
+        // Only the selected tab's panel is mounted, so only it is referenced:
+        // an id that is not in the document is a broken reference.
+        aria-controls={panels && active ? panelId(group, t.id) : undefined}
+        tabIndex={active ? 0 : -1}
+        data-tab={t.id}
+        data-tab-active={active || undefined}
+        onClick={() => onChange?.(t.id)}
+        className={classes}
+      >
+        {inner}
+      </button>
+    );
+  });
+
+  if (links) {
+    return (
+      <nav aria-label={label} onKeyDown={onKeyDown} className={`flex ${className}`}>
+        {strip}
+      </nav>
+    );
+  }
   return (
-    <div role="tablist" aria-label={label} className={`flex ${className}`}>
-      {shown.map((t) => {
-        const active = t.id === value;
-        return (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            data-tab={t.id}
-            data-tab-active={active || undefined}
-            onClick={() => onChange(t.id)}
-            className={`relative ${fill ? 'flex-1' : 'shrink-0 px-3'} py-3 text-sm font-medium text-center whitespace-nowrap transition-colors ${
-              active ? activeClassName : idleClassName
-            }`}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              {t.label}
-              {t.badge}
-            </span>
-            {active && (
-              <motion.span
-                // ONE element, shared across every tab in this strip: motion
-                // animates it from its old box to its new one instead of
-                // fading one out and another in.
-                layoutId={`tab-indicator-${group}`}
-                data-tab-indicator
-                className={`absolute bottom-0 start-0 end-0 h-0.5 rounded-t-full ${indicatorClassName}`}
-                transition={m.reduced ? { duration: 0 } : m.spring('move')}
-              />
-            )}
-          </button>
-        );
-      })}
+    <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className={`flex ${className}`}>
+      {strip}
     </div>
   );
 }
@@ -126,6 +215,8 @@ export interface TabPanelsProps {
   order: string[];
   children: React.ReactNode;
   className?: string;
+  /** The strip's `group`: makes the body the `tabpanel` its tab controls. */
+  group?: string;
 }
 
 /**
@@ -133,7 +224,7 @@ export interface TabPanelsProps {
  * change implies, and it keeps the OLD panel until the new one has arrived
  * (`mode="wait"`) so the two never overlap into a smear.
  */
-export function TabPanels({ value, order, children, className = '' }: TabPanelsProps) {
+export function TabPanels({ value, order, children, className = '', group }: TabPanelsProps) {
   const m = useMotion();
   const previous = useRef(value);
   const from = order.indexOf(previous.current);
@@ -144,6 +235,9 @@ export function TabPanels({ value, order, children, className = '' }: TabPanelsP
   previous.current = value;
 
   const travel = m.travel(20) * (forward === 0 ? 0 : forward) * m.dir;
+  const wiring = group
+    ? { role: 'tabpanel', id: panelId(group, value), 'aria-labelledby': tabId(group, value), tabIndex: 0 }
+    : {};
 
   return (
     <div className={`min-w-0 ${className}`}>
@@ -151,11 +245,12 @@ export function TabPanels({ value, order, children, className = '' }: TabPanelsP
         <motion.div
           key={value}
           data-tab-panel={value}
+          {...wiring}
           initial={{ opacity: 0, x: travel }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -travel }}
           transition={m.spring('ui')}
-          className="min-w-0"
+          className="min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           {children}
         </motion.div>

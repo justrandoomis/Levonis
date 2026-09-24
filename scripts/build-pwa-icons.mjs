@@ -27,9 +27,10 @@
  * that no cache anywhere has ever seen.
  *
  * When the logo in R2 changes, this script stops and prints the new
- * revision. Rename the icons to it in the four places that name them — the
- * failing assertions in tests/siteMedia.test.ts list them: src/lib/siteLogo.ts,
- * index.html, worker/lib/webManifest.ts and public/sw.js — bump `VERSION` in
+ * revision. Rename the icons to it in the five places that name them — the
+ * failing assertions in tests/siteMedia.test.ts and tests/storeIcons.test.ts
+ * list them: src/lib/siteLogo.ts, index.html, worker/lib/webManifest.ts,
+ * worker/lib/storeIcons.ts (the per-host fallback table) and public/sw.js — bump `VERSION` in
  * public/sw.js, run this again, and commit the new files. The old ones are
  * deleted by the run, so the folder never carries a stale mark.
  *
@@ -196,7 +197,8 @@ if (logo.revision !== revision) {
   console.error(
     `build-pwa-icons: the logo changed. Its revision is now ${revision}; src/lib/siteLogo.ts says ${logo.revision}.\n` +
       `  Rename the icons from .${logo.revision}.png to .${revision}.png in src/lib/siteLogo.ts (and set\n` +
-      `  PLATFORM_ICON_REVISION), index.html, worker/lib/webManifest.ts and public/sw.js, bump VERSION in\n` +
+      `  PLATFORM_ICON_REVISION), index.html, worker/lib/webManifest.ts, worker/lib/storeIcons.ts and\n` +
+      `  public/sw.js, bump VERSION in\n` +
       '  public/sw.js, then run this again. New pixels under an old name are exactly what every cache keeps.'
   );
   process.exit(1);

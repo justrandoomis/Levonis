@@ -73,6 +73,24 @@ export const openDisputeSql = (o: string) => `(
   OR EXISTS (SELECT 1 FROM support_tickets st
               WHERE st.order_id = ${o}.id AND st.state <> 'resolved'))`;
 
+/**
+ * THE CUSTOMER WAS ALREADY REFUNDED FOR THIS ORDER — its wallet refund row
+ * exists. `orderId` is the SQL expression (a placeholder or a column) for the
+ * order's id. The refund's id is deterministic, `wtx_refund_<order>_usd`
+ * (worker/lib/orderCancelOps.ts), which is what makes this one primary-key
+ * lookup.
+ *
+ * WHY IT GUARDS EVERY RELEASE (review F4). The code before wave 1 refunded a
+ * cancelled store order and then let an admin RE-OPEN it, leaving live rows in
+ * which the customer holds the refund and the merchant's credit is still
+ * `pending`. Releasing such a credit — three days after a delivery, or on the
+ * customer's «استلمت طلبي» — pays the merchant for goods whose price the
+ * customer already has back. No credit on a refunded order is released; those
+ * orders are listed for a financial admin (`storeOrderMoneyDrift`) instead.
+ */
+export const refundedStoreOrderSql = (orderId: string) =>
+  `EXISTS (SELECT 1 FROM wallet_transactions rt WHERE rt.id = 'wtx_refund_' || ${orderId} || '_usd')`;
+
 // ------------------------------------------------------ may this store sell
 
 /** Why a store is not taking orders. Logged and audited — never shown to a customer. */
@@ -301,6 +319,25 @@ export async function notifyMerchantOfStoreOrder(
 
 export type StoreOrderActor = 'merchant' | 'customer' | 'admin';
 
+/**
+ * WOULD CANCELLING THIS STORE ORDER MOVE MONEY? — a refund to the customer's
+ * wallet (cash or points the order took), or a claw-back of a merchant credit
+ * that was already released. The admin doors ask it to decide whether the
+ * cancel needs the financial scope (review S6); a status move that moves no
+ * money does not.
+ */
+export async function storeCancelMovesMoney(db: D1Database, o: Record<string, unknown>): Promise<boolean> {
+  if ((Number(o.wallet_applied_usd_cents) || 0) > 0 || (Number(o.points_discount_iqd) || 0) > 0) return true;
+  const released = await db
+    .prepare(
+      `SELECT 1 AS x FROM merchant_payout_ledger
+        WHERE order_id = ? AND kind = 'sale_credit' AND state = 'available' AND amount_iqd > 0 LIMIT 1`
+    )
+    .bind(String(o.id ?? ''))
+    .first();
+  return !!released;
+}
+
 export interface CancelStoreOrderInput {
   /**
    * The order row EXACTLY as the caller read it (`SELECT * FROM orders`) and
@@ -449,7 +486,10 @@ export async function cancelStoreOrder(env: Env, p: CancelStoreOrderInput): Prom
 
   stmts.push(
     // Already released → taken back out of «متاح» by a row of its own. Before
-    // the flip below, and mutually exclusive with it by `state`.
+    // the flip below, and mutually exclusive with it by `state`. Never a
+    // second one: a financial admin may already have taken the credit back
+    // (`reconcileReverseCredit`) under the same key, and a UNIQUE clash here
+    // would refuse the whole cancellation — the customer's refund with it.
     db
       .prepare(
         `INSERT INTO merchant_payout_ledger (id, merchant_id, kind, amount_iqd, state, order_id, note, idempotency_key)
@@ -457,6 +497,7 @@ export async function cancelStoreOrder(env: Env, p: CancelStoreOrderInput): Prom
            FROM merchant_payout_ledger l
           WHERE l.order_id = ?3 AND l.merchant_id = ?4 AND l.kind = 'sale_credit'
             AND l.state = 'available' AND l.amount_iqd > 0
+            AND NOT EXISTS (SELECT 1 FROM merchant_payout_ledger x WHERE x.idempotency_key = 'reversal:' || l.order_id)
             AND ${gate(5)}`
       )
       .bind(newId('pay'), `store order ${id} cancelled after release`, id, merchantId, anchor),
@@ -547,12 +588,15 @@ export async function confirmStoreOrderReceipt(
             AND status = 'delivered' AND receipt_confirmed_at IS NULL`
       )
       .bind(now, id, p.customerId),
+    // Never on an order whose customer was already refunded (review F4): the
+    // receipt is still recorded, and the credit waits for a financial admin.
     db
       .prepare(
         `UPDATE merchant_payout_ledger SET state = 'available'
           WHERE order_id = ?1 AND kind = 'sale_credit' AND state = 'pending'
             AND EXISTS (SELECT 1 FROM orders o
-                         WHERE o.id = ?1 AND o.status = 'delivered' AND o.receipt_confirmed_at = ?2)`
+                         WHERE o.id = ?1 AND o.status = 'delivered' AND o.receipt_confirmed_at = ?2)
+            AND NOT ${refundedStoreOrderSql('?1')}`
       )
       .bind(id, now),
   ]);
@@ -577,6 +621,11 @@ export interface StoreOrderSweepReport {
   released: number;
   /** Due credits left pending because a complaint or ticket is open. */
   frozen: number;
+  /**
+   * Due credits left pending because the customer was already refunded for
+   * the order (review F4) — legacy rows a financial admin reconciles.
+   */
+  refund_blocked: number;
   /** Orphaned store-checkout wallet holds handed back (B13). */
   holds_released: number;
   errors: number;
@@ -587,36 +636,51 @@ export interface StoreOrderSweepReport {
  *
  * Idempotent by construction: each release is a conditional flip of one
  * `pending` row, re-checking inside the statement that the order is still
- * delivered, still past its three days and still free of an open dispute — so
- * an admin moving the order back, or a complaint filed a second before the
- * sweep, both win. Audited per release (actor NULL: nobody pressed anything).
+ * delivered, still past its three days, still free of an open dispute and
+ * not refunded — so an admin moving the order back, or a complaint filed a
+ * second before the sweep, both win. Audited per release (actor NULL: nobody
+ * pressed anything).
+ *
+ * ONLY ROWS IT CAN RELEASE ARE READ (review F3). A frozen row used to be
+ * selected, skipped in code and counted — and `ORDER BY delivered_at LIMIT
+ * 100` served the SAME hundred frozen rows (a ticket asking for an invoice is
+ * enough) to every run, so no later due credit was ever released. The frozen
+ * and the refunded are filtered in the SELECT and counted by queries of their
+ * own.
  */
 export async function releaseDueStoreCredits(
   env: Env,
   nowIso: string,
   limit = 100
-): Promise<Pick<StoreOrderSweepReport, 'released' | 'frozen' | 'errors'>> {
-  const out = { released: 0, frozen: 0, errors: 0 };
+): Promise<Pick<StoreOrderSweepReport, 'released' | 'frozen' | 'refund_blocked' | 'errors'>> {
+  const out = { released: 0, frozen: 0, refund_blocked: 0, errors: 0 };
   const cutoff = new Date(Date.parse(nowIso) - STORE_RELEASE_DAYS * 86_400_000).toISOString();
-  const { results } = await env.DB.prepare(
-    `SELECT l.id AS ledger_id, l.amount_iqd, o.id AS order_id, o.merchant_id,
-            CASE WHEN ${openDisputeSql('o')} THEN 1 ELSE 0 END AS disputed
-       FROM merchant_payout_ledger l
+  const due = `FROM merchant_payout_ledger l
        JOIN orders o ON o.id = l.order_id
       WHERE l.kind = 'sale_credit' AND l.state = 'pending'
         AND o.seller_type = 'merchant' AND o.status = 'delivered'
-        AND o.delivered_at IS NOT NULL AND o.delivered_at <> '' AND o.delivered_at <= ?1
+        AND o.delivered_at IS NOT NULL AND o.delivered_at <> '' AND o.delivered_at <= ?1`;
+  const { results } = await env.DB.prepare(
+    `SELECT l.id AS ledger_id, l.amount_iqd, o.id AS order_id, o.merchant_id
+       ${due}
+        AND NOT ${openDisputeSql('o')}
+        AND NOT ${refundedStoreOrderSql('o.id')}
       ORDER BY o.delivered_at
       LIMIT ?2`
   )
     .bind(cutoff, limit)
-    .all<{ ledger_id: string; amount_iqd: number; order_id: string; merchant_id: string; disputed: number }>();
+    .all<{ ledger_id: string; amount_iqd: number; order_id: string; merchant_id: string }>();
+  const held = await env.DB.prepare(
+    `SELECT COALESCE(SUM(CASE WHEN ${openDisputeSql('o')} THEN 1 ELSE 0 END), 0) AS frozen,
+            COALESCE(SUM(CASE WHEN ${refundedStoreOrderSql('o.id')} THEN 1 ELSE 0 END), 0) AS refunded
+       ${due}`
+  )
+    .bind(cutoff)
+    .first<{ frozen: number; refunded: number }>();
+  out.frozen = Number(held?.frozen ?? 0);
+  out.refund_blocked = Number(held?.refunded ?? 0);
 
   for (const r of results ?? []) {
-    if (Number(r.disputed) === 1) {
-      out.frozen += 1;
-      continue;
-    }
     try {
       const res = await env.DB.prepare(
         `UPDATE merchant_payout_ledger SET state = 'available'
@@ -624,7 +688,8 @@ export async function releaseDueStoreCredits(
             AND EXISTS (SELECT 1 FROM orders o
                          WHERE o.id = ?2 AND o.status = 'delivered'
                            AND o.delivered_at IS NOT NULL AND o.delivered_at <> '' AND o.delivered_at <= ?3
-                           AND NOT ${openDisputeSql('o')})`
+                           AND NOT ${openDisputeSql('o')})
+            AND NOT ${refundedStoreOrderSql('?2')}`
       )
         .bind(r.ledger_id, r.order_id, cutoff)
         .run();
@@ -715,7 +780,335 @@ export async function runStoreOrderSweeps(env: Env, nowIso: string): Promise<Sto
   return {
     released: credits.released,
     frozen: credits.frozen,
+    refund_blocked: credits.refund_blocked,
     holds_released: holds.holds_released,
     errors: credits.errors + holds.errors,
   };
+}
+
+// ---------------------------------------------------------- reconciliation
+
+/**
+ * STORE-ORDER MONEY THE CODE BEFORE WAVE 1 LEFT WRONG, AND NO ROUTE CAN REACH
+ * (review F4) — found by a read-only query, shown to a financial admin, and put
+ * right one order at a time by a decision on the record. Never by a migration:
+ * each row is somebody's money, and which way it goes is a human's call made
+ * with the order in front of them.
+ *
+ *   A · REFUNDED, THEN RE-OPENED. The customer's or the admin's cancel
+ *       refunded the buyer and left the merchant's credit `pending`; an admin
+ *       then re-opened the order. The customer holds the refund and the
+ *       merchant still stands to be paid (the release paths now refuse it —
+ *       `refundedStoreOrderSql`). Remedy: `reconcileReverseCredit`.
+ *   B · CANCELLED, PAID, NEVER REFUNDED. The merchant's old cancel reversed
+ *       their own credit and never refunded the buyer, whose wallet had been
+ *       debited at checkout — and every door now refuses a cancelled order.
+ *       Remedy: `reconcileRefundUnrefunded`, the cancel operation's own refund.
+ *
+ * A row leaves the list the moment it is reconciled, so the list is also the
+ * proof that nothing is left.
+ */
+export interface DriftRefundedReopened {
+  order_id: string;
+  status: string;
+  created_at: string;
+  customer_id: string;
+  customer_name: string | null;
+  merchant_id: string;
+  merchant_name: string | null;
+  total_iqd: number;
+  refund_usd_cents: number;
+  refund_iqd: number | null;
+  refunded_at: string;
+  credit_state: 'pending' | 'available';
+  credit_iqd: number;
+}
+
+export interface DriftCancelledUnrefunded {
+  order_id: string;
+  created_at: string;
+  updated_at: string;
+  customer_id: string;
+  customer_name: string | null;
+  merchant_id: string;
+  merchant_name: string | null;
+  total_iqd: number;
+  paid_usd_cents: number;
+  paid_iqd: number | null;
+  credit_state: string | null;
+}
+
+export async function storeOrderMoneyDrift(
+  db: D1Database,
+  limit = 200
+): Promise<{ refunded_reopened: DriftRefundedReopened[]; cancelled_unrefunded: DriftCancelledUnrefunded[] }> {
+  const [{ results: reopened }, { results: unrefunded }] = await Promise.all([
+    db
+      .prepare(
+        `SELECT o.id AS order_id, o.status, o.created_at, o.user_id AS customer_id, u.name AS customer_name,
+                o.merchant_id, m.name AS merchant_name, o.total_iqd,
+                rt.amount AS refund_usd_cents, rt.amount_iqd AS refund_iqd, rt.created_at AS refunded_at,
+                l.state AS credit_state, l.amount_iqd AS credit_iqd
+           FROM orders o
+           JOIN wallet_transactions rt ON rt.id = 'wtx_refund_' || o.id || '_usd'
+           JOIN merchant_payout_ledger l ON l.order_id = o.id AND l.kind = 'sale_credit'
+           LEFT JOIN users u ON u.id = o.user_id
+           LEFT JOIN community_merchants m ON m.id = o.merchant_id
+          WHERE o.seller_type = 'merchant' AND o.status <> 'cancelled'
+            AND (l.state = 'pending'
+                 OR (l.state = 'available' AND l.amount_iqd > 0
+                     AND NOT EXISTS (SELECT 1 FROM merchant_payout_ledger x
+                                      WHERE x.idempotency_key = 'reversal:' || o.id)))
+          ORDER BY o.created_at DESC, o.id DESC
+          LIMIT ?1`
+      )
+      .bind(limit)
+      .all<DriftRefundedReopened>(),
+    db
+      .prepare(
+        `SELECT o.id AS order_id, o.created_at, o.updated_at, o.user_id AS customer_id, u.name AS customer_name,
+                o.merchant_id, m.name AS merchant_name, o.total_iqd,
+                (SELECT d.amount FROM wallet_transactions d
+                  WHERE d.user_id = o.user_id AND d.ref = o.id AND d.type = 'withdrawal'
+                    AND d.currency = 'USD' AND d.status = 'approved' LIMIT 1) AS paid_usd_cents,
+                (SELECT d.amount_iqd FROM wallet_transactions d
+                  WHERE d.user_id = o.user_id AND d.ref = o.id AND d.type = 'withdrawal'
+                    AND d.currency = 'USD' AND d.status = 'approved' LIMIT 1) AS paid_iqd,
+                (SELECT l.state FROM merchant_payout_ledger l
+                  WHERE l.order_id = o.id AND l.kind = 'sale_credit' LIMIT 1) AS credit_state
+           FROM orders o
+           LEFT JOIN users u ON u.id = o.user_id
+           LEFT JOIN community_merchants m ON m.id = o.merchant_id
+          WHERE o.seller_type = 'merchant' AND o.status = 'cancelled' AND o.wallet_applied_usd_cents > 0
+            AND NOT ${refundedStoreOrderSql('o.id')}
+            AND EXISTS (SELECT 1 FROM wallet_transactions d
+                         WHERE d.user_id = o.user_id AND d.ref = o.id AND d.type = 'withdrawal'
+                           AND d.currency = 'USD' AND d.status = 'approved')
+          ORDER BY o.updated_at DESC, o.id DESC
+          LIMIT ?1`
+      )
+      .bind(limit)
+      .all<DriftCancelledUnrefunded>(),
+  ]);
+  return { refunded_reopened: reopened ?? [], cancelled_unrefunded: unrefunded ?? [] };
+}
+
+export type ReconcileResult =
+  | { ok: true; replayed: boolean; orderId: string }
+  | { ok: false; reason: 'NOT_FOUND' | 'NOT_APPLICABLE'; detail: string };
+
+/**
+ * The merchant's credit on an order, taken back: `pending → reversed` in
+ * place, or — when it had become available — a negative `reversal` row keyed
+ * `reversal:<order>`, the same key `cancelStoreOrder` uses, so the two can
+ * never both take it back. Both are conditional and idempotent.
+ */
+function creditTakeBackStatements(
+  db: D1Database,
+  p: {
+    orderId: string;
+    reversalId: string;
+    note: string;
+    adminId: string;
+    /** A further condition, given the SQL for the credit row's order id. */
+    extraGuard?: (orderIdColumn: string) => string;
+  }
+): D1PreparedStatement[] {
+  const guard = (col: string) => (p.extraGuard ? ` AND ${p.extraGuard(col)}` : '');
+  return [
+    db
+      .prepare(
+        `UPDATE merchant_payout_ledger SET state = 'reversed', note = note || ?2, admin_id = ?3
+          WHERE order_id = ?1 AND kind = 'sale_credit' AND state = 'pending'${guard('merchant_payout_ledger.order_id')}`
+      )
+      .bind(p.orderId, ` · ${p.note}`, p.adminId),
+    db
+      .prepare(
+        `INSERT INTO merchant_payout_ledger (id, merchant_id, kind, amount_iqd, state, order_id, note, admin_id, idempotency_key)
+         SELECT ?1, l.merchant_id, 'reversal', -l.amount_iqd, 'available', l.order_id, ?2, ?3, 'reversal:' || l.order_id
+           FROM merchant_payout_ledger l
+          WHERE l.order_id = ?4 AND l.kind = 'sale_credit' AND l.state = 'available' AND l.amount_iqd > 0
+            AND NOT EXISTS (SELECT 1 FROM merchant_payout_ledger x WHERE x.idempotency_key = 'reversal:' || l.order_id)${guard('l.order_id')}`
+      )
+      .bind(p.reversalId, p.note, p.adminId, p.orderId),
+  ];
+}
+
+/**
+ * B · REFUND A CANCELLED, PAID STORE ORDER THAT WAS NEVER REFUNDED — with the
+ * cancel operation's own refund statements (`cancelledOrderRefundStatements`,
+ * which `cancelStoreOrder` runs): exactly what the checkout debit took, cents
+ * and the dinars beside them, under the deterministic `wtx_refund_<order>_usd`
+ * id, fenced on the order being cancelled. The merchant's credit is taken
+ * back if it is somehow still payable. Two fences bracket the refund: the
+ * batch aborts if the refund row ALREADY exists when it starts (a second
+ * submit — D1 runs batches one at a time, so it sees the first one's row), and
+ * again unless the row exists once the refund ran. So a double submit refunds
+ * once and writes one audit row, whatever the clock says — which is why
+ * neither fence compares timestamps.
+ *
+ * Stock and the coupon use are NOT touched: months later the merchant may
+ * have corrected their stock by hand, and a blind restock would overstate it.
+ */
+export async function reconcileRefundUnrefunded(
+  env: Env,
+  p: { orderId: string; adminId: string; reason: string; nowIso?: string }
+): Promise<ReconcileResult> {
+  const db = env.DB;
+  const o = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(p.orderId).first<Record<string, unknown>>();
+  if (!o) return { ok: false, reason: 'NOT_FOUND', detail: 'order' };
+  const id = String(o.id);
+  if (String(o.seller_type ?? '') !== 'merchant') return { ok: false, reason: 'NOT_APPLICABLE', detail: 'not_a_store_order' };
+  const refundId = `wtx_refund_${id}_usd`;
+  const already = await db.prepare('SELECT 1 AS x FROM wallet_transactions WHERE id = ?').bind(refundId).first();
+  if (already) return { ok: true, replayed: true, orderId: id };
+  if (String(o.status ?? '') !== 'cancelled') return { ok: false, reason: 'NOT_APPLICABLE', detail: 'not_cancelled' };
+  const cents = Number(o.wallet_applied_usd_cents) || 0;
+  const debit = await db
+    .prepare(
+      `SELECT id, amount FROM wallet_transactions
+        WHERE user_id = ? AND ref = ? AND type = 'withdrawal' AND currency = 'USD' AND status = 'approved' LIMIT 1`
+    )
+    .bind(String(o.user_id), id)
+    .first<{ id: string; amount: number }>();
+  if (!(cents > 0) || !debit) return { ok: false, reason: 'NOT_APPLICABLE', detail: 'not_paid_from_wallet' };
+
+  const now = p.nowIso ?? new Date().toISOString();
+  const credit = await db
+    .prepare("SELECT state, amount_iqd FROM merchant_payout_ledger WHERE order_id = ? AND kind = 'sale_credit' LIMIT 1")
+    .bind(id)
+    .first<{ state: string; amount_iqd: number }>();
+  const { statements: auditStmts } = await auditStatements(db, p.adminId, 'admin.store_order_reconciled', id, {
+    kind: 'refund_unrefunded_cancellation',
+    reason: p.reason,
+    refund_usd_cents: cents,
+    debit_id: debit.id,
+    debit_usd_cents: Number(debit.amount) || 0,
+    credit_before: credit?.state ?? null,
+  });
+  // `orders.status` is NOT NULL: writing NULL into it is the abort, the same
+  // idiom as the refund's own fence.
+  const refundFence = (mustExist: boolean) =>
+    db
+      .prepare(
+        `UPDATE orders
+            SET status = CASE WHEN ${mustExist ? '' : 'NOT '}EXISTS (SELECT 1 FROM wallet_transactions WHERE id = ?1)
+                              THEN status ELSE NULL END
+          WHERE id = ?2`
+      )
+      .bind(refundId, id);
+  const stmts: D1PreparedStatement[] = [
+    // Nobody refunded it yet — a second submit stops here.
+    refundFence(false),
+    ...(await cancelledOrderRefundStatements(env, o, 'admin', now)),
+    // …and THIS batch did, or nothing in it stands.
+    refundFence(true),
+    ...creditTakeBackStatements(db, {
+      orderId: id,
+      reversalId: newId('pay'),
+      note: `store order ${id} cancelled and refunded by reconciliation`,
+      adminId: p.adminId,
+    }),
+    ...auditStmts,
+  ];
+  try {
+    await db.batch(stmts);
+  } catch (e) {
+    const landed = await db.prepare('SELECT 1 AS x FROM wallet_transactions WHERE id = ?').bind(refundId).first();
+    if (landed) return { ok: true, replayed: true, orderId: id };
+    throw e;
+  }
+  return { ok: true, replayed: false, orderId: id };
+}
+
+/**
+ * A · TAKE BACK THE CREDIT OF A STORE ORDER WHOSE CUSTOMER WAS ALREADY
+ * REFUNDED and which an admin then re-opened. Conditional, inside the
+ * statements, on the refund still existing and the order not cancelled (a
+ * cancellation takes the credit back by itself). The order is left as it is —
+ * whether the goods still go out, and on what terms, is between the admin,
+ * the customer and the merchant; the money can no longer pay twice.
+ */
+export async function reconcileReverseCredit(
+  env: Env,
+  p: { orderId: string; adminId: string; reason: string }
+): Promise<ReconcileResult> {
+  const db = env.DB;
+  const o = await db
+    .prepare('SELECT id, status, seller_type, merchant_id FROM orders WHERE id = ?')
+    .bind(p.orderId)
+    .first<{ id: string; status: string; seller_type: string; merchant_id: string | null }>();
+  if (!o) return { ok: false, reason: 'NOT_FOUND', detail: 'order' };
+  if (o.seller_type !== 'merchant') return { ok: false, reason: 'NOT_APPLICABLE', detail: 'not_a_store_order' };
+  const refund = await db
+    .prepare('SELECT amount, amount_iqd FROM wallet_transactions WHERE id = ?')
+    .bind(`wtx_refund_${o.id}_usd`)
+    .first<{ amount: number; amount_iqd: number | null }>();
+  if (!refund) return { ok: false, reason: 'NOT_APPLICABLE', detail: 'not_refunded' };
+  const credit = await db
+    .prepare(
+      `SELECT l.state, l.amount_iqd,
+              EXISTS (SELECT 1 FROM merchant_payout_ledger x WHERE x.idempotency_key = 'reversal:' || l.order_id) AS clawed
+         FROM merchant_payout_ledger l WHERE l.order_id = ? AND l.kind = 'sale_credit' LIMIT 1`
+    )
+    .bind(o.id)
+    .first<{ state: string; amount_iqd: number; clawed: number }>();
+  if (!credit) return { ok: false, reason: 'NOT_APPLICABLE', detail: 'no_credit' };
+  if (credit.state === 'reversed' || Number(credit.clawed) === 1) return { ok: true, replayed: true, orderId: o.id };
+  if (o.status === 'cancelled') return { ok: false, reason: 'NOT_APPLICABLE', detail: 'cancelled' };
+  if (credit.state !== 'pending' && credit.state !== 'available') {
+    return { ok: false, reason: 'NOT_APPLICABLE', detail: `credit_${credit.state}` };
+  }
+
+  const nonce = newId('rcn');
+  const reversalId = newId('pay');
+  const { statements: auditStmts } = await auditStatements(db, p.adminId, 'admin.store_order_reconciled', o.id, {
+    kind: 'reverse_credit_of_refunded_order',
+    reason: p.reason,
+    credit_before: credit.state,
+    credit_iqd: Number(credit.amount_iqd) || 0,
+    refund_usd_cents: Number(refund.amount) || 0,
+    refund_iqd: refund.amount_iqd ?? null,
+  });
+  const inBatchGuard = (col: string) => `${refundedStoreOrderSql(col)}
+            AND EXISTS (SELECT 1 FROM orders ro WHERE ro.id = ${col} AND ro.status <> 'cancelled')`;
+  const stmts: D1PreparedStatement[] = [
+    ...creditTakeBackStatements(db, {
+      orderId: o.id,
+      reversalId,
+      note: `customer refunded before the order was re-opened — reversed by reconciliation [${nonce}]`,
+      adminId: p.adminId,
+      extraGuard: inBatchGuard,
+    }),
+    // THIS batch took the credit back, or nothing in it — the audit row
+    // included — stands.
+    db
+      .prepare(
+        `UPDATE orders
+            SET status = CASE WHEN EXISTS (SELECT 1 FROM merchant_payout_ledger WHERE id = ?1)
+                               OR EXISTS (SELECT 1 FROM merchant_payout_ledger
+                                           WHERE order_id = ?2 AND kind = 'sale_credit' AND state = 'reversed'
+                                             AND instr(note, ?3) > 0)
+                              THEN status ELSE NULL END
+          WHERE id = ?2`
+      )
+      .bind(reversalId, o.id, nonce),
+    ...auditStmts,
+  ];
+  try {
+    await db.batch(stmts);
+  } catch (e) {
+    const again = await db
+      .prepare(
+        `SELECT l.state, EXISTS (SELECT 1 FROM merchant_payout_ledger x WHERE x.idempotency_key = 'reversal:' || l.order_id) AS clawed
+           FROM merchant_payout_ledger l WHERE l.order_id = ? AND l.kind = 'sale_credit' LIMIT 1`
+      )
+      .bind(o.id)
+      .first<{ state: string; clawed: number }>();
+    if (again && (again.state === 'reversed' || Number(again.clawed) === 1)) return { ok: true, replayed: true, orderId: o.id };
+    const now = await db.prepare('SELECT status FROM orders WHERE id = ?').bind(o.id).first<{ status: string }>();
+    if (now?.status === 'cancelled') return { ok: false, reason: 'NOT_APPLICABLE', detail: 'cancelled' };
+    throw e;
+  }
+  return { ok: true, replayed: false, orderId: o.id };
 }

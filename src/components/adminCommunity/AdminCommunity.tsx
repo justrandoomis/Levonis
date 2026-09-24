@@ -1961,7 +1961,185 @@ function Finance({ t }: { t: T }) {
           )}
         </p>
       </Section>
+
+      <StoreOrderReconciliation t={t} />
     </div>
+  );
+}
+
+/**
+ * «مطابقة أموال طلبات المتاجر» — STORE-ORDER MONEY THE OLD CODE LEFT WRONG
+ * (review F4, worker/lib/storeOrderOps.ts `storeOrderMoneyDrift`).
+ *
+ * Two shapes no customer or merchant door can reach any more: an order that
+ * was refunded and then re-opened (the merchant still stands to be paid for
+ * goods the customer has the price of), and a cancelled, paid order the old
+ * merchant cancel never refunded (the customer is out of pocket). Looking
+ * changes nothing. Each row is put right by its OWN decision — one order, one
+ * reason in the panel's sheet, one audit row in the same batch as the money —
+ * never by a bulk button or a migration. A row leaves the list once it is
+ * reconciled, so an empty list is the proof nothing is left.
+ *
+ * Owner or financial admin only: the routes answer an assistant 403
+ * FINANCIAL_SCOPE_REQUIRED, which is a state to explain, not a spinner.
+ */
+function StoreOrderReconciliation({ t }: { t: T }) {
+  const [data, setData] = useState<Awaited<ReturnType<typeof adminCommunityApi.storeOrderDrift>> | null>(null);
+  const [state, setState] = useState<'loading' | 'ready' | 'scope' | 'error'>('loading');
+  const [ask, setAsk] = useState<ReasonRequest | null>(null);
+  const [done, setDone] = useState('');
+
+  const load = useCallback(() => {
+    adminCommunityApi
+      .storeOrderDrift()
+      .then((d) => {
+        setData(d);
+        setState('ready');
+      })
+      .catch((e) => setState(e instanceof ApiError && e.code === 'FINANCIAL_SCOPE_REQUIRED' ? 'scope' : 'error'));
+  }, []);
+  useEffect(load, [load]);
+
+  /** The route's refusals in the panel's words — thrown so the sheet shows them beside the reason. */
+  const refused = (e: unknown): Error =>
+    new Error(
+      e instanceof ApiError && e.code === 'RECONCILE_NOT_APPLICABLE'
+        ? t('تغيّر هذا الطلب منذ تحميل القائمة — أغلق وحدّث القائمة.', 'This order changed since the list loaded — close and refresh the list.')
+        : e instanceof ApiError && e.code === 'FINANCIAL_SCOPE_REQUIRED'
+          ? t('هذا القرار للمالك أو الدور المالي فقط.', 'Only the owner or a financial admin can make this decision.')
+          : t('تعذّر التنفيذ — حاول مجددًا.', 'Could not complete it — try again.')
+    );
+
+  const people = (o: { customer_name: string | null; merchant_name: string | null }) =>
+    `${o.customer_name || t('زبون', 'Customer')} · ${o.merchant_name || t('متجر', 'Store')}`;
+
+  return (
+    <Section title={t('مطابقة أموال طلبات المتاجر', 'Store-order money to reconcile')}>
+      {state === 'loading' ? (
+        <Spin />
+      ) : state === 'scope' ? (
+        <p className="text-zinc-400 text-[12.5px]" data-finance-scope>
+          {t('هذه القائمة وقراراتها للمالك أو الدور المالي فقط.', 'This list and its decisions are for the owner or a financial admin only.')}
+        </p>
+      ) : state === 'error' || !data ? (
+        <Err text={t('تعذّر تحميل القائمة.', 'Could not load the list.')} />
+      ) : !data.refunded_reopened.length && !data.cancelled_unrefunded.length ? (
+        <p className="text-zinc-500 text-[12.5px]" data-reconcile-empty>
+          {t('لا توجد طلبات تحتاج مطابقة.', 'Nothing needs reconciling.')}
+        </p>
+      ) : (
+        <div className="space-y-4" data-store-reconciliation>
+          <p className="text-zinc-500 text-[11.5px] leading-relaxed">
+            {t(
+              'طلبات تركها النظام القديم بمال في غير مكانه. العرض لا يغيّر شيئًا؛ كل طلب يُصحَّح بقرار منفرد وسبب يُسجَّل.',
+              'Orders the old code left with money in the wrong place. Looking changes nothing; each order is put right by its own decision, with a reason on the record.'
+            )}
+          </p>
+
+          {data.cancelled_unrefunded.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-zinc-300 text-[12.5px] font-semibold">
+                {t('ملغاة ومدفوعة ولم يُعَد مبلغها', 'Cancelled and paid, never refunded')}
+              </h4>
+              {data.cancelled_unrefunded.map((o) => (
+                <div key={o.order_id} className="flex items-center justify-between gap-3 border-t border-zinc-700/40 pt-2">
+                  <div className="min-w-0">
+                    <p className="text-white text-[12.5px] font-semibold truncate" dir="ltr">{o.order_id}</p>
+                    <p className="text-zinc-500 text-[11.5px] truncate">{people(o)}</p>
+                    <p className="text-zinc-400 text-[11.5px]">
+                      {t('دُفع من المحفظة:', 'Paid from the wallet:')}{' '}
+                      <span dir="ltr" className="tabular-nums">{iqd(o.paid_iqd ?? o.total_iqd)}</span>
+                    </p>
+                  </div>
+                  <Act
+                    label={t('إعادة المبلغ للزبون', 'Refund the customer')}
+                    icon={<Wallet className="w-3.5 h-3.5" aria-hidden="true" />}
+                    onClick={() => {
+                      setDone('');
+                      setAsk({
+                        title: t(`إعادة مبلغ الطلب ${o.order_id}`, `Refund order ${o.order_id}`),
+                        consequence: t(
+                          'يعود للزبون ما دفعه من محفظته لهذا الطلب الملغى، مرة واحدة، ولا يُحتسب للتاجر شيء عنه. المخزون والكوبون لا يُمسّان.',
+                          'The customer gets back what their wallet paid for this cancelled order, once, and the merchant is credited nothing for it. Stock and the coupon are not touched.'
+                        ),
+                        confirmLabel: t('إعادة المبلغ', 'Refund'),
+                        onConfirm: async (reason) => {
+                          try {
+                            const r = await adminCommunityApi.reconcileRefund(o.order_id, reason);
+                            setDone(
+                              r.replayed
+                                ? t('أُعيد هذا المبلغ مسبقًا — لم يُعَد مرتين.', 'That refund was already made — it was not made twice.')
+                                : t('أُعيد المبلغ للزبون.', 'The customer was refunded.')
+                            );
+                            load();
+                          } catch (e) {
+                            throw refused(e);
+                          }
+                        },
+                      });
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {data.refunded_reopened.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-zinc-300 text-[12.5px] font-semibold">
+                {t('أُعيد مبلغها ثم أُعيد فتحها', 'Refunded, then re-opened')}
+              </h4>
+              {data.refunded_reopened.map((o) => (
+                <div key={o.order_id} className="flex items-center justify-between gap-3 border-t border-zinc-700/40 pt-2">
+                  <div className="min-w-0">
+                    <p className="text-white text-[12.5px] font-semibold truncate" dir="ltr">{o.order_id}</p>
+                    <p className="text-zinc-500 text-[11.5px] truncate">{people(o)}</p>
+                    <p className="text-zinc-400 text-[11.5px]">
+                      {t('مستحقات التاجر:', 'Merchant credit:')}{' '}
+                      <span dir="ltr" className="tabular-nums">{iqd(o.credit_iqd)}</span>{' '}
+                      {o.credit_state === 'available' ? t('(متاحة)', '(available)') : t('(معلّقة)', '(pending)')}
+                    </p>
+                  </div>
+                  <Act
+                    label={t('إلغاء مستحقات التاجر', 'Reverse the credit')}
+                    danger
+                    onClick={() => {
+                      setDone('');
+                      setAsk({
+                        title: t(`مستحقات الطلب ${o.order_id}`, `Credit on order ${o.order_id}`),
+                        consequence: t(
+                          `استرد الزبون مبلغ هذا الطلب، فتُلغى مستحقات التاجر عنه (${iqd(o.credit_iqd)}). يبقى الطلب نفسه كما هو.`,
+                          `The customer was refunded for this order, so the merchant's credit for it (${iqd(o.credit_iqd)}) is reversed. The order itself is left as it is.`
+                        ),
+                        confirmLabel: t('إلغاء المستحقات', 'Reverse'),
+                        danger: true,
+                        onConfirm: async (reason) => {
+                          try {
+                            const r = await adminCommunityApi.reconcileReverseCredit(o.order_id, reason);
+                            setDone(
+                              r.replayed
+                                ? t('أُلغيت هذه المستحقات مسبقًا.', 'That credit was already reversed.')
+                                : t('أُلغيت مستحقات التاجر عن الطلب.', "The merchant's credit on the order was reversed.")
+                            );
+                            load();
+                          } catch (e) {
+                            throw refused(e);
+                          }
+                        },
+                      });
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <p role="status" className={done ? 'text-emerald-300 text-[12px] mt-3' : 'sr-only'}>
+        {done}
+      </p>
+      <ReasonSheet request={ask} onClose={() => setAsk(null)} t={t} />
+    </Section>
   );
 }
 

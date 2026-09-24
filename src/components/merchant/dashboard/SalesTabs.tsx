@@ -538,7 +538,7 @@ function communityStateLabel(k: string, loc: Loc): string {
  * releases the funds — the buttons say exactly that.
  */
 export function CustomOrdersTab() {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
   const mainHref = useMainSiteHref();
   // The request board is Levo Community (DECISIONS 110): while it is shut to
   // this merchant, browsing it would land on the maintenance card. Funded
@@ -546,6 +546,9 @@ export function CustomOrdersTab() {
   const { access: communityAccess } = useCommunityAccess();
   const [orders, setOrders] = useState<CommunityOrderRow[] | null>(null);
   const [busy, setBusy] = useState('');
+  // A refused «ابدأ العمل» says why, on its own card, in the merchant's language
+  // (the order changed under them, or its money is not held — review F2).
+  const [startError, setStartError] = useState<{ id: string; text: string } | null>(null);
 
   const load = useCallback(() => {
     communityOrdersApi
@@ -604,18 +607,26 @@ export function CustomOrdersTab() {
               disabled={busy === o.id}
               onClick={async () => {
                 setBusy(o.id);
+                setStartError(null);
                 try {
                   await communityOrdersApi.start(o.id);
-                  load();
                 } catch (e) {
-                  if (e instanceof ApiError) alert(e.message);
+                  // OWNER: Sorani to be written by hand.
+                  setStartError({ id: o.id, text: apiRefusal(e, lang, loc('تعذّر بدء العمل', 'Could not start the work')) });
                 } finally {
                   setBusy('');
+                  // Either way the card shows the order as it now stands.
+                  load();
                 }
               }}
             >
               {loc('ابدأ العمل', 'Start work', 'دەست پێ بکە')}
             </Btn>
+          )}
+          {startError?.id === o.id && (
+            <p role="alert" className="text-red-300 text-[11px] mt-1.5">
+              {startError.text}
+            </p>
           )}
           {o.state === 'in_progress' && (
             <Btn

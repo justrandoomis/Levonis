@@ -140,6 +140,13 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'merchant_payout_ledger', 'community_merchants', 'merchant_stores', 'merchant_store_slugs', 'reserved_slugs',
     'merchant_notification_preferences', 'community_products', 'merchant_store_sections', 'merchant_services', 'merchant_showcase',
     'merchant_coupons', 'merchant_reviews', 'merchant_reputation_events',
+    // 0122 — the store page as data (docs/MERCHANT_PLATFORM.md §4.4): the
+    // merchant's working draft and the immutable published revisions the
+    // storefront reads through merchant_stores.published_revision_id.
+    'store_layout_drafts', 'store_layout_revisions',
+    // 0123 — the store's own app identity: one row per rendered home-screen
+    // icon size, cut from the merchant's logo (docs/MERCHANT_PLATFORM.md §4.5).
+    'merchant_store_icons',
     // The print quote engine (migration 0078, `docs/PRINT_QUOTE_ENGINE.md`).
     // It sits here rather than in Catalog because every one of these rows is
     // read to answer «كم تكلف طباعتي» for a `community_requests` job on a

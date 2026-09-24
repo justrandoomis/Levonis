@@ -259,6 +259,65 @@ test('the split really happened: every page and panel §10 names has a chunk of 
   assert.deepEqual(missing, [], `these have no chunk of their own — the lazy import or the manualChunks rule was removed:\n${missing.join(', ')}`);
 });
 
+/**
+ * THE STORE PAGE'S OWN WEIGHT. A visitor to a store downloads the initial
+ * payload, then the `Storefront` (or `StorefrontProduct`) chunk and whatever
+ * that statically imports: the layout renderer and its schema, the theme, and
+ * what the classic page shows first (hero, tab strip, Products tab). The other
+ * tabs are one lazy chunk (`tabViews`, prefetched when idle), every other
+ * block a second (`extra`), and the merchant's design panel a lazy chunk of
+ * the dashboard — none of them may become static imports of a store page.
+ *
+ * THE NUMBER. Audit 05 §6.5 proposed 30 KB, measured at 24.0. Before the
+ * store-layout work (W2-C) the same closure already measured 33.8 KB — 8.8 of
+ * it `refusalStrings`, which `StorefrontProduct` imports for its error text.
+ * The renderer brought it to 46.7: the layout schema the page normalises
+ * again before it renders (6.3 KB with the normaliser), the block runtime and
+ * theme, plus the share strings (merchant/share) and the Tabs primitive that
+ * grew alongside. 50 KB holds that with room for ordinary work, and fails the
+ * day either lazy chunk (tabViews 5.3 KB, extra 7.5 KB) is pulled back in.
+ * The way down to 30: load `refusalStrings` on the first refusal (-8.8), the
+ * owner's share strings with the owner's menu (-2.3).
+ */
+const STOREFRONT_BUDGET = 50 * KB;
+
+function staticClosure(start: string): Set<string> {
+  const seen = new Set<string>();
+  const queue = [start];
+  while (queue.length) {
+    const file = queue.pop()!;
+    if (seen.has(file)) continue;
+    seen.add(file);
+    for (const dep of staticImports(readFileSync(join(ASSETS, file), 'utf8'))) if (!seen.has(dep)) queue.push(dep);
+  }
+  return seen;
+}
+
+test('the storefront pages add at most 50 KB gzip beyond the initial payload, and the other blocks stay lazy', () => {
+  const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
+  const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
+  const initial = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
+  const pages = ['Storefront', 'StorefrontProduct'].map((name) => {
+    const f = chunk(name);
+    assert.ok(f, `${name} has no chunk of its own`);
+    return f!;
+  });
+  const beyond = new Set<string>();
+  for (const page of pages) for (const f of staticClosure(page)) if (!initial.has(f)) beyond.add(f);
+  const total = [...beyond].reduce((sum, f) => sum + gz(join(ASSETS, f)), 0);
+  const detail = [...beyond].sort().map((f) => `  ${f}: ${kb(gz(join(ASSETS, f)))}`).join('\n');
+  console.log(`bundle: storefront pages ${kb(total)} gzip beyond the initial payload\n${detail}`);
+  assert.ok(total <= STOREFRONT_BUDGET, `the storefront pages add ${kb(total)} gzip, over ${kb(STOREFRONT_BUDGET)}:\n${detail}`);
+
+  assert.ok(chunk('extra'), 'the non-classic blocks have no lazy chunk of their own');
+  assert.ok(chunk('StoreDesignPanel'), 'the store design panel is not a lazy chunk');
+  assert.ok(chunk('tabViews'), 'the other tabs\' views have no lazy chunk of their own');
+  for (const lazyOnly of ['extra', 'tabViews', 'StoreDesignPanel', 'MerchantDashboardPage', 'vendor-charts']) {
+    const found = [...beyond, ...initial].find((f) => f.startsWith(`${lazyOnly}-`));
+    assert.equal(found, undefined, `${lazyOnly} is a STATIC import of a storefront page — every store visit would download it`);
+  }
+});
+
 test('the stylesheets stay under their budget', () => {
   // Not "one file": splitting a route out also splits the CSS it is the only
   // user of, which is the point. The budget is on the total, because the whole

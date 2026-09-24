@@ -270,7 +270,10 @@ nothing read it): a delivered, undisputed order past its date is released
 through the same `releaseEscrow` and the same idempotency key as the customer's
 own confirmation, so the two can never pay twice between them. Completion is
 counted once (`completed_orders`, +10 reputation) however many confirmations
-race.
+race. Both the confirmation and the sweep release only while the order is
+still `merchant_marked_delivered` — asked inside the settlement batch, so a
+dispute filed a moment earlier wins (review F1) — and the sweep reads only
+orders whose escrow it can settle, counting the rest (review F3).
 
 A delivered order can go **back** to in-progress if the customer says it is not
 done. Without that, the only way to reject bad work is a formal dispute, which
@@ -293,6 +296,14 @@ Before work starts, walking away costs nobody anything. Once it is under way,
 one side walking away imposes a real loss on the other, so it becomes a dispute
 for an admin rather than a button either party can press.
 
+The refund and the cancellation are **one batch**, conditional on the order
+still being `accepted`/`funded` (review F2): a cancel that loses to the
+merchant's «ابدأ العمل» moves nothing and answers 409 `ORDER_CHANGED`, and the
+merchant can start only on an escrow that is still `held` (409
+`ESCROW_NOT_HELD` otherwise). A cancel that an older build left half-done — the
+escrow refunded, the order still `funded` — is finished by the customer's
+retry, with no money moving.
+
 ---
 
 ## 8. Disputes
@@ -305,6 +316,10 @@ An admin resolves it as `release`, `refund` or `partial_refund`, with a
 required reason. Every decision appends escrow events and ledger rows and
 **never rewrites amounts**, so an admin can be asked months later exactly what
 they decided and on what day, and the answer comes from the data (§45).
+
+A disputed escrow is settled **only by an admin** (review F1): the system, the
+customer and the merchant settle a `held` escrow and nothing else, and a fence
+aborts any settlement whose escrow did not move in that same batch.
 
 Wave 1: only a **disputed** escrow is decided (`ESCROW_NOT_DISPUTED` otherwise);
 a repeated decision is a replay whose consequences apply once — one dispute
@@ -501,7 +516,9 @@ A store order's conversation is between the customer and the seller — both are
 participants from the moment it opens, and each customer message notifies the
 seller (audit 04 #4). An admin who opens it from an order **reads it read-only**
 (audit 04 #11 — the option chosen of the two the brief offered, docs/DECISIONS.md):
-they are not added as a participant, `POST` is `403 CHAT_READ_ONLY`, the thread
+they are not added as a participant, every write — a message, «يكتب…», a file —
+is `403 CHAT_READ_ONLY` (one rule, `assertMayWriteInThread`; review S3), staff rows
+an older build had added were removed by migration 0119, the thread
 answers `read_only: true`, and each reading — of the messages or of a file sent in
 the thread — writes an `admin.chat_read` audit row (at most one per admin, thread
 and hour). A visible «انضم فريق الدعم» message was

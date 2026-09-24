@@ -17,11 +17,17 @@ interface FollowedMerchant {
   store_slug?: string | null;
   /** The shop's own address — a card click is a full navigation there. */
   store_url?: string | null;
+  /**
+   * Levonis has sanctioned this shop (review S5): the server sends its id and
+   * nothing the merchant wrote, and the card says only that it is unavailable
+   * — the customer can still unfollow it.
+   */
+  unavailable?: boolean;
 }
 
 export default function FollowedStores() {
   const navigate = useNavigate();
-  const { dir } = useLanguage();
+  const { dir, loc } = useLanguage();
   const [stores, setStores] = useState<FollowedMerchant[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -95,7 +101,36 @@ export default function FollowedStores() {
             <p>{dir === 'rtl' ? 'لا توجد متاجر تمت متابعتها' : 'No followed stores yet'}</p>
           </div>
         ) : (
-          stores.map((store) => (
+          stores.map((store) =>
+            store.unavailable ? (
+              // A sanctioned shop: nothing of it is shown and there is nowhere
+              // to go — only the way to stop following it.
+              <div
+                key={store.id}
+                data-store-unavailable-card
+                className="bg-zinc-900/30 border border-zinc-800/40 rounded-xl p-4 flex items-center gap-4"
+              >
+                <div className="w-12 h-12 rounded-full bg-zinc-800/60 border border-zinc-700/60 flex items-center justify-center shrink-0">
+                  <Store className="w-5 h-5 text-zinc-600" aria-hidden="true" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  {/* OWNER: Sorani to be written by hand. */}
+                  <h3 className="font-bold truncate text-zinc-400">{loc('متجر غير متاح', 'Store unavailable')}</h3>
+                  <div className="text-sm text-zinc-500 truncate">
+                    {loc('هذا المتجر غير متاح حاليًا.', 'This store is not available right now.')}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => unfollow(e, store.id)}
+                  disabled={busyId === store.id}
+                  className="border border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-full px-4 min-h-[44px] text-sm font-medium transition-colors disabled:opacity-50 shrink-0"
+                >
+                  {/* OWNER: Sorani to be written by hand. */}
+                  {busyId === store.id ? '...' : loc('إلغاء المتابعة', 'Unfollow')}
+                </button>
+              </div>
+            ) : (
             <div
               key={store.id}
               onClick={() => {
@@ -132,7 +167,8 @@ export default function FollowedStores() {
                   : (dir === 'rtl' ? 'إلغاء المتابعة' : 'Unfollow')}
               </button>
             </div>
-          ))
+            )
+          )
         )}
       </div>
     </div>

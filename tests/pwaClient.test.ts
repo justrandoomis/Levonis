@@ -531,17 +531,22 @@ test('iOS home-screen identity is per host, not the shared index.html', () => {
   );
 
   // <title> is iOS's next fallback, so a merchant host has to own it while its
-  // storefront is on screen — and the apple-touch-icon with it.
+  // storefront is on screen.
   const identity = SRC('components/pwa/HostAppleIdentity.tsx');
   assert.match(identity, /document\.title = name;/);
-  assert.match(identity, /link\[rel="apple-touch-icon"\]/);
   assert.match(SRC('App.tsx'), /<HostAppleIdentity \/>/);
 
-  // The icon is repointed ONLY for formats iOS decodes. A merchant logo is
-  // often a WebP, and iOS does not fall back when it cannot read this link —
-  // it uses a SCREENSHOT OF THE PAGE, which is the bug the PNG replaced.
-  assert.match(identity, /APPLE_ICON_EXTENSIONS = \['\.png', '\.jpg', '\.jpeg'\]/);
-  assert.ok(!/webp/i.test(identity.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '')));
+  // The ICON is per host at the source now (merchant platform W2-D): index.html
+  // links /store-icon/apple-touch.png and the Worker answers it with the
+  // store's own 180 px PNG rendition. The component used to repoint the link
+  // at the RAW logo (PNG/JPEG only — iOS refuses WebP and uses a screenshot of
+  // the page); doing that now would replace the rendition with the upload, so
+  // it must not touch the link at all.
+  const code = identity.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '');
+  assert.ok(!/apple-touch-icon/.test(code), 'HostAppleIdentity repoints the apple-touch-icon again');
+  assert.ok(!/logoUrl/.test(code), 'HostAppleIdentity reads the raw logo again');
+  const shell = html.replace(/<!--[\s\S]*?-->/g, '');
+  assert.match(shell, /<link rel="apple-touch-icon" sizes="180x180" href="\/store-icon\/apple-touch\.png" \/>/);
 });
 
 // ---------------------------------------------------------------------------

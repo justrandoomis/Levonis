@@ -19,13 +19,13 @@
  * is decorative.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
   Store, Package, ShoppingBag, Star, Users, BarChart3, Settings as SettingsIcon,
   Bell, Wallet, Loader2, Plus, ExternalLink,
-  ArrowRight, LayoutGrid, Hammer, Images, Tag, ClipboardList, MessageCircle, Printer, Calculator,
+  ArrowRight, LayoutGrid, Hammer, Images, Tag, ClipboardList, MessageCircle, Printer, Calculator, Palette,
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { ApiError } from '../lib/api';
@@ -41,11 +41,16 @@ import { OrdersTab, CustomOrdersTab, CouponsTab } from '../components/merchant/d
 import { StoreSettingsTab } from '../components/merchant/dashboard/StoreSettingsTab';
 import { PrintersTab } from '../components/merchant/dashboard/PrintersTab';
 import { CostingTab } from '../components/merchant/dashboard/CostingTab';
+// The shared toast stack (src/components/ui/Toast.tsx), mounted once for the workspace.
+import { Toaster } from '../components/ui/Toast';
+// The store page's theme, preview, publish and history (merchant platform
+// W2-C) — its own chunk, fetched when the tab is opened.
+const StoreDesignPanel = lazy(() => import('../components/merchant/storeDesign/StoreDesignPanel'));
 
 type Tab =
   | 'overview' | 'products' | 'sections' | 'services' | 'showcase'
   | 'orders' | 'custom' | 'coupons'
-  | 'reviews' | 'customers' | 'money' | 'settings' | 'notifications' | 'printers' | 'costing';
+  | 'reviews' | 'customers' | 'money' | 'settings' | 'design' | 'notifications' | 'printers' | 'costing';
 
 /**
  * Is this page being shown on the viewer's OWN store host (or on the main
@@ -169,6 +174,8 @@ export default function MerchantDashboardPage() {
     { id: 'customers', label: loc('العملاء', 'Customers', 'کڕیاران'), icon: <Users className="w-3.5 h-3.5" /> },
     { id: 'money', label: loc('الأرباح', 'Earnings', 'قازانج'), icon: <Wallet className="w-3.5 h-3.5" /> },
     { id: 'settings', label: loc('إعداد المتجر', 'Store setup', 'ڕێکخستنی فرۆشگا'), icon: <SettingsIcon className="w-3.5 h-3.5" />, group: true },
+    // OWNER: Sorani to be written by hand.
+    { id: 'design', label: loc('تصميم المتجر', 'Store design'), icon: <Palette className="w-3.5 h-3.5" /> },
     /* The printers are what Levonis matches a print request against, so they
        belong beside the store setup rather than in the catalogue: a shop with
        no printer here is a shop the matcher can never notify. */
@@ -182,6 +189,7 @@ export default function MerchantDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 pb-28">
+      <Toaster />
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[360px] bg-olive/15 rounded-full blur-[120px] pointer-events-none z-0" />
 
       <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 pt-4">
@@ -291,6 +299,11 @@ export default function MerchantDashboardPage() {
           {tab === 'customers' && <CustomersTab />}
           {tab === 'money' && <MoneyTab />}
           {tab === 'settings' && <StoreSettingsTab me={me} onSaved={reload} />}
+          {tab === 'design' && (
+            <Suspense fallback={<Spinner />}>
+              <StoreDesignPanel />
+            </Suspense>
+          )}
           {tab === 'notifications' && <NotificationsTab />}
           {tab === 'printers' && <PrintersTab canSell={canSell} />}
           {tab === 'costing' && <CostingTab />}

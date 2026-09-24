@@ -116,9 +116,14 @@ communityRoutes.get('/merchants', async (c) => {
   // The storefront half rides along so a directory card can send the visitor
   // straight to the shop's own address; a profile-only merchant has neither
   // slug nor URL and keeps the in-site page.
+  // NOTHING OF A SANCTIONED SHOP (review S5, owner decision 2026-09-24): a
+  // suspended merchant or a suspended store is not in the directory at all —
+  // its name, bio and avatar are exactly what the storefront no longer serves,
+  // and a card linking to the in-site page would advertise them anyway.
   const { results } = await c.env.DB.prepare(
     `SELECT cm.*, s.id AS store_id, s.slug AS store_slug, s.status AS store_status
        FROM community_merchants cm LEFT JOIN merchant_stores s ON s.merchant_id = cm.id
+      WHERE cm.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
       ORDER BY cm.created_at DESC LIMIT 20`
   ).all<Record<string, unknown>>();
   const proBadges = await usersWithEntitlement(c.env.DB, results.map((m) => m.user_id), 'proMerchantBadge');
@@ -290,14 +295,30 @@ communityRoutes.get('/followed', requireAuth, async (c) => {
   const proBadges = await usersWithEntitlement(c.env.DB, results.map((m) => m.user_id), 'proMerchantBadge');
   return c.json({
     success: true,
-    merchants: results.map((m) => ({
-      ...merchantPublic(m, proBadges),
-      store_slug: m.store_slug ?? null,
-      store_url:
-        m.store_slug && m.store_status !== 'suspended' && m.status !== 'suspended'
-          ? storeUrl(String(m.store_slug), root, String(m.store_id))
-          : null,
-    })),
+    merchants: results.map((m) =>
+      // A shop the customer follows that Levonis has since SANCTIONED stays
+      // in their list — so they can unfollow it — as a neutral card (review
+      // S5): its id and `unavailable`, and not one field the merchant wrote.
+      m.status === 'suspended' || m.store_status === 'suspended'
+        ? {
+            id: m.id,
+            unavailable: true,
+            name: null,
+            bio: null,
+            avatarUrl: null,
+            verified: false,
+            pro_badge: false,
+            created_at: m.created_at,
+            store_slug: null,
+            store_url: null,
+          }
+        : {
+            ...merchantPublic(m, proBadges),
+            unavailable: false,
+            store_slug: m.store_slug ?? null,
+            store_url: m.store_slug ? storeUrl(String(m.store_slug), root, String(m.store_id)) : null,
+          }
+    ),
   });
 });
 

@@ -89,8 +89,33 @@ export async function isEngagedMerchant(db: D1Database, requestId: string, userI
 export async function mayQuoteOnBoard(db: D1Database, userId: string): Promise<boolean> {
   const ctx = await storeForUser(db, userId);
   if (!ctx) return false;
-  if (ctx.merchant.status === 'suspended' || ctx.store.status !== 'active') return false;
-  const tier = await getTierStatus(db, userId);
+  return merchantTakesNewWork(db, {
+    merchantStatus: ctx.merchant.status,
+    storeStatus: ctx.store.status,
+    ownerUserId: userId,
+  });
+}
+
+/**
+ * MAY THIS MERCHANT TAKE ON NEW WORK — the ONE allow-list behind making an
+ * offer (`requireOfferPrivileges` + the `communityOffers` benefit), minting a
+ * preview link on the board (`mayQuoteOnBoard`) and a customer ACCEPTING a
+ * standing offer (worker/routes/marketplace.ts). Review S2: acceptance asked
+ * only "not suspended", so an offer from a PAUSED store or an owner whose plan
+ * had lapsed was accepted and its escrow funded while the same merchant was
+ * refused a new offer; and a RESTRICTED merchant, refused every offer, could
+ * still mint a viewer link.
+ *
+ * An allow-list, like the buy path: the merchant exactly `active`, the store
+ * exactly `active` (a missing store is not one), and the owner's plan carries
+ * both the store and the community-offers benefit.
+ */
+export async function merchantTakesNewWork(
+  db: D1Database,
+  p: { merchantStatus: unknown; storeStatus: unknown; ownerUserId: string }
+): Promise<boolean> {
+  if (p.merchantStatus !== 'active' || p.storeStatus !== 'active') return false;
+  const tier = await getTierStatus(db, p.ownerUserId);
   return benefits.merchantStore(tier) && benefits.communityOffers(tier);
 }
 
@@ -358,7 +383,19 @@ export const STRANDED_AFTER_MINUTES = 15;
  *
  * NOT WHEN DISPUTED. A disputed order has left `merchant_marked_delivered`,
  * and an escrow frozen by a dispute is skipped even if an older bug left its
- * order behind (the dispute route used to flip the two separately).
+ * order behind (the dispute route used to flip the two separately). And not
+ * on a READ of either (review F1): the release itself is conditional on the
+ * escrow still being `held` (`releaseEscrow`, as the system — only an admin
+ * settles a disputed escrow) AND on the order still being
+ * `merchant_marked_delivered`, inside the settlement batch, so a dispute filed
+ * between this SELECT and the release wins.
+ *
+ * ONLY ROWS IT CAN SETTLE ARE READ (review F3). Due orders whose escrow is
+ * missing or frozen used to be selected, skipped in code and counted — and
+ * `ORDER BY auto_complete_at LIMIT n` served the same n of them to every run,
+ * so a hundred stuck rows at the head of the queue starved every later due
+ * order for ever. They are filtered in the SELECT and counted by a query of
+ * their own.
  */
 export async function sweepCommunityAutoComplete(
   env: Env,
@@ -366,13 +403,24 @@ export async function sweepCommunityAutoComplete(
   limit: number,
   report: CommunitySweepReport
 ): Promise<void> {
+  const settleable = `EXISTS (SELECT 1 FROM community_escrows e
+                              WHERE e.community_order_id = o.id AND e.state IN ('held','released'))`;
   const { results } = await env.DB.prepare(
-    `SELECT id, request_id, merchant_id, customer_id, auto_complete_at FROM community_orders
-      WHERE state = 'merchant_marked_delivered' AND auto_complete_at IS NOT NULL AND auto_complete_at <= ?
-      ORDER BY auto_complete_at LIMIT ?`
+    `SELECT o.id, o.request_id, o.merchant_id, o.customer_id, o.auto_complete_at FROM community_orders o
+      WHERE o.state = 'merchant_marked_delivered' AND o.auto_complete_at IS NOT NULL AND o.auto_complete_at <= ?1
+        AND ${settleable}
+      ORDER BY o.auto_complete_at LIMIT ?2`
   )
     .bind(now, limit)
     .all<{ id: string; request_id: string; merchant_id: string; customer_id: string; auto_complete_at: string }>();
+  const stuck = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM community_orders o
+      WHERE o.state = 'merchant_marked_delivered' AND o.auto_complete_at IS NOT NULL AND o.auto_complete_at <= ?1
+        AND NOT ${settleable}`
+  )
+    .bind(now)
+    .first<{ n: number }>();
+  report.auto_complete_skipped += Number(stuck?.n ?? 0);
 
   for (const o of results ?? []) {
     try {
@@ -387,6 +435,7 @@ export async function sweepCommunityAutoComplete(
         actorRole: 'system',
         reason: `auto-confirmed: no confirmation or dispute by ${o.auto_complete_at}`,
         idempotencyKey: `confirm:${o.id}`,
+        orderStates: ['merchant_marked_delivered'],
       });
       if (!released.ok) {
         report.auto_complete_skipped += 1;

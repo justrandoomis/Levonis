@@ -23,7 +23,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
@@ -217,15 +217,69 @@ test("wrangler's banner lines before the JSON do not defeat it", () => {
   assert.match(out, /FAIL shop/);
 });
 
-test('output it cannot parse is SKIPPED, never a pass', () => {
+test('output it cannot read FAILS CLOSED — it stops the deploy, never waves it through (review F9)', () => {
   // An auth failure or a changed output format must not read as "no store
   // collides" — that is precisely the report that would let the deploy
-  // through and take a shop offline.
-  for (const payload of ['Authentication error [code: 10000]', '', 'null']) {
+  // through and take a shop offline. It used to print `slugs=skipped` and
+  // exit 0, and the deploy carried on without anybody having looked.
+  for (const payload of [
+    'Authentication error [code: 10000]',
+    '',
+    'null',
+    JSON.stringify({ success: false, errors: [{ code: 7500, message: 'no such table: merchant_store_slugs' }] }),
+  ]) {
     const { out, code } = slugCheck(payload);
-    assert.equal(code, 0, out);
-    assert.match(out, /slugs=skipped/, JSON.stringify(payload));
+    assert.equal(code, 1, out);
+    assert.match(out, /slugs=unreadable/, JSON.stringify(payload));
     assert.doesNotMatch(out, /slugs=ok/);
+  }
+  // No file at all — the read step failed before writing one.
+  const missing = (() => {
+    try {
+      return { out: execFileSync('node', ['scripts/check-live-store-slugs.mjs', join(dir, 'never-written.json')], { cwd: ROOT, encoding: 'utf8' }), code: 0 };
+    } catch (err) {
+      const e = err as { stdout?: string; status?: number };
+      return { out: e.stdout ?? '', code: e.status ?? 1 };
+    }
+  })();
+  assert.equal(missing.code, 1, missing.out);
+  assert.match(missing.out, /slugs=unreadable/);
+});
+
+const d1Rows = (...rows: Array<[string, 'live' | 'retired']>) =>
+  JSON.stringify([{ results: rows.map(([slug, kind]) => ({ slug, kind })), success: true }]);
+
+test('the OLD name of a renamed store that just became reserved STOPS the deploy (review F9)', () => {
+  // The storefront redirects a retired name to the shop's new address — the
+  // redirect every QR code printed before the rename relies on — and a
+  // reserved word breaks it exactly as it breaks a live store.
+  const { out, code } = slugCheck(d1Rows(['ali3d', 'live'], ['products', 'retired'], ['old-ali', 'retired']));
+  assert.equal(code, 1, out);
+  assert.match(out, /slugs=FAILED/);
+  assert.match(out, /FAIL products \(retired name, redirects\)/);
+  assert.match(out, /ok +old-ali \(retired name, redirects\)/);
+  assert.match(out, /ok +ali3d/);
+  assert.match(out, /break the redirect/);
+  assert.match(out, /retired store names read \(json\): 2/);
+});
+
+test('every storefront path word wave 1 reserved stops a store already trading under it', () => {
+  for (const word of ['resolve', 'by-id', 'p', 'products', 'sections', 'services', 'showcase', 'reviews']) {
+    const { out, code } = slugCheck(d1Rows([word, 'live']));
+    assert.equal(code, 1, `${word}: ${out}`);
+    assert.match(out, new RegExp(`FAIL ${word}\\b`));
+  }
+});
+
+test('the deploy workflows read retired names too, and both run the guard before deploying', () => {
+  for (const wf of ['deploy-staging-code.yml', 'deploy-staging.yml']) {
+    const yml = readFileSync(join(ROOT, '.github/workflows', wf), 'utf8');
+    const guard = yml.indexOf('node scripts/check-live-store-slugs.mjs');
+    assert.ok(guard > 0, `${wf} does not run the slug guard`);
+    assert.match(yml, /FROM merchant_store_slugs WHERE active = 0/, `${wf} does not read the retired names`);
+    const deploy = yml.indexOf('npx wrangler deploy', guard);
+    assert.ok(deploy > guard, `${wf}: the guard must run BEFORE the deploy`);
+    assert.ok(yml.lastIndexOf('npx wrangler deploy', guard) === -1, `${wf}: a deploy runs before the guard`);
   }
 });
 

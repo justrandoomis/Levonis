@@ -86,7 +86,23 @@
       // where robots.txt should be, and no sitemap at all. Per-host, so a
       // merchant subdomain names its own URLs (worker/routes/seo.ts).
       "/robots.txt",
-      "/sitemap.xml"
+      "/sitemap.xml",
+      // A STORE'S OWN IDENTITY, PER HOST (merchant platform W2-D).
+      //
+      // "/store-icon/*": the home-screen and tab icons index.html links
+      // (/store-icon/apple-touch.png, /store-icon/favicon-32.png, …). They are
+      // not files in dist/ — the Worker answers each with THIS host's store
+      // icon, or the platform's on the apex (worker/routes/manifest.ts
+      // storeIconRoute). Without the entry the asset layer answers them with
+      // index.html at 200 and iOS, handed HTML for its icon, uses a
+      // screenshot of the page.
+      //
+      // "/" — ONE exact path, the root document: a store's home link is the
+      // link its merchant shares, and only the Worker can write the STORE's
+      // card into it (worker/lib/socialPreview.ts). On the apex it passes the
+      // asset through untouched, with no database read.
+      "/store-icon/*",
+      "/"
     ]
   },
 
@@ -212,7 +228,11 @@
           // levonis-iq.com is served by env.staging, so the top-level copy
           // alone left both routes as dead code in production.
           "/robots.txt",
-          "/sitemap.xml"
+          "/sitemap.xml",
+          // The per-host store icons and the store's home card — see the
+          // top-level block. Repeated for the same reason as the two above.
+          "/store-icon/*",
+          "/"
         ]
       },
       "d1_databases": [
@@ -294,7 +314,11 @@
           // levonis-iq.com is served by env.staging, so the top-level copy
           // alone left both routes as dead code in production.
           "/robots.txt",
-          "/sitemap.xml"
+          "/sitemap.xml",
+          // The per-host store icons and the store's home card — see the
+          // top-level block. Repeated for the same reason as the two above.
+          "/store-icon/*",
+          "/"
         ]
       },
       "workers_dev": false,

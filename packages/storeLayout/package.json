@@ -1,0 +1,13 @@
+{
+  "name": "@levonis/storeLayout",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The store page as data: the versioned layout schema (theme presets, tokens, header/footer, the block registry), the one normaliser every layout passes on write, read and render, the default layout that reproduces the pre-builder storefront, and the data-needs planner. Pure: no I/O, no Cloudflare bindings, no imports from worker/ or services/.",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json"
+  }
+}

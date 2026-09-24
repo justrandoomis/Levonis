@@ -123,7 +123,11 @@ QR code already printed on a box points at them. Parking alone left those links
 on «No such store», so the parked slug also **points at the shop**: its host's
 `/resolve` answers `404 STORE_MOVED` with `details.redirect` (the app replaces
 the address) until another store claims the slug — and a live slug always wins
-over a parked one (audit 01 B14).
+over a parked one (audit 01 B14). A suspended store's old address answers
+`STORE_UNAVAILABLE` instead and never discloses where the shop moved (review
+S4); and `scripts/check-live-store-slugs.mjs` checks the parked names as well
+as the live ones before a deploy, failing closed when it cannot read them
+(review F9).
 
 `slug` is **never a primary key**. Stores are keyed on `store_id`, so a future
 custom domain can be mapped to a store without touching a single order (§69).

@@ -561,8 +561,17 @@ export const storeCheckoutApi = {
   setQty: (cartItemId: string, qty: number) =>
     api.patch<MerchantCartData>(`/api/cart/merchant-items/${cartItemId}`, { qty }),
   removeLine: (cartItemId: string) => api.delete<MerchantCartData>(`/api/cart/merchant-items/${cartItemId}`),
-  quote: (couponCode = '') =>
-    api.post<{ quote: StoreQuote }>('/api/store-orders/quote', couponCode ? { couponCode } : {}),
+  /**
+   * `idempotencyKey` is the checkout attempt's own key, when there is one: the
+   * server counts that attempt's still-active reservation as the customer's
+   * money for THIS order, so a retry after a dropped connection is not shown
+   * «رصيدك لا يغطي» by its own hold.
+   */
+  quote: (couponCode = '', idempotencyKey = '') =>
+    api.post<{ quote: StoreQuote }>('/api/store-orders/quote', {
+      ...(couponCode ? { couponCode } : {}),
+      ...(idempotencyKey ? { idempotencyKey } : {}),
+    }),
   // No `payWithWallet`: there is nothing to choose. The server refuses an
   // explicit `false` with STORE_PREPAID_ONLY rather than silently charging a
   // wallet for a method the customer did not pick.
@@ -733,6 +742,42 @@ export interface AdminEscrow {
   disputed_at: string | null;
 }
 
+/**
+ * STORE-ORDER MONEY THE OLD CODE LEFT WRONG (review F4) — the two shapes the
+ * financial admin's reconciliation panel lists. A: refunded to the customer,
+ * then re-opened, the merchant still due to be paid. B: cancelled and paid
+ * from the wallet, never refunded.
+ */
+export interface DriftRefundedReopened {
+  order_id: string;
+  status: string;
+  created_at: string;
+  customer_id: string;
+  customer_name: string | null;
+  merchant_id: string;
+  merchant_name: string | null;
+  total_iqd: number;
+  refund_usd_cents: number;
+  refund_iqd: number | null;
+  refunded_at: string;
+  credit_state: 'pending' | 'available';
+  credit_iqd: number;
+}
+
+export interface DriftCancelledUnrefunded {
+  order_id: string;
+  created_at: string;
+  updated_at: string;
+  customer_id: string;
+  customer_name: string | null;
+  merchant_id: string;
+  merchant_name: string | null;
+  total_iqd: number;
+  paid_usd_cents: number;
+  paid_iqd: number | null;
+  credit_state: string | null;
+}
+
 export interface AdminRequestRow {
   id: string;
   title: string;
@@ -878,6 +923,24 @@ export const adminCommunityApi = {
     api.post<{ replayed: boolean; balance: { available_iqd: number; pending_iqd: number; paid_iqd: number } }>(
       `/api/admin/community/merchants/${id}/payout`,
       { amount_iqd, note, idempotencyKey }
+    ),
+
+  /** Read-only: the store orders whose money the old code left wrong (review F4). */
+  storeOrderDrift: () =>
+    api.get<{ refunded_reopened: DriftRefundedReopened[]; cancelled_unrefunded: DriftCancelledUnrefunded[] }>(
+      '/api/admin/community/reconciliation/store-orders'
+    ),
+  /** B — refund a cancelled, paid store order that was never refunded. Audited; a reason is required. */
+  reconcileRefund: (orderId: string, reason: string) =>
+    api.post<{ order_id: string; replayed: boolean }>(
+      `/api/admin/community/reconciliation/store-orders/${encodeURIComponent(orderId)}/refund`,
+      { reason }
+    ),
+  /** A — take back the merchant's credit on an order refunded before it was re-opened. */
+  reconcileReverseCredit: (orderId: string, reason: string) =>
+    api.post<{ order_id: string; replayed: boolean }>(
+      `/api/admin/community/reconciliation/store-orders/${encodeURIComponent(orderId)}/reverse-credit`,
+      { reason }
     ),
 
   complaints: (status = '') =>

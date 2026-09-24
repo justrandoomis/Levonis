@@ -47,6 +47,25 @@ export interface ManifestIdentity {
    * `/files/<key>`, exactly as `worker/routes/storefront.ts` renders it.
    */
   logoKey?: string | null;
+  /**
+   * THE STORE'S OWN PNG RENDITIONS (worker/lib/storeIcons.ts), as the
+   * `/files/<key>` paths `storeIconUrls` produces — present only while they
+   * are servable for the store's CURRENT logo. When all three are valid they
+   * are the store's whole icon set; otherwise the raw logo + platform icons
+   * below remain the answer.
+   */
+  icons?: StoreManifestIcons | null;
+  /** The ground of the store's preset (`storeSurface`): the splash colour. `#rrggbb`. */
+  backgroundColor?: string | null;
+  /** The title-bar colour of the store's preset. `#rrggbb`. */
+  themeColor?: string | null;
+}
+
+/** The three renditions a manifest names (the Apple and tab icons are linked by the document). */
+export interface StoreManifestIcons {
+  icon192: string;
+  icon512: string;
+  maskable512: string;
 }
 
 export interface WebManifestIcon {
@@ -186,7 +205,12 @@ const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066
  */
 const NAME_ALREADY_HAS_A_NOUN = /^(?:متجر|محل|شركة|مؤسسة|معمل|ورشة)\s/;
 
-function storeDescription(name: string): string {
+/**
+ * Exported for the store's share card (worker/lib/socialPreview.ts): a shop
+ * with no tagline unfurls with the same sentence its installed app shows,
+ * rather than with the PLATFORM's description of itself.
+ */
+export function storeDescription(name: string): string {
   const subject = NAME_ALREADY_HAS_A_NOUN.test(name) ? name : `متجر ${name}`;
   return `${subject} على منصة \u2068Levonis\u2069`;
 }
@@ -204,6 +228,20 @@ function cleanText(raw: unknown, max: number): string {
   const collapsed = raw.replace(UNSAFE_TEXT, ' ').replace(/\s+/g, ' ').trim();
   const chars = Array.from(collapsed);
   return (chars.length <= max ? collapsed : chars.slice(0, max).join('')).trim();
+}
+
+/**
+ * The same cleaning for the store's OTHER identity surface — its share card
+ * (worker/lib/socialPreview.ts). A chat app prints a store name with no page
+ * around it exactly as a launcher does, so the bidi-override and zero-width
+ * rules above apply there for the same reasons.
+ */
+export function cleanIdentityText(raw: unknown, max: number): string {
+  try {
+    return cleanText(raw, max);
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -310,9 +348,13 @@ const LOGO_TYPES: Readonly<Record<string, string>> = {
  *
  * WHAT THAT COSTS. Chromium picks an icon by declared size, so it will keep
  * choosing the platform PNGs; this entry is for the browsers that read the
- * bytes, and it is a true statement in all of them. The day merchant logo
- * dimensions are recorded reliably, adding `sizes` here is a one-line change
- * and the entry starts winning.
+ * bytes, and it is a true statement in all of them.
+ *
+ * IT IS NOW ONLY THE FALLBACK. The store's own PNG renditions (sized, known,
+ * `storeRenditionIcons` below) replace this entry AND the platform icons the
+ * moment they exist; this raw-logo entry is what a store gets in the seconds
+ * before its first renditions are cut, or on a deployment with no Images
+ * binding to cut them.
  *
  * `purpose: 'any'`, never `maskable`: a merchant logo has no guaranteed safe
  * zone, so a circular mask would crop their mark.
@@ -331,6 +373,62 @@ function storeLogoIcon(logoKey: unknown): WebManifestIcon | null {
   // others. Neither is worth guessing for.
   if (!type) return null;
   return { src: `/files/${key}`, type, purpose: 'any' };
+}
+
+/**
+ * THE STORE'S OWN ICONS — sized, typed, and the whole set, or nothing.
+ *
+ * This is the follow-up the note above waited for. `worker/lib/storeIcons.ts`
+ * cuts the logo into PNGs whose pixel size is KNOWN (it re-reads every output
+ * and refuses one that is not exactly its size), so the entries below can
+ * declare `sizes` truthfully and Chromium picks the store's icon instead of
+ * the platform's.
+ *
+ * WHEN THEY ARE VALID THEY ARE THE ONLY ICONS. Appending the platform PNGs as
+ * "extra fallbacks" is not harmless: Chrome chooses the maskable icon closest
+ * to its launcher's size, so a platform `maskable-192` beside the store's
+ * `maskable-512` would put LEVONIS on the home screen of a store that has its
+ * own icon. The platform appears on a merchant host only as a true fallback —
+ * when this function returns null.
+ *
+ * Validated here by SHAPE (this module keeps its no-imports property): the
+ * three `/files/merchants/<owner>/logos/appicon-<rev>-<role>.png` paths the
+ * renditions are served under, each for its own role. Anything else — one
+ * missing, one for the wrong role, a URL — is no set at all.
+ */
+const RENDITION_SRC =
+  /^\/files\/merchants\/[A-Za-z0-9][A-Za-z0-9_-]{0,79}\/logos\/appicon-[0-9a-f]{16}-(icon192|icon512|maskable512)\.png$/;
+
+function storeRenditionIcons(icons: unknown): WebManifestIcon[] | null {
+  if (!icons || typeof icons !== 'object') return null;
+  const set = icons as Record<string, unknown>;
+  const src = (role: 'icon192' | 'icon512' | 'maskable512'): string | null => {
+    const value = set[role];
+    return typeof value === 'string' && RENDITION_SRC.exec(value)?.[1] === role ? value : null;
+  };
+  const icon192 = src('icon192');
+  const icon512 = src('icon512');
+  const maskable512 = src('maskable512');
+  if (!icon192 || !icon512 || !maskable512) return null;
+  return [
+    { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any' },
+    // Padded into the safe zone on the store's own ground — `any` and
+    // `maskable` stay separate entries, for the reason given above
+    // PLATFORM_ICONS.
+    { src: maskable512, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+  ];
+}
+
+/**
+ * A colour a launcher may paint, or the fallback. Only `#rrggbb`: the value
+ * comes from a code-owned preset table (`storeSurface`), never from a
+ * merchant, and anything else — a name, `rgb()`, an empty string — is the
+ * document's black rather than a splash screen some launcher renders white.
+ */
+const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
+function colourOr(value: unknown, fallback: string): string {
+  return typeof value === 'string' && HEX_COLOUR.test(value) ? value.toLowerCase() : fallback;
 }
 
 /**
@@ -355,11 +453,17 @@ const SHORTCUT_ICONS: WebManifestIcon[] = [
   { src: '/icons/icon-192.bc80fc2b.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
 ];
 
-function shortcuts(): WebManifestShortcut[] {
+/**
+ * On a store with its own renditions the shortcuts carry the STORE's 192
+ * icon — the platform mark in a merchant app's long-press menu would be the
+ * same substitution the icons themselves no longer make.
+ */
+function shortcuts(icon: WebManifestIcon | null = null): WebManifestShortcut[] {
+  const icons = () => (icon ? [{ ...icon }] : [...SHORTCUT_ICONS]);
   return [
-    { name: 'المنتجات', short_name: 'المنتجات', url: '/products', icons: [...SHORTCUT_ICONS] },
-    { name: 'سلة التسوق', short_name: 'السلة', url: '/cart', icons: [...SHORTCUT_ICONS] },
-    { name: 'طلباتي', short_name: 'طلباتي', url: '/orders', icons: [...SHORTCUT_ICONS] },
+    { name: 'المنتجات', short_name: 'المنتجات', url: '/products', icons: icons() },
+    { name: 'سلة التسوق', short_name: 'السلة', url: '/cart', icons: icons() },
+    { name: 'طلباتي', short_name: 'طلباتي', url: '/orders', icons: icons() },
   ];
 }
 
@@ -374,10 +478,21 @@ export function buildWebManifest(identity?: ManifestIdentity | null): WebManifes
   let name = '';
   let tagline = '';
   let logo: WebManifestIcon | null = null;
+  let renditions: WebManifestIcon[] | null = null;
+  let background = BLACK;
+  let theme = BLACK;
   try {
     name = cleanText(identity?.name, NAME_MAX);
     tagline = cleanText(identity?.tagline, DESCRIPTION_MAX);
-    logo = name ? storeLogoIcon(identity?.logoKey) : null;
+    renditions = name ? storeRenditionIcons(identity?.icons) : null;
+    // The raw logo is the fallback FOR the renditions, never beside them.
+    logo = name && !renditions ? storeLogoIcon(identity?.logoKey) : null;
+    // The store's own ground, from its preset; the platform keeps the
+    // document's black whatever an identity says.
+    if (name) {
+      background = colourOr(identity?.backgroundColor, BLACK);
+      theme = colourOr(identity?.themeColor, BLACK);
+    }
   } catch {
     // An identity is a database row, and this function's whole promise is that
     // it returns a manifest. A getter that throws, a proxy, a row shaped like
@@ -386,6 +501,9 @@ export function buildWebManifest(identity?: ManifestIdentity | null): WebManifes
     name = '';
     tagline = '';
     logo = null;
+    renditions = null;
+    background = BLACK;
+    theme = BLACK;
   }
 
   const isStore = name.length > 0;
@@ -435,8 +553,8 @@ export function buildWebManifest(identity?: ManifestIdentity | null): WebManifes
     start_url: '/',
     scope: '/',
     display: 'standalone',
-    background_color: BLACK,
-    theme_color: BLACK,
+    background_color: background,
+    theme_color: theme,
     categories: ['shopping'],
     /**
      * NO `orientation`. This is a phone-first store, but it is not a
@@ -448,7 +566,7 @@ export function buildWebManifest(identity?: ManifestIdentity | null): WebManifes
      * already works in both directions. Omitting the field lets the device
      * decide, which is what it does today in the browser.
      */
-    icons: logo ? [logo, ...PLATFORM_ICONS] : [...PLATFORM_ICONS],
-    shortcuts: shortcuts(),
+    icons: renditions ?? (logo ? [logo, ...PLATFORM_ICONS] : [...PLATFORM_ICONS]),
+    shortcuts: shortcuts(renditions ? renditions[0] : null),
   };
 }

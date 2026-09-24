@@ -187,10 +187,14 @@ test('the shop mark has ONE spelling — the shell repeats the module, it does n
   assert.equal(SITE_LOGO_VERSIONED_URL, `${SITE_LOGO_URL}?v=${PLATFORM_ICON_REVISION}`);
   assert.equal(SITE_LOGO_SHARE_URL, `${SITE_ORIGIN}${SITE_LOGO_VERSIONED_URL}`);
 
-  // The tab icon, relative because the browser resolves it against the page.
-  const icon = /<link\s+rel="icon"\s+type="image\/webp"\s+href="([^"]*)"/i.exec(SHELL_MARKUP);
-  assert.ok(icon, 'index.html has no WebP tab icon');
-  assert.equal(icon![1], SITE_LOGO_VERSIONED_URL);
+  // THE TAB ICON NO LONGER NAMES THE R2 LOGO (merchant platform W2-D). The
+  // shell is shared by every store's host, so its icon links are per-host
+  // Worker paths (`/store-icon/*`: the store's own PNG on its host, the
+  // platform's committed PNG elsewhere — tests/indexHtmlPwa.test.ts owns
+  // them); a WebP link to the platform logo beside them put the LEVONIS mark
+  // in the tab of a merchant's shop. The mark itself is still named once:
+  // below, in the share card.
+  assert.equal(/<link\s+rel="icon"\s+type="image\/webp"/i.exec(SHELL_MARKUP), null, 'a platform-only WebP tab icon is back');
 
   // The share card, absolute because a relative og:image is silently dropped.
   assert.equal(shellMeta('property', 'og:image'), SITE_LOGO_SHARE_URL);

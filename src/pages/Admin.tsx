@@ -5,6 +5,8 @@ import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, L
 import DashboardLayout from '../components/DashboardLayout';
 import { supportTotal, useSupportCounts } from '../components/adminSupport/supportCounts';
 import { useAuth } from '../AuthContext';
+// The shared toast stack (src/components/ui/Toast.tsx), mounted once for the admin console.
+import { Toaster } from '../components/ui/Toast';
 
 /**
  * THE NINETEEN ADMIN PANELS, EACH ITS OWN CHUNK (`01-TARGET.md` §10, plan 1.8).
@@ -245,6 +247,7 @@ export default function Admin() {
       activeTab={activeTab}
       onTabChange={(id) => setActiveTab(id as AdminTab)}
     >
+      <Toaster />
       <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'inventory' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'membership_benefits' ? '' : 'bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-4 md:p-5 shadow-lg'}`}>
         <React.Suspense fallback={<PanelFallback dir={dir} />}>
 

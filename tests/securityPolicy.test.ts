@@ -344,8 +344,11 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
   for (const block of blocks) {
     assert.ok(block.includes('"/api/*"') && block.includes('"/files/*"'), block);
     const routes = [...block.matchAll(/"([^"]+)"/g)].map((m) => m[1]).filter((r) => r.startsWith('/'));
+    // `/*` is the change the note above is about: every page and every asset
+    // through the Worker. The exact root `/` is ONE document and is allowed
+    // below, argued for like every other entry.
     assert.ok(
-      !routes.includes('/*') && !routes.includes('/'),
+      !routes.includes('/*'),
       'the whole SPA behind the Worker would make dist/_headers redundant — read the note above before doing it'
     );
     // Named prefixes only. Every one of them is a deliberate decision, and
@@ -379,6 +382,26 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
     // Still two exact documents rather than a prefix, so index.html and every
     // SPA route keep taking their policy from dist/_headers, which is the
     // property this test exists to protect.
+    //
+    // REVISITED FOR THE MERCHANT PLATFORM (W2-D), for two entries:
+    //
+    //   `/store-icon/*` — for the manifest's reason exactly. index.html's
+    //   home-screen and tab icons name these paths, and no file in dist/ can
+    //   answer them, because the answer is per HOST: a store's own PNG on its
+    //   subdomain, the platform's elsewhere. Unlisted, the asset layer would
+    //   answer them with index.html at 200 and iOS would use a screenshot of
+    //   the page as the icon. A narrow prefix of image routes, no document.
+    //
+    //   `/` — ONE exact document, not the SPA: the root, so a store's home
+    //   link — the link every merchant shares — carries the STORE's card
+    //   (worker/lib/socialPreview.ts). It is the product paths' reason, for
+    //   the one page that names a store rather than a product. It passes the
+    //   asset through untouched on the apex (no read — the session is skipped
+    //   for it in worker/index.ts), and it arrives carrying dist/_headers'
+    //   policy like the product documents do; `securityHeaders` never
+    //   overwrites one. Every other route — `/products`, `/cart`, `/auth`,
+    //   every admin screen, every built asset — still takes its policy from
+    //   dist/_headers with the Worker nowhere in the request.
     for (const route of routes) {
       assert.ok(
         [
@@ -391,6 +414,8 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
           '/manifest.webmanifest',
           '/robots.txt',
           '/sitemap.xml',
+          '/store-icon/*',
+          '/',
         ].includes(route),
         `${route} was added to run_worker_first without revisiting this test`
       );

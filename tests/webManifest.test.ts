@@ -24,10 +24,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { APEX, MERCHANT_HOST, asD1, ctx, freshDb } from './fixtures/app';
+import { APEX, MERCHANT_HOST, asD1, ctx, freshDb, pending } from './fixtures/app';
+import { fixtureWebp, iconEnv, imagesStub } from './fixtures/storeIcons';
 import worker from '../worker/index';
 import { buildWebManifest, PLATFORM_NAME, type WebManifest } from '../worker/lib/webManifest';
 import { MANIFEST_CONTENT_TYPE } from '../worker/routes/manifest';
+import { refreshStoreIcons, renditionKey } from '../worker/lib/storeIcons';
 
 const repo = (p: string) => new URL(`../${p}`, import.meta.url);
 
@@ -518,3 +520,150 @@ function stripJsonc(src: string): string {
   }
   return out.replace(/,(\s*[}\]])/g, '$1');
 }
+
+// ============================================================================
+//  THE STORE'S OWN ICONS AND GROUND (merchant platform W2-D)
+// ============================================================================
+
+const REV = '0123456789abcdef';
+const RENDITIONS = {
+  icon192: `/files/${renditionKey('u1', REV, 'icon192')}`,
+  icon512: `/files/${renditionKey('u1', REV, 'icon512')}`,
+  maskable512: `/files/${renditionKey('u1', REV, 'maskable512')}`,
+};
+
+test('with its renditions a store installs with ITS icons only — sized, typed, any + maskable, no platform mark', () => {
+  const m = buildWebManifest({ name: 'Ali 3D', logoKey: 'merchants/u1/public/abc.webp', icons: RENDITIONS });
+  assert.deepEqual(
+    m.icons.map((i) => `${i.src} ${i.sizes} ${i.type} ${i.purpose}`),
+    [
+      `${RENDITIONS.icon192} 192x192 image/png any`,
+      `${RENDITIONS.icon512} 512x512 image/png any`,
+      `${RENDITIONS.maskable512} 512x512 image/png maskable`,
+    ]
+  );
+  // A platform maskable-192 beside the store's maskable-512 would be the one
+  // Chrome picks for the launcher — LEVONIS on a store with its own icon.
+  assert.ok(m.icons.every((i) => !i.src.startsWith('/icons/')), 'no platform icon rides along');
+  assert.ok(!m.icons.some((i) => i.src.endsWith('.webp')), 'the raw logo is the fallback, not an extra');
+  // The long-press shortcuts carry the store's icon too.
+  for (const s of m.shortcuts) assert.deepEqual(s.icons.map((i) => i.src), [RENDITIONS.icon192]);
+  // Same origin, same app: the install identity does not move.
+  assert.equal(m.id, '/');
+  assert.equal(m.start_url, '/');
+  assert.equal(m.scope, '/');
+  assert.equal(m.display, 'standalone');
+});
+
+test('a partial, mislabelled or foreign rendition set is no set: the raw logo and the platform icons remain', () => {
+  const broken = [
+    { ...RENDITIONS, maskable512: '' },
+    { ...RENDITIONS, maskable512: RENDITIONS.icon512 }, // right shape, wrong role
+    { ...RENDITIONS, icon192: '/files/merchants/u1/public/abc.png' },
+    { ...RENDITIONS, icon512: 'https://evil.example/icon.png' },
+    { ...RENDITIONS, icon192: `/files/${renditionKey('u1', REV, 'icon192')}?v=1` },
+    { icon192: RENDITIONS.icon192 },
+    'not an object',
+  ];
+  for (const icons of broken) {
+    const m = buildWebManifest({ name: 'Ali 3D', logoKey: 'merchants/u1/public/abc.webp', icons: icons as never });
+    assert.equal(m.icons.length, 5, JSON.stringify(icons));
+    assert.equal(m.icons[0].src, '/files/merchants/u1/public/abc.webp');
+    assert.equal(m.icons.filter((i) => i.src.startsWith('/icons/')).length, 4);
+  }
+  // And renditions never ride in on a nameless identity — that is the platform.
+  const platform = buildWebManifest({ name: '  ', icons: RENDITIONS });
+  assert.equal(platform.name, PLATFORM_NAME);
+  assert.ok(platform.icons.every((i) => i.src.startsWith('/icons/')));
+});
+
+test('the ground comes from the store identity, validated; the platform keeps the document black', () => {
+  const m = buildWebManifest({ name: 'Ali 3D', backgroundColor: '#0A0B0C', themeColor: '#111111' });
+  assert.equal(m.background_color, '#0a0b0c');
+  assert.equal(m.theme_color, '#111111');
+  for (const bad of ['red', 'rgb(0,0,0)', '#fff', '', 'url(x)', '#0000000', null]) {
+    const w = buildWebManifest({ name: 'Ali 3D', backgroundColor: bad as never, themeColor: bad as never });
+    assert.equal(w.background_color, '#000000', String(bad));
+    assert.equal(w.theme_color, '#000000', String(bad));
+  }
+  const platform = buildWebManifest({ name: '', backgroundColor: '#ffffff', themeColor: '#ffffff' });
+  assert.equal(platform.background_color, '#000000');
+});
+
+/** Store + a committed rendition set, cut through the stubbed binding. */
+async function seedWithRenditions() {
+  const raw = freshDb();
+  seed(raw, { name: 'متجر علي', tagline: 'طباعة' });
+  const images = imagesStub();
+  const bound = iconEnv(asD1(raw), images.binding);
+  bound.publicBucket.seed('merchants/u1/public/abc.webp', fixtureWebp(600, 600));
+  const out = await refreshStoreIcons(bound.env, { id: 's1', user_id: 'u1', logo_key: 'merchants/u1/public/abc.webp', accent: 'default' });
+  assert.equal(out.outcome, 'ready');
+  const rev = (raw.prepare(`SELECT rev FROM merchant_store_icons WHERE store_id = 's1'`).get() as { rev: string }).rev;
+  return { raw, images, bound, rev };
+}
+
+function envWith(db: unknown, extra: Record<string, unknown> = {}) {
+  return { ...(envFor(db) as unknown as Record<string, unknown>), ...extra } as never;
+}
+
+test('THROUGH THE WORKER: a store with renditions installs with them, on its own ground, at its own root', async () => {
+  const { raw, rev } = await seedWithRenditions();
+  const m = await manifestOf(await fetchManifest(MERCHANT_HOST, envWith(asD1(raw))));
+  assert.equal(m.name, 'متجر علي');
+  assert.equal(m.description, 'طباعة');
+  assert.deepEqual(
+    m.icons.map((i) => `${i.src} ${i.sizes} ${i.purpose}`),
+    [
+      `/files/merchants/u1/logos/appicon-${rev}-icon192.png 192x192 any`,
+      `/files/merchants/u1/logos/appicon-${rev}-icon512.png 512x512 any`,
+      `/files/merchants/u1/logos/appicon-${rev}-maskable512.png 512x512 maskable`,
+    ]
+  );
+  assert.equal(m.start_url, '/');
+  assert.equal(m.scope, '/');
+  assert.equal(m.id, '/');
+  assert.equal(m.display, 'standalone');
+  assert.equal(m.background_color, '#000000');
+  assert.equal(m.theme_color, '#000000');
+});
+
+test('THROUGH THE WORKER: a store whose logo changed is NOT served its old icons', async () => {
+  const { raw } = await seedWithRenditions();
+  raw.exec(`UPDATE merchant_stores SET logo_key = 'merchants/u1/public/new12345.webp' WHERE id = 's1'`);
+  const m = await manifestOf(await fetchManifest(MERCHANT_HOST, envWith(asD1(raw))));
+  // The honest fallback for the seconds before the new logo is cut.
+  assert.equal(m.icons[0].src, '/files/merchants/u1/public/new12345.webp');
+  assert.ok(!m.icons.some((i) => i.src.includes('/logos/appicon-')));
+});
+
+test('THROUGH THE WORKER: a suspended store falls back to the platform even with renditions', async () => {
+  const { raw } = await seedWithRenditions();
+  raw.exec(`UPDATE merchant_stores SET status = 'suspended' WHERE id = 's1'`);
+  const m = await manifestOf(await fetchManifest(MERCHANT_HOST, envWith(asD1(raw))));
+  assert.equal(m.name, PLATFORM_NAME);
+  assert.ok(m.icons.every((i) => i.src.startsWith('/icons/')));
+});
+
+test('THE LAZY BACKFILL: the first manifest request of a store with no renditions cuts them after the response', async () => {
+  const raw = freshDb();
+  seed(raw, { name: 'Ali 3D' });
+  const images = imagesStub();
+  const bound = iconEnv(asD1(raw), images.binding);
+  bound.publicBucket.seed('merchants/u1/public/abc.webp', fixtureWebp(640, 640));
+  const env = envWith(asD1(raw), { R2_PUBLIC: bound.env.R2_PUBLIC, BUCKET: bound.env.BUCKET, R2_PRIVATE: bound.env.R2_PRIVATE, IMAGES: images.binding });
+
+  pending.length = 0;
+  const first = await manifestOf(await fetchManifest(MERCHANT_HOST, env));
+  // This response is the fallback — the render has not run yet...
+  assert.equal(first.icons[0].src, '/files/merchants/u1/public/abc.webp');
+  // ...it runs after the response, in waitUntil.
+  assert.ok(pending.length >= 1, 'the render was scheduled with waitUntil');
+  await Promise.all(pending.splice(0));
+  assert.equal(images.calls.length, 5);
+
+  const second = await manifestOf(await fetchManifest(MERCHANT_HOST, env));
+  assert.ok(second.icons.every((i) => i.src.includes('/logos/appicon-')), JSON.stringify(second.icons));
+  await Promise.all(pending.splice(0));
+  assert.equal(images.calls.length, 5, 'and nothing is rendered twice');
+});

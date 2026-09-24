@@ -57,6 +57,26 @@ async function storeOrderThread(db: D1Database, chatId: string): Promise<StoreOr
 }
 
 /**
+ * MAY THIS ACCOUNT WRITE IN THIS THREAD — send a message, attach a file, or
+ * show «يكتب…»? The ONE rule every write door asks (review S3).
+ *
+ * A participant, always; and on a merchant-store order's thread only its
+ * customer and its seller. An admin a pre-0118 thread silently joined is still
+ * a participant row: the message door refused them CHAT_READ_ONLY while the
+ * typing indicator and the upload door asked participation alone, so staff
+ * could still drive «يكتب…» on both sides and store files under a thread they
+ * may only read. Migration 0119 removes those rows; this refuses them even
+ * where one survives.
+ */
+export async function assertMayWriteInThread(db: D1Database, chatId: string, userId: string): Promise<void> {
+  await assertParticipant(db, chatId, userId);
+  const thread = await storeOrderThread(db, chatId);
+  if (thread && userId !== thread.customer_id && userId !== thread.seller_id) {
+    throw new HttpError(403, 'Staff can read this conversation but not write in it', 'CHAT_READ_ONLY');
+  }
+}
+
+/**
  * The staff read of a merchant↔customer thread, recorded — once per admin per
  * thread per hour, because the thread screen re-reads every few seconds and an
  * audit row per poll would bury the one fact that matters: WHO looked, WHEN.
@@ -363,7 +383,8 @@ chatRoutes.get('/:id/typing', async (c) => {
 chatRoutes.post('/:id/typing', async (c) => {
   const chatId = str(c.req.param('id'), 'chatId', { min: 1, max: 60 });
   const user = c.get('user')!;
-  await assertParticipant(c.env.DB, chatId, user.id);
+  // «يكتب…» is a write: only the parties to a store thread show it (review S3).
+  await assertMayWriteInThread(c.env.DB, chatId, user.id);
   await rateLimit(c, 'chat-typing', 90, 60);
   const body = await c.req.json().catch(() => ({}));
   if (typeof body.typing !== 'boolean') throw badRequest('typing must be a boolean');
@@ -490,16 +511,13 @@ chatRoutes.post('/:id/messages', async (c) => {
   await rateLimit(c, 'chat-send', 200, 3600);
   const user = c.get('user')!;
   const chatId = str(c.req.param('id'), 'chatId', { min: 1, max: 60 });
-  await assertParticipant(c.env.DB, chatId, user.id);
   /*
    * A merchant-store order's thread is written by its customer and its seller
    * only. An admin who was silently joined to one before that stopped (audit
    * 04 B6) is still a participant row — and is read-only all the same.
    */
+  await assertMayWriteInThread(c.env.DB, chatId, user.id);
   const storeThread = await storeOrderThread(c.env.DB, chatId);
-  if (storeThread && user.id !== storeThread.customer_id && user.id !== storeThread.seller_id) {
-    throw new HttpError(403, 'Staff can read this conversation but not write in it', 'CHAT_READ_ONLY');
-  }
   const body = await c.req.json().catch(() => ({}));
   // «كاميرا/ملف/بصمة صوتية». Any of the four attachment kinds means "this
   // message carries a file"; WHICH kind it is comes from where the upload route

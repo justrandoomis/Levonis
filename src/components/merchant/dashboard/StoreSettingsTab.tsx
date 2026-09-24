@@ -16,6 +16,7 @@ import { GOVERNORATES } from '../../../lib/governorates';
 import { ImagePicker } from '../../media/ImagePicker';
 import { WIDGET_ICONS, WidgetIcon } from '../profileIcons';
 import { Btn, Card, Chip, ChipListEditor, Input, Notice, TextArea, Toggle } from './ui';
+import ShareStore from '../share/ShareStore';
 
 /** The accent presets, with an honest swatch for each. Classes only — the
  *  merchant picks a NAME; no colour value they type can reach a style rule. */
@@ -522,6 +523,10 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : null}
         {saved ? loc('تم الحفظ', 'Saved', 'پاشەکەوت کرا') : loc('حفظ التغييرات', 'Save changes', 'پاشەکەوتکردن')}
       </Btn>
+
+      {/* The store's link, its QR code, the card it unfurls as and the app a
+          customer installs (W2-D) — its own actions, outside the form's save. */}
+      <ShareStore />
 
       <SlugCard currentSlug={store.slug} url={store.url} onChanged={onSaved} />
     </div>

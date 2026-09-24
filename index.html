@@ -73,7 +73,7 @@
     />
 
     <!--
-      THE SHOP'S OWN FACE, IN THE TAB AND IN THE SHARE CARD.
+      THE SHOP'S OWN FACE, IN THE SHARE CARD.
 
       Until now this document declared NO icon and NO Open Graph tags at all.
       The consequences were both things the owner reported: the browser tab
@@ -81,8 +81,8 @@
       WhatsApp or Messenger unfurled with no picture and no description —
       because there was nothing for a crawler to read.
 
-      The image is the logo that already lives in R2 at a PUBLIC key, served
-      through the Worker's own /files route. It is verified anonymously
+      The card image is the logo that already lives in R2 at a PUBLIC key,
+      served through the Worker's own /files route. It is verified anonymously
       fetchable (200, 107,218 bytes), which is the only property that matters
       here: a social crawler arrives with no cookie and no session, and an
       image it cannot fetch is an image it will not show.
@@ -92,86 +92,73 @@
       several silently drop a relative one. `og:url` and `og:image` are
       therefore written against the canonical origin.
 
-      THESE ARE THE DEFAULTS, AND ONLY THE DEFAULTS. A product link overwrites
-      og:title, og:description and og:image in the Worker before the HTML ever
-      reaches the crawler — see worker/lib/socialPreview.ts. What stays here is
-      what a share of the site ITSELF should say.
+      THESE ARE THE DEFAULTS, AND ONLY THE DEFAULTS. A product link, and a
+      store's own home on its own host, overwrite og:title, og:description and
+      og:image in the Worker before the HTML ever reaches the crawler — see
+      worker/lib/socialPreview.ts. What stays here is what a share of the
+      platform ITSELF should say.
 
       THE KEY IS MIRRORED HERE, NOT DECIDED HERE. `src/lib/siteLogo.ts` is the
       single place the shop's mark is named; this document cannot import it,
       because the shell is parsed before any module runs and nothing templates
-      it on the way out. So `tests/siteMedia.test.ts` holds the WebP icon link
-      below and the two absolute image tags further down to that module's
-      constants and fails when any of them drifts — a check at test time
-      standing in for an import at run time.
-
-      AND THIS IS THE ONLY PATH A REPLACED R2 OBJECT REACHES. The owner swaps
-      the bytes under this fixed name in the bucket; `/files/*` answers the
-      brand folder with a short revalidating Cache-Control rather than a year
-      of `immutable` for exactly that reason (worker/routes/uploads.ts,
-      `isRewritableMediaKey`). The three `/icons/*.png` links below do NOT come
-      from R2 — see the next comment.
+      it on the way out. So `tests/siteMedia.test.ts` holds the two absolute
+      image tags further down to that module's constants and fails when either
+      drifts — a check at test time standing in for an import at run time.
+      The owner swaps the bytes under that fixed name in the bucket; `/files/*`
+      answers the brand folder with a short revalidating Cache-Control rather
+      than a year of `immutable` for exactly that reason
+      (worker/routes/uploads.ts, `isRewritableMediaKey`).
     -->
-    <link rel="icon" type="image/webp" href="/files/UiUx/Logo/Logo.webp?v=bc80fc2b" />
 
     <!--
-      THE HOME-SCREEN ICON, AND WHY IT IS A PNG NOW.
+      THE HOME-SCREEN AND TAB ICONS ARE PER HOST.
 
-      This link used to point at the same WebP as the tab icon above, and that
-      was a bug the owner could see on their own phone: iOS does not accept
-      WebP for `apple-touch-icon`. It does not fall back to another link and it
-      reports nothing — it gives up and uses A SCREENSHOT OF THE PAGE as the
-      home-screen icon. Every iPhone that ever added this shop to its home
-      screen got a picture of whatever page happened to be open instead of the
-      mark. `public/icons/apple-touch-icon.<rev>.png` has existed since the icons
-      were generated; until now nothing pointed at it.
+      THIS DOCUMENT IS SHARED. The asset layer serves these same bytes on
+      levonis-iq.com and on every store's subdomain, so a link here that names
+      a file names the SAME file on every shop — and these links are exactly
+      what iOS reads at «إضافة إلى الشاشة الرئيسية» (it prefers
+      `apple-touch-icon` to anything in the manifest) and what every browser
+      paints in the tab. Pointed at the platform's PNGs, they put the LEVONIS
+      mark on the home screen of every customer who installed a merchant's
+      shop, under the shop's own name.
 
-      180x180 is the size iOS asks for, and `sizes` is declared because iOS
-      chooses between several `apple-touch-icon` links by comparing exactly
-      that attribute — a link without one is only the fallback.
+      So they point at `/store-icon/*`, three STABLE paths the Worker answers
+      per Host (worker/routes/manifest.ts `storeIconRoute`, in
+      `run_worker_first` in all three environments of wrangler.jsonc): on a
+      store's host, the store's own PNG rendition of its logo
+      (worker/lib/storeIcons.ts); on the apex — and on a store with no
+      renditions yet, or a suspended one — the platform's committed PNG for the
+      same role, `/icons/*.<rev>.png`, read through the asset binding. Answered
+      with a revalidating Cache-Control and an ETag, so a merchant's new logo
+      reaches a tab within minutes and a revalidation costs a 304.
 
-      These three are ORDINARY STATIC FILES. `public/` is copied byte-for-byte
-      into `dist/` by Vite, and `/icons/*` is not in `run_worker_first`, so the
-      asset layer answers them directly. That is deliberately a different path
-      from the two `/files/UiUx/...` URLs above, which the Worker serves out of
-      R2: an icon the browser needs before anything renders should not depend
-      on a database-backed Worker route being healthy.
+      EVERY ONE IS A PNG. iOS does not accept WebP for `apple-touch-icon`: it
+      does not fall back to another link and it reports nothing — it uses A
+      SCREENSHOT OF THE PAGE as the home-screen icon. 180x180 is the size iOS
+      asks for, and `sizes` is declared because iOS chooses between several
+      `apple-touch-icon` links by comparing exactly that attribute.
 
-      THE WEBP `rel="icon"` ABOVE STAYS, and the PNGs join it rather than
-      replace it. That link is the TAB icon, where WebP is universally
-      supported; the two PNG favicons are for the browsers that never shipped
-      WebP favicon decoding at all (older Safari, several embedded webviews).
-      A browser that understands the WebP takes it; the rest now take a PNG
-      instead of drawing a blank square.
+      NO WEBP `rel="icon"` ANY MORE, and that is the decision. It pointed at
+      the platform logo in R2, and a browser picks among several `rel="icon"`
+      links by its own rules (by `sizes` in Chromium, by document order in
+      others) — a platform link beside the per-host ones would put the LEVONIS
+      mark in some browsers' tab on a merchant's shop. Every tab icon here is
+      per host; 32 px for the tab, 192 px for the bookmark and tab-switcher
+      tiles that ask for a larger one.
 
-      THEY ARE A FORK OF THE LOGO, NOT A COPY THAT REFRESHES ITSELF, and that
-      is the trap this comment exists to spring. These PNGs are binaries
-      committed to the repository, produced from `/files/UiUx/Logo/Logo.webp`
-      by `scripts/build-pwa-icons.mjs`, which is deliberately not part of
-      `npm run build`. Replacing the object in R2 therefore changes the WebP
-      link and the share card above and NOTHING HERE: an iPad takes
-      `apple-touch-icon.png` for the home screen and prefers a PNG `rel=icon`
-      for the tab, and an installed Android app takes `/icons/icon-192.<rev>.png`
-      and `maskable-192.png` out of the manifest. A new logo is invisible on
-      both of those devices until someone runs the generator, commits the
-      seven files and bumps `VERSION` in public/sw.js so the precached copies
-      are dropped. `src/lib/siteLogo.ts` names these paths once and
-      `tests/siteMedia.test.ts` checks that this document, the generator and
-      worker/lib/webManifest.ts are all still talking about the same files.
-
-      THE NAMES CARRY THE LOGO'S REVISION (`.bc80fc2b.`, and `?v=bc80fc2b`
-      on the R2 URLs above and below). A fixed name is a promise every cache
-      keeps: `/icons/*` is served for a week and answered from Cloudflare's
-      edge, the browser keeps a tab icon per URL, Android decides whether an
-      installed app's icon changed by fetching the SAME URL through its HTTP
-      cache, and Telegram and WhatsApp keep a link preview for as long as its
-      `og:image` URL is unchanged. So a new mark is a new URL.
-      `scripts/build-pwa-icons.mjs` refuses to write new pixels under an old
-      revision and prints the new one to rename to.
+      THE PLATFORM'S PNGs ARE A FORK OF THE LOGO, NOT A COPY THAT REFRESHES
+      ITSELF. They are binaries committed to the repository, produced from
+      `/files/UiUx/Logo/Logo.webp` by `scripts/build-pwa-icons.mjs` (not part
+      of `npm run build`), and their names carry the logo's revision
+      (`.bc80fc2b.`): replacing the object in R2 changes the share card above
+      and NOTHING an icon shows until someone runs the generator, commits the
+      files and bumps `VERSION` in public/sw.js. `src/lib/siteLogo.ts` names
+      those paths once; tests/storeIcons.test.ts holds the Worker's fallback
+      table to it.
     -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.bc80fc2b.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.bc80fc2b.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.bc80fc2b.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/store-icon/apple-touch.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/store-icon/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/store-icon/192.png" />
 
     <meta property="og:site_name" content="LEVONIS" />
     <meta property="og:type" content="website" />

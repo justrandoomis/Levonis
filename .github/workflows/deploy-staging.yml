@@ -83,6 +83,22 @@ jobs:
       - name: Apply migrations (STAGING database only)
         run: npx wrangler d1 migrations apply levonis-db-staging --remote --env staging
 
+      # The same guard `7 - Deploy LIVE main site` runs (review F9): this
+      # workflow deploys the Worker that serves every store's subdomain too, so
+      # a store — or a renamed store's old address — whose name the new code
+      # reserves would go dark here just the same. Read-only; a failed read
+      # stops the deploy.
+      - name: No live store is about to be renamed out of existence
+        run: |
+          set -e
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
+            --command "SELECT slug, 'live' AS kind FROM merchant_stores UNION ALL SELECT slug, 'retired' AS kind FROM merchant_store_slugs WHERE active = 0" \
+            > /tmp/slugs.json 2>/tmp/slugs.err || {
+              echo "::error::could not read the store slugs — the check below will stop the deploy"
+              sed -n '1,20p' /tmp/slugs.err || true
+            }
+          node scripts/check-live-store-slugs.mjs /tmp/slugs.json
+
       - name: Deploy staging worker
         id: deploy
         env:

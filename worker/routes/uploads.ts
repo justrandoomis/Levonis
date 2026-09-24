@@ -4,7 +4,7 @@ import type { AppContext } from '../lib/types';
 import { requireAuth, badRequest, forbidden, notFound, oneOf, str, unavailable } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
-import { recordStaffChatFileRead } from './chats';
+import { assertMayWriteInThread, recordStaffChatFileRead } from './chats';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import {
   buildMediaKey,
@@ -461,12 +461,10 @@ uploadRoutes.post('/', async (c) => {
   let chatEntity = '';
   if (purpose === 'chat') {
     chatEntity = str(form.get('entity_id'), 'entity_id', { max: 64 });
-    const member = await c.env.DB.prepare(
-      'SELECT 1 AS x FROM chat_participants WHERE chat_id = ? AND user_id = ? LIMIT 1'
-    )
-      .bind(chatEntity, user.id)
-      .first();
-    if (!member) throw forbidden('Not a participant in this conversation');
+    // Storing a file under a thread is writing in it: the same rule as the
+    // message door — a participant, and on a store thread only its customer
+    // or its seller (review S3; 403 CHAT_READ_ONLY for read-only staff).
+    await assertMayWriteInThread(c.env.DB, chatEntity, user.id);
   }
 
   /**

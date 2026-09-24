@@ -44,6 +44,8 @@ import { notifyOrderStatus } from '../lib/orderNotify';
 import { cancelStoreOrder, STORE_RELEASE_DAYS } from '../lib/storeOrderOps';
 import { stageForLegacyStatus } from '../lib/orderStages';
 import { newHistoryId } from '../lib/orderStageOps';
+import { scheduleStoreIconRefresh } from '../lib/storeIcons';
+import { storeShareKit } from '../lib/storeShareKit';
 
 export const merchantRoutes = new Hono<AppContext>();
 
@@ -430,7 +432,24 @@ merchantRoutes.patch('/store', async (c) => {
     fields: sets.map((s) => s.split(' = ')[0]),
   });
   const fresh = await storeForUser(c.env.DB, ctx.store.user_id);
+  // THE APP ICON FOLLOWS THE LOGO (merchant platform W2-D). A new logo — or a
+  // preset whose ground the icons are padded on — is cut into the store's PNG
+  // renditions AFTER this response (worker/lib/storeIcons.ts); a removed logo
+  // clears them. Never in front of the save, and never able to fail it.
+  if (fresh && (fresh.store.logo_key !== ctx.store.logo_key || fresh.store.accent !== ctx.store.accent)) {
+    scheduleStoreIconRefresh(c, fresh.store);
+  }
   return c.json({ success: true, store: storePublicShape(fresh!, rootDomainFrom(c.env)) });
+});
+
+// GET /store/share — the share kit (W2-D): the store's absolute link, the
+// card that link unfurls as and the app icon a customer installs, all read
+// from the functions the crawler and the installer themselves use
+// (worker/lib/storeShareKit.ts). The OWNER's store only — from the session.
+merchantRoutes.get('/store/share', async (c) => {
+  await rateLimit(c, 'merchant-store-share', 60, 300);
+  const ctx = await requireStoreOwner(c);
+  return c.json({ success: true, ...(await storeShareKit(c, ctx)) });
 });
 
 const ACCENTS = ['default', 'olive', 'gold', 'slate', 'plum', 'teal', 'blue'] as const;
@@ -1540,8 +1559,11 @@ const MERCHANT_ORDER_FLOW: Record<string, readonly string[]> = {
  * WHAT A MOVE WRITES, ALL IN ONE CONDITIONAL BATCH (B9): the status, the
  * customer-facing `stage` beside it (the tracker used to say «تم استلام
  * الطلب» for ever), an `order_status_history` row, and on delivery
- * `delivered_at` — stamped once (COALESCE), because it starts the customer's
- * three days.
+ * `delivered_at` — stamped on EVERY move into delivered, because it starts
+ * the customer's three days (review F5). It used to be stamped once
+ * (COALESCE): a delivery an admin walked back («I never got it» → shipped)
+ * kept its old date, so the merchant's next «تم التسليم» released the money
+ * the same minute, with no window after the delivery that really happened.
  *
  * «تم التسليم» NO LONGER RELEASES MONEY (B10, owner decision 2026-09-24). This
  * route used to flip the sale credit to `available` on the merchant's own
@@ -1602,7 +1624,7 @@ merchantRoutes.post('/orders/:id/status', async (c) => {
     c.env.DB.prepare(
       `UPDATE orders SET status = ?1, stage = ?2, stage_changed_at = ?3, stage_source = 'manual',
               next_stage = '', next_stage_at = NULL,
-              delivered_at = CASE WHEN ?1 = 'delivered' THEN COALESCE(NULLIF(delivered_at, ''), ?3) ELSE delivered_at END,
+              delivered_at = CASE WHEN ?1 = 'delivered' THEN ?3 ELSE delivered_at END,
               updated_at = ?3
         WHERE id = ?4 AND merchant_id = ?5 AND status = ?6`
     ).bind(to, stage, ts, id, ctx.merchant.id, from),

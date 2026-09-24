@@ -320,13 +320,17 @@ jobs:
       # pointing at it.
       #
       # One SELECT, read-only. It runs after the migrations (the table has to
-      # exist) and before the deploy (that is the whole point).
+      # exist) and before the deploy (that is the whole point). The OLD names
+      # of renamed stores are read too: they redirect to the shop, and a
+      # reserved word breaks that redirect the same way. A read that fails is
+      # not a pass — the script stops the deploy (`slugs=unreadable`).
       - name: No live store is about to be renamed out of existence
         run: |
           set -e
           npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
-            --command "SELECT slug FROM merchant_stores" > /tmp/slugs.json 2>/tmp/slugs.err || {
-              echo "::warning::could not read the live store slugs"
+            --command "SELECT slug, 'live' AS kind FROM merchant_stores UNION ALL SELECT slug, 'retired' AS kind FROM merchant_store_slugs WHERE active = 0" \
+            > /tmp/slugs.json 2>/tmp/slugs.err || {
+              echo "::error::could not read the store slugs — the check below will stop the deploy"
               sed -n '1,20p' /tmp/slugs.err || true
             }
           node scripts/check-live-store-slugs.mjs /tmp/slugs.json

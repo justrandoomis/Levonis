@@ -32,10 +32,12 @@ import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { HttpError, notFound, int, str } from '../lib/http';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
-import { storeBySlug, storeById, storeIsOpen, storeIsSuspended, type StoreContext } from '../lib/merchantAuth';
+import { storeBySlug, storeById, storeIsSuspended, type StoreContext } from '../lib/merchantAuth';
+import { storeTakesOrders } from '../lib/storeOrderOps';
 import { benefits, getTierStatus } from '../lib/entitlements';
 import { salesBadgeTier } from '../lib/salesBadge';
 import { maskName } from './reviews';
+import { storefrontLayoutPayload, storefrontTheme } from '../lib/storeLayout';
 
 export const storefrontRoutes = new Hono<AppContext>();
 
@@ -43,6 +45,16 @@ export const storefrontRoutes = new Hono<AppContext>();
 async function publicStore(db: D1Database, ctx: StoreContext, rootDomain: string | null) {
   const { store: s, merchant: m } = ctx;
   const tier = await getTierStatus(db, m.user_id);
+  /**
+   * «OPEN» MEANS THE CART WILL TAKE AN ORDER (review S1). It used to be
+   * `storeIsOpen` — the store's own switch and the merchant suspension — while
+   * the cart and the checkout ask `storeTakesOrders`, which also refuses a
+   * RESTRICTED merchant, an owner whose plan lapsed and a store that stopped
+   * selling direct products. The shop then read «open», the product page
+   * showed a live «أضف إلى السلة», and every tap came back STORE_CLOSED. One
+   * rule for both now: what this says is what the cart does.
+   */
+  const takingOrders = (await storeTakesOrders(db, ctx)).ok;
   return {
     id: s.id,
     slug: s.slug,
@@ -77,11 +89,11 @@ async function publicStore(db: D1Database, ctx: StoreContext, rootDomain: string
     })(),
     accepts_custom_requests: !!s.accepts_custom_requests,
     sells_direct_products: !!s.sells_direct_products,
-    open: storeIsOpen(ctx),
+    open: takingOrders,
     // The reason a shop is shut is between the merchant and Levonis. A
     // visitor is told it is closed, never whether the merchant paused it, an
-    // admin suspended it, or their subscription lapsed.
-    status: storeIsOpen(ctx) ? 'active' : 'closed',
+    // admin restricted it, or their subscription lapsed.
+    status: takingOrders ? 'active' : 'closed',
     merchant: {
       id: m.id,
       name: m.name,
@@ -163,6 +175,22 @@ async function storeStats(db: D1Database, ctx: StoreContext) {
     positive_pct: total ? Math.round((Number(positive?.good ?? 0) / total) * 100) : null,
     deal_count: deals?.n ?? 0,
   };
+}
+
+/**
+ * THE STORE AS THE STOREFRONT RENDERS IT (merchant platform W2-C): the public
+ * profile and its honest stats, plus the PUBLISHED layout — never the draft —
+ * normalised on read, and the rows its blocks show, fetched in one fixed set of
+ * statements (worker/lib/storeLayout.ts). A store that never published gets
+ * the classic page generated from its settings. The three reads run together.
+ */
+async function storefrontStore(db: D1Database, ctx: StoreContext, rootDomain: string | null) {
+  const [profile, stats, layout] = await Promise.all([
+    publicStore(db, ctx, rootDomain),
+    storeStats(db, ctx),
+    storefrontLayoutPayload(db, ctx),
+  ]);
+  return { ...profile, ...stats, ...layout };
 }
 
 /**
@@ -256,12 +284,31 @@ storefrontRoutes.get('/resolve', async (c) => {
     return c.json({ success: true, kind: host.kind, store: null, root_domain });
   }
 
+  // Not one merchant-controlled field — not even the name, which may be the
+  // very thing the store was suspended for.
+  const unavailable = () =>
+    c.json(
+      {
+        success: false,
+        kind: 'merchant',
+        store: null,
+        error: 'This store is not available right now',
+        code: 'STORE_UNAVAILABLE',
+        root_domain,
+      },
+      404
+    );
+
   const ctx = await storeBySlug(c.env.DB, host.slug);
   if (!ctx) {
     // A slug this store was RENAMED away from. The browser is told where the
     // shop lives now and replaces the address (src/StoreContext.tsx), so a
     // QR code printed on a box before the rename still lands on the shop.
     const moved = await storeForRetiredSlug(c.env.DB, host.slug);
+    // …unless a sanction closed it (review S4). Its new address is a name
+    // the merchant chose — possibly the very thing it was suspended for — and
+    // a redirect would advertise it to everyone holding the old link.
+    if (moved && storeIsSuspended(moved)) return unavailable();
     if (moved) {
       return c.json(
         {
@@ -281,38 +328,18 @@ storefrontRoutes.get('/resolve', async (c) => {
     // which would make a typo silently look like the platform's own homepage.
     return c.json({ success: false, kind: 'merchant', store: null, error: 'No such store', root_domain }, 404);
   }
-  if (storeIsSuspended(ctx)) {
-    // Not one merchant-controlled field — not even the name, which may be the
-    // very thing the store was suspended for.
-    return c.json(
-      {
-        success: false,
-        kind: 'merchant',
-        store: null,
-        error: 'This store is not available right now',
-        code: 'STORE_UNAVAILABLE',
-        root_domain,
-      },
-      404
-    );
-  }
+  if (storeIsSuspended(ctx)) return unavailable();
   return c.json({
     success: true,
     kind: 'merchant',
-    store: { ...(await publicStore(c.env.DB, ctx, root)), ...(await storeStats(c.env.DB, ctx)) },
+    store: await storefrontStore(c.env.DB, ctx, root),
     root_domain,
   });
 });
 
 storefrontRoutes.get('/:slug', async (c) => {
   const ctx = await servableStore(c, c.req.param('slug'));
-  return c.json({
-    success: true,
-    store: {
-      ...(await publicStore(c.env.DB, ctx, rootDomainFrom(c.env))),
-      ...(await storeStats(c.env.DB, ctx)),
-    },
-  });
+  return c.json({ success: true, store: await storefrontStore(c.env.DB, ctx, rootDomainFrom(c.env)) });
 });
 
 /**
@@ -434,7 +461,12 @@ storefrontRoutes.get('/:slug/products/:productSlug', async (c) => {
     }
   }
 
-  return c.json({ success: true, product: publicProduct(p), store: await publicStore(c.env.DB, ctx, rootDomainFrom(c.env)) });
+  // The product page renders no blocks, only the store's THEME (W2-C).
+  const [store, layout_theme] = await Promise.all([
+    publicStore(c.env.DB, ctx, rootDomainFrom(c.env)),
+    storefrontTheme(c.env.DB, ctx),
+  ]);
+  return c.json({ success: true, product: publicProduct(p), store: { ...store, layout_theme } });
 });
 
 /**
@@ -547,11 +579,5 @@ storefrontRoutes.get('/by-id/:storeId', async (c) => {
   }
   if (!ctx) throw notFound('Store not found');
   if (storeIsSuspended(ctx)) throw storeUnavailable();
-  return c.json({
-    success: true,
-    store: {
-      ...(await publicStore(c.env.DB, ctx, rootDomainFrom(c.env))),
-      ...(await storeStats(c.env.DB, ctx)),
-    },
-  });
+  return c.json({ success: true, store: await storefrontStore(c.env.DB, ctx, rootDomainFrom(c.env)) });
 });

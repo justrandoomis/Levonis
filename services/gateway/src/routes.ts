@@ -204,7 +204,7 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/reviews', hosts: 'main', owner: 'REVIEWS', flipPhase: 6, requires: 'none', rateClass: 'write' },
 
   // ----------------------------------------------- marketplace / merchants
-  { prefix: '/api/merchant', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'auth', rateClass: 'user' },
+  { prefix: '/api/merchant', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'auth', rateClass: 'user', note: 'covers /api/merchant/store/layout — the store page draft, publish, history and restore (merchant platform W2-C)' },
   { prefix: '/api/storefront', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'public-read', cacheable: true, note: '/api/storefront/resolve must answer on every hostname' },
   { prefix: '/api/community-reviews', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'write' },
   { prefix: '/api/community', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'user', legacy: true, note: 'legacy shims' },

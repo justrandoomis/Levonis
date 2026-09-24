@@ -152,9 +152,10 @@ for (const [label, opts] of [
     const body = await json(resolved);
     assert.equal(body.code, 'STORE_UNAVAILABLE');
     assert.equal(body.store, null);
-    // And the directory does not advertise it as a destination.
+    // And the directory does not list it at all — not even as a card with no
+    // destination: its name, bio and avatar are what a sanction stops (review S5).
     const dir = await json(await get(v, '/api/community/merchants'));
-    assert.equal(dir.merchants[0].store_url, null);
+    assert.equal((dir.merchants as Array<{ id: string }>).find((m) => m.id === 'm1'), undefined);
   });
 }
 

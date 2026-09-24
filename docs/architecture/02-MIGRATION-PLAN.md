@@ -88,7 +88,9 @@ Levonis/
 │   │            rpc/ledger.ts rpc/ledgerPolicy.ts rpc/identity.ts rpc/catalog.ts rpc/orders.ts rpc/consumer.ts rpc/notifications.ts rpc/audit.ts
 │   │            http/<service>.ts   # response types shared with src/ (type-only)
 │   ├── pricing/                      # (new) pure: pricing.ts priceGrid.ts pinnedPrices.ts cheapestBase.ts shippingType.ts paymentPolicy.ts (+ price parts of productOverlay.ts stay in the core until 5.1)
-│   └── shipping/                     # (new) pure quote engine: shipping.ts iraqGovernorates.ts
+│   ├── shipping/                     # (new) pure quote engine: shipping.ts iraqGovernorates.ts
+│   └── storeLayout/                  # (merchant platform wave 2, W2-C) pure store-page schema: schema.ts tokens.ts blocks.ts text.ts refs.ts
+│                                     #   normalize.ts defaults.ts data.ts — one normaliser for Worker (write + read), builder and storefront
 ├── services/
 │   ├── gateway/        wrangler.jsonc package.json OWNERSHIP.json SECRETS.md src/{index.ts,routes.ts,capabilities.ts,pipeline.ts,cache.ts,limiter.ts,principal.ts,uploadClasses.ts} tests/
 │   ├── probes/         (1.0) throwaway Workers, one per platform question; deleted after the results are recorded in 04-DECISIONS.md ADR-017

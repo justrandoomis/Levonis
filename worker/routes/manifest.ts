@@ -1,7 +1,21 @@
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
-import { storeBySlug, storeIsSuspended } from '../lib/merchantAuth';
-import { buildWebManifest } from '../lib/webManifest';
+import { storeBySlug, storeIsSuspended, type StoreContext } from '../lib/merchantAuth';
+import { getMediaObject } from '../lib/mediaStorage';
+import {
+  PLATFORM_ICON_FOR_ROLE,
+  PLATFORM_ICON_REVISION,
+  STORE_ICON_PATHS,
+  readStoreIconsQuietly,
+  scheduleStoreIconRefresh,
+  servableStoreIcons,
+  storeIconStatus,
+  storeIconUrls,
+  storeSurface,
+  type StoreIconRole,
+  type StoreIconSet,
+} from '../lib/storeIcons';
+import { buildWebManifest, type ManifestIdentity } from '../lib/webManifest';
 
 /**
  * GET /manifest.webmanifest — the document that decides what installing this
@@ -46,7 +60,7 @@ export const MANIFEST_CONTENT_TYPE = 'application/manifest+json; charset=utf-8';
 
 export async function webManifestRoute(c: Context<AppContext>): Promise<Response> {
   const host = c.get('host');
-  let identity = null as { name: string; tagline: string; logoKey: string | null } | null;
+  let identity: ManifestIdentity | null = null;
 
   // `main`, `system` and `foreign` are the platform, and they are answered
   // without touching D1 at all. That is most of this route's traffic — the
@@ -58,10 +72,17 @@ export async function webManifestRoute(c: Context<AppContext>): Promise<Response
       // An ADMIN-SUSPENDED store (or a store whose merchant is suspended)
       // falls back to the platform identity — see the note below.
       if (ctx && !storeIsSuspended(ctx)) {
+        const icons = await servableIconsFor(c, ctx);
+        const surface = storeSurface(ctx.store);
         identity = {
           name: String(ctx.store.name ?? ''),
           tagline: String(ctx.store.tagline ?? ''),
           logoKey: ctx.store.logo_key ?? null,
+          // The store's own PNGs when they exist for its CURRENT logo; the
+          // builder falls back to the raw logo + platform icons otherwise.
+          icons: icons ? storeIconUrls(icons) : null,
+          backgroundColor: surface.background,
+          themeColor: surface.theme,
         };
       }
       // `ctx === null` is a subdomain with no store behind it — a typo, a
@@ -115,4 +136,124 @@ export async function webManifestRoute(c: Context<AppContext>): Promise<Response
      * conservatively, only costs hit rate.
      */
   });
+}
+
+// ---------------------------------------------------------------------------
+//  THE STORE'S RENDITIONS, AND THE LAZY BACKFILL
+// ---------------------------------------------------------------------------
+
+/**
+ * What this store may serve as its app icon right now — and, when that is not
+ * yet its current logo's renditions, the refresh that makes them, AFTER the
+ * response (worker/lib/storeIcons.ts). This is the backfill: an existing store
+ * gets its icons from the first manifest or icon request after this ships,
+ * with no job to run. The read is quiet — a database without migration 0123
+ * reads as "no renditions", which is what this route served before.
+ */
+async function servableIconsFor(c: Context<AppContext>, ctx: StoreContext): Promise<StoreIconSet | null> {
+  const row = await readStoreIconsQuietly(c.env.DB, ctx.store.id);
+  const status = storeIconStatus(c.env, ctx.store, row);
+  if (status.due) scheduleStoreIconRefresh(c, ctx.store);
+  return servableStoreIcons(ctx.store, row);
+}
+
+/**
+ * GET /store-icon/<name> — THE HOST'S OWN ICON AT A PATH THAT NEVER CHANGES.
+ *
+ * `index.html` is one document served byte-identically on the apex and on
+ * every store's subdomain, so it cannot name a store's content-addressed
+ * rendition key — yet it is what iOS reads at «إضافة إلى الشاشة الرئيسية»
+ * (`apple-touch-icon`, which iOS prefers to anything in the manifest) and
+ * what every browser reads for the tab icon. So the document names these
+ * stable paths, and the Worker answers each per Host:
+ *
+ *   a store's host   the store's rendition for its CURRENT logo;
+ *   everywhere else  the platform's own PNG for the same role — the apex, a
+ *                    system host, an unknown store, a suspended store (whose
+ *                    customer sees only «المتجر غير متاح حاليًا»), and a store
+ *                    whose renditions are not cut yet (which this request
+ *                    then schedules).
+ *
+ * Never the SPA shell and never a 500: an unknown name is a bare 404, and any
+ * failure on the store's side falls back to the platform icon — a real icon
+ * beats a missing one, and iOS, given nothing it can decode, uses a
+ * SCREENSHOT OF THE PAGE instead.
+ *
+ * REVALIDATING, NOT IMMUTABLE. The bytes behind one of these URLs change the
+ * moment a merchant replaces their logo, so the answer is cached for five
+ * minutes (the manifest's own figure — `MANIFEST_CACHE_SECONDS`) and then
+ * revalidated; the ETag names the rendition revision, so a revalidation that
+ * finds nothing new is a 304 and one D1 read, never a body. No `Vary: Host`,
+ * for the reason the manifest gives: the host is in the URL.
+ */
+export const STORE_ICON_CACHE_CONTROL = `public, max-age=${MANIFEST_CACHE_SECONDS}, must-revalidate`;
+
+/** An image needs no policy of its own beyond "run nothing". */
+const ICON_CSP = "default-src 'none'; sandbox";
+
+export async function storeIconRoute(c: Context<AppContext>): Promise<Response> {
+  const name = c.req.param('name') ?? '';
+  const role: StoreIconRole | undefined = Object.prototype.hasOwnProperty.call(STORE_ICON_PATHS, name)
+    ? STORE_ICON_PATHS[name]
+    : undefined;
+  if (!role) {
+    return new Response(null, { status: 404, headers: { 'Cache-Control': 'no-store', 'Content-Security-Policy': ICON_CSP } });
+  }
+
+  const host = c.get('host');
+  if (host.kind === 'merchant' && host.slug) {
+    try {
+      const ctx = await storeBySlug(c.env.DB, host.slug);
+      if (ctx && !storeIsSuspended(ctx)) {
+        const icons = await servableIconsFor(c, ctx);
+        if (icons) {
+          const served = await serveRendition(c, icons, role);
+          if (served) return served;
+        }
+      }
+    } catch {
+      // The store could not be read: the platform icon below is the answer.
+    }
+  }
+  return servePlatformIcon(c, role);
+}
+
+function iconHeaders(etag: string): Headers {
+  return new Headers({
+    'Content-Type': 'image/png',
+    'Cache-Control': STORE_ICON_CACHE_CONTROL,
+    ETag: etag,
+    'Content-Security-Policy': ICON_CSP,
+  });
+}
+
+/** The store's rendition from R2, or null to fall back (the object is missing). */
+async function serveRendition(c: Context<AppContext>, icons: StoreIconSet, role: StoreIconRole): Promise<Response | null> {
+  const etag = `"${icons.rev}-${role}"`;
+  if (c.req.header('If-None-Match') === etag) return new Response(null, { status: 304, headers: iconHeaders(etag) });
+  const object = await getMediaObject(c.env, 'public', icons.keys[role]);
+  if (!object) return null;
+  return new Response(object.body, { status: 200, headers: iconHeaders(etag) });
+}
+
+/**
+ * The platform's PNG for this role, read through the asset binding — the same
+ * committed file `/icons/*` serves, so there is one copy of every platform
+ * icon, not two. A 404 (never the SPA shell) if the asset layer cannot supply
+ * an image.
+ */
+async function servePlatformIcon(c: Context<AppContext>, role: StoreIconRole): Promise<Response> {
+  const etag = `"platform-${PLATFORM_ICON_REVISION}-${role}"`;
+  if (c.req.header('If-None-Match') === etag) return new Response(null, { status: 304, headers: iconHeaders(etag) });
+  try {
+    const asset = await c.env.ASSETS.fetch(new Request(new URL(PLATFORM_ICON_FOR_ROLE[role], c.req.url).toString()));
+    const type = (asset.headers.get('Content-Type') || '').toLowerCase();
+    if (asset.ok && type.startsWith('image/png')) {
+      return new Response(asset.body, { status: 200, headers: iconHeaders(etag) });
+    }
+    await asset.body?.cancel().catch(() => undefined);
+  } catch {
+    // No asset binding (a unit test, a misconfigured preview).
+  }
+  return new Response(null, { status: 404, headers: { 'Cache-Control': 'no-store', 'Content-Security-Policy': ICON_CSP } });
 }

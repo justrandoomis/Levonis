@@ -183,6 +183,113 @@ html {
 }
 
 /* ---------------------------------------------------------------------------
+   APP-CHROME TOKENS — one vocabulary for every shell (audit 05 §6.2).
+
+   ONE ACCENT. `--color-accent` IS the gold, under the name a component
+   should reach for; `--color-accent-contrast` is the ink that reads on it
+   (7.8:1). There is no second accent — the admin editor's purple stays
+   inside `.ap` and never becomes a workspace colour.
+
+   A TYPE SCALE FOR NEW CODE: `text-ui-2xs … text-ui-xl` = 11/12/13/15/17/20px
+   with the leading Cairo needs. Namespaced `ui-` because Tailwind's own
+   `text-sm`/`text-base` are 14/16px and 3,440 call sites depend on them —
+   nothing existing is resized. Three elevations, `shadow-1/2/3`: resting
+   tile, floating menu, window.
+
+   These live in @theme, and Tailwind 4 emits a theme variable only when
+   something uses it, so an unused token costs the storefront nothing.
+   --------------------------------------------------------------------------- */
+@theme {
+  --color-accent: var(--color-gold);
+  --color-accent-contrast: #101114;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-2: 0 12px 32px -16px rgb(0 0 0 / 0.8);
+  --shadow-3: 0 28px 70px -28px rgb(0 0 0 / 0.9);
+  --text-ui-2xs: 0.6875rem;
+  --text-ui-2xs--line-height: 1rem;
+  --text-ui-xs: 0.75rem;
+  --text-ui-xs--line-height: 1.125rem;
+  --text-ui-sm: 0.8125rem;
+  --text-ui-sm--line-height: 1.25rem;
+  --text-ui-base: 0.9375rem;
+  --text-ui-base--line-height: 1.5rem;
+  --text-ui-lg: 1.0625rem;
+  --text-ui-lg--line-height: 1.625rem;
+  --text-ui-xl: 1.25rem;
+  --text-ui-xl--line-height: 1.75rem;
+}
+
+/* The stacking contract and the timings, as CSS. `--z-*` mirrors UI_LAYERS in
+   src/components/ui/Overlay.tsx (`--z-busy` is AppBusy's overlay + 100) and
+   `--duration-press/quick` mirror PRESS_MS and CROSS_FADE in src/lib/motion.ts;
+   tests/uiPrimitives.test.ts fails when the two sides drift.
+   `--shell-bottom-inset` is how much of the bottom edge a shell's own bar owns
+   (a phone tab bar); toasts and sticky action bars sit above it. */
+:root {
+  --z-header: 100;
+  --z-bottom-nav: 120;
+  --z-popover: 160;
+  --z-overlay: 200;
+  --z-toast: 280;
+  --z-busy: 300;
+  --duration-press: 100ms;
+  --duration-quick: 150ms;
+  --duration-ui: 250ms;
+  --shell-bottom-inset: 0px;
+}
+
+/* ---------------------------------------------------------------------------
+   DENSITY — `data-density="compact"` on a shell or a panel.
+
+   The owner asked for a denser admin (adminProducts/ui.tsx) and every
+   control here promises a 44px target; both hold. Compact shrinks what is
+   DRAWN, and only where the pointer is precise (a mouse or trackpad): on a
+   touch screen the scope does nothing at all. A shrunken button keeps a 44px
+   hit area through an invisible slop above and below it, so a denser toolbar
+   is not a harder one to hit.
+   --------------------------------------------------------------------------- */
+@media (pointer: fine) {
+  [data-density='compact'] .lv-button,
+  [data-density='compact'] [data-icon-button] {
+    position: relative;
+    min-block-size: 32px;
+  }
+  [data-density='compact'] .lv-button {
+    padding-inline: 0.75rem;
+    font-size: 0.8125rem;
+    border-radius: var(--radius-sm);
+  }
+  [data-density='compact'] [data-icon-button] {
+    inline-size: 32px;
+    block-size: 32px;
+  }
+  [data-density='compact'] [data-icon-disc] {
+    inline-size: 28px;
+    block-size: 28px;
+  }
+  [data-density='compact'] .lv-button::after,
+  [data-density='compact'] [data-icon-button]::after {
+    content: '';
+    position: absolute;
+    inset-block: -6px;
+    inset-inline: 0;
+  }
+  [data-density='compact'] .lv-choice {
+    min-block-size: 36px;
+  }
+  [data-density='compact'] .lv-choice::after {
+    content: '';
+    position: absolute;
+    inset-block: -4px;
+    inset-inline: 0;
+  }
+  [data-density='compact'] .lv-input {
+    min-block-size: 44px;
+    font-size: 0.8125rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    SHARED SURFACES, CONTROLS AND STATES
 
    These classes refine the design system that is already in use. They are

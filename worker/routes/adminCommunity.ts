@@ -44,6 +44,7 @@ import { COMPLAINT_AWAITS_DESK_SQL } from './adminChats';
 import { requireFinancialScope } from '../lib/walletAdjust';
 import { canViewFinancials } from '../lib/adminScope';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
+import { reconcileRefundUnrefunded, reconcileReverseCredit, storeOrderMoneyDrift } from '../lib/storeOrderOps';
 
 export const adminCommunityRoutes = new Hono<AppContext>();
 adminCommunityRoutes.use('*', requireAdmin);
@@ -1292,6 +1293,64 @@ adminCommunityRoutes.get('/merchants/:id/finance', requireFinancialScope, async 
     `SELECT * FROM community_escrows WHERE merchant_id = ? ORDER BY created_at DESC LIMIT 100`
   ).bind(id).all();
   return c.json({ success: true, balance, ledger, escrows });
+});
+
+// --------------------------------------------------------- reconciliation
+
+/**
+ * STORE-ORDER MONEY THE OLD CODE LEFT WRONG (review F4) — READ-ONLY.
+ *
+ * Two shapes no route can reach any more: an order refunded and then
+ * re-opened (the merchant still stands to be paid for goods the customer has
+ * the price of), and a cancelled, paid order the merchant's old cancel never
+ * refunded (the customer is out of pocket). Listed here for the owner or a
+ * financial admin; nothing is changed by looking. Each row is put right by one
+ * of the two decisions below — never by a migration.
+ */
+adminCommunityRoutes.get('/reconciliation/store-orders', requireFinancialScope, async (c) => {
+  return c.json({ success: true, ...(await storeOrderMoneyDrift(c.env.DB)) });
+});
+
+/** The refusals the two decisions below share, as stable codes. */
+function reconcileRefusal(res: { reason: 'NOT_FOUND' | 'NOT_APPLICABLE'; detail: string }): HttpError {
+  if (res.reason === 'NOT_FOUND') return notFound('Order not found');
+  return new HttpError(
+    409,
+    'This order is not in the state this reconciliation fixes — reload the list',
+    'RECONCILE_NOT_APPLICABLE',
+    { detail: res.detail }
+  );
+}
+
+/**
+ * B · Refund a cancelled, paid store order that was never refunded — the
+ * cancel operation's own refund statements, once (worker/lib/storeOrderOps.ts
+ * `reconcileRefundUnrefunded`). A reason is required; the decision is an audit
+ * row in the same batch as the money.
+ */
+adminCommunityRoutes.post('/reconciliation/store-orders/:id/refund', requireFinancialScope, async (c) => {
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = await c.req.json().catch(() => ({}));
+  const reason = str(body.reason, 'reason', { min: 3, max: 500 });
+  const res = await reconcileRefundUnrefunded(c.env, { orderId: id, adminId: admin.id, reason });
+  if (!res.ok) throw reconcileRefusal(res);
+  return c.json({ success: true, order_id: res.orderId, replayed: res.replayed });
+});
+
+/**
+ * A · Take back the merchant's credit on an order whose customer was already
+ * refunded before it was re-opened (`reconcileReverseCredit`). The order
+ * itself is left as it is.
+ */
+adminCommunityRoutes.post('/reconciliation/store-orders/:id/reverse-credit', requireFinancialScope, async (c) => {
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = await c.req.json().catch(() => ({}));
+  const reason = str(body.reason, 'reason', { min: 3, max: 500 });
+  const res = await reconcileReverseCredit(c.env, { orderId: id, adminId: admin.id, reason });
+  if (!res.ok) throw reconcileRefusal(res);
+  return c.json({ success: true, order_id: res.orderId, replayed: res.replayed });
 });
 
 /**

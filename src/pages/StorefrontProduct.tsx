@@ -32,6 +32,9 @@ import SellerConflictDialog, { type SellerConflict } from '../components/merchan
 import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
 import StoreUnavailable from '../components/merchant/StoreUnavailable';
 import { useStore } from '../StoreContext';
+import StoreTheme from '../components/storefront/StoreTheme';
+import '../components/storefront/styles';
+import type { StorefrontStore } from '../components/storefront/types';
 
 export default function StorefrontProduct() {
   const { slug: routeSlug, productSlug } = useParams<{ slug: string; productSlug: string }>();
@@ -136,10 +139,16 @@ export default function StorefrontProduct() {
 
   const storeHome = hostStore ? '/' : `/community/store/${slug}`;
   const sellable = store.open !== false && product.in_stock !== false;
+  // The store's THEME (merchant platform W2-C): the product answer carries the
+  // published layout's tokens; on the store's own host the resolve answer does.
+  type Tokens = NonNullable<StorefrontStore['layout_theme']>['tokens'];
+  const themeTokens: Tokens =
+    (store as StorefrontStore).layout_theme?.tokens ??
+    ((hostStore as StorefrontStore | null)?.layout as { tokens?: Tokens } | undefined)?.tokens;
   const discounted = product.original_price_iqd && product.original_price_iqd > product.price_iqd;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 pb-32">
+    <StoreTheme tokens={themeTokens ?? null} storeAccent={store.accent} className="min-h-screen text-zinc-300 pb-32">
       <div className="max-w-2xl mx-auto">
         <div className="px-4 sm:px-6 pt-4">
           <Link to={storeHome} className="inline-flex items-center gap-1.5 text-zinc-400 text-[13px] mb-4">
@@ -283,6 +292,6 @@ export default function StorefrontProduct() {
         // The same add, re-sent with the customer's confirmation attached.
         onReplace={() => addToCart(true)}
       />
-    </div>
+    </StoreTheme>
   );
 }

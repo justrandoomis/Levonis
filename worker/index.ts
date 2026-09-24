@@ -4,7 +4,15 @@ import type { AppContext, Env } from './lib/types';
 import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
 import { loadSessionUser } from './lib/session';
 import { isAnonymousPublicMediaKey } from './lib/mediaStorage';
-import { injectSocialPreview, previewStoreRef, productSlugFromPath, resolveProductPreview } from './lib/socialPreview';
+import {
+  framedByStore,
+  injectSocialPreview,
+  previewStoreRef,
+  productSlugFromPath,
+  resolveProductPreview,
+  resolveStorePreview,
+  storeHomeRef,
+} from './lib/socialPreview';
 import { trustedOrigin } from './lib/appOrigin';
 import { runDurableJobs } from './lib/jobs';
 import { authRoutes } from './routes/auth';
@@ -20,7 +28,7 @@ import { communityRoutes } from './routes/community';
 import { chatRoutes } from './routes/chats';
 import { profileRoutes } from './routes/profile';
 import { uploadRoutes, fileRoutes } from './routes/uploads';
-import { webManifestRoute } from './routes/manifest';
+import { storeIconRoute, webManifestRoute } from './routes/manifest';
 import { robotsRoute, sitemapRoute } from './routes/seo';
 import { miscRoutes } from './routes/misc';
 import { adminRoutes } from './routes/admin';
@@ -56,6 +64,7 @@ import { referralRoutes } from './routes/referrals';
 import { studioRoutes } from './routes/studio';
 import { classifyHost, rootDomainFrom } from './lib/hosts';
 import { merchantRoutes } from './routes/merchant';
+import { storeLayoutRoutes } from './routes/storeLayout';
 import { storefrontRoutes } from './routes/storefront';
 import { marketplaceRoutes } from './routes/marketplace';
 import { storeOrderRoutes } from './routes/storeOrders';
@@ -185,6 +194,20 @@ app.use('*', async (c, next) => {
    * that arrive in bursts from every bot on the internet.
    */
   if (path === '/robots.txt' || path === '/sitemap.xml') {
+    await next();
+    return;
+  }
+  /**
+   * NOR DO A STORE'S HOME DOCUMENT AND ITS ICONS (merchant platform W2-D).
+   *
+   * `/` joins `run_worker_first` so a shared store link carries the STORE's
+   * card, and `/store-icon/*` so every host gets its own home-screen and tab
+   * icon. Neither reads `user`: `/` matches no route (the SPA fallback below
+   * answers it, with a card that is the same for every visitor), and an icon
+   * cannot depend on who asks. `/community/store/<ref>` is the store's page
+   * on the main site, rewritten the same way.
+   */
+  if (path === '/' || path.startsWith('/store-icon/') || storeHomeRef(path) !== null) {
     await next();
     return;
   }
@@ -341,6 +364,10 @@ app.route('/api/merchant', merchantRoutes);
 // Printers and request-notification preferences: what a shop can make, and
 // which of those jobs it wants to hear about.
 app.route('/api/merchant', merchantPrinterRoutes);
+// The store page as data — its draft, publish, history and restore
+// (merchant platform W2-C). Its own mount so the routing design can name it;
+// the same session-scoped rules as the rest of /api/merchant.
+app.route('/api/merchant/store/layout', storeLayoutRoutes);
 // The public shopfront: readable by anyone, on any host.
 app.route('/api/storefront', storefrontRoutes);
 // The print journey EXTENDS the marketplace rather than starting a second one:
@@ -394,6 +421,17 @@ app.route('/files', fileRoutes);
 // Top-level and on every host, deliberately: this is not admin surface, and a
 // storefront that cannot be installed is the defect, not the risk.
 app.get('/manifest.webmanifest', webManifestRoute);
+
+// GET /store-icon/<name> — THE HOST'S OWN HOME-SCREEN AND TAB ICON (W2-D).
+//
+// index.html is one document on every host, so it links these stable paths
+// and the Worker answers each with THIS host's rendition of its store's logo
+// (or the platform icon on the apex and wherever a store has none) — see
+// storeIconRoute in worker/routes/manifest.ts. Like the manifest, the path is
+// named in run_worker_first in all three environments, or the asset layer
+// answers it with the SPA shell at 200 and iOS draws a page screenshot.
+// Line comments only, for the reason given at robots.txt below.
+app.get('/store-icon/:name', storeIconRoute);
 
 // GET /robots.txt and GET /sitemap.xml — see worker/routes/seo.ts for why
 // these are routes rather than files in `public/`: one bundle serves the apex
@@ -451,7 +489,15 @@ app.all('/api/upload', (c) => c.json({ success: false, error: 'Use POST /api/upl
 async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
   const asset = await c.env.ASSETS.fetch(c.req.raw);
   const slug = productSlugFromPath(c.req.path);
-  if (!slug || !asset.ok) return asset;
+  // THE STORE'S OWN CARD (W2-D): a store's home on its own host (`/`, which
+  // is in run_worker_first for exactly this), and its page on the main site
+  // (`/community/store/<ref>`). Anywhere else a path that names no product
+  // pays nothing: no read, no buffering, the asset as it came.
+  const host = c.get('host');
+  const onStore = host.kind === 'merchant' && !!host.slug;
+  const homeRef = storeHomeRef(c.req.path);
+  const storeHome = onStore ? c.req.path === '/' : homeRef !== null;
+  if ((!slug && !storeHome) || !asset.ok) return asset;
   if (!/^text\/html\b/i.test(asset.headers.get('Content-Type') || '')) return asset;
 
   try {
@@ -460,18 +506,25 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
     // which is not an apex route, and any product slug unfurled on any shop.
     // `host.host` is the classified, normalised Host — a merchant kind is a
     // valid slug under the configured root, never a spoofed domain.
-    const host = c.get('host');
-    const onStore = host.kind === 'merchant' && !!host.slug;
     const origin = onStore ? `https://${host.host}` : trustedOrigin(c);
-    const product = await resolveProductPreview(c.env.DB, slug, origin, {
+    const scope = {
       storeSlug: onStore ? host.slug : null,
-      storeRef: previewStoreRef(c.req.path),
-    });
-    if (!product) return asset;
+      storeRef: previewStoreRef(c.req.path) ?? homeRef,
+    };
+    const product = slug ? await resolveProductPreview(c.env.DB, slug, origin, scope) : null;
+    // On a store's own host the store IS the site: its name heads every card,
+    // its line and logo stand in for what a product lacks, and a link there
+    // that names no product of it — the home, a product since removed — is
+    // the store's card rather than the platform's. On the main site the store
+    // card is only for the store's own page (or a product of it now gone).
+    const store =
+      onStore || (!product && scope.storeRef) ? await resolveStorePreview(c.env.DB, origin, scope) : null;
+    const card = product ? framedByStore(product, onStore ? store : null) : store;
+    if (!card) return asset;
 
     const url = new URL(c.req.url);
     const html = injectSocialPreview(await asset.text(), {
-      ...product,
+      ...card,
       // The URL the crawler was given, not the canonical one — query string
       // included. A shared link carries the supporter's handle as `?ref=`
       // (`productSupportPath`), and a crawler that is told the canonical

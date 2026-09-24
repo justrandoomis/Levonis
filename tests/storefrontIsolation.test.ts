@@ -13,7 +13,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
 
@@ -114,44 +114,67 @@ test('a merchant host renders the storefront, not the main site with a shop insi
 
 // ------------------------------------------------------ merchant styling
 
+/**
+ * The store page is src/pages/Storefront.tsx plus the renderer and its blocks
+ * (src/components/storefront/**) — every rule below holds across all of them.
+ */
+function storefrontSources(): Array<[string, string]> {
+  const files = ['src/pages/Storefront.tsx'];
+  const walk = (rel: string) => {
+    for (const f of readdirSync(join(ROOT, rel), { withFileTypes: true })) {
+      const p = `${rel}/${f.name}`;
+      if (f.isDirectory()) walk(p);
+      else if (/\.tsx?$/.test(f.name)) files.push(p);
+    }
+  };
+  walk('src/components/storefront');
+  return files.map((f) => [f, code(read(f))]);
+}
+
 test('a merchant can never put a colour, style or raw HTML on their page', () => {
-  const src = read('src/pages/Storefront.tsx');
-  const c = code(src);
+  // The accent is a NAME looked up in a table defined in the storefront's
+  // theme module. If a merchant's string could reach a style attribute or a
+  // class string directly, they could paint over the platform — or worse,
+  // break out of the container. Theme tokens are the same kind of thing:
+  // enums, set as data attributes our stylesheet reads
+  // (tests/storeLayoutMalicious.test.ts renders hostile ones).
+  const theme = code(read('src/components/storefront/theme.ts'));
+  assert.match(theme, /const ACCENTS: Record<string,/, 'the accent preset table is gone');
+  assert.match(theme, /ACCENTS\[name \?\? 'default'\] \?\? ACCENTS\.default/, 'unknown accents must fall back');
 
-  // The accent is a NAME looked up in a table defined here. If a merchant's
-  // string could reach a style attribute or a class string directly, they
-  // could paint over the platform — or worse, break out of the container.
-  assert.match(c, /const ACCENTS: Record<string,/, 'the accent preset table is gone');
-  assert.match(c, /ACCENTS\[store\?\.accent \?\? 'default'\] \?\? ACCENTS\.default/, 'unknown accents must fall back');
-
-  assert.equal(
-    /dangerouslySetInnerHTML/.test(c),
-    false,
-    'the storefront renders raw HTML somewhere — a merchant field could carry a script'
-  );
-  // The one inline style is a computed width for the rating bars, which is a
-  // number this file derives. A merchant string must never appear in one.
-  const inlineStyles = c.match(/style=\{\{[^}]*\}\}/g) ?? [];
-  for (const s of inlineStyles) {
+  const sources = storefrontSources();
+  assert.ok(sources.length > 30, 'the renderer and its blocks are checked too');
+  for (const [f, c] of sources) {
     assert.equal(
-      /store\.|product\.|merchant\./.test(s),
+      /dangerouslySetInnerHTML/.test(c),
       false,
-      `a merchant-supplied value reaches an inline style: ${s}`
+      `${f} renders raw HTML somewhere — a merchant field could carry a script`
     );
+    // The one inline style is a computed width for the rating bars, which is a
+    // number the file derives. A merchant string must never appear in one.
+    const inlineStyles = c.match(/style=\{\{[^}]*\}\}/g) ?? [];
+    for (const s of inlineStyles) {
+      assert.equal(
+        /store\.|product\.|merchant\.|settings\.|block\.|layout\.|tokens\./.test(s),
+        false,
+        `${f}: a merchant-supplied value reaches an inline style: ${s}`
+      );
+    }
   }
 });
 
 test('outbound merchant links cannot hand the new tab a handle on the page', () => {
-  const c = code(read('src/pages/Storefront.tsx'));
-  // Every target=_blank anchor needs noopener; without it the opened page
-  // gets window.opener back onto the storefront.
-  const anchors = c.match(/<a[\s\S]{0,400}?>/g) ?? [];
-  for (const a of anchors) {
-    if (!/target=["']_blank["']/.test(a)) continue;
-    const rel = /\brel=["']([^"']*)["']/.exec(a)?.[1] ?? '';
-    const tokens = new Set(rel.split(/\s+/).filter(Boolean));
-    assert.ok(tokens.has('noopener'), `a _blank link without noopener: ${a.slice(0, 120)}`);
-    assert.ok(tokens.has('noreferrer'), `a _blank link without noreferrer: ${a.slice(0, 120)}`);
+  for (const [f, c] of storefrontSources()) {
+    // Every target=_blank anchor needs noopener; without it the opened page
+    // gets window.opener back onto the storefront.
+    const anchors = c.match(/<a[\s\S]{0,400}?>/g) ?? [];
+    for (const a of anchors) {
+      if (!/target=["']_blank["']/.test(a)) continue;
+      const rel = /\brel=["']([^"']*)["']/.exec(a)?.[1] ?? '';
+      const tokens = new Set(rel.split(/\s+/).filter(Boolean));
+      assert.ok(tokens.has('noopener'), `${f}: a _blank link without noopener: ${a.slice(0, 120)}`);
+      assert.ok(tokens.has('noreferrer'), `${f}: a _blank link without noreferrer: ${a.slice(0, 120)}`);
+    }
   }
 });
 

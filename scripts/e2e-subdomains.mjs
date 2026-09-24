@@ -705,6 +705,14 @@ async function main() {
     `status ${req1.status} ${req1.json?.error ?? ''}`);
   const requestId = req1.json?.request?.id ?? null;
 
+  // A new request is a PRIVATE DRAFT until its customer publishes it (wave 1:
+  // drafts are invisible and unbiddable) — the one road onto the board.
+  if (requestId) {
+    const pub = await shopper.req('POST', APEX, `/api/marketplace/print/requests/${requestId}/publish`, {});
+    check('the customer publishes it onto the board', pub.status < 400,
+      `status ${pub.status} ${pub.json?.code ?? pub.json?.error ?? ''}`);
+  }
+
   if (requestId) {
     const att = await shopper.upload(APEX, `/api/marketplace/requests/${requestId}/files`, {
       file: { name: 'reference.png', type: 'image/png', bytes: PNG_1x1 },
@@ -844,6 +852,8 @@ async function main() {
   const shopperFunds = await admin.req('POST', APEX, '/api/admin/wallet/credit', {
     userId: shopperId, currency: 'USD', amount: 5_000,
     note: `e2e ${RUN} — §95 verification float, reversed at the end of this run`,
+    // Every manual credit carries its own key, so a retried run credits once.
+    idempotencyKey: `e2e-float-${RUN}`,
   });
   const shopperTxnId = shopperFunds.json?.id ?? null;
   check('the shopper is funded', shopperFunds.status === 200, `status ${shopperFunds.status}`);
@@ -859,8 +869,11 @@ async function main() {
   check('the store quotes the cart', quote.status < 400,
     `status ${quote.status} ${quote.json?.error ?? ''}`);
 
+  // The order binds to the quote the customer saw: its fingerprint goes back
+  // with the order, or the server answers 409 QUOTE_CHANGED with a fresh one.
   const placed = await shopper.req('POST', APEX, '/api/store-orders', {
-    addressId: addr.json?.id, payWithWallet: true, idempotencyKey: `e2e-store-${RUN}`,
+    addressId: addr.json?.id, idempotencyKey: `e2e-store-${RUN}`,
+    quoteFingerprint: quote.json?.quote?.quote_fingerprint,
   });
   check('a real merchant order is placed', placed.status < 400,
     `status ${placed.status} ${placed.json?.error ?? ''}`);
@@ -888,6 +901,11 @@ async function main() {
   check('a community request is posted for the escrow path', reqRes.status < 400,
     `status ${reqRes.status} ${reqRes.json?.error ?? ''}`);
   const escrowRequestId = reqRes.json?.request?.id ?? null;
+  if (escrowRequestId) {
+    const pub = await shopper.req('POST', APEX, `/api/marketplace/print/requests/${escrowRequestId}/publish`, {});
+    check('and published, so a merchant can offer on it', pub.status < 400,
+      `status ${pub.status} ${pub.json?.code ?? pub.json?.error ?? ''}`);
+  }
 
   if (!escrowRequestId) {
     blocked('community escrow', 'the request was not created');
@@ -900,7 +918,12 @@ async function main() {
     const offerId = offer.json?.offer?.id ?? null;
 
     if (offerId) {
-      const accepted = await shopper.req('POST', APEX, `/api/marketplace/offers/${offerId}/accept`);
+      // The customer accepts EXACTLY the version they were shown — the price
+      // and the offer's revision go back with the acceptance (wave 1).
+      const accepted = await shopper.req('POST', APEX, `/api/marketplace/offers/${offerId}/accept`, {
+        expected_price_iqd: offer.json?.offer?.price_iqd,
+        offer_revision: offer.json?.offer?.revision ?? 1,
+      });
       check('accepting HOLDS the money rather than paying it', accepted.status < 400,
         `status ${accepted.status} ${accepted.json?.error ?? ''}`);
 

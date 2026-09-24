@@ -32,6 +32,10 @@ function seed() {
     INSERT INTO community_merchants (id,user_id,name) VALUES ('m1','owner','Ali 3D'), ('m2','owner2','Omar 3D');
     INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES
       ('s1','m1','owner','ali3d','Ali 3D'), ('s2','m2','owner2','omar3d','Omar 3D');
+    -- Acceptance asks what making an offer asks (review S2): the owner's plan too.
+    INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at) VALUES
+      ('mem1','owner','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z'),
+      ('mem2','owner2','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
     INSERT INTO community_requests (id,customer_id,title,description,state,status,visibility,offer_count,expires_at)
       VALUES ('r1','buyer','Print a bracket','I need a bracket printed','receiving_offers','open','public',2,
               '2099-01-01T00:00:00.000Z');

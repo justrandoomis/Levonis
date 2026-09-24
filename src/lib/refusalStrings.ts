@@ -479,6 +479,19 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This order has already been settled. Refresh the page.',
     ckb: 'تمت تسوية هذا الطلب بالفعل. حدّث الصفحة.',
   },
+  // Wave 1 review (F2, the older NO_PREVIEW): the merchant's «ابدأ العمل» on an
+  // order whose money is not held, and a model with no 3D preview.
+  // OWNER: Sorani to be written by hand for both (the ckb slot carries the Arabic).
+  ESCROW_NOT_HELD: {
+    ar: 'المبلغ غير محجوز لهذا الطلب، لذلك لا يمكن بدء العمل. تواصل مع الدعم.',
+    en: 'The money for this order is not held, so work cannot start. Contact support.',
+    ckb: 'المبلغ غير محجوز لهذا الطلب، لذلك لا يمكن بدء العمل. تواصل مع الدعم.',
+  },
+  NO_PREVIEW: {
+    ar: 'لا تتوفر معاينة ثلاثية الأبعاد لهذا الملف.',
+    en: 'This file has no 3D preview.',
+    ckb: 'لا تتوفر معاينة ثلاثية الأبعاد لهذا الملف.',
+  },
   // Why a merchant cannot make, edit or re-confirm an offer — the selling gate
   // in worker/lib/merchantAuth.ts, each sanction by its own code. The three the
   // store banner already words (src/components/merchant/StoreCta.tsx) carry
@@ -602,6 +615,24 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ar: 'لا يمكن نقل الطلب إلى هذه الحالة من حالته الحالية. حدّث الصفحة.',
     en: 'The order cannot move to that status from where it is now. Refresh the page.',
     ckb: 'لا يمكن نقل الطلب إلى هذه الحالة من حالته الحالية. حدّث الصفحة.',
+  },
+  // Wave 1 review: the store cart's own "gone" (the merchant-line quantity
+  // door), the wallet reservation a checkout could not make, and a cart another
+  // tab already checked out (F7).
+  UNAVAILABLE: {
+    ar: 'هذا المنتج لم يعد متاحًا. احذفه من السلة للمتابعة.',
+    en: 'This product is no longer available. Remove it from the cart to continue.',
+    ckb: 'هذا المنتج لم يعد متاحًا. احذفه من السلة للمتابعة.',
+  },
+  WALLET_ERROR: {
+    ar: 'تعذّر حجز المبلغ من محفظتك الآن. لم يُخصم شيء — حاول مرة أخرى بعد قليل.',
+    en: 'The payment could not be reserved from your wallet right now. Nothing was charged — try again shortly.',
+    ckb: 'تعذّر حجز المبلغ من محفظتك الآن. لم يُخصم شيء — حاول مرة أخرى بعد قليل.',
+  },
+  CART_CHANGED: {
+    ar: 'تغيّرت سلتك أثناء إتمام الطلب — ربما أُكمل الطلب من نافذة أخرى. راجع «طلباتي» قبل المحاولة مجددًا.',
+    en: 'Your cart changed while you were checking out — it may have been ordered from another tab. Check your orders before trying again.',
+    ckb: 'تغيّرت سلتك أثناء إتمام الطلب — ربما أُكمل الطلب من نافذة أخرى. راجع «طلباتي» قبل المحاولة مجددًا.',
   },
 };
 

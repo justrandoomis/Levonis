@@ -201,6 +201,18 @@ test('/sw.js and /icons/* are NOT routed through the Worker', () => {
   }
 });
 
+test('/store-icon/* is the Worker\'s, not the asset layer\'s — no _headers rule may claim it (W2-D)', () => {
+  // The per-host home-screen and tab icons are answered by the Worker
+  // (worker/routes/manifest.ts `storeIconRoute`, in run_worker_first), which
+  // sets their revalidating Cache-Control itself. A `_headers` rule for them
+  // would be dead weight at best, and — since the asset layer APPENDS to a
+  // header an earlier rule set — a second Cache-Control at worst. The icons
+  // the asset layer does serve keep their own week under /icons/*.
+  const file = assetHeadersFile();
+  assert.ok(!parseRules(file).some((r) => r.path.startsWith('/store-icon')));
+  assert.equal(served(file, '/icons/apple-touch-icon.bc80fc2b.png').get('cache-control'), ICON_CACHE_CONTROL);
+});
+
 test('the platform-kit copy of securityPolicy.ts is byte-identical', () => {
   // tests/edgeParity.test.ts pins this too, and it also runs outside the unit
   // suite under `npm run check:boundaries`. It is repeated here because this

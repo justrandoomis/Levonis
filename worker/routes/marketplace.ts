@@ -69,6 +69,7 @@ import {
   completionStatements,
   isEngagedMerchant,
   isPast,
+  merchantTakesNewWork,
   offerAcceptedNotification,
   offerCountStatement,
   onPublicBoard,
@@ -907,6 +908,15 @@ marketplaceRoutes.post('/offers/:id/reconfirm', requireCommunityOpen, requireAut
 
 // ------------------------------------------------------------- acceptance
 
+/** Whether the merchant behind this offer row may take on new work now (review S2). */
+function offerMerchantTakesWork(db: D1Database, offer: Record<string, unknown>): Promise<boolean> {
+  return merchantTakesNewWork(db, {
+    merchantStatus: offer.m_status,
+    storeStatus: offer.s_status,
+    ownerUserId: String(offer.m_user_id ?? ''),
+  });
+}
+
 /** The offer, its request and its merchant — everything acceptance decides on. */
 async function offerForAcceptance(db: D1Database, offerId: string) {
   return db
@@ -936,7 +946,8 @@ async function offerForAcceptance(db: D1Database, offerId: string) {
 function acceptanceRefusal(
   offer: Record<string, unknown>,
   expected: { price: number; revision: number },
-  now: string
+  now: string,
+  merchantTakesWork: boolean
 ): HttpError | null {
   if (offer.state !== 'pending') return conflict('That offer is no longer available', 'OFFER_NOT_AVAILABLE');
   if (!(BOARD_STATES as readonly string[]).includes(String(offer.request_state))) {
@@ -946,11 +957,14 @@ function acceptanceRefusal(
     return conflict('This request has expired', 'REQUEST_EXPIRED');
   }
   if (isPast(offer.expires_at as string | null, now)) return conflict('This offer has expired', 'OFFER_EXPIRED');
-  // A merchant Levonis has since restricted or suspended — or whose store it
-  // suspended — takes on no new work, so their standing offer is not a
-  // contract a customer can enter now (audit 03 V; `requireOfferPrivileges`).
-  // An allow-list, like the buy path: only an `active` merchant.
-  if (offer.m_status !== 'active' || offer.s_status === 'suspended') {
+  // A merchant who could not MAKE this offer today cannot be handed the
+  // contract either (audit 03 V, review S2): the SAME allow-list as offer
+  // creation — merchant active, store active, owner's plan valid
+  // (`merchantTakesNewWork`, worker/lib/communityRequests.ts) — decided by the
+  // caller before any money is reserved. The customer is told the merchant is
+  // not taking work, never why: a paused shop, a lapsed plan and a sanction are
+  // between the merchant and Levonis.
+  if (!merchantTakesWork) {
     return conflict('This merchant is not taking new work right now — choose another offer', 'MERCHANT_UNAVAILABLE');
   }
   const fresh = { offer: offerShape(offer) };
@@ -1011,7 +1025,7 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
   const offer = await offerForAcceptance(c.env.DB, offerId);
   if (!offer) throw notFound('Offer not found');
   if (offer.customer_id !== user.id) throw forbidden('This request is not yours');
-  const refusal = acceptanceRefusal(offer, expected, nowIso());
+  const refusal = acceptanceRefusal(offer, expected, nowIso(), await offerMerchantTakesWork(c.env.DB, offer));
   if (refusal) throw refusal;
 
   const requestId = String(offer.req_id);
@@ -1120,15 +1134,33 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
       offerAcceptedNotification(db, { merchantUserId, requestId, offerId, orderId, priceIqd: price }),
     ]);
   } catch (e) {
-    // Nothing of the batch landed. Give the reservation back; if even that
-    // fails, the reconciliation sweep finds the orphaned hold and releases it.
-    await releaseEscrowReservation(db, holdId, 'Offer acceptance did not complete').catch((err) =>
-      console.error('accept: reservation not released', holdId, err instanceof Error ? err.message : String(err))
-    );
-    if (!isConstraintAbort(e)) throw e;
-    const fresh = await offerForAcceptance(db, offerId);
-    const why = fresh ? acceptanceRefusal(fresh, expected, nowIso()) : notFound('Offer not found');
-    throw why ?? conflict('This request changed while you were accepting — reload it and try again', 'ACCEPT_CONFLICT');
+    /**
+     * DID IT LAND? (review F8) An error here is what the Worker was told, not
+     * what the database did: a batch can commit and its response be lost. An
+     * escrow on this reservation means the acceptance happened — it is
+     * answered as the success it was, and the hold under it is left alone.
+     * The release below re-asks the same question inside its own UPDATE, so
+     * even a commit that becomes visible between the two cannot be undone.
+     */
+    const landed = await db
+      .prepare('SELECT id FROM community_escrows WHERE hold_id = ? AND community_order_id = ?')
+      .bind(holdId, orderId)
+      .first<{ id: string }>()
+      .catch(() => null);
+    if (!landed) {
+      // Nothing of the batch landed. Give the reservation back; if even that
+      // fails, the reconciliation sweep finds the orphaned hold and releases it.
+      await releaseEscrowReservation(db, holdId, 'Offer acceptance did not complete').catch((err) =>
+        console.error('accept: reservation not released', holdId, err instanceof Error ? err.message : String(err))
+      );
+      if (!isConstraintAbort(e)) throw e;
+      const fresh = await offerForAcceptance(db, offerId);
+      const why = fresh
+        ? acceptanceRefusal(fresh, expected, nowIso(), await offerMerchantTakesWork(db, fresh))
+        : notFound('Offer not found');
+      throw why ?? conflict('This request changed while you were accepting — reload it and try again', 'ACCEPT_CONFLICT');
+    }
+    console.error('accept: the batch committed but reported an error', orderId, e instanceof Error ? e.message : String(e));
   }
 
   await audit(db, user.id, 'community.offer_accepted', offerId, {
@@ -1214,10 +1246,34 @@ marketplaceRoutes.post('/orders/:id/start', requireAuth, async (c) => {
   if (!canMoveCommunityOrder(String(row.state) as CommunityOrderState, 'in_progress')) {
     throw conflict(`An order that is ${row.state} cannot be started`);
   }
+  /**
+   * WORK STARTS ONLY ON MONEY THAT IS STILL HELD (review F2). The flip used to
+   * ask the order alone, and a customer's cancel racing this tap refunded the
+   * escrow while the order went `in_progress` — a live job over money that
+   * was already back in the customer's wallet, which nothing could ever pay
+   * the merchant for. The escrow's state is now part of the same UPDATE (the
+   * cancel moves the escrow and the order in ONE batch), and a flip that
+   * matched nothing is reported, never answered with a success.
+   */
   const res = await c.env.DB.prepare(
-    `UPDATE community_orders SET state = 'in_progress', updated_at = ? WHERE id = ? AND state = 'funded'`
+    `UPDATE community_orders SET state = 'in_progress', updated_at = ?
+      WHERE id = ? AND state = 'funded'
+        AND EXISTS (SELECT 1 FROM community_escrows e
+                     WHERE e.community_order_id = community_orders.id AND e.state = 'held')`
   ).bind(nowIso(), orderId).run();
-  if (res.meta.changes) await audit(c.env.DB, c.get('user')!.id, 'community.order_started', orderId, {});
+  if (!res.meta.changes) {
+    const now = await c.env.DB.prepare(
+      `SELECT o.state, (SELECT e.state FROM community_escrows e WHERE e.community_order_id = o.id) AS escrow_state
+         FROM community_orders o WHERE o.id = ?`
+    ).bind(orderId).first<{ state: string; escrow_state: string | null }>();
+    // A second tap that lost to the first: the work IS started.
+    if (now?.state === 'in_progress') return c.json({ success: true, replayed: true });
+    if (now?.state === 'funded') {
+      throw conflict('The money for this order is not held, so work cannot start — contact support', 'ESCROW_NOT_HELD');
+    }
+    throw conflict('This order changed — reload it', 'ORDER_CHANGED');
+  }
+  await audit(c.env.DB, c.get('user')!.id, 'community.order_started', orderId, {});
   return c.json({ success: true });
 });
 
@@ -1278,9 +1334,13 @@ marketplaceRoutes.post('/orders/:id/confirm', requireAuth, async (c) => {
     // client does — and the auto-confirm sweep uses the same key, so the two
     // can never release twice between them.
     idempotencyKey: `confirm:${orderId}`,
+    // Still delivered-and-waiting WHEN the money moves, not only when this
+    // route read it (review F1): a dispute that landed in between wins.
+    orderStates: ['merchant_marked_delivered'],
   });
   if (!released.ok) {
     const reason = (released as { reason: string }).reason;
+    if (reason === 'ORDER_CHANGED') throw conflict('This order changed — reload it', 'ORDER_CHANGED');
     throw new HttpError(409, `The funds could not be released (${reason})`, 'ESCROW_RELEASE_FAILED', { reason });
   }
 
@@ -1423,7 +1483,41 @@ marketplaceRoutes.post('/orders/:id/cancel', requireAuth, async (c) => {
     );
   }
 
+  /**
+   * THE REFUND AND THE CANCELLATION ARE ONE BATCH (review F2).
+   *
+   * They were two: the escrow was refunded first, and the order's flip —
+   * conditional on `accepted`/`funded` — ran afterwards and quietly matched
+   * nothing when the merchant's «ابدأ العمل» had landed in between, while the
+   * request was still marked cancelled. The customer had their money back and
+   * the merchant a live job nobody could ever pay for. Now the escrow's own
+   * UPDATE requires the order to still be `accepted`/`funded`, and the
+   * order's and the request's moves ride in the SAME batch
+   * (`refundEscrow` … `alsoWrite`): either the work had not started and all
+   * of it happens, or it had and none of it does (409 ORDER_CHANGED). The
+   * merchant's start, for its part, requires a `held` escrow.
+   */
   const escrow = await escrowForOrder(c.env.DB, orderId);
+  const ts = nowIso();
+  const cancelStatements = [
+    c.env.DB.prepare(
+      `UPDATE community_orders SET state = 'cancelled', cancelled_at = ?1, updated_at = ?1
+        WHERE id = ?2 AND state IN ('accepted','funded')`
+    ).bind(ts, orderId),
+    // A fence: this batch's flip landed, or nothing in it stands.
+    c.env.DB.prepare(
+      `UPDATE community_orders
+          SET updated_at = CASE WHEN state = 'cancelled' AND cancelled_at = ?2 THEN updated_at ELSE NULL END
+        WHERE id = ?1`
+    ).bind(orderId, ts),
+    c.env.DB.prepare(
+      `UPDATE community_requests SET state = 'cancelled', status = 'closed', updated_at = ?
+        WHERE id = ? AND state IN ('offer_selected','in_progress')`
+    ).bind(ts, row.request_id),
+    revokeViewerTokensStatement(c.env.DB, String(row.request_id), ts),
+  ];
+  const workStarted = () => conflict('This order changed — the work may already have started. Reload it.', 'ORDER_CHANGED');
+
   if (escrow) {
     const refund = await refundEscrow(c.env.DB, {
       escrowId: escrow.id,
@@ -1431,25 +1525,41 @@ marketplaceRoutes.post('/orders/:id/cancel', requireAuth, async (c) => {
       actorRole: role,
       reason: 'cancelled before work started',
       idempotencyKey: `cancel:${orderId}`,
+      orderStates: ['accepted', 'funded'],
+      alsoWrite: cancelStatements,
     });
     if (!refund.ok) {
       const reason = (refund as { reason: string }).reason;
+      if (reason === 'ORDER_CHANGED') throw workStarted();
       throw new HttpError(409, `Could not refund (${reason})`, 'ESCROW_REFUND_FAILED', { reason });
     }
+    if (refund.replayed) {
+      // The escrow was ALREADY refunded. This cancel's own batch, retried, is
+      // done. An order still waiting for its work over refunded money is the
+      // other half of a cancel that stopped between its two steps before they
+      // were one batch: it is finished here, and no money moves (the refund is
+      // behind it, and the merchant's start refuses an escrow that is not
+      // held). Anything else was decided elsewhere — say so.
+      const again = await c.env.DB.prepare('SELECT state FROM community_orders WHERE id = ?')
+        .bind(orderId)
+        .first<{ state: string }>();
+      if (again?.state === 'cancelled') return c.json({ success: true, refunded: true, replayed: true });
+      if (again?.state !== 'accepted' && again?.state !== 'funded') throw workStarted();
+      try {
+        await c.env.DB.batch(cancelStatements);
+      } catch (e) {
+        if (!isConstraintAbort(e)) throw e;
+        throw workStarted();
+      }
+    }
+  } else {
+    try {
+      await c.env.DB.batch(cancelStatements);
+    } catch (e) {
+      if (!isConstraintAbort(e)) throw e;
+      throw workStarted();
+    }
   }
-
-  const ts = nowIso();
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE community_orders SET state = 'cancelled', cancelled_at = ?, updated_at = ?
-        WHERE id = ? AND state IN ('accepted','funded')`
-    ).bind(ts, ts, orderId),
-    c.env.DB.prepare(
-      `UPDATE community_requests SET state = 'cancelled', status = 'closed', updated_at = ?
-        WHERE id = ? AND state IN ('offer_selected','in_progress')`
-    ).bind(ts, row.request_id),
-    revokeViewerTokensStatement(c.env.DB, String(row.request_id), ts),
-  ]);
 
   await audit(c.env.DB, user.id, 'community.order_cancelled', orderId, { by: role, state });
   return c.json({ success: true, refunded: !!escrow });

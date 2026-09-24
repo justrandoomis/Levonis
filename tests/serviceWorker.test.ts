@@ -492,6 +492,41 @@ test('the asset cache is capped, oldest first, so it cannot grow across deploys'
   assert.equal(store.entries[0].key, `${ORIGIN}/assets/old-6.js`, 'the oldest entries go first');
 });
 
+test('the per-host store icons are never cached here, and the worker\'s scope and precache are unchanged (W2-D)', async () => {
+  /**
+   * `/store-icon/*` (index.html's apple-touch and tab icons) is answered by
+   * the Worker PER HOST from a live store row: a store's own rendition, which
+   * changes the moment its merchant replaces the logo, or the platform icon
+   * while it has none. That is the manifest's property exactly — a stored copy
+   * would pin an old logo, or a first fetch's platform fallback, onto that
+   * store's origin with no expiry — so it gets the manifest's treatment: the
+   * worker does not touch it. It falls to the default, network-only, and this
+   * pins that nobody moves it onto the `/icons/` path.
+   */
+  const sw = loadWorker();
+  const decide = (path: string) => sw.strategyFor(new URL(path, ORIGIN), makeRequest(path));
+  for (const name of ['apple-touch.png', 'favicon-32.png', '192.png', '512.png', 'maskable-512.png']) {
+    assert.equal(decide(`/store-icon/${name}`), 'network-only', name);
+  }
+  sw.setFetch(async () => basic('never'));
+  const event = sw.dispatch('fetch', makeEvent(makeRequest('/store-icon/apple-touch.png')));
+  assert.equal(event.response, undefined, 'passed through untouched, not re-issued');
+
+  // A store's HOME is still a network-first navigation — the document the
+  // Worker now rewrites with the store's card is never served from a cache
+  // while the network answers.
+  assert.equal(sw.strategyFor(new URL('/', ORIGIN), navigation('/')), 'network-first');
+
+  // The precache is still exactly the platform's revisioned PNGs, and the
+  // registration is still the root script, so the scope is the whole origin —
+  // one per host, as before.
+  const precache = sw.internals.PRECACHE_URLS as string[];
+  assert.ok(precache.every((url) => /^\/icons\/[a-z0-9-]+\.[0-9a-f]{8}\.png$/.test(url)), precache.join(', '));
+  assert.ok(!precache.some((url) => url.startsWith('/store-icon/')));
+  const main = readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8');
+  assert.match(main, /\.register\('\/sw\.js'\)/);
+});
+
 test('the API and the file store are not answered by the worker at all', async () => {
   const sw = loadWorker();
   sw.setFetch(async () => basic('never'));

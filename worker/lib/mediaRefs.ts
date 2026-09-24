@@ -292,6 +292,24 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   { table: 'community_products', column: 'options', kind: 'json', why: 'merchant product options carry images' },
   { table: 'community_products', column: 'colors', kind: 'json', why: 'merchant product colours carry images' },
   { table: 'merchant_reviews', column: 'images', kind: 'json', why: 'photographs a buyer attached to a merchant review' },
+  // 0123 — a store's app-icon renditions (worker/lib/storeIcons.ts). Each is
+  // served to every installed app and home-screen icon of that store; the
+  // replaced ones are queued on media_cleanup_jobs, whose guarded drain must
+  // see these to know which renditions are still live.
+  { table: 'merchant_store_icons', column: 'icon192_key', kind: 'text', why: 'the store app icon, 192 px (manifest)' },
+  { table: 'merchant_store_icons', column: 'icon512_key', kind: 'text', why: 'the store app icon, 512 px (manifest, share card)' },
+  { table: 'merchant_store_icons', column: 'maskable512_key', kind: 'text', why: 'the store app icon, 512 px maskable (Android)' },
+  { table: 'merchant_store_icons', column: 'apple180_key', kind: 'text', why: 'the store apple-touch icon, 180 px (iOS home screen)' },
+  { table: 'merchant_store_icons', column: 'favicon32_key', kind: 'text', why: 'the store tab icon, 32 px' },
+  { table: 'merchant_store_icons', column: 'source_key', kind: 'text', why: 'the logo the renditions were cut from; kept alive until they are re-cut' },
+  // 0122 — a store page's layout (packages/storeLayout): banner, gallery,
+  // image+text and video blocks hold media KEYS at any depth. Every retained
+  // revision counts, not only the published one — a merchant can restore any
+  // of the last 50, and a restore that brought back a deleted picture would
+  // be a broken page. Registered in the same change as the columns, because an
+  // unclassified `*_json` column refuses the whole guarded sweep.
+  { table: 'store_layout_drafts', column: 'layout_json', kind: 'json', why: 'the merchant\'s working store layout (0122) — block media keys' },
+  { table: 'store_layout_revisions', column: 'layout_json', kind: 'json', why: 'published store layouts (0122), the last 50 per store, each restorable' },
 
   // ---- customers ---------------------------------------------------------
   { table: 'users', column: 'avatar_key', kind: 'text', why: 'account avatar' },
@@ -411,6 +429,13 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   // Migration 0110. Classified in the same change as the column: left unknown,
   // it would refuse the WHOLE guarded sweep (see `verifyMediaCoverage`).
   'chat_messages.attachment_kind': "'image' | 'video' | 'audio' | 'file' — what `file_key` holds, not a key",
+  // 0123 — bookkeeping of the app-icon renditions. The net does not catch
+  // these two names; they are written down anyway because each string embeds
+  // the logo key it is about (`<recipe>:<colour>:<key>`). They record which
+  // attempt failed / which one is in flight — nothing is SHOWN from them, and
+  // the live pointer to the logo is merchant_stores.logo_key.
+  'merchant_store_icons.failed_fingerprint': 'which (recipe, colour, logo) failed to render — bookkeeping, not a display',
+  'merchant_store_icons.lease_fingerprint': 'which (recipe, colour, logo) is rendering now — a lease, not a display',
 
   // -- the game. every *_key here names a game asset, not an R2 object ------
   'farm_achievements.key': 'the achievement id',

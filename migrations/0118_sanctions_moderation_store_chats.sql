@@ -7,8 +7,11 @@
 --
 -- NONDESTRUCTIVE. Two nullable/defaulted ADD COLUMNs on `community_products`,
 -- and three idempotent backfills. Nothing is dropped, no CHECK is touched, no
--- table is rebuilt. Every statement can run twice: the second run matches no
--- row it did not already fix (see each one).
+-- table is rebuilt. The three BACKFILLS can run twice: the second run matches
+-- no row it did not already fix (see each one). The two ADD COLUMNs cannot —
+-- SQLite has no ADD COLUMN IF NOT EXISTS — which is safe only because the
+-- migration runner records this file as applied once it has succeeded and
+-- never runs it again; do not re-execute this file by hand.
 --
 -- ---------------------------------------------------------------------------
 --  1. THE ADMIN'S HIDE IS ITS OWN STATE (audit 01 B9)

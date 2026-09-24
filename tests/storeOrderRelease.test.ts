@@ -179,13 +179,13 @@ test('three days after delivery with no open complaint, the sweep releases the c
   raw.prepare('UPDATE orders SET delivered_at = ? WHERE id = ?').run(ago(STORE_RELEASE_DAYS - 1), young);
 
   const first = await releaseDueStoreCredits(env(raw), new Date().toISOString());
-  assert.deepEqual(first, { released: 1, frozen: 0, errors: 0 });
+  assert.deepEqual(first, { released: 1, frozen: 0, refund_blocked: 0, errors: 0 });
   assert.equal(creditState(raw, old), 'available');
   assert.equal(creditState(raw, young), 'pending', 'two days is not three');
   assert.equal(count(raw, "SELECT COUNT(*) n FROM audit_log WHERE action = 'store_order.credit_released' AND target = ?", old), 1);
 
   const second = await releaseDueStoreCredits(env(raw), new Date().toISOString());
-  assert.deepEqual(second, { released: 0, frozen: 0, errors: 0 }, 'nothing is released twice');
+  assert.deepEqual(second, { released: 0, frozen: 0, refund_blocked: 0, errors: 0 }, 'nothing is released twice');
 });
 
 test('an open support ticket or complaint on the order FREEZES the release; resolving it lets it go', async () => {
@@ -201,14 +201,14 @@ test('an open support ticket or complaint on the order FREEZES the release; reso
                VALUES ('cmp1','buyer','m_ali','s_ali',?,'order','never arrived','under_review')`).run(byComplaint);
 
   const frozen = await releaseDueStoreCredits(env(raw), new Date().toISOString());
-  assert.deepEqual(frozen, { released: 0, frozen: 2, errors: 0 });
+  assert.deepEqual(frozen, { released: 0, frozen: 2, refund_blocked: 0, errors: 0 });
   assert.equal(creditState(raw, byTicket), 'pending');
   assert.equal(creditState(raw, byComplaint), 'pending');
 
   raw.exec("UPDATE support_tickets SET state = 'resolved' WHERE id = 't1'");
   raw.exec("UPDATE community_complaints SET status = 'resolved' WHERE id = 'cmp1'");
   const released = await releaseDueStoreCredits(env(raw), new Date().toISOString());
-  assert.deepEqual(released, { released: 2, frozen: 0, errors: 0 });
+  assert.deepEqual(released, { released: 2, frozen: 0, refund_blocked: 0, errors: 0 });
 });
 
 test('an order moved back from delivered is not released by the sweep', async () => {

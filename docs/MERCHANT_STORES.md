@@ -158,7 +158,10 @@ A renamed store's old slug is parked for 180 days (`SLUG_RESERVATION_DAYS`) and
 **keeps pointing at the shop** until another store claims it: on the old host
 `/resolve` answers `404 STORE_MOVED` with `details.redirect` and the app
 replaces the address; `/api/storefront/<old slug>` serves the store. A live slug
-always wins over a parked one (audit 01 B14). Every literal segment of the
+always wins over a parked one (audit 01 B14). A store under a sanction is not
+followed there: its old address answers `STORE_UNAVAILABLE` and never discloses
+the new one (review S4). The deploy guard checks these retired names too, and
+stops the deploy when it cannot read them (review F9). Every literal segment of the
 storefront router (`resolve`, `by-id`, `sections`, …) and `p` are reserved
 slugs (worker/lib/hosts.ts, group 7; the router is walked by a test — B23). A
 slug lost to a concurrent onboarding or rename is `409 SLUG_UNAVAILABLE`, a
@@ -345,6 +348,26 @@ releases three days after `delivered_at` — idempotent and audited — unless a
 complaint or support ticket on the order is open, which freezes it. Returns
 of a store order go through support (`STORE_ORDER_RETURN_VIA_SUPPORT`).
 
+`delivered_at` is the **latest** move into delivered (review F5): a delivery an
+admin walked back and the merchant marks again starts a fresh three days; a
+Levonis order keeps its first date (its warranty and return window start
+there). The sweep reads only rows it can release, so frozen rows never starve
+it (review F3). **No credit is ever released on an order whose customer was
+already refunded** (`wtx_refund_<order>_usd` exists — legacy rows the old
+code refunded and then let an admin re-open, review F4); those, and paid
+orders an old merchant-cancel never refunded, are listed read-only to the
+owner or a financial admin under Community → Money → «مطابقة أموال طلبات
+المتاجر» (`GET /api/admin/community/reconciliation/store-orders`) and put right
+one order at a time by an audited decision — `…/:id/reverse-credit` or
+`…/:id/refund` — never by a migration.
+
+A checkout retried with the same key pays with its own reservation (review
+F6), and two checkout tabs on one cart cannot both commit: the batch requires
+every priced cart line to still be there (409 `CART_CHANGED`, review F7). An
+admin cancel that refunds or claws back money needs the financial scope
+(review S6). The storefront's `open` is the cart's own answer
+(`storeTakesOrders`, review S1).
+
 Cancelling — by the merchant, by the customer while the order is still
 pending, or by an admin — is **one operation** (`cancelStoreOrder`): the
 conditional status flip, the full wallet refund, stock and `sold_count`
@@ -408,7 +431,9 @@ contain someone they have traded with. There is no user search.
 
 ### `/api/merchant/*` — the caller's own store
 - **store:** `GET /me` (with `root_domain`) · `GET /slug-check` · `POST /onboard` ·
-  `PATCH /store` · `POST /store/slug` · `GET /subscription`
+  `PATCH /store` · `POST /store/slug` · `GET /subscription` ·
+  `GET /store/share` (the share kit: the absolute link, the card it unfurls as,
+  the app icon's state — §11)
 - **products:** `GET /products` (a `<created_at>|<id>` cursor, or `?page=` for the
   filtered manager) · `POST /products` · `PATCH /products/:id` ·
   `DELETE /products/:id` (archive when ordered) · `POST /products/:id/duplicate` ·
@@ -425,6 +450,10 @@ contain someone they have traded with. There is no user search.
   sender actually reads; the rest show «قريبًا»)
 - **printers** (worker/routes/merchantPrinters.ts, same prefix): `GET|POST /printers` ·
   `PUT|DELETE /printers/:id` · `GET|PUT /request-prefs` · `GET /request-matches`
+- **store page layout** (worker/routes/storeLayout.ts, `/store/layout`): `GET /` ·
+  `PUT /draft` (`{layout, version}`; `409 DRAFT_CHANGED`) · `POST /publish` ·
+  `GET /revisions` · `GET /revisions/:revision` · `POST /restore/:revision`
+  (`publish: true` to make it live) · `GET /preview` — §10
 
 ### `/api/storefront/*` — public
 `GET /resolve` · `GET /:slug` · `GET /:slug/sections` · `GET /:slug/services` ·
@@ -434,11 +463,18 @@ contain someone they have traded with. There is no user search.
 Every `/:slug…` read serves the live slug, then a slug the store was renamed
 away from, and never a sanctioned store (`404 STORE_UNAVAILABLE`, §4).
 
+`/resolve`, `/:slug` and `/by-id` also carry the store's **published** layout
+(`layout`, `layout_source`, `layout_revision`) and the rows its blocks show
+(`blocks_data`); the product page's `store.layout_theme` carries the theme
+alone. Never the draft (§10).
+
 ### `/api/admin/community/*` — store moderation (apex only)
 `GET /merchants` (with each store's `store_url`) ·
 `POST /merchants/:id/status` (the merchant row only) ·
 `POST /stores/:id/status` (the store row only) · `POST /merchants/:id/verify|badge` ·
 `GET /merchants/:id/products` · `POST /products/:id/hide {hidden, reason}` ·
+`GET /reconciliation/store-orders` (read-only) and
+`POST /reconciliation/store-orders/:id/refund|reverse-credit {reason}` (review F4) ·
 money routes behind the financial scope — see COMMUNITY_V2.md §11
 
 ### `/api/community/*` — legacy merchant doors
@@ -450,7 +486,9 @@ money routes behind the financial scope — see COMMUNITY_V2.md §11
 pages newest-first (`limit`, `before` cursor, `has_more`, `older_cursor`); a
 customer's message notifies the seller (their `new_messages` switch). Staff read
 a store thread — its messages and its files — read-only (`read_only: true`, an
-`admin.chat_read` audit row) and never join it.
+`admin.chat_read` audit row) and never join it; sending, typing and uploading
+into it are the customer's and the seller's only (`403 CHAT_READ_ONLY`, review
+S3).
 
 ### `/api/store-orders/*` — merchant checkout
 `POST /quote` (returns `quote_fingerprint`) · `POST /` (requires it:
@@ -469,11 +507,47 @@ a store thread — its messages and its files — read-only (`read_only: true`, 
 A merchant controls **content**: logo, banner, name, tagline, description,
 policies, hours, social links, featured products.
 
-They control **no styling**. `accent` is a preset *name* mapped to classes
-defined in `Storefront.tsx`, with an explicit fallback for anything
+They choose **presentation only from closed lists**, never write it. `accent`
+is a preset *name* mapped to classes defined in
+`src/components/storefront/theme.ts`, with an explicit fallback for anything
 unrecognised. No merchant string reaches the stylesheet; there is no
 `dangerouslySetInnerHTML`; and a test asserts no merchant value appears in an
 inline style.
+
+### The store page's layout (packages/storeLayout, migration 0122)
+
+The page is a **layout**: a theme (seven presets — classic, minimal, modern,
+premium dark, workshop, portfolio, product focused), tokens chosen from enums
+(surface, radius, density, type, card, product card, picture ratio, spacing,
+columns, width), a header and footer variant, and up to 40 **blocks** of 27
+types, each with typed, bounded settings. Text is `{ar, en, ckb}`; a link is
+an internal route, one of this store's products or collections, or an
+`https://` address; a picture or a video is a storage key this owner uploaded
+(checked against `file_objects`); a social link is a provider and a handle,
+and the address is built from the provider's template.
+
+- **One gate.** `normalizeLayout` (the same code in the Worker and the page)
+  cleans what it can and names what it refuses: an unsafe link, somebody
+  else's media, an unknown schema version or an oversize layout refuses the
+  save (`400 LAYOUT_REJECTED` with the issues); anything else is cleaned and
+  reported. The Worker then checks ids and media against this store's rows.
+- **A draft is never public.** The storefront reads the revision
+  `merchant_stores.published_revision_id` names, normalised again on the way
+  out. A store that never published — and a database a migration behind —
+  shows the classic page, generated from its settings on the fly; nothing was
+  backfilled.
+- **Publishing is one batch** fenced on the draft version: the revision, the
+  pointer, pruning to the newest 50 and the audit row land together or not at
+  all, and two tabs publishing the same draft make one revision. Restore
+  copies a revision into the draft, or publishes it as a new revision.
+- **The theme is presentation only.** Tokens reach the page as `data-sf-*`
+  attributes whose values are enums, read by our own
+  `src/components/storefront/theme.css`; every preset's accent is `store`,
+  i.e. the colour picked in store settings. Changing the theme touches no
+  product, review, collection or word.
+
+Tests: `tests/storeLayoutSchema.test.ts`, `tests/storeLayoutRoutes.test.ts`,
+`tests/storeLayoutMalicious.test.ts`, `tests/storefrontBlocks.test.ts`.
 
 Social links are reduced to `http(s)` URLs **on the way in**, so a
 `javascript:` href in a store profile — stored XSS against every visitor of
@@ -509,3 +583,41 @@ three surfaces: pick, preview, replace, remove, and — for a gallery — promot
 an image to cover, since the first image is what the storefront grid shows.
 Type and size are checked in the browser as a courtesy; the server sniffs the
 bytes and is the gate.
+
+---
+
+## 11. The store's own app and share card
+
+Each store installs as **its own app** on its own host (docs/MERCHANT_PLATFORM.md
+§2 decision 11, §4.5): the per-host manifest names the store, starts at `/` of
+that host with scope `/`, `display: standalone`, on the document black
+(worker/lib/webManifest.ts, worker/routes/manifest.ts).
+
+- **Icons are the store's logo, cut to size.** When the logo changes
+  (`PATCH /store`, after the response) — and, for stores that predate this,
+  on the first manifest, `/store-icon/*` or share-kit request — the Worker cuts
+  it through `env.IMAGES` into five PNGs: 192 and 512 (`any`), 512 `maskable`
+  (the whole logo inside the safe zone, on the store's ground colour), the
+  180 px Apple touch icon and a 32 px favicon (worker/lib/storeIcons.ts,
+  table `merchant_store_icons`, migration 0123). Their keys carry a digest of
+  the logo, so a new logo is a new URL and installed apps update. With valid
+  renditions the manifest lists only the store's icons; the platform's appear
+  only as a true fallback — no logo, a logo too small (under 96 px) or
+  unreadable, renditions still being cut, no Images binding, or a suspended
+  store. A logo that cannot be cut is recorded with a stable reason and not
+  retried before its back-off.
+- **iOS and the tab read `/store-icon/<name>`** (`apple-touch.png`,
+  `favicon-32.png`, `192.png`, `512.png`, `maskable-512.png`): one shared
+  `index.html` links these stable paths and the Worker answers each per host —
+  the store's rendition, or the platform's PNG — revalidating every five
+  minutes.
+- **A store link unfurls as the store.** `/` on a store's host (and
+  `/community/store/<ref>` on the main site) carries the store's card: its
+  name, its tagline (else its description, else «متجر X على منصة Levonis»),
+  its 512 px icon and its host; a product card on the store's host names the
+  store as the site and borrows its line and icon where the product has none
+  (worker/lib/socialPreview.ts). A suspended store has no card.
+- **The owner's share kit** (`src/components/merchant/share/`): copy, the
+  system share sheet where one exists, a printable QR code, the card preview
+  and the app icon's state — in store settings, and for the owner behind the
+  storefront's «…» menu.

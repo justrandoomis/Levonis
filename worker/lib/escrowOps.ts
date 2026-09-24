@@ -41,11 +41,11 @@ import {
   holdSettledEventStatements,
   isConstraintAbort,
   readWalletDust,
-  releaseHold,
   releaseHoldStatement,
   walletIqdAvailable,
   walletLedgerDinarsReady,
   walletSpendCents,
+  type HoldResult,
   type HoldState,
 } from './walletOps';
 
@@ -81,6 +81,8 @@ export type EscrowFailure =
   | 'ALREADY_EXISTS'
   | 'NOT_FOUND'
   | 'STATE_CONFLICT'
+  /** The community order left the state(s) the settlement required (`SettleInput.orderStates`). */
+  | 'ORDER_CHANGED'
   | 'AMOUNT_EXCEEDS_HELD'
   | 'INVALID_AMOUNT'
   | 'WALLET_ERROR';
@@ -332,12 +334,42 @@ export function escrowRecordStatements(
 
 /**
  * Give back a reservation whose escrow was never recorded — a lost acceptance
- * race, an offer that changed, a batch that refused. `releaseHold` flips only
- * an ACTIVE hold, so a second call (or the reconciliation sweep reaching the
- * same hold) changes nothing.
+ * race, an offer that changed, a batch that refused. Only an ACTIVE hold is
+ * flipped, so a second call (or the reconciliation sweep reaching the same
+ * hold) changes nothing.
+ *
+ * NEVER A HOLD AN ESCROW STANDS ON (review F8). "The acceptance batch failed"
+ * is what the Worker was TOLD, not what happened: a batch can commit and its
+ * response be lost ("Network connection lost"), and the old catch then
+ * released the hold under a live `held` escrow — the customer's money back in
+ * their spendable balance, the merchant working for an escrow that reserved
+ * nothing, and every later release refused WALLET_ERROR. The question "does an
+ * escrow point at this hold?" is asked INSIDE the releasing statement, so it
+ * is answered against the committed rows, not against a read taken before them.
+ * Refused that way it reports STATE_CONFLICT and changes nothing.
  */
-export async function releaseEscrowReservation(db: D1Database, holdId: string, reason: string) {
-  return releaseHold(db, { holdId, reason });
+export async function releaseEscrowReservation(db: D1Database, holdId: string, reason: string): Promise<HoldResult> {
+  const res = await db
+    .prepare(
+      `UPDATE wallet_holds
+          SET state = 'released', released_at = ?3, updated_at = ?3, release_reason = ?2
+        WHERE id = ?1 AND state = 'active'
+          AND NOT EXISTS (SELECT 1 FROM community_escrows e WHERE e.hold_id = wallet_holds.id)`
+    )
+    .bind(holdId, reason.slice(0, 300), NOW())
+    .run();
+  if ((res.meta.changes ?? 0) > 0) return { ok: true, holdId, replayed: false };
+  const row = await db
+    .prepare(
+      `SELECT h.state, EXISTS (SELECT 1 FROM community_escrows e WHERE e.hold_id = h.id) AS claimed
+         FROM wallet_holds h WHERE h.id = ?`
+    )
+    .bind(holdId)
+    .first<{ state: HoldState; claimed: number }>();
+  if (!row) return { ok: false, reason: 'NOT_FOUND' };
+  if (Number(row.claimed) === 1) return { ok: false, reason: 'STATE_CONFLICT', holdId };
+  if (row.state === 'released') return { ok: true, holdId, replayed: true };
+  return { ok: false, reason: 'STATE_CONFLICT', holdId };
 }
 
 /**
@@ -374,6 +406,69 @@ export interface SettleInput {
   actorRole: 'customer' | 'merchant' | 'admin' | 'system';
   reason?: string;
   idempotencyKey: string;
+  /**
+   * THE ORDER'S STATE, ASKED WHERE THE MONEY MOVES (review F1/F2). When set,
+   * the escrow's own conditional UPDATE also requires its community order to
+   * be in one of these states — inside the settlement batch, not in a read
+   * taken before it. The customer's confirmation and the auto-confirm sweep
+   * pass `merchant_marked_delivered` (a dispute that moved the order first
+   * wins); the customer's cancel passes `accepted`/`funded` (a merchant who
+   * started the work first wins). Refused that way the answer is ORDER_CHANGED.
+   */
+  orderStates?: readonly string[];
+  /**
+   * Statements that commit WITH the settlement or not at all — appended after
+   * the money in the same batch (the customer's cancel flips its order and
+   * request here). They run only when the settlement itself does.
+   */
+  alsoWrite?: D1PreparedStatement[];
+}
+
+/**
+ * WHO MAY SETTLE AN ESCROW FROM WHICH STATE (review F1).
+ *
+ * A dispute FREEZES the money until an admin decides (§45) — that is the
+ * whole point of holding it. Settlement used to accept `disputed` from any
+ * actor, so the auto-confirm sweep that had read the order a moment before the
+ * customer's dispute paid the merchant over it, and the admin could no longer
+ * decide the complaint. Only an admin settles a disputed escrow; everyone else
+ * settles a `held` one, and the UPDATE that moves it says so.
+ */
+function settleableFrom(role: SettleInput['actorRole']): EscrowState[] {
+  return role === 'admin' ? ['held', 'disputed'] : ['held'];
+}
+
+/** `AND` the order's state into an escrow UPDATE; `n` is the placeholder of the JSON list. */
+function orderStateGuardSql(n: number): string {
+  return ` AND EXISTS (SELECT 1 FROM community_orders co
+                      WHERE co.id = community_escrows.community_order_id
+                        AND co.state IN (SELECT value FROM json_each(?${n})))`;
+}
+
+/**
+ * THE FENCE AFTER THE ESCROW'S OWN FLIP — the batch aborts unless the escrow
+ * now reads `state` stamped with THIS batch's `ts` (state is NOT NULL: writing
+ * NULL into it is the abort, the same idiom as `assertHoldStateStatement`).
+ *
+ * Without it the rest of a settlement batch does not depend on the flip at
+ * all: the debit and the merchant's credit are fenced on the HOLD, and a
+ * dispute changes the escrow without touching the hold — so a flip that
+ * matched nothing (an escrow a dispute had just frozen) would still have paid.
+ */
+function escrowMovedFence(
+  db: D1Database,
+  escrowId: string,
+  state: EscrowState,
+  stampColumn: 'released_at' | 'refunded_at',
+  ts: string
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE community_escrows
+          SET state = CASE WHEN state = ?2 AND ${stampColumn} = ?3 THEN state ELSE NULL END
+        WHERE id = ?1`
+    )
+    .bind(escrowId, state, ts);
 }
 
 /**
@@ -388,17 +483,28 @@ const FUNDED_BY_HOLD = `EXISTS (SELECT 1 FROM wallet_holds fh
 
 /**
  * Why did a settlement batch write nothing? Read-only: the escrow that was
- * read before the batch, re-read now, and its hold.
+ * read before the batch, re-read now, its order when the settlement required
+ * one of its states, and its hold.
  */
 async function classifySettleFailure(
   db: D1Database,
   esc: EscrowRow,
-  intended: EscrowState
+  intended: EscrowState,
+  orderStates?: readonly string[]
 ): Promise<EscrowResult> {
   const again = await getEscrow(db, esc.id);
   if (!again) return { ok: false, reason: 'NOT_FOUND' };
   if (again.state === intended) return { ok: true, replayed: true, escrowId: esc.id };
   if (again.state !== esc.state) return { ok: false, reason: 'STATE_CONFLICT', detail: again.state };
+  if (orderStates?.length) {
+    const order = await db
+      .prepare('SELECT state FROM community_orders WHERE id = ?')
+      .bind(esc.community_order_id)
+      .first<{ state: string }>();
+    if (!order || !orderStates.includes(order.state)) {
+      return { ok: false, reason: 'ORDER_CHANGED', detail: order?.state ?? 'missing' };
+    }
+  }
   // The escrow did not move, so the hold refused: it is no longer active, or
   // the reservation is no longer covered by the customer's settled money.
   const hold = esc.hold_id
@@ -435,7 +541,8 @@ export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<Esc
   const esc = await getEscrow(db, p.escrowId);
   if (!esc) return { ok: false, reason: 'NOT_FOUND' };
   if (esc.state === 'released') return { ok: true, replayed: true, escrowId: esc.id };
-  if (esc.state !== 'held' && esc.state !== 'disputed') {
+  const from = settleableFrom(p.actorRole);
+  if (!from.includes(esc.state)) {
     return { ok: false, reason: 'STATE_CONFLICT', detail: esc.state };
   }
   // No hold means no customer money to settle, so nothing may be paid out.
@@ -444,14 +551,18 @@ export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<Esc
   const ts = NOW();
   const debitTx = holdDebitTxId(esc.hold_id);
   const debitDinars = await settlementDinars(db, esc, esc.gross_iqd);
+  const orderStates = p.orderStates?.length ? p.orderStates : null;
   const statements = [
+    // Conditional on the state THIS actor may settle from (a dispute froze it
+    // for everyone but an admin) and, when asked, on the order's state.
     db
       .prepare(
         `UPDATE community_escrows
-            SET state = 'released', released_iqd = gross_iqd, released_at = ?
-          WHERE id = ? AND state IN ('held','disputed')`
+            SET state = 'released', released_iqd = gross_iqd, released_at = ?1
+          WHERE id = ?2 AND state IN (SELECT value FROM json_each(?3))${orderStates ? orderStateGuardSql(4) : ''}`
       )
-      .bind(ts, esc.id),
+      .bind(ts, esc.id, JSON.stringify(from), ...(orderStates ? [JSON.stringify(orderStates)] : [])),
+    escrowMovedFence(db, esc.id, 'released', 'released_at', ts),
     ...commitHoldStatements(db, {
       holdId: esc.hold_id,
       note: 'Community order payment',
@@ -497,17 +608,19 @@ export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<Esc
         newId('ese'), esc.id, esc.merchant_receivable_iqd, p.actorId, p.actorRole,
         p.reason ?? '', p.idempotencyKey, ts
       ),
+    ...(p.alsoWrite ?? []),
   ];
 
   try {
     const res = await db.batch(statements);
     if (res[0]?.meta.changes) return { ok: true, replayed: false, escrowId: esc.id };
   } catch (e) {
-    // The debit's CHECK guard fired — the batch rolled back whole and the
-    // re-read below says why. A failure that is not a guard propagates.
+    // A guard fired — the escrow fence, or the debit's CHECK — and the batch
+    // rolled back whole; the re-read below says why. A failure that is not a
+    // guard propagates.
     if (!isConstraintAbort(e)) throw e;
   }
-  return classifySettleFailure(db, esc, 'released');
+  return classifySettleFailure(db, esc, 'released', orderStates ?? undefined);
 }
 
 // ----------------------------------------------------------------- refund
@@ -543,7 +656,8 @@ export async function refundEscrow(db: D1Database, p: RefundInput): Promise<Escr
   const esc = await getEscrow(db, p.escrowId);
   if (!esc) return { ok: false, reason: 'NOT_FOUND' };
   if (esc.state === 'refunded') return { ok: true, replayed: true, escrowId: esc.id };
-  if (esc.state !== 'held' && esc.state !== 'disputed') {
+  const from = settleableFrom(p.actorRole);
+  if (!from.includes(esc.state)) {
     return { ok: false, reason: 'STATE_CONFLICT', detail: esc.state };
   }
   if (!esc.hold_id) return { ok: false, reason: 'WALLET_ERROR', detail: 'escrow has no wallet hold' };
@@ -557,16 +671,23 @@ export async function refundEscrow(db: D1Database, p: RefundInput): Promise<Escr
   const full = amount === esc.gross_iqd;
   const ts = NOW();
   const nextState: EscrowState = full ? 'refunded' : 'partially_refunded';
+  const orderStates = p.orderStates?.length ? p.orderStates : null;
 
   const statements: D1PreparedStatement[] = [
+    // The same two conditions as a release: the state this actor may settle
+    // from, and — when asked — the order's state (the customer's cancel may
+    // not refund work the merchant has already started).
     db
       .prepare(
         `UPDATE community_escrows
-            SET state = ?, refunded_iqd = refunded_iqd + ?, refunded_at = ?
-          WHERE id = ? AND state IN ('held','disputed')
-            AND released_iqd + refunded_iqd + ? <= gross_iqd`
+            SET state = ?1, refunded_iqd = refunded_iqd + ?2, refunded_at = ?3
+          WHERE id = ?4 AND state IN (SELECT value FROM json_each(?5))
+            AND released_iqd + refunded_iqd + ?2 <= gross_iqd${orderStates ? orderStateGuardSql(6) : ''}`
       )
-      .bind(nextState, amount, ts, esc.id, amount),
+      .bind(nextState, amount, ts, esc.id, JSON.stringify(from), ...(orderStates ? [JSON.stringify(orderStates)] : [])),
+    // Neither the release of a hold nor its settlement below depends on the
+    // flip above; this makes them.
+    escrowMovedFence(db, esc.id, nextState, 'refunded_at', ts),
   ];
 
   if (full) {
@@ -663,16 +784,18 @@ export async function refundEscrow(db: D1Database, p: RefundInput): Promise<Escr
         )
     );
   }
+  statements.push(...(p.alsoWrite ?? []));
 
   try {
     const res = await db.batch(statements);
     if (res[0]?.meta.changes) return { ok: true, replayed: false, escrowId: esc.id };
   } catch (e) {
-    // A hold statement refused (fence or debit guard) — the whole batch
-    // rolled back and the re-read below says why. Anything else propagates.
+    // A guard refused (the escrow fence, a hold fence or the debit guard) —
+    // the whole batch rolled back and the re-read below says why. Anything
+    // else propagates.
     if (!isConstraintAbort(e)) throw e;
   }
-  return classifySettleFailure(db, esc, nextState);
+  return classifySettleFailure(db, esc, nextState, orderStates ?? undefined);
 }
 
 // ---------------------------------------------------------------- dispute
