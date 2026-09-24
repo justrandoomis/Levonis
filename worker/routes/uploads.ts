@@ -6,6 +6,7 @@ import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { assertMayWriteInThread, recordStaffChatFileRead } from './chats';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
+import { sniffVideo } from '../lib/videoSniff';
 import {
   buildMediaKey,
   getMediaObject,
@@ -282,7 +283,18 @@ uploadRoutes.post('/', async (c) => {
    * a support agent, and it is the same forty-megabyte ceiling a chat clip
    * already has. The image ceiling below still applies to images.
    */
-  const allowVideo = purpose === 'product' || purpose === 'chat' || purpose === 'support' || purpose === 'complaint';
+  /**
+   * A MERCHANT'S VIDEO (merchant platform W2-F): a product's video and the
+   * store page's video block. Stored exactly like a merchant picture —
+   * `merchants/<uploader>/public/<id>.<ext>`, the uploader's own prefix, in the
+   * ledger under their id — and only when the bytes ARE an MP4 or WebM video
+   * in a codec browsers play (`sniffVideo`, worker/lib/videoSniff.ts): the
+   * container is walked end to end and a real video track is found, so a page,
+   * a picture or an audio file wearing a video header is refused. The ceiling
+   * is the one every other video here has.
+   */
+  const merchantVideo = purpose === 'community';
+  const allowVideo = purpose === 'product' || purpose === 'chat' || purpose === 'support' || purpose === 'complaint' || merchantVideo;
   const maxSize = allowVideo ? VIDEO_MAX : IMAGE_MAX;
   if (file.size > maxSize) {
     throw badRequest(`File is too large (max ${Math.round(maxSize / 1024 / 1024)} MB)`);
@@ -291,7 +303,18 @@ uploadRoutes.post('/', async (c) => {
   let buf = new Uint8Array(await file.arrayBuffer());
   // A conversation may also carry a voice note or a PDF (`sniffChat`); every
   // other purpose keeps the picture-and-clip sniff it always had.
-  const kind = purpose === 'chat' ? sniffChat(buf, file.type || '') : sniff(buf);
+  let kind = purpose === 'chat' ? sniffChat(buf, file.type || '') : sniff(buf);
+  if (merchantVideo && (kind?.mime.startsWith('video/') || (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3))) {
+    const video = sniffVideo(buf);
+    if (!video.ok) {
+      throw badRequest(
+        'This video cannot be played in a browser — upload an MP4 (H.264, HEVC or AV1) or a WebM (VP8, VP9 or AV1) video.',
+        'VIDEO_UNSUPPORTED',
+        { reason: video.reason }
+      );
+    }
+    kind = { ext: video.ext, mime: video.mime };
+  }
   /**
    * NAME THE FORMAT BEFORE SAYING "UNSUPPORTED".
    *

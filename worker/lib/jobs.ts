@@ -22,6 +22,7 @@ import { sweepBnplOverdue, type BnplOverdueReport } from './bnpl';
 import { sweepAutomaticReviews, type AutomaticReviewSweepReport } from './reviewAutoSweep';
 import { runCommunitySweeps } from './communityRequests';
 import { runStoreOrderSweeps } from './storeOrderOps';
+import { runMerchantSweeps } from './merchantSweeps';
 import { refreshStaleMerchantBadges } from '../routes/merchantReviews';
 import { sweepCancelledOrders, type CancelledOrderSweepReport } from './orderDeletion';
 import {
@@ -33,6 +34,7 @@ import {
   type StockAlertPruneReport,
 } from './stockAlerts';
 import { runGuardedMediaCleanup } from './mediaRefs';
+import { convertLegacyProducts } from './catalog/legacy';
 import { checkSchemaDrift, type DriftAlarmReport } from './schemaDriftAlarm';
 import { backfillSearchIndex, searchIndexInstalled } from './search/store';
 
@@ -526,6 +528,10 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   await step('community_requests', async () => { report.errors.push(...(await runCommunitySweeps(env, nowIso)).errors.map((e) => `community_requests: ${e}`)); });
   // 14d. Store orders: the sale credit three days after delivery (no open complaint), and orphaned checkout holds (storeOrderOps.ts).
   await step('store_orders', async () => { const r = await runStoreOrderSweeps(env, nowIso); if (r.errors) report.errors.push(`store_orders: ${r.errors} failed (released ${r.released}, frozen ${r.frozen}, holds ${r.holds_released})`); });
+  // W2-F: pre-0126 options/colours JSON onto the variant model, 50 products a tick (worker/lib/catalog/legacy.ts).
+  await step('catalog_legacy_variants', async () => { const r = await convertLegacyProducts(env); if (r.errors) report.errors.push(`catalog_legacy_variants: ${r.errors} failed (converted ${r.converted}, kept ${r.kept_legacy})`); });
+  // 14e. Merchant notices the rows announce (released credits, coupons ending, orders left unconfirmed) and the analytics marks' pruning (merchantSweeps.ts, W2-E).
+  await step('merchant_notices', async () => { const r = await runMerchantSweeps(env, nowIso); if (r.errors) report.errors.push(`merchant_notices: ${r.errors} failed`); });
 
   /**
    * 15. DRAIN THE OUTBOX AGAIN, LAST.

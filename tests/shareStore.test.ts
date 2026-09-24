@@ -165,7 +165,10 @@ test('the panel is mounted in the dashboard\'s store settings, outside the form\
 
 test('the storefront menu carries the owner row, and the storefront pays only for the row', () => {
   const storefront = SRC('pages/Storefront.tsx');
-  assert.match(storefront, /import OwnerShareMenuItem from '\.\.\/components\/merchant\/share\/OwnerShareMenuItem';/);
+  // W2-F: the row is a LAZY import of the «…» menu, so a customer's visit
+  // downloads neither it nor its strings (tests/bundleBudget.test.ts).
+  assert.match(storefront, /const OwnerShareMenuItem = lazy\(\(\) => import\('\.\.\/components\/merchant\/share\/OwnerShareMenuItem'\)\);/);
+  assert.doesNotMatch(storefront, /import OwnerShareMenuItem from/);
   assert.match(storefront, /<StoreMenu url=\{store\.url\} name=\{store\.name\} loc=\{loc\} storeId=\{store\.id\} \/>/);
   assert.match(storefront, /<OwnerShareMenuItem\s+storeId=\{storeId\}\s+onDone=\{\(\) => setOpen\(false\)\}/);
   // The heavy half — the panel and the QR encoder — is a lazy chunk.

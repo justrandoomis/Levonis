@@ -22,6 +22,7 @@ import {
 import { ROOT } from './fixtures/d1';
 import { adminCommunityRoutes } from '../worker/routes/adminCommunity';
 import { merchantRoutes } from '../worker/routes/merchant';
+import { merchantCatalogRoutes } from '../worker/routes/merchantCatalog';
 import { storefrontRoutes } from '../worker/routes/storefront';
 import { communityRoutes } from '../worker/routes/community';
 import { webManifestRoute } from '../worker/routes/manifest';
@@ -57,6 +58,7 @@ const admin = (raw: ReturnType<typeof freshDb>) =>
 const merchant = (raw: ReturnType<typeof freshDb>) =>
   stubApp(asD1(raw), OWNER, (a) => {
     a.route('/api/merchant', merchantRoutes);
+    a.route('/api/merchant', merchantCatalogRoutes); // W2-F: the catalogue's own router
     a.route('/api/storefront', storefrontRoutes);
   });
 const visitor = (raw: ReturnType<typeof freshDb>, host?: string) =>
@@ -251,10 +253,12 @@ test('the hide wins IN THE STATEMENT, even when it lands between the merchant\'s
   const raw = seed();
   const d1 = asD1(raw);
   // A D1 whose merchant UPDATE first lets an admin hide land — the race the
-  // SQL guard exists for.
+  // guard exists for. Since 0126 (W2-F) the merchant writes `publish_state`
+  // and the DATABASE computes `status` (trg_product_state_mirror), so the
+  // hide is let in right before that write.
   const racing = {
     prepare(sql: string) {
-      if (/^\s*UPDATE community_products SET/.test(sql) && /admin_hidden_at IS NULL/.test(sql)) {
+      if (/^\s*UPDATE community_products SET/.test(sql) && /publish_state/.test(sql)) {
         raw.exec(`UPDATE community_products SET admin_hidden_at = '2026-09-24T00:00:00.000Z', admin_hidden_reason = 'race', status = 'hidden' WHERE id = 'cp1'`);
       }
       return (d1 as unknown as { prepare: (s: string) => unknown }).prepare(sql);
@@ -262,7 +266,7 @@ test('the hide wins IN THE STATEMENT, even when it lands between the merchant\'s
     batch: (s: unknown[]) => (d1 as unknown as { batch: (x: unknown[]) => unknown }).batch(s),
   } as unknown as D1Database;
   raw.exec(`UPDATE community_products SET lifecycle = 'draft', status = 'hidden' WHERE id = 'cp1'`);
-  const m = stubApp(racing, OWNER, (a) => a.route('/api/merchant', merchantRoutes));
+  const m = stubApp(racing, OWNER, (a) => a.route('/api/merchant', merchantRoutes).route('/api/merchant', merchantCatalogRoutes));
   await patch(m, '/api/merchant/products/cp1', { lifecycle: 'active' });
   assert.equal(row<{ status: string }>(raw, "SELECT status FROM community_products WHERE id = 'cp1'")!.status, 'hidden');
 });

@@ -32,6 +32,7 @@
  */
 
 import { newId } from './crypto';
+import { escrowCreditStatements } from './merchantLedger';
 import {
   assertHoldStateStatement,
   availableUsdSql,
@@ -248,7 +249,7 @@ export async function reserveEscrowFunds(db: D1Database, p: HoldEscrowInput): Pr
    * WHO CARRIES THE DIFFERENCE is what 0108 says for every spend: the shop, at
    * most one cent per order, out of remainders it was transferred and floored
    * away. The merchant is unaffected — they are paid `merchant_receivable_iqd`
-   * in dinars from `merchant_payout_ledger`, never from these cents.
+   * in dinars from the merchant ledger, never from these cents.
    */
   //
   // A RETRY AFTER THE HOLD BUT BEFORE THE ESCROW ROW (a crash between the two
@@ -572,30 +573,25 @@ export async function releaseEscrow(db: D1Database, p: SettleInput): Promise<Esc
     // §3.9's settlement event, guarded by the debit this batch posts. Nothing
     // at all while the bus is off.
     ...(await holdSettledEventStatements(db, esc.hold_id)),
-    db
-      .prepare(
-        `INSERT INTO merchant_payout_ledger
-           (id, merchant_id, kind, amount_iqd, state, community_order_id, escrow_id, note, idempotency_key)
-         SELECT ?3, ?4, 'community_order_credit', ?5, 'available', ?6, ?7, ?8, ?9
-          WHERE ${FUNDED_BY_HOLD}`
-      )
-      .bind(
-        esc.hold_id, debitTx,
-        newId('pay'), esc.merchant_id, esc.merchant_receivable_iqd,
-        esc.community_order_id, esc.id, p.reason ?? '', `credit:${p.idempotencyKey}`
-      ),
-    db
-      .prepare(
-        `INSERT INTO merchant_payout_ledger
-           (id, merchant_id, kind, amount_iqd, state, community_order_id, escrow_id, note, idempotency_key)
-         SELECT ?3, ?4, 'commission', ?5, 'paid', ?6, ?7, 'platform commission', ?8
-          WHERE ${FUNDED_BY_HOLD}`
-      )
-      .bind(
-        esc.hold_id, debitTx,
-        newId('pay'), esc.merchant_id, -esc.platform_fee_iqd,
-        esc.community_order_id, esc.id, `fee:${p.idempotencyKey}`
-      ),
+    // The merchant's credit, in the merchant ledger (worker/lib/merchantLedger.ts):
+    // the escrow's gross released and the platform's commission as its own
+    // line — straight into «available» (the escrow was the waiting period),
+    // and only in a batch where the customer's debit posted.
+    ...escrowCreditStatements(
+      db,
+      { sql: FUNDED_BY_HOLD, binds: [esc.hold_id, debitTx] },
+      {
+        escrowId: esc.id,
+        merchantId: esc.merchant_id,
+        communityOrderId: esc.community_order_id,
+        grossIqd: esc.gross_iqd,
+        commissionIqd: esc.platform_fee_iqd,
+        stage: 'release',
+        note: p.reason || 'custom order released',
+        actorId: p.actorRole === 'system' ? null : p.actorId,
+        ts,
+      }
+    ),
     db
       .prepare(
         `INSERT INTO community_escrow_events
@@ -769,19 +765,23 @@ export async function refundEscrow(db: D1Database, p: RefundInput): Promise<Escr
           newId('ese'), esc.id, amount, p.actorId, p.actorRole, p.reason ?? '', p.idempotencyKey, ts
         ),
       // The merchant still earns on the part that was kept — funded by the
-      // same debit, in the same batch.
-      db
-        .prepare(
-          `INSERT INTO merchant_payout_ledger
-             (id, merchant_id, kind, amount_iqd, state, community_order_id, escrow_id, note, idempotency_key)
-           SELECT ?3, ?4, 'community_order_credit', ?5, 'available', ?6, ?7, 'partial settlement', ?8
-            WHERE ${FUNDED_BY_HOLD}`
-        )
-        .bind(
-          esc.hold_id, debitTx,
-          newId('pay'), esc.merchant_id, keptReceivable, esc.community_order_id, esc.id,
-          `partial:${p.idempotencyKey}`
-        )
+      // same debit, in the same batch: the kept gross, and the platform's
+      // part of it as its own commission line.
+      ...escrowCreditStatements(
+        db,
+        { sql: FUNDED_BY_HOLD, binds: [esc.hold_id, debitTx] },
+        {
+          escrowId: esc.id,
+          merchantId: esc.merchant_id,
+          communityOrderId: esc.community_order_id,
+          grossIqd: keptGross,
+          commissionIqd: keptGross - keptReceivable,
+          stage: 'partial',
+          note: 'partial settlement',
+          actorId: p.actorRole === 'system' ? null : p.actorId,
+          ts,
+        }
+      )
     );
   }
   statements.push(...(p.alsoWrite ?? []));
@@ -838,47 +838,8 @@ export async function disputeEscrow(db: D1Database, p: SettleInput): Promise<Esc
 }
 
 /**
- * WHAT A MERCHANT MAY BE PAID OUT NOW, as SQL — the ONE definition, read by
- * `merchantBalance` below AND inside the payout route's conditional INSERT
- * (worker/routes/adminCommunity.ts), so the figure an admin is shown and the
- * figure the database enforces cannot drift apart. `m` is the SQL placeholder
- * (or expression) for the merchant id.
- *
- * Every `available` row PLUS every payout row, which is negative. A payout is
- * written `state = 'paid'`, so the old `SUM(state = 'available')` never went
- * down after one: the same 10,000 could be paid out again and again
- * (audit 02 B3, audit 04 B1). A reversal of a released sale is its own
- * negative `available` row, so it lowers this figure too.
+ * A merchant's balance and the SQL of «available» now live with the ledger
+ * they sum (worker/lib/merchantLedger.ts, migration 0121). Re-exported so
+ * the callers that imported them from here keep one definition.
  */
-export const merchantAvailableSql = (m: string) =>
-  `(SELECT COALESCE(SUM(CASE WHEN state = 'available' OR kind = 'payout' THEN amount_iqd ELSE 0 END), 0)
-      FROM merchant_payout_ledger WHERE merchant_id = ${m})`;
-
-/**
- * A merchant's balance: SUMs over the ledger, never a stored column.
- *
- *   · available — `merchantAvailableSql`: what may be paid out now;
- *   · pending   — sale credits waiting for the customer (or three days);
- *   · paid      — PAYOUT rows only, negative. It used to be every `paid` row,
- *     and escrow writes the platform's COMMISSION as a `paid` row, so a
- *     merchant's «Paid out» tile showed money Levonis kept (B20).
- */
-export async function merchantBalance(
-  db: D1Database,
-  merchantId: string
-): Promise<{ available_iqd: number; pending_iqd: number; paid_iqd: number }> {
-  const row = await db
-    .prepare(
-      `SELECT ${merchantAvailableSql('?1')} AS available,
-              COALESCE(SUM(CASE WHEN state = 'pending' THEN amount_iqd ELSE 0 END), 0) AS pending,
-              COALESCE(SUM(CASE WHEN kind = 'payout' THEN amount_iqd ELSE 0 END), 0) AS paid
-         FROM merchant_payout_ledger WHERE merchant_id = ?1`
-    )
-    .bind(merchantId)
-    .first<{ available: number; pending: number; paid: number }>();
-  return {
-    available_iqd: Number(row?.available) || 0,
-    pending_iqd: Number(row?.pending) || 0,
-    paid_iqd: Number(row?.paid) || 0,
-  };
-}
+export { merchantAvailableSql, merchantBalance } from './merchantLedger';

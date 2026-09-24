@@ -19,8 +19,10 @@ const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 // `storeLayout` (wave 2, W2-C): the store-page schema shared by the Worker and the
 // storefront; pure for the same reason the pricing engine is.
-const PURE_PACKAGES = ['pricing', 'shipping', 'storeLayout'];
-const ALL_PACKAGES = ['platform-kit', 'contracts', 'pricing', 'shipping', 'storeLayout'];
+// `catalog` (wave 2, W2-F): the product variant model shared by the Worker and the
+// editor/storefront; pure for the same reason.
+const PURE_PACKAGES = ['pricing', 'shipping', 'storeLayout', 'catalog'];
+const ALL_PACKAGES = ['platform-kit', 'contracts', 'pricing', 'shipping', 'storeLayout', 'catalog'];
 
 test('root workspaces and per-package manifests', () => {
   const pkg = JSON.parse(read('package.json')) as { workspaces?: string[]; scripts: Record<string, string> };

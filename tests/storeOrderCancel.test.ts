@@ -24,6 +24,7 @@ import { adminRoutes } from '../worker/routes/admin';
 import { moveOrderStage } from '../worker/lib/orderStageOps';
 import { merchantBalance } from '../worker/lib/escrowOps';
 import { cancelAnchorId } from '../worker/lib/storeOrderOps';
+import { orderCreditStateSql } from '../worker/lib/merchantLedger';
 import type { Env } from '../worker/lib/types';
 
 const DEP = 100_000;
@@ -85,8 +86,14 @@ const product = (raw: DatabaseSync) =>
   row<{ stock: number; sold_count: number }>(raw, "SELECT stock, sold_count FROM community_products WHERE id='cp_ltd'")!;
 const couponUses = (raw: DatabaseSync) =>
   row<{ used_count: number }>(raw, "SELECT used_count FROM merchant_coupons WHERE id='mc1'")!.used_count;
+/** The sale credit from the append-only merchant ledger (migration 0121): its state and what it holds. */
 const credit = (raw: DatabaseSync, id: string) =>
-  row<{ state: string; amount_iqd: number }>(raw, "SELECT state, amount_iqd FROM merchant_payout_ledger WHERE order_id = ? AND kind = 'sale_credit'", id)!;
+  row<{ state: string; amount_iqd: number }>(
+    raw,
+    `SELECT ${orderCreditStateSql('?1')} AS state,
+            (SELECT COALESCE(SUM(amount_iqd), 0) FROM merchant_ledger_entries WHERE order_id = ?1 AND bucket IN ('pending','available')) AS amount_iqd`,
+    id
+  )!;
 const order = (raw: DatabaseSync, id: string) =>
   row<{ status: string; stage: string }>(raw, 'SELECT status, stage FROM orders WHERE id = ?', id)!;
 
@@ -254,10 +261,12 @@ test('cancelling after the credit was released takes it back out of «available�
   assert.equal((await patch(admin, `/api/admin/orders/${id}`, { status: 'cancelled' })).status, 200);
   await Promise.allSettled(pending.splice(0));
 
-  const reversal = row<{ amount_iqd: number; state: string; idempotency_key: string }>(
-    raw, "SELECT amount_iqd, state, idempotency_key FROM merchant_payout_ledger WHERE order_id = ? AND kind = 'reversal'", id
+  // The claw-back is refund lines of its own in «available» (never an edit), keyed once per order.
+  const reversal = row<{ amount_iqd: number; n: number }>(
+    raw, "SELECT SUM(amount_iqd) AS amount_iqd, COUNT(*) AS n FROM merchant_ledger_entries WHERE order_id = ? AND bucket = 'available' AND event_key LIKE 'reversal:' || ? || ':%'", id, id
   )!;
-  assert.deepEqual(reversal, { amount_iqd: -owed, state: 'available', idempotency_key: `reversal:${id}` });
+  assert.equal(reversal.amount_iqd, -owed);
+  assert.ok(reversal.n >= 1);
   assert.equal((await merchantBalance(asD1(raw), 'm_ali')).available_iqd, 0, 'nothing left to pay out for a refunded sale');
   assert.equal(spendable(raw, 'buyer'), DEP);
 });

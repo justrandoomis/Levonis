@@ -63,6 +63,9 @@ const PRODUCT_GRAPH = new Set([
   'product_images',
 ]);
 
+/** Tables whose `product_id` is a community_products id, kept without a foreign key (see the loop). */
+const COMMUNITY_NAMESPACE_WITHOUT_FK = new Set(['merchant_product_analytics_daily', 'storefront_event_marks']);
+
 test('every table that can name a CATALOGUE product is in exactly one registry', () => {
   const db = schema();
   const owned = new Set(OWNED_TABLES.map((t) => t.table));
@@ -89,6 +92,10 @@ test('every table that can name a CATALOGUE product is in exactly one registry',
       return fk ? !PRODUCT_GRAPH.has(fk.table) : false;
     });
     if (pointsElsewhere) continue;
+    // The merchant storefront's analytics (0125) name a COMMUNITY product by id
+    // with no foreign key on purpose: a day's counters outlive the listing they
+    // counted. They are the same separate namespace as the listings above.
+    if (COMMUNITY_NAMESPACE_WITHOUT_FK.has(t)) continue;
 
     if (!owned.has(t) && !history.has(t) && !frozen.has(t) && !blocking.has(t)) {
       unregistered.push(`${t} (${shaped.join(', ')})`);

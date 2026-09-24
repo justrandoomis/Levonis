@@ -103,7 +103,7 @@ export const SYSTEM_SUBDOMAINS: ReadonlySet<string> = new Set([
   //    literal segment of that router is reserved, plus `p`, the product path
   //    on a store's own host; tests/storeSlugsPaging.test.ts walks the router
   //    so a new route word cannot be added without landing here.
-  'resolve', 'by-id', 'p', 'products', 'sections', 'services', 'showcase', 'reviews',
+  'resolve', 'by-id', 'p', 'products', 'sections', 'services', 'showcase', 'reviews', 'delivery',
 ]);
 
 /** Slug syntax. Deliberately narrow — it becomes a DNS label and a URL. */

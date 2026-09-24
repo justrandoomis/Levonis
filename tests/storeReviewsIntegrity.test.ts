@@ -16,6 +16,7 @@ import {
 } from './fixtures/app';
 import { communityReviewRoutes, refreshStaleMerchantBadges } from '../worker/routes/merchantReviews';
 import { storefrontRoutes } from '../worker/routes/storefront';
+import { storefrontEventRoutes } from '../worker/routes/storefrontEvents';
 
 const BUYER: StubUser = { id: 'buyer', role: 'customer', email: 'buyer@x.co' };
 const OWNER: StubUser = { id: 'owner', role: 'merchant', email: 'owner@x.co' };
@@ -42,7 +43,10 @@ function seed() {
 const reviews = (raw: ReturnType<typeof freshDb>, user: StubUser) =>
   stubApp(asD1(raw), user, (a) => a.route('/api/community-reviews', communityReviewRoutes));
 const storefront = (raw: ReturnType<typeof freshDb>, user: StubUser | null = null) =>
-  stubApp(asD1(raw), user, (a) => a.route('/api/storefront', storefrontRoutes));
+  stubApp(asD1(raw), user, (a) => {
+    a.route('/api/storefront/events', storefrontEventRoutes);
+    a.route('/api/storefront', storefrontRoutes);
+  });
 
 test('B11: the store owner cannot review their own store — refused with SELF_REVIEW, and nothing moves', async () => {
   const raw = seed();
@@ -127,22 +131,26 @@ test('#20: the storefront says «+200», never 237 — a rounded-down tier, and 
   assert.equal('sold_count' in one.product, false);
 });
 
-test('#21: a visitor is one view per product per day; the owner and crawlers are none', async () => {
+test('#21: a visitor is one view per product per day; the owner and crawlers are none (the beacon, W2-E)', async () => {
   const raw = seed();
   const views = () => row<{ view_count: number }>(raw, "SELECT view_count FROM community_products WHERE id = 'cp1'")!.view_count;
-  const visitor = storefront(raw, BUYER);
-  for (let i = 0; i < 5; i++) await get(visitor, '/api/storefront/ali3d/products/ali3d-widget');
+  const UA = { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1' };
+  // Opening the product (the API GET) counts nothing any more: a request is not a visitor.
+  for (let i = 0; i < 5; i++) await get(storefront(raw, BUYER), '/api/storefront/ali3d/products/ali3d-widget', UA);
   await Promise.allSettled(pending.splice(0));
+  assert.equal(views(), 0, 'a GET is not a view');
+
+  const beacon = (user: StubUser | null, headers: Record<string, string> = UA, visitor = 'anon-visitor-000001') =>
+    post(storefront(raw, user), '/api/storefront/events', { event: 'product_view', store: 's1', product: 'cp1', visitor }, headers);
+  for (let i = 0; i < 5; i++) assert.equal((await beacon(BUYER)).status, 204);
   assert.equal(views(), 1, 'five reloads are one visitor');
 
-  await get(storefront(raw, OWNER), '/api/storefront/ali3d/products/ali3d-widget');
-  await get(storefront(raw), '/api/storefront/ali3d/products/ali3d-widget', { 'User-Agent': 'Googlebot/2.1' });
-  await Promise.allSettled(pending.splice(0));
+  await beacon(OWNER);
+  await beacon(null, { 'User-Agent': 'Googlebot/2.1 (+http://www.google.com/bot.html)' });
   assert.equal(views(), 1, 'the owner checking their own page and a crawler are not views');
 
-  // A second, anonymous visitor (another IP) is a second view.
-  await get(storefront(raw), '/api/storefront/ali3d/products/ali3d-widget', { 'CF-Connecting-IP': '9.9.9.9' });
-  await Promise.allSettled(pending.splice(0));
+  // A second, anonymous visitor is a second view.
+  await beacon(null, { ...UA, 'CF-Connecting-IP': '9.9.9.9' }, 'anon-visitor-000002');
   assert.equal(views(), 2);
 });
 

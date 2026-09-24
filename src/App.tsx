@@ -402,6 +402,9 @@ function StorefrontApp() {
         <Route path="/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
+        {/* The workspace's addresses on the store's own host (a notification's
+            `/merchant/orders/<id>` opens here as `/admin/orders/<id>`, W2-E). */}
+        <Route path="/admin/*" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
         <Route path="*" element={<Storefront store={store} />} />
       </Routes>
       </Suspense>

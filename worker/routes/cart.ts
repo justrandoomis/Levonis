@@ -13,6 +13,7 @@ import {
 } from '../lib/cartSeller';
 import { storeById } from '../lib/merchantAuth';
 import { isOwnStore, merchantVariantLabel, storeTakesOrders } from '../lib/storeOrderOps';
+import { LINE_VARIANT_COLUMNS, LINE_VARIANT_JOIN, resolveCatalogLine } from '../lib/catalog/lines';
 import type { Context } from 'hono';
 import { cartLineSelect } from '../lib/cartLineProjection';
 import type { AppContext } from '../lib/types';
@@ -2259,30 +2260,53 @@ cartRoutes.post('/merchant-items', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const productId = str(body.productId, 'productId', { min: 1, max: 60 });
   const qty = int(body.qty, 'qty', { min: 1, max: 99, def: 1 });
-  const optionId = str(body.optionId, 'optionId', { max: 60, required: false });
-  const colorId = str(body.colorId, 'colorId', { max: 60, required: false });
+  let optionId = str(body.optionId, 'optionId', { max: 60, required: false });
+  let colorId = str(body.colorId, 'colorId', { max: 60, required: false });
+  const variantId = str(body.variantId, 'variantId', { max: 64, required: false });
   const replaceCart = body.replaceCart === true;
 
   const product = await loadBuyableMerchantProduct(c, productId);
 
-  // AN OPTION OR COLOUR IS AN ENTRY THE MERCHANT PUT ON THE PRODUCT (B16).
-  // These ids used to be any 60 characters a client sent, and reached the
-  // merchant's order as the chosen variant — «GOLD PLATED (paid +20000)» at
-  // the base price. Nothing chosen is still fine: the storefront offers no
-  // picker today, and a product sells as itself.
-  const variant = merchantVariantLabel(product.options, product.colors, optionId, colorId);
-  if (!variant.ok) {
-    throw badRequest(
-      `That ${variant.which} is not offered for this product`,
-      variant.which === 'option' ? 'OPTION_INVALID' : 'COLOR_INVALID'
-    );
+  /**
+   * A PRODUCT WITH VARIANTS IS BOUGHT AS ONE OF THEM (merchant platform W2-F).
+   * The variant must be an ACTIVE variant of THIS product; its stock is its
+   * own; its price is decided at checkout from the database (never here, and
+   * never from the body). The line's identity is (product, option_id =
+   * variant id), so the same variant added twice is one line.
+   */
+  let variantStock: number | null = null;
+  if (product.variant_mode === 'variants') {
+    if (!variantId) throw badRequest('Choose one of the options first', 'VARIANT_REQUIRED');
+    const v = await c.env.DB.prepare(
+      'SELECT id, active, stock FROM community_product_variants WHERE id = ? AND product_id = ?'
+    ).bind(variantId, productId).first<{ id: string; active: number; stock: number }>();
+    if (!v) throw badRequest('That option is not offered for this product', 'VARIANT_INVALID');
+    if (Number(v.active) !== 1) throw badRequest('That option is not available right now', 'VARIANT_UNAVAILABLE');
+    variantStock = Number(v.stock) || 0;
+    optionId = variantId;
+    colorId = '';
+  } else if (variantId) {
+    throw badRequest('That option is not offered for this product', 'VARIANT_INVALID');
+  } else {
+    // AN OPTION OR COLOUR IS AN ENTRY THE MERCHANT PUT ON THE PRODUCT (B16).
+    // These ids used to be any 60 characters a client sent, and reached the
+    // merchant's order as the chosen variant — «GOLD PLATED (paid +20000)» at
+    // the base price. Nothing chosen is still fine: a simple product sells as
+    // itself, and a legacy product as it always did.
+    const variant = merchantVariantLabel(product.options, product.colors, optionId, colorId);
+    if (!variant.ok) {
+      throw badRequest(
+        `That ${variant.which} is not offered for this product`,
+        variant.which === 'option' ? 'OPTION_INVALID' : 'COLOR_INVALID'
+      );
+    }
   }
 
   const incoming = merchantScope(String(product.m_id), String(product.s_id));
   const { results: existingLines } = await c.env.DB
-    .prepare('SELECT seller_type, merchant_id, store_id, community_product_id, qty FROM cart_items WHERE user_id = ? ORDER BY created_at, id')
+    .prepare('SELECT seller_type, merchant_id, store_id, community_product_id, option_id, qty FROM cart_items WHERE user_id = ? ORDER BY created_at, id')
     .bind(user.id)
-    .all<SellerLine & { community_product_id: string | null; qty: number }>();
+    .all<SellerLine & { community_product_id: string | null; option_id: string | null; qty: number }>();
 
   // Name BOTH shops. "Items from another store" leaves the customer guessing
   // which of the shops they were browsing is in the way.
@@ -2303,6 +2327,19 @@ cartRoutes.post('/merchant-items', async (c) => {
       available: Math.max(0, Number(product.stock) - alreadyInCart),
     });
   }
+  // And over this VARIANT's own units (its lines are the one line keyed by it).
+  if (variantStock !== null && product.track_stock) {
+    const sameVariant = replacing
+      ? 0
+      : existingLines
+          .filter((l) => String(l.community_product_id ?? '') === productId && String(l.option_id ?? '') === optionId)
+          .reduce((n, l) => n + (Number(l.qty) || 0), 0);
+    if (variantStock < sameVariant + qty) {
+      throw badRequest('Not enough stock for that quantity', 'OUT_OF_STOCK', {
+        available: Math.max(0, variantStock - sameVariant),
+      });
+    }
+  }
 
   // VALIDATED FIRST, EMPTIED IN THE SAME BATCH AS THE ADD (B15). The confirmed
   // "empty the cart and shop here" used to delete the cart before the stock
@@ -2314,12 +2351,12 @@ cartRoutes.post('/merchant-items', async (c) => {
       ...(replacing ? [c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id)] : []),
       c.env.DB.prepare(
         `INSERT INTO cart_items
-           (id, user_id, seller_type, merchant_id, store_id, community_product_id, option_id, color_id, qty)
-         VALUES (?, ?, 'merchant', ?, ?, ?, ?, ?, ?)
+           (id, user_id, seller_type, merchant_id, store_id, community_product_id, option_id, color_id, qty, variant_id)
+         VALUES (?, ?, 'merchant', ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (user_id, community_product_id, option_id, color_id)
            WHERE community_product_id IS NOT NULL
          DO UPDATE SET qty = MIN(99, cart_items.qty + excluded.qty)`
-      ).bind(id, user.id, product.m_id, product.s_id, productId, optionId, colorId, qty),
+      ).bind(id, user.id, product.m_id, product.s_id, productId, optionId, colorId, qty, variantStock !== null ? variantId : null),
     ]);
   } catch (e) {
     // Another seller's line landed between the read above and this write; the
@@ -2357,11 +2394,13 @@ async function loadMerchantCart(c: Context<AppContext>) {
     `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.color_id, ci.created_at AS added_at,
             p.id, p.name, p.name_ar, p.images, p.price_iqd, p.original_price_iqd,
             p.stock, p.track_stock, p.lifecycle, p.status AS product_status, p.prep_days,
-            p.options, p.colors, p.store_id AS product_store_id,
+            p.options, p.colors, p.store_id AS product_store_id, p.sku,
+            ${LINE_VARIANT_COLUMNS},
             s.id AS store_id, s.slug AS store_slug, s.name AS store_name,
             m.id AS merchant_id, m.name AS merchant_name
        FROM cart_items ci
        JOIN community_products p ON p.id = ci.community_product_id
+       ${LINE_VARIANT_JOIN}
        JOIN merchant_stores s ON s.id = ci.store_id
        JOIN community_merchants m ON m.id = ci.merchant_id
       WHERE ci.user_id = ? AND ci.seller_type = 'merchant'
@@ -2386,9 +2425,16 @@ async function loadMerchantCart(c: Context<AppContext>) {
     unitsPerProduct.set(String(r.id), (unitsPerProduct.get(String(r.id)) ?? 0) + (Number(r.qty) || 0));
   }
 
+  // A variant line draws on its variant's own units (W2-F).
+  const unitsPerVariant = new Map<string, number>();
+  for (const r of results) {
+    if (r.v_id) unitsPerVariant.set(String(r.v_id), (unitsPerVariant.get(String(r.v_id)) ?? 0) + (Number(r.qty) || 0));
+  }
+
   let subtotal = 0;
   const items = results.map((r) => {
-    const unit = Number(r.price_iqd) || 0;
+    const priced = resolveCatalogLine(r);
+    const unit = priced.ok ? priced.unit : Number(r.price_iqd) || 0;
     const qty = Number(r.qty) || 1;
     const line = unit * qty;
     subtotal += line;
@@ -2400,12 +2446,14 @@ async function loadMerchantCart(c: Context<AppContext>) {
           ? storeBlock
           : r.lifecycle !== 'active' || r.product_status !== 'active' || String(r.product_store_id) !== String(r.store_id)
             ? 'unavailable'
-            : !merchantVariantLabel(r.options, r.colors, String(r.option_id ?? ''), String(r.color_id ?? '')).ok
+            : !priced.ok
               ? 'option_gone'
               : tracked && Number(r.stock) < (unitsPerProduct.get(String(r.id)) ?? qty)
                 ? 'out_of_stock'
-                : null;
-    const variant = merchantVariantLabel(r.options, r.colors, String(r.option_id ?? ''), String(r.color_id ?? ''));
+                : tracked && priced.variantId && priced.stock < (unitsPerVariant.get(priced.variantId) ?? qty)
+                  ? 'out_of_stock'
+                  : null;
+    const variant = priced.ok ? { ok: true as const, label: priced.label } : { ok: false as const };
     return {
       cart_item_id: r.cart_item_id,
       product_id: r.id,
@@ -2415,6 +2463,7 @@ async function loadMerchantCart(c: Context<AppContext>) {
       qty,
       option_id: r.option_id,
       color_id: r.color_id,
+      variant_id: priced.ok ? priced.variantId : null,
       /** The merchant's own words for the choice, never an id a client typed. */
       variant: variant.ok ? variant.label : '',
       unit_price_iqd: unit,
@@ -2427,7 +2476,8 @@ async function loadMerchantCart(c: Context<AppContext>) {
       // vanishing without explanation.
       available: block === null,
       unavailable_reason: block,
-      stock: tracked ? Number(r.stock) : null,
+      // The variant's own units when the line is a variant — never another's.
+      stock: tracked ? (priced.ok && priced.variantId ? priced.stock : Number(r.stock)) : null,
     };
   });
 
@@ -2486,10 +2536,12 @@ cartRoutes.patch('/merchant-items/:id', async (c) => {
 
   const line = await c.env.DB.prepare(
     `SELECT ci.id, ci.community_product_id, p.stock, p.track_stock, p.lifecycle, p.status,
+            p.variant_mode, v.stock AS v_stock, v.active AS v_active, ci.variant_id,
             (SELECT COALESCE(SUM(o.qty), 0) FROM cart_items o
               WHERE o.user_id = ci.user_id AND o.community_product_id = ci.community_product_id
                 AND o.id <> ci.id) AS other_units
        FROM cart_items ci JOIN community_products p ON p.id = ci.community_product_id
+       LEFT JOIN community_product_variants v ON v.id = ci.variant_id AND v.product_id = p.id
       WHERE ci.id = ? AND ci.user_id = ? AND ci.seller_type = 'merchant'`
   ).bind(id, user.id).first<Record<string, unknown>>();
   if (!line) throw notFound('Cart item not found');
@@ -2503,6 +2555,16 @@ cartRoutes.patch('/merchant-items/:id', async (c) => {
     throw badRequest('Not enough stock for that quantity', 'OUT_OF_STOCK', {
       available: Math.max(0, Number(line.stock) - otherUnits),
     });
+  }
+  // A variant line is judged against its own variant (W2-F): it is the only
+  // line that variant has, so its new quantity is the whole demand on it.
+  if (line.variant_mode === 'variants') {
+    if (!line.variant_id || line.v_stock === null || Number(line.v_active) !== 1) {
+      throw badRequest('This option is no longer available', 'VARIANT_UNAVAILABLE');
+    }
+    if (line.track_stock && Number(line.v_stock) < qty) {
+      throw badRequest('Not enough stock for that quantity', 'OUT_OF_STOCK', { available: Math.max(0, Number(line.v_stock)) });
+    }
   }
 
   await c.env.DB.prepare('UPDATE cart_items SET qty = ? WHERE id = ? AND user_id = ?')

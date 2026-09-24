@@ -53,7 +53,8 @@ test('B10: the customer opens the order chat first — the SELLER is in it, sees
   assert.equal(list.chats[0].unread, 1);
 
   const notes = all<{ user_id: string; kind: string; link: string }>(raw, 'SELECT user_id, kind, link FROM user_notifications');
-  assert.deepEqual(notes, [{ user_id: 'owner', kind: 'chat_message', link: `/chat/${chatId}` }]);
+  // The seller hears it as the STORE's notice, opening the thread in the workspace inbox (W2-E).
+  assert.deepEqual(notes, [{ user_id: 'owner', kind: 'new_message', link: `/merchant/inbox/${chatId}` }]);
 
   // Once per TURN: a second line in a row is the same question waiting.
   await post(as(raw, BUYER), `/api/chats/${chatId}/messages`, { body: 'And the size?' });
@@ -74,12 +75,13 @@ test('B10: a thread created BEFORE the fix (buyer alone) gains its seller on the
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = 'owner'"), 1);
 });
 
-test('the seller\'s «رسائل جديدة» switch is honoured (audit 04 #19)', async () => {
+test('the seller\'s «رسائل جديدة» switch governs the outside channels; the in-app record always lands (W2-E)', async () => {
   const raw = seed();
   raw.exec(`INSERT INTO merchant_notification_preferences (merchant_id, new_messages) VALUES ('m1', 0)`);
   const { chatId } = await json(await post(as(raw, BUYER), '/api/chats/open', { orderId: 'ord1' }));
   await post(as(raw, BUYER), `/api/chats/${chatId}/messages`, { body: 'hi' });
-  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM user_notifications'), 0, 'switched off means off');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'new_message'"), 1, 'in-app: the store\'s record');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM outbox WHERE event_key LIKE 'merchant:%'"), 0, 'switched off: nothing goes out');
   assert.deepEqual(members(raw, chatId), ['buyer', 'owner'], 'the message still reaches the thread');
 });
 

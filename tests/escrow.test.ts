@@ -107,7 +107,7 @@ test('confirming delivery pays the merchant exactly once, net of commission', as
   // `paid` counts PAYOUTS only (audit 02 B20): the commission is Levonis's,
   // never money paid out to the merchant — but it is still its own row.
   assert.equal(bal.paid_iqd, 0, 'no payout has been made');
-  const fee = (await db.prepare("SELECT COALESCE(SUM(amount_iqd), 0) AS n FROM merchant_payout_ledger WHERE merchant_id = 'm1' AND kind = 'commission'").first<{ n: number }>())!.n;
+  const fee = (await db.prepare("SELECT COALESCE(SUM(amount_iqd), 0) AS n FROM merchant_ledger_entries WHERE merchant_id = 'm1' AND kind = 'commission'").first<{ n: number }>())!.n;
   assert.equal(fee, -5_000, 'the commission is recorded as its own ledger row');
   // Ledger rows sum to the gross: nothing appeared or vanished.
   assert.equal(bal.available_iqd + -fee, 50_000);

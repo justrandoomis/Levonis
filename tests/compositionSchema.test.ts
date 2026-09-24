@@ -259,6 +259,10 @@ test('a bundle row stores NULL stock and the four stock tables are the only coun
       // own product stock, and the gift pool's remaining prizes.
       'community_products',
       'gift_pool_items',
+      // W2-F (0126, DECISIONS 126): a merchant product's per-variant stock.
+      // Merchant inventory, not platform catalogue stock; community_products.stock
+      // is the trigger-maintained sum of these for a variant product.
+      'community_product_variants',
     ].sort(),
     'a new table with a stock column is a deliberate decision, never an accident'
   );

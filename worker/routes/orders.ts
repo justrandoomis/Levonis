@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { notifyOrderCreditAvailable } from '../lib/merchantNotify';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
@@ -5098,7 +5099,7 @@ orderRoutes.post('/:id/cancel', async (c) => {
   if (String(data.order.seller_type ?? '') === 'merchant') {
     const res = await cancelStoreOrder(c.env, { order: data.order, actor: 'customer', actorUserId: user.id });
     if (!res.ok) throw badRequest('This order was already cancelled or has progressed');
-    const tell = notifyMerchantOfStoreOrder(c.env.DB, {
+    const tell = notifyMerchantOfStoreOrder(c.env, {
       merchantId: String(data.order.merchant_id ?? ''),
       orderId: id,
       event: 'cancelled_by_customer',
@@ -5191,6 +5192,8 @@ orderRoutes.post('/:id/confirm-receipt', async (c) => {
     }
     throw conflict('The order has not been delivered yet', 'ORDER_NOT_DELIVERED');
   }
+  // «صار مبلغ متاحًا» — the merchant's credit just became available (W2-E; one key with the 3-day sweep).
+  if (res.released) await notifyOrderCreditAvailable(c.env, id);
   return c.json({ success: true, replayed: res.replayed, released: res.released });
 });
 

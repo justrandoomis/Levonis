@@ -147,6 +147,15 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // 0123 — the store's own app identity: one row per rendered home-screen
     // icon size, cut from the merchant's logo (docs/MERCHANT_PLATFORM.md §4.5).
     'merchant_store_icons',
+    // 0120 — the merchant's delivery by governorate (W2-A, §4.2): one profile
+    // per store and a rule per governorate that departs from its default.
+    'merchant_delivery_profiles', 'merchant_delivery_rules',
+    // 0121 — the append-only merchant ledger and payout requests (docs/MERCHANT_PLATFORM.md §4.3).
+    'merchant_ledger_entries', 'merchant_payouts',
+    // 0126 — the merchant catalogue (W2-F): option groups, their values and the
+    // variants sold, a product's ordered media, and manual collection membership.
+    'community_product_options', 'community_product_option_values', 'community_product_variants',
+    'community_product_media', 'merchant_collection_products',
     // The print quote engine (migration 0078, `docs/PRINT_QUOTE_ENGINE.md`).
     // It sits here rather than in Catalog because every one of these rows is
     // read to answer «كم تكلف طباعتي» for a `community_requests` job on a
@@ -212,6 +221,11 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // §1.10, §12). An aggregate counter with no user id and no order id;
     // everything else on those screens is a query over rows commerce owns.
     'composition_daily_metrics',
+    // 0125 — a store's first-party traffic (docs/MERCHANT_PLATFORM.md §4.8):
+    // each product's day beside the store's day above, the short-lived
+    // once-per-visitor-per-day marks that dedupe them, and the daily salt the
+    // visitor hash is cut with (deleted two days later).
+    'merchant_product_analytics_daily', 'storefront_event_marks', 'storefront_salts',
   ]),
   ...owned('ads', ['ads_providers', 'ads_event_map', 'ads_deliveries', 'ads_consent_snapshots', 'ads_dead_letters']),
   ...owned('search', ['search_products', 'search_stores', 'search_index_state']),

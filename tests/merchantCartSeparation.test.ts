@@ -61,8 +61,10 @@ function seed(raw: DatabaseSync) {
     INSERT INTO products (id,slug,name,price_iqd,status,stock)
       VALUES ('p_levo','levo-nozzle','Levonis nozzle',5000,'active',50);
 
-    INSERT INTO addresses (id,user_id,name,phone,address)
-      VALUES ('a1','buyer','Sara','+964770','Baghdad');
+    /* A governorate: the store checkout prices delivery from it and refuses
+       an address without one (W2-A, ADDRESS_GOVERNORATE_REQUIRED). */
+    INSERT INTO addresses (id,user_id,name,phone,address,governorate)
+      VALUES ('a1','buyer','Sara','+964770','Baghdad','baghdad');
     INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status,note)
       VALUES ('dep_buyer','buyer','deposit','USD',${DEP},'approved','seed funding');
 
@@ -205,7 +207,7 @@ test('THE BUG: cash on delivery is refused, and refused BEFORE anything is writt
   // customer did not pick — so nothing at all exists afterwards.
   assert.equal(count(raw, "SELECT COUNT(*) n FROM orders"), 0);
   assert.equal(holds(raw, 'buyer').length, 0, 'no money was reserved');
-  assert.equal(count(raw, "SELECT COUNT(*) n FROM merchant_payout_ledger"), 0, 'and no merchant was credited');
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM merchant_ledger_entries"), 0, 'and no merchant was credited');
   assert.equal(lines(raw), 1, 'the cart is untouched, so they can still pay properly');
 });
 
@@ -310,7 +312,7 @@ test('the order lands in the selling merchant\'s own list and in nobody else\'s'
 
   // The merchant's share is recorded against THEM, pending until it completes.
   assert.equal(
-    count(raw, "SELECT COUNT(*) n FROM merchant_payout_ledger WHERE merchant_id='m_ali' AND state='pending'"),
+    count(raw, "SELECT COUNT(DISTINCT order_id) n FROM merchant_ledger_entries WHERE merchant_id='m_ali' AND bucket='pending'"),
     1
   );
   await Promise.allSettled(pending);

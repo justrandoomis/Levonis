@@ -20,7 +20,7 @@
  */
 
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
   Store, Package, ShoppingBag, Star, Users, BarChart3, Settings as SettingsIcon,
@@ -33,7 +33,7 @@ import { merchantApi, iqd, type MerchantMe } from '../lib/merchant';
 import { useCommunityAccess } from './community/access';
 import { useStore } from '../StoreContext';
 import {
-  Btn, Card, Empty, Notice, Spinner, Stat, Toggle, useMainSiteHref,
+  Btn, Card, Empty, Notice, Spinner, Stat, useMainSiteHref,
 } from '../components/merchant/dashboard/ui';
 import { SectionsTab, ServicesTab, ShowcaseTab } from '../components/merchant/dashboard/CatalogTabs';
 import { ProductsManager } from '../components/merchant/dashboard/ProductsManager';
@@ -46,11 +46,91 @@ import { Toaster } from '../components/ui/Toast';
 // The store page's theme, preview, publish and history (merchant platform
 // W2-C) — its own chunk, fetched when the tab is opened.
 const StoreDesignPanel = lazy(() => import('../components/merchant/storeDesign/StoreDesignPanel'));
+// The merchant's money from the append-only ledger (W2-B) — its own chunk, fetched when the tab is opened.
+const MerchantFinance = lazy(() => import('../components/merchant/finance/MerchantFinance'));
+// The store's notification centre and switches, its inbox and its traffic
+// (merchant platform W2-E) — self-contained, each its own chunk.
+const MerchantNotificationCenter = lazy(() => import('../components/merchant/notifications/MerchantNotificationCenter'));
+const MerchantNotificationPreferences = lazy(() => import('../components/merchant/notifications/MerchantNotificationPreferences'));
+const MerchantInbox = lazy(() => import('../components/merchant/inbox/MerchantInbox'));
+const StoreTrafficCard = lazy(() => import('../components/merchant/analytics/StoreTrafficCard'));
+import MerchantNotificationBell from '../components/merchant/notifications/MerchantNotificationBell';
+import {
+  MERCHANT_BASE, STORE_HOST_BASE, SECTION_PATHS, hostPath, merchantHref, parseMerchantPath,
+  type MerchantLocation, type MerchantSection,
+} from '../lib/merchantRoutes';
 
 type Tab =
   | 'overview' | 'products' | 'sections' | 'services' | 'showcase'
-  | 'orders' | 'custom' | 'coupons'
+  | 'orders' | 'custom' | 'coupons' | 'inbox'
   | 'reviews' | 'customers' | 'money' | 'settings' | 'design' | 'notifications' | 'printers' | 'costing';
+
+/**
+ * THE WORKSPACE'S ADDRESSES, ON TODAY'S TABS (W2-E). Every link a merchant
+ * notification stores is a workspace address (packages/contracts/src/
+ * merchantRoutes.ts) — `/merchant/orders/<id>`, `/merchant/inbox/<thread>` …
+ * — and until the wave-3 workspace ships real pages for them, this page
+ * accepts every one of them and lands on the tab that holds the object, so no
+ * link is dead. The tab strip writes the address back, so a refresh keeps the
+ * tab and Back walks the tabs. Two addresses leave the page because their
+ * object lives elsewhere today: a request opens on the request board, and a
+ * thread opens in the Chat page.
+ */
+const SECTION_TAB: Record<MerchantSection, Tab> = {
+  home: 'overview',
+  orders: 'orders',
+  products: 'products',
+  customers: 'customers',
+  inbox: 'inbox',
+  coupons: 'coupons',
+  collections: 'sections',
+  services: 'services',
+  showcase: 'showcase',
+  printers: 'printers',
+  costing: 'costing',
+  requests: 'custom',
+  custom_orders: 'custom',
+  money: 'money',
+  analytics: 'overview',
+  reviews: 'reviews',
+  notifications: 'notifications',
+  store_design: 'design',
+  store_settings: 'settings',
+  store_delivery: 'settings',
+};
+
+const TAB_SECTION: Record<Tab, MerchantSection> = {
+  overview: 'home',
+  products: 'products',
+  sections: 'collections',
+  services: 'services',
+  showcase: 'showcase',
+  orders: 'orders',
+  custom: 'custom_orders',
+  coupons: 'coupons',
+  inbox: 'inbox',
+  reviews: 'reviews',
+  customers: 'customers',
+  money: 'money',
+  settings: 'store_settings',
+  design: 'store_design',
+  notifications: 'notifications',
+  printers: 'printers',
+  costing: 'costing',
+};
+
+function tabPath(t: Tab, onStoreHost: boolean): string {
+  const path = SECTION_PATHS[TAB_SECTION[t]];
+  return hostPath(path ? `${MERCHANT_BASE}/${path}` : MERCHANT_BASE, onStoreHost);
+}
+
+/** Where an address takes the merchant: a tab here, or a page elsewhere. */
+export function landingFor(at: MerchantLocation | null): { tab: Tab } | { away: string } | null {
+  if (!at) return null;
+  if (at.section === 'requests' && at.id) return { away: `/requests?request=${encodeURIComponent(at.id)}` };
+  if (at.section === 'inbox' && at.id) return { away: `/chat/${encodeURIComponent(at.id)}` };
+  return { tab: SECTION_TAB[at.section] };
+}
 
 /**
  * Is this page being shown on the viewer's OWN store host (or on the main
@@ -90,8 +170,41 @@ export default function MerchantDashboardPage() {
    * `MerchantStart` already sends the `created` flag that says this is the
    * first time anyone has seen this dashboard.
    */
-  const created = !!(useLocation().state as { created?: string } | null)?.created;
-  const [tab, setTab] = useState<Tab>(created ? 'printers' : 'overview');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const mainHref = useMainSiteHref();
+  const onStoreHost = !!hostStore;
+  const addressed = parseMerchantPath(location.pathname, onStoreHost ? STORE_HOST_BASE : MERCHANT_BASE);
+  const landing = landingFor(addressed);
+  // The order an address names (a notification, the ledger's «فتح الطلب») opens on the orders tab.
+  const focusOrderId = addressed?.section === 'orders' ? addressed.id ?? null : null;
+  const created = !!(location.state as { created?: string } | null)?.created;
+  const [tab, setTab] = useState<Tab>(() =>
+    landing && 'tab' in landing && landing.tab !== 'overview' ? landing.tab : created ? 'printers' : 'overview'
+  );
+  const [bellUnread, setBellUnread] = useState<number | null>(null);
+
+  // The address decides the tab — on arrival, on Back, and when a
+  // notification inside this page links to another tab.
+  useEffect(() => {
+    if (!landing) return;
+    if ('away' in landing) {
+      if (onStoreHost) window.location.assign(mainHref(landing.away));
+      else navigate(landing.away, { replace: true });
+      return;
+    }
+    if (landing.tab !== 'overview' || !created) setTab(landing.tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  const go = useCallback(
+    (t: Tab) => {
+      setTab(t);
+      const path = tabPath(t, onStoreHost);
+      if (path !== location.pathname) navigate(path);
+    },
+    [navigate, onStoreHost, location.pathname]
+  );
 
   const reload = useCallback(() => {
     merchantApi
@@ -170,6 +283,8 @@ export default function MerchantDashboardPage() {
     { id: 'orders', label: loc('الطلبات', 'Orders', 'داواکاری'), icon: <ShoppingBag className="w-3.5 h-3.5" />, group: true },
     { id: 'custom', label: loc('طلبات مخصصة', 'Custom orders', 'داواکاری تایبەت'), icon: <ClipboardList className="w-3.5 h-3.5" /> },
     { id: 'coupons', label: loc('الكوبونات', 'Coupons', 'کۆبۆن'), icon: <Tag className="w-3.5 h-3.5" /> },
+    // The store's own conversations (W2-E): customers' messages, order and request threads.
+    { id: 'inbox', label: loc('الرسائل', 'Messages', 'نامەکان'), icon: <MessageCircle className="w-3.5 h-3.5" /> },
     { id: 'reviews', label: loc('التقييمات', 'Reviews', 'هەڵسەنگاندن'), icon: <Star className="w-3.5 h-3.5" />, group: true },
     { id: 'customers', label: loc('العملاء', 'Customers', 'کڕیاران'), icon: <Users className="w-3.5 h-3.5" /> },
     { id: 'money', label: loc('الأرباح', 'Earnings', 'قازانج'), icon: <Wallet className="w-3.5 h-3.5" /> },
@@ -234,6 +349,7 @@ export default function MerchantDashboardPage() {
             <Store className="w-3.5 h-3.5" />
             {loc('عرض المتجر', 'View store', 'بینینی فرۆشگا')}
           </a>
+          <MerchantNotificationBell onOpen={() => go('notifications')} unread={bellUnread} />
         </div>
 
         {/* Why selling is off, in words. Never a silently missing button. */}
@@ -272,7 +388,8 @@ export default function MerchantDashboardPage() {
             <span key={tb.id} className="shrink-0 flex items-center gap-1.5">
               {tb.group && <span className="w-px h-5 bg-white/10" aria-hidden="true" />}
               <button
-                onClick={() => setTab(tb.id)}
+                onClick={() => go(tb.id)}
+                aria-current={tab === tb.id ? 'page' : undefined}
                 className={`flex items-center gap-1.5 px-3 h-9 rounded-xl text-[12px] font-semibold border transition-colors ${
                   tab === tb.id
                     ? 'bg-olive text-white border-olive'
@@ -287,24 +404,40 @@ export default function MerchantDashboardPage() {
         </div>
 
         <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
-          {tab === 'overview' && <OverviewTab canSell={canSell} go={setTab} />}
+          {tab === 'overview' && <OverviewTab canSell={canSell} go={go} />}
           {tab === 'products' && <ProductsManager canSell={canSell} store={store} />}
           {tab === 'sections' && <SectionsTab canSell={canSell} />}
           {tab === 'services' && <ServicesTab canSell={canSell} />}
           {tab === 'showcase' && <ShowcaseTab />}
-          {tab === 'orders' && <OrdersTab />}
+          {tab === 'orders' && <OrdersTab focusOrderId={focusOrderId} />}
           {tab === 'custom' && <CustomOrdersTab />}
           {tab === 'coupons' && <CouponsTab canSell={canSell} />}
           {tab === 'reviews' && <ReviewsTab />}
           {tab === 'customers' && <CustomersTab />}
-          {tab === 'money' && <MoneyTab />}
+          {tab === 'money' && (
+            <Suspense fallback={<Spinner />}>
+              <MerchantFinance onOpenOrder={(id) => navigate(hostPath(merchantHref.order(id), onStoreHost))} onOpenCustomOrders={() => go('custom')} />
+            </Suspense>
+          )}
           {tab === 'settings' && <StoreSettingsTab me={me} onSaved={reload} />}
           {tab === 'design' && (
             <Suspense fallback={<Spinner />}>
               <StoreDesignPanel />
             </Suspense>
           )}
-          {tab === 'notifications' && <NotificationsTab />}
+          {tab === 'notifications' && (
+            <Suspense fallback={<Spinner />}>
+              <div className="space-y-6">
+                <MerchantNotificationCenter onUnreadChange={setBellUnread} />
+                <MerchantNotificationPreferences />
+              </div>
+            </Suspense>
+          )}
+          {tab === 'inbox' && (
+            <Suspense fallback={<Spinner />}>
+              <MerchantInbox />
+            </Suspense>
+          )}
           {tab === 'printers' && <PrintersTab canSell={canSell} />}
           {tab === 'costing' && <CostingTab />}
         </motion.div>
@@ -370,6 +503,11 @@ function OverviewTab({ canSell, go }: { canSell: boolean; go: (t: Tab) => void }
           </>
         )}
       </p>
+      {/* The store's traffic and funnel from real, deduped events (W2-E). */}
+      <Suspense fallback={null}>
+        <StoreTrafficCard />
+      </Suspense>
+
       {Number((data.custom_orders as Record<string, number> | undefined)?.completed ?? 0) > 0 && (
         <Stat
           label={loc('طلبات مخصصة مكتملة — صافيها', 'Completed custom orders — your share')}
@@ -442,13 +580,10 @@ function OverviewTab({ canSell, go }: { canSell: boolean; go: (t: Tab) => void }
                 {loc('طلبات الزبائن', 'Customer requests', 'داواکاری کڕیاران')}
               </a>
             )}
-            <a
-              href={mainHref('/chats')}
-              className="h-9 rounded-xl border border-white/10 bg-white/[0.03] flex items-center justify-center gap-1.5 text-[12.5px] font-bold text-zinc-300"
-            >
+            <Btn kind="ghost" onClick={() => go('inbox')} full>
               <MessageCircle className="w-3.5 h-3.5" />
               {loc('الرسائل', 'Messages', 'نامەکان')}
-            </a>
+            </Btn>
           </div>
         </Card>
       )}
@@ -578,213 +713,4 @@ function CustomersTab() {
       ))}
     </div>
   );
-}
-
-// ----------------------------------------------------------------- money
-
-function MoneyTab() {
-  const { loc } = useLanguage();
-  const [data, setData] = useState<Awaited<ReturnType<typeof merchantApi.payouts>> | null>(null);
-  useEffect(() => {
-    merchantApi.payouts().then(setData).catch(() => {});
-  }, []);
-
-  if (!data) return <Spinner />;
-
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-2">
-        <Stat label={loc('متاح', 'Available', 'بەردەست')} value={iqd(data.balance.available_iqd)} accent small />
-        <Stat label={loc('قيد الانتظار', 'Pending', 'چاوەڕوان')} value={iqd(data.balance.pending_iqd)} small />
-        <Stat label={loc('مدفوع', 'Paid out', 'دراوە')} value={iqd(Math.abs(data.balance.paid_iqd))} small />
-      </div>
-      {/* What the three figures mean, once (audit 02 B3/B20 and the owner's
-          completion rule): a store sale waits for the customer, a payout
-          leaves «available», and the platform's commission is never money
-          that was paid to the merchant. */}
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 space-y-1 text-[11px] leading-relaxed text-zinc-500">
-        {/* OWNER: Sorani to be written by hand. */}
-        <p>
-          {loc(
-            'قيد الانتظار: مبيعات تصبح متاحة حين يؤكد الزبون الاستلام، أو تلقائيًا بعد 3 أيام من التسليم ما لم تُفتح شكوى.',
-            'Pending: sales that become available when the customer confirms receipt — or automatically 3 days after delivery unless a complaint is open.'
-          )}
-        </p>
-        <p>
-          {loc(
-            'مدفوع: ما حُوِّل إليك فعلًا، ويُخصم من المتاح. عمولة المنصة لا تدخل فيه.',
-            'Paid out: what was actually transferred to you; it comes off «Available». The platform commission is not part of it.'
-          )}
-        </p>
-      </div>
-
-      <Card title={loc('سجل الحركات', 'Ledger', 'تۆمار')}>
-        {/* Every row that makes up the balance. The balance is a sum over
-            exactly these, so a merchant can add them up and get the same
-            number — which is the point of not storing a balance. */}
-        {!data.entries.length ? (
-          <p className="text-zinc-500 text-[12px]">{loc('لا توجد حركات', 'No entries yet', 'هیچ تۆمارێک نییە')}</p>
-        ) : (
-          <div className="space-y-2">
-            {data.entries.map((e) => (
-              <div key={String(e.id)} className="flex items-center justify-between gap-3 text-[12px]">
-                <div className="min-w-0">
-                  <p className="text-zinc-300 truncate">{ledgerLabel(String(e.kind), loc)}</p>
-                  <p className="text-zinc-600 text-[10.5px] truncate">
-                    {/* Which of the three figures this row sits in — or none. */}
-                    <span data-ledger-state={String(e.state)}>{ledgerStateLabel(String(e.kind), String(e.state), loc)}</span>
-                    {(e.order_id || e.community_order_id) && (
-                      <>
-                        {' · '}
-                        <bdi dir="ltr">{String(e.order_id || e.community_order_id)}</bdi>
-                      </>
-                    )}
-                  </p>
-                </div>
-                <span
-                  className={`font-bold shrink-0 ${Number(e.amount_iqd) < 0 ? 'text-zinc-500' : 'text-gold'}`}
-                  dir="ltr"
-                >
-                  {Number(e.amount_iqd) < 0 ? '−' : '+'}
-                  {iqd(Math.abs(Number(e.amount_iqd)))}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-    </div>
-  );
-}
-
-// --------------------------------------------------------- notifications
-
-function NotificationsTab() {
-  const { loc } = useLanguage();
-  const [prefs, setPrefs] = useState<Record<string, boolean> | null>(null);
-  const [forced, setForced] = useState<string[]>([]);
-  // The switches a sender actually reads (audit 04 #19). Null from a server
-  // that predates the field: every switch is drawn as before.
-  const [wired, setWired] = useState<string[] | null>(null);
-  const [saving, setSaving] = useState('');
-  const [failed, setFailed] = useState('');
-
-  useEffect(() => {
-    merchantApi
-      .notifications()
-      .then((d) => {
-        setPrefs(d.preferences);
-        setForced(d.forced);
-        setWired(d.wired ?? null);
-      })
-      .catch(() => setPrefs({}));
-  }, []);
-
-  if (!prefs) return <Spinner />;
-
-  const KEYS: Array<[string, string]> = [
-    ['new_orders', loc('طلبات جديدة', 'New orders', 'داواکاری نوێ')],
-    ['request_opportunities', loc('فرص طلبات العملاء', 'Customer request opportunities', 'دەرفەتی داواکاری')],
-    ['new_messages', loc('رسائل جديدة', 'New messages', 'نامەی نوێ')],
-    ['new_reviews', loc('تقييمات جديدة', 'New reviews', 'هەڵسەنگاندنی نوێ')],
-    ['new_followers', loc('متابعون جدد', 'New followers', 'شوێنکەوتووی نوێ')],
-    ['complaints', loc('الشكاوى والنزاعات', 'Complaints and disputes', 'سکاڵا و ناکۆکی')],
-    ['subscription_expiry', loc('انتهاء الاشتراك', 'Subscription expiry', 'کۆتایی ئەندامێتی')],
-    ['system_alerts', loc('تنبيهات النظام', 'System alerts', 'ئاگادارکردنەوەی سیستەم')],
-    ['marketing', loc('عروض وتسويق', 'Offers and marketing', 'ئۆفەر و بازاڕکردن')],
-  ];
-
-  return (
-    <Card title={loc('ما الذي تريد أن تُشعَر به', 'What you want to hear about', 'چی دەتەوێت ئاگادار بکرێیت')}>
-      <div className="space-y-2.5">
-        {KEYS.map(([k, label]) => {
-          const isForced = forced.includes(k);
-          // «قريبًا», not a switch that controls nothing: nothing sends this
-          // notification yet, so the control says so (DECISIONS: no fake UI).
-          const soon = wired !== null && !wired.includes(k);
-          return (
-            <div key={k} data-notification-key={k} data-soon={soon || undefined}>
-              <Toggle
-                label={label}
-                on={!soon && !!prefs[k]}
-                disabled={soon || isForced || saving === k}
-                onChange={async (v) => {
-                  const before = !!prefs[k];
-                  setSaving(k);
-                  setFailed('');
-                  setPrefs({ ...prefs, [k]: v });
-                  try {
-                    const d = await merchantApi.setNotifications({ [k]: v });
-                    setPrefs(d.preferences);
-                  } catch {
-                    // The switch goes back to what is actually stored.
-                    setPrefs((p) => (p ? { ...p, [k]: before } : p));
-                    setFailed(k);
-                  } finally {
-                    setSaving('');
-                  }
-                }}
-              />
-              {soon ? (
-                <p className="text-zinc-600 text-[10.5px] mt-0.5">
-                  {loc('قريبًا — هذا الإشعار لم يُطلق بعد.', 'Coming soon — this notification is not live yet.')}
-                  {/* OWNER: Sorani to be written by hand. */}
-                </p>
-              ) : isForced ? (
-                /* Forced-on, with the reason. Better than a switch that
-                   silently snaps back, and better than hiding it (§61). */
-                <p className="text-zinc-600 text-[10.5px] mt-0.5">
-                  {loc(
-                    'لا يمكن إيقافه — يخص أموالك أو حسابك.',
-                    'Cannot be turned off — it concerns your money or your account.',
-                    'ناتوانرێت بکوژێنرێتەوە.'
-                  )}
-                </p>
-              ) : null}
-              {failed === k && (
-                <p role="alert" className="text-red-300 text-[10.5px] mt-0.5">
-                  {loc('تعذّر الحفظ — حاول مجددًا.', 'Could not save — try again.')}
-                  {/* OWNER: Sorani to be written by hand. */}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
-
-// ------------------------------------------------------------------ bits
-
-type Loc = (ar: string, en: string, ckb?: string) => string;
-
-/**
- * Where a ledger row counts. `available` is the sum of available rows AND
- * payouts; `pending` waits for the customer; `paid out` is payouts alone. A
- * commission row is the platform's share, already taken off the sale credit
- * beside it, and a reversed credit counts nowhere (worker/lib/escrowOps.ts).
- */
-function ledgerStateLabel(kind: string, state: string, loc: Loc): string {
-  if (kind === 'payout') return loc('مدفوع', 'Paid out', 'دراوە');
-  // OWNER: Sorani to be written by hand (the new strings below).
-  if (kind === 'commission') return loc('مخصومة من البيع', 'Taken off the sale');
-  if (state === 'pending') return loc('قيد الانتظار', 'Pending', 'چاوەڕوان');
-  if (state === 'available') return loc('متاح', 'Available', 'بەردەست');
-  if (state === 'reversed') return loc('أُلغي — لا يُحتسب', 'Reversed — not counted');
-  if (state === 'reserved') return loc('محجوز', 'Reserved');
-  if (state === 'paid') return loc('مسدَّد', 'Settled');
-  return '';
-}
-
-function ledgerLabel(k: string, loc: Loc): string {
-  switch (k) {
-    case 'sale_credit': return loc('بيع من المتجر', 'Store sale', 'فرۆشتن');
-    case 'community_order_credit': return loc('طلب مخصص', 'Custom order', 'داواکاری تایبەت');
-    case 'commission': return loc('عمولة المنصة', 'Platform commission', 'کۆمیشن');
-    case 'refund_debit': return loc('استرجاع', 'Refund', 'گەڕاندنەوە');
-    case 'payout': return loc('تحويل لك', 'Paid out to you', 'دراوە بە تۆ');
-    case 'reversal': return loc('عكس عملية', 'Reversal', 'پووچەڵکردنەوە');
-    default: return loc('تعديل', 'Adjustment', 'گۆڕانکاری');
-  }
 }

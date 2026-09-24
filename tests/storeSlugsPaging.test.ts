@@ -15,6 +15,7 @@ import {
   freshDb, asD1, failingD1, stubApp, post, patch, get, json, row, all, type StubUser,
 } from './fixtures/app';
 import { merchantRoutes } from '../worker/routes/merchant';
+import { merchantCatalogRoutes } from '../worker/routes/merchantCatalog';
 import { storefrontRoutes } from '../worker/routes/storefront';
 import { checkSlug } from '../worker/lib/merchantOps';
 import { isSystemSlug, SLUG_MIN } from '../worker/lib/hosts';
@@ -47,6 +48,7 @@ function withStore(raw: ReturnType<typeof freshDb>) {
 const merchant = (db: D1Database, user: StubUser = OWNER) =>
   stubApp(db, user, (a) => {
     a.route('/api/merchant', merchantRoutes);
+    a.route('/api/merchant', merchantCatalogRoutes); // W2-F: the catalogue's own router
     a.route('/api/storefront', storefrontRoutes);
   }, { env: ENV });
 const host = (raw: ReturnType<typeof freshDb>, h: string) =>

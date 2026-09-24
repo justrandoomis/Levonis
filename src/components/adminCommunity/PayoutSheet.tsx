@@ -140,8 +140,8 @@ export default function PayoutSheet({
           </h2>
           <p className="text-zinc-400 text-[12.5px] leading-relaxed">
             {t(
-              'سجّل التحويل بعد أن ترسل المال فعلًا. يُكتب حركةً سالبة في سجل التاجر وينقص المتاح بقدره.',
-              'Record it after you have actually sent the money. It is written as a negative entry in the merchant’s ledger and lowers what is available by the same amount.'
+              'سجّل التحويل بعد أن ترسل المال فعلًا. يُسجَّل طلبَ سحب مدفوعًا ويُنقص المتاح بقدره، والملاحظة مرجعه.',
+              'Record it after you have actually sent the money. It is recorded as a paid payout request that lowers what is available by the same amount; the note is its reference.'
             )}
           </p>
           <div>

@@ -14,17 +14,16 @@
  * the write routes that create obligations take `requireSellingPrivileges`.
  */
 
-import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, forbidden, notFound, conflict, str, int, oneOf , pickFrom, HttpError } from '../lib/http';
+import { requireAuth, badRequest, forbidden, notFound, conflict, str, int, oneOf, HttpError } from '../lib/http';
 import { communityClosedRefusal, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
-import { audit } from '../lib/audit';
-import { ownedMediaKey, ownedMediaUrls } from '../lib/mediaRefs';
+import { audit, auditStatements } from '../lib/audit';
+import { ownedMediaKey } from '../lib/mediaRefs';
 import { getTierStatus, benefits } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import {
@@ -36,8 +35,8 @@ import {
   type StoreContext,
 } from '../lib/merchantAuth';
 import { checkSlug, suggestSlug, SLUG_RESERVATION_DAYS } from '../lib/merchantOps';
-import { parseCsv, toCsv } from '../lib/importCsv';
 import { merchantBalance } from '../lib/escrowOps';
+import { orderCreditStateSql } from '../lib/merchantLedger';
 import { normalizeGovernorate } from '../lib/iraqGovernorates';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { notifyOrderStatus } from '../lib/orderNotify';
@@ -46,6 +45,15 @@ import { stageForLegacyStatus } from '../lib/orderStages';
 import { newHistoryId } from '../lib/orderStageOps';
 import { scheduleStoreIconRefresh } from '../lib/storeIcons';
 import { storeShareKit } from '../lib/storeShareKit';
+import { FORCED_PREFS, NOTIFICATION_PREF_KEYS, WIRED_PREFS, preferenceShape } from '../lib/merchantNotify';
+import {
+  deliveryConfigShape,
+  isDeliveryVersionAbort,
+  legacyDoorStatements,
+  loadDeliveryConfig,
+  saveDeliveryStatements,
+} from '../lib/merchantDelivery';
+import { deliveryCoverage, validateDeliveryConfig } from '@levonis/shipping/merchantDelivery';
 
 export const merchantRoutes = new Hono<AppContext>();
 
@@ -95,54 +103,6 @@ function storePublicShape(ctx: StoreContext, rootDomain: string | null) {
       completed_orders: m.completed_orders,
     },
   };
-}
-
-function productShape(p: Record<string, unknown>) {
-  return {
-    id: p.id,
-    slug: p.slug,
-    name: p.name,
-    name_ar: p.name_ar,
-    description: p.description,
-    description_ar: p.description_ar,
-    images: safeParse(p.images, []),
-    price_iqd: p.price_iqd,
-    original_price_iqd: p.original_price_iqd,
-    sku: p.sku,
-    stock: p.stock,
-    track_stock: !!p.track_stock,
-    category: p.category,
-    condition: p.condition,
-    options: safeParse(p.options, []),
-    colors: safeParse(p.colors, []),
-    delivery_methods: safeParse(p.delivery_methods, []),
-    prep_days: p.prep_days,
-    status: p.status,
-    lifecycle: p.lifecycle,
-    section_id: p.section_id ?? null,
-    featured: !!p.featured,
-    sold_count: p.sold_count,
-    view_count: p.view_count,
-    // Levonis's own decision, beside the merchant's lifecycle and never mixed
-    // into it (migration 0118): the merchant sees that the product is hidden
-    // by the platform and WHY, and the publish control says so instead of
-    // silently failing.
-    moderation: p.admin_hidden_at
-      ? { hidden_by_admin: true, reason: String(p.admin_hidden_reason ?? ''), at: p.admin_hidden_at }
-      : null,
-    created_at: p.created_at,
-    updated_at: p.updated_at,
-  };
-}
-
-/** 409 PRODUCT_HIDDEN_BY_ADMIN, carrying the reason the merchant is shown. */
-function hiddenByAdmin(reason: string): HttpError {
-  return new HttpError(
-    409,
-    'Levonis has hidden this product. Fix what the reason names and contact support to have it reviewed.',
-    'PRODUCT_HIDDEN_BY_ADMIN',
-    { reason }
-  );
 }
 
 // ------------------------------------------------------------- onboarding
@@ -377,8 +337,9 @@ merchantRoutes.patch('/store', async (c) => {
   // is http(s) or dropped. Order is the array order the merchant saved.
   if (body.profile_links !== undefined) put('profile_links', JSON.stringify(sanitizeWidgets(body.profile_links, 'link')));
   if (body.profile_facts !== undefined) put('profile_facts', JSON.stringify(sanitizeWidgets(body.profile_facts, 'fact')));
-  // The store's own delivery pricing, reduced to the two numbers checkout
-  // reads (storeOrders.ts) plus a free-text note. Anything else is dropped.
+  // The wave-1 flat delivery settings, kept for a cached build of the form and
+  // for rollback: the checkout now prices from the delivery profile
+  // (GET/PUT /delivery below, W2-A), which a real edit here also reaches.
   if (body.delivery_settings !== undefined) put('delivery_settings', JSON.stringify(sanitizeDelivery(body.delivery_settings)));
 
   // The merchant's own pause switch. It can never lift an admin suspension:
@@ -414,6 +375,15 @@ merchantRoutes.patch('/store', async (c) => {
           'SUBSCRIPTION_INACTIVE'
         );
       }
+      // An open store must be able to deliver somewhere, or offer pickup
+      // (W2-A): re-opening a shop whose delivery is switched off everywhere
+      // would take orders nobody can receive.
+      if (ctx.store.status !== 'active') {
+        const cfg = await loadDeliveryConfig(c.env.DB, ctx.store);
+        if (!deliveryCoverage(cfg.profile, cfg.rules).serviceable) {
+          throw new HttpError(409, 'Choose where you deliver, or offer pickup, before opening the store', 'DELIVERY_NO_COVERAGE');
+        }
+      }
       put('status', 'active');
     } else {
       put('status', 'paused');
@@ -422,11 +392,26 @@ merchantRoutes.patch('/store', async (c) => {
 
   if (!sets.length) return c.json({ success: true, store: storePublicShape(ctx, rootDomainFrom(c.env)) });
 
-  put('updated_at', nowIso());
+  const ts = nowIso();
+  put('updated_at', ts);
   vals.push(ctx.store.id, ctx.store.user_id);
-  await c.env.DB.prepare(
-    `UPDATE merchant_stores SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`
-  ).bind(...vals).run();
+  // THE WAVE-1 DELIVERY FIELD, FROM A CACHED BUILD OF THIS FORM (W2-A): an
+  // unchanged echo moves nothing; a real edit reaches the delivery profile in
+  // the same batch (worker/lib/merchantDelivery.ts `legacyDoorStatements`).
+  const legacyDelivery =
+    body.delivery_settings !== undefined
+      ? legacyDoorStatements(c.env.DB, {
+          storeId: ctx.store.id,
+          storedJson: ctx.store.delivery_settings,
+          incoming: sanitizeDelivery(body.delivery_settings),
+          userId: ctx.store.user_id,
+          ts,
+        })
+      : [];
+  await c.env.DB.batch([
+    c.env.DB.prepare(`UPDATE merchant_stores SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`).bind(...vals),
+    ...legacyDelivery,
+  ]);
 
   await audit(c.env.DB, ctx.store.user_id, 'merchant.store_updated', ctx.store.id, {
     fields: sets.map((s) => s.split(' = ')[0]),
@@ -440,6 +425,88 @@ merchantRoutes.patch('/store', async (c) => {
     scheduleStoreIconRefresh(c, fresh.store);
   }
   return c.json({ success: true, store: storePublicShape(fresh!, rootDomainFrom(c.env)) });
+});
+
+// ------------------------------------------------------------- delivery (W2-A)
+//
+// THE MERCHANT SETS THEIR STORE'S DELIVERY (docs/MERCHANT_PLATFORM.md §2
+// decision 3, §4.2): a default (fee / free / off), a free-delivery threshold,
+// pickup, preparation days, a note — and the eighteen governorates where they
+// depart from the default. The OWNER's store only, from the session; every
+// value is checked by the one validator the editor also runs
+// (packages/shipping/src/merchantDelivery.ts `validateDeliveryConfig`), and
+// every save bumps the profile's version, which the checkout's quote
+// fingerprint binds.
+
+merchantRoutes.get('/delivery', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const cfg = await loadDeliveryConfig(c.env.DB, ctx.store);
+  return c.json({ success: true, ...deliveryConfigShape(cfg, ctx.store.status === 'active') });
+});
+
+/**
+ * PUT /api/merchant/delivery `{version, profile, rules[]}` — the whole
+ * configuration, replacing the stored one.
+ *   400 DELIVERY_INVALID {issues:[{path, code}]}  a value outside the rules
+ *   409 DELIVERY_NO_COVERAGE                      the store is open and would
+ *                                                 deliver nowhere, with no pickup
+ *   409 DELIVERY_VERSION_CONFLICT {config}        saved elsewhere since this
+ *                                                 editor loaded (two tabs)
+ * One batch: the version fence, the profile, the rules, the rollback mirror
+ * and the audit row — all or nothing.
+ */
+merchantRoutes.put('/delivery', async (c) => {
+  await rateLimit(c, 'merchant-delivery-update', 30, 300);
+  const ctx = await requireStoreOwner(c);
+  const body = await c.req.json().catch(() => ({}));
+  const expected = body?.version;
+  if (typeof expected !== 'number' || !Number.isInteger(expected) || expected < 0) {
+    throw badRequest('Send the version you loaded', 'DELIVERY_INVALID', { issues: [{ path: 'version', code: 'not_integer' }] });
+  }
+  const checked = validateDeliveryConfig({ profile: body?.profile, rules: body?.rules });
+  if (!checked.ok) throw badRequest('The delivery settings are not valid', 'DELIVERY_INVALID', { issues: checked.issues });
+
+  const open = ctx.store.status === 'active';
+  if (open && !deliveryCoverage({ ...checked.profile, version: expected }, checked.rules).serviceable) {
+    throw new HttpError(
+      409,
+      'An open store must deliver to at least one governorate or offer pickup',
+      'DELIVERY_NO_COVERAGE'
+    );
+  }
+
+  const db = c.env.DB;
+  const ts = nowIso();
+  const { statements: auditRows } = await auditStatements(db, ctx.store.user_id, 'merchant.delivery_updated', ctx.store.id, {
+    version: expected + 1,
+    default_mode: checked.profile.default_mode,
+    default_fee_iqd: checked.profile.default_fee_iqd,
+    free_over_iqd: checked.profile.free_over_iqd,
+    pickup: checked.profile.pickup_enabled,
+    rules: checked.rules.map((r) => `${r.governorate_id}:${r.mode}${r.mode === 'fee' ? `:${r.fee_iqd}` : ''}`),
+  });
+  try {
+    await db.batch([
+      ...saveDeliveryStatements(db, {
+        storeId: ctx.store.id,
+        expectedVersion: expected,
+        profile: checked.profile,
+        rules: checked.rules,
+        userId: ctx.store.user_id,
+        ts,
+      }),
+      ...auditRows,
+    ]);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!isDeliveryVersionAbort(msg)) throw e;
+    const fresh = await loadDeliveryConfig(db, ctx.store);
+    throw new HttpError(409, 'These delivery settings were changed elsewhere. Review them and save again.', 'DELIVERY_VERSION_CONFLICT', {
+      config: deliveryConfigShape(fresh, open),
+    });
+  }
+  const fresh = await loadDeliveryConfig(db, ctx.store);
+  return c.json({ success: true, ...deliveryConfigShape(fresh, open) });
 });
 
 // GET /store/share — the share kit (W2-D): the store's absolute link, the
@@ -657,599 +724,11 @@ function nextKeyset(
   return `${String(last[atKey])}|${String(last[idKey])}`;
 }
 
-/**
- * The management list. Two modes on one route so old callers keep working:
- * the bare call (and ?cursor=) is the original newest-first cursor page,
- * while ?page= switches to the manager's filtered mode — search, section,
- * lifecycle, stock, price band, recency window, featured/deal flags, seven
- * sort orders, and an exact total for «عرض X-Y من Z». Every WHERE clause is
- * built from a fixed whitelist and bound parameters; nothing a merchant
- * types reaches the SQL text.
- */
-merchantRoutes.get('/products', async (c) => {
-  const ctx = await requireStoreOwner(c);
-  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 50 });
-
-  if (c.req.query('page') === undefined) {
-    // Keyset on (created_at, id) — see `keysetCursor` for why the timestamp
-    // alone skipped rows (audit 01 B5).
-    const cursor = keysetCursor(c.req.query('cursor'));
-    const { results } = await c.env.DB.prepare(
-      `SELECT * FROM community_products
-        WHERE merchant_id = ?1
-          AND (?2 = '' OR created_at < ?2 OR (created_at = ?2 AND id < ?3))
-        ORDER BY created_at DESC, id DESC LIMIT ?4`
-    ).bind(ctx.merchant.id, cursor.at, cursor.id, limit).all();
-    return c.json({
-      success: true,
-      products: results.map(productShape),
-      next_cursor: nextKeyset(results, limit, 'created_at', 'id'),
-    });
-  }
-
-  const page = int(c.req.query('page'), 'page', { min: 1, max: 10_000, def: 1 });
-  const q = str(c.req.query('q') ?? '', 'q', { min: 0, max: 120, required: false });
-  const section = str(c.req.query('section') ?? '', 'section', { min: 0, max: 60, required: false });
-  const lifecycle = c.req.query('lifecycle') ?? '';
-  const stockFilter = c.req.query('stock') ?? '';
-  const category = str(c.req.query('category') ?? '', 'category', { min: 0, max: 60, required: false });
-  const priceMin = c.req.query('price_min') !== undefined ? int(c.req.query('price_min'), 'price_min', { min: 0, max: 1_000_000_000 }) : null;
-  const priceMax = c.req.query('price_max') !== undefined ? int(c.req.query('price_max'), 'price_max', { min: 0, max: 1_000_000_000 }) : null;
-  const days = c.req.query('days') !== undefined ? int(c.req.query('days'), 'days', { min: 1, max: 3650 }) : null;
-  const featuredOnly = c.req.query('featured') === '1';
-  const dealsOnly = c.req.query('deals') === '1';
-  const sort = c.req.query('sort') ?? 'newest';
-
-  const where: string[] = ['merchant_id = ?'];
-  const binds: unknown[] = [ctx.merchant.id];
-  if (q) {
-    // LIKE special characters are literal search text here, not wildcards —
-    // and the pattern is bounded in BYTES, which D1 caps at 50.
-    const like = likePattern(q);
-    where.push(`(${sqlLikeClause(['name', 'name_ar', 'sku'])})`);
-    binds.push(like, like, like);
-  }
-  if (section === 'none') where.push('section_id IS NULL');
-  else if (section) {
-    where.push('section_id = ?');
-    binds.push(section);
-  }
-  if (['draft', 'active', 'hidden', 'sold_out', 'archived'].includes(lifecycle)) {
-    where.push('lifecycle = ?');
-    binds.push(lifecycle);
-  }
-  if (stockFilter === 'in') where.push('(track_stock = 0 OR stock > 0)');
-  else if (stockFilter === 'low') where.push('(track_stock = 1 AND stock > 0 AND stock <= 5)');
-  else if (stockFilter === 'out') where.push('(track_stock = 1 AND stock <= 0)');
-  else if (stockFilter === 'untracked') where.push('track_stock = 0');
-  if (category) {
-    where.push('category = ?');
-    binds.push(category);
-  }
-  if (priceMin !== null) {
-    where.push('price_iqd >= ?');
-    binds.push(priceMin);
-  }
-  if (priceMax !== null) {
-    where.push('price_iqd <= ?');
-    binds.push(priceMax);
-  }
-  if (days !== null) {
-    where.push('created_at >= ?');
-    binds.push(new Date(Date.now() - days * 86_400_000).toISOString());
-  }
-  if (featuredOnly) where.push('featured = 1');
-  if (dealsOnly) where.push('(original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd)');
-
-  const ORDERS: Record<string, string> = {
-    newest: 'created_at DESC',
-    oldest: 'created_at ASC',
-    price_asc: 'price_iqd ASC, created_at DESC',
-    price_desc: 'price_iqd DESC, created_at DESC',
-    sales: 'sold_count DESC, created_at DESC',
-    views: 'view_count DESC, created_at DESC',
-    stock: 'stock ASC, created_at DESC',
-    updated: "COALESCE(NULLIF(updated_at, ''), created_at) DESC",
-  };
-  const orderBy = pickFrom(ORDERS, sort, ORDERS.newest);
-
-  const whereSql = where.join(' AND ');
-  const [{ results }, count] = await Promise.all([
-    c.env.DB.prepare(
-      `SELECT * FROM community_products WHERE ${whereSql} ORDER BY ${orderBy} LIMIT ? OFFSET ?`
-    ).bind(...binds, limit, (page - 1) * limit).all(),
-    c.env.DB.prepare(`SELECT COUNT(*) AS n FROM community_products WHERE ${whereSql}`)
-      .bind(...binds)
-      .first<{ n: number }>(),
-  ]);
-
-  return c.json({
-    success: true,
-    products: results.map(productShape),
-    total: count?.n ?? 0,
-    page,
-    limit,
-  });
-});
-
-/** Every field a merchant may set on a product, validated once, used by create and edit. */
-async function readProductBody(c: Context<AppContext>, partial: boolean) {
-  const body = await c.req.json().catch(() => ({}));
-  const out: Record<string, unknown> = {};
-  const has = (k: string) => body[k] !== undefined;
-  const need = (k: string) => !partial || has(k);
-
-  if (need('name')) out.name = str(body.name, 'name', { min: 2, max: 120 });
-  if (has('name_ar')) out.name_ar = str(body.name_ar, 'name_ar', { min: 0, max: 120, required: false });
-  if (has('description')) out.description = str(body.description, 'description', { min: 0, max: 6000, required: false });
-  if (has('description_ar'))
-    out.description_ar = str(body.description_ar, 'description_ar', { min: 0, max: 6000, required: false });
-  if (need('price_iqd')) out.price_iqd = int(body.price_iqd, 'price_iqd', { min: 0, max: 1_000_000_000 });
-  if (has('original_price_iqd'))
-    out.original_price_iqd = body.original_price_iqd === null
-      ? null
-      : int(body.original_price_iqd, 'original_price_iqd', { min: 0, max: 1_000_000_000 });
-  if (has('sku')) out.sku = str(body.sku, 'sku', { min: 0, max: 64, required: false });
-  if (has('stock')) out.stock = int(body.stock, 'stock', { min: 0, max: 1_000_000 });
-  if (has('track_stock')) out.track_stock = body.track_stock ? 1 : 0;
-  if (has('category')) out.category = str(body.category, 'category', { min: 0, max: 60, required: false });
-  if (has('condition')) out.condition = oneOf(body.condition, 'condition', ['new', 'used', 'refurbished'] as const);
-  if (has('prep_days')) out.prep_days = int(body.prep_days, 'prep_days', { min: 0, max: 365 });
-  // Same rule as the store logo: a product picture is a URL a visitor's
-  // browser will fetch, so it may only address this merchant's own uploads.
-  // Filtered rather than refused — a merchant fixing a price should not be
-  // blocked because an old image reference no longer resolves.
-  if (has('images')) out.images = JSON.stringify(ownedMediaUrls(body.images, c.get('user')!.id, 8));
-  if (has('options')) out.options = JSON.stringify(Array.isArray(body.options) ? body.options.slice(0, 20) : []);
-  if (has('colors')) out.colors = JSON.stringify(Array.isArray(body.colors) ? body.colors.slice(0, 30) : []);
-  if (has('delivery_methods')) out.delivery_methods = JSON.stringify(sanitizeList(body.delivery_methods, 10, 60));
-  if (has('lifecycle'))
-    out.lifecycle = oneOf(body.lifecycle, 'lifecycle', ['draft', 'active', 'hidden', 'sold_out', 'archived'] as const);
-  if (has('featured')) out.featured = body.featured ? 1 : 0;
-  // The section is checked against THIS store's sections at write time (the
-  // caller's ctx is not available here) — see assertOwnSection in the routes.
-  if (has('section_id'))
-    out.section_id = body.section_id ? str(body.section_id, 'section_id', { min: 1, max: 60 }) : null;
-  return out;
-}
-
-/** A section id in a product body must name one of the caller's OWN sections. */
-async function assertOwnSection(c: Context<AppContext>, storeId: string, sectionId: unknown) {
-  if (typeof sectionId !== 'string' || !sectionId) return;
-  const row = await c.env.DB.prepare(
-    'SELECT id FROM merchant_store_sections WHERE id = ? AND store_id = ?'
-  ).bind(sectionId, storeId).first();
-  if (!row) throw badRequest('That section does not belong to your store', 'SECTION_NOT_FOUND');
-}
-
-merchantRoutes.post('/products', async (c) => {
-  await rateLimit(c, 'merchant-product-create', 60, 3600);
-  const ctx = await requireSellingPrivileges(c);
-  const fields = await readProductBody(c, false);
-  await assertOwnSection(c, ctx.store.id, fields.section_id);
-
-  const id = newId('cp');
-  const base = suggestSlug(String(fields.name)) || 'item';
-  // The slug column is globally UNIQUE, so it is namespaced by store. Two
-  // merchants may both sell a "bracket" without one of them failing to save.
-  const slug = `${ctx.store.slug}-${base}-${id.slice(-6)}`.slice(0, 120);
-  const ts = nowIso();
-
-  const lifecycle = (fields.lifecycle as string) ?? 'active';
-  await c.env.DB.prepare(
-    `INSERT INTO community_products
-       (id, merchant_id, store_id, slug, name, name_ar, description, description_ar, images,
-        price_iqd, original_price_iqd, sku, stock, track_stock, category, condition,
-        options, colors, delivery_methods, prep_days, status, lifecycle,
-        section_id, featured, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
-  ).bind(
-    id, ctx.merchant.id, ctx.store.id, slug,
-    fields.name, fields.name_ar ?? '', fields.description ?? '', fields.description_ar ?? '',
-    fields.images ?? '[]', fields.price_iqd, fields.original_price_iqd ?? null,
-    fields.sku ?? '', fields.stock ?? 0, fields.track_stock ?? 1,
-    fields.category ?? '', fields.condition ?? 'new',
-    fields.options ?? '[]', fields.colors ?? '[]', fields.delivery_methods ?? '[]',
-    fields.prep_days ?? 0,
-    lifecycle === 'active' ? 'active' : 'hidden', lifecycle,
-    fields.section_id ?? null, fields.featured ?? 0, ts, ts
-  ).run();
-
-  await audit(c.env.DB, ctx.store.user_id, 'merchant.product_created', id, { store: ctx.store.id });
-  const row = await c.env.DB.prepare('SELECT * FROM community_products WHERE id = ?').bind(id).first();
-  return c.json({ success: true, product: productShape(row as Record<string, unknown>) }, 201);
-});
-
-/**
- * Real editing. The previous dashboard could create and delete but not edit,
- * which meant a typo in a price could only be fixed by deleting the product
- * and losing its history.
- */
-merchantRoutes.patch('/products/:id', async (c) => {
-  await rateLimit(c, 'merchant-product-update', 120, 3600);
-  const ctx = await requireSellingPrivileges(c);
-  const id = c.req.param('id');
-  const fields = await readProductBody(c, true);
-  if (!Object.keys(fields).length) throw badRequest('Nothing to update');
-  await assertOwnSection(c, ctx.store.id, fields.section_id);
-
-  // A product LEVONIS hid stays hidden until Levonis lifts it (audit 01 B9).
-  // The merchant may still edit it — fixing what it was hidden for is the
-  // point — but not publish it, and is told why rather than finding a
-  // «published» product that never appears. ONLY A CHANGE IS AN ATTEMPT: the
-  // editor re-sends the whole form, so an `active` that was already the
-  // merchant's lifecycle is an edit, not a publish (and stays hidden — below).
-  if (fields.lifecycle === 'active') {
-    const held = await c.env.DB.prepare(
-      'SELECT lifecycle, admin_hidden_at, admin_hidden_reason FROM community_products WHERE id = ? AND merchant_id = ?'
-    ).bind(id, ctx.merchant.id).first<{ lifecycle: string; admin_hidden_at: string | null; admin_hidden_reason: string }>();
-    if (held?.admin_hidden_at && held.lifecycle !== 'active') throw hiddenByAdmin(held.admin_hidden_reason);
-  }
-
-  const sets = Object.keys(fields).map((k) => `${k} = ?`);
-  const vals = Object.values(fields);
-  // `status` mirrors `lifecycle` so the 0001 visibility column stays truthful
-  // for every existing reader — EXCEPT that an admin hide wins, decided IN
-  // the statement: a hide that lands between the check above and this write
-  // (or any future path that forgets the check) still cannot surface it.
-  if (fields.lifecycle !== undefined) {
-    sets.push(`status = CASE WHEN ? = 'active' AND admin_hidden_at IS NULL THEN 'active' ELSE 'hidden' END`);
-    vals.push(fields.lifecycle);
-  }
-  sets.push('updated_at = ?');
-  vals.push(nowIso(), id, ctx.merchant.id);
-
-  // The ownership clause is IN the statement. There is no path where a
-  // product id from the URL reaches an update without it.
-  const res = await c.env.DB.prepare(
-    `UPDATE community_products SET ${sets.join(', ')} WHERE id = ? AND merchant_id = ?`
-  ).bind(...vals).run();
-  if (!res.meta.changes) throw notFound('Product not found');
-
-  await audit(c.env.DB, ctx.store.user_id, 'merchant.product_updated', id, { fields: Object.keys(fields) });
-  const row = await c.env.DB.prepare('SELECT * FROM community_products WHERE id = ?').bind(id).first();
-  return c.json({ success: true, product: productShape(row as Record<string, unknown>) });
-});
-
-merchantRoutes.post('/products/:id/duplicate', async (c) => {
-  await rateLimit(c, 'merchant-product-create', 60, 3600);
-  const ctx = await requireSellingPrivileges(c);
-  const src = await c.env.DB.prepare(
-    'SELECT * FROM community_products WHERE id = ? AND merchant_id = ?'
-  ).bind(c.req.param('id'), ctx.merchant.id).first<Record<string, unknown>>();
-  if (!src) throw notFound('Product not found');
-  // A copy of a product Levonis hid is the hidden content with a new id —
-  // one tap around the decision. The original stays editable.
-  if (src.admin_hidden_at) throw hiddenByAdmin(String(src.admin_hidden_reason ?? ''));
-
-  const id = newId('cp');
-  const ts = nowIso();
-  // A duplicate starts as a DRAFT. Copying a live product straight to the
-  // storefront would publish an unedited clone to real customers.
-  await c.env.DB.prepare(
-    `INSERT INTO community_products
-       (id, merchant_id, store_id, slug, name, name_ar, description, description_ar, images,
-        price_iqd, original_price_iqd, sku, stock, track_stock, category, condition,
-        options, colors, delivery_methods, prep_days, status, lifecycle, section_id, featured,
-        created_at, updated_at)
-     SELECT ?, merchant_id, store_id, ?, name || ' (copy)', name_ar, description, description_ar, images,
-        price_iqd, original_price_iqd, '', stock, track_stock, category, condition,
-        options, colors, delivery_methods, prep_days, 'hidden', 'draft', section_id, featured, ?, ?
-       FROM community_products WHERE id = ? AND merchant_id = ?`
-  ).bind(id, `${ctx.store.slug}-copy-${id.slice(-6)}`, ts, ts, src.id, ctx.merchant.id).run();
-
-  const row = await c.env.DB.prepare('SELECT * FROM community_products WHERE id = ?').bind(id).first();
-  return c.json({ success: true, product: productShape(row as Record<string, unknown>) }, 201);
-});
-
-/**
- * The manager's stat cards, from real rows only. The weekly series buckets
- * products by CREATION week (the only per-product timestamp history that
- * exists), so every sparkline is a true statement: how this catalogue — and
- * each slice of it — grew. No invented month-over-month deltas.
- */
-merchantRoutes.get('/products/stats', async (c) => {
-  const ctx = await requireStoreOwner(c);
-  const db = c.env.DB;
-  const since = new Date(Date.now() - 12 * 7 * 86_400_000).toISOString();
-
-  const [totals, weekly, categories, salesDaily] = await Promise.all([
-    db.prepare(
-      `SELECT COUNT(*) AS total,
-              SUM(CASE WHEN lifecycle = 'active' THEN 1 ELSE 0 END) AS active,
-              SUM(CASE WHEN lifecycle = 'draft' THEN 1 ELSE 0 END) AS draft,
-              SUM(CASE WHEN lifecycle IN ('hidden','archived','sold_out') THEN 1 ELSE 0 END) AS hidden,
-              SUM(CASE WHEN track_stock = 1 AND stock <= 0 AND lifecycle = 'active' THEN 1 ELSE 0 END) AS out_of_stock,
-              COALESCE(SUM(view_count), 0) AS views,
-              COALESCE(SUM(sold_count), 0) AS sold
-         FROM community_products WHERE merchant_id = ?`
-    ).bind(ctx.merchant.id).first<Record<string, number>>(),
-    db.prepare(
-      `SELECT substr(created_at, 1, 10) AS day, strftime('%Y-%W', created_at) AS week,
-              COUNT(*) AS added,
-              SUM(CASE WHEN lifecycle = 'active' THEN 1 ELSE 0 END) AS active_added,
-              SUM(CASE WHEN lifecycle = 'draft' THEN 1 ELSE 0 END) AS draft_added,
-              SUM(CASE WHEN lifecycle IN ('hidden','archived','sold_out') THEN 1 ELSE 0 END) AS hidden_added,
-              COALESCE(SUM(view_count), 0) AS views
-         FROM community_products
-        WHERE merchant_id = ? AND created_at >= ?
-        GROUP BY week ORDER BY week`
-    ).bind(ctx.merchant.id, since).all(),
-    db.prepare(
-      `SELECT DISTINCT category FROM community_products
-        WHERE merchant_id = ? AND category != '' ORDER BY category LIMIT 40`
-    ).bind(ctx.merchant.id).all(),
-    db.prepare(
-      `SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS orders, COALESCE(SUM(total_iqd), 0) AS gross
-         FROM orders
-        WHERE merchant_id = ? AND status != 'cancelled' AND created_at >= ?
-        GROUP BY day ORDER BY day`
-    ).bind(ctx.merchant.id, new Date(Date.now() - 14 * 86_400_000).toISOString()).all(),
-  ]);
-
-  return c.json({
-    success: true,
-    totals: {
-      total: totals?.total ?? 0,
-      active: totals?.active ?? 0,
-      draft: totals?.draft ?? 0,
-      hidden: totals?.hidden ?? 0,
-      out_of_stock: totals?.out_of_stock ?? 0,
-      views: totals?.views ?? 0,
-      sold: totals?.sold ?? 0,
-    },
-    weekly: (weekly.results ?? []).map((w) => ({
-      week: w.week,
-      added: Number(w.added ?? 0),
-      active_added: Number(w.active_added ?? 0),
-      draft_added: Number(w.draft_added ?? 0),
-      hidden_added: Number(w.hidden_added ?? 0),
-      views: Number(w.views ?? 0),
-    })),
-    categories: (categories.results ?? []).map((r) => String(r.category)),
-    sales_daily: (salesDaily.results ?? []).map((r) => ({
-      day: r.day,
-      orders: Number(r.orders ?? 0),
-      gross: Number(r.gross ?? 0),
-    })),
-  });
-});
-
-/** One product's real numbers: lifetime views/sales plus settled revenue. */
-merchantRoutes.get('/products/:id/insights', async (c) => {
-  const ctx = await requireStoreOwner(c);
-  const id = c.req.param('id');
-  const product = await c.env.DB.prepare(
-    'SELECT * FROM community_products WHERE id = ? AND merchant_id = ?'
-  ).bind(id, ctx.merchant.id).first<Record<string, unknown>>();
-  if (!product) throw notFound('Product not found');
-
-  const revenue = await c.env.DB.prepare(
-    `SELECT COALESCE(SUM(i.line_total_iqd), 0) AS revenue, COALESCE(SUM(i.qty), 0) AS units,
-            COUNT(DISTINCT i.order_id) AS orders
-       FROM order_items i JOIN orders o ON o.id = i.order_id
-      WHERE i.community_product_id = ? AND o.merchant_id = ? AND o.status != 'cancelled'`
-  ).bind(id, ctx.merchant.id).first<Record<string, number>>();
-
-  return c.json({
-    success: true,
-    product: productShape(product),
-    insights: {
-      views: Number(product.view_count ?? 0),
-      sold: Number(product.sold_count ?? 0),
-      revenue_iqd: revenue?.revenue ?? 0,
-      units_ordered: revenue?.units ?? 0,
-      orders: revenue?.orders ?? 0,
-      created_at: product.created_at,
-      updated_at: product.updated_at || product.created_at,
-    },
-  });
-});
-
-const PRODUCT_CSV_HEADER = [
-  'name', 'name_ar', 'price_iqd', 'original_price_iqd', 'sku', 'stock', 'track_stock',
-  'category', 'condition', 'prep_days', 'lifecycle', 'featured', 'section', 'description',
-];
-
-/** The whole catalogue as a spreadsheet — BOM for Excel-friendly Arabic. */
-merchantRoutes.get('/products/export.csv', async (c) => {
-  const ctx = await requireStoreOwner(c);
-  const [{ results }, count] = await Promise.all([
-    c.env.DB.prepare(
-      `SELECT p.*, s.name AS section_name FROM community_products p
-         LEFT JOIN merchant_store_sections s ON s.id = p.section_id
-        WHERE p.merchant_id = ? ORDER BY p.created_at DESC LIMIT 2000`
-    ).bind(ctx.merchant.id).all<Record<string, unknown>>(),
-    c.env.DB.prepare('SELECT COUNT(*) AS n FROM community_products WHERE merchant_id = ?')
-      .bind(ctx.merchant.id)
-      .first<{ n: number }>(),
-  ]);
-  // A silent cut would read as "that's the whole catalogue" — say so instead.
-  const truncated = (count?.n ?? 0) > (results ?? []).length;
-
-  const rows: string[][] = [
-    [...PRODUCT_CSV_HEADER, 'sold_count', 'view_count', 'id', 'slug', 'created_at', 'updated_at'],
-    ...(results ?? []).map((p) => [
-      String(p.name ?? ''), String(p.name_ar ?? ''), String(p.price_iqd ?? 0),
-      p.original_price_iqd === null || p.original_price_iqd === undefined ? '' : String(p.original_price_iqd),
-      String(p.sku ?? ''), String(p.stock ?? 0), p.track_stock ? '1' : '0',
-      String(p.category ?? ''), String(p.condition ?? 'new'), String(p.prep_days ?? 0),
-      String(p.lifecycle ?? 'active'), p.featured ? '1' : '0', String(p.section_name ?? ''),
-      String(p.description ?? ''),
-      String(p.sold_count ?? 0), String(p.view_count ?? 0),
-      String(p.id), String(p.slug), String(p.created_at ?? ''), String(p.updated_at ?? ''),
-    ]),
-  ];
-  const csv = '\uFEFF' + toCsv(rows);
-  return new Response(csv, {
-    headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="products.csv"',
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
-      ...(truncated ? { 'X-Levonis-Truncated': String(count?.n ?? 0) } : {}),
-    },
-  });
-});
-
-/**
- * Spreadsheet import, previewed before it commits. The caller sends the CSV
- * text; confirm=false answers with the per-row report and writes NOTHING;
- * confirm=true creates the valid rows. Imported products always start as
- * DRAFTS — a spreadsheet must not publish straight to real customers —
- * and every row passes the same bounds the editor enforces.
- */
-merchantRoutes.post('/products/import', async (c) => {
-  await rateLimit(c, 'merchant-product-import', 10, 3600);
-  const ctx = await requireSellingPrivileges(c);
-  const body = await c.req.json().catch(() => ({}));
-  const csvText = str(body.csv, 'csv', { min: 1, max: 400_000 });
-  const confirm = body.confirm === true;
-
-  const grid = parseCsv(csvText.replace(/^\uFEFF/, ''));
-  if (grid.length < 2) throw badRequest('The file has no data rows', 'CSV_EMPTY');
-  const header = grid[0].map((h) => h.trim().toLowerCase());
-  const col = (name: string) => header.indexOf(name);
-  if (col('name') === -1 || col('price_iqd') === -1) {
-    throw badRequest('The file must carry name and price_iqd columns', 'CSV_HEADER');
-  }
-  // Keep each row's ORIGINAL file line number so an error report points at
-  // the line the merchant actually sees in their spreadsheet.
-  const dataRows = grid
-    .slice(1)
-    .map((r, i) => ({ r, line: i + 2 }))
-    .filter(({ r }) => r.some((cell) => cell.trim() !== ''));
-  if (dataRows.length > 200) throw badRequest('Up to 200 rows per import', 'CSV_TOO_BIG');
-
-  const sections = await c.env.DB.prepare(
-    'SELECT id, name, name_ar FROM merchant_store_sections WHERE store_id = ?'
-  ).bind(ctx.store.id).all<Record<string, unknown>>();
-  const sectionByName = new Map<string, string>();
-  for (const s of sections.results ?? []) {
-    sectionByName.set(String(s.name).trim().toLowerCase(), String(s.id));
-    if (s.name_ar) sectionByName.set(String(s.name_ar).trim().toLowerCase(), String(s.id));
-  }
-
-  const cell = (r: string[], name: string) => {
-    const i = col(name);
-    return i === -1 ? '' : (r[i] ?? '').trim();
-  };
-  const report: Array<{ row: number; name: string; ok: boolean; error?: string }> = [];
-  const valid: Array<Record<string, unknown>> = [];
-  for (const { r, line: rowNo } of dataRows) {
-    const name = cell(r, 'name');
-    try {
-      if (name.length < 2 || name.length > 120) throw new Error('name must be 2-120 characters');
-      const price = Number(cell(r, 'price_iqd'));
-      if (!Number.isFinite(price) || price < 0 || price > 1_000_000_000) throw new Error('price_iqd is not a valid amount');
-      const origRaw = cell(r, 'original_price_iqd');
-      const orig = origRaw === '' ? null : Number(origRaw);
-      if (orig !== null && (!Number.isFinite(orig) || orig < 0 || orig > 1_000_000_000)) throw new Error('original_price_iqd is not a valid amount');
-      const stockRaw = cell(r, 'stock');
-      const stock = stockRaw === '' ? 0 : Number(stockRaw);
-      if (!Number.isFinite(stock) || stock < 0 || stock > 1_000_000) throw new Error('stock is not a valid count');
-      const prepRaw = cell(r, 'prep_days');
-      const prep = prepRaw === '' ? 0 : Number(prepRaw);
-      if (!Number.isFinite(prep) || prep < 0 || prep > 365) throw new Error('prep_days must be 0-365');
-      const condition = cell(r, 'condition') || 'new';
-      if (!['new', 'used', 'refurbished'].includes(condition)) throw new Error('condition must be new/used/refurbished');
-      const sectionName = cell(r, 'section').toLowerCase();
-      const sectionId = sectionName ? sectionByName.get(sectionName) ?? null : null;
-      if (sectionName && !sectionId) throw new Error(`unknown section «${cell(r, 'section')}»`);
-      valid.push({
-        name,
-        name_ar: cell(r, 'name_ar').slice(0, 120),
-        description: cell(r, 'description').slice(0, 6000),
-        price_iqd: Math.round(price),
-        original_price_iqd: orig === null ? null : Math.round(orig),
-        sku: cell(r, 'sku').slice(0, 64),
-        stock: Math.round(stock),
-        track_stock: cell(r, 'track_stock') === '0' ? 0 : 1,
-        category: cell(r, 'category').slice(0, 60),
-        condition,
-        prep_days: Math.round(prep),
-        featured: cell(r, 'featured') === '1' ? 1 : 0,
-        section_id: sectionId,
-      });
-      report.push({ row: rowNo, name, ok: true });
-    } catch (e) {
-      report.push({ row: rowNo, name: name || '—', ok: false, error: e instanceof Error ? e.message : 'invalid row' });
-    }
-  }
-
-  let created = 0;
-  if (confirm && valid.length) {
-    // ONE INSTANT PER ROW, in file order (audit 01 B5). Every row used to share
-    // one `created_at`, which is the tie the timestamp-only cursors could not
-    // page through; a millisecond apart, the newest-first lists also show the
-    // import in the order the merchant's spreadsheet has it. The cursors break
-    // ties on the id as well, so this is order, not the only guard.
-    const base = Date.now();
-    const stmts = valid.map((v, i) => {
-      const ts = new Date(base - i).toISOString();
-      const id = newId('cp');
-      return c.env.DB.prepare(
-        `INSERT INTO community_products
-           (id, merchant_id, store_id, slug, name, name_ar, description, price_iqd, original_price_iqd,
-            sku, stock, track_stock, category, condition, prep_days, featured, section_id,
-            status, lifecycle, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'hidden', 'draft', ?, ?)`
-      ).bind(
-        id, ctx.merchant.id, ctx.store.id,
-        `${ctx.store.slug}-${suggestSlug(String(v.name)) || 'item'}-${id.slice(-6)}`.slice(0, 120),
-        v.name, v.name_ar, v.description, v.price_iqd, v.original_price_iqd,
-        v.sku, v.stock, v.track_stock, v.category, v.condition, v.prep_days,
-        v.featured, v.section_id, ts, ts
-      );
-    });
-    await c.env.DB.batch(stmts);
-    created = valid.length;
-    await audit(c.env.DB, ctx.store.user_id, 'merchant.products_imported', ctx.store.id, { created });
-  }
-
-  return c.json({
-    success: true,
-    confirmed: confirm,
-    created,
-    valid: valid.length,
-    invalid: report.filter((r) => !r.ok).length,
-    report,
-  });
-});
-
-/**
- * Archive, not delete.
- *
- * A product that has ever been ordered is referenced by order lines, reviews
- * and a customer's own history. Removing the row would blank out what someone
- * actually bought. Archiving takes it off the storefront and leaves the
- * record intact — and `DELETE` is only honoured for a product nothing has
- * ever touched.
- */
-merchantRoutes.delete('/products/:id', async (c) => {
-  const ctx = await requireStoreOwner(c);
-  const id = c.req.param('id');
-  const sold = await c.env.DB.prepare(
-    'SELECT COUNT(*) AS n FROM order_items WHERE community_product_id = ?'
-  ).bind(id).first<{ n: number }>();
-
-  if (sold && sold.n > 0) {
-    const res = await c.env.DB.prepare(
-      `UPDATE community_products SET lifecycle = 'archived', status = 'hidden', updated_at = ?
-        WHERE id = ? AND merchant_id = ?`
-    ).bind(nowIso(), id, ctx.merchant.id).run();
-    if (!res.meta.changes) throw notFound('Product not found');
-    await audit(c.env.DB, ctx.store.user_id, 'merchant.product_archived', id, { reason: 'has_orders' });
-    return c.json({ success: true, archived: true });
-  }
-
-  const res = await c.env.DB.prepare(
-    'DELETE FROM community_products WHERE id = ? AND merchant_id = ?'
-  ).bind(id, ctx.merchant.id).run();
-  if (!res.meta.changes) throw notFound('Product not found');
-  await audit(c.env.DB, ctx.store.user_id, 'merchant.product_deleted', id, {});
-  return c.json({ success: true, archived: false });
-});
+// The products themselves — list, create, edit, duplicate, bulk, variants,
+// media, insights, import/export — and the store's collections live in
+// worker/routes/merchantCatalog.ts (merchant platform W2-F), mounted beside
+// this router in worker/index.ts under the same /api/merchant prefix, so every
+// URL is the one it always was.
 
 // ------------------------------------------------------------ notifications
 
@@ -1262,38 +741,20 @@ merchantRoutes.get('/notifications', async (c) => {
 });
 
 /**
- * THE SWITCHES THAT ARE CONNECTED TO SOMETHING (audit 04 #19).
- *
- * Nine switches were drawn as working toggles and eight of them controlled
- * nothing. These are the ones a sender actually reads today:
- *   new_orders             worker/lib/storeOrderOps.ts (a new store order)
- *   request_opportunities  worker/lib/printMatching.ts / printRequests.ts
- *   new_messages           worker/routes/chats.ts (a customer on an order thread)
- * The panel shows every other switch as «قريبًا» — kept, not hidden, so the
- * merchant's saved choice is waiting when its sender exists — rather than as a
- * control that does nothing. A sender that starts reading one adds it here.
+ * THE SWITCHES, AND WHAT EACH ONE CONTROLS (audit 04 #19) — defined once, with
+ * the notification kinds that read them, in worker/lib/merchantNotify.ts:
+ *   - the in-app notice is always written (the store's notification centre);
+ *     a switch decides whether the same news also goes to the merchant's
+ *     outside channels (Telegram / WhatsApp / email);
+ *   - `wired` lists the switches some notification kind reads — the panel
+ *     shows the rest as «قريبًا» rather than as a control that does nothing;
+ *   - `forced` cannot be switched off (§61): a dispute, the subscription, a
+ *     sanction on the store — those decide money and standing.
  */
-const WIRED_NOTIFICATIONS = ['new_orders', 'request_opportunities', 'new_messages'] as const;
-
-/**
- * Three of these cannot be switched off (§61). A merchant must not be able to
- * silence the notice that their subscription lapsed, that a dispute was
- * opened against them, or a platform security alert — those decide money and
- * standing. They are returned as `forced` so the UI can show them ON with a
- * reason rather than pretending the switch works.
- */
-const FORCED_NOTIFICATIONS = ['complaints', 'subscription_expiry', 'system_alerts'] as const;
-const NOTIFICATION_KEYS = [
-  'new_orders', 'request_opportunities', 'new_messages', 'new_reviews',
-  'new_followers', 'complaints', 'subscription_expiry', 'system_alerts', 'marketing',
-] as const;
-
-function notificationShape(row: Record<string, unknown> | null) {
-  const out: Record<string, boolean> = {};
-  for (const k of NOTIFICATION_KEYS) out[k] = row ? !!row[k] : true;
-  for (const k of FORCED_NOTIFICATIONS) out[k] = true;
-  return out;
-}
+const WIRED_NOTIFICATIONS = WIRED_PREFS;
+const FORCED_NOTIFICATIONS = FORCED_PREFS;
+const NOTIFICATION_KEYS = NOTIFICATION_PREF_KEYS;
+const notificationShape = preferenceShape;
 
 merchantRoutes.patch('/notifications', async (c) => {
   await rateLimit(c, 'merchant-notifications', 30, 300);
@@ -1423,8 +884,8 @@ function releaseAfter(o: Record<string, unknown>): string | null {
 }
 
 /** The merchant's credit for an order, as a column any order read can add. */
-const CREDIT_STATE_SQL = `(SELECT l.state FROM merchant_payout_ledger l
-      WHERE l.order_id = o.id AND l.merchant_id = o.merchant_id AND l.kind = 'sale_credit' LIMIT 1)`;
+// From the merchant ledger (worker/lib/merchantLedger.ts): pending / available / reversed.
+const CREDIT_STATE_SQL = orderCreditStateSql('o.id');
 
 /**
  * Both commerce paths in one list, with an origin filter (§74).
@@ -1697,20 +1158,10 @@ merchantRoutes.post('/orders/:id/status', async (c) => {
 });
 
 // ---------------------------------------------------------------- payouts
-
-merchantRoutes.get('/payouts', async (c) => {
-  const ctx = await requireStoreOwner(c);
-  const balance = await merchantBalance(c.env.DB, ctx.merchant.id);
-  const { results } = await c.env.DB.prepare(
-    `SELECT id, kind, amount_iqd, state, order_id, community_order_id, note, created_at
-       FROM merchant_payout_ledger WHERE merchant_id = ?
-      ORDER BY created_at DESC LIMIT 100`
-  ).bind(ctx.merchant.id).all();
-  // The balance is a SUM over these rows, so the merchant can add up the
-  // list and get the same number. A stored balance they could not reconcile
-  // is the thing this design exists to avoid.
-  return c.json({ success: true, balance, entries: results });
-});
+//
+// `GET /payouts` and the payout requests live in worker/routes/merchantFinance.ts
+// (mounted at /api/merchant/payouts and /api/merchant/finance), beside the
+// ledger they read.
 
 // ---------------------------------------------------------------- reviews
 
@@ -1914,93 +1365,6 @@ merchantRoutes.get('/analytics', async (c) => {
     rating_count: ctx.merchant.rating_count,
     balance: await merchantBalance(c.env.DB, ctx.merchant.id),
   });
-});
-
-// ---------------------------------------------------------------- sections
-//
-// The shelves of the shop. Organising the catalogue is not a new commercial
-// commitment, so a lapsed-PLUS merchant may still tidy their store —
-// requireStoreOwner, not requireSellingPrivileges (§48).
-
-function sectionShape(s: Record<string, unknown>) {
-  return {
-    id: s.id,
-    name: s.name,
-    name_ar: s.name_ar,
-    sort_order: s.sort_order,
-    active: !!s.active,
-    product_count: s.product_count ?? undefined,
-    created_at: s.created_at,
-  };
-}
-
-merchantRoutes.get('/sections', async (c) => {
-  const ctx = await requireStoreOwner(c);
-  const { results } = await c.env.DB.prepare(
-    `SELECT s.*, (SELECT COUNT(*) FROM community_products p
-                   WHERE p.section_id = s.id AND p.lifecycle != 'archived') AS product_count
-       FROM merchant_store_sections s WHERE s.store_id = ?
-      ORDER BY s.sort_order, s.created_at`
-  ).bind(ctx.store.id).all<Record<string, unknown>>();
-  return c.json({ success: true, sections: results.map(sectionShape) });
-});
-
-merchantRoutes.post('/sections', async (c) => {
-  await rateLimit(c, 'merchant-section', 60, 3600);
-  const ctx = await requireStoreOwner(c);
-  const body = await c.req.json().catch(() => ({}));
-  const count = await c.env.DB.prepare(
-    'SELECT COUNT(*) AS n FROM merchant_store_sections WHERE store_id = ?'
-  ).bind(ctx.store.id).first<{ n: number }>();
-  if ((count?.n ?? 0) >= 30) throw badRequest('A store can hold at most 30 sections');
-
-  const id = newId('sec');
-  await c.env.DB.prepare(
-    `INSERT INTO merchant_store_sections (id, store_id, name, name_ar, sort_order, active)
-     VALUES (?,?,?,?,?,1)`
-  ).bind(
-    id, ctx.store.id,
-    str(body.name, 'name', { min: 1, max: 60 }),
-    str(body.name_ar, 'name_ar', { min: 0, max: 60, required: false }),
-    int(body.sort_order, 'sort_order', { min: 0, max: 999, def: 0 })
-  ).run();
-  const row = await c.env.DB.prepare('SELECT * FROM merchant_store_sections WHERE id = ?').bind(id).first();
-  return c.json({ success: true, section: sectionShape(row as Record<string, unknown>) }, 201);
-});
-
-merchantRoutes.patch('/sections/:id', async (c) => {
-  const ctx = await requireStoreOwner(c);
-  const body = await c.req.json().catch(() => ({}));
-  const sets: string[] = [];
-  const vals: unknown[] = [];
-  if (body.name !== undefined) { sets.push('name = ?'); vals.push(str(body.name, 'name', { min: 1, max: 60 })); }
-  if (body.name_ar !== undefined) { sets.push('name_ar = ?'); vals.push(str(body.name_ar, 'name_ar', { min: 0, max: 60, required: false })); }
-  if (body.sort_order !== undefined) { sets.push('sort_order = ?'); vals.push(int(body.sort_order, 'sort_order', { min: 0, max: 999 })); }
-  if (body.active !== undefined) { sets.push('active = ?'); vals.push(body.active ? 1 : 0); }
-  if (!sets.length) throw badRequest('Nothing to update');
-  vals.push(c.req.param('id'), ctx.store.id);
-  const res = await c.env.DB.prepare(
-    `UPDATE merchant_store_sections SET ${sets.join(', ')} WHERE id = ? AND store_id = ?`
-  ).bind(...vals).run();
-  if (!res.meta.changes) throw notFound('Section not found');
-  return c.json({ success: true });
-});
-
-merchantRoutes.delete('/sections/:id', async (c) => {
-  const ctx = await requireStoreOwner(c);
-  const id = c.req.param('id');
-  // Products survive their section: they become ungrouped, never deleted.
-  const res = await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE community_products SET section_id = NULL
-        WHERE section_id = ? AND store_id = ?`
-    ).bind(id, ctx.store.id),
-    c.env.DB.prepare(
-      'DELETE FROM merchant_store_sections WHERE id = ? AND store_id = ?'
-    ).bind(id, ctx.store.id),
-  ]);
-  if (!res[1].meta.changes) throw notFound('Section not found');
-  return c.json({ success: true });
 });
 
 // ---------------------------------------------------------------- services

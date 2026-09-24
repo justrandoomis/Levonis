@@ -278,8 +278,15 @@ test('the split really happened: every page and panel §10 names has a chunk of 
  * day either lazy chunk (tabViews 5.3 KB, extra 7.5 KB) is pulled back in.
  * The way down to 30: load `refusalStrings` on the first refusal (-8.8), the
  * owner's share strings with the owner's menu (-2.3).
+ *
+ * W2-F TOOK BOTH STEPS and added the product page's variant picker, media
+ * gallery (video included) and printed-product facts: `refusalStrings` is a
+ * dynamic import on the first refusal, `OwnerShareMenuItem` a lazy row of the
+ * «…» menu. The closure measured 40.7 KB after it (StorefrontProduct 6.8 KB
+ * with the variant UI inside it); the budget is that plus ~4 KB, so re-eagering
+ * either lazy piece (8.8 / 2.3 KB) fails the same day.
  */
-const STOREFRONT_BUDGET = 50 * KB;
+const STOREFRONT_BUDGET = 44 * KB;
 
 function staticClosure(start: string): Set<string> {
   const seen = new Set<string>();
@@ -293,7 +300,7 @@ function staticClosure(start: string): Set<string> {
   return seen;
 }
 
-test('the storefront pages add at most 50 KB gzip beyond the initial payload, and the other blocks stay lazy', () => {
+test('the storefront pages add at most 44 KB gzip beyond the initial payload, and the other blocks stay lazy', () => {
   const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
   const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
   const initial = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);

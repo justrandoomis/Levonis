@@ -11,6 +11,7 @@ validators, no runtime dependency; imports nothing outside the package.
 | `events/index` | `EVENT_SCHEMAS` registry keyed `'<Type>.v<n>'`, `schemaFor(type, version)` |
 | `events/fixtures/*.json` | one valid envelope per schema (`sig: "fixture"`, signed with a throwaway key at test time); regenerate with `node_modules/.bin/tsx packages/contracts/scripts/regen-fixtures.ts` |
 | `subscriptions` | `SUBSCRIPTIONS` (consumers per event type — no wildcard), `PRODUCERS` (verified by signature), `CONSUMER_PII_MAX`, `mayConsume`, `deliverableSubscribers` |
+| `merchantRoutes` | the merchant workspace's addresses (`/merchant/orders/:id`, `/merchant/inbox/:threadId` …): `merchantHref` builders the Worker writes into notification links, `parseMerchantPath` the SPA routes them with, `hostPath` for the `/admin` tree on a store's own subdomain |
 | `ownership` | `TABLE_OWNER` — table → owning service from `01-TARGET.md` §2.1; rebuild artefacts and `<svc>_*` platform tables resolve to their owner |
 | `schema` | the validator combinators (`obj`, `str`, `int`, `oneOf`, `nullable`, `arr`, …) and `ContractViolation` |
 | `canonical` | canonical JSON, `sha256Hex`, `canonicalHash`, base64url — the bytes every signature is computed over |

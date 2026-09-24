@@ -634,6 +634,49 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'Your cart changed while you were checking out — it may have been ordered from another tab. Check your orders before trying again.',
     ckb: 'تغيّرت سلتك أثناء إتمام الطلب — ربما أُكمل الطلب من نافذة أخرى. راجع «طلباتي» قبل المحاولة مجددًا.',
   },
+  // Wave 2 (W2-A): the store's delivery is priced from the customer's SAVED
+  // address (worker/lib/merchantDelivery.ts). The checkout draws its own panel
+  // for these three; these sentences are for any other door that meets them.
+  ADDRESS_REQUIRED: {
+    ar: 'أضف عنوان التوصيل لإكمال الطلب.',
+    en: 'Add a delivery address to finish the order.',
+    ckb: 'أضف عنوان التوصيل لإكمال الطلب.',
+  },
+  ADDRESS_GOVERNORATE_REQUIRED: {
+    ar: 'هذا العنوان بلا محافظة. أضف المحافظة لنعرف أجرة التوصيل.',
+    en: 'This address has no governorate. Add it so the delivery can be priced.',
+    ckb: 'هذا العنوان بلا محافظة. أضف المحافظة لنعرف أجرة التوصيل.',
+  },
+  DELIVERY_UNAVAILABLE: {
+    ar: 'هذا المتجر لا يوصل إلى محافظة هذا العنوان. اختر عنوانًا آخر أو الاستلام من المتجر إن كان متاحًا.',
+    en: 'This store does not deliver to that governorate. Choose another address, or pickup if the store offers it.',
+    ckb: 'هذا المتجر لا يوصل إلى محافظة هذا العنوان. اختر عنوانًا آخر أو الاستلام من المتجر إن كان متاحًا.',
+  },
+  ADDRESS_NOT_FOUND: {
+    ar: 'لم نجد هذا العنوان في دفتر عناوينك. اختر عنوانًا آخر.',
+    en: 'That address is not in your address book. Choose another.',
+    ckb: 'لم نجد هذا العنوان في دفتر عناوينك. اختر عنوانًا آخر.',
+  },
+  // Wave 2 (W2-F): a product sold by VARIANT is added as one of its variants
+  // (worker/routes/cart.ts). The storefront product page picks one before the
+  // add, so these meet a stale page or another door. The ckb column carries
+  // the Arabic until the owner writes the Sorani by hand (DECISIONS row 11),
+  // as the entries above do. OWNER: Sorani to be written by hand.
+  VARIANT_REQUIRED: {
+    ar: 'اختر من خيارات المنتج أولًا (المقاس أو اللون…).',
+    en: 'Choose from the product’s options first (size, colour…).',
+    ckb: 'اختر من خيارات المنتج أولًا (المقاس أو اللون…).',
+  },
+  VARIANT_INVALID: {
+    ar: 'هذا الاختيار لا يخص هذا المنتج. حدّث الصفحة واختر من جديد.',
+    en: 'That choice does not belong to this product. Refresh the page and choose again.',
+    ckb: 'هذا الاختيار لا يخص هذا المنتج. حدّث الصفحة واختر من جديد.',
+  },
+  VARIANT_UNAVAILABLE: {
+    ar: 'هذا الاختيار لم يعد معروضًا للبيع. اختر خيارًا آخر.',
+    en: 'That choice is no longer for sale. Choose another option.',
+    ckb: 'هذا الاختيار لم يعد معروضًا للبيع. اختر خيارًا آخر.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

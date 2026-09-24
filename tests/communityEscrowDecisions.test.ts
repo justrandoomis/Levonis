@@ -76,7 +76,7 @@ async function disputedOrder(raw: DatabaseSync) {
  *  themselves, not through a balance function another change may redefine. */
 const credited = (raw: DatabaseSync) =>
   row<{ s: number | null }>(raw,
-    "SELECT SUM(amount_iqd) AS s FROM merchant_payout_ledger WHERE merchant_id = 'm1' AND kind = 'community_order_credit'")?.s ?? 0;
+    "SELECT SUM(amount_iqd) AS s FROM merchant_ledger_entries WHERE merchant_id='m1' AND escrow_id IS NOT NULL")?.s ?? 0;
 
 const repEvents = (raw: DatabaseSync, orderId: string, kind: string) =>
   count(raw, 'SELECT COUNT(*) AS n FROM merchant_reputation_events WHERE community_order_id = ? AND kind = ?', orderId, kind);

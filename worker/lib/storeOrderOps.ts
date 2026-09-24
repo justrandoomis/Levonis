@@ -40,7 +40,13 @@ import { newId } from './crypto';
 import { audit, auditStatements } from './audit';
 import { cancelledOrderRefundStatements } from './orderCancelOps';
 import { sellingVerdict, type StoreContext } from './merchantAuth';
-import { notify } from './notifications';
+import { notifyMerchant, storeOrderNotice } from './merchantNotify';
+import {
+  orderCredit,
+  orderCreditStateSql,
+  releaseOrderCreditStatements,
+  reverseOrderCreditStatement,
+} from './merchantLedger';
 
 // ------------------------------------------------------------------ policy
 
@@ -246,21 +252,19 @@ export function storeOrderPublic(o: Record<string, unknown>) {
 // ------------------------------------------------ telling the merchant
 
 /**
- * THE MERCHANT HEARS ABOUT THEIR OWN ORDERS (B23).
+ * THE MERCHANT HEARS ABOUT THEIR OWN ORDERS (B23) — through the one merchant
+ * notification door (worker/lib/merchantNotify.ts, stream W2-E).
  *
- * A paid order reached the admin group's Telegram topic and nobody at the
- * store: `merchant_notification_preferences.new_orders` was stored and never
- * read. It is read here — a merchant who switched new-order notices off gets
- * none — and an absent row means the platform default, which is on.
+ * The in-app notice is always written and opens THE ORDER
+ * (`/merchant/orders/<id>`); the merchant's `new_orders` switch decides whether
+ * it also goes to their Telegram / WhatsApp / email. A cancellation is
+ * `order_needs_action` — the instruction not to ship what was paid for.
+ * Pass the Env for the outside channels; a bare database writes in-app only.
  *
- * A CANCELLATION IS ALWAYS SENT, whatever that switch says. It is not news
- * about a new order; it is the instruction not to ship one that was already
- * paid for.
- *
- * Never throws (`notify`), and replay-proof by event key.
+ * Never throws, and replay-proof by event key (wave 1's keys, kept).
  */
 export async function notifyMerchantOfStoreOrder(
-  db: D1Database,
+  envOrDb: Env | D1Database,
   p: {
     merchantId: string;
     orderId: string;
@@ -268,51 +272,7 @@ export async function notifyMerchantOfStoreOrder(
     totalIqd?: number;
   }
 ): Promise<void> {
-  try {
-    const owner = await db
-      .prepare(
-        `SELECT m.user_id, COALESCE(p.new_orders, 1) AS new_orders
-           FROM community_merchants m
-           LEFT JOIN merchant_notification_preferences p ON p.merchant_id = m.id
-          WHERE m.id = ?`
-      )
-      .bind(p.merchantId)
-      .first<{ user_id: string; new_orders: number }>();
-    if (!owner) return;
-    if (p.event === 'new' && Number(owner.new_orders) === 0) return;
-    const total = Math.max(0, Math.trunc(Number(p.totalIqd) || 0)).toLocaleString('en-US');
-    const copy =
-      p.event === 'new'
-        ? {
-            title_ar: `طلب جديد في متجرك — ${p.orderId}`,
-            title_en: `New order in your store — ${p.orderId}`,
-            body_ar: `الإجمالي ${total} د.ع، مدفوع مسبقًا من محفظة الزبون. أكّده من «الطلبات» في لوحة متجرك.`,
-            body_en: `Total ${total} IQD, prepaid from the customer's wallet. Confirm it under Orders in your store dashboard.`,
-          }
-        : {
-            title_ar: `أُلغي الطلب ${p.orderId} — لا تشحنه`,
-            title_en: `Order ${p.orderId} was cancelled — do not ship it`,
-            body_ar:
-              p.event === 'cancelled_by_customer'
-                ? 'ألغى الزبون الطلب، وأُعيد المبلغ إلى محفظته.'
-                : 'ألغت Levonis الطلب، وأُعيد المبلغ إلى محفظة الزبون.',
-            body_en:
-              p.event === 'cancelled_by_customer'
-                ? 'The customer cancelled it and was refunded to their wallet.'
-                : 'Levonis cancelled it and refunded the customer to their wallet.',
-          };
-    await notify(db, {
-      userId: owner.user_id,
-      kind: 'order_update',
-      ...copy,
-      link: '/merchant',
-      entity_type: 'order',
-      entity_id: p.orderId,
-      eventKey: `store_order.${p.event === 'new' ? 'new' : 'cancelled'}:${p.orderId}`,
-    });
-  } catch (e) {
-    console.error('merchant order notice not written', p.orderId, e instanceof Error ? e.message : String(e));
-  }
+  await notifyMerchant(envOrDb, { merchantId: p.merchantId }, storeOrderNotice(p.event, p.orderId, p.totalIqd));
 }
 
 // ------------------------------------------------------------- cancelling
@@ -328,14 +288,8 @@ export type StoreOrderActor = 'merchant' | 'customer' | 'admin';
  */
 export async function storeCancelMovesMoney(db: D1Database, o: Record<string, unknown>): Promise<boolean> {
   if ((Number(o.wallet_applied_usd_cents) || 0) > 0 || (Number(o.points_discount_iqd) || 0) > 0) return true;
-  const released = await db
-    .prepare(
-      `SELECT 1 AS x FROM merchant_payout_ledger
-        WHERE order_id = ? AND kind = 'sale_credit' AND state = 'available' AND amount_iqd > 0 LIMIT 1`
-    )
-    .bind(String(o.id ?? ''))
-    .first();
-  return !!released;
+  // A credit already released (the merchant ledger holds it in «available»).
+  return (await orderCredit(db, String(o.id ?? ''))).available_iqd > 0;
 }
 
 export interface CancelStoreOrderInput {
@@ -378,10 +332,11 @@ export type CancelStoreOrderResult =
  *      (`cancelledOrderRefundStatements`, the customer door's own statements);
  *   4. the community stock and `sold_count` put back, per product;
  *   5. the coupon use given back;
- *   6. the merchant's credit: `pending → reversed` in place, or — when it had
- *      already become available (an admin cancelling after a release) — a
- *      negative `reversal` row that takes it back out of «متاح», keyed
- *      `reversal:<order>` so it can exist once;
+ *   6. the merchant's credit, undone in the append-only merchant ledger
+ *      (worker/lib/merchantLedger.ts): refund lines in «pending», or — when it
+ *      had already become available (an admin cancelling after a release) —
+ *      in «available», a claw-back; keyed `reversal:<order>:<part>` so it can
+ *      exist once;
  *   7. a fence that aborts everything unless THIS batch's gate row exists;
  *   8. the audit row.
  *
@@ -415,13 +370,7 @@ export async function cancelStoreOrder(env: Env, p: CancelStoreOrderInput): Prom
       )
       .bind(id)
       .all<{ product_id: string; qty: number }>(),
-    db
-      .prepare(
-        `SELECT state FROM merchant_payout_ledger
-          WHERE order_id = ? AND merchant_id = ? AND kind = 'sale_credit' LIMIT 1`
-      )
-      .bind(id, merchantId)
-      .first<{ state: string }>(),
+    orderCredit(db, id),
   ]);
 
   const note = `Cancelled by the ${p.actor}${p.reason ? `: ${p.reason.slice(0, 300)}` : ''}`;
@@ -484,31 +433,20 @@ export async function cancelStoreOrder(env: Env, p: CancelStoreOrderInput): Prom
     );
   }
 
+  // The merchant's credit, undone in the merchant ledger: refund lines in
+  // «pending» when it was never released, in «available» when it was (a
+  // claw-back) — one statement that computes what is left, so a credit a
+  // financial admin already took back (`reconcileReverseCredit`) is not taken
+  // twice, and fenced on THIS batch's gate row.
   stmts.push(
-    // Already released → taken back out of «متاح» by a row of its own. Before
-    // the flip below, and mutually exclusive with it by `state`. Never a
-    // second one: a financial admin may already have taken the credit back
-    // (`reconcileReverseCredit`) under the same key, and a UNIQUE clash here
-    // would refuse the whole cancellation — the customer's refund with it.
-    db
-      .prepare(
-        `INSERT INTO merchant_payout_ledger (id, merchant_id, kind, amount_iqd, state, order_id, note, idempotency_key)
-         SELECT ?1, l.merchant_id, 'reversal', -l.amount_iqd, 'available', l.order_id, ?2, 'reversal:' || l.order_id
-           FROM merchant_payout_ledger l
-          WHERE l.order_id = ?3 AND l.merchant_id = ?4 AND l.kind = 'sale_credit'
-            AND l.state = 'available' AND l.amount_iqd > 0
-            AND NOT EXISTS (SELECT 1 FROM merchant_payout_ledger x WHERE x.idempotency_key = 'reversal:' || l.order_id)
-            AND ${gate(5)}`
-      )
-      .bind(newId('pay'), `store order ${id} cancelled after release`, id, merchantId, anchor),
-    db
-      .prepare(
-        `UPDATE merchant_payout_ledger SET state = 'reversed'
-          WHERE order_id = ?1 AND merchant_id = ?2 AND kind = 'sale_credit' AND state = 'pending'
-            AND ${gate(3)}`
-      )
-      .bind(id, merchantId, anchor),
-    // THIS batch's gate row must exist, or nothing above may stand.
+    reverseOrderCreditStatement(db, {
+      orderId: id,
+      merchantId,
+      actorId: p.actorUserId,
+      note: `store order ${id} cancelled by the ${p.actor}`,
+      ts: now,
+      guard: { sql: gate(7), binds: [anchor] },
+    }).statement,
     db
       .prepare(
         `UPDATE orders
@@ -517,10 +455,9 @@ export async function cancelStoreOrder(env: Env, p: CancelStoreOrderInput): Prom
       )
       .bind(anchor, id)
   );
-
   const refundedUsdCents = Number(o.wallet_applied_usd_cents) || 0;
   const creditOutcome: 'reversed' | 'clawed_back' | 'none' =
-    credit?.state === 'pending' ? 'reversed' : credit?.state === 'available' ? 'clawed_back' : 'none';
+    credit.state === 'pending' ? 'reversed' : credit.state === 'available' ? 'clawed_back' : 'none';
   const { statements: auditStmts } = await auditStatements(db, p.actorUserId, 'store_order.cancelled', id, {
     actor: p.actor,
     from,
@@ -590,15 +527,20 @@ export async function confirmStoreOrderReceipt(
       .bind(now, id, p.customerId),
     // Never on an order whose customer was already refunded (review F4): the
     // receipt is still recorded, and the credit waits for a financial admin.
-    db
-      .prepare(
-        `UPDATE merchant_payout_ledger SET state = 'available'
-          WHERE order_id = ?1 AND kind = 'sale_credit' AND state = 'pending'
-            AND EXISTS (SELECT 1 FROM orders o
-                         WHERE o.id = ?1 AND o.status = 'delivered' AND o.receipt_confirmed_at = ?2)
-            AND NOT ${refundedStoreOrderSql('?1')}`
-      )
-      .bind(id, now),
+    // The release moves what the order holds in «pending», only in the batch
+    // that wrote this receipt.
+    ...releaseOrderCreditStatements(db, {
+      orderId: id,
+      merchantId: String(o.merchant_id ?? ''),
+      actorId: p.customerId,
+      note: 'the customer confirmed receipt',
+      ts: now,
+      condition: {
+        sql: `EXISTS (SELECT 1 FROM orders ro WHERE ro.id = ?3 AND ro.status = 'delivered' AND ro.receipt_confirmed_at = ?7)
+              AND NOT ${refundedStoreOrderSql('?3')}`,
+        binds: [now],
+      },
+    }),
   ]);
   const stamped = (res[0]?.meta?.changes ?? 0) > 0;
   if (!stamped) {
@@ -655,13 +597,15 @@ export async function releaseDueStoreCredits(
 ): Promise<Pick<StoreOrderSweepReport, 'released' | 'frozen' | 'refund_blocked' | 'errors'>> {
   const out = { released: 0, frozen: 0, refund_blocked: 0, errors: 0 };
   const cutoff = new Date(Date.parse(nowIso) - STORE_RELEASE_DAYS * 86_400_000).toISOString();
-  const due = `FROM merchant_payout_ledger l
-       JOIN orders o ON o.id = l.order_id
-      WHERE l.kind = 'sale_credit' AND l.state = 'pending'
-        AND o.seller_type = 'merchant' AND o.status = 'delivered'
-        AND o.delivered_at IS NOT NULL AND o.delivered_at <> '' AND o.delivered_at <= ?1`;
+  // Delivered store orders past their three days whose credit is still in
+  // «pending» in the merchant ledger.
+  const due = `FROM orders o
+      WHERE o.seller_type = 'merchant' AND o.status = 'delivered'
+        AND o.delivered_at IS NOT NULL AND o.delivered_at <> '' AND o.delivered_at <= ?1
+        AND (SELECT COALESCE(SUM(l.amount_iqd), 0) FROM merchant_ledger_entries l
+              WHERE l.order_id = o.id AND l.bucket = 'pending') > 0`;
   const { results } = await env.DB.prepare(
-    `SELECT l.id AS ledger_id, l.amount_iqd, o.id AS order_id, o.merchant_id
+    `SELECT o.id AS order_id, o.merchant_id
        ${due}
         AND NOT ${openDisputeSql('o')}
         AND NOT ${refundedStoreOrderSql('o.id')}
@@ -669,7 +613,7 @@ export async function releaseDueStoreCredits(
       LIMIT ?2`
   )
     .bind(cutoff, limit)
-    .all<{ ledger_id: string; amount_iqd: number; order_id: string; merchant_id: string }>();
+    .all<{ order_id: string; merchant_id: string }>();
   const held = await env.DB.prepare(
     `SELECT COALESCE(SUM(CASE WHEN ${openDisputeSql('o')} THEN 1 ELSE 0 END), 0) AS frozen,
             COALESCE(SUM(CASE WHEN ${refundedStoreOrderSql('o.id')} THEN 1 ELSE 0 END), 0) AS refunded
@@ -682,22 +626,34 @@ export async function releaseDueStoreCredits(
 
   for (const r of results ?? []) {
     try {
-      const res = await env.DB.prepare(
-        `UPDATE merchant_payout_ledger SET state = 'available'
-          WHERE id = ?1 AND kind = 'sale_credit' AND state = 'pending'
-            AND EXISTS (SELECT 1 FROM orders o
-                         WHERE o.id = ?2 AND o.status = 'delivered'
-                           AND o.delivered_at IS NOT NULL AND o.delivered_at <> '' AND o.delivered_at <= ?3
+      // Every condition asked again INSIDE the statement that moves the money:
+      // still delivered, still past the three days, no complaint or ticket
+      // opened a second ago, not refunded.
+      const stmts = releaseOrderCreditStatements(env.DB, {
+        orderId: r.order_id,
+        merchantId: String(r.merchant_id ?? ''),
+        actorId: null,
+        note: `released ${STORE_RELEASE_DAYS} days after delivery`,
+        ts: nowIso,
+        condition: {
+          sql: `EXISTS (SELECT 1 FROM orders o
+                         WHERE o.id = ?3 AND o.status = 'delivered'
+                           AND o.delivered_at IS NOT NULL AND o.delivered_at <> '' AND o.delivered_at <= ?7
                            AND NOT ${openDisputeSql('o')})
-            AND NOT ${refundedStoreOrderSql('?2')}`
-      )
-        .bind(r.ledger_id, r.order_id, cutoff)
-        .run();
-      if ((res.meta.changes ?? 0) > 0) {
+                AND NOT ${refundedStoreOrderSql('?3')}`,
+          binds: [cutoff],
+        },
+      });
+      const res = await env.DB.batch(stmts);
+      if ((res[0]?.meta?.changes ?? 0) > 0) {
         out.released += 1;
+        const moved = await env.DB.prepare(
+          "SELECT amount_iqd FROM merchant_ledger_entries WHERE event_key = 'release:' || ? || ':available'"
+        )
+          .bind(r.order_id)
+          .first<{ amount_iqd: number }>();
         await audit(env.DB, null, 'store_order.credit_released', r.order_id, {
-          ledger_id: r.ledger_id,
-          amount_iqd: Number(r.amount_iqd) || 0,
+          amount_iqd: Number(moved?.amount_iqd) || 0,
           merchant_id: r.merchant_id,
           basis: `${STORE_RELEASE_DAYS} days after delivery, no open complaint`,
         });
@@ -848,17 +804,19 @@ export async function storeOrderMoneyDrift(
         `SELECT o.id AS order_id, o.status, o.created_at, o.user_id AS customer_id, u.name AS customer_name,
                 o.merchant_id, m.name AS merchant_name, o.total_iqd,
                 rt.amount AS refund_usd_cents, rt.amount_iqd AS refund_iqd, rt.created_at AS refunded_at,
-                l.state AS credit_state, l.amount_iqd AS credit_iqd
+                c.credit_state, CASE WHEN c.pend > 0 THEN c.pend ELSE c.avail END AS credit_iqd
            FROM orders o
            JOIN wallet_transactions rt ON rt.id = 'wtx_refund_' || o.id || '_usd'
-           JOIN merchant_payout_ledger l ON l.order_id = o.id AND l.kind = 'sale_credit'
+           JOIN (SELECT l.order_id,
+                        COALESCE(SUM(CASE WHEN l.bucket = 'pending' THEN l.amount_iqd ELSE 0 END), 0) AS pend,
+                        COALESCE(SUM(CASE WHEN l.bucket = 'available' THEN l.amount_iqd ELSE 0 END), 0) AS avail,
+                        CASE WHEN SUM(CASE WHEN l.bucket = 'pending' THEN l.amount_iqd ELSE 0 END) > 0 THEN 'pending'
+                             ELSE 'available' END AS credit_state
+                   FROM merchant_ledger_entries l WHERE l.order_id IS NOT NULL GROUP BY l.order_id) c ON c.order_id = o.id
            LEFT JOIN users u ON u.id = o.user_id
            LEFT JOIN community_merchants m ON m.id = o.merchant_id
           WHERE o.seller_type = 'merchant' AND o.status <> 'cancelled'
-            AND (l.state = 'pending'
-                 OR (l.state = 'available' AND l.amount_iqd > 0
-                     AND NOT EXISTS (SELECT 1 FROM merchant_payout_ledger x
-                                      WHERE x.idempotency_key = 'reversal:' || o.id)))
+            AND (c.pend > 0 OR c.avail > 0)
           ORDER BY o.created_at DESC, o.id DESC
           LIMIT ?1`
       )
@@ -874,8 +832,7 @@ export async function storeOrderMoneyDrift(
                 (SELECT d.amount_iqd FROM wallet_transactions d
                   WHERE d.user_id = o.user_id AND d.ref = o.id AND d.type = 'withdrawal'
                     AND d.currency = 'USD' AND d.status = 'approved' LIMIT 1) AS paid_iqd,
-                (SELECT l.state FROM merchant_payout_ledger l
-                  WHERE l.order_id = o.id AND l.kind = 'sale_credit' LIMIT 1) AS credit_state
+                ${orderCreditStateSql('o.id')} AS credit_state
            FROM orders o
            LEFT JOIN users u ON u.id = o.user_id
            LEFT JOIN community_merchants m ON m.id = o.merchant_id
@@ -898,40 +855,33 @@ export type ReconcileResult =
   | { ok: false; reason: 'NOT_FOUND' | 'NOT_APPLICABLE'; detail: string };
 
 /**
- * The merchant's credit on an order, taken back: `pending → reversed` in
- * place, or — when it had become available — a negative `reversal` row keyed
- * `reversal:<order>`, the same key `cancelStoreOrder` uses, so the two can
- * never both take it back. Both are conditional and idempotent.
+ * The merchant's credit on an order, taken back — refund lines that zero what
+ * the order still holds, in «pending» or (already released) in «available»
+ * (worker/lib/merchantLedger.ts `reverseOrderCreditStatement`), keyed
+ * `reversal:<order>:<part>` exactly as `cancelStoreOrder` keys them, so the two
+ * can never both take it back. Conditional and idempotent.
  */
-function creditTakeBackStatements(
+function creditTakeBackStatement(
   db: D1Database,
   p: {
     orderId: string;
-    reversalId: string;
+    merchantId: string;
+    idPrefix: string;
     note: string;
     adminId: string;
-    /** A further condition, given the SQL for the credit row's order id. */
-    extraGuard?: (orderIdColumn: string) => string;
+    /** A further condition, given the SQL for the order id (?3); its binds start at ?7. */
+    extraGuard?: { sql: string; binds: unknown[] };
   }
-): D1PreparedStatement[] {
-  const guard = (col: string) => (p.extraGuard ? ` AND ${p.extraGuard(col)}` : '');
-  return [
-    db
-      .prepare(
-        `UPDATE merchant_payout_ledger SET state = 'reversed', note = note || ?2, admin_id = ?3
-          WHERE order_id = ?1 AND kind = 'sale_credit' AND state = 'pending'${guard('merchant_payout_ledger.order_id')}`
-      )
-      .bind(p.orderId, ` · ${p.note}`, p.adminId),
-    db
-      .prepare(
-        `INSERT INTO merchant_payout_ledger (id, merchant_id, kind, amount_iqd, state, order_id, note, admin_id, idempotency_key)
-         SELECT ?1, l.merchant_id, 'reversal', -l.amount_iqd, 'available', l.order_id, ?2, ?3, 'reversal:' || l.order_id
-           FROM merchant_payout_ledger l
-          WHERE l.order_id = ?4 AND l.kind = 'sale_credit' AND l.state = 'available' AND l.amount_iqd > 0
-            AND NOT EXISTS (SELECT 1 FROM merchant_payout_ledger x WHERE x.idempotency_key = 'reversal:' || l.order_id)${guard('l.order_id')}`
-      )
-      .bind(p.reversalId, p.note, p.adminId, p.orderId),
-  ];
+): D1PreparedStatement {
+  return reverseOrderCreditStatement(db, {
+    orderId: p.orderId,
+    merchantId: p.merchantId,
+    actorId: p.adminId,
+    note: p.note,
+    ts: new Date().toISOString(),
+    idPrefix: p.idPrefix,
+    guard: p.extraGuard,
+  }).statement;
 }
 
 /**
@@ -974,17 +924,14 @@ export async function reconcileRefundUnrefunded(
   if (!(cents > 0) || !debit) return { ok: false, reason: 'NOT_APPLICABLE', detail: 'not_paid_from_wallet' };
 
   const now = p.nowIso ?? new Date().toISOString();
-  const credit = await db
-    .prepare("SELECT state, amount_iqd FROM merchant_payout_ledger WHERE order_id = ? AND kind = 'sale_credit' LIMIT 1")
-    .bind(id)
-    .first<{ state: string; amount_iqd: number }>();
+  const credit = await orderCredit(db, id);
   const { statements: auditStmts } = await auditStatements(db, p.adminId, 'admin.store_order_reconciled', id, {
     kind: 'refund_unrefunded_cancellation',
     reason: p.reason,
     refund_usd_cents: cents,
     debit_id: debit.id,
     debit_usd_cents: Number(debit.amount) || 0,
-    credit_before: credit?.state ?? null,
+    credit_before: credit.state,
   });
   // `orders.status` is NOT NULL: writing NULL into it is the abort, the same
   // idiom as the refund's own fence.
@@ -1003,9 +950,10 @@ export async function reconcileRefundUnrefunded(
     ...(await cancelledOrderRefundStatements(env, o, 'admin', now)),
     // …and THIS batch did, or nothing in it stands.
     refundFence(true),
-    ...creditTakeBackStatements(db, {
+    creditTakeBackStatement(db, {
       orderId: id,
-      reversalId: newId('pay'),
+      merchantId: String(o.merchant_id ?? ''),
+      idPrefix: newId('mle'),
       note: `store order ${id} cancelled and refunded by reconciliation`,
       adminId: p.adminId,
     }),
@@ -1045,67 +993,51 @@ export async function reconcileReverseCredit(
     .bind(`wtx_refund_${o.id}_usd`)
     .first<{ amount: number; amount_iqd: number | null }>();
   if (!refund) return { ok: false, reason: 'NOT_APPLICABLE', detail: 'not_refunded' };
-  const credit = await db
-    .prepare(
-      `SELECT l.state, l.amount_iqd,
-              EXISTS (SELECT 1 FROM merchant_payout_ledger x WHERE x.idempotency_key = 'reversal:' || l.order_id) AS clawed
-         FROM merchant_payout_ledger l WHERE l.order_id = ? AND l.kind = 'sale_credit' LIMIT 1`
-    )
-    .bind(o.id)
-    .first<{ state: string; amount_iqd: number; clawed: number }>();
-  if (!credit) return { ok: false, reason: 'NOT_APPLICABLE', detail: 'no_credit' };
-  if (credit.state === 'reversed' || Number(credit.clawed) === 1) return { ok: true, replayed: true, orderId: o.id };
+  const credit = await orderCredit(db, o.id);
+  if (credit.state === null) return { ok: false, reason: 'NOT_APPLICABLE', detail: 'no_credit' };
+  if (credit.state === 'reversed' || credit.state === 'settled') return { ok: true, replayed: true, orderId: o.id };
   if (o.status === 'cancelled') return { ok: false, reason: 'NOT_APPLICABLE', detail: 'cancelled' };
-  if (credit.state !== 'pending' && credit.state !== 'available') {
-    return { ok: false, reason: 'NOT_APPLICABLE', detail: `credit_${credit.state}` };
-  }
 
-  const nonce = newId('rcn');
-  const reversalId = newId('pay');
+  const prefix = newId('mle');
   const { statements: auditStmts } = await auditStatements(db, p.adminId, 'admin.store_order_reconciled', o.id, {
     kind: 'reverse_credit_of_refunded_order',
     reason: p.reason,
     credit_before: credit.state,
-    credit_iqd: Number(credit.amount_iqd) || 0,
+    credit_iqd: credit.state === 'pending' ? credit.pending_iqd : credit.available_iqd,
     refund_usd_cents: Number(refund.amount) || 0,
     refund_iqd: refund.amount_iqd ?? null,
   });
-  const inBatchGuard = (col: string) => `${refundedStoreOrderSql(col)}
-            AND EXISTS (SELECT 1 FROM orders ro WHERE ro.id = ${col} AND ro.status <> 'cancelled')`;
   const stmts: D1PreparedStatement[] = [
-    ...creditTakeBackStatements(db, {
+    creditTakeBackStatement(db, {
       orderId: o.id,
-      reversalId,
-      note: `customer refunded before the order was re-opened — reversed by reconciliation [${nonce}]`,
+      merchantId: String(o.merchant_id ?? ''),
+      idPrefix: prefix,
+      note: 'customer refunded before the order was re-opened — reversed by reconciliation',
       adminId: p.adminId,
-      extraGuard: inBatchGuard,
+      extraGuard: {
+        sql: `${refundedStoreOrderSql('?3')}
+              AND EXISTS (SELECT 1 FROM orders ro WHERE ro.id = ?3 AND ro.status <> 'cancelled')`,
+        binds: [],
+      },
     }),
     // THIS batch took the credit back, or nothing in it — the audit row
     // included — stands.
     db
       .prepare(
         `UPDATE orders
-            SET status = CASE WHEN EXISTS (SELECT 1 FROM merchant_payout_ledger WHERE id = ?1)
-                               OR EXISTS (SELECT 1 FROM merchant_payout_ledger
-                                           WHERE order_id = ?2 AND kind = 'sale_credit' AND state = 'reversed'
-                                             AND instr(note, ?3) > 0)
+            SET status = CASE WHEN EXISTS (SELECT 1 FROM merchant_ledger_entries
+                                            WHERE id IN (?1 || '_refund', ?1 || '_commission_refund', ?1 || '_delivery_refund'))
                               THEN status ELSE NULL END
           WHERE id = ?2`
       )
-      .bind(reversalId, o.id, nonce),
+      .bind(prefix, o.id),
     ...auditStmts,
   ];
   try {
     await db.batch(stmts);
   } catch (e) {
-    const again = await db
-      .prepare(
-        `SELECT l.state, EXISTS (SELECT 1 FROM merchant_payout_ledger x WHERE x.idempotency_key = 'reversal:' || l.order_id) AS clawed
-           FROM merchant_payout_ledger l WHERE l.order_id = ? AND l.kind = 'sale_credit' LIMIT 1`
-      )
-      .bind(o.id)
-      .first<{ state: string; clawed: number }>();
-    if (again && (again.state === 'reversed' || Number(again.clawed) === 1)) return { ok: true, replayed: true, orderId: o.id };
+    const again = await orderCredit(db, o.id);
+    if (again.state === 'reversed') return { ok: true, replayed: true, orderId: o.id };
     const now = await db.prepare('SELECT status FROM orders WHERE id = ?').bind(o.id).first<{ status: string }>();
     if (now?.status === 'cancelled') return { ok: false, reason: 'NOT_APPLICABLE', detail: 'cancelled' };
     throw e;

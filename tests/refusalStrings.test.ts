@@ -142,6 +142,9 @@ test('every code the table translates is one the server can actually emit', () =
     // The merchant selling gate every offer and store write passes through:
     // one code per sanction, MERCHANT_RESTRICTED among them (wave 1).
     'worker/lib/merchantAuth.ts',
+    // The store checkout's delivery by governorate (wave 2, W2-A): the address
+    // and delivery refusals are raised from the saved address here.
+    'worker/lib/merchantDelivery.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

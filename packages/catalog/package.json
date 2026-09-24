@@ -1,0 +1,13 @@
+{
+  "name": "@levonis/catalog",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The merchant catalogue model shared by the Worker (authoritative) and the SPA (editor and storefront): option groups, values and variants, the variant key and resolution, the legacy options/colours converter, the colour palette and the 3D-printing attribute vocabularies. Pure: no I/O, no Cloudflare bindings, no imports from worker/ or services/.",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json"
+  }
+}

@@ -1,0 +1,43 @@
+/*
+ * THE SWATCH PALETTE — packages/catalog/src/palette.ts, as CSS.
+ *
+ * A swatch is drawn from its KEY (`data-swatch="red"`), which the server only
+ * ever stores from the closed list in palette.ts (a CHECK constraint in
+ * migration 0126). No merchant string is a selector, a value or a class here
+ * (docs/MERCHANT_STORES.md §10) — adding a colour means adding a key to the
+ * palette, a row to the CHECK and a rule below.
+ */
+.lv-swatch {
+  display: inline-block;
+  inline-size: 1em;
+  block-size: 1em;
+  border-radius: 9999px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+  background: rgb(255 255 255 / 0.08);
+  flex-shrink: 0;
+}
+.lv-swatch[data-swatch='black'] { background: #16161a; }
+.lv-swatch[data-swatch='white'] { background: #f4f4f2; }
+.lv-swatch[data-swatch='gray'] { background: #8a8d93; }
+.lv-swatch[data-swatch='silver'] { background: linear-gradient(135deg, #e3e5e8, #9ea3aa); }
+.lv-swatch[data-swatch='red'] { background: #d7263d; }
+.lv-swatch[data-swatch='orange'] { background: #f28c28; }
+.lv-swatch[data-swatch='yellow'] { background: #f5d130; }
+.lv-swatch[data-swatch='green'] { background: #2fa65a; }
+.lv-swatch[data-swatch='teal'] { background: #1aa6a0; }
+.lv-swatch[data-swatch='blue'] { background: #2f6fde; }
+.lv-swatch[data-swatch='navy'] { background: #1f2d5c; }
+.lv-swatch[data-swatch='purple'] { background: #7d4bd1; }
+.lv-swatch[data-swatch='pink'] { background: #ec6fa9; }
+.lv-swatch[data-swatch='brown'] { background: #7a4b2a; }
+.lv-swatch[data-swatch='beige'] { background: #dccaa7; }
+.lv-swatch[data-swatch='gold'] { background: linear-gradient(135deg, #f3d77a, #b8892b); }
+.lv-swatch[data-swatch='bronze'] { background: linear-gradient(135deg, #d59a63, #8a5a2f); }
+.lv-swatch[data-swatch='wood'] { background: repeating-linear-gradient(100deg, #a9743f 0 3px, #8c5a2e 3px 6px); }
+.lv-swatch[data-swatch='marble'] { background: linear-gradient(135deg, #f1f1ef 0 40%, #b9bcc2 45%, #f1f1ef 55%); }
+.lv-swatch[data-swatch='clear'] {
+  background: linear-gradient(135deg, rgb(255 255 255 / 0.35), rgb(255 255 255 / 0.05));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.45);
+}
+.lv-swatch[data-swatch='glow'] { background: #b9f35b; box-shadow: 0 0 6px rgb(185 243 91 / 0.7); }
+.lv-swatch[data-swatch='multi'] { background: conic-gradient(#d7263d, #f5d130, #2fa65a, #2f6fde, #7d4bd1, #d7263d); }

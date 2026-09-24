@@ -107,7 +107,7 @@ test('B25 a blocked store cart line says why, for every reason the server gives'
 
 test('B26 the merchant orders tab pages through next_cursor and never uses a native dialog', () => {
   const all = code('src/components/merchant/dashboard/SalesTabs.tsx');
-  const tab = /export function OrdersTab\(\) \{[\s\S]*?\n\}\n/.exec(all)?.[0] ?? '';
+  const tab = /export function OrdersTab\([^)]*\)[^{]*\{[\s\S]*?\n\}\n/.exec(all)?.[0] ?? '';
   assert.ok(tab, 'OrdersTab is findable');
   assert.match(tab, /setNextCursor\(d\.next_cursor \?\? null\)/);
   assert.match(tab, /merchantApi\.orders\(query\(nextCursor\)\)/);

@@ -38,13 +38,29 @@ import { benefits, getTierStatus } from '../lib/entitlements';
 import { salesBadgeTier } from '../lib/salesBadge';
 import { maskName } from './reviews';
 import { storefrontLayoutPayload, storefrontTheme } from '../lib/storeLayout';
+import { collectionMemberSql, collectionOrder, sinceNewArrivals, type CollectionKind } from '../lib/catalog/sql';
+import { publicProductExtras } from '../lib/catalog/public';
+import { isSchemaMissing } from '../lib/membershipBenefits';
+import {
+  deliveryToGovernorate,
+  loadDeliveryConfig,
+  publicDeliverySummary,
+  viewerGovernorate,
+} from '../lib/merchantDelivery';
+import { normalizeGovernorate } from '../lib/iraqGovernorates';
 
 export const storefrontRoutes = new Hono<AppContext>();
 
 /** The shopfront view. Deliberately smaller than the merchant's own view. */
-async function publicStore(db: D1Database, ctx: StoreContext, rootDomain: string | null) {
+async function publicStore(db: D1Database, ctx: StoreContext, rootDomain: string | null, viewerId: string | null = null) {
   const { store: s, merchant: m } = ctx;
-  const tier = await getTierStatus(db, m.user_id);
+  // The store's delivery (W2-A) and — for a signed-in visitor with a saved
+  // address — what delivery to THEIR governorate costs, read together.
+  const [tier, deliveryCfg, viewerGov] = await Promise.all([
+    getTierStatus(db, m.user_id),
+    loadDeliveryConfig(db, s),
+    viewerGovernorate(db, viewerId),
+  ]);
   /**
    * «OPEN» MEANS THE CART WILL TAKE AN ORDER (review S1). It used to be
    * `storeIsOpen` — the store's own switch and the merchant suspension — while
@@ -81,12 +97,18 @@ async function publicStore(db: D1Database, ctx: StoreContext, rootDomain: string
     profile_links: safeParse<Array<{ visible?: boolean }>>(s.profile_links, []).filter((w) => w?.visible !== false),
     profile_facts: safeParse<Array<{ visible?: boolean }>>(s.profile_facts, []).filter((w) => w?.visible !== false),
     profile_facts_configured: safeParse<unknown[]>(s.profile_facts, []).length > 0,
-    // Only the customer-facing half of the delivery settings; the fee numbers
-    // are checkout's business and are priced there from the database.
-    delivery_settings: (() => {
-      const note = safeParse<Record<string, unknown>>(s.delivery_settings, {}).note;
-      return typeof note === 'string' && note ? { note } : {};
-    })(),
+    // The store's delivery note, from its delivery profile (W2-A) — the key
+    // the storefront has always read it under.
+    delivery_settings: deliveryCfg.profile.note ? { note: deliveryCfg.profile.note } : {},
+    // WHERE THE STORE DELIVERS AND FOR HOW MUCH (W2-A): the governorates it
+    // serves with their fees, pickup, preparation days. Display only — the
+    // checkout prices again from the customer's saved address.
+    delivery: publicDeliverySummary(deliveryCfg),
+    // «التوصيل إلى <محافظتك>»: the visitor's own default-address governorate,
+    // answered for this store. Null for a guest or an address without one.
+    // It is the VIEWER's own data, in a response nothing caches (the API is
+    // network-only in the service worker and uncached at the edge).
+    delivery_to_you: viewerGov ? deliveryToGovernorate(deliveryCfg, viewerGov) : null,
     accepts_custom_requests: !!s.accepts_custom_requests,
     sells_direct_products: !!s.sells_direct_products,
     open: takingOrders,
@@ -121,8 +143,13 @@ function publicProduct(p: Record<string, unknown>) {
     original_price_iqd: p.original_price_iqd,
     category: p.category,
     condition: p.condition,
-    options: safeParse(p.options, []),
-    colors: safeParse(p.colors, []),
+    // How it is sold (W2-F): `variants` products carry their option groups and
+    // variants on the product page; the pre-0126 JSON lists are served only
+    // while a product is still sold by them (`legacy`) — the merchant's raw
+    // JSON is otherwise nobody's business.
+    variant_mode: p.variant_mode ?? 'simple',
+    options: p.variant_mode === 'legacy' ? safeParse(p.options, []) : [],
+    colors: p.variant_mode === 'legacy' ? safeParse(p.colors, []) : [],
     delivery_methods: safeParse(p.delivery_methods, []),
     prep_days: p.prep_days,
     // In stock or not — never the exact count. A competitor should not be
@@ -184,9 +211,9 @@ async function storeStats(db: D1Database, ctx: StoreContext) {
  * statements (worker/lib/storeLayout.ts). A store that never published gets
  * the classic page generated from its settings. The three reads run together.
  */
-async function storefrontStore(db: D1Database, ctx: StoreContext, rootDomain: string | null) {
+async function storefrontStore(db: D1Database, ctx: StoreContext, rootDomain: string | null, viewerId: string | null = null) {
   const [profile, stats, layout] = await Promise.all([
-    publicStore(db, ctx, rootDomain),
+    publicStore(db, ctx, rootDomain, viewerId),
     storeStats(db, ctx),
     storefrontLayoutPayload(db, ctx),
   ]);
@@ -332,14 +359,46 @@ storefrontRoutes.get('/resolve', async (c) => {
   return c.json({
     success: true,
     kind: 'merchant',
-    store: await storefrontStore(c.env.DB, ctx, root),
+    store: await storefrontStore(c.env.DB, ctx, root, c.get('user')?.id ?? null),
     root_domain,
   });
 });
 
 storefrontRoutes.get('/:slug', async (c) => {
   const ctx = await servableStore(c, c.req.param('slug'));
-  return c.json({ success: true, store: await storefrontStore(c.env.DB, ctx, rootDomainFrom(c.env)) });
+  return c.json({ success: true, store: await storefrontStore(c.env.DB, ctx, rootDomainFrom(c.env), c.get('user')?.id ?? null) });
+});
+
+/**
+ * GET /:slug/delivery?governorate=<id> — what this store charges to deliver to
+ * one governorate, and where it delivers at all (W2-A). Public: fees and
+ * availability only, never the merchant's editor state. Without `governorate`
+ * a signed-in visitor gets their own default address's; a guest gets only the
+ * list. The checkout prices again from the saved address — this is a preview.
+ */
+storefrontRoutes.get('/:slug/delivery', async (c) => {
+  const ctx = await servableStore(c, c.req.param('slug'));
+  const asked = (c.req.query('governorate') ?? '').trim();
+  let governorate = '';
+  let source: 'query' | 'address' | null = null;
+  if (asked) {
+    governorate = normalizeGovernorate(asked);
+    if (!governorate) throw new HttpError(400, 'Choose a governorate from the list', 'GOVERNORATE_INVALID');
+    source = 'query';
+  } else {
+    governorate = await viewerGovernorate(c.env.DB, c.get('user')?.id ?? null);
+    source = governorate ? 'address' : null;
+  }
+  const cfg = await loadDeliveryConfig(c.env.DB, ctx.store);
+  return c.json({
+    success: true,
+    delivery: {
+      governorate: governorate || null,
+      source,
+      quote: governorate ? deliveryToGovernorate(cfg, governorate) : null,
+      ...publicDeliverySummary(cfg),
+    },
+  });
 });
 
 /**
@@ -347,23 +406,53 @@ storefrontRoutes.get('/:slug', async (c) => {
  * and only sections that actually hold a published product — an empty shelf
  * is the merchant's business, not the visitor's.
  */
-storefrontRoutes.get('/:slug/sections', async (c) => {
+async function publicCollections(c: Context<AppContext>) {
   const ctx = await servableStore(c, c.req.param('slug'));
+  // COLLECTIONS (W2-F): the store's «sections» — manual ones count their
+  // published members, computed ones the published products their rule picks.
+  // (A database before 0126 answers with the pre-0126 shelf count.)
   const { results } = await c.env.DB.prepare(
-    `SELECT s.id, s.name, s.name_ar, s.sort_order,
-            (SELECT COUNT(*) FROM community_products p
-              WHERE p.section_id = s.id AND p.lifecycle = 'active' AND p.status = 'active') AS product_count
+    `SELECT s.id, s.name, s.name_ar, s.kind, s.image_key, s.sort_order,
+            CASE s.kind
+              WHEN 'manual' THEN (SELECT COUNT(*) FROM merchant_collection_products m JOIN community_products p ON p.id = m.product_id
+                                   WHERE m.collection_id = s.id AND p.lifecycle = 'active' AND p.status = 'active')
+              WHEN 'featured' THEN (SELECT COUNT(*) FROM community_products p WHERE p.store_id = s.store_id AND p.featured = 1
+                                     AND p.lifecycle = 'active' AND p.status = 'active')
+              WHEN 'new_arrivals' THEN (SELECT COUNT(*) FROM community_products p WHERE p.store_id = s.store_id AND p.created_at >= ?2
+                                     AND p.lifecycle = 'active' AND p.status = 'active')
+              ELSE (SELECT COUNT(*) FROM community_products p WHERE p.store_id = s.store_id AND p.sold_count > 0
+                      AND p.lifecycle = 'active' AND p.status = 'active')
+            END AS product_count
        FROM merchant_store_sections s
-      WHERE s.store_id = ? AND s.active = 1
+      WHERE s.store_id = ?1 AND s.active = 1
       ORDER BY s.sort_order, s.created_at`
-  ).bind(ctx.store.id).all<Record<string, unknown>>();
-  return c.json({
-    success: true,
-    sections: results
-      .filter((s) => Number(s.product_count) > 0)
-      .map((s) => ({ id: s.id, name: s.name, name_ar: s.name_ar, product_count: s.product_count })),
+  ).bind(ctx.store.id, sinceNewArrivals()).all<Record<string, unknown>>().catch(async (e: unknown) => {
+    if (!isSchemaMissing(e)) throw e;
+    return c.env.DB.prepare(
+      `SELECT s.id, s.name, s.name_ar, 'manual' AS kind, NULL AS image_key, s.sort_order,
+              (SELECT COUNT(*) FROM community_products p
+                WHERE p.section_id = s.id AND p.lifecycle = 'active' AND p.status = 'active') AS product_count
+         FROM merchant_store_sections s WHERE s.store_id = ? AND s.active = 1 ORDER BY s.sort_order, s.created_at`
+    ).bind(ctx.store.id).all<Record<string, unknown>>();
   });
-});
+  // An empty shelf is the merchant's business, not the visitor's.
+  const list = results
+    .filter((s) => Number(s.product_count) > 0)
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      name_ar: s.name_ar,
+      kind: s.kind ?? 'manual',
+      image_url: s.image_key ? `/files/${String(s.image_key)}` : null,
+      product_count: s.product_count,
+    }));
+  return c.json({ success: true, sections: list, collections: list });
+}
+
+// One path only: every literal segment of this router must be a reserved
+// store slug (tests/storeSlugsPaging.test.ts B23), so «collections» is served
+// under the path the storefront has always called.
+storefrontRoutes.get('/:slug/sections', publicCollections);
 
 /** The services this shop advertises. Prices here are honest floors, not quotes. */
 storefrontRoutes.get('/:slug/services', async (c) => {
@@ -414,8 +503,47 @@ storefrontRoutes.get('/:slug/products', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 60, def: 24 });
   const cursor = parseCursor(c.req.query('cursor'));
   const category = c.req.query('category') || '';
-  const section = c.req.query('section') || '';
+  const section = c.req.query('collection') || c.req.query('section') || '';
   const dealsOnly = c.req.query('deals') === '1' ? 1 : 0;
+
+  // ONE COLLECTION (W2-F): its members in the merchant's order, or its rule's
+  // products in the rule's order, paged by (that order's value, id). A
+  // collection that is not this store's (or is switched off) lists nothing.
+  let legacySection = '';
+  let col: { id: string; kind: CollectionKind } | null = null;
+  if (section) {
+    try {
+      col = await c.env.DB.prepare(
+        'SELECT id, kind FROM merchant_store_sections WHERE id = ? AND store_id = ? AND active = 1'
+      ).bind(section, ctx.store.id).first<{ id: string; kind: CollectionKind }>();
+    } catch (e) {
+      // A database before 0126: the shelf is `section_id`, as it was.
+      if (!isSchemaMissing(e)) throw e;
+      legacySection = section;
+    }
+    if (!col && !legacySection) return c.json({ success: true, products: [], next_cursor: null });
+  }
+  if (col) {
+    const order = collectionOrder(col.kind, 'p', '?2');
+    const cmp = order.dir === 'DESC' ? '<' : '>';
+    const numeric = col.kind === 'manual' || col.kind === 'best_sellers';
+    const cursorValue = cursor.at === '' ? '' : numeric ? Number(cursor.at) : cursor.at;
+    const { results } = await c.env.DB.prepare(
+      `SELECT p.*, ${order.sortExpr} AS sort_value FROM community_products p
+        WHERE p.store_id = ?1 AND p.lifecycle = 'active' AND p.status = 'active'
+          AND ${collectionMemberSql(col.kind, 'p', '?2', '?3')}
+          AND (?4 = '' OR p.category = ?4)
+          AND (?5 = 0 OR (p.original_price_iqd IS NOT NULL AND p.original_price_iqd > p.price_iqd))
+          AND (?6 = '' OR ${order.sortExpr} ${cmp} ?6 OR (${order.sortExpr} = ?6 AND p.id < ?7))
+        ORDER BY ${order.sortExpr} ${order.dir}, p.id DESC LIMIT ?8`
+    ).bind(ctx.store.id, col.id, sinceNewArrivals(), category, dealsOnly, cursorValue, cursor.id, limit).all<Record<string, unknown>>();
+    const last = results[results.length - 1];
+    return c.json({
+      success: true,
+      products: results.map(publicProduct),
+      next_cursor: results.length === limit && last ? `${String(last.sort_value)}|${String(last.id)}` : null,
+    });
+  }
 
   // Only what the merchant published. draft, hidden and archived products are
   // invisible here — the WHERE clause is the enforcement, not a filter the
@@ -429,7 +557,7 @@ storefrontRoutes.get('/:slug/products', async (c) => {
         AND (?4 = 0 OR (original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd))
         AND (?5 = '' OR created_at < ?5 OR (created_at = ?5 AND id < ?6))
       ORDER BY created_at DESC, id DESC LIMIT ?7`
-  ).bind(ctx.store.id, category, section, dealsOnly, cursor.at, cursor.id, limit).all();
+  ).bind(ctx.store.id, category, legacySection, dealsOnly, cursor.at, cursor.id, limit).all();
 
   return c.json({
     success: true,
@@ -449,56 +577,22 @@ storefrontRoutes.get('/:slug/products/:productSlug', async (c) => {
   ).bind(ctx.store.id, c.req.param('productSlug')).first<Record<string, unknown>>();
   if (!p) throw notFound('Product not found');
 
-  // Best-effort view counter. A failure here must never cost a shopper their
-  // page, so it is not awaited into the response path.
+  // No view is counted here any more (audit 01 B22): a GET is a request, not a
+  // visitor. The product page sends `product_view` to POST /api/storefront/events,
+  // which counts each visitor once per product per Baghdad day, never the
+  // owner or a crawler, and keeps `view_count` as the sum of those days
+  // (worker/lib/storefrontAnalytics.ts, W2-E).
   const viewer = c.get('user')?.id ?? '';
-  if (viewer !== ctx.store.user_id && !BOT_UA.test(c.req.header('User-Agent') ?? '')) {
-    const work = countProductView(c.env.DB, String(p.id), viewer || (c.req.header('CF-Connecting-IP') ?? '')).catch(() => {});
-    try {
-      c.executionCtx.waitUntil(work);
-    } catch {
-      // No ExecutionContext (a test harness): the count still runs, detached.
-    }
-  }
 
   // The product page renders no blocks, only the store's THEME (W2-C).
-  const [store, layout_theme] = await Promise.all([
-    publicStore(c.env.DB, ctx, rootDomainFrom(c.env)),
+  // …and the variant picker, the ordered media and the printing attributes (W2-F).
+  const [store, layout_theme, extras] = await Promise.all([
+    publicStore(c.env.DB, ctx, rootDomainFrom(c.env), viewer || null),
     storefrontTheme(c.env.DB, ctx),
+    publicProductExtras(c.env.DB, p),
   ]);
-  return c.json({ success: true, product: publicProduct(p), store: { ...store, layout_theme } });
+  return c.json({ success: true, product: { ...publicProduct(p), ...extras }, store: { ...store, layout_theme } });
 });
-
-/**
- * «Views» COUNTS VISITORS, NOT REQUESTS (audit 04 #21, audit 01 B22).
- *
- * `view_count + 1` ran on every anonymous GET — a refresh loop, a scraper, the
- * owner checking their own page — and the number feeds the merchant's «views»
- * tile, the sort-by-views and each product's insights. One visitor now counts
- * once per product per day: the fixed-window row in `rate_limits` (the same
- * table and upsert the rate limiter uses) is the dedupe, and only the request
- * that OPENS a day's window increments. The store's owner and self-declared
- * crawlers are not counted at all (see the caller).
- */
-const BOT_UA = /bot|crawl|spider|slurp|preview|facebookexternalhit|headless/i;
-
-async function countProductView(db: D1Database, productId: string, viewer: string): Promise<void> {
-  if (!viewer) return;
-  const now = Math.floor(Date.now() / 1000);
-  const day = now - (now % 86_400);
-  const seen = await db
-    .prepare(
-      `INSERT INTO rate_limits (key, window_start, count) VALUES (?1, ?2, 1)
-       ON CONFLICT(key) DO UPDATE SET
-         count = CASE WHEN window_start = ?2 THEN count + 1 ELSE 1 END,
-         window_start = ?2
-       RETURNING count`
-    )
-    .bind(`pview:${productId}:${viewer}`, day)
-    .first<{ count: number }>();
-  if (Number(seen?.count) !== 1) return;
-  await db.prepare('UPDATE community_products SET view_count = view_count + 1 WHERE id = ?').bind(productId).run();
-}
 
 storefrontRoutes.get('/:slug/reviews', async (c) => {
   const ctx = await servableStore(c, c.req.param('slug'));
@@ -579,5 +673,5 @@ storefrontRoutes.get('/by-id/:storeId', async (c) => {
   }
   if (!ctx) throw notFound('Store not found');
   if (storeIsSuspended(ctx)) throw storeUnavailable();
-  return c.json({ success: true, store: await storefrontStore(c.env.DB, ctx, rootDomainFrom(c.env)) });
+  return c.json({ success: true, store: await storefrontStore(c.env.DB, ctx, rootDomainFrom(c.env), c.get('user')?.id ?? null) });
 });

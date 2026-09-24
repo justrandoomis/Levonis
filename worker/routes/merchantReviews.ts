@@ -15,6 +15,7 @@
  */
 
 import { Hono } from 'hono';
+import { notifyNewReview } from '../lib/merchantNotify';
 import type { AppContext } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, str, int, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
@@ -260,6 +261,8 @@ communityReviewRoutes.post('/', requireAuth, async (c) => {
 
   await refreshMerchantRating(c.env.DB, merchantId);
   await audit(c.env.DB, user.id, 'community.review_created', id, { merchant: merchantId, rating });
+  // «تقييم جديد» to the store it is about (W2-E: in-app always, outside channels per `new_reviews`).
+  await notifyNewReview(c.env, id);
 
   /**
    * THE SAME «📢 Review» TOPIC, because a review is a review.

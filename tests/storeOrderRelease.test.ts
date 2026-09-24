@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, post, patch, get, json, count, row, pending } from './fixtures/app';
+import { freshDb, asD1, stubApp, post, patch, get, json, count, row, all, pending } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
 import { storeOrderRoutes } from '../worker/routes/storeOrders';
 import { orderRoutes } from '../worker/routes/orders';
@@ -25,6 +25,8 @@ import { merchantRoutes } from '../worker/routes/merchant';
 import { adminRoutes } from '../worker/routes/admin';
 import { returnRoutes } from '../worker/routes/returns';
 import { releaseDueStoreCredits, STORE_RELEASE_DAYS } from '../worker/lib/storeOrderOps';
+import { orderCreditStateSql } from '../worker/lib/merchantLedger';
+import { merchantPayoutRoutes } from '../worker/routes/merchantFinance';
 import type { Env } from '../worker/lib/types';
 
 const DEP = 100_000;
@@ -85,8 +87,9 @@ async function deliver(raw: DatabaseSync, id: string) {
   await Promise.allSettled(pending.splice(0));
 }
 
+/** The sale credit's state, from the append-only merchant ledger (migration 0121). */
 const creditState = (raw: DatabaseSync, id: string) =>
-  row<{ state: string }>(raw, "SELECT state FROM merchant_payout_ledger WHERE order_id = ? AND kind = 'sale_credit'", id)!.state;
+  row<{ state: string }>(raw, `SELECT ${orderCreditStateSql('?')} AS state`, id)!.state;
 const env = (raw: DatabaseSync) => ({ DB: asD1(raw) } as unknown as Env);
 const ago = (days: number) => new Date(Date.now() - days * DAY).toISOString();
 
@@ -116,7 +119,10 @@ test('B10 «تم التسليم» by the merchant does NOT make the money availa
   const id = await placeOrder(raw);
   await deliver(raw, id);
   assert.equal(creditState(raw, id), 'pending');
-  const payouts = await json(await get(merchantApp(asD1(raw)), '/api/merchant/payouts'));
+  const payouts = await json(await get(
+    stubApp(asD1(raw), { id: 'ali', role: 'merchant', email: 'ali@x.co' }, (a) => a.route('/api/merchant/payouts', merchantPayoutRoutes)),
+    '/api/merchant/payouts'
+  ));
   assert.equal(payouts.balance.available_iqd, 0);
   assert.equal(payouts.balance.pending_iqd, 13300);
   const detail = await json(await get(merchantApp(asD1(raw)), `/api/merchant/orders/${id}`));
@@ -152,6 +158,9 @@ test('the CUSTOMER’s «استلمت طلبي» releases the credit — once', 
   const again = await json(await post(app, `/api/orders/${id}/confirm-receipt`, {}));
   assert.equal(again.replayed, true);
   assert.equal(again.released, false);
+  // The merchant hears the money is available — once, deep-linked to the money screen (W2-E).
+  const told = all<{ kind: string; link: string }>(raw, "SELECT kind, link FROM user_notifications WHERE kind = 'payout_available'");
+  assert.deepEqual(told, [{ kind: 'payout_available', link: '/merchant/money' }]);
   assert.equal(count(raw, "SELECT COUNT(*) n FROM audit_log WHERE action = 'store_order.receipt_confirmed'"), 1);
   assert.equal((await json(await get(app, `/api/orders/${id}`))).order.receipt.can_confirm, false);
 });
@@ -257,18 +266,21 @@ test('a store order is not returned through Levonis’s returns desk — the cus
 
 // ================================================================ B23
 
-test('B23 the merchant is told about a new order — unless they switched new-order notices off', async () => {
+test('B23 the merchant is told about a new order, deep-linked to it; the switch governs the outside channels only (W2-E)', async () => {
   const raw = freshDb();
   seed(raw);
   const first = await placeOrder(raw);
   const bell = row<{ link: string; kind: string; title_ar: string }>(
     raw, "SELECT link, kind, title_ar FROM user_notifications WHERE user_id = 'ali' AND event_key = ?", `store_order.new:${first}`
   )!;
-  assert.equal(bell.link, '/merchant');
-  assert.equal(bell.kind, 'order_update');
+  assert.equal(bell.link, `/merchant/orders/${first}`);
+  assert.equal(bell.kind, 'new_order');
   assert.match(bell.title_ar, new RegExp(first));
 
+  // Switched off: the in-app record is still written (the store's notification
+  // centre is the record of what happened); only Telegram/WhatsApp/email stop
+  // (tests/merchantNotifications.test.ts pins the outbound half).
   raw.exec(`INSERT INTO merchant_notification_preferences (merchant_id, new_orders) VALUES ('m_ali', 0)`);
   const second = await placeOrder(raw);
-  assert.equal(count(raw, "SELECT COUNT(*) n FROM user_notifications WHERE user_id = 'ali' AND event_key = ?", `store_order.new:${second}`), 0);
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM user_notifications WHERE user_id = 'ali' AND event_key = ?", `store_order.new:${second}`), 1);
 });

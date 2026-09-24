@@ -2441,7 +2441,7 @@ async function adminStoreOrderMove(
     notifyOrderStatus(c.env, id, 'cancelled', { defer: (work) => c.executionCtx.waitUntil(work) })
   );
   c.executionCtx.waitUntil(
-    notifyMerchantOfStoreOrder(c.env.DB, {
+    notifyMerchantOfStoreOrder(c.env, {
       merchantId: String(order.merchant_id ?? ''),
       orderId: id,
       event: 'cancelled_by_admin',

@@ -10,6 +10,12 @@
  */
 
 import { api } from './api';
+import type {
+  DeliveryIssue,
+  Fulfilment,
+  MerchantDeliveryProfile,
+  MerchantDeliveryRule,
+} from '../../packages/shipping/src/merchantDelivery';
 
 export interface StoreMerchantSummary {
   id: string;
@@ -45,6 +51,10 @@ export interface MerchantStore {
   business_hours: Array<{ day: string; open: string; close: string }>;
   policies: Record<string, string>;
   delivery_settings?: Record<string, unknown>;
+  /** Storefront reads only (W2-A): where the store delivers and for how much — display, never a price. */
+  delivery?: StoreDeliverySummary;
+  /** Storefront reads only: delivery to the signed-in viewer's default-address governorate, or null. */
+  delivery_to_you?: DeliveryToGovernorate | null;
   social_links: Record<string, string>;
   accepts_custom_requests: boolean;
   sells_direct_products: boolean;
@@ -69,6 +79,37 @@ export interface MerchantStore {
   created_at: string;
   merchant: StoreMerchantSummary;
 }
+
+/** The store's delivery as the storefront shows it (worker/lib/merchantDelivery.ts `publicDeliverySummary`). */
+export interface StoreDeliverySummary {
+  areas: Array<{ governorate: string; fee_iqd: number; free: boolean; free_over_iqd: number | null; prep_days: number; eta_note: string }>;
+  pickup: { governorate: string; note: string } | null;
+  prep_days: number;
+  free_over_iqd: number | null;
+  note: string;
+}
+
+/** One governorate's delivery, as the storefront previews it. */
+export interface DeliveryToGovernorate {
+  governorate: string;
+  available: boolean;
+  reason: string | null;
+  fee_iqd: number;
+  free: boolean;
+  free_over_iqd: number | null;
+  prep_days: number;
+  eta_note: string;
+}
+
+/** GET/PUT /api/merchant/delivery (W2-A). */
+export interface MerchantDeliveryConfig {
+  profile: MerchantDeliveryProfile;
+  rules: MerchantDeliveryRule[];
+  configured: boolean;
+  store_open: boolean;
+  coverage: { served: string[]; pickup: boolean; serviceable: boolean };
+}
+export type { DeliveryIssue, Fulfilment, MerchantDeliveryProfile, MerchantDeliveryRule };
 
 /** One merchant-controlled header widget: a link pill or an info card. */
 export interface ProfileWidget {
@@ -138,6 +179,13 @@ export interface MerchantProduct {
   moderation?: { hidden_by_admin: boolean; reason: string; at: string } | null;
   created_at?: string;
   updated_at?: string;
+  /** W2-F: 'variants' = sold by variant (pick one, send its id); 'legacy' = the pre-0126 lists. */
+  variant_mode?: 'simple' | 'variants' | 'legacy';
+  /** Storefront product detail only (W2-F, worker/lib/catalog/public.ts). */
+  option_groups?: import('../../packages/catalog/src/variants').PublicGroup[];
+  variants?: import('../../packages/catalog/src/variants').PublicVariant[];
+  media?: Array<{ kind: 'image' | 'video'; url: string; alt: string; alt_ar: string }>;
+  attributes?: import('../../packages/catalog/src/attributes').Attributes;
 }
 
 export interface StoreSection {
@@ -147,6 +195,8 @@ export interface StoreSection {
   sort_order?: number;
   active?: boolean;
   product_count?: number;
+  /** W2-F: a section IS a collection; the three computed kinds fill themselves. */
+  kind?: 'manual' | 'featured' | 'new_arrivals' | 'best_sellers';
 }
 
 export interface StoreService {
@@ -282,8 +332,9 @@ export const merchantApi = {
       reason ? { status, reason } : { status }
     ),
   analytics: () => api.get<Record<string, unknown>>('/api/merchant/analytics'),
+  /** The balance and payout requests (worker/routes/merchantFinance.ts); the finance screen uses its own client. */
   payouts: () =>
-    api.get<{ balance: { available_iqd: number; pending_iqd: number; paid_iqd: number }; entries: Record<string, unknown>[] }>(
+    api.get<{ balance: { available_iqd: number; pending_iqd: number; paid_iqd: number }; payouts: Record<string, unknown>[] }>(
       '/api/merchant/payouts'
     ),
   reviews: () => api.get<{ reviews: Record<string, unknown>[] }>('/api/merchant/reviews'),
@@ -326,6 +377,12 @@ export const merchantApi = {
   updateCoupon: (id: string, body: Record<string, unknown>) =>
     api.patch(`/api/merchant/coupons/${id}`, body),
   deleteCoupon: (id: string) => api.delete<{ deactivated: boolean }>(`/api/merchant/coupons/${id}`),
+
+  /** The store's delivery by governorate (W2-A) — the editor in components/merchant/delivery. */
+  delivery: () => api.get<{ success: true } & MerchantDeliveryConfig>('/api/merchant/delivery'),
+  /** The whole configuration; `version` is the one loaded — a stale one is 409 DELIVERY_VERSION_CONFLICT. */
+  saveDelivery: (body: { version: number; profile: Omit<MerchantDeliveryProfile, 'version'>; rules: MerchantDeliveryRule[] }) =>
+    api.put<{ success: true } & MerchantDeliveryConfig>('/api/merchant/delivery', body),
 
   customOrdersSummary: () =>
     api.get<{ to_start: number; in_progress: number; awaiting_customer: number }>(
@@ -376,6 +433,11 @@ export const storefrontApi = {
   sections: (slug: string) => api.get<{ sections: StoreSection[] }>(`/api/storefront/${slug}/sections`),
   services: (slug: string) => api.get<{ services: StoreService[] }>(`/api/storefront/${slug}/services`),
   showcase: (slug: string) => api.get<{ items: ShowcaseItem[] }>(`/api/storefront/${slug}/showcase`),
+  /** A preview of delivery to one governorate — or, signed in and without one, to the viewer's own address. */
+  delivery: (slug: string, governorate = '') =>
+    api.get<{ delivery: StoreDeliverySummary & { governorate: string | null; source: 'query' | 'address' | null; quote: DeliveryToGovernorate | null } }>(
+      `/api/storefront/${slug}/delivery${governorate ? `?governorate=${encodeURIComponent(governorate)}` : ''}`
+    ),
 };
 
 /** The products manager's stat feed — every number a real aggregate. */
@@ -516,6 +578,8 @@ export interface StoreQuote {
   }>;
   subtotal_iqd: number;
   delivery_iqd: number;
+  /** How the goods reach the customer, priced by the server from the saved address (W2-A). */
+  delivery: StoreQuoteDelivery;
   coupon_code: string;
   discount_iqd: number;
   total_iqd: number;
@@ -544,6 +608,45 @@ export interface StoreQuote {
   wallet_topup_url: string;
 }
 
+/** What the store offers, carried by every quote and every delivery refusal. */
+export interface StoreDeliveryOffer {
+  /** Governorate ids the store delivers to. */
+  served: string[];
+  /** Collection from the store, when offered. */
+  pickup: { governorate: string; note: string } | null;
+}
+
+export interface StoreQuoteDelivery extends StoreDeliveryOffer {
+  fulfilment: Fulfilment;
+  address_id: string;
+  governorate: string;
+  rule: 'override' | 'default' | 'free_governorate' | 'free_over' | 'pickup';
+  fee_iqd: number;
+  /** The fee below the free-delivery threshold. */
+  base_fee_iqd: number;
+  free_over_iqd: number | null;
+  prep_days: number;
+  eta_note: string;
+  note: string;
+}
+
+/** The cart's summary a delivery refusal carries, so the page keeps showing what is bought. Not an agreement. */
+export type StorePreview = Pick<StoreQuote, 'store_name' | 'store_slug' | 'lines' | 'subtotal_iqd' | 'coupon_code' | 'discount_iqd'> & {
+  store_id?: string;
+};
+
+/** The three refusals that ask for a different address or fulfilment, and what they carry. */
+export const DELIVERY_REFUSALS = ['ADDRESS_REQUIRED', 'ADDRESS_GOVERNORATE_REQUIRED', 'DELIVERY_UNAVAILABLE'] as const;
+export type DeliveryRefusalCode = (typeof DELIVERY_REFUSALS)[number];
+export interface DeliveryRefusal extends StoreDeliveryOffer {
+  code: DeliveryRefusalCode;
+  fulfilment: Fulfilment;
+  address_id?: string;
+  governorate?: string;
+  reason?: 'governorate_required' | 'governorate_disabled' | 'pickup_disabled';
+  preview: StorePreview;
+}
+
 /** What `/api/store-orders` answers about a placed order — the public projection (B18). */
 export interface StoreOrderPublic {
   id: string;
@@ -567,15 +670,18 @@ export const storeCheckoutApi = {
    * money for THIS order, so a retry after a dropped connection is not shown
    * «رصيدك لا يغطي» by its own hold.
    */
-  quote: (couponCode = '', idempotencyKey = '') =>
+  quote: (couponCode = '', idempotencyKey = '', where: { addressId?: string; fulfilment?: Fulfilment } = {}) =>
     api.post<{ quote: StoreQuote }>('/api/store-orders/quote', {
       ...(couponCode ? { couponCode } : {}),
       ...(idempotencyKey ? { idempotencyKey } : {}),
+      // No address: the server prices the customer's default one and says which.
+      ...(where.addressId ? { addressId: where.addressId } : {}),
+      fulfilment: where.fulfilment ?? 'delivery',
     }),
   // No `payWithWallet`: there is nothing to choose. The server refuses an
   // explicit `false` with STORE_PREPAID_ONLY rather than silently charging a
   // wallet for a method the customer did not pick.
-  place: (body: { addressId: string; idempotencyKey: string; quoteFingerprint: string; couponCode?: string }) =>
+  place: (body: { addressId: string; fulfilment: Fulfilment; idempotencyKey: string; quoteFingerprint: string; couponCode?: string }) =>
     api.post<{ order: StoreOrderPublic; replay?: boolean }>('/api/store-orders', body),
 };
 
@@ -916,6 +1022,7 @@ export const adminCommunityApi = {
   finance: (id: string) =>
     api.get<{
       balance: { available_iqd: number; pending_iqd: number; paid_iqd: number };
+      /** Lines of the append-only merchant ledger: `kind`, `bucket`, `amount_iqd` (W2-B). */
       ledger: Record<string, unknown>[];
       escrows: AdminEscrow[];
     }>(`/api/admin/community/merchants/${id}/finance`),

@@ -446,7 +446,8 @@ onto the board; its list shows exactly what the board shows; and
 ### `/api/admin/community/*` — apex host only
 `GET /overview` · `GET|PATCH /settings` · `GET|PUT /gate` · `GET /gate/lookup` ·
 `GET /merchants` · `POST /merchants/:id/verify|status|badge` ·
-`GET /merchants/:id/finance` · `POST /merchants/:id/payout` ·
+`GET /merchants/:id/finance` · `POST /merchants/:id/payout` · `POST /merchants/:id/adjustment` ·
+`GET /payouts?state=` · `POST /payouts/:id/approve|paid|fail` · `GET /ledger/parity` (W2-B) ·
 `GET|POST /merchants/:id/reputation` · `GET /merchants/:id/products` ·
 `POST /stores/:id/status` · `GET /requests` · `GET /requests/:id` ·
 `POST /requests/:id/remove` · `POST /offers/:id/reject` · `GET /reviews` ·
@@ -461,7 +462,8 @@ do nothing runs the other way too: an endpoint an operator cannot reach is a
 feature that does not exist.
 
 **Money needs the financial scope** (audit 04 #2). `PATCH /settings` (the
-commission), `GET /merchants/:id/finance`, `POST /merchants/:id/payout` and
+commission), `GET /merchants/:id/finance`, `POST /merchants/:id/payout`, the
+payout queue and its decisions, adjustments, the ledger parity report and
 `POST /escrows/:id/resolve` carry `requireFinancialScope` in their route
 declarations — the same rule as `walletAdjust.ts` — so an assistant-scope admin
 gets `403 FINANCIAL_SCOPE_REQUIRED`, and the overview leaves the fee figures out

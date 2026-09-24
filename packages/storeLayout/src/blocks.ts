@@ -75,10 +75,10 @@ export interface BlockDef {
   readonly max?: number;
   /**
    * A capability the platform must have before a builder offers this block.
-   * `merchant_video_upload`: merchant uploads (`purpose=community`) refuse
-   * video today, so no store can own a video key yet and a video block
-   * normalises to an empty one — the builder must not offer it until uploads
-   * accept merchant video.
+   * `merchant_video_upload`: merchant uploads (`purpose=community`) accept
+   * sniffed MP4/WebM video since W2-F (worker/routes/uploads.ts, 40 MB), so a
+   * store can now own a video key; a builder may offer the block once it has a
+   * video picker (the key must still be the owner's own, ledgered as video).
    */
   readonly requires?: 'merchant_video_upload';
 }

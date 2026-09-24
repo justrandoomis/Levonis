@@ -9,6 +9,7 @@ import { headMediaObject } from '../lib/mediaStorage';
 import { isSchemaMissing } from '../lib/membershipBenefits';
 import { audit } from '../lib/audit';
 import { notify } from '../lib/notifications';
+import { newMessageNotice, notifyMerchant } from '../lib/merchantNotify';
 import { announceCustomerChatMessage } from './adminChats';
 
 /**
@@ -117,17 +118,80 @@ export async function recordStaffChatFileRead(c: Context<AppContext>, chatId: st
 }
 
 /**
- * «رسالة جديدة» TO THE OTHER SIDE of a store order's thread (audit 04 B10).
+ * A THREAD THE STORE OWNS (migration 0124): a customer's direct message to the
+ * store (`store`), a store order's thread (`store_order`), or a custom
+ * request's thread (`request`) — with who its customer and its seller are.
+ * A store order's thread opened before 0124 stamped its context is found
+ * through the order, exactly as before.
+ */
+interface StoreThread {
+  store_id: string;
+  context_type: 'store' | 'store_order' | 'request';
+  context_id: string;
+  customer_id: string;
+  seller_id: string;
+}
+
+async function storeThreadOf(db: D1Database, chatId: string): Promise<StoreThread | null> {
+  const row = await db
+    .prepare(
+      `SELECT ch.store_id, ch.context_type, ch.context_id, s.user_id AS seller_id,
+              CASE ch.context_type
+                WHEN 'store' THEN ch.context_id
+                WHEN 'store_order' THEN (SELECT o.user_id FROM orders o WHERE o.id = ch.context_id)
+                WHEN 'request' THEN (SELECT r.customer_id FROM community_requests r WHERE r.id = ch.context_id)
+              END AS customer_id
+         FROM chats ch
+         JOIN merchant_stores s ON s.id = ch.store_id
+        WHERE ch.id = ? AND ch.context_type IN ('store', 'store_order', 'request')`
+    )
+    .bind(chatId)
+    .first<StoreThread>()
+    .catch(() => null);
+  if (row?.customer_id) return row;
+  const legacy = await storeOrderThread(db, chatId);
+  if (!legacy) return null;
+  const store = await db
+    .prepare('SELECT s.id FROM orders o JOIN merchant_stores s ON s.merchant_id = o.merchant_id WHERE o.id = ?')
+    .bind(legacy.order_id)
+    .first<{ id: string }>();
+  return store
+    ? { store_id: store.id, context_type: 'store_order', context_id: legacy.order_id, customer_id: legacy.customer_id, seller_id: legacy.seller_id }
+    : null;
+}
+
+/**
+ * WHO EACH MEMBER IS (chat_participants.role, migration 0124) — written after
+ * the membership rows, and best-effort: membership is the access rule, the
+ * role only names the sides, so a database a migration behind still opens
+ * every thread.
+ */
+async function setRoles(db: D1Database, chatId: string, roles: Array<[string, 'customer' | 'merchant' | 'support']>): Promise<void> {
+  try {
+    await db.batch(
+      roles.map(([userId, role]) =>
+        db.prepare("UPDATE chat_participants SET role = ? WHERE chat_id = ? AND user_id = ? AND role = ''").bind(role, chatId, userId)
+      )
+    );
+  } catch (e) {
+    if (!isSchemaMissing(e)) console.error('chat roles not written', chatId, e instanceof Error ? e.message : String(e));
+  }
+}
+
+/**
+ * «رسالة جديدة» TO THE OTHER SIDE of one of a store's threads (audit 04 B10).
  *
  * Once per TURN, not per line: a customer typing four lines in a row is one
  * question waiting, so a line whose predecessor was the same sender's says
  * nothing new — the same rule the shop desk's announce follows. The event key
- * is the message id, so a retried send cannot notify twice. A path, not an
- * origin, as every notification link is.
+ * is the message id, so a retried send cannot notify twice. The seller hears
+ * it as the STORE's `new_message`, opening the thread in the workspace inbox
+ * (worker/lib/merchantNotify.ts: always in-app, outside channels per their
+ * `new_messages` switch); the customer as their own `chat_message`.
  */
 async function notifyStoreThread(
   env: Env,
-  thread: StoreOrderThread,
+  thread: StoreThread,
   chatId: string,
   senderId: string,
   messageId: string
@@ -139,29 +203,24 @@ async function notifyStoreThread(
     .bind(chatId, messageId)
     .first<{ sender_id: string }>();
   if (prev?.sender_id === senderId) return;
-  const toSeller = senderId === thread.customer_id;
+  const toSeller = senderId !== thread.seller_id;
   const recipient = toSeller ? thread.seller_id : thread.customer_id;
   if (!recipient || recipient === senderId) return;
   if (toSeller) {
-    // The merchant's own «رسائل جديدة» switch (merchant_notification_
-    // preferences.new_messages) — one of the nine that used to control nothing
-    // (audit 04 #19). No row means the default: on.
-    const pref = await env.DB.prepare(
-      `SELECT p.new_messages AS on_ FROM merchant_notification_preferences p
-         JOIN community_merchants m ON m.id = p.merchant_id
-        WHERE m.user_id = ?`
-    )
-      .bind(recipient)
-      .first<{ on_: number }>();
-    if (pref && !pref.on_) return;
+    await notifyMerchant(env, { storeId: thread.store_id }, newMessageNotice(chatId, messageId, { type: thread.context_type, id: thread.context_id }));
+    return;
   }
+  const about =
+    thread.context_type === 'store_order'
+      ? { ar: `بخصوص الطلب ${thread.context_id}`, en: `About order ${thread.context_id}` }
+      : { ar: 'افتح المحادثة لقراءته.', en: 'Open the conversation to read it.' };
   await notify(env.DB, {
     userId: recipient,
     kind: 'chat_message',
-    title_ar: toSeller ? 'رسالة جديدة من زبون' : 'ردّ المتجر على رسالتك',
-    title_en: toSeller ? 'New message from a customer' : 'The store replied to your message',
-    body_ar: `بخصوص الطلب ${thread.order_id}`,
-    body_en: `About order ${thread.order_id}`,
+    title_ar: 'ردّ المتجر على رسالتك',
+    title_en: 'The store replied to your message',
+    body_ar: about.ar,
+    body_en: about.en,
     link: `/chat/${chatId}`,
     entity_type: 'chat',
     entity_id: chatId,
@@ -222,6 +281,48 @@ chatRoutes.get('/', async (c) => {
 });
 
 /**
+ * The store's one thread for this context (a customer, or a request), found or
+ * created. ONE per (context, store, subject) — the unique index of 0124 — so
+ * two first opens that race both end in the same thread. Both parties are
+ * members from the start, and nobody else ever is.
+ */
+async function openStoreThread(
+  db: D1Database,
+  t: { contextType: 'store' | 'request'; contextId: string; storeId: string; merchantId: string; customerId: string; sellerId: string }
+): Promise<string> {
+  const find = () =>
+    db
+      .prepare('SELECT id FROM chats WHERE context_type = ? AND store_id = ? AND context_id = ?')
+      .bind(t.contextType, t.storeId, t.contextId)
+      .first<{ id: string }>();
+  const members = (chatId: string) =>
+    [t.customerId, t.sellerId].map((u) =>
+      db.prepare('INSERT OR IGNORE INTO chat_participants (chat_id, user_id) VALUES (?, ?)').bind(chatId, u)
+    );
+  let chatId = (await find())?.id ?? '';
+  if (chatId) {
+    await db.batch(members(chatId));
+  } else {
+    chatId = newId('chat');
+    try {
+      await db.batch([
+        db
+          .prepare('INSERT INTO chats (id, context_type, context_id, store_id, merchant_id) VALUES (?, ?, ?, ?, ?)')
+          .bind(chatId, t.contextType, t.contextId, t.storeId, t.merchantId),
+        ...members(chatId),
+      ]);
+    } catch (e) {
+      const won = await find();
+      if (!won) throw e;
+      chatId = won.id;
+      await db.batch(members(chatId));
+    }
+  }
+  await setRoles(db, chatId, [[t.customerId, 'customer'], [t.sellerId, 'merchant']]);
+  return chatId;
+}
+
+/**
  * Opens (or returns) a chat.
  *
  * TWO KINDS, and the difference matters. `{userId}` is the general direct
@@ -278,9 +379,16 @@ chatRoutes.post('/open', async (c) => {
         return c.json({ success: true, chatId: existing?.id ?? null, orderId, readOnly: true });
       }
       const chatId = existing?.id ?? newId('chat');
+      // The thread is the STORE's (migration 0124): its context is the order,
+      // and the store and merchant come from the order row, never the caller.
       const stmts = existing
         ? []
-        : [c.env.DB.prepare('INSERT INTO chats (id, order_id) VALUES (?, ?)').bind(chatId, orderId)];
+        : [
+            c.env.DB.prepare(
+              `INSERT INTO chats (id, order_id, context_type, context_id, store_id, merchant_id)
+               VALUES (?1, ?2, 'store_order', ?2, (SELECT id FROM merchant_stores WHERE merchant_id = ?3), ?3)`
+            ).bind(chatId, orderId, order.merchant_id),
+          ];
       for (const member of new Set([order.user_id, order.merchant_user_id])) {
         stmts.push(
           c.env.DB.prepare('INSERT OR IGNORE INTO chat_participants (chat_id, user_id) VALUES (?, ?)').bind(chatId, member)
@@ -298,8 +406,10 @@ chatRoutes.post('/open', async (c) => {
             c.env.DB.prepare('INSERT OR IGNORE INTO chat_participants (chat_id, user_id) VALUES (?, ?)').bind(won.id, member)
           )
         );
+        await setRoles(c.env.DB, won.id, [[order.user_id, 'customer'], [order.merchant_user_id, 'merchant']]);
         return c.json({ success: true, chatId: won.id, orderId });
       }
+      await setRoles(c.env.DB, chatId, [[order.user_id, 'customer'], [order.merchant_user_id, 'merchant']]);
       return c.json({ success: true, chatId, orderId });
     }
 
@@ -330,18 +440,74 @@ chatRoutes.post('/open', async (c) => {
       );
     }
     await c.env.DB.batch(stmts);
+    await setRoles(c.env.DB, chatId, [[order.user_id, 'customer'], ...(user.id !== order.user_id ? [[user.id, 'support'] as [string, 'support']] : [])]);
     return c.json({ success: true, chatId, orderId });
   }
 
+  /*
+   * A CUSTOM REQUEST'S THREAD — the requester and ONE merchant who made an
+   * offer on it (pending, or accepted and now the job). The customer names the
+   * merchant; a merchant opens the thread of their own offer. Nobody else,
+   * and no merchant who never bid: the board is not a way to DM a customer.
+   */
+  if (body.requestId !== undefined) {
+    const requestId = str(body.requestId, 'requestId', { min: 1, max: 60 });
+    const request = await c.env.DB.prepare('SELECT id, customer_id FROM community_requests WHERE id = ?')
+      .bind(requestId)
+      .first<{ id: string; customer_id: string }>();
+    if (!request) throw notFound('Request not found');
+    const isCustomer = request.customer_id === user.id;
+    const merchantId = isCustomer ? str(body.merchantId, 'merchantId', { min: 1, max: 60 }) : '';
+    const offer = await c.env.DB.prepare(
+      `SELECT m.id AS merchant_id, m.user_id AS merchant_user_id, s.id AS store_id
+         FROM community_offers o
+         JOIN community_merchants m ON m.id = o.merchant_id
+         JOIN merchant_stores s ON s.merchant_id = m.id
+        WHERE o.request_id = ?1 AND o.state IN ('pending','accepted')
+          AND ${isCustomer ? 'm.id = ?2' : 'm.user_id = ?2'}
+        LIMIT 1`
+    )
+      .bind(requestId, isCustomer ? merchantId : user.id)
+      .first<{ merchant_id: string; merchant_user_id: string; store_id: string }>();
+    if (!offer || offer.merchant_user_id === request.customer_id) {
+      throw new HttpError(403, 'Only the requester and a merchant with an offer on it can talk about this request', 'REQUEST_THREAD_NOT_ALLOWED');
+    }
+    const chatId = await openStoreThread(c.env.DB, {
+      contextType: 'request',
+      contextId: requestId,
+      storeId: offer.store_id,
+      merchantId: offer.merchant_id,
+      customerId: request.customer_id,
+      sellerId: offer.merchant_user_id,
+    });
+    return c.json({ success: true, chatId, requestId, context: 'request' });
+  }
+
   // A storefront may open the conversation by MERCHANT id, so the public
-  // store payload never has to carry the merchant's account id at all.
+  // store payload never has to carry the merchant's account id at all. With a
+  // store, it is the STORE's thread with this customer — one per pair, listed
+  // in the store's inbox — and not the two accounts' personal DM.
   let otherUserId: string;
   if (body.merchantId !== undefined && body.userId === undefined) {
     const merchantId = str(body.merchantId, 'merchantId', { min: 1, max: 60 });
-    const m = await c.env.DB.prepare('SELECT user_id FROM community_merchants WHERE id = ?')
+    const m = await c.env.DB.prepare(
+      'SELECT m.user_id, s.id AS store_id FROM community_merchants m LEFT JOIN merchant_stores s ON s.merchant_id = m.id WHERE m.id = ?'
+    )
       .bind(merchantId)
-      .first<{ user_id: string }>();
+      .first<{ user_id: string; store_id: string | null }>();
     if (!m) throw notFound('Store not found');
+    if (m.user_id === user.id) throw badRequest('You cannot chat with yourself');
+    if (m.store_id) {
+      const chatId = await openStoreThread(c.env.DB, {
+        contextType: 'store',
+        contextId: user.id,
+        storeId: m.store_id,
+        merchantId,
+        customerId: user.id,
+        sellerId: m.user_id,
+      });
+      return c.json({ success: true, chatId, context: 'store' });
+    }
     otherUserId = m.user_id;
   } else {
     otherUserId = str(body.userId, 'userId', { min: 1, max: 60 });
@@ -517,7 +683,7 @@ chatRoutes.post('/:id/messages', async (c) => {
    * 04 B6) is still a participant row — and is read-only all the same.
    */
   await assertMayWriteInThread(c.env.DB, chatId, user.id);
-  const storeThread = await storeOrderThread(c.env.DB, chatId);
+  const storeThread = await storeThreadOf(c.env.DB, chatId);
   const body = await c.req.json().catch(() => ({}));
   // «كاميرا/ملف/بصمة صوتية». Any of the four attachment kinds means "this
   // message carries a file"; WHICH kind it is comes from where the upload route
@@ -593,14 +759,22 @@ chatRoutes.post('/:id/messages', async (c) => {
     await insertPlain();
   }
   await setChatTyping(c.env.DB, chatId, user.id, false).catch(() => {});
+  // The thread's last activity, which the store's inbox pages by (0124).
+  await c.env.DB.prepare('UPDATE chats SET last_message_at = ? WHERE id = ?')
+    .bind(createdAt, chatId)
+    .run()
+    .catch((e) => {
+      if (!isSchemaMissing(e)) console.error('chat activity not stamped', chatId, e instanceof Error ? e.message : String(e));
+    });
   // «محادثة مباشرة مع الفريق» has to reach the team: a customer line on one of
   // the shop's order threads is announced to «‼️ Support» (debounced; total).
   await announceCustomerChatMessage(c, chatId, user.id, id);
   if (storeThread) {
-    // …and a store order's line reaches its SELLER (or the customer, when the
-    // seller answers). The seller is made a member first: a thread opened
-    // before migration 0118 may not have them, and a notification pointing at
-    // a thread they cannot open would be worse than none.
+    // …and a line on one of a store's threads reaches its SELLER (or the
+    // customer, when the seller answers). The seller is made a member first: a
+    // thread opened before migration 0118 may not have them, and a
+    // notification pointing at a thread they cannot open would be worse than
+    // none.
     await c.env.DB.prepare('INSERT OR IGNORE INTO chat_participants (chat_id, user_id) VALUES (?, ?)')
       .bind(chatId, storeThread.seller_id)
       .run()

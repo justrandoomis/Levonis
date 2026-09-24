@@ -303,7 +303,8 @@ test('15: the merchant is told their offer was accepted — once, linking to the
     "SELECT user_id, kind, link, entity_type, entity_id FROM user_notifications WHERE kind = 'offer_accepted'"
   );
   assert.deepEqual(n, [
-    { user_id: 'owner', kind: 'offer_accepted', link: '/requests?request=r1', entity_type: 'order', entity_id: orderId },
+    // The job itself, at its workspace address (W2-E: packages/contracts/src/merchantRoutes.ts).
+    { user_id: 'owner', kind: 'offer_accepted', link: `/merchant/requests/orders/${orderId}`, entity_type: 'order', entity_id: orderId },
   ]);
   // The losing merchant is not told they won.
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = 'owner2' AND kind = 'offer_accepted'"), 0);

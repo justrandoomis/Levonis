@@ -96,7 +96,12 @@ function creditText(o: Record<string, unknown>, loc: Loc, lang: string): string 
   return '';
 }
 
-export function OrdersTab() {
+/**
+ * `focusOrderId`: the order a workspace address names (`/merchant/orders/<id>`,
+ * a notification's or the ledger's link, W2-E) — opened and scrolled to; shown
+ * on its own above the list when it is not on the loaded page.
+ */
+export function OrdersTab({ focusOrderId = null }: { focusOrderId?: string | null } = {}) {
   const { loc, lang } = useLanguage();
   const [orders, setOrders] = useState<Record<string, unknown>[] | null>(null);
   /** The server's keyset cursor for the next page (B26) — null on the last. */
@@ -105,7 +110,10 @@ export function OrdersTab() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [filter, setFilter] = useState('');
   const [busy, setBusy] = useState('');
-  const [openId, setOpenId] = useState('');
+  const [openId, setOpenId] = useState(focusOrderId ?? '');
+  useEffect(() => {
+    if (focusOrderId) setOpenId(focusOrderId);
+  }, [focusOrderId]);
   /** A refused move, beside the order it was refused for — never a browser alert. */
   const [moveError, setMoveError] = useState<{ id: string; text: string } | null>(null);
   /** The order whose cancellation is being confirmed, and that sheet's own error. */
@@ -239,17 +247,28 @@ export function OrdersTab() {
         ) : (
           <Spinner />
         )
-      ) : !orders.length ? (
+      ) : !orders.length && !focusOrderId ? (
         <Empty text={loc('لا توجد طلبات', 'No orders', 'داواکاری نییە')} />
       ) : (
-        orders.map((o) => {
+        <>
+        {focusOrderId && !orders.some((o) => String(o.id) === focusOrderId) && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03]" data-focus-order={focusOrderId}>
+            <p className="px-3 pt-3 text-white text-[12.5px] font-semibold" dir="ltr">{focusOrderId}</p>
+            <OrderDetail id={focusOrderId} />
+          </div>
+        )}
+        {orders.map((o) => {
           const id = String(o.id);
           const status = String(o.status);
           const next = ORDER_FLOW[status] ?? [];
           const open = openId === id;
           const credit = creditText(o, loc, lang);
           return (
-            <div key={id} className="rounded-2xl border border-white/10 bg-white/[0.03]">
+            <div
+              key={id}
+              className="rounded-2xl border border-white/10 bg-white/[0.03]"
+              ref={id === focusOrderId ? (el) => el?.scrollIntoView({ block: 'start' }) : undefined}
+            >
               <button
                 type="button"
                 onClick={() => setOpenId(open ? '' : id)}
@@ -321,7 +340,8 @@ export function OrdersTab() {
               )}
             </div>
           );
-        })
+        })}
+        </>
       )}
 
       {orders !== null && nextCursor && (

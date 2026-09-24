@@ -24,6 +24,8 @@ import { storeForUser } from './merchantAuth';
 import { benefits, getTierStatus } from './entitlements';
 import { escrowForOrder, releaseEscrow, releaseEscrowReservation } from './escrowOps';
 import { notifyStatement } from './notifications';
+import { merchantNotificationStatement, offerAcceptedNotice } from './merchantNotify';
+import { merchantHref } from '@levonis/contracts/merchantRoutes';
 import { audit } from './audit';
 
 const nowIso = () => new Date().toISOString();
@@ -283,20 +285,8 @@ export function offerAcceptedNotification(
   db: D1Database,
   p: { merchantUserId: string; requestId: string; offerId: string; orderId: string; priceIqd: number }
 ): D1PreparedStatement {
-  const price = Math.trunc(p.priceIqd).toLocaleString('en-US');
-  return notifyStatement(db, {
-    userId: p.merchantUserId,
-    kind: 'offer_accepted',
-    title_ar: 'قبل العميل عرضك',
-    title_en: 'Your offer was accepted',
-    body_ar: `قبل العميل عرضك على الطلب ${p.requestId} بمبلغ ${price} د.ع. المبلغ محجوز لدى Levonis ويُحرَّر لك بعد تأكيد الاستلام.`,
-    body_en: `The customer accepted your offer on request ${p.requestId} for ${price} IQD. Levonis holds the money and releases it to you when delivery is confirmed.`,
-    link: `/requests?request=${encodeURIComponent(p.requestId)}`,
-    entity_type: 'order',
-    entity_id: p.orderId,
-    meta: { request_id: p.requestId, offer_id: p.offerId, price_iqd: p.priceIqd },
-    eventKey: `offer_accepted:${p.offerId}`,
-  }).stmt;
+  // The one copy and the workspace address of the job (worker/lib/merchantNotify.ts, W2-E).
+  return merchantNotificationStatement(db, p.merchantUserId, offerAcceptedNotice(p));
 }
 
 /**
@@ -326,7 +316,7 @@ export async function staleOfferNotifications(
         title_en: 'A request you offered on has changed',
         body_ar: `عدّل العميل تفاصيل الطلب ${requestId}. عرضك معلّق ولا يمكن قبوله حتى تؤكده من جديد أو تسحبه.`,
         body_en: `The customer changed request ${requestId}. Your offer is on hold and cannot be accepted until you re-confirm or withdraw it.`,
-        link: `/requests?request=${encodeURIComponent(requestId)}`,
+        link: merchantHref.request(requestId),
         entity_type: 'offer',
         entity_id: o.id,
         meta: { request_id: requestId, revision },

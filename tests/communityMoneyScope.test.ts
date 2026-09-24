@@ -163,6 +163,13 @@ const ADMIN_COMMUNITY_ROUTES: Record<string, MoneyClass> = {
   'POST /reconciliation/store-orders/:id/refund': 'guard',
   'POST /reconciliation/store-orders/:id/reverse-credit': 'guard',
   'POST /merchants/:id/payout': 'guard',
+  // The merchant ledger's payout queue, adjustments and backfill parity (W2-B).
+  'GET /payouts': 'guard',
+  'POST /payouts/:id/approve': 'guard',
+  'POST /payouts/:id/paid': 'guard',
+  'POST /payouts/:id/fail': 'guard',
+  'POST /merchants/:id/adjustment': 'guard',
+  'GET /ledger/parity': 'guard',
 };
 
 const ADMIN_ROUTES: Record<string, MoneyClass> = {

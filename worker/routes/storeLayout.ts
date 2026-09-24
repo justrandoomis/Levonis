@@ -312,8 +312,26 @@ storeLayoutRoutes.get('/', async (c) => {
   });
 });
 
-storeLayoutRoutes.put('/draft', async (c) => {
+/**
+ * WRITES NEED A STORE THAT IS NOT UNDER SANCTION (security review of 644e3ea, L2).
+ * Reading stays open — the owner keeps their history — but a suspended
+ * merchant or store cannot stage a page that would go live the moment the
+ * sanction lifts. A PAUSED store may still design: pausing is the owner's own
+ * choice, not Levonis's.
+ */
+async function requireLayoutWriter(c: Context<AppContext>): Promise<StoreContext> {
   const ctx = await requireStoreOwner(c);
+  if (ctx.merchant.status === 'suspended') {
+    throw new HttpError(403, 'This merchant account is suspended. Contact support.', 'MERCHANT_SUSPENDED');
+  }
+  if (ctx.store.status === 'suspended') {
+    throw new HttpError(403, 'This store is suspended by Levonis. Contact support.', 'STORE_SUSPENDED');
+  }
+  return ctx;
+}
+
+storeLayoutRoutes.put('/draft', async (c) => {
+  const ctx = await requireLayoutWriter(c);
   await rateLimit(c, 'store-layout-draft', 240, 900);
   const body = await readBody(c);
   const expected = versionOf(body);
@@ -362,7 +380,7 @@ storeLayoutRoutes.put('/draft', async (c) => {
 });
 
 storeLayoutRoutes.post('/publish', async (c) => {
-  const ctx = await requireStoreOwner(c);
+  const ctx = await requireLayoutWriter(c);
   await rateLimit(c, 'store-layout-publish', 60, 3600);
   const body = await readBody(c);
   const expected = versionOf(body);
@@ -453,7 +471,7 @@ storeLayoutRoutes.get('/revisions/:revision', async (c) => {
 });
 
 storeLayoutRoutes.post('/restore/:revision', async (c) => {
-  const ctx = await requireStoreOwner(c);
+  const ctx = await requireLayoutWriter(c);
   await rateLimit(c, 'store-layout-publish', 60, 3600);
   const body = await readBody(c);
   const expected = versionOf(body);

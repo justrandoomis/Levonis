@@ -42,6 +42,7 @@ import { getSetting } from './settings';
 import { safeParse } from './types';
 import type { StoreContext } from './merchantAuth';
 import { maskName } from '../routes/reviews';
+import { collectionMemberSql, collectionOrder, sinceNewArrivals, type CollectionKind } from './catalog/sql';
 
 // --------------------------------------------------------------------- read
 
@@ -146,28 +147,55 @@ export async function blockDataFor(db: D1Database, ctx: StoreContext, layout: St
     // One statement for every product list: each list is its own ordered,
     // limited subquery, tagged with its key. ?1 is the store; each list binds
     // its key and limit, and a collection list its collection id too — every
-    // bound parameter is referenced, at most 1 + 12 × 3 = 37 of them.
+    // bound parameter is referenced, at most 2 + 12 × 3 = 38 of them.
+    //
+    // A COLLECTION IS MEMBERSHIP OR A RULE (W2-F, migration 0126): a manual
+    // collection lists its members in the merchant's order, a computed one
+    // (featured / new arrivals / best sellers) its rule's products in the
+    // rule's order. The kinds are read first — one small statement — so each
+    // list's subquery is built for its own kind; `sv` is the order's value,
+    // which is also what «load more» pages by.
+    const collectionIds = needs.products.filter((q) => q.source === 'collection').map((q) => q.collection_id);
+    const kinds = new Map<string, CollectionKind>();
+    if (collectionIds.length) {
+      const { results } = await db
+        .prepare(
+          `SELECT id, kind FROM merchant_store_sections WHERE store_id = ?1 AND active = 1 AND id IN (SELECT value FROM json_each(?2))`
+        )
+        .bind(storeId, JSON.stringify(collectionIds))
+        .all<{ id: string; kind: CollectionKind }>()
+        .catch(() => ({ results: [] as Array<{ id: string; kind: CollectionKind }> }));
+      for (const r of results ?? []) kinds.set(r.id, r.kind ?? 'manual');
+    }
     const parts: string[] = [];
-    const binds: unknown[] = [storeId];
+    const binds: unknown[] = [storeId, sinceNewArrivals()];
     const param = (v: unknown) => {
       binds.push(v);
       return `?${binds.length}`;
     };
     for (const q of needs.products) {
       const key = param(q.key);
-      const filter =
-        q.source === 'featured'
-          ? 'AND featured = 1'
-          : q.source === 'deals'
-            ? 'AND original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd'
-            : q.source === 'collection'
-              ? `AND section_id = ${param(q.collection_id)}`
-              : '';
+      let filter = '';
+      let sv = 'created_at';
+      let order = 'created_at DESC, id DESC';
+      if (q.source === 'featured') filter = 'AND featured = 1';
+      else if (q.source === 'deals') filter = 'AND original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd';
+      else if (q.source === 'collection') {
+        const kind = kinds.get(q.collection_id);
+        const idp = param(q.collection_id);
+        if (!kind) filter = 'AND 0';
+        else {
+          filter = `AND ${collectionMemberSql(kind, 'community_products', idp, '?2')}`;
+          const o = collectionOrder(kind, 'community_products', idp);
+          sv = o.sortExpr;
+          order = `${o.sortExpr} ${o.dir}, id DESC`;
+        }
+      }
       const limit = param(q.limit);
       parts.push(
-        `SELECT * FROM (SELECT ${key} AS qk, ${PRODUCT_CARD_COLUMNS} FROM community_products
+        `SELECT * FROM (SELECT ${key} AS qk, ${PRODUCT_CARD_COLUMNS}, ${sv} AS sv FROM community_products
            WHERE store_id = ?1 AND ${live} ${filter}
-           ORDER BY created_at DESC, id DESC LIMIT ${limit})`
+           ORDER BY ${order} LIMIT ${limit})`
       );
     }
     tasks.push(
@@ -188,7 +216,12 @@ export async function blockDataFor(db: D1Database, ctx: StoreContext, layout: St
               items: rows.map(productCard),
               // «Load more» follows the storefront's own listing, which filters
               // by collection and deals but not by «featured».
-              next_cursor: q.source === 'featured' ? null : cursorOf(rows, q.limit),
+              next_cursor:
+                q.source === 'featured'
+                  ? null
+                  : rows.length === q.limit
+                    ? `${String(rows[rows.length - 1].sv)}|${String(rows[rows.length - 1].id)}`
+                    : null,
             };
             data.products[q.key] = page;
           }
@@ -216,15 +249,24 @@ export async function blockDataFor(db: D1Database, ctx: StoreContext, layout: St
     tasks.push(
       db
         .prepare(
-          `SELECT s.id, s.name, s.name_ar, COUNT(p.id) AS product_count
-             FROM merchant_store_sections s
-             JOIN community_products p
-               ON p.section_id = s.id AND p.store_id = s.store_id AND p.lifecycle = 'active' AND p.status = 'active'
-            WHERE s.store_id = ? AND s.active = 1
-            GROUP BY s.id
-            ORDER BY s.sort_order, s.created_at`
+          `SELECT * FROM (
+             SELECT s.id, s.name, s.name_ar, s.sort_order, s.created_at,
+                    CASE s.kind
+                      WHEN 'manual' THEN (SELECT COUNT(*) FROM merchant_collection_products m JOIN community_products p ON p.id = m.product_id
+                                           WHERE m.collection_id = s.id AND p.lifecycle = 'active' AND p.status = 'active')
+                      WHEN 'featured' THEN (SELECT COUNT(*) FROM community_products p WHERE p.store_id = s.store_id AND p.featured = 1
+                                             AND p.lifecycle = 'active' AND p.status = 'active')
+                      WHEN 'new_arrivals' THEN (SELECT COUNT(*) FROM community_products p WHERE p.store_id = s.store_id AND p.created_at >= ?2
+                                             AND p.lifecycle = 'active' AND p.status = 'active')
+                      ELSE (SELECT COUNT(*) FROM community_products p WHERE p.store_id = s.store_id AND p.sold_count > 0
+                              AND p.lifecycle = 'active' AND p.status = 'active')
+                    END AS product_count
+               FROM merchant_store_sections s
+              WHERE s.store_id = ?1 AND s.active = 1)
+            WHERE product_count > 0
+            ORDER BY sort_order, created_at`
         )
-        .bind(storeId)
+        .bind(storeId, sinceNewArrivals())
         .all<Record<string, unknown>>()
         .then(({ results }) => {
           data.collections = (results ?? []).map((s) => ({

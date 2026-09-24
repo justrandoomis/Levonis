@@ -204,7 +204,10 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/reviews', hosts: 'main', owner: 'REVIEWS', flipPhase: 6, requires: 'none', rateClass: 'write' },
 
   // ----------------------------------------------- marketplace / merchants
-  { prefix: '/api/merchant', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'auth', rateClass: 'user', note: 'covers /api/merchant/store/layout — the store page draft, publish, history and restore (merchant platform W2-C)' },
+  { prefix: '/api/merchant', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'auth', rateClass: 'user', note: 'covers /api/merchant/store/layout — the store page draft, publish, history and restore (merchant platform W2-C) — and /api/merchant/notifications/*, /api/merchant/inbox, /api/merchant/analytics/report (the store notification centre, inbox and range analytics, W2-E); /api/merchant/finance and /api/merchant/payouts (the merchant ledger, finance summary and payout requests, W2-B); /api/merchant/products* and /api/merchant/collections* (worker/routes/merchantCatalog.ts — the catalogue, variants, bulk, import/export, collections, W2-F)' },
+  // The storefront's first-party analytics beacon (W2-E): a POST from every
+  // store host, never cached, limited per account or network inside the core.
+  { prefix: '/api/storefront/events', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'public-read', methods: ['POST'], note: 'POST only, anonymous per-network beacon (core bucket 240/min) — store_view, product_view, add_to_cart, checkout_started (merchant platform W2-E)' },
   { prefix: '/api/storefront', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'public-read', cacheable: true, note: '/api/storefront/resolve must answer on every hostname' },
   { prefix: '/api/community-reviews', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'write' },
   { prefix: '/api/community', hosts: 'root', owner: 'MARKETPLACE', flipPhase: 6, requires: 'none', rateClass: 'user', legacy: true, note: 'legacy shims' },

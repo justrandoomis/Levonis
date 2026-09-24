@@ -43,6 +43,7 @@ import {
   type LexEntry,
 } from '../lib/assistantNlu';
 import { Hono } from 'hono';
+import { notifyStoreOrderComplaint } from '../lib/merchantNotify';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
@@ -2679,6 +2680,8 @@ supportRoutes.post('/tickets', requireAuth, async (c) => {
       `\nSource: ${source}`
   );
 
+  // A ticket on a STORE order freezes its money — its merchant is told why (W2-E).
+  if (orderId) await notifyStoreOrderComplaint(c.env, { orderId, ticketId });
   return c.json({ success: true, ticket: ticketPublic(ticket) });
 });
 

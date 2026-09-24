@@ -23,7 +23,7 @@
  * string ever becomes a style rule or raw HTML.
  */
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Suspense, createContext, lazy, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Hammer, Link2, Loader2, MessageCircle, MessageCircleMore, MoreHorizontal, PackageX } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
@@ -31,10 +31,10 @@ import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
 import { storefrontApi, communityFavoritesApi, type MerchantProduct } from '../lib/merchant';
 import { useStore } from '../StoreContext';
+import { trackStoreEvent } from '../lib/storeBeacon';
 import { useCommunityAccess } from './community/access';
 import InstallAppButton from '../components/pwa/InstallAppButton';
 import StoreUnavailable from '../components/merchant/StoreUnavailable';
-import OwnerShareMenuItem from '../components/merchant/share/OwnerShareMenuItem';
 import StoreRenderer from '../components/storefront/StoreRenderer';
 import '../components/storefront/styles';
 import { SavedIdsProvider, StorefrontRuntimeProvider, type StorefrontRuntime, type TabKind } from '../components/storefront/runtime';
@@ -42,6 +42,10 @@ import type { AccentClasses } from '../components/storefront/theme';
 import type { StorefrontStore } from '../components/storefront/types';
 import type { LinkRoute } from '../../packages/storeLayout/src/refs';
 import type { ReviewsData } from '../../packages/storeLayout/src/data';
+
+// The owner's «QR and store card» row and its strings arrive with the «…»
+// menu, not with the page: a customer's visit never downloads them (W2-F).
+const OwnerShareMenuItem = lazy(() => import('../components/merchant/share/OwnerShareMenuItem'));
 
 type Loc = (ar: string, en: string, ckb?: string) => string;
 
@@ -122,6 +126,8 @@ export default function Storefront({
   const pendingSaves = useRef(new Map<string, boolean>());
 
   const slug = store?.slug ?? routeSlug ?? '';
+  // First-party analytics (W2-E): the Worker counts one store view per visitor per day.
+  useEffect(() => trackStoreEvent(store?.id, 'store_view'), [store?.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -788,11 +794,13 @@ function StoreMenu({
             <button onClick={copy} className="w-full text-start px-3.5 py-2.5 text-[12.5px] text-zinc-200 active:bg-white/10 border-t border-white/5">
               {copied ? loc('تم النسخ ✓', 'Copied ✓', 'کۆپی کرا ✓') : loc('نسخ الرابط', 'Copy the link', 'کۆپی بەستەر')}
             </button>
-            <OwnerShareMenuItem
-              storeId={storeId}
-              onDone={() => setOpen(false)}
-              className="w-full text-start px-3.5 py-2.5 text-[12.5px] text-zinc-200 active:bg-white/10 border-t border-white/5"
-            />
+            <Suspense fallback={null}>
+              <OwnerShareMenuItem
+                storeId={storeId}
+                onDone={() => setOpen(false)}
+                className="w-full text-start px-3.5 py-2.5 text-[12.5px] text-zinc-200 active:bg-white/10 border-t border-white/5"
+              />
+            </Suspense>
           </div>
         </>
       )}

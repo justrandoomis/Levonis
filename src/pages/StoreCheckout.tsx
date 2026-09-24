@@ -9,9 +9,16 @@ import OrderCelebration from '../components/bloub/OrderCelebration';
  * exactly what is genuinely shared: the address book, the wallet, and the one
  * order history.
  *
- * EVERY NUMBER COMES FROM THE QUOTE. The client sends a coupon code and an
- * address id; prices, delivery and the discount are computed server-side and
- * rendered here verbatim.
+ * EVERY NUMBER COMES FROM THE QUOTE. The client sends a coupon code, an
+ * address id and delivery-or-pickup; prices, delivery and the discount are
+ * computed server-side and rendered here verbatim.
+ *
+ * DELIVERY BY GOVERNORATE (W2-A). The merchant prices their own delivery per
+ * governorate; the server reads the chosen SAVED address, and every change of
+ * address or of delivery/pickup re-quotes. An address the store does not
+ * deliver to, one saved without a governorate, or no address at all comes back
+ * as a refusal carrying the cart's summary (`DeliveryRefusal`): the goods stay
+ * on screen, the panel says what to do, and there is no Place button to press.
  *
  * THE ORDER IS THE QUOTE THE CUSTOMER SAW (audit 02 B12). Placing it sends the
  * quote's fingerprint back; if anything that costs money moved in between, the
@@ -24,17 +31,45 @@ import OrderCelebration from '../components/bloub/OrderCelebration';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Check, Loader2, MapPin, Plus, Store, Tag, Wallet as WalletIcon, ShoppingBag,
+  ArrowLeft, Check, Loader2, MapPin, Plus, Store, Tag, Truck, Wallet as WalletIcon, ShoppingBag,
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, type ApiAddress } from '../lib/api';
-import { storeCheckoutApi, iqd, type StoreQuote } from '../lib/merchant';
+import {
+  storeCheckoutApi, iqd, DELIVERY_REFUSALS,
+  type DeliveryRefusal, type Fulfilment, type StorePreview, type StoreQuote,
+} from '../lib/merchant';
+import CheckoutDeliveryPanel, { governorateText } from '../components/merchant/delivery/CheckoutDeliveryPanel';
+import { Segmented } from '../components/ui/Segmented';
+import { GOVERNORATES } from '../lib/governorates';
 import { apiRefusal } from '../lib/refusalStrings';
 import { useFreshOnReturn } from '../lib/useFreshOnReturn';
 import AddressForm from '../components/address/AddressForm';
 import { useStore } from '../StoreContext';
+import { trackStoreEvent } from '../lib/storeBeacon';
 import { useBusy } from '../lib/busy';
 import { mascot } from '../lib/mascot';
+
+const GOVERNORATE_IDS = new Set(GOVERNORATES.map((g) => g.id));
+
+/** A refusal that asks for another address or fulfilment — the cart's summary rides along (W2-A). */
+function deliveryRefusal(e: unknown): DeliveryRefusal | null {
+  if (!(e instanceof ApiError)) return null;
+  const code = e.code ?? '';
+  if (!(DELIVERY_REFUSALS as readonly string[]).includes(code)) return null;
+  const d = (e.details ?? {}) as Record<string, unknown>;
+  if (!d.preview || typeof d.preview !== 'object') return null;
+  return {
+    code: code as DeliveryRefusal['code'],
+    fulfilment: d.fulfilment === 'pickup' ? 'pickup' : 'delivery',
+    address_id: typeof d.address_id === 'string' ? d.address_id : undefined,
+    governorate: typeof d.governorate === 'string' ? d.governorate : undefined,
+    reason: d.reason as DeliveryRefusal['reason'],
+    served: Array.isArray(d.served) ? (d.served as string[]) : [],
+    pickup: (d.pickup as DeliveryRefusal['pickup']) ?? null,
+    preview: d.preview as StorePreview,
+  };
+}
 
 /** A fresh checkout key — one per agreed quote (see `keyFor`). */
 const newCheckoutKey = () => `sc-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
@@ -62,6 +97,21 @@ export default function StoreCheckout() {
   const [addresses, setAddresses] = useState<ApiAddress[] | null>(null);
   const [addressId, setAddressId] = useState('');
   const [addingAddress, setAddingAddress] = useState(false);
+  /**
+   * DELIVERY BY GOVERNORATE (W2-A). `fulfilment` is the customer's choice
+   * when the store offers pickup; `blocked` is the server's refusal for the
+   * current choice (no address, no governorate, not delivered there), and
+   * `preview` the cart summary it carried — shown in place of a quote, never
+   * placeable. `editing` is a saved address being completed in place.
+   */
+  const [fulfilment, setFulfilment] = useState<Fulfilment>('delivery');
+  const [blocked, setBlocked] = useState<DeliveryRefusal | null>(null);
+  const [preview, setPreview] = useState<StorePreview | null>(null);
+  const [editing, setEditing] = useState<ApiAddress | null>(null);
+  const addressRef = useRef('');
+  addressRef.current = addressId;
+  const fulfilmentRef = useRef<Fulfilment>('delivery');
+  fulfilmentRef.current = fulfilment;
   const [couponInput, setCouponInput] = useState('');
   const [coupon, setCoupon] = useState('');
   const [couponError, setCouponError] = useState('');
@@ -94,6 +144,8 @@ export default function StoreCheckout() {
   const [priceMoved, setPriceMoved] = useState<{ from: number; to: number } | null>(null);
   const quoteRef = useRef<StoreQuote | null>(null);
   quoteRef.current = quote;
+  // First-party analytics (W2-E): reaching the store checkout, once per visitor per day.
+  useEffect(() => trackStoreEvent(quote?.store_id, 'checkout_started'), [quote?.store_id]);
 
   /**
    * THE RE-QUOTE HAD NO WAIT AT ALL, AND «تأكيد الطلب» STAYED LIVE THROUGH IT.
@@ -143,9 +195,16 @@ export default function StoreCheckout() {
         // The attempt's own key rides along: a reservation a failed attempt
         // left behind is still this checkout's money, and the server counts
         // it back so the button is not disabled by it (review F6).
-        const d = await storeCheckoutApi.quote(code, attempt.current?.key ?? '');
+        const d = await storeCheckoutApi.quote(code, attempt.current?.key ?? '', {
+          addressId: addressRef.current || undefined,
+          fulfilment: fulfilmentRef.current,
+        });
         if (seq !== quoteSeq.current) return false;
         setQuote(d.quote);
+        setBlocked(null);
+        setPreview(null);
+        // The first quote priced the default address: that is the one selected.
+        if (!addressRef.current && d.quote.delivery?.address_id) setAddressId(d.quote.delivery.address_id);
         // A total that moved on its own is named; one the customer moved with
         // a coupon is theirs, and clears any older notice. (`quoteRef` still
         // holds the quote on screen until the next render.)
@@ -161,6 +220,19 @@ export default function StoreCheckout() {
         if (seq !== quoteSeq.current) return false;
         if (e instanceof ApiError && e.code === 'COUPON_INVALID') {
           setCouponError(loc('هذا الكود غير صالح لهذا الطلب', 'This code cannot be used on this order', 'ئەم کۆدە بەکارناهێت'));
+          return false;
+        }
+        // Not delivered there, no governorate, no address: the goods stay on
+        // screen from the refusal's summary, and the panel asks for a change.
+        const refused = deliveryRefusal(e);
+        if (refused) {
+          setQuote(null);
+          setPreview(refused.preview);
+          setBlocked(refused);
+          setCoupon(refused.preview.coupon_code || '');
+          setQuoteError('');
+          if (!addressRef.current && refused.address_id) setAddressId(refused.address_id);
+          if (refused.code === 'ADDRESS_REQUIRED') setAddingAddress(true);
           return false;
         }
         // The refusal's CODE, in the customer's language — never the server's
@@ -206,17 +278,46 @@ export default function StoreCheckout() {
     pollWhileVisibleMs: 60_000,
   });
 
+  /** A different saved address — a new delivery answer, asked for by the customer. */
+  function chooseAddress(id: string) {
+    if (id === addressRef.current && !blocked) return;
+    addressRef.current = id;
+    setAddressId(id);
+    void loadQuote(couponRef.current, true);
+  }
+
+  /** Delivery or pickup — only offered when the store offers pickup. */
+  function chooseFulfilment(next: Fulfilment) {
+    if (next === fulfilmentRef.current) return;
+    fulfilmentRef.current = next;
+    setFulfilment(next);
+    void loadQuote(couponRef.current, true);
+  }
+
+  /** The address book again, after an address was added or completed here. */
+  async function afterAddressSaved(id: string) {
+    setAddingAddress(false);
+    setEditing(null);
+    const d = await api.get<{ addresses: ApiAddress[] }>('/api/addresses');
+    setAddresses(d.addresses);
+    addressRef.current = id;
+    setAddressId(id);
+    await loadQuote(couponRef.current, true);
+  }
+
   async function place() {
     // `quoteLoading` too: the total on the button is about to change.
     if (!addressId || !quote || quoteLoading) return;
-    // The quote on screen IS the agreement: its fingerprint, its coupon, its key.
+    // The quote on screen IS the agreement: its fingerprint, its coupon, its key,
+    // and the address and fulfilment it priced.
     const agreed = quote;
     setPlacing(true);
     setPlaceError('');
     setPlaceRemedy(null);
     try {
       const r = await storeCheckoutApi.place({
-        addressId,
+        addressId: agreed.delivery?.address_id || addressId,
+        fulfilment: agreed.delivery?.fulfilment ?? fulfilment,
         idempotencyKey: keyFor(agreed.quote_fingerprint),
         quoteFingerprint: agreed.quote_fingerprint,
         ...(agreed.coupon_code ? { couponCode: agreed.coupon_code } : {}),
@@ -258,6 +359,15 @@ export default function StoreCheckout() {
           )
         );
         void loadQuote(coupon);
+        return;
+      }
+      // The address or the store's delivery moved under the tap: not
+      // delivered there any more, or the address lost its governorate.
+      const refused = deliveryRefusal(e);
+      if (refused) {
+        setQuote(null);
+        setPreview(refused.preview);
+        setBlocked(refused);
         return;
       }
       if (code === 'INSUFFICIENT_FUNDS') {
@@ -338,13 +448,20 @@ export default function StoreCheckout() {
     );
   }
 
+  // What is on screen: the placeable quote, or the refusal's summary of the cart.
+  const summary: StorePreview | null = quote ?? preview;
+  const offer = quote?.delivery ?? blocked;
+  const served = new Set(offer?.served ?? []);
+  const pickupOffered = !!offer?.pickup;
+  const merchandise = summary ? summary.subtotal_iqd - summary.discount_iqd : 0;
+
   return (
     <div className="h-full min-h-0 bg-canvas text-text-secondary flex flex-col">
       <div className="lv-character-header shrink-0 bg-canvas/96 backdrop-blur border-b border-border-subtle/70 px-3 sm:px-4 py-2 flex items-center gap-3">
         <button type="button" aria-label={loc('رجوع', 'Back', 'گەڕانەوە')} onClick={() => navigate(-1)} className="w-11 h-11 rounded-md flex items-center justify-center text-text-secondary hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           <ArrowLeft className={`w-4 h-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
         </button>
-        <MotionCharacterHome busy={!quote && !quoteError} />
+        <MotionCharacterHome busy={!summary && !quoteError} />
         <h1 className="text-white font-bold text-[15px]">{loc('إتمام الطلب', 'Checkout', 'تەواوکردنی داواکاری')}</h1>
       </div>
 
@@ -359,25 +476,25 @@ export default function StoreCheckout() {
           </div>
         )}
 
-        {!quote && !quoteError && (
+        {!summary && !quoteError && (
           <div role="status" className="py-16 flex flex-col items-center justify-center gap-3 text-text-muted">
             <Loader2 className="w-5 h-5 animate-spin" />
             <span className="text-xs">{loc('جارٍ تجهيز دفع المتجر…', 'Preparing store checkout…', 'ئامادەکردنی پارەدان…')}</span>
           </div>
         )}
 
-        {quote && (
+        {summary && (
           <>
             <section className="lv-surface p-3.5">
               <div className="flex items-center gap-2 mb-2.5">
                 <Store className="w-4 h-4 text-gold" />
-                <h2 className="text-white font-bold text-[13px]">{quote.store_name}</h2>
+                <h2 className="text-white font-bold text-[13px]">{summary.store_name}</h2>
               </div>
               <div className="space-y-2">
-                {quote.lines.map((l) => (
+                {summary.lines.map((l) => (
                   <div key={l.cart_item_id} className="flex items-center gap-2.5 text-[12.5px]">
                     <div className="w-10 h-10 rounded-lg bg-black/40 overflow-hidden shrink-0">
-                      {l.image && <img src={l.image} alt="" className="w-full h-full object-cover" />}
+                      {l.image && <img src={l.image} alt="" width={40} height={40} className="w-full h-full object-cover" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-zinc-200 truncate">{l.name}</p>
@@ -391,34 +508,53 @@ export default function StoreCheckout() {
               </div>
             </section>
 
-            {/* Delivery address — the platform's own address book. */}
-            <section className="lv-surface p-3.5">
-              <div className="flex items-center justify-between mb-2.5">
-                <h2 className="text-white font-bold text-[13px] flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-gold" />
-                  {loc('عنوان التوصيل', 'Delivery address', 'ناونیشانی گەیاندن')}
+            {/* DELIVERY — the customer's own address book, and the store's own
+                price for the governorate of the address chosen (W2-A). */}
+            <section className="lv-surface p-3.5 space-y-3" aria-labelledby="store-delivery-title" data-store-delivery>
+              <div className="flex items-center justify-between gap-2">
+                <h2 id="store-delivery-title" className="text-white font-bold text-[13px] flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-gold" aria-hidden="true" />
+                  {fulfilment === 'pickup'
+                    ? // OWNER: Sorani to be written by hand.
+                      loc('الاستلام وبيانات التواصل', 'Pickup and contact')
+                    : loc('عنوان التوصيل', 'Delivery address', 'ناونیشانی گەیاندن')}
                 </h2>
-                {!addingAddress && (
-                  <button type="button" onClick={() => setAddingAddress(true)} className="lv-button lv-button-ghost min-h-9 px-2 text-[11.5px]">
-                    <Plus className="w-3.5 h-3.5" />
+                {!addingAddress && !editing && (
+                  <button type="button" onClick={() => setAddingAddress(true)} className="lv-button lv-button-ghost min-h-11 px-2 text-[11.5px]">
+                    <Plus className="w-3.5 h-3.5" aria-hidden="true" />
                     {loc('عنوان جديد', 'New address', 'ناونیشانی نوێ')}
                   </button>
                 )}
               </div>
 
+              {/* Delivery or pickup: offered only when the store offers pickup. */}
+              {pickupOffered && (
+                <Segmented
+                  group="store-fulfilment"
+                  // OWNER: Sorani to be written by hand.
+                  label={loc('طريقة الاستلام', 'How you get it')}
+                  value={fulfilment}
+                  onChange={(v) => chooseFulfilment(v as Fulfilment)}
+                  items={[
+                    { id: 'delivery', label: loc('توصيل', 'Delivery', 'گەیاندن'), icon: <Truck className="w-4 h-4" aria-hidden="true" /> },
+                    // OWNER: Sorani to be written by hand.
+                    { id: 'pickup', label: loc('من المتجر', 'Pickup'), icon: <Store className="w-4 h-4" aria-hidden="true" /> },
+                  ]}
+                />
+              )}
+
               {addresses === null ? (
-                <Loader2 className="w-4 h-4 text-gold animate-spin" />
-              ) : addingAddress ? (
+                <Loader2 className="w-4 h-4 text-gold animate-spin" aria-hidden="true" />
+              ) : addingAddress || editing ? (
                 <AddressForm
                   dense
                   defaultWhenFirst
-                  onSaved={async (id) => {
+                  initial={editing}
+                  onSaved={(id) => void afterAddressSaved(id)}
+                  onCancel={() => {
                     setAddingAddress(false);
-                    const d = await api.get<{ addresses: ApiAddress[] }>('/api/addresses');
-                    setAddresses(d.addresses);
-                    setAddressId(id);
+                    setEditing(null);
                   }}
-                  onCancel={() => setAddingAddress(false)}
                 />
               ) : !addresses.length ? (
                 <p className="text-zinc-500 text-[12px]">
@@ -426,28 +562,71 @@ export default function StoreCheckout() {
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {addresses.map((a) => (
-                    <button
-                      type="button"
-                      key={a.id}
-                      onClick={() => setAddressId(a.id)}
-                      aria-pressed={addressId === a.id}
-                      data-selected={addressId === a.id}
-                      className="lv-choice w-full text-start p-2.5"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="lv-choice-mark"
-                        >
-                          <Check className="w-3 h-3" aria-hidden="true" />
-                        </span>
-                        <span className="text-white text-[12.5px] font-semibold">{a.label || a.name}</span>
-                        <span className="text-zinc-500 text-[11px]" dir="ltr">{a.phone}</span>
-                      </div>
-                      <p className="text-zinc-400 text-[11.5px] mt-1 ps-6">{a.address}</p>
-                    </button>
-                  ))}
+                  {addresses.map((a) => {
+                    const gov = a.governorate && GOVERNORATE_IDS.has(a.governorate) ? a.governorate : '';
+                    // Said on the address itself, before it is chosen: where the store delivers.
+                    const notServed = fulfilment === 'delivery' && !!offer && !!gov && !served.has(gov);
+                    return (
+                      <button
+                        type="button"
+                        key={a.id}
+                        onClick={() => chooseAddress(a.id)}
+                        aria-pressed={addressId === a.id}
+                        data-selected={addressId === a.id}
+                        className="lv-choice w-full text-start p-2.5"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="lv-choice-mark">
+                            <Check className="w-3 h-3" aria-hidden="true" />
+                          </span>
+                          <span className="text-white text-[12.5px] font-semibold truncate">{a.label || a.name}</span>
+                          <span className="text-zinc-500 text-[11px] shrink-0" dir="ltr">{a.phone}</span>
+                        </div>
+                        <p className="text-zinc-400 text-[11.5px] mt-1 ps-6 break-words">
+                          {gov ? <span className="text-text-secondary">{governorateText(gov, lang)}</span> : null}
+                          {gov ? ' · ' : ''}
+                          {a.address}
+                        </p>
+                        {!gov && fulfilment === 'delivery' && (
+                          <p className="text-warning text-[11px] mt-1 ps-6">
+                            {/* OWNER: Sorani to be written by hand. */}
+                            {loc('بلا محافظة — أضفها لمعرفة أجرة التوصيل', 'No governorate — add it to price the delivery')}
+                          </p>
+                        )}
+                        {notServed && (
+                          <p className="text-text-muted text-[11px] mt-1 ps-6">
+                            {/* OWNER: Sorani to be written by hand. */}
+                            {loc('المتجر لا يوصل إلى هذه المحافظة', 'The store does not deliver here')}
+                          </p>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
+              )}
+
+              {!addingAddress && !editing && (
+                <div aria-live="polite">
+                  <CheckoutDeliveryPanel
+                    delivery={quote?.delivery ?? null}
+                    blocked={blocked}
+                    merchandiseIqd={merchandise}
+                    onChoosePickup={() => chooseFulfilment('pickup')}
+                    onFixAddress={() => {
+                      const a = addresses?.find((x) => x.id === (blocked?.address_id || addressId));
+                      if (a) setEditing(a);
+                    }}
+                  />
+                </div>
+              )}
+              {fulfilment === 'pickup' && quote && (
+                <p className="text-text-muted text-[11.5px] leading-relaxed">
+                  {/* OWNER: Sorani to be written by hand. */}
+                  {loc(
+                    'يتواصل المتجر معك على رقم هذا العنوان عندما يصبح طلبك جاهزًا.',
+                    'The store contacts you on this address’s number when your order is ready.'
+                  )}
+                </p>
               )}
             </section>
 
@@ -461,16 +640,17 @@ export default function StoreCheckout() {
               way to pay here, so the screen says so and then answers the
               only question that is actually open: does the wallet cover it.
             */}
+            {quote && (
             <section className="lv-surface p-3.5">
               <h2 className="text-white font-bold text-[13px] mb-1.5 flex items-center gap-1.5">
                 <WalletIcon className="w-4 h-4 text-gold" />
                 {loc('الدفع من المحفظة', 'Paid from your wallet', 'پارەدان لە جزدان')}
               </h2>
               <p className="text-zinc-400 text-[11.5px] leading-[1.6] mb-2.5">
+                {/* OWNER: Sorani to be written by hand. */}
                 {loc(
-                  'طلبات متاجر المجتمع تُدفع مقدمًا. لا دفع عند الاستلام ولا استلام من المخزن.',
-                  'Community-store orders are prepaid — no cash on delivery and no warehouse pickup.',
-                  'داواکاری فرۆشگاکانی کۆمەڵگە پێشوەخت دەدرێن.'
+                  'طلبات متاجر المجتمع تُدفع مقدمًا من المحفظة، ولا دفع عند الاستلام.',
+                  'Community-store orders are prepaid from your wallet — no cash on delivery.'
                 )}
               </p>
               <div className="flex items-center justify-between gap-2 text-[12.5px]">
@@ -493,6 +673,7 @@ export default function StoreCheckout() {
                 </div>
               )}
             </section>
+            )}
 
             {/* The store's own coupon. */}
             <section className="lv-surface p-3.5">
@@ -500,18 +681,19 @@ export default function StoreCheckout() {
                 <Tag className="w-4 h-4 text-gold" />
                 {loc('كوبون المتجر', 'Store coupon', 'کۆبۆنی فرۆشگا')}
               </h2>
-              {quote.coupon_code ? (
+              {summary.coupon_code ? (
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-emerald-400 text-[12.5px] font-bold" dir="ltr">
-                    {quote.coupon_code} — {iqd(quote.discount_iqd)}
+                    {summary.coupon_code} — {iqd(summary.discount_iqd)}
                   </span>
                   <button
+                    type="button"
                     onClick={() => {
                       setCouponInput('');
                       loadQuote('', true);
                     }}
                     disabled={quoteLoading}
-                    className="text-zinc-500 text-[11.5px] font-bold"
+                    className="lv-button lv-button-ghost min-h-11 px-2 text-zinc-400 text-[11.5px] font-bold"
                   >
                     {loc('إزالة', 'Remove', 'لابردن')}
                   </button>
@@ -524,6 +706,9 @@ export default function StoreCheckout() {
                   <div className="flex gap-2">
                   <input
                     id="store-coupon-code"
+                    name="store-coupon-code"
+                    autoComplete="off"
+                    spellCheck={false}
                     value={couponInput}
                     onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                     dir="ltr"
@@ -531,6 +716,7 @@ export default function StoreCheckout() {
                     className="lv-input flex-1 min-w-0 text-[13px] font-mono"
                   />
                   <button
+                    type="button"
                     onClick={() => couponInput.trim() && loadQuote(couponInput.trim(), true)}
                     disabled={!couponInput.trim() || quoteLoading}
                     className="lv-button lv-button-secondary text-[12.5px]"
@@ -547,18 +733,25 @@ export default function StoreCheckout() {
             <section className="lv-surface p-3.5 space-y-1.5 text-[12.5px]">
               <div className="flex justify-between">
                 <span className="text-zinc-400">{loc('المنتجات', 'Items', 'بەرهەمەکان')}</span>
-                <span className="text-zinc-200" dir="ltr">{iqd(quote.subtotal_iqd)}</span>
+                <span className="text-zinc-200 tabular-nums" dir="ltr">{iqd(summary.subtotal_iqd)}</span>
               </div>
-              {quote.discount_iqd > 0 && (
+              {summary.discount_iqd > 0 && (
                 <div className="flex justify-between text-emerald-400">
                   <span>{loc('خصم الكوبون', 'Coupon discount', 'داشکاندن')}</span>
-                  <span dir="ltr">− {iqd(quote.discount_iqd)}</span>
+                  <span className="tabular-nums" dir="ltr">− {iqd(summary.discount_iqd)}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-zinc-400">{loc('التوصيل', 'Delivery', 'گەیاندن')}</span>
-                <span className="text-zinc-200" dir="ltr">
-                  {quote.delivery_iqd === 0 ? (
+                <span className="text-zinc-400">
+                  {fulfilment === 'pickup'
+                    ? // OWNER: Sorani to be written by hand.
+                      loc('الاستلام من المتجر', 'Pickup')
+                    : loc('التوصيل', 'Delivery', 'گەیاندن')}
+                </span>
+                <span className="text-zinc-200 tabular-nums" dir="ltr">
+                  {!quote ? (
+                    '—'
+                  ) : quote.delivery_iqd === 0 ? (
                     <span className="text-emerald-400">{loc('مجاني', 'Free', 'بەخۆڕایی')}</span>
                   ) : (
                     iqd(quote.delivery_iqd)
@@ -568,7 +761,7 @@ export default function StoreCheckout() {
               <div className="h-px bg-white/10 my-1" />
               <div className="flex justify-between text-[14px]">
                 <span className="text-white font-bold">{loc('الإجمالي', 'Total', 'کۆی گشتی')}</span>
-                <span className="text-gold font-bold" dir="ltr">{iqd(quote.total_iqd)}</span>
+                <span className="text-gold font-bold tabular-nums" dir="ltr">{quote ? iqd(quote.total_iqd) : '—'}</span>
               </div>
             </section>
 
@@ -615,6 +808,7 @@ export default function StoreCheckout() {
                 and is said in the same place, before the tap rather than
                 after it. */}
             <button
+              type="button"
               onClick={place}
               disabled={placing || quoteLoading || !addressId || !quote.wallet_covers}
               aria-busy={placing || quoteLoading}
@@ -636,6 +830,32 @@ export default function StoreCheckout() {
                 {loc('اشحن المحفظة لإتمام الطلب', 'Top up the wallet to finish', 'جزدان پڕ بکەرەوە')}
               </p>
             ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* NOTHING TO PLACE YET: the current address or choice is not one the
+          store can deliver (W2-A). No live button — the reason, and the one
+          thing that changes it, are in the delivery section above. */}
+      {!quote && blocked && (
+        <div data-store-checkout-blocked className="shrink-0 border-t border-border-subtle/70 bg-surface-raised/98 px-3 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="max-w-2xl mx-auto">
+            <button type="button" disabled aria-describedby="store-checkout-blocked-why" className="lv-button lv-button-primary w-full min-h-12 text-[14px]">
+              {quoteLoading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Check className="w-4 h-4" aria-hidden="true" />}
+              {loc('تأكيد الطلب', 'Place the order', 'دووپاتکردنەوە')}
+            </button>
+            <p id="store-checkout-blocked-why" className="text-amber-400/90 text-[11px] text-center mt-1.5">
+              {blocked.code === 'ADDRESS_REQUIRED'
+                ? loc('أضف عنوانك الأول لإتمام الطلب.', 'Add your first address to finish the order.', 'ناونیشانێک زیاد بکە.')
+                : blocked.code === 'ADDRESS_GOVERNORATE_REQUIRED'
+                  ? // OWNER: Sorani to be written by hand.
+                    loc('أضف المحافظة إلى العنوان أولًا', 'Add the governorate to the address first')
+                  : blocked.reason === 'pickup_disabled'
+                    ? // OWNER: Sorani to be written by hand.
+                      loc('اختر التوصيل', 'Choose delivery')
+                    : // OWNER: Sorani to be written by hand.
+                      loc('اختر عنوانًا يوصل إليه المتجر', 'Choose an address the store delivers to')}
+            </p>
           </div>
         </div>
       )}

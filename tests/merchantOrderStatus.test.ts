@@ -61,7 +61,8 @@ test('A NORMAL DELIVERY counts the completion ONCE — and does NOT free the pay
   // The owner's rule (docs/MERCHANT_PLATFORM.md §2): the merchant's own
   // «تم التسليم» never releases money — the customer's confirmation, or three
   // days after delivery, does (tests/storeOrderRelease.test.ts).
-  assert.equal((raw.prepare("SELECT state FROM merchant_payout_ledger WHERE id = 'pl1'").get() as { state: string }).state, 'pending');
+  // The credit (carried into the append-only ledger, migration 0121) is still pending.
+  assert.equal((raw.prepare("SELECT COALESCE(SUM(amount_iqd), 0) AS p FROM merchant_ledger_entries WHERE legacy_id = 'pl1' AND bucket = 'pending'").get() as { p: number }).p, 9000);
 });
 
 test('THE DOUBLE TAP — the tap that LOST the race adds no completion and no reputation, and says so', async () => {

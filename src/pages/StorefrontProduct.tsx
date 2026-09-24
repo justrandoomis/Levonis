@@ -15,26 +15,40 @@
  * PRICE IS NEVER SENT. The client posts a product id and a quantity; every
  * figure on this page came from the server and every figure that decides
  * money is read again server-side at add and at checkout (§17).
+ *
+ * VARIANTS (W2-F). A product sold by variant shows one picker per option
+ * group (src/components/catalog/VariantPicker.tsx); the add names the chosen
+ * VARIANT by id and nothing else — its price is the server's, read again at
+ * add and at checkout. The price shown follows the choice (a range until the
+ * choice is complete), and so do the stock state and the picture.
+ *
+ * SPEED. The refusal sentences (src/lib/refusalStrings.ts, ~9 KB gzip) are
+ * loaded on the first refusal, not with the page: most visits never see one.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
-  ShoppingBag, Store, ChevronLeft, Loader2, PackageX, Minus, Plus, Check, Clock, BadgeCheck,
+  ShoppingBag, Store, ChevronLeft, Loader2, PackageX, Minus, Plus, Check, Clock, BadgeCheck, Truck,
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
-import { apiRefusal } from '../lib/refusalStrings';
 import { storefrontApi, iqd, type MerchantProduct, type MerchantStore } from '../lib/merchant';
 import SellerConflictDialog, { type SellerConflict } from '../components/merchant/SellerConflictDialog';
 import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
 import StoreUnavailable from '../components/merchant/StoreUnavailable';
 import { useStore } from '../StoreContext';
+import { trackStoreEvent } from '../lib/storeBeacon';
 import StoreTheme from '../components/storefront/StoreTheme';
 import '../components/storefront/styles';
 import type { StorefrontStore } from '../components/storefront/types';
+import { deliveryToYou } from '../components/storefront/parts';
+import { VariantPicker } from '../components/catalog/VariantPicker';
+import { ProductGallery, type GalleryItem } from '../components/catalog/ProductGallery';
+import { ProductFacts } from '../components/catalog/ProductFacts';
+import { findVariant, initialSelection, priceRange } from '../../packages/catalog/src/variants';
 
 export default function StorefrontProduct() {
   const { slug: routeSlug, productSlug } = useParams<{ slug: string; productSlug: string }>();
@@ -57,6 +71,7 @@ export default function StorefrontProduct() {
   const [added, setAdded] = useState(false);
   const [error, setError] = useState('');
   const [conflict, setConflict] = useState<SellerConflict | null>(null);
+  const [selection, setSelection] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!slug || !productSlug) return;
@@ -67,6 +82,9 @@ export default function StorefrontProduct() {
         if (!alive) return;
         setProduct(d.product);
         setStore(d.store);
+        // The first combination that can be bought, chosen for the customer.
+        setSelection(initialSelection(d.product.option_groups ?? [], d.product.variants ?? []));
+        trackStoreEvent(d.store?.id, 'product_view', d.product?.id); // W2-E analytics beacon
       })
       .catch((e: unknown) => {
         if (!alive) return;
@@ -81,6 +99,18 @@ export default function StorefrontProduct() {
     };
   }, [slug, productSlug]);
 
+  // THE CHOICE (W2-F). Computed before any early return: hooks below.
+  const groups = product?.option_groups ?? [];
+  const variantList = product?.variants ?? [];
+  const isVariants = product?.variant_mode === 'variants' && groups.length > 0 && variantList.length > 0;
+  const chosen = isVariants ? findVariant(groups, variantList, selection) : null;
+  const gallery = useMemo<GalleryItem[]>(() => {
+    if (!product) return [];
+    const alt = (m: { alt: string; alt_ar: string }) => (lang === 'en' ? m.alt || m.alt_ar : m.alt_ar || m.alt);
+    if (product.media?.length) return product.media.map((m) => ({ kind: m.kind, url: m.url, alt: alt(m) }));
+    return product.images.map((url) => ({ kind: 'image' as const, url, alt: '' }));
+  }, [product, lang]);
+
   async function addToCart(replaceCart = false) {
     if (!product) return;
     if (!user) {
@@ -92,11 +122,14 @@ export default function StorefrontProduct() {
     try {
       await api.post('/api/cart/merchant-items', {
         productId: product.id,
+        // The chosen variant's ID — never its price (the server prices it).
+        ...(chosen ? { variantId: chosen.id } : {}),
         qty,
         replaceCart,
       });
       setConflict(null);
       setAdded(true);
+      trackStoreEvent(store?.id, 'add_to_cart', product.id); // W2-E analytics beacon
       setTimeout(() => setAdded(false), 2500);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'CART_SELLER_CONFLICT') {
@@ -107,7 +140,12 @@ export default function StorefrontProduct() {
         // STORE_CLOSED, OUT_OF_STOCK (with how many are left), OPTION_INVALID…
         // — never the server's English sentence (src/lib/refusalStrings.ts).
         const fallback = loc('تعذّرت الإضافة', 'Could not add to cart', 'نەتوانرا زیاد بکرێت');
-        setError(e instanceof ApiError ? apiRefusal(e, lang, fallback) : fallback);
+        if (!(e instanceof ApiError)) setError(fallback);
+        else {
+          // Loaded on the first refusal only (see the header).
+          const { apiRefusal } = await import('../lib/refusalStrings');
+          setError(apiRefusal(e, lang, fallback));
+        }
       }
     } finally {
       setAdding(false);
@@ -138,14 +176,21 @@ export default function StorefrontProduct() {
   }
 
   const storeHome = hostStore ? '/' : `/community/store/${slug}`;
-  const sellable = store.open !== false && product.in_stock !== false;
+  // A variant product is sellable when the CHOSEN variant is in stock; until
+  // the choice is complete the button asks for it instead.
+  const choiceMissing = isVariants && !chosen;
+  const sellable = store.open !== false && (isVariants ? !!chosen?.in_stock : product.in_stock !== false);
+  const range = isVariants ? priceRange(product.price_iqd, variantList) : null;
+  const shownPrice = chosen ? chosen.price_iqd : product.price_iqd;
+  const shownCompare = chosen ? chosen.compare_at_iqd : product.original_price_iqd;
+  const toYou = deliveryToYou(store as StorefrontStore, loc, lang);
   // The store's THEME (merchant platform W2-C): the product answer carries the
   // published layout's tokens; on the store's own host the resolve answer does.
   type Tokens = NonNullable<StorefrontStore['layout_theme']>['tokens'];
   const themeTokens: Tokens =
     (store as StorefrontStore).layout_theme?.tokens ??
     ((hostStore as StorefrontStore | null)?.layout as { tokens?: Tokens } | undefined)?.tokens;
-  const discounted = product.original_price_iqd && product.original_price_iqd > product.price_iqd;
+  const discounted = !!shownCompare && shownCompare > shownPrice;
 
   return (
     <StoreTheme tokens={themeTokens ?? null} storeAccent={store.accent} className="min-h-screen text-zinc-300 pb-32">
@@ -157,33 +202,44 @@ export default function StorefrontProduct() {
           </Link>
         </div>
 
-        <div className="aspect-square sm:aspect-[4/3] bg-black/40 overflow-hidden">
-          {product.images[0] ? (
-            <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <ShoppingBag className="w-12 h-12 text-zinc-700" />
-            </div>
-          )}
-        </div>
-
-        {product.images.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto hide-scrollbar px-4 sm:px-6 py-3">
-            {product.images.slice(1).map((img, i) => (
-              <img key={i} src={img} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0 border border-white/10" />
-            ))}
-          </div>
-        )}
+        <ProductGallery
+          items={gallery}
+          focusUrl={chosen?.image ?? null}
+          productName={product.name}
+          videoLabel={loc('فيديو', 'Video') /* OWNER: Sorani to be written by hand. */}
+          showLabel={(n) => loc(`عرض ${n}`, `Show ${n}`) /* OWNER: Sorani to be written by hand. */}
+        />
 
         <div className="px-4 sm:px-6 pt-4">
           <h1 className="text-white font-bold text-[18px] leading-snug mb-2">{product.name}</h1>
 
-          <div className="flex items-baseline gap-2 mb-4" dir="ltr">
-            <span className="text-gold font-bold text-xl">{iqd(product.price_iqd)}</span>
-            {discounted && (
-              <span className="text-zinc-600 text-[14px] line-through">{iqd(product.original_price_iqd)}</span>
-            )}
+          <div className="flex items-baseline gap-2 mb-4 tabular-nums" dir="ltr" aria-live="polite" data-product-price>
+            <span className="text-gold font-bold text-xl">
+              {!chosen && range && range.min !== range.max ? `${iqd(range.min)} – ${iqd(range.max)}` : iqd(shownPrice)}
+            </span>
+            {discounted && <span className="text-zinc-600 text-[14px] line-through">{iqd(shownCompare)}</span>}
           </div>
+
+          {isVariants && (
+            <div className="mb-5">
+              <VariantPicker
+                groups={groups}
+                variants={variantList}
+                selection={selection}
+                onChange={(next) => {
+                  setSelection(next);
+                  setError('');
+                }}
+                lang={lang}
+                soldOutLabel={loc('نفد', 'Sold out', 'تەواو بوو')}
+              />
+              {chosen && !chosen.in_stock && (
+                <p className="mt-2 text-[12.5px] text-amber-300" role="status">
+                  {loc('هذا الاختيار نفد حاليًا.', 'This choice is sold out for now.') /* OWNER: Sorani to be written by hand. */}
+                </p>
+              )}
+            </div>
+          )}
 
           <Link
             to={storeHome}
@@ -210,6 +266,15 @@ export default function StorefrontProduct() {
             </div>
           </Link>
 
+          {toYou && (
+            <div className={`flex items-center gap-2 text-[12.5px] mb-3 ${toYou.available ? 'text-zinc-400' : 'text-amber-300'}`} data-delivery-to-you>
+              <Truck className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>
+                {toYou.title}: <span className="tabular-nums">{toYou.subtitle}</span>
+              </span>
+            </div>
+          )}
+
           {product.prep_days > 0 && (
             <div className="flex items-center gap-2 text-zinc-400 text-[12.5px] mb-4">
               <Clock className="w-4 h-4" />
@@ -220,6 +285,8 @@ export default function StorefrontProduct() {
               )}
             </div>
           )}
+
+          <ProductFacts attributes={product.attributes} loc={loc} lang={lang} />
 
           {product.description && (
             <p className="text-zinc-300 text-[13.5px] leading-relaxed whitespace-pre-wrap mb-6">
@@ -273,6 +340,8 @@ export default function StorefrontProduct() {
                 <Check className="w-4 h-4" />
                 {loc('أُضيف', 'Added', 'زیادکرا')}
               </>
+            ) : choiceMissing ? (
+              loc('اختر من الخيارات', 'Choose an option') /* OWNER: Sorani to be written by hand. */
             ) : !sellable ? (
               loc('غير متوفر', 'Unavailable', 'بەردەست نییە')
             ) : (

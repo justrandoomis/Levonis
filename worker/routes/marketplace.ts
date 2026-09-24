@@ -21,6 +21,7 @@
  */
 
 import { Hono } from 'hono';
+import { fanOutMerchantNotice, notifyDisputeOpened, notifyPayoutAvailable, offerAcceptedNotice } from '../lib/merchantNotify';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
@@ -1171,6 +1172,8 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
     auto_complete_days: autoDays,
   });
 
+  // The in-app notice rode in the batch; its outside channels follow, per the merchant's switch (W2-E).
+  await fanOutMerchantNotice(c.env, { merchant_id: String(offer.merchant_id), user_id: merchantUserId }, offerAcceptedNotice({ requestId, offerId, orderId, priceIqd: price }));
   const order = await db.prepare('SELECT * FROM community_orders WHERE id = ?').bind(orderId).first();
   return c.json({ success: true, order, escrow_id: escrowId }, 201);
 });
@@ -1359,6 +1362,8 @@ marketplaceRoutes.post('/orders/:id/confirm', requireAuth, async (c) => {
   );
 
   await audit(c.env.DB, user.id, 'community.order_completed', orderId, { escrow: escrow.id });
+  // «صار مبلغ متاحًا» — the escrow released the merchant's share (W2-E; keyed on the order, once).
+  await notifyPayoutAvailable(c.env, { merchantId: String(row.merchant_id), amountIqd: Number(row.merchant_receivable_iqd) || 0, sourceKey: `community_order:${orderId}`, communityOrderId: orderId });
   return c.json({ success: true, review_available: true });
 });
 
@@ -1433,6 +1438,8 @@ marketplaceRoutes.post('/orders/:id/dispute', requireAuth, async (c) => {
   }
 
   await audit(c.env.DB, user.id, 'community.order_disputed', orderId, { complaint: complaintId });
+  // The merchant is told the money is frozen and why (W2-E; forced on, §61).
+  if (isCustomer) await notifyDisputeOpened(c.env, { communityOrderId: orderId, complaintId, merchantId: String(row.merchant_id) });
   /**
    * MONEY IS NOW FROZEN AND A HUMAN HAS TO DECIDE — SO A HUMAN IS TOLD.
    *

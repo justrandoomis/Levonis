@@ -139,7 +139,7 @@ test('E: publishing is the one door onto the board — it opens the request, sta
 test('E: «إعادة الطلب» — the copy goes through matching instead of landing unmatched on the board', async () => {
   const raw = seed();
   const source = await newPublished(raw);
-  const before = count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'print_request_match'");
+  const before = count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'matching_request'");
 
   const res = await post(as(raw, 'buyer'), `/api/marketplace/print/requests/${source}/repeat`);
   assert.equal(res.status, 201);
@@ -152,10 +152,10 @@ test('E: «إعادة الطلب» — the copy goes through matching instead of
   // that can make it was told about the new request, by its own id.
   assert.ok(count(raw, 'SELECT COUNT(*) AS n FROM community_request_matches WHERE request_id = ?', copy) >= 1);
   assert.equal(
-    count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'print_request_match' AND entity_id = ? AND user_id = 'owner'", copy),
+    count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'matching_request' AND entity_id = ? AND user_id = 'owner'", copy),
     1
   );
-  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'print_request_match'"), before + 1);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'matching_request'"), before + 1);
   // It carries the source's spec, priced again today rather than copied.
   assert.deepEqual(row(raw, 'SELECT process, material_id FROM community_print_requests WHERE request_id = ?', copy), {
     process: 'fdm',
@@ -408,5 +408,5 @@ test('U: a re-publish keeps the id of the notification that really reached the m
     "SELECT notified, notification_id FROM community_request_matches WHERE request_id = ? AND merchant_id = 'm1'", id)!;
   assert.equal(second.notification_id, first.notification_id);
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM user_notifications WHERE id = ?', second.notification_id), 1);
-  assert.equal(all(raw, "SELECT id FROM user_notifications WHERE kind = 'print_request_match' AND user_id = 'owner'").length, 1);
+  assert.equal(all(raw, "SELECT id FROM user_notifications WHERE kind = 'matching_request' AND user_id = 'owner'").length, 1);
 });

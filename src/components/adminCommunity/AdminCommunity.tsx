@@ -35,6 +35,7 @@ import PrintPricingAdmin from './PrintPricingAdmin';
 import CommunityGatePanel from './CommunityGatePanel';
 import ReasonSheet, { type ReasonRequest } from './ReasonSheet';
 import PayoutSheet from './PayoutSheet';
+import PayoutQueue from './PayoutQueue';
 import {
   adminCommunityApi, iqd, badgeLabel,
   type CommunityOverview, type AdminMerchantRow, type AdminMerchantProduct, type AdminComplaintRow,
@@ -584,8 +585,8 @@ function MerchantDetail({ merchant, t, onBack }: { merchant: AdminMerchantRow; t
           />
           <p className="text-zinc-600 text-[11px] -mt-2">
             {t(
-              'يُسجَّل التحويل كحركة سالبة في السجل — الرصيد يظل مجموع الحركات ولا يُعدَّل يدويًا.',
-              'A payout is recorded as a negative ledger entry — the balance stays a sum of entries and is never edited by hand.'
+              'يُسجَّل التحويل طلبَ سحب مدفوعًا: ينتقل المبلغ من «متاح» إلى «مدفوع» في السجل — الرصيد يظل مجموع الحركات ولا يُعدَّل يدويًا.',
+              'A payout is recorded as a paid payout request: the amount moves from Available to Paid in the ledger — the balance stays a sum of entries and is never edited by hand.'
             )}
           </p>
 
@@ -615,7 +616,7 @@ function MerchantDetail({ merchant, t, onBack }: { merchant: AdminMerchantRow; t
                 {fin.ledger.slice(0, 40).map((l) => (
                   <div key={String(l.id)} className="flex items-center justify-between gap-3 text-[12px]">
                     <span className="text-zinc-400 truncate">
-                      {String(l.kind)} · {String(l.state)}
+                      {String(l.kind)} · {String(l.bucket ?? l.state ?? '')}
                     </span>
                     <span
                       className={`font-semibold shrink-0 ${Number(l.amount_iqd) < 0 ? 'text-zinc-500' : 'text-gold'}`}
@@ -1923,6 +1924,9 @@ function Finance({ t }: { t: T }) {
 
   return (
     <div className="space-y-4">
+      {/* Merchants' payout requests, from the append-only ledger (W2-B). */}
+      <PayoutQueue t={t} />
+
       <Section title={t('الأموال حسب الحالة', 'Money by escrow state')}>
         {!d.escrows.length ? (
           <p className="text-zinc-500 text-[12.5px]">{t('لا توجد ضمانات', 'No escrows yet')}</p>

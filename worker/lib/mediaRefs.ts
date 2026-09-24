@@ -292,6 +292,12 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   { table: 'community_products', column: 'options', kind: 'json', why: 'merchant product options carry images' },
   { table: 'community_products', column: 'colors', kind: 'json', why: 'merchant product colours carry images' },
   { table: 'merchant_reviews', column: 'images', kind: 'json', why: 'photographs a buyer attached to a merchant review' },
+  // 0126 — the catalogue model (W2-F): a product's ordered pictures and videos,
+  // a variant's own picture, and a collection's cover. `community_products.images`
+  // stays above as the JSON mirror of the pictures.
+  { table: 'community_product_media', column: 'media_key', kind: 'text', why: 'a merchant product picture or video, in gallery order (0126)' },
+  { table: 'community_product_variants', column: 'image_key', kind: 'text', why: 'the picture a product variant shows when chosen (0126)' },
+  { table: 'merchant_store_sections', column: 'image_key', kind: 'text', why: 'a store collection cover (0126)' },
   // 0123 — a store's app-icon renditions (worker/lib/storeIcons.ts). Each is
   // served to every installed app and home-screen icon of that store; the
   // replaced ones are queued on media_cleanup_jobs, whose guarded drain must
@@ -376,6 +382,9 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'incoming_inventory_receipts.idempotency_key': 'request de-duplication token',
   'order_item_inventory_allocations.idempotency_key': 'request de-duplication token',
   'merchant_payout_ledger.idempotency_key': 'request de-duplication token',
+  'merchant_ledger_entries.event_key': 'ledger idempotency key (0121)',
+  'merchant_payouts.event_key': 'payout idempotency key (0121)',
+  'merchant_payouts.method_snapshot': 'payout channel and account as requested — JSON, no media (0121)',
   'orders.idempotency_key': 'request de-duplication token',
   'orders.client_idempotency_key': 'request de-duplication token',
   'reward_claims.idempotency_key': 'request de-duplication token',
@@ -428,6 +437,11 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'wallet_deposit_meta.attachment_fingerprint': 'a hash used to detect a re-used receipt image, not its key',
   // Migration 0110. Classified in the same change as the column: left unknown,
   // it would refuse the WHOLE guarded sweep (see `verifyMediaCoverage`).
+  // 0126 — the catalogue model (W2-F). A swatch is a palette NAME
+  // (packages/catalog/src/palette.ts), and the SKU snapshot is the text a
+  // merchant gave the variant — neither is a key.
+  'community_product_option_values.swatch': "a palette colour name, e.g. 'red' — never CSS, never a key",
+  'order_items.sku_snapshot': 'the SKU text of the variant at order time',
   'chat_messages.attachment_kind': "'image' | 'video' | 'audio' | 'file' — what `file_key` holds, not a key",
   // 0123 — bookkeeping of the app-icon renditions. The net does not catch
   // these two names; they are written down anyway because each string embeds

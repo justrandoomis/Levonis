@@ -89,7 +89,25 @@ export type NotificationKind =
    * the seller answers (worker/routes/chats.ts). A customer's question on a
    * store order used to reach nobody at all (audit 04 B10).
    */
-  | 'chat_message';
+  | 'chat_message'
+  /**
+   * THE MERCHANT'S KINDS (docs/MERCHANT_PLATFORM.md §4.8, stream W2-E). Each
+   * is written by worker/lib/merchantNotify.ts from the real event it names,
+   * links to its object's workspace address (packages/contracts/src/
+   * merchantRoutes.ts), and is what makes a row the STORE's: the merchant
+   * notification centre lists exactly these kinds (`MERCHANT_KINDS`).
+   */
+  | 'new_order'
+  | 'order_needs_action'
+  | 'new_message'
+  | 'matching_request'
+  | 'low_stock'
+  | 'new_review'
+  | 'dispute_opened'
+  | 'payout_available'
+  | 'payout_paid'
+  | 'coupon_ending'
+  | 'store_status_changed';
 
 export interface NotificationInput {
   userId: string;
@@ -111,7 +129,11 @@ export interface NotificationInput {
    * widened in the same commit as the kind, which is what this paragraph
    * asks for. 'claim' arrived with 'warranty_reply' and 'warranty_stage'.
    */
-  entity_type?: 'request' | 'offer' | 'order' | 'review' | 'product' | 'ticket' | 'complaint' | 'claim' | 'chat' | '';
+  entity_type?:
+    | 'request' | 'offer' | 'order' | 'review' | 'product' | 'ticket' | 'complaint' | 'claim' | 'chat'
+    // The merchant kinds' objects (W2-E): a custom order, a coupon, a payout, the store itself.
+    | 'custom_order' | 'coupon' | 'payout' | 'store'
+    | '';
   entity_id?: string;
   meta?: Record<string, unknown>;
   /** Unique per user. Empty means "no replay protection wanted". */

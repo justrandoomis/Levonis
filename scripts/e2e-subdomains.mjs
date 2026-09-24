@@ -865,7 +865,9 @@ async function main() {
   check('the shopper has a delivery address', addr.status < 400,
     `status ${addr.status} ${addr.json?.error ?? ''}`);
 
-  const quote = await shopper.req('POST', APEX, '/api/store-orders/quote', {});
+  // Priced for THIS address (W2-A: delivery by governorate is read from the
+  // saved address, and the fingerprint binds it).
+  const quote = await shopper.req('POST', APEX, '/api/store-orders/quote', { addressId: addr.json?.id });
   check('the store quotes the cart', quote.status < 400,
     `status ${quote.status} ${quote.json?.error ?? ''}`);
 

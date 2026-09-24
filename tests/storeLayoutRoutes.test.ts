@@ -825,3 +825,29 @@ test('a Worker deployed before migration 0122 serves the classic page on every s
   const product = await ok(await get(w.pub, `/api/storefront/${SLUG}/products/raf3d-p1`));
   assert.equal(product.store.layout_theme.theme, 'classic');
 });
+
+// Security review of 644e3ea, L2: a sanctioned store keeps READING its design,
+// but cannot stage a page that would go live the moment the sanction lifts.
+test('a suspended store or merchant cannot save, publish or restore a layout — reading still works', async () => {
+  for (const [table, code] of [['merchant_stores', 'STORE_SUSPENDED'], ['community_merchants', 'MERCHANT_SUSPENDED']] as const) {
+    const w = world();
+    await saveDraft(w, L([text('t1', 'قبل الإيقاف')]), 0);
+    await publish(w, 1);
+    const idCol = table === 'merchant_stores' ? 'id' : `(SELECT merchant_id FROM merchant_stores WHERE id = '${STORE_ID}')`;
+    w.raw.exec(`UPDATE ${table} SET status = 'suspended' WHERE id = ${table === 'merchant_stores' ? `'${STORE_ID}'` : idCol}`);
+    const before = revisions(w.raw);
+    const draftBefore = draftVersion(w.raw);
+
+    for (const res of [
+      await put(w.owner, `${BASE}/draft`, { layout: L([text('t2', 'أثناء الإيقاف')]), version: draftBefore }),
+      await post(w.owner, `${BASE}/publish`, { version: draftBefore }),
+      await post(w.owner, `${BASE}/restore/1`, { version: draftBefore, publish: true }),
+    ]) {
+      assert.equal(res.status, 403, table);
+      assert.equal((await json(res)).code, code, table);
+    }
+    assert.equal(revisions(w.raw), before, `${table}: nothing published`);
+    assert.equal(draftVersion(w.raw), draftBefore, `${table}: the draft is untouched`);
+    await ok(await get(w.owner, BASE));
+  }
+});

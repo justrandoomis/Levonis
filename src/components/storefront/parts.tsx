@@ -288,6 +288,11 @@ export function factsWithFallback(store: StorefrontStore, loc: Loc, lang: string
   if (store.governorate) {
     out.push({ icon: 'map-pin', title: governorateLabel(store.governorate, lang), subtitle: loc('الموقع', 'Location', 'شوێن'), visible: true });
   }
+  // «التوصيل إلى <محافظتك>: <الأجرة>» — the signed-in visitor's own
+  // default-address governorate, answered by the server from this store's
+  // delivery rules (W2-A). A preview: the checkout prices again.
+  const toYou = deliveryToYou(store, loc, lang);
+  if (toYou) out.push({ icon: 'truck', title: toYou.title, subtitle: toYou.subtitle, visible: true });
   if ((store.service_areas?.length ?? 0) > 0) {
     out.push({
       icon: 'truck',
@@ -303,6 +308,23 @@ export function factsWithFallback(store: StorefrontStore, loc: Loc, lang: string
 
 export function governorateLabel(id: string, lang: string): string {
   return GOVERNORATE_LABELS[id]?.[lang === 'ckb' ? 'ckb' : lang === 'en' ? 'en' : 'ar'] ?? id;
+}
+
+/**
+ * The visitor's own delivery line (W2-A), or null for a guest, an address
+ * without a governorate, or a server that sends none: «التوصيل إلى بغداد» over
+ * «3,000 د.ع» / «مجاني» / «لا يوصل إليها».
+ */
+export function deliveryToYou(store: StorefrontStore, loc: Loc, lang: string): { title: string; subtitle: string; available: boolean } | null {
+  const d = store.delivery_to_you;
+  if (!d || !d.governorate) return null;
+  const place = governorateLabel(d.governorate, lang);
+  // OWNER: Sorani to be written by hand.
+  const title = loc(`التوصيل إلى ${place}`, `Delivery to ${place}`);
+  if (!d.available) return { title, subtitle: loc('لا يوصل إليها', 'Not delivered'), available: false };
+  if (d.free) return { title, subtitle: loc('مجاني', 'Free', 'بەخۆڕایی'), available: true };
+  const fee = `${Number(d.fee_iqd).toLocaleString('en-US')} ${lang === 'en' ? 'IQD' : 'د.ع'}`;
+  return { title, subtitle: fee, available: true };
 }
 
 export function deliveryNote(store: StorefrontStore): string {

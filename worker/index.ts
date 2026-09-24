@@ -50,6 +50,7 @@ import { stockAlertRoutes } from './routes/stockAlerts';
 import { compareRoutes } from './routes/compare';
 import { priceReportRoutes, adminPriceReportRoutes } from './routes/priceReports';
 import { merchantPrinterRoutes } from './routes/merchantPrinters';
+import { merchantCatalogRoutes } from './routes/merchantCatalog';
 import { adminPrintQuoteRoutes, printQuoteRoutes } from './routes/printQuote';
 import { membershipsRoutes } from './routes/memberships';
 import { telegramRoutes } from './routes/telegram';
@@ -65,7 +66,14 @@ import { studioRoutes } from './routes/studio';
 import { classifyHost, rootDomainFrom } from './lib/hosts';
 import { merchantRoutes } from './routes/merchant';
 import { storeLayoutRoutes } from './routes/storeLayout';
+import { merchantFinanceRoutes, merchantPayoutRoutes } from './routes/merchantFinance';
 import { storefrontRoutes } from './routes/storefront';
+// Merchant platform W2-E: the store's notification centre, inbox and
+// analytics, and the storefront's first-party analytics beacon.
+import { merchantNotificationRoutes } from './routes/merchantNotifications';
+import { merchantInboxRoutes } from './routes/merchantInbox';
+import { merchantAnalyticsRoutes } from './routes/merchantAnalytics';
+import { storefrontEventRoutes } from './routes/storefrontEvents';
 import { marketplaceRoutes } from './routes/marketplace';
 import { storeOrderRoutes } from './routes/storeOrders';
 import { communityReviewRoutes } from './routes/merchantReviews';
@@ -364,10 +372,27 @@ app.route('/api/merchant', merchantRoutes);
 // Printers and request-notification preferences: what a shop can make, and
 // which of those jobs it wants to hear about.
 app.route('/api/merchant', merchantPrinterRoutes);
+// The catalogue — products, variants, media, bulk, import/export, insights —
+// and the store's collections (merchant platform W2-F).
+app.route('/api/merchant', merchantCatalogRoutes);
 // The store page as data — its draft, publish, history and restore
 // (merchant platform W2-C). Its own mount so the routing design can name it;
 // the same session-scoped rules as the rest of /api/merchant.
 app.route('/api/merchant/store/layout', storeLayoutRoutes);
+// The store's notification centre (feed, badge, mark read), its inbox of
+// store-owned conversations, and its analytics over a range (W2-E). Sub-paths
+// only: GET/PATCH /api/merchant/notifications (the switches) and GET
+// /api/merchant/analytics (lifetime totals) stay with merchantRoutes above.
+app.route('/api/merchant/notifications', merchantNotificationRoutes);
+app.route('/api/merchant/inbox', merchantInboxRoutes);
+app.route('/api/merchant/analytics', merchantAnalyticsRoutes);
+// The merchant's money (W2-B): the finance summary and ledger, and payout
+// requests — beside the append-only ledger they read (worker/lib/merchantLedger.ts).
+app.route('/api/merchant/finance', merchantFinanceRoutes);
+app.route('/api/merchant/payouts', merchantPayoutRoutes);
+// The storefront's analytics beacon — POST only, before the public reads so
+// `events` can never be taken for a store slug.
+app.route('/api/storefront/events', storefrontEventRoutes);
 // The public shopfront: readable by anyone, on any host.
 app.route('/api/storefront', storefrontRoutes);
 // The print journey EXTENDS the marketplace rather than starting a second one:

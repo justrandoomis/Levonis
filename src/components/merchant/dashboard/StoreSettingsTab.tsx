@@ -7,7 +7,7 @@
  * a column the server validates; nothing here is decorative.
  */
 
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Check, Loader2, Globe, AlertTriangle, ArrowUp, ArrowDown, Trash2, Eye, EyeOff, Plus } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { ApiError } from '../../../lib/api';
@@ -17,6 +17,10 @@ import { ImagePicker } from '../../media/ImagePicker';
 import { WIDGET_ICONS, WidgetIcon } from '../profileIcons';
 import { Btn, Card, Chip, ChipListEditor, Input, Notice, TextArea, Toggle } from './ui';
 import ShareStore from '../share/ShareStore';
+import { Skeleton } from '../../ui/Skeleton';
+
+/** Delivery by governorate (W2-A): its own editor, its own save, its own chunk. */
+const DeliverySettingsEditor = lazy(() => import('../delivery/DeliverySettingsEditor'));
 
 /** The accent presets, with an honest swatch for each. Classes only — the
  *  merchant picks a NAME; no colour value they type can reach a style rule. */
@@ -64,6 +68,8 @@ function settingsRefusal(e: unknown, loc: (ar: string, en: string, ckb?: string)
       return loc('اشتراكك غير فعّال. جدّده لإعادة فتح المتجر.', 'Your subscription is not active. Renew it to re-open the store.'); // OWNER: Sorani to be written by hand.
     case 'GOVERNORATE_INVALID':
       return loc('اختر المحافظة من القائمة.', 'Choose a governorate from the list.'); // OWNER: Sorani to be written by hand.
+    case 'DELIVERY_NO_COVERAGE':
+      return loc('لا يُفتح المتجر قبل أن توصل إلى محافظة واحدة على الأقل أو تفعّل الاستلام من المتجر — من «التوصيل حسب المحافظة» أدناه.', 'The store cannot open until it delivers to at least one governorate or offers pickup — see «Delivery by governorate» below.'); // OWNER: Sorani to be written by hand.
     default:
       return loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت');
   }
@@ -72,7 +78,6 @@ function settingsRefusal(e: unknown, loc: (ar: string, en: string, ckb?: string)
 export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () => void }) {
   const { loc, lang } = useLanguage();
   const store = me.store!;
-  const delivery = (store.delivery_settings ?? {}) as Record<string, unknown>;
 
   const [f, setF] = useState({
     name: store.name,
@@ -95,9 +100,6 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
     profile_facts: (store.profile_facts ?? []) as ProfileWidget[],
     policies: Object.entries(store.policies ?? {}),
     social_links: Object.entries(store.social_links ?? {}),
-    delivery_fee: delivery.fee_iqd !== undefined ? String(delivery.fee_iqd) : '',
-    delivery_free_over: delivery.free_over_iqd !== undefined ? String(delivery.free_over_iqd) : '',
-    delivery_note: typeof delivery.note === 'string' ? delivery.note : '',
     open: store.status === 'active',
   });
   const [saving, setSaving] = useState(false);
@@ -148,11 +150,7 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
         // Rows the merchant never titled are simply not sent.
         profile_links: f.profile_links.filter((w) => w.title.trim()),
         profile_facts: f.profile_facts.filter((w) => w.title.trim()),
-        delivery_settings: {
-          ...(f.delivery_fee !== '' ? { fee_iqd: Number(f.delivery_fee) || 0 } : {}),
-          ...(f.delivery_free_over !== '' ? { free_over_iqd: Number(f.delivery_free_over) || 0 } : {}),
-          ...(f.delivery_note ? { note: f.delivery_note } : {}),
-        },
+        // No `delivery_settings`: delivery is its own editor below (W2-A).
         // Open/closed goes up ONLY when the merchant changed it (audit 01 B4):
         // it used to ride along on every save, so a store Levonis had
         // suspended could not save a thing — not even the banner it was
@@ -296,31 +294,20 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
         </div>
       </Card>
 
-      <Card title={loc('التوصيل', 'Delivery', 'گەیاندن')}>
-        <div className="grid grid-cols-2 gap-2 mb-2.5">
-          <Input
-            label={loc('أجرة التوصيل (د.ع)', 'Delivery fee (IQD)', 'کرێی گەیاندن')}
-            value={f.delivery_fee}
-            type="number"
-            ltr
-            onChange={(v) => setF({ ...f, delivery_fee: v })}
-            hint={loc('فارغ أو 0 = مجاني', 'Empty or 0 = free', 'بەتاڵ = بەخۆڕایی')}
-          />
-          <Input
-            label={loc('مجاني فوق (د.ع)', 'Free over (IQD)', 'بەخۆڕایی سەروو')}
-            value={f.delivery_free_over}
-            type="number"
-            ltr
-            onChange={(v) => setF({ ...f, delivery_free_over: v })}
-          />
-        </div>
-        <Input
-          label={loc('ملاحظة للزبون (اختياري)', 'Note for customers (optional)', 'تێبینی')}
-          value={f.delivery_note}
-          onChange={(v) => setF({ ...f, delivery_note: v })}
-          placeholder={loc('مثال: التوصيل خلال ٢-٤ أيام', 'e.g. delivery within 2–4 days', '…')}
-        />
-      </Card>
+      {/* DELIVERY BY GOVERNORATE (W2-A) — where the flat fee used to be, now
+          its own editor with its own save (the workspace mounts the same
+          component at /store/delivery). */}
+      <Suspense
+        fallback={
+          <div className="lv-surface p-4 space-y-2" role="status" aria-label={loc('جارٍ التحميل…', 'Loading…', 'بارکردن…')}>
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-11 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        }
+      >
+        <DeliverySettingsEditor storeGovernorate={store.governorate ?? ''} />
+      </Suspense>
 
       <Card title={loc('ساعات العمل', 'Business hours', 'کاتژمێرەکانی کار')}>
         <div className="space-y-2">

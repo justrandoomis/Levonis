@@ -22,7 +22,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import {
-  freshDb, asD1, failingD1, stubApp, post, get, json, ledger, holds, spendable, count, row, pending,
+  freshDb, asD1, failingD1, stubApp, post, get, json, ledger, holds, spendable, count, row, all, pending,
 } from './fixtures/app';
 import { walletRoutes } from '../worker/routes/wallet';
 import { storeOrderRoutes } from '../worker/routes/storeOrders';
@@ -44,7 +44,7 @@ function seedStore(raw: DatabaseSync) {
       VALUES ('s1','m1','mowner','ali3d','Ali 3D','active','{}');
     INSERT INTO community_products (id,merchant_id,store_id,slug,name,status,lifecycle,price_iqd,stock,track_stock)
       VALUES ('cp1','m1','s1','widget','Widget','active','active',14000,100,0);
-    INSERT INTO addresses (id,user_id,name,phone,address) VALUES ('a1','buyer','Sara','+964770','Baghdad');
+    INSERT INTO addresses (id,user_id,name,phone,address,governorate) VALUES ('a1','buyer','Sara','+964770','Baghdad','baghdad');
     INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status,note)
       VALUES ('dep_buyer','buyer','deposit','USD',${DEP},'approved','seed funding');
     INSERT INTO cart_items (id,user_id,seller_type,merchant_id,store_id,community_product_id,qty)
@@ -98,7 +98,11 @@ test('a wallet-paid store order debits the buyer exactly once, at placement, ins
   assert.equal(Number(placed.order.wallet_applied_usd_cents), 1000);
 
   // The merchant's share is pending, as before — and now backed by real money.
-  assert.equal(count(raw, "SELECT COUNT(*) n FROM merchant_payout_ledger WHERE merchant_id='m1' AND kind='sale_credit' AND state='pending'"), 1);
+  // Its lines in the append-only merchant ledger (migration 0121): the gross and the commission, pending.
+  assert.deepEqual(
+    all(raw, "SELECT kind, bucket FROM merchant_ledger_entries WHERE merchant_id='m1' AND order_id IS NOT NULL ORDER BY kind"),
+    [{ kind: 'commission', bucket: 'pending' }, { kind: 'sale_gross', bucket: 'pending' }]
+  );
   await Promise.allSettled(pending);
 });
 
@@ -133,7 +137,7 @@ test('a failed order batch leaves the hold active and nothing else written; the 
   const first = await placeStore(app, { idempotencyKey: 'store-key-0003', addressId: 'a1', payWithWallet: true });
   assert.equal(first.status, 500);
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM orders'), 0);
-  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_payout_ledger'), 0, 'no merchant share without an order');
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_ledger_entries'), 0, 'no merchant share without an order');
   assert.equal(ledger(raw, 'buyer').filter((t) => t.type === 'withdrawal').length, 0, 'no debit without an order');
   assert.equal(holds(raw, 'buyer')[0].state, 'active', 'the reservation survives the failure');
   assert.equal(spendable(raw, 'buyer'), DEP - 1000, 'and still reserves the money');
@@ -273,7 +277,7 @@ test('a full refund releases the hold: no debit, no credit, no merchant row, bal
   assert.equal(holds(raw, 'cust')[0].state, 'released');
   assert.equal(ledger(raw, 'cust').length, 1, 'only the seed deposit');
   assert.equal(spendable(raw, 'cust'), DEP);
-  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_payout_ledger'), 0);
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_ledger_entries'), 0);
 });
 
 test('a merchant is never credited without the buyer debit: a hold that cannot settle refuses the whole release', async () => {
@@ -288,7 +292,7 @@ test('a merchant is never credited without the buyer debit: a hold that cannot s
 
   const rel = await releaseEscrow(db, { escrowId, actorId: 'cust', actorRole: 'customer', idempotencyKey: 'confirm:co1' });
   assert.deepEqual(rel, { ok: false, reason: 'WALLET_ERROR', detail: 'hold is released' });
-  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_payout_ledger'), 0, 'not a dinar for the merchant');
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_ledger_entries'), 0, 'not a dinar for the merchant');
   assert.equal(count(raw, "SELECT COUNT(*) n FROM community_escrow_events WHERE kind='release'"), 0);
   assert.equal(row<{ state: string }>(raw, 'SELECT state FROM community_escrows WHERE id = ?', escrowId)?.state, 'held', 'the escrow did not move either');
   assert.equal(ledger(raw, 'cust').filter((t) => t.type === 'withdrawal').length, 0);
@@ -296,7 +300,7 @@ test('a merchant is never credited without the buyer debit: a hold that cannot s
   // Same for the partial refund path.
   const part = await refundEscrow(db, { escrowId, actorId: 'cust', actorRole: 'customer', amountIqd: 35_000, idempotencyKey: 'partial:co1' });
   assert.equal(part.ok, false);
-  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_payout_ledger'), 0);
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_ledger_entries'), 0);
   assert.equal(ledger(raw, 'cust').length, 1, 'no credit for a refund of money never debited');
 });
 
@@ -305,11 +309,11 @@ test('a transient failure inside the settlement batch writes nothing on either s
   seedEscrow(raw);
   const { failing, db } = failingD1(raw);
   const escrowId = ((await escrowFor(db)) as { escrowId: string }).escrowId;
-  failing.failWhen = (stmts) => stmts.some((s) => /merchant_payout_ledger/i.test(s.sql));
+  failing.failWhen = (stmts) => stmts.some((s) => /merchant_ledger_entries/i.test(s.sql));
   await assert.rejects(releaseEscrow(db, { escrowId, actorId: 'cust', actorRole: 'customer', idempotencyKey: 'confirm:co1' }));
   assert.equal(holds(raw, 'cust')[0].state, 'active');
   assert.equal(ledger(raw, 'cust').length, 1);
-  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_payout_ledger'), 0);
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_ledger_entries'), 0);
   assert.equal(row<{ state: string }>(raw, 'SELECT state FROM community_escrows WHERE id = ?', escrowId)?.state, 'held');
 });
 

@@ -55,6 +55,7 @@ import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
 import { communityReviewRoutes } from '../worker/routes/merchantReviews';
 import { merchantRoutes } from '../worker/routes/merchant';
+import { merchantCatalogRoutes } from '../worker/routes/merchantCatalog';
 import { communityAccessOf } from '../src/pages/community/access';
 
 // ------------------------------------------------------------------ harness
@@ -97,6 +98,7 @@ function appAs(db: D1Database, userId: string | null, role = 'customer', host = 
   a.route('/api/marketplace', marketplaceRoutes);
   a.route('/api/community-reviews', communityReviewRoutes);
   a.route('/api/merchant', merchantRoutes);
+  a.route('/api/merchant', merchantCatalogRoutes); // W2-F: the catalogue's own router
   a.onError((err, c) => {
     if (err instanceof HttpError) {
       return c.json(

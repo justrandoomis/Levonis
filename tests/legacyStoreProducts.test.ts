@@ -22,6 +22,7 @@ import { freshDb, asD1, stubApp, send, json, row, count, type StubUser } from '.
 import { ROOT } from './fixtures/d1';
 import { communityRoutes } from '../worker/routes/community';
 import { merchantRoutes } from '../worker/routes/merchant';
+import { merchantCatalogRoutes } from '../worker/routes/merchantCatalog';
 
 const OWNER: StubUser = { id: 'owner', role: 'merchant', email: 'owner@x.co' };
 const BARE: StubUser = { id: 'bare', role: 'customer', email: 'bare@x.co' };
@@ -46,6 +47,7 @@ const app = (raw: ReturnType<typeof freshDb>, user: StubUser) =>
   stubApp(asD1(raw), user, (a) => {
     a.route('/api/community', communityRoutes);
     a.route('/api/merchant', merchantRoutes);
+    a.route('/api/merchant', merchantCatalogRoutes); // W2-F: the catalogue's own router
   });
 
 /** What `fetch` does with a 307: the same method and body, to the Location. */

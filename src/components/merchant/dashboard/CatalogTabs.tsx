@@ -9,136 +9,27 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Plus, Trash2, Pencil, GripVertical, Printer, Layers, Hammer, Check, Loader2,
-  ArrowUp, ArrowDown, EyeOff,
+  Plus, Trash2, Pencil, Printer, Layers, Hammer, Check, Loader2,
 } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { ApiError } from '../../../lib/api';
 import {
   merchantApi, iqd,
-  type StoreSection, type StoreService, type ShowcaseItem,
+  type StoreService, type ShowcaseItem,
 } from '../../../lib/merchant';
 import { ImagePicker } from '../../media/ImagePicker';
 import { Btn, Card, Chip, ChipListEditor, Empty, Input, Notice, Spinner, TextArea } from './ui';
+import { CollectionsManager } from '../catalog/CollectionsManager';
 
 // ---------------------------------------------------------------- sections
 
+/**
+ * The shop's shelves ARE its collections now (merchant platform W2-F): manual
+ * ones with the merchant's own product order, and the automatic featured /
+ * new-arrivals / best-sellers. The screen lives with the catalogue editor.
+ */
 export function SectionsTab({ canSell }: { canSell: boolean }) {
-  const { loc } = useLanguage();
-  const [items, setItems] = useState<StoreSection[] | null>(null);
-  const [name, setName] = useState('');
-  const [nameAr, setNameAr] = useState('');
-  const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
-
-  const load = useCallback(() => {
-    merchantApi.sections().then((d) => setItems(d.sections)).catch(() => setItems([]));
-  }, []);
-  useEffect(load, [load]);
-
-  if (items === null) return <Spinner />;
-
-  async function add() {
-    if (!name.trim()) return;
-    setBusy('new');
-    setError('');
-    try {
-      await merchantApi.createSection({ name: name.trim(), name_ar: nameAr.trim(), sort_order: items!.length });
-      setName('');
-      setNameAr('');
-      load();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'error');
-    } finally {
-      setBusy('');
-    }
-  }
-
-  async function move(i: number, dir: -1 | 1) {
-    const next = [...items!];
-    const j = i + dir;
-    if (j < 0 || j >= next.length) return;
-    [next[i], next[j]] = [next[j], next[i]];
-    setItems(next);
-    await Promise.all(next.map((s, idx) => merchantApi.updateSection(s.id, { sort_order: idx }))).catch(() => {});
-    load();
-  }
-
-  return (
-    <div className="space-y-3">
-      <Card title={loc('قسم جديد في متجرك', 'New section in your shop', 'بەشی نوێ')}>
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <Input value={name} onChange={setName} placeholder={loc('الاسم', 'Name', 'ناو')} ltr />
-          <Input value={nameAr} onChange={setNameAr} placeholder={loc('الاسم بالعربية (اختياري)', 'Arabic name (optional)', 'ناوی عەرەبی')} />
-        </div>
-        {error && <p className="text-red-400 text-[11.5px] mb-2">{error}</p>}
-        <Btn onClick={add} disabled={busy === 'new' || !name.trim()} full>
-          {busy === 'new' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-          {loc('إضافة القسم', 'Add section', 'زیادکردنی بەش')}
-        </Btn>
-        <p className="text-zinc-600 text-[10.5px] mt-2">
-          {loc(
-            'الأقسام ترتّب منتجاتك في واجهة متجرك — مثل «مطبوعات جاهزة» و«قطع غيار» و«خامات». اربط كل منتج بقسمه من شاشة تعديل المنتج.',
-            'Sections organise your storefront — e.g. “Ready prints”, “Spare parts”, “Materials”. Attach each product to its section from the product editor.',
-            'بەشەکان بەرهەمەکانت ڕێک دەخەن. لە دەستکاری بەرهەمەوە بەشەکەی هەڵبژێرە.'
-          )}
-        </p>
-      </Card>
-
-      {!items.length && <Empty text={loc('لا توجد أقسام بعد', 'No sections yet', 'هێشتا بەش نییە')} />}
-
-      {items.map((s, i) => (
-        <div key={s.id} className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2 flex items-center gap-2">
-          <GripVertical className="w-4 h-4 text-zinc-700 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <p className="text-white text-[13px] font-semibold truncate" dir="ltr">{s.name}</p>
-            <p className="text-zinc-500 text-[11px] truncate">
-              {s.name_ar ? `${s.name_ar} · ` : ''}
-              {loc(`${s.product_count ?? 0} منتج`, `${s.product_count ?? 0} products`, `${s.product_count ?? 0} بەرهەم`)}
-              {!s.active && ` · ${loc('مخفي', 'hidden', 'شاراوە')}`}
-            </p>
-          </div>
-          <button onClick={() => move(i, -1)} disabled={i === 0} className="w-8 h-8 rounded-lg border border-white/10 text-zinc-400 disabled:opacity-30 flex items-center justify-center">
-            <ArrowUp className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={() => move(i, 1)} disabled={i === items.length - 1} className="w-8 h-8 rounded-lg border border-white/10 text-zinc-400 disabled:opacity-30 flex items-center justify-center">
-            <ArrowDown className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={async () => {
-              await merchantApi.updateSection(s.id, { active: !s.active });
-              load();
-            }}
-            className={`w-8 h-8 rounded-lg border flex items-center justify-center ${s.active ? 'border-white/10 text-zinc-400' : 'border-amber-500/30 text-amber-400'}`}
-            title={loc('إظهار/إخفاء', 'Show/hide', 'پیشاندان/شاردنەوە')}
-          >
-            <EyeOff className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={async () => {
-              if (!confirm(loc('حذف القسم؟ المنتجات تبقى وتصبح بدون قسم.', 'Delete the section? Products stay, ungrouped.', 'بەشەکە بسڕدرێتەوە؟ بەرهەمەکان دەمێننەوە.'))) return;
-              setBusy(s.id);
-              try {
-                await merchantApi.deleteSection(s.id);
-                load();
-              } finally {
-                setBusy('');
-              }
-            }}
-            disabled={busy === s.id}
-            className="w-8 h-8 rounded-lg border border-red-500/30 text-red-300 disabled:opacity-40 flex items-center justify-center"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ))}
-      {!canSell && items.length > 0 && (
-        <p className="text-zinc-600 text-[10.5px]">
-          {loc('تنظيم المتجر متاح دائمًا حتى أثناء توقف البيع.', 'Organising your shop stays available even while selling is paused.', 'ڕێکخستن هەمیشە بەردەستە.')}
-        </p>
-      )}
-    </div>
-  );
+  return <CollectionsManager canSell={canSell} />;
 }
 
 // ---------------------------------------------------------------- services

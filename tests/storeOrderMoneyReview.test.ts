@@ -20,7 +20,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import {
-  freshDb, asD1, stubApp, post, patch, get, json, count, row, all, pending, spendable, holds, ledger, failingD1,
+  freshDb, asD1, stubApp, post, patch, get, json, count, row, pending, spendable, holds, ledger, failingD1,
   type StubUser,
 } from './fixtures/app';
 import { serialD1 } from './fixtures/serialD1';
@@ -32,6 +32,7 @@ import { adminRoutes } from '../worker/routes/admin';
 import { adminCommunityRoutes } from '../worker/routes/adminCommunity';
 import { releaseDueStoreCredits, runStoreOrderSweeps, STORE_RELEASE_DAYS } from '../worker/lib/storeOrderOps';
 import { merchantBalance } from '../worker/lib/escrowOps';
+import { orderCreditStateSql, releaseOrderCreditStatements, reverseOrderCreditStatement } from '../worker/lib/merchantLedger';
 import { moveOrderStage } from '../worker/lib/orderStageOps';
 import type { Env } from '../worker/lib/types';
 
@@ -101,8 +102,24 @@ async function deliver(raw: DatabaseSync, id: string, from = ['confirmed', 'proc
   await Promise.allSettled(pending.splice(0));
 }
 
+/** The sale credit from the append-only merchant ledger (migration 0121): its state and what it holds. */
 const creditOf = (raw: DatabaseSync, id: string) =>
-  row<{ state: string; amount_iqd: number }>(raw, "SELECT state, amount_iqd FROM merchant_payout_ledger WHERE order_id = ? AND kind = 'sale_credit'", id)!;
+  row<{ state: string; amount_iqd: number }>(
+    raw,
+    `SELECT ${orderCreditStateSql('?1')} AS state,
+            (SELECT COALESCE(SUM(amount_iqd), 0) FROM merchant_ledger_entries WHERE order_id = ?1 AND bucket IN ('pending','available')) AS amount_iqd`,
+    id
+  )!;
+
+/** What the code before wave 1 did to a credit, re-enacted on the ledger the credit now lives in. */
+async function legacyRelease(raw: DatabaseSync, id: string) {
+  const db = asD1(raw);
+  await db.batch(releaseOrderCreditStatements(db, { orderId: id, merchantId: 'm_ali', actorId: null, note: 'legacy release', ts: new Date().toISOString() }));
+}
+async function legacyReverse(raw: DatabaseSync, id: string) {
+  const db = asD1(raw);
+  await db.batch([reverseOrderCreditStatement(db, { orderId: id, merchantId: 'm_ali', actorId: null, note: 'legacy merchant cancel', ts: new Date().toISOString() }).statement]);
+}
 const ago = (days: number) => new Date(Date.now() - days * DAY).toISOString();
 
 // ===================================================================== F3
@@ -141,7 +158,7 @@ async function refundedThenReopened(raw: DatabaseSync, creditState: 'pending' | 
   raw.prepare(`INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status,note,ref,created_by,amount_iqd,exchange_rate_snapshot)
                VALUES (?, 'buyer','deposit','USD',?,'approved','Refund for cancelled order',?,'system',?,1400)`).run(`wtx_refund_${id}_usd`, debit.amount, id, debit.amount_iqd);
   raw.prepare("UPDATE orders SET status = 'confirmed' WHERE id = ?").run(id);
-  if (creditState === 'available') raw.prepare("UPDATE merchant_payout_ledger SET state = 'available' WHERE order_id = ?").run(id);
+  if (creditState === 'available') await legacyRelease(raw, id);
   return id;
 }
 
@@ -149,7 +166,7 @@ async function refundedThenReopened(raw: DatabaseSync, creditState: 'pending' | 
 async function unrefundedMerchantCancel(raw: DatabaseSync) {
   const id = await placeOrder(raw, 'k-legacy-b-001');
   raw.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?").run(id);
-  raw.prepare("UPDATE merchant_payout_ledger SET state = 'reversed' WHERE order_id = ?").run(id);
+  await legacyReverse(raw, id);
   return id;
 }
 
@@ -177,7 +194,7 @@ test('F4: the read-only detector lists BOTH legacy shapes to a financial admin �
   seed(raw);
   const a = await refundedThenReopened(raw);
   const b = await unrefundedMerchantCancel(raw);
-  const ledgerBefore = count(raw, 'SELECT COUNT(*) n FROM merchant_payout_ledger');
+  const ledgerBefore = count(raw, 'SELECT COUNT(*) n FROM merchant_ledger_entries');
   const txBefore = count(raw, 'SELECT COUNT(*) n FROM wallet_transactions');
   const res = await get(adminApp(asD1(raw)), '/api/admin/community/reconciliation/store-orders');
   assert.equal(res.status, 200);
@@ -186,7 +203,7 @@ test('F4: the read-only detector lists BOTH legacy shapes to a financial admin �
   assert.equal(d.refunded_reopened[0].credit_state, 'pending');
   assert.deepEqual(d.cancelled_unrefunded.map((o: { order_id: string }) => o.order_id), [b]);
   assert.equal(d.cancelled_unrefunded[0].paid_usd_cents, row<{ amount: number }>(raw, "SELECT amount FROM wallet_transactions WHERE ref = ? AND type='withdrawal'", b)!.amount);
-  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_payout_ledger'), ledgerBefore, 'looking changed nothing');
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_ledger_entries'), ledgerBefore, 'looking changed nothing');
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM wallet_transactions'), txBefore);
   // A healthy order is in neither list.
   const healthy = await placeOrder(raw, 'k-healthy-0001');
@@ -239,8 +256,9 @@ test('F4: the refunded-then-reopened order’s credit is reversed by the admin d
     if (state === 'pending') {
       assert.equal(creditOf(raw, id).state, 'reversed');
     } else {
-      const claw = all<{ amount_iqd: number; state: string }>(raw, "SELECT amount_iqd, state FROM merchant_payout_ledger WHERE order_id = ? AND kind = 'reversal'", id);
-      assert.deepEqual(claw, [{ amount_iqd: -credit.amount_iqd, state: 'available' }]);
+      const claw = row<{ total: number; buckets: string }>(raw,
+        "SELECT SUM(amount_iqd) AS total, GROUP_CONCAT(DISTINCT bucket) AS buckets FROM merchant_ledger_entries WHERE order_id = ? AND event_key LIKE 'reversal:%'", id)!;
+      assert.deepEqual({ ...claw }, { total: -credit.amount_iqd, buckets: 'available' });
       assert.equal((await merchantBalance(asD1(raw), 'm_ali')).available_iqd, availableBefore - credit.amount_iqd);
     }
     assert.equal(count(raw, "SELECT COUNT(*) n FROM audit_log WHERE action = 'admin.store_order_reconciled' AND target = ?", id), 1);
@@ -252,7 +270,11 @@ test('F4: the refunded-then-reopened order’s credit is reversed by the admin d
     // already taken, and takes nothing twice.
     const shipped = await patch(adminApp(asD1(raw)), `/api/admin/orders/${id}`, { status: 'cancelled' });
     assert.equal(shipped.status, 200, JSON.stringify(await json(shipped.clone())));
-    assert.equal(count(raw, "SELECT COUNT(*) n FROM merchant_payout_ledger WHERE order_id = ? AND kind = 'reversal'", id), state === 'available' ? 1 : 0);
+    assert.equal(
+      count(raw, "SELECT COUNT(DISTINCT bucket) n FROM merchant_ledger_entries WHERE order_id = ? AND event_key LIKE 'reversal:%' AND bucket = 'available'", id),
+      state === 'available' ? 1 : 0
+    );
+    assert.equal(creditOf(raw, id).amount_iqd, 0, 'taken back once — never twice');
     assert.equal(count(raw, 'SELECT COUNT(*) n FROM wallet_transactions WHERE id = ?', `wtx_refund_${id}_usd`), 1, 'never refunded twice');
     await Promise.allSettled(pending.splice(0));
   }
@@ -267,7 +289,7 @@ test('F4: the credit reversal re-checks the order INSIDE its own batch — an or
   // touch the credit). The decision must not act on the stale read.
   const { failing, db } = failingD1(raw);
   failing.beforeBatch = (stmts) => {
-    if (stmts.some((st) => /SET state = 'reversed'/.test(st.sql))) {
+    if (stmts.some((st) => st.sql.includes("'reversal:' || ?3"))) {
       raw.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?").run(id);
       failing.beforeBatch = null;
     }
@@ -430,7 +452,7 @@ test('S6 (security probe P8 inverted): an assistant-scope admin cannot refund or
     assert.equal((await json(res)).code, 'FINANCIAL_SCOPE_REQUIRED');
   }
   assert.equal(row<{ status: string }>(raw, 'SELECT status FROM orders WHERE id = ?', id)!.status, 'shipped');
-  assert.equal(count(raw, "SELECT COUNT(*) n FROM merchant_payout_ledger WHERE order_id = ? AND kind = 'reversal'", id), 0, 'no claw-back');
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM merchant_ledger_entries WHERE order_id = ? AND kind LIKE '%refund'", id), 0, 'no claw-back');
   assert.equal(spendable(raw, 'buyer'), buyerBefore, 'no refund');
   assert.equal((await merchantBalance(asD1(raw), 'm_ali')).available_iqd, owed);
 

@@ -28,7 +28,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import {
-  freshDb, asD1, failingD1, stubApp, post, get, patch, json, count, row, holds, spendable, pending,
+  freshDb, asD1, failingD1, stubApp, post, get, patch, json, count, row, all, holds, spendable, pending,
 } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
 import { storeOrderRoutes } from '../worker/routes/storeOrders';
@@ -181,7 +181,7 @@ test('B5 a unit taken by a concurrent order ABORTS this order — no order, no d
   assert.equal(body.details.product_id, 'cp_ltd');
   assert.equal(body.details.available, 0);
   assert.equal(orders(raw), 0, 'the order did not commit');
-  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_payout_ledger'), 0, 'no merchant credit');
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_ledger_entries'), 0, 'no merchant credit');
   assert.equal(stockOf(raw, 'cp_ltd').sold_count, 0, 'nothing was sold');
   // The refusal is FINAL for this attempt: the customer's remedy changes the
   // cart, and with it the quote and the checkout key (B12). The reservation is
@@ -484,8 +484,15 @@ test('B4 the merchant is credited their delivery fee; commission is on the goods
   assert.equal(o.platform_fee_iqd, 700, '5% of the 14,000 goods — never of the delivery');
   assert.equal(o.merchant_receivable_iqd, 18300, '13,300 for the goods + the 5,000 delivery');
   assert.equal(o.platform_fee_iqd + o.merchant_receivable_iqd, o.total_iqd, 'no dinar in nobody’s books');
-  const credit = row<{ amount_iqd: number; state: string }>(raw, "SELECT amount_iqd, state FROM merchant_payout_ledger WHERE order_id = ? AND kind = 'sale_credit'", body.order.id)!;
-  assert.deepEqual(credit, { amount_iqd: 18300, state: 'pending' });
+  // Three lines of their own in the merchant ledger (migration 0121), pending, summing to the receivable.
+  const lines = all<{ kind: string; bucket: string; amount_iqd: number }>(raw,
+    'SELECT kind, bucket, amount_iqd FROM merchant_ledger_entries WHERE order_id = ? ORDER BY kind', body.order.id);
+  assert.deepEqual(lines, [
+    { kind: 'commission', bucket: 'pending', amount_iqd: -700 },
+    { kind: 'delivery_fee', bucket: 'pending', amount_iqd: 5000 },
+    { kind: 'sale_gross', bucket: 'pending', amount_iqd: 14000 },
+  ]);
+  assert.equal(lines.reduce((a, l) => a + l.amount_iqd, 0), 18300);
   await Promise.allSettled(pending);
 });
 

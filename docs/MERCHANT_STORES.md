@@ -175,9 +175,27 @@ every `/resolve` answer), never from a literal in the app (B19).
 
 `community_products`, extended rather than replaced (0001 → 0030).
 
-`status` stays the visibility switch it always was; `lifecycle` says why:
-`draft | active | hidden | sold_out | archived`. They are kept in step by every
-writer, so a reader that predates the lifecycle is never lied to.
+**The state is `publish_state`** (0126): `draft | published | hidden | archived`,
+CHECK-constrained. `lifecycle` (`active` for published) and `status` are
+trigger-maintained mirrors, so a reader that predates it is never lied to.
+«Sold out» is DERIVED (tracked stock at zero), never stored; the old manual
+`sold_out` became `hidden`, which is what customers saw (0127, DECISIONS 126).
+
+**Variants** (0126): up to 3 option groups, 30 values each, 100 variants, each
+with its own price override, compare-at, stock, SKU, active flag, picture and
+low-stock line. The product's stock is the sum of its active variants
+(triggers). The server prices the chosen variant at add and at checkout; a
+client sends a variant id, never a price. Products still sold by the pre-0126
+`options`/`colors` JSON are `variant_mode = 'legacy'` and sell exactly as
+before until converted (automatically only when nothing must be invented —
+the `catalog_legacy_variants` job — otherwise by the merchant in the editor).
+Media are ordered rows (images and up to 2 videos, 12 in all, alt text), and a
+printed product carries typed attributes (material from the platform list,
+technology, palette colour, finish, dimensions, weight).
+
+**Collections are the sections** (same rows, same ids): manual ones hold
+products in the merchant's order; `featured`, `new_arrivals` (30 days) and
+`best_sellers` are computed, one of each per store.
 
 **Editing is real.** The old dashboard could create and delete but not edit, so
 fixing a mistyped price meant deleting the product and losing its history.
@@ -390,24 +408,53 @@ from their own store (`OWN_STORE_PURCHASE`). The free-delivery threshold is
 judged on the goods after the coupon; the coupon's own minimum on the goods at
 the store's prices, before it (docs/DECISIONS.md).
 
+**Delivery is the merchant's, by governorate** (W2-A, migration 0120,
+docs/DECISIONS.md row 125). A profile per store — default fee / free / off,
+a free-over threshold, pickup (a place and instructions, still prepaid),
+preparation days, a note, a version — and a rule for each governorate that
+departs from the default (fee, free or off, with its own threshold, preparation
+days, delivery-time line and note). The fee is computed on the server from the
+customer's SAVED address → governorate → these rows
+(`resolveMerchantDelivery`, packages/shipping), at the quote and again at
+place-order; the quote fingerprint binds the address, the governorate, the
+rule, the fee and the profile version, and the order batch fences on the
+version. The order keeps `delivery_governorate`, `delivery_rule`,
+`delivery_prep_days`, `quote_fingerprint` and the whole applied rule in
+`delivery_method_snapshot`; `delivery_method_id` is `merchant` or
+`merchant_pickup`. A store that never saved the editor is priced from its
+wave-1 `delivery_settings` as version 0.
+
 Commission is snapshot per order (`commission_percent_x100`,
 `platform_fee_iqd`, `merchant_receivable_iqd`). Changing the rate tomorrow
 never rewrites what a merchant was owed for a sale that already happened
 (§30, §75).
 
-### The balance is a SUM
+### The balance is a SUM — of an append-only ledger (wave 2, W2-B)
 
-`merchant_payout_ledger` is append-only. There is **no balance column** for a
-retry to double, and a merchant can add up the list in their dashboard and get
-the same number the platform shows.
+The merchant's money lives in `merchant_ledger_entries` (migration 0121,
+worker/lib/merchantLedger.ts). A line is written once — triggers refuse any
+UPDATE or DELETE — and there is **no balance column**: every figure is a SUM.
+Money sits in four buckets, `pending → available → reserved → paid`; a move
+between buckets is two lines that sum to zero. A store sale is three pending
+lines: the goods, the platform's commission as its own line, and the
+merchant's delivery fee as its own line. The customer's confirmation or the
+three-day sweep releases them (`release`); a cancel writes refund lines
+(in pending, or as a claw-back from available); a custom order's escrow
+release credits `escrow_release` and its commission straight into available.
+No new line may take a bucket below zero, except a customer refund after the
+release (a debt the merchant's next sales settle; payouts are refused while it
+lasts).
 
-Paying a merchant writes a **negative** row (`kind = 'payout'`) rather than
-reducing anything. That row counts in **available** — `available` is the sum
-of available rows AND payouts, so a payout lowers it — and the insert is
-conditional on `available >= amount`, so the same balance cannot be paid out
-twice (audit 02 B3, 04 B1). Only a replay of the same key, merchant and amount
-answers «already recorded»; any other failure is a failure (B14). **Paid out**
-sums payouts only — never the platform's commission rows (B20).
+**Payouts are requests** (`merchant_payouts`): the merchant asks from the
+finance page, and the same batch moves the amount available → reserved with an
+INSERT that cannot exceed «available», however many requests race. A
+financial admin approves, then marks it paid with the transfer's reference
+(reserved → paid) — or fails it with a reason (reserved → available); the
+merchant may cancel a request nobody approved yet. The wave-1 «record a
+payout» sheet now records a payout request the admin makes and pays in one
+batch. The old `merchant_payout_ledger` is read-only for the code; its rows
+were carried over deterministically with every merchant's balance unchanged
+(`GET /api/admin/community/ledger/parity` re-proves it).
 
 ---
 
@@ -434,22 +481,60 @@ contain someone they have traded with. There is no user search.
   `PATCH /store` · `POST /store/slug` · `GET /subscription` ·
   `GET /store/share` (the share kit: the absolute link, the card it unfurls as,
   the app icon's state — §11)
-- **products:** `GET /products` (a `<created_at>|<id>` cursor, or `?page=` for the
-  filtered manager) · `POST /products` · `PATCH /products/:id` ·
-  `DELETE /products/:id` (archive when ordered) · `POST /products/:id/duplicate` ·
-  `GET /products/stats` · `GET /products/:id/insights` · `GET /products/export.csv` ·
-  `POST /products/import`
-- **catalogue:** `GET|POST /sections` · `PATCH|DELETE /sections/:id` · the same four
-  for `/services`, `/showcase` and `/coupons`
+- **delivery by governorate** (W2-A, §7): `GET /delivery` →
+  `{profile, rules[], configured, store_open, coverage}` · `PUT /delivery`
+  (`{version, profile, rules[]}`, the whole configuration; `400 DELIVERY_INVALID
+  {issues:[{path, code}]}`, `409 DELIVERY_VERSION_CONFLICT {config}`,
+  `409 DELIVERY_NO_COVERAGE` for an open store that would deliver nowhere with no
+  pickup — `PATCH /store {open: true}` refuses the same). `PATCH /store` still
+  accepts wave 1's flat `delivery_settings` from a cached form: an unchanged echo
+  moves nothing, a real edit reaches the profile's default
+- **products** (worker/routes/merchantCatalog.ts, same prefix, W2-F):
+  `GET /products?q=&state=&stock=in|low|out|untracked&collection=&variants=&sort=&cursor=`
+  (opaque `next_cursor`, `total`; `?page=` still pages by offset; `400 CURSOR_INVALID`) ·
+  `GET /products/:id` (with `media`, `option_groups`, `variants`) · `POST /products` ·
+  `PATCH /products/:id` (`400 PRODUCT_INVALID {errors:[{path,code}]}`,
+  `409 PRODUCT_HIDDEN_BY_ADMIN`, `409 PRODUCT_NOT_PUBLISHABLE`, `400 STOCK_REQUIRED`) ·
+  `DELETE /products/:id` (archive when ordered) · `POST /products/:id/duplicate` (a draft) ·
+  `POST /products/bulk {action, ids ≤100, price_iqd|stock|collection_id}` — answered per
+  product (`NOT_FOUND`, `PRODUCT_HIDDEN_BY_ADMIN`, `PRODUCT_NOT_PUBLISHABLE`,
+  `VARIANTS_HAVE_OWN_STOCK`, `PRODUCT_HAS_ORDERS`) · `GET /products/stats` ·
+  `GET /products/:id/insights` (views from the analytics days, units/revenue from
+  non-cancelled orders, per variant) · `GET /products/export.csv` ·
+  `POST /products/import {csv, confirm}` (dry run first; per-row `{row, field, code}`; drafts)
+- **collections:** `GET|POST /collections` · `PATCH|DELETE /collections/:id` (the same
+  four under `/sections`) · `GET|PUT|POST /collections/:id/products` ·
+  `DELETE /collections/:id/products/:productId` (`409 COLLECTION_COMPUTED`,
+  `400 COLLECTION_KIND_EXISTS`, `COLLECTIONS_LIMIT`)
+- **catalogue:** the same four for `/services`, `/showcase` and `/coupons`
 - **orders:** `GET /orders` · `GET /orders/:id` · `POST /orders/:id/status` ·
   `GET /custom-orders/summary`
 - **money and people:** `GET /analytics` (sales only — cancelled orders are
-  counted apart, never as revenue) · `GET /payouts` · `GET /customers` ·
+  counted apart, never as revenue) · `GET /customers` ·
   `GET /followers` · `GET /reviews` · `POST /reviews/:id/reply`
 - **notifications:** `GET|PATCH /notifications` (`wired` names the switches a
-  sender actually reads; the rest show «قريبًا»)
+  sender actually reads; the rest show «قريبًا». A switch governs the OUTSIDE
+  channels — the in-app notice is always written; `complaints`,
+  `subscription_expiry`, `system_alerts` are forced on) ·
+  `GET /notifications/feed?cursor=&unread=1&kind=` · `GET /notifications/unread-count` ·
+  `POST /notifications/read {id?}` — the store's notices only, each deep-linked
+  to its object's workspace address (W2-E, worker/lib/merchantNotify.ts)
+- **inbox** (worker/routes/merchantInbox.ts): `GET /inbox?cursor=&q=&kind=direct|order|request&unread=1`
+  · `GET /inbox/unread-count` — the store's threads its owner is a member of,
+  searched on the server
+- **analytics over a range** (worker/routes/merchantAnalytics.ts):
+  `GET /analytics/report?from=&to=` (Baghdad days, ≤366) — traffic from the
+  beacon (absent before counting began), orders live from `orders`, funnel,
+  top/least-viewed products, returning customers, coupons, governorates,
+  requests/offers; `403 ANALYTICS_NOT_INCLUDED`, `400 BAD_RANGE`
 - **printers** (worker/routes/merchantPrinters.ts, same prefix): `GET|POST /printers` ·
   `PUT|DELETE /printers/:id` · `GET|PUT /request-prefs` · `GET /request-matches`
+- **finance** (worker/routes/merchantFinance.ts): `GET /finance/summary` ·
+  `GET /finance/ledger?cursor=&kind=&from=&to=` · `GET /payouts` ·
+  `POST /payouts` (`{amount_iqd, channel, account, holder, note, idempotencyKey}`;
+  `400 INSUFFICIENT_BALANCE {available_iqd}`, `UNKNOWN_PAYOUT_METHOD`,
+  `PAYOUT_ACCOUNT_REQUIRED`, `409 IDEMPOTENCY_KEY_REUSED`) ·
+  `POST /payouts/:id/cancel` (`409 PAYOUT_NOT_CANCELLABLE`) — §7
 - **store page layout** (worker/routes/storeLayout.ts, `/store/layout`): `GET /` ·
   `PUT /draft` (`{layout, version}`; `409 DRAFT_CHANGED`) · `POST /publish` ·
   `GET /revisions` · `GET /revisions/:revision` · `POST /restore/:revision`
@@ -458,7 +543,15 @@ contain someone they have traded with. There is no user search.
 ### `/api/storefront/*` — public
 `GET /resolve` · `GET /:slug` · `GET /:slug/sections` · `GET /:slug/services` ·
 `GET /:slug/showcase` · `GET /:slug/products` · `GET /:slug/products/:productSlug` ·
-`GET /:slug/reviews` · `GET /by-id/:storeId`
+`GET /:slug/reviews` · `GET /by-id/:storeId` ·
+`GET /:slug/delivery?governorate=` — fees and availability for one governorate
+(without it, the signed-in visitor's default-address governorate) plus where the
+store delivers; a preview, the checkout prices again (W2-A) ·
+`POST /events` — the first-party analytics beacon (`store_view`, `product_view`,
+`add_to_cart`, `checkout_started`; always `204`, `400 BAD_EVENT`,
+`413 EVENT_TOO_LARGE`): once per visitor per day, never the owner or a crawler,
+stored only as salted hashes (worker/lib/storefrontAnalytics.ts). A product GET
+no longer counts a view (audit 01 B22).
 
 Every `/:slug…` read serves the live slug, then a slug the store was renamed
 away from, and never a sanctioned store (`404 STORE_UNAVAILABLE`, §4).
@@ -466,7 +559,9 @@ away from, and never a sanctioned store (`404 STORE_UNAVAILABLE`, §4).
 `/resolve`, `/:slug` and `/by-id` also carry the store's **published** layout
 (`layout`, `layout_source`, `layout_revision`) and the rows its blocks show
 (`blocks_data`); the product page's `store.layout_theme` carries the theme
-alone. Never the draft (§10).
+alone. Never the draft (§10). Every store answer also carries `delivery` (the
+governorates served with their fees, pickup, preparation days, the note) and
+`delivery_to_you` — the signed-in visitor's own governorate, answered — or null.
 
 ### `/api/admin/community/*` — store moderation (apex only)
 `GET /merchants` (with each store's `store_url`) ·
@@ -475,24 +570,40 @@ alone. Never the draft (§10).
 `GET /merchants/:id/products` · `POST /products/:id/hide {hidden, reason}` ·
 `GET /reconciliation/store-orders` (read-only) and
 `POST /reconciliation/store-orders/:id/refund|reverse-credit {reason}` (review F4) ·
+`GET /payouts` · `POST /payouts/:id/approve|paid {reference}|fail {reason}` ·
+`POST /merchants/:id/adjustment {amount_iqd, reason, idempotencyKey}` · `GET /ledger/parity` (W2-B, §7) ·
 money routes behind the financial scope — see COMMUNITY_V2.md §11
 
 ### `/api/community/*` — legacy merchant doors
 `POST /my-store/products` → `307 /api/merchant/products` ·
 `DELETE /my-store/products/:id` → `307 /api/merchant/products/:id` (§5)
 
-### `/api/chats/*` — a store order's thread
+### `/api/chats/*` — a store's threads
+`POST /open {merchantId}` opens the STORE's thread with this customer (one per
+pair, `context: 'store'`); `POST /open {requestId, merchantId?}` a custom
+request's thread between its requester and a merchant with an offer on it
+(`403 REQUEST_THREAD_NOT_ALLOWED` otherwise). Every store thread carries
+`store_id`, its context and each member's role (migration 0124).
 `POST /open {orderId}` adds the customer AND the seller; `GET /:id/messages`
 pages newest-first (`limit`, `before` cursor, `has_more`, `older_cursor`); a
-customer's message notifies the seller (their `new_messages` switch). Staff read
+customer's message notifies the seller as the store's `new_message`, opening
+the thread in the inbox (their `new_messages` switch governs the outside
+channels). Staff read
 a store thread — its messages and its files — read-only (`read_only: true`, an
 `admin.chat_read` audit row) and never join it; sending, typing and uploading
 into it are the customer's and the seller's only (`403 CHAT_READ_ONLY`, review
 S3).
 
 ### `/api/store-orders/*` — merchant checkout
-`POST /quote` (returns `quote_fingerprint`) · `POST /` (requires it:
-`409 QUOTE_CHANGED` carries the fresh quote)
+`POST /quote` `{addressId?, fulfilment: delivery|pickup, couponCode?}` (returns
+`quote_fingerprint` and the `delivery` breakdown; without `addressId` it prices
+the default address and names it) · `POST /` `{idempotencyKey, addressId,
+fulfilment, quoteFingerprint, couponCode?}` (`409 QUOTE_CHANGED` carries the
+fresh quote; the same key with a different fingerprint is
+`409 IDEMPOTENCY_KEY_REUSED`). Both refuse `409 ADDRESS_REQUIRED`,
+`409 ADDRESS_GOVERNORATE_REQUIRED` and `409 DELIVERY_UNAVAILABLE {reason, served,
+pickup, preview}` — never a default fee for an address without a governorate —
+and `404 ADDRESS_NOT_FOUND` for an address that is not the customer's
 
 ### `/api/orders/*` — added for store orders
 `POST /:id/confirm-receipt` — the customer's «استلمت طلبي»

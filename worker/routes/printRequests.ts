@@ -31,6 +31,8 @@ import {
 import { resolveModelLink, parseModelLink } from '../lib/externalModels';
 import { governorateName, normalizeGovernorate } from '../lib/iraqGovernorates';
 import { notifyStatement } from '../lib/notifications';
+import { fanOutMerchantNotice, matchingRequestNotice } from '../lib/merchantNotify';
+import { merchantHref } from '@levonis/contracts/merchantRoutes';
 import { getMediaObject, putMediaObject } from '../lib/mediaStorage';
 import { communityClosedRefusal, communityMayEnter, readCommunityGate, requireCommunityOpen } from '../lib/communityGate';
 import {
@@ -1000,13 +1002,13 @@ export async function publishRequest(
   for (const d of notify) {
     const { id, stmt } = notifyStatement(env.DB, {
       userId: d.user_id,
-      kind: 'print_request_match',
+      kind: 'matching_request',
       title_ar: text.title.ar,
       title_en: text.title.en,
       body_ar: text.body.ar,
       body_en: text.body.en,
-      // The link is the request itself. There is nothing else to open.
-      link: `/requests?request=${requestId}`,
+      // The link is the request itself, at its workspace address (W2-E).
+      link: merchantHref.request(requestId),
       entity_type: 'request',
       entity_id: requestId,
       meta: {
@@ -1063,6 +1065,8 @@ export async function publishRequest(
   // The merchants whose offers the change left behind hear about it.
   if (revised) stmts.push(...(await staleOfferNotifications(env.DB, requestId, nextRevision)));
   if (stmts.length) await env.DB.batch(stmts);
+  // …and on their outside channels, per each merchant's `request_opportunities` switch (W2-E).
+  await Promise.all(notify.map((d) => fanOutMerchantNotice(env, { merchant_id: d.merchant_id, user_id: d.user_id }, matchingRequestNotice(requestId, text))));
 
   await audit(env.DB, userId, firstPublish ? 'print.request_published' : 'print.request_republished', requestId, {
     considered: decisions.length,

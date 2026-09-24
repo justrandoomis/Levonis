@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1, stubApp, post, get, json, count } from './fixtures/app';
 import { adminCommunityRoutes } from '../worker/routes/adminCommunity';
-import { merchantRoutes } from '../worker/routes/merchant';
+import { merchantPayoutRoutes } from '../worker/routes/merchantFinance';
 import { merchantBalance } from '../worker/lib/escrowOps';
 
 function seed(raw: DatabaseSync) {
@@ -36,7 +36,9 @@ const adminApp = (db: D1Database, user: { id: string; email: string } = { id: 'b
   stubApp(db, { ...user, role: 'admin' }, (a) => a.route('/api/admin/community', adminCommunityRoutes));
 const payout = (raw: DatabaseSync, body: Record<string, unknown>, merchant = 'm_ali') =>
   post(adminApp(asD1(raw)), `/api/admin/community/merchants/${merchant}/payout`, body);
-const payouts = (raw: DatabaseSync) => count(raw, "SELECT COUNT(*) n FROM merchant_payout_ledger WHERE kind = 'payout'");
+// Payouts are records of their own since the append-only ledger (migration 0121); the
+// seeds above are legacy rows, carried into it by the migration's mirror.
+const payouts = (raw: DatabaseSync) => count(raw, "SELECT COUNT(*) n FROM merchant_payouts WHERE source <> 'legacy'");
 
 test('B3 a payout lowers «available», so the same balance cannot be paid out twice', async () => {
   const raw = freshDb();
@@ -78,9 +80,13 @@ test('B14 the SAME payout replays; the same key for anything else is 409; any ot
 
   raw.exec(`INSERT INTO merchant_payout_ledger (id,merchant_id,kind,amount_iqd,state,order_id,idempotency_key)
             VALUES ('plz','m_zain','sale_credit',9000,'available','ORD-Z','sale:ORD-Z')`);
+  // Keys are namespaced per merchant (server-minted `admin:<merchant>:<key>`, the 0064 lesson): the same
+  // client key for ANOTHER merchant is that merchant's own payout — never a false «already recorded».
   const otherMerchant = await payout(raw, { amount_iqd: 4000, idempotencyKey: 'payout-key-9' }, 'm_zain');
-  assert.equal(otherMerchant.status, 409, 'another merchant’s key is not this payout');
-  assert.equal(payouts(raw), 1);
+  const other = await json(otherMerchant);
+  assert.equal(otherMerchant.status, 200, JSON.stringify(other));
+  assert.equal(other.replayed, false, 'another merchant’s key is not this payout');
+  assert.equal(payouts(raw), 2);
 
   // A write that fails for a reason that is not the key — here the foreign
   // key on admin_id, a session user with no users row — is NOT "already recorded".
@@ -92,7 +98,7 @@ test('B14 the SAME payout replays; the same key for anything else is 409; any ot
   const ghostBody = await json(ghost);
   assert.equal(ghost.status, 500, JSON.stringify(ghostBody));
   assert.notEqual(ghostBody.replayed, true, 'nothing was written, and the admin is not told it was');
-  assert.equal(payouts(raw), 1);
+  assert.equal(payouts(raw), 2);
 
   const unknown = await payout(raw, { amount_iqd: 1000, idempotencyKey: 'payout-key-11' }, 'm_nobody');
   assert.equal(unknown.status, 404);
@@ -112,7 +118,7 @@ test('B20 «paid out» counts payouts only — never the platform’s commission
   assert.deepEqual(await merchantBalance(db, 'm_ali'), { available_iqd: 35000, pending_iqd: 0, paid_iqd: -20000 });
 
   // The merchant's own money screen reads the same figures.
-  const mine = await json(await get(stubApp(db, { id: 'ali', role: 'merchant', email: 'ali@x.co' }, (a) => a.route('/api/merchant', merchantRoutes)), '/api/merchant/payouts'));
+  const mine = await json(await get(stubApp(db, { id: 'ali', role: 'merchant', email: 'ali@x.co' }, (a) => a.route('/api/merchant/payouts', merchantPayoutRoutes)), '/api/merchant/payouts'));
   assert.deepEqual(mine.balance, { available_iqd: 35000, pending_iqd: 0, paid_iqd: -20000 });
-  assert.ok(mine.entries.every((e: { state: string }) => typeof e.state === 'string'), 'every row says what state it is in');
+  assert.ok(mine.payouts.every((p: { state: string }) => typeof p.state === 'string'), 'every payout says what state it is in');
 });

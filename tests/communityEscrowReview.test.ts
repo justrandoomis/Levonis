@@ -75,7 +75,7 @@ async function delivered(raw: DatabaseSync) {
 }
 
 const credited = (raw: DatabaseSync) =>
-  row<{ s: number | null }>(raw, "SELECT SUM(amount_iqd) AS s FROM merchant_payout_ledger WHERE merchant_id='m1' AND kind='community_order_credit'")?.s ?? 0;
+  row<{ s: number | null }>(raw, "SELECT SUM(amount_iqd) AS s FROM merchant_ledger_entries WHERE merchant_id='m1' AND escrow_id IS NOT NULL")?.s ?? 0;
 const escrowState = (raw: DatabaseSync, id: string) => row<{ state: string }>(raw, 'SELECT state FROM community_escrows WHERE id = ?', id)!.state;
 const orderState = (raw: DatabaseSync, id: string) => row<{ state: string }>(raw, 'SELECT state FROM community_orders WHERE id = ?', id)!.state;
 

@@ -21,12 +21,29 @@
 
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
+import { notifyPayoutPaidById, notifyStoreStatusChanged } from '../lib/merchantNotify';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, str, int, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { getSetting } from '../lib/settings';
-import { releaseEscrow, refundEscrow, escrowForOrder, getEscrow, merchantBalance, merchantAvailableSql } from '../lib/escrowOps';
+import { releaseEscrow, refundEscrow, escrowForOrder, getEscrow } from '../lib/escrowOps';
+import {
+  adjustMerchantBalance,
+  adminPayoutQueue,
+  approvePayout,
+  failPayout,
+  financeSummary,
+  legacyParity,
+  ledgerPage,
+  markPayoutPaid,
+  merchantBalance,
+  merchantBuckets,
+  payoutPublic,
+  payoutsPage,
+  recordAdminPayout,
+  type PayoutResult,
+} from '../lib/merchantLedger';
 import { badgeFor } from '../lib/merchantOps';
 import {
   COMMUNITY_GATE_SETTING_KEY,
@@ -450,6 +467,8 @@ adminCommunityRoutes.post('/merchants/:id/status', async (c) => {
   ).bind(status, reason, nowIso(), id).run();
 
   await audit(c.env.DB, admin.id, 'admin.merchant_status', id, { status, reason, from: m.status });
+  // The merchant is told of the sanction and its reason (W2-E; forced on, §61).
+  if (status !== m.status) await notifyStoreStatusChanged(c.env, { scope: 'merchant', id, status, reason, at: nowIso() });
   const store = await c.env.DB.prepare('SELECT status FROM merchant_stores WHERE merchant_id = ?')
     .bind(id)
     .first<{ status: string }>();
@@ -514,6 +533,7 @@ adminCommunityRoutes.post('/stores/:id/status', async (c) => {
   await audit(c.env.DB, admin.id, 'admin.store_status', id, {
     status, reason, merchant: store.merchant_id,
   });
+  await notifyStoreStatusChanged(c.env, { scope: 'store', id, status, reason, at: nowIso() }); // W2-E: the merchant is told (forced on, §61)
   return c.json({ success: true, status });
 });
 
@@ -1282,17 +1302,30 @@ adminCommunityRoutes.post('/escrows/:id/resolve', requireFinancialScope, async (
   return c.json({ success: true, decision, replayed });
 });
 
-/** A merchant's full financial timeline, for an admin answering a question. */
+/**
+ * A merchant's full financial picture, for an admin answering a question —
+ * the same ledger figures the merchant's own finance page shows
+ * (worker/lib/merchantLedger.ts), the newest lines, their payouts and escrows.
+ */
 adminCommunityRoutes.get('/merchants/:id/finance', requireFinancialScope, async (c) => {
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
-  const balance = await merchantBalance(c.env.DB, id);
-  const { results: ledger } = await c.env.DB.prepare(
-    `SELECT * FROM merchant_payout_ledger WHERE merchant_id = ? ORDER BY created_at DESC LIMIT 200`
-  ).bind(id).all();
-  const { results: escrows } = await c.env.DB.prepare(
-    `SELECT * FROM community_escrows WHERE merchant_id = ? ORDER BY created_at DESC LIMIT 100`
-  ).bind(id).all();
-  return c.json({ success: true, balance, ledger, escrows });
+  const [balance, buckets, summary, page, payouts, escrows] = await Promise.all([
+    merchantBalance(c.env.DB, id),
+    merchantBuckets(c.env.DB, id),
+    financeSummary(c.env.DB, id),
+    ledgerPage(c.env.DB, id, { limit: 100 }),
+    payoutsPage(c.env.DB, id, { limit: 20 }),
+    c.env.DB.prepare(`SELECT * FROM community_escrows WHERE merchant_id = ? ORDER BY created_at DESC LIMIT 100`).bind(id).all(),
+  ]);
+  return c.json({
+    success: true,
+    balance,
+    buckets,
+    summary,
+    ledger: page.entries,
+    payouts: payouts.payouts,
+    escrows: escrows.results,
+  });
 });
 
 // --------------------------------------------------------- reconciliation
@@ -1354,25 +1387,15 @@ adminCommunityRoutes.post('/reconciliation/store-orders/:id/reverse-credit', req
 });
 
 /**
- * Record a payout to a merchant, or an adjustment.
+ * RECORD A TRANSFER THE ADMIN ALREADY MADE (the wave-1 «تسجيل تحويل» sheet).
  *
- * Append-only: paying a merchant writes a NEGATIVE ledger row rather than
- * reducing a balance, so the balance stays a SUM and the payment itself is
- * visible in the history (§76).
- *
- * NEVER MORE THAN AVAILABLE — DECIDED IN THE INSERT (audit 02 B3, audit 04
- * B1). "Available" used to be `SUM(state = 'available')` while payouts were
- * written `state = 'paid'`, so it never went down: two payouts of 10,000 from
- * a 10,000 balance both succeeded. The figure is now `merchantAvailableSql`
- * (payouts included), and the INSERT itself carries the comparison, so two
- * payouts racing on one balance cannot both land.
- *
- * A REPLAY IS THE SAME PAYOUT, AND NOTHING ELSE IS (B14). The old catch-all
- * answered EVERY failed insert — a foreign-key failure, a transient D1 error,
- * a key another merchant's payout already carried — with «already recorded»
- * while nothing had been written. Only this key, for this merchant and this
- * amount, is a replay; the same key for anything else is 409
- * IDEMPOTENCY_KEY_REUSED; every other error propagates as the failure it is.
+ * Now a payout on the merchant's behalf through the SAME statements as the
+ * queue below (worker/lib/merchantLedger.ts `recordAdminPayout`): requested,
+ * approved and paid in one batch, reserved only if «available» covers it, the
+ * note as its reference, audited once. The wave-1 guarantees stand: a payout
+ * lowers «available» and can never exceed it (audit 02 B3, 04 B1); only this
+ * key, for this merchant and this amount, is a replay, the same key for
+ * anything else is 409, and any other failure is a failure (B14).
  */
 adminCommunityRoutes.post('/merchants/:id/payout', requireFinancialScope, async (c) => {
   const admin = c.get('user')!;
@@ -1382,54 +1405,117 @@ adminCommunityRoutes.post('/merchants/:id/payout', requireFinancialScope, async 
   const note = str(body.note, 'note', { min: 0, max: 300, required: false });
   const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80 });
 
-  const priorUseOfKey = async (): Promise<'none' | 'this_payout' | 'another_row'> => {
-    const row = await c.env.DB.prepare(
-      'SELECT merchant_id, kind, amount_iqd FROM merchant_payout_ledger WHERE idempotency_key = ?'
-    ).bind(idempotencyKey).first<{ merchant_id: string; kind: string; amount_iqd: number }>();
-    if (!row) return 'none';
-    return row.merchant_id === id && row.kind === 'payout' && Number(row.amount_iqd) === -amount
-      ? 'this_payout'
-      : 'another_row';
-  };
-  const replayed = async () =>
-    c.json({ success: true, replayed: true, balance: await merchantBalance(c.env.DB, id) });
-  const keyReused = () =>
-    conflict('This payout key was already used for a different payout. Start again.', 'IDEMPOTENCY_KEY_REUSED');
-
-  const prior = await priorUseOfKey();
-  if (prior === 'this_payout') return replayed();
-  if (prior === 'another_row') throw keyReused();
-
-  const merchant = await c.env.DB.prepare('SELECT id FROM community_merchants WHERE id = ?')
-    .bind(id)
-    .first<{ id: string }>();
+  const merchant = await c.env.DB.prepare('SELECT id FROM community_merchants WHERE id = ?').bind(id).first<{ id: string }>();
   if (!merchant) throw notFound('Merchant not found');
 
-  let written = 0;
-  try {
-    const res = await c.env.DB.prepare(
-      `INSERT INTO merchant_payout_ledger (id, merchant_id, kind, amount_iqd, state, note, admin_id, idempotency_key)
-       SELECT ?1, ?2, 'payout', ?3, 'paid', ?4, ?5, ?6
-        WHERE ${merchantAvailableSql('?2')} >= ?7`
-    ).bind(newId('pay'), id, -amount, note, admin.id, idempotencyKey, amount).run();
-    written = res.meta.changes ?? 0;
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes('UNIQUE') && msg.includes('idempotency_key')) {
-      if ((await priorUseOfKey()) === 'this_payout') return replayed();
-      throw keyReused();
+  const res = await recordAdminPayout(c.env.DB, { merchantId: id, amountIqd: amount, reference: note, adminId: admin.id, key: idempotencyKey });
+  if (!res.ok) {
+    if (res.reason === 'IDEMPOTENCY_KEY_REUSED') {
+      throw conflict('This payout key was already used for a different payout. Start again.', 'IDEMPOTENCY_KEY_REUSED');
     }
-    throw e;
-  }
-  if (!written) {
-    // A twin of this very request may have landed first and spent the balance.
-    if ((await priorUseOfKey()) === 'this_payout') return replayed();
-    const balance = await merchantBalance(c.env.DB, id);
     throw badRequest('That is more than the merchant has available', 'INSUFFICIENT_BALANCE', {
-      available_iqd: balance.available_iqd,
+      available_iqd: res.availableIqd ?? (await merchantBalance(c.env.DB, id)).available_iqd,
     });
   }
+  // A payout the admin recorded directly is paid on the spot (W2-E; once per payout).
+  await notifyPayoutPaidById(c.env, res.payout.id);
+  return c.json({ success: true, replayed: res.replayed, payout: payoutPublic(res.payout), balance: await merchantBalance(c.env.DB, id) });
+});
 
-  await audit(c.env.DB, admin.id, 'admin.merchant_payout', id, { amount, note, idempotency_key: idempotencyKey });
-  return c.json({ success: true, replayed: false, balance: await merchantBalance(c.env.DB, id) });
+// ----------------------------------------------------------- payout queue
+
+/** A payout decision's refusals, as stable codes. */
+function payoutRefusal(res: Extract<PayoutResult, { ok: false }>): HttpError {
+  if (res.reason === 'NOT_FOUND') return notFound('Payout request not found');
+  return new HttpError(409, 'This request is not in a state that allows that — reload the queue', 'PAYOUT_STATE_CONFLICT', {
+    state: res.state ?? null,
+  });
+}
+
+/**
+ * THE PAYOUT QUEUE — merchants' requests, oldest open first, each with its
+ * channel, account and the merchant's buckets (worker/lib/merchantLedger.ts
+ * `adminPayoutQueue`). `?state=open` (requested + approved, the default),
+ * or one state; keyset-paged by `?cursor=`.
+ */
+adminCommunityRoutes.get('/payouts', requireFinancialScope, async (c) => {
+  const raw = c.req.query('state') || 'open';
+  const state = oneOf(raw, 'state', ['open', 'requested', 'approved', 'paid', 'failed', 'cancelled'] as const);
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 50 });
+  return c.json({ success: true, ...(await adminPayoutQueue(c.env.DB, { state, cursor: c.req.query('cursor'), limit })) });
+});
+
+/** requested → approved: accepted for transfer. The money stays reserved. */
+adminCommunityRoutes.post('/payouts/:id/approve', requireFinancialScope, async (c) => {
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const res = await approvePayout(c.env.DB, { payoutId: id, actorId: admin.id });
+  if (!res.ok) throw payoutRefusal(res);
+  return c.json({ success: true, replayed: res.replayed, payout: payoutPublic(res.payout) });
+});
+
+/** approved → paid, with the transfer's reference: reserved → paid. */
+adminCommunityRoutes.post('/payouts/:id/paid', requireFinancialScope, async (c) => {
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+  const reference = typeof body.reference === 'string' ? body.reference.trim() : '';
+  if (reference.length < 3 || reference.length > 120) {
+    throw badRequest('Write the transfer reference', 'PAYOUT_REFERENCE_REQUIRED');
+  }
+  const res = await markPayoutPaid(c.env.DB, { payoutId: id, actorId: admin.id, reference });
+  if (!res.ok) throw payoutRefusal(res);
+  // «حوّلت Levonis إليك» — the merchant hears their payout was paid (W2-E; once per payout).
+  await notifyPayoutPaidById(c.env, res.payout.id);
+  return c.json({ success: true, replayed: res.replayed, payout: payoutPublic(res.payout) });
+});
+
+/** requested | approved → failed, with the reason: reserved → available. */
+adminCommunityRoutes.post('/payouts/:id/fail', requireFinancialScope, async (c) => {
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+  if (reason.length < 3 || reason.length > 300) throw badRequest('Say why the payout failed', 'REASON_REQUIRED');
+  const res = await failPayout(c.env.DB, { payoutId: id, actorId: admin.id, reason });
+  if (!res.ok) throw payoutRefusal(res);
+  return c.json({ success: true, replayed: res.replayed, payout: payoutPublic(res.payout) });
+});
+
+/**
+ * A MANUAL ADJUSTMENT of a merchant's «available» — a reason required, a line
+ * of its own and an audit row in the same batch; never below zero.
+ */
+adminCommunityRoutes.post('/merchants/:id/adjustment', requireFinancialScope, async (c) => {
+  const admin = c.get('user')!;
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+  const amount = Number(body.amount_iqd);
+  if (!(Number.isSafeInteger(amount) && amount !== 0 && Math.abs(amount) <= 1_000_000_000)) {
+    throw badRequest('Enter a whole number of dinars, not zero', 'INVALID_AMOUNT');
+  }
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+  if (reason.length < 3 || reason.length > 300) throw badRequest('A reason is required', 'REASON_REQUIRED');
+  const key = typeof body.idempotencyKey === 'string' ? body.idempotencyKey : '';
+  if (!/^[\w:.-]{8,80}$/.test(key)) throw badRequest('Missing request key', 'INVALID_IDEMPOTENCY_KEY');
+  const merchant = await c.env.DB.prepare('SELECT id FROM community_merchants WHERE id = ?').bind(id).first<{ id: string }>();
+  if (!merchant) throw notFound('Merchant not found');
+  const res = await adjustMerchantBalance(c.env.DB, { merchantId: id, amountIqd: amount, reason, adminId: admin.id, key });
+  if (!res.ok) {
+    if (res.reason === 'IDEMPOTENCY_KEY_REUSED') throw conflict('This key was already used for a different adjustment', 'IDEMPOTENCY_KEY_REUSED');
+    if (res.reason === 'INSUFFICIENT_BALANCE') {
+      throw badRequest('That would take the merchant below zero', 'INSUFFICIENT_BALANCE', { available_iqd: res.availableIqd ?? 0 });
+    }
+    throw badRequest('Enter a whole number of dinars, not zero', 'INVALID_AMOUNT');
+  }
+  return c.json({ success: true, replayed: res.replayed, balance: await merchantBalance(c.env.DB, id) });
+});
+
+/**
+ * THE LEDGER BACKFILL, RE-PROVED ON THE LIVE DATA (migration 0121): per
+ * merchant, the wave-1 balance of the old table beside the lines carried from
+ * it. `mismatches` is empty when the switch-over was exact. Read-only.
+ */
+adminCommunityRoutes.get('/ledger/parity', requireFinancialScope, async (c) => {
+  return c.json({ success: true, ...(await legacyParity(c.env.DB)) });
 });

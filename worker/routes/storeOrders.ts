@@ -28,11 +28,17 @@
  *
  * AND IT IS PREPAID. Every order on this path is paid from the customer's
  * wallet before the merchant ships — there is no cash on delivery and no
- * warehouse pickup, because Levonis holds neither the merchant's stock nor
- * their cash and has nobody at either end to collect. The two halves of that
- * rule are one line each and both are here: `delivery_method_id` is fixed to
- * `'merchant'`, and `payment_method_id` to `'wallet'` with nothing due on
- * delivery. Neither is a client's choice.
+ * Levonis-warehouse pickup, because Levonis holds neither the merchant's stock
+ * nor their cash and has nobody at either end to collect. `payment_method_id`
+ * is fixed to `'wallet'` with nothing due on delivery. `delivery_method_id` is
+ * the MERCHANT's: `'merchant'` (their own delivery) or `'merchant_pickup'`
+ * (collected from the store, when the merchant offers it — W2-A).
+ *
+ * THE DELIVERY IS PRICED FROM THE CUSTOMER'S SAVED ADDRESS (W2-A,
+ * docs/MERCHANT_PLATFORM.md §4.2): address → governorate → the merchant's
+ * profile and per-governorate rules (worker/lib/merchantDelivery.ts, the
+ * resolver in packages/shipping). At the quote and again at place-order;
+ * nothing the client sends is a fee.
  *
  * THE QUOTE AND THE ORDER ARE ONE AGREEMENT (B12). The quote returns a
  * `quote_fingerprint` over everything that costs money; place-order re-prices
@@ -46,7 +52,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, notFound, str, HttpError } from '../lib/http';
+import { requireAuth, badRequest, str, HttpError } from '../lib/http';
 import { newId, sha256Hex } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
@@ -59,14 +65,24 @@ import {
 import { rootDomainFrom } from '../lib/hosts';
 import { announceAfterResponse, orderAnnouncement, orderTopic } from '../lib/adminTopicRouting';
 import { storeById } from '../lib/merchantAuth';
+import { storeSaleLedgerStatements, storeSaleReceivable } from '../lib/merchantLedger';
 import { CART_SELLER_CONFLICT } from '../lib/cartSeller';
+import { LINE_VARIANT_COLUMNS, LINE_VARIANT_JOIN, resolveCatalogLine } from '../lib/catalog/lines';
+import { alertLowStock, type StockMove } from '../lib/catalog/lowStock';
 import {
   isOwnStore,
-  merchantVariantLabel,
   notifyMerchantOfStoreOrder,
   storeOrderPublic,
   storeTakesOrders,
 } from '../lib/storeOrderOps';
+import {
+  checkoutDelivery,
+  checkoutWhere,
+  deliveryFenceStatement,
+  isDeliveryFenceAbort,
+  type CheckoutDelivery,
+  type CheckoutWhere,
+} from '../lib/merchantDelivery';
 
 export const storeOrderRoutes = new Hono<AppContext>();
 storeOrderRoutes.use('*', requireAuth);
@@ -92,9 +108,14 @@ interface PricedLine {
   /**
    * What `order_items.option_snapshot` records: the merchant's own words for
    * a choice VALIDATED against the product (worker/lib/storeOrderOps.ts,
-   * `merchantVariantLabel`) — never the text a client posted (B16).
+   * `merchantVariantLabel`) — never the text a client posted (B16). For a
+   * variant, its values in group order (W2-F).
    */
   option_snapshot: string;
+  /** The variant this line buys (W2-F), or null for a product without variants. */
+  variant_id: string | null;
+  /** The variant's (or product's) SKU, snapshotted on the order line for the merchant. */
+  sku: string;
 }
 
 /**
@@ -145,6 +166,10 @@ interface PricedCart {
   lines: PricedLine[];
   /** Units per product, summed across option/colour lines — what stock is judged against. */
   products: Array<{ product_id: string; qty: number }>;
+  /** Units per VARIANT (W2-F): each variant's own stock is fenced like the product's. */
+  variants: Array<{ variant_id: string; product_id: string; qty: number }>;
+  /** What each stock line stood at when priced, for the low-stock notice after the order. */
+  stockMoves: StockMove[];
   /** Merchandise at the store's own prices, before any coupon. */
   subtotal_iqd: number;
   coupon_code: string;
@@ -161,6 +186,8 @@ interface PricedCart {
    */
   commission: { commission_percent_x100: number; platform_fee_iqd: number; merchant_receivable_iqd: number };
   quote_fingerprint: string;
+  /** How it reaches the customer, priced from their saved address (W2-A, worker/lib/merchantDelivery.ts). */
+  delivery: CheckoutDelivery;
 }
 
 /**
@@ -225,16 +252,17 @@ const refuse = (msg: string, code: string, details?: Record<string, unknown>) =>
  *   · stock judged on the units per PRODUCT, not per line (B5): two colours
  *     of a product with one unit left used to both pass.
  */
-async function priceMerchantCart(c: Context<AppContext>, couponCode = ''): Promise<PricedCart> {
+async function priceMerchantCart(c: Context<AppContext>, couponCode: string, where: CheckoutWhere): Promise<PricedCart> {
   const user = c.get('user')!;
   const db = c.env.DB;
   const { results } = await db.prepare(
     `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.color_id,
             ci.merchant_id AS line_merchant_id, ci.store_id AS line_store_id,
             p.id, p.name, p.images, p.price_iqd, p.stock, p.track_stock, p.lifecycle, p.status,
-            p.options, p.colors, p.store_id AS product_store_id
+            p.options, p.colors, p.store_id AS product_store_id, p.prep_days, p.sku, ${LINE_VARIANT_COLUMNS}
        FROM cart_items ci
        JOIN community_products p ON p.id = ci.community_product_id
+       ${LINE_VARIANT_JOIN}
       WHERE ci.user_id = ? AND ci.seller_type = 'merchant'
       ORDER BY ci.created_at, ci.id`
   ).bind(user.id).all<Record<string, unknown>>();
@@ -265,10 +293,16 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode = ''): Promi
   if (!verdict.ok) throw refuse('This store is not taking orders right now', 'STORE_CLOSED');
 
   const lines: PricedLine[] = [];
-  const perProduct = new Map<string, { qty: number; stock: number; tracked: boolean }>();
+  const perProduct = new Map<string, { qty: number; stock: number; tracked: boolean; name: string; threshold: number | null }>();
+  const perVariant = new Map<
+    string,
+    { product_id: string; qty: number; stock: number; tracked: boolean; name: string; label: string; threshold: number | null }
+  >();
   let subtotal = 0;
+  let productPrepDays = 0;
   for (const r of results) {
     const productId = String(r.id);
+    productPrepDays = Math.max(productPrepDays, Math.trunc(Number(r.prep_days) || 0));
     // Availability is re-checked at checkout, not trusted from when the item
     // was added. A product hidden, archived or moved in between must stop
     // the order rather than create one the merchant cannot fulfil.
@@ -277,18 +311,32 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode = ''): Promi
     }
     const optionId = String(r.option_id ?? '');
     const colorId = String(r.color_id ?? '');
-    const variant = merchantVariantLabel(r.options, r.colors, optionId, colorId);
+    // THE SERVER PRICES THE CHOSEN VARIANT (W2-F, worker/lib/catalog/lines.ts):
+    // its override or the product's price, from the database; a variant that
+    // is gone or inactive, or none on a product that has variants, stops here.
+    const variant = resolveCatalogLine(r);
     if (!variant.ok) {
-      throw refuse(`The ${variant.which} chosen for "${r.name}" is no longer offered`, 'OPTION_UNAVAILABLE', {
+      throw refuse(`The option chosen for "${r.name}" is no longer offered`, 'OPTION_UNAVAILABLE', {
         product_id: productId,
-        which: variant.which,
+        which: variant.which ?? 'option',
       });
     }
     const qty = Math.max(1, Math.trunc(Number(r.qty) || 1));
-    const unit = Math.max(0, Math.trunc(Number(r.price_iqd) || 0));
+    const unit = variant.unit;
+    if (variant.variantId) {
+      const vagg = perVariant.get(variant.variantId) ?? {
+        product_id: productId, qty: 0, stock: variant.stock, tracked: !!Number(r.track_stock),
+        name: String(r.name), label: variant.label, threshold: variant.threshold,
+      };
+      vagg.qty += qty;
+      perVariant.set(variant.variantId, vagg);
+    }
     const line = unit * qty;
     subtotal += line;
-    const agg = perProduct.get(productId) ?? { qty: 0, stock: Number(r.stock) || 0, tracked: !!Number(r.track_stock) };
+    const agg = perProduct.get(productId) ?? {
+      qty: 0, stock: Number(r.stock) || 0, tracked: !!Number(r.track_stock), name: String(r.name),
+      threshold: r.p_threshold === null || r.p_threshold === undefined ? null : Number(r.p_threshold),
+    };
     agg.qty += qty;
     perProduct.set(productId, agg);
     lines.push({
@@ -301,9 +349,20 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode = ''): Promi
       line_total_iqd: line,
       option_id: optionId,
       color_id: colorId,
-      variant: merchantVariant(r.options, r.colors, optionId, colorId),
+      variant: variant.variantId ? variant.label : merchantVariant(r.options, r.colors, optionId, colorId),
       option_snapshot: variant.label,
+      variant_id: variant.variantId,
+      sku: variant.sku,
     });
+  }
+  for (const [variantId, agg] of perVariant) {
+    if (agg.tracked && agg.stock < agg.qty) {
+      throw refuse('There is not enough stock for this order', 'OUT_OF_STOCK', {
+        product_id: agg.product_id,
+        variant_id: variantId,
+        available: Math.max(0, agg.stock),
+      });
+    }
   }
   for (const [productId, agg] of perProduct) {
     if (agg.tracked && agg.stock < agg.qty) {
@@ -318,16 +377,30 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode = ''): Promi
   const discount = coupon?.discount ?? 0;
   const merchandise = subtotal - discount;
 
-  // The merchant's own delivery fee, from their store settings. Absent means
-  // free — never an invented number. THE FREE-OVER THRESHOLD IS JUDGED ON
-  // WHAT THE CUSTOMER PAYS FOR THE GOODS, after the coupon (B22): a 50% code
-  // on a 14,000 cart used to earn the 14,000 free-delivery threshold for a
-  // customer paying 7,000.
-  const settings = safeParse<Record<string, unknown>>(ctx.store.delivery_settings, {});
-  const rawFee = Number(settings.fee_iqd);
-  const freeOver = Number(settings.free_over_iqd);
-  let delivery = Number.isFinite(rawFee) && rawFee > 0 ? Math.floor(rawFee) : 0;
-  if (Number.isFinite(freeOver) && freeOver > 0 && merchandise >= freeOver) delivery = 0;
+  // THE MERCHANT'S OWN DELIVERY, PRICED FROM THE CUSTOMER'S SAVED ADDRESS
+  // (W2-A, docs/MERCHANT_PLATFORM.md §4.2): address → governorate → the
+  // merchant's rules (packages/shipping/src/merchantDelivery.ts). Nothing the
+  // client sends is a fee. The free-over threshold is judged on what the
+  // customer pays for the GOODS, after the coupon (B22). An address with no
+  // governorate, a governorate the store does not serve, or no address at all
+  // is a 409 carrying the cart's summary — so the page can keep showing what
+  // is being bought while it asks for a different address.
+  const resolved = await checkoutDelivery(db, ctx.store, where, merchandise, productPrepDays);
+  if (!resolved.ok) {
+    throw refuse(resolved.message, resolved.code, {
+      ...resolved.details,
+      preview: {
+        store_id: storeId,
+        store_name: ctx.store.name,
+        store_slug: ctx.store.slug,
+        lines: lines.map(publicLine),
+        subtotal_iqd: subtotal,
+        coupon_code: coupon?.code ?? '',
+        discount_iqd: discount,
+      },
+    });
+  }
+  const delivery = resolved.resolution.fee_iqd;
 
   const total = merchandise + delivery;
   // Commission on the goods only — never on delivery, which is the merchant's
@@ -342,13 +415,16 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode = ''): Promi
   const fingerprint = (
     await sha256Hex(
       JSON.stringify({
-        v: 1,
+        // v2 (W2-A): the delivery half names the fulfilment, the address, its
+        // governorate, the rule that priced it, the fee and the merchant's
+        // profile version — an edit to any of them is a new agreement.
+        v: 2,
         store: storeId,
         lines: lines.map((l) => [l.cart_item_id, l.product_id, l.qty, l.unit_price_iqd, l.option_id, l.color_id]),
         subtotal,
         coupon: coupon?.code ?? '',
         discount,
-        delivery,
+        delivery: resolved.fingerprint,
         total,
       })
     )
@@ -361,6 +437,15 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode = ''): Promi
     store_slug: ctx.store.slug,
     lines,
     products: [...perProduct].map(([product_id, agg]) => ({ product_id, qty: agg.qty })),
+    variants: [...perVariant].map(([variant_id, agg]) => ({ variant_id, product_id: agg.product_id, qty: agg.qty })),
+    stockMoves: [
+      ...[...perVariant.values()].map((a) => ({
+        productId: a.product_id, productName: a.name, variantLabel: a.label, before: a.stock, after: a.stock - a.qty, threshold: a.threshold,
+      })),
+      ...[...perProduct]
+        .filter(([pid]) => ![...perVariant.values()].some((v) => v.product_id === pid))
+        .map(([productId, a]) => ({ productId, productName: a.name, before: a.stock, after: a.stock - a.qty, threshold: a.threshold })),
+    ].filter((m) => m.threshold !== null),
     subtotal_iqd: subtotal,
     coupon_code: coupon?.code ?? '',
     coupon_id: coupon?.id ?? null,
@@ -370,6 +455,21 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode = ''): Promi
     total_iqd: total,
     commission,
     quote_fingerprint: fingerprint,
+    delivery: resolved,
+  };
+}
+
+/** A priced line as the customer's quote shows it. */
+function publicLine(l: PricedLine) {
+  return {
+    cart_item_id: l.cart_item_id,
+    product_id: l.product_id,
+    name: l.name,
+    image: l.image,
+    qty: l.qty,
+    unit_price_iqd: l.unit_price_iqd,
+    line_total_iqd: l.line_total_iqd,
+    variant: l.option_snapshot,
   };
 }
 
@@ -411,20 +511,13 @@ async function publicQuote(c: Context<AppContext>, cart: PricedCart, checkoutKey
     store_id: cart.store_id,
     store_name: cart.store_name,
     store_slug: cart.store_slug,
-    lines: cart.lines.map((l) => ({
-      cart_item_id: l.cart_item_id,
-      product_id: l.product_id,
-      name: l.name,
-      image: l.image,
-      qty: l.qty,
-      unit_price_iqd: l.unit_price_iqd,
-      line_total_iqd: l.line_total_iqd,
-      variant: l.option_snapshot,
-    })),
+    lines: cart.lines.map(publicLine),
     subtotal_iqd: cart.subtotal_iqd,
     coupon_code: cart.coupon_code,
     discount_iqd: cart.discount_iqd,
     delivery_iqd: cart.delivery_iqd,
+    /** The delivery breakdown (W2-A): how, where, which rule, the fee, preparation — never a figure the client sent. */
+    delivery: cart.delivery.public,
     total_iqd: cart.total_iqd,
     /** What place-order charges if nothing moves — the figure the button shows. */
     expected_total_iqd: cart.total_iqd,
@@ -458,7 +551,11 @@ storeOrderRoutes.post('/quote', async (c) => {
   // .tsx) — generous, but no longer unbounded.
   await rateLimit(c, 'store-quote', 120, 300);
   const body = await c.req.json().catch(() => ({}));
-  const cart = await priceMerchantCart(c, typeof body.couponCode === 'string' ? body.couponCode : '');
+  // `{addressId, fulfilment: delivery|pickup, couponCode?}` — the address is
+  // read as the customer's own; without one the quote prices their default
+  // address (worker/lib/merchantDelivery.ts `checkoutWhere`).
+  const where = await checkoutWhere(c.env.DB, c.get('user')!.id, body, 'quote');
+  const cart = await priceMerchantCart(c, typeof body.couponCode === 'string' ? body.couponCode : '', where);
   // Optional: the attempt key the checkout will place with (review F6). Only
   // a well-formed key is read — anything else is simply no key.
   const key = typeof body.idempotencyKey === 'string' && /^[\w:.-]{8,80}$/.test(body.idempotencyKey)
@@ -514,9 +611,57 @@ async function stockRefusal(db: D1Database, cart: PricedCart): Promise<HttpError
       });
     }
   }
+  for (const need of cart.variants) {
+    const v = await db.prepare(
+      `SELECT v.stock, v.active, p.track_stock FROM community_product_variants v
+         JOIN community_products p ON p.id = v.product_id WHERE v.id = ? AND v.product_id = ?`
+    ).bind(need.variant_id, need.product_id).first<{ stock: number; active: number; track_stock: number }>();
+    if (!v || Number(v.active) !== 1) {
+      return refuse('An option in your cart is no longer offered', 'OPTION_UNAVAILABLE', { product_id: need.product_id, which: 'option' });
+    }
+    if (Number(v.track_stock) && Number(v.stock) < need.qty) {
+      return refuse('There is not enough stock for this order', 'OUT_OF_STOCK', {
+        product_id: need.product_id,
+        variant_id: need.variant_id,
+        available: Math.max(0, Number(v.stock) || 0),
+      });
+    }
+  }
   // Nothing is short any more — another order was cancelled in between. The
   // honest answer is still "try again", and the checkout re-quotes.
   return refuse('The stock changed while you were checking out — please try again', 'OUT_OF_STOCK');
+}
+
+/**
+ * A placed order answered to its own key: the order when the request names
+ * the fingerprint it was placed with (or none, or the order predates
+ * fingerprints), a spent key when it names ANOTHER agreement (W2-A — the key
+ * is bound to what was agreed). Only the customer's own order is ever read.
+ */
+function replayOrKeyReused(c: Context<AppContext>, order: Record<string, unknown>, confirmed: string) {
+  const bound = typeof order.quote_fingerprint === 'string' && order.quote_fingerprint ? order.quote_fingerprint : '';
+  if (bound && confirmed && bound !== confirmed) {
+    throw refuse('This checkout key was already used for another order. Start the checkout again.', 'IDEMPOTENCY_KEY_REUSED');
+  }
+  return c.json({ success: true, order: storeOrderPublic(order), replay: true });
+}
+
+/**
+ * The merchant's delivery moved between the price check and the commit (the
+ * batch's delivery fence aborted): the same answer an earlier edit gets — the
+ * fresh quote to confirm — or the delivery refusal when the governorate is no
+ * longer served at all.
+ */
+async function deliveryMovedRefusal(c: Context<AppContext>, couponCode: string, where: CheckoutWhere): Promise<HttpError> {
+  try {
+    const fresh = await priceMerchantCart(c, couponCode, where);
+    return refuse('The delivery changed since you saw it. Review the new total and confirm again.', 'QUOTE_CHANGED', {
+      quote: await publicQuote(c, fresh),
+    });
+  } catch (e) {
+    if (e instanceof HttpError) return e;
+    throw e;
+  }
 }
 
 /**
@@ -532,28 +677,36 @@ storeOrderRoutes.post('/', async (c) => {
   const db = c.env.DB;
   const body = await c.req.json().catch(() => ({}));
   const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80 });
+  const confirmed = typeof body.quoteFingerprint === 'string' ? body.quoteFingerprint : '';
 
   // Per user, both columns (0064): `client_idempotency_key` is where this
   // route now stores the key and is unique per user; `idempotency_key` is the
   // legacy globally-unique column, still holding keys written before the
   // migration, so a retry in flight across the deploy still replays.
+  //
+  // A REPLAY IS THE SAME AGREEMENT (W2-A). It is answered from the order as it
+  // was placed — later edits to prices or delivery change nothing about it —
+  // but only for the fingerprint it was placed with: the same key sent with a
+  // different agreement is a spent key, never that order returned as if it
+  // were the new one. Orders placed before 0120 carry no fingerprint and
+  // replay as they always did.
   const replay = await placedOrder(c, idempotencyKey);
-  if (replay) return c.json({ success: true, order: storeOrderPublic(replay), replay: true });
+  if (replay) return replayOrKeyReused(c, replay, confirmed);
 
-  const addressId = str(body.addressId, 'addressId', { min: 1, max: 60 });
-  const address = await db.prepare('SELECT * FROM addresses WHERE id = ? AND user_id = ?')
-    .bind(addressId, user.id)
-    .first<Record<string, unknown>>();
-  if (!address) throw notFound('Address not found');
+  // The customer's OWN saved address, and how they want the goods: never a
+  // governorate or a fee from the body (worker/lib/merchantDelivery.ts).
+  const where = await checkoutWhere(db, user.id, body, 'place');
+  const address = where.address!;
 
   // PREPAID ONLY — the rule for every merchant sale in Levo community.
   //
   // A merchant's goods are shipped by the merchant, and Levonis holds neither
   // the stock nor the cash: there is no driver of ours to collect at the door
-  // and no counter of ours to collect from, so cash on delivery and warehouse
-  // pickup are not options that happen to be turned off — they do not exist
-  // on this path. Delivery is already fixed to the merchant's own
-  // (`delivery_method_id = 'merchant'`, below), and payment is the wallet.
+  // and no counter of ours to collect from, so cash on delivery and pickup
+  // from a Levonis warehouse are not options that happen to be turned off —
+  // they do not exist on this path. Delivery is the merchant's own (their
+  // delivery, or collection from their store — `delivery_method_id`, below),
+  // and payment is the wallet, even for a pickup.
   //
   // This route USED TO accept `payWithWallet: false` and write the order as
   // `cod` with the full total due on delivery, which is the order nobody
@@ -566,12 +719,14 @@ storeOrderRoutes.post('/', async (c) => {
       'STORE_PREPAID_ONLY'
     );
   }
-  const cart = await priceMerchantCart(c, typeof body.couponCode === 'string' ? body.couponCode : '');
+  const cart = await priceMerchantCart(c, typeof body.couponCode === 'string' ? body.couponCode : '', where);
 
   // THE CUSTOMER AGREED TO A QUOTE, NOT TO WHATEVER THE DATABASE SAYS NOW.
   // No fingerprint is no agreement: an old client that never asked for one
   // is answered exactly like a stale one — here is the quote, confirm it.
-  const confirmed = typeof body.quoteFingerprint === 'string' ? body.quoteFingerprint : '';
+  // The fingerprint names the address, its governorate, the delivery rule, the
+  // fee and the merchant's profile version (W2-A): a changed address, or a
+  // merchant editing their delivery mid-checkout, is a new agreement.
   if (confirmed !== cart.quote_fingerprint) {
     throw refuse('The price changed since you saw it. Review the new total and confirm again.', 'QUOTE_CHANGED', {
       quote: await publicQuote(c, cart),
@@ -679,11 +834,17 @@ storeOrderRoutes.post('/', async (c) => {
           client_idempotency_key, created_at, updated_at,
           seller_type, merchant_id, store_id, origin,
           commission_percent_x100, platform_fee_iqd, merchant_receivable_iqd,
-          stage, stage_changed_at, coupon_code, coupon_discount_iqd)
-       VALUES (?,?, 'pending', ?, 'merchant', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-               'merchant', ?, ?, 'store_product', ?, ?, ?, 'received', ?, ?, ?)`
+          stage, stage_changed_at, coupon_code, coupon_discount_iqd,
+          delivery_governorate, delivery_rule, delivery_prep_days, quote_fingerprint)
+       VALUES (?,?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+               'merchant', ?, ?, 'store_product', ?, ?, ?, 'received', ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
-      orderId, user.id, JSON.stringify(address), JSON.stringify({ by: 'merchant', store: cart.store_name }),
+      orderId, user.id, JSON.stringify(address),
+      // The merchant's own delivery, or collection from the store — and the
+      // WHOLE applied rule with the profile version it came from, so a later
+      // edit never rewrites what this order was charged under (W2-A).
+      cart.delivery.method_id,
+      JSON.stringify({ by: 'merchant', store: cart.store_name, ...cart.delivery.snapshot }),
       // Always 'wallet', and nothing is ever due at the door: see the
       // prepaid-only rule above.
       'wallet',
@@ -694,9 +855,15 @@ storeOrderRoutes.post('/', async (c) => {
       cart.merchant_id, cart.store_id,
       cart.commission.commission_percent_x100, cart.commission.platform_fee_iqd,
       cart.commission.merchant_receivable_iqd,
-      ts, cart.coupon_code, cart.discount_iqd
+      ts, cart.coupon_code, cart.discount_iqd,
+      cart.delivery.resolution.governorate, cart.delivery.resolution.rule, cart.delivery.prep_days, cart.quote_fingerprint
     ),
   ];
+  // The merchant's delivery profile must still be the version this order was
+  // priced at when the batch commits (worker/lib/merchantDelivery.ts).
+  if (cart.delivery.fence_version !== null) {
+    stmts.push(deliveryFenceStatement(db, orderId, cart.store_id, cart.delivery.fence_version));
+  }
 
   /**
    * THE FENCES ABORT THE ORDER — they used to be no-ops (B5, B6).
@@ -743,6 +910,21 @@ storeOrderRoutes.post('/', async (c) => {
       ).bind(orderId, need.product_id, cart.store_id, need.qty)
     );
   }
+  // THE VARIANT'S OWN STOCK IS FENCED THE SAME WAY (W2-F): the chosen variant
+  // is still this product's, still active, and holds the units — or NULL into
+  // `orders.status` aborts the whole batch (409 OUT_OF_STOCK, re-read below).
+  for (const need of cart.variants) {
+    stmts.push(
+      db.prepare(
+        `UPDATE orders
+            SET status = CASE WHEN EXISTS (
+                  SELECT 1 FROM community_product_variants v JOIN community_products p ON p.id = v.product_id
+                   WHERE v.id = ?2 AND v.product_id = ?3 AND v.active = 1 AND (p.track_stock = 0 OR v.stock >= ?4)
+                ) THEN status ELSE NULL END
+          WHERE id = ?1`
+      ).bind(orderId, need.variant_id, need.product_id, need.qty)
+    );
+  }
   if (cart.coupon_id) {
     stmts.push(
       db.prepare(
@@ -765,12 +947,12 @@ storeOrderRoutes.post('/', async (c) => {
       db.prepare(
         `INSERT INTO order_items
            (id, order_id, product_id, community_product_id, seller_type, name_snapshot, image_snapshot,
-            option_snapshot, qty, unit_price_iqd, line_total_iqd)
-         VALUES (?,?,NULL,?, 'merchant', ?,?,?,?,?,?)`
+            option_snapshot, qty, unit_price_iqd, line_total_iqd, variant_id, sku_snapshot)
+         VALUES (?,?,NULL,?, 'merchant', ?,?,?,?,?,?,?,?)`
       ).bind(
         newId('oi'), orderId, l.product_id, l.name, l.image,
         l.option_snapshot,
-        l.qty, l.unit_price_iqd, l.line_total_iqd
+        l.qty, l.unit_price_iqd, l.line_total_iqd, l.variant_id, l.sku
       )
     );
   }
@@ -784,25 +966,36 @@ storeOrderRoutes.post('/', async (c) => {
       ).bind(need.qty, ts, need.product_id)
     );
   }
+  // And each variant's units (W2-F) — a variant product's own `stock` is the
+  // sum of its variants, which 0126's trigger keeps true after both writes.
+  for (const need of cart.variants) {
+    stmts.push(
+      db.prepare(
+        `UPDATE community_product_variants SET stock = stock - ?1, updated_at = ?2 WHERE id = ?3 AND product_id = ?4`
+      ).bind(need.qty, ts, need.variant_id, need.product_id)
+    );
+  }
 
-  // The merchant's share — goods less commission, PLUS their delivery fee —
+  // The merchant's share as the MERCHANT LEDGER's own lines (worker/lib/
+  // merchantLedger.ts, stream W2-B): the goods, the platform's commission as
+  // its own line, and the merchant's delivery fee as its own line — all
   // PENDING until the customer confirms receipt or three days pass after
-  // delivery (worker/lib/storeOrderOps.ts). Visible as "coming", not spendable.
-  stmts.push(
-    db.prepare(
-      `INSERT INTO merchant_payout_ledger
-         (id, merchant_id, kind, amount_iqd, state, order_id, note, idempotency_key)
-       VALUES (?,?,'sale_credit',?,'pending',?,?,?)`
-    // `merchant_payout_ledger.idempotency_key` is GLOBALLY unique, so binding
-    // the client's key here reproduced the very defect 0064 fixes — and in a
-    // batch with no catch, so it surfaced as a bare 500. The order id is
-    // server-minted and already unique per sale.
-    ).bind(
-      newId('pay'), cart.merchant_id, cart.commission.merchant_receivable_iqd, orderId,
-      cart.delivery_iqd > 0 ? 'store sale (incl. delivery)' : 'store sale',
-      `sale:${orderId}`
-    )
-  );
+  // delivery (worker/lib/storeOrderOps.ts). Keys are `sale:<order>:<part>`,
+  // server-minted. The three lines add up to the receivable snapshotted on the
+  // order, or this is a programming error and nothing is written.
+  {
+    const sale = {
+      goodsIqd: cart.merchandise_iqd,
+      commissionIqd: cart.commission.platform_fee_iqd,
+      deliveryIqd: cart.delivery_iqd,
+    };
+    if (storeSaleReceivable(sale) !== cart.commission.merchant_receivable_iqd) {
+      throw new Error(`store order ${orderId}: the ledger lines do not add up to the receivable`);
+    }
+    stmts.push(
+      ...storeSaleLedgerStatements(db, { orderId, merchantId: cart.merchant_id, storeId: cart.store_id, ...sale, ts })
+    );
+  }
   // ONLY THE LINES THIS ORDER PRICED, at the quantity it priced them (B21).
   // Checkout used to empty the whole cart — a Levonis line it never priced
   // included — and a quantity raised in another tab after the quote vanished
@@ -861,7 +1054,7 @@ storeOrderRoutes.post('/', async (c) => {
     // rather than reporting a failure for work that succeeded.
     if (msg.includes('UNIQUE') && (msg.includes('orders.idempotency_key') || msg.includes('orders.client_idempotency_key'))) {
       const again = await placedOrder(c, idempotencyKey);
-      if (again) return c.json({ success: true, order: storeOrderPublic(again), replay: true });
+      if (again) return replayOrKeyReused(c, again, confirmed);
       throw refuse('This checkout key was already used. Start the checkout again.', 'IDEMPOTENCY_KEY_REUSED');
     }
     // A REFUSAL THE DATABASE DECIDED is final for this attempt: the last units
@@ -881,7 +1074,9 @@ storeOrderRoutes.post('/', async (c) => {
               'Your cart changed while you were checking out — it may have been ordered from another tab. Check your orders.',
               'CART_CHANGED'
             )
-          : null;
+          : isDeliveryFenceAbort(msg)
+            ? await deliveryMovedRefusal(c, typeof body.couponCode === 'string' ? body.couponCode : '', where)
+            : null;
     if (!refusal) throw e;
     // A failed release is not the customer's problem and does not change the
     // answer: the orphan sweep returns the reservation after its TTL.
@@ -895,6 +1090,10 @@ storeOrderRoutes.post('/', async (c) => {
     store: cart.store_id,
     total: cart.total_iqd,
     delivery: cart.delivery_iqd,
+    fulfilment: cart.delivery.resolution.fulfilment,
+    governorate: cart.delivery.resolution.governorate,
+    delivery_rule: cart.delivery.resolution.rule,
+    delivery_version: cart.delivery.resolution.profile_version,
     fee: cart.commission.platform_fee_iqd,
     receivable: cart.commission.merchant_receivable_iqd,
   });
@@ -952,7 +1151,7 @@ storeOrderRoutes.post('/', async (c) => {
 
   // THE STORE HEARS ABOUT ITS OWN SALE (B23) — after the response, never
   // holding it, and never able to fail it.
-  const tell = notifyMerchantOfStoreOrder(db, {
+  const tell = notifyMerchantOfStoreOrder(c.env, {
     merchantId: cart.merchant_id,
     orderId,
     event: 'new',
@@ -962,6 +1161,16 @@ storeOrderRoutes.post('/', async (c) => {
     c.executionCtx.waitUntil(tell);
   } catch {
     await tell;
+  }
+  // «المخزون ينفد» — a product or variant this sale took to (or under) the
+  // merchant's own line is told once per order (W2-F, worker/lib/catalog/lowStock.ts).
+  if (cart.stockMoves.length) {
+    const low = alertLowStock(c.env, cart.merchant_id, cart.stockMoves, `order:${orderId}`);
+    try {
+      c.executionCtx.waitUntil(low);
+    } catch {
+      await low;
+    }
   }
 
   const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first<Record<string, unknown>>();
