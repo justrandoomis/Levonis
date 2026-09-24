@@ -1,0 +1,34 @@
+# READ-ONLY. Constant SELECTs only — no table is read or written.
+#
+# Migration 0121 was refused by the live D1 with «too many terms in compound
+# SELECT»: D1 caps SQLITE_LIMIT_COMPOUND_SELECT far below SQLite's default of
+# 500, and the local test engine does not. This measures the real cap, for
+# both a UNION ALL chain and a multi-row VALUES used as a table, so migrations
+# and runtime SQL can be held to it by a test.
+name: 58 - Probe D1 compound SELECT limit (read-only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: UNION ALL chains and VALUES tables of N terms
+        run: |
+          for n in 2 3 4 5 6 7 8 10 12 16 20 50; do
+            u="SELECT 1 AS x"; v="(1)"
+            for i in $(seq 2 $n); do u="$u UNION ALL SELECT $i"; v="$v,($i)"; done
+            if npx wrangler d1 execute levonis-db-staging --remote --env staging --json --command "SELECT COUNT(*) AS n FROM ($u)" >/dev/null 2>/tmp/e; then ru=ok; else ru="FAIL $(grep -o 'too many terms[^[]*' /tmp/e | head -1)"; fi
+            if npx wrangler d1 execute levonis-db-staging --remote --env staging --json --command "WITH t(x) AS (VALUES $v) SELECT COUNT(*) AS n FROM t" >/dev/null 2>/tmp/e; then rv=ok; else rv="FAIL $(grep -o 'too many terms[^[]*' /tmp/e | head -1)"; fi
+            echo "terms=$n  union_all=$ru  values_table=$rv"
+          done
