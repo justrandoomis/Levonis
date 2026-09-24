@@ -66,7 +66,7 @@ function words(loc: Loc) {
   };
 }
 
-export function CollectionsManager({ canSell }: { canSell: boolean }) {
+export function CollectionsManager({ canSell, autoFocusCreate = false }: { canSell: boolean; /** The workspace's «new section» door (W3-A): start in the name field. */ autoFocusCreate?: boolean }) {
   const { loc, lang } = useLanguage();
   const s = catalogStrings(loc);
   const w = words(loc);
@@ -160,7 +160,7 @@ export function CollectionsManager({ canSell }: { canSell: boolean }) {
         }}
       >
         <Field label={w.newName} className="min-w-0 flex-1">
-          <Input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} disabled={!canSell} />
+          <Input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} disabled={!canSell} autoFocus={autoFocusCreate && canSell} />
         </Field>
         <Button type="submit" variant="primary" icon={<Plus className="h-4 w-4" />} loading={busy === 'new-manual'} disabled={!canSell || !name.trim()}>
           {w.add}

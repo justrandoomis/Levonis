@@ -539,6 +539,19 @@ contain someone they have traded with. There is no user search.
   `PUT /draft` (`{layout, version}`; `409 DRAFT_CHANGED`) · `POST /publish` ·
   `GET /revisions` · `GET /revisions/:revision` · `POST /restore/:revision`
   (`publish: true` to make it live) · `GET /preview` — §10
+- **the workspace** (worker/routes/merchantWorkspace.ts, W3-A): `GET /attention` —
+  every count the Command Center and the workspace badges show (orders waiting
+  on the merchant by stage, custom orders to start / in progress, unread
+  conversations, unread notices, open matching requests with no offer, low /
+  sold-out published products, new and unanswered reviews, available and
+  pending money, payouts in flight, coupons ending within 7 days, the store's
+  problems: suspended / restricted / paused / PLUS lapsed / unpublished page
+  draft), each with its workspace link; a source that cannot answer is ABSENT,
+  never 0, and the requests count is absent while Levo Community is shut ·
+  `GET /search?q=` (2–60 characters; `400 SEARCH_QUERY_TOO_SHORT` /
+  `SEARCH_QUERY_TOO_LONG`) — orders by number, products by name / Arabic name /
+  SKU, customers who bought here by name or phone (matched, never returned),
+  5 of each. Both owner-scoped in SQL, rate-limited (120 / 60 per minute).
 
 ### `/api/storefront/*` — public
 `GET /resolve` · `GET /:slug` · `GET /:slug/sections` · `GET /:slug/services` ·

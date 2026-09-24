@@ -60,8 +60,10 @@ test('the screen computes no money, asks no native dialog, and is mounted lazily
     assert.doesNotMatch(code, /window\.(confirm|alert|prompt)|\balert\(/, f);
     assert.doesNotMatch(code, /\.reduce\(/, `${f} sums nothing itself`);
   }
+  // Since W3-A the workspace mounts each screen lazily from ONE table (shell/sections.tsx).
+  const sections = readFileSync(join(ROOT, 'src/components/merchant/shell/sections.tsx'), 'utf8');
+  assert.match(sections, /money: section\(\s*\(\) => import\('\.\.\/finance\/MerchantFinance'\)/);
   const page = readFileSync(join(ROOT, 'src/pages/MerchantDashboardPage.tsx'), 'utf8');
-  assert.match(page, /lazy\(\(\) => import\('\.\.\/components\/merchant\/finance\/MerchantFinance'\)\)/);
   assert.doesNotMatch(page, /function MoneyTab/);
   const admin = readFileSync(join(ROOT, 'src/components/adminCommunity/AdminCommunity.tsx'), 'utf8');
   assert.match(admin, /<PayoutQueue t=\{t\} \/>/);

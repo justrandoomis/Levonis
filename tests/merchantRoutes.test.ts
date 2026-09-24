@@ -61,6 +61,10 @@ test('an id is a plain token: a builder never produces, and the parser never acc
   assert.equal(merchantHref.order(''), '/merchant/orders');
   assert.equal(parseMerchantPath('/merchant/orders/a/b'), null);
   assert.equal(parseMerchantPath('/merchant/orders/%2e%2e%2fadmin'), null);
+  assert.equal(parseMerchantPath('/merchant/orders/%2e%2e'), null, 'dots alone are a path segment, not an id');
+  assert.equal(parseMerchantPath('/merchant/orders/..'), null);
+  assert.equal(merchantHref.order('..'), '/merchant/orders');
+  assert.deepEqual(parseMerchantPath('/merchant/orders/ORD.1'), { section: 'orders', id: 'ORD.1' }, 'a dot inside an id is fine');
   assert.equal(parseMerchantPath('/merchant/money/123'), null, 'a section without objects takes no id');
   assert.equal(parseMerchantPath('/merchant/unknown'), null);
   assert.equal(parseMerchantPath('/merchantx'), null);
@@ -77,13 +81,13 @@ test('hostPath re-bases a stored link on a store host and leaves everything else
   assert.equal(hostPath('/merchantx', true), '/merchantx');
 });
 
-test('the SPA uses the same module, and every section lands on a tab of today\'s dashboard (no dead link)', () => {
+test('the SPA uses the same module, and every section lands on a screen of the workspace (no dead link)', () => {
   const reexport = readFileSync(join(ROOT, 'src/lib/merchantRoutes.ts'), 'utf8');
   assert.match(reexport, /export \* from '\.\.\/\.\.\/packages\/contracts\/src\/merchantRoutes'/);
-  const page = readFileSync(join(ROOT, 'src/pages/MerchantDashboardPage.tsx'), 'utf8');
-  const map = /const SECTION_TAB: Record<MerchantSection, Tab> = \{([\s\S]*?)\};/.exec(page)?.[1] ?? '';
+  // W3-A: the URL→tab adapter became the workspace's router; every section is a lazy screen.
+  const screens = readFileSync(join(ROOT, 'src/components/merchant/shell/sections.tsx'), 'utf8');
   for (const section of Object.keys(SECTION_PATHS)) {
-    assert.match(map, new RegExp(`\\b${section}: '`), `section ${section} has no landing tab`);
+    assert.match(screens, new RegExp(`\\n  ${section}: (lazy|section)\\(`), `section ${section} has no screen`);
   }
   const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8');
   assert.match(app, /path="\/merchant\/\*"/, 'the apex serves the tree');

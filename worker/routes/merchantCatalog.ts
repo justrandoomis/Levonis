@@ -131,6 +131,18 @@ const SORTS: Record<string, { expr: string; dir: 'ASC' | 'DESC' }> = {
   name: { expr: 'p.name', dir: 'ASC' },
 };
 
+/**
+ * «ينفد» and «نفد» as the list filters read them (`?stock=low|out`), over a
+ * product row aliased `p`. Exported so the workspace's «what needs me now»
+ * (worker/routes/merchantWorkspace.ts) counts exactly what this list then
+ * shows when its link is followed — one predicate, not two that drift.
+ */
+export const LOW_STOCK_SQL = `p.track_stock = 1 AND (
+      (p.stock > 0 AND p.stock <= COALESCE(p.low_stock_threshold, 5))
+      OR EXISTS (SELECT 1 FROM community_product_variants v WHERE v.product_id = p.id AND v.active = 1 AND v.stock > 0
+                  AND v.stock <= COALESCE(v.low_stock_threshold, p.low_stock_threshold, 5)))`;
+export const OUT_OF_STOCK_SQL = '(p.track_stock = 1 AND p.stock <= 0)';
+
 /** The WHERE clause of the management list, from a whitelist of filters; every value bound. */
 function listFilters(c: Context<AppContext>, ctx: StoreContext): { where: string[]; binds: unknown[] } {
   const q = str(c.req.query('q') ?? '', 'q', { min: 0, max: 120, required: false });
@@ -162,11 +174,8 @@ function listFilters(c: Context<AppContext>, ctx: StoreContext): { where: string
   }
   if (stock === 'in') where.push('(p.track_stock = 0 OR p.stock > 0)');
   else if (stock === 'low') {
-    where.push(`p.track_stock = 1 AND (
-      (p.stock > 0 AND p.stock <= COALESCE(p.low_stock_threshold, 5))
-      OR EXISTS (SELECT 1 FROM community_product_variants v WHERE v.product_id = p.id AND v.active = 1 AND v.stock > 0
-                  AND v.stock <= COALESCE(v.low_stock_threshold, p.low_stock_threshold, 5)))`);
-  } else if (stock === 'out') where.push('(p.track_stock = 1 AND p.stock <= 0)');
+    where.push(LOW_STOCK_SQL);
+  } else if (stock === 'out') where.push(OUT_OF_STOCK_SQL);
   else if (stock === 'untracked') where.push('p.track_stock = 0');
   if (category) {
     where.push('p.category = ?');

@@ -8,7 +8,7 @@
  */
 
 import { lazy, Suspense, useState } from 'react';
-import { Check, Loader2, Globe, AlertTriangle, ArrowUp, ArrowDown, Trash2, Eye, EyeOff, Plus } from 'lucide-react';
+import { Check, Loader2, Globe, AlertTriangle, ArrowUp, ArrowDown, Trash2, Eye, EyeOff, Plus, Truck, ChevronRight } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { ApiError } from '../../../lib/api';
 import { merchantApi, slugMessage, type MerchantMe, type SlugRejection, type ProfileWidget } from '../../../lib/merchant';
@@ -18,6 +18,9 @@ import { WIDGET_ICONS, WidgetIcon } from '../profileIcons';
 import { Btn, Card, Chip, ChipListEditor, Input, Notice, TextArea, Toggle } from './ui';
 import ShareStore from '../share/ShareStore';
 import { Skeleton } from '../../ui/Skeleton';
+import { useConfirm } from '../../ui/ConfirmDialog';
+import { merchantRefusal } from '../shell/refusal';
+import { Link } from 'react-router-dom';
 
 /** Delivery by governorate (W2-A): its own editor, its own save, its own chunk. */
 const DeliverySettingsEditor = lazy(() => import('../delivery/DeliverySettingsEditor'));
@@ -69,13 +72,26 @@ function settingsRefusal(e: unknown, loc: (ar: string, en: string, ckb?: string)
     case 'GOVERNORATE_INVALID':
       return loc('اختر المحافظة من القائمة.', 'Choose a governorate from the list.'); // OWNER: Sorani to be written by hand.
     case 'DELIVERY_NO_COVERAGE':
-      return loc('لا يُفتح المتجر قبل أن توصل إلى محافظة واحدة على الأقل أو تفعّل الاستلام من المتجر — من «التوصيل حسب المحافظة» أدناه.', 'The store cannot open until it delivers to at least one governorate or offers pickup — see «Delivery by governorate» below.'); // OWNER: Sorani to be written by hand.
+      return loc('لا يُفتح المتجر قبل أن توصل إلى محافظة واحدة على الأقل أو تفعّل الاستلام من المتجر — من «التوصيل حسب المحافظة».', 'The store cannot open until it delivers to at least one governorate or offers pickup — see «Delivery by governorate».'); // OWNER: Sorani to be written by hand.
     default:
       return loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت');
   }
 }
 
-export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () => void }) {
+export function StoreSettingsTab({
+  me,
+  onSaved,
+  deliveryHref,
+}: {
+  me: MerchantMe;
+  onSaved: () => void;
+  /**
+   * The workspace's own delivery screen (`/merchant/store/delivery`, W3-A).
+   * Given, this screen links to it instead of embedding a second copy of the
+   * same editor; absent, the editor is embedded as before.
+   */
+  deliveryHref?: string;
+}) {
   const { loc, lang } = useLanguage();
   const store = me.store!;
 
@@ -297,17 +313,30 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
       {/* DELIVERY BY GOVERNORATE (W2-A) — where the flat fee used to be, now
           its own editor with its own save (the workspace mounts the same
           component at /store/delivery). */}
-      <Suspense
-        fallback={
-          <div className="lv-surface p-4 space-y-2" role="status" aria-label={loc('جارٍ التحميل…', 'Loading…', 'بارکردن…')}>
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-11 w-full" />
-            <Skeleton className="h-32 w-full" />
-          </div>
-        }
-      >
-        <DeliverySettingsEditor storeGovernorate={store.governorate ?? ''} />
-      </Suspense>
+      {deliveryHref ? (
+        <Link
+          to={deliveryHref}
+          data-delivery-link
+          className="lv-surface flex min-h-14 items-center gap-3 px-4 py-3 text-[14px] font-medium text-text-primary transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          <Truck aria-hidden="true" className="h-5 w-5 shrink-0 text-text-muted" />
+          {/* OWNER: Sorani to be written by hand. */}
+          <span className="min-w-0 flex-1">{loc('التوصيل حسب المحافظة', 'Delivery by governorate')}</span>
+          <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted rtl:-scale-x-100" />
+        </Link>
+      ) : (
+        <Suspense
+          fallback={
+            <div className="lv-surface p-4 space-y-2" role="status" aria-label={loc('جارٍ التحميل…', 'Loading…', 'بارکردن…')}>
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-11 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          }
+        >
+          <DeliverySettingsEditor storeGovernorate={store.governorate ?? ''} />
+        </Suspense>
+      )}
 
       <Card title={loc('ساعات العمل', 'Business hours', 'کاتژمێرەکانی کار')}>
         <div className="space-y-2">
@@ -650,7 +679,8 @@ function WidgetGroupEditor({
 
 /** Changing the store address — controlled, checked live, parked-not-released. */
 function SlugCard({ currentSlug, url, onChanged }: { currentSlug: string; url: string; onChanged: () => void }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
+  const [confirm, confirmDialog] = useConfirm();
   const [slug, setSlug] = useState(currentSlug);
   const [check, setCheck] = useState<{ ok: boolean; reason: SlugRejection | null } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -671,18 +701,24 @@ function SlugCard({ currentSlug, url, onChanged }: { currentSlug: string; url: s
   }
 
   async function apply() {
-    if (!confirm(loc(
-      'تغيير عنوان المتجر؟ العنوان القديم يبقى محجوزًا لك فترة ثم يتحرر — حدّث روابطك المطبوعة.',
-      'Change the store address? The old one stays parked for a while, then frees up — update your printed links.',
-      'ناونیشان بگۆڕدرێت؟'
-    ))) return;
+    const ok = await confirm({
+      title: loc('تغيير عنوان المتجر؟', 'Change the store address?', 'ناونیشان بگۆڕدرێت؟'),
+      // OWNER: Sorani to be written by hand.
+      consequence: loc(
+        'العنوان القديم يبقى محجوزًا لك فترة ثم يتحرر — حدّث روابطك المطبوعة.',
+        'The old one stays parked for a while, then frees up — update your printed links.'
+      ),
+      confirmLabel: loc('تغيير', 'Change', 'گۆڕین'),
+      cancelLabel: loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە'),
+    });
+    if (!ok) return;
     setBusy(true);
     setError('');
     try {
       await merchantApi.changeSlug(slug.trim().toLowerCase());
       onChanged();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'error');
+      setError(merchantRefusal(e, lang, loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت')));
     } finally {
       setBusy(false);
     }
@@ -712,6 +748,7 @@ function SlugCard({ currentSlug, url, onChanged }: { currentSlug: string; url: s
         <p className="text-emerald-400 text-[11px] mt-1.5">{loc('العنوان متاح', 'Available', 'بەردەستە')}</p>
       )}
       {error && <p className="text-red-400 text-[11px] mt-1.5">{error}</p>}
+      {confirmDialog}
     </Card>
   );
 }

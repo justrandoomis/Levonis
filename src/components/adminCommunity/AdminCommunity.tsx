@@ -36,6 +36,9 @@ import CommunityGatePanel from './CommunityGatePanel';
 import ReasonSheet, { type ReasonRequest } from './ReasonSheet';
 import PayoutSheet from './PayoutSheet';
 import PayoutQueue from './PayoutQueue';
+import { useConfirm } from '../ui/ConfirmDialog';
+import { toast } from '../ui/Toast';
+import { refusalText } from '../../lib/refusalStrings';
 import {
   adminCommunityApi, iqd, badgeLabel,
   type CommunityOverview, type AdminMerchantRow, type AdminMerchantProduct, type AdminComplaintRow,
@@ -104,6 +107,17 @@ export default function AdminCommunity({ dir }: { dir: 'ltr' | 'rtl' }) {
 }
 
 type T = (ar: string, en: string) => string;
+
+/**
+ * A refused admin action, in words from the refusal table — never the
+ * server's raw sentence (which is English whatever the admin reads). The code
+ * rides along in brackets: an admin reporting a problem needs it.
+ */
+function refused(e: unknown, t: T): string {
+  const code = e instanceof ApiError ? e.code ?? '' : '';
+  const text = refusalText(code, t('ar', 'en') as 'ar' | 'en', t('تعذّر تنفيذ الإجراء.', 'The action could not be completed.'));
+  return code ? `${text} (${code})` : text;
+}
 
 /**
  * «الشكاوى» in the support console (src/components/adminSupport/SupportQueue.tsx)
@@ -869,7 +883,7 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
       await fn();
       load();
     } catch (e) {
-      if (e instanceof ApiError) alert(e.message);
+      toast.error(refused(e, t));
     } finally {
       setBusy('');
     }
@@ -1093,7 +1107,7 @@ function Reputation({ t }: { t: T }) {
       await adminCommunityApi.hideReview(rv.id, !rv.hidden);
       load();
     } catch (e) {
-      if (e instanceof ApiError) alert(e.message);
+      toast.error(refused(e, t));
     } finally {
       setBusy('');
     }
@@ -1214,7 +1228,7 @@ function MerchantReputation({
       await fn();
       load();
     } catch (e) {
-      if (e instanceof ApiError) alert(e.message);
+      toast.error(refused(e, t));
     } finally {
       setBusy(false);
     }
@@ -1452,6 +1466,7 @@ function Disputes({ t }: { t: T }) {
 }
 
 function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void }) {
+  const [confirm, confirmDialog] = useConfirm();
   const [d, setD] = useState<Awaited<ReturnType<typeof adminCommunityApi.complaint>> | null>(null);
   const [busy, setBusy] = useState(false);
   /**
@@ -1559,16 +1574,23 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
               `${d.escrow.gross_iqd} IQD will be returned to the customer in full. Continue?`
             )
           : t(`سيُعاد ${amount} د.ع للعميل. متابعة؟`, `${amount} IQD will be returned to the customer. Continue?`);
-    if (!window.confirm(confirmText)) return;
+    const ok = await confirm({
+      title: decision === 'release' ? t('تحرير المبلغ للتاجر؟', 'Release the money to the merchant?') : t('إعادة المبلغ للعميل؟', 'Refund the customer?'),
+      consequence: confirmText,
+      confirmLabel: t('متابعة', 'Continue'),
+      cancelLabel: t('إلغاء', 'Cancel'),
+      destructive: true,
+    });
+    if (!ok) return;
 
     setBusy(true);
     try {
       const r = await adminCommunityApi.resolveEscrow(d.escrow.id, decision, reason.trim(), amount);
-      if (r.replayed) alert(t('هذا القرار مسجّل مسبقًا.', 'That decision was already recorded.'));
+      if (r.replayed) toast.info(t('هذا القرار مسجّل مسبقًا.', 'That decision was already recorded.'));
       await adminCommunityApi.setComplaintStatus(id, 'resolved', `${decision}: ${reason.trim()}`);
       load();
     } catch (e) {
-      if (e instanceof ApiError) alert(e.message);
+      toast.error(refused(e, t));
     } finally {
       setBusy(false);
     }
@@ -1906,6 +1928,7 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
           ))}
         </div>
       </Section>
+      {confirmDialog}
     </div>
   );
 }

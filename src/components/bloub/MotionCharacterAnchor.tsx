@@ -88,7 +88,9 @@ export function MotionCharacterHome({ busy = false, kind = 'top-header', compact
  */
 export function isMascotHiddenRoute(pathname: string): boolean {
   const path = pathname.toLowerCase();
-  return path === '/admin' || path.startsWith('/admin/');
+  if (path === '/admin' || path.startsWith('/admin/')) return true;
+  // The merchant workspace (W3-A) is a work tool like the admin; its onboarding is not.
+  return (path === '/merchant' || path.startsWith('/merchant/')) && !path.startsWith('/merchant/start');
 }
 
 export function MotionCharacterFallbackHeader() {

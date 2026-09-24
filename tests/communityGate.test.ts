@@ -727,7 +727,7 @@ test('no other door into /requests is left open while the community is shut', ()
   const store = readFileSync(join(ROOT, 'src/pages/Storefront.tsx'), 'utf8');
   assert.match(store, /const quotes = accepts && communityAccess\?\.may_enter !== false;/);
   assert.match(store, /\{quotes && \(\s*<a\s*href=\{requestsHref\}/);
-  for (const f of ['src/pages/MerchantDashboardPage.tsx', 'src/components/merchant/dashboard/SalesTabs.tsx']) {
+  for (const f of ['src/components/merchant/shell/sections/RequestsSection.tsx', 'src/components/merchant/dashboard/SalesTabs.tsx']) {
     const src = readFileSync(join(ROOT, f), 'utf8');
     assert.match(src, /\{communityAccess\?\.may_enter !== false && \(\s*<a\s*href=\{mainHref\('\/requests'\)\}/, `${f} still links the board unconditionally`);
   }

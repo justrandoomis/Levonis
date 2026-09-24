@@ -28,6 +28,9 @@ import {
 import { Btn, Card, Chip, Empty, Input, Notice, Spinner, Toggle, useMainSiteHref, type Loc } from './ui';
 import { Sheet } from '../../ui/Overlay';
 import { apiRefusal } from '../../../lib/refusalStrings';
+import { useConfirm } from '../../ui/ConfirmDialog';
+import { useToast } from '../../ui/Toast';
+import { merchantRefusal } from '../shell/refusal';
 import { formatDate } from '../../orders/format';
 
 // ------------------------------------------------------------ store orders
@@ -101,14 +104,24 @@ function creditText(o: Record<string, unknown>, loc: Loc, lang: string): string 
  * a notification's or the ledger's link, W2-E) — opened and scrolled to; shown
  * on its own above the list when it is not on the loaded page.
  */
-export function OrdersTab({ focusOrderId = null }: { focusOrderId?: string | null } = {}) {
+export function OrdersTab({
+  focusOrderId = null,
+  initialStatus = '',
+}: {
+  focusOrderId?: string | null;
+  /** The list opened on one status — a workspace address's `?status=` (W3-A). */
+  initialStatus?: string;
+} = {}) {
   const { loc, lang } = useLanguage();
   const [orders, setOrders] = useState<Record<string, unknown>[] | null>(null);
   /** The server's keyset cursor for the next page (B26) — null on the last. */
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [more, setMore] = useState<'idle' | 'loading' | 'error'>('idle');
   const [loadFailed, setLoadFailed] = useState(false);
-  const [filter, setFilter] = useState('');
+  const [filter, setFilter] = useState(() => ((STATUS_FILTERS as readonly string[]).includes(initialStatus) ? initialStatus : ''));
+  useEffect(() => {
+    if ((STATUS_FILTERS as readonly string[]).includes(initialStatus)) setFilter(initialStatus);
+  }, [initialStatus]);
   const [busy, setBusy] = useState('');
   const [openId, setOpenId] = useState(focusOrderId ?? '');
   useEffect(() => {
@@ -559,6 +572,8 @@ function communityStateLabel(k: string, loc: Loc): string {
  */
 export function CustomOrdersTab() {
   const { loc, lang } = useLanguage();
+  const [confirm, confirmDialog] = useConfirm();
+  const toast = useToast();
   const mainHref = useMainSiteHref();
   // The request board is Levo Community (DECISIONS 110): while it is shut to
   // this merchant, browsing it would land on the maintenance card. Funded
@@ -653,17 +668,21 @@ export function CustomOrdersTab() {
               small
               disabled={busy === o.id}
               onClick={async () => {
-                if (!confirm(loc(
-                  'تأكيد التسليم؟ المبلغ يبقى محجوزًا حتى يؤكد الزبون الاستلام.',
-                  'Mark delivered? The money stays held until the customer confirms.',
-                  'گەیاندن پشتڕاست بکرێتەوە؟'
-                ))) return;
+                const ok = await confirm({
+                  title: loc('تأكيد التسليم؟', 'Mark delivered?', 'گەیاندن پشتڕاست بکرێتەوە؟'),
+                  // OWNER: Sorani to be written by hand.
+                  consequence: loc('المبلغ يبقى محجوزًا حتى يؤكد الزبون الاستلام.', 'The money stays held until the customer confirms.'),
+                  confirmLabel: loc('سلّمت العمل', 'I delivered the work', 'کارەکەم گەیاند'),
+                  cancelLabel: loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە'),
+                });
+                if (!ok) return;
                 setBusy(o.id);
                 try {
                   await communityOrdersApi.delivered(o.id);
                   load();
                 } catch (e) {
-                  if (e instanceof ApiError) alert(e.message);
+                  // OWNER: Sorani to be written by hand.
+                  toast.error(merchantRefusal(e, lang, loc('تعذّر تسجيل التسليم', 'Could not mark the work delivered')));
                 } finally {
                   setBusy('');
                 }
@@ -686,16 +705,36 @@ export function CustomOrdersTab() {
           )}
         </div>
       ))}
+      {confirmDialog}
     </div>
   );
 }
 
 // ----------------------------------------------------------------- coupons
 
-export function CouponsTab({ canSell }: { canSell: boolean }) {
-  const { loc } = useLanguage();
+export function CouponsTab({
+  canSell,
+  startCreating = false,
+  onCreateHandled,
+}: {
+  canSell: boolean;
+  /** Open with the «new coupon» form showing — the workspace's quick create (`?new=1`, W3-A). */
+  startCreating?: boolean;
+  /** Told once the form was opened for `startCreating`, so the address can drop `?new=1`. */
+  onCreateHandled?: () => void;
+}) {
+  const { loc, lang } = useLanguage();
+  const [confirm, confirmDialog] = useConfirm();
+  const toast = useToast();
   const [items, setItems] = useState<MerchantCoupon[] | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(() => startCreating && canSell);
+  const handled = useRef(onCreateHandled);
+  handled.current = onCreateHandled;
+  useEffect(() => {
+    if (!startCreating) return;
+    if (canSell) setCreating(true);
+    handled.current?.();
+  }, [startCreating, canSell]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [f, setF] = useState({ code: '', kind: 'percent' as 'percent' | 'fixed_iqd', value: '', min: '', maxUses: '' });
@@ -722,7 +761,7 @@ export function CouponsTab({ canSell }: { canSell: boolean }) {
       setCreating(false);
       load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'error');
+      setError(merchantRefusal(e, lang, loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت')));
     } finally {
       setBusy('');
     }
@@ -810,7 +849,7 @@ export function CouponsTab({ canSell }: { canSell: boolean }) {
                   await merchantApi.updateCoupon(cp.id, { active: v });
                   load();
                 } catch (e) {
-                  if (e instanceof ApiError) alert(e.message);
+                  toast.error(merchantRefusal(e, lang, loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت')));
                 } finally {
                   setBusy('');
                 }
@@ -818,23 +857,35 @@ export function CouponsTab({ canSell }: { canSell: boolean }) {
             />
             <button
               onClick={async () => {
-                if (!confirm(loc('حذف الكوبون؟', 'Delete this coupon?', 'بسڕدرێتەوە؟'))) return;
+                const ok = await confirm({
+                  title: loc('حذف الكوبون؟', 'Delete this coupon?', 'بسڕدرێتەوە؟'),
+                  // OWNER: Sorani to be written by hand.
+                  consequence: loc('الكوبون المستخدم من قبل يُوقف ولا يُمحى، لأن طلباتك تحمل رمزه.', 'A coupon that was already used is switched off, not erased — your orders carry its code.'),
+                  confirmLabel: loc('حذف', 'Delete', 'سڕینەوە'),
+                  cancelLabel: loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە'),
+                  destructive: true,
+                });
+                if (!ok) return;
                 setBusy(cp.id);
                 try {
                   await merchantApi.deleteCoupon(cp.id);
                   load();
+                } catch (e) {
+                  toast.error(merchantRefusal(e, lang, loc('تعذّر الحذف', 'Could not delete', 'نەسڕایەوە')));
                 } finally {
                   setBusy('');
                 }
               }}
               disabled={busy === cp.id}
-              className="w-8 h-8 rounded-lg border border-red-500/30 text-red-300 disabled:opacity-40 flex items-center justify-center shrink-0 self-center"
+              aria-label={loc('حذف الكوبون؟', 'Delete this coupon?', 'بسڕدرێتەوە؟')}
+              className="w-11 h-11 rounded-lg border border-red-500/30 text-red-300 disabled:opacity-40 flex items-center justify-center shrink-0 self-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 aria-hidden="true" className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       ))}
+      {confirmDialog}
     </div>
   );
 }

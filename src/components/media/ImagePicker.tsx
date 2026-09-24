@@ -94,7 +94,7 @@ export function ImagePicker({
   }
 
   const box =
-    shape === 'wide' ? 'aspect-[3/1] w-full'
+    shape === 'wide' ? 'aspect-[3/1] w-full max-w-xl'
       : shape === 'tile' ? 'w-20 h-20'
         : 'w-24 h-24';
 
@@ -104,7 +104,9 @@ export function ImagePicker({
         <label className="block text-zinc-400 text-[12.5px] font-semibold mb-2">{label}</label>
       )}
 
-      <div className="flex items-start gap-3">
+      {/* A wide picture takes the whole row, so its buttons go under it —
+          beside it they were squeezed to nothing and pushed off the screen. */}
+      <div className={`flex gap-3 ${shape === 'wide' ? 'flex-col' : 'items-start'}`}>
         <div className={`${box} rounded-2xl bg-black/40 border border-white/10 overflow-hidden shrink-0 relative`}>
           {value ? (
             <img src={value} alt="" className="w-full h-full object-cover" />

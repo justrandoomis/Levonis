@@ -72,7 +72,7 @@ export const SECTION_PATHS: Readonly<Record<MerchantSection, string>> = {
 };
 
 /** Sections whose path may carry one object id after it. */
-const WITH_ID: ReadonlySet<MerchantSection> = new Set<MerchantSection>([
+export const SECTIONS_WITH_ID: ReadonlySet<MerchantSection> = new Set<MerchantSection>([
   'orders',
   'products',
   'inbox',
@@ -81,14 +81,19 @@ const WITH_ID: ReadonlySet<MerchantSection> = new Set<MerchantSection>([
   'custom_orders',
 ]);
 
-/** Ids are opaque tokens: letters, digits, `_`, `-`, `.`; never a slash or a query. */
-const ID_RE = /^[A-Za-z0-9_.-]{1,80}$/;
+/**
+ * Ids are opaque tokens: letters, digits, `_`, `-`, `.`; never a slash or a
+ * query — and never dots alone: `.` / `..` are path segments a URL parser
+ * resolves, so `/orders/..` would reach the router as an id and a fetch built
+ * from it as a different endpoint (W3-A).
+ */
+const ID_RE = /^(?!\.+$)[A-Za-z0-9_.-]{1,80}$/;
 
 function at(section: MerchantSection, id?: string): string {
   const path = SECTION_PATHS[section];
   const base = path ? `${MERCHANT_BASE}/${path}` : MERCHANT_BASE;
   if (id === undefined) return base;
-  if (!WITH_ID.has(section) || !ID_RE.test(id)) return base;
+  if (!SECTIONS_WITH_ID.has(section) || !ID_RE.test(id)) return base;
   return `${base}/${encodeURIComponent(id)}`;
 }
 
@@ -116,6 +121,7 @@ export const merchantHref = {
   requests: () => at('requests'),
   request: (requestId: string) => at('requests', requestId),
   customOrder: (orderId: string) => at('custom_orders', orderId),
+  customOrders: () => at('custom_orders'),
   money: () => at('money'),
   analytics: () => at('analytics'),
   reviews: () => at('reviews'),
@@ -123,7 +129,58 @@ export const merchantHref = {
   storeDesign: () => at('store_design'),
   storeSettings: () => at('store_settings'),
   storeDelivery: () => at('store_delivery'),
+  /** The orders list opened on one status (the Command Center's «3 new»). */
+  ordersInStatus: (status: OrderStatusFilter) =>
+    (ORDER_STATUS_FILTERS as readonly string[]).includes(status) ? `${at('orders')}?status=${status}` : at('orders'),
+  /** The published products that are running low / sold out. */
+  productsInStock: (stock: StockFilter) =>
+    (STOCK_FILTERS as readonly string[]).includes(stock) ? `${at('products')}?state=published&stock=${stock}` : at('products'),
+  /** The quick-create doors: the section, with its «new» form open. */
+  newProduct: () => `${at('products')}?new=1`,
+  newCoupon: () => `${at('coupons')}?new=1`,
+  newCollection: () => `${at('collections')}?new=1`,
 } as const;
+
+/**
+ * THE FEW QUERY WORDS A WORKSPACE ADDRESS MAY CARRY — each from a closed list,
+ * so a stored or typed link can open a list on a filter, or a «new» form, and
+ * nothing else. Anything outside the lists is dropped, never passed on.
+ */
+export const ORDER_STATUS_FILTERS = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
+export type OrderStatusFilter = (typeof ORDER_STATUS_FILTERS)[number];
+export const STOCK_FILTERS = ['low', 'out'] as const;
+export type StockFilter = (typeof STOCK_FILTERS)[number];
+export const PRODUCT_STATE_FILTERS = ['published', 'draft', 'hidden', 'archived'] as const;
+export type ProductStateFilter = (typeof PRODUCT_STATE_FILTERS)[number];
+
+export interface WorkspaceQuery {
+  status?: OrderStatusFilter;
+  stock?: StockFilter;
+  state?: ProductStateFilter;
+  /** Open the section's «new» form. */
+  create: boolean;
+}
+
+export function readWorkspaceQuery(search: string): WorkspaceQuery {
+  let params: URLSearchParams;
+  try {
+    params = new URLSearchParams(String(search ?? '').replace(/^\?/, ''));
+  } catch {
+    return { create: false };
+  }
+  const pick = <T extends string>(key: string, list: readonly T[]): T | undefined => {
+    const v = params.get(key);
+    return v !== null && (list as readonly string[]).includes(v) ? (v as T) : undefined;
+  };
+  const out: WorkspaceQuery = { create: params.get('new') === '1' };
+  const status = pick('status', ORDER_STATUS_FILTERS);
+  const stock = pick('stock', STOCK_FILTERS);
+  const state = pick('state', PRODUCT_STATE_FILTERS);
+  if (status) out.status = status;
+  if (stock) out.stock = stock;
+  if (state) out.state = state;
+  return out;
+}
 
 export interface MerchantLocation {
   section: MerchantSection;
@@ -150,7 +207,7 @@ export function parseMerchantPath(pathname: string, base: string = MERCHANT_BASE
   for (const section of MATCH_ORDER) {
     const path = SECTION_PATHS[section];
     if (rest === path) return { section };
-    if (WITH_ID.has(section) && rest.startsWith(`${path}/`)) {
+    if (SECTIONS_WITH_ID.has(section) && rest.startsWith(`${path}/`)) {
       const raw = rest.slice(path.length + 1);
       if (raw.includes('/')) continue;
       let id: string;

@@ -26,6 +26,8 @@ import { api, ApiError } from '../../../lib/api';
 import { iqd } from '../../../lib/merchant';
 import { GOVERNORATES } from '../../../lib/governorates';
 import { Btn, Card, Chip, Empty, Input, Notice, Spinner, Toggle, type Loc } from './ui';
+import { useConfirm } from '../../ui/ConfirmDialog';
+import { merchantRefusal } from '../shell/refusal';
 
 // ------------------------------------------------------------- the vocabulary
 
@@ -431,7 +433,8 @@ function toDraft(p: Printer): Draft {
 }
 
 function PrintersSection() {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
+  const [confirm, confirmDialog] = useConfirm();
   const [data, setData] = useState<PrintersResponse | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState('');
@@ -448,24 +451,22 @@ function PrintersSection() {
   useEffect(load, [load]);
 
   async function remove(id: string) {
-    if (
-      !confirm(
-        loc(
-          'حذف هذه الطابعة؟ لن تُطابَق بها أي طلبات بعد الآن.',
-          'Delete this printer? No request will be matched to it any more.',
-          'ئەم چاپکەرە بسڕدرێتەوە؟'
-        )
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: loc('حذف هذه الطابعة؟', 'Delete this printer?', 'ئەم چاپکەرە بسڕدرێتەوە؟'),
+      // OWNER: Sorani to be written by hand.
+      consequence: loc('لن تُطابَق بها أي طلبات بعد الآن.', 'No request will be matched to it any more.'),
+      confirmLabel: loc('حذف', 'Delete', 'سڕینەوە'),
+      cancelLabel: loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە'),
+      destructive: true,
+    });
+    if (!ok) return;
     setBusy(id);
     setError('');
     try {
       await api.delete(`/api/merchant/printers/${id}`);
       load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : loc('تعذّر الحذف', 'Could not delete', 'نەسڕایەوە'));
+      setError(merchantRefusal(e, lang, loc('تعذّر الحذف', 'Could not delete', 'نەسڕایەوە')));
     } finally {
       setBusy('');
     }
@@ -582,6 +583,7 @@ function PrintersSection() {
       )}
 
       {error && !draft && <p className="text-red-400 text-[11.5px] mt-2">{error}</p>}
+      {confirmDialog}
     </Card>
   );
 }

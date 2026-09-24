@@ -67,6 +67,7 @@ import { classifyHost, rootDomainFrom } from './lib/hosts';
 import { merchantRoutes } from './routes/merchant';
 import { storeLayoutRoutes } from './routes/storeLayout';
 import { merchantFinanceRoutes, merchantPayoutRoutes } from './routes/merchantFinance';
+import { merchantAttentionRoutes, merchantSearchRoutes } from './routes/merchantWorkspace';
 import { storefrontRoutes } from './routes/storefront';
 // Merchant platform W2-E: the store's notification centre, inbox and
 // analytics, and the storefront's first-party analytics beacon.
@@ -390,6 +391,11 @@ app.route('/api/merchant/analytics', merchantAnalyticsRoutes);
 // requests — beside the append-only ledger they read (worker/lib/merchantLedger.ts).
 app.route('/api/merchant/finance', merchantFinanceRoutes);
 app.route('/api/merchant/payouts', merchantPayoutRoutes);
+// The workspace's «what needs me now» and its command-palette search (W3-A):
+// owner-scoped reads over the sources above, each its own mount so the
+// routing design names it (worker/routes/merchantWorkspace.ts).
+app.route('/api/merchant/attention', merchantAttentionRoutes);
+app.route('/api/merchant/search', merchantSearchRoutes);
 // The storefront's analytics beacon — POST only, before the public reads so
 // `events` can never be taken for a store slug.
 app.route('/api/storefront/events', storefrontEventRoutes);

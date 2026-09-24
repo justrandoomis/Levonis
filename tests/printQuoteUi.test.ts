@@ -86,7 +86,8 @@ test('the calculator shows the upload on the file row, and invents no percentage
 });
 
 test('the merchant costing panel is reachable only from the merchant dashboard', () => {
-  const dashboard = code(read('src/pages/MerchantDashboardPage.tsx'));
+  // The workspace's screen table (W3-A) is where the dashboard mounts its tabs.
+  const dashboard = code(read('src/components/merchant/shell/sections.tsx'));
   assert.match(dashboard, /CostingTab/, 'the dashboard must mount the costing tab');
 
   // No customer-facing page may import it. The list is every page a signed-out

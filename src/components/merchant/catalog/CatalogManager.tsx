@@ -37,7 +37,22 @@ const ImportSheet = lazy(() => import('./ImportSheet'));
 
 type StateFilter = '' | 'published' | 'draft' | 'hidden' | 'archived';
 
-export function CatalogManager({ canSell, store }: { canSell: boolean; store: MerchantStore }) {
+export interface CatalogManagerProps {
+  canSell: boolean;
+  store: MerchantStore;
+  /**
+   * The product a workspace address names (`/merchant/products/<id>`) — its
+   * editor opens — or `'new'` for the quick-create door (`?new=1`). W3-A.
+   */
+  focusProductId?: string | null;
+  /** The list opened on a filter (`?state=`, `?stock=` — the Command Center's «running low»). */
+  initialState?: string;
+  initialStock?: string;
+  /** The editor opened for `focusProductId` closed: the address goes back to the list. */
+  onEditorClose?: () => void;
+}
+
+export function CatalogManager({ canSell, store, focusProductId = null, initialState, initialStock, onEditorClose }: CatalogManagerProps) {
   const { loc, lang } = useLanguage();
   const s = catalogStrings(loc);
   const toast = useToast();
@@ -46,8 +61,8 @@ export function CatalogManager({ canSell, store }: { canSell: boolean; store: Me
 
   const [qLive, setQLive] = useState('');
   const [q, setQ] = useState('');
-  const [state, setState] = useState<StateFilter>('');
-  const [stock, setStock] = useState('');
+  const [state, setState] = useState<StateFilter>(() => (['published', 'draft', 'hidden', 'archived'].includes(initialState ?? '') ? (initialState as StateFilter) : ''));
+  const [stock, setStock] = useState(() => (['in', 'low', 'out', 'untracked'].includes(initialStock ?? '') ? initialStock! : ''));
   const [collection, setCollection] = useState('');
   const [sort, setSort] = useState('newest');
 
@@ -62,6 +77,14 @@ export function CatalogManager({ canSell, store }: { canSell: boolean; store: Me
   const [busy, setBusy] = useState(false);
 
   const [editing, setEditing] = useState<{ id: string | null } | null>(null);
+  // An address that names a product (or «new») opens its editor — a new
+  // product only when this store may take one on.
+  useEffect(() => {
+    if (!focusProductId) return;
+    if (focusProductId === 'new') {
+      if (canSell) setEditing({ id: null });
+    } else setEditing({ id: focusProductId });
+  }, [focusProductId, canSell]);
   const [insightsFor, setInsightsFor] = useState<CatalogProduct | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [bulkValue, setBulkValue] = useState<BulkValueKind | null>(null);
@@ -391,7 +414,10 @@ export function CatalogManager({ canSell, store }: { canSell: boolean; store: Me
             productId={editing.id}
             canSell={canSell}
             collections={collections}
-            onClose={() => setEditing(null)}
+            onClose={() => {
+              setEditing(null);
+              if (focusProductId) onEditorClose?.();
+            }}
             onSaved={reload}
           />
         )}

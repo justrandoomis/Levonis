@@ -12,7 +12,6 @@ import {
   Plus, Trash2, Pencil, Printer, Layers, Hammer, Check, Loader2,
 } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
-import { ApiError } from '../../../lib/api';
 import {
   merchantApi, iqd,
   type StoreService, type ShowcaseItem,
@@ -20,6 +19,9 @@ import {
 import { ImagePicker } from '../../media/ImagePicker';
 import { Btn, Card, Chip, ChipListEditor, Empty, Input, Notice, Spinner, TextArea } from './ui';
 import { CollectionsManager } from '../catalog/CollectionsManager';
+import { useConfirm } from '../../ui/ConfirmDialog';
+import { useToast } from '../../ui/Toast';
+import { merchantRefusal } from '../shell/refusal';
 
 // ---------------------------------------------------------------- sections
 
@@ -28,8 +30,9 @@ import { CollectionsManager } from '../catalog/CollectionsManager';
  * ones with the merchant's own product order, and the automatic featured /
  * new-arrivals / best-sellers. The screen lives with the catalogue editor.
  */
-export function SectionsTab({ canSell }: { canSell: boolean }) {
-  return <CollectionsManager canSell={canSell} />;
+export function SectionsTab({ canSell, autoFocusCreate = false }: { canSell: boolean; autoFocusCreate?: boolean }) {
+  // `autoFocusCreate`: the workspace's «new section» door (`?new=1`, W3-A) lands on the name field.
+  return <CollectionsManager canSell={canSell} autoFocusCreate={autoFocusCreate} />;
 }
 
 // ---------------------------------------------------------------- services
@@ -55,7 +58,9 @@ const EMPTY_SERVICE = {
 };
 
 export function ServicesTab({ canSell }: { canSell: boolean }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
+  const [confirm, confirmDialog] = useConfirm();
+  const toast = useToast();
   const [items, setItems] = useState<StoreService[] | null>(null);
   const [editing, setEditing] = useState<StoreService | 'new' | null>(null);
   const [busy, setBusy] = useState('');
@@ -152,7 +157,7 @@ export function ServicesTab({ canSell }: { canSell: boolean }) {
                   await merchantApi.updateService(s.id, { active: !s.active });
                   load();
                 } catch (e) {
-                  if (e instanceof ApiError) alert(e.message);
+                  toast.error(merchantRefusal(e, lang, loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت')));
                 } finally {
                   setBusy('');
                 }
@@ -165,11 +170,21 @@ export function ServicesTab({ canSell }: { canSell: boolean }) {
               small
               disabled={busy === s.id}
               onClick={async () => {
-                if (!confirm(loc('حذف الخدمة؟', 'Delete this service?', 'بسڕدرێتەوە؟'))) return;
+                const ok = await confirm({
+                  title: loc('حذف الخدمة؟', 'Delete this service?', 'بسڕدرێتەوە؟'),
+                  // OWNER: Sorani to be written by hand.
+                  consequence: loc('تختفي من صفحة متجرك، ولا يمكن التراجع.', 'It disappears from your store page, and this cannot be undone.'),
+                  confirmLabel: loc('حذف', 'Delete', 'سڕینەوە'),
+                  cancelLabel: loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە'),
+                  destructive: true,
+                });
+                if (!ok) return;
                 setBusy(s.id);
                 try {
                   await merchantApi.deleteService(s.id);
                   load();
+                } catch (e) {
+                  toast.error(merchantRefusal(e, lang, loc('تعذّر الحذف', 'Could not delete', 'نەسڕایەوە')));
                 } finally {
                   setBusy('');
                 }
@@ -180,6 +195,7 @@ export function ServicesTab({ canSell }: { canSell: boolean }) {
           </div>
         </div>
       ))}
+      {confirmDialog}
     </div>
   );
 }
@@ -193,7 +209,7 @@ function ServiceEditor({
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
   const [f, setF] = useState(() => ({
     ...EMPTY_SERVICE,
     ...(service
@@ -230,7 +246,7 @@ function ServiceEditor({
       else await merchantApi.createService(body);
       onDone();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا'));
+      setError(merchantRefusal(e, lang, loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا')));
       setSaving(false);
     }
   }
@@ -319,7 +335,9 @@ const SHOWCASE_KINDS: Array<{ id: 'printer' | 'material' | 'work'; icon: React.R
 ];
 
 export function ShowcaseTab() {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
+  const [confirm, confirmDialog] = useConfirm();
+  const toast = useToast();
   const [items, setItems] = useState<ShowcaseItem[] | null>(null);
   const [kind, setKind] = useState<'printer' | 'material' | 'work'>('work');
   const [title, setTitle] = useState('');
@@ -346,7 +364,7 @@ export function ShowcaseTab() {
       setImageUrl(null);
       load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'error');
+      setError(merchantRefusal(e, lang, loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت')));
     } finally {
       setBusy('');
     }
@@ -428,11 +446,21 @@ export function ShowcaseTab() {
                     {it.details && <p className="text-zinc-500 text-[10.5px] line-clamp-2">{it.details}</p>}
                     <button
                       onClick={async () => {
-                        if (!confirm(loc('حذف؟', 'Delete?', 'بسڕدرێتەوە؟'))) return;
+                        const ok = await confirm({
+                          title: loc('حذف؟', 'Delete?', 'بسڕدرێتەوە؟'),
+                          // OWNER: Sorani to be written by hand.
+                          consequence: loc('يختفي من معرض متجرك، ولا يمكن التراجع.', 'It disappears from your store’s showcase, and this cannot be undone.'),
+                          confirmLabel: loc('حذف', 'Delete', 'سڕینەوە'),
+                          cancelLabel: loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە'),
+                          destructive: true,
+                        });
+                        if (!ok) return;
                         setBusy(it.id);
                         try {
                           await merchantApi.deleteShowcase(it.id);
                           load();
+                        } catch (e) {
+                          toast.error(merchantRefusal(e, lang, loc('تعذّر الحذف', 'Could not delete', 'نەسڕایەوە')));
                         } finally {
                           setBusy('');
                         }
@@ -449,6 +477,7 @@ export function ShowcaseTab() {
           </div>
         );
       })}
+      {confirmDialog}
     </div>
   );
 }

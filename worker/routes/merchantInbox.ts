@@ -149,10 +149,15 @@ merchantInboxRoutes.get('/', async (c) => {
   });
 });
 
-merchantInboxRoutes.get('/unread-count', async (c) => {
-  const ctx = await requireStoreOwner(c);
-  const me = c.get('user')!.id;
-  const row = await c.env.DB.prepare(
+/**
+ * Conversations and messages from the other side the owner has not read, in
+ * the store's own threads — the badge of the inbox, and one line of the
+ * workspace's «what needs me now» (worker/routes/merchantWorkspace.ts), which
+ * calls this rather than the route. Scoped by BOTH the store and the caller's
+ * membership in each thread, like the list.
+ */
+export async function inboxUnreadCounts(db: D1Database, userId: string, storeId: string): Promise<{ threads: number; messages: number }> {
+  const row = await db.prepare(
     `SELECT COUNT(*) AS threads, COALESCE(SUM(u.n), 0) AS messages FROM (
        SELECT ${UNREAD_SQL} AS n
          FROM chats ch
@@ -161,8 +166,14 @@ merchantInboxRoutes.get('/unread-count', async (c) => {
           AND (cp.last_read_at IS NULL OR COALESCE(ch.last_message_at, '') > cp.last_read_at)
      ) u WHERE u.n > 0`
   )
-    .bind(me, ctx.store.id)
+    .bind(userId, storeId)
     .first<{ threads: number; messages: number }>();
+  return { threads: Number(row?.threads ?? 0), messages: Number(row?.messages ?? 0) };
+}
+
+merchantInboxRoutes.get('/unread-count', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const counts = await inboxUnreadCounts(c.env.DB, c.get('user')!.id, ctx.store.id);
   c.header('Cache-Control', 'private, no-store');
-  return c.json({ success: true, threads: Number(row?.threads ?? 0), messages: Number(row?.messages ?? 0) });
+  return c.json({ success: true, threads: counts.threads, messages: counts.messages });
 });

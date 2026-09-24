@@ -401,9 +401,11 @@ function StorefrontApp() {
         <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
         <Route path="/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
         <Route path="/auth" element={<Auth />} />
-        <Route path="/admin" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
-        {/* The workspace's addresses on the store's own host (a notification's
-            `/merchant/orders/<id>` opens here as `/admin/orders/<id>`, W2-E). */}
+        {/* The merchant workspace on the store's own host: the same tree as
+            `/merchant/*` on the platform (a notification's `/merchant/orders/<id>`
+            opens here as `/admin/orders/<id>`). ONE splat route — it matches
+            `/admin` itself too — so moving between screens never remounts the
+            workspace (W3-A). */}
         <Route path="/admin/*" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
         <Route path="*" element={<Storefront store={store} />} />
       </Routes>
@@ -534,7 +536,10 @@ function AppContent() {
   // it to the other <Routes> block and render a different tree for the same
   // page. Comparing the way the router does keeps the two in step.
   const pathForShell = location.pathname.toLowerCase();
-  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support', '/chat', '/model-viewer'].some(p => pathForShell === p || pathForShell.startsWith(p + '/'));
+  // `/merchant` is the merchant workspace (W3-A): its own full-screen frame, out
+  // of the customer shell. `/merchant/start` — onboarding — stays where it was.
+  const isMerchantStart = pathForShell === '/merchant/start' || pathForShell.startsWith('/merchant/start/');
+  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support', '/chat', '/model-viewer', '/merchant'].some(p => pathForShell === p || pathForShell.startsWith(p + '/')) && !isMerchantStart;
 
   if (isFullScreenRoute) {
     return (
@@ -636,6 +641,12 @@ function AppContent() {
                 page shell used to create two scroll owners and forced a fixed
                 composer to cover the last messages. */}
             <Route path="/chat/:id" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+            {/* THE MERCHANT WORKSPACE (W3-A): the Command Center and every
+                screen under it, one splat route so moving between screens
+                never remounts the frame. The addresses are the contract's
+                (packages/contracts/src/merchantRoutes.ts); the shell routes
+                them (src/components/merchant/shell/routeTable.ts). */}
+            <Route path="/merchant/*" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
             {/* PUBLIC BY DESIGN, AND THAT IS THE WHOLE POINT OF THE TOKEN.
                 A print model belongs to the customer, so the preview is not
                 gated on being signed in — it is gated on holding a token that
@@ -755,8 +766,6 @@ function AppContent() {
               cancel — /api/marketplace/orders is outside the wall. */}
           <Route path="/requests" element={<CommunityGate closedExtra={<RunningCommunityOrders />}><Requests /></CommunityGate>} />
           <Route path="/merchant/start" element={<ProtectedRoute><MerchantStart /></ProtectedRoute>} />
-          <Route path="/merchant" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
-          <Route path="/merchant/*" element={<ProtectedRoute><MerchantDashboardPage /></ProtectedRoute>} />
           {/* Behind the gate too: the page is a list of COMMUNITY stores and it
               reads /api/community/followed, which the wall refuses. Without
               this wrapper a refused visitor got the server's refusal rendered

@@ -325,6 +325,63 @@ test('the storefront pages add at most 44 KB gzip beyond the initial payload, an
   }
 });
 
+/**
+ * THE MERCHANT WORKSPACE'S FRAME (W3-A). `/merchant` used to be one eager
+ * 65.3 KB gzip chunk (103.1 KB with its closure beyond the initial payload):
+ * opening the Overview downloaded every tab. The workspace is now a small
+ * shell — the route element, the one nav table, the top bar, the sidebar /
+ * rail / phone tabs, the router — and every screen is its own lazy chunk,
+ * fetched when its address is opened. The palette and the phone's «More»
+ * sheet load the first time they are opened.
+ *
+ * THE NUMBERS. Audit 05 §6.5 proposed 25 KB gzip for the shell. Measured at
+ * W3-A: the shell chunk 20.5 KB (a third of it the words of the store-status
+ * reasons and the nav in Arabic, English and Sorani), 28.3 KB with its closure
+ * beyond the initial payload (the store bell, the toast stack, the menu
+ * primitive and the nav icons). The budgets are that plus ~4 KB, so pulling
+ * any screen back into the frame (the smallest, CustomersSection, is 1 KB; a
+ * typical one 5–10 KB) fails the same day.
+ */
+const WORKSPACE_SHELL_BUDGET = 25 * KB;
+const WORKSPACE_CLOSURE_BUDGET = 32 * KB;
+/** The screens: each must have a chunk of its own and none may be a static import of the frame. */
+const WORKSPACE_SCREENS = [
+  'CommandCenter', 'SalesTabs', 'CatalogTabs', 'ProductsManager', 'PrintersTab', 'CostingTab', 'StoreSettingsTab',
+  'StoreDesignPanel', 'MerchantFinance', 'DeliverySettingsEditor', 'MerchantInbox', 'AnalyticsSection', 'ReviewsSection',
+  'CustomersSection', 'RequestsSection', 'NotificationsSection', 'CommandPalette', 'MoreSheet',
+];
+
+test('the merchant workspace shell is small, stays out of every customer closure, and loads each screen lazily', () => {
+  const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
+  const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
+  const shell = chunk('MerchantDashboardPage');
+  assert.ok(shell, 'the workspace shell has no chunk of its own');
+  const initial = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
+  assert.equal(initial.has(shell!), false, 'the workspace shell is in the initial payload');
+
+  const own = gz(join(ASSETS, shell!));
+  const closure = [...staticClosure(shell!)].filter((f) => !initial.has(f));
+  const total = closure.reduce((sum, f) => sum + gz(join(ASSETS, f)), 0);
+  const detail = closure.sort().map((f) => `  ${f}: ${kb(gz(join(ASSETS, f)))}`).join('\n');
+  console.log(`bundle: workspace shell ${kb(own)} gzip, ${kb(total)} with its closure beyond the initial payload\n${detail}`);
+  assert.ok(own <= WORKSPACE_SHELL_BUDGET, `the workspace shell is ${kb(own)} gzip, over ${kb(WORKSPACE_SHELL_BUDGET)}`);
+  assert.ok(total <= WORKSPACE_CLOSURE_BUDGET, `the workspace shell adds ${kb(total)} gzip, over ${kb(WORKSPACE_CLOSURE_BUDGET)}:\n${detail}`);
+
+  const inShell = new Set(closure);
+  for (const name of WORKSPACE_SCREENS) {
+    const f = chunk(name);
+    assert.ok(f, `${name} has no chunk of its own — a workspace screen was made eager`);
+    assert.equal(inShell.has(f!), false, `${name} is a STATIC import of the workspace shell — opening /merchant would download it`);
+    assert.equal(initial.has(f!), false, `${name} is in the initial payload`);
+  }
+  // Nothing of the workspace reaches a store visitor either.
+  const storefront = new Set(['Storefront', 'StorefrontProduct'].flatMap((n) => [...staticClosure(chunk(n)!)]));
+  for (const name of ['MerchantDashboardPage', ...WORKSPACE_SCREENS]) {
+    const f = chunk(name)!;
+    assert.equal(storefront.has(f), false, `${name} is a static import of a storefront page`);
+  }
+});
+
 test('the stylesheets stay under their budget', () => {
   // Not "one file": splitting a route out also splits the CSS it is the only
   // user of, which is the point. The budget is on the total, because the whole

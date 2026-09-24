@@ -68,7 +68,7 @@ test('the merchant surface it moved to is real, unlimited, and made of facts', (
   // No slot count anywhere: the list is as long as the shop's shelf.
   assert.ok(!/printer[1-4]\b/.test(tab), 'nothing here is a numbered slot');
   // And it is reachable as its own tab in the dashboard.
-  const page = read('src/pages/MerchantDashboardPage.tsx');
-  assert.match(page, /id: 'printers'/);
-  assert.match(page, /<PrintersTab/);
+  // Since W3-A: an entry of the workspace's one nav table, mounted by its screen table.
+  assert.match(read('src/components/merchant/shell/nav.ts'), /id: 'printers'/);
+  assert.match(read('src/components/merchant/shell/sections.tsx'), /<m\.PrintersTab/);
 });
