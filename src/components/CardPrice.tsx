@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star } from 'lucide-react';
+import { Sparkles, Star } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { type ApiProduct } from '../lib/api';
 import { useMoney } from '../CurrencyContext';
@@ -21,7 +21,8 @@ import { useMoney } from '../CurrencyContext';
  *    the cart and at the door;
  *  - PRIME member: bold PRIME price (strikethrough regular beside it), faint
  *    PRO price under it;
- *  - PRO member: the PRO price alone.
+ *  - PRO member: the PRO price, in PRO's red with its mark, and the regular
+ *    price small and struck beside it — the saving read at a glance.
  * Which branch applies is read from display_applied_tier — the server's
  * verdict, not a client guess. `display_from` marks genuinely differing
  * variant prices, so «يبدأ من» is honest, never decorative.
@@ -52,6 +53,8 @@ export default function CardPrice({ p, compact = false }: { p: ApiProduct; compa
   // A PRO member sees the PRO price alone — nothing to tease.
 
   const memberPrice = appliedTier !== 'regular';
+  /** PRO is drawn in PRO's own red (tierMeta), every other member rung in gold. */
+  const pro = appliedTier === 'pro';
 
   return (
     <div className="min-w-0">
@@ -61,14 +64,23 @@ export default function CardPrice({ p, compact = false }: { p: ApiProduct; compa
         )}
         <span
           className={`font-bold ${compact ? 'text-[13px]' : 'text-[15px]'} ${
-            memberPrice ? 'text-gold font-extrabold inline-flex items-center gap-1' : 'text-white'
+            pro
+              ? 'text-[#e06070] font-extrabold inline-flex items-center gap-1'
+              : memberPrice
+                ? 'text-gold font-extrabold inline-flex items-center gap-1'
+                : 'text-white'
           }`}
+          data-pro-price={pro || undefined}
         >
-          {memberPrice && <Star aria-hidden className="w-3 h-3 fill-gold" />}
+          {pro ? (
+            <Sparkles aria-hidden className="w-3 h-3" />
+          ) : (
+            memberPrice && <Star aria-hidden className="w-3 h-3 fill-gold" />
+          )}
           {money(main)}
         </span>
         {struck !== null && (
-          <span className="text-zinc-500 text-[11px] line-through truncate">{money(struck)}</span>
+          <span className="text-zinc-500/80 text-[10.5px] line-through truncate">{money(struck)}</span>
         )}
       </div>
       {teasers.map((t) => (

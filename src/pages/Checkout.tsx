@@ -11,6 +11,7 @@ import {
   Check, Sparkles, MapPin, AlertCircle,
   Lock, CheckCircle2, Plus, Receipt, ShoppingCart, CalendarClock, Tag
 } from 'lucide-react';
+import ProAddressNotice from '../components/membership/ProAddressNotice';
 import { useWallet } from '../WalletContext';
 import { api, ApiAddress, ApiError, ApiOrder, CartItem, newIdempotencyKey, usdCentsToIqd, formatIqd } from '../lib/api';
 import type { DeliveryDayOption } from '../lib/api';
@@ -2010,6 +2011,11 @@ export default function Checkout() {
               <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">2</span>
               {dir === 'rtl' ? 'طريقة الشحن' : 'Delivery Method'}
             </h2>
+            {/* A PRO member quoted outside their PRO context is charged the
+                ordinary price and delivery — say why, where they choose. */}
+            {quote?.tier?.tier === 'pro' && quote.tier.active && !quote.tier.pro_benefits_context ? (
+              <ProAddressNotice className="mb-3" />
+            ) : null}
             <div className="grid grid-cols-1 gap-3">
               {availableDeliveryMethods.map(method => {
                 const selected = deliveryMethod === method.id;

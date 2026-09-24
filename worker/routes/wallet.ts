@@ -424,11 +424,26 @@ walletRoutes.get('/policy', async (c) => {
  * key or a renamed screenshot cannot buy a second credit (§11.2/§11.4). The
  * attachment fingerprint is recorded as a REVIEW SIGNAL only.
  */
+/**
+ * The cents a typed dinar amount converts to at `rate` — floor, the wallet's
+ * one dollar rule (the customer keeps the remainder, and 0108's dust term
+ * returns it on every dinar reading). Null when there is no typed figure or
+ * no rate, or when the result falls outside what a request may carry; the
+ * caller then keeps the cents the client sent, exactly as before.
+ */
+export function dinarsToCents(declaredIqd: number, rate: number): number | null {
+  if (!Number.isInteger(declaredIqd) || declaredIqd <= 0) return null;
+  if (!Number.isFinite(rate) || rate <= 0) return null;
+  const cents = Math.floor((declaredIqd * 100) / rate);
+  if (cents < 100 || cents > MAX_AMOUNT_CENTS) return null;
+  return cents;
+}
+
 walletRoutes.post('/deposits', async (c) => {
   await rateLimit(c, 'wallet-deposit', 10, 3600);
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
-  const amount = int(body.amount_usd_cents, 'amount_usd_cents', { min: 100, max: MAX_AMOUNT_CENTS });
+  const clientCents = int(body.amount_usd_cents, 'amount_usd_cents', { min: 100, max: MAX_AMOUNT_CENTS });
   const note = str(body.note, 'note', { max: 500, required: false });
   const paymentMethod = str(body.paymentMethod, 'paymentMethod', { max: 60, required: false });
   const receiptKey = str(body.receiptKey, 'receiptKey', { min: 5, max: 300 });
@@ -464,6 +479,17 @@ walletRoutes.post('/deposits', async (c) => {
   // The rate is read once, here, and stored beside the dinars — never
   // re-read at display time, which is what made the figure drift.
   const exchangeRate = declaredAmountIqd ? Number(await getSetting(c.env.DB, 'exchangeRate')) || 0 : 0;
+  /**
+   * «يضاف كما هو ولكن يحول الى الدولار وليس العكس». When the customer typed
+   * dinars, the DINARS are the request and the cents are converted from them
+   * HERE, at the server's own rate — never taken from the tab. The tab's cents
+   * used to be authoritative and the typed figure was kept only if it floored
+   * back onto them; a tab holding yesterday's rate therefore filed a deposit
+   * with no dinars on it at all, and the approved 50,000 read back as 49,994.
+   * Now the pair always agrees by construction, so the typed figure is always
+   * recorded and always what the customer sees.
+   */
+  const amount = dinarsToCents(declaredAmountIqd, exchangeRate) ?? clientCents;
 
   const created = await createDepositRequest(c.env.DB, {
     userId: user.id,
@@ -530,7 +556,7 @@ walletRoutes.post('/withdrawals', async (c) => {
   await rateLimit(c, 'wallet-withdraw', 10, 3600);
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
-  const amount = int(body.amount_usd_cents, 'amount_usd_cents', { min: 100, max: MAX_AMOUNT_CENTS });
+  const clientCents = int(body.amount_usd_cents, 'amount_usd_cents', { min: 100, max: MAX_AMOUNT_CENTS });
   const note = str(body.note, 'note', { max: 500, required: false });
   const kind = str(body.destinationKind, 'destinationKind', { max: 40, required: false }) || 'manual_transfer';
   /**
@@ -593,6 +619,9 @@ walletRoutes.post('/withdrawals', async (c) => {
    * converts the cents instead. The withdrawal itself is never refused for it.
    */
   const exchangeRate = declaredAmountIqd ? Number(await getSetting(c.env.DB, 'exchangeRate')) || 0 : 0;
+  // The typed dinars are the request; the cents follow from them at the
+  // server's rate (see the deposit route above).
+  const amount = dinarsToCents(declaredAmountIqd, exchangeRate) ?? clientCents;
   const eventKey = idempotencyKey ? `wd:${idempotencyKey}` : `wd:${newId('evt')}`;
 
   /**

@@ -43,10 +43,11 @@ import ShippingConflictDialog from '../components/cart/ShippingConflictDialog';
 import { useAuth } from '../AuthContext';
 import { useWallet } from '../WalletContext';
 import {
-  ArrowRight, ArrowLeft, ShoppingCart, Star, Check, Share2, Heart, Clock, Package,
+  ArrowRight, ArrowLeft, ShoppingCart, Star, Sparkles, Check, Share2, Heart, Clock, Package,
   ChevronDown, Minus, Plus, X, FileText, Settings2, ShieldCheck, Truck,
   AlertTriangle, Store, ZoomIn, Image as ImageIcon, Box, ExternalLink, PlayCircle, Wrench, TrendingUp, PackageOpen,
 } from 'lucide-react';
+import ProAddressNotice from '../components/membership/ProAddressNotice';
 import { api, ApiError, CartItem, pickText } from '../lib/api';
 import { rememberViewed } from '../lib/recentlyViewed';
 import { useGoBack } from '../lib/useGoBack';
@@ -2393,7 +2394,8 @@ export default function Product() {
             */}
             <span
               aria-busy={priceIsPending || undefined}
-              className={`text-white font-black text-2xl sm:text-3xl tabular-nums transition-opacity duration-200 ${
+              data-pro-price={appliedMemberTier === 'pro' || undefined}
+              className={`${appliedMemberTier === 'pro' ? 'text-[#e06070]' : 'text-white'} font-black text-2xl sm:text-3xl tabular-nums transition-opacity duration-200 ${
                 priceIsPending ? 'opacity-55' : 'opacity-100'
               }`}
             >
@@ -2404,9 +2406,16 @@ export default function Product() {
               <span
                 data-testid="product-applied-tier"
                 data-tier={appliedMemberTier}
-                className="inline-flex items-center gap-1.5 rounded-md bg-gold/10 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-gold"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${
+                  appliedMemberTier === 'pro' ? 'bg-[#B03142]/15 text-[#e06070]' : 'bg-gold/10 text-gold'
+                }`}
               >
-                <Star aria-hidden="true" className="w-3 h-3 fill-gold" />
+                {/* PRO is red across the shop — the tier's own colour (tierMeta). */}
+                {appliedMemberTier === 'pro' ? (
+                  <Sparkles aria-hidden="true" className="w-3 h-3" />
+                ) : (
+                  <Star aria-hidden="true" className="w-3 h-3 fill-gold" />
+                )}
                 {s.appliedPriceOf(appliedMemberLabel)}
               </span>
             ) : (
@@ -2420,14 +2429,18 @@ export default function Product() {
               numbers or to discover the benefit at checkout. */}
           {shownPrice.applied < shownPrice.regular ? (
             <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="text-zinc-500 text-sm line-through tabular-nums">{money(shownPrice.regular)}</span>
+              <span className="text-zinc-500/80 text-[12px] line-through tabular-nums">{money(shownPrice.regular)}</span>
               {memberSavingIqd !== null ? (
-                <span data-testid="product-member-saving" className="text-gold text-[12.5px] font-bold tabular-nums">
+                <span
+                  data-testid="product-member-saving"
+                  className={`${appliedMemberTier === 'pro' ? 'text-[#e06070]' : 'text-gold'} text-[12.5px] font-bold tabular-nums`}
+                >
                   {s.savedWithTier(money(memberSavingIqd), appliedMemberLabel)}
                 </span>
               ) : null}
             </div>
           ) : null}
+          {isPro && viewerTier?.pro_benefits_context === false ? <ProAddressNotice className="mt-2.5" /> : null}
           {qty > 1 ? (
             <div className="text-zinc-400 text-[13px] mt-2">
               {s.lineTotal}: <span className="text-white font-bold tabular-nums">{money(lineTotal!)}</span>
