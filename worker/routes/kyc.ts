@@ -18,6 +18,7 @@ import { safeParse } from '../lib/types';
 import { sniff } from './uploads';
 import { getMediaObject, storeMedia } from '../lib/mediaStorage';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
+import { getTierStatus } from '../lib/entitlements';
 
 /**
  * PRO KYC (final-phase brief §9) + approved-address versioning.
@@ -505,6 +506,81 @@ kycRoutes.post('/address-request', async (c) => {
 });
 
 /** Current approved snapshot — the same data checkout/commerce compares. */
+/**
+ * «زر بجانب الحذف: اعتمد العنوان … هذه العملية لا يمكن تغييرها لاحقاً».
+ *
+ * A PRO member approves ONE of their own saved addresses as their PRO address,
+ * themselves, once. The owner's rule stands — PRO prices and free delivery
+ * apply at the approved address only — but a new PRO member had no way to get
+ * one: the only door was a request for an admin to review. This is the first
+ * approval; changing it afterwards is the existing admin-reviewed request
+ * (`/address-request`), which is why the page warns it cannot be undone here.
+ *
+ * Refused unless the account holds an ACTIVE PRO membership, owns the address,
+ * has no approved address yet, and typed the confirmation the second window
+ * asks for. A pending admin request is superseded by this approval. The
+ * address also becomes the default, because the product page and the cart
+ * judge PRO context at the default address.
+ */
+kycRoutes.post('/address-self-approve', async (c) => {
+  await rateLimit(c, 'kyc-address-self', 10, 3600);
+  const user = c.get('user')!;
+  const db = c.env.DB;
+  const body = await c.req.json().catch(() => ({}));
+  const addressId = str(body.addressId, 'addressId', { min: 1, max: 60 });
+  if (body.confirm !== 'APPROVE_ADDRESS') throw badRequest('Confirmation is required', 'CONFIRM_REQUIRED');
+
+  const tier = await getTierStatus(db, user.id);
+  if (!(tier.tier === 'pro' && tier.active)) {
+    throw badRequest('اعتماد العنوان متاح لمشتركي PRO فقط / Only active PRO members can approve an address', 'PRO_REQUIRED');
+  }
+  const addr = await db
+    .prepare('SELECT id, user_id, label, name, phone, address, landmark FROM addresses WHERE id = ? AND user_id = ?')
+    .bind(addressId, user.id)
+    .first<SavedAddressRow>();
+  if (!addr) throw notFound('Address not found');
+  if (await getApprovedAddress(db, user.id)) {
+    throw conflict(
+      'لديك عنوان معتمد بالفعل — تغييره يتم بطلب مراجعة / You already have an approved address — changing it goes through a review request',
+      'ALREADY_HAS_APPROVED'
+    );
+  }
+
+  const maxV = await db
+    .prepare('SELECT COALESCE(MAX(version), 0) AS v FROM approved_addresses WHERE user_id = ?')
+    .bind(user.id)
+    .first<{ v: number }>();
+  const version = Number(maxV?.v ?? 0) + 1;
+  const id = newId('apa');
+  const now = new Date().toISOString();
+  try {
+    await db.batch([
+      db
+        .prepare("UPDATE approved_addresses SET state = 'superseded' WHERE user_id = ? AND state = 'pending'")
+        .bind(user.id),
+      // Guarded in SQL too: two taps racing can never leave two approved rows.
+      db
+        .prepare(
+          `INSERT INTO approved_addresses (id, user_id, version, name, phone_e164, address, landmark,
+             state, reason, source_address_id, approved_by, approved_at)
+           SELECT ?, ?, ?, ?, ?, ?, ?, 'approved', 'self-approved by the PRO member', ?, ?, ?
+            WHERE NOT EXISTS (SELECT 1 FROM approved_addresses WHERE user_id = ? AND state = 'approved')`
+        )
+        .bind(id, user.id, version, addr.name, addr.phone, addr.address, addr.landmark, addr.id, user.id, now, user.id),
+      db.prepare('UPDATE addresses SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE user_id = ?').bind(addr.id, user.id),
+    ]);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('UNIQUE')) throw conflict('A concurrent request took this version — please retry');
+    throw e;
+  }
+  const made = await db.prepare("SELECT id FROM approved_addresses WHERE id = ? AND state = 'approved'").bind(id).first();
+  if (!made) throw conflict('لديك عنوان معتمد بالفعل / You already have an approved address', 'ALREADY_HAS_APPROVED');
+  await audit(db, user.id, 'kyc.address.self_approved', id, { version, source_address_id: addr.id });
+  announceAfterResponse(c, 'merchant_verification', `✅ PRO address self-approved — user ${user.id} (v${version})`);
+  return c.json({ success: true, id, version, state: 'approved' });
+});
+
 kycRoutes.get('/approved-address', async (c) => {
   const user = c.get('user')!;
   const db = c.env.DB;

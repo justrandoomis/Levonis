@@ -29,7 +29,7 @@ export default function ProAddressNotice({ className = '' }: { className?: strin
           'سعر PRO والتوصيل المجاني يُطبَّقان على عنوانك المعتمد فقط.',
           'PRO prices and free delivery apply at your approved address only.'
         )}{' '}
-        <Link to="/subscription#membership-title" className="font-bold text-[#e06070] underline underline-offset-2">
+        <Link to="/addresses" className="font-bold text-[#e06070] underline underline-offset-2">
           {loc('اعتمد عنوانك', 'Get your address approved')}
         </Link>
       </span>

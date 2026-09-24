@@ -53,7 +53,7 @@ import AddressForm from '../components/address/AddressForm';
 export default function Addresses() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, isLoaded } = useAuth();
+  const { isAuthenticated, isLoaded, user } = useAuth();
   const { loc, lang, dir } = useLanguage();
 
   const [addresses, setAddresses] = useState<ApiAddress[]>([]);
@@ -66,6 +66,19 @@ export default function Addresses() {
   /** One write at a time. A second tap on Delete used to fire a second request
    *  and report 'Address not found' for a deletion that had just succeeded. */
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  /**
+   * «اعتمد العنوان» — a PRO member's first approved address, chosen here, next
+   * to Delete. Two windows, because it cannot be undone from this screen: the
+   * first says what it is and that it is final, the second asks for the plain
+   * «أنا متأكد». The server re-checks every condition (worker/routes/kyc.ts
+   * `/address-self-approve`); the button is only where it is offered.
+   */
+  const isPro =
+    !!user && user.membership_tier === 'pro' && (user.subscription_expiry === 0 || user.subscription_expiry > Date.now());
+  const [approveId, setApproveId] = useState<string | null>(null);
+  const [approveStep, setApproveStep] = useState<1 | 2>(1);
+  const approveAnchor = useRef<HTMLElement | null>(null);
 
   /**
    * WHERE TO GO BACK TO, AND WHAT TO TELL IT.
@@ -135,6 +148,22 @@ export default function Addresses() {
       await loadAddresses();
     } catch (err) {
       setActionError(apiRefusal(err, lang as 'ar' | 'en' | 'ckb', loc('تعذّر حذف العنوان', 'Could not delete the address', 'نەتوانرا ناونیشان بسڕدرێتەوە')));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!approveId || busyId) return;
+    const id = approveId;
+    setActionError('');
+    setBusyId(id);
+    setApproveId(null);
+    try {
+      await api.post('/api/kyc/address-self-approve', { addressId: id, confirm: 'APPROVE_ADDRESS' });
+      await loadAddresses();
+    } catch (err) {
+      setActionError(apiRefusal(err, lang as 'ar' | 'en' | 'ckb', loc('تعذّر اعتماد العنوان', 'Could not approve the address')));
     } finally {
       setBusyId(null);
     }
@@ -320,6 +349,22 @@ export default function Addresses() {
                           <Trash2 aria-hidden="true" className="w-3.5 h-3.5" />
                           {loc('حذف', 'Delete', 'سڕینەوە')}
                         </button>
+                        {isPro && !addresses.some((a) => a.backs_approved_snapshot) ? (
+                          <button
+                            type="button"
+                            data-approve-address={addr.id}
+                            disabled={busyId !== null}
+                            onClick={(e) => {
+                              approveAnchor.current = e.currentTarget;
+                              setApproveStep(1);
+                              setApproveId(addr.id);
+                            }}
+                            className="lv-button lv-button-ghost min-h-[40px] px-2.5 text-[12px] font-bold text-[#e06070] hover:text-[#f07a88] disabled:opacity-40 [touch-action:manipulation]"
+                          >
+                            <ShieldCheck aria-hidden="true" className="w-3.5 h-3.5" />
+                            {loc('اعتمد العنوان', 'Approve address')}
+                          </button>
+                        ) : null}
                         {!isDefault ? (
                           <button
                             type="button"
@@ -395,6 +440,75 @@ export default function Addresses() {
             >
               {loc('حذف', 'Delete', 'سڕینەوە')}
             </button>
+          </div>
+        </div>
+      </Overlay>
+
+      {/* APPROVE — two answers, twice. Same Overlay contract as Delete: it
+          grows out of the row's own button, and neither Escape nor the scrim
+          answers for the customer, because the answer is final. */}
+      <Overlay
+        open={!!approveId}
+        onClose={() => setApproveId(null)}
+        labelledBy="approve-address-title"
+        anchor={approveAnchor}
+        dismissOnEscape={false}
+        dismissOnScrim={false}
+        z={60}
+        testId="address-approve-confirm"
+        panelClassName="w-full max-w-sm"
+      >
+        <div className="p-6" data-approve-step={approveStep}>
+          <h2 id="approve-address-title" className="text-xl font-bold mb-2 flex items-center gap-2">
+            <ShieldCheck aria-hidden="true" className="w-5 h-5 text-[#e06070]" />
+            {approveStep === 1 ? loc('اعتماد العنوان', 'Approve this address') : loc('هل أنت متأكد؟', 'Are you sure?')}
+          </h2>
+          {approveStep === 1 ? (
+            <>
+              <p className="text-zinc-300 text-[14px] leading-relaxed">
+                {loc(
+                  'سيصبح هذا العنوان عنوانك المعتمد لعضوية PRO، وعليه تُطبَّق أسعار PRO والتوصيل المجاني.',
+                  'This becomes your approved PRO address — where PRO prices and free delivery apply.'
+                )}
+              </p>
+              <p className="lv-alert lv-alert-warning mt-3 mb-6 flex items-start gap-1.5 text-[13px] text-amber-100">
+                <AlertTriangle aria-hidden="true" className="w-4 h-4 shrink-0 mt-0.5" />
+                {loc(
+                  'انتبه: هذه العملية لا يمكن تغييرها لاحقًا. تأكد من الاسم والرقم والعنوان قبل المتابعة.',
+                  'Careful: this cannot be changed later. Check the name, phone and address before you continue.'
+                )}
+              </p>
+            </>
+          ) : (
+            <p className="text-zinc-300 mb-6 text-[14px] leading-relaxed">
+              {loc(
+                'بعد الاعتماد لا يمكنك تغيير عنوانك المعتمد بنفسك.',
+                'Once approved, you cannot change your approved address yourself.'
+              )}
+            </p>
+          )}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setApproveId(null)}
+              className="lv-button lv-button-secondary flex-1 min-h-[48px]"
+            >
+              {loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}
+            </button>
+            {approveStep === 1 ? (
+              <button type="button" onClick={() => setApproveStep(2)} className="lv-button lv-button-primary flex-1 min-h-[48px]">
+                {loc('متابعة', 'Continue')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                data-approve-final
+                onClick={handleApprove}
+                className="lv-button lv-button-primary flex-1 min-h-[48px] text-[13.5px]"
+              >
+                {loc('أنا متأكد وأعتمد العنوان', "I'm sure — approve it")}
+              </button>
+            )}
           </div>
         </div>
       </Overlay>
