@@ -152,6 +152,51 @@ CREATE INDEX IF NOT EXISTS idx_mle_legacy ON merchant_ledger_entries(legacy_id) 
 -- ------------------------------------------------------------ the mapping
 -- One view, read by the backfill below AND by the insert mirror, so the two
 -- can never map an old row differently.
+-- ------------------------------------------------------ the mapping, as rows
+-- How each old ledger row's shape splits into new lines. It was a VALUES list
+-- inside the view and a UNION ALL chain inside the mirror trigger; the live D1
+-- refused both («too many terms in compound SELECT» — D1 caps compound SELECT
+-- terms far below SQLite's 500, and a multi-row VALUES used as a table counts
+-- as one), so the rows live here, written by a plain INSERT, which D1 does
+-- not limit that way. tests/d1CompoundLimit.test.ts holds every migration
+-- and the Worker's SQL to the measured cap.
+CREATE TABLE IF NOT EXISTS merchant_ledger_legacy_parts (
+  src TEXT NOT NULL CHECK (src IN ('backfill','mirror')),
+  shape TEXT NOT NULL,
+  part TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  bucket TEXT NOT NULL,
+  PRIMARY KEY (src, shape, part)
+);
+INSERT OR IGNORE INTO merchant_ledger_legacy_parts (src, shape, part, kind, bucket) VALUES
+  ('backfill','sale','gross','sale_gross','STATE'),
+  ('backfill','sale','commission','commission','STATE'),
+  ('backfill','sale','delivery','delivery_fee','STATE'),
+  ('backfill','sale_void','gross','sale_gross','pending'),
+  ('backfill','sale_void','commission','commission','pending'),
+  ('backfill','sale_void','delivery','delivery_fee','pending'),
+  ('backfill','sale_void','refund','refund','pending'),
+  ('backfill','sale_void','commission_refund','commission_refund','pending'),
+  ('backfill','sale_void','delivery_refund','delivery_refund','pending'),
+  ('backfill','clawback','refund','refund','available'),
+  ('backfill','clawback','commission_refund','commission_refund','available'),
+  ('backfill','clawback','delivery_refund','delivery_refund','available'),
+  ('backfill','escrow','credit','escrow_release','available'),
+  ('backfill','escrow_fee','fee_gross','escrow_release','available'),
+  ('backfill','escrow_fee','commission','commission','available'),
+  ('backfill','payout','out','payout','available'),
+  ('backfill','payout','paid','payout','paid'),
+  ('backfill','payout','adj_pending','adjustment','pending'),
+  ('backfill','other','adj_pending','adjustment','pending'),
+  ('backfill','other','adj_available','adjustment','available'),
+  ('mirror','release','rel_out','release','pending'),
+  ('mirror','release','rel_in','release','available'),
+  ('mirror','void','refund','refund','pending'),
+  ('mirror','void','commission_refund','commission_refund','pending'),
+  ('mirror','void','delivery_refund','delivery_refund','pending'),
+  ('mirror','other','adj_pending','adjustment','pending'),
+  ('mirror','other','adj_available','adjustment','available');
+
 CREATE VIEW IF NOT EXISTS merchant_ledger_legacy_lines AS
 WITH r AS (
   SELECT l.id AS legacy_id, l.merchant_id, l.kind, l.state, l.amount_iqd AS amount, ABS(l.amount_iqd) AS a,
@@ -178,17 +223,8 @@ WITH r AS (
       ELSE 'other'
     END AS shape
   FROM r
-), p(shape, part, kind, bucket) AS (VALUES
-  ('sale','gross','sale_gross','STATE'), ('sale','commission','commission','STATE'), ('sale','delivery','delivery_fee','STATE'),
-  ('sale_void','gross','sale_gross','pending'), ('sale_void','commission','commission','pending'),
-  ('sale_void','delivery','delivery_fee','pending'), ('sale_void','refund','refund','pending'),
-  ('sale_void','commission_refund','commission_refund','pending'), ('sale_void','delivery_refund','delivery_refund','pending'),
-  ('clawback','refund','refund','available'), ('clawback','commission_refund','commission_refund','available'),
-  ('clawback','delivery_refund','delivery_refund','available'),
-  ('escrow','credit','escrow_release','available'),
-  ('escrow_fee','fee_gross','escrow_release','available'), ('escrow_fee','commission','commission','available'),
-  ('payout','out','payout','available'), ('payout','paid','payout','paid'), ('payout','adj_pending','adjustment','pending'),
-  ('other','adj_pending','adjustment','pending'), ('other','adj_available','adjustment','available')
+), p AS (
+  SELECT shape, part, kind, bucket FROM merchant_ledger_legacy_parts WHERE src = 'backfill'
 )
 SELECT 'mle_legacy_' || s.legacy_id || '_' || p.part AS id,
        s.merchant_id, s.store_id, s.order_id, s.community_order_id, s.escrow_id,
@@ -381,13 +417,7 @@ BEGIN
             ) x
         ) d
         JOIN (
-          SELECT 'release' AS how, 'rel_out' AS part, 'release' AS kind, 'pending' AS bucket
-          UNION ALL SELECT 'release', 'rel_in', 'release', 'available'
-          UNION ALL SELECT 'void', 'refund', 'refund', 'pending'
-          UNION ALL SELECT 'void', 'commission_refund', 'commission_refund', 'pending'
-          UNION ALL SELECT 'void', 'delivery_refund', 'delivery_refund', 'pending'
-          UNION ALL SELECT 'other', 'adj_pending', 'adjustment', 'pending'
-          UNION ALL SELECT 'other', 'adj_available', 'adjustment', 'available'
+          SELECT shape AS how, part, kind, bucket FROM merchant_ledger_legacy_parts WHERE src = 'mirror'
         ) p ON p.how = d.how
     ) q
    WHERE q.amt <> 0

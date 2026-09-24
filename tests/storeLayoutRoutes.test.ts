@@ -46,7 +46,7 @@ import { serialD1 } from './fixtures/serialD1';
 import { MEDIA, OTHER, OWNER, SLUG, STORE_ID, seedLayoutStore } from './fixtures/storeLayout';
 import { storeLayoutRoutes, MAX_REVISIONS } from '../worker/routes/storeLayout';
 import { storefrontRoutes } from '../worker/routes/storefront';
-import { blockDataFor } from '../worker/lib/storeLayout';
+import { blockDataFor, D1_MAX_UNION_TERMS } from '../worker/lib/storeLayout';
 import { storeById } from '../worker/lib/merchantAuth';
 import { collectMediaReferences, readLiveSchema } from '../worker/lib/mediaRefs';
 import { defaultLayoutFromStore } from '../packages/storeLayout/src/defaults';
@@ -758,11 +758,18 @@ test('the rows a layout shows are read in a fixed number of statements, however 
   const smallCount = executed.length;
   const smallBinds = Math.max(...executed.map((e) => e.binds));
   executed.length = 0;
-  await blockDataFor(db, ctx, large);
+  const largeData = await blockDataFor(db, ctx, large);
   const largeCount = executed.length;
   const largeBinds = Math.max(...executed.map((e) => e.binds));
+  assert.equal(Object.keys(largeData.products).length, MAX_PRODUCT_QUERIES, 'every one of the twelve lists is answered');
 
-  assert.equal(largeCount, smallCount, `statements do not grow with the layout (${smallCount} vs ${largeCount})`);
+  // Twelve lists are three statements, not one: the live D1 refuses a UNION ALL
+  // chain of more than D1_MAX_UNION_TERMS terms (workflow 58). Still bounded.
+  assert.ok(largeCount <= smallCount + 2, `statements stay bounded (${smallCount} vs ${largeCount})`);
+  for (const e of executed) {
+    const terms = (e.sql.match(/\bUNION\b/gi) ?? []).length + 1;
+    assert.ok(terms <= D1_MAX_UNION_TERMS, `a compound SELECT of ${terms} terms would be refused by D1`);
+  }
   assert.ok(smallCount <= 11, `a fixed handful of statements (${smallCount})`);
   assert.ok(largeBinds <= 40, `the widest statement binds ${largeBinds} parameters`);
   assert.ok(smallBinds <= largeBinds);

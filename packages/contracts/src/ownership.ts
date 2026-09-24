@@ -151,7 +151,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // per store and a rule per governorate that departs from its default.
     'merchant_delivery_profiles', 'merchant_delivery_rules',
     // 0121 — the append-only merchant ledger and payout requests (docs/MERCHANT_PLATFORM.md §4.3).
-    'merchant_ledger_entries', 'merchant_payouts',
+    'merchant_ledger_entries', 'merchant_payouts', 'merchant_ledger_legacy_parts',
     // 0126 — the merchant catalogue (W2-F): option groups, their values and the
     // variants sold, a product's ordered media, and manual collection membership.
     'community_product_options', 'community_product_option_values', 'community_product_variants',

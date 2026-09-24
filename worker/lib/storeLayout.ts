@@ -136,6 +136,9 @@ function cursorOf(rows: Array<Record<string, unknown>>, limit: number): string |
  * together; see the file header. Never throws: a failed read leaves those
  * blocks to load their own rows (their empty `null`), and the page stands.
  */
+/** The live D1's cap on terms in one compound SELECT (workflow 58 measured it: 5 pass, 6 fail). */
+export const D1_MAX_UNION_TERMS = 5;
+
 export async function blockDataFor(db: D1Database, ctx: StoreContext, layout: StoreLayout): Promise<BlockData> {
   const needs = collectDataNeeds(layout);
   const data = emptyBlockData();
@@ -167,48 +170,56 @@ export async function blockDataFor(db: D1Database, ctx: StoreContext, layout: St
         .catch(() => ({ results: [] as Array<{ id: string; kind: CollectionKind }> }));
       for (const r of results ?? []) kinds.set(r.id, r.kind ?? 'manual');
     }
-    const parts: string[] = [];
-    const binds: unknown[] = [storeId, sinceNewArrivals()];
-    const param = (v: unknown) => {
-      binds.push(v);
-      return `?${binds.length}`;
-    };
-    for (const q of needs.products) {
-      const key = param(q.key);
-      let filter = '';
-      let sv = 'created_at';
-      let order = 'created_at DESC, id DESC';
-      if (q.source === 'featured') filter = 'AND featured = 1';
-      else if (q.source === 'deals') filter = 'AND original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd';
-      else if (q.source === 'collection') {
-        const kind = kinds.get(q.collection_id);
-        const idp = param(q.collection_id);
-        if (!kind) filter = 'AND 0';
-        else {
-          filter = `AND ${collectionMemberSql(kind, 'community_products', idp, '?2')}`;
-          const o = collectionOrder(kind, 'community_products', idp);
-          sv = o.sortExpr;
-          order = `${o.sortExpr} ${o.dir}, id DESC`;
+    // THE LIVE D1 CAPS A UNION ALL CHAIN AT 5 TERMS (measured by workflow 58:
+    // 6 terms fail with «too many terms in compound SELECT»), and a layout may
+    // ask for up to 12 lists. So the lists go in chunks of D1_MAX_UNION_TERMS,
+    // one statement each, every chunk numbering its own parameters from ?3.
+    const since = sinceNewArrivals();
+    const statements: Array<{ sql: string; binds: unknown[] }> = [];
+    for (let i = 0; i < needs.products.length; i += D1_MAX_UNION_TERMS) {
+      const parts: string[] = [];
+      const binds: unknown[] = [storeId, since];
+      const param = (v: unknown) => {
+        binds.push(v);
+        return `?${binds.length}`;
+      };
+      for (const q of needs.products.slice(i, i + D1_MAX_UNION_TERMS)) {
+        const key = param(q.key);
+        let filter = '';
+        let sv = 'created_at';
+        let order = 'created_at DESC, id DESC';
+        if (q.source === 'featured') filter = 'AND featured = 1';
+        else if (q.source === 'deals') filter = 'AND original_price_iqd IS NOT NULL AND original_price_iqd > price_iqd';
+        else if (q.source === 'collection') {
+          const kind = kinds.get(q.collection_id);
+          const idp = param(q.collection_id);
+          if (!kind) filter = 'AND 0';
+          else {
+            filter = `AND ${collectionMemberSql(kind, 'community_products', idp, '?2')}`;
+            const o = collectionOrder(kind, 'community_products', idp);
+            sv = o.sortExpr;
+            order = `${o.sortExpr} ${o.dir}, id DESC`;
+          }
         }
+        const limit = param(q.limit);
+        parts.push(
+          `SELECT * FROM (SELECT ${key} AS qk, ${PRODUCT_CARD_COLUMNS}, ${sv} AS sv FROM community_products
+             WHERE store_id = ?1 AND ${live} ${filter}
+             ORDER BY ${order} LIMIT ${limit})`
+        );
       }
-      const limit = param(q.limit);
-      parts.push(
-        `SELECT * FROM (SELECT ${key} AS qk, ${PRODUCT_CARD_COLUMNS}, ${sv} AS sv FROM community_products
-           WHERE store_id = ?1 AND ${live} ${filter}
-           ORDER BY ${order} LIMIT ${limit})`
-      );
+      statements.push({ sql: parts.join(' UNION ALL '), binds });
     }
     tasks.push(
-      db
-        .prepare(parts.join(' UNION ALL '))
-        .bind(...binds)
-        .all<Record<string, unknown>>()
-        .then(({ results }) => {
+      Promise.all(statements.map((st) => db.prepare(st.sql).bind(...st.binds).all<Record<string, unknown>>()))
+        .then((answers) => {
           const byKey = new Map<string, Array<Record<string, unknown>>>();
-          for (const r of results ?? []) {
-            const list = byKey.get(String(r.qk)) ?? [];
-            list.push(r);
-            byKey.set(String(r.qk), list);
+          for (const { results } of answers) {
+            for (const r of results ?? []) {
+              const list = byKey.get(String(r.qk)) ?? [];
+              list.push(r);
+              byKey.set(String(r.qk), list);
+            }
           }
           for (const q of needs.products) {
             const rows = byKey.get(q.key) ?? [];
