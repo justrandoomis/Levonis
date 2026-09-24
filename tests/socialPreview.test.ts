@@ -418,3 +418,33 @@ test('the fallback injects, strips the stale validator, and cannot break a page 
   // must pass through untouched.
   assert.match(fn, /text\\\/html/);
 });
+
+// Security review of 644e3ea, H1: `$` sequences are replacement COMMANDS in a
+// string passed to String.prototype.replace. A store name or an og:url query
+// carrying `$\``, `$'` or `$&` must land in the document literally, escaped,
+// and never splice the page's own markup into an attribute.
+test('`$` sequences in any card field are written literally, never as replacement patterns', () => {
+  const shell = [
+    '<!doctype html><html><head>',
+    '<title>LEVONIS</title>',
+    '<meta property="og:title" content="LEVONIS" />',
+    '<meta property="og:url" content="https://levonis-iq.com/" />',
+    '<meta name="description" content="x" />',
+    '</head><body><div id="root"></div><script type="module" src="/assets/index.js"></script></body></html>',
+  ].join('\n');
+  for (const evil of ['$`', "$'", '$&', '$$', 'A$`B$\'C$&D']) {
+    const out = injectSocialPreview(shell, {
+      title: `Shop ${evil}`,
+      description: `About ${evil}`,
+      image: '',
+      url: `https://levonis-iq.com/product/x?q=${evil}`,
+      siteName: `Site ${evil}`,
+    });
+    assert.equal((out.match(/<!doctype html>/gi) ?? []).length, 1, `${evil}: the document prefix was spliced in`);
+    assert.equal((out.match(/<body>/g) ?? []).length, 1, `${evil}: the document tail was spliced in`);
+    assert.equal((out.match(/<title>/g) ?? []).length, 1, `${evil}: one title`);
+    const esc = evil.replace(/&/g, '&amp;');
+    assert.ok(out.includes(`<title>Shop ${esc}</title>`), `${evil}: title written literally`);
+    assert.ok(out.includes(`?q=${esc}"`), `${evil}: og:url written literally`);
+  }
+});

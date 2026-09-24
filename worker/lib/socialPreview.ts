@@ -208,8 +208,12 @@ function escapeAttribute(value: string): string {
 function setMeta(html: string, attr: 'property' | 'name', key: string, value: string): string {
   const tag = `<meta ${attr}="${key}" content="${escapeAttribute(value)}" />`;
   const existing = new RegExp(`<meta\\s+${attr}="${key}"[^>]*>`, 'i');
-  if (existing.test(html)) return html.replace(existing, tag);
-  return html.replace(/<\/head>/i, `  ${tag}\n  </head>`);
+  // A FUNCTION replacement, never a string: in a replacement string `$&`,
+  // `$\``, `$'` and `$$` are commands, so a store name or an og:url query
+  // carrying one spliced raw document text into the attribute and broke out
+  // of the escaping above (security review of 644e3ea, H1).
+  if (existing.test(html)) return html.replace(existing, () => tag);
+  return html.replace(/<\/head>/i, () => `  ${tag}\n  </head>`);
 }
 
 /**
@@ -228,7 +232,7 @@ function setMeta(html: string, attr: 'property' | 'name', key: string, value: st
 export function injectSocialPreview(html: string, preview: SocialPreview): string {
   let out = html;
   if (preview.title) {
-    out = out.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeAttribute(preview.title)}</title>`);
+    out = out.replace(/<title>[\s\S]*?<\/title>/i, () => `<title>${escapeAttribute(preview.title)}</title>`);
     out = setMeta(out, 'property', 'og:title', preview.title);
     out = setMeta(out, 'name', 'twitter:title', preview.title);
   }
