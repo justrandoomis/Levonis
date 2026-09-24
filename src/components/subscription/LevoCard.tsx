@@ -26,6 +26,31 @@ const ART_SIZE = {
   lg: 'w-44 h-[6.95rem] rounded-[14px]',
 } as const;
 
+/**
+ * THE MATERIAL. A Levo card is an object from a print shop, so its surface is
+ * printed: fine horizontal layer lines — the grain every FDM part carries —
+ * under a wash of the tier's colour from one corner and a single diagonal
+ * sheen, on a near-black body. The same material draws the big cards on
+ * /subscription and the member's own card, so the card you choose is the card
+ * you get. The body stays dark in the light theme too: it is a physical card,
+ * not a surface of the page.
+ */
+export function cardMaterial(tier: PaidTier): React.CSSProperties {
+  const hex = TIER_META[tier].hex;
+  return {
+    backgroundColor: '#0f1012',
+    backgroundImage: [
+      'linear-gradient(115deg, transparent 34%, rgb(255 255 255 / 0.07) 47%, transparent 60%)',
+      'repeating-linear-gradient(0deg, rgb(255 255 255 / 0.035) 0 1px, transparent 1px 4px)',
+      `radial-gradient(130% 95% at 100% 0%, ${hex}66 0%, ${hex}1f 38%, transparent 62%)`,
+      `radial-gradient(90% 80% at 0% 100%, ${hex}26 0%, transparent 58%)`,
+      'linear-gradient(160deg, #1c1e21 0%, #0c0d0f 100%)',
+    ].join(', '),
+    borderColor: `${hex}4d`,
+    boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.12), 0 24px 48px -28px rgb(0 0 0 / 0.85)',
+  };
+}
+
 /** A tier's card face at a glance. Decorative: the name is always said beside it. */
 export function CardArt({ tier, size = 'sm', className = '' }: { tier: PaidTier; size?: keyof typeof ART_SIZE; className?: string }) {
   const meta = TIER_META[tier];
@@ -34,8 +59,8 @@ export function CardArt({ tier, size = 'sm', className = '' }: { tier: PaidTier;
     <span
       aria-hidden
       data-card-art={tier}
-      className={`relative block shrink-0 overflow-hidden border ${ART_SIZE[size]} ${meta.cardFace} ${className}`}
-      style={{ borderColor: `${meta.hex}59` }}
+      className={`relative block shrink-0 overflow-hidden border ${ART_SIZE[size]} ${className}`}
+      style={cardMaterial(tier)}
     >
       <meta.Icon className={`absolute ${big ? 'top-3 start-3 w-5 h-5' : 'top-[18%] start-[12%] w-[26%] h-[40%]'}`} style={{ color: meta.hex }} />
       {big && (
@@ -65,8 +90,8 @@ export function LevoCard({ user, tier }: LevoCardProps) {
   return (
     <div
       data-levo-card={tier}
-      className={`relative shrink-0 w-[10.5rem] sm:w-[15.5rem] aspect-[1.58/1] rounded-[14px] sm:rounded-[18px] border p-3 sm:p-3.5 flex flex-col justify-between overflow-hidden ${meta.cardFace}`}
-      style={{ borderColor: `${meta.hex}59` }}
+      className="relative shrink-0 w-[10.5rem] sm:w-[15.5rem] aspect-[1.586/1] rounded-[14px] sm:rounded-[18px] border p-3 sm:p-3.5 flex flex-col justify-between overflow-hidden"
+      style={cardMaterial(tier)}
     >
       <div className="flex items-start justify-between gap-2">
         <span className="flex items-center gap-1.5 min-w-0">
