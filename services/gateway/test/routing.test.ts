@@ -58,6 +58,8 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/admin/warranties': 'DEVICES',
   '/api/admin/community': 'MARKETPLACE',
   '/api/admin/import': 'CATALOG',
+  '/api/admin/chats': 'CORE',
+  '/api/admin/wallet-adjust': 'LEDGER',
   '/api/admin/products': 'CATALOG',
   '/api/memberships': 'SUBSCRIPTIONS',
   '/api/telegram': 'IDENTITY',
