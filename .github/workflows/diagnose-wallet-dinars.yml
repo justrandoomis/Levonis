@@ -1,0 +1,67 @@
+# READ-ONLY. Every statement is a SELECT against the live database.
+#
+# «عند تعبئة 50,000 وبعد موافقة التعبئة ظهر 49,994 دينار». Prints the recent
+# deposits exactly as the ledger holds them — the cents, the dinars recorded on
+# the row (0108), the dinars the customer declared (0105) and the rate each was
+# filed at — so the cause of a 49,994 reading is read off the data instead of
+# guessed. Accounts are shown by the last 6 characters of their id only.
+name: 0 - Diagnose wallet dinars (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'How many days back to read'
+        required: false
+        default: '10'
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DAYS: ${{ github.event.inputs.days || '10' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: The rate
+        continue-on-error: true
+        run: |
+          npx wrangler d1 execute levonis-db-staging --remote --json \
+            --command "SELECT key, value FROM admin_settings WHERE key IN ('exchangeRate')" | jq -r '.[0].results[] | "\(.key) = \(.value)"'
+
+      - name: Recent deposits, as stored
+        continue-on-error: true
+        run: |
+          D=$(printf '%d' "$DAYS")
+          npx wrangler d1 execute levonis-db-staging --remote --json --command "
+            SELECT substr(t.user_id, -6) AS acct, substr(t.id, -6) AS tx, t.status, t.amount AS cents,
+                   t.amount_iqd, t.exchange_rate_snapshot AS tx_rate,
+                   m.declared_amount_iqd AS declared, m.exchange_rate_snapshot AS meta_rate,
+                   (m.tx_id IS NOT NULL) AS has_meta, t.created_at, t.decided_at, t.created_by
+              FROM wallet_transactions t
+              LEFT JOIN wallet_deposit_meta m ON m.tx_id = t.id
+             WHERE t.type = 'deposit' AND t.currency = 'USD'
+               AND t.created_at >= datetime('now', '-$D days')
+             ORDER BY t.created_at DESC LIMIT 40" \
+            | jq -r '.[0].results[] | "\(.created_at)  acct=\(.acct) tx=\(.tx) \(.status)  cents=\(.cents) amount_iqd=\(.amount_iqd) tx_rate=\(.tx_rate)  declared=\(.declared) meta_rate=\(.meta_rate) meta=\(.has_meta)  by=\(.created_by // "-")"'
+
+      - name: Other USD rows on the same accounts (credits, adjustments, spends)
+        continue-on-error: true
+        run: |
+          D=$(printf '%d' "$DAYS")
+          npx wrangler d1 execute levonis-db-staging --remote --json --command "
+            SELECT substr(t.user_id, -6) AS acct, t.type, t.status, t.amount AS cents, t.amount_iqd,
+                   t.exchange_rate_snapshot AS rate, t.created_at
+              FROM wallet_transactions t
+             WHERE t.currency = 'USD' AND t.type <> 'deposit'
+               AND t.user_id IN (SELECT user_id FROM wallet_transactions
+                                  WHERE type = 'deposit' AND created_at >= datetime('now', '-$D days'))
+             ORDER BY t.created_at DESC LIMIT 60" \
+            | jq -r '.[0].results[] | "\(.created_at)  acct=\(.acct) \(.type) \(.status) cents=\(.cents) amount_iqd=\(.amount_iqd) rate=\(.rate)"'
