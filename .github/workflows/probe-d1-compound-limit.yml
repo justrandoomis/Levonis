@@ -28,7 +28,7 @@ jobs:
           for n in 2 3 4 5 6 7 8 10 12 16 20 50; do
             u="SELECT 1 AS x"; v="(1)"
             for i in $(seq 2 $n); do u="$u UNION ALL SELECT $i"; v="$v,($i)"; done
-            if npx wrangler d1 execute levonis-db-staging --remote --env staging --json --command "SELECT COUNT(*) AS n FROM ($u)" >/dev/null 2>/tmp/e; then ru=ok; else ru="FAIL $(grep -o 'too many terms[^[]*' /tmp/e | head -1)"; fi
-            if npx wrangler d1 execute levonis-db-staging --remote --env staging --json --command "WITH t(x) AS (VALUES $v) SELECT COUNT(*) AS n FROM t" >/dev/null 2>/tmp/e; then rv=ok; else rv="FAIL $(grep -o 'too many terms[^[]*' /tmp/e | head -1)"; fi
+            if npx wrangler d1 execute levonis-db-staging --remote --json --command "SELECT COUNT(*) AS n FROM ($u)" >/dev/null 2>/tmp/e; then ru=ok; else ru="FAIL $(tr -d "\n" < /tmp/e | grep -oE "(too many terms|ERROR)[^│]{0,90}" | head -1)"; fi
+            if npx wrangler d1 execute levonis-db-staging --remote --json --command "WITH t(x) AS (VALUES $v) SELECT COUNT(*) AS n FROM t" >/dev/null 2>/tmp/e; then rv=ok; else rv="FAIL $(tr -d "\n" < /tmp/e | grep -oE "(too many terms|ERROR)[^│]{0,90}" | head -1)"; fi
             echo "terms=$n  union_all=$ru  values_table=$rv"
           done
