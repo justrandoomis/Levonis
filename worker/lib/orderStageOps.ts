@@ -305,6 +305,17 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   if (!opts.force && !canMoveStage(from, opts.to, order.shipping_type)) {
     return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'ILLEGAL_MOVE' };
   }
+  /*
+   * A COMMUNITY-STORE ORDER NEVER ENTERS OR LEAVES `cancelled` HERE — not even
+   * forced. A stage move into `cancelled` refunds nothing (see below), and a
+   * store order's cancellation must refund the buyer, restock the store and
+   * reverse the merchant's credit together: that is `cancelStoreOrder`
+   * (worker/lib/storeOrderOps.ts), which every door calls instead. Leaving
+   * `cancelled` would re-open an order whose money went back to the customer.
+   */
+  if (String(row.seller_type ?? '') === 'merchant' && legacyFrom !== legacyTo && (legacyTo === 'cancelled' || legacyFrom === 'cancelled')) {
+    return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'ILLEGAL_MOVE' };
+  }
 
   const durations = resolveDurations(await getSetting(env.DB, 'orderStageDurations'));
   const schedule = scheduleFrom(opts.to, order.shipping_type, durations, nowIso, spreadFor(order.id));

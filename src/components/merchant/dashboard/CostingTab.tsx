@@ -102,15 +102,30 @@ const PROVENANCE_LABEL: Record<string, [string, string]> = {
   inferred: ['مستنتج', 'inferred'],
 };
 
-/** Why a machine cannot take the job, in the merchant's language. */
+/**
+ * Why a machine cannot take the job, in the merchant's language.
+ *
+ * KEYED ON THE CODES THE SERVER SENDS (audit 03 §10 Z). `printerEligibility`
+ * (worker/lib/printQuote/printers.ts) answers `build_volume`, `material:<id>`,
+ * `materials_at_once`, `enclosure`, `hardened_nozzle` and `nozzle`; this table
+ * used to be keyed on names nothing ever sent (`TOO_LARGE`, …), so every
+ * refusal was printed to the merchant as the raw code.
+ */
 const REASON_LABEL: Record<string, [string, string]> = {
-  TOO_LARGE: ['القطعة أكبر من مساحة الطباعة', 'The part is larger than the build volume'],
-  MATERIAL_NOT_SUPPORTED: ['المادة غير مدعومة على هذا الجهاز', 'This machine cannot run that material'],
-  NEEDS_ENCLOSURE: ['المادة تحتاج غرفة مغلقة', 'The material needs an enclosure'],
-  NEEDS_HARDENED_NOZZLE: ['المادة كاشطة وتحتاج فوهة مقوّاة', 'The material is abrasive and needs a hardened nozzle'],
-  TOO_MANY_MATERIALS: ['عدد المواد أكثر مما يحمله الجهاز', 'More materials than the machine can hold at once'],
-  NOZZLE_NOT_AVAILABLE: ['قياس الفوهة غير متوفر', 'That nozzle size is not fitted'],
+  build_volume: ['القطعة أكبر من مساحة الطباعة', 'The part is larger than the build volume'],
+  materials_at_once: ['عدد المواد أكثر مما يحمله الجهاز', 'More materials than the machine can hold at once'],
+  enclosure: ['المادة تحتاج غرفة مغلقة', 'The material needs an enclosure'],
+  hardened_nozzle: ['المادة كاشطة وتحتاج فوهة مقوّاة', 'The material is abrasive and needs a hardened nozzle'],
+  nozzle: ['قياس الفوهة غير متوفر', 'That nozzle size is not fitted'],
 };
+const MATERIAL_REASON: [string, string] = ['المادة غير مدعومة على هذا الجهاز', 'This machine cannot run that material'];
+
+/** One refusal code as the merchant reads it; an unknown code is shown as it came. */
+function reasonLabel(code: string, en: boolean): string {
+  if (code.startsWith('material:')) return `${MATERIAL_REASON[en ? 1 : 0]} (${code.slice('material:'.length)})`;
+  const label = REASON_LABEL[code];
+  return label ? label[en ? 1 : 0] : code;
+}
 
 export function CostingTab() {
   const { lang, loc } = useLanguage();
@@ -399,9 +414,7 @@ export function CostingTab() {
                 <div className="min-w-0">
                   <p className="text-zinc-300 text-[12px]">{r.name}</p>
                   <p className="text-zinc-600 text-[11px] leading-relaxed">
-                    {(r.reasons ?? [])
-                      .map((code) => (REASON_LABEL[code] ? REASON_LABEL[code][en ? 1 : 0] : code))
-                      .join(' · ')}
+                    {(r.reasons ?? []).map((code) => reasonLabel(code, en)).join(' · ')}
                   </p>
                 </div>
               </li>

@@ -43,7 +43,7 @@
  * fails otherwise, which is the point: the value exists so that a deploy can
  * notice its own database is behind, and a stale value notices nothing.
  */
-export const EXPECTED_MIGRATION = '0113_warranty_config_brand_latin.sql';
+export const EXPECTED_MIGRATION = '0118_sanctions_moderation_store_chats.sql';
 
 /**
  * How many migration files this code expects to have been applied.
@@ -59,11 +59,11 @@ export const EXPECTED_MIGRATION = '0113_warranty_config_brand_latin.sql';
  * as a shortfall whatever its position. Kept honest by the same test as the
  * name above.
  *
- * IT IS NOT THE HIGHEST NUMBER. There are 111 files and the newest is 0113 —
+ * IT IS NOT THE HIGHEST NUMBER. There are 115 files and the newest is 0118 —
  * the numbering has gaps, which is exactly why the count has to be its own
  * constant rather than something derived from the name.
  */
-export const EXPECTED_MIGRATION_COUNT = 111;
+export const EXPECTED_MIGRATION_COUNT = 115;
 
 /**
  * The leading number of a migration filename, or null when it has none.
@@ -147,7 +147,14 @@ export async function readSchemaStatus(db: D1Database): Promise<SchemaStatus> {
   // BEHIND if either reading says so. The count catches a hole in the middle
   // that the newest name cannot see; the number catches a database whose
   // history was rewritten to the right length with the wrong files.
-  const behind = Math.max(behindByNumber, short);
+  //
+  // HOW FAR BEHIND is the COUNT whenever the count sees a shortfall. The
+  // numbers have gaps — a wave reserves a range and leaves some of it unused
+  // (0114–0119 in the merchant platform's wave 1) — so `expected − applied`
+  // counts numbers nobody ever wrote a file for as "missing", and a database
+  // stopped at 0083 read 35 behind with 32 files outstanding. The number is
+  // only the answer when the count says nothing is short.
+  const behind = short > 0 ? short : Math.max(behindByNumber, 0);
   if (behind > 0) {
     return { expected, applied, state: 'behind', behind, expected_count: EXPECTED_MIGRATION_COUNT, applied_count: appliedCount };
   }

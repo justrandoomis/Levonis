@@ -503,8 +503,14 @@ async function main() {
   check('and the measurement came with them', copiedFiles.some((f) => (f.analysis ?? '').includes('dimensions_mm')));
   const repeatSpec = query(`SELECT estimate_low_iqd, material_id FROM community_print_requests WHERE request_id='${repeatId}'`);
   check('the print spec was copied', repeatSpec[0]?.material_id === 'petg', JSON.stringify(repeatSpec[0]));
-  check('but January\'s price was NOT — it is re-estimated on publish',
-    repeatSpec[0]?.estimate_low_iqd === null, String(repeatSpec[0]?.estimate_low_iqd));
+  // The repeat is published through the one publish path (matching, expiry,
+  // a fresh estimate), so the price is today's, computed at publish — never
+  // January's copied across.
+  check('and it was published through matching, not left as a copy',
+    repeat.data?.published === true, JSON.stringify({ published: repeat.data?.published, error: repeat.data?.publish_error }));
+  check('with a fresh estimate computed at publish',
+    typeof repeatSpec[0]?.estimate_low_iqd === 'number' && repeatSpec[0].estimate_low_iqd > 0,
+    String(repeatSpec[0]?.estimate_low_iqd));
 
   // ------------------------------------------------------ 12. the refusals
   console.log('\n12. the refusals');

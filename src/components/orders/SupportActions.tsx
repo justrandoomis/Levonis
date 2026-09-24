@@ -19,6 +19,7 @@ const STRINGS = {
   ar: {
     chat: 'محادثة حول هذا الطلب',
     chatDesc: 'محادثة مباشرة مع الفريق مرتبطة بهذا الطلب',
+    chatDescStore: 'محادثة مباشرة مع المتجر مرتبطة بهذا الطلب',
     opening: 'جارٍ فتح المحادثة…',
     chatFailed: 'تعذر فتح المحادثة.',
     ticket: 'فتح تذكرة دعم',
@@ -33,6 +34,7 @@ const STRINGS = {
   en: {
     chat: 'Chat about this order',
     chatDesc: 'A direct conversation with the team, tied to this order',
+    chatDescStore: 'A direct conversation with the store, tied to this order',
     opening: 'Opening chat…',
     chatFailed: 'The chat could not be opened.',
     ticket: 'Open a support ticket',
@@ -47,6 +49,8 @@ const STRINGS = {
   ckb: {
     chat: 'گفتوگۆ دەربارەی ئەم داواکارییە',
     chatDesc: 'گفتوگۆی ڕاستەوخۆ لەگەڵ تیم، بەستراو بەم داواکارییە',
+    // OWNER: Sorani to be written by hand — the Arabic stands in until then.
+    chatDescStore: 'محادثة مباشرة مع المتجر مرتبطة بهذا الطلب',
     opening: 'کردنەوەی گفتوگۆ…',
     chatFailed: 'گفتوگۆکە نەکرایەوە.',
     ticket: 'کردنەوەی تکتی پشتگیری',
@@ -100,7 +104,9 @@ export default function SupportActions({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-white text-[13.5px] font-bold">{opening ? s.opening : s.chat}</span>
-          <span className="block text-zinc-500 text-[11.5px] truncate">{s.chatDesc}</span>
+          {/* A store order's thread is with its SELLER, who is a participant
+              and is notified (audit 04 #4) — not with the Levonis team. */}
+          <span className="block text-zinc-500 text-[11.5px] truncate">{order.receipt != null ? s.chatDescStore : s.chatDesc}</span>
         </span>
         <ChevronRight className="w-4 h-4 text-zinc-600 rtl:rotate-180 shrink-0" aria-hidden />
       </button>

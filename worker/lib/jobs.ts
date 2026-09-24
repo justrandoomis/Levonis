@@ -20,6 +20,9 @@ import { resolveOrderExpiry } from './orderExpiry';
 import type { SupportGiftReconciliation } from './membershipOps';
 import { sweepBnplOverdue, type BnplOverdueReport } from './bnpl';
 import { sweepAutomaticReviews, type AutomaticReviewSweepReport } from './reviewAutoSweep';
+import { runCommunitySweeps } from './communityRequests';
+import { runStoreOrderSweeps } from './storeOrderOps';
+import { refreshStaleMerchantBadges } from '../routes/merchantReviews';
 import { sweepCancelledOrders, type CancelledOrderSweepReport } from './orderDeletion';
 import {
   sweepStockAlerts,
@@ -517,6 +520,12 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
   await step('automatic_reviews', async () => {
     report.automatic_reviews = await sweepAutomaticReviews(env.DB, nowIso, 200);
   });
+  // 14b. A merchant badge earned by a completed order (audit 04 #24).
+  await step('merchant_badges', async () => { await refreshStaleMerchantBadges(env.DB); });
+  // 14c. Custom requests: stranded acceptances healed, request/offer expiry, the «يتأكد تلقائيًا» clock (communityRequests.ts).
+  await step('community_requests', async () => { report.errors.push(...(await runCommunitySweeps(env, nowIso)).errors.map((e) => `community_requests: ${e}`)); });
+  // 14d. Store orders: the sale credit three days after delivery (no open complaint), and orphaned checkout holds (storeOrderOps.ts).
+  await step('store_orders', async () => { const r = await runStoreOrderSweeps(env, nowIso); if (r.errors) report.errors.push(`store_orders: ${r.errors} failed (released ${r.released}, frozen ${r.frozen}, holds ${r.holds_released})`); });
 
   /**
    * 15. DRAIN THE OUTBOX AGAIN, LAST.

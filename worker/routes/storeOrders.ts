@@ -19,10 +19,12 @@
  *
  * MONEY. A store sale is not escrowed the way custom work is: the goods
  * exist, and the customer is buying rather than commissioning. The merchant's
- * share is written to the payout ledger as `pending` when the order is placed
- * and becomes `available` when it completes (§77) — so a merchant can see
- * what is coming without being able to spend it before the customer has the
- * goods.
+ * share — the goods after the coupon, less the platform's commission, PLUS
+ * the merchant's own delivery fee — is written to the payout ledger as
+ * `pending` when the order is placed. It becomes `available` when the
+ * CUSTOMER confirms receipt, or three days after delivery with no open
+ * complaint (the owner's rule, worker/lib/storeOrderOps.ts) — never on the
+ * merchant's own «تم التسليم».
  *
  * AND IT IS PREPAID. Every order on this path is paid from the customer's
  * wallet before the merchant ships — there is no cash on delivery and no
@@ -31,24 +33,40 @@
  * rule are one line each and both are here: `delivery_method_id` is fixed to
  * `'merchant'`, and `payment_method_id` to `'wallet'` with nothing due on
  * delivery. Neither is a client's choice.
+ *
+ * THE QUOTE AND THE ORDER ARE ONE AGREEMENT (B12). The quote returns a
+ * `quote_fingerprint` over everything that costs money; place-order re-prices
+ * from the database and refuses `409 QUOTE_CHANGED` — with the fresh quote —
+ * unless the fingerprint the customer confirmed is the one it computes now. A
+ * merchant raising a price or a delivery fee between the two used to be
+ * charged silently.
  */
 
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, notFound, conflict, str } from '../lib/http';
-import { newId } from '../lib/crypto';
+import { requireAuth, badRequest, notFound, str, HttpError } from '../lib/http';
+import { newId, sha256Hex } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { feeFor } from '../lib/merchantOps';
 import { exchangeRate } from '../lib/escrowOps';
 import {
   createPurchaseHold, commitHoldStatements, holdSettledEventStatements, getAvailableBalances,
-  readWalletDust, walletIqdAvailable, walletSpendCents,
+  readWalletDust, releaseHold, walletIqdAvailable, walletLedgerDinarsReady, walletSpendCents,
 } from '../lib/walletOps';
 import { rootDomainFrom } from '../lib/hosts';
 import { announceAfterResponse, orderAnnouncement, orderTopic } from '../lib/adminTopicRouting';
+import { storeById } from '../lib/merchantAuth';
+import { CART_SELLER_CONFLICT } from '../lib/cartSeller';
+import {
+  isOwnStore,
+  merchantVariantLabel,
+  notifyMerchantOfStoreOrder,
+  storeOrderPublic,
+  storeTakesOrders,
+} from '../lib/storeOrderOps';
 
 export const storeOrderRoutes = new Hono<AppContext>();
 storeOrderRoutes.use('*', requireAuth);
@@ -71,6 +89,12 @@ interface PricedLine {
    * nothing was chosen or the id no longer names anything on the product.
    */
   variant: string;
+  /**
+   * What `order_items.option_snapshot` records: the merchant's own words for
+   * a choice VALIDATED against the product (worker/lib/storeOrderOps.ts,
+   * `merchantVariantLabel`) — never the text a client posted (B16).
+   */
+  option_snapshot: string;
 }
 
 /**
@@ -119,12 +143,24 @@ interface PricedCart {
   store_name: string;
   store_slug: string;
   lines: PricedLine[];
+  /** Units per product, summed across option/colour lines — what stock is judged against. */
+  products: Array<{ product_id: string; qty: number }>;
+  /** Merchandise at the store's own prices, before any coupon. */
   subtotal_iqd: number;
-  delivery_iqd: number;
   coupon_code: string;
   coupon_id: string | null;
   discount_iqd: number;
+  /** What the customer pays for the GOODS: the subtotal after the coupon. */
+  merchandise_iqd: number;
+  delivery_iqd: number;
   total_iqd: number;
+  /**
+   * The order's commission snapshot. The platform's fee is taken on the goods
+   * only; the merchant receives the rest of the goods AND their whole delivery
+   * fee, so fee + receivable = total, to the dinar (B4).
+   */
+  commission: { commission_percent_x100: number; platform_fee_iqd: number; merchant_receivable_iqd: number };
+  quote_fingerprint: string;
 }
 
 /**
@@ -133,6 +169,12 @@ interface PricedCart {
  * Only consulted when the customer actually typed a code: an empty code is a
  * normal cart, never an error. A code that does not apply is a 400 with the
  * reason — a discount silently not applied is worse than a refusal.
+ *
+ * ITS MINIMUM IS JUDGED ON THE MERCHANDISE AT THE STORE'S OWN PRICES, before
+ * this coupon's discount (B22, docs/DECISIONS.md) — a minimum that included
+ * the coupon's own discount would be circular, and it is the platform
+ * coupon's rule too (worker/routes/orders.ts: the basis is after line
+ * discounts, before the coupon).
  */
 async function resolveCoupon(
   db: D1Database,
@@ -161,101 +203,183 @@ async function resolveCoupon(
   return { id: String(cp.id), code, discount };
 }
 
+/** 409 with the machine-readable context the checkout needs to say which line. */
+const refuse = (msg: string, code: string, details?: Record<string, unknown>) => new HttpError(409, msg, code, details);
+
 /**
  * Prices the merchant cart from the DATABASE, refusing anything that cannot
  * actually be sold right now.
  *
  * Every number here is read server-side (§17). A client that posts prices,
  * totals or a delivery fee is ignored entirely — those fields are not read.
+ *
+ * WHAT IT REFUSES, IN ORDER, AND WHY EACH ONE IS HERE:
+ *   · a cart spanning two stores (B8): the order is written with ONE seller,
+ *     and the first line's seller used to be billed for — and credited with —
+ *     the second store's goods;
+ *   · the merchant's own store (B17);
+ *   · a store that may not sell (B11): paused, suspended, restricted, not
+ *     selling products, or an owner without the store entitlement;
+ *   · a hidden or moved product, and an option or colour that names nothing
+ *     on its product (B16);
+ *   · stock judged on the units per PRODUCT, not per line (B5): two colours
+ *     of a product with one unit left used to both pass.
  */
 async function priceMerchantCart(c: Context<AppContext>, couponCode = ''): Promise<PricedCart> {
   const user = c.get('user')!;
-  const { results } = await c.env.DB.prepare(
+  const db = c.env.DB;
+  const { results } = await db.prepare(
     `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.color_id,
+            ci.merchant_id AS line_merchant_id, ci.store_id AS line_store_id,
             p.id, p.name, p.images, p.price_iqd, p.stock, p.track_stock, p.lifecycle, p.status,
-            p.options, p.colors,
-            s.id AS store_id, s.slug AS store_slug, s.name AS store_name,
-            s.status AS store_status, s.delivery_settings,
-            m.id AS merchant_id, m.status AS merchant_status
+            p.options, p.colors, p.store_id AS product_store_id
        FROM cart_items ci
        JOIN community_products p ON p.id = ci.community_product_id
-       JOIN merchant_stores s ON s.id = ci.store_id
-       JOIN community_merchants m ON m.id = ci.merchant_id
       WHERE ci.user_id = ? AND ci.seller_type = 'merchant'
-      ORDER BY ci.created_at`
+      ORDER BY ci.created_at, ci.id`
   ).bind(user.id).all<Record<string, unknown>>();
 
   if (!results.length) throw badRequest('Your cart is empty', 'CART_EMPTY');
 
-  const first = results[0];
-  if (first.store_status !== 'active' || first.merchant_status === 'suspended') {
-    throw conflict('This store is not taking orders right now');
+  const merchants = new Set(results.map((r) => String(r.line_merchant_id ?? '')));
+  const stores = new Set(results.map((r) => String(r.line_store_id ?? '')));
+  if (merchants.size !== 1 || stores.size !== 1) {
+    throw refuse('Your cart holds items from more than one store. Keep one store’s items to check out.', CART_SELLER_CONFLICT, {
+      stores: stores.size,
+    });
   }
+  const storeId = [...stores][0];
+
+  const ctx = await storeById(db, storeId);
+  if (!ctx || ctx.merchant.id !== [...merchants][0]) {
+    throw refuse('This store is not taking orders right now', 'STORE_CLOSED');
+  }
+  if (isOwnStore(ctx, user.id)) {
+    throw new HttpError(403, 'A store cannot buy from itself', 'OWN_STORE_PURCHASE');
+  }
+  // Each refusal names only what a shopper needs to know. "This store is not
+  // taking orders" is true whether the merchant paused it, an admin
+  // suspended it, or their subscription lapsed — a customer has no business
+  // being told which, and a probe learns nothing about another account.
+  const verdict = await storeTakesOrders(db, ctx);
+  if (!verdict.ok) throw refuse('This store is not taking orders right now', 'STORE_CLOSED');
 
   const lines: PricedLine[] = [];
+  const perProduct = new Map<string, { qty: number; stock: number; tracked: boolean }>();
   let subtotal = 0;
   for (const r of results) {
+    const productId = String(r.id);
     // Availability is re-checked at checkout, not trusted from when the item
-    // was added. A product hidden or sold out in between must stop the order
-    // rather than create one the merchant cannot fulfil.
-    if (r.lifecycle !== 'active' || r.status !== 'active') {
-      throw conflict(`"${r.name}" is no longer available`);
+    // was added. A product hidden, archived or moved in between must stop
+    // the order rather than create one the merchant cannot fulfil.
+    if (r.lifecycle !== 'active' || r.status !== 'active' || String(r.product_store_id ?? '') !== storeId) {
+      throw refuse(`"${r.name}" is no longer available`, 'PRODUCT_UNAVAILABLE', { product_id: productId });
     }
-    const qty = Number(r.qty) || 1;
-    if (r.track_stock && Number(r.stock) < qty) {
-      throw conflict(`"${r.name}" does not have ${qty} in stock`);
+    const optionId = String(r.option_id ?? '');
+    const colorId = String(r.color_id ?? '');
+    const variant = merchantVariantLabel(r.options, r.colors, optionId, colorId);
+    if (!variant.ok) {
+      throw refuse(`The ${variant.which} chosen for "${r.name}" is no longer offered`, 'OPTION_UNAVAILABLE', {
+        product_id: productId,
+        which: variant.which,
+      });
     }
-    const unit = Number(r.price_iqd) || 0;
+    const qty = Math.max(1, Math.trunc(Number(r.qty) || 1));
+    const unit = Math.max(0, Math.trunc(Number(r.price_iqd) || 0));
     const line = unit * qty;
     subtotal += line;
+    const agg = perProduct.get(productId) ?? { qty: 0, stock: Number(r.stock) || 0, tracked: !!Number(r.track_stock) };
+    agg.qty += qty;
+    perProduct.set(productId, agg);
     lines.push({
       cart_item_id: String(r.cart_item_id),
-      product_id: String(r.id),
+      product_id: productId,
       name: String(r.name),
       image: (safeParse<string[]>(r.images, [])[0] ?? ''),
       qty,
       unit_price_iqd: unit,
       line_total_iqd: line,
-      option_id: String(r.option_id ?? ''),
-      color_id: String(r.color_id ?? ''),
-      variant: merchantVariant(r.options, r.colors, String(r.option_id ?? ''), String(r.color_id ?? '')),
+      option_id: optionId,
+      color_id: colorId,
+      variant: merchantVariant(r.options, r.colors, optionId, colorId),
+      option_snapshot: variant.label,
     });
   }
+  for (const [productId, agg] of perProduct) {
+    if (agg.tracked && agg.stock < agg.qty) {
+      throw refuse('There is not enough stock for this order', 'OUT_OF_STOCK', {
+        product_id: productId,
+        available: Math.max(0, agg.stock),
+      });
+    }
+  }
+
+  const coupon = await resolveCoupon(db, storeId, couponCode, subtotal);
+  const discount = coupon?.discount ?? 0;
+  const merchandise = subtotal - discount;
 
   // The merchant's own delivery fee, from their store settings. Absent means
-  // free — never an invented number.
-  const settings = safeParse<Record<string, unknown>>(first.delivery_settings, {});
+  // free — never an invented number. THE FREE-OVER THRESHOLD IS JUDGED ON
+  // WHAT THE CUSTOMER PAYS FOR THE GOODS, after the coupon (B22): a 50% code
+  // on a 14,000 cart used to earn the 14,000 free-delivery threshold for a
+  // customer paying 7,000.
+  const settings = safeParse<Record<string, unknown>>(ctx.store.delivery_settings, {});
   const rawFee = Number(settings.fee_iqd);
   const freeOver = Number(settings.free_over_iqd);
   let delivery = Number.isFinite(rawFee) && rawFee > 0 ? Math.floor(rawFee) : 0;
-  if (Number.isFinite(freeOver) && freeOver > 0 && subtotal >= freeOver) delivery = 0;
+  if (Number.isFinite(freeOver) && freeOver > 0 && merchandise >= freeOver) delivery = 0;
 
-  const coupon = await resolveCoupon(c.env.DB, String(first.store_id), couponCode, subtotal);
-  const discount = coupon?.discount ?? 0;
+  const total = merchandise + delivery;
+  // Commission on the goods only — never on delivery, which is the merchant's
+  // own cost of shipping and is credited to them whole (B4).
+  const split = await feeFor(db, 'store', merchandise);
+  const commission = {
+    commission_percent_x100: split.commission_percent_x100,
+    platform_fee_iqd: split.platform_fee_iqd,
+    merchant_receivable_iqd: split.merchant_receivable_iqd + delivery,
+  };
+
+  const fingerprint = (
+    await sha256Hex(
+      JSON.stringify({
+        v: 1,
+        store: storeId,
+        lines: lines.map((l) => [l.cart_item_id, l.product_id, l.qty, l.unit_price_iqd, l.option_id, l.color_id]),
+        subtotal,
+        coupon: coupon?.code ?? '',
+        discount,
+        delivery,
+        total,
+      })
+    )
+  ).slice(0, 40);
 
   return {
-    merchant_id: String(first.merchant_id),
-    store_id: String(first.store_id),
-    store_name: String(first.store_name),
-    store_slug: String(first.store_slug),
+    merchant_id: ctx.merchant.id,
+    store_id: storeId,
+    store_name: ctx.store.name,
+    store_slug: ctx.store.slug,
     lines,
+    products: [...perProduct].map(([product_id, agg]) => ({ product_id, qty: agg.qty })),
     subtotal_iqd: subtotal,
-    delivery_iqd: delivery,
     coupon_code: coupon?.code ?? '',
     coupon_id: coupon?.id ?? null,
     discount_iqd: discount,
-    total_iqd: subtotal - discount + delivery,
+    merchandise_iqd: merchandise,
+    delivery_iqd: delivery,
+    total_iqd: total,
+    commission,
+    quote_fingerprint: fingerprint,
   };
 }
 
-/** What the order will cost, before committing to it. */
-storeOrderRoutes.post('/quote', async (c) => {
+/**
+ * The quote as the CUSTOMER sees it (B18): prices, delivery, the coupon, the
+ * wallet's answer and the fingerprint to confirm — and nothing of the
+ * commission, which is the merchant's and the platform's business.
+ */
+async function publicQuote(c: Context<AppContext>, cart: PricedCart) {
   const user = c.get('user')!;
-  const body = await c.req.json().catch(() => ({}));
-  const cart = await priceMerchantCart(c, typeof body.couponCode === 'string' ? body.couponCode : '');
-  // The commission base is what the customer actually pays for the goods.
-  const split = await feeFor(c.env.DB, 'store', cart.subtotal_iqd - cart.discount_iqd);
-
   // PREPAID ONLY. On this path the wallet is not one payment method among
   // several — it is the only one — so whether it covers this total decides
   // whether the order can be placed at all. That has to be on the screen
@@ -279,39 +403,93 @@ storeOrderRoutes.post('/quote', async (c) => {
     readWalletDust(c.env.DB, user.id),
   ]);
   const walletAvailableIqd = walletIqdAvailable(balances.usd_cents_available, dust.dust_iqd, rate);
+  return {
+    store_id: cart.store_id,
+    store_name: cart.store_name,
+    store_slug: cart.store_slug,
+    lines: cart.lines.map((l) => ({
+      cart_item_id: l.cart_item_id,
+      product_id: l.product_id,
+      name: l.name,
+      image: l.image,
+      qty: l.qty,
+      unit_price_iqd: l.unit_price_iqd,
+      line_total_iqd: l.line_total_iqd,
+      variant: l.option_snapshot,
+    })),
+    subtotal_iqd: cart.subtotal_iqd,
+    coupon_code: cart.coupon_code,
+    discount_iqd: cart.discount_iqd,
+    delivery_iqd: cart.delivery_iqd,
+    total_iqd: cart.total_iqd,
+    /** What place-order charges if nothing moves — the figure the button shows. */
+    expected_total_iqd: cart.total_iqd,
+    /** Send this back to place the order; it names every figure above. */
+    quote_fingerprint: cart.quote_fingerprint,
+    payment_method: 'wallet' as const,
+    /** Spendable only — money already held for another order is not it. */
+    wallet_available_iqd: walletAvailableIqd,
+    wallet_covers: cart.total_iqd <= walletAvailableIqd,
+    wallet_shortfall_iqd: Math.max(0, cart.total_iqd - walletAvailableIqd),
+    /**
+     * Where to top up, as an ABSOLUTE url.
+     *
+     * A merchant subdomain serves the storefront app, which routes the
+     * cart, the checkout and the order history but deliberately not the
+     * wallet (§94) — so a relative `/wallet` from `ali3d.levonis-iq.com`
+     * lands on the shop's catch-all instead of the wallet, which is the
+     * one screen a customer who cannot pay actually needs. Only the server
+     * knows the root domain, so it is the server that answers.
+     */
+    wallet_topup_url: (() => {
+      const root = rootDomainFrom(c.env);
+      return root ? `https://${root}/wallet` : '/wallet';
+    })(),
+  };
+}
 
-  return c.json({
-    success: true,
-    quote: {
-      ...cart,
-      payment_method: 'wallet' as const,
-      /** Spendable only — money already held for another order is not it. */
-      wallet_available_iqd: walletAvailableIqd,
-      wallet_covers: cart.total_iqd <= walletAvailableIqd,
-      wallet_shortfall_iqd: Math.max(0, cart.total_iqd - walletAvailableIqd),
-      /**
-       * Where to top up, as an ABSOLUTE url.
-       *
-       * A merchant subdomain serves the storefront app, which routes the
-       * cart, the checkout and the order history but deliberately not the
-       * wallet (§94) — so a relative `/wallet` from `ali3d.levonis-iq.com`
-       * lands on the shop's catch-all instead of the wallet, which is the
-       * one screen a customer who cannot pay actually needs. Only the server
-       * knows the root domain, so it is the server that answers.
-       */
-      wallet_topup_url: (() => {
-        const root = rootDomainFrom(c.env);
-        return root ? `https://${root}/wallet` : '/wallet';
-      })(),
-      // Shown to the customer as a total; the commission split is the
-      // merchant's and the platform's business, and is returned so the
-      // merchant's own screens can render it without a second call.
-      commission_percent_x100: split.commission_percent_x100,
-      platform_fee_iqd: split.platform_fee_iqd,
-      merchant_receivable_iqd: split.merchant_receivable_iqd,
-    },
-  });
+/** What the order will cost, before committing to it. */
+storeOrderRoutes.post('/quote', async (c) => {
+  // Re-quoted on return and polled while the checkout is open (StoreCheckout
+  // .tsx) — generous, but no longer unbounded.
+  await rateLimit(c, 'store-quote', 120, 300);
+  const body = await c.req.json().catch(() => ({}));
+  const cart = await priceMerchantCart(c, typeof body.couponCode === 'string' ? body.couponCode : '');
+  return c.json({ success: true, quote: await publicQuote(c, cart) });
 });
+
+/** The customer's own order, as they may see it — for a replay of a placed order. */
+async function placedOrder(c: Context<AppContext>, idempotencyKey: string) {
+  const user = c.get('user')!;
+  return c.env.DB.prepare(
+    'SELECT * FROM orders WHERE user_id = ?1 AND (client_idempotency_key = ?2 OR idempotency_key = ?2)'
+  ).bind(user.id, idempotencyKey).first<Record<string, unknown>>();
+}
+
+/**
+ * After a fence aborted the batch: which product ran out, read from the rows
+ * as they are NOW. A product hidden in between says so; one that is merely
+ * short names the units left, which the checkout shows as a number.
+ */
+async function stockRefusal(db: D1Database, cart: PricedCart): Promise<HttpError> {
+  for (const need of cart.products) {
+    const p = await db.prepare(
+      'SELECT stock, track_stock, lifecycle, status, store_id FROM community_products WHERE id = ?'
+    ).bind(need.product_id).first<{ stock: number; track_stock: number; lifecycle: string; status: string; store_id: string }>();
+    if (!p || p.lifecycle !== 'active' || p.status !== 'active' || p.store_id !== cart.store_id) {
+      return refuse('A product in your cart is no longer available', 'PRODUCT_UNAVAILABLE', { product_id: need.product_id });
+    }
+    if (Number(p.track_stock) && Number(p.stock) < need.qty) {
+      return refuse('There is not enough stock for this order', 'OUT_OF_STOCK', {
+        product_id: need.product_id,
+        available: Math.max(0, Number(p.stock) || 0),
+      });
+    }
+  }
+  // Nothing is short any more — another order was cancelled in between. The
+  // honest answer is still "try again", and the checkout re-quotes.
+  return refuse('The stock changed while you were checking out — please try again', 'OUT_OF_STOCK');
+}
 
 /**
  * Place the order.
@@ -323,6 +501,7 @@ storeOrderRoutes.post('/quote', async (c) => {
 storeOrderRoutes.post('/', async (c) => {
   await rateLimit(c, 'store-checkout', 15, 300);
   const user = c.get('user')!;
+  const db = c.env.DB;
   const body = await c.req.json().catch(() => ({}));
   const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80 });
 
@@ -330,16 +509,11 @@ storeOrderRoutes.post('/', async (c) => {
   // route now stores the key and is unique per user; `idempotency_key` is the
   // legacy globally-unique column, still holding keys written before the
   // migration, so a retry in flight across the deploy still replays.
-  const replay = await c.env.DB.prepare(
-    'SELECT id FROM orders WHERE user_id = ?1 AND (client_idempotency_key = ?2 OR idempotency_key = ?2)'
-  ).bind(user.id, idempotencyKey).first<{ id: string }>();
-  if (replay) {
-    const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(replay.id).first();
-    return c.json({ success: true, order, replay: true });
-  }
+  const replay = await placedOrder(c, idempotencyKey);
+  if (replay) return c.json({ success: true, order: storeOrderPublic(replay), replay: true });
 
   const addressId = str(body.addressId, 'addressId', { min: 1, max: 60 });
-  const address = await c.env.DB.prepare('SELECT * FROM addresses WHERE id = ? AND user_id = ?')
+  const address = await db.prepare('SELECT * FROM addresses WHERE id = ? AND user_id = ?')
     .bind(addressId, user.id)
     .first<Record<string, unknown>>();
   if (!address) throw notFound('Address not found');
@@ -365,8 +539,18 @@ storeOrderRoutes.post('/', async (c) => {
     );
   }
   const cart = await priceMerchantCart(c, typeof body.couponCode === 'string' ? body.couponCode : '');
-  const split = await feeFor(c.env.DB, 'store', cart.subtotal_iqd - cart.discount_iqd);
-  const rate = await exchangeRate(c.env.DB);
+
+  // THE CUSTOMER AGREED TO A QUOTE, NOT TO WHATEVER THE DATABASE SAYS NOW.
+  // No fingerprint is no agreement: an old client that never asked for one
+  // is answered exactly like a stale one — here is the quote, confirm it.
+  const confirmed = typeof body.quoteFingerprint === 'string' ? body.quoteFingerprint : '';
+  if (confirmed !== cart.quote_fingerprint) {
+    throw refuse('The price changed since you saw it. Review the new total and confirm again.', 'QUOTE_CHANGED', {
+      quote: await publicQuote(c, cart),
+    });
+  }
+
+  const rate = await exchangeRate(db);
 
   /**
    * Wallet payment is reserved and committed in the same request. A hold
@@ -387,7 +571,7 @@ storeOrderRoutes.post('/', async (c) => {
    * exactly as it was: a balance that moved in between still refuses the hold
    * and still writes nothing.
    */
-  const walletDust = await readWalletDust(c.env.DB, user.id);
+  const walletDust = await readWalletDust(db, user.id);
   const walletBalances = await getAvailableBalances(c.env, user.id);
   const walletBalanceIqd = walletIqdAvailable(
     walletBalances.usd_cents_available,
@@ -415,7 +599,7 @@ storeOrderRoutes.post('/', async (c) => {
    * than the quoted dinars, once, on a price smaller than that.
    */
   const walletCents = Math.max(1, walletSpendCents(cart.total_iqd, walletBalances.usd_cents_available, rate));
-  const hold = await createPurchaseHold(c.env.DB, {
+  const hold = await createPurchaseHold(db, {
     userId: user.id,
     amountCents: walletCents,
     // SERVER-MINTED, never the client's key. `wallet_holds.event_key` is
@@ -434,6 +618,13 @@ storeOrderRoutes.post('/', async (c) => {
         required_iqd: cart.total_iqd,
       });
     }
+    // THE SAME CHECKOUT KEY, A DIFFERENT AMOUNT — or a key whose hold was
+    // already settled or handed back by the orphan sweep. Either way this key
+    // is spent: say so in the code the checkout already knows how to recover
+    // from (it mints a new key and asks again), never as a bare wallet error.
+    if (hold.reason === 'EVENT_KEY_REUSED' || hold.reason === 'DUPLICATE_EVENT') {
+      throw refuse('This checkout key was already used. Start the checkout again.', 'IDEMPOTENCY_KEY_REUSED');
+    }
     throw badRequest('Could not reserve the payment', 'WALLET_ERROR', { reason: hold.reason });
   }
   const holdId = hold.holdId;
@@ -441,8 +632,8 @@ storeOrderRoutes.post('/', async (c) => {
   const orderId = `ORD-${newId().slice(0, 10).toUpperCase()}`;
   const ts = nowIso();
 
-  const stmts = [
-    c.env.DB.prepare(
+  const stmts: D1PreparedStatement[] = [
+    db.prepare(
       `INSERT INTO orders
          (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot,
           payment_method_id, subtotal_iqd, shipping_iqd, exchange_rate, total_iqd,
@@ -463,60 +654,112 @@ storeOrderRoutes.post('/', async (c) => {
       cart.total_iqd, walletCents,
       idempotencyKey, ts, ts,
       cart.merchant_id, cart.store_id,
-      split.commission_percent_x100, split.platform_fee_iqd, split.merchant_receivable_iqd,
+      cart.commission.commission_percent_x100, cart.commission.platform_fee_iqd,
+      cart.commission.merchant_receivable_iqd,
       ts, cart.coupon_code, cart.discount_iqd
     ),
   ];
-  // The redemption is counted with the order, conditionally: a coupon at its
-  // cap cannot be spent one more time by a concurrent checkout.
+
+  /**
+   * THE FENCES ABORT THE ORDER — they used to be no-ops (B5, B6).
+   *
+   * The stock decrement carried `WHERE stock >= qty` and the coupon counter
+   * `WHERE used_count < max_uses`, and both simply matched zero rows when a
+   * concurrent order had taken the last unit or the last use — while the
+   * order, its discount and its payment committed anyway. Each fence below
+   * writes NULL into a NOT NULL column of THIS order's row unless its
+   * condition holds, which aborts the whole batch: the order, the debit, the
+   * credit, everything. They run BEFORE the decrements, against the rows as
+   * they stand inside this transaction, and a missing product aborts too.
+   *   · stock / availability → `orders.status`      → 409 OUT_OF_STOCK
+   *   · the coupon's cap     → `orders.coupon_code` → 409 COUPON_EXHAUSTED
+   */
+  for (const need of cart.products) {
+    stmts.push(
+      db.prepare(
+        `UPDATE orders
+            SET status = CASE WHEN EXISTS (
+                  SELECT 1 FROM community_products p
+                   WHERE p.id = ?2 AND p.store_id = ?3 AND p.lifecycle = 'active' AND p.status = 'active'
+                     AND (p.track_stock = 0 OR p.stock >= ?4)
+                ) THEN status ELSE NULL END
+          WHERE id = ?1`
+      ).bind(orderId, need.product_id, cart.store_id, need.qty)
+    );
+  }
   if (cart.coupon_id) {
     stmts.push(
-      c.env.DB.prepare(
-        `UPDATE merchant_coupons SET used_count = used_count + 1
-          WHERE id = ? AND active = 1 AND (max_uses IS NULL OR used_count < max_uses)`
-      ).bind(cart.coupon_id)
+      db.prepare(
+        `UPDATE orders
+            SET coupon_code = CASE WHEN EXISTS (
+                  SELECT 1 FROM merchant_coupons k
+                   WHERE k.id = ?2 AND k.store_id = ?3 AND k.active = 1
+                     AND (k.max_uses IS NULL OR k.used_count < k.max_uses)
+                ) THEN coupon_code ELSE NULL END
+          WHERE id = ?1`
+      ).bind(orderId, cart.coupon_id, cart.store_id),
+      db.prepare(
+        'UPDATE merchant_coupons SET used_count = used_count + 1, updated_at = ?2 WHERE id = ?1'
+      ).bind(cart.coupon_id, ts)
     );
   }
 
   for (const l of cart.lines) {
     stmts.push(
-      c.env.DB.prepare(
+      db.prepare(
         `INSERT INTO order_items
            (id, order_id, product_id, community_product_id, seller_type, name_snapshot, image_snapshot,
             option_snapshot, qty, unit_price_iqd, line_total_iqd)
          VALUES (?,?,NULL,?, 'merchant', ?,?,?,?,?,?)`
       ).bind(
         newId('oi'), orderId, l.product_id, l.name, l.image,
-        [l.option_id, l.color_id].filter(Boolean).join(' / '),
+        l.option_snapshot,
         l.qty, l.unit_price_iqd, l.line_total_iqd
       )
     );
-    // Stock moves with the order, conditionally: the WHERE clause means a
-    // concurrent order that already took the last unit makes this a no-op
-    // rather than driving stock negative.
+  }
+  // Per PRODUCT, after the fences: the units the fences just proved are there.
+  for (const need of cart.products) {
     stmts.push(
-      c.env.DB.prepare(
+      db.prepare(
         `UPDATE community_products
-            SET stock = stock - ?, sold_count = sold_count + ?
-          WHERE id = ? AND (track_stock = 0 OR stock >= ?)`
-      ).bind(l.qty, l.qty, l.product_id, l.qty)
+            SET stock = stock - ?1, sold_count = sold_count + ?1, updated_at = ?2
+          WHERE id = ?3`
+      ).bind(need.qty, ts, need.product_id)
     );
   }
 
-  // The merchant's share, PENDING until the order completes (§77). Visible to
-  // them as "coming", not spendable.
+  // The merchant's share — goods less commission, PLUS their delivery fee —
+  // PENDING until the customer confirms receipt or three days pass after
+  // delivery (worker/lib/storeOrderOps.ts). Visible as "coming", not spendable.
   stmts.push(
-    c.env.DB.prepare(
+    db.prepare(
       `INSERT INTO merchant_payout_ledger
          (id, merchant_id, kind, amount_iqd, state, order_id, note, idempotency_key)
-       VALUES (?,?,'sale_credit',?,'pending',?,'store sale',?)`
+       VALUES (?,?,'sale_credit',?,'pending',?,?,?)`
     // `merchant_payout_ledger.idempotency_key` is GLOBALLY unique, so binding
     // the client's key here reproduced the very defect 0064 fixes — and in a
     // batch with no catch, so it surfaced as a bare 500. The order id is
     // server-minted and already unique per sale.
-    ).bind(newId('pay'), cart.merchant_id, split.merchant_receivable_iqd, orderId, `sale:${orderId}`)
+    ).bind(
+      newId('pay'), cart.merchant_id, cart.commission.merchant_receivable_iqd, orderId,
+      cart.delivery_iqd > 0 ? 'store sale (incl. delivery)' : 'store sale',
+      `sale:${orderId}`
+    )
   );
-  stmts.push(c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id));
+  // ONLY THE LINES THIS ORDER PRICED, at the quantity it priced them (B21).
+  // Checkout used to empty the whole cart — a Levonis line it never priced
+  // included — and a quantity raised in another tab after the quote vanished
+  // with the line. A line that changed stays in the cart, visibly.
+  stmts.push(
+    db.prepare(
+      `DELETE FROM cart_items
+        WHERE user_id = ?1 AND seller_type = 'merchant'
+          AND EXISTS (SELECT 1 FROM json_each(?2) j
+                       WHERE json_extract(j.value, '$.id') = cart_items.id
+                         AND json_extract(j.value, '$.qty') = cart_items.qty)`
+    ).bind(user.id, JSON.stringify(cart.lines.map((l) => ({ id: l.cart_item_id, qty: l.qty }))))
+  );
 
   // §11.1 settlement rule: the hold commits AND its ledger debit posts inside
   // THIS batch, with the order and the merchant's pending share. Committing
@@ -525,47 +768,74 @@ storeOrderRoutes.post('/', async (c) => {
   // buyer's spendable balance while the merchant was credited for the sale.
   // The debit's guard aborts the whole batch if the hold is not an active,
   // still-funded reservation, so no order can exist unpaid.
+  //
+  // AND IT RECORDS THE DINARS IT SPENT (0108, B24), exactly as the platform
+  // checkout's debit does: the pair is what cancels the deposit remainders
+  // that funded it, so a wallet spent down on a store order reads what it
+  // should, and a cancellation's refund copies the same dinars back.
+  const dinars = Number.isInteger(rate) && (await walletLedgerDinarsReady(db))
+    ? { amountIqd: cart.total_iqd, exchangeRateSnapshot: rate }
+    : {};
   stmts.push(
-    ...commitHoldStatements(c.env.DB, {
+    ...commitHoldStatements(db, {
       holdId,
       note: `Wallet payment on order ${orderId}`,
       ref: orderId,
+      ...dinars,
     }),
     // The settlement event (§3.9) rides in the SAME batch as the debit,
     // guarded by it: this is the path that actually settles a store order,
     // so publishing afterwards would lose the event to any crash in between.
     // Nothing at all while the bus is off.
-    ...(await holdSettledEventStatements(c.env.DB, holdId))
+    ...(await holdSettledEventStatements(db, holdId))
   );
 
-  // The hold taken above deliberately SURVIVES a failed batch: the key is
-  // deterministic per user and checkout key, so the buyer's retry reuses that
-  // same reservation instead of taking a second one out of their balance
+  // The hold taken above deliberately SURVIVES a TRANSIENT failed batch: the
+  // key is deterministic per user and checkout key, so the buyer's retry reuses
+  // that same reservation instead of taking a second one out of their balance
   // (tests/walletHoldSettlement.test.ts pins it). This catch therefore does not
-  // release it — it only answers a retry whose order already committed.
+  // release it — the orphan sweep does, if no retry ever comes
+  // (worker/lib/storeOrderOps.ts `releaseOrphanStoreHolds`). A stock or coupon
+  // REFUSAL is not transient, and is handed back below.
   try {
-    await c.env.DB.batch(stmts);
+    await db.batch(stmts);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     // The same-user retry: their own order already exists, so replay it
     // rather than reporting a failure for work that succeeded.
     if (msg.includes('UNIQUE') && (msg.includes('orders.idempotency_key') || msg.includes('orders.client_idempotency_key'))) {
-      const again = await c.env.DB.prepare(
-        'SELECT id FROM orders WHERE user_id = ?1 AND (client_idempotency_key = ?2 OR idempotency_key = ?2)'
-      ).bind(user.id, idempotencyKey).first<{ id: string }>();
-      if (again) {
-        const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(again.id).first();
-        return c.json({ success: true, order, replay: true });
-      }
-      throw conflict('This checkout key was already used. Start the checkout again.', 'IDEMPOTENCY_KEY_REUSED');
+      const again = await placedOrder(c, idempotencyKey);
+      if (again) return c.json({ success: true, order: storeOrderPublic(again), replay: true });
+      throw refuse('This checkout key was already used. Start the checkout again.', 'IDEMPOTENCY_KEY_REUSED');
     }
-    throw e;
+    // A REFUSAL THE DATABASE DECIDED is final for this attempt: the last units
+    // went to another buyer, or the coupon ran out. The customer's remedy
+    // changes the cart, which changes the quote and with it the checkout key
+    // (B12) — so no retry will ever come back for THIS hold, and keeping it
+    // would leave the money unspendable until the orphan sweep, refusing the
+    // corrected order with INSUFFICIENT_FUNDS on a tight wallet. It is handed
+    // back now. Anything else is transient and keeps the hold for the
+    // same-key retry, exactly as above.
+    const refusal = /NOT NULL constraint failed: orders\.status/i.test(msg)
+      ? await stockRefusal(db, cart)
+      : /NOT NULL constraint failed: orders\.coupon_code/i.test(msg)
+        ? refuse('This coupon has just been used up', 'COUPON_EXHAUSTED', { code: cart.coupon_code })
+        : null;
+    if (!refusal) throw e;
+    // A failed release is not the customer's problem and does not change the
+    // answer: the orphan sweep returns the reservation after its TTL.
+    await releaseHold(db, { holdId, reason: `store order refused: ${refusal.code}` }).catch((err: unknown) =>
+      console.error('store checkout: could not release the refused hold', holdId, err)
+    );
+    throw refusal;
   }
 
-  await audit(c.env.DB, user.id, 'community.store_order_created', orderId, {
+  await audit(db, user.id, 'community.store_order_created', orderId, {
     store: cart.store_id,
     total: cart.total_iqd,
-    fee: split.platform_fee_iqd,
+    delivery: cart.delivery_iqd,
+    fee: cart.commission.platform_fee_iqd,
+    receivable: cart.commission.merchant_receivable_iqd,
   });
 
   /**
@@ -609,7 +879,7 @@ storeOrderRoutes.post('/', async (c) => {
       // above), so the message says so with a zero rather than omitting the
       // line — an absent figure reads as "unknown", which is worse here.
       dueOnDeliveryIqd: 0,
-      merchantReceivableIqd: split.merchant_receivable_iqd,
+      merchantReceivableIqd: cart.commission.merchant_receivable_iqd,
       // `PricedLine.variant` is the option and colour by the MERCHANT'S names
       // (`merchantVariant`), never the ids this path stores — an id in a group
       // message is noise, and a missing name prints no variant at all. No
@@ -619,6 +889,20 @@ storeOrderRoutes.post('/', async (c) => {
     })
   );
 
-  const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
-  return c.json({ success: true, order }, 201);
+  // THE STORE HEARS ABOUT ITS OWN SALE (B23) — after the response, never
+  // holding it, and never able to fail it.
+  const tell = notifyMerchantOfStoreOrder(db, {
+    merchantId: cart.merchant_id,
+    orderId,
+    event: 'new',
+    totalIqd: cart.total_iqd,
+  });
+  try {
+    c.executionCtx.waitUntil(tell);
+  } catch {
+    await tell;
+  }
+
+  const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first<Record<string, unknown>>();
+  return c.json({ success: true, order: storeOrderPublic(order!) }, 201);
 });

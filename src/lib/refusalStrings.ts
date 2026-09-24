@@ -356,6 +356,253 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'Only http and https links are accepted.',
     ckb: 'تەنها بەستەری http یان https قبوڵ دەکرێت.',
   },
+
+  // ---- custom requests, offers and their escrow (merchant platform wave 1) --
+  // Raised by worker/routes/marketplace.ts and printRequests.ts. Each says
+  // what the customer or merchant can DO next. NO SORANI IS INVENTED HERE
+  // (docs/DECISIONS.md row 11): until the owner writes it by hand, the ckb slot
+  // carries the ARABIC — the app's documented fallback, the same choice
+  // PREORDER_CAPACITY_EXHAUSTED above makes.
+  // OWNER: Sorani to be written by hand for every entry in this block.
+  OFFER_CHANGED: {
+    ar: 'غيّر التاجر هذا العرض بعد أن فتحته. راجع الشروط الجديدة قبل القبول.',
+    en: 'The merchant changed this offer after you opened it. Review the new terms before accepting.',
+    ckb: 'غيّر التاجر هذا العرض بعد أن فتحته. راجع الشروط الجديدة قبل القبول.',
+  },
+  OFFER_STALE: {
+    ar: 'عدّلتَ طلبك بعد أن قدّم التاجر هذا العرض، فلا يمكن قبوله حتى يؤكده التاجر من جديد.',
+    en: 'You changed your request after this offer was made, so it can be accepted once the merchant re-confirms it.',
+    ckb: 'عدّلتَ طلبك بعد أن قدّم التاجر هذا العرض، فلا يمكن قبوله حتى يؤكده التاجر من جديد.',
+  },
+  OFFER_EXPIRED: {
+    ar: 'انتهت صلاحية هذا العرض. اختر عرضًا آخر أو اطلب من التاجر عرضًا جديدًا.',
+    en: 'This offer has expired. Choose another offer, or ask the merchant for a new one.',
+    ckb: 'انتهت صلاحية هذا العرض. اختر عرضًا آخر أو اطلب من التاجر عرضًا جديدًا.',
+  },
+  OFFER_NOT_AVAILABLE: {
+    ar: 'هذا العرض لم يعد متاحًا — ربما سحبه التاجر. حدّث الصفحة.',
+    en: 'This offer is no longer available — the merchant may have withdrawn it. Refresh the page.',
+    ckb: 'هذا العرض لم يعد متاحًا — ربما سحبه التاجر. حدّث الصفحة.',
+  },
+  OFFER_EXISTS: {
+    ar: 'لديك عرض قائم على هذا الطلب. اسحبه أولًا إن أردت تقديم عرض جديد.',
+    en: 'You already have an active offer on this request. Withdraw it first to make a new one.',
+    ckb: 'لديك عرض قائم على هذا الطلب. اسحبه أولًا إن أردت تقديم عرض جديد.',
+  },
+  OFFER_NOT_STALE: {
+    ar: 'عرضك مطابق للطلب بصيغته الحالية، ولا يحتاج إلى تأكيد.',
+    en: 'Your offer already matches the request as it is — there is nothing to re-confirm.',
+    ckb: 'عرضك مطابق للطلب بصيغته الحالية، ولا يحتاج إلى تأكيد.',
+  },
+  OFFER_EXPIRY_INVALID: {
+    ar: 'تاريخ صلاحية العرض غير صحيح. اختر تاريخًا قادمًا.',
+    en: 'The offer validity date is not valid. Choose a future date.',
+    ckb: 'تاريخ صلاحية العرض غير صحيح. اختر تاريخًا قادمًا.',
+  },
+  OWN_REQUEST: {
+    ar: 'لا يمكنك تقديم عرض على طلبك.',
+    en: 'You cannot make an offer on your own request.',
+    ckb: 'لا يمكنك تقديم عرض على طلبك.',
+  },
+  REQUEST_NOT_OPEN: {
+    ar: 'هذا الطلب لم يعد يستقبل عروضًا.',
+    en: 'This request is no longer taking offers.',
+    ckb: 'هذا الطلب لم يعد يستقبل عروضًا.',
+  },
+  REQUEST_EXPIRED: {
+    ar: 'انتهت مدة هذا الطلب ولم يعد يستقبل عروضًا.',
+    en: 'This request has expired and no longer takes offers.',
+    ckb: 'انتهت مدة هذا الطلب ولم يعد يستقبل عروضًا.',
+  },
+  REQUEST_HAS_ORDER: {
+    ar: 'لهذا الطلب تنفيذ مدفوع. ألغِ التنفيذ قبل أن يبدأ التاجر، أو افتح نزاعًا.',
+    en: 'This request has a paid order. Cancel the order before the merchant starts, or open a dispute.',
+    ckb: 'لهذا الطلب تنفيذ مدفوع. ألغِ التنفيذ قبل أن يبدأ التاجر، أو افتح نزاعًا.',
+  },
+  REQUEST_NOT_CANCELLABLE: {
+    ar: 'لا يمكن إلغاء هذا الطلب في حالته الحالية.',
+    en: 'This request cannot be cancelled in its current state.',
+    ckb: 'لا يمكن إلغاء هذا الطلب في حالته الحالية.',
+  },
+  REQUEST_NOT_EDITABLE: {
+    ar: 'لم يعد بالإمكان تعديل مرفقات هذا الطلب.',
+    en: 'The attachments of this request can no longer change.',
+    ckb: 'لم يعد بالإمكان تعديل مرفقات هذا الطلب.',
+  },
+  REQUEST_CHANGED: {
+    ar: 'تغيّر هذا الطلب أثناء العملية. حدّث الصفحة وحاول مرة أخرى.',
+    en: 'This request changed while you were working on it. Refresh the page and try again.',
+    ckb: 'تغيّر هذا الطلب أثناء العملية. حدّث الصفحة وحاول مرة أخرى.',
+  },
+  ACCEPT_CONFLICT: {
+    ar: 'تغيّر الطلب أثناء القبول. حدّث الصفحة وحاول مرة أخرى.',
+    en: 'The request changed while you were accepting. Refresh the page and try again.',
+    ckb: 'تغيّر الطلب أثناء القبول. حدّث الصفحة وحاول مرة أخرى.',
+  },
+  REQUEST_CLOSED: {
+    ar: 'هذا الطلب مغلق، ولم تعد معاينة مجسّمه متاحة.',
+    en: 'This request is closed, so its model can no longer be previewed.',
+    ckb: 'هذا الطلب مغلق، ولم تعد معاينة مجسّمه متاحة.',
+  },
+  VIEWER_NOT_ALLOWED: {
+    ar: 'المعاينة ثلاثية الأبعاد متاحة لصاحب الطلب وللتجار الذين يمكنهم تقديم عرض عليه.',
+    en: 'The 3D preview is available to the request’s owner and to merchants who can make an offer on it.',
+    ckb: 'المعاينة ثلاثية الأبعاد متاحة لصاحب الطلب وللتجار الذين يمكنهم تقديم عرض عليه.',
+  },
+  BAD_URL: {
+    ar: 'الرابط غير صالح. الصق رابط التصميم كاملًا مع ‎https://‎.',
+    en: 'That link is not valid. Paste the full design link, including https://.',
+    ckb: 'الرابط غير صالح. الصق رابط التصميم كاملًا مع ‎https://‎.',
+  },
+  INSUFFICIENT_FUNDS: {
+    ar: 'رصيد محفظتك لا يغطي هذا المبلغ. اشحن المحفظة ثم حاول مرة أخرى.',
+    en: 'Your wallet balance does not cover this amount. Top up your wallet and try again.',
+    ckb: 'رصيد محفظتك لا يغطي هذا المبلغ. اشحن المحفظة ثم حاول مرة أخرى.',
+  },
+  ESCROW_FAILED: {
+    ar: 'تعذّر حجز المبلغ لهذا العرض. حاول مرة أخرى بعد قليل.',
+    en: 'The money for this offer could not be reserved. Try again shortly.',
+    ckb: 'تعذّر حجز المبلغ لهذا العرض. حاول مرة أخرى بعد قليل.',
+  },
+  ESCROW_RELEASE_FAILED: {
+    ar: 'تعذّر تحويل المبلغ للتاجر الآن. حاول مرة أخرى أو تواصل مع الدعم.',
+    en: 'The payment to the merchant could not be released right now. Try again, or contact support.',
+    ckb: 'تعذّر تحويل المبلغ للتاجر الآن. حاول مرة أخرى أو تواصل مع الدعم.',
+  },
+  ESCROW_REFUND_FAILED: {
+    ar: 'تعذّر إرجاع المبلغ الآن. حاول مرة أخرى أو تواصل مع الدعم.',
+    en: 'The refund could not be made right now. Try again, or contact support.',
+    ckb: 'تعذّر إرجاع المبلغ الآن. حاول مرة أخرى أو تواصل مع الدعم.',
+  },
+  ORDER_SETTLED: {
+    ar: 'تمت تسوية هذا الطلب بالفعل. حدّث الصفحة.',
+    en: 'This order has already been settled. Refresh the page.',
+    ckb: 'تمت تسوية هذا الطلب بالفعل. حدّث الصفحة.',
+  },
+  // Why a merchant cannot make, edit or re-confirm an offer — the selling gate
+  // in worker/lib/merchantAuth.ts, each sanction by its own code. The three the
+  // store banner already words (src/components/merchant/StoreCta.tsx) carry
+  // that banner's sentences, Sorani included, verbatim; the rest follow this
+  // block's rule above.
+  MERCHANT_RESTRICTED: {
+    ar: 'قيّدت Levonis حساب التاجر: لا يمكنك تقديم عروض جديدة أو تأكيدها حتى يُرفع التقييد. أعمالك المقبولة مستمرة — تواصل مع الدعم.',
+    en: 'Levonis has restricted your merchant account: you cannot make or re-confirm offers until the restriction is lifted. Your accepted work continues — contact support.',
+    ckb: 'قيّدت Levonis حساب التاجر: لا يمكنك تقديم عروض جديدة أو تأكيدها حتى يُرفع التقييد. أعمالك المقبولة مستمرة — تواصل مع الدعم.',
+  },
+  MERCHANT_SUSPENDED: {
+    ar: 'المتجر موقوف من إدارة Levonis. تواصل مع الدعم لمعرفة التفاصيل.',
+    en: 'This store is suspended by Levonis. Contact support for details.',
+    ckb: 'فرۆشگاکە لەلایەن LEVONIS ڕاگیراوە. پەیوەندی بە پشتیوانییەوە بکە.',
+  },
+  STORE_SUSPENDED: {
+    ar: 'المتجر موقوف من إدارة Levonis. تواصل مع الدعم لمعرفة التفاصيل.',
+    en: 'This store is suspended by Levonis. Contact support for details.',
+    ckb: 'فرۆشگاکە لەلایەن LEVONIS ڕاگیراوە. پەیوەندی بە پشتیوانییەوە بکە.',
+  },
+  STORE_PAUSED: {
+    ar: 'متجرك متوقّف مؤقتًا بطلبك. أعِد فتحه من إعدادات المتجر.',
+    en: 'You paused your store. Re-open it from store settings.',
+    ckb: 'فرۆشگاکەت لەلایەن خۆتەوە ڕاگیراوە. لە ڕێکخستنەکانەوە بیکەرەوە.',
+  },
+  SUBSCRIPTION_INACTIVE: {
+    ar: 'اشتراك PLUS غير فعّال. متجرك وسجلّه محفوظان — جدّد الاشتراك للبيع من جديد.',
+    en: 'Your PLUS subscription is not active. Your store and its history are kept — renew to sell again.',
+    ckb: 'ئەندامێتی PLUS چالاک نییە. فرۆشگا و مێژووەکەی پارێزراون — نوێی بکەرەوە بۆ فرۆشتنەوە.',
+  },
+  // The customer's side: a standing offer from a merchant Levonis has since
+  // restricted or suspended cannot be accepted (worker/routes/marketplace.ts).
+  MERCHANT_UNAVAILABLE: {
+    ar: 'هذا التاجر لا يستقبل أعمالًا جديدة حاليًا. اختر عرضًا آخر.',
+    en: 'This merchant is not taking new work right now. Choose another offer.',
+    ckb: 'هذا التاجر لا يستقبل أعمالًا جديدة حاليًا. اختر عرضًا آخر.',
+  },
+
+  // ---- community-store cart, checkout and orders (merchant platform wave 1) --
+  // Raised by worker/routes/cart.ts, storeOrders.ts, orders.ts, returns.ts and
+  // the merchant's order door in merchant.ts. Same rule as the block above: NO
+  // SORANI IS INVENTED — the ckb slot carries the ARABIC until the owner writes
+  // it by hand (docs/DECISIONS.md row 11).
+  // OWNER: Sorani to be written by hand for every entry in this block.
+  CART_EMPTY: {
+    ar: 'سلتك فارغة. أضف منتجًا ثم أكمل الطلب.',
+    en: 'Your cart is empty. Add a product, then check out.',
+    ckb: 'سلتك فارغة. أضف منتجًا ثم أكمل الطلب.',
+  },
+  CART_SELLER_CONFLICT: {
+    ar: 'سلتك تضم منتجات من أكثر من بائع. أبقِ منتجات بائع واحد ثم أكمل الطلب.',
+    en: 'Your cart holds items from more than one seller. Keep one seller’s items, then check out.',
+    ckb: 'سلتك تضم منتجات من أكثر من بائع. أبقِ منتجات بائع واحد ثم أكمل الطلب.',
+  },
+  STORE_CLOSED: {
+    ar: 'هذا المتجر لا يستقبل طلبات حاليًا. جرّب لاحقًا.',
+    en: 'This store is not taking orders right now. Try again later.',
+    ckb: 'هذا المتجر لا يستقبل طلبات حاليًا. جرّب لاحقًا.',
+  },
+  OWN_STORE_PURCHASE: {
+    ar: 'لا يمكنك الشراء من متجرك.',
+    en: 'You cannot buy from your own store.',
+    ckb: 'لا يمكنك الشراء من متجرك.',
+  },
+  PRODUCT_UNAVAILABLE: {
+    ar: 'أحد المنتجات لم يعد متاحًا. احذفه من السلة للمتابعة.',
+    en: 'One of the items is no longer available. Remove it from the cart to continue.',
+    ckb: 'أحد المنتجات لم يعد متاحًا. احذفه من السلة للمتابعة.',
+  },
+  OPTION_UNAVAILABLE: {
+    ar: 'الخيار الذي اخترته لأحد المنتجات لم يعد متاحًا. احذف المنتج ثم أضفه من جديد.',
+    en: 'An option you chose is no longer offered. Remove the item, then add it again.',
+    ckb: 'الخيار الذي اخترته لأحد المنتجات لم يعد متاحًا. احذف المنتج ثم أضفه من جديد.',
+  },
+  OPTION_INVALID: {
+    ar: 'هذا الخيار غير متاح لهذا المنتج. اختر من الخيارات المعروضة.',
+    en: 'That option is not offered for this product. Choose one of the options shown.',
+    ckb: 'هذا الخيار غير متاح لهذا المنتج. اختر من الخيارات المعروضة.',
+  },
+  COLOR_INVALID: {
+    ar: 'هذا اللون غير متاح لهذا المنتج. اختر من الألوان المعروضة.',
+    en: 'That colour is not offered for this product. Choose one of the colours shown.',
+    ckb: 'هذا اللون غير متاح لهذا المنتج. اختر من الألوان المعروضة.',
+  },
+  COUPON_EXHAUSTED: {
+    ar: 'نفد هذا الكوبون للتو. أزِله ثم أكّد الطلب.',
+    en: 'This coupon has just run out. Remove it, then place the order.',
+    ckb: 'نفد هذا الكوبون للتو. أزِله ثم أكّد الطلب.',
+  },
+  QUOTE_CHANGED: {
+    ar: 'تغيّر السعر منذ أن عُرض عليك. راجع الإجمالي الجديد ثم أكّد مرة أخرى.',
+    en: 'The price changed since it was shown to you. Review the new total, then confirm again.',
+    ckb: 'تغيّر السعر منذ أن عُرض عليك. راجع الإجمالي الجديد ثم أكّد مرة أخرى.',
+  },
+  STORE_PREPAID_ONLY: {
+    ar: 'طلبات متاجر المجتمع تُدفع من محفظتك قبل أن يشحنها المتجر.',
+    en: 'Community-store orders are paid from your wallet before the store ships them.',
+    ckb: 'طلبات متاجر المجتمع تُدفع من محفظتك قبل أن يشحنها المتجر.',
+  },
+  RECEIPT_NOT_APPLICABLE: {
+    ar: 'تأكيد الاستلام خاص بطلبات متاجر المجتمع.',
+    en: 'Confirming receipt applies to community-store orders only.',
+    ckb: 'تأكيد الاستلام خاص بطلبات متاجر المجتمع.',
+  },
+  ORDER_NOT_DELIVERED: {
+    ar: 'لم يُسلَّم هذا الطلب بعد. يمكنك ذلك بعد أن تصبح حالته «تم التسليم».',
+    en: 'This order has not been delivered yet. You can do this once it is marked delivered.',
+    ckb: 'لم يُسلَّم هذا الطلب بعد. يمكنك ذلك بعد أن تصبح حالته «تم التسليم».',
+  },
+  STORE_ORDER_RETURN_VIA_SUPPORT: {
+    ar: 'إرجاع طلبات المتاجر يتم عبر الدعم. افتح تذكرة من صفحة الطلب.',
+    en: 'Returns for store orders go through support. Open a ticket from the order page.',
+    ckb: 'إرجاع طلبات المتاجر يتم عبر الدعم. افتح تذكرة من صفحة الطلب.',
+  },
+  ORDER_CHANGED: {
+    ar: 'تغيّر هذا الطلب أثناء عملك عليه. حدّث الصفحة ثم حاول مرة أخرى.',
+    en: 'This order changed while you were working on it. Refresh the page, then try again.',
+    ckb: 'تغيّر هذا الطلب أثناء عملك عليه. حدّث الصفحة ثم حاول مرة أخرى.',
+  },
+  ORDER_TRANSITION_INVALID: {
+    ar: 'لا يمكن نقل الطلب إلى هذه الحالة من حالته الحالية. حدّث الصفحة.',
+    en: 'The order cannot move to that status from where it is now. Refresh the page.',
+    ckb: 'لا يمكن نقل الطلب إلى هذه الحالة من حالته الحالية. حدّث الصفحة.',
+  },
 };
 
 export type Lang = 'ar' | 'en' | 'ckb';

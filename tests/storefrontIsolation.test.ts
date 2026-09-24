@@ -104,7 +104,9 @@ test('a merchant host renders the storefront, not the main site with a shop insi
   assert.match(app, /function StorefrontApp\(/, 'no storefront application branch exists');
   // The branch must come before the main site renders, or a visitor sees the
   // wrong brand flash first.
-  const branch = app.indexOf('if (store || unknownStore) return <StorefrontApp />');
+  // A store host that resolves to a SUSPENDED store is still a store host: it
+  // renders «المتجر غير متاح حاليًا», never the main site (owner, 2026-09-24).
+  const branch = app.indexOf('if (store || unknownStore || unavailableStore) return <StorefrontApp />');
   const header = app.indexOf('<Header />');
   assert.ok(branch > 0, 'the storefront branch is missing from AppContent');
   assert.ok(branch < header, 'the storefront branch must be decided before the main site chrome renders');

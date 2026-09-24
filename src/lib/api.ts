@@ -995,6 +995,12 @@ export interface ApiOrder {
   invoice?: OrderInvoiceRef | null;
   can_cancel?: boolean;
   can_review?: boolean;
+  /**
+   * A community-store order's receipt (owner decision 2026-09-24): the store
+   * is paid when the customer confirms it, or on its own `auto_confirms_at`
+   * unless a complaint is open. null on a platform order.
+   */
+  receipt?: { can_confirm: boolean; confirmed_at: string | null; auto_confirms_at: string | null } | null;
   /** The THIRD verb, beside `can_cancel` and `can_review` — the day picker as
    *  a whole answer, including why there is no picker when there is none. */
   delivery_date?: OrderDeliveryDate;

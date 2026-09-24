@@ -70,6 +70,25 @@ export async function runOrderDeliveredEffects(
   let deviceUnits: CreateUnitsResult | null = null;
   let deviceUnitsWarning: string | null = null;
 
+  /*
+   * A COMMUNITY-STORE ORDER EARNS NOTHING FROM LEVONIS AT DELIVERY. These
+   * grants are the PLATFORM's — its device warranties, its purchase points,
+   * its referral programme — and a store sale is a merchant's goods: «never
+   * community-store lines» (worker/lib/pointsOps.ts, the redemption cap). The
+   * admin doors reach here for any order they mark delivered, and the legacy
+   * points path priced a store order's lines as if Levonis had sold them.
+   */
+  try {
+    const seller = await env.DB.prepare('SELECT seller_type FROM orders WHERE id = ?')
+      .bind(orderId)
+      .first<{ seller_type: string | null }>();
+    if (String(seller?.seller_type ?? '') === 'merchant') return { deviceUnits, deviceUnitsWarning };
+  } catch (e) {
+    // TOTAL, like every step below: a read that fails here leaves the
+    // platform path exactly as it always ran.
+    console.error('seller lookup failed for delivered order', orderId, e instanceof Error ? e.message : String(e));
+  }
+
   // Mandate §4: one device record per PHYSICAL unit of every serialized
   // product, clocked to the delivered_at the move just stamped (the flip keeps
   // an existing one, so a re-delivery never restarts a clock). Awaited:

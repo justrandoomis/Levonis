@@ -196,7 +196,7 @@ returnRoutes.post('/', async (c) => {
    */
   const itemSql = (conditionExpr: string) =>
     `SELECT oi.id, oi.order_id, oi.qty AS item_qty, oi.name_snapshot, oi.bundle_parent_item_id,
-            o.user_id, o.status, o.delivered_at, o.stage, o.shipping_type,
+            o.user_id, o.status, o.delivered_at, o.stage, o.shipping_type, o.seller_type,
             ${conditionExpr} AS product_condition_doc
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
@@ -216,6 +216,7 @@ returnRoutes.post('/', async (c) => {
       delivered_at: string | null;
       stage: string | null;
       shipping_type: string | null;
+      seller_type: string | null;
       product_condition_doc: string | null;
     }>();
   let item: Awaited<ReturnType<typeof readItem>>;
@@ -226,6 +227,25 @@ returnRoutes.post('/', async (c) => {
     item = await readItem(CONDITION_DOC_DEFAULT_SQL);
   }
   if (!item || item.user_id !== user.id) throw notFound('Order item not found');
+
+  /**
+   * A COMMUNITY-STORE ORDER IS NOT RETURNED THROUGH LEVONIS'S RETURNS DESK.
+   *
+   * The goods are the merchant's and the money is the merchant's credit; a
+   * case resolved here as `refund` would credit the customer's wallet from
+   * Levonis while the store kept its sale. Store orders could never reach this
+   * door before — nothing on their path wrote `delivered_at` — and now that
+   * the store's «تم التسليم» does, the rule is stated instead of accidental:
+   * a problem with a store order is a support ticket or complaint on it, which
+   * also FREEZES the merchant's money until a human decides
+   * (worker/lib/storeOrderOps.ts).
+   */
+  if (String(item.seller_type ?? '') === 'merchant') {
+    throw badRequest(
+      'Returns for a community store order go through support — open a ticket on the order and the store is paid nothing until it is resolved.',
+      'STORE_ORDER_RETURN_VIA_SUPPORT'
+    );
+  }
 
   /**
    * AN OPEN-BOX UNIT IS SOLD AS IMPERFECT, SO "not as described" IS NOT A CASE.

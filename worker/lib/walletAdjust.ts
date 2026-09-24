@@ -60,7 +60,7 @@
  * `usdSpendStatement` uses, so a debit the balance does not cover aborts the
  * whole batch on `CHECK (amount > 0)` and nothing half-lands.
  */
-import type { Context } from 'hono';
+import type { Context, Next } from 'hono';
 import type { AppContext } from './types';
 import { HttpError } from './http';
 import { canViewFinancials } from './adminScope';
@@ -87,6 +87,22 @@ export function assertFinancialScope(c: Context<AppContext>): void {
       'FINANCIAL_SCOPE_REQUIRED'
     );
   }
+}
+
+/**
+ * THE SAME RULE, WORN ON THE ROUTE DECLARATION.
+ *
+ * `assertFinancialScope` inside a handler is only as good as the handler
+ * remembering to call it first — and the community money routes
+ * (worker/routes/adminCommunity.ts) never did: an assistant-scope admin could
+ * resolve an escrow, record a payout or change the commission. As middleware
+ * it sits on the line that declares the route, BEFORE the body is parsed or a
+ * row is read, so a handler rewritten later cannot drop it by accident and a
+ * reviewer sees the scope where the path is. Same 403, same code.
+ */
+export async function requireFinancialScope(c: Context<AppContext>, next: Next): Promise<void> {
+  assertFinancialScope(c);
+  await next();
 }
 
 // ------------------------------------------------------------------ the legs

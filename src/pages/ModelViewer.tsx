@@ -43,8 +43,11 @@ import {
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
 
+/**
+ * No `name`: the server stopped sending the customer's own file name (audit 03
+ * §10 F) — it reached anyone holding the link. The page says what it shows.
+ */
 interface ViewerMeta {
-  name: string;
   format: string;
   dimensions_mm: { x: number; y: number; z: number } | null;
   volume_mm3: number | null;
@@ -128,6 +131,7 @@ function xrParts(): { xr: XrSystem; Layer: XrWebGLLayerCtor } | null {
 const STR = {
   ar: {
     loading: 'جارٍ تحميل المجسم',
+    title: 'معاينة المجسم',
     gone: 'هذا الرابط لم يعد صالحًا',
     goneHint: 'اطلب رابط عرض جديدًا ممن أرسله إليك.',
     failed: 'تعذّر فتح العارض',
@@ -151,6 +155,7 @@ const STR = {
   },
   en: {
     loading: 'Loading the model',
+    title: 'Model preview',
     gone: 'This link is no longer valid',
     goneHint: 'Ask whoever sent it for a fresh viewing link.',
     failed: 'The viewer could not be opened',
@@ -806,13 +811,11 @@ export default function ModelViewer() {
 
       {!fatal && (
         <>
-          {/* Top bar: the file's name, and the controls. Both float over the
+          {/* Top bar: what this is, and the controls. Both float over the
               canvas so the model keeps the whole viewport. */}
           <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start gap-2 p-3">
             <div className="pointer-events-auto min-w-0 flex-1 rounded-xl border border-white/10 bg-zinc-950/70 px-3 py-2 backdrop-blur-md">
-              <p className="truncate text-sm font-bold" title={meta?.name}>
-                {meta?.name || '—'}
-              </p>
+              <p className="truncate text-sm font-bold">{t.title}</p>
               {meta?.format && (
                 <p
                   className="text-[11px] uppercase tracking-wide text-zinc-500"

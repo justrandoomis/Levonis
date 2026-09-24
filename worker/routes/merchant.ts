@@ -19,7 +19,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, forbidden, notFound, conflict, str, int, oneOf , pickFrom } from '../lib/http';
+import { requireAuth, badRequest, forbidden, notFound, conflict, str, int, oneOf , pickFrom, HttpError } from '../lib/http';
 import { communityClosedRefusal, communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
@@ -38,8 +38,12 @@ import {
 import { checkSlug, suggestSlug, SLUG_RESERVATION_DAYS } from '../lib/merchantOps';
 import { parseCsv, toCsv } from '../lib/importCsv';
 import { merchantBalance } from '../lib/escrowOps';
+import { normalizeGovernorate } from '../lib/iraqGovernorates';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { notifyOrderStatus } from '../lib/orderNotify';
+import { cancelStoreOrder, STORE_RELEASE_DAYS } from '../lib/storeOrderOps';
+import { stageForLegacyStatus } from '../lib/orderStages';
+import { newHistoryId } from '../lib/orderStageOps';
 
 export const merchantRoutes = new Hono<AppContext>();
 
@@ -117,12 +121,48 @@ function productShape(p: Record<string, unknown>) {
     featured: !!p.featured,
     sold_count: p.sold_count,
     view_count: p.view_count,
+    // Levonis's own decision, beside the merchant's lifecycle and never mixed
+    // into it (migration 0118): the merchant sees that the product is hidden
+    // by the platform and WHY, and the publish control says so instead of
+    // silently failing.
+    moderation: p.admin_hidden_at
+      ? { hidden_by_admin: true, reason: String(p.admin_hidden_reason ?? ''), at: p.admin_hidden_at }
+      : null,
     created_at: p.created_at,
     updated_at: p.updated_at,
   };
 }
 
+/** 409 PRODUCT_HIDDEN_BY_ADMIN, carrying the reason the merchant is shown. */
+function hiddenByAdmin(reason: string): HttpError {
+  return new HttpError(
+    409,
+    'Levonis has hidden this product. Fix what the reason names and contact support to have it reviewed.',
+    'PRODUCT_HIDDEN_BY_ADMIN',
+    { reason }
+  );
+}
+
 // ------------------------------------------------------------- onboarding
+
+/** A UNIQUE / PRIMARY KEY refusal from D1 (or SQLite in the tests). */
+function isUniqueViolation(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return msg.includes('UNIQUE') || msg.includes('PRIMARY KEY');
+}
+
+/**
+ * WHAT A LOST ONBOARDING RACE MEANS (audit 01 B24). The slug check and the
+ * insert are two steps, so two people can pass the check for one slug — or
+ * one person can double-tap «افتح متجري» — and the loser's batch hits a
+ * UNIQUE. That used to surface as a raw 500. The batch is one transaction, so
+ * nothing half-landed; the only question is which race was lost.
+ */
+async function onboardRace(db: D1Database, userId: string, e: unknown): Promise<unknown> {
+  if (!isUniqueViolation(e)) return e;
+  if (await storeForUser(db, userId)) return conflict('You already have a store', 'STORE_EXISTS');
+  return conflict('That store address was just taken — choose another', 'SLUG_UNAVAILABLE');
+}
 
 /**
  * Is this slug free? Called as the merchant types, so it is rate-limited and
@@ -164,6 +204,10 @@ merchantRoutes.get('/me', async (c) => {
     store: ctx ? storePublicShape(ctx, root) : null,
     selling: ctx ? await sellingStatus(c, ctx) : { canSell: false, reason: 'no_store' },
     suggested_slug: ctx ? null : suggestSlug(String(user.name ?? '')),
+    // The domain a store address lives under, from configuration — so
+    // onboarding previews `<slug>.<this>` instead of a hard-coded domain
+    // (audit 01 B19). Null when none is configured.
+    root_domain: root,
   });
 });
 
@@ -201,7 +245,7 @@ merchantRoutes.post('/onboard', async (c) => {
 
   const tagline = str(body.tagline, 'tagline', { min: 0, max: 140, required: false });
   const description = str(body.description, 'description', { min: 0, max: 4000, required: false });
-  const governorate = str(body.governorate, 'governorate', { min: 0, max: 60, required: false });
+  const governorate = governorateId(body.governorate, '');
 
   const merchantId = (await merchantForUser(c.env.DB, user.id))?.id ?? newId('mch');
   const storeId = newId('str');
@@ -209,25 +253,34 @@ merchantRoutes.post('/onboard', async (c) => {
 
   // One batch: a store without its merchant, or a slug reservation without
   // its store, is a broken half-state a retry would then trip over.
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT INTO community_merchants (id, user_id, name, bio, governorate, status)
-       VALUES (?, ?, ?, ?, ?, 'active')
-       ON CONFLICT(user_id) DO UPDATE SET name = excluded.name`
-    ).bind(merchantId, user.id, name, tagline, governorate),
-    c.env.DB.prepare(
-      `INSERT INTO merchant_stores
-         (id, merchant_id, user_id, slug, name, tagline, description, governorate, created_at, updated_at)
-       VALUES (?, (SELECT id FROM community_merchants WHERE user_id = ?), ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(storeId, user.id, user.id, slug, name, tagline, description, governorate, ts, ts),
-    c.env.DB.prepare(
-      `INSERT INTO merchant_store_slugs (slug, store_id, active) VALUES (?, ?, 1)`
-    ).bind(slug, storeId),
-    c.env.DB.prepare(
-      `INSERT OR IGNORE INTO merchant_notification_preferences (merchant_id)
-       VALUES ((SELECT id FROM community_merchants WHERE user_id = ?))`
-    ).bind(user.id),
-  ]);
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `INSERT INTO community_merchants (id, user_id, name, bio, governorate, status)
+         VALUES (?, ?, ?, ?, ?, 'active')
+         ON CONFLICT(user_id) DO UPDATE SET name = excluded.name`
+      ).bind(merchantId, user.id, name, tagline, governorate),
+      c.env.DB.prepare(
+        `INSERT INTO merchant_stores
+           (id, merchant_id, user_id, slug, name, tagline, description, governorate, created_at, updated_at)
+         VALUES (?, (SELECT id FROM community_merchants WHERE user_id = ?), ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(storeId, user.id, user.id, slug, name, tagline, description, governorate, ts, ts),
+      // An UPSERT, as the rename below does: a slug whose 180-day parking has
+      // lapsed is free for `checkSlug` but still has its history row, and a
+      // plain INSERT on that primary key was a raw 500 for a slug the page had
+      // just shown as available.
+      c.env.DB.prepare(
+        `INSERT INTO merchant_store_slugs (slug, store_id, active) VALUES (?, ?, 1)
+         ON CONFLICT(slug) DO UPDATE SET active = 1, reserved_until = NULL, store_id = excluded.store_id`
+      ).bind(slug, storeId),
+      c.env.DB.prepare(
+        `INSERT OR IGNORE INTO merchant_notification_preferences (merchant_id)
+         VALUES ((SELECT id FROM community_merchants WHERE user_id = ?))`
+      ).bind(user.id),
+    ]);
+  } catch (e) {
+    throw await onboardRace(c.env.DB, user.id, e);
+  }
 
   await audit(c.env.DB, user.id, 'merchant.store_created', storeId, { slug, name });
   /**
@@ -271,8 +324,14 @@ merchantRoutes.patch('/store', async (c) => {
   if (body.tagline !== undefined) put('tagline', str(body.tagline, 'tagline', { min: 0, max: 140, required: false }));
   if (body.description !== undefined)
     put('description', str(body.description, 'description', { min: 0, max: 4000, required: false }));
-  if (body.governorate !== undefined)
-    put('governorate', str(body.governorate, 'governorate', { min: 0, max: 60, required: false }));
+  if (body.governorate !== undefined) {
+    // An id from the closed list, never free text (audit 02 B27). A legacy
+    // store still holding free text gets it back from the form on every save;
+    // that echo is left as it is — readable, untouched — rather than refusing
+    // the merchant's whole save over a field they did not change.
+    const gov = governorateId(body.governorate, ctx.store.governorate);
+    if (gov !== ctx.store.governorate) put('governorate', gov);
+  }
   if (body.contact_phone !== undefined)
     put('contact_phone', str(body.contact_phone, 'contact_phone', { min: 0, max: 32, required: false }));
   if (body.contact_phone_public !== undefined) put('contact_phone_public', body.contact_phone_public ? 1 : 0);
@@ -323,10 +382,40 @@ merchantRoutes.patch('/store', async (c) => {
   // The merchant's own pause switch. It can never lift an admin suspension:
   // that state is not reachable from here at all.
   if (body.open !== undefined) {
+    const wantOpen = body.open === true;
     if (ctx.store.status === 'suspended') {
-      throw forbidden('This store is suspended by Levonis and cannot be re-opened from here');
+      /*
+       * A SUSPENDED STORE STILL SAVES ITS SETTINGS (audit 01 B4). Any `open` in
+       * the body — and the settings form always sent one — used to 403 the
+       * WHOLE save, so a merchant suspended for a bad banner could not fix the
+       * banner. Now only the open/closed state is Levonis's while the
+       * suspension lasts: asking to OPEN is refused with a stable code, and
+       * «closed» is what the store already is, so it is not written at all —
+       * writing 'paused' over 'suspended' would hand the merchant the key to
+       * the admin's lock (they re-open a paused store themselves).
+       */
+      if (wantOpen) {
+        throw new HttpError(403, 'This store is suspended by Levonis and cannot be re-opened from here', 'STORE_SUSPENDED');
+      }
+    } else if (wantOpen) {
+      // Re-opening is taking on new orders, so it asks what selling asks
+      // (worker/lib/merchantAuth.ts `requireSellingPrivileges`): a suspended
+      // merchant, or one whose store entitlement has lapsed (audit 01 B3), may
+      // pause and edit their shop but not re-open it.
+      if (ctx.merchant.status === 'suspended') {
+        throw new HttpError(403, 'This merchant account is suspended. Contact support.', 'MERCHANT_SUSPENDED');
+      }
+      if (!benefits.merchantStore(await getTierStatus(c.env.DB, ctx.store.user_id))) {
+        throw new HttpError(
+          403,
+          'Your store subscription is not active. Renew it to re-open the store.',
+          'SUBSCRIPTION_INACTIVE'
+        );
+      }
+      put('status', 'active');
+    } else {
+      put('status', 'paused');
     }
-    put('status', body.open ? 'active' : 'paused');
   }
 
   if (!sets.length) return c.json({ success: true, store: storePublicShape(ctx, rootDomainFrom(c.env)) });
@@ -345,6 +434,22 @@ merchantRoutes.patch('/store', async (c) => {
 });
 
 const ACCENTS = ['default', 'olive', 'gold', 'slate', 'plum', 'teal', 'blue'] as const;
+
+/**
+ * A store's governorate, as the closed-list id couriers and the delivery rules
+ * route on (`normalizeGovernorate`: the id, or its name in any of the three
+ * languages). Empty clears it. Anything else is refused with a stable code —
+ * EXCEPT the value already stored, which is a legacy free-text row being
+ * echoed back by the settings form and is kept exactly as it was.
+ */
+function governorateId(raw: unknown, stored: string): string {
+  const text = str(raw, 'governorate', { min: 0, max: 60, required: false }).trim();
+  if (!text) return '';
+  const id = normalizeGovernorate(text);
+  if (id) return id;
+  if (text === (stored ?? '').trim()) return stored;
+  throw badRequest('Choose a governorate from the list', 'GOVERNORATE_INVALID');
+}
 
 function sanitizeList(v: unknown, maxItems: number, maxLen: number): string[] {
   if (!Array.isArray(v)) return [];
@@ -477,17 +582,25 @@ merchantRoutes.post('/store/slug', async (c) => {
   if (check.slug === ctx.store.slug) return c.json({ success: true, slug: ctx.store.slug, changed: false });
 
   const reservedUntil = new Date(Date.now() + SLUG_RESERVATION_DAYS * 86_400_000).toISOString();
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE merchant_store_slugs SET active = 0, reserved_until = ? WHERE store_id = ? AND active = 1`
-    ).bind(reservedUntil, ctx.store.id),
-    c.env.DB.prepare(
-      `INSERT INTO merchant_store_slugs (slug, store_id, active) VALUES (?, ?, 1)
-       ON CONFLICT(slug) DO UPDATE SET active = 1, reserved_until = NULL, store_id = excluded.store_id`
-    ).bind(check.slug, ctx.store.id),
-    c.env.DB.prepare(`UPDATE merchant_stores SET slug = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
-      .bind(check.slug, nowIso(), ctx.store.id, ctx.store.user_id),
-  ]);
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `UPDATE merchant_store_slugs SET active = 0, reserved_until = ? WHERE store_id = ? AND active = 1`
+      ).bind(reservedUntil, ctx.store.id),
+      c.env.DB.prepare(
+        `INSERT INTO merchant_store_slugs (slug, store_id, active) VALUES (?, ?, 1)
+         ON CONFLICT(slug) DO UPDATE SET active = 1, reserved_until = NULL, store_id = excluded.store_id`
+      ).bind(check.slug, ctx.store.id),
+      c.env.DB.prepare(`UPDATE merchant_stores SET slug = ?, updated_at = ? WHERE id = ? AND user_id = ?`)
+        .bind(check.slug, nowIso(), ctx.store.id, ctx.store.user_id),
+    ]);
+  } catch (e) {
+    // Another store took the name between the check and this batch: the
+    // UNIQUE on `merchant_stores.slug` rolled the whole rename back, so the
+    // old address is still this store's. A stable 409, not a raw 500.
+    if (!isUniqueViolation(e)) throw e;
+    throw conflict('That store address was just taken — choose another', 'SLUG_UNAVAILABLE');
+  }
 
   await audit(c.env.DB, ctx.store.user_id, 'merchant.slug_changed', ctx.store.id, {
     from: ctx.store.slug,
@@ -497,6 +610,33 @@ merchantRoutes.post('/store/slug', async (c) => {
 });
 
 // ----------------------------------------------------------------- products
+
+/**
+ * KEYSET CURSORS THAT NEVER SKIP A ROW (audit 01 B5).
+ *
+ * A cursor that is only the last row's `created_at`, read back as
+ * `created_at < cursor`, drops every other row that shares that instant —
+ * exactly what a CSV import produced, one timestamp for up to 200 rows. The
+ * cursor is `<created_at>|<id>` and every list orders by both, so a tie is
+ * broken by the id. A bare timestamp (a cursor an older client still holds)
+ * reads as `(timestamp, '')`, which is the old predicate unchanged.
+ */
+function keysetCursor(raw: string | undefined): { at: string; id: string } {
+  const v = (raw ?? '').slice(0, 200);
+  const bar = v.lastIndexOf('|');
+  return bar === -1 ? { at: v, id: '' } : { at: v.slice(0, bar), id: v.slice(bar + 1) };
+}
+
+function nextKeyset(
+  rows: Array<Record<string, unknown>>,
+  limit: number,
+  atKey: string,
+  idKey: string
+): string | null {
+  if (rows.length !== limit) return null;
+  const last = rows[rows.length - 1];
+  return `${String(last[atKey])}|${String(last[idKey])}`;
+}
 
 /**
  * The management list. Two modes on one route so old callers keep working:
@@ -512,16 +652,19 @@ merchantRoutes.get('/products', async (c) => {
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 50 });
 
   if (c.req.query('page') === undefined) {
-    const cursor = c.req.query('cursor') || '';
+    // Keyset on (created_at, id) — see `keysetCursor` for why the timestamp
+    // alone skipped rows (audit 01 B5).
+    const cursor = keysetCursor(c.req.query('cursor'));
     const { results } = await c.env.DB.prepare(
       `SELECT * FROM community_products
-        WHERE merchant_id = ? AND (? = '' OR created_at < ?)
-        ORDER BY created_at DESC LIMIT ?`
-    ).bind(ctx.merchant.id, cursor, cursor, limit).all();
+        WHERE merchant_id = ?1
+          AND (?2 = '' OR created_at < ?2 OR (created_at = ?2 AND id < ?3))
+        ORDER BY created_at DESC, id DESC LIMIT ?4`
+    ).bind(ctx.merchant.id, cursor.at, cursor.id, limit).all();
     return c.json({
       success: true,
       products: results.map(productShape),
-      next_cursor: results.length === limit ? String(results[results.length - 1].created_at) : null,
+      next_cursor: nextKeyset(results, limit, 'created_at', 'id'),
     });
   }
 
@@ -711,13 +854,28 @@ merchantRoutes.patch('/products/:id', async (c) => {
   if (!Object.keys(fields).length) throw badRequest('Nothing to update');
   await assertOwnSection(c, ctx.store.id, fields.section_id);
 
+  // A product LEVONIS hid stays hidden until Levonis lifts it (audit 01 B9).
+  // The merchant may still edit it — fixing what it was hidden for is the
+  // point — but not publish it, and is told why rather than finding a
+  // «published» product that never appears. ONLY A CHANGE IS AN ATTEMPT: the
+  // editor re-sends the whole form, so an `active` that was already the
+  // merchant's lifecycle is an edit, not a publish (and stays hidden — below).
+  if (fields.lifecycle === 'active') {
+    const held = await c.env.DB.prepare(
+      'SELECT lifecycle, admin_hidden_at, admin_hidden_reason FROM community_products WHERE id = ? AND merchant_id = ?'
+    ).bind(id, ctx.merchant.id).first<{ lifecycle: string; admin_hidden_at: string | null; admin_hidden_reason: string }>();
+    if (held?.admin_hidden_at && held.lifecycle !== 'active') throw hiddenByAdmin(held.admin_hidden_reason);
+  }
+
   const sets = Object.keys(fields).map((k) => `${k} = ?`);
   const vals = Object.values(fields);
   // `status` mirrors `lifecycle` so the 0001 visibility column stays truthful
-  // for every existing reader.
+  // for every existing reader — EXCEPT that an admin hide wins, decided IN
+  // the statement: a hide that lands between the check above and this write
+  // (or any future path that forgets the check) still cannot surface it.
   if (fields.lifecycle !== undefined) {
-    sets.push('status = ?');
-    vals.push(fields.lifecycle === 'active' ? 'active' : 'hidden');
+    sets.push(`status = CASE WHEN ? = 'active' AND admin_hidden_at IS NULL THEN 'active' ELSE 'hidden' END`);
+    vals.push(fields.lifecycle);
   }
   sets.push('updated_at = ?');
   vals.push(nowIso(), id, ctx.merchant.id);
@@ -741,6 +899,9 @@ merchantRoutes.post('/products/:id/duplicate', async (c) => {
     'SELECT * FROM community_products WHERE id = ? AND merchant_id = ?'
   ).bind(c.req.param('id'), ctx.merchant.id).first<Record<string, unknown>>();
   if (!src) throw notFound('Product not found');
+  // A copy of a product Levonis hid is the hidden content with a new id —
+  // one tap around the decision. The original stays editable.
+  if (src.admin_hidden_at) throw hiddenByAdmin(String(src.admin_hidden_reason ?? ''));
 
   const id = newId('cp');
   const ts = nowIso();
@@ -999,8 +1160,14 @@ merchantRoutes.post('/products/import', async (c) => {
 
   let created = 0;
   if (confirm && valid.length) {
-    const ts = nowIso();
-    const stmts = valid.map((v) => {
+    // ONE INSTANT PER ROW, in file order (audit 01 B5). Every row used to share
+    // one `created_at`, which is the tie the timestamp-only cursors could not
+    // page through; a millisecond apart, the newest-first lists also show the
+    // import in the order the merchant's spreadsheet has it. The cursors break
+    // ties on the id as well, so this is order, not the only guard.
+    const base = Date.now();
+    const stmts = valid.map((v, i) => {
+      const ts = new Date(base - i).toISOString();
       const id = newId('cp');
       return c.env.DB.prepare(
         `INSERT INTO community_products
@@ -1072,8 +1239,22 @@ merchantRoutes.get('/notifications', async (c) => {
   const row = await c.env.DB.prepare(
     'SELECT * FROM merchant_notification_preferences WHERE merchant_id = ?'
   ).bind(ctx.merchant.id).first<Record<string, unknown>>();
-  return c.json({ success: true, preferences: notificationShape(row), forced: FORCED_NOTIFICATIONS });
+  return c.json({ success: true, preferences: notificationShape(row), forced: FORCED_NOTIFICATIONS, wired: WIRED_NOTIFICATIONS });
 });
+
+/**
+ * THE SWITCHES THAT ARE CONNECTED TO SOMETHING (audit 04 #19).
+ *
+ * Nine switches were drawn as working toggles and eight of them controlled
+ * nothing. These are the ones a sender actually reads today:
+ *   new_orders             worker/lib/storeOrderOps.ts (a new store order)
+ *   request_opportunities  worker/lib/printMatching.ts / printRequests.ts
+ *   new_messages           worker/routes/chats.ts (a customer on an order thread)
+ * The panel shows every other switch as «قريبًا» — kept, not hidden, so the
+ * merchant's saved choice is waiting when its sender exists — rather than as a
+ * control that does nothing. A sender that starts reading one adds it here.
+ */
+const WIRED_NOTIFICATIONS = ['new_orders', 'request_opportunities', 'new_messages'] as const;
 
 /**
  * Three of these cannot be switched off (§61). A merchant must not be able to
@@ -1126,7 +1307,7 @@ merchantRoutes.patch('/notifications', async (c) => {
   const row = await c.env.DB.prepare(
     'SELECT * FROM merchant_notification_preferences WHERE merchant_id = ?'
   ).bind(ctx.merchant.id).first<Record<string, unknown>>();
-  return c.json({ success: true, preferences: notificationShape(row), forced: FORCED_NOTIFICATIONS });
+  return c.json({ success: true, preferences: notificationShape(row), forced: FORCED_NOTIFICATIONS, wired: WIRED_NOTIFICATIONS });
 });
 
 // -------------------------------------------------------------- subscription
@@ -1181,12 +1362,16 @@ merchantRoutes.get('/followers', async (c) => {
   // Display name only. A follower list is not a customer directory, and a
   // merchant has no legitimate need for the email or phone of someone who
   // merely followed their shop (§51).
+  // Keyset on (created_at, user id): a follower list page never drops the
+  // followers who share the boundary row's timestamp (audit 01 B5).
+  const key = keysetCursor(cursor);
   const { results } = await c.env.DB.prepare(
     `SELECT u.id, u.name, u.username, f.created_at
        FROM follows f JOIN users u ON u.id = f.user_id
-      WHERE f.merchant_id = ? AND (? = '' OR f.created_at < ?)
-      ORDER BY f.created_at DESC LIMIT ?`
-  ).bind(ctx.merchant.id, cursor, cursor, limit).all();
+      WHERE f.merchant_id = ?1
+        AND (?2 = '' OR f.created_at < ?2 OR (f.created_at = ?2 AND f.user_id < ?3))
+      ORDER BY f.created_at DESC, f.user_id DESC LIMIT ?4`
+  ).bind(ctx.merchant.id, key.at, key.id, limit).all();
 
   const total = await c.env.DB.prepare(
     'SELECT COUNT(*) AS n FROM follows WHERE merchant_id = ?'
@@ -1196,7 +1381,7 @@ merchantRoutes.get('/followers', async (c) => {
     success: true,
     total: total?.n ?? 0,
     followers: results,
-    next_cursor: results.length === limit ? String(results[results.length - 1].created_at) : null,
+    next_cursor: nextKeyset(results, limit, 'created_at', 'id'),
   });
 });
 
@@ -1207,30 +1392,52 @@ merchantRoutes.get('/followers', async (c) => {
 // merchant sees their orders and nobody else's — the isolation is the WHERE
 // clause, not a filter the client could drop.
 
-/** Both commerce paths in one list, with an origin filter (§74). */
+/**
+ * When a store sale's money becomes the merchant's, if nobody acts first:
+ * three days after delivery (worker/lib/storeOrderOps.ts). Null once the
+ * credit has moved, or before there is a delivery to count from.
+ */
+function releaseAfter(o: Record<string, unknown>): string | null {
+  if (o.status !== 'delivered' || o.credit_state !== 'pending' || o.receipt_confirmed_at) return null;
+  const at = Date.parse(String(o.delivered_at ?? ''));
+  return Number.isFinite(at) ? new Date(at + STORE_RELEASE_DAYS * 86_400_000).toISOString() : null;
+}
+
+/** The merchant's credit for an order, as a column any order read can add. */
+const CREDIT_STATE_SQL = `(SELECT l.state FROM merchant_payout_ledger l
+      WHERE l.order_id = o.id AND l.merchant_id = o.merchant_id AND l.kind = 'sale_credit' LIMIT 1)`;
+
+/**
+ * Both commerce paths in one list, with an origin filter (§74).
+ *
+ * PAGED BY (created_at, id), like the product and follower lists (`keysetCursor`
+ * above): the orders tab used to read the first 30 and never ask for more
+ * (B26), and a timestamp-only cursor would skip orders sharing its instant.
+ */
 merchantRoutes.get('/orders', async (c) => {
   const ctx = await requireStoreOwner(c);
   const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 100, def: 30 });
-  const cursor = c.req.query('cursor') || '';
+  const cursor = keysetCursor(c.req.query('cursor'));
   const status = c.req.query('status') || '';
 
   const { results } = await c.env.DB.prepare(
     `SELECT o.id, o.status, o.stage, o.origin, o.total_iqd, o.subtotal_iqd, o.shipping_iqd,
             o.platform_fee_iqd, o.merchant_receivable_iqd, o.payment_method_id,
-            o.created_at, o.updated_at,
+            o.created_at, o.updated_at, o.delivered_at, o.receipt_confirmed_at,
             u.name AS customer_name,
-            (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count
+            (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count,
+            ${CREDIT_STATE_SQL} AS credit_state
        FROM orders o JOIN users u ON u.id = o.user_id
-      WHERE o.merchant_id = ?
-        AND (? = '' OR o.status = ?)
-        AND (? = '' OR o.created_at < ?)
-      ORDER BY o.created_at DESC LIMIT ?`
-  ).bind(ctx.merchant.id, status, status, cursor, cursor, limit).all();
+      WHERE o.merchant_id = ?1
+        AND (?2 = '' OR o.status = ?2)
+        AND (?3 = '' OR o.created_at < ?3 OR (o.created_at = ?3 AND o.id < ?4))
+      ORDER BY o.created_at DESC, o.id DESC LIMIT ?5`
+  ).bind(ctx.merchant.id, status, cursor.at, cursor.id, limit).all<Record<string, unknown>>();
 
   return c.json({
     success: true,
-    orders: results,
-    next_cursor: results.length === limit ? String(results[results.length - 1].created_at) : null,
+    orders: results.map((o) => ({ ...o, release_after: releaseAfter(o) })),
+    next_cursor: nextKeyset(results, limit, 'created_at', 'id'),
   });
 });
 
@@ -1251,7 +1458,7 @@ merchantRoutes.get('/orders/:id', async (c) => {
   // this endpoint had never been called by a UI until now, so the stale
   // column name sat here unnoticed and 500'd on first real use.
   const order = await c.env.DB.prepare(
-    `SELECT o.*, u.name AS customer_name, u.phone_e164 AS customer_phone
+    `SELECT o.*, u.name AS customer_name, u.phone_e164 AS customer_phone, ${CREDIT_STATE_SQL} AS credit_state
        FROM orders o JOIN users u ON u.id = o.user_id
       WHERE o.id = ? AND o.merchant_id = ?`
   ).bind(id, ctx.merchant.id).first<Record<string, unknown>>();
@@ -1288,6 +1495,12 @@ merchantRoutes.get('/orders/:id', async (c) => {
       stage: order.stage,
       origin: order.origin,
       created_at: order.created_at,
+      delivered_at: order.delivered_at ?? null,
+      receipt_confirmed_at: order.receipt_confirmed_at ?? null,
+      // The money's own state, beside the order's: `pending` until the
+      // customer confirms or three days pass after delivery, then `available`.
+      credit_state: order.credit_state ?? null,
+      release_after: releaseAfter(order),
       subtotal_iqd: order.subtotal_iqd,
       shipping_iqd: order.shipping_iqd,
       total_iqd: order.total_iqd,
@@ -1315,18 +1528,30 @@ const MERCHANT_ORDER_FLOW: Record<string, readonly string[]> = {
   confirmed: ['processing', 'cancelled'],
   processing: ['shipped', 'cancelled'],
   shipped: ['delivered'],
-  // Terminal: money settles on delivery, so there is no path onward.
+  // Terminal for the merchant. Delivered is NOT money: the credit waits for the
+  // customer's confirmation, or three days (worker/lib/storeOrderOps.ts).
   delivered: [],
   cancelled: [],
 };
 
 /**
- * Move an order forward.
+ * Move an order forward — or cancel it, which REFUNDS the customer.
  *
- * On delivery the merchant's pending payout becomes available (§77) — that
- * is the moment the sale is really theirs. The ledger row is flipped by a
- * conditional UPDATE keyed on the order, so a double tap cannot make the
- * money available twice.
+ * WHAT A MOVE WRITES, ALL IN ONE CONDITIONAL BATCH (B9): the status, the
+ * customer-facing `stage` beside it (the tracker used to say «تم استلام
+ * الطلب» for ever), an `order_status_history` row, and on delivery
+ * `delivered_at` — stamped once (COALESCE), because it starts the customer's
+ * three days.
+ *
+ * «تم التسليم» NO LONGER RELEASES MONEY (B10, owner decision 2026-09-24). This
+ * route used to flip the sale credit to `available` on the merchant's own
+ * word; it now stays `pending` until the customer confirms receipt or three
+ * days pass with no open complaint.
+ *
+ * A CANCEL IS THE ONE STORE CANCELLATION (B2, worker/lib/storeOrderOps.ts):
+ * the buyer is refunded, stock and `sold_count` and the coupon use come back,
+ * and the merchant's credit is reversed — the old cancel reversed the credit
+ * and kept the customer's money.
  */
 merchantRoutes.post('/orders/:id/status', async (c) => {
   await rateLimit(c, 'merchant-order-status', 120, 3600);
@@ -1334,31 +1559,65 @@ merchantRoutes.post('/orders/:id/status', async (c) => {
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const body = await c.req.json().catch(() => ({}));
   const to = str(body.status, 'status', { min: 1, max: 30 });
+  const reason = str(body.reason, 'reason', { max: 300, required: false });
 
   const order = await c.env.DB.prepare(
-    'SELECT id, status FROM orders WHERE id = ? AND merchant_id = ?'
-  ).bind(id, ctx.merchant.id).first<{ id: string; status: string }>();
+    'SELECT * FROM orders WHERE id = ? AND merchant_id = ?'
+  ).bind(id, ctx.merchant.id).first<Record<string, unknown>>();
   if (!order) throw notFound('Order not found');
+  const from = String(order.status);
 
-  const allowed = MERCHANT_ORDER_FLOW[order.status] ?? [];
+  const allowed = MERCHANT_ORDER_FLOW[from] ?? [];
   if (!allowed.includes(to)) {
-    throw conflict(`An order that is ${order.status} cannot become ${to}`);
+    throw conflict(`An order that is ${from} cannot become ${to}`, 'ORDER_TRANSITION_INVALID');
+  }
+
+  const tellCustomer = () => {
+    try {
+      c.executionCtx.waitUntil(
+        notifyOrderStatus(c.env, id, to, { defer: (work) => c.executionCtx.waitUntil(work) })
+      );
+    } catch {
+      // No ExecutionContext on this call path (a test harness): the notice is
+      // still queued, just not kept alive past the response.
+      void notifyOrderStatus(c.env, id, to);
+    }
+  };
+
+  if (to === 'cancelled') {
+    const res = await cancelStoreOrder(c.env, {
+      order,
+      actor: 'merchant',
+      actorUserId: ctx.store.user_id,
+      reason: reason || undefined,
+    });
+    if (!res.ok) throw conflict('The order changed while you were editing — reload and retry', 'ORDER_CHANGED');
+    tellCustomer();
+    return c.json({ success: true, status: 'cancelled', refunded_usd_cents: res.refundedUsdCents });
   }
 
   const ts = nowIso();
+  const stage = stageForLegacyStatus(to, 'direct');
   const stmts = [
     c.env.DB.prepare(
-      `UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND merchant_id = ? AND status = ?`
-    ).bind(to, ts, id, ctx.merchant.id, order.status),
+      `UPDATE orders SET status = ?1, stage = ?2, stage_changed_at = ?3, stage_source = 'manual',
+              next_stage = '', next_stage_at = NULL,
+              delivered_at = CASE WHEN ?1 = 'delivered' THEN COALESCE(NULLIF(delivered_at, ''), ?3) ELSE delivered_at END,
+              updated_at = ?3
+        WHERE id = ?4 AND merchant_id = ?5 AND status = ?6`
+    ).bind(to, stage, ts, id, ctx.merchant.id, from),
+    // The customer's tracker reads this table. Written only by the batch whose
+    // flip landed: the row must be at THIS status with THIS batch's timestamp.
+    c.env.DB.prepare(
+      `INSERT OR IGNORE INTO order_status_history (id, order_id, stage, status, source, changed_at, changed_by, note)
+       SELECT ?1, ?2, ?3, ?4, 'manual', ?5, ?6, 'Moved by the store'
+        WHERE EXISTS (SELECT 1 FROM orders WHERE id = ?2 AND status = ?4 AND stage_changed_at = ?5)`
+    // The status in the id: two moves of one order inside one millisecond
+    // (a fast double step) must not collide into one silently ignored row.
+    ).bind(`${newHistoryId(id, ts)}_${to}`, id, stage, to, ts, ctx.store.user_id),
   ];
 
   if (to === 'delivered') {
-    stmts.push(
-      c.env.DB.prepare(
-        `UPDATE merchant_payout_ledger SET state = 'available'
-          WHERE order_id = ? AND merchant_id = ? AND kind = 'sale_credit' AND state = 'pending'`
-      ).bind(id, ctx.merchant.id)
-    );
     /*
      * THE COMPLETION IS COUNTED ONCE, EVEN WHEN TWO TAPS BOTH READ `shipped`.
      *
@@ -1366,8 +1625,7 @@ merchantRoutes.post('/orders/:id/status', async (c) => {
      * conditional on that status, so the second one matches zero rows — but
      * these two statements used to be unconditional, and the loser still
      * inserted a second «order_completed» reputation row and added a second
-     * completed order. The ledger line above was always safe (it is fenced on
-     * `state = 'pending'`); these were not.
+     * completed order.
      *
      * Both are now fenced on the one fact this batch establishes: the order IS
      * delivered and no completion has been recorded for it yet. The counter
@@ -1394,25 +1652,14 @@ merchantRoutes.post('/orders/:id/status', async (c) => {
     );
   }
 
-  if (to === 'cancelled') {
-    // The sale never happened: the pending credit is reversed rather than
-    // deleted, so the ledger still explains itself.
-    stmts.push(
-      c.env.DB.prepare(
-        `UPDATE merchant_payout_ledger SET state = 'reversed'
-          WHERE order_id = ? AND merchant_id = ? AND kind = 'sale_credit' AND state = 'pending'`
-      ).bind(id, ctx.merchant.id)
-    );
-  }
-
   const results = await c.env.DB.batch(stmts);
   // A double tap is a lost race, and the loser says so rather than reporting a
   // transition it did not make — and, above all, rather than telling the
   // customer twice. Nothing else in its batch changed anything (see above).
   if ((results[0]?.meta?.changes ?? 0) === 0) {
-    throw conflict('The order changed while you were editing — reload and retry');
+    throw conflict('The order changed while you were editing — reload and retry', 'ORDER_CHANGED');
   }
-  await audit(c.env.DB, ctx.store.user_id, 'merchant.order_status', id, { from: order.status, to });
+  await audit(c.env.DB, ctx.store.user_id, 'merchant.order_status', id, { from, to });
   /*
    * THE BUYER IS TOLD, AS THE PLATFORM'S OWN DOORS TELL THEM.
    *
@@ -1423,15 +1670,7 @@ merchantRoutes.post('/orders/:id/status', async (c) => {
    * key (so a replay is silent), and nothing for `processing`. After the
    * response, and flushed straight away rather than at the next cron.
    */
-  try {
-    c.executionCtx.waitUntil(
-      notifyOrderStatus(c.env, id, to, { defer: (work) => c.executionCtx.waitUntil(work) })
-    );
-  } catch {
-    // No ExecutionContext on this call path (a test harness): the notice is
-    // still queued, just not kept alive past the response.
-    void notifyOrderStatus(c.env, id, to);
-  }
+  tellCustomer();
   return c.json({ success: true, status: to });
 });
 
@@ -1512,18 +1751,34 @@ merchantRoutes.post('/reviews/:id/reply', async (c) => {
  */
 merchantRoutes.get('/customers', async (c) => {
   const ctx = await requireStoreOwner(c);
+  // A cancelled order is refunded money, not a customer's spend (audit 04 #12,
+  // audit 01 B12): «2 orders / 100,000» for one real 10,000 sale was the old
+  // answer. Someone whose only order was cancelled never bought anything.
   const { results } = await c.env.DB.prepare(
     `SELECT u.id, u.name,
             COUNT(o.id) AS order_count,
             COALESCE(SUM(o.total_iqd), 0) AS lifetime_iqd,
             MAX(o.created_at) AS last_order_at
        FROM orders o JOIN users u ON u.id = o.user_id
-      WHERE o.merchant_id = ?
+      WHERE o.merchant_id = ? AND ${COUNTED_STORE_ORDER}
       GROUP BY u.id, u.name
       ORDER BY last_order_at DESC LIMIT 100`
   ).bind(ctx.merchant.id).all();
   return c.json({ success: true, customers: results });
 });
+
+/**
+ * WHICH STORE ORDERS ARE SALES — one predicate for every figure below.
+ *
+ * A cancelled store order is refunded in full, so its total is not revenue,
+ * its fee was never earned and its receivable is never owed. Counting it made
+ * «إجمالي المبيعات», «أرباحك», the average order and the customer list all
+ * report money that was handed back (audit 04 #12, audit 01 B12, audit 02
+ * B19). A store order has no separate "refunded" status: the refund IS the
+ * cancellation. Orders still in flight (pending → delivered) are sales and
+ * are counted.
+ */
+const COUNTED_STORE_ORDER = `o.status <> 'cancelled'`;
 
 // -------------------------------------------------------------- analytics
 
@@ -1543,28 +1798,46 @@ merchantRoutes.get('/analytics', async (c) => {
     throw forbidden('Analytics are part of LEVO PLUS. Renew to see them again.');
   }
 
+  // Gross, fees, receivable and the average are over SALES only
+  // (`COUNTED_STORE_ORDER`); the cancelled count is reported beside them.
   const orders = await c.env.DB.prepare(
-    `SELECT COUNT(*) AS orders,
-            COALESCE(SUM(total_iqd), 0) AS gross,
-            COALESCE(SUM(platform_fee_iqd), 0) AS fees,
-            COALESCE(SUM(merchant_receivable_iqd), 0) AS receivable,
-            SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) AS completed,
-            SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
-       FROM orders WHERE merchant_id = ?`
+    `SELECT SUM(CASE WHEN ${COUNTED_STORE_ORDER} THEN 1 ELSE 0 END) AS orders,
+            COALESCE(SUM(CASE WHEN ${COUNTED_STORE_ORDER} THEN o.total_iqd ELSE 0 END), 0) AS gross,
+            COALESCE(SUM(CASE WHEN ${COUNTED_STORE_ORDER} THEN o.platform_fee_iqd ELSE 0 END), 0) AS fees,
+            COALESCE(SUM(CASE WHEN ${COUNTED_STORE_ORDER} THEN o.merchant_receivable_iqd ELSE 0 END), 0) AS receivable,
+            SUM(CASE WHEN o.status = 'delivered' THEN 1 ELSE 0 END) AS completed,
+            SUM(CASE WHEN o.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
+       FROM orders o WHERE o.merchant_id = ?`
   ).bind(ctx.merchant.id).first<Record<string, number>>();
 
+  // Units from the order lines of real sales, not `sold_count`: that counter
+  // was added at checkout and never taken back when an order was cancelled.
   const products = await c.env.DB.prepare(
     `SELECT COUNT(*) AS total,
             SUM(CASE WHEN lifecycle = 'active' THEN 1 ELSE 0 END) AS active,
             COALESCE(SUM(view_count), 0) AS views,
-            COALESCE(SUM(sold_count), 0) AS sold
-       FROM community_products WHERE merchant_id = ?`
+            (SELECT COALESCE(SUM(i.qty), 0) FROM order_items i JOIN orders o ON o.id = i.order_id
+              WHERE o.merchant_id = ?1 AND ${COUNTED_STORE_ORDER}) AS sold
+       FROM community_products WHERE merchant_id = ?1`
   ).bind(ctx.merchant.id).first<Record<string, number>>();
 
   const top = await c.env.DB.prepare(
-    `SELECT id, name, sold_count, view_count, price_iqd FROM community_products
-      WHERE merchant_id = ? ORDER BY sold_count DESC, view_count DESC LIMIT 5`
+    `SELECT p.id, p.name, p.view_count, p.price_iqd,
+            SUM(i.qty) AS sold_count, SUM(i.line_total_iqd) AS revenue_iqd
+       FROM order_items i
+       JOIN orders o ON o.id = i.order_id
+       JOIN community_products p ON p.id = i.community_product_id AND p.merchant_id = o.merchant_id
+      WHERE o.merchant_id = ? AND ${COUNTED_STORE_ORDER}
+      GROUP BY p.id, p.name, p.view_count, p.price_iqd
+      ORDER BY sold_count DESC, revenue_iqd DESC LIMIT 5`
   ).bind(ctx.merchant.id).all();
+
+  // Custom (request) orders are a second, separate series: finished work only
+  // — a cancelled or refunded one earned the merchant nothing to report.
+  const custom = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS completed, COALESCE(SUM(merchant_receivable_iqd), 0) AS receivable
+       FROM community_orders WHERE merchant_id = ? AND state = 'completed'`
+  ).bind(ctx.merchant.id).first<Record<string, number>>();
 
   const offers = await c.env.DB.prepare(
     `SELECT COUNT(*) AS sent, SUM(CASE WHEN state = 'accepted' THEN 1 ELSE 0 END) AS accepted
@@ -1577,7 +1850,8 @@ merchantRoutes.get('/analytics', async (c) => {
 
   const repeat = await c.env.DB.prepare(
     `SELECT COUNT(*) AS n FROM (
-       SELECT user_id FROM orders WHERE merchant_id = ? GROUP BY user_id HAVING COUNT(*) > 1
+       SELECT o.user_id FROM orders o WHERE o.merchant_id = ? AND ${COUNTED_STORE_ORDER}
+        GROUP BY o.user_id HAVING COUNT(*) > 1
      )`
   ).bind(ctx.merchant.id).first<{ n: number }>();
 
@@ -1603,6 +1877,10 @@ merchantRoutes.get('/analytics', async (c) => {
       sold: Number(products?.sold ?? 0),
     },
     top_products: top.results,
+    custom_orders: {
+      completed: Number(custom?.completed ?? 0),
+      receivable_iqd: Number(custom?.receivable ?? 0),
+    },
     offers: {
       sent,
       accepted: Number(offers?.accepted ?? 0),

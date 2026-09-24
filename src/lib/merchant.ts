@@ -121,10 +121,21 @@ export interface MerchantProduct {
   lifecycle?: string;
   section_id?: string | null;
   featured?: boolean;
-  sold_count: number;
+  /** The merchant's own view only — the public shape carries `sales_tier`. */
+  sold_count?: number;
+  /** Public: sales rounded DOWN to a tier the product has passed, or null
+   *  below the first tier — never the exact count (worker/lib/salesBadge.ts). */
+  sales_tier?: number | null;
   view_count?: number;
   /** Public shape reports availability, never the exact count. */
   in_stock?: boolean;
+  /**
+   * Levonis's own hide, beside (never inside) the merchant's lifecycle
+   * (migration 0118). While set, the product is off the storefront whatever
+   * its lifecycle says, the merchant cannot publish it, and `reason` is what
+   * they are told. Merchant's own reads only.
+   */
+  moderation?: { hidden_by_admin: boolean; reason: string; at: string } | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -208,6 +219,9 @@ export interface MerchantMe {
   store: MerchantStore | null;
   selling: { canSell: boolean; reason: string };
   suggested_slug: string | null;
+  /** The domain store addresses live under, from the server's configuration;
+   *  null when none is configured (audit 01 B19). */
+  root_domain?: string | null;
 }
 
 export type SlugRejection =
@@ -258,11 +272,15 @@ export const merchantApi = {
   deleteProduct: (id: string) => api.delete<{ archived: boolean }>(`/api/merchant/products/${id}`),
   duplicateProduct: (id: string) =>
     api.post<{ product: MerchantProduct }>(`/api/merchant/products/${id}/duplicate`),
-  orders: (params = '') => api.get<{ orders: Record<string, unknown>[] }>(`/api/merchant/orders${params}`),
+  orders: (params = '') =>
+    api.get<{ orders: Record<string, unknown>[]; next_cursor: string | null }>(`/api/merchant/orders${params}`),
   order: (id: string) =>
     api.get<{ order: Record<string, unknown>; items: Record<string, unknown>[] }>(`/api/merchant/orders/${id}`),
-  setOrderStatus: (id: string, status: string) =>
-    api.post<{ status: string }>(`/api/merchant/orders/${id}/status`, { status }),
+  setOrderStatus: (id: string, status: string, reason = '') =>
+    api.post<{ status: string; refunded_usd_cents?: number }>(
+      `/api/merchant/orders/${id}/status`,
+      reason ? { status, reason } : { status }
+    ),
   analytics: () => api.get<Record<string, unknown>>('/api/merchant/analytics'),
   payouts: () =>
     api.get<{ balance: { available_iqd: number; pending_iqd: number; paid_iqd: number }; entries: Record<string, unknown>[] }>(
@@ -274,9 +292,9 @@ export const merchantApi = {
   followers: () => api.get<{ total: number; followers: Record<string, unknown>[] }>('/api/merchant/followers'),
   customers: () => api.get<{ customers: Record<string, unknown>[] }>('/api/merchant/customers'),
   notifications: () =>
-    api.get<{ preferences: Record<string, boolean>; forced: string[] }>('/api/merchant/notifications'),
+    api.get<{ preferences: Record<string, boolean>; forced: string[]; wired?: string[] }>('/api/merchant/notifications'),
   setNotifications: (body: Record<string, boolean>) =>
-    api.patch<{ preferences: Record<string, boolean>; forced: string[] }>('/api/merchant/notifications', body),
+    api.patch<{ preferences: Record<string, boolean>; forced: string[]; wired?: string[] }>('/api/merchant/notifications', body),
   subscription: () => api.get<Record<string, unknown>>('/api/merchant/subscription'),
   changeSlug: (slug: string) =>
     api.post<{ slug: string; changed: boolean }>('/api/merchant/store/slug', { slug }),
@@ -335,7 +353,8 @@ export const communityOrdersApi = {
 };
 
 export const storefrontApi = {
-  resolve: () => api.get<{ kind: string; store: MerchantStore | null }>('/api/storefront/resolve'),
+  resolve: () =>
+    api.get<{ kind: string; store: MerchantStore | null; root_domain?: string | null }>('/api/storefront/resolve'),
   store: (slug: string) => api.get<{ store: MerchantStore }>(`/api/storefront/${slug}`),
   /** Legacy-link resolution: accepts a store id OR a merchant id (§57). */
   storeById: (id: string) => api.get<{ store: MerchantStore }>(`/api/storefront/by-id/${encodeURIComponent(id)}`),
@@ -454,7 +473,24 @@ export interface MerchantCartLine {
   prep_days: number;
   available: boolean;
   stock: number | null;
+  /**
+   * WHY a line cannot be bought, when it cannot (audit 02 B25): the product
+   * was hidden or archived, the stock is short, the chosen option is gone,
+   * the store stopped taking orders, the store is the customer's own, or the
+   * line belongs to a store other than the one this cart is locked to.
+   */
+  unavailable_reason?: MerchantLineUnavailable | null;
+  /** The option / colour the customer chose, as the store names it — '' for none. */
+  variant?: string;
 }
+
+export type MerchantLineUnavailable =
+  | 'unavailable'
+  | 'out_of_stock'
+  | 'option_gone'
+  | 'store_closed'
+  | 'own_store'
+  | 'other_store';
 
 export interface MerchantCartData {
   scope: { seller_type: string; merchant_id?: string; store_id?: string } | null;
@@ -464,14 +500,34 @@ export interface MerchantCartData {
 }
 
 export interface StoreQuote {
+  store_id?: string;
   store_name: string;
   store_slug: string;
-  lines: Array<{ cart_item_id: string; name: string; image: string; qty: number; unit_price_iqd: number; line_total_iqd: number }>;
+  lines: Array<{
+    cart_item_id: string;
+    product_id?: string;
+    name: string;
+    image: string;
+    qty: number;
+    unit_price_iqd: number;
+    line_total_iqd: number;
+    /** The option / colour chosen, as the store names it — '' for none. */
+    variant?: string;
+  }>;
   subtotal_iqd: number;
   delivery_iqd: number;
   coupon_code: string;
   discount_iqd: number;
   total_iqd: number;
+  /** What placing the order charges if nothing moves (audit 02 B12). */
+  expected_total_iqd: number;
+  /**
+   * The server's name for EVERY figure above. Placing the order sends it
+   * back; if anything that costs money moved since, the server refuses
+   * `409 QUOTE_CHANGED` with the fresh quote instead of charging the new
+   * total silently.
+   */
+  quote_fingerprint: string;
   /**
    * PREPAID ONLY (§74). A community-store order is paid from the wallet
    * before the merchant ships it — there is no cash on delivery and no
@@ -488,6 +544,14 @@ export interface StoreQuote {
   wallet_topup_url: string;
 }
 
+/** What `/api/store-orders` answers about a placed order — the public projection (B18). */
+export interface StoreOrderPublic {
+  id: string;
+  status: string;
+  total_iqd: number;
+  [key: string]: unknown;
+}
+
 export const storeCheckoutApi = {
   cart: () => api.get<MerchantCartData>('/api/cart/merchant'),
   scope: () =>
@@ -502,8 +566,8 @@ export const storeCheckoutApi = {
   // No `payWithWallet`: there is nothing to choose. The server refuses an
   // explicit `false` with STORE_PREPAID_ONLY rather than silently charging a
   // wallet for a method the customer did not pick.
-  place: (body: { addressId: string; idempotencyKey: string; couponCode?: string }) =>
-    api.post<{ order: Record<string, unknown>; replay?: boolean }>('/api/store-orders', body),
+  place: (body: { addressId: string; idempotencyKey: string; quoteFingerprint: string; couponCode?: string }) =>
+    api.post<{ order: StoreOrderPublic; replay?: boolean }>('/api/store-orders', body),
 };
 
 /**
@@ -578,12 +642,17 @@ export function badgeLabel(
 // ---------------------------------------------------------------------------
 
 export interface CommunityOverview {
+  /** False for an assistant-scope admin: the commission figures are null. */
+  financial?: boolean;
   merchants: { total: number; verified: number; suspended: number };
   stores: { total: number; active: number };
   products: { total: number; active: number };
   requests: { total: number; open: number };
   offers: { total: number };
-  orders: { total: number; gross: number; fees: number; completed: number };
+  /** Custom (request) orders, funded and never cancelled or refunded. */
+  orders: { total: number; gross: number; fees: number | null; completed: number };
+  /** Store-product sales, cancelled ones excluded. */
+  store_sales?: { total: number; gross: number; fees: number | null };
   escrows: Array<{ state: string; n: number; total: number }>;
   complaints: { total: number; open: number };
 }
@@ -605,9 +674,27 @@ export interface AdminMerchantRow {
   store_status: string | null;
   store_status_reason: string | null;
   store_name: string | null;
+  /** The store's real address, from the server's configured root domain. */
+  store_url?: string | null;
   owner_email: string;
   owner_name: string;
   created_at: string;
+}
+
+/** One of a merchant's products as moderation sees it (admin only). */
+export interface AdminMerchantProduct {
+  id: string;
+  slug: string;
+  name: string;
+  name_ar: string;
+  price_iqd: number;
+  image: string | null;
+  lifecycle: string;
+  /** On the storefront right now. */
+  live: boolean;
+  admin_hidden: boolean;
+  admin_hidden_at: string | null;
+  admin_hidden_reason: string;
 }
 
 export interface AdminComplaintRow {
@@ -775,7 +862,7 @@ export const adminCommunityApi = {
   verify: (id: string, verified: boolean) =>
     api.post<{ verified: boolean }>(`/api/admin/community/merchants/${id}/verify`, { verified }),
   setStatus: (id: string, status: string, reason: string) =>
-    api.post<{ status: string }>(`/api/admin/community/merchants/${id}/status`, { status, reason }),
+    api.post<{ status: string; store_status: string | null }>(`/api/admin/community/merchants/${id}/status`, { status, reason }),
   setBadge: (id: string, badge: string) =>
     api.post(`/api/admin/community/merchants/${id}/badge`, { badge }),
   /** Suspending a STORE is a different sanction from suspending its merchant. */
@@ -853,7 +940,11 @@ export const adminCommunityApi = {
   adjustReputation: (id: string, points: number, note: string) =>
     api.post(`/api/admin/community/merchants/${id}/reputation`, { points, note }),
 
-  hideProduct: (id: string) => api.post(`/api/admin/community/products/${id}/hide`),
+  /** Levonis's own hide — sticky, with the reason the merchant is shown. */
+  hideProduct: (id: string, hidden: boolean, reason = '') =>
+    api.post<{ hidden: boolean }>(`/api/admin/community/products/${id}/hide`, { hidden, reason }),
+  merchantProducts: (id: string) =>
+    api.get<{ products: AdminMerchantProduct[] }>(`/api/admin/community/merchants/${id}/products`),
   hideReview: (id: string, hidden: boolean) =>
     api.post<{ hidden: boolean }>(`/api/admin/community/reviews/${id}/hide`, { hidden }),
   removeRequest: (id: string, reason: string) =>

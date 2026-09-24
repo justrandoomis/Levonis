@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Edit2, Store } from 'lucide-react';
 import { useAuth } from '../AuthContext';
-import MerchantDashboard from '../components/MerchantDashboard';
+import { useLanguage } from '../LanguageContext';
 import { api, uploadFile } from '../lib/api';
 import { COUNTRIES, countryNames, flagOf } from '../components/auth/PhoneField';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
@@ -64,8 +64,8 @@ export default function EditProfile() {
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const [merchantMode, setMerchantMode] = useState(false);
   const [canMerchant, setCanMerchant] = useState(user?.role === 'merchant' || user?.role === 'admin');
+  const { loc } = useLanguage();
 
   // Re-sync the form when the user loads/refreshes.
   const loadedUserId = useRef<string | null>(user?.id ?? null);
@@ -161,16 +161,21 @@ export default function EditProfile() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white w-full font-sans pb-16">
-      {/* Merchant Mode Toggle — only for users with a store or merchant/admin role */}
+      {/* THE STORE LIVES IN ONE PLACE (audit 01 B10). This used to be a
+          «Merchant Mode» toggle that swapped this page for a second, legacy
+          store editor writing products through /api/community/my-store —
+          store-less, entitlement-free, any image URL, hard deletes. That API
+          now hands every write to the store API, and this is the way there. */}
       {canMerchant && (
-        <div className="flex justify-center pt-8 bg-[#0a0a0a]">
-          <button
-            onClick={() => setMerchantMode(!merchantMode)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-colors ${merchantMode ? 'bg-gold/20 text-gold border border-gold/30' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}`}
+        <div className="flex justify-center pt-8 px-4 bg-[#0a0a0a]">
+          <Link
+            to="/merchant"
+            data-edit-profile-store-link
+            className="lv-button lv-button-secondary lv-button-sm"
           >
-            <Store className="w-4 h-4" />
-            {merchantMode ? 'Merchant Mode: ON' : 'Merchant Mode: OFF'}
-          </button>
+            <Store className="w-4 h-4" aria-hidden="true" />
+            {loc('إدارة متجري', 'Manage my store') /* OWNER: Sorani to be written by hand. */}
+          </Link>
         </div>
       )}
 
@@ -212,9 +217,6 @@ export default function EditProfile() {
         </div>
       )}
 
-      {merchantMode && canMerchant ? (
-        <MerchantDashboard />
-      ) : (
         <div className="px-4 pb-8 pt-4 space-y-6 max-w-md mx-auto">
         {/* Avatar */}
         <div className="flex justify-center mb-8">
@@ -413,7 +415,6 @@ export default function EditProfile() {
         </div>
 
         </div>
-      )}
     </div>
   );
 }

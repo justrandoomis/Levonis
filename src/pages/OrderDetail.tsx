@@ -24,6 +24,7 @@ import SupportActions from '../components/orders/SupportActions';
 import CancelOrderSheet from '../components/orders/CancelOrderSheet';
 import ReviewSheet from '../components/orders/ReviewSheet';
 import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
+import StoreReceipt from '../components/orders/StoreReceipt';
 import { apiRefusal } from '../lib/refusalStrings';
 import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, statusLabel, statusStyle } from '../components/orders/format';
 import { useMoney } from '../CurrencyContext';
@@ -511,6 +512,15 @@ export default function OrderDetail() {
                   </span>
                 </div>
               )}
+              {/* A delivered community-store order: «استلمت طلبي», and the
+                  date it counts as received on its own (null elsewhere). */}
+              <StoreReceipt
+                order={order}
+                onConfirmed={(msg) => {
+                  setNotice(msg);
+                  void load({ quiet: true });
+                }}
+              />
             </section>
 
             <TabStrip

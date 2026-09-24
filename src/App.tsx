@@ -420,13 +420,13 @@ function StorefrontApp() {
 function AppBootstrapLayer() {
   const location = useLocation();
   const { isLoaded } = useAuth();
-  const { store, resolved, unknownStore } = useStore();
+  const { store, resolved, unknownStore, unavailableStore } = useStore();
   const homeReady = React.useSyncExternalStore(
     homeCriticalReadyStore.subscribe,
     homeCriticalReadyStore.snapshot,
     homeCriticalReadyStore.serverSnapshot
   );
-  const mainHomeNeedsData = !store && !unknownStore && location.pathname === '/';
+  const mainHomeNeedsData = !store && !unknownStore && !unavailableStore && location.pathname === '/';
 
   /**
    * ITS OWN BOUNDARY, BECAUSE IT IS A SIBLING OF THE ROUTES AND NOT A CHILD.
@@ -515,7 +515,7 @@ function AppContent() {
     };
   }, [location.key, location.hash, navigationType]);
 
-  const { store, resolved, unknownStore } = useStore();
+  const { store, resolved, unknownStore, unavailableStore } = useStore();
   // Fetch the catalogue, the product page, the cart and the address book once
   // the browser is idle, so a tap on a product card renders synchronously.
   useIdlePrefetch();
@@ -525,7 +525,7 @@ function AppContent() {
   // site first and swapping to a storefront would flash the wrong brand at
   // someone who opened a merchant's link.
   if (!resolved) return <RouteFallback />;
-  if (store || unknownStore) return <StorefrontApp />;
+  if (store || unknownStore || unavailableStore) return <StorefrontApp />;
   // Lower-cased on BOTH sides: react-router matches a path case-insensitively,
   // so /Points reaches the router while a case-sensitive test here would send
   // it to the other <Routes> block and render a different tree for the same

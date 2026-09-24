@@ -590,7 +590,7 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
                 <p className="text-white text-[12px] font-semibold truncate" dir="auto">{p.name}</p>
                 <p className="text-zinc-300 text-[11.5px] mt-0.5"><span dir="ltr">{dinar(p.price_iqd)}</span></p>
                 <div className="flex items-center justify-between mt-1.5">
-                  <LifecycleChip lifecycle={p.lifecycle ?? 'active'} />
+                  <LifecycleChip lifecycle={p.lifecycle ?? 'active'} moderation={p.moderation} />
                   <div className="flex gap-1">
                     <IconBtn onClick={() => setEditing(p)} disabled={!canSell} label={loc('تعديل', 'Edit', 'دەستکاری')}>
                       <Pencil className="w-3 h-3" />
@@ -614,7 +614,7 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
               <span className="text-white text-[12px] font-medium truncate flex-1 min-w-0" dir="auto">{p.name}</span>
               <span className="text-zinc-300 text-[11.5px] shrink-0" dir="ltr">{dinar(p.price_iqd)}</span>
               <StockCell p={p} loc={loc} compact />
-              <LifecycleChip lifecycle={p.lifecycle ?? 'active'} />
+              <LifecycleChip lifecycle={p.lifecycle ?? 'active'} moderation={p.moderation} />
               <IconBtn onClick={() => setEditing(p)} disabled={!canSell} label={loc('تعديل', 'Edit', 'دەستکاری')}>
                 <Pencil className="w-3 h-3" />
               </IconBtn>
@@ -669,7 +669,7 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
                       )}
                     </td>
                     <td className="px-2 py-2.5"><StockCell p={p} loc={loc} /></td>
-                    <td className="px-2 py-2.5"><LifecycleChip lifecycle={p.lifecycle ?? 'active'} /></td>
+                    <td className="px-2 py-2.5"><LifecycleChip lifecycle={p.lifecycle ?? 'active'} moderation={p.moderation} /></td>
                     <td className="px-2 py-2.5">
                       <p className="text-white text-[12.5px] font-bold"><span dir="ltr">{p.sold_count ?? 0}</span></p>
                       <p className="text-zinc-500 text-[10px]">{loc('مبيع', 'sold', 'فرۆشراو')}</p>
@@ -727,9 +727,13 @@ export function ProductsManager({ canSell, store }: { canSell: boolean; store: M
                                 ) : (
                                   <MenuItem
                                     icon={<Eye className="w-3.5 h-3.5" />}
-                                    label={loc('نشر في المتجر', 'Publish to store', 'بڵاوکردنەوە')}
+                                    label={
+                                      p.moderation?.hidden_by_admin
+                                        ? loc('أخفته Levonis — لا يُنشر', 'Hidden by Levonis — cannot publish') /* OWNER: Sorani to be written by hand. */
+                                        : loc('نشر في المتجر', 'Publish to store', 'بڵاوکردنەوە')
+                                    }
                                     onClick={() => quickPatch(p, { lifecycle: 'active' })}
-                                    disabled={!canSell || (p.lifecycle ?? '') === 'archived'}
+                                    disabled={!canSell || (p.lifecycle ?? '') === 'archived' || !!p.moderation?.hidden_by_admin}
                                   />
                                 )}
                                 <MenuItem
@@ -1096,8 +1100,28 @@ function ImportPanel({ loc, onDone, onClose }: { loc: Loc; onDone: () => void; o
 
 // ------------------------------------------------------- lifecycle helpers
 
-export function LifecycleChip({ lifecycle }: { lifecycle: string }) {
+export function LifecycleChip({
+  lifecycle,
+  moderation,
+}: {
+  lifecycle: string;
+  /** Levonis's hide wins over the lifecycle: the merchant sees THAT, and why. */
+  moderation?: MerchantProduct['moderation'];
+}) {
   const { loc } = useLanguage();
+  if (moderation?.hidden_by_admin) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap bg-red-500/10 text-red-300 border-red-500/25"
+        title={moderation.reason || undefined}
+        data-hidden-by-admin
+      >
+        <span className="w-1 h-1 rounded-full bg-current" aria-hidden="true" />
+        {loc('أخفته Levonis', 'Hidden by Levonis')}
+        {/* OWNER: Sorani to be written by hand. */}
+      </span>
+    );
+  }
 
   const map: Record<string, string> = {
     active: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
@@ -1198,7 +1222,17 @@ export function ProductEditor({
       else await merchantApi.createProduct(f);
       onDone();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت'));
+      if (e instanceof ApiError && e.code === 'PRODUCT_HIDDEN_BY_ADMIN') {
+        const reason = typeof e.details?.reason === 'string' ? e.details.reason : '';
+        setError(
+          loc(
+            `أخفت Levonis هذا المنتج ولا يمكن نشره${reason ? ` — السبب: ${reason}` : ''}. عدّل ما يذكره السبب وتواصل مع الدعم لمراجعته.`,
+            `Levonis has hidden this product and it cannot be published${reason ? ` — reason: ${reason}` : ''}. Fix what the reason names and contact support for a review.`
+          ) // OWNER: Sorani to be written by hand.
+        );
+      } else {
+        setError(e instanceof ApiError ? e.message : loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت'));
+      }
       setSaving(false);
     }
   }
@@ -1208,6 +1242,19 @@ export function ProductEditor({
       <h3 className="text-gold font-bold text-[13px]">
         {product ? loc('تعديل المنتج', 'Edit product', 'دەستکاری بەرهەم') : loc('منتج جديد', 'New product', 'بەرهەمی نوێ')}
       </h3>
+      {product?.moderation?.hidden_by_admin && (
+        <p role="note" className="lv-alert lv-alert-danger text-[12px] text-zinc-200 leading-relaxed" data-editor-hidden-by-admin>
+          {loc(
+            'أخفت Levonis هذا المنتج من المتجر. يمكنك تعديله، لكنه لا يظهر للزبائن حتى ترفع Levonis الإخفاء.',
+            'Levonis has hidden this product from the store. You can still edit it; it will not show to customers until Levonis lifts the hide.'
+          ) /* OWNER: Sorani to be written by hand. */}
+          {product.moderation.reason && (
+            <span className="block mt-1 text-zinc-400">
+              {loc('السبب', 'Reason')}: <span dir="auto">{product.moderation.reason}</span>
+            </span>
+          )}
+        </p>
+      )}
 
       <Input label={loc('الاسم', 'Name', 'ناو')} value={f.name} onChange={(v) => setF({ ...f, name: v })} />
 

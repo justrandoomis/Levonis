@@ -261,11 +261,16 @@ export async function sitemapRoute(c: Context<AppContext>): Promise<Response> {
       // `lifecycle = 'active' AND status = 'active'` pair the storefront's own
       // listing uses (worker/routes/storefront.ts) — a sitemap that advertises
       // a draft is a sitemap that advertises a 404.
+      // …and never for a SANCTIONED store (suspended, or its merchant
+      // suspended): its page is «المتجر غير متاح حاليًا», so its products are
+      // not served anywhere, a sitemap included (owner decision 2026-09-24).
       const { results } = await c.env.DB.prepare(
         `SELECT p.slug AS slug, p.updated_at AS updated_at
            FROM community_products p
            JOIN merchant_stores s ON s.id = p.store_id
+           JOIN community_merchants m ON m.id = s.merchant_id
           WHERE s.slug = ? AND p.lifecycle = 'active' AND p.status = 'active' AND p.slug <> ''
+            AND s.status <> 'suspended' AND m.status <> 'suspended'
           ORDER BY p.updated_at DESC
           LIMIT ${MAX_SITEMAP_URLS}`
       )

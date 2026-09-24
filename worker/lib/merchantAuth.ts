@@ -23,7 +23,7 @@
 
 import type { Context } from 'hono';
 import type { AppContext } from './types';
-import { forbidden, notFound, unauthorized } from './http';
+import { forbidden, HttpError, notFound, unauthorized } from './http';
 import { getTierStatus, benefits } from './entitlements';
 
 export interface MerchantRow {
@@ -186,21 +186,55 @@ export async function requireSellingPrivileges(c: Context<AppContext>): Promise<
   const ctx = await requireStoreOwner(c);
   const user = c.get('user')!;
 
+  // Each refusal names its cause with a stable code — the two sanctions are
+  // separate rows (worker/routes/adminCommunity.ts) and the merchant is told
+  // which one applies, not a generic FORBIDDEN.
   if (ctx.merchant.status === 'suspended') {
-    throw forbidden('This merchant account is suspended. Contact support.');
+    throw new HttpError(403, 'This merchant account is suspended. Contact support.', 'MERCHANT_SUSPENDED');
   }
   if (ctx.store.status === 'suspended') {
-    throw forbidden('This store is suspended by Levonis. Contact support.');
+    throw new HttpError(403, 'This store is suspended by Levonis. Contact support.', 'STORE_SUSPENDED');
   }
   if (ctx.store.status === 'paused') {
-    throw forbidden('Your store is paused. Re-open it in store settings to sell again.');
+    throw new HttpError(403, 'Your store is paused. Re-open it in store settings to sell again.', 'STORE_PAUSED');
   }
 
   const tier = await getTierStatus(c.env.DB, user.id);
   if (!benefits.merchantStore(tier)) {
-    throw forbidden(
+    throw new HttpError(
+      403,
       'Your LEVO PLUS subscription is not active. Your store and its history are kept — renew to sell again.',
-      );
+      'SUBSCRIPTION_INACTIVE'
+    );
+  }
+  return ctx;
+}
+
+/**
+ * MAY THIS MERCHANT MAKE A NEW PROMISE ON A CUSTOMER'S REQUEST?
+ *
+ * Making an offer, re-confirming one the customer's change made stale, and
+ * re-pricing one (an edit re-confirms — worker/routes/marketplace.ts) are each
+ * a new commitment: everything `requireSellingPrivileges` asks, AND a merchant
+ * in good standing. A RESTRICTED merchant — Levonis's sanction short of a
+ * suspension: the store stays visible and existing work goes on, but no new
+ * orders (`storeTakesOrders`, worker/lib/storeOrderOps.ts) and no new offers —
+ * was refused only by the matcher, which stopped telling them about requests
+ * but let them bid on any they found (audit 03 V, audit 04 #23).
+ *
+ * AN ALLOW-LIST, like the buy path: anything but exactly `active` is refused,
+ * so a status nobody has taught this function stops bids rather than slipping
+ * past. Withdrawing an offer stays on `requireSellingPrivileges` — taking a
+ * promise back is never refused to a restricted merchant.
+ */
+export async function requireOfferPrivileges(c: Context<AppContext>): Promise<StoreContext> {
+  const ctx = await requireSellingPrivileges(c);
+  if (ctx.merchant.status !== 'active') {
+    throw new HttpError(
+      403,
+      'Levonis has restricted your merchant account: you cannot make or re-confirm offers until the restriction is lifted. Your accepted work continues — contact support.',
+      'MERCHANT_RESTRICTED'
+    );
   }
   return ctx;
 }
@@ -216,10 +250,27 @@ export async function sellingStatus(
 ): Promise<{ canSell: boolean; reason: string }> {
   const user = c.get('user');
   if (!user) return { canSell: false, reason: 'signed_out' };
+  return sellingVerdict(c.env.DB, ctx, user.id);
+}
+
+/**
+ * THE SAME ANSWER, FOR A NAMED ACCOUNT RATHER THAN THE SIGNED-IN ONE.
+ *
+ * `sellingStatus` asks it of the session user — right on the merchant's own
+ * dashboard, where the session IS the owner. The buy path asks it of the
+ * store's OWNER while a CUSTOMER is signed in (worker/lib/storeOrderOps.ts,
+ * `storeTakesOrders`): a lapsed PLUS stopped nothing at checkout because the
+ * only copy of this rule read `c.get('user')`, which there is the buyer.
+ */
+export async function sellingVerdict(
+  db: D1Database,
+  ctx: StoreContext,
+  ownerUserId: string
+): Promise<{ canSell: boolean; reason: string }> {
   if (ctx.merchant.status === 'suspended') return { canSell: false, reason: 'merchant_suspended' };
   if (ctx.store.status === 'suspended') return { canSell: false, reason: 'store_suspended' };
   if (ctx.store.status === 'paused') return { canSell: false, reason: 'store_paused' };
-  const tier = await getTierStatus(c.env.DB, user.id);
+  const tier = await getTierStatus(db, ownerUserId);
   if ((tier.gated_benefits ?? []).includes('merchantStore')) {
     return { canSell: false, reason: 'benefit_restricted' };
   }
@@ -235,4 +286,19 @@ export async function sellingStatus(
  */
 export function storeIsOpen(ctx: StoreContext): boolean {
   return ctx.store.status === 'active' && ctx.merchant.status !== 'suspended';
+}
+
+/**
+ * Is this storefront under an ADMIN sanction — its own store suspension, or
+ * its owner's merchant suspension?
+ *
+ * OWNER DECISION (2026-09-24, docs/MERCHANT_PLATFORM.md §2): a customer on an
+ * admin-suspended store sees only «المتجر غير متاح حاليًا» — no products,
+ * banner, bio or reviews. The two sanctions are separate rows and neither
+ * writes the other (worker/routes/adminCommunity.ts), so the public reads ask
+ * both here, in one place. `paused` is NOT a sanction: it is the merchant's
+ * own switch, and a paused shop stays visible and says it is closed.
+ */
+export function storeIsSuspended(ctx: StoreContext): boolean {
+  return ctx.store.status === 'suspended' || ctx.merchant.status === 'suspended';
 }

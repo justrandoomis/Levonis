@@ -65,7 +65,22 @@ function seed(raw: DatabaseSync) {
       VALUES ('a1','buyer','Sara','+964770','Baghdad');
     INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status,note)
       VALUES ('dep_buyer','buyer','deposit','USD',${DEP},'approved','seed funding');
+
+    /* A store sells only while its OWNER holds the store entitlement
+       (worker/lib/storeOrderOps.ts, storeTakesOrders) — both are PLUS here. */
+    INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at) VALUES
+      ('mem_ali','ali','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z'),
+      ('mem_zain','zain','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
   `);
+}
+
+/**
+ * Place a store order the way the checkout page does: quote first, then send
+ * back the fingerprint of the quote the customer confirmed (B12).
+ */
+async function placeStoreOrder(app: ReturnType<typeof buyerApp>, body: Record<string, unknown>) {
+  const q = await json(await post(app, '/api/store-orders/quote', {}));
+  return post(app, '/api/store-orders', { quoteFingerprint: q.quote?.quote_fingerprint, ...body });
 }
 
 const buyerApp = (db: D1Database) =>
@@ -200,7 +215,7 @@ test('a merchant order is wallet-paid, with nothing due at the door and no picku
   const app = buyerApp(asD1(raw));
   await addMerchant(app, 'cp_ali');
 
-  const placed = await json(await post(app, '/api/store-orders', {
+  const placed = await json(await placeStoreOrder(app, {
     idempotencyKey: 'prepaid-key-002', addressId: 'a1',
   }));
   assert.equal(placed.success, true, JSON.stringify(placed));
@@ -230,7 +245,7 @@ test('omitting the field is not a loophole — it is the only way to pay', async
   const app = buyerApp(asD1(raw));
   await addMerchant(app, 'cp_ali');
 
-  const placed = await json(await post(app, '/api/store-orders', {
+  const placed = await json(await placeStoreOrder(app, {
     idempotencyKey: 'prepaid-key-003', addressId: 'a1', payWithWallet: true,
   }));
   assert.equal(placed.order.payment_method_id, 'wallet');
@@ -260,7 +275,7 @@ test('the quote answers "can my wallet actually pay this" before the button, not
   assert.equal(poor.wallet_shortfall_iqd, 7000, 'and the customer is told the exact gap');
 
   // The screen's answer and the checkout's answer must be the same answer.
-  const refused = await json(await post(app, '/api/store-orders', {
+  const refused = await json(await placeStoreOrder(app, {
     idempotencyKey: 'prepaid-key-004', addressId: 'a1',
   }));
   assert.equal(refused.code, 'INSUFFICIENT_FUNDS');
@@ -276,7 +291,7 @@ test('the order lands in the selling merchant\'s own list and in nobody else\'s'
   seed(raw);
   const app = buyerApp(asD1(raw));
   await addMerchant(app, 'cp_ali');
-  const placed = await json(await post(app, '/api/store-orders', {
+  const placed = await json(await placeStoreOrder(app, {
     idempotencyKey: 'prepaid-key-005', addressId: 'a1',
   }));
   const orderId = placed.order.id as string;

@@ -376,9 +376,15 @@ test('only a published product is readable — a draft must not leak through a c
   // The status filter is the whole guard: a crawler is anonymous, and a guessed
   // slug would otherwise unfurl an unreleased product's name and photo.
   const source = readFileSync(new URL('../worker/lib/socialPreview.ts', import.meta.url), 'utf8');
-  const selects = source.match(/SELECT[\s\S]*?FROM (?:products|community_products)[\s\S]*?(?=")/g) ?? [];
-  assert.equal(selects.length, 2, `expected two reads, saw ${selects.length}`);
-  for (const select of selects) assert.match(select, /WHERE slug = \? AND status = 'active'$/);
+  // Three reads now: the catalogue, a merchant product anywhere, and a
+  // merchant product scoped to ONE store (a merchant host, or
+  // /community/store/<ref>/p/<slug> — audit 01 B15). Every one is published-only.
+  const selects = source.match(/SELECT[^`"]*?FROM (?:products|community_products)[^`"]*/g) ?? [];
+  assert.equal(selects.length, 3, `expected three reads, saw ${selects.length}`);
+  for (const select of selects) {
+    assert.match(select, /\bslug = \?\d?/, 'the slug is a bound parameter');
+    assert.match(select, /\bstatus = 'active'/, 'a draft or hidden product is not a card');
+  }
   // And the slug is bound, never interpolated.
   assert.ok(!/\$\{slug\}/.test(source));
 });

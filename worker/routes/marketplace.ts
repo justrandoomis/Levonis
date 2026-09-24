@@ -24,7 +24,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, badRequest, forbidden, notFound, conflict, str, int } from '../lib/http';
+import { requireAuth, badRequest, forbidden, notFound, conflict, str, int, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
@@ -35,13 +35,23 @@ import {
   MODEL_MAX_BYTES,
 } from '../lib/attachments';
 import { getTierStatus, benefits, usersWithEntitlement } from '../lib/entitlements';
-import { requireSellingPrivileges, storeForUser } from '../lib/merchantAuth';
+import { requireOfferPrivileges, requireSellingPrivileges, storeForUser } from '../lib/merchantAuth';
 import { feeFor, autoCompleteDays } from '../lib/merchantOps';
-import { holdEscrow, escrowForOrder, releaseEscrow, refundEscrow, disputeEscrow } from '../lib/escrowOps';
+import {
+  escrowForOrder,
+  escrowRecordStatements,
+  releaseEscrow,
+  releaseEscrowReservation,
+  refundEscrow,
+  disputeEscrow,
+  reserveEscrowFunds,
+  type HoldEscrowInput,
+} from '../lib/escrowOps';
+import { assertHoldStateStatement, isConstraintAbort } from '../lib/walletOps';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 // Levo Community's maintenance switch, on the routes that START trade here
 // (the owner closed /requests with the community — docs/DECISIONS.md).
-import { requireCommunityOpen } from '../lib/communityGate';
+import { communityClosedRefusal, requireCommunityOpen } from '../lib/communityGate';
 import { notifyOfferReceived } from '../lib/engagementNotify';
 import { deleteMediaObject, getMediaObject, headMediaObject, isSafeMediaKey, putMediaObject } from '../lib/mediaStorage';
 import {
@@ -53,6 +63,21 @@ import {
   type RequestState,
   type CommunityOrderState,
 } from '../lib/communityStates';
+import {
+  BOARD_STATES,
+  CUSTOMER_CANCELLABLE_STATES,
+  completionStatements,
+  isEngagedMerchant,
+  isPast,
+  offerAcceptedNotification,
+  offerCountStatement,
+  onPublicBoard,
+  requestFileAccess,
+  requestMovedFence,
+  revokeViewerTokensStatement,
+  staleOfferNotifications,
+  type RequestForAccess,
+} from '../lib/communityRequests';
 
 export const marketplaceRoutes = new Hono<AppContext>();
 
@@ -87,6 +112,9 @@ function publicRequest(r: Record<string, unknown>) {
     expires_at: r.expires_at,
     customer_name: r.customer_name ?? null,
     file_count: r.file_count ?? 0,
+    /** The job's version. It moves when a published request's terms change,
+     *  and an offer priced against an older one is stale (migration 0116). */
+    revision: r.revision ?? 1,
   };
 }
 
@@ -106,6 +134,20 @@ function offerShape(o: Record<string, unknown>, proBadges: Set<string> = new Set
     state: o.state,
     expires_at: o.expires_at,
     created_at: o.created_at,
+    /**
+     * THE VERSION THE CUSTOMER IS LOOKING AT. Acceptance sends it back with
+     * the price, and only that exact version can be accepted (audit 03 §10 B).
+     */
+    revision: Number(o.revision ?? 1),
+    /**
+     * STALE: the customer changed the job after this offer priced it (audit 03
+     * §10 K). It cannot be accepted until its merchant re-confirms it. Known
+     * only where the request's own revision was read alongside the offer.
+     */
+    stale:
+      o.state === 'pending' && o.r_revision !== undefined && o.r_revision !== null
+        ? Number(o.request_revision ?? 1) < Number(o.r_revision)
+        : false,
     // What a customer needs to compare offers (§27) — reputation, not contact
     // details.
     merchant: o.m_name
@@ -169,16 +211,12 @@ marketplaceRoutes.get('/requests/:id', requireCommunityOpen, async (c) => {
   if (!r) throw notFound('Request not found');
 
   const isOwner = !!user && user.id === r.customer_id;
-  if (!isOwner && (r.visibility !== 'public' || !REQUEST_OPEN_STATES.includes(r.state as RequestState))) {
-    // A closed or private request is only visible to the customer who made
-    // it and, below, to the merchant actually engaged on it.
-    const engaged = user
-      ? await c.env.DB.prepare(
-          `SELECT 1 FROM community_offers o
-             JOIN community_merchants m ON m.id = o.merchant_id
-            WHERE o.request_id = ? AND m.user_id = ? AND o.state = 'accepted'`
-        ).bind(id, user.id).first()
-      : null;
+  // A draft, a closed, a private or an EXPIRED request is only visible to the
+  // customer who made it and to the merchant actually engaged on it. Expiry is
+  // part of the question (audit 03 §10 I): the board hid an expired request
+  // while this page still served it to anyone holding the link.
+  if (!isOwner && !onPublicBoard(r as unknown as RequestForAccess)) {
+    const engaged = user ? await isEngagedMerchant(c.env.DB, id, user.id) : false;
     if (!engaged) throw notFound('Request not found');
   }
 
@@ -239,6 +277,35 @@ async function requestForFiles(c: Context<AppContext>, id: string, userId: strin
   return r;
 }
 
+/**
+ * A PUBLISHED JOB CHANGED — its revision moves (migration 0116). Conditional
+ * on the request taking offers, so editing a DRAFT (the wizard uploading its
+ * files) revises nothing: no merchant has priced it yet.
+ */
+function reviseStatement(db: D1Database, requestId: string, ts: string): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE community_requests SET revision = revision + 1, updated_at = ?
+        WHERE id = ? AND state IN ('open','receiving_offers')`
+    )
+    .bind(ts, requestId);
+}
+
+/** Tell every merchant whose pending offer priced an older revision. Never throws. */
+async function notifyStaleOffers(db: D1Database, requestId: string): Promise<void> {
+  try {
+    const row = await db
+      .prepare(`SELECT revision FROM community_requests WHERE id = ? AND state IN ('open','receiving_offers')`)
+      .bind(requestId)
+      .first<{ revision: number }>();
+    if (!row) return;
+    const stmts = await staleOfferNotifications(db, requestId, Number(row.revision));
+    if (stmts.length) await db.batch(stmts);
+  } catch (e) {
+    console.error('stale-offer notifications not written for', requestId, e instanceof Error ? e.message : String(e));
+  }
+}
+
 marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
   await rateLimit(c, 'request-file', 40, 3600);
   const user = c.get('user')!;
@@ -249,7 +316,7 @@ marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
   // an offer was accepted would change the job under a signed contract, so
   // the window closes when the request stops taking offers.
   if (!REQUEST_OPEN_STATES.includes(r.state as RequestState) && r.state !== 'draft') {
-    throw conflict('This request is no longer open, so its attachments cannot change');
+    throw conflict('This request is no longer open, so its attachments cannot change', 'REQUEST_NOT_EDITABLE');
   }
 
   const existing = await c.env.DB.prepare(
@@ -302,17 +369,24 @@ marketplaceRoutes.post('/requests/:id/files', requireAuth, async (c) => {
 
   const fileId = newId('crf');
   const name = safeFileName(file.name, kind.ext);
+  const ts = nowIso();
   try {
-    await c.env.DB.prepare(
-      `INSERT INTO community_request_files (id, request_id, file_key, file_name, content_type, size_bytes, kind)
-       VALUES (?,?,?,?,?,?,?)`
-    ).bind(fileId, id, key, name, kind.mime, buf.byteLength, kind.kind).run();
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `INSERT INTO community_request_files (id, request_id, file_key, file_name, content_type, size_bytes, kind)
+         VALUES (?,?,?,?,?,?,?)`
+      ).bind(fileId, id, key, name, kind.mime, buf.byteLength, kind.kind),
+      // A PUBLISHED job changed: revise it in the same write, so every offer
+      // priced without this file is stale until its merchant re-confirms.
+      reviseStatement(c.env.DB, id, ts),
+    ]);
   } catch (e) {
     // The row is what makes the object reachable. If it cannot be written,
     // delete the object rather than leaving a file nothing points at.
     await deleteMediaObject(c.env, 'private', key).catch(() => {});
     throw e;
   }
+  await notifyStaleOffers(c.env.DB, id);
 
   return c.json({
     success: true,
@@ -342,28 +416,22 @@ marketplaceRoutes.get('/requests/:id/files/:fileId', requireAuth, async (c) => {
 
   const row = await c.env.DB.prepare(
     `SELECT f.file_key, f.file_name, f.content_type, f.kind,
-            r.customer_id, r.state, r.visibility
+            r.id, r.customer_id, r.state, r.visibility, r.expires_at
        FROM community_request_files f
        JOIN community_requests r ON r.id = f.request_id
       WHERE f.id = ? AND f.request_id = ?`
   ).bind(fileId, id).first<{
     file_key: string; file_name: string; content_type: string; kind: string;
-    customer_id: string; state: string; visibility: string;
-  }>();
+  } & RequestForAccess>();
   if (!row) throw notFound('File not found');
 
-  const isOwner = row.customer_id === user.id;
-  const openToOffers =
-    row.visibility === 'public' && REQUEST_OPEN_STATES.includes(row.state as RequestState);
-
-  if (!isOwner && !openToOffers && user.role !== 'admin') {
-    const engaged = await c.env.DB.prepare(
-      `SELECT 1 FROM community_offers o
-         JOIN community_merchants m ON m.id = o.merchant_id
-        WHERE o.request_id = ? AND m.user_id = ? AND o.state = 'accepted'`
-    ).bind(id, user.id).first();
-    if (!engaged) throw notFound('File not found');
-  }
+  // ONE policy for every door onto a request's files (worker/lib/
+  // communityRequests.ts): the customer, an admin, the engaged merchant — and
+  // the board, which means NOT EXPIRED and Levo Community letting this caller
+  // in (audit 03 §10 G: the board answered 503 while this answered 200).
+  const { access, gateClosed } = await requestFileAccess(c.env, row, user, { allowAdmin: true });
+  if (gateClosed) throw communityClosedRefusal();
+  if (!access) throw notFound('File not found');
 
   const obj = await getMediaObject(c.env, 'private', row.file_key);
   if (!obj) throw notFound('File not found');
@@ -390,9 +458,10 @@ marketplaceRoutes.delete('/requests/:id/files/:fileId', requireAuth, async (c) =
   const r = await requestForFiles(c, id, user.id);
 
   // Same window as adding. Removing the model a merchant quoted against,
-  // after they quoted, would leave the price attached to a job nobody can see.
+  // after they quoted, would leave the price attached to a job nobody can see
+  // — so on a published request it revises the job and the offers go stale.
   if (!REQUEST_OPEN_STATES.includes(r.state as RequestState) && r.state !== 'draft') {
-    throw conflict('This request is no longer open, so its attachments cannot change');
+    throw conflict('This request is no longer open, so its attachments cannot change', 'REQUEST_NOT_EDITABLE');
   }
 
   const row = await c.env.DB.prepare(
@@ -402,13 +471,32 @@ marketplaceRoutes.delete('/requests/:id/files/:fileId', requireAuth, async (c) =
 
   // Row first: while it exists the object is reachable, so removing it last
   // can only leave an unreferenced object, never a broken reference.
-  await c.env.DB.prepare('DELETE FROM community_request_files WHERE id = ? AND request_id = ?')
-    .bind(fileId, id).run();
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM community_request_files WHERE id = ? AND request_id = ?').bind(fileId, id),
+    reviseStatement(c.env.DB, id, nowIso()),
+  ]);
   await deleteMediaObject(c.env, 'private', row.file_key).catch(() => {});
+  await notifyStaleOffers(c.env.DB, id);
 
   return c.json({ success: true });
 });
 
+/**
+ * CREATE A REQUEST — AS A DRAFT (audit 03 §10 E).
+ *
+ * The print wizard calls this at the end of its FIRST step, because a file
+ * belongs to a request and must be uploaded (and measured) before the customer
+ * has chosen a material. The row used to be created `open` and public, so an
+ * abandoned wizard left a live job on the board that merchants could bid on
+ * with no matching, no estimate and no spec — and PRINT_REQUESTS.md promised
+ * the opposite: publishing is the last moment before any merchant sees it.
+ *
+ * So the row is born `draft` (status `closed`, the coarse mirror every older
+ * reader already treats as "not on the board"): invisible to everyone but its
+ * customer, not biddable, and made public by exactly one transition —
+ * `POST /api/marketplace/print/requests/:id/publish`, which also runs the
+ * matching. The expiry clock starts there, not here.
+ */
 marketplaceRoutes.post('/requests', requireCommunityOpen, requireAuth, async (c) => {
   await rateLimit(c, 'request-create', 10, 3600);
   const user = c.get('user')!;
@@ -425,7 +513,7 @@ marketplaceRoutes.post('/requests', requireCommunityOpen, requireAuth, async (c)
        (id, customer_id, title, description, status, state, category, quantity, material, color,
         dimensions, budget_iqd, deadline, governorate, delivery_pref, notes, visibility,
         created_at, expires_at, updated_at)
-     VALUES (?,?,?,?,'open','open',?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+     VALUES (?,?,?,?,'closed','draft',?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
   ).bind(
     id, user.id, title, description,
     str(body.category, 'category', { min: 0, max: 60, required: false }),
@@ -446,10 +534,26 @@ marketplaceRoutes.post('/requests', requireCommunityOpen, requireAuth, async (c)
     ts
   ).run();
 
-  await audit(c.env.DB, user.id, 'community.request_created', id, { title });
+  await audit(c.env.DB, user.id, 'community.request_created', id, { title, state: 'draft' });
   const row = await c.env.DB.prepare('SELECT * FROM community_requests WHERE id = ?').bind(id).first();
   return c.json({ success: true, request: publicRequest(row as Record<string, unknown>) }, 201);
 });
+
+/**
+ * AN OFFER'S OWN VALIDITY, OR NONE. The column took forty characters of free
+ * text and nothing ever read it; now it is either absent or a real instant in
+ * the future, stored as ISO so the expiry sweep and the acceptance can compare
+ * it (audit 03 §10 I).
+ */
+function offerExpiry(raw: unknown, now: string): string | null {
+  const text = str(raw, 'expires_at', { min: 0, max: 40, required: false });
+  if (!text) return null;
+  const at = Date.parse(text);
+  if (!Number.isFinite(at)) throw badRequest('The offer validity is not a date', 'OFFER_EXPIRY_INVALID');
+  const iso = new Date(at).toISOString();
+  if (iso <= now) throw badRequest('The offer validity is already in the past', 'OFFER_EXPIRY_INVALID');
+  return iso;
+}
 
 async function requestExpiryDays(db: D1Database): Promise<number> {
   const row = await db
@@ -471,7 +575,19 @@ marketplaceRoutes.get('/my-requests', requireAuth, async (c) => {
   return c.json({ success: true, requests: results.map(publicRequest) });
 });
 
-/** Close a request. Only the customer, and only while nothing is committed. */
+/**
+ * Close a request. Only the customer, and only while nothing is committed.
+ *
+ * ONCE AN ORDER EXISTS, THIS IS THE WRONG DOOR (audit 03 §10 J). The state
+ * table lets a request in `in_progress` become `cancelled` — that is the
+ * ORDER's cancellation and the admin's dispute ruling reaching the request —
+ * and this route used to take the same path, so a customer could cancel the
+ * request while its paid order kept running: request `cancelled`, order
+ * `in_progress`, escrow `held`. A funded order is cancelled through
+ * `/orders/:id/cancel` before work starts (which refunds it) and through a
+ * dispute after, so here the customer may cancel only a draft or a request
+ * still taking offers, and anything later is `REQUEST_HAS_ORDER`.
+ */
 marketplaceRoutes.post('/requests/:id/cancel', requireAuth, async (c) => {
   const user = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
@@ -481,22 +597,39 @@ marketplaceRoutes.post('/requests/:id/cancel', requireAuth, async (c) => {
   if (!r) throw notFound('Request not found');
 
   const from = String(r.state) as RequestState;
-  if (!canMoveRequest(from, 'cancelled')) {
-    throw conflict(`A request that is ${from} cannot be cancelled here`);
+  if (from === 'cancelled') return c.json({ success: true, replayed: true });
+  if (!(CUSTOMER_CANCELLABLE_STATES as readonly string[]).includes(from) || !canMoveRequest(from, 'cancelled')) {
+    throw conflict(
+      ['offer_selected', 'in_progress', 'delivered', 'disputed'].includes(from)
+        ? 'This request has a paid order. Cancel the order before work starts, or open a dispute.'
+        : `A request that is ${from} cannot be cancelled here`,
+      ['offer_selected', 'in_progress', 'delivered', 'disputed'].includes(from) ? 'REQUEST_HAS_ORDER' : 'REQUEST_NOT_CANCELLABLE'
+    );
   }
 
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE community_requests SET state = 'cancelled', status = 'closed', updated_at = ?
-        WHERE id = ? AND customer_id = ? AND state = ?`
-    ).bind(nowIso(), id, user.id, from),
-    // Pending offers are told why they will never be answered, rather than
-    // being left hanging forever.
-    c.env.DB.prepare(
-      `UPDATE community_offers SET state = 'rejected', updated_at = ?
-        WHERE request_id = ? AND state = 'pending'`
-    ).bind(nowIso(), id),
-  ]);
+  const ts = nowIso();
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `UPDATE community_requests SET state = 'cancelled', status = 'closed', updated_at = ?
+          WHERE id = ? AND customer_id = ? AND state IN ('draft','open','receiving_offers')`
+      ).bind(ts, id, user.id),
+      // Nothing below runs unless the line above really moved it: an offer
+      // accepted a moment ago must not be "rejected" by a cancel that lost.
+      requestMovedFence(c.env.DB, id, 'cancelled', ts),
+      // Pending offers are told why they will never be answered, rather than
+      // being left hanging forever.
+      c.env.DB.prepare(
+        `UPDATE community_offers SET state = 'rejected', updated_at = ?
+          WHERE request_id = ? AND state = 'pending'`
+      ).bind(ts, id),
+      offerCountStatement(c.env.DB, id),
+      revokeViewerTokensStatement(c.env.DB, id, ts),
+    ]);
+  } catch (e) {
+    if (!isConstraintAbort(e)) throw e;
+    throw conflict('This request changed while you were cancelling it — reload it', 'REQUEST_CHANGED');
+  }
 
   await audit(c.env.DB, user.id, 'community.request_cancelled', id, { from });
   return c.json({ success: true });
@@ -521,8 +654,9 @@ marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
     `SELECT o.*, m.user_id AS m_user_id, m.name AS m_name, m.verified AS m_verified, m.badge AS m_badge,
             m.badge_override AS m_badge_override, m.rating_avg_x100 AS m_rating,
             m.rating_count AS m_rating_count, m.completed_orders AS m_completed,
-            s.slug AS s_slug
+            s.slug AS s_slug, r.revision AS r_revision
        FROM community_offers o
+       JOIN community_requests r ON r.id = o.request_id
        JOIN community_merchants m ON m.id = o.merchant_id
        LEFT JOIN merchant_stores s ON s.id = o.store_id
       WHERE o.request_id = ?
@@ -537,7 +671,8 @@ marketplaceRoutes.get('/requests/:id/offers', requireAuth, async (c) => {
 marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth, async (c) => {
   await rateLimit(c, 'offer-create', 30, 3600);
   const user = c.get('user')!;
-  const ctx = await requireSellingPrivileges(c);
+  // A new promise: a restricted merchant makes none (audit 03 V).
+  const ctx = await requireOfferPrivileges(c);
   const tier = await getTierStatus(c.env.DB, user.id);
   if (!benefits.communityOffers(tier)) throw forbidden('Your plan does not include community offers');
 
@@ -545,48 +680,70 @@ marketplaceRoutes.post('/requests/:id/offers', requireCommunityOpen, requireAuth
   const req = await c.env.DB.prepare('SELECT * FROM community_requests WHERE id = ?')
     .bind(requestId)
     .first<Record<string, unknown>>();
-  if (!req) throw notFound('Request not found');
+  // A draft or a private request is not on the board: to a merchant it does
+  // not exist (audit 03 §10 E, V).
+  if (!req || req.state === 'draft' || req.visibility !== 'public') throw notFound('Request not found');
+  if (req.customer_id === user.id) throw badRequest('You cannot bid on your own request', 'OWN_REQUEST');
+  const ts = nowIso();
   if (!REQUEST_OPEN_STATES.includes(String(req.state) as RequestState)) {
-    throw conflict('This request is no longer accepting offers');
+    throw conflict('This request is no longer accepting offers', 'REQUEST_NOT_OPEN');
   }
-  if (req.customer_id === user.id) throw badRequest('You cannot bid on your own request');
+  if (isPast(req.expires_at as string | null, ts)) {
+    throw conflict('This request has expired and no longer takes offers', 'REQUEST_EXPIRED');
+  }
 
   const body = await c.req.json().catch(() => ({}));
   const price = int(body.price_iqd, 'price_iqd', { min: 1, max: 1_000_000_000 });
+  const expiresAt = offerExpiry(body.expires_at, ts);
 
   const id = newId('off');
-  const ts = nowIso();
+  let inserted = 0;
   try {
-    await c.env.DB.batch([
+    const res = await c.env.DB.batch([
+      // The offer is written ONLY while the request is still on the board —
+      // re-checked here, in the write, not just above (audit 03 §10 P). It
+      // prices the job's CURRENT revision.
       c.env.DB.prepare(
         `INSERT INTO community_offers
            (id, request_id, merchant_id, store_id, price_iqd, completion_days, delivery_method,
-            message, materials, included, warranty_terms, state, expires_at, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?, 'pending', ?, ?, ?)`
+            message, materials, included, warranty_terms, state, expires_at, revision, request_revision,
+            created_at, updated_at)
+         SELECT ?1, r.id, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'pending', ?11, 1, r.revision, ?12, ?12
+           FROM community_requests r
+          WHERE r.id = ?13 AND r.state IN ('open','receiving_offers') AND r.visibility = 'public'
+            AND r.customer_id <> ?14
+            AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?12)`
       ).bind(
-        id, requestId, ctx.merchant.id, ctx.store.id, price,
+        id, ctx.merchant.id, ctx.store.id, price,
         int(body.completion_days, 'completion_days', { min: 0, max: 365, def: 0 }),
         str(body.delivery_method, 'delivery_method', { min: 0, max: 60, required: false }),
         str(body.message, 'message', { min: 0, max: 2000, required: false }),
         str(body.materials, 'materials', { min: 0, max: 500, required: false }),
         str(body.included, 'included', { min: 0, max: 500, required: false }),
         str(body.warranty_terms, 'warranty_terms', { min: 0, max: 500, required: false }),
-        str(body.expires_at, 'expires_at', { min: 0, max: 40, required: false }) || null,
-        ts, ts
+        expiresAt, ts, requestId, user.id
       ),
-      // The board should show a live count without a COUNT(*) per row.
       c.env.DB.prepare(
         `UPDATE community_requests
-            SET offer_count = offer_count + 1,
-                state = CASE WHEN state = 'open' THEN 'receiving_offers' ELSE state END,
+            SET state = CASE WHEN state = 'open' THEN 'receiving_offers' ELSE state END,
                 updated_at = ?
-          WHERE id = ?`
-      ).bind(ts, requestId),
+          WHERE id = ? AND state IN ('open','receiving_offers')
+            AND EXISTS (SELECT 1 FROM community_offers WHERE id = ?)`
+      ).bind(ts, requestId, id),
+      // The board shows a live count; it is recomputed, never incremented.
+      offerCountStatement(c.env.DB, requestId),
     ]);
-  } catch {
+    inserted = Number(res[0]?.meta.changes ?? 0);
+  } catch (e) {
     // The partial unique index on (request_id, merchant_id) WHERE state is
     // live. A merchant already has an offer here; withdrawing frees the slot.
-    throw conflict('You already have an active offer on this request');
+    // Anything else is a real failure and is not dressed up as this one.
+    if (!(isConstraintAbort(e) && /UNIQUE/i.test(e instanceof Error ? e.message : String(e)))) throw e;
+    throw conflict('You already have an active offer on this request', 'OFFER_EXISTS');
+  }
+  if (!inserted) {
+    // The request left the board between the read above and the write.
+    throw conflict('This request is no longer accepting offers', 'REQUEST_NOT_OPEN');
   }
 
   await audit(c.env.DB, user.id, 'community.offer_created', id, { request: requestId, price });
@@ -620,18 +777,39 @@ marketplaceRoutes.post('/offers/:id/withdraw', requireAuth, async (c) => {
   const user = c.get('user')!;
   const ctx = await requireSellingPrivileges(c);
   const offerId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
-  const res = await c.env.DB.prepare(
-    `UPDATE community_offers SET state = 'withdrawn', updated_at = ?
-      WHERE id = ? AND merchant_id = ? AND state = 'pending'`
-  ).bind(nowIso(), offerId, ctx.merchant.id).run();
-  if (!res.meta.changes) throw conflict('That offer can no longer be withdrawn');
+  const offer = await c.env.DB.prepare('SELECT request_id FROM community_offers WHERE id = ? AND merchant_id = ?')
+    .bind(offerId, ctx.merchant.id)
+    .first<{ request_id: string }>();
+  if (!offer) throw notFound('Offer not found');
+  const res = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE community_offers SET state = 'withdrawn', updated_at = ?
+        WHERE id = ? AND merchant_id = ? AND state = 'pending'`
+    ).bind(nowIso(), offerId, ctx.merchant.id),
+    // The count comes down with the offer (audit 03 §10 H): it used to stay,
+    // and a re-offer then advertised one more offer than existed.
+    offerCountStatement(c.env.DB, offer.request_id),
+  ]);
+  if (!res[0]?.meta.changes) throw conflict('That offer can no longer be withdrawn', 'OFFER_NOT_AVAILABLE');
   await audit(c.env.DB, user.id, 'community.offer_withdrawn', offerId, {});
   return c.json({ success: true });
 });
 
-/** Edit an offer — pending only. After acceptance it is the contract (§26). */
+/**
+ * Edit an offer — pending only. After acceptance it is the contract (§26).
+ *
+ * AN EDIT IS A NEW VERSION (audit 03 §10 B). It used to rewrite the offer in
+ * place, unaudited, and acceptance took whatever the row said at that moment —
+ * so a price changed after the customer read it was the price they paid. Now
+ * every edit writes `revision + 1`; the customer's acceptance names the
+ * revision and price they confirmed, and an older one is refused with the
+ * fresh offer (`OFFER_CHANGED`). The edit also prices the job AS IT STANDS,
+ * so it re-confirms an offer the customer's own change had made stale. What it
+ * replaced is on the audit record.
+ */
 marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async (c) => {
-  const ctx = await requireSellingPrivileges(c);
+  // An edit re-prices and re-confirms: a new promise (audit 03 V).
+  const ctx = await requireOfferPrivileges(c);
   const body = await c.req.json().catch(() => ({}));
   const sets: string[] = [];
   const vals: unknown[] = [];
@@ -640,6 +818,8 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
   if (body.price_iqd !== undefined) put('price_iqd', int(body.price_iqd, 'price_iqd', { min: 1, max: 1_000_000_000 }));
   if (body.completion_days !== undefined)
     put('completion_days', int(body.completion_days, 'completion_days', { min: 0, max: 365 }));
+  if (body.delivery_method !== undefined)
+    put('delivery_method', str(body.delivery_method, 'delivery_method', { min: 0, max: 60, required: false }));
   if (body.message !== undefined) put('message', str(body.message, 'message', { min: 0, max: 2000, required: false }));
   if (body.materials !== undefined) put('materials', str(body.materials, 'materials', { min: 0, max: 500, required: false }));
   if (body.included !== undefined) put('included', str(body.included, 'included', { min: 0, max: 500, required: false }));
@@ -648,102 +828,199 @@ marketplaceRoutes.patch('/offers/:id', requireCommunityOpen, requireAuth, async 
   if (!sets.length) throw badRequest('Nothing to update');
 
   const offerId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
-  put('updated_at', nowIso());
-  vals.push(offerId, ctx.merchant.id);
-  // `state = 'pending'` is in the WHERE clause, so an accepted offer cannot be
-  // edited even by a request that tries.
-  const res = await c.env.DB.prepare(
-    `UPDATE community_offers SET ${sets.join(', ')} WHERE id = ? AND merchant_id = ? AND state = 'pending'`
-  ).bind(...vals).run();
-  if (!res.meta.changes) throw conflict('That offer can no longer be changed');
+  const before = await c.env.DB.prepare(
+    `SELECT price_iqd, completion_days, delivery_method, message, materials, included, warranty_terms, revision
+       FROM community_offers WHERE id = ? AND merchant_id = ?`
+  ).bind(offerId, ctx.merchant.id).first<Record<string, unknown>>();
+  if (!before) throw notFound('Offer not found');
 
-  const row = await c.env.DB.prepare('SELECT * FROM community_offers WHERE id = ?').bind(offerId).first();
+  const ts = nowIso();
+  // `state = 'pending'` is in the WHERE clause, so an accepted offer cannot be
+  // edited even by a request that tries; and only while its request is still
+  // on the board.
+  const res = await c.env.DB.prepare(
+    `UPDATE community_offers
+        SET ${sets.join(', ')}, revision = revision + 1,
+            request_revision = (SELECT r.revision FROM community_requests r WHERE r.id = community_offers.request_id),
+            updated_at = ?
+      WHERE id = ? AND merchant_id = ? AND state = 'pending'
+        AND EXISTS (SELECT 1 FROM community_requests r
+                     WHERE r.id = community_offers.request_id AND r.state IN ('open','receiving_offers')
+                       AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?))`
+  ).bind(...vals, ts, offerId, ctx.merchant.id, ts).run();
+  if (!res.meta.changes) throw conflict('That offer can no longer be changed', 'OFFER_NOT_AVAILABLE');
+
+  const row = await c.env.DB.prepare('SELECT * FROM community_offers WHERE id = ?').bind(offerId).first<Record<string, unknown>>();
+  await audit(c.env.DB, c.get('user')!.id, 'community.offer_edited', offerId, {
+    before,
+    after: {
+      price_iqd: row?.price_iqd, completion_days: row?.completion_days, delivery_method: row?.delivery_method,
+      warranty_terms: row?.warranty_terms, revision: row?.revision,
+    },
+  });
+  return c.json({ success: true, offer: offerShape(row as Record<string, unknown>) });
+});
+
+/**
+ * «أؤكد عرضي» — the merchant stands by their offer for the job AS IT NOW IS.
+ *
+ * The customer changed a published request (a re-publish with a different
+ * spec, an attachment added or removed) after this offer priced it, so the
+ * offer is stale and cannot be accepted (audit 03 §10 K). Re-confirming
+ * writes the request's current revision onto it and a new offer revision —
+ * the customer is then accepting a promise made against the job they see.
+ * To change the terms instead, the merchant edits (PATCH) or withdraws.
+ */
+marketplaceRoutes.post('/offers/:id/reconfirm', requireCommunityOpen, requireAuth, async (c) => {
+  const ctx = await requireOfferPrivileges(c);
+  const offerId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const ts = nowIso();
+  const res = await c.env.DB.prepare(
+    `UPDATE community_offers
+        SET revision = revision + 1,
+            request_revision = (SELECT r.revision FROM community_requests r WHERE r.id = community_offers.request_id),
+            updated_at = ?1
+      WHERE id = ?2 AND merchant_id = ?3 AND state = 'pending'
+        AND request_revision < (SELECT r.revision FROM community_requests r WHERE r.id = community_offers.request_id)
+        AND EXISTS (SELECT 1 FROM community_requests r
+                     WHERE r.id = community_offers.request_id AND r.state IN ('open','receiving_offers')
+                       AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?1))`
+  ).bind(ts, offerId, ctx.merchant.id).run();
+  if (!res.meta.changes) {
+    const o = await c.env.DB.prepare(
+      `SELECT o.state, o.request_revision, r.revision AS r_revision FROM community_offers o
+         JOIN community_requests r ON r.id = o.request_id WHERE o.id = ? AND o.merchant_id = ?`
+    ).bind(offerId, ctx.merchant.id).first<{ state: string; request_revision: number; r_revision: number }>();
+    if (!o) throw notFound('Offer not found');
+    if (o.state === 'pending' && Number(o.request_revision) >= Number(o.r_revision)) {
+      throw conflict('This offer already matches the request as it is', 'OFFER_NOT_STALE');
+    }
+    throw conflict('That offer can no longer be changed', 'OFFER_NOT_AVAILABLE');
+  }
+  const row = await c.env.DB.prepare('SELECT * FROM community_offers WHERE id = ?').bind(offerId).first<Record<string, unknown>>();
+  await audit(c.env.DB, c.get('user')!.id, 'community.offer_reconfirmed', offerId, {
+    revision: row?.revision,
+    request_revision: row?.request_revision,
+  });
   return c.json({ success: true, offer: offerShape(row as Record<string, unknown>) });
 });
 
 // ------------------------------------------------------------- acceptance
 
+/** The offer, its request and its merchant — everything acceptance decides on. */
+async function offerForAcceptance(db: D1Database, offerId: string) {
+  return db
+    .prepare(
+      `SELECT o.*, r.customer_id, r.state AS request_state, r.id AS req_id, r.revision AS r_revision,
+              r.expires_at AS r_expires_at,
+              m.user_id AS m_user_id, m.name AS m_name, m.verified AS m_verified, m.badge AS m_badge,
+              m.badge_override AS m_badge_override, m.rating_avg_x100 AS m_rating,
+              m.rating_count AS m_rating_count, m.completed_orders AS m_completed,
+              m.status AS m_status, s.status AS s_status,
+              s.slug AS s_slug
+         FROM community_offers o
+         JOIN community_requests r ON r.id = o.request_id
+         JOIN community_merchants m ON m.id = o.merchant_id
+         LEFT JOIN merchant_stores s ON s.id = o.store_id
+        WHERE o.id = ?`
+    )
+    .bind(offerId)
+    .first<Record<string, unknown>>();
+}
+
+/**
+ * WHY THIS OFFER CANNOT BE ACCEPTED AS SENT — or null when it can. One reading
+ * for the checks before the money is reserved and for the classification
+ * after a batch refused, so the two can never disagree about the reason.
+ */
+function acceptanceRefusal(
+  offer: Record<string, unknown>,
+  expected: { price: number; revision: number },
+  now: string
+): HttpError | null {
+  if (offer.state !== 'pending') return conflict('That offer is no longer available', 'OFFER_NOT_AVAILABLE');
+  if (!(BOARD_STATES as readonly string[]).includes(String(offer.request_state))) {
+    return conflict('This request already has an accepted offer', 'REQUEST_NOT_OPEN');
+  }
+  if (isPast(offer.r_expires_at as string | null, now)) {
+    return conflict('This request has expired', 'REQUEST_EXPIRED');
+  }
+  if (isPast(offer.expires_at as string | null, now)) return conflict('This offer has expired', 'OFFER_EXPIRED');
+  // A merchant Levonis has since restricted or suspended — or whose store it
+  // suspended — takes on no new work, so their standing offer is not a
+  // contract a customer can enter now (audit 03 V; `requireOfferPrivileges`).
+  // An allow-list, like the buy path: only an `active` merchant.
+  if (offer.m_status !== 'active' || offer.s_status === 'suspended') {
+    return conflict('This merchant is not taking new work right now — choose another offer', 'MERCHANT_UNAVAILABLE');
+  }
+  const fresh = { offer: offerShape(offer) };
+  if (Number(offer.request_revision ?? 1) < Number(offer.r_revision ?? 1)) {
+    return new HttpError(
+      409,
+      'You changed this request after the merchant made this offer — it can be accepted once they re-confirm it',
+      'OFFER_STALE',
+      fresh
+    );
+  }
+  if (expected.price !== Number(offer.price_iqd) || expected.revision !== Number(offer.revision ?? 1)) {
+    return new HttpError(409, 'This offer changed since you opened it — review it again', 'OFFER_CHANGED', fresh);
+  }
+  return null;
+}
+
 /**
  * Accept one offer. The single most important transaction in the marketplace.
  *
- * ATOMICITY. The request is moved to `offer_selected` by a CONDITIONAL update
- * that requires it to still be open. Whoever wins that update owns the
- * acceptance; a concurrent second attempt changes zero rows and is told the
- * request already has a winner. Everything after it — freezing the offer,
- * rejecting the others, creating the order — happens only for the winner.
+ * THE CUSTOMER ACCEPTS WHAT THEY SAW (audit 03 §10 B). The body carries the
+ * `expected_price_iqd` and `offer_revision` the confirmation showed. If the
+ * merchant edited the offer since, the answer is `OFFER_CHANGED` with the
+ * fresh offer — never a hold at a price nobody confirmed. Missing values are
+ * treated exactly like changed ones: the customer is shown the offer and asked
+ * again. A STALE offer (priced before the customer changed the job) is
+ * `OFFER_STALE`; an expired request or offer is `REQUEST_EXPIRED` /
+ * `OFFER_EXPIRED` (§10 I).
  *
- * ORDER OF OPERATIONS. The order is created BEFORE the escrow, because the
- * escrow references it. If funding then fails, the order is cancelled and the
- * request is reopened, so a customer who cannot pay does not lose their
- * request and the merchants do not lose their offers.
+ * THE MONEY IS RESERVED FIRST, then everything is written in ONE batch. The
+ * old order — move the request to `offer_selected`, create the order, THEN ask
+ * whether the customer can pay — left a cancelled order that locked the offer
+ * for ever when they could not, a 500 on their retry after topping up, and a
+ * request stranded in `offer_selected` (audit 03 §10 A, 04 B12). Now a
+ * customer who cannot pay is refused before anything is written, and the
+ * request moves `open → in_progress` in the same commit as the offer freeze,
+ * the rivals' rejection, the FUNDED order and its escrow — or none of them
+ * happen.
+ *
+ * ONE ACCEPTANCE WINS. The batch is fenced: the request's move is conditional
+ * on it still taking offers at this revision, the offer's freeze on it still
+ * being the exact pending version confirmed (a concurrent withdraw or edit
+ * matches nothing — §10 O), and a fence after each aborts the whole batch if
+ * its guard matched nothing. A refused batch gives the reservation back and
+ * says why; a crash before the batch leaves only a reservation, which the
+ * reconciliation sweep releases (worker/lib/communityRequests.ts).
  */
 marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
   await rateLimit(c, 'offer-accept', 20, 3600);
   const user = c.get('user')!;
   const offerId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const expected = {
+    price: Number.isSafeInteger(Number(body.expected_price_iqd)) ? Number(body.expected_price_iqd) : NaN,
+    revision: Number.isSafeInteger(Number(body.offer_revision)) ? Number(body.offer_revision) : NaN,
+  };
 
-  const offer = await c.env.DB.prepare(
-    `SELECT o.*, r.customer_id, r.state AS request_state, r.id AS req_id
-       FROM community_offers o JOIN community_requests r ON r.id = o.request_id
-      WHERE o.id = ?`
-  ).bind(offerId).first<Record<string, unknown>>();
+  const offer = await offerForAcceptance(c.env.DB, offerId);
   if (!offer) throw notFound('Offer not found');
   if (offer.customer_id !== user.id) throw forbidden('This request is not yours');
-  if (offer.state !== 'pending') throw conflict('That offer is no longer available');
+  const refusal = acceptanceRefusal(offer, expected, nowIso());
+  if (refusal) throw refusal;
 
-  const ts = nowIso();
-  // THE RACE GUARD. Only one request can move out of an open state.
-  const won = await c.env.DB.prepare(
-    `UPDATE community_requests
-        SET state = 'offer_selected', status = 'closed', accepted_offer_id = ?, updated_at = ?
-      WHERE id = ? AND customer_id = ? AND state IN ('open','receiving_offers')`
-  ).bind(offerId, ts, offer.req_id, user.id).run();
-  if (!won.meta.changes) throw conflict('This request already has an accepted offer');
-
+  const requestId = String(offer.req_id);
+  const merchantUserId = String(offer.m_user_id);
   const price = Number(offer.price_iqd);
   const split = await feeFor(c.env.DB, 'request', price);
   const autoDays = await autoCompleteDays(c.env.DB);
   const orderId = newId('cord');
-
-  await c.env.DB.batch([
-    // The offer is frozen, and every rival is closed in the same breath.
-    c.env.DB.prepare(`UPDATE community_offers SET state = 'accepted', updated_at = ? WHERE id = ?`)
-      .bind(ts, offerId),
-    c.env.DB.prepare(
-      `UPDATE community_offers SET state = 'rejected', updated_at = ?
-        WHERE request_id = ? AND id != ? AND state = 'pending'`
-    ).bind(ts, offer.req_id, offerId),
-    c.env.DB.prepare(
-      `INSERT INTO community_orders
-         (id, request_id, offer_id, customer_id, merchant_id, store_id, state,
-          price_iqd, commission_percent_x100, platform_fee_iqd, merchant_receivable_iqd,
-          completion_days, delivery_method, offer_snapshot, created_at, updated_at)
-       VALUES (?,?,?,?,?,?, 'accepted', ?,?,?,?,?,?,?,?,?)`
-    ).bind(
-      orderId, offer.req_id, offerId, user.id, offer.merchant_id, offer.store_id,
-      price, split.commission_percent_x100, split.platform_fee_iqd, split.merchant_receivable_iqd,
-      offer.completion_days, offer.delivery_method,
-      // The snapshot. Everything the merchant promised, frozen at this
-      // instant, so editing the offer later cannot change the deal.
-      JSON.stringify({
-        price_iqd: price,
-        completion_days: offer.completion_days,
-        delivery_method: offer.delivery_method,
-        message: offer.message,
-        materials: offer.materials,
-        included: offer.included,
-        warranty_terms: offer.warranty_terms,
-        accepted_at: ts,
-      }),
-      ts, ts
-    ),
-    c.env.DB.prepare(`UPDATE community_requests SET community_order_id = ? WHERE id = ?`)
-      .bind(orderId, offer.req_id),
-  ]);
-
-  // Now reserve the money. Idempotent on the order id, so a retry of this
-  // whole request cannot hold twice.
-  const escrow = await holdEscrow(c.env.DB, {
+  const escrowInput: HoldEscrowInput = {
     communityOrderId: orderId,
     customerId: user.id,
     merchantId: String(offer.merchant_id),
@@ -751,56 +1028,119 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
     platformFeeIqd: split.platform_fee_iqd,
     merchantReceivableIqd: split.merchant_receivable_iqd,
     idempotencyKey: `accept:${orderId}`,
-  });
+  };
 
-  if (!escrow.ok) {
-    // Funding failed. Undo cleanly: the customer keeps their request, the
-    // merchants keep their offers, and nobody is left holding a contract that
-    // was never paid for.
-    await c.env.DB.batch([
-      c.env.DB.prepare(`UPDATE community_orders SET state = 'cancelled', cancelled_at = ? WHERE id = ?`)
-        .bind(ts, orderId),
-      c.env.DB.prepare(
-        `UPDATE community_requests
-            SET state = 'receiving_offers', status = 'open', accepted_offer_id = NULL,
-                community_order_id = NULL, updated_at = ?
-          WHERE id = ?`
-      ).bind(ts, offer.req_id),
-      c.env.DB.prepare(`UPDATE community_offers SET state = 'pending', updated_at = ? WHERE id = ?`)
-        .bind(ts, offerId),
-      c.env.DB.prepare(
-        `UPDATE community_offers SET state = 'pending', updated_at = ?
-          WHERE request_id = ? AND id != ? AND state = 'rejected' AND updated_at = ?`
-      ).bind(ts, offer.req_id, offerId, ts),
-    ]);
-    if (escrow.reason === 'INSUFFICIENT_FUNDS') {
+  // 1. The money, before anything else. A refusal here has nothing to undo.
+  const reserved = await reserveEscrowFunds(c.env.DB, escrowInput);
+  if (!reserved.ok) {
+    if (reserved.reason === 'INSUFFICIENT_FUNDS') {
       throw badRequest(
         'Your wallet balance does not cover this offer. Top up and try again.',
         'INSUFFICIENT_FUNDS',
         { required_iqd: price }
       );
     }
-    throw badRequest('Could not reserve the funds for this offer', 'ESCROW_FAILED', { reason: escrow.reason });
+    throw badRequest('Could not reserve the funds for this offer', 'ESCROW_FAILED', { reason: reserved.reason });
+  }
+  const holdId = reserved.reservation.holdId;
+
+  // 2. Everything else, together.
+  const ts = nowIso();
+  const escrowId = newId('esc');
+  const db = c.env.DB;
+  try {
+    await db.batch([
+      // The reservation is still ours and still active.
+      assertHoldStateStatement(db, holdId, 'active'),
+      // THE RACE GUARD. Only one acceptance can move the request off the
+      // board, and only at the revision the offer priced.
+      db.prepare(
+        `UPDATE community_requests
+            SET state = 'in_progress', status = 'closed', accepted_offer_id = ?1, community_order_id = ?2,
+                updated_at = ?3
+          WHERE id = ?4 AND customer_id = ?5 AND state IN ('open','receiving_offers') AND revision = ?6
+            AND (expires_at IS NULL OR expires_at = '' OR expires_at > ?3)`
+      ).bind(offerId, orderId, ts, requestId, user.id, Number(offer.r_revision ?? 1)),
+      db.prepare(
+        `UPDATE community_requests
+            SET updated_at = CASE WHEN community_order_id = ?2 THEN updated_at ELSE NULL END
+          WHERE id = ?1`
+      ).bind(requestId, orderId),
+      // The offer is frozen — the exact version the customer confirmed.
+      db.prepare(
+        `UPDATE community_offers SET state = 'accepted', updated_at = ?1
+          WHERE id = ?2 AND request_id = ?3 AND state = 'pending'
+            AND revision = ?4 AND price_iqd = ?5 AND request_revision = ?6
+            AND (expires_at IS NULL OR expires_at = '' OR expires_at > ?1)`
+      ).bind(ts, offerId, requestId, expected.revision, expected.price, Number(offer.r_revision ?? 1)),
+      db.prepare(
+        `UPDATE community_offers
+            SET updated_at = CASE WHEN state = 'accepted' AND updated_at = ?2 THEN updated_at ELSE NULL END
+          WHERE id = ?1`
+      ).bind(offerId, ts),
+      // Every rival is closed in the same breath.
+      db.prepare(
+        `UPDATE community_offers SET state = 'rejected', updated_at = ?
+          WHERE request_id = ? AND id != ? AND state = 'pending'`
+      ).bind(ts, requestId, offerId),
+      // The order is born FUNDED: its escrow commits in this same batch.
+      db.prepare(
+        `INSERT INTO community_orders
+           (id, request_id, offer_id, customer_id, merchant_id, store_id, state,
+            price_iqd, commission_percent_x100, platform_fee_iqd, merchant_receivable_iqd,
+            completion_days, delivery_method, offer_snapshot, created_at, updated_at)
+         VALUES (?,?,?,?,?,?, 'funded', ?,?,?,?,?,?,?,?,?)`
+      ).bind(
+        orderId, requestId, offerId, user.id, offer.merchant_id, offer.store_id,
+        price, split.commission_percent_x100, split.platform_fee_iqd, split.merchant_receivable_iqd,
+        offer.completion_days, offer.delivery_method,
+        // The snapshot. Everything the merchant promised, frozen at this
+        // instant, so editing the offer later cannot change the deal.
+        JSON.stringify({
+          price_iqd: price,
+          completion_days: offer.completion_days,
+          delivery_method: offer.delivery_method,
+          message: offer.message,
+          materials: offer.materials,
+          included: offer.included,
+          warranty_terms: offer.warranty_terms,
+          offer_revision: Number(offer.revision ?? 1),
+          request_revision: Number(offer.r_revision ?? 1),
+          accepted_at: ts,
+        }),
+        ts, ts
+      ),
+      ...escrowRecordStatements(db, escrowInput, reserved.reservation, escrowId, ts),
+      offerCountStatement(db, requestId),
+      // A merchant who lost the job loses its preview links with it.
+      revokeViewerTokensStatement(db, requestId, ts, [user.id, merchantUserId]),
+      // «قبل العميل عرضك» — in the same commit as the acceptance it announces
+      // (audit 03 §10 N). INSERT OR IGNORE on a per-offer key: it cannot fail
+      // the batch and cannot be sent twice.
+      offerAcceptedNotification(db, { merchantUserId, requestId, offerId, orderId, priceIqd: price }),
+    ]);
+  } catch (e) {
+    // Nothing of the batch landed. Give the reservation back; if even that
+    // fails, the reconciliation sweep finds the orphaned hold and releases it.
+    await releaseEscrowReservation(db, holdId, 'Offer acceptance did not complete').catch((err) =>
+      console.error('accept: reservation not released', holdId, err instanceof Error ? err.message : String(err))
+    );
+    if (!isConstraintAbort(e)) throw e;
+    const fresh = await offerForAcceptance(db, offerId);
+    const why = fresh ? acceptanceRefusal(fresh, expected, nowIso()) : notFound('Offer not found');
+    throw why ?? conflict('This request changed while you were accepting — reload it and try again', 'ACCEPT_CONFLICT');
   }
 
-  // Funded. Open the order for work and start the confirmation clock.
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE community_orders SET state = 'funded', updated_at = ? WHERE id = ? AND state = 'accepted'`
-    ).bind(ts, orderId),
-    c.env.DB.prepare(`UPDATE community_requests SET state = 'in_progress', updated_at = ? WHERE id = ?`)
-      .bind(ts, offer.req_id),
-  ]);
-
-  await audit(c.env.DB, user.id, 'community.offer_accepted', offerId, {
+  await audit(db, user.id, 'community.offer_accepted', offerId, {
     order: orderId,
     price,
+    offer_revision: expected.revision,
     fee: split.platform_fee_iqd,
     auto_complete_days: autoDays,
   });
 
-  const order = await c.env.DB.prepare('SELECT * FROM community_orders WHERE id = ?').bind(orderId).first();
-  return c.json({ success: true, order, escrow_id: (escrow as { escrowId: string }).escrowId }, 201);
+  const order = await db.prepare('SELECT * FROM community_orders WHERE id = ?').bind(orderId).first();
+  return c.json({ success: true, order, escrow_id: escrowId }, 201);
 });
 
 // -------------------------------------------------------- order lifecycle
@@ -874,9 +1214,10 @@ marketplaceRoutes.post('/orders/:id/start', requireAuth, async (c) => {
   if (!canMoveCommunityOrder(String(row.state) as CommunityOrderState, 'in_progress')) {
     throw conflict(`An order that is ${row.state} cannot be started`);
   }
-  await c.env.DB.prepare(
+  const res = await c.env.DB.prepare(
     `UPDATE community_orders SET state = 'in_progress', updated_at = ? WHERE id = ? AND state = 'funded'`
   ).bind(nowIso(), orderId).run();
+  if (res.meta.changes) await audit(c.env.DB, c.get('user')!.id, 'community.order_started', orderId, {});
   return c.json({ success: true });
 });
 
@@ -934,31 +1275,28 @@ marketplaceRoutes.post('/orders/:id/confirm', requireAuth, async (c) => {
     actorRole: 'customer',
     reason: 'customer confirmed delivery',
     // Keyed on the ORDER, not the request: a retry releases once whatever the
-    // client does.
+    // client does — and the auto-confirm sweep uses the same key, so the two
+    // can never release twice between them.
     idempotencyKey: `confirm:${orderId}`,
   });
   if (!released.ok) {
-    throw conflict(`The funds could not be released (${(released as { reason: string }).reason})`);
+    const reason = (released as { reason: string }).reason;
+    throw new HttpError(409, `The funds could not be released (${reason})`, 'ESCROW_RELEASE_FAILED', { reason });
   }
 
-  const ts = nowIso();
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE community_orders SET state = 'completed', confirmed_at = ?, completed_at = ?, updated_at = ?
-        WHERE id = ? AND state = 'merchant_marked_delivered'`
-    ).bind(ts, ts, ts, orderId),
-    c.env.DB.prepare(
-      `UPDATE community_requests SET state = 'completed', status = 'closed', updated_at = ? WHERE id = ?`
-    ).bind(ts, row.request_id),
-    // Reputation is a raw EVENT, never a number someone edits (§41).
-    c.env.DB.prepare(
-      `INSERT INTO merchant_reputation_events (id, merchant_id, kind, points, community_order_id)
-       VALUES (?,?,'order_completed',10,?)`
-    ).bind(newId('rep'), row.merchant_id, orderId),
-    c.env.DB.prepare(
-      `UPDATE community_merchants SET completed_orders = completed_orders + 1 WHERE id = ?`
-    ).bind(row.merchant_id),
-  ]);
+  // THE COMPLETION COUNTS ONCE (audit 04 B9). Two taps racing each other both
+  // got `ok` above — the second as a replay — and both used to add one to
+  // `completed_orders` and +10 to the merchant's reputation. The statements
+  // are gated on this batch being the one that completed the order and on no
+  // completion event existing yet (worker/lib/communityRequests.ts).
+  await c.env.DB.batch(
+    completionStatements(
+      c.env.DB,
+      { id: orderId, request_id: String(row.request_id), merchant_id: String(row.merchant_id) },
+      nowIso(),
+      { confirmedByCustomer: true }
+    )
+  );
 
   await audit(c.env.DB, user.id, 'community.order_completed', orderId, { escrow: escrow.id });
   return c.json({ success: true, review_available: true });
@@ -977,40 +1315,61 @@ marketplaceRoutes.post('/orders/:id/dispute', requireAuth, async (c) => {
   const description = str(body.description, 'description', { min: 10, max: 4000 });
 
   if (!orderIsActive(String(row.state) as CommunityOrderState)) {
-    throw conflict('This order is already settled');
+    throw conflict('This order is already settled', 'ORDER_SETTLED');
   }
 
   const escrow = await escrowForOrder(c.env.DB, orderId);
-  const ts = nowIso();
   const complaintId = newId('cmp');
 
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT INTO community_complaints
-         (id, reporter_id, reported_user_id, merchant_id, store_id, community_order_id,
-          category, description, status, created_at, updated_at)
-       VALUES (?,?,?,?,?,?, 'order', ?, 'submitted', ?, ?)`
-    ).bind(
-      complaintId, user.id,
-      isCustomer ? row.merchant_user_id : row.customer_id,
-      row.merchant_id, row.store_id, orderId, description, ts, ts
-    ),
-    c.env.DB.prepare(
-      `UPDATE community_orders SET state = 'disputed', updated_at = ? WHERE id = ?`
-    ).bind(ts, orderId),
-    c.env.DB.prepare(
-      `UPDATE community_requests SET state = 'disputed', updated_at = ? WHERE id = ?`
-    ).bind(ts, row.request_id),
-  ]);
-
+  // THE MONEY FREEZES FIRST, AND ONLY IF IT IS STILL THERE TO FREEZE (audit 03
+  // §10 R). This route used to flip the order and the request to `disputed`
+  // unconditionally and then ignore what `disputeEscrow` said — so a dispute
+  // racing a confirmation (or the auto-confirm clock) could leave a `disputed`
+  // order sitting on a `released` escrow. Now an escrow that has already been
+  // settled refuses the dispute, and nothing else is written.
   if (escrow) {
-    await disputeEscrow(c.env.DB, {
+    const frozen = await disputeEscrow(c.env.DB, {
       escrowId: escrow.id,
       actorId: user.id,
       actorRole: isCustomer ? 'customer' : 'merchant',
       reason: description.slice(0, 200),
       idempotencyKey: `dispute:${orderId}`,
     });
+    if (!frozen.ok) throw conflict('This order is already settled', 'ORDER_SETTLED');
+  }
+
+  const ts = nowIso();
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `UPDATE community_orders SET state = 'disputed', updated_at = ?
+          WHERE id = ? AND state IN ('funded','in_progress','merchant_marked_delivered','disputed')`
+      ).bind(ts, orderId),
+      // The complaint is only filed against an order this batch really holds
+      // in `disputed`.
+      c.env.DB.prepare(
+        `UPDATE community_orders
+            SET updated_at = CASE WHEN state = 'disputed' AND updated_at = ?2 THEN updated_at ELSE NULL END
+          WHERE id = ?1`
+      ).bind(orderId, ts),
+      c.env.DB.prepare(
+        `UPDATE community_requests SET state = 'disputed', status = 'closed', updated_at = ?
+          WHERE id = ? AND state IN ('offer_selected','in_progress','delivered','disputed')`
+      ).bind(ts, row.request_id),
+      c.env.DB.prepare(
+        `INSERT INTO community_complaints
+           (id, reporter_id, reported_user_id, merchant_id, store_id, community_order_id,
+            category, description, status, created_at, updated_at)
+         VALUES (?,?,?,?,?,?, 'order', ?, 'submitted', ?, ?)`
+      ).bind(
+        complaintId, user.id,
+        isCustomer ? row.merchant_user_id : row.customer_id,
+        row.merchant_id, row.store_id, orderId, description, ts, ts
+      ),
+    ]);
+  } catch (e) {
+    if (!isConstraintAbort(e)) throw e;
+    throw conflict('This order is already settled', 'ORDER_SETTLED');
   }
 
   await audit(c.env.DB, user.id, 'community.order_disputed', orderId, { complaint: complaintId });
@@ -1073,17 +1432,23 @@ marketplaceRoutes.post('/orders/:id/cancel', requireAuth, async (c) => {
       reason: 'cancelled before work started',
       idempotencyKey: `cancel:${orderId}`,
     });
-    if (!refund.ok) throw conflict(`Could not refund (${(refund as { reason: string }).reason})`);
+    if (!refund.ok) {
+      const reason = (refund as { reason: string }).reason;
+      throw new HttpError(409, `Could not refund (${reason})`, 'ESCROW_REFUND_FAILED', { reason });
+    }
   }
 
   const ts = nowIso();
   await c.env.DB.batch([
     c.env.DB.prepare(
-      `UPDATE community_orders SET state = 'cancelled', cancelled_at = ?, updated_at = ? WHERE id = ?`
+      `UPDATE community_orders SET state = 'cancelled', cancelled_at = ?, updated_at = ?
+        WHERE id = ? AND state IN ('accepted','funded')`
     ).bind(ts, ts, orderId),
     c.env.DB.prepare(
-      `UPDATE community_requests SET state = 'cancelled', status = 'closed', updated_at = ? WHERE id = ?`
+      `UPDATE community_requests SET state = 'cancelled', status = 'closed', updated_at = ?
+        WHERE id = ? AND state IN ('offer_selected','in_progress')`
     ).bind(ts, row.request_id),
+    revokeViewerTokensStatement(c.env.DB, String(row.request_id), ts),
   ]);
 
   await audit(c.env.DB, user.id, 'community.order_cancelled', orderId, { by: role, state });

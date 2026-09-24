@@ -95,6 +95,15 @@ export const SYSTEM_SUBDOMAINS: ReadonlySet<string> = new Set([
   'dev', 'development', 'staging', 'stage', 'test', 'testing', 'qa',
   'beta', 'alpha', 'preview', 'sandbox', 'demo', 'local', 'localhost',
   'internal', 'private', 'root', 'blog', 'docs', 'doc', 'wiki', 'news',
+
+  // 7. THE STOREFRONT'S OWN PATH WORDS (audit 01 B23). A store is addressed
+  //    as `/api/storefront/<slug>`, beside fixed routes on the same router —
+  //    so a shop slugged `resolve` was unreachable (`/resolve` answers first)
+  //    and one slugged `by-id` collided with the legacy-link lookup. Every
+  //    literal segment of that router is reserved, plus `p`, the product path
+  //    on a store's own host; tests/storeSlugsPaging.test.ts walks the router
+  //    so a new route word cannot be added without landing here.
+  'resolve', 'by-id', 'p', 'products', 'sections', 'services', 'showcase', 'reviews',
 ]);
 
 /** Slug syntax. Deliberately narrow — it becomes a DNS label and a URL. */

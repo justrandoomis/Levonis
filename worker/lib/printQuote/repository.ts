@@ -155,11 +155,22 @@ export interface MerchantPrinter {
   unlinked: boolean;
 }
 
+/**
+ * EVERY COLUMN THE JOIN SHARES WITH `merchant_printers` IS ALIASED (audit 03
+ * §10 L). `p.*` and `m.build_x_mm` both produce a column named `build_x_mm`,
+ * and a row object keeps only the LAST of two same-named columns — so for an
+ * unlinked printer (every printer the dashboard has ever created, since
+ * nothing writes `model_id`) the LEFT JOIN's NULLs overwrote the build volume
+ * the merchant typed, `buildMm` read {0,0,0}, and the Costing tab refused a
+ * 20 mm cube on a 300 mm machine as `build_volume`. The canonical dimensions
+ * now arrive as `m_build_*_mm` and the merchant's own as `build_*_mm`.
+ */
 export async function loadMerchantPrinters(db: D1Database, merchantId: string): Promise<MerchantPrinter[]> {
   const { results } = await db
     .prepare(
       `SELECT p.*, m.id AS m_id, m.manufacturer, m.model AS m_model, m.generation, m.technology AS m_technology,
-              m.build_x_mm, m.build_y_mm, m.build_z_mm, m.nozzle_sizes, m.default_nozzle_mm,
+              m.build_x_mm AS m_build_x_mm, m.build_y_mm AS m_build_y_mm, m.build_z_mm AS m_build_z_mm,
+              m.nozzle_sizes, m.default_nozzle_mm,
               m.toolhead_count AS m_toolhead_count, m.independent_toolheads, m.max_simultaneous_materials,
               m.multi_material AS m_multi_material, m.enclosed AS m_enclosed, m.heated_chamber,
               m.hardened_nozzle_available, m.materials AS m_materials,
@@ -184,9 +195,9 @@ export async function loadMerchantPrinters(db: D1Database, merchantId: string): 
           model: row.m_model,
           generation: row.generation,
           technology: row.m_technology,
-          build_x_mm: row.build_x_mm,
-          build_y_mm: row.build_y_mm,
-          build_z_mm: row.build_z_mm,
+          build_x_mm: row.m_build_x_mm,
+          build_y_mm: row.m_build_y_mm,
+          build_z_mm: row.m_build_z_mm,
           nozzle_sizes: row.nozzle_sizes,
           default_nozzle_mm: row.default_nozzle_mm,
           toolhead_count: row.m_toolhead_count,

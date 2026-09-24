@@ -30,6 +30,8 @@ export type NotificationKind =
   | 'print_request_match'
   | 'offer_received'
   | 'offer_accepted'
+  /** A published request changed under a merchant's pending offer. */
+  | 'offer_stale'
   | 'order_update'
   /** «رد من الدعم» — staff answered a support ticket. */
   | 'support_reply';

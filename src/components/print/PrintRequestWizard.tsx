@@ -22,6 +22,12 @@
  * are eligible at all, and the budget is what the public board card shows. It is
  * one request throughout; nothing here creates a second one.
  *
+ * AND UNTIL THEN IT IS A DRAFT. The step-1 row is created as `draft`: nobody but
+ * this customer can see it, and no merchant can bid on it (audit 03 §10 E — it
+ * used to be `open` from step 1, so an abandoned wizard left a live, unmatched
+ * job on the board). Publishing is the one move onto the board; a draft left
+ * behind can be published or discarded from its own page.
+ *
  * THE COMPLETENESS METER IS NOT A GATE. The owner was explicit: unnecessary
  * detail must never be mandatory. The meter says "more detail buys you a better
  * price"; it never blocks the publish button, and the publish button never waits
@@ -51,6 +57,8 @@ import { GOVERNORATES } from '../../lib/governorates';
 import { UnauthorizedState } from '../ui/AsyncStates';
 import { MAX_ATTACHMENTS, formatBytes, uploadRequestFiles, type RequestFile } from '../media/RequestAttachments';
 import { useMoney } from '../../CurrencyContext';
+import { apiRefusal } from '../../lib/refusalStrings';
+import { asLang } from '../orders/format';
 
 // ------------------------------------------------------------------ the shapes
 
@@ -388,9 +396,12 @@ export default function PrintRequestWizard({
         setSignInNeeded(true);
         return;
       }
-      setError(e instanceof ApiError ? e.message : fallback);
+      // A refusal code is decoded into the reader's language (a request that
+      // changed or expired while the wizard was open, a link that is not one);
+      // a code the table does not know keeps the server's own sentence.
+      setError(e instanceof ApiError ? apiRefusal(e, asLang(lang), e.message || fallback) : fallback);
     },
-    []
+    [lang]
   );
 
   useEffect(() => {
@@ -1058,8 +1069,8 @@ export default function PrintRequestWizard({
           {!!requestId && (
             <p className="text-zinc-500 text-[11.5px] leading-relaxed">
               {loc(
-                'طلبك أُنشئ بالفعل وملفاتك مرفوعة، لذلك لا يمكن تعديل هذا الجزء هنا — يمكنك تعديله من صفحة الطلب بعد النشر.',
-                'Your request already exists and your files are uploaded, so this part is fixed here — you can edit it from the request page after publishing.'
+                'حُفظ طلبك كمسودة ورُفعت ملفاتك، لذلك لا يمكن تعديل هذا الجزء هنا. لن يراه أي تاجر قبل أن تنشره.',
+                'Your request is saved as a draft and your files are uploaded, so this part is fixed here. No merchant sees it until you publish.'
               )}
             </p>
           )}

@@ -4,7 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { api } from '../lib/api';
-import { cartCountStore, setCartCount, countCartItems } from '../lib/cartCount';
+import { cartCountStore, setCartCount, cartResponseCount } from '../lib/cartCount';
 import { signalBloub } from './bloub/events';
 import { MotionCharacterAnchor } from './bloub/MotionCharacterAnchor';
 import { authPathWithSupportRef } from '../lib/supportRef';
@@ -103,9 +103,10 @@ export default function BottomNav() {
     if (cartCountStore.snapshot() !== null) return;
     let cancelled = false;
     api
-      .get<{ items: Array<{ qty?: number | null }> }>('/api/cart', { mascot: 'silent' })
+      .get<{ items: Array<{ qty?: number | null }>; item_count?: number }>('/api/cart', { mascot: 'silent' })
       .then((d) => {
-        if (!cancelled) setCartCount(countCartItems(d.items ?? []));
+        // `item_count` counts a store cart too; `items` is the Levonis half.
+        if (!cancelled) setCartCount(cartResponseCount(d) ?? 0);
       })
       .catch(() => {});
     return () => {

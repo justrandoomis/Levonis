@@ -119,14 +119,18 @@ onboarding form can show `Ali3D → ali3d` before the merchant commits.
 
 **Releasing a slug parks it for 180 days** (`SLUG_RESERVATION_DAYS`). Otherwise
 a competitor watches for a rename and captures the traffic, and every link and
-QR code already printed on a box points at them.
+QR code already printed on a box points at them. Parking alone left those links
+on «No such store», so the parked slug also **points at the shop**: its host's
+`/resolve` answers `404 STORE_MOVED` with `details.redirect` (the app replaces
+the address) until another store claims the slug — and a live slug always wins
+over a parked one (audit 01 B14).
 
 `slug` is **never a primary key**. Stores are keyed on `store_id`, so a future
 custom domain can be mapped to a store without touching a single order (§69).
 
 ### Which names a merchant can never have, and why
 
-`SYSTEM_SUBDOMAINS` in `worker/lib/hosts.ts` holds **138 names**, checked
+`SYSTEM_SUBDOMAINS` in `worker/lib/hosts.ts` holds **146 names**, checked
 **before** `reserved_slugs` and kept in code on purpose: a wildcard that
 resolves before the database answers is a wildcard that has to be safe without
 it. They are grouped by *why*, because the reason decides whether a future name
@@ -140,6 +144,7 @@ belongs there:
 | Platform functions | `admin`, `checkout`, `cart`, `wallet`, `orders`, `invoice`, `refunds` | A shop at `checkout.` is indistinguishable from the platform doing the same thing |
 | Infrastructure | `cdn`, `assets`, `ns1`, `dns`, `vpn`, `git`, `ci`, `status`, `metrics` | Operator names, and the ones scanners try first |
 | Environments | `dev`, `staging`, `beta`, `sandbox`, `demo`, `internal`, `docs` | A merchant on `staging.` will be mistaken for our own pre-release site |
+| The storefront's own path words | `resolve`, `by-id`, `p`, `products`, `sections`, `services`, `showcase`, `reviews` | A store is addressed as `/api/storefront/<slug>` beside fixed routes on the same router: a shop slugged `resolve` was unreachable and `by-id` collided with the legacy-link lookup. `tests/storeSlugsPaging.test.ts` walks the router, so a new route word cannot ship unreserved (audit 01 B23) |
 
 Two of those groups are not about names we use. That is deliberate: a name is
 reserved because of **who could otherwise ask for it**, not because we plan to

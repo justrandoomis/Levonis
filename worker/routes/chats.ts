@@ -1,17 +1,28 @@
 import { setChatTyping, remoteChatTyping } from '../lib/chatPresence';
 import { Hono } from 'hono';
-import type { AppContext } from '../lib/types';
-import { requireAuth, badRequest, notFound, forbidden, str } from '../lib/http';
+import type { Context } from 'hono';
+import type { AppContext, Env } from '../lib/types';
+import { requireAuth, badRequest, notFound, forbidden, str, int, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { headMediaObject } from '../lib/mediaStorage';
 import { isSchemaMissing } from '../lib/membershipBenefits';
+import { audit } from '../lib/audit';
+import { notify } from '../lib/notifications';
 import { announceCustomerChatMessage } from './adminChats';
 
 /**
  * Direct chats. Only participants can read or write a conversation; there is
- * no moderator backdoor by default (an admin endpoint would need explicit,
- * audited access — deliberately not implemented in Phase 1).
+ * no moderator backdoor by default.
+ *
+ * THE ONE STAFF EXCEPTION, AND HOW IT IS BOUNDED (audit 04 B6, DECISIONS.md).
+ * A merchant-store order's thread belongs to the customer and the seller. An
+ * admin handling a dispute or a complaint about that order may READ it — and
+ * only read it: they are never added as a participant (so nobody's list, typing
+ * dots or unread counts change), they cannot write into it, and every look is
+ * an audit row (`admin.chat_read`, one per admin per thread per hour). The
+ * shop's OWN order threads are different — there the admin IS the other party,
+ * the support desk (worker/routes/adminChats.ts), and joins as before.
  */
 export const chatRoutes = new Hono<AppContext>();
 chatRoutes.use('*', requireAuth);
@@ -22,6 +33,120 @@ async function assertParticipant(db: D1Database, chatId: string, userId: string)
     .bind(chatId, userId)
     .first();
   if (!row) throw forbidden('You are not part of this conversation');
+}
+
+/** The order a thread is about, when it is a MERCHANT-STORE order's thread. */
+interface StoreOrderThread {
+  order_id: string;
+  customer_id: string;
+  seller_id: string;
+}
+
+async function storeOrderThread(db: D1Database, chatId: string): Promise<StoreOrderThread | null> {
+  const row = await db
+    .prepare(
+      `SELECT o.id AS order_id, o.user_id AS customer_id, m.user_id AS seller_id
+         FROM chats ch
+         JOIN orders o ON o.id = ch.order_id
+         JOIN community_merchants m ON m.id = o.merchant_id
+        WHERE ch.id = ?`
+    )
+    .bind(chatId)
+    .first<StoreOrderThread>();
+  return row ?? null;
+}
+
+/**
+ * The staff read of a merchant↔customer thread, recorded — once per admin per
+ * thread per hour, because the thread screen re-reads every few seconds and an
+ * audit row per poll would bury the one fact that matters: WHO looked, WHEN.
+ * The dedupe is the rate limiter's own fixed-window row (`rate_limits`, keyed
+ * by its primary key), so it costs one indexed upsert, not an audit-log scan.
+ */
+async function auditStaffRead(c: Context<AppContext>, chatId: string, orderId: string): Promise<void> {
+  const admin = c.get('user')!;
+  const now = Math.floor(Date.now() / 1000);
+  const hour = now - (now % 3600);
+  const seen = await c.env.DB.prepare(
+    `INSERT INTO rate_limits (key, window_start, count) VALUES (?1, ?2, 1)
+     ON CONFLICT(key) DO UPDATE SET
+       count = CASE WHEN window_start = ?2 THEN count + 1 ELSE 1 END,
+       window_start = ?2
+     RETURNING count`
+  )
+    .bind(`chat-staff-read:${admin.id}:${chatId}`, hour)
+    .first<{ count: number }>();
+  if (Number(seen?.count) === 1) {
+    await audit(c.env.DB, admin.id, 'admin.chat_read', chatId, { order: orderId, read_only: true });
+  }
+}
+
+/**
+ * A FILE FROM A STORE THREAD, OPENED BY STAFF WHO ONLY READ IT (audit 04 #11).
+ *
+ * `/files/chat/<chat id>/…` serves a non-participant admin the file
+ * (worker/routes/uploads.ts) — the same read-only access the thread itself
+ * gives staff — and that access is recorded the same way: one `admin.chat_read`
+ * row per admin, thread and hour, shared with the thread read. The shop's own
+ * threads are the support desk's work, not a merchant↔customer conversation,
+ * so nothing is written for them.
+ */
+export async function recordStaffChatFileRead(c: Context<AppContext>, chatId: string): Promise<void> {
+  const thread = await storeOrderThread(c.env.DB, chatId);
+  if (thread) await auditStaffRead(c, chatId, thread.order_id);
+}
+
+/**
+ * «رسالة جديدة» TO THE OTHER SIDE of a store order's thread (audit 04 B10).
+ *
+ * Once per TURN, not per line: a customer typing four lines in a row is one
+ * question waiting, so a line whose predecessor was the same sender's says
+ * nothing new — the same rule the shop desk's announce follows. The event key
+ * is the message id, so a retried send cannot notify twice. A path, not an
+ * origin, as every notification link is.
+ */
+async function notifyStoreThread(
+  env: Env,
+  thread: StoreOrderThread,
+  chatId: string,
+  senderId: string,
+  messageId: string
+): Promise<void> {
+  const prev = await env.DB.prepare(
+    `SELECT sender_id FROM chat_messages WHERE chat_id = ? AND id <> ?
+      ORDER BY created_at DESC, rowid DESC LIMIT 1`
+  )
+    .bind(chatId, messageId)
+    .first<{ sender_id: string }>();
+  if (prev?.sender_id === senderId) return;
+  const toSeller = senderId === thread.customer_id;
+  const recipient = toSeller ? thread.seller_id : thread.customer_id;
+  if (!recipient || recipient === senderId) return;
+  if (toSeller) {
+    // The merchant's own «رسائل جديدة» switch (merchant_notification_
+    // preferences.new_messages) — one of the nine that used to control nothing
+    // (audit 04 #19). No row means the default: on.
+    const pref = await env.DB.prepare(
+      `SELECT p.new_messages AS on_ FROM merchant_notification_preferences p
+         JOIN community_merchants m ON m.id = p.merchant_id
+        WHERE m.user_id = ?`
+    )
+      .bind(recipient)
+      .first<{ on_: number }>();
+    if (pref && !pref.on_) return;
+  }
+  await notify(env.DB, {
+    userId: recipient,
+    kind: 'chat_message',
+    title_ar: toSeller ? 'رسالة جديدة من زبون' : 'ردّ المتجر على رسالتك',
+    title_en: toSeller ? 'New message from a customer' : 'The store replied to your message',
+    body_ar: `بخصوص الطلب ${thread.order_id}`,
+    body_en: `About order ${thread.order_id}`,
+    link: `/chat/${chatId}`,
+    entity_type: 'chat',
+    entity_id: chatId,
+    eventKey: `chat_msg:${messageId}`,
+  });
 }
 
 /**
@@ -98,28 +223,72 @@ chatRoutes.post('/open', async (c) => {
   if (body.orderId !== undefined) {
     const orderId = str(body.orderId, 'orderId', { min: 1, max: 60 });
     const order = await c.env.DB.prepare(
-      `SELECT o.id, o.user_id, m.user_id AS merchant_user_id
+      `SELECT o.id, o.user_id, o.merchant_id, m.user_id AS merchant_user_id
          FROM orders o LEFT JOIN community_merchants m ON m.id = o.merchant_id
         WHERE o.id = ?`
     )
       .bind(orderId)
-      .first<{ id: string; user_id: string; merchant_user_id: string | null }>();
+      .first<{ id: string; user_id: string; merchant_id: string | null; merchant_user_id: string | null }>();
     if (!order) throw notFound('Order not found');
     const isAdmin = user.role === 'admin';
     // The order's owner, an admin — or, for a merchant-store order, the
     // merchant who has to fulfil it. A seller who cannot ask "which colour
     // did you mean?" can only guess, and guessing ships the wrong thing.
     const isSeller = order.merchant_user_id !== null && order.merchant_user_id === user.id;
-    if (!isAdmin && !isSeller && order.user_id !== user.id) throw forbidden('This is not your order');
+    const isCustomer = order.user_id === user.id;
+    if (!isAdmin && !isSeller && !isCustomer) throw forbidden('This is not your order');
 
     const existing = await c.env.DB.prepare('SELECT id FROM chats WHERE order_id = ?')
       .bind(orderId)
       .first<{ id: string }>();
+
+    /*
+     * A MERCHANT-STORE ORDER'S THREAD IS THE CUSTOMER'S AND THE SELLER'S.
+     *
+     * Both are members from the moment it exists (audit 04 B10: a customer who
+     * opened it first was alone in it, and the shop desk excludes store orders,
+     * so the question reached nobody). An admin who is neither is answered
+     * READ-ONLY and is never added — staff joining a private merchant thread
+     * silently is exactly what B6 found. They get the thread to read (audited
+     * on each read) or nothing, if none exists yet: an admin does not start
+     * a conversation between two other people.
+     */
+    if (order.merchant_id && order.merchant_user_id) {
+      if (!isCustomer && !isSeller) {
+        return c.json({ success: true, chatId: existing?.id ?? null, orderId, readOnly: true });
+      }
+      const chatId = existing?.id ?? newId('chat');
+      const stmts = existing
+        ? []
+        : [c.env.DB.prepare('INSERT INTO chats (id, order_id) VALUES (?, ?)').bind(chatId, orderId)];
+      for (const member of new Set([order.user_id, order.merchant_user_id])) {
+        stmts.push(
+          c.env.DB.prepare('INSERT OR IGNORE INTO chat_participants (chat_id, user_id) VALUES (?, ?)').bind(chatId, member)
+        );
+      }
+      try {
+        await c.env.DB.batch(stmts);
+      } catch (e) {
+        // Two first opens raced (UNIQUE on chats.order_id): the other one made
+        // the thread — use it.
+        const won = await c.env.DB.prepare('SELECT id FROM chats WHERE order_id = ?').bind(orderId).first<{ id: string }>();
+        if (!won) throw e;
+        await c.env.DB.batch(
+          [...new Set([order.user_id, order.merchant_user_id])].map((member) =>
+            c.env.DB.prepare('INSERT OR IGNORE INTO chat_participants (chat_id, user_id) VALUES (?, ?)').bind(won.id, member)
+          )
+        );
+        return c.json({ success: true, chatId: won.id, orderId });
+      }
+      return c.json({ success: true, chatId, orderId });
+    }
+
+    // THE SHOP'S OWN ORDER: the admin is the other party (the support desk).
     if (existing) {
-      // An admin or the order's seller opening an existing thread joins it —
-      // the first admin to reply is rarely the one who reads it next, and a
-      // thread nobody else can open is a thread that gets abandoned.
-      if (isAdmin || isSeller) {
+      // An admin opening an existing thread joins it — the first admin to
+      // reply is rarely the one who reads it next, and a thread nobody else
+      // can open is a thread that gets abandoned.
+      if (isAdmin) {
         await c.env.DB
           .prepare('INSERT OR IGNORE INTO chat_participants (chat_id, user_id) VALUES (?, ?)')
           .bind(existing.id, user.id)
@@ -252,31 +421,85 @@ export function chatMessagePublic(m: Record<string, unknown>, viewerId: string) 
   };
 }
 
+/**
+ * A THREAD, NEWEST FIRST IN PAGES (audit 04 B5).
+ *
+ * This returned `ORDER BY created_at ASC LIMIT 500` — the OLDEST 500 — so on a
+ * long thread every message after the 500th was invisible, including the one
+ * that had just been sent. Now the default answer is the newest `limit`
+ * messages (oldest→newest, the order a thread is drawn in), and `before` pages
+ * backwards: `older_cursor` is `<created_at>|<id>` of the oldest message
+ * returned, or null when there is nothing older. The id breaks ties, so a
+ * page boundary never drops a message that shares its timestamp.
+ *
+ * Only the newest page marks the thread read: scrolling back through history
+ * is not reading what just arrived.
+ */
+const PAGE_DEFAULT = 60;
+
 chatRoutes.get('/:id/messages', async (c) => {
   const user = c.get('user')!;
-  const chatId = c.req.param('id');
-  await assertParticipant(c.env.DB, chatId, user.id);
-  const { results } = await c.env.DB.prepare(
-    'SELECT * FROM chat_messages WHERE chat_id = ? ORDER BY created_at ASC LIMIT 500'
-  )
-    .bind(chatId)
-    .all<Record<string, unknown>>();
-  await c.env.DB.prepare(
-    "UPDATE chat_participants SET last_read_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE chat_id = ? AND user_id = ?"
-  )
+  const chatId = str(c.req.param('id'), 'chatId', { min: 1, max: 60 });
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 200, def: PAGE_DEFAULT });
+  const beforeRaw = (c.req.query('before') ?? '').slice(0, 200);
+  const bar = beforeRaw.lastIndexOf('|');
+  const before = bar === -1 ? { at: beforeRaw, id: '' } : { at: beforeRaw.slice(0, bar), id: beforeRaw.slice(bar + 1) };
+
+  const member = await c.env.DB.prepare('SELECT 1 AS x FROM chat_participants WHERE chat_id = ? AND user_id = ?')
     .bind(chatId, user.id)
-    .run();
+    .first();
+  let readOnly = false;
+  if (!member) {
+    // Staff reading a merchant↔customer thread: allowed, never joined,
+    // never able to write, always recorded. Anything else is refused.
+    const thread = user.role === 'admin' ? await storeOrderThread(c.env.DB, chatId) : null;
+    if (!thread) throw forbidden('You are not part of this conversation');
+    await auditStaffRead(c, chatId, thread.order_id);
+    readOnly = true;
+  }
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT * FROM chat_messages
+      WHERE chat_id = ?1
+        AND (?2 = '' OR created_at < ?2 OR (created_at = ?2 AND id < ?3))
+      ORDER BY created_at DESC, id DESC LIMIT ?4`
+  )
+    .bind(chatId, before.at, before.id, limit + 1)
+    .all<Record<string, unknown>>();
+  const hasMore = results.length > limit;
+  const page = results.slice(0, limit).reverse();
+
+  if (!readOnly && !before.at) {
+    await c.env.DB.prepare(
+      "UPDATE chat_participants SET last_read_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE chat_id = ? AND user_id = ?"
+    )
+      .bind(chatId, user.id)
+      .run();
+  }
+  const oldest = page[0];
   return c.json({
     success: true,
-    messages: results.map((m) => chatMessagePublic(m, user.id)),
+    messages: page.map((m) => chatMessagePublic(m, user.id)),
+    has_more: hasMore,
+    older_cursor: hasMore && oldest ? `${String(oldest.created_at)}|${String(oldest.id)}` : null,
+    read_only: readOnly,
   });
 });
 
 chatRoutes.post('/:id/messages', async (c) => {
   await rateLimit(c, 'chat-send', 200, 3600);
   const user = c.get('user')!;
-  const chatId = c.req.param('id');
+  const chatId = str(c.req.param('id'), 'chatId', { min: 1, max: 60 });
   await assertParticipant(c.env.DB, chatId, user.id);
+  /*
+   * A merchant-store order's thread is written by its customer and its seller
+   * only. An admin who was silently joined to one before that stopped (audit
+   * 04 B6) is still a participant row — and is read-only all the same.
+   */
+  const storeThread = await storeOrderThread(c.env.DB, chatId);
+  if (storeThread && user.id !== storeThread.customer_id && user.id !== storeThread.seller_id) {
+    throw new HttpError(403, 'Staff can read this conversation but not write in it', 'CHAT_READ_ONLY');
+  }
   const body = await c.req.json().catch(() => ({}));
   // «كاميرا/ملف/بصمة صوتية». Any of the four attachment kinds means "this
   // message carries a file"; WHICH kind it is comes from where the upload route
@@ -355,6 +578,17 @@ chatRoutes.post('/:id/messages', async (c) => {
   // «محادثة مباشرة مع الفريق» has to reach the team: a customer line on one of
   // the shop's order threads is announced to «‼️ Support» (debounced; total).
   await announceCustomerChatMessage(c, chatId, user.id, id);
+  if (storeThread) {
+    // …and a store order's line reaches its SELLER (or the customer, when the
+    // seller answers). The seller is made a member first: a thread opened
+    // before migration 0118 may not have them, and a notification pointing at
+    // a thread they cannot open would be worse than none.
+    await c.env.DB.prepare('INSERT OR IGNORE INTO chat_participants (chat_id, user_id) VALUES (?, ?)')
+      .bind(chatId, storeThread.seller_id)
+      .run()
+      .catch(() => {});
+    await notifyStoreThread(c.env, storeThread, chatId, user.id, id).catch(() => {});
+  }
   // The stored message, in the read path's own shape, so a screen can append
   // it instead of re-fetching the whole thread after every send.
   const message = chatMessagePublic(

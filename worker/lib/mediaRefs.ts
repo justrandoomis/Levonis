@@ -387,6 +387,10 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
    */
   'products.gini_url': 'an external link to the product in the Gini app',
   'orders.gini_receipt_barcode': 'the Gini collection barcode, as text',
+  // 0115 — WHEN the customer confirmed receiving a community-store order (the
+  // «استلمت طلبي» that releases the merchant's credit): an ISO timestamp,
+  // never an image of a receipt.
+  'orders.receipt_confirmed_at': 'a timestamp — when the customer confirmed receipt',
   'rate_limits.key': 'the throttle bucket, e.g. login:1.2.3.4',
   'policy_documents.key': 'the policy slug — terms, privacy, warranty',
   'policy_acceptances.policy_key': 'the same policy slug',

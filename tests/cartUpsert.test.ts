@@ -284,15 +284,17 @@ test('reordering option groups cannot create a second line for the same complete
   assert.equal(r[0].option_value_ids, '["a-size","z-model"]');
 });
 
-test('a merchant line and a Levonis line for the same shape do not collide', () => {
-  // They are different sellers and different products; nothing about one
-  // should be able to absorb the other.
+test('a merchant line and a Levonis line never share one cart — the database refuses the second (0114)', () => {
+  // They are different sellers; nothing about one may absorb the other, and
+  // since migration 0114 one customer's cart cannot hold both at all
+  // (docs/MERCHANT_PLATFORM.md §2 decision 1). The line identities still do
+  // not collide across customers — tests/cartSellerGuard.test.ts has the rest.
   const raw = db();
   addLevonis(raw, 'ci1', 1);
-  addMerchant(raw, 'ci2', 1);
+  assert.throws(() => addMerchant(raw, 'ci2', 1), /CART_SELLER_CONFLICT/);
   const r = rows(raw);
-  assert.equal(r.length, 2);
-  assert.deepEqual(r.map((x) => x.seller_type).sort(), ['levonis', 'merchant']);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].seller_type, 'levonis');
 });
 
 // ------------------------------------------------- the invariants beneath

@@ -107,6 +107,12 @@ import { CheckoutStartedV1 } from '@levonis/contracts/events/v1/CheckoutStarted'
 import { OrderCreatedV1 } from '@levonis/contracts/events/v1/OrderCreated';
 import { planOrderReturn } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
+import {
+  cancelStoreOrder,
+  confirmStoreOrderReceipt,
+  notifyMerchantOfStoreOrder,
+  STORE_RELEASE_DAYS,
+} from '../lib/storeOrderOps';
 import type { StockMove, StockResolution, StockTarget } from '../lib/inventory';
 import { benefits, pricingTierContext, preorderGiftFor, shippingEntitlementContext } from '../lib/entitlements';
 import {
@@ -4781,6 +4787,24 @@ orderRoutes.get('/:id', async (c) => {
       can_cancel: status === 'pending',
       can_review: status === 'delivered',
       /**
+       * A COMMUNITY-STORE ORDER'S RECEIPT (owner decision 2026-09-24): the
+       * merchant is paid when THIS customer confirms receiving it, or on its
+       * own three days after delivery unless a complaint is open. The page
+       * offers the confirmation and says the date — null on every platform
+       * order, which has no such step.
+       */
+      receipt:
+        String(data.order.seller_type ?? '') === 'merchant'
+          ? {
+              can_confirm: status === 'delivered' && !data.order.receipt_confirmed_at,
+              confirmed_at: (data.order.receipt_confirmed_at as string | null) ?? null,
+              auto_confirms_at:
+                status === 'delivered' && !data.order.receipt_confirmed_at && data.order.delivered_at
+                  ? new Date(Date.parse(String(data.order.delivered_at)) + STORE_RELEASE_DAYS * 86_400_000).toISOString()
+                  : null,
+            }
+          : null,
+      /**
        * The day picker, as a whole answer rather than a boolean: which days
        * may be picked, which one is picked, where the ceiling is, and — when
        * none of it applies — WHY. A disabled control with no sentence beside
@@ -5064,6 +5088,39 @@ orderRoutes.post('/:id/cancel', async (c) => {
    */
   await refuseRevealedCancel(c.env.DB, data.order, data.items);
 
+  /**
+   * A COMMUNITY-STORE ORDER IS CANCELLED BY ITS OWN OPERATION (B7). This door
+   * refunded the wallet and stopped there: the merchant's credit stayed
+   * `pending` for a refunded order, and the store's stock, `sold_count` and
+   * coupon use stayed spent. `cancelStoreOrder` does all of it in one batch —
+   * the same one the merchant's and the admin's cancel run.
+   */
+  if (String(data.order.seller_type ?? '') === 'merchant') {
+    const res = await cancelStoreOrder(c.env, { order: data.order, actor: 'customer', actorUserId: user.id });
+    if (!res.ok) throw badRequest('This order was already cancelled or has progressed');
+    const tell = notifyMerchantOfStoreOrder(c.env.DB, {
+      merchantId: String(data.order.merchant_id ?? ''),
+      orderId: id,
+      event: 'cancelled_by_customer',
+    });
+    try {
+      c.executionCtx.waitUntil(tell);
+    } catch {
+      await tell;
+    }
+    const cancelled = (await loadOrder(c.env.DB, id))!;
+    const cancelledSnaps = await getOrderPointsSnapshots(c.env, [id]);
+    return c.json({
+      success: true,
+      order: orderPublic(
+        cancelled.order,
+        cancelled.items,
+        cancelledSnaps.get(id),
+        await mysteryViewFor(c.env.DB, [id], 'customer', langOf(c))
+      ),
+    });
+  }
+
   const now = new Date().toISOString();
   const walletCents = Number(data.order.wallet_applied_usd_cents) || 0;
   const points = Number(data.order.points_discount_iqd) || 0;
@@ -5110,6 +5167,31 @@ orderRoutes.post('/:id/cancel', async (c) => {
     success: true,
     order: orderPublic(after.order, after.items, snaps.get(id), await mysteryViewFor(c.env.DB, [id], 'customer', langOf(c))),
   });
+});
+
+/**
+ * «استلمت طلبي» — the customer confirms a DELIVERED community-store order.
+ *
+ * The owner's completion rule (docs/MERCHANT_PLATFORM.md §2): the merchant's
+ * «تم التسليم» no longer releases their money; the customer's confirmation
+ * does, or three days after delivery with no open complaint (the cron,
+ * worker/lib/storeOrderOps.ts). Idempotent — a second tap answers `replayed`.
+ * Platform orders have no such step and are refused with a stable code.
+ */
+orderRoutes.post('/:id/confirm-receipt', async (c) => {
+  await rateLimit(c, 'order-confirm-receipt', 30, 3600);
+  const user = c.get('user')!;
+  const id = c.req.param('id');
+  const data = await loadOrder(c.env.DB, id);
+  if (!data || data.order.user_id !== user.id) throw notFound('Order not found');
+  const res = await confirmStoreOrderReceipt(c.env, { order: data.order, customerId: user.id });
+  if (!res.ok) {
+    if (res.reason === 'NOT_A_STORE_ORDER') {
+      throw badRequest('This order has no receipt to confirm', 'RECEIPT_NOT_APPLICABLE');
+    }
+    throw conflict('The order has not been delivered yet', 'ORDER_NOT_DELIVERED');
+  }
+  return c.json({ success: true, replayed: res.replayed, released: res.released });
 });
 
 /**

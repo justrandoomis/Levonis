@@ -104,9 +104,13 @@ test('confirming delivery pays the merchant exactly once, net of commission', as
 
   const bal = await merchantBalance(db, 'm1');
   assert.equal(bal.available_iqd, 45_000, 'the merchant should be owed the receivable');
-  assert.equal(bal.paid_iqd, -5_000, 'the commission is recorded as its own ledger row');
+  // `paid` counts PAYOUTS only (audit 02 B20): the commission is Levonis's,
+  // never money paid out to the merchant — but it is still its own row.
+  assert.equal(bal.paid_iqd, 0, 'no payout has been made');
+  const fee = (await db.prepare("SELECT COALESCE(SUM(amount_iqd), 0) AS n FROM merchant_payout_ledger WHERE merchant_id = 'm1' AND kind = 'commission'").first<{ n: number }>())!.n;
+  assert.equal(fee, -5_000, 'the commission is recorded as its own ledger row');
   // Ledger rows sum to the gross: nothing appeared or vanished.
-  assert.equal(bal.available_iqd + -bal.paid_iqd, 50_000);
+  assert.equal(bal.available_iqd + -fee, 50_000);
 
   const esc = (await getEscrow(db, escrowId))!;
   assert.equal(esc.state, 'released');

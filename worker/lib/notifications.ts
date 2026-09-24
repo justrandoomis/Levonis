@@ -35,6 +35,13 @@ export type NotificationKind =
   | 'print_request_match'
   | 'offer_received'
   | 'offer_accepted'
+  /**
+   * «تغيّر الطلب» — the customer changed a published request (a re-publish
+   * with a different spec, an attachment added or removed), so a merchant's
+   * pending offer now prices a job that no longer exists. The offer is held
+   * until they re-confirm or withdraw it (worker/lib/communityRequests.ts).
+   */
+  | 'offer_stale'
   | 'order_update'
   | 'review_reward_pending'
   /**
@@ -75,7 +82,14 @@ export type NotificationKind =
    * one message a claimant is waiting for, and the admin queue recorded it in
    * the audit log and nowhere the claimant could see without looking.
    */
-  | 'warranty_stage';
+  | 'warranty_stage'
+  /**
+   * «رسالة جديدة» — a message in a merchant-store order's thread, told to the
+   * OTHER side of it: the seller when the customer writes, the customer when
+   * the seller answers (worker/routes/chats.ts). A customer's question on a
+   * store order used to reach nobody at all (audit 04 B10).
+   */
+  | 'chat_message';
 
 export interface NotificationInput {
   userId: string;
@@ -97,7 +111,7 @@ export interface NotificationInput {
    * widened in the same commit as the kind, which is what this paragraph
    * asks for. 'claim' arrived with 'warranty_reply' and 'warranty_stage'.
    */
-  entity_type?: 'request' | 'offer' | 'order' | 'review' | 'product' | 'ticket' | 'complaint' | 'claim' | '';
+  entity_type?: 'request' | 'offer' | 'order' | 'review' | 'product' | 'ticket' | 'complaint' | 'claim' | 'chat' | '';
   entity_id?: string;
   meta?: Record<string, unknown>;
   /** Unique per user. Empty means "no replay protection wanted". */

@@ -33,10 +33,11 @@ import { refreshSupportCounts } from '../adminSupport/supportCounts';
 import { mergeThread, pollWhileVisible, settleThread, useThreadScroll } from '../../lib/supportThread';
 import PrintPricingAdmin from './PrintPricingAdmin';
 import CommunityGatePanel from './CommunityGatePanel';
-import { newIdempotencyKey } from '../../lib/api';
+import ReasonSheet, { type ReasonRequest } from './ReasonSheet';
+import PayoutSheet from './PayoutSheet';
 import {
   adminCommunityApi, iqd, badgeLabel,
-  type CommunityOverview, type AdminMerchantRow, type AdminComplaintRow,
+  type CommunityOverview, type AdminMerchantRow, type AdminMerchantProduct, type AdminComplaintRow,
   type AdminRequestRow, type AdminReviewRow, type AdminReputation, type AdminComplaintMessage,
 } from '../../lib/merchant';
 
@@ -154,8 +155,22 @@ function Overview({ t }: { t: T }) {
             sub={t(`${disputed?.n ?? 0} طلب`, `${disputed?.n ?? 0} orders`)}
             danger={!!disputed?.n}
           />
-          <Stat label={t('إجمالي المبيعات', 'Gross volume')} value={iqd(d.orders.gross)} />
-          <Stat label={t('عمولة المنصة', 'Platform fees')} value={iqd(d.orders.fees)} accent />
+          {/* Money that moved and stayed (audit 04 #22): custom work from
+              funding on, plus store sales — nothing cancelled or refunded. */}
+          <Stat
+            label={t('إجمالي المبيعات', 'Gross volume')}
+            value={iqd(d.orders.gross + (d.store_sales?.gross ?? 0))}
+            sub={t('طلبات مخصصة + متاجر، بلا الملغى والمسترد', 'Custom + store orders, cancelled and refunded excluded')}
+          />
+          {/* The platform's commission is its profit — the owner's and the
+              financial role's only (§11); an assistant gets null and no tile. */}
+          {d.orders.fees !== null && (
+            <Stat
+              label={t('عمولة المنصة', 'Platform fees')}
+              value={iqd((d.orders.fees ?? 0) + (d.store_sales?.fees ?? 0))}
+              accent
+            />
+          )}
         </div>
       </div>
 
@@ -205,11 +220,31 @@ function Overview({ t }: { t: T }) {
 
 // --------------------------------------------------------------- merchants
 
+/**
+ * WHAT A SHOPPER SEES, from the two separate sanctions (audit 04 B2).
+ *
+ * The merchant row and the store row are two decisions and neither writes the
+ * other, so the panel derives the store's EFFECTIVE state from both: a store
+ * whose own row says `active` is still shut while its merchant is suspended.
+ */
+function storeState(m: AdminMerchantRow, t: T): { label: string; tone: 'ok' | 'warn' | 'bad' | 'muted' } | null {
+  if (!m.store_id) return null;
+  if (m.store_status === 'suspended') return { label: t('المتجر موقوف من الإدارة', 'Store suspended by Levonis'), tone: 'bad' };
+  if (m.status === 'suspended') return { label: t('المتجر غير متاح — التاجر موقوف', 'Store unavailable — merchant suspended'), tone: 'bad' };
+  if (m.store_status === 'paused') return { label: t('المتجر متوقف بقرار التاجر', 'Paused by the merchant'), tone: 'muted' };
+  if (m.status === 'restricted') return { label: t('المتجر مفتوح — التاجر مقيّد', 'Store open — merchant restricted'), tone: 'warn' };
+  return { label: t('المتجر مفتوح', 'Store open'), tone: 'ok' };
+}
+
 function Merchants({ t }: { t: T }) {
   const [rows, setRows] = useState<AdminMerchantRow[] | null>(null);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState('');
   const [open, setOpen] = useState<AdminMerchantRow | null>(null);
+  // Per-row feedback, in place of a native alert: an error, or what the
+  // decision left in force («ما زال المتجر موقوفًا»).
+  const [notes, setNotes] = useState<Record<string, { text: string; error?: boolean }>>({});
+  const [ask, setAsk] = useState<ReasonRequest | null>(null);
 
   const load = useCallback(() => {
     adminCommunityApi.merchants(q).then((d) => setRows(d.merchants)).catch(() => setRows([]));
@@ -219,178 +254,261 @@ function Merchants({ t }: { t: T }) {
   if (open) return <MerchantDetail merchant={open} t={t} onBack={() => { setOpen(null); load(); }} />;
   if (rows === null) return <Spin />;
 
-  async function act(m: AdminMerchantRow, fn: () => Promise<unknown>) {
+  const note = (id: string, text: string, error = false) => setNotes((n) => ({ ...n, [id]: { text, error } }));
+
+  /** One decision, with its row locked while it is in flight. */
+  async function act(m: AdminMerchantRow, fn: () => Promise<string | void>) {
     setBusy(m.id);
+    setNotes((n) => ({ ...n, [m.id]: { text: '' } }));
     try {
-      await fn();
+      const after = await fn();
+      if (after) note(m.id, after);
       load();
     } catch (e) {
-      if (e instanceof ApiError) alert(e.message);
+      note(m.id, e instanceof ApiError ? e.message : t('تعذّر الحفظ.', 'Could not save.'), true);
     } finally {
       setBusy('');
     }
   }
 
+  /** Where the STORE stands after a merchant decision — said, never assumed. */
+  const afterMerchant = (storeStatus: string | null | undefined): string =>
+    storeStatus === 'suspended'
+      ? t('ما زال المتجر موقوفًا بقرار منفصل — أعد فتحه إن كان ذلك مقصودًا.', 'The store is still suspended by its own decision — re-open it if that is intended.')
+      : storeStatus === 'paused'
+        ? t('المتجر متوقف بقرار التاجر نفسه، ويعيد فتحه متى شاء.', 'The store is paused by the merchant, who re-opens it when they choose.')
+        : '';
+
+  /** A sanction that needs a reason: asked in the sheet, then sent. */
+  const sanction = (m: AdminMerchantRow, req: Omit<ReasonRequest, 'onConfirm'>, send: (reason: string) => Promise<string | void>) =>
+    setAsk({
+      ...req,
+      onConfirm: async (reason) => {
+        setBusy(m.id);
+        try {
+          const after = await send(reason);
+          note(m.id, after || '');
+          load();
+        } finally {
+          setBusy('');
+        }
+      },
+    });
+
   return (
     <div className="space-y-4">
       <div className="relative">
-        <Search className="w-4 h-4 text-zinc-500 absolute start-3 top-1/2 -translate-y-1/2" />
+        <Search className="w-4 h-4 text-zinc-500 absolute start-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder={t('ابحث باسم التاجر أو المتجر', 'Search by merchant or store name')}
+          placeholder={t('ابحث باسم التاجر أو المتجر…', 'Search by merchant or store name…')}
+          aria-label={t('بحث', 'Search')}
+          name="merchant-search"
+          autoComplete="off"
           className="w-full min-h-[44px] rounded-2xl bg-zinc-800/40 border border-zinc-700/50 ps-10 pe-4 text-white text-[13px] outline-none focus:border-gold/40"
         />
       </div>
 
       {!rows.length && <Empty text={t('لا يوجد تجار', 'No merchants')} />}
 
-      {rows.map((m) => (
-        <div key={m.id} className="rounded-2xl border border-zinc-700/50 bg-zinc-800/30 p-4">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <button onClick={() => setOpen(m)} className="min-w-0 text-start">
-              <div className="flex items-center gap-1.5">
-                <span className="text-white font-semibold text-[14px] truncate">{m.name}</span>
-                {!!m.verified && <BadgeCheck className="w-4 h-4 text-gold shrink-0" />}
-              </div>
-              <p className="text-zinc-500 text-[11.5px] truncate">
-                {m.store_slug ? `${m.store_slug}.levonis-iq.com` : t('لا يوجد متجر', 'no store')} · {m.owner_email}
-              </p>
-              <div className="flex items-center gap-2 mt-1 text-[11px]">
-                <span className="text-gold/80">{badgeLabel(m.badge_override || m.badge, (ar, en) => t(ar, en))}</span>
-                {!!m.rating_count && (
+      {rows.map((m) => {
+        const state = storeState(m, t);
+        const rowBusy = busy === m.id;
+        const address = m.store_url ? m.store_url.replace(/^https?:\/\//, '') : m.store_slug ? `@${m.store_slug}` : '';
+        return (
+          <div key={m.id} className="rounded-2xl border border-zinc-700/50 bg-zinc-800/30 p-4" data-admin-merchant={m.id}>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <button onClick={() => setOpen(m)} className="min-w-0 text-start">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-white font-semibold text-[14px] truncate">{m.name}</span>
+                  {!!m.verified && <BadgeCheck className="w-4 h-4 text-gold shrink-0" aria-label={t('موثّق', 'Verified')} />}
+                </div>
+                <p className="text-zinc-500 text-[11.5px] truncate">
+                  <span dir="ltr" translate="no">{address || t('لا يوجد متجر', 'no store')}</span> · {m.owner_email}
+                </p>
+                <div className="flex items-center gap-2 mt-1 text-[11px]">
+                  <span className="text-gold/80">{badgeLabel(m.badge_override || m.badge, (ar, en) => t(ar, en))}</span>
+                  {!!m.rating_count && (
+                    <span className="text-zinc-500 tabular-nums">
+                      {(m.rating_avg_x100 / 100).toFixed(1)} ★ ({m.rating_count})
+                    </span>
+                  )}
                   <span className="text-zinc-500">
-                    {(m.rating_avg_x100 / 100).toFixed(1)} ★ ({m.rating_count})
+                    {t(`${m.completed_orders} مكتمل`, `${m.completed_orders} completed`)}
                   </span>
-                )}
-                <span className="text-zinc-500">
-                  {t(`${m.completed_orders} مكتمل`, `${m.completed_orders} completed`)}
-                </span>
-              </div>
-            </button>
-            <StatusPill status={m.status} t={t} />
-          </div>
+                </div>
+              </button>
+              <StatusPill status={m.status} t={t} />
+            </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Act
-              label={m.verified ? t('إلغاء التوثيق', 'Unverify') : t('توثيق', 'Verify')}
-              icon={<ShieldCheck className="w-3.5 h-3.5" />}
-              disabled={busy === m.id}
-              onClick={() => act(m, () => adminCommunityApi.verify(m.id, !m.verified))}
-            />
-            {m.status !== 'suspended' ? (
-              <Act
-                label={t('إيقاف', 'Suspend')}
-                icon={<Ban className="w-3.5 h-3.5" />}
-                danger
-                disabled={busy === m.id}
-                onClick={() => {
-                  // A reason is required. A suspension nobody can explain
-                  // later is a suspension that gets reversed by whoever asks
-                  // loudest.
-                  const reason = window.prompt(t('سبب الإيقاف (مطلوب):', 'Reason for suspension (required):'));
-                  if (!reason?.trim()) return;
-                  act(m, () => adminCommunityApi.setStatus(m.id, 'suspended', reason.trim()));
-                }}
-              />
-            ) : (
-              <Act
-                label={t('إعادة التفعيل', 'Restore')}
-                icon={<Check className="w-3.5 h-3.5" />}
-                disabled={busy === m.id}
-                onClick={() => act(m, () => adminCommunityApi.setStatus(m.id, 'active', ''))}
-              />
+            {state && (
+              <p
+                className={`text-[11.5px] mb-3 ${
+                  state.tone === 'bad' ? 'text-red-300/90' : state.tone === 'warn' ? 'text-amber-300/90' : state.tone === 'ok' ? 'text-emerald-300/80' : 'text-zinc-500'
+                }`}
+                data-store-state
+              >
+                {state.label}
+              </p>
             )}
-            <Act
-              label={t('تقييد', 'Restrict')}
-              disabled={busy === m.id || m.status === 'restricted'}
-              onClick={() => {
-                const reason = window.prompt(t('سبب التقييد (مطلوب):', 'Reason for restriction (required):'));
-                if (!reason?.trim()) return;
-                act(m, () => adminCommunityApi.setStatus(m.id, 'restricted', reason.trim()));
-              }}
-            />
-            {/* Shutting a STOREFRONT is a different sanction from shutting
-                its merchant: a bad banner should not cancel work the merchant
-                already owes other customers. */}
-            {m.store_id && (m.store_status === 'suspended' ? (
-              <Act
-                label={t('إعادة فتح المتجر', 'Re-open store')}
-                icon={<Store className="w-3.5 h-3.5" />}
-                disabled={busy === m.id}
-                onClick={() => act(m, () => adminCommunityApi.setStoreStatus(m.store_id!, 'active', ''))}
-              />
-            ) : (
-              <Act
-                label={t('إيقاف المتجر فقط', 'Suspend store only')}
-                icon={<Store className="w-3.5 h-3.5" />}
-                danger
-                disabled={busy === m.id}
-                onClick={() => {
-                  const reason = window.prompt(
-                    t('سبب إيقاف المتجر (مطلوب):', 'Reason for suspending the store (required):')
-                  );
-                  if (!reason?.trim()) return;
-                  act(m, () => adminCommunityApi.setStoreStatus(m.store_id!, 'suspended', reason.trim()));
-                }}
-              />
-            ))}
-          </div>
 
-          {m.status_reason && (
-            <p className="text-amber-300/80 text-[11.5px] mt-2">
-              {t('سبب حالة التاجر', 'Merchant status reason')}: {m.status_reason}
-            </p>
-          )}
-          {m.store_status === 'suspended' && m.store_status_reason && (
-            <p className="text-amber-300/80 text-[11.5px] mt-1">
-              {t('سبب إيقاف المتجر', 'Store suspension reason')}: {m.store_status_reason}
-            </p>
-          )}
-          {m.store_status === 'paused' && (
-            <p className="text-zinc-500 text-[11.5px] mt-1">
-              {t('المتجر متوقف مؤقتًا بقرار التاجر نفسه.', 'The merchant has paused their own shop.')}
-            </p>
-          )}
-        </div>
-      ))}
+            <div className="flex flex-wrap gap-2">
+              <Act
+                label={m.verified ? t('إلغاء التوثيق', 'Unverify') : t('توثيق', 'Verify')}
+                icon={<ShieldCheck className="w-3.5 h-3.5" />}
+                disabled={rowBusy}
+                onClick={() => act(m, () => adminCommunityApi.verify(m.id, !m.verified).then(() => undefined))}
+              />
+              {m.status === 'suspended' ? (
+                <Act
+                  label={t('إعادة تفعيل التاجر', 'Restore merchant')}
+                  icon={<Check className="w-3.5 h-3.5" />}
+                  disabled={rowBusy}
+                  onClick={() => act(m, async () => afterMerchant((await adminCommunityApi.setStatus(m.id, 'active', '')).store_status))}
+                />
+              ) : (
+                <>
+                  {m.status === 'restricted' ? (
+                    <Act
+                      label={t('رفع التقييد', 'Lift restriction')}
+                      icon={<Check className="w-3.5 h-3.5" />}
+                      disabled={rowBusy}
+                      onClick={() => act(m, async () => afterMerchant((await adminCommunityApi.setStatus(m.id, 'active', '')).store_status))}
+                    />
+                  ) : (
+                    <Act
+                      label={t('تقييد', 'Restrict')}
+                      disabled={rowBusy}
+                      onClick={() =>
+                        sanction(
+                          m,
+                          {
+                            title: t(`تقييد ${m.name}`, `Restrict ${m.name}`),
+                            consequence: t(
+                              'يبقى المتجر ظاهرًا، ولا يستقبل التاجر طلبات جديدة ولا عروضًا حتى يُرفع التقييد.',
+                              'The store stays visible; the merchant takes no new orders or offers until the restriction is lifted.'
+                            ),
+                            confirmLabel: t('قيّد التاجر', 'Restrict merchant'),
+                            danger: true,
+                          },
+                          async (reason) => afterMerchant((await adminCommunityApi.setStatus(m.id, 'restricted', reason)).store_status)
+                        )
+                      }
+                    />
+                  )}
+                  <Act
+                    label={t('إيقاف التاجر', 'Suspend merchant')}
+                    icon={<Ban className="w-3.5 h-3.5" />}
+                    danger
+                    disabled={rowBusy}
+                    onClick={() =>
+                      sanction(
+                        m,
+                        {
+                          title: t(`إيقاف ${m.name}`, `Suspend ${m.name}`),
+                          consequence: t(
+                            'يتوقف التاجر عن كل بيع، ويظهر متجره للزبائن «غير متاح حاليًا». لا يُحذف شيء، ويبقى متجره كما هو عند إعادة التفعيل.',
+                            'The merchant stops trading and their store shows as unavailable. Nothing is deleted, and the store is left exactly as it was when they are restored.'
+                          ),
+                          confirmLabel: t('أوقف التاجر', 'Suspend merchant'),
+                          danger: true,
+                        },
+                        async (reason) => afterMerchant((await adminCommunityApi.setStatus(m.id, 'suspended', reason)).store_status)
+                      )
+                    }
+                  />
+                </>
+              )}
+              {/* Shutting a STOREFRONT is a different sanction from shutting
+                  its merchant: a bad banner should not cancel work the merchant
+                  already owes other customers. */}
+              {m.store_id && (m.store_status === 'suspended' ? (
+                <Act
+                  label={t('إعادة فتح المتجر', 'Re-open store')}
+                  icon={<Store className="w-3.5 h-3.5" />}
+                  disabled={rowBusy || m.status === 'suspended'}
+                  onClick={() => act(m, () => adminCommunityApi.setStoreStatus(m.store_id!, 'active', '').then(() => undefined))}
+                />
+              ) : (
+                <Act
+                  label={t('إيقاف المتجر فقط', 'Suspend store only')}
+                  icon={<Store className="w-3.5 h-3.5" />}
+                  danger
+                  disabled={rowBusy}
+                  onClick={() =>
+                    sanction(
+                      m,
+                      {
+                        title: t('إيقاف المتجر فقط', 'Suspend the store only'),
+                        consequence: t(
+                          'تظهر صفحة المتجر للزبائن «غير متاح حاليًا» ولا تُعرض منتجاته، ويبقى التاجر قادرًا على إكمال أعماله القائمة.',
+                          'The storefront shows as unavailable and serves no products; the merchant can still finish the work they already owe.'
+                        ),
+                        confirmLabel: t('أوقف المتجر', 'Suspend store'),
+                        danger: true,
+                      },
+                      (reason) => adminCommunityApi.setStoreStatus(m.store_id!, 'suspended', reason).then(() => undefined)
+                    )
+                  }
+                />
+              ))}
+            </div>
+
+            {m.store_status === 'suspended' && m.status === 'suspended' && (
+              <p className="text-zinc-500 text-[11.5px] mt-2">
+                {t('أعد تفعيل التاجر أولًا، ثم أعد فتح المتجر إن لزم.', 'Restore the merchant first, then re-open the store if needed.')}
+              </p>
+            )}
+            {m.status_reason && (
+              <p className="text-amber-300/80 text-[11.5px] mt-2">
+                {t('سبب حالة التاجر', 'Merchant status reason')}: {m.status_reason}
+              </p>
+            )}
+            {m.store_status === 'suspended' && m.store_status_reason && (
+              <p className="text-amber-300/80 text-[11.5px] mt-1">
+                {t('سبب إيقاف المتجر', 'Store suspension reason')}: {m.store_status_reason}
+              </p>
+            )}
+            {notes[m.id]?.text && (
+              <p
+                role={notes[m.id].error ? 'alert' : 'status'}
+                className={`text-[11.5px] mt-2 ${notes[m.id].error ? 'text-red-300' : 'text-zinc-300'}`}
+              >
+                {notes[m.id].text}
+              </p>
+            )}
+          </div>
+        );
+      })}
+
+      <ReasonSheet request={ask} onClose={() => setAsk(null)} t={t} />
     </div>
   );
 }
 
 function MerchantDetail({ merchant, t, onBack }: { merchant: AdminMerchantRow; t: T; onBack: () => void }) {
   const [fin, setFin] = useState<Awaited<ReturnType<typeof adminCommunityApi.finance>> | null>(null);
-  const [busy, setBusy] = useState(false);
+  // The money routes answer an assistant-scope admin 403 FINANCIAL_SCOPE_REQUIRED
+  // (audit 04 B2): that is a state to explain, not a spinner that never ends.
+  const [finRefused, setFinRefused] = useState<'' | 'scope' | 'error'>('');
   const [rep, setRep] = useState(false);
 
   const load = useCallback(() => {
-    adminCommunityApi.finance(merchant.id).then(setFin).catch(() => {});
+    adminCommunityApi
+      .finance(merchant.id)
+      .then((d) => {
+        setFin(d);
+        setFinRefused('');
+      })
+      .catch((e) => setFinRefused(e instanceof ApiError && e.code === 'FINANCIAL_SCOPE_REQUIRED' ? 'scope' : 'error'));
   }, [merchant.id]);
   useEffect(load, [load]);
 
-  async function payout() {
-    const raw = window.prompt(
-      t(
-        `المبلغ المراد تحويله (المتاح: ${fin?.balance.available_iqd ?? 0} د.ع):`,
-        `Amount to pay out (available: ${fin?.balance.available_iqd ?? 0} IQD):`
-      )
-    );
-    const amount = Number(raw);
-    if (!Number.isFinite(amount) || amount <= 0) return;
-    const note = window.prompt(t('ملاحظة (طريقة التحويل، المرجع):', 'Note (method, reference):')) ?? '';
-
-    setBusy(true);
-    try {
-      // Idempotent: a double submit records one payout, not two.
-      const r = await adminCommunityApi.payout(merchant.id, amount, note, newIdempotencyKey());
-      if (r.replayed) alert(t('هذه العملية مسجّلة مسبقًا.', 'That payout was already recorded.'));
-      load();
-    } catch (e) {
-      if (e instanceof ApiError) alert(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
+  // The payout is asked in its own sheet (PayoutSheet): amount, note, and the
+  // route's refusals in words — never a browser prompt or the raw English code.
+  const [paying, setPaying] = useState(false);
+  const [paid, setPaid] = useState('');
 
   // A merchant with no reviews yet is unreachable from the ratings list, and
   // that is exactly the merchant whose standing an admin most often has to
@@ -416,7 +534,16 @@ function MerchantDetail({ merchant, t, onBack }: { merchant: AdminMerchantRow; t
         />
       </div>
 
-      {!fin ? (
+      {finRefused === 'scope' ? (
+        <p className="rounded-2xl border border-zinc-700/50 bg-zinc-800/30 px-4 py-3 text-zinc-400 text-[12.5px]" data-finance-scope>
+          {t(
+            'رصيد التاجر وسجله المالي والتحويلات للمالك أو الدور المالي فقط.',
+            "The merchant's balance, ledger and payouts are for the owner or a financial admin only."
+          )}
+        </p>
+      ) : finRefused === 'error' ? (
+        <Err text={t('تعذّر تحميل الأموال.', 'Could not load the money.')} />
+      ) : !fin ? (
         <Spin />
       ) : (
         <>
@@ -427,13 +554,34 @@ function MerchantDetail({ merchant, t, onBack }: { merchant: AdminMerchantRow; t
           </div>
 
           <button
-            onClick={payout}
-            disabled={busy || fin.balance.available_iqd <= 0}
+            onClick={() => {
+              setPaid('');
+              setPaying(true);
+            }}
+            disabled={fin.balance.available_iqd <= 0}
             className="w-full min-h-[46px] rounded-2xl bg-olive text-white font-bold text-[13.5px] flex items-center justify-center gap-2 disabled:opacity-40"
           >
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
+            <Wallet className="w-4 h-4" aria-hidden="true" />
             {t('تسجيل تحويل للتاجر', 'Record a payout')}
           </button>
+          <p role="status" className={paid ? 'text-emerald-300 text-[12px] -mt-2' : 'sr-only'}>
+            {paid}
+          </p>
+          <PayoutSheet
+            open={paying}
+            merchant={merchant}
+            available={fin.balance.available_iqd}
+            onClose={() => setPaying(false)}
+            onRecorded={(replayed) => {
+              setPaid(
+                replayed
+                  ? t('هذا التحويل مسجّل مسبقًا — لم يُسجَّل مرتين.', 'That payout was already recorded — it was not recorded twice.')
+                  : t('سُجّل التحويل.', 'Payout recorded.')
+              );
+              load();
+            }}
+            t={t}
+          />
           <p className="text-zinc-600 text-[11px] -mt-2">
             {t(
               'يُسجَّل التحويل كحركة سالبة في السجل — الرصيد يظل مجموع الحركات ولا يُعدَّل يدويًا.',
@@ -483,7 +631,108 @@ function MerchantDetail({ merchant, t, onBack }: { merchant: AdminMerchantRow; t
           </Section>
         </>
       )}
+
+      <MerchantProducts merchantId={merchant.id} t={t} />
     </div>
+  );
+}
+
+/**
+ * A MERCHANT'S PRODUCTS, FOR MODERATION (audit 01 B9, audit 04 #27).
+ *
+ * The product hide had an endpoint and no control anywhere. It is Levonis's
+ * own decision now, kept apart from the merchant's lifecycle (migration 0118):
+ * the merchant cannot re-publish a hidden product, sees the reason given here,
+ * and lifting the hide puts back exactly what they had chosen.
+ */
+function MerchantProducts({ merchantId, t }: { merchantId: string; t: T }) {
+  const [rows, setRows] = useState<AdminMerchantProduct[] | null>(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState('');
+  const [ask, setAsk] = useState<ReasonRequest | null>(null);
+
+  const load = useCallback(() => {
+    adminCommunityApi
+      .merchantProducts(merchantId)
+      .then((d) => setRows(d.products))
+      .catch((e) => setErr(e instanceof ApiError ? e.message : t('تعذّر التحميل.', 'Could not load.')));
+  }, [merchantId, t]);
+  useEffect(load, [load]);
+
+  async function lift(p: AdminMerchantProduct) {
+    setBusy(p.id);
+    setErr('');
+    try {
+      await adminCommunityApi.hideProduct(p.id, false);
+      load();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : t('تعذّر الحفظ.', 'Could not save.'));
+    } finally {
+      setBusy('');
+    }
+  }
+
+  return (
+    <Section title={t('المنتجات', 'Products')}>
+      {err && <p role="alert" className="text-red-300 text-[12px] mb-2">{err}</p>}
+      {rows === null ? (
+        !err && <Spin />
+      ) : !rows.length ? (
+        <p className="text-zinc-500 text-[12.5px]">{t('لا توجد منتجات', 'No products')}</p>
+      ) : (
+        <ul className="space-y-2" data-admin-products>
+          {rows.map((p) => (
+            <li key={p.id} className="flex items-center gap-3 min-w-0">
+              {p.image ? (
+                <img src={p.image} alt="" width={40} height={40} loading="lazy" className="w-10 h-10 rounded-lg object-cover bg-zinc-800 shrink-0" />
+              ) : (
+                <span className="w-10 h-10 rounded-lg bg-zinc-800 shrink-0" aria-hidden="true" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-white text-[13px] font-semibold truncate" dir="auto">{p.name_ar || p.name}</p>
+                <p className="text-[11px] truncate">
+                  {p.admin_hidden ? (
+                    <span className="text-red-300/90">
+                      {t('مخفي من الإدارة', 'Hidden by Levonis')}
+                      {p.admin_hidden_reason ? ` — ${p.admin_hidden_reason}` : ''}
+                    </span>
+                  ) : (
+                    <span className={p.live ? 'text-emerald-300/80' : 'text-zinc-500'}>
+                      {p.live ? t('ظاهر في المتجر', 'Live on the store') : t('غير منشور', 'Not published')}
+                    </span>
+                  )}
+                </p>
+              </div>
+              {p.admin_hidden ? (
+                <Act label={t('إظهار', 'Unhide')} disabled={busy === p.id} onClick={() => lift(p)} />
+              ) : (
+                <Act
+                  label={t('إخفاء', 'Hide')}
+                  danger
+                  disabled={busy === p.id}
+                  onClick={() =>
+                    setAsk({
+                      title: t('إخفاء المنتج', 'Hide the product'),
+                      consequence: t(
+                        'يختفي المنتج من المتجر فورًا، ولا يستطيع التاجر نشره حتى ترفع الإدارة الإخفاء. يرى التاجر السبب الذي تكتبه.',
+                        'The product leaves the store at once, and the merchant cannot publish it until Levonis lifts the hide. The merchant sees the reason you write.'
+                      ),
+                      confirmLabel: t('أخفِ المنتج', 'Hide product'),
+                      danger: true,
+                      onConfirm: async (reason) => {
+                        await adminCommunityApi.hideProduct(p.id, true, reason);
+                        load();
+                      },
+                    })
+                  }
+                />
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <ReasonSheet request={ask} onClose={() => setAsk(null)} t={t} />
+    </Section>
   );
 }
 
@@ -704,7 +953,9 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
                       {!!o.verified && <BadgeCheck className="w-3.5 h-3.5 text-gold shrink-0" />}
                     </div>
                     <p className="text-zinc-500 text-[11px] truncate">
-                      {o.store_slug ? `${o.store_slug}.levonis-iq.com` : t('لا يوجد متجر', 'no store')}
+                      {/* The slug names the store; the domain is configuration,
+                          never typed into the panel (audit 04 #25). */}
+                      {o.store_slug ? <span dir="ltr" translate="no">@{o.store_slug}</span> : t('لا يوجد متجر', 'no store')}
                       {o.merchant_status !== 'active' && ` · ${o.merchant_status}`}
                     </p>
                   </div>
@@ -1101,6 +1352,9 @@ function reputationKindLabel(k: string, t: T): string {
     case 'order_cancelled': return t('طلب ملغي', 'Order cancelled');
     case 'order_refunded': return t('طلب مُعاد', 'Order refunded');
     case 'review_received': return t('تقييم جديد', 'Review received');
+    // A review edited within its window: the difference in points, appended
+    // (audit 04 #16) — the original event stays on the record.
+    case 'review_edited': return t('تعديل تقييم', 'Review edited');
     case 'dispute_opened': return t('فتح نزاع', 'Dispute opened');
     case 'dispute_won': return t('كسب النزاع', 'Dispute won');
     case 'dispute_lost': return t('خسر النزاع', 'Dispute lost');

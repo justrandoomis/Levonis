@@ -1,7 +1,9 @@
 import { useChatPresence } from '../lib/useChatPresence';
 import { mascot } from '../lib/mascot';
 import { MotionCharacterHome, useCharacterBusy } from '../components/bloub/MotionCharacterAnchor';
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
+import { useThreadScroll } from '../lib/supportThread';
+import { mergeNewestPage, prependOlder } from '../lib/chatPaging';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
@@ -74,6 +76,17 @@ export default function Chat() {
   const [actionNotice, setActionNotice] = useState('');
   const [otherName, setOtherName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  // THE THREAD IN PAGES (audit 04 B5): the newest page first, older ones on
+  // the way up. `olderCursor` is where the next older page starts, or null
+  // when the whole thread is on screen.
+  const [olderCursor, setOlderCursor] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [olderFailed, setOlderFailed] = useState(false);
+  // Staff reading a merchant↔customer thread they are not part of: the
+  // server answers it READ-ONLY, and so does the screen.
+  const [readOnly, setReadOnly] = useState(false);
+  const pagedBack = useRef(false);
+  const prependAnchor = useRef<{ height: number; top: number } | null>(null);
 
   const presence = useChatPresence(id, !!user && !notFound);
   // «بصمة صوتية» — the microphone that used to say «قريباً».
@@ -85,31 +98,56 @@ export default function Chat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const tempCounter = useRef(0);
 
   const comingSoon = dir === 'rtl' ? 'قريباً' : 'Coming soon';
   const emojis = ['😀','😂','😅','😍','😊','😎','🤔','😭','👍','🙏','❤️','🔥','✨','🎉','💯'];
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // The newest message stays in view — but only for a reader who is AT the
+  // bottom, and never by `scrollIntoView` (which walked every scrollable
+  // ancestor and yanked a reader who had scrolled up). The same hook the
+  // support threads use (src/lib/supportThread.ts).
+  useThreadScroll(listRef, id ?? '', messages.length + pending.length, pending.length > 0);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages.length, pending.length]);
+  // An older page lands ABOVE what the reader is looking at: keep their place
+  // by moving the scroll position down by exactly the height it added.
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    const anchor = prependAnchor.current;
+    if (!el || !anchor) return;
+    prependAnchor.current = null;
+    el.scrollTop = anchor.top + (el.scrollHeight - anchor.height);
+  }, [messages]);
 
   const fetchMessages = useCallback(async () => {
     if (!id) return;
     try {
-      const data = await api.get<{ messages: ChatMessage[] }>(`/api/chats/${id}/messages`, { mascot: 'silent' });
+      const data = await api.get<{ messages: ChatMessage[]; older_cursor?: string | null; read_only?: boolean }>(
+        `/api/chats/${id}/messages`,
+        { mascot: 'silent' }
+      );
       if (seenRemote.current.chat !== id) return;
-      const remoteIds = new Set((data.messages || []).filter(m => !m.mine).map(m => m.id));
+      const page = data.messages || [];
+      const remoteIds = new Set(page.filter(m => !m.mine).map(m => m.id));
       if (seenRemote.current.ids && [...remoteIds].some(messageId => !seenRemote.current.ids!.has(messageId))) mascot.trigger('notify');
       seenRemote.current.ids = remoteIds;
-      setMessages(data.messages || []);
+      const hasOlder = !!data.older_cursor;
+      let reset = false;
+      setMessages((prev) => {
+        const merged = mergeNewestPage(prev, page, hasOlder);
+        reset = merged.reset;
+        return merged.messages;
+      });
+      // Until the reader pages back, the cursor follows the newest page; after
+      // that it is theirs — unless the poll had to restart the list.
+      if (!pagedBack.current || reset) {
+        pagedBack.current = false;
+        setOlderCursor(data.older_cursor ?? null);
+      }
+      setReadOnly(!!data.read_only);
       // Drop optimistic messages the server now knows about.
-      const serverIds = new Set((data.messages || []).map((m) => m.id));
+      const serverIds = new Set(page.map((m) => m.id));
       setPending((prev) => prev.filter((p) => !(p.serverId && serverIds.has(p.serverId))));
       setNotFound(false);
     } catch (err) {
@@ -122,6 +160,35 @@ export default function Chat() {
     }
   }, [id, navigate]);
 
+  /** The page before the oldest one on screen — on scroll-up, or the button. */
+  const loadOlder = useCallback(async () => {
+    if (!id || !olderCursor || loadingOlder) return;
+    setLoadingOlder(true);
+    setOlderFailed(false);
+    try {
+      const data = await api.get<{ messages: ChatMessage[]; older_cursor?: string | null }>(
+        `/api/chats/${id}/messages?before=${encodeURIComponent(olderCursor)}`,
+        { mascot: 'silent' }
+      );
+      if (seenRemote.current.chat !== id) return;
+      const el = listRef.current;
+      prependAnchor.current = el ? { height: el.scrollHeight, top: el.scrollTop } : null;
+      pagedBack.current = true;
+      setMessages((prev) => prependOlder(prev, data.messages || []));
+      setOlderCursor(data.older_cursor ?? null);
+    } catch {
+      setOlderFailed(true);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [id, olderCursor, loadingOlder]);
+
+  // Near the top of the thread, fetch the page above before the reader hits it.
+  const onListScroll = useCallback(() => {
+    const el = listRef.current;
+    if (el && el.scrollTop < 120 && olderCursor && !loadingOlder && !olderFailed) void loadOlder();
+  }, [olderCursor, loadingOlder, olderFailed, loadOlder]);
+
   // Initial load + 5s polling while mounted.
   useEffect(() => {
     let cancelled = false;
@@ -129,6 +196,10 @@ export default function Chat() {
     setMessages([]);
     setPending([]);
     setNotFound(false);
+    setOlderCursor(null);
+    setOlderFailed(false);
+    setReadOnly(false);
+    pagedBack.current = false;
     fetchMessages().finally(() => {
       if (!cancelled) setLoading(false);
     });
@@ -459,7 +530,10 @@ export default function Chat() {
 
       {/* Chat Area */}
       <div
+        ref={listRef}
         data-chat-messages
+        onScroll={onListScroll}
+        style={{ overflowAnchor: 'none' }}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 sm:px-5 py-4 flex flex-col gap-4 scroll-pb-6"
         onClick={() => { setIsPlusMenuOpen(false); setShowEmojiPicker(false); }}
       >
@@ -475,6 +549,27 @@ export default function Chat() {
           </div>
         ) : (
           <>
+            {/* The way up. Scrolling near the top fetches it on its own; the
+                button is the same action for a keyboard, a screen reader or a
+                failed fetch — never a gesture-only control. */}
+            {(olderCursor || loadingOlder) && (
+              <div className="flex justify-center" data-chat-older>
+                <button
+                  type="button"
+                  onClick={() => { setOlderFailed(false); void loadOlder(); }}
+                  disabled={loadingOlder}
+                  aria-busy={loadingOlder}
+                  className="lv-button lv-button-ghost lv-button-sm"
+                >
+                  {loadingOlder
+                    ? loc('جارٍ تحميل الرسائل الأقدم…', 'Loading earlier messages…')
+                    : olderFailed
+                      ? loc('تعذّر التحميل — حاول مجددًا', 'Could not load — try again')
+                      : loc('عرض الرسائل الأقدم', 'Show earlier messages')}
+                  {/* OWNER: Sorani to be written by hand. */}
+                </button>
+              </div>
+            )}
             {messages.map((msg, index) => {
               const time = formatMsgTime(msg.created_at, lang);
               const prevTime = index > 0 ? formatMsgTime(messages[index - 1].created_at, lang) : null;
@@ -505,10 +600,22 @@ export default function Chat() {
         {actionNotice && (
           <div role="status" className="text-center text-xs text-text-muted font-medium">{actionNotice}</div>
         )}
-        <div ref={messagesEndRef} className="h-px shrink-0" aria-hidden="true" />
       </div>
 
+      {/* A thread this viewer may read but not write in (staff on a
+          merchant↔customer order thread): no composer, and it says why. */}
+      {readOnly && (
+        <div data-chat-read-only className="shrink-0 border-t border-border-subtle/70 bg-surface px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] text-center text-xs text-text-secondary">
+          {loc(
+            'للقراءة فقط — هذه محادثة بين الزبون والمتجر، وكل اطلاع عليها يُسجَّل.',
+            'Read-only — this conversation is between the customer and the store, and every view of it is recorded.'
+          )}
+          {/* OWNER: Sorani to be written by hand. */}
+        </div>
+      )}
+
       {/* Bottom Area */}
+      {!readOnly && (
       <div data-chat-composer className="relative z-10 shrink-0 bg-surface border-t border-border-subtle/70 pb-[max(env(safe-area-inset-bottom),0.5rem)]">
 
         {/* Emoji choices remain part of the composer flow. They can expand
@@ -669,6 +776,7 @@ export default function Chat() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

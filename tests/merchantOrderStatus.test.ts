@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, failingD1, asD1, stubApp, post, json, pending, count } from './fixtures/app';
+import { freshDb, failingD1, asD1, stubApp, post, get, json, pending, count } from './fixtures/app';
 import { merchantRoutes } from '../worker/routes/merchant';
 
 function seed(status: string): DatabaseSync {
@@ -51,14 +51,17 @@ const completed = (raw: DatabaseSync) =>
 const reputation = (raw: DatabaseSync) =>
   count(raw, "SELECT COUNT(*) AS n FROM merchant_reputation_events WHERE order_id = 'ORD-M1' AND kind = 'order_completed'");
 
-test('A NORMAL DELIVERY counts the completion ONCE and frees the payout', async () => {
+test('A NORMAL DELIVERY counts the completion ONCE — and does NOT free the payout', async () => {
   const raw = seed('shipped');
   const res = await post(merchantApp(asD1(raw)), '/api/merchant/orders/ORD-M1/status', { status: 'delivered' });
   assert.equal(res.status, 200, JSON.stringify(await json(res)));
   await Promise.all(pending.splice(0));
   assert.equal(completed(raw), 1);
   assert.equal(reputation(raw), 1);
-  assert.equal((raw.prepare("SELECT state FROM merchant_payout_ledger WHERE id = 'pl1'").get() as { state: string }).state, 'available');
+  // The owner's rule (docs/MERCHANT_PLATFORM.md §2): the merchant's own
+  // «تم التسليم» never releases money — the customer's confirmation, or three
+  // days after delivery, does (tests/storeOrderRelease.test.ts).
+  assert.equal((raw.prepare("SELECT state FROM merchant_payout_ledger WHERE id = 'pl1'").get() as { state: string }).state, 'pending');
 });
 
 test('THE DOUBLE TAP — the tap that LOST the race adds no completion and no reputation, and says so', async () => {
@@ -106,4 +109,42 @@ test('`processing` is a warehouse fact on a store order too — no message', asy
   assert.equal(res.status, 200);
   await Promise.all(pending.splice(0));
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = 'buyer'"), 0);
+});
+
+/**
+ * B26 — THE ORDERS TAB READ THE FIRST 30 AND NEVER ASKED FOR MORE. The list is
+ * paged by (created_at, id): every order comes back exactly once, in order,
+ * including two that share an instant — which a timestamp-only cursor skips —
+ * and the status filter holds across pages.
+ */
+test('B26 the merchant orders list pages through every order once, ties included', async () => {
+  const raw = seed('pending');
+  const add = raw.prepare(
+    `INSERT INTO orders
+       (id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,
+        subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_type,stage,merchant_id,seller_type,created_at)
+     VALUES (?,'buyer',?,'{}','merchant','{}','wallet',1000,1400,1000,0,'direct','received','m_ali','merchant',?)`
+  );
+  add.run('ORD-M2', 'pending', '2026-03-01T00:00:00.000Z');
+  add.run('ORD-M3', 'delivered', '2026-03-01T00:00:00.000Z'); // the same instant as M2
+  add.run('ORD-M4', 'pending', '2026-02-01T00:00:00.000Z');
+  add.run('ORD-M5', 'pending', '2026-01-01T00:00:00.000Z');
+  raw.exec("UPDATE orders SET created_at = '2026-04-01T00:00:00.000Z' WHERE id = 'ORD-M1'");
+  const app = merchantApp(asD1(raw));
+
+  const walk = async (filter: string) => {
+    const seen: string[] = [];
+    let cursor: string | null = '';
+    for (let page = 0; cursor !== null && page < 10; page++) {
+      const qs = new URLSearchParams({ limit: '2', ...(filter ? { status: filter } : {}), ...(cursor ? { cursor } : {}) });
+      const body = await json(await get(app, `/api/merchant/orders?${qs}`));
+      assert.equal(body.success, true, JSON.stringify(body));
+      seen.push(...body.orders.map((o: { id: string }) => o.id));
+      cursor = body.next_cursor;
+    }
+    return seen;
+  };
+
+  assert.deepEqual(await walk(''), ['ORD-M1', 'ORD-M3', 'ORD-M2', 'ORD-M4', 'ORD-M5'], 'newest first, ties by id, nothing twice');
+  assert.deepEqual(await walk('pending'), ['ORD-M1', 'ORD-M2', 'ORD-M4', 'ORD-M5'], 'the filter holds on every page');
 });

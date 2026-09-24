@@ -264,8 +264,19 @@ export const printApi = {
       `${BASE}/requests/${requestId}/files/${fileId}/viewer-token`
     ),
 
+  /**
+   * Copy a request and PUBLISH the copy (it goes through matching). When the
+   * publish step fails the copy is kept as a draft and `published` says so —
+   * the caller must tell the customer rather than assume it went live.
+   */
   repeat: (requestId: string) =>
-    api.post<{ request_id: string; files: number }>(`${BASE}/requests/${requestId}/repeat`),
+    api.post<{
+      request_id: string;
+      files: number;
+      published: boolean;
+      publish_error?: string;
+      matching?: { considered: number; eligible: number; notified: number };
+    }>(`${BASE}/requests/${requestId}/repeat`),
 };
 
 /**

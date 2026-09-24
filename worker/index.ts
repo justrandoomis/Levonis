@@ -4,7 +4,7 @@ import type { AppContext, Env } from './lib/types';
 import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
 import { loadSessionUser } from './lib/session';
 import { isAnonymousPublicMediaKey } from './lib/mediaStorage';
-import { injectSocialPreview, productSlugFromPath, resolveProductPreview } from './lib/socialPreview';
+import { injectSocialPreview, previewStoreRef, productSlugFromPath, resolveProductPreview } from './lib/socialPreview';
 import { trustedOrigin } from './lib/appOrigin';
 import { runDurableJobs } from './lib/jobs';
 import { authRoutes } from './routes/auth';
@@ -455,8 +455,18 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
   if (!/^text\/html\b/i.test(asset.headers.get('Content-Type') || '')) return asset;
 
   try {
-    const origin = trustedOrigin(c);
-    const product = await resolveProductPreview(c.env.DB, slug, origin);
+    // On a merchant host the card names THAT host and only that store's
+    // products (audit 01 B15): the apex origin produced `https://<apex>/p/…`,
+    // which is not an apex route, and any product slug unfurled on any shop.
+    // `host.host` is the classified, normalised Host — a merchant kind is a
+    // valid slug under the configured root, never a spoofed domain.
+    const host = c.get('host');
+    const onStore = host.kind === 'merchant' && !!host.slug;
+    const origin = onStore ? `https://${host.host}` : trustedOrigin(c);
+    const product = await resolveProductPreview(c.env.DB, slug, origin, {
+      storeSlug: onStore ? host.slug : null,
+      storeRef: previewStoreRef(c.req.path),
+    });
     if (!product) return asset;
 
     const url = new URL(c.req.url);

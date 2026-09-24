@@ -8,10 +8,13 @@
  * (`GET /api/marketplace/print/my-requests`) rather than from widening the
  * board's privacy whitelist — see the comment on that handler.
  *
- * "إعادة الطلب" copies a request into a NEW one. It asks first, because it
- * duplicates files and starts a fresh 30-day clock, and then it takes the
- * person to the copy — a confirmation that vanished into a list would leave
- * them wondering whether anything happened.
+ * "إعادة الطلب" copies a request into a NEW one and PUBLISHES it — the copy
+ * goes through the same matching as a first publish, so the merchants who can
+ * make it are told (audit 03 §10 E: copies used to land on the board unmatched).
+ * It asks first, in a sheet, because it duplicates files, starts a fresh 30-day
+ * clock and notifies merchants; then it takes the person to the copy. If the
+ * publish step failed, the copy is a draft and the person is told so, with the
+ * draft's own Publish button one tap away — never a success that was not one.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -26,6 +29,9 @@ import { ApiError } from '../../lib/api';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
 import { printApi, priceRange, type MyRequestRow, type Confidence } from '../../lib/printApi';
 import { useMoney } from '../../CurrencyContext';
+import { apiRefusal } from '../../lib/refusalStrings';
+import { asLang } from '../orders/format';
+import ConfirmSheet from './ConfirmSheet';
 
 const CONFIDENCE_TEXT: Record<Confidence, [string, string]> = {
   high: ['دقة عالية', 'High confidence'],
@@ -51,6 +57,9 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
   const [rows, setRows] = useState<MyRequestRow[] | null>(null);
   const [repeating, setRepeating] = useState('');
   const [error, setError] = useState('');
+  /** The request the customer asked to repeat — the sheet confirms it. */
+  const [asking, setAsking] = useState<MyRequestRow | null>(null);
+  const [notice, setNotice] = useState('');
 
   const load = useCallback(() => {
     if (!isAuthenticated) {
@@ -66,24 +75,28 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
   useEffect(load, [load]);
 
   async function repeat(row: MyRequestRow) {
-    const ok = window.confirm(
-      loc(
-        `سيتم إنشاء طلب جديد بنفس تفاصيل «${row.title}» وبنسخة من ملفاته. متابعة؟`,
-        `A new request will be created with the same details as "${row.title}" and a copy of its files. Continue?`,
-        `داواکارییەکی نوێ دروست دەکرێت بە هەمان زانیاری «${row.title}». بەردەوام بیت؟`
-      )
-    );
-    if (!ok) return;
     setRepeating(row.id);
     setError('');
+    setNotice('');
     try {
       const d = await printApi.repeat(row.id);
+      setAsking(null);
       load();
+      if (!d.published) {
+        // The copy exists as a draft only — say so before opening it.
+        // OWNER: Sorani to be written by hand.
+        setNotice(
+          loc(
+            'نُسخ الطلب لكنه لم يُنشر بعد — افتحه واضغط «نشر».',
+            'The request was copied but not published yet — open it and press Publish.'
+          )
+        );
+      }
       onOpen(d.request_id);
     } catch (e) {
       setError(
         e instanceof ApiError
-          ? e.message
+          ? apiRefusal(e, asLang(lang), loc('تعذّرت إعادة الطلب', 'Could not repeat the request', 'نەتوانرا دووبارە بکرێتەوە'))
           : loc('تعذّرت إعادة الطلب', 'Could not repeat the request', 'نەتوانرا دووبارە بکرێتەوە')
       );
     } finally {
@@ -114,11 +127,35 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
 
   return (
     <div className="space-y-3" data-my-requests>
-      {error && (
-        <p className="rounded-2xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-[12.5px] text-red-300">
-          {error}
+      {notice && (
+        <p
+          role="status"
+          className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-[12.5px] text-amber-200"
+        >
+          {notice}
         </p>
       )}
+
+      <ConfirmSheet
+        open={!!asking}
+        testId="repeat-request"
+        // OWNER: Sorani to be written by hand.
+        title={loc('إعادة هذا الطلب؟', 'Repeat this request?')}
+        confirmLabel={loc('إعادة الطلب', 'Repeat', 'دووبارە')}
+        // OWNER: Sorani to be written by hand.
+        busyLabel={loc('جارٍ النسخ والنشر…', 'Copying and publishing…')}
+        busy={!!asking && repeating === asking.id}
+        error={error}
+        onConfirm={() => asking && repeat(asking)}
+        onClose={() => setAsking(null)}
+      >
+        {/* OWNER: Sorani to be written by hand. */}
+        {asking &&
+          loc(
+            `سيُنشأ طلب جديد بنفس تفاصيل «${asking.title}» وبنسخة من ملفاته، ويُنشر فورًا ليصل إلى التجار المناسبين بتقدير سعر جديد.`,
+            `A new request will be created with the same details as “${asking.title}” and a copy of its files, and published straight away to the merchants who can make it, with a fresh estimate.`
+          )}
+      </ConfirmSheet>
 
       {rows.map((r) => {
         const st = STATE_TEXT[r.state];
@@ -229,7 +266,11 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
                 <ChevronLeft className="w-3.5 h-3.5 rotate-180 rtl:rotate-0" />
               </button>
               <button
-                onClick={() => repeat(r)}
+                type="button"
+                onClick={() => {
+                  setError('');
+                  setAsking(r);
+                }}
                 disabled={repeating === r.id}
                 data-my-request-repeat={r.id}
                 className="flex-1 min-h-[42px] border-s border-white/[0.07] text-[12.5px] font-semibold text-gold flex items-center justify-center gap-1.5 disabled:opacity-60"

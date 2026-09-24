@@ -290,21 +290,68 @@ function pickText(...candidates: unknown[]): string {
 export async function resolveProductPreview(
   db: D1Database,
   slug: string,
-  origin: string
+  origin: string,
+  /**
+   * WHICH STORE THIS CARD MAY COME FROM (audit 01 B15). On a merchant host the
+   * host's own slug; on `/community/store/<ref>/p/<slug>` the ref (slug, store
+   * id or merchant id — the page accepts all three). With a scope, only that
+   * store's published product is a card: `/p/<any slug>` on ali3d's host used
+   * to unfurl ANY merchant's product, or a catalogue product, under ali3d's
+   * address. A sanctioned store (suspended, or its merchant suspended) gives
+   * no card at all — its page is «المتجر غير متاح حاليًا».
+   */
+  scope: { storeSlug?: string | null; storeRef?: string | null } = {}
 ): Promise<Pick<SocialPreview, 'title' | 'description' | 'image'> | null> {
+  const storeKey = scope.storeSlug || scope.storeRef || '';
+  if (storeKey) {
+    const scoped = await db
+      .prepare(
+        `SELECT p.name, p.name_ar, p.description, p.description_ar, p.images
+           FROM community_products p
+           JOIN merchant_stores s ON s.id = p.store_id
+           JOIN community_merchants m ON m.id = s.merchant_id
+          WHERE p.slug = ?1 AND p.status = 'active' AND p.lifecycle = 'active'
+            AND (s.slug = ?2 OR (?3 = 1 AND (s.id = ?2 OR s.merchant_id = ?2)))
+            AND s.status <> 'suspended' AND m.status <> 'suspended'`
+      )
+      .bind(slug, storeKey, scope.storeSlug ? 0 : 1)
+      .first<PreviewRow>();
+    return scoped ? previewFrom(scoped, null, origin, db) : null;
+  }
+  // `products` has `name`/`name_ar`/`name_ku` and no `_en` columns (0001):
+  // naming `name_en` here made SQLite refuse the whole read, the caller's
+  // catch served the shop's card, and no catalogue product ever unfurled as
+  // itself — invisible to the fake-database tests, caught by a real one
+  // (tests/storeShareCards.test.ts).
   const product = await db
     .prepare(
-      "SELECT id, name, name_ar, name_en, description, description_ar, description_en FROM products WHERE slug = ? AND status = 'active'"
+      "SELECT id, name, name_ar, description, description_ar FROM products WHERE slug = ? AND status = 'active'"
     )
     .bind(slug)
     .first<PreviewRow>();
   const row = product ??
     (await db
-      .prepare("SELECT name, name_ar, description, description_ar, images FROM community_products WHERE slug = ? AND status = 'active'")
+      .prepare(
+        `SELECT p.name, p.name_ar, p.description, p.description_ar, p.images
+           FROM community_products p
+           JOIN community_merchants m ON m.id = p.merchant_id
+           LEFT JOIN merchant_stores s ON s.id = p.store_id
+          WHERE p.slug = ? AND p.status = 'active'
+            AND m.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'`
+      )
       .bind(slug)
       .first<PreviewRow>());
   if (!row) return null;
+  return previewFrom(row, product, origin, db);
+}
 
+/** The card for a row found above: title, trimmed description, lead image. */
+async function previewFrom(
+  row: PreviewRow,
+  product: PreviewRow | null,
+  origin: string,
+  db: D1Database
+): Promise<Pick<SocialPreview, 'title' | 'description' | 'image'> | null> {
   const title = pickText(row.name_ar, row.name, row.name_en);
   if (!title) return null; // nothing to identify it by; keep the shop's card
 
@@ -320,4 +367,20 @@ export async function resolveProductPreview(
     description: shortDescription(pickText(row.description_ar, row.description, row.description_en)),
     image: absoluteImageUrl(image, origin),
   };
+}
+
+/**
+ * The store a `/community/store/<ref>/p/<slug>` path names — its slug, store
+ * id or merchant id — so that card is scoped like the page it links to. Null
+ * for every other product path.
+ */
+export function previewStoreRef(path: string): string | null {
+  const m = /^\/community\/store\/([^/]+)\/p\/[^/]+\/?$/.exec(path);
+  if (!m) return null;
+  try {
+    const ref = decodeURIComponent(m[1]);
+    return ref && ref.length <= 64 ? ref : null;
+  } catch {
+    return null;
+  }
 }

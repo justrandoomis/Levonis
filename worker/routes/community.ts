@@ -1,14 +1,15 @@
 import { Hono } from 'hono';
-import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, notFound, forbidden, str, int, jsonArray } from '../lib/http';
+import { requireAuth, notFound, forbidden, str, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { getTierStatus, benefits, usersWithEntitlement } from '../lib/entitlements';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { communityAdminDoor, communityClosedRefusal, communityGate, communityMayEnter, readCommunityGate } from '../lib/communityGate';
+import { audit } from '../lib/audit';
+import { publishRequest } from './printRequests';
 
 export const communityRoutes = new Hono<AppContext>();
 
@@ -97,8 +98,15 @@ communityRoutes.get('/access', async (c) => {
 communityRoutes.use('*', communityGate());
 
 communityRoutes.get('/products', async (c) => {
+  // Nothing of a SANCTIONED shop — a suspended merchant, or a suspended store —
+  // is served anywhere (owner decision 2026-09-24). The merchant suspension no
+  // longer rewrites the store row, so both are asked here.
   const { results } = await c.env.DB.prepare(
-    "SELECT * FROM community_products WHERE status = 'active' ORDER BY created_at DESC LIMIT 20"
+    `SELECT p.* FROM community_products p
+       JOIN community_merchants m ON m.id = p.merchant_id
+       LEFT JOIN merchant_stores s ON s.id = p.store_id
+      WHERE p.status = 'active' AND m.status <> 'suspended' AND COALESCE(s.status, '') <> 'suspended'
+      ORDER BY p.created_at DESC LIMIT 20`
   ).all();
   return c.json({ success: true, products: results.map(communityProductPublic) });
 });
@@ -119,23 +127,31 @@ communityRoutes.get('/merchants', async (c) => {
     merchants: results.map((m) => ({
       ...merchantPublic(m, proBadges),
       store_slug: m.store_slug ?? null,
-      // A suspended store is not advertised as a destination; the card falls
-      // back to the in-site page. Paused shops keep their address — the page
-      // itself says they are closed.
+      // A suspended store — or a suspended merchant's store — is not
+      // advertised as a destination; the card falls back to the in-site page.
+      // Paused shops keep their address — the page itself says they are closed.
       store_url:
-        m.store_slug && m.store_status !== 'suspended'
+        m.store_slug && m.store_status !== 'suspended' && m.status !== 'suspended'
           ? storeUrl(String(m.store_slug), root, String(m.store_id))
           : null,
     })),
   });
 });
 
+/**
+ * The community page's short list of requests — the SAME rows the board shows
+ * (`GET /api/marketplace/requests`): published, still taking offers, public
+ * and not expired. The coarse `status = 'open'` alone also listed a request
+ * its customer had made PRIVATE, and one whose expiry had passed.
+ */
 communityRoutes.get('/requests', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT cr.*, u.username AS customer_username FROM community_requests cr
        LEFT JOIN users u ON u.id = cr.customer_id
-      WHERE cr.status = 'open' ORDER BY cr.created_at DESC LIMIT 20`
-  ).all<Record<string, unknown>>();
+      WHERE cr.state IN ('open','receiving_offers') AND cr.visibility = 'public'
+        AND (cr.expires_at IS NULL OR cr.expires_at > ?)
+      ORDER BY cr.created_at DESC LIMIT 20`
+  ).bind(new Date().toISOString()).all<Record<string, unknown>>();
   return c.json({
     success: true,
     requests: results.map((r) => ({
@@ -149,40 +165,69 @@ communityRoutes.get('/requests', async (c) => {
   });
 });
 
+/**
+ * A REQUEST FROM THE COMMUNITY PAGE TAKES THE ONE ROAD ONTO THE BOARD
+ * (audit 03 §10 E).
+ *
+ * This used to INSERT with the table's defaults — `open` (0031), public, no
+ * expiry — so the request was live on the board at once: no draft, no
+ * estimate, no matching, no merchant told, and an expiry sweep with nothing to
+ * expire. It is now born a DRAFT exactly as `POST /api/marketplace/requests`
+ * makes one, and made public by `publishRequest` (worker/routes/printRequests.ts),
+ * the only transition to `open`: it starts the expiry clock, prices what it
+ * can and runs the matching. The answer keeps the shape the page that sends
+ * it reads (`{ success, id }`, src/pages/Community.tsx), plus what the publish
+ * decided. A publish that fails leaves an invisible draft in the customer's
+ * own «طلباتي» and answers with the publish's own stable code.
+ */
 communityRoutes.post('/requests', requireAuth, async (c) => {
   await rateLimit(c, 'community-request', 10, 3600);
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
   const title = str(body.title, 'title', { min: 3, max: 150 });
   const description = str(body.description, 'description', { max: 2000, required: false });
-  const id = newId('creq');
+  const id = newId('req');
+  const ts = new Date().toISOString();
   await c.env.DB.prepare(
-    'INSERT INTO community_requests (id, customer_id, title, description) VALUES (?, ?, ?, ?)'
+    `INSERT INTO community_requests (id, customer_id, title, description, status, state, visibility, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'closed', 'draft', 'public', ?, ?)`
   )
-    .bind(id, user.id, title, description)
+    .bind(id, user.id, title, description, ts, ts)
     .run();
-  return c.json({ success: true, id });
+  await audit(c.env.DB, user.id, 'community.request_created', id, { title, state: 'draft', via: 'community' });
+
+  const out = await publishRequest(c.env, user.id, id, {});
+  return c.json({ success: true, id, published: true, completeness: out.completeness, matching: out.matching });
 });
 
-communityRoutes.post('/requests/:id/close', requireAuth, async (c) => {
-  const user = c.get('user')!;
-  const res = await c.env.DB.prepare(
-    "UPDATE community_requests SET status = 'closed' WHERE id = ? AND customer_id = ?"
-  )
-    .bind(c.req.param('id'), user.id)
-    .run();
-  if (res.meta.changes === 0) throw notFound('Request not found');
-  return c.json({ success: true });
-});
+/**
+ * RETIRED onto the request state machine. This set `status = 'closed'` on any
+ * of the customer's requests in any state — a paid `in_progress` one included —
+ * without touching `state`, so the request stayed on the board and its pending
+ * offers were never told. `POST /api/marketplace/requests/:id/cancel` is the
+ * customer's one cancel (a draft or a request still taking offers; a paid one
+ * is `REQUEST_HAS_ORDER`), and a 307 hands it the same request.
+ */
+communityRoutes.post('/requests/:id/close', requireAuth, (c) =>
+  c.redirect(`/api/marketplace/requests/${encodeURIComponent(c.req.param('id') ?? '')}/cancel`, 307)
+);
 
 // Merchant storefront ---------------------------------------------------------
 
 communityRoutes.get('/store/:id', async (c) => {
   const id = c.req.param('id');
-  const merchant = await c.env.DB.prepare('SELECT * FROM community_merchants WHERE id = ?')
+  const merchant = await c.env.DB.prepare(
+    `SELECT m.*, (SELECT s.status FROM merchant_stores s WHERE s.merchant_id = m.id) AS store_status
+       FROM community_merchants m WHERE m.id = ?`
+  )
     .bind(id)
     .first<Record<string, unknown>>();
   if (!merchant) throw notFound('Store not found');
+  // The in-site profile of a sanctioned shop answers what its storefront does:
+  // «المتجر غير متاح حاليًا», and nothing of the shop (worker/routes/storefront.ts).
+  if (merchant.status === 'suspended' || merchant.store_status === 'suspended') {
+    throw new HttpError(404, 'This store is not available right now', 'STORE_UNAVAILABLE');
+  }
   const [{ results: products }, followers] = await Promise.all([
     c.env.DB.prepare(
       "SELECT * FROM community_products WHERE merchant_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 100"
@@ -249,7 +294,7 @@ communityRoutes.get('/followed', requireAuth, async (c) => {
       ...merchantPublic(m, proBadges),
       store_slug: m.store_slug ?? null,
       store_url:
-        m.store_slug && m.store_status !== 'suspended'
+        m.store_slug && m.store_status !== 'suspended' && m.status !== 'suspended'
           ? storeUrl(String(m.store_slug), root, String(m.store_id))
           : null,
     })),
@@ -333,47 +378,27 @@ communityRoutes.post('/my-store', requireAuth, async (c) => {
   return c.json({ success: true, id });
 });
 
-async function requireOwnMerchant(c: Context<AppContext>) {
-  const user = c.get('user')!;
-  const merchant = await c.env.DB.prepare('SELECT id FROM community_merchants WHERE user_id = ?')
-    .bind(user.id)
-    .first<{ id: string }>();
-  if (!merchant) throw forbidden('Set up your store profile first');
-  return merchant.id;
-}
+/**
+ * RETIRED — the store API is the one door for a merchant's products (audit 01
+ * B10).
+ *
+ * These two wrote products with none of the store rules: no store (the row had
+ * `store_id` NULL), no selling entitlement or suspension check, any image URL
+ * at all (an off-platform tracking pixel on the community pages), and a hard
+ * DELETE that took ordered products out from under their order lines. They
+ * stay reachable while the community is closed, so they were the way around
+ * every rule `/api/merchant/products` enforces.
+ *
+ * A 307 hands the SAME request — method and body — to the store route, so an
+ * old client still works, under the rules: `requireSellingPrivileges`, owned
+ * media only, archive-not-delete for anything ever ordered. The legacy editor
+ * in /edit-profile now sends merchants to /merchant.
+ */
+communityRoutes.post('/my-store/products', requireAuth, (c) => c.redirect('/api/merchant/products', 307));
 
-communityRoutes.post('/my-store/products', requireAuth, async (c) => {
-  await rateLimit(c, 'store-product', 60, 3600);
-  const merchantId = await requireOwnMerchant(c);
-  const body = await c.req.json().catch(() => ({}));
-  const name = str(body.name, 'name', { min: 2, max: 150 });
-  const nameAr = str(body.name_ar, 'name_ar', { max: 150, required: false });
-  const description = str(body.description, 'description', { max: 3000, required: false });
-  const descriptionAr = str(body.description_ar, 'description_ar', { max: 3000, required: false });
-  const price = int(body.price_iqd, 'price_iqd', { min: 0, max: 1_000_000_000 });
-  const original = body.original_price_iqd == null ? null : int(body.original_price_iqd, 'original_price_iqd', { min: 0, max: 1_000_000_000 });
-  const images = jsonArray(body.images, 'images', 12);
-
-  const id = newId('cp');
-  const slugBase = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'item';
-  const slug = `${slugBase}-${id.slice(-6)}`;
-  await c.env.DB.prepare(
-    `INSERT INTO community_products (id, merchant_id, slug, name, name_ar, description, description_ar, images, price_iqd, original_price_iqd)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  )
-    .bind(id, merchantId, slug, name, nameAr, description, descriptionAr, images, price, original)
-    .run();
-  return c.json({ success: true, id, slug });
-});
-
-communityRoutes.delete('/my-store/products/:id', requireAuth, async (c) => {
-  const merchantId = await requireOwnMerchant(c);
-  const res = await c.env.DB.prepare('DELETE FROM community_products WHERE id = ? AND merchant_id = ?')
-    .bind(c.req.param('id'), merchantId)
-    .run();
-  if (res.meta.changes === 0) throw notFound('Product not found');
-  return c.json({ success: true });
-});
+communityRoutes.delete('/my-store/products/:id', requireAuth, (c) =>
+  c.redirect(`/api/merchant/products/${encodeURIComponent(c.req.param('id') ?? '')}`, 307)
+);
 
 // Community profile completeness (used by the /community route guard).
 communityRoutes.get('/profile-status', requireAuth, async (c) => {

@@ -16,13 +16,14 @@
 
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAuth, badRequest, conflict, notFound, str, int } from '../lib/http';
+import { requireAuth, badRequest, conflict, notFound, str, int, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { badgeFor } from '../lib/merchantOps';
 import { requireCommunityOpen } from '../lib/communityGate';
+import { ownedMediaUrls } from '../lib/mediaRefs';
 
 export const communityReviewRoutes = new Hono<AppContext>();
 
@@ -71,6 +72,61 @@ export async function refreshMerchantRating(db: D1Database, merchantId: string):
 }
 
 /**
+ * THE BADGE CATCHES UP WITH COMPLETED WORK (audit 04 #24).
+ *
+ * `refreshMerchantRating` recomputes the badge when a REVIEW moves, and the
+ * admin verify / badge / hide routes call it too — but a badge is also earned
+ * by completed orders, and the places that count a completion (the merchant's
+ * «تم التسليم», the customer's confirmation of a custom order, the
+ * auto-completion sweeps) never asked for it. A merchant who crossed a tier on
+ * an order kept the old badge until the next review arrived, which for most
+ * merchants is weeks.
+ *
+ * So the scheduled job re-derives every badge from the same `badgeFor` the
+ * write paths use — one definition — and writes only the rows that are wrong.
+ * An admin override always wins, exactly as in `refreshMerchantRating`.
+ * Returns how many rows it corrected.
+ */
+export async function refreshStaleMerchantBadges(db: D1Database): Promise<number> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, completed_orders, rating_avg_x100, rating_count, verified, badge, badge_override
+         FROM community_merchants`
+    )
+    .all<{
+      id: string;
+      completed_orders: number;
+      rating_avg_x100: number;
+      rating_count: number;
+      verified: number;
+      badge: string;
+      badge_override: string;
+    }>();
+  const stale = results
+    .map((m) => ({
+      id: m.id,
+      want: m.badge_override
+        ? m.badge_override
+        : badgeFor({
+            completed_orders: Number(m.completed_orders ?? 0),
+            rating_avg_x100: Number(m.rating_avg_x100 ?? 0),
+            rating_count: Number(m.rating_count ?? 0),
+            verified: Number(m.verified ?? 0),
+          }),
+      have: m.badge,
+    }))
+    .filter((m) => m.want !== m.have);
+  for (let i = 0; i < stale.length; i += 50) {
+    await db.batch(
+      stale.slice(i, i + 50).map((m) =>
+        db.prepare('UPDATE community_merchants SET badge = ? WHERE id = ?').bind(m.want, m.id)
+      )
+    );
+  }
+  return stale.length;
+}
+
+/**
  * What this customer may review right now.
  *
  * Returned as a list so the UI can offer "review your order from Ali 3D"
@@ -83,7 +139,8 @@ communityReviewRoutes.get('/eligible', requireAuth, async (c) => {
     `SELECT o.id AS order_id, NULL AS community_order_id, o.merchant_id, o.store_id,
             m.name AS merchant_name, o.created_at
        FROM orders o JOIN community_merchants m ON m.id = o.merchant_id
-      WHERE o.user_id = ? AND o.merchant_id IS NOT NULL AND o.status = 'delivered'
+      WHERE o.user_id = ?1 AND o.merchant_id IS NOT NULL AND o.status = 'delivered'
+        AND m.user_id <> ?1
         AND NOT EXISTS (SELECT 1 FROM merchant_reviews r WHERE r.order_id = o.id)
       ORDER BY o.created_at DESC LIMIT 20`
   ).bind(user.id).all();
@@ -92,7 +149,8 @@ communityReviewRoutes.get('/eligible', requireAuth, async (c) => {
     `SELECT NULL AS order_id, o.id AS community_order_id, o.merchant_id, o.store_id,
             m.name AS merchant_name, o.completed_at AS created_at
        FROM community_orders o JOIN community_merchants m ON m.id = o.merchant_id
-      WHERE o.customer_id = ? AND o.state = 'completed'
+      WHERE o.customer_id = ?1 AND o.state = 'completed'
+        AND m.user_id <> ?1
         AND NOT EXISTS (SELECT 1 FROM merchant_reviews r WHERE r.community_order_id = o.id)
       ORDER BY o.completed_at DESC LIMIT 20`
   ).bind(user.id).all();
@@ -144,6 +202,37 @@ communityReviewRoutes.post('/', requireAuth, async (c) => {
     storeId = o.store_id;
   }
 
+  /*
+   * NOBODY REVIEWS THEIR OWN SHOP (audit 04 B11, audit 02 B17).
+   *
+   * The eligibility query proves the reviewer owns the ORDER; it never asked
+   * whether the reviewer also owns the STORE. An owner who bought from their
+   * own shop (or took a request through their own merchant account) could rate
+   * themselves five stars and collect +10 reputation, and the badge and the
+   * request matcher both read those numbers. Asked of the merchant row AND the
+   * store row, so neither ownership record alone can be the way around it.
+   */
+  const owner = await c.env.DB.prepare(
+    `SELECT m.user_id AS merchant_user,
+            (SELECT s.user_id FROM merchant_stores s WHERE s.merchant_id = m.id) AS store_user
+       FROM community_merchants m WHERE m.id = ?`
+  ).bind(merchantId).first<{ merchant_user: string; store_user: string | null }>();
+  if (owner && (owner.merchant_user === user.id || owner.store_user === user.id)) {
+    throw new HttpError(403, 'You cannot review your own store', 'SELF_REVIEW');
+  }
+
+  /*
+   * PICTURES ARE THE REVIEWER'S OWN UPLOADS, OR NOTHING (audit 04 #17).
+   *
+   * `images` took any six strings of any length: a 200 KB blob, an external
+   * tracking pixel, a `javascript:` URL — stored, and served to every visitor
+   * the day a renderer ships. The same rule every merchant picture follows
+   * (worker/lib/mediaRefs.ts): an object this platform issued to THIS account,
+   * as its `/files/…` path; anything else is dropped, silently, like a stale
+   * gallery entry.
+   */
+  const images = ownedMediaUrls(body.images, user.id, 6);
+
   const id = newId('rev');
   const ts = nowIso();
   try {
@@ -155,7 +244,7 @@ communityReviewRoutes.post('/', requireAuth, async (c) => {
       id, merchantId, storeId, user.id,
       orderId || null, communityOrderId || null,
       rating, text,
-      JSON.stringify(Array.isArray(body.images) ? body.images.filter((x: unknown) => typeof x === 'string').slice(0, 6) : []),
+      JSON.stringify(images),
       ts, ts
     ).run();
   } catch {
@@ -218,17 +307,47 @@ communityReviewRoutes.patch('/:id', requireAuth, async (c) => {
   const text = str(body.body, 'body', { min: 0, max: 3000, required: false });
 
   const existing = await c.env.DB.prepare(
-    'SELECT merchant_id, created_at FROM merchant_reviews WHERE id = ? AND customer_id = ?'
-  ).bind(id, user.id).first<{ merchant_id: string; created_at: string }>();
+    `SELECT merchant_id, rating, order_id, community_order_id, created_at
+       FROM merchant_reviews WHERE id = ? AND customer_id = ?`
+  ).bind(id, user.id).first<{
+    merchant_id: string;
+    rating: number;
+    order_id: string | null;
+    community_order_id: string | null;
+    created_at: string;
+  }>();
   if (!existing) throw notFound('Review not found');
   if (Date.now() - new Date(existing.created_at).getTime() > EDIT_WINDOW_MS) {
     throw conflict('Reviews can only be edited within 24 hours');
   }
 
-  await c.env.DB.prepare(
+  // Conditional on the rating this request READ, so two edits racing each
+  // other cannot both post a correction against the same starting point.
+  const res = await c.env.DB.prepare(
     `UPDATE merchant_reviews SET rating = ?, body = ?, edited_count = edited_count + 1, updated_at = ?
-      WHERE id = ? AND customer_id = ?`
-  ).bind(rating, text, nowIso(), id, user.id).run();
+      WHERE id = ? AND customer_id = ? AND rating = ?`
+  ).bind(rating, text, nowIso(), id, user.id, existing.rating).run();
+  if (!res.meta.changes) throw conflict('That review changed while you were editing it — reload it and try again');
+
+  /*
+   * THE REPUTATION FOLLOWS THE STARS (audit 04 #16).
+   *
+   * A review's points (`(rating − 3) × 5`) were written once, at creation, so
+   * a 5★ edited down to 1★ kept its +10 for ever. The log is append-only
+   * (§41), so the correction is a NEW event carrying the difference — the
+   * original row and this one together say exactly what happened.
+   */
+  const delta = (rating - 3) * 5 - (Number(existing.rating) - 3) * 5;
+  if (delta !== 0) {
+    await c.env.DB.prepare(
+      `INSERT INTO merchant_reputation_events (id, merchant_id, kind, points, review_id, order_id, community_order_id, note)
+       VALUES (?,?,'review_edited',?,?,?,?,?)`
+    ).bind(
+      newId('rep'), existing.merchant_id, delta, id,
+      existing.order_id, existing.community_order_id,
+      `${existing.rating}★ → ${rating}★`
+    ).run();
+  }
 
   await refreshMerchantRating(c.env.DB, existing.merchant_id);
   return c.json({ success: true });

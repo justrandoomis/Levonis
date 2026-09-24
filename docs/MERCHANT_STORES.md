@@ -41,21 +41,22 @@ A brand-new PLUS member can sell. Only an admin can verify.
 `/api/merchant/me` says and never inspects a tier string
 (`tests/storefrontIsolation.test.ts` asserts this).
 
-| Benefit | PLUS | PRO | PRIME |
+| Benefit | PLUS | PREMIUM (`prime`) | PRO |
 |---|---|---|---|
-| `merchantStore` | ✅ | ✅ | ❌ |
-| `merchantProducts` | ✅ | ✅ | ❌ |
-| `merchantOrders` | ✅ | ✅ | ❌ |
-| `communityOffers` | ✅ | ✅ | ❌ |
-| `merchantAnalytics` | ✅ | ✅ | ❌ |
-| `merchantSubdomain` | ✅ | ✅ | ❌ |
+| `merchantStore` | ✅ | ✅ | ✅ |
+| `merchantProducts` | ✅ | ✅ | ✅ |
+| `merchantOrders` | ✅ | ✅ | ✅ |
+| `communityOffers` | ✅ | ✅ | ✅ |
+| `merchantAnalytics` | ✅ | ✅ | ✅ |
+| `merchantSubdomain` | ✅ | ✅ | ✅ |
 
-**PRO inherits every PLUS merchant benefit** — a PRO member is a more
-privileged merchant, not a lesser one.
-
-**PRIME inherits none.** It was sold as a delivery and priority tier for
-buyers; granting it selling rights would let someone open a shop on a plan that
-was never sold as one.
+**Every higher tier inherits every PLUS merchant benefit.** A benefit is
+introduced once, at the lowest tier that owns it (`ENTITLEMENT_MINIMUM_TIER`),
+and `TIER_INHERITANCE` hands it up the ladder: PLUS → PREMIUM → PRO. A PREMIUM
+or PRO member is a more privileged merchant, never a lesser one — **PREMIUM may
+open a store.** (PREMIUM is stored as `prime`, the tier's historical id; every
+customer-facing surface says PREMIUM.) An earlier version of this table said
+PRIME inherited none; the code never worked that way (audit 01 B20).
 
 They are separate names rather than one flag because `gated_benefits` works per
 name: an admin must be able to suspend exactly one capability — publishing
@@ -76,7 +77,20 @@ any `/api/merchant/*` path or body for anyone to swap.
 ### `requireSellingPrivileges` — *may you take on new commitments?*
 
 The same store, plus: merchant not suspended, store not suspended or paused,
-and `merchantStore` currently granted.
+and `merchantStore` currently granted. Each refusal is `403` with its own code —
+`MERCHANT_SUSPENDED`, `STORE_SUSPENDED`, `STORE_PAUSED`, `SUBSCRIPTION_INACTIVE`
+— so the screen can say which of them applies.
+
+### `requireOfferPrivileges` — *may you make a new promise on a request?*
+
+`requireSellingPrivileges` plus a merchant in good standing. Anything but
+exactly `active` — a `restricted` merchant, or a status nobody has taught the
+gate — is `403 MERCHANT_RESTRICTED`. It guards making an offer, editing one (an
+edit re-prices and re-confirms) and re-confirming a stale one; withdrawing stays
+on `requireSellingPrivileges`, because taking a promise back is never refused.
+The buy path asks the same of a store's owner (`storeTakesOrders`), and accepting
+a standing offer from a merchant sanctioned since it was made is
+`409 MERCHANT_UNAVAILABLE` (audit 03 V, audit 04 #23).
 
 **Collapsing these is how an expired subscription ends up hiding a merchant's
 own unpaid invoices.** When PLUS lapses:
@@ -97,20 +111,60 @@ Nothing is deleted, ever. Renewal restores selling immediately (§48).
 
 ```
 merchant.status : active | restricted | suspended     (admin)
-store.status    : active | paused | suspended         (paused = merchant's own)
+store.status    : active | paused | suspended         (paused = merchant's own; suspended = admin)
 ```
+
+**Two sanctions, two rows** (audit 04 B2, audit 01 B8). The merchant route
+(`POST /api/admin/community/merchants/:id/status`) writes only
+`community_merchants`; the store route (`POST /stores/:id/status`) writes only
+`merchant_stores`. Neither overwrites the other, so restricting or restoring a
+merchant never re-opens a store its merchant paused or an admin suspended.
+Migration 0118 handed back the stores the old cascade had suspended *along with*
+their merchant — with no store decision of their own on the audit record — as
+`paused`: closed, and re-openable by the merchant alone once restored.
+
+| | Storefront | New store orders | New offers | Work already owed |
+|---|---|---|---|---|
+| store `paused` (the merchant's switch) | renders, says it is closed | ✗ | ✗ `STORE_PAUSED` | ✓ |
+| merchant `restricted` | live and editable | ✗ | ✗ `MERCHANT_RESTRICTED` | ✓ |
+| store `suspended` | «المتجر غير متاح حاليًا» only | ✗ | ✗ `STORE_SUSPENDED` | ✓ |
+| merchant `suspended` | «المتجر غير متاح حاليًا» only | ✗ | ✗ `MERCHANT_SUSPENDED` | ✓ |
+
+**A suspended store shows only «المتجر غير متاح حاليًا»** (owner decision,
+2026-09-24). Its own suspension or its owner's — `storeIsSuspended`,
+worker/lib/merchantAuth.ts — and every `/api/storefront/*` read answers
+`404 STORE_UNAVAILABLE` with no merchant-controlled field: no products, banner,
+bio or reviews, not even the name, which may be the very thing it was suspended
+for. `/resolve` says the same on the store's own host, the web manifest falls
+back to the platform's identity, and the share card, the sitemap entry and the
+community listings drop it. A `paused` store is not a sanction: it renders and
+says it is closed. Existing customers keep their orders and chats either way.
+
+A suspended store still **saves its settings** — everything but `open`, which
+answers `STORE_SUSPENDED` (or `MERCHANT_SUSPENDED` / `SUBSCRIPTION_INACTIVE`)
+while the rest of the form lands (audit 01 B4).
 
 A merchant can pause and re-open their own shop. **A merchant can never lift an
 admin suspension** — that state is not reachable from the settings endpoint at
 all, and the UI shows the reason instead of a disabled control.
 
-A suspended or paused store still **resolves**: its page renders and explains
-itself, and its existing customers keep their orders and chats. It simply
-cannot take new ones.
+A visitor is told a shop is closed or unavailable, never *why*. Whether the
+merchant paused it, an admin suspended it, or their subscription lapsed is
+between them and Levonis (§51).
 
-A visitor is told a shop is closed, never *why*. Whether the merchant paused
-it, an admin suspended it, or their subscription lapsed is between them and
-Levonis (§51).
+### Addresses
+
+A renamed store's old slug is parked for 180 days (`SLUG_RESERVATION_DAYS`) and
+**keeps pointing at the shop** until another store claims it: on the old host
+`/resolve` answers `404 STORE_MOVED` with `details.redirect` and the app
+replaces the address; `/api/storefront/<old slug>` serves the store. A live slug
+always wins over a parked one (audit 01 B14). Every literal segment of the
+storefront router (`resolve`, `by-id`, `sections`, …) and `p` are reserved
+slugs (worker/lib/hosts.ts, group 7; the router is walked by a test — B23). A
+slug lost to a concurrent onboarding or rename is `409 SLUG_UNAVAILABLE`, a
+double-tapped onboarding `409 STORE_EXISTS` — never a raw 500 (B24). The domain
+under which addresses live comes from the server (`root_domain` on `/me` and on
+every `/resolve` answer), never from a literal in the app (B19).
 
 ---
 
@@ -131,6 +185,28 @@ a product nothing has ever touched, and the UI says which happened.
 
 **Duplicating starts as a draft** — copying a live product straight to the
 storefront publishes an unedited clone to real customers.
+
+**A product Levonis hid stays hidden** (audit 01 B9). The hide is Levonis's own
+state — `admin_hidden_at`, `admin_hidden_reason` (0118) — beside the merchant's
+`lifecycle`, not written over it. The merchant may still edit the product
+(fixing what it was hidden for is the point) but not publish or duplicate it:
+`409 PRODUCT_HIDDEN_BY_ADMIN`, with the reason, and the dashboard shows
+«أخفته Levonis» and why. `status` is computed in the same SQL statement, where
+the hide wins, so no path can surface it. Only
+`POST /api/admin/community/products/:id/hide {hidden:false}` lifts it, and the
+merchant's own lifecycle choice is what returns.
+
+**One door for products.** The legacy `POST /api/community/my-store/products`
+and `DELETE …/:id` wrote store-less rows with any image URL and hard-deleted
+ordered products; they now answer `307` to the store routes above, so an old
+client still works — under these rules (audit 01 B10).
+
+The public storefront shows a product's sales as a rounded-down tier
+(`sales_tier`: «+200»), never the exact `sold_count`; a product view counts one
+visitor per product per day, and never the owner or a crawler (audit 04 #20,
+#21). Lists page by `(created_at, id)` so rows sharing an instant — a CSV
+import — are never skipped, and an import stamps each row its own instant in
+file order (audit 01 B5).
 
 Slugs are namespaced by store (`ali3d-bracket-a1b2c3`), so two merchants can
 both sell a "bracket" without one of them failing to save.
@@ -176,6 +252,17 @@ CHECK (
 An endpoint written next year that skips `cartSeller` entirely still cannot
 write a line that lies about who is selling.
 
+**And one user's cart holds ONE seller** (migration 0114, wave 1). The two
+add doors read the cart, decide, then insert — so two adds from two tabs
+could both pass their read, and the store checkout then billed one store for
+another's goods (audit 02 B8). `BEFORE INSERT` and `BEFORE UPDATE OF user_id,
+seller_type, merchant_id` triggers on `cart_items` now
+`RAISE(ABORT, 'CART_SELLER_CONFLICT')` when another row of the same user
+names another seller; both doors map it to the same `400
+CART_SELLER_CONFLICT` their own check answers. The store checkout refuses a
+cart an older build left mixed (`409 CART_SELLER_CONFLICT`) and deletes only
+the line ids it priced (B21).
+
 ### Line identity: two partial indexes, and why not one key
 
 "The same line twice is one line with a bigger quantity" is enforced by two
@@ -220,12 +307,16 @@ quietly undone.
 
 `400 CART_SELLER_CONFLICT`, with **both shops named** in `details` — "items
 from another store" makes the customer guess which one is in the way. The
-dialogue offers going back to the cart (primary) or clearing it (deliberately
-not the default).
+dialogue offers the owner's two answers (docs/MERCHANT_PLATFORM.md §2):
+«العودة إلى السلة الحالية» (primary) or «إفراغ السلة والتحول للبائع الجديد»
+(deliberately not the default).
 
 Clearing is the **same add re-sent with `replaceCart: true`** — one request, so
 a cart can never be left emptied with nothing added because a second call
-failed. Nothing is ever cleared without that flag.
+failed. Nothing is ever cleared without that flag. The add is **validated
+first** — an add that would be refused (sold out, store closed, an option the
+product does not offer) clears nothing — and the delete and the insert run in
+**one batch** (audit 02 B15).
 
 ---
 
@@ -238,12 +329,43 @@ price, a total or a delivery fee is **ignored** — those fields are not read
 ### Store sales
 
 ```
-customer pays → merchant credited PENDING → delivered → AVAILABLE
+customer pays → merchant credited PENDING → merchant marks delivered
+  → customer confirms receipt, OR 3 days pass with no open complaint → AVAILABLE
 ```
 
-The merchant's share is visible as "coming" without being spendable before the
-customer has the goods (§77). Cancelling **reverses** the row rather than
-deleting it, so the ledger still explains itself.
+The merchant's share — the goods after the coupon, less the commission, **plus
+the merchant's own delivery fee** (audit 02 B4; the commission is on the goods
+only) — is visible as "coming" without being spendable before the customer has
+the goods (§77). **The merchant's own «تم التسليم» releases nothing** (owner
+decision 2026-09-24): it stamps `delivered_at`, writes the stage and the
+customer's tracker history, and starts the clock. The customer's «استلمت
+طلبي» (`POST /api/orders/:id/confirm-receipt`) releases at once; otherwise the
+scheduled sweep (`worker/lib/storeOrderOps.ts`, `releaseDueStoreCredits`)
+releases three days after `delivered_at` — idempotent and audited — unless a
+complaint or support ticket on the order is open, which freezes it. Returns
+of a store order go through support (`STORE_ORDER_RETURN_VIA_SUPPORT`).
+
+Cancelling — by the merchant, by the customer while the order is still
+pending, or by an admin — is **one operation** (`cancelStoreOrder`): the
+conditional status flip, the full wallet refund, stock and `sold_count`
+restored, the coupon use released, and the credit **reversed** rather than
+deleted (a pending credit becomes `reversed`; one already available gets a
+negative `reversal` row), with a history row — once, however many taps race.
+An admin cannot "reopen" a cancelled store order
+(`409 STORE_ORDER_REOPEN_REFUSED`): its money has already gone back.
+
+The quote and the order are **one agreement** (audit 02 B12): the quote
+returns `quote_fingerprint`, and placing the order without the fingerprint of
+what the database prices now is refused `409 QUOTE_CHANGED` with the fresh
+quote. Stock and single-use coupon caps are fences inside the order's batch —
+a unit or a code taken by a concurrent order aborts it (`409 OUT_OF_STOCK`,
+`409 COUPON_EXHAUSTED`) rather than being a silent no-op. A store that is
+paused, suspended, not selling products, or whose owner no longer holds the
+store entitlement (PLUS, PREMIUM or PRO), or whose merchant is suspended or
+restricted, takes no order and no cart add (`STORE_CLOSED`); nobody buys
+from their own store (`OWN_STORE_PURCHASE`). The free-delivery threshold is
+judged on the goods after the coupon; the coupon's own minimum on the goods at
+the store's prices, before it (docs/DECISIONS.md).
 
 Commission is snapshot per order (`commission_percent_x100`,
 `platform_fee_iqd`, `merchant_receivable_iqd`). Changing the rate tomorrow
@@ -257,7 +379,12 @@ retry to double, and a merchant can add up the list in their dashboard and get
 the same number the platform shows.
 
 Paying a merchant writes a **negative** row (`kind = 'payout'`) rather than
-reducing anything.
+reducing anything. That row counts in **available** — `available` is the sum
+of available rows AND payouts, so a payout lowers it — and the insert is
+conditional on `available >= amount`, so the same balance cannot be paid out
+twice (audit 02 B3, 04 B1). Only a replay of the same key, merchant and amount
+answers «already recorded»; any other failure is a failure (B14). **Paid out**
+sums payouts only — never the platform's commission rows (B20).
 
 ---
 
@@ -280,18 +407,57 @@ contain someone they have traded with. There is no user search.
 ## 9. API surface
 
 ### `/api/merchant/*` — the caller's own store
-`GET /me` · `GET /slug-check` · `POST /onboard` · `PATCH /store` ·
-`POST /store/slug` · products CRUD + duplicate · `GET /orders`,
-`GET /orders/:id`, `POST /orders/:id/status` · `GET /analytics` ·
-`GET /payouts` · `GET /reviews`, `POST /reviews/:id/reply` · `GET /followers` ·
-`GET /customers` · `GET|PATCH /notifications` · `GET /subscription`
+- **store:** `GET /me` (with `root_domain`) · `GET /slug-check` · `POST /onboard` ·
+  `PATCH /store` · `POST /store/slug` · `GET /subscription`
+- **products:** `GET /products` (a `<created_at>|<id>` cursor, or `?page=` for the
+  filtered manager) · `POST /products` · `PATCH /products/:id` ·
+  `DELETE /products/:id` (archive when ordered) · `POST /products/:id/duplicate` ·
+  `GET /products/stats` · `GET /products/:id/insights` · `GET /products/export.csv` ·
+  `POST /products/import`
+- **catalogue:** `GET|POST /sections` · `PATCH|DELETE /sections/:id` · the same four
+  for `/services`, `/showcase` and `/coupons`
+- **orders:** `GET /orders` · `GET /orders/:id` · `POST /orders/:id/status` ·
+  `GET /custom-orders/summary`
+- **money and people:** `GET /analytics` (sales only — cancelled orders are
+  counted apart, never as revenue) · `GET /payouts` · `GET /customers` ·
+  `GET /followers` · `GET /reviews` · `POST /reviews/:id/reply`
+- **notifications:** `GET|PATCH /notifications` (`wired` names the switches a
+  sender actually reads; the rest show «قريبًا»)
+- **printers** (worker/routes/merchantPrinters.ts, same prefix): `GET|POST /printers` ·
+  `PUT|DELETE /printers/:id` · `GET|PUT /request-prefs` · `GET /request-matches`
 
 ### `/api/storefront/*` — public
-`GET /resolve` · `GET /:slug` · `GET /:slug/products` ·
-`GET /:slug/products/:productSlug` · `GET /:slug/reviews` · `GET /by-id/:id`
+`GET /resolve` · `GET /:slug` · `GET /:slug/sections` · `GET /:slug/services` ·
+`GET /:slug/showcase` · `GET /:slug/products` · `GET /:slug/products/:productSlug` ·
+`GET /:slug/reviews` · `GET /by-id/:storeId`
+
+Every `/:slug…` read serves the live slug, then a slug the store was renamed
+away from, and never a sanctioned store (`404 STORE_UNAVAILABLE`, §4).
+
+### `/api/admin/community/*` — store moderation (apex only)
+`GET /merchants` (with each store's `store_url`) ·
+`POST /merchants/:id/status` (the merchant row only) ·
+`POST /stores/:id/status` (the store row only) · `POST /merchants/:id/verify|badge` ·
+`GET /merchants/:id/products` · `POST /products/:id/hide {hidden, reason}` ·
+money routes behind the financial scope — see COMMUNITY_V2.md §11
+
+### `/api/community/*` — legacy merchant doors
+`POST /my-store/products` → `307 /api/merchant/products` ·
+`DELETE /my-store/products/:id` → `307 /api/merchant/products/:id` (§5)
+
+### `/api/chats/*` — a store order's thread
+`POST /open {orderId}` adds the customer AND the seller; `GET /:id/messages`
+pages newest-first (`limit`, `before` cursor, `has_more`, `older_cursor`); a
+customer's message notifies the seller (their `new_messages` switch). Staff read
+a store thread — its messages and its files — read-only (`read_only: true`, an
+`admin.chat_read` audit row) and never join it.
 
 ### `/api/store-orders/*` — merchant checkout
-`POST /quote` · `POST /`
+`POST /quote` (returns `quote_fingerprint`) · `POST /` (requires it:
+`409 QUOTE_CHANGED` carries the fresh quote)
+
+### `/api/orders/*` — added for store orders
+`POST /:id/confirm-receipt` — the customer's «استلمت طلبي»
 
 ### `/api/cart/*` — added
 `POST /merchant-items` · `GET /scope` · `GET /merchant`

@@ -113,11 +113,23 @@ export default function MerchantStart() {
       });
       navigate('/merchant', { replace: true, state: { created: res.store?.slug } });
     } catch (e) {
-      setError(
-        e instanceof ApiError
-          ? e.message
-          : loc('تعذّر إنشاء المتجر. حاول مجددًا.', 'Could not create the store. Try again.', 'نەتوانرا فرۆشگاکە دروست بکرێت.')
-      );
+      // The server's refusals are CODES; each becomes this page's own
+      // sentence (never the server's English). A slug lost to a race between
+      // the live check and the insert is a 409 SLUG_UNAVAILABLE, and a second
+      // tap that finds the store already created is STORE_EXISTS.
+      if (e instanceof ApiError && e.code === 'STORE_EXISTS') {
+        navigate('/merchant', { replace: true });
+        return;
+      }
+      if (e instanceof ApiError && e.code === 'SLUG_UNAVAILABLE') {
+        const reason = (e.details?.reason as SlugRejection | undefined) ?? 'taken';
+        setSlugState({ kind: 'bad', reason, slug: slugState.kind === 'ok' ? slugState.slug : slug });
+        setError(slugMessage(reason, loc));
+      } else if (e instanceof ApiError && e.code === 'GOVERNORATE_INVALID') {
+        setError(loc('اختر المحافظة من القائمة.', 'Choose a governorate from the list.')); /* OWNER: Sorani to be written by hand. */
+      } else {
+        setError(loc('تعذّر إنشاء المتجر. حاول مجددًا.', 'Could not create the store. Try again.', 'نەتوانرا فرۆشگاکە دروست بکرێت.'));
+      }
       setSubmitting(false);
     }
   }
@@ -228,7 +240,12 @@ export default function MerchantStart() {
           {slugState.kind === 'ok' && (
             <div className="flex items-center gap-1.5 mt-2 text-emerald-400/90 text-[12px]" dir="ltr">
               <Globe className="w-3.5 h-3.5 shrink-0" />
-              <span className="font-semibold truncate">{slugState.slug}.levonis-iq.com</span>
+              {/* The domain from the SERVER (`/api/merchant/me` root_domain),
+                  never typed into the bundle — a staging deployment previews
+                  its own domain, not production's (audit 01 B19). */}
+              <span className="font-semibold truncate" translate="no">
+                {me?.root_domain ? `${slugState.slug}.${me.root_domain}` : `@${slugState.slug}`}
+              </span>
             </div>
           )}
           {slugState.kind === 'bad' && (

@@ -369,12 +369,29 @@ test('a merchant host installs as the MERCHANT, with the merchant’s own logo',
   assert.equal(m.start_url, '/');
 });
 
-test('a paused or suspended store keeps its own identity', async () => {
+test('a PAUSED store keeps its own identity', async () => {
+  const raw = freshDb();
+  seed(raw, { name: 'متجر علي' });
+  raw.exec(`UPDATE merchant_stores SET status = 'paused' WHERE id = 's1'`);
+  const m = await manifestOf(await fetchManifest(MERCHANT_HOST, envFor(asD1(raw))));
+  assert.equal(m.name, 'متجر علي', 'the merchant closing for the afternoon must not relabel an installed app');
+});
+
+test('an ADMIN-SUSPENDED store — or a store whose merchant is suspended — installs as the platform', async () => {
+  // Owner decision 2026-09-24 (docs/MERCHANT_PLATFORM.md §2): a suspended store
+  // serves nothing of itself, and its name or logo may be what it was
+  // suspended for. The manifest falls back exactly like an unknown host.
   const raw = freshDb();
   seed(raw, { name: 'متجر علي' });
   raw.exec(`UPDATE merchant_stores SET status = 'suspended' WHERE id = 's1'`);
-  const m = await manifestOf(await fetchManifest(MERCHANT_HOST, envFor(asD1(raw))));
-  assert.equal(m.name, 'متجر علي', 'relabelling an installed app over a trading state is not this route’s job');
+  let res = await fetchManifest(MERCHANT_HOST, envFor(asD1(raw)));
+  assert.equal(res.status, 200);
+  assert.equal((await manifestOf(res)).name, PLATFORM_NAME);
+
+  raw.exec(`UPDATE merchant_stores SET status = 'active' WHERE id = 's1'`);
+  raw.exec(`UPDATE community_merchants SET status = 'suspended'`);
+  res = await fetchManifest(MERCHANT_HOST, envFor(asD1(raw)));
+  assert.equal((await manifestOf(res)).name, PLATFORM_NAME);
 });
 
 test('an unknown subdomain falls back to the platform, at 200', async () => {

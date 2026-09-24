@@ -49,6 +49,9 @@ function seedStore(raw: DatabaseSync) {
       VALUES ('dep_buyer','buyer','deposit','USD',${DEP},'approved','seed funding');
     INSERT INTO cart_items (id,user_id,seller_type,merchant_id,store_id,community_product_id,qty)
       VALUES ('ci1','buyer','merchant','m1','s1','cp1',1);
+    -- A store sells only while its owner holds the store entitlement.
+    INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at)
+      VALUES ('mem1','mowner','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
   `);
 }
 
@@ -59,6 +62,12 @@ const buyerApp = (db: D1Database) =>
     a.route('/api/wallet', walletRoutes);
   });
 
+/** Place as the checkout page does: confirm the quote's fingerprint (B12). */
+async function placeStore(app: ReturnType<typeof buyerApp>, body: Record<string, unknown>) {
+  const q = await json(await post(app, '/api/store-orders/quote', {}));
+  return post(app, '/api/store-orders', { quoteFingerprint: q.quote?.quote_fingerprint, ...body });
+}
+
 // ------------------------------------------------------------ store orders
 
 test('a wallet-paid store order debits the buyer exactly once, at placement, inside the order batch', async () => {
@@ -66,7 +75,7 @@ test('a wallet-paid store order debits the buyer exactly once, at placement, ins
   seedStore(raw);
   const app = buyerApp(asD1(raw));
 
-  const placed = await json(await post(app, '/api/store-orders', { idempotencyKey: 'store-key-0001', addressId: 'a1', payWithWallet: true }));
+  const placed = await json(await placeStore(app, { idempotencyKey: 'store-key-0001', addressId: 'a1', payWithWallet: true }));
   assert.equal(placed.success, true, JSON.stringify(placed));
   const orderId = placed.order.id as string;
 
@@ -97,7 +106,7 @@ test('place → cancel returns the balance to EXACTLY the original deposit, neve
   const raw = freshDb();
   seedStore(raw);
   const app = buyerApp(asD1(raw));
-  const placed = await json(await post(app, '/api/store-orders', { idempotencyKey: 'store-key-0002', addressId: 'a1', payWithWallet: true }));
+  const placed = await json(await placeStore(app, { idempotencyKey: 'store-key-0002', addressId: 'a1', payWithWallet: true }));
   const orderId = placed.order.id as string;
   assert.equal(spendable(raw, 'buyer'), DEP - 1000);
 
@@ -121,7 +130,7 @@ test('a failed order batch leaves the hold active and nothing else written; the 
   const app = buyerApp(db);
 
   failing.failWhen = (stmts) => stmts.some((s) => /INSERT INTO orders/i.test(s.sql));
-  const first = await post(app, '/api/store-orders', { idempotencyKey: 'store-key-0003', addressId: 'a1', payWithWallet: true });
+  const first = await placeStore(app, { idempotencyKey: 'store-key-0003', addressId: 'a1', payWithWallet: true });
   assert.equal(first.status, 500);
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM orders'), 0);
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM merchant_payout_ledger'), 0, 'no merchant share without an order');
@@ -130,7 +139,7 @@ test('a failed order batch leaves the hold active and nothing else written; the 
   assert.equal(spendable(raw, 'buyer'), DEP - 1000, 'and still reserves the money');
 
   failing.failWhen = null;
-  const retry = await json(await post(app, '/api/store-orders', { idempotencyKey: 'store-key-0003', addressId: 'a1', payWithWallet: true }));
+  const retry = await json(await placeStore(app, { idempotencyKey: 'store-key-0003', addressId: 'a1', payWithWallet: true }));
   assert.equal(retry.success, true, JSON.stringify(retry));
   assert.equal(holds(raw, 'buyer').length, 1, 'the same hold was reused, not a second one');
   assert.equal(holds(raw, 'buyer')[0].state, 'committed');
@@ -222,7 +231,9 @@ test('releasing an escrow debits the customer once and credits the merchant in t
   assert.equal(debits.length, 1);
   assert.equal(debits[0].amount, 5000);
   assert.equal(spendable(raw, 'cust'), DEP - 5000, 'the customer paid — the balance did not spring back');
-  assert.deepEqual(await merchantBalance(db, 'm1'), { available_iqd: 63_000, pending_iqd: 0, paid_iqd: -7_000 });
+  // `paid` is PAYOUTS only: the platform's 7,000 commission row is not money
+  // paid out to the merchant (audit 02 B20).
+  assert.deepEqual(await merchantBalance(db, 'm1'), { available_iqd: 63_000, pending_iqd: 0, paid_iqd: 0 });
 
   // A second release (any key) pays and debits nothing more.
   const again = await releaseEscrow(db, { escrowId, actorId: 'cust', actorRole: 'customer', idempotencyKey: 'confirm:co1:again' });
@@ -330,7 +341,7 @@ test('reconciliation REPORTS a legacy committed hold without a debit and never r
 
   // A hold settled under the rule is clean, and the admin route exposes the count.
   const app = buyerApp(db);
-  await post(app, '/api/store-orders', { idempotencyKey: 'store-key-0009', addressId: 'a1', payWithWallet: true });
+  await placeStore(app, { idempotencyKey: 'store-key-0009', addressId: 'a1', payWithWallet: true });
   const after = await walletReconciliationReport(db);
   assert.equal(after.committed_holds_without_debit, 1, 'still only the legacy row');
   const adminApp = stubApp(db, { id: 'mowner', role: 'admin', email: 'boss@x.co' }, (a) => a.route('/api/wallet', walletRoutes));

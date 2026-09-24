@@ -31,6 +31,7 @@ import { useLanguage } from '../LanguageContext';
 import { ApiError } from '../lib/api';
 import { merchantApi, iqd, type MerchantMe } from '../lib/merchant';
 import { useCommunityAccess } from './community/access';
+import { useStore } from '../StoreContext';
 import {
   Btn, Card, Empty, Notice, Spinner, Stat, Toggle, useMainSiteHref,
 } from '../components/merchant/dashboard/ui';
@@ -46,8 +47,31 @@ type Tab =
   | 'orders' | 'custom' | 'coupons'
   | 'reviews' | 'customers' | 'money' | 'settings' | 'notifications' | 'printers' | 'costing';
 
+/**
+ * Is this page being shown on the viewer's OWN store host (or on the main
+ * site)? `/admin` on a store's subdomain is that store's dashboard; opened on
+ * somebody else's shop it used to show the VIEWER's own store under the other
+ * shop's address (audit 01 B16). Nothing leaked — every call is scoped to the
+ * session — but a dashboard that is not the host's is the wrong page there.
+ */
+function onOwnHost(
+  own: { id: string; url: string },
+  host: { storeId: string | null; storeHost: boolean }
+): boolean {
+  if (!host.storeHost) return true;
+  if (host.storeId) return host.storeId === own.id;
+  // The host resolved to no servable store (a suspended one): compare the
+  // address the SERVER gave the viewer's own store with the one in the bar.
+  try {
+    return new URL(own.url).host === window.location.host;
+  } catch {
+    return false;
+  }
+}
+
 export default function MerchantDashboardPage() {
   const { loc } = useLanguage();
+  const { store: hostStore, unknownStore: hostUnknown, unavailableStore: hostUnavailable } = useStore();
   const [me, setMe] = useState<MerchantMe | null>(null);
   const [loading, setLoading] = useState(true);
   /**
@@ -100,6 +124,29 @@ export default function MerchantDashboardPage() {
               : loc('اشترك في PLUS', 'Subscribe to PLUS', 'بەشداری PLUS بکە')}
             <ArrowRight className="w-4 h-4 rtl:rotate-180" />
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!onOwnHost(me.store, { storeId: hostStore?.id ?? null, storeHost: !!hostStore || hostUnknown || hostUnavailable })) {
+    const ownAdmin = /^https?:\/\//.test(me.store.url) ? `${me.store.url}/admin` : '/merchant';
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-6" data-not-your-store>
+        <div className="text-center max-w-sm">
+          <Store className="w-10 h-10 text-zinc-600 mx-auto mb-4" aria-hidden="true" />
+          <h1 className="text-white font-bold text-[17px] mb-2 [text-wrap:balance]">
+            {loc('هذه لوحة إدارة متجر آخر', 'This is another store\'s dashboard')}
+            {/* OWNER: Sorani to be written by hand. */}
+          </h1>
+          <p className="text-zinc-500 text-[13px] leading-relaxed">
+            {loc('لوحة متجرك على عنوان متجرك.', 'Your store\'s dashboard is on your store\'s own address.')}
+            {/* OWNER: Sorani to be written by hand. */}
+          </p>
+          <a href={ownAdmin} className="lv-button lv-button-primary mt-6 w-full">
+            {loc('افتح لوحة متجري', 'Open my store dashboard')}
+            {/* OWNER: Sorani to be written by hand. */}
+          </a>
         </div>
       </div>
     );
@@ -194,6 +241,24 @@ export default function MerchantDashboardPage() {
           </div>
         )}
 
+        {/* A RESTRICTION IS NOT A PAUSE (audit 03 V, audit 04 #23). The store
+            stays up and editable, so nothing on this screen is disabled — but
+            it takes no new orders and the merchant makes no offers until
+            Levonis lifts it. Said here, in words, rather than discovered as
+            orders that stopped arriving. Anything but `active` reads this way,
+            like the server's allow-list. */}
+        {canSell && store.merchant.status && store.merchant.status !== 'active' && (
+          <div className="mb-3">
+            <Notice
+              text={loc(
+                'قيّدت Levonis حسابك: متجرك ظاهر ويمكنك تعديله، لكنه لا يستقبل طلبات جديدة ولا يمكنك تقديم عروض حتى يُرفع التقييد. طلباتك الحالية وأرباحك كما هي — تواصل مع الدعم.',
+                'Levonis has restricted your account: your store stays visible and editable, but it takes no new orders and you cannot make offers until the restriction is lifted. Your current orders and earnings are unaffected — contact support.'
+              )}
+            />
+            {/* OWNER: Sorani to be written by hand. */}
+          </div>
+        )}
+
         <div className="flex gap-1.5 overflow-x-auto hide-scrollbar -mx-4 px-4 mb-4 pb-1 items-center">
           {TABS.map((tb) => (
             <span key={tb.id} className="shrink-0 flex items-center gap-1.5">
@@ -275,6 +340,30 @@ function OverviewTab({ canSell, go }: { canSell: boolean; go: (t: Tab) => void }
           value={orders.average_order_iqd === null ? loc('لا بيانات', 'No data', 'داتا نییە') : iqd(orders.average_order_iqd)}
         />
       </div>
+      {/* What the four figures count, said once (audit 04 #12): a cancelled
+          store order is refunded in full, so it is not a sale, an earning or
+          part of the average — and the count of them is shown, not hidden. */}
+      <p className="text-zinc-500 text-[11px] leading-relaxed px-0.5" data-analytics-basis>
+        {loc(
+          'المبيعات والأرباح والمتوسط من الطلبات غير الملغاة فقط.',
+          'Sales, earnings and the average count only orders that were not cancelled.'
+        ) /* OWNER: Sorani to be written by hand. */}
+        {Number(orders.cancelled ?? 0) > 0 && (
+          <>
+            {' '}
+            <span className="tabular-nums">
+              {loc(`(${orders.cancelled} ملغاة لم تُحتسب)`, `(${orders.cancelled} cancelled, not counted)`)}
+            </span>
+          </>
+        )}
+      </p>
+      {Number((data.custom_orders as Record<string, number> | undefined)?.completed ?? 0) > 0 && (
+        <Stat
+          label={loc('طلبات مخصصة مكتملة — صافيها', 'Completed custom orders — your share')}
+          value={`${(data.custom_orders as Record<string, number>).completed} · ${iqd((data.custom_orders as Record<string, number>).receivable_iqd)}`}
+          small
+        />
+      )}
 
       <div className="grid grid-cols-3 gap-2">
         <Stat label={loc('منتجات', 'Products', 'بەرهەم')} value={`${products.active ?? 0}/${products.total ?? 0}`} small />
@@ -496,6 +585,25 @@ function MoneyTab() {
         <Stat label={loc('قيد الانتظار', 'Pending', 'چاوەڕوان')} value={iqd(data.balance.pending_iqd)} small />
         <Stat label={loc('مدفوع', 'Paid out', 'دراوە')} value={iqd(Math.abs(data.balance.paid_iqd))} small />
       </div>
+      {/* What the three figures mean, once (audit 02 B3/B20 and the owner's
+          completion rule): a store sale waits for the customer, a payout
+          leaves «available», and the platform's commission is never money
+          that was paid to the merchant. */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 space-y-1 text-[11px] leading-relaxed text-zinc-500">
+        {/* OWNER: Sorani to be written by hand. */}
+        <p>
+          {loc(
+            'قيد الانتظار: مبيعات تصبح متاحة حين يؤكد الزبون الاستلام، أو تلقائيًا بعد 3 أيام من التسليم ما لم تُفتح شكوى.',
+            'Pending: sales that become available when the customer confirms receipt — or automatically 3 days after delivery unless a complaint is open.'
+          )}
+        </p>
+        <p>
+          {loc(
+            'مدفوع: ما حُوِّل إليك فعلًا، ويُخصم من المتاح. عمولة المنصة لا تدخل فيه.',
+            'Paid out: what was actually transferred to you; it comes off «Available». The platform commission is not part of it.'
+          )}
+        </p>
+      </div>
 
       <Card title={loc('سجل الحركات', 'Ledger', 'تۆمار')}>
         {/* Every row that makes up the balance. The balance is a sum over
@@ -509,8 +617,15 @@ function MoneyTab() {
               <div key={String(e.id)} className="flex items-center justify-between gap-3 text-[12px]">
                 <div className="min-w-0">
                   <p className="text-zinc-300 truncate">{ledgerLabel(String(e.kind), loc)}</p>
-                  <p className="text-zinc-600 text-[10.5px] truncate" dir="ltr">
-                    {String(e.order_id || e.community_order_id || '')}
+                  <p className="text-zinc-600 text-[10.5px] truncate">
+                    {/* Which of the three figures this row sits in — or none. */}
+                    <span data-ledger-state={String(e.state)}>{ledgerStateLabel(String(e.kind), String(e.state), loc)}</span>
+                    {(e.order_id || e.community_order_id) && (
+                      <>
+                        {' · '}
+                        <bdi dir="ltr">{String(e.order_id || e.community_order_id)}</bdi>
+                      </>
+                    )}
                   </p>
                 </div>
                 <span
@@ -535,7 +650,11 @@ function NotificationsTab() {
   const { loc } = useLanguage();
   const [prefs, setPrefs] = useState<Record<string, boolean> | null>(null);
   const [forced, setForced] = useState<string[]>([]);
+  // The switches a sender actually reads (audit 04 #19). Null from a server
+  // that predates the field: every switch is drawn as before.
+  const [wired, setWired] = useState<string[] | null>(null);
   const [saving, setSaving] = useState('');
+  const [failed, setFailed] = useState('');
 
   useEffect(() => {
     merchantApi
@@ -543,6 +662,7 @@ function NotificationsTab() {
       .then((d) => {
         setPrefs(d.preferences);
         setForced(d.forced);
+        setWired(d.wired ?? null);
       })
       .catch(() => setPrefs({}));
   }, []);
@@ -566,32 +686,52 @@ function NotificationsTab() {
       <div className="space-y-2.5">
         {KEYS.map(([k, label]) => {
           const isForced = forced.includes(k);
+          // «قريبًا», not a switch that controls nothing: nothing sends this
+          // notification yet, so the control says so (DECISIONS: no fake UI).
+          const soon = wired !== null && !wired.includes(k);
           return (
-            <div key={k}>
+            <div key={k} data-notification-key={k} data-soon={soon || undefined}>
               <Toggle
                 label={label}
-                on={!!prefs[k]}
-                disabled={isForced || saving === k}
+                on={!soon && !!prefs[k]}
+                disabled={soon || isForced || saving === k}
                 onChange={async (v) => {
+                  const before = !!prefs[k];
                   setSaving(k);
+                  setFailed('');
                   setPrefs({ ...prefs, [k]: v });
                   try {
                     const d = await merchantApi.setNotifications({ [k]: v });
                     setPrefs(d.preferences);
+                  } catch {
+                    // The switch goes back to what is actually stored.
+                    setPrefs((p) => (p ? { ...p, [k]: before } : p));
+                    setFailed(k);
                   } finally {
                     setSaving('');
                   }
                 }}
               />
-              {/* Forced-on, with the reason. Better than a switch that
-                  silently snaps back, and better than hiding it (§61). */}
-              {isForced && (
+              {soon ? (
+                <p className="text-zinc-600 text-[10.5px] mt-0.5">
+                  {loc('قريبًا — هذا الإشعار لم يُطلق بعد.', 'Coming soon — this notification is not live yet.')}
+                  {/* OWNER: Sorani to be written by hand. */}
+                </p>
+              ) : isForced ? (
+                /* Forced-on, with the reason. Better than a switch that
+                   silently snaps back, and better than hiding it (§61). */
                 <p className="text-zinc-600 text-[10.5px] mt-0.5">
                   {loc(
                     'لا يمكن إيقافه — يخص أموالك أو حسابك.',
                     'Cannot be turned off — it concerns your money or your account.',
                     'ناتوانرێت بکوژێنرێتەوە.'
                   )}
+                </p>
+              ) : null}
+              {failed === k && (
+                <p role="alert" className="text-red-300 text-[10.5px] mt-0.5">
+                  {loc('تعذّر الحفظ — حاول مجددًا.', 'Could not save — try again.')}
+                  {/* OWNER: Sorani to be written by hand. */}
                 </p>
               )}
             </div>
@@ -605,6 +745,24 @@ function NotificationsTab() {
 // ------------------------------------------------------------------ bits
 
 type Loc = (ar: string, en: string, ckb?: string) => string;
+
+/**
+ * Where a ledger row counts. `available` is the sum of available rows AND
+ * payouts; `pending` waits for the customer; `paid out` is payouts alone. A
+ * commission row is the platform's share, already taken off the sale credit
+ * beside it, and a reversed credit counts nowhere (worker/lib/escrowOps.ts).
+ */
+function ledgerStateLabel(kind: string, state: string, loc: Loc): string {
+  if (kind === 'payout') return loc('مدفوع', 'Paid out', 'دراوە');
+  // OWNER: Sorani to be written by hand (the new strings below).
+  if (kind === 'commission') return loc('مخصومة من البيع', 'Taken off the sale');
+  if (state === 'pending') return loc('قيد الانتظار', 'Pending', 'چاوەڕوان');
+  if (state === 'available') return loc('متاح', 'Available', 'بەردەست');
+  if (state === 'reversed') return loc('أُلغي — لا يُحتسب', 'Reversed — not counted');
+  if (state === 'reserved') return loc('محجوز', 'Reserved');
+  if (state === 'paid') return loc('مسدَّد', 'Settled');
+  return '';
+}
 
 function ledgerLabel(k: string, loc: Loc): string {
   switch (k) {

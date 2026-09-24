@@ -130,6 +130,18 @@ test('every code the table translates is one the server can actually emit', () =
      * call them dead weight while they are on screen.
      */
     'worker/routes/products.ts',
+    // Custom print requests, their offers and the escrow behind them (merchant
+    // platform wave 1): the board, acceptance, cancellation and the 3D preview
+    // refuse with codes the request screens decode through this table.
+    'worker/routes/marketplace.ts',
+    'worker/routes/printRequests.ts',
+    // The community-store checkout and the merchant's order door (wave 1):
+    // QUOTE_CHANGED, COUPON_EXHAUSTED, ORDER_CHANGED and their siblings.
+    'worker/routes/storeOrders.ts',
+    'worker/routes/merchant.ts',
+    // The merchant selling gate every offer and store write passes through:
+    // one code per sanction, MERCHANT_RESTRICTED among them (wave 1).
+    'worker/lib/merchantAuth.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');
@@ -176,6 +188,15 @@ const DOORS = [
   'src/components/orders/CancelOrderSheet.tsx',
   'src/components/returns/ReturnsSection.tsx',
   'src/components/orders/PriceProtection.tsx',
+  // The community-store doors (merchant platform wave 1): the store cart, its
+  // checkout — where QUOTE_CHANGED and COUPON_EXHAUSTED land — and the
+  // customer's «استلمت طلبي».
+  'src/components/merchant/MerchantCartView.tsx',
+  'src/pages/StoreCheckout.tsx',
+  'src/components/orders/StoreReceipt.tsx',
+  // A store's product page: the add-to-cart door, where OWN_STORE_PURCHASE,
+  // STORE_CLOSED and OUT_OF_STOCK land (the seller conflict opens its dialog).
+  'src/pages/StorefrontProduct.tsx',
 ];
 
 test('every customer door decodes the refusal CODE rather than printing the server sentence', () => {

@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
-import { storeBySlug } from '../lib/merchantAuth';
+import { storeBySlug, storeIsSuspended } from '../lib/merchantAuth';
 import { buildWebManifest } from '../lib/webManifest';
 
 /**
@@ -55,7 +55,9 @@ export async function webManifestRoute(c: Context<AppContext>): Promise<Response
   if (host.kind === 'merchant' && host.slug) {
     try {
       const ctx = await storeBySlug(c.env.DB, host.slug);
-      if (ctx) {
+      // An ADMIN-SUSPENDED store (or a store whose merchant is suspended)
+      // falls back to the platform identity — see the note below.
+      if (ctx && !storeIsSuspended(ctx)) {
         identity = {
           name: String(ctx.store.name ?? ''),
           tagline: String(ctx.store.tagline ?? ''),
@@ -75,14 +77,18 @@ export async function webManifestRoute(c: Context<AppContext>): Promise<Response
   }
 
   /**
-   * A SUSPENDED OR PAUSED STORE STILL GETS ITS OWN NAME.
+   * A PAUSED STORE KEEPS ITS OWN NAME; A SUSPENDED ONE DOES NOT.
    *
-   * `storeIsOpen()` is the predicate for taking new commercial commitments,
-   * and this is not one. The storefront page already renders under the shop's
-   * own brand while it is closed and explains itself there; a manifest that
-   * suddenly said "LEVONIS" would relabel an already-installed app on a
-   * customer's home screen because of an administrative state they cannot see.
-   * Identity follows the row that exists, not its trading status.
+   * `paused` is the merchant closing for the afternoon: the storefront still
+   * renders under the shop's own brand and says it is closed, so relabelling
+   * an installed app over it would be wrong.
+   *
+   * An ADMIN suspension is different by the owner's decision (2026-09-24,
+   * docs/MERCHANT_PLATFORM.md §2): the customer sees only «المتجر غير متاح
+   * حاليًا» and none of the shop's content — and a store name or logo can be
+   * the very thing it was suspended for (an impersonating name, a bad logo).
+   * So a suspended store, or a store whose merchant is suspended, installs as
+   * the platform, exactly like any other host with no servable store behind it.
    */
   const manifest = buildWebManifest(identity);
 

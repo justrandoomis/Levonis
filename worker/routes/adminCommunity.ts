@@ -22,23 +22,28 @@
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, conflict, notFound, str, int, oneOf } from '../lib/http';
+import { requireAdmin, badRequest, conflict, notFound, str, int, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { getSetting } from '../lib/settings';
-import { releaseEscrow, refundEscrow, escrowForOrder, getEscrow, merchantBalance } from '../lib/escrowOps';
+import { releaseEscrow, refundEscrow, escrowForOrder, getEscrow, merchantBalance, merchantAvailableSql } from '../lib/escrowOps';
 import { badgeFor } from '../lib/merchantOps';
 import {
   COMMUNITY_GATE_SETTING_KEY,
   readCommunityGate,
 } from '../lib/communityGate';
 import { canMoveOffer, type OfferState } from '../lib/communityStates';
+import { offerCountStatement, requestMovedFence, revokeViewerTokensStatement } from '../lib/communityRequests';
+import { isConstraintAbort } from '../lib/walletOps';
 import { chunk } from '../lib/inventory';
 import { notifyComplaintReply } from '../lib/engagementNotify';
 import { headMediaObject, isSafeMediaKey } from '../lib/mediaStorage';
 import { maskPhone, normalizePhone } from '../lib/phone';
 import { refreshMerchantRating } from './merchantReviews';
 import { COMPLAINT_AWAITS_DESK_SQL } from './adminChats';
+import { requireFinancialScope } from '../lib/walletAdjust';
+import { canViewFinancials } from '../lib/adminScope';
+import { rootDomainFrom, storeUrl } from '../lib/hosts';
 
 export const adminCommunityRoutes = new Hono<AppContext>();
 adminCommunityRoutes.use('*', requireAdmin);
@@ -47,17 +52,35 @@ const nowIso = () => new Date().toISOString();
 
 // ---------------------------------------------------------------- overview
 
+/**
+ * The marketplace at a glance.
+ *
+ * THE MONEY TILES COUNT MONEY THAT MOVED AND STAYED (audit 04 #22). «عمولة
+ * المنصة» and «إجمالي المبيعات» summed every custom order ever created —
+ * cancelled and refunded ones included, an accepted-but-never-funded one too —
+ * and left out the commission on store sales altogether. Custom work is now
+ * counted from funding onwards and never once cancelled or refunded, and store
+ * sales are their own line (a cancelled store order is refunded in full).
+ *
+ * The platform's COMMISSION is its profit, which §11 reserves for the owner
+ * and the financial role: an assistant-scope admin gets the counts and the
+ * volume, and `fees` as null (the panel hides the tile).
+ */
 adminCommunityRoutes.get('/overview', async (c) => {
-  const [merchants, stores, products, requests, offers, orders, escrows, complaints] = await Promise.all([
+  const financial = canViewFinancials(c.env, c.get('user'));
+  const [merchants, stores, products, requests, offers, orders, escrows, complaints, storeSales] = await Promise.all([
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total,
               SUM(CASE WHEN verified = 1 THEN 1 ELSE 0 END) AS verified,
               SUM(CASE WHEN status = 'suspended' THEN 1 ELSE 0 END) AS suspended
          FROM community_merchants`
     ).first<Record<string, number>>(),
+    // «active» is open for business: the store's own status AND a merchant who
+    // is not suspended — a merchant sanction no longer rewrites the store row.
     c.env.DB.prepare(
-      `SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active
-         FROM merchant_stores`
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN s.status = 'active' AND m.status <> 'suspended' THEN 1 ELSE 0 END) AS active
+         FROM merchant_stores s JOIN community_merchants m ON m.id = s.merchant_id`
     ).first<Record<string, number>>(),
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total, SUM(CASE WHEN lifecycle = 'active' THEN 1 ELSE 0 END) AS active
@@ -70,8 +93,8 @@ adminCommunityRoutes.get('/overview', async (c) => {
     c.env.DB.prepare('SELECT COUNT(*) AS total FROM community_offers').first<{ total: number }>(),
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total,
-              COALESCE(SUM(price_iqd), 0) AS gross,
-              COALESCE(SUM(platform_fee_iqd), 0) AS fees,
+              COALESCE(SUM(CASE WHEN state NOT IN ('accepted','cancelled','refunded') THEN price_iqd ELSE 0 END), 0) AS gross,
+              COALESCE(SUM(CASE WHEN state NOT IN ('accepted','cancelled','refunded') THEN platform_fee_iqd ELSE 0 END), 0) AS fees,
               SUM(CASE WHEN state = 'completed' THEN 1 ELSE 0 END) AS completed
          FROM community_orders`
     ).first<Record<string, number>>(),
@@ -84,16 +107,28 @@ adminCommunityRoutes.get('/overview', async (c) => {
               SUM(CASE WHEN status IN ('submitted','under_review') THEN 1 ELSE 0 END) AS open
          FROM community_complaints`
     ).first<Record<string, number>>(),
+    c.env.DB.prepare(
+      `SELECT COUNT(*) AS total,
+              COALESCE(SUM(total_iqd), 0) AS gross,
+              COALESCE(SUM(platform_fee_iqd), 0) AS fees
+         FROM orders WHERE merchant_id IS NOT NULL AND status <> 'cancelled'`
+    ).first<Record<string, number>>(),
   ]);
 
   return c.json({
     success: true,
+    financial,
     merchants,
     stores,
     products,
     requests,
     offers,
-    orders,
+    orders: { ...orders, fees: financial ? Number(orders?.fees ?? 0) : null },
+    store_sales: {
+      total: Number(storeSales?.total ?? 0),
+      gross: Number(storeSales?.gross ?? 0),
+      fees: financial ? Number(storeSales?.fees ?? 0) : null,
+    },
     escrows: escrows.results,
     complaints,
   });
@@ -123,7 +158,7 @@ adminCommunityRoutes.get('/settings', async (c) => {
  * retroactively recalculating what a merchant was owed for a sale that
  * already happened would be indefensible (§30, §75).
  */
-adminCommunityRoutes.patch('/settings', async (c) => {
+adminCommunityRoutes.patch('/settings', requireFinancialScope, async (c) => {
   const admin = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
   const changed: Record<string, number> = {};
@@ -338,8 +373,17 @@ adminCommunityRoutes.get('/merchants', async (c) => {
        JOIN users u ON u.id = m.user_id
       WHERE (?1 = '' OR ${sqlLikeClause(['m.name', 's.slug'], '?2')})
       ORDER BY m.created_at DESC LIMIT ?3`
-  ).bind(q, likePattern(q), limit).all();
-  return c.json({ success: true, merchants: results });
+  ).bind(q, likePattern(q), limit).all<Record<string, unknown>>();
+  // The store's real address, from configuration — the panel used to print
+  // `<slug>.levonis-iq.com` whatever domain it was running on (audit 04 #25).
+  const root = rootDomainFrom(c.env);
+  return c.json({
+    success: true,
+    merchants: results.map((m) => ({
+      ...m,
+      store_url: m.store_slug ? storeUrl(String(m.store_slug), root, String(m.store_id)) : null,
+    })),
+  });
 });
 
 /** Levonis verification — distinct from PLUS eligibility (§43). */
@@ -362,12 +406,31 @@ adminCommunityRoutes.post('/merchants/:id/verify', async (c) => {
 });
 
 /**
- * Suspend or restore a merchant.
+ * Suspend, restrict or restore a merchant.
  *
  * NOTHING IS DELETED. Products come off the storefront and the store stops
  * taking orders; every order, payout row, review and dispute stays exactly
  * where it is, and both the merchant and their customers keep access to their
  * own history (§46, §47).
+ *
+ * ONE ROW, AND IT IS THE MERCHANT'S (audit 04 B2 / audit 01 B8). This used to
+ * write the STORE too — `suspended` for a suspended merchant and `active` for
+ * anything else — so restricting a merchant lifted a store suspension the
+ * admin had set for a bad banner, and restoring a merchant re-opened a shop
+ * the merchant had paused themselves. The two sanctions are two rows now, and
+ * neither decision writes the other's:
+ *
+ *   - the shop of a suspended merchant is shut by the MERCHANT row — every
+ *     reader asks both (`storeIsOpen`, `storeIsSuspended` in
+ *     worker/lib/merchantAuth.ts; the cart and checkout read `m.status`);
+ *   - lifting the merchant sanction leaves the store exactly as it was: still
+ *     suspended if an admin suspended it, still paused if its merchant paused
+ *     it. Stores the old code had suspended ALONG WITH their merchant were
+ *     handed back to their merchant as `paused` by migration 0118.
+ *
+ * The store's own state comes back in the answer so the panel can say so
+ * («المتجر ما زال موقوفًا») rather than leave the admin believing the restore
+ * re-opened it.
  */
 adminCommunityRoutes.post('/merchants/:id/status', async (c) => {
   const admin = c.get('user')!;
@@ -376,24 +439,20 @@ adminCommunityRoutes.post('/merchants/:id/status', async (c) => {
   const status = oneOf(body.status, 'status', ['active', 'restricted', 'suspended'] as const);
   const reason = str(body.reason, 'reason', { min: 0, max: 500, required: false });
 
-  const m = await c.env.DB.prepare('SELECT id FROM community_merchants WHERE id = ?').bind(id).first();
+  const m = await c.env.DB.prepare('SELECT id, status FROM community_merchants WHERE id = ?')
+    .bind(id)
+    .first<{ id: string; status: string }>();
   if (!m) throw notFound('Merchant not found');
 
-  const ts = nowIso();
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      'UPDATE community_merchants SET status = ?, status_reason = ?, status_changed_at = ? WHERE id = ?'
-    ).bind(status, reason, ts, id),
-    // The storefront follows the merchant, so a suspended merchant's shop is
-    // shut too — and restoring them re-opens it rather than leaving the shop
-    // silently closed with no way for them to notice.
-    c.env.DB.prepare(
-      `UPDATE merchant_stores SET status = ?, status_reason = ?, updated_at = ? WHERE merchant_id = ?`
-    ).bind(status === 'suspended' ? 'suspended' : 'active', reason, ts, id),
-  ]);
+  await c.env.DB.prepare(
+    'UPDATE community_merchants SET status = ?, status_reason = ?, status_changed_at = ? WHERE id = ?'
+  ).bind(status, reason, nowIso(), id).run();
 
-  await audit(c.env.DB, admin.id, 'admin.merchant_status', id, { status, reason });
-  return c.json({ success: true, status });
+  await audit(c.env.DB, admin.id, 'admin.merchant_status', id, { status, reason, from: m.status });
+  const store = await c.env.DB.prepare('SELECT status FROM merchant_stores WHERE merchant_id = ?')
+    .bind(id)
+    .first<{ status: string }>();
+  return c.json({ success: true, status, store_status: store?.status ?? null });
 });
 
 /** Pin or clear a badge. A merchant can never set their own (§42). */
@@ -459,15 +518,84 @@ adminCommunityRoutes.post('/stores/:id/status', async (c) => {
 
 // -------------------------------------------------------------- moderation
 
+/**
+ * A merchant's products as moderation sees them — every lifecycle, with the
+ * admin hide beside the merchant's own state, so the panel can offer «إخفاء»
+ * and «إظهار» on the product in question (the hide had no control at all).
+ */
+adminCommunityRoutes.get('/merchants/:id/products', async (c) => {
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, slug, name, name_ar, price_iqd, images, lifecycle, status,
+            admin_hidden_at, admin_hidden_reason, created_at, updated_at
+       FROM community_products WHERE merchant_id = ?
+      ORDER BY created_at DESC, id DESC LIMIT 200`
+  ).bind(id).all<Record<string, unknown>>();
+  return c.json({
+    success: true,
+    products: results.map((p) => ({
+      id: p.id,
+      slug: p.slug,
+      name: p.name,
+      name_ar: p.name_ar,
+      price_iqd: p.price_iqd,
+      image: (() => {
+        try {
+          const list = JSON.parse(String(p.images ?? '[]'));
+          return Array.isArray(list) && typeof list[0] === 'string' ? list[0] : null;
+        } catch {
+          return null;
+        }
+      })(),
+      lifecycle: p.lifecycle,
+      live: p.status === 'active',
+      admin_hidden: !!p.admin_hidden_at,
+      admin_hidden_at: p.admin_hidden_at ?? null,
+      admin_hidden_reason: p.admin_hidden_reason ?? '',
+    })),
+  });
+});
+
+/**
+ * Hide a product — or lift the hide — as LEVONIS, not as its merchant.
+ *
+ * STICKY (audit 01 B9). The hide used to write `lifecycle`/`status`, the same
+ * two columns the merchant's editor writes, so one «نشر» from the merchant put
+ * the product straight back on the storefront. The decision now lives in its
+ * own column (`admin_hidden_at`, migration 0118): the merchant route refuses
+ * to publish while it is set and computes `status` as 'hidden' in SQL whatever
+ * the merchant sends (worker/routes/merchant.ts). `lifecycle` is left as the
+ * merchant chose it, so lifting the hide puts back exactly what they had.
+ *
+ * A REASON IS REQUIRED to hide: it is what the merchant is shown, and a hide
+ * nobody can explain is one the merchant can only guess at.
+ */
 adminCommunityRoutes.post('/products/:id/hide', async (c) => {
   const admin = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
-  const res = await c.env.DB.prepare(
-    `UPDATE community_products SET lifecycle = 'hidden', status = 'hidden', updated_at = ? WHERE id = ?`
-  ).bind(nowIso(), id).run();
+  const body = await c.req.json().catch(() => ({}));
+  const hidden = body.hidden !== false;
+  const reason = hidden
+    ? str(body.reason, 'reason', { min: 3, max: 300 })
+    : '';
+  const ts = nowIso();
+
+  const res = hidden
+    ? await c.env.DB.prepare(
+        `UPDATE community_products
+            SET admin_hidden_at = ?, admin_hidden_reason = ?, status = 'hidden', updated_at = ?
+          WHERE id = ?`
+      ).bind(ts, reason, ts, id).run()
+    : await c.env.DB.prepare(
+        `UPDATE community_products
+            SET admin_hidden_at = NULL, admin_hidden_reason = '',
+                status = CASE WHEN lifecycle = 'active' THEN 'active' ELSE 'hidden' END,
+                updated_at = ?
+          WHERE id = ?`
+      ).bind(ts, id).run();
   if (!res.meta.changes) throw notFound('Product not found');
-  await audit(c.env.DB, admin.id, 'admin.product_hidden', id, {});
-  return c.json({ success: true });
+  await audit(c.env.DB, admin.id, hidden ? 'admin.product_hidden' : 'admin.product_unhidden', id, { reason });
+  return c.json({ success: true, hidden });
 });
 
 adminCommunityRoutes.post('/reviews/:id/hide', async (c) => {
@@ -488,18 +616,67 @@ adminCommunityRoutes.post('/reviews/:id/hide', async (c) => {
   return c.json({ success: true, hidden });
 });
 
+/**
+ * Take a request off the board — moderation, not settlement.
+ *
+ * NOT WHILE MONEY IS IN IT (audit 04 B4, audit 03 §10 S). The guard used to
+ * list only `completed`, `in_progress` and `delivered`, so a DISPUTED request —
+ * or one whose acceptance was mid-flight — could be "removed": the request
+ * read `cancelled` while its order stayed `disputed` and the customer's money
+ * stayed frozen in escrow with nothing pointing at it. A request with a live
+ * order or a held/disputed escrow is refused with `REQUEST_HAS_ESCROW`: decide
+ * the dispute (or cancel the order) first, and the request closes with it.
+ * Removal also rejects the pending offers, zeroes the count and kills every
+ * preview link, in the same batch; removing an already-cancelled request is a
+ * no-op, not an error.
+ */
+const ADMIN_REMOVABLE_STATES = ['draft', 'open', 'receiving_offers', 'offer_selected', 'expired'];
+const LIVE_ORDER_OR_ESCROW = `EXISTS (SELECT 1 FROM community_orders o
+                                LEFT JOIN community_escrows e ON e.community_order_id = o.id
+                               WHERE o.request_id = ?1
+                                 AND (o.state IN ('accepted','funded','in_progress','merchant_marked_delivered','disputed')
+                                      OR e.state IN ('held','disputed')))`;
+
 adminCommunityRoutes.post('/requests/:id/remove', async (c) => {
   const admin = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const reason = str((await c.req.json().catch(() => ({}))).reason, 'reason', { min: 0, max: 300, required: false });
-  const res = await c.env.DB.prepare(
-    `UPDATE community_requests SET state = 'cancelled', status = 'closed', updated_at = ?
-      WHERE id = ? AND state NOT IN ('completed','in_progress','delivered')`
-  ).bind(nowIso(), id).run();
-  if (!res.meta.changes) {
-    throw conflict('That request is already settled or has work under way — resolve it as a dispute instead');
+
+  const r = await c.env.DB.prepare('SELECT state FROM community_requests WHERE id = ?').bind(id).first<{ state: string }>();
+  if (!r) throw notFound('Request not found');
+  if (r.state === 'cancelled') return c.json({ success: true, replayed: true });
+  if (await c.env.DB.prepare(`SELECT ${LIVE_ORDER_OR_ESCROW} AS live`).bind(id).first<{ live: number }>().then((x) => !!x?.live)) {
+    throw conflict(
+      'This request has an order or money in escrow — resolve the dispute or cancel the order first',
+      'REQUEST_HAS_ESCROW'
+    );
   }
-  await audit(c.env.DB, admin.id, 'admin.request_removed', id, { reason });
+  if (!ADMIN_REMOVABLE_STATES.includes(r.state)) {
+    throw conflict('That request is already settled or has work under way — resolve it as a dispute instead', 'REQUEST_NOT_REMOVABLE');
+  }
+
+  const ts = nowIso();
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        // The same list as the check above, bound as ONE JSON value — no
+        // list templated into the SQL (tests/d1ParameterCeilings.test.ts).
+        `UPDATE community_requests SET state = 'cancelled', status = 'closed', updated_at = ?2
+          WHERE id = ?1 AND state IN (SELECT value FROM json_each(?3))
+            AND NOT ${LIVE_ORDER_OR_ESCROW}`
+      ).bind(id, ts, JSON.stringify(ADMIN_REMOVABLE_STATES)),
+      requestMovedFence(c.env.DB, id, 'cancelled', ts),
+      c.env.DB.prepare(
+        `UPDATE community_offers SET state = 'rejected', updated_at = ? WHERE request_id = ? AND state = 'pending'`
+      ).bind(ts, id),
+      offerCountStatement(c.env.DB, id),
+      revokeViewerTokensStatement(c.env.DB, id, ts),
+    ]);
+  } catch (e) {
+    if (!isConstraintAbort(e)) throw e;
+    throw conflict('That request changed while you were deciding — reload it', 'REQUEST_CHANGED');
+  }
+  await audit(c.env.DB, admin.id, 'admin.request_removed', id, { reason, from: r.state });
   return c.json({ success: true });
 });
 
@@ -994,7 +1171,7 @@ adminCommunityRoutes.post('/complaints/:id/messages', async (c) => {
  * The idempotency key is derived from the escrow and the decision, so a
  * double-submitted resolution settles once.
  */
-adminCommunityRoutes.post('/escrows/:id/resolve', async (c) => {
+adminCommunityRoutes.post('/escrows/:id/resolve', requireFinancialScope, async (c) => {
   const admin = c.get('user')!;
   const escrowId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const body = await c.req.json().catch(() => ({}));
@@ -1003,8 +1180,34 @@ adminCommunityRoutes.post('/escrows/:id/resolve', async (c) => {
 
   const esc = await getEscrow(c.env.DB, escrowId);
   if (!esc) throw notFound('Escrow not found');
+  const order = await c.env.DB.prepare('SELECT request_id, state FROM community_orders WHERE id = ?')
+    .bind(esc.community_order_id)
+    .first<{ request_id: string; state: string }>();
 
   const key = `admin:${decision}:${escrowId}`;
+  /**
+   * ONLY A DISPUTE IS DECIDED HERE — unless this exact decision is already on
+   * the record, in which case it is replayed (below) rather than refused. Any
+   * `held` escrow used to be settleable, so an admin could pay a merchant for
+   * work the customer never confirmed and nobody disputed (audit 03 §10 C).
+   * An escrow a dispute left `held` while its order reads `disputed` (the old
+   * dispute route flipped the two separately) still counts as disputed.
+   */
+  const recorded = await c.env.DB.prepare('SELECT 1 AS x FROM community_escrow_events WHERE idempotency_key = ?')
+    .bind(key)
+    .first();
+  if (!recorded) {
+    const disputed = esc.state === 'disputed' || (esc.state === 'held' && order?.state === 'disputed');
+    if (!disputed) {
+      throw conflict(
+        esc.state === 'held'
+          ? 'This escrow is not in dispute — it settles by the customer\'s confirmation'
+          : 'This escrow is already settled',
+        esc.state === 'held' ? 'ESCROW_NOT_DISPUTED' : 'ESCROW_SETTLED'
+      );
+    }
+  }
+
   let result;
   if (decision === 'release') {
     result = await releaseEscrow(c.env.DB, {
@@ -1018,40 +1221,68 @@ adminCommunityRoutes.post('/escrows/:id/resolve', async (c) => {
       escrowId, actorId: admin.id, actorRole: 'admin', reason, amountIqd: amount, idempotencyKey: key,
     });
   }
-  if (!result.ok) throw conflict(`Could not settle (${(result as { reason: string }).reason})`);
+  if (!result.ok) {
+    const why = (result as { reason: string }).reason;
+    throw new HttpError(409, `Could not settle (${why})`, 'ESCROW_SETTLE_FAILED', { reason: why });
+  }
+  const replayed = (result as { replayed: boolean }).replayed;
 
+  /**
+   * THE DECISION'S CONSEQUENCES, EACH ONE ONCE (audit 04 B3, audit 03 §10 C).
+   *
+   * A replayed decision used to write another −20 reputation event and
+   * rewrite the order, and the request stayed `disputed` for ever. Every
+   * statement here is conditional, so running it again — a double submit, a
+   * replay after a crash between the money and this batch — changes nothing
+   * that already happened and finishes anything that did not:
+   *   - the order leaves an ACTIVE state only (never rewrites a settled one);
+   *   - the request leaves `disputed`: `completed` when the merchant was paid
+   *     (in full or in part), `cancelled` on a full refund;
+   *   - ONE dispute outcome per order on the merchant's reputation;
+   *   - the complaint is resolved with the decision as its resolution;
+   *   - the request's preview links stop working.
+   */
   const ts = nowIso();
+  const orderState = decision === 'release' ? 'completed' : 'refunded';
+  const requestState = decision === 'refund' ? 'cancelled' : 'completed';
+  const outcome = decision === 'release' ? 'dispute_won' : 'dispute_lost';
   await c.env.DB.batch([
     c.env.DB.prepare(
       `UPDATE community_orders
-          SET state = ?, completed_at = CASE WHEN ? = 'completed' THEN ? ELSE completed_at END, updated_at = ?
-        WHERE id = ?`
-    ).bind(
-      decision === 'release' ? 'completed' : 'refunded',
-      decision === 'release' ? 'completed' : 'refunded',
-      ts, ts, esc.community_order_id
-    ),
+          SET state = ?1, completed_at = CASE WHEN ?1 = 'completed' THEN ?2 ELSE completed_at END, updated_at = ?2
+        WHERE id = ?3 AND state IN ('funded','in_progress','merchant_marked_delivered','disputed')`
+    ).bind(orderState, ts, esc.community_order_id),
+    c.env.DB.prepare(
+      `UPDATE community_requests SET state = ?1, status = 'closed', updated_at = ?2
+        WHERE id = ?3 AND state IN ('offer_selected','in_progress','delivered','disputed')`
+    ).bind(requestState, ts, order?.request_id ?? ''),
     c.env.DB.prepare(
       `INSERT INTO merchant_reputation_events (id, merchant_id, kind, points, community_order_id, note)
-       VALUES (?,?,?,?,?,?)`
-    ).bind(
-      newId('rep'), esc.merchant_id,
-      decision === 'release' ? 'dispute_won' : 'dispute_lost',
-      decision === 'release' ? 0 : -20,
-      esc.community_order_id, reason.slice(0, 200)
-    ),
+       SELECT ?1, ?2, ?3, ?4, ?5, ?6
+        WHERE NOT EXISTS (SELECT 1 FROM merchant_reputation_events
+                           WHERE community_order_id = ?5 AND kind IN ('dispute_won','dispute_lost'))`
+    ).bind(newId('rep'), esc.merchant_id, outcome, outcome === 'dispute_lost' ? -20 : 0, esc.community_order_id, reason.slice(0, 200)),
+    c.env.DB.prepare(
+      `UPDATE community_complaints
+          SET status = 'resolved', resolution = ?1, resolved_at = ?2, updated_at = ?2,
+              assigned_admin_id = COALESCE(assigned_admin_id, ?3)
+        WHERE community_order_id = ?4 AND status NOT IN ('resolved','rejected','closed')`
+    ).bind(`${decision}: ${reason}`.slice(0, 2000), ts, admin.id, esc.community_order_id),
+    revokeViewerTokensStatement(c.env.DB, order?.request_id ?? '', ts),
   ]);
 
-  await audit(c.env.DB, admin.id, 'admin.escrow_resolved', escrowId, {
-    decision,
-    reason,
-    amount: body.amount_iqd ?? esc.gross_iqd,
-  });
-  return c.json({ success: true, decision, replayed: (result as { replayed: boolean }).replayed });
+  if (!replayed) {
+    await audit(c.env.DB, admin.id, 'admin.escrow_resolved', escrowId, {
+      decision,
+      reason,
+      amount: body.amount_iqd ?? esc.gross_iqd,
+    });
+  }
+  return c.json({ success: true, decision, replayed });
 });
 
 /** A merchant's full financial timeline, for an admin answering a question. */
-adminCommunityRoutes.get('/merchants/:id/finance', async (c) => {
+adminCommunityRoutes.get('/merchants/:id/finance', requireFinancialScope, async (c) => {
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const balance = await merchantBalance(c.env.DB, id);
   const { results: ledger } = await c.env.DB.prepare(
@@ -1069,8 +1300,22 @@ adminCommunityRoutes.get('/merchants/:id/finance', async (c) => {
  * Append-only: paying a merchant writes a NEGATIVE ledger row rather than
  * reducing a balance, so the balance stays a SUM and the payment itself is
  * visible in the history (§76).
+ *
+ * NEVER MORE THAN AVAILABLE — DECIDED IN THE INSERT (audit 02 B3, audit 04
+ * B1). "Available" used to be `SUM(state = 'available')` while payouts were
+ * written `state = 'paid'`, so it never went down: two payouts of 10,000 from
+ * a 10,000 balance both succeeded. The figure is now `merchantAvailableSql`
+ * (payouts included), and the INSERT itself carries the comparison, so two
+ * payouts racing on one balance cannot both land.
+ *
+ * A REPLAY IS THE SAME PAYOUT, AND NOTHING ELSE IS (B14). The old catch-all
+ * answered EVERY failed insert — a foreign-key failure, a transient D1 error,
+ * a key another merchant's payout already carried — with «already recorded»
+ * while nothing had been written. Only this key, for this merchant and this
+ * amount, is a replay; the same key for anything else is 409
+ * IDEMPOTENCY_KEY_REUSED; every other error propagates as the failure it is.
  */
-adminCommunityRoutes.post('/merchants/:id/payout', async (c) => {
+adminCommunityRoutes.post('/merchants/:id/payout', requireFinancialScope, async (c) => {
   const admin = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const body = await c.req.json().catch(() => ({}));
@@ -1078,22 +1323,54 @@ adminCommunityRoutes.post('/merchants/:id/payout', async (c) => {
   const note = str(body.note, 'note', { min: 0, max: 300, required: false });
   const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80 });
 
-  const balance = await merchantBalance(c.env.DB, id);
-  if (amount > balance.available_iqd) {
+  const priorUseOfKey = async (): Promise<'none' | 'this_payout' | 'another_row'> => {
+    const row = await c.env.DB.prepare(
+      'SELECT merchant_id, kind, amount_iqd FROM merchant_payout_ledger WHERE idempotency_key = ?'
+    ).bind(idempotencyKey).first<{ merchant_id: string; kind: string; amount_iqd: number }>();
+    if (!row) return 'none';
+    return row.merchant_id === id && row.kind === 'payout' && Number(row.amount_iqd) === -amount
+      ? 'this_payout'
+      : 'another_row';
+  };
+  const replayed = async () =>
+    c.json({ success: true, replayed: true, balance: await merchantBalance(c.env.DB, id) });
+  const keyReused = () =>
+    conflict('This payout key was already used for a different payout. Start again.', 'IDEMPOTENCY_KEY_REUSED');
+
+  const prior = await priorUseOfKey();
+  if (prior === 'this_payout') return replayed();
+  if (prior === 'another_row') throw keyReused();
+
+  const merchant = await c.env.DB.prepare('SELECT id FROM community_merchants WHERE id = ?')
+    .bind(id)
+    .first<{ id: string }>();
+  if (!merchant) throw notFound('Merchant not found');
+
+  let written = 0;
+  try {
+    const res = await c.env.DB.prepare(
+      `INSERT INTO merchant_payout_ledger (id, merchant_id, kind, amount_iqd, state, note, admin_id, idempotency_key)
+       SELECT ?1, ?2, 'payout', ?3, 'paid', ?4, ?5, ?6
+        WHERE ${merchantAvailableSql('?2')} >= ?7`
+    ).bind(newId('pay'), id, -amount, note, admin.id, idempotencyKey, amount).run();
+    written = res.meta.changes ?? 0;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('UNIQUE') && msg.includes('idempotency_key')) {
+      if ((await priorUseOfKey()) === 'this_payout') return replayed();
+      throw keyReused();
+    }
+    throw e;
+  }
+  if (!written) {
+    // A twin of this very request may have landed first and spent the balance.
+    if ((await priorUseOfKey()) === 'this_payout') return replayed();
+    const balance = await merchantBalance(c.env.DB, id);
     throw badRequest('That is more than the merchant has available', 'INSUFFICIENT_BALANCE', {
       available_iqd: balance.available_iqd,
     });
   }
 
-  try {
-    await c.env.DB.prepare(
-      `INSERT INTO merchant_payout_ledger (id, merchant_id, kind, amount_iqd, state, note, admin_id, idempotency_key)
-       VALUES (?,?,'payout',?,'paid',?,?,?)`
-    ).bind(newId('pay'), id, -amount, note, admin.id, idempotencyKey).run();
-  } catch {
-    return c.json({ success: true, replayed: true, balance: await merchantBalance(c.env.DB, id) });
-  }
-
-  await audit(c.env.DB, admin.id, 'admin.merchant_payout', id, { amount, note });
+  await audit(c.env.DB, admin.id, 'admin.merchant_payout', id, { amount, note, idempotency_key: idempotencyKey });
   return c.json({ success: true, replayed: false, balance: await merchantBalance(c.env.DB, id) });
 });

@@ -3,12 +3,15 @@
  * detail — address, phone, items, chat), custom community orders (the
  * request → offer → escrow lifecycle), and the store's own coupons.
  *
- * Money semantics are the server's: delivery flips the payout to available,
- * a community order pays only when the CUSTOMER confirms, and every state
- * button below is exactly one legal transition of those machines.
+ * Money semantics are the server's: a store order's payout becomes available
+ * when the CUSTOMER confirms receipt, or three days after delivery with no
+ * open complaint — the merchant's own «تم التسليم» starts that clock and
+ * releases nothing (owner decision 2026-09-24); a community order pays only
+ * when the customer confirms. Every state button below is exactly one legal
+ * transition of those machines.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronDown, Copy, Loader2, MapPin, MessageCircle, Phone, Plus, Tag, Trash2,
@@ -23,6 +26,9 @@ import {
   type CommunityOrderRow, type MerchantCoupon,
 } from '../../../lib/merchant';
 import { Btn, Card, Chip, Empty, Input, Notice, Spinner, Toggle, useMainSiteHref, type Loc } from './ui';
+import { Sheet } from '../../ui/Overlay';
+import { apiRefusal } from '../../../lib/refusalStrings';
+import { formatDate } from '../../orders/format';
 
 // ------------------------------------------------------------ store orders
 
@@ -66,20 +72,140 @@ export function StatusChip({ status }: { status: string }) {
   );
 }
 
+/**
+ * Where the merchant's money for one store order stands — said on the order,
+ * so «تم التسليم» is never read as «paid». Nothing for a cancelled order (its
+ * chip says it) or one still on its way.
+ */
+function creditText(o: Record<string, unknown>, loc: Loc, lang: string): string {
+  if (o.status === 'cancelled') return '';
+  if (o.credit_state === 'available') {
+    // OWNER: Sorani to be written by hand.
+    return loc('المبلغ متاح في رصيدك', 'The money is in your available balance');
+  }
+  if (o.credit_state === 'pending' && o.status === 'delivered') {
+    const at = typeof o.release_after === 'string' ? formatDate(o.release_after, lang) : '';
+    return at
+      ? // OWNER: Sorani to be written by hand.
+        loc(
+          `بانتظار تأكيد الزبون — أو تلقائيًا بعد ${at} ما لم تُفتح شكوى`,
+          `Awaiting the customer’s confirmation — or automatically after ${at} unless a complaint is open`
+        )
+      : loc('بانتظار تأكيد الزبون', 'Awaiting customer confirmation', 'چاوەڕوانی کڕیار');
+  }
+  return '';
+}
+
 export function OrdersTab() {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
   const [orders, setOrders] = useState<Record<string, unknown>[] | null>(null);
+  /** The server's keyset cursor for the next page (B26) — null on the last. */
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [more, setMore] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [loadFailed, setLoadFailed] = useState(false);
   const [filter, setFilter] = useState('');
   const [busy, setBusy] = useState('');
   const [openId, setOpenId] = useState('');
+  /** A refused move, beside the order it was refused for — never a browser alert. */
+  const [moveError, setMoveError] = useState<{ id: string; text: string } | null>(null);
+  /** The order whose cancellation is being confirmed, and that sheet's own error. */
+  const [cancelId, setCancelId] = useState('');
+  const [cancelError, setCancelError] = useState('');
+  /** A list answer that lands after the filter changed is dropped, not shown. */
+  const seq = useRef(0);
+
+  const query = useCallback(
+    (cursor?: string) => {
+      const qs = new URLSearchParams();
+      if (filter) qs.set('status', filter);
+      if (cursor) qs.set('cursor', cursor);
+      const q = qs.toString();
+      return q ? `?${q}` : '';
+    },
+    [filter]
+  );
 
   const load = useCallback(() => {
+    const mine = ++seq.current;
+    setLoadFailed(false);
     merchantApi
-      .orders(filter ? `?status=${filter}` : '')
-      .then((d) => setOrders(d.orders))
-      .catch(() => setOrders([]));
-  }, [filter]);
+      .orders(query())
+      .then((d) => {
+        if (mine !== seq.current) return;
+        setOrders(d.orders);
+        setNextCursor(d.next_cursor ?? null);
+        setMore('idle');
+      })
+      .catch(() => {
+        if (mine === seq.current) setLoadFailed(true);
+      });
+  }, [query]);
   useEffect(load, [load]);
+
+  async function loadMore() {
+    if (!nextCursor || more === 'loading') return;
+    const mine = seq.current;
+    setMore('loading');
+    try {
+      const d = await merchantApi.orders(query(nextCursor));
+      if (mine !== seq.current) return;
+      setOrders((prev) => {
+        const seen = new Set((prev ?? []).map((o) => String(o.id)));
+        return [...(prev ?? []), ...d.orders.filter((o) => !seen.has(String(o.id)))];
+      });
+      setNextCursor(d.next_cursor ?? null);
+      setMore('idle');
+    } catch {
+      if (mine === seq.current) setMore('error');
+    }
+  }
+
+  /** Re-read ONE order after a move, in place — the pages already loaded stay loaded. */
+  async function refreshOne(id: string) {
+    try {
+      const { order: o } = await merchantApi.order(id);
+      setOrders((prev) =>
+        prev?.map((row) =>
+          String(row.id) === id
+            ? {
+                ...row,
+                status: o.status,
+                credit_state: o.credit_state,
+                release_after: o.release_after,
+                delivered_at: o.delivered_at,
+                receipt_confirmed_at: o.receipt_confirmed_at,
+              }
+            : row
+        ) ?? prev
+      );
+    } catch {
+      load();
+    }
+  }
+
+  async function move(id: string, to: string) {
+    setBusy(id);
+    setMoveError(null);
+    setCancelError('');
+    try {
+      await merchantApi.setOrderStatus(id, to);
+      setCancelId('');
+      await refreshOne(id);
+    } catch (e) {
+      // The code, in the merchant's language (ORDER_CHANGED and friends).
+      const text = apiRefusal(e, lang, loc('تعذّر تحديث الطلب', 'Could not update the order'));
+      if (to === 'cancelled') setCancelError(text);
+      else setMoveError({ id, text });
+      // A refusal that says the order moved on: show where it is now.
+      if (e instanceof ApiError && (e.code === 'ORDER_CHANGED' || e.code === 'ORDER_TRANSITION_INVALID')) {
+        void refreshOne(id);
+      }
+    } finally {
+      setBusy('');
+    }
+  }
+
+  const cancelling = busy !== '' && busy === cancelId;
 
   return (
     <div className="space-y-3">
@@ -89,14 +215,30 @@ export function OrdersTab() {
             <Chip
               label={s === '' ? loc('الكل', 'All', 'هەموو') : statusLabel(s, loc)}
               active={filter === s}
-              onClick={() => setFilter(s)}
+              onClick={() => {
+                if (s === filter) return;
+                setOrders(null);
+                setNextCursor(null);
+                setFilter(s);
+              }}
             />
           </span>
         ))}
       </div>
 
       {orders === null ? (
-        <Spinner />
+        loadFailed ? (
+          <div className="py-8 text-center space-y-3" role="alert">
+            {/* OWNER: Sorani to be written by hand. */}
+            <p className="text-zinc-400 text-[13px]">{loc('تعذّر تحميل الطلبات', 'Could not load the orders')}</p>
+            <Btn kind="ghost" small onClick={load}>
+              {/* OWNER: Sorani to be written by hand. */}
+              {loc('إعادة المحاولة', 'Try again')}
+            </Btn>
+          </div>
+        ) : (
+          <Spinner />
+        )
       ) : !orders.length ? (
         <Empty text={loc('لا توجد طلبات', 'No orders', 'داواکاری نییە')} />
       ) : (
@@ -105,11 +247,13 @@ export function OrdersTab() {
           const status = String(o.status);
           const next = ORDER_FLOW[status] ?? [];
           const open = openId === id;
+          const credit = creditText(o, loc, lang);
           return (
             <div key={id} className="rounded-2xl border border-white/10 bg-white/[0.03]">
               <button
                 type="button"
                 onClick={() => setOpenId(open ? '' : id)}
+                aria-expanded={open}
                 className="w-full p-3 text-start"
               >
                 <div className="flex items-start justify-between gap-3 mb-1.5">
@@ -121,7 +265,7 @@ export function OrdersTab() {
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <StatusChip status={status} />
-                    <ChevronDown className={`w-4 h-4 text-zinc-600 transition-transform ${open ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-4 h-4 text-zinc-600 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-[11.5px]">
@@ -132,51 +276,126 @@ export function OrdersTab() {
                     {loc('لك', 'You get', 'بۆ تۆ')}: <span className="text-gold font-semibold" dir="ltr">{iqd(Number(o.merchant_receivable_iqd))}</span>
                   </span>
                 </div>
+                {credit && <p className="text-zinc-500 text-[10.5px] mt-1 leading-relaxed" data-credit-state={String(o.credit_state ?? '')}>{credit}</p>}
               </button>
 
-              {open && <OrderDetail id={id} />}
+              {/* Keyed on the status, so a move re-reads the sheet's money rows. */}
+              {open && <OrderDetail key={`${id}:${status}`} id={id} />}
 
               {next.length > 0 && (
-                <div className="flex gap-2 flex-wrap px-3 pb-3">
-                  {next.map((s) => (
-                    <Btn
-                      key={s}
-                      small
-                      kind={s === 'cancelled' ? 'danger' : 'primary'}
-                      disabled={busy === id}
-                      onClick={async () => {
-                        if (s === 'cancelled' && !confirm(loc('إلغاء الطلب؟', 'Cancel this order?', 'هەڵوەشاندنەوە؟'))) return;
-                        setBusy(id);
-                        try {
-                          await merchantApi.setOrderStatus(id, s);
-                          load();
-                        } catch (e) {
-                          if (e instanceof ApiError) alert(e.message);
-                        } finally {
-                          setBusy('');
-                        }
-                      }}
-                    >
-                      {statusLabel(s, loc)}
-                    </Btn>
-                  ))}
+                <div className="px-3 pb-3 space-y-1.5">
+                  <div className="flex gap-2 flex-wrap">
+                    {next.map((s) => (
+                      <Btn
+                        key={s}
+                        small
+                        kind={s === 'cancelled' ? 'danger' : 'primary'}
+                        disabled={busy === id}
+                        onClick={() => {
+                          if (s === 'cancelled') {
+                            setCancelError('');
+                            setCancelId(id);
+                            return;
+                          }
+                          void move(id, s);
+                        }}
+                      >
+                        {busy === id && s !== 'cancelled' ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : null}
+                        {statusLabel(s, loc)}
+                      </Btn>
+                    ))}
+                  </div>
+                  {next.includes('delivered') && (
+                    <p className="text-zinc-600 text-[10.5px] leading-relaxed">
+                      {/* OWNER: Sorani to be written by hand. */}
+                      {loc(
+                        'بعد «تم التسليم» يصلك المبلغ حين يؤكد الزبون الاستلام، أو تلقائيًا بعد 3 أيام ما لم تُفتح شكوى.',
+                        'After “Delivered”, your money arrives when the customer confirms receipt — or automatically after 3 days unless a complaint is open.'
+                      )}
+                    </p>
+                  )}
+                  {moveError?.id === id && (
+                    <p role="alert" className="text-red-300 text-[11px]">{moveError.text}</p>
+                  )}
                 </div>
               )}
             </div>
           );
         })
       )}
+
+      {orders !== null && nextCursor && (
+        <Btn kind="ghost" full onClick={loadMore} disabled={more === 'loading'}>
+          {more === 'loading'
+            ? loc('جارٍ التحميل…', 'Loading…', 'باردەکرێت…')
+            : more === 'error'
+              ? loc('تعذر تحميل المزيد — إعادة المحاولة', 'Failed to load more — retry', 'زیاتر بارنەبوو — دووبارە هەوڵ بدەوە')
+              : loc('عرض المزيد', 'Load more', 'زیاتر پیشان بدە')}
+        </Btn>
+      )}
+
+      {/* The one irreversible move, confirmed in a sheet that says what it
+          does to the customer's money — never `window.confirm`. */}
+      <Sheet
+        open={cancelId !== ''}
+        onClose={() => {
+          if (!cancelling) setCancelId('');
+        }}
+        label={loc('إلغاء الطلب؟', 'Cancel this order?', 'هەڵوەشاندنەوە؟')}
+        dismissOnEscape={!cancelling}
+        dismissOnScrim={!cancelling}
+        panelClassName="w-full sm:max-w-md"
+        testId="merchant-cancel-order"
+      >
+        <div className="px-5 pb-6 pt-2">
+          <h2 className="text-white font-bold text-[16px]">{loc('إلغاء الطلب؟', 'Cancel this order?', 'هەڵوەشاندنەوە؟')}</h2>
+          <p className="text-zinc-400 text-[13px] mt-2 leading-relaxed">
+            {/* OWNER: Sorani to be written by hand. */}
+            {loc(
+              'يُعاد إلى الزبون كامل ما دفعه في محفظته، وتعود الكمية إلى مخزونك، ويُحرَّر استخدام الكوبون. لا يمكن التراجع عن الإلغاء.',
+              'The customer gets back everything they paid, to their wallet; the units return to your stock and the coupon use is released. A cancellation cannot be undone.'
+            )}
+          </p>
+          <p role="alert" aria-live="assertive" className="text-red-400 text-[12.5px] mt-3 min-h-[1.25em]">
+            {cancelError}
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setCancelId('')}
+              disabled={cancelling}
+              className="flex-1 min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-50"
+            >
+              {loc('الإبقاء على الطلب', 'Keep order', 'هێشتنەوەی داواکاری')}
+            </button>
+            <button
+              type="button"
+              onClick={() => void move(cancelId, 'cancelled')}
+              disabled={cancelling}
+              data-confirm-merchant-cancel
+              className="flex-1 min-h-[44px] rounded-xl bg-[#ef233c] text-white text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
+            >
+              {cancelling && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+              {cancelling
+                ? loc('جارٍ الإلغاء…', 'Cancelling…', 'هەڵوەشاندنەوە…')
+                : loc('إلغاء الطلب', 'Cancel order', 'هەڵوەشاندنەوەی داواکاری')}
+            </button>
+          </div>
+        </div>
+      </Sheet>
     </div>
   );
 }
 
 /** The fulfilment sheet: who, where, what — and the door to the order chat. */
 function OrderDetail({ id }: { id: string }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
   const navigate = useNavigate();
   const { store: hostStore } = useStore();
+  const mainHref = useMainSiteHref();
   const [data, setData] = useState<Awaited<ReturnType<typeof merchantApi.order>> | null>(null);
   const [chatBusy, setChatBusy] = useState(false);
+  const [chatError, setChatError] = useState('');
 
   useEffect(() => {
     merchantApi.order(id).then(setData).catch(() => {});
@@ -194,14 +413,18 @@ function OrderDetail({ id }: { id: string }) {
 
   async function openChat() {
     setChatBusy(true);
+    setChatError('');
     try {
       const r = await api.post<{ chatId: string }>('/api/chats/open', { orderId: id });
       // On a store subdomain the messenger lives on the main site — the
-      // shared cookie keeps the session across the hop.
-      if (hostStore) window.location.href = `https://levonis-iq.com/chat/${r.chatId}`;
+      // shared cookie keeps the session across the hop. The address comes
+      // from the dashboard's one main-site helper, not a second literal.
+      if (hostStore) window.location.href = mainHref(`/chat/${r.chatId}`);
       else navigate(`/chat/${r.chatId}`);
     } catch (e) {
-      if (e instanceof ApiError) alert(e.message);
+      // Beside the button, in the merchant's language — never a browser alert.
+      // OWNER: Sorani to be written by hand.
+      setChatError(apiRefusal(e, lang, loc('تعذّر فتح المحادثة', 'Could not open the chat')));
     } finally {
       setChatBusy(false);
     }
@@ -250,7 +473,7 @@ function OrderDetail({ id }: { id: string }) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-zinc-200 truncate">{String(it.name_snapshot)}</p>
-              {!!it.option_snapshot && <p className="text-zinc-600 text-[10.5px]" dir="ltr">{String(it.option_snapshot)}</p>}
+              {!!it.option_snapshot && <p className="text-zinc-600 text-[10.5px]" dir="auto">{String(it.option_snapshot)}</p>}
             </div>
             <span className="text-zinc-500 shrink-0" dir="ltr">×{String(it.qty)}</span>
             <span className="text-zinc-300 font-semibold shrink-0" dir="ltr">{iqd(Number(it.line_total_iqd))}</span>
@@ -277,6 +500,7 @@ function OrderDetail({ id }: { id: string }) {
         {chatBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />}
         {loc('محادثة حول الطلب', 'Chat about this order', 'گفتوگۆ لەسەر داواکاری')}
       </Btn>
+      {chatError && <p role="alert" className="text-red-300 text-[11px]">{chatError}</p>}
     </div>
   );
 }

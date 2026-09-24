@@ -115,3 +115,17 @@ export function conflictDetails(
     incoming_seller_name: names.incoming ?? null,
   };
 }
+
+/**
+ * Did a write abort on the DATABASE's one-seller guard (migration 0114)?
+ *
+ * The add doors read the cart and decide before they insert, but two adds
+ * from two tabs can both pass that read. The trigger refuses the second one
+ * inside its own statement with `RAISE(ABORT, 'CART_SELLER_CONFLICT')`, and
+ * the door answers exactly as its read-then-decide check would have — the
+ * message is matched rather than the whole string because D1 wraps SQLite's
+ * text in its own prefix.
+ */
+export function isCartSellerAbort(e: unknown): boolean {
+  return (e instanceof Error ? e.message : String(e)).includes(CART_SELLER_CONFLICT);
+}

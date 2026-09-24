@@ -83,7 +83,10 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [attaching, setAttaching] = useState(false);
-  const presence = useChatPresence(chatId, active && !error);
+  // A MERCHANT-STORE order's thread is the customer's and the seller's: staff
+  // READ it (audited on the server) and never join or write (audit 04 B6).
+  const [readOnly, setReadOnly] = useState(false);
+  const presence = useChatPresence(readOnly ? null : chatId, active && !error && !readOnly);
   const listRef = useRef<HTMLDivElement | null>(null);
   const openedFor = useRef<string | null>(null);
   const cameraRef = useRef<HTMLInputElement | null>(null);
@@ -95,8 +98,15 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
     try {
       // Opening is idempotent: the server returns the existing thread when
       // there is one and creates it only the first time.
-      const opened = await api.post<{ chatId: string }>('/api/chats/open', { orderId });
+      const opened = await api.post<{ chatId: string | null; readOnly?: boolean }>('/api/chats/open', { orderId });
+      setReadOnly(!!opened.readOnly);
       setChatId(opened.chatId);
+      if (!opened.chatId) {
+        // A store order whose customer and seller have not talked yet: there
+        // is nothing to read, and staff do not start their conversation.
+        setMessages([]);
+        return;
+      }
       const [msgs, me] = await Promise.all([
         api.get<{ messages: ChatMessage[] }>(`/api/chats/${opened.chatId}/messages`),
         api.get<{ user: { id: string } }>('/api/auth/me'),
@@ -262,11 +272,16 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
       <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0" data-order-chat>
         {messages.length === 0 && (
           <p className="text-center text-sm text-zinc-500 py-10">
-            {loc(
-              'لا رسائل بعد — اكتب أول رسالة بخصوص هذا الطلب.',
-              'No messages yet — write the first one about this order.',
-              'هێشتا هیچ نامەیەک نییە — یەکەم نامە دەربارەی ئەم داواکارییە بنووسە.'
-            )}
+            {readOnly
+              ? loc(
+                  'لم يتراسل الزبون والمتجر بخصوص هذا الطلب بعد.',
+                  'The customer and the store have not written about this order yet.'
+                ) /* OWNER: Sorani to be written by hand. */
+              : loc(
+                  'لا رسائل بعد — اكتب أول رسالة بخصوص هذا الطلب.',
+                  'No messages yet — write the first one about this order.',
+                  'هێشتا هیچ نامەیەک نییە — یەکەم نامە دەربارەی ئەم داواکارییە بنووسە.'
+                )}
           </p>
         )}
         {messages.map((m) => {
@@ -295,6 +310,14 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
         })}
       </div>
 
+      {readOnly ? (
+        <p data-order-chat-read-only className="border-t border-zinc-800 p-3 shrink-0 text-center text-xs text-zinc-400">
+          {loc(
+            'للقراءة فقط — محادثة بين الزبون والمتجر. لا تنضم الإدارة إليها، وكل اطلاع عليها يُسجَّل.',
+            'Read-only — a conversation between the customer and the store. Staff do not join it, and every view is recorded.'
+          ) /* OWNER: Sorani to be written by hand. */}
+        </p>
+      ) : (
       <div className="border-t border-zinc-800 p-3 shrink-0">
         {presence.typing && <p role="status" className="text-xs text-text-secondary mb-2">{loc('يكتب الآن…', 'Typing…', 'دەنووسێت…')}</p>}
         {(sendError || voiceError) && <p className="text-[12px] text-red-400 mb-2">{sendError || voiceError}</p>}
@@ -424,6 +447,7 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
         </form>
         )}
       </div>
+      )}
     </div>
   );
 }

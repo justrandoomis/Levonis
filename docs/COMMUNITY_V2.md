@@ -43,6 +43,19 @@ is refusal** — there is no "any other transition is probably fine" path.
 `completed` and `cancelled` are terminal: reopening one would mean money that
 has already settled could move again.
 
+**`draft` is real (wave 1).** `POST /api/marketplace/requests` creates a
+**draft** — invisible to everyone but its customer and not biddable — and
+publishing (`POST /api/marketplace/print/requests/:id/publish`) is the one move
+to `open`; it runs the matching and starts the expiry clock. «إعادة الطلب»
+copies are published the same way. A re-publish that changes what merchants
+priced moves the request's `revision` and makes standing offers **stale** (not
+acceptable until their merchant re-confirms). **Expiry is a state**: a request
+past `expires_at` takes no offers and no acceptance, is not served to strangers,
+and a scheduled sweep moves it (and its pending offers) to `expired`. The
+customer cancels a request only while it is a draft or taking offers — once a
+paid order exists the answer is `REQUEST_HAS_ORDER` (cancel the order, or
+dispute). (`docs/merchant-platform/audit/03` §10 E, I, J, K; migration 0116.)
+
 ### What the public board shows
 
 The job, and a display name. **Never** a phone, an email or an address, and
@@ -88,10 +101,16 @@ caller's right on every request rather than baking it into a link:
 | Who | May read |
 |---|---|
 | The customer | always |
-| Any signed-in caller | while the request is **public and open** — a merchant cannot quote a model they may not look at |
+| Any signed-in caller | while the request is **on the board** — public, taking offers and **not expired** — and Levo Community lets them in (otherwise `503 COMMUNITY_CLOSED`, as the board answers); a merchant cannot quote a model they may not look at |
 | The engaged merchant | after acceptance, for as long as the order lives |
 | An admin | always, for moderation |
 | Anyone else | 404 |
+
+The **3D preview link** (`/model-viewer/{token}`) is narrower still: minted only
+by the customer, the engaged merchant, or a merchant who could make an offer on
+the board request right now; it lives one hour (server-fixed), carries no file
+name, and is revoked when the request closes and, for the losing merchants, at
+acceptance (`docs/PRINT_REQUESTS.md` §5).
 
 When the request closes, the general permission closes with it, so a link
 shared earlier simply stops working. `tests/requestFiles.test.ts` asserts the
@@ -124,7 +143,10 @@ Withdrawing frees the slot, so a merchant is not locked out for good.
 
 A merchant may edit an offer **only while it is pending** — `state = 'pending'`
 is in the `WHERE` clause of the update, so an accepted offer cannot be edited
-even by a request that tries.
+even by a request that tries. **Every edit is a new version** (`revision + 1`,
+audited with what it replaced): the customer accepts the version they saw or
+nothing. The advertised `offer_count` is recomputed from the live offers
+(pending + accepted) in the same batch as every change, never incremented.
 
 **A merchant cannot read a rival's price** on the same request. The offers
 query filters to the caller's own unless they are the customer.
@@ -137,18 +159,26 @@ Two taps, or two tabs, must not produce two contracts.
 
 ```sql
 UPDATE community_requests
-   SET state='offer_selected', accepted_offer_id=?
+   SET state='in_progress', accepted_offer_id=?, community_order_id=?
  WHERE id=? AND customer_id=? AND state IN ('open','receiving_offers')
+   AND revision=? AND (expires_at IS NULL OR expires_at > now)
 ```
 
-Whoever wins that conditional update owns the acceptance. A concurrent second
-attempt changes **zero rows** and is told the request already has a winner.
-Everything after — freezing the offer, rejecting the rest, creating the order —
-happens only for the winner.
+Whoever wins that conditional update owns the acceptance. **Since wave 1 the
+money is reserved first** (a wallet hold, nothing else written — a customer who
+cannot pay has nothing to undo), and then the request's move, the freeze of the
+**exact offer version the customer confirmed** (`expected_price_iqd` +
+`offer_revision`; otherwise `409 OFFER_CHANGED` with the fresh offer), the
+rivals' rejection, the order (born `funded`) and its escrow are ONE fenced
+batch: a guard that matched nothing aborts all of it and the hold is released.
+A crash between the reservation and the batch leaves only a hold, which the
+community reconciliation sweep releases. `offer_selected` is no longer written
+by acceptance; the sweep reopens requests the pre-wave-1 flow stranded there.
 
-The database backs it up independently: `community_orders.offer_id` is unique,
-so even a route that skipped the guard could not create two orders for one
-offer.
+The database backs it up independently: one **live** community order per offer
+(`idx_community_orders_offer_live`, migration 0116 — a cancelled attempt no
+longer locks the offer for ever, which is what made a retry after topping up
+fail with a 500).
 
 ### The snapshot
 
@@ -158,9 +188,10 @@ even possible — could not change what the merchant owes.
 
 ### If funding fails
 
-Everything unwinds: the order is cancelled, the request reopens, every offer
-returns to pending. The customer keeps their request, the merchants keep their
-offers, and nobody holds a contract that was never paid for.
+Nothing was written, so nothing unwinds: the customer is told
+`INSUFFICIENT_FUNDS` before the request, the offers or any order move. The
+customer keeps their request, the merchants keep their offers, and nobody holds
+a contract that was never paid for.
 
 ---
 
@@ -233,7 +264,13 @@ decorative.
 Auto-completion is configurable (`communityAutoCompleteDays`, default 7).
 **Setting it to 0 disables automatic release entirely**, which is the safe
 default for a policy that has not been decided: money then only ever moves when
-a human says so.
+a human says so. The date is fixed when the merchant marks the work delivered
+(`auto_complete_at`) and **a scheduled sweep honours it** (wave 1 — until then
+nothing read it): a delivered, undisputed order past its date is released
+through the same `releaseEscrow` and the same idempotency key as the customer's
+own confirmation, so the two can never pay twice between them. Completion is
+counted once (`completed_orders`, +10 reputation) however many confirmations
+race.
 
 A delivered order can go **back** to in-progress if the customer says it is not
 done. Without that, the only way to reject bad work is a formal dispute, which
@@ -268,6 +305,14 @@ An admin resolves it as `release`, `refund` or `partial_refund`, with a
 required reason. Every decision appends escrow events and ledger rows and
 **never rewrites amounts**, so an admin can be asked months later exactly what
 they decided and on what day, and the answer comes from the data (§45).
+
+Wave 1: only a **disputed** escrow is decided (`ESCROW_NOT_DISPUTED` otherwise);
+a repeated decision is a replay whose consequences apply once — one dispute
+outcome on the merchant's reputation, the order out of `disputed`, the request
+to `completed` (merchant paid, fully or in part) or `cancelled` (full refund),
+and the complaint resolved. The dispute itself now freezes the escrow FIRST and
+refuses (`ORDER_SETTLED`) when it was already settled. An admin cannot remove a
+request with a live order or escrow (`REQUEST_HAS_ESCROW`).
 
 ---
 
@@ -322,6 +367,18 @@ than the reviews it actually has (§40).
 A merchant may reply **once**, publicly. Hiding a review is an admin moderation
 decision, never the reviewed party's.
 
+**Nobody reviews their own shop.** The store's owner — by the merchant's user or
+the store's — is `403 SELF_REVIEW`, and their own orders are never offered to
+them as reviewable (audit 04 #3 / B11, audit 02 B17; the buying half, a merchant
+ordering from their own store, is refused at the cart).
+
+**An edit moves the score by the difference.** Editing a review appends a
+`review_edited` event worth the change — 5★ → 1★ is −20 after the original +10 —
+so the log always sums to what the review now says; editing only the text moves
+nothing (audit 04 #16). Review pictures are the reviewer's own uploads, at most
+six, or nothing (#17). A public store review names its author the way a platform
+review does — «Ahmed K.» (#15).
+
 ### Reputation
 
 `merchant_reputation_events` is kept forever. The score is **derived**, so a
@@ -337,7 +394,9 @@ evidence months later. `tests/adminCommunity.test.ts` asserts the two rows.
 Badges (`new | trusted | professional | elite`) need **volume as well as a good
 rating** — five stars from two customers is a good start, not a track record.
 `elite` additionally requires admin verification, so volume alone cannot buy
-it. An admin can pin a badge; a merchant never can (§42).
+it. An admin can pin a badge; a merchant never can (§42). A badge earned by
+completed orders — with no review event to recompute it — is written by the
+scheduled sweep `refreshStaleMerchantBadges` (worker/lib/jobs.ts, audit 04 #24).
 
 ---
 
@@ -347,27 +406,52 @@ it. An admin can pin a badge; a merchant never can (§42).
 `GET /requests` · `GET /requests/:id` · `POST /requests` · `GET /my-requests` ·
 `POST /requests/:id/cancel` ·
 `POST|GET|DELETE /requests/:id/files[/:fileId]` · `GET /requests/:id/offers` ·
-`POST /requests/:id/offers` · `PATCH /offers/:id` · `POST /offers/:id/withdraw` ·
-**`POST /offers/:id/accept`** · `GET /orders` · `GET /orders/:id` ·
-`POST /orders/:id/start|delivered|confirm|dispute|cancel`
+`POST /requests/:id/offers` · `PATCH /offers/:id` · `POST /offers/:id/reconfirm` ·
+`POST /offers/:id/withdraw` · **`POST /offers/:id/accept`** · `GET /orders` ·
+`GET /orders/:id` · `POST /orders/:id/start|delivered|confirm|dispute|cancel` ·
+`GET /complaints` · `GET /complaints/:id` · `POST /complaints/:id/messages`
+
+Making, editing and re-confirming an offer pass `requireOfferPrivileges`
+(worker/lib/merchantAuth.ts): a `restricted` merchant is
+`403 MERCHANT_RESTRICTED`, each other sanction its own code, and withdrawing is
+never refused. A standing offer from a merchant Levonis has restricted or
+suspended since — or whose store it suspended — cannot be accepted
+(`409 MERCHANT_UNAVAILABLE`).
+
+The community page's own doors (`/api/community/requests`) take the same road:
+a request is created as a draft and published by `publishRequest`, the one door
+onto the board; its list shows exactly what the board shows; and
+`POST /api/community/requests/:id/close` answers `307` to
+`/api/marketplace/requests/:id/cancel`.
 
 ### `/api/community-reviews/*`
 `GET /eligible` · `POST /` · `PATCH /:id` · `POST|DELETE|PATCH /follow/:merchantId` ·
 `GET /following`
 
 ### `/api/admin/community/*` — apex host only
-`GET /overview` · `GET|PATCH /settings` · `GET /merchants` ·
-`POST /merchants/:id/verify|status|badge` · `GET /merchants/:id/finance` ·
-`POST /merchants/:id/payout` · `GET|POST /merchants/:id/reputation` ·
+`GET /overview` · `GET|PATCH /settings` · `GET|PUT /gate` · `GET /gate/lookup` ·
+`GET /merchants` · `POST /merchants/:id/verify|status|badge` ·
+`GET /merchants/:id/finance` · `POST /merchants/:id/payout` ·
+`GET|POST /merchants/:id/reputation` · `GET /merchants/:id/products` ·
 `POST /stores/:id/status` · `GET /requests` · `GET /requests/:id` ·
 `POST /requests/:id/remove` · `POST /offers/:id/reject` · `GET /reviews` ·
-`POST /reviews/:id/hide` · `POST /products/:id/hide` · `GET /complaints` ·
-`GET /complaints/:id` · `POST /complaints/:id/status` ·
-**`POST /escrows/:id/resolve`**
+`POST /reviews/:id/hide` · `POST /products/:id/hide {hidden, reason}` ·
+`GET /complaints` · `GET /complaints/:id` · `POST /complaints/:id/status` ·
+`POST /complaints/:id/messages` · **`POST /escrows/:id/resolve`**
 
-Every one of these has a control in `src/components/adminCommunity/`. The
-mandate's rule against buttons that do nothing runs the other way too: an
-endpoint an operator cannot reach is a feature that does not exist.
+Every one of these has a control in `src/components/adminCommunity/` — the
+product hide included, in a merchant's detail («منتجات التاجر»), with the
+required reason the merchant is shown. The mandate's rule against buttons that
+do nothing runs the other way too: an endpoint an operator cannot reach is a
+feature that does not exist.
+
+**Money needs the financial scope** (audit 04 #2). `PATCH /settings` (the
+commission), `GET /merchants/:id/finance`, `POST /merchants/:id/payout` and
+`POST /escrows/:id/resolve` carry `requireFinancialScope` in their route
+declarations — the same rule as `walletAdjust.ts` — so an assistant-scope admin
+gets `403 FINANCIAL_SCOPE_REQUIRED`, and the overview leaves the fee figures out
+for them. `tests/communityMoneyScope.test.ts` walks the router so a new money
+route cannot land without the guard.
 
 ### What an admin sees that a merchant does not
 
@@ -383,16 +467,46 @@ stream through the Worker after an authorisation check.
 
 ### Two sanctions, not one
 
-Suspending a **merchant** stops them trading everywhere and shuts their shop
-with them. Suspending a **store** takes the storefront down and leaves the
-merchant bidding, fulfilling and answering for the work they already owe.
-A bad banner should not cancel someone else's half-finished order.
+The merchant and the store are two rows and each admin route writes only its
+own (audit 04 #6). Suspending a **merchant** stops them trading everywhere and
+shuts their shop with them — by being read, not by writing the store row: every
+public reader asks `storeIsSuspended` (the store's own suspension OR its
+merchant's). Restoring the merchant therefore brings back exactly the store
+they had: open, paused by its merchant, or suspended on its own account.
+Suspending a **store** takes the storefront down and stops new commitments made
+in its name — store orders and offers (`STORE_SUSPENDED`) — while the merchant
+goes on fulfilling and answering for the work they already owe. A bad banner
+should not cancel someone else's half-finished order. **Restricting** a merchant
+is the sanction short of either: the shop stays up and editable, but it takes no
+new orders or offers (MERCHANT_STORES.md §4).
+
+**A suspended store is an unavailable page** (owner decision, 2026-09-24). A
+customer on a store suspended either way sees only «المتجر غير متاح حاليًا» and a
+way back to Levonis and to their own orders: `/api/storefront/*` serves none of
+its products, banner, bio or reviews (`404 STORE_UNAVAILABLE`), the web manifest
+falls back to the platform's name and icon, the share card, the sitemap and the
+community listings drop it, and `/api/community/store/:id` answers the same.
+Nothing is deleted; lifting the suspension brings the page back as it was.
 
 `paused` is the merchant's own switch and is not reachable from the admin
 endpoint at all — if an admin could write it, the merchant re-opening their
 shop would silently lift an admin decision (§50). For the same reason a store
-cannot be re-opened while its owner is suspended: the two decisions would
-contradict each other and the storefront would have to pick a winner.
+cannot be re-opened while its owner is suspended (`MERCHANT_SUSPENDED` on
+`open`): the two decisions would contradict each other and the storefront would
+have to pick a winner.
+
+### Staff never join a private thread
+
+A store order's conversation is between the customer and the seller — both are
+participants from the moment it opens, and each customer message notifies the
+seller (audit 04 #4). An admin who opens it from an order **reads it read-only**
+(audit 04 #11 — the option chosen of the two the brief offered, docs/DECISIONS.md):
+they are not added as a participant, `POST` is `403 CHAT_READ_ONLY`, the thread
+answers `read_only: true`, and each reading — of the messages or of a file sent in
+the thread — writes an `admin.chat_read` audit row (at most one per admin, thread
+and hour). A visible «انضم فريق الدعم» message was
+the alternative; reading for an investigation should not have to announce
+itself to both parties, and the silent JOIN — the defect — is gone either way.
 
 ---
 
@@ -404,12 +518,16 @@ Enforced by the database, not only by application code:
    `community_orders` and `community_escrows`
 2. `released_iqd + refunded_iqd <= gross_iqd`
 3. One escrow per community order (unique)
-4. One community order per accepted offer (unique)
+4. One LIVE community order per offer (partial unique, migration 0116)
 5. One review per transaction (two partial unique indexes)
 6. One live offer per merchant per request (partial unique index)
-7. A cart line names exactly one product source, matching its declared seller
+7. A cart line names exactly one product source, matching its declared seller —
+   and one user's cart holds ONE seller (triggers, migration 0114)
 8. Escrow events and payout rows are **append-only** — no update path exists
-9. A merchant balance is a `SUM`; there is no balance column anywhere
+9. A merchant balance is a `SUM`; there is no balance column anywhere.
+   `available` counts available rows AND payouts (a payout lowers it, and the
+   payout insert is conditional on it); `paid out` counts payouts only, never
+   commission rows (`merchantBalance`, worker/lib/escrowOps.ts)
 10. IQD is an integer everywhere; no money value touches floating point
 
 ---

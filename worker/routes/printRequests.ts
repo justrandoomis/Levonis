@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { AppContext, Env } from '../lib/types';
-import { requireAuth, badRequest, notFound, forbidden, conflict, str, int } from '../lib/http';
+import { requireAuth, badRequest, notFound, conflict, str, int, HttpError } from '../lib/http';
 import { newId, randomToken, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
@@ -33,6 +33,15 @@ import { governorateName, normalizeGovernorate } from '../lib/iraqGovernorates';
 import { notifyStatement } from '../lib/notifications';
 import { getMediaObject, putMediaObject } from '../lib/mediaStorage';
 import { communityClosedRefusal, communityMayEnter, readCommunityGate, requireCommunityOpen } from '../lib/communityGate';
+import {
+  isEngagedMerchant,
+  isPast,
+  mayQuoteOnBoard,
+  onPublicBoard,
+  requestFileAccess,
+  staleOfferNotifications,
+  type RequestForAccess,
+} from '../lib/communityRequests';
 
 /**
  * THE PRINT REQUEST JOURNEY — upload, measure, estimate, publish, notify.
@@ -155,7 +164,9 @@ const parseJson = <T>(raw: unknown, fallback: T): T => {
 /** The request row plus its print side, for the owner of the request. */
 async function ownedRequest(c: { env: Env }, requestId: string, userId: string) {
   const row = await c.env.DB.prepare(
-    'SELECT id, customer_id, state, title, governorate, delivery_pref, quantity FROM community_requests WHERE id = ?'
+    `SELECT id, customer_id, state, title, governorate, delivery_pref, quantity, deadline, revision,
+            expires_at, visibility
+       FROM community_requests WHERE id = ?`
   )
     .bind(requestId)
     .first<Record<string, unknown>>();
@@ -642,37 +653,105 @@ export function printMatchNotification(f: PrintMatchFacts): { title: Trilingual;
 // -------------------------------------------------------------- 5. publishing
 
 /**
- * Attach the print spec to a request that already exists, snapshot the estimate,
- * then find and notify the merchants who can make it.
- *
- * ONE REQUEST. The row was created by `POST /api/marketplace/requests` before
- * this call and is not touched here beyond its print side; nothing in this
- * handler inserts into `community_requests`, and the matching engine has no
- * ability to (worker/lib/printMatching.ts returns decisions, not rows).
+ * The spec a request was last published with, as the body a publish takes —
+ * so a request can be (re)published AS STORED: the «إعادة الطلب» copy, and a
+ * draft published from its own page, carry no wizard state to send.
  */
-printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAuth, async (c) => {
-  await rateLimit(c, 'print-publish', 20, 3600);
-  const user = c.get('user')!;
-  const requestId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
-  const request = await ownedRequest(c, requestId, user.id);
-  if (!['open', 'receiving_offers', 'draft'].includes(String(request.state))) {
-    throw conflict('This request is no longer open');
+function storedPublishBody(stored: Record<string, unknown>, request: Record<string, unknown>): Record<string, unknown> {
+  const estimate = parseJson<{ accessory_lines?: Array<{ id?: unknown; qty?: unknown }> }>(stored.estimate, {});
+  return {
+    process: stored.process,
+    material_id: stored.material_id,
+    quality: stored.quality,
+    infill_percent: Number(stored.infill_percent ?? 20),
+    supports: Number(stored.supports ?? 1) === 1,
+    colors_count: Number(stored.colors_count ?? 1),
+    post_processing_minutes: Number(stored.post_processing_minutes ?? 0),
+    quantity: Number(request.quantity ?? 1),
+    color_hex: stored.color_hex ?? '',
+    color_name: stored.color_name ?? '',
+    accessories: (estimate.accessory_lines ?? []).map((l) => ({ id: l.id, qty: l.qty })),
+    primary_file_id: stored.primary_file_id ?? undefined,
+    source_kind: stored.source_kind,
+    source_url: stored.source_url ?? '',
+    source_meta: parseJson<Record<string, unknown>>(stored.source_meta, {}),
+  };
+}
+
+/** The facts a merchant priced, in a form two publishes can be compared by. */
+const jobFacts = (p: Record<string, unknown> | null, r: Record<string, unknown>) =>
+  JSON.stringify([
+    p?.process ?? null, p?.material_id ?? null, p?.color_hex ?? null, p?.color_name ?? null,
+    p?.quality ?? null, Number(p?.infill_percent ?? -1), Number(p?.supports ?? -1), Number(p?.colors_count ?? -1),
+    Number(p?.post_processing_minutes ?? -1), p?.primary_file_id ?? null, p?.source_url ?? null,
+    Number(r.quantity ?? 1), String(r.governorate ?? ''), String(r.delivery_pref ?? ''), String(r.deadline ?? ''),
+  ]);
+
+export interface PublishOutcome {
+  quote: Record<string, unknown>;
+  completeness: number;
+  matching: { considered: number; eligible: number; notified: number };
+  /** The job changed under standing offers, which are now stale. */
+  revised: boolean;
+}
+
+/**
+ * Publish a request: attach the print spec, snapshot the estimate, make it
+ * public, and find and notify the merchants who can make it.
+ *
+ * THE ONLY DOOR ONTO THE BOARD (audit 03 §10 E). `POST /api/marketplace/
+ * requests` creates a DRAFT; this is the one transition to `open`, taken in
+ * the same write that fixes the job's facts, and the expiry clock starts here.
+ *
+ * A RE-PUBLISH IS AN EDIT, AND AN EDIT IS A REVISION (§10 K). Re-publishing an
+ * open request used to rewrite the job — PLA×1 to resin×50 ultra — under the
+ * offers already priced against it. When the facts a merchant priced change,
+ * the request's `revision` moves in the same write, every pending offer priced
+ * against the old one is stale (unacceptable until its merchant re-confirms),
+ * and those merchants are told. A re-publish that changes nothing revises
+ * nothing.
+ *
+ * ONE REQUEST. Nothing here inserts into `community_requests`, and the
+ * matching engine has no ability to (worker/lib/printMatching.ts returns
+ * decisions, not rows).
+ */
+export async function publishRequest(
+  env: Env,
+  userId: string,
+  requestId: string,
+  input: Record<string, unknown>
+): Promise<PublishOutcome> {
+  const request = await ownedRequest({ env }, requestId, userId);
+  const state = String(request.state);
+  if (!['open', 'receiving_offers', 'draft'].includes(state)) {
+    throw conflict('This request is no longer open', 'REQUEST_NOT_OPEN');
+  }
+  const firstPublish = state === 'draft';
+  if (!firstPublish && isPast(request.expires_at as string | null)) {
+    throw conflict('This request has expired', 'REQUEST_EXPIRED');
   }
 
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const stored = await env.DB.prepare('SELECT * FROM community_print_requests WHERE request_id = ?')
+    .bind(requestId)
+    .first<Record<string, unknown>>();
+  // A body with no spec at all publishes the spec already stored, when there
+  // is one — the repeat copy and a draft published from its own page.
+  const asStored = !!stored && input.process === undefined && input.material_id === undefined;
+  const body = asStored ? { ...storedPublishBody(stored!, request), ...input } : input;
+
   const spec = readSpec(body);
   const [mats, cfg, weights, notifyLimit] = await Promise.all([
-    materials(c.env),
-    pricingConfig(c.env),
-    getSetting(c.env.DB, 'printMatchWeights'),
-    getSetting(c.env.DB, 'printMatchNotifyLimit'),
+    materials(env),
+    pricingConfig(env),
+    getSetting(env.DB, 'printMatchWeights'),
+    getSetting(env.DB, 'printMatchNotifyLimit'),
   ]);
 
   // ---- the model: whichever attachment is the model, measured -------------
   const primaryFileId = str(body.primary_file_id, 'primary_file_id', { max: 60, required: false }) ?? '';
   let analysis: ModelAnalysis | null = null;
   if (primaryFileId) {
-    const row = await c.env.DB.prepare(
+    const row = await env.DB.prepare(
       'SELECT analysis FROM community_request_files WHERE id = ? AND request_id = ?'
     )
       .bind(primaryFileId, requestId)
@@ -684,10 +763,23 @@ printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAu
   }
 
   const sourceKind = body.source_kind === 'link' ? 'link' : 'upload';
-  const sourceUrl = str(body.source_url, 'source_url', { max: 600, required: false }) ?? '';
+  const providers = await getSetting(env.DB, 'printLinkProviders');
+  /**
+   * THE LINK IS VALIDATED, NOT JUST STORED (audit 03 §10 W). `source_url` was
+   * 600 characters of whatever arrived, shown to merchants — one `<a href>`
+   * away from a `javascript:` sink. It now passes the same outbound-URL guard
+   * the link step itself uses and is stored in its canonical form. A caller
+   * sending a bad one is told; a stored legacy value that no longer passes is
+   * dropped rather than blocking the republish of an old request.
+   */
+  const rawSourceUrl = str(body.source_url, 'source_url', { max: 600, required: false }) ?? '';
+  const parsedLink = rawSourceUrl ? parseModelLink(rawSourceUrl, providers) : null;
+  if (rawSourceUrl && !parsedLink && !asStored) {
+    throw badRequest('That link is not a valid https address', 'BAD_URL');
+  }
+  const sourceUrl = parsedLink?.canonical_url ?? '';
   const sourceMeta = sanitizeSourceMeta(body.source_meta);
-  const providers = await getSetting(c.env.DB, 'printLinkProviders');
-  const sourceProvider = sourceUrl ? (parseModelLink(sourceUrl, providers)?.provider ?? '') : '';
+  const sourceProvider = parsedLink?.provider ?? '';
 
   const quote = quotePrint(
     {
@@ -700,7 +792,7 @@ printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAu
       supports: spec.supports,
       post_processing_minutes: spec.post_processing_minutes,
       accessories: spec.accessories,
-      accessory_catalogue: await accessories(c.env),
+      accessory_catalogue: await accessories(env),
       fallback_volume_cm3:
         typeof body.volume_cm3 === 'number' && body.volume_cm3 > 0 ? body.volume_cm3 : undefined,
     },
@@ -723,14 +815,18 @@ printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAu
    * which merchants are eligible at all. A customer who picked Baghdad would
    * have been matched as though they had picked nowhere.
    *
-   * This is not a second create. It is the same row, the same owner, the same
-   * open state, written at the last moment before any merchant can see it.
-   * Only fields the caller actually supplied are touched; a republish that
-   * sends nothing leaves the row exactly as it is.
+   * This is not a second create. It is the same row, the same owner, written
+   * in the same commit that makes it public. Only fields the caller actually
+   * supplied are touched; a republish that sends nothing leaves them as they are.
    */
-  const governorate = str(body.governorate, 'governorate', { max: 60, required: false });
-  const deliveryPref = str(body.delivery_pref, 'delivery_pref', { max: 40, required: false });
-  const deadline = str(body.deadline, 'deadline', { max: 40, required: false });
+  // `str` answers '' for an absent value, so "supplied" is asked of the body
+  // itself — a republish that omits a field must not blank it.
+  const supplied = (k: string) => body[k] !== undefined;
+  const governorate = supplied('governorate') ? str(body.governorate, 'governorate', { max: 60, required: false }) : undefined;
+  const deliveryPref = supplied('delivery_pref')
+    ? str(body.delivery_pref, 'delivery_pref', { max: 40, required: false })
+    : undefined;
+  const deadline = supplied('deadline') ? str(body.deadline, 'deadline', { max: 40, required: false }) : undefined;
   const budget =
     body.budget_iqd === undefined || body.budget_iqd === null || body.budget_iqd === ''
       ? undefined
@@ -744,32 +840,105 @@ printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAu
     ? `${Math.round(analysis.dimensions_mm.x)}×${Math.round(analysis.dimensions_mm.y)}×${Math.round(analysis.dimensions_mm.z)} mm`
     : '';
 
+  // Did the facts a merchant priced change? Only a PUBLISHED request can be
+  // revised: nobody has priced a draft.
+  const nextRow = {
+    quantity: spec.quantity,
+    governorate: governorate ?? request.governorate,
+    delivery_pref: deliveryPref ?? request.delivery_pref,
+    deadline: deadline !== undefined ? deadline || null : request.deadline,
+  };
+  const nextSpec = {
+    process: spec.process, material_id: spec.material_id, color_hex: spec.color_hex, color_name: spec.color_name,
+    quality: spec.quality, infill_percent: spec.infill_percent, supports: spec.supports ? 1 : 0,
+    colors_count: spec.colors_count, post_processing_minutes: spec.post_processing_minutes,
+    primary_file_id: primaryFileId || null, source_url: sourceUrl,
+  };
+  const revised = !firstPublish && jobFacts(stored ?? null, request) !== jobFacts(nextSpec, nextRow);
+
+  const ts = new Date().toISOString();
+  const readRevision = Number(request.revision ?? 1);
+  const nextRevision = revised ? readRevision + 1 : readRevision;
+  const expiryDays = Number(await getSetting(env.DB, 'communityRequestExpiryDays')) || 30;
+  const expiresAt = new Date(Date.now() + expiryDays * 86_400_000).toISOString();
+
   const sets: string[] = [
-    'material = ?', 'color = ?', 'quantity = ?', "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')",
+    'material = ?', 'color = ?', 'quantity = ?',
+    // Draft → open is THE publish. Every SET reads the row as it was, so the
+    // expiry below sees the same `state` this CASE does.
+    "state = CASE WHEN state = 'draft' THEN 'open' ELSE state END",
+    "status = 'open'",
+    "expires_at = CASE WHEN state = 'draft' THEN ? ELSE expires_at END",
+    'revision = ?',
+    'updated_at = ?',
   ];
-  const vals: Array<string | number | null> = [materialLabel, colorLabel, spec.quantity];
+  const vals: Array<string | number | null> = [materialLabel, colorLabel, spec.quantity, expiresAt, nextRevision, ts];
   if (dimsLabel) { sets.splice(2, 0, 'dimensions = ?'); vals.splice(2, 0, dimsLabel); }
   if (governorate !== undefined) { sets.push('governorate = ?'); vals.push(governorate); }
   if (deliveryPref !== undefined) { sets.push('delivery_pref = ?'); vals.push(deliveryPref); }
   if (deadline !== undefined) { sets.push('deadline = ?'); vals.push(deadline || null); }
   if (budget !== undefined) { sets.push('budget_iqd = ?'); vals.push(budget); }
 
-  await c.env.DB.prepare(
-    `UPDATE community_requests SET ${sets.join(', ')}
-      WHERE id = ? AND customer_id = ? AND state IN ('open','receiving_offers','draft')`
-  )
-    .bind(...vals, requestId, user.id)
-    .run();
+  try {
+    await env.DB.batch([
+      // The request, conditional on it being exactly what was read: a file
+      // added in between moved its revision and this publish refuses.
+      env.DB.prepare(
+        `UPDATE community_requests SET ${sets.join(', ')}
+          WHERE id = ? AND customer_id = ? AND state IN ('open','receiving_offers','draft') AND revision = ?`
+      ).bind(...vals, requestId, userId, readRevision),
+      // Nothing below is written unless the line above really was.
+      env.DB.prepare(
+        `UPDATE community_requests
+            SET updated_at = CASE WHEN updated_at = ?2 AND revision = ?3 THEN updated_at ELSE NULL END
+          WHERE id = ?1`
+      ).bind(requestId, ts, nextRevision),
+      env.DB.prepare(
+        `INSERT INTO community_print_requests
+           (request_id, process, material_id, color_hex, color_name, quality, infill_percent,
+            supports, colors_count, post_processing_minutes, primary_file_id,
+            source_kind, source_provider, source_url, source_meta,
+            analysis, estimate, estimate_low_iqd, estimate_high_iqd, estimate_confidence,
+            completeness, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         ON CONFLICT (request_id) DO UPDATE SET
+           process=excluded.process, material_id=excluded.material_id, color_hex=excluded.color_hex,
+           color_name=excluded.color_name, quality=excluded.quality, infill_percent=excluded.infill_percent,
+           supports=excluded.supports, colors_count=excluded.colors_count,
+           post_processing_minutes=excluded.post_processing_minutes, primary_file_id=excluded.primary_file_id,
+           source_kind=excluded.source_kind, source_provider=excluded.source_provider,
+           source_url=excluded.source_url, source_meta=excluded.source_meta,
+           analysis=excluded.analysis, estimate=excluded.estimate,
+           estimate_low_iqd=excluded.estimate_low_iqd, estimate_high_iqd=excluded.estimate_high_iqd,
+           estimate_confidence=excluded.estimate_confidence, completeness=excluded.completeness,
+           updated_at=excluded.updated_at`
+      ).bind(
+        requestId, spec.process, spec.material_id, spec.color_hex, spec.color_name, spec.quality,
+        spec.infill_percent, spec.supports ? 1 : 0, spec.colors_count, spec.post_processing_minutes,
+        primaryFileId || null,
+        sourceKind, sourceProvider, sourceUrl, JSON.stringify(sourceMeta),
+        analysis ? JSON.stringify(analysis) : '{}',
+        JSON.stringify(quote),
+        quote.priced ? quote.price_low_iqd : null,
+        quote.priced ? quote.price_high_iqd : null,
+        quote.priced ? quote.confidence : '',
+        completeness,
+        ts
+      ),
+    ]);
+  } catch (e) {
+    if (!/constraint/i.test(e instanceof Error ? e.message : String(e))) throw e;
+    throw conflict('This request changed while you were publishing it — reload it and try again', 'REQUEST_CHANGED');
+  }
 
-  // Re-read, so the matcher sees what was just written rather than what
-  // `ownedRequest` loaded a few statements ago.
+  // Re-read, so the matcher sees what was just written.
   //
   // `deadline` and `budget_iqd` join the re-read because the merchant's
   // notification is composed from the ROW, not from this call's payload. A
   // republish that does not resend them must still tell merchants the deadline
   // and budget the customer set the first time round, rather than quietly
   // dropping two of the facts an offer is priced against.
-  const forMatching = await c.env.DB.prepare(
+  const forMatching = await env.DB.prepare(
     'SELECT governorate, delivery_pref, deadline, budget_iqd FROM community_requests WHERE id = ?'
   )
     .bind(requestId)
@@ -779,40 +948,6 @@ printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAu
       deadline: string | null;
       budget_iqd: number | null;
     }>();
-
-  await c.env.DB.prepare(
-    `INSERT INTO community_print_requests
-       (request_id, process, material_id, color_hex, color_name, quality, infill_percent,
-        supports, colors_count, post_processing_minutes, primary_file_id,
-        source_kind, source_provider, source_url, source_meta,
-        analysis, estimate, estimate_low_iqd, estimate_high_iqd, estimate_confidence,
-        completeness, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-     ON CONFLICT (request_id) DO UPDATE SET
-       process=excluded.process, material_id=excluded.material_id, color_hex=excluded.color_hex,
-       color_name=excluded.color_name, quality=excluded.quality, infill_percent=excluded.infill_percent,
-       supports=excluded.supports, colors_count=excluded.colors_count,
-       post_processing_minutes=excluded.post_processing_minutes, primary_file_id=excluded.primary_file_id,
-       source_kind=excluded.source_kind, source_provider=excluded.source_provider,
-       source_url=excluded.source_url, source_meta=excluded.source_meta,
-       analysis=excluded.analysis, estimate=excluded.estimate,
-       estimate_low_iqd=excluded.estimate_low_iqd, estimate_high_iqd=excluded.estimate_high_iqd,
-       estimate_confidence=excluded.estimate_confidence, completeness=excluded.completeness,
-       updated_at=excluded.updated_at`
-  )
-    .bind(
-      requestId, spec.process, spec.material_id, spec.color_hex, spec.color_name, spec.quality,
-      spec.infill_percent, spec.supports ? 1 : 0, spec.colors_count, spec.post_processing_minutes,
-      primaryFileId || null,
-      sourceKind, sourceProvider, sourceUrl, JSON.stringify(sourceMeta),
-      analysis ? JSON.stringify(analysis) : '{}',
-      JSON.stringify(quote),
-      quote.priced ? quote.price_low_iqd : null,
-      quote.priced ? quote.price_high_iqd : null,
-      quote.priced ? quote.confidence : '',
-      completeness
-    )
-    .run();
 
   // ---- who can make it ----------------------------------------------------
   const matchReq: MatchRequest = {
@@ -829,7 +964,7 @@ printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAu
     quantity: spec.quantity,
   };
   const material = mats.find((m) => m.id === spec.material_id) ?? null;
-  const candidates = await loadCandidates(c.env);
+  const candidates = await loadCandidates(env);
   const { decisions, notify } = matchMerchants(
     candidates,
     matchReq,
@@ -863,7 +998,7 @@ printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAu
   const stmts: D1PreparedStatement[] = [];
   const notified = new Map<string, string>();
   for (const d of notify) {
-    const { id, stmt } = notifyStatement(c.env.DB, {
+    const { id, stmt } = notifyStatement(env.DB, {
       userId: d.user_id,
       kind: 'print_request_match',
       title_ar: text.title.ar,
@@ -901,17 +1036,23 @@ printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAu
   }
 
   // Every decision is recorded, rejections included: this table is the answer
-  // to "why did my shop never see this job?".
+  // to "why did my shop never see this job?". A merchant told once STAYS told,
+  // with the id of the notification that really reached them: on a re-publish
+  // the INSERT OR IGNORE above writes nothing for them, so its fresh id must
+  // not overwrite the real one (audit 03 §10 U).
   for (const d of decisions) {
     stmts.push(
-      c.env.DB.prepare(
+      env.DB.prepare(
         `INSERT INTO community_request_matches
            (id, request_id, merchant_id, eligible, reject_reason, score, score_detail, notified, notification_id)
          VALUES (?,?,?,?,?,?,?,?,?)
          ON CONFLICT (request_id, merchant_id) DO UPDATE SET
            eligible=excluded.eligible, reject_reason=excluded.reject_reason,
            score=excluded.score, score_detail=excluded.score_detail,
-           notified=excluded.notified, notification_id=excluded.notification_id`
+           notification_id = CASE WHEN community_request_matches.notified = 1
+                                  THEN community_request_matches.notification_id
+                                  ELSE excluded.notification_id END,
+           notified = MAX(community_request_matches.notified, excluded.notified)`
       ).bind(
         newId('mch'), requestId, d.merchant_id, d.eligible ? 1 : 0, d.reject_reason,
         d.score, JSON.stringify(d.detail),
@@ -919,28 +1060,40 @@ printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAu
       )
     );
   }
-  if (stmts.length) await c.env.DB.batch(stmts);
+  // The merchants whose offers the change left behind hear about it.
+  if (revised) stmts.push(...(await staleOfferNotifications(env.DB, requestId, nextRevision)));
+  if (stmts.length) await env.DB.batch(stmts);
 
-  await audit(c.env.DB, user.id, 'print.request_published', requestId, {
+  await audit(env.DB, userId, firstPublish ? 'print.request_published' : 'print.request_republished', requestId, {
     considered: decisions.length,
     eligible: decisions.filter((d) => d.eligible).length,
     notified: notify.length,
     confidence: quote.confidence,
+    revision: nextRevision,
+    revised,
   });
 
   const { cost_lines, cost_iqd, floor_iqd, margin_percent, ...publicQuote } = quote;
   void cost_lines; void cost_iqd; void floor_iqd; void margin_percent;
-  return c.json({
-    success: true,
-    request_id: requestId,
-    quote: publicQuote,
+  return {
+    quote: publicQuote as unknown as Record<string, unknown>,
     completeness,
     matching: {
       considered: decisions.length,
       eligible: decisions.filter((d) => d.eligible).length,
       notified: notify.length,
     },
-  });
+    revised,
+  };
+}
+
+printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAuth, async (c) => {
+  await rateLimit(c, 'print-publish', 20, 3600);
+  const user = c.get('user')!;
+  const requestId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const out = await publishRequest(c.env, user.id, requestId, body);
+  return c.json({ success: true, request_id: requestId, published: true, ...out });
 });
 
 /**
@@ -1084,27 +1237,22 @@ printRequestRoutes.get('/requests/:id', async (c) => {
   const requestId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const user = c.get('user');
   const request = await c.env.DB.prepare(
-    'SELECT id, customer_id, state, visibility FROM community_requests WHERE id = ?'
+    'SELECT id, customer_id, state, visibility, expires_at FROM community_requests WHERE id = ?'
   )
     .bind(requestId)
-    .first<{ id: string; customer_id: string; state: string; visibility: string }>();
+    .first<RequestForAccess>();
   if (!request) throw notFound('Request not found');
 
   const isOwner = !!user && user.id === request.customer_id;
-  const publicBoard = request.visibility === 'public' && ['open', 'receiving_offers'].includes(request.state);
+  // On the board means public, taking offers AND not expired (audit 03 §10 I).
+  const publicBoard = onPublicBoard(request);
   // The public board is Levo Community and closes with it (DECISIONS 110):
   // this is the print twin of the walled GET /api/marketplace/requests/:id.
   // The customer and the merchant already working the job keep their view.
   const boardShut = publicBoard && !isOwner && !communityMayEnter(await readCommunityGate(c.env.DB), user);
   const openToAll = publicBoard && !boardShut;
   if (!isOwner && !openToAll) {
-    const engaged = user
-      ? await c.env.DB.prepare(
-          `SELECT 1 FROM community_offers o
-             JOIN community_merchants m ON m.id = o.merchant_id
-            WHERE o.request_id = ? AND m.user_id = ? AND o.state = 'accepted'`
-        ).bind(requestId, user.id).first()
-      : null;
+    const engaged = user ? await isEngagedMerchant(c.env.DB, requestId, user.id) : false;
     if (!engaged) throw boardShut ? communityClosedRefusal() : notFound('Request not found');
   }
 
@@ -1172,10 +1320,33 @@ printRequestRoutes.get('/requests/:id', async (c) => {
 // ------------------------------------------------------------- 7. the viewer
 
 /**
+ * HOW LONG A PREVIEW LINK LIVES — decided here, never by the caller.
+ *
+ * The mint used to take `hours` from the body, 1 to 168, default 72: a week
+ * of anonymous access to a customer's model preview, chosen by whoever asked
+ * for it (audit 03 §10 F). The viewer page loads the metadata and the mesh the
+ * moment it opens, so an hour is ample for anyone actually looking — and a
+ * link that leaks is dead by the time it is passed around. A body `hours` is
+ * ignored rather than refused, so an older client still gets a working link.
+ */
+export const VIEWER_TOKEN_TTL_MINUTES = 60;
+
+/** Request states in which nobody may preview anything any more. */
+const VIEWER_CLOSED_STATES = ['cancelled', 'expired'];
+
+/**
  * Mint a link to the 3D preview.
  *
  * The token is random, stored HASHED (so the table is useless to whoever reads
- * it), expires, and grants the DERIVED mesh — never the uploaded file.
+ * it), expires after `VIEWER_TOKEN_TTL_MINUTES`, and grants the DERIVED mesh —
+ * never the uploaded file.
+ *
+ * WHO MAY MINT (audit 03 §10 F): the request's customer; the merchant whose
+ * offer was accepted; and, while the request is ON THE BOARD (public, taking
+ * offers, not expired) and Levo Community lets them in, a merchant who could
+ * quote on it right now (`mayQuoteOnBoard`). It used to be "anyone signed in
+ * while the request is open" — a plain customer account could mint a week-long
+ * anonymous link to somebody else's model.
  */
 printRequestRoutes.post('/requests/:id/files/:fileId/viewer-token', requireAuth, async (c) => {
   await rateLimit(c, 'viewer-token', 60, 3600);
@@ -1183,26 +1354,23 @@ printRequestRoutes.post('/requests/:id/files/:fileId/viewer-token', requireAuth,
   const requestId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const fileId = str(c.req.param('fileId'), 'fileId', { min: 1, max: 60 });
 
-  // Anyone who may READ the file may mint a preview of it — the same rule the
-  // marketplace download route applies, so the viewer never widens access.
   const file = await c.env.DB.prepare(
-    `SELECT f.id, f.preview_key, r.customer_id, r.state, r.visibility
+    `SELECT f.id AS file_id, f.preview_key, r.id, r.customer_id, r.state, r.visibility, r.expires_at
        FROM community_request_files f
        JOIN community_requests r ON r.id = f.request_id
       WHERE f.id = ? AND f.request_id = ?`
   )
     .bind(fileId, requestId)
-    .first<{ id: string; preview_key: string; customer_id: string; state: string; visibility: string }>();
+    .first<{ file_id: string; preview_key: string } & RequestForAccess>();
   if (!file) throw notFound('File not found');
+  if (VIEWER_CLOSED_STATES.includes(file.state)) {
+    throw conflict('This request is closed, so its model can no longer be previewed', 'REQUEST_CLOSED');
+  }
 
-  const isOwner = file.customer_id === user.id;
-  const openToAll = file.visibility === 'public' && ['open', 'receiving_offers'].includes(file.state);
-  if (!isOwner && !openToAll) {
-    const engaged = await c.env.DB.prepare(
-      `SELECT 1 FROM community_offers o JOIN community_merchants m ON m.id = o.merchant_id
-        WHERE o.request_id = ? AND m.user_id = ? AND o.state = 'accepted'`
-    ).bind(requestId, user.id).first();
-    if (!engaged) throw forbidden('Not allowed to view this model');
+  const { access, gateClosed } = await requestFileAccess(c.env, file, user, { allowAdmin: false });
+  if (gateClosed) throw communityClosedRefusal();
+  if (!access || (access === 'board' && !(await mayQuoteOnBoard(c.env.DB, user.id)))) {
+    throw new HttpError(403, 'Only merchants who can quote on this request may preview its model', 'VIEWER_NOT_ALLOWED');
   }
   if (!file.preview_key) throw conflict('This file has no 3D preview', 'NO_PREVIEW');
 
@@ -1210,8 +1378,7 @@ printRequestRoutes.post('/requests/:id/files/:fileId/viewer-token', requireAuth,
   // thing standing between a stranger and someone's model preview.
   const token = randomToken(32);
   const hash = await sha256Hex(token);
-  const hours = int((await c.req.json().catch(() => ({}))).hours, 'hours', { min: 1, max: 168, def: 72 });
-  const expires = new Date(Date.now() + hours * 3600_000).toISOString();
+  const expires = new Date(Date.now() + VIEWER_TOKEN_TTL_MINUTES * 60_000).toISOString();
   await c.env.DB.prepare(
     'INSERT INTO model_view_tokens (token_hash, file_id, request_id, created_by, expires_at) VALUES (?,?,?,?,?)'
   )
@@ -1221,18 +1388,23 @@ printRequestRoutes.post('/requests/:id/files/:fileId/viewer-token', requireAuth,
   return c.json({ success: true, token, url: `/model-viewer/${token}`, expires_at: expires });
 });
 
-/** What the viewer page needs to draw its labels. No file, no key, no owner. */
+/**
+ * What the viewer page needs to draw its labels. No file, no key, no owner —
+ * and NO FILE NAME (audit 03 §10 F): the name a customer saved their model
+ * under is theirs («Sara_Ahmed_dental_crown.stl» was the audit's example), and
+ * this answer reaches anyone holding the link, signed in or not. The format
+ * and the measured size say what the page needs to say.
+ */
 printRequestRoutes.get('/viewer/:token', async (c) => {
   const row = await viewerToken(c.env, c.req.param('token'));
   const file = await c.env.DB.prepare(
-    'SELECT file_name, analysis, model_format FROM community_request_files WHERE id = ?'
+    'SELECT analysis, model_format FROM community_request_files WHERE id = ?'
   )
     .bind(row.file_id)
-    .first<{ file_name: string; analysis: string; model_format: string }>();
+    .first<{ analysis: string; model_format: string }>();
   const analysis = parseJson<ModelAnalysis | null>(file?.analysis, null);
   return c.json({
     success: true,
-    name: file?.file_name ?? '',
     format: file?.model_format ?? '',
     dimensions_mm: analysis?.dimensions_mm ?? null,
     volume_mm3: analysis?.volume_mm3 ?? null,
@@ -1271,25 +1443,50 @@ async function viewerToken(env: Env, raw: string | undefined) {
   const token = str(raw, 'token', { min: 20, max: 120 });
   const hash = await sha256Hex(token);
   const row = await env.DB.prepare(
-    'SELECT token_hash, file_id, request_id, expires_at, revoked_at FROM model_view_tokens WHERE token_hash = ?'
+    `SELECT t.token_hash, t.file_id, t.request_id, t.expires_at, t.revoked_at, r.state AS request_state
+       FROM model_view_tokens t
+       JOIN community_requests r ON r.id = t.request_id
+      WHERE t.token_hash = ?`
   )
     .bind(hash)
-    .first<{ token_hash: string; file_id: string; request_id: string; expires_at: string; revoked_at: string | null }>();
-  // One answer for "wrong", "expired" and "revoked": a viewer link that has
-  // stopped working must not tell a stranger which of the three it was.
-  if (!row || row.revoked_at || Date.parse(row.expires_at) < Date.now()) throw notFound('This link is no longer valid');
+    .first<{
+      token_hash: string; file_id: string; request_id: string; expires_at: string;
+      revoked_at: string | null; request_state: string;
+    }>();
+  // One answer for "wrong", "expired", "revoked" and "the request is closed":
+  // a viewer link that has stopped working must not tell a stranger which of
+  // them it was. The request's state is re-read on every use as well as the
+  // revocation written when it closed — the second guard does not depend on
+  // the first having run.
+  if (
+    !row ||
+    row.revoked_at ||
+    !(Date.parse(row.expires_at) > Date.now()) ||
+    VIEWER_CLOSED_STATES.includes(row.request_state)
+  ) {
+    throw notFound('This link is no longer valid');
+  }
   return row;
 }
 
 // -------------------------------------------------------- 8. repeat a request
 
 /**
- * "اطلب مرة أخرى" — copy a finished request into a NEW one.
+ * "اطلب مرة أخرى" — copy a finished request into a NEW one, and publish it.
  *
  * A new request row, a new id, and the files RE-COPIED in R2 rather than shared:
  * two requests pointing at one object means deleting the old one breaks the new
  * one, and a customer who repeats an order in March should not lose it because
  * they tidied up in January.
+ *
+ * THE COPY GOES THROUGH MATCHING (audit 03 §10 E). It used to be inserted
+ * straight onto the board — `open`, public, offerable — and never published,
+ * so no merchant was ever told and no estimate was ever made. Now it is born a
+ * DRAFT like every other request and published by the same `publishRequest`
+ * the wizard uses, with the spec it was copied from: a fresh estimate at
+ * today's prices, the matching, the notifications. If publishing fails, the
+ * copy stays a draft (invisible, and publishable from its own page) and the
+ * answer says so — `published: false` — rather than pretending.
  */
 printRequestRoutes.post('/requests/:id/repeat', requireCommunityOpen, requireAuth, async (c) => {
   await rateLimit(c, 'request-repeat', 20, 3600);
@@ -1315,7 +1512,7 @@ printRequestRoutes.post('/requests/:id/repeat', requireCommunityOpen, requireAut
        (id, customer_id, title, description, status, state, category, quantity, material, color,
         dimensions, budget_iqd, deadline, governorate, delivery_pref, notes, visibility,
         created_at, updated_at, expires_at)
-     VALUES (?,?,?,?,'open','open',?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+     VALUES (?,?,?,?,'closed','draft',?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
   )
     .bind(
       newRequestId, user.id, String(src.title ?? ''), String(src.description ?? ''),
@@ -1417,14 +1614,36 @@ printRequestRoutes.post('/requests/:id/repeat', requireCommunityOpen, requireAut
         String(spec.analysis ?? '{}'),
         // The estimate is deliberately NOT copied: prices move, and showing a
         // customer January's number on a March request would be a quote nobody
-        // can honour. It is recomputed when they publish.
+        // can honour. The publish below prices it again, today.
         Number(spec.completeness ?? 0)
       )
       .run();
   }
 
   await audit(c.env.DB, user.id, 'print.request_repeated', newRequestId, { from: sourceId });
-  return c.json({ success: true, request_id: newRequestId, files: fileIdMap.size }, 201);
+
+  // The hardware the source carried is in its estimate's itemised lines — the
+  // one thing the copied spec row does not hold.
+  const sourceAccessories = parseJson<{ accessory_lines?: Array<{ id?: unknown; qty?: unknown }> }>(spec?.estimate, {})
+    .accessory_lines ?? [];
+  try {
+    const out = await publishRequest(c.env, user.id, newRequestId, {
+      ...(sourceAccessories.length ? { accessories: sourceAccessories.map((l) => ({ id: l.id, qty: l.qty })) } : {}),
+    });
+    return c.json(
+      { success: true, request_id: newRequestId, files: fileIdMap.size, published: true, ...out },
+      201
+    );
+  } catch (e) {
+    // The copy exists and is safe — a draft nobody else can see. Say that it
+    // was NOT published and why, rather than reporting a success that isn't.
+    const code = e instanceof HttpError ? e.code ?? 'PUBLISH_FAILED' : 'PUBLISH_FAILED';
+    console.error('repeat: the copy was made but not published', newRequestId, e instanceof Error ? e.message : String(e));
+    return c.json(
+      { success: true, request_id: newRequestId, files: fileIdMap.size, published: false, publish_error: code },
+      201
+    );
+  }
 });
 
 // ------------------------------------------------------------ 9. my requests

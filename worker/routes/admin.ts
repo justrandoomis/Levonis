@@ -34,6 +34,7 @@ import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { sniff } from './uploads';
 import { deductOrderStock, planOrderReturn, stockReturnNote } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
+import { cancelStoreOrder, notifyMerchantOfStoreOrder } from '../lib/storeOrderOps';
 import { deleteCancelledOrder, OrderDeletionRefusal } from '../lib/orderDeletion';
 import { reclaimOrderRedemptionsStatement } from '../lib/offers';
 import { resolveOrderExpiry } from '../lib/orderExpiry';
@@ -2389,6 +2390,59 @@ async function deliveredEffects(
   return effects;
 }
 
+/**
+ * AN ADMIN MOVING A COMMUNITY-STORE ORDER INTO OR OUT OF `cancelled`.
+ *
+ * Both admin doors used to treat a store order as a platform one (audit 02
+ * A1, B7): the cancel refunded the buyer and left the merchant's credit
+ * `pending`, the store's stock and coupon use spent; and a cancelled, REFUNDED
+ * store order could be re-opened — whereupon the merchant's «تم التسليم» paid
+ * them for goods whose price the customer already had back.
+ *
+ *   · INTO cancelled → `cancelStoreOrder`, the one store cancellation the
+ *     merchant's and the customer's doors run too (refund, restock, coupon,
+ *     credit reversal, history, audit), then both parties are told.
+ *   · OUT OF cancelled → refused, 409 STORE_ORDER_REOPEN_REFUSED. Re-opening
+ *     would need the customer to pay again, and there is no such step; the
+ *     customer places a new order.
+ *
+ * Returns true when it answered the request; false leaves every other move to
+ * the platform path. `c` is the request (for its waitUntil).
+ */
+async function adminStoreOrderMove(
+  c: Context<AppContext>,
+  order: Record<string, unknown>,
+  nextStatus: string,
+  note: string
+): Promise<boolean> {
+  const id = String(order.id);
+  const from = String(order.status ?? '');
+  if (from === 'cancelled' && nextStatus !== 'cancelled') {
+    throw conflict(
+      'A cancelled store order was refunded to the customer and cannot be re-opened. The customer places a new order.',
+      'STORE_ORDER_REOPEN_REFUSED'
+    );
+  }
+  if (nextStatus !== 'cancelled' || from === 'cancelled') return false;
+  const admin = c.get('user')!;
+  const res = await cancelStoreOrder(c.env, { order, actor: 'admin', actorUserId: admin.id, reason: note || undefined });
+  if (!res.ok) throw badRequest('The order changed while you were editing — reload and retry');
+  if (note) {
+    await c.env.DB.prepare('UPDATE orders SET admin_note = ? WHERE id = ?').bind(note, id).run();
+  }
+  c.executionCtx.waitUntil(
+    notifyOrderStatus(c.env, id, 'cancelled', { defer: (work) => c.executionCtx.waitUntil(work) })
+  );
+  c.executionCtx.waitUntil(
+    notifyMerchantOfStoreOrder(c.env.DB, {
+      merchantId: String(order.merchant_id ?? ''),
+      orderId: id,
+      event: 'cancelled_by_admin',
+    })
+  );
+  return true;
+}
+
 const ORDER_TRANSITIONS: Record<string, string[]> = {
   pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
   confirmed: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
@@ -3127,6 +3181,17 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
   const note = str(body.note, 'note', { max: 500, required: false });
   await refuseUnscannedGini(c, id, STAGE_LEGACY_STATUS[to]);
 
+  // A COMMUNITY-STORE ORDER is cancelled by its own operation and is never
+  // re-opened (see `adminStoreOrderMove` below); every other stage move of it
+  // is the platform's ordinary one.
+  const storeOrder = await c.env.DB.prepare("SELECT * FROM orders WHERE id = ? AND seller_type = 'merchant'")
+    .bind(id)
+    .first<Record<string, unknown>>();
+  if (storeOrder) {
+    const handled = await adminStoreOrderMove(c, storeOrder, STAGE_LEGACY_STATUS[to], note);
+    if (handled) return c.json({ success: true, stage: 'cancelled', legacy_status: 'cancelled', next_stage: null, next_stage_at: null });
+  }
+
   const res = await moveOrderStage(c.env, {
     orderId: id,
     to,
@@ -3204,6 +3269,12 @@ adminRoutes.patch('/orders/:id', async (c) => {
       gini_state: giniStateOf(order.gini_state),
       gini_order_no: String(order.gini_order_no ?? ''),
     });
+  }
+
+  // A COMMUNITY-STORE ORDER: cancelled by its own operation, never re-opened
+  // (`adminStoreOrderMove`). Its other transitions take the path below.
+  if (String(order.seller_type ?? '') === 'merchant') {
+    if (await adminStoreOrderMove(c, order, next, adminNote)) return c.json({ success: true });
   }
 
   // delivered_at is stamped in the SAME conditional update as the status flip

@@ -41,6 +41,7 @@ import {
   holdSettledEventStatements,
   isConstraintAbort,
   readWalletDust,
+  releaseHold,
   releaseHoldStatement,
   walletIqdAvailable,
   walletLedgerDinarsReady,
@@ -186,25 +187,47 @@ export interface HoldEscrowInput {
 }
 
 /**
- * Reserve the customer's money against a community order.
- *
- * The wallet hold is taken FIRST. If the customer cannot cover it, nothing
- * is written at all — no escrow row in a half-funded state for someone to
- * find later and wonder about.
+ * The amounts every hold path checks before it touches the database. The
+ * CHECK constraints would refuse a bad split anyway; failing here names the
+ * real problem instead of surfacing a constraint error.
  */
-export async function holdEscrow(db: D1Database, p: HoldEscrowInput): Promise<EscrowResult> {
-  if (p.grossIqd <= 0) return { ok: false, reason: 'INVALID_AMOUNT' };
+function invalidHoldInput(p: HoldEscrowInput): EscrowResult | null {
+  if (!(Number.isSafeInteger(p.grossIqd) && p.grossIqd > 0)) return { ok: false, reason: 'INVALID_AMOUNT' };
   if (p.platformFeeIqd + p.merchantReceivableIqd !== p.grossIqd) {
-    // The database CHECK would refuse this anyway; failing here names the
-    // real problem instead of surfacing a constraint error.
     return { ok: false, reason: 'INVALID_AMOUNT', detail: 'fee + receivable must equal gross' };
   }
+  return null;
+}
 
-  const replay = await findEvent(db, p.idempotencyKey);
-  if (replay) return { ok: true, replayed: true, escrowId: replay.escrow_id };
+/** A wallet reservation taken for an escrow that has not been recorded yet. */
+export interface EscrowReservation {
+  holdId: string;
+  cents: number;
+  rate: number;
+}
 
-  const existing = await escrowForOrder(db, p.communityOrderId);
-  if (existing) return { ok: false, reason: 'ALREADY_EXISTS', detail: existing.id };
+export type EscrowReservationResult =
+  | { ok: true; reservation: EscrowReservation }
+  | { ok: false; reason: EscrowFailure; detail?: string };
+
+/**
+ * STEP ONE OF A HOLD: reserve the customer's money, and write nothing else.
+ *
+ * WHY IT IS ITS OWN STEP. The acceptance (worker/routes/marketplace.ts) used to
+ * move the request, freeze the offer and create the order FIRST, and only then
+ * ask whether the customer could pay — so a customer who could not left a
+ * cancelled order behind that locked the offer for ever (audit 03 §10 A), and a
+ * crash between the writes left the request in `offer_selected` with nobody to
+ * move it back. Reserving first means a refusal has nothing to undo, and the
+ * offer, the order and the escrow are then written together in ONE batch
+ * (`escrowRecordStatements`) or not at all. A reservation whose batch never
+ * commits is given back by `releaseEscrowReservation`, and one orphaned by a
+ * crash is found by the community reconciliation sweep, which releases any
+ * active `community_order` hold that no escrow row points at.
+ */
+export async function reserveEscrowFunds(db: D1Database, p: HoldEscrowInput): Promise<EscrowReservationResult> {
+  const invalid = invalidHoldInput(p);
+  if (invalid && !invalid.ok) return invalid;
 
   const rate = Math.trunc(await exchangeRate(db));
   /**
@@ -227,9 +250,9 @@ export async function holdEscrow(db: D1Database, p: HoldEscrowInput): Promise<Es
    */
   //
   // A RETRY AFTER THE HOLD BUT BEFORE THE ESCROW ROW (a crash between the two
-  // writes below) finds its own reservation already subtracted from the
-  // balance, so it must not be re-asked the dinar question — it re-asks for
-  // the SAME cents and `createPurchaseHold` replays the hold it placed.
+  // writes) finds its own reservation already subtracted from the balance, so
+  // it must not be re-asked the dinar question — it re-asks for the SAME cents
+  // and `createPurchaseHold` replays the hold it placed.
   const holdKey = `escrow:${p.idempotencyKey}`;
   const priorHold = await db
     .prepare("SELECT amount_cents FROM wallet_holds WHERE user_id = ? AND kind = 'purchase' AND event_key = ?")
@@ -267,10 +290,25 @@ export async function holdEscrow(db: D1Database, p: HoldEscrowInput): Promise<Es
       detail: hold.reason,
     };
   }
+  return { ok: true, reservation: { holdId: hold.holdId, cents, rate } };
+}
 
-  const escrowId = newId('esc');
-  const ts = NOW();
-  await db.batch([
+/**
+ * STEP TWO: the rows that turn a reservation into an escrow — returned, not
+ * run, so a caller commits them in the SAME batch as the community order they
+ * belong to (`community_escrows.community_order_id` references it, so they go
+ * AFTER the order's INSERT). The `held` event carries the hold-time rate and
+ * cents (`rate=…;cents=…`), which is the only place that rate is recorded and
+ * what every settlement reads back (`heldAtRate`).
+ */
+export function escrowRecordStatements(
+  db: D1Database,
+  p: HoldEscrowInput,
+  r: EscrowReservation,
+  escrowId: string,
+  ts: string
+): D1PreparedStatement[] {
+  return [
     db
       .prepare(
         `INSERT INTO community_escrows
@@ -280,7 +318,7 @@ export async function holdEscrow(db: D1Database, p: HoldEscrowInput): Promise<Es
       )
       .bind(
         escrowId, p.communityOrderId, p.customerId, p.merchantId,
-        p.grossIqd, p.platformFeeIqd, p.merchantReceivableIqd, hold.holdId, ts, ts
+        p.grossIqd, p.platformFeeIqd, p.merchantReceivableIqd, r.holdId, ts, ts
       ),
     db
       .prepare(
@@ -288,9 +326,43 @@ export async function holdEscrow(db: D1Database, p: HoldEscrowInput): Promise<Es
            (id, escrow_id, kind, amount_iqd, actor_id, actor_role, reason, idempotency_key, created_at)
          VALUES (?,?,'held',?,?, 'customer', ?, ?, ?)`
       )
-      .bind(newId('ese'), escrowId, p.grossIqd, p.customerId, `rate=${rate};cents=${cents}`, p.idempotencyKey, ts),
-  ]);
+      .bind(newId('ese'), escrowId, p.grossIqd, p.customerId, `rate=${r.rate};cents=${r.cents}`, p.idempotencyKey, ts),
+  ];
+}
 
+/**
+ * Give back a reservation whose escrow was never recorded — a lost acceptance
+ * race, an offer that changed, a batch that refused. `releaseHold` flips only
+ * an ACTIVE hold, so a second call (or the reconciliation sweep reaching the
+ * same hold) changes nothing.
+ */
+export async function releaseEscrowReservation(db: D1Database, holdId: string, reason: string) {
+  return releaseHold(db, { holdId, reason });
+}
+
+/**
+ * Reserve the customer's money against a community order, and record the
+ * escrow over it.
+ *
+ * The wallet hold is taken FIRST. If the customer cannot cover it, nothing
+ * is written at all — no escrow row in a half-funded state for someone to
+ * find later and wonder about.
+ */
+export async function holdEscrow(db: D1Database, p: HoldEscrowInput): Promise<EscrowResult> {
+  const invalid = invalidHoldInput(p);
+  if (invalid) return invalid;
+
+  const replay = await findEvent(db, p.idempotencyKey);
+  if (replay) return { ok: true, replayed: true, escrowId: replay.escrow_id };
+
+  const existing = await escrowForOrder(db, p.communityOrderId);
+  if (existing) return { ok: false, reason: 'ALREADY_EXISTS', detail: existing.id };
+
+  const reserved = await reserveEscrowFunds(db, p);
+  if (!reserved.ok) return reserved;
+
+  const escrowId = newId('esc');
+  await db.batch(escrowRecordStatements(db, p, reserved.reservation, escrowId, NOW()));
   return { ok: true, replayed: false, escrowId };
 }
 
@@ -642,22 +714,48 @@ export async function disputeEscrow(db: D1Database, p: SettleInput): Promise<Esc
   return { ok: true, replayed: false, escrowId: esc.id };
 }
 
-/** A merchant's settled balance: a SUM over the ledger, never a stored column. */
+/**
+ * WHAT A MERCHANT MAY BE PAID OUT NOW, as SQL — the ONE definition, read by
+ * `merchantBalance` below AND inside the payout route's conditional INSERT
+ * (worker/routes/adminCommunity.ts), so the figure an admin is shown and the
+ * figure the database enforces cannot drift apart. `m` is the SQL placeholder
+ * (or expression) for the merchant id.
+ *
+ * Every `available` row PLUS every payout row, which is negative. A payout is
+ * written `state = 'paid'`, so the old `SUM(state = 'available')` never went
+ * down after one: the same 10,000 could be paid out again and again
+ * (audit 02 B3, audit 04 B1). A reversal of a released sale is its own
+ * negative `available` row, so it lowers this figure too.
+ */
+export const merchantAvailableSql = (m: string) =>
+  `(SELECT COALESCE(SUM(CASE WHEN state = 'available' OR kind = 'payout' THEN amount_iqd ELSE 0 END), 0)
+      FROM merchant_payout_ledger WHERE merchant_id = ${m})`;
+
+/**
+ * A merchant's balance: SUMs over the ledger, never a stored column.
+ *
+ *   · available — `merchantAvailableSql`: what may be paid out now;
+ *   · pending   — sale credits waiting for the customer (or three days);
+ *   · paid      — PAYOUT rows only, negative. It used to be every `paid` row,
+ *     and escrow writes the platform's COMMISSION as a `paid` row, so a
+ *     merchant's «Paid out» tile showed money Levonis kept (B20).
+ */
 export async function merchantBalance(
   db: D1Database,
   merchantId: string
 ): Promise<{ available_iqd: number; pending_iqd: number; paid_iqd: number }> {
-  const { results } = await db
+  const row = await db
     .prepare(
-      `SELECT state, COALESCE(SUM(amount_iqd), 0) AS total
-         FROM merchant_payout_ledger WHERE merchant_id = ? GROUP BY state`
+      `SELECT ${merchantAvailableSql('?1')} AS available,
+              COALESCE(SUM(CASE WHEN state = 'pending' THEN amount_iqd ELSE 0 END), 0) AS pending,
+              COALESCE(SUM(CASE WHEN kind = 'payout' THEN amount_iqd ELSE 0 END), 0) AS paid
+         FROM merchant_payout_ledger WHERE merchant_id = ?1`
     )
     .bind(merchantId)
-    .all<{ state: string; total: number }>();
-  const by = new Map(results.map((r) => [r.state, Number(r.total)]));
+    .first<{ available: number; pending: number; paid: number }>();
   return {
-    available_iqd: by.get('available') ?? 0,
-    pending_iqd: by.get('pending') ?? 0,
-    paid_iqd: by.get('paid') ?? 0,
+    available_iqd: Number(row?.available) || 0,
+    pending_iqd: Number(row?.pending) || 0,
+    paid_iqd: Number(row?.paid) || 0,
   };
 }

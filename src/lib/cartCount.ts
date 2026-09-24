@@ -82,9 +82,24 @@ export function countCartItems(items: Array<{ qty?: number | null }>): number {
  */
 export function noteCartResponse(path: string, data: unknown): void {
   if (!path.startsWith('/api/cart')) return;
-  const items = (data as { items?: unknown } | null)?.items;
-  if (!Array.isArray(items)) return;
-  setCartCount(countCartItems(items as Array<{ qty?: number | null }>));
+  const total = cartResponseCount(data);
+  if (total !== null) setCartCount(total);
+}
+
+/**
+ * The units a cart response says the customer holds, or null when it says
+ * nothing. `GET /api/cart` sends `item_count` — both sellers' units — because
+ * its `items` is the Levonis half only: counting `items` put 0 on the badge
+ * over a full store cart (audit 02 B1). The merchant cart's own responses
+ * carry only their lines, which ARE the whole cart.
+ */
+export function cartResponseCount(data: unknown): number | null {
+  const body = data as { items?: unknown; item_count?: unknown } | null;
+  const declared = body?.item_count;
+  if (typeof declared === 'number' && Number.isFinite(declared) && declared >= 0) return Math.trunc(declared);
+  const items = body?.items;
+  if (!Array.isArray(items)) return null;
+  return countCartItems(items as Array<{ qty?: number | null }>);
 }
 
 export const cartCountStore = { subscribe, snapshot };

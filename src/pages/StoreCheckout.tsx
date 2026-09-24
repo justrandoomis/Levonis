@@ -11,8 +11,14 @@ import OrderCelebration from '../components/bloub/OrderCelebration';
  *
  * EVERY NUMBER COMES FROM THE QUOTE. The client sends a coupon code and an
  * address id; prices, delivery and the discount are computed server-side and
- * rendered here verbatim. Placing the order is idempotent on a random key
- * minted once per visit, so a double tap cannot buy twice.
+ * rendered here verbatim.
+ *
+ * THE ORDER IS THE QUOTE THE CUSTOMER SAW (audit 02 B12). Placing it sends the
+ * quote's fingerprint back; if anything that costs money moved in between, the
+ * server refuses `409 QUOTE_CHANGED` with the fresh quote, and this screen
+ * names the old and the new total and asks for the new one to be confirmed.
+ * The checkout key follows the agreement: the same total reuses it — a double
+ * tap cannot buy twice — and a new total mints a new one.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -23,14 +29,29 @@ import {
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, type ApiAddress } from '../lib/api';
 import { storeCheckoutApi, iqd, type StoreQuote } from '../lib/merchant';
+import { apiRefusal } from '../lib/refusalStrings';
 import { useFreshOnReturn } from '../lib/useFreshOnReturn';
 import AddressForm from '../components/address/AddressForm';
 import { useStore } from '../StoreContext';
 import { useBusy } from '../lib/busy';
 import { mascot } from '../lib/mascot';
 
+/** A fresh checkout key — one per agreed quote (see `keyFor`). */
+const newCheckoutKey = () => `sc-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
+
+/** Refusals whose remedy is in the cart, not on this screen. */
+const CART_REMEDY = new Set([
+  'OUT_OF_STOCK',
+  'PRODUCT_UNAVAILABLE',
+  'OPTION_UNAVAILABLE',
+  'CART_SELLER_CONFLICT',
+  'CART_EMPTY',
+  'STORE_CLOSED',
+  'OWN_STORE_PURCHASE',
+]);
+
 export default function StoreCheckout() {
-  const { loc, dir } = useLanguage();
+  const { loc, dir, lang } = useLanguage();
   const navigate = useNavigate();
   const { store: hostStore } = useStore();
 
@@ -52,12 +73,25 @@ export default function StoreCheckout() {
    * the summary above it. `placing` is already the authority (the button is
    * disabled on it and it is cleared in the request's own settlement); the
    * overlay only makes the refusal cover the whole screen. It is not a
-   * precondition for placing: the idempotency key minted once per visit stays
-   * the real duplicate guard, exactly as the header of this file says.
+   * precondition for placing: the idempotency key — one per agreed quote,
+   * `keyFor` below — stays the real duplicate guard, as the header says.
    */
   useBusy(placing, 'order');
   const [placeError, setPlaceError] = useState('');
+  /** What the customer can do about `placeError`, when there is something. */
+  const [placeRemedy, setPlaceRemedy] = useState<'topup' | 'cart' | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  /**
+   * THE TOTAL MOVED UNDER THE CUSTOMER — said, never absorbed (B12).
+   *
+   * Set when place-order answers QUOTE_CHANGED, and when a background
+   * re-quote (not the customer's own coupon change) comes back with a
+   * different total. The bar above the button names both figures and the
+   * button asks for the NEW one to be confirmed.
+   */
+  const [priceMoved, setPriceMoved] = useState<{ from: number; to: number } | null>(null);
+  const quoteRef = useRef<StoreQuote | null>(null);
+  quoteRef.current = quote;
 
   /**
    * THE RE-QUOTE HAD NO WAIT AT ALL, AND «تأكيد الطلب» STAYED LIVE THROUGH IT.
@@ -81,8 +115,21 @@ export default function StoreCheckout() {
   const quoteSeq = useRef(0);
   useBusy(quoteLoading && quote !== null && quoteAskedFor, 'quote');
 
-  // One key per visit: refreshing mints a new one, retrying does not.
-  const idemKey = useRef(`sc-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`);
+  /**
+   * ONE CHECKOUT KEY PER AGREEMENT, not per visit.
+   *
+   * A retry of the SAME quote — a double tap, a dropped connection — reuses
+   * the key, so the server replays the order instead of placing a second one
+   * and reuses the wallet reservation it already took. A DIFFERENT quote is a
+   * different agreement and gets a new key: the server refuses a key it has
+   * seen with another amount (IDEMPOTENCY_KEY_REUSED), so carrying the old one
+   * forward would fail the corrected order.
+   */
+  const attempt = useRef<{ fingerprint: string; key: string } | null>(null);
+  const keyFor = (fingerprint: string) => {
+    if (attempt.current?.fingerprint !== fingerprint) attempt.current = { fingerprint, key: newCheckoutKey() };
+    return attempt.current.key;
+  };
 
   const loadQuote = useCallback(
     async (code: string, askedFor = false) => {
@@ -94,6 +141,14 @@ export default function StoreCheckout() {
         const d = await storeCheckoutApi.quote(code);
         if (seq !== quoteSeq.current) return false;
         setQuote(d.quote);
+        // A total that moved on its own is named; one the customer moved with
+        // a coupon is theirs, and clears any older notice. (`quoteRef` still
+        // holds the quote on screen until the next render.)
+        const before = quoteRef.current;
+        if (askedFor) setPriceMoved(null);
+        else if (before && before.total_iqd !== d.quote.total_iqd) {
+          setPriceMoved({ from: before.total_iqd, to: d.quote.total_iqd });
+        }
         setCoupon(code);
         setQuoteError('');
         return true;
@@ -103,13 +158,15 @@ export default function StoreCheckout() {
           setCouponError(loc('هذا الكود غير صالح لهذا الطلب', 'This code cannot be used on this order', 'ئەم کۆدە بەکارناهێت'));
           return false;
         }
-        setQuoteError(e instanceof ApiError ? e.message : loc('تعذّر تسعير السلة', 'Could not price the cart', 'نەتوانرا'));
+        // The refusal's CODE, in the customer's language — never the server's
+        // English sentence (src/lib/refusalStrings.ts).
+        setQuoteError(apiRefusal(e, lang, loc('تعذّر تسعير السلة', 'Could not price the cart', 'نەتوانرا')));
         return false;
       } finally {
         if (seq === quoteSeq.current) setQuoteLoading(false);
       }
     },
-    [loc]
+    [lang, loc]
   );
 
   useEffect(() => {
@@ -147,20 +204,58 @@ export default function StoreCheckout() {
   async function place() {
     // `quoteLoading` too: the total on the button is about to change.
     if (!addressId || !quote || quoteLoading) return;
+    // The quote on screen IS the agreement: its fingerprint, its coupon, its key.
+    const agreed = quote;
     setPlacing(true);
     setPlaceError('');
+    setPlaceRemedy(null);
     try {
       const r = await storeCheckoutApi.place({
         addressId,
-        idempotencyKey: idemKey.current,
-        ...(coupon ? { couponCode: coupon } : {}),
+        idempotencyKey: keyFor(agreed.quote_fingerprint),
+        quoteFingerprint: agreed.quote_fingerprint,
+        ...(agreed.coupon_code ? { couponCode: agreed.coupon_code } : {}),
       });
-      setDone(String((r.order as Record<string, unknown>).id));
+      setPriceMoved(null);
+      setDone(String(r.order.id));
       // The same moment the platform checkout names: the order went through.
       // The confirmation below raises the stage the character appears on.
       mascot.outcome('ordered');
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'INSUFFICIENT_FUNDS') {
+      const code = e instanceof ApiError ? e.code ?? '' : '';
+      if (code === 'QUOTE_CHANGED') {
+        // Nothing was charged. The refusal carries the fresh quote: show it,
+        // name both totals, and let the customer confirm the new one — a new
+        // agreement, so the next tap sends a new key.
+        const fresh = e instanceof ApiError ? (e.details?.quote as StoreQuote | undefined) : undefined;
+        if (fresh && typeof fresh.quote_fingerprint === 'string') {
+          quoteSeq.current += 1; // a re-quote still in flight is older than this one
+          setQuoteLoading(false);
+          setQuote(fresh);
+          setCoupon(fresh.coupon_code || '');
+          setPriceMoved({ from: agreed.total_iqd, to: fresh.total_iqd });
+        } else {
+          setPlaceError(apiRefusal(e, lang, loc('تعذّر إتمام الطلب', 'Could not place the order', 'نەتوانرا')));
+          void loadQuote(coupon);
+        }
+        return;
+      }
+      if (code === 'IDEMPOTENCY_KEY_REUSED') {
+        // This key is spent — a reservation for another figure, or one already
+        // handed back. A fresh key and a fresh quote, and then the customer
+        // taps again: never a second charge attempt nobody asked for.
+        attempt.current = null;
+        setPlaceError(
+          // OWNER: Sorani to be written by hand.
+          loc(
+            'لم تكتمل المحاولة السابقة. راجع الإجمالي ثم أكّد الطلب من جديد.',
+            'The previous attempt did not complete. Review the total, then place the order again.'
+          )
+        );
+        void loadQuote(coupon);
+        return;
+      }
+      if (code === 'INSUFFICIENT_FUNDS') {
         setPlaceError(
           loc(
             'رصيد محفظتك لا يغطي هذا الطلب. اشحن المحفظة ثم أكمل الطلب.',
@@ -168,9 +263,11 @@ export default function StoreCheckout() {
             'باڵانسی جزدانەکەت بەش ناکات. پڕی بکەرەوە.'
           )
         );
-      } else {
-        setPlaceError(e instanceof ApiError ? e.message : loc('تعذّر إتمام الطلب', 'Could not place the order', 'نەتوانرا'));
+        setPlaceRemedy('topup');
+        return;
       }
+      setPlaceError(apiRefusal(e, lang, loc('تعذّر إتمام الطلب', 'Could not place the order', 'نەتوانرا')));
+      if (CART_REMEDY.has(code)) setPlaceRemedy('cart');
     } finally {
       setPlacing(false);
     }
@@ -277,7 +374,11 @@ export default function StoreCheckout() {
                     <div className="w-10 h-10 rounded-lg bg-black/40 overflow-hidden shrink-0">
                       {l.image && <img src={l.image} alt="" className="w-full h-full object-cover" />}
                     </div>
-                    <p className="text-zinc-200 flex-1 min-w-0 truncate">{l.name}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-zinc-200 truncate">{l.name}</p>
+                      {/* The option the store will prepare, in the store's own words. */}
+                      {l.variant && <p className="text-zinc-500 text-[11px] truncate">{l.variant}</p>}
+                    </div>
                     <span className="text-zinc-500 shrink-0" dir="ltr">×{l.qty}</span>
                     <span className="text-zinc-200 font-semibold shrink-0" dir="ltr">{iqd(l.line_total_iqd)}</span>
                   </div>
@@ -466,12 +567,6 @@ export default function StoreCheckout() {
               </div>
             </section>
 
-            {placeError && (
-              <div className="lv-alert lv-alert-danger">
-                <p className="text-text-secondary text-[12.5px]">{placeError}</p>
-                {topUpLink(loc('شحن المحفظة', 'Top up the wallet', 'پڕکردنەوەی جزدان'))}
-              </div>
-            )}
           </>
         )}
       </div>
@@ -480,6 +575,36 @@ export default function StoreCheckout() {
       {quote && (
         <div className="shrink-0 border-t border-border-subtle/70 bg-surface-raised/98 px-3 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="max-w-2xl mx-auto">
+            {/* What changed, and what went wrong, are said HERE — beside the
+                button the customer is about to press, not at the foot of a
+                scroll area they may not be looking at. */}
+            {priceMoved && (
+              <p role="status" data-quote-changed className="lv-alert lv-alert-warning mb-2 text-[12px] leading-relaxed text-text-primary">
+                {priceMoved.from === priceMoved.to ? (
+                  // OWNER: Sorani to be written by hand.
+                  loc('تغيّرت تفاصيل طلبك. راجعها ثم أكّد.', 'Your order details changed. Review them, then confirm.')
+                ) : (
+                  <>
+                    {/* OWNER: Sorani to be written by hand. */}
+                    {loc('تغيّر الإجمالي من', 'The total changed from')}{' '}
+                    <bdi className="tabular-nums line-through opacity-70">{iqd(priceMoved.from)}</bdi>{' '}
+                    {loc('إلى', 'to')} <bdi className="tabular-nums font-bold">{iqd(priceMoved.to)}</bdi>.{' '}
+                    {loc('راجعه ثم أكّد الطلب.', 'Review it, then confirm.')}
+                  </>
+                )}
+              </p>
+            )}
+            {placeError && (
+              <div role="alert" className="lv-alert lv-alert-danger mb-2">
+                <p className="text-text-secondary text-[12.5px]">{placeError}</p>
+                {placeRemedy === 'topup' && topUpLink(loc('شحن المحفظة', 'Top up the wallet', 'پڕکردنەوەی جزدان'))}
+                {placeRemedy === 'cart' && (
+                  <Link to="/cart" className="text-gold text-[12px] font-bold mt-1 inline-block">
+                    {loc('العودة إلى السلة', 'Back to the cart', 'گەڕانەوە بۆ سەبەتە')}
+                  </Link>
+                )}
+              </div>
+            )}
             {/* The wallet is the only way to pay here, so a balance that
                 cannot cover the total is as blocking as a missing address —
                 and is said in the same place, before the tap rather than
@@ -491,7 +616,10 @@ export default function StoreCheckout() {
               className="lv-button lv-button-primary w-full min-h-12 text-[14px]"
             >
               {placing || quoteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-              {loc('تأكيد الطلب', 'Place the order', 'دووپاتکردنەوە')}
+              {priceMoved
+                ? // OWNER: Sorani to be written by hand.
+                  loc('تأكيد الإجمالي الجديد', 'Confirm the new total')
+                : loc('تأكيد الطلب', 'Place the order', 'دووپاتکردنەوە')}
               <span dir="ltr">· {iqd(quote.total_iqd)}</span>
             </button>
             {!addressId ? (

@@ -43,6 +43,7 @@ import { WidgetIcon } from '../components/merchant/profileIcons';
 import { useStore } from '../StoreContext';
 import { useCommunityAccess } from './community/access';
 import InstallAppButton from '../components/pwa/InstallAppButton';
+import StoreUnavailable from '../components/merchant/StoreUnavailable';
 
 /**
  * The accent presets. A NAME maps to classes chosen here — a merchant never
@@ -65,10 +66,20 @@ const ACCENTS: Record<string, { ring: string; chip: string; glow: string; text: 
 
 type Tab = 'products' | 'sections' | 'deals' | 'services' | 'showcase' | 'about';
 
-/** The main site, from wherever this store is rendered. On a subdomain the
- *  messenger and the request board live on the apex; the shared cookie keeps
- *  the visitor signed in across the hop. */
-const MAIN_SITE = 'https://levonis-iq.com';
+/**
+ * The main site, from wherever this store is rendered. On a subdomain the
+ * messenger and the request board live on the apex; the shared cookie keeps
+ * the visitor signed in across the hop.
+ *
+ * FROM THE SERVER (audit 01 B19): `/api/storefront/resolve` names the root
+ * domain the Worker is configured with, and StoreContext keeps it. This was a
+ * domain typed into the bundle, so every preview and staging deployment sent
+ * its visitors to production. Empty when no root domain is configured — the
+ * links are then relative, which on such a deployment is the right answer.
+ */
+function useMainSite(): string {
+  return useStore().mainSite;
+}
 
 export default function Storefront({
   store: injected,
@@ -78,7 +89,8 @@ export default function Storefront({
   const location = useLocation();
   const { loc, lang } = useLanguage();
   const { user } = useAuth();
-  const { store: hostStore } = useStore();
+  const { store: hostStore, unknownStore: hostUnknown, unavailableStore: hostUnavailable } = useStore();
+  const MAIN_SITE = useMainSite();
   /**
    * THE BACK ARROW MUST NOT POINT AT A CLOSED DOOR.
    *
@@ -94,8 +106,13 @@ export default function Storefront({
   const backTo = communityAccess?.may_enter === false ? '/' : '/community';
 
   const [store, setStore] = useState<MerchantStore | null>(injected ?? null);
-  const [loading, setLoading] = useState(!injected);
-  const [notFound, setNotFound] = useState(false);
+  // Nothing to load on a store host whose resolve already answered "unknown"
+  // or "unavailable" — without this the page spun for ever there.
+  const [loading, setLoading] = useState(!injected && !hostUnknown && !hostUnavailable);
+  const [notFound, setNotFound] = useState(hostUnknown);
+  // The server answered STORE_UNAVAILABLE for the in-site route
+  // (`/community/store/:slug`) — an admin-suspended store.
+  const [unavailable, setUnavailable] = useState(false);
   // Old /reviews deep-links land on «عن المتجر», where the reviews now live.
   const [tab, setTab] = useState<Tab>(() =>
     location.pathname.endsWith('/reviews') || location.pathname.endsWith('/about') ? 'about' : 'products'
@@ -188,7 +205,11 @@ export default function Storefront({
     storefrontApi
       .store(routeSlug)
       .then((d) => alive && setStore(d.store))
-      .catch(() => alive && setNotFound(true))
+      .catch((e: unknown) => {
+        if (!alive) return;
+        if (e instanceof ApiError && e.code === 'STORE_UNAVAILABLE') setUnavailable(true);
+        else setNotFound(true);
+      })
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
@@ -207,6 +228,10 @@ export default function Storefront({
   }, [slug]);
 
   const accent = ACCENTS[store?.accent ?? 'default'] ?? ACCENTS.default;
+
+  // OWNER DECISION (2026-09-24): an admin-suspended store is this page and
+  // nothing else — the server sends nothing of the shop to render anyway.
+  if (hostUnavailable || unavailable) return <StoreUnavailable />;
 
   if (loading) {
     return (
@@ -232,7 +257,8 @@ export default function Storefront({
             )}
           </p>
           <a
-            href={MAIN_SITE}
+            href={MAIN_SITE ? `${MAIN_SITE}/` : '/'}
+            translate="no"
             className="inline-flex items-center gap-2 min-h-[44px] px-5 rounded-2xl bg-olive text-white font-bold text-[13px]"
           >
             LEVONIS
@@ -274,7 +300,7 @@ export default function Storefront({
               corners, not writing-direction ones. */}
           {hostStore ? (
             <a
-              href={`${MAIN_SITE}${backTo === '/' ? '' : backTo}`}
+              href={`${MAIN_SITE}${backTo}`}
               className="absolute top-3 left-3 w-9 h-9 flex items-center justify-center text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
               aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
             >
@@ -1027,6 +1053,8 @@ function ServicesTab({
   const { loc } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const MAIN_SITE = useMainSite();
+  const [chatFailed, setChatFailed] = useState(false);
   const requestsHref = onHost ? `${MAIN_SITE}/requests` : '/requests';
   // The request board IS Levo Community and closes with it (DECISIONS 110):
   // while it is shut to this viewer the quote door would open onto the
@@ -1039,12 +1067,14 @@ function ServicesTab({
       window.location.href = `/auth?next=${encodeURIComponent(window.location.pathname)}`;
       return;
     }
+    setChatFailed(false);
     try {
       const r = await api.post<{ chatId: string }>('/api/chats/open', { merchantId });
       if (onHost) window.location.href = `${MAIN_SITE}/chat/${r.chatId}`;
       else navigate(`/chat/${r.chatId}`);
-    } catch (e) {
-      if (e instanceof ApiError) alert(e.message);
+    } catch {
+      // Said on the button itself, not in a native alert that blocks the page.
+      setChatFailed(true);
     }
   }
 
@@ -1107,10 +1137,16 @@ function ServicesTab({
           onClick={openChat}
           className={`h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-200 font-bold text-[12px] flex items-center justify-center gap-1.5 ${quotes ? '' : 'col-span-2'}`}
         >
-          <MessageCircle className="w-3.5 h-3.5" />
+          <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />
           {loc('مراسلة المتجر', 'Message the store', 'نامە بۆ فرۆشگا')}
         </button>
       </div>
+      {chatFailed && (
+        <p role="alert" className="text-red-300/90 text-[11.5px] text-center">
+          {loc('تعذّر فتح المحادثة — حاول مجددًا.', 'Could not open the conversation — try again.')}
+          {/* OWNER: Sorani to be written by hand. */}
+        </p>
+      )}
       {quotes && (
         <p className="text-zinc-600 text-[10.5px] text-center">
           {loc(
@@ -1504,7 +1540,16 @@ function ContactButton({
   profileOnly?: boolean;
 }) {
   const navigate = useNavigate();
+  const MAIN_SITE = useMainSite();
   const [busy, setBusy] = useState(false);
+  // A failed open is said ON the button for a few seconds (and announced),
+  // not in a native alert that blocks the whole page.
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!failed) return;
+    const t = setTimeout(() => setFailed(false), 4000);
+    return () => clearTimeout(t);
+  }, [failed]);
 
   async function open() {
     if (!signedIn) {
@@ -1512,12 +1557,13 @@ function ContactButton({
       return;
     }
     setBusy(true);
+    setFailed(false);
     try {
       const r = await api.post<{ chatId: string }>('/api/chats/open', { merchantId });
       if (onHost) window.location.href = `${MAIN_SITE}/chat/${r.chatId}`;
       else navigate(`/chat/${r.chatId}`);
-    } catch (e) {
-      if (e instanceof ApiError) alert(e.message);
+    } catch {
+      setFailed(true);
     } finally {
       setBusy(false);
     }
@@ -1529,12 +1575,16 @@ function ContactButton({
       disabled={busy}
       className={`flex-1 h-[30px] rounded-xl font-semibold text-[13px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-50 ${accentBtn}`}
     >
-      {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircleMore className="w-3.5 h-3.5" strokeWidth={1.75} />}
+      {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <MessageCircleMore className="w-3.5 h-3.5" strokeWidth={1.75} aria-hidden="true" />}
       {/* A profile with no store behind it is a person to talk to, and the
           «مراسلة» name is a pinned contract for that page. */}
-      {profileOnly
-        ? loc('مراسلة', 'Message', 'نامە')
-        : loc('تواصل مع المتجر', 'Contact the store', 'پەیوەندی بە فرۆشگا')}
+      <span aria-live="polite">
+        {failed
+          ? loc('تعذّر الفتح — حاول مجددًا', 'Could not open — try again') /* OWNER: Sorani to be written by hand. */
+          : profileOnly
+            ? loc('مراسلة', 'Message', 'نامە')
+            : loc('تواصل مع المتجر', 'Contact the store', 'پەیوەندی بە فرۆشگا')}
+      </span>
     </button>
   );
 }

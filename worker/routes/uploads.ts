@@ -4,6 +4,7 @@ import type { AppContext } from '../lib/types';
 import { requireAuth, badRequest, forbidden, notFound, oneOf, str, unavailable } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
+import { recordStaffChatFileRead } from './chats';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import {
   buildMediaKey,
@@ -658,6 +659,9 @@ fileRoutes.get('/*', async (c) => {
         .bind(chatId, user.id)
         .first();
       if (!row && user.role !== 'admin') throw forbidden('Not your file');
+      // Staff reading a merchant↔customer thread they are not part of is
+      // recorded, file by file as message by message (audit 04 #11).
+      if (!row) await recordStaffChatFileRead(c, chatId);
     } else if (key.startsWith('support/')) {
       /**
        * ONE QUESTION: IS THIS YOUR TICKET.

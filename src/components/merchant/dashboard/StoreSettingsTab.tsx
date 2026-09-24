@@ -48,6 +48,26 @@ const DAY_PRESETS: Array<[string, string]> = [
   ['الجمعة', 'Friday'],
 ];
 
+/**
+ * The save's refusals as this screen's own sentences — the server's codes,
+ * never its English text (the codes are pinned in worker/routes/merchant.ts).
+ */
+function settingsRefusal(e: unknown, loc: (ar: string, en: string, ckb?: string) => string): string {
+  const code = e instanceof ApiError ? e.code : '';
+  switch (code) {
+    case 'STORE_SUSPENDED':
+      return loc('المتجر موقوف من Levonis، ولا يُعاد فتحه من هنا. بقية الإعدادات تُحفظ كالمعتاد.', 'Levonis has suspended this store; it cannot be re-opened from here. Your other settings still save.'); // OWNER: Sorani to be written by hand.
+    case 'MERCHANT_SUSPENDED':
+      return loc('حساب التاجر موقوف، فلا يمكن فتح المتجر. تواصل مع الدعم.', 'Your merchant account is suspended, so the store cannot be opened. Contact support.'); // OWNER: Sorani to be written by hand.
+    case 'SUBSCRIPTION_INACTIVE':
+      return loc('اشتراكك غير فعّال. جدّده لإعادة فتح المتجر.', 'Your subscription is not active. Renew it to re-open the store.'); // OWNER: Sorani to be written by hand.
+    case 'GOVERNORATE_INVALID':
+      return loc('اختر المحافظة من القائمة.', 'Choose a governorate from the list.'); // OWNER: Sorani to be written by hand.
+    default:
+      return loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت');
+  }
+}
+
 export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () => void }) {
   const { loc, lang } = useLanguage();
   const store = me.store!;
@@ -132,12 +152,16 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
           ...(f.delivery_free_over !== '' ? { free_over_iqd: Number(f.delivery_free_over) || 0 } : {}),
           ...(f.delivery_note ? { note: f.delivery_note } : {}),
         },
-        open: f.open,
+        // Open/closed goes up ONLY when the merchant changed it (audit 01 B4):
+        // it used to ride along on every save, so a store Levonis had
+        // suspended could not save a thing — not even the banner it was
+        // suspended for. On a suspended store it is never sent at all.
+        ...(!suspended && f.open !== (store.status === 'active') ? { open: f.open } : {}),
       });
       setSaved(true);
       onSaved();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : loc('تعذّر الحفظ', 'Could not save', 'نەتوانرا پاشەکەوت بکرێت'));
+      setError(settingsRefusal(e, loc));
     } finally {
       setSaving(false);
     }
@@ -232,6 +256,12 @@ export function StoreSettingsTab({ me, onSaved }: { me: MerchantMe; onSaved: () 
               className="w-full h-10 rounded-xl bg-black/40 border border-white/10 px-3 text-white text-[13px] outline-none focus:border-gold/40"
             >
               <option value="">{loc('— اختر —', '— choose —', '—')}</option>
+              {/* A store saved before the closed list (audit 02 B27) holds free
+                  text: it stays readable here, and saving it back leaves it
+                  exactly as it is until a governorate is chosen. */}
+              {f.governorate && !GOVERNORATES.some((g) => g.id === f.governorate) && (
+                <option value={f.governorate}>{f.governorate}</option>
+              )}
               {GOVERNORATES.map((g) => (
                 <option key={g.id} value={g.id}>
                   {lang === 'ckb' ? g.ckb : lang === 'en' ? g.en : g.ar}

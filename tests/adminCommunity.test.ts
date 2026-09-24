@@ -196,8 +196,14 @@ test('a store cannot be re-opened while its merchant is suspended', async () => 
 
   const res = await post(app, '/api/admin/community/stores/s1/status', { status: 'active', reason: '' });
   assert.equal(res.status, 409);
+  // The merchant sanction shuts the shop from the MERCHANT row; it no longer
+  // writes the store's own status (audit 04 B2 — see
+  // tests/merchantSanctionsModeration.test.ts), and the refused re-open wrote
+  // nothing either.
   const store = raw.prepare('SELECT status FROM merchant_stores WHERE id = ?').get('s1') as { status: string };
-  assert.equal(store.status, 'suspended');
+  assert.equal(store.status, 'active');
+  const merchant = raw.prepare('SELECT status FROM community_merchants WHERE id = ?').get('m1') as { status: string };
+  assert.equal(merchant.status, 'suspended');
 });
 
 test('a store sanction cannot be set to `paused` — that is the merchant\'s own switch', async () => {

@@ -7,8 +7,12 @@ import {
   merchantScope,
   PLATFORM_SCOPE,
   CART_SELLER_CONFLICT,
+  isCartSellerAbort,
   type SellerLine,
+  type SellerScope,
 } from '../lib/cartSeller';
+import { storeById } from '../lib/merchantAuth';
+import { isOwnStore, merchantVariantLabel, storeTakesOrders } from '../lib/storeOrderOps';
 import type { Context } from 'hono';
 import { cartLineSelect } from '../lib/cartLineProjection';
 import type { AppContext } from '../lib/types';
@@ -1084,7 +1088,25 @@ cartRoutes.post('/coupon-check', async (c) => {
 });
 
 cartRoutes.get('/', async (c) => {
-  const { items, tier, tierActive, delivery_methods, membership } = await loadCart(c);
+  const user = c.get('user')!;
+  // `loadCart` prices the PLATFORM lines — it joins `products`, so a store
+  // line never appears in `items`. The scope and the badge count therefore
+  // come from EVERY line of the user (B1): computed from `items` alone, a cart
+  // holding only a store's goods answered `scope: null`, the cart page never
+  // rendered the store cart — the only way to /store-checkout — and the badge
+  // was reset to 0 over a full cart.
+  const [{ items, tier, tierActive, delivery_methods, membership }, allLines] = await Promise.all([
+    loadCart(c),
+    c.env.DB
+      .prepare('SELECT seller_type, merchant_id, store_id, qty FROM cart_items WHERE user_id = ? ORDER BY created_at, id')
+      .bind(user.id)
+      .all<{ seller_type: string; merchant_id: string | null; store_id: string | null; qty: number }>(),
+  ]);
+  const lines = allLines.results ?? [];
+  const merchantUnits = lines
+    .filter((l) => l.seller_type === 'merchant')
+    .reduce((n, l) => n + (Number(l.qty) || 0), 0);
+  const platformUnits = (items as Array<{ qty?: unknown }>).reduce((n, it) => n + (Number(it.qty) || 0), 0);
   // §1: the type the cart is locked to, so the storefront can say so before
   // the customer discovers it by being refused. null = empty, so any type may
   // still be started.
@@ -1109,7 +1131,13 @@ cartRoutes.get('/', async (c) => {
     membership,
     delivery_methods,
     shipping_type: shippingType,
-    scope: cartSellerScope(items as unknown as SellerLine[]),
+    scope: cartSellerScope(lines),
+    /**
+     * Every unit in the cart, from either seller — what the badge shows.
+     * `items` alone is the platform half, and counting it zeroed the badge
+     * over a store cart (src/lib/cartCount.ts prefers this field).
+     */
+    item_count: platformUnits + merchantUnits,
   });
 });
 
@@ -1127,40 +1155,35 @@ cartRoutes.get('/', async (c) => {
  * `replaceCart: true` is that first choice arriving as one request: the caller
  * has already confirmed, and doing it in a single call means a cart can never
  * be left emptied with nothing added because the second request failed.
+ *
+ * THE EMPTYING IS RETURNED, NOT RUN (B15). It used to be a `DELETE` of its
+ * own, executed here — before the caller had written anything — so a refusal
+ * or a failure after this point (a racing store add refused by the 0114
+ * trigger, a transient D1 error) left the customer's cart emptied with nothing
+ * added, the one outcome the comment above promised could not happen. The
+ * caller now runs these statements IN THE SAME BATCH as its insert: the cart
+ * is emptied exactly when the new line lands, or not at all.
  */
 async function enforceCartScope(
   c: Context<AppContext>,
   incomingType: ShippingType,
   replaceCart: boolean
-): Promise<void> {
+): Promise<D1PreparedStatement[]> {
   const user = c.get('user')!;
   const { results: existingLines } = await c.env.DB
     .prepare('SELECT transport_method, seller_type, merchant_id, store_id FROM cart_items WHERE user_id = ?')
     .bind(user.id)
     .all<{ transport_method: string; seller_type: string; merchant_id: string | null; store_id: string | null }>();
   const currentType = cartShippingType(existingLines);
+  const emptyCart = c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id);
 
   // This is a Levonis product; if the cart is currently a merchant's, the two
   // cannot settle as one order — different fulfilment, different commission,
   // different party responsible. Refused the same way whether or not the
   // client showed the customer a dialogue first.
   const sellerClash = sellerConflict(existingLines as SellerLine[], PLATFORM_SCOPE);
-  if (sellerClash && !replaceCart) {
-    const shop = sellerClash.current.merchant_id
-      ? await c.env.DB.prepare('SELECT name FROM community_merchants WHERE id = ?')
-          .bind(sellerClash.current.merchant_id)
-          .first<{ name: string }>()
-      : null;
-    throw badRequest(
-      'Your cart holds items from another store. Empty it to shop from LEVONIS.',
-      CART_SELLER_CONFLICT,
-      conflictDetails(sellerClash, { current: shop?.name ?? null, incoming: 'LEVONIS' })
-    );
-  }
-  if (sellerClash && replaceCart) {
-    await c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id).run();
-    return;
-  }
+  if (sellerClash && !replaceCart) throw await sellerConflictRefusal(c, PLATFORM_SCOPE, 'LEVONIS');
+  if (sellerClash && replaceCart) return [emptyCart];
 
   if (currentType !== null && currentType !== incomingType) {
     if (!replaceCart) {
@@ -1170,8 +1193,44 @@ async function enforceCartScope(
         { cart_shipping_type: currentType, incoming_shipping_type: incomingType }
       );
     }
-    await c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id).run();
+    return [emptyCart];
   }
+  return [];
+}
+
+/**
+ * The 400 CART_SELLER_CONFLICT, naming BOTH shops, built from the cart as it
+ * is NOW — for the read-then-decide refusal and for the 0114 trigger's, so
+ * a customer cannot tell which of the two stopped them and never needs to.
+ */
+async function sellerConflictRefusal(
+  c: Context<AppContext>,
+  incoming: SellerScope,
+  incomingName: string
+): Promise<HttpError> {
+  const user = c.get('user')!;
+  const { results: lines } = await c.env.DB
+    .prepare('SELECT seller_type, merchant_id, store_id FROM cart_items WHERE user_id = ? ORDER BY created_at, id')
+    .bind(user.id)
+    .all<SellerLine>();
+  // A clash the read cannot see any more (the other line was removed in the
+  // meantime) is still reported as what it was: another seller got there first.
+  const clash = sellerConflict(lines, incoming) ?? { current: cartSellerScope(lines) ?? incoming, incoming };
+  const currentName =
+    clash.current.seller_type === 'levonis'
+      ? 'LEVONIS'
+      : clash.current.merchant_id
+        ? ((await c.env.DB.prepare('SELECT name FROM community_merchants WHERE id = ?')
+            .bind(clash.current.merchant_id)
+            .first<{ name: string }>())?.name ?? null)
+        : null;
+  return badRequest(
+    incoming.seller_type === 'levonis'
+      ? 'Your cart holds items from another store. Empty it to shop from LEVONIS.'
+      : 'Your cart holds items from a different seller. Empty it to shop from this store.',
+    CART_SELLER_CONFLICT,
+    conflictDetails(clash, { current: currentName, incoming: incomingName })
+  );
 }
 
 function parseTransportMethod(v: unknown): string {
@@ -1317,7 +1376,7 @@ async function addCompositionLine(
     throw e;
   }
 
-  await enforceCartScope(c, typeForTransport(method), body.replaceCart === true);
+  const replacing = await enforceCartScope(c, typeForTransport(method), body.replaceCart === true);
 
   const key = compositionKey(isMystery ? mysteryKeyInput(familyId) : keyInput(choices));
   const identityIds = canonicalOptionValueIds(familyId ? [familyId] : []);
@@ -1328,14 +1387,17 @@ async function addCompositionLine(
   // key), so the cap is judged against the merged quantity and refused with
   // the number — never clamped afterwards, which would silently rewrite the
   // one number the customer is touching.
-  const merged = await c.env.DB
-    .prepare(
-      `SELECT id, qty FROM cart_items
-        WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ?
-          AND color_id = '' AND shipping_method_id = ''`
-    )
-    .bind(user.id, productId, key, identityJson)
-    .first<{ id: string; qty: number }>();
+  // A cart about to be emptied (`replacing`) holds no line to merge into.
+  const merged = replacing.length
+    ? null
+    : await c.env.DB
+        .prepare(
+          `SELECT id, qty FROM cart_items
+            WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ?
+              AND color_id = '' AND shipping_method_id = ''`
+        )
+        .bind(user.id, productId, key, identityJson)
+        .first<{ id: string; qty: number }>();
   if (merged) refuseComposition(b, (Number(merged.qty) || 0) + qty, label);
 
   const lineId = newId('ci');
@@ -1350,19 +1412,29 @@ async function addCompositionLine(
   // five-column index before 0082, both v1+v2 during the rolling deploy, and
   // 0083's six-column index afterwards. Naming either shape would strand the
   // Worker on one side of that expand/contract boundary.
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
-                               shipping_method_id, transport_method, warranty_plan_id, qty, draw_salt)
-       VALUES (?, ?, ?, ?, ?, '', '', ?, '', ?, ?)
-       ON CONFLICT DO UPDATE SET qty = MIN(99, qty + excluded.qty),
-                     transport_method = excluded.transport_method`
-    ).bind(lineId, user.id, productId, key, identityJson, method, qty, salt),
-    ...cartChoiceStatements(c.env.DB, user.id, productId, key, identityIds, choices),
-    // §12's `adds`, in the SAME batch as the line it counts — so a counted add
-    // is an add that happened, and a tap costs no extra round trip.
-    ...(addMetric ? [addMetric] : []),
-  ]);
+  try {
+    await c.env.DB.batch([
+      // The confirmed "empty the cart first", in the same transaction as the
+      // line that replaces it (B15).
+      ...replacing,
+      c.env.DB.prepare(
+        `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
+                                 shipping_method_id, transport_method, warranty_plan_id, qty, draw_salt)
+         VALUES (?, ?, ?, ?, ?, '', '', ?, '', ?, ?)
+         ON CONFLICT DO UPDATE SET qty = MIN(99, qty + excluded.qty),
+                       transport_method = excluded.transport_method`
+      ).bind(lineId, user.id, productId, key, identityJson, method, qty, salt),
+      ...cartChoiceStatements(c.env.DB, user.id, productId, key, identityIds, choices),
+      // §12's `adds`, in the SAME batch as the line it counts — so a counted add
+      // is an add that happened, and a tap costs no extra round trip.
+      ...(addMetric ? [addMetric] : []),
+    ]);
+  } catch (e) {
+    // A store line landed between this door's read and its write; the 0114
+    // trigger refused the mix inside the statement.
+    if (isCartSellerAbort(e)) throw await sellerConflictRefusal(c, PLATFORM_SCOPE, 'LEVONIS');
+    throw e;
+  }
 
   const { items, tier: t, tierActive: ta } = await loadCart(c);
   return c.json({ success: true, items, tier: t, tierActive: ta });
@@ -1678,7 +1750,7 @@ cartRoutes.post('/items', async (c) => {
   // ONE SHIPPING TYPE PER CART and ONE SELLER PER CART, checked before
   // anything is written — the same two rules, in the same function, for an
   // ordinary product and for a bundle.
-  await enforceCartScope(c, typeForTransport(transportMethod), body.replaceCart === true);
+  const replacing = await enforceCartScope(c, typeForTransport(transportMethod), body.replaceCart === true);
 
   // shipping_method_id stays '' — legacy column kept for the UNIQUE key only,
   // pricing is entirely resolver-driven now.
@@ -1701,14 +1773,17 @@ cartRoutes.post('/items', async (c) => {
   // never picked it for. An add that names a DIFFERENT plan than the line
   // holds (including a line with none) is refused, naming the fix; an add that
   // names none keeps the line's plan (the CASE in the upsert below).
-  const existingLine = await c.env.DB
-    .prepare(
-      `SELECT id, warranty_plan_id FROM cart_items
-        WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ?
-          AND color_id = ? AND shipping_method_id = ''`
-    )
-    .bind(user.id, productId, primaryOption, canonicalJson, colorId)
-    .first<{ id: string; warranty_plan_id: string | null }>();
+  // A cart about to be emptied (`replacing`) holds no line to merge into.
+  const existingLine = replacing.length
+    ? null
+    : await c.env.DB
+        .prepare(
+          `SELECT id, warranty_plan_id FROM cart_items
+            WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ?
+              AND color_id = ? AND shipping_method_id = ''`
+        )
+        .bind(user.id, productId, primaryOption, canonicalJson, colorId)
+        .first<{ id: string; warranty_plan_id: string | null }>();
   if (existingLine && warrantyPlanId && warrantyPlanId !== String(existingLine.warranty_plan_id ?? '')) {
     throw conflict(
       'This printer is already in your cart with a different extended-warranty choice — change it from the cart.',
@@ -1719,23 +1794,33 @@ cartRoutes.post('/items', async (c) => {
   // Intentionally targetless for the same three-schema rollout as the bundle
   // upsert above: old-only, v1+v2, then v2-only. Stage C enables the multi-
   // group UI only after the separate 0083 contract deployment completes.
-  await c.env.DB.prepare(
-    `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
-                             shipping_method_id, transport_method, fulfillment_type, warranty_plan_id, qty)
-     VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
-     ON CONFLICT DO UPDATE SET qty = MIN(99, qty + excluded.qty),
-                   option_value_ids = excluded.option_value_ids,
-                   transport_method = excluded.transport_method,
-                   fulfillment_type = excluded.fulfillment_type,
-                   warranty_plan_id = CASE WHEN excluded.warranty_plan_id = ''
-                                           THEN cart_items.warranty_plan_id
-                                           ELSE excluded.warranty_plan_id END`
-  )
-    .bind(
-      newId('ci'), user.id, productId, primaryOption, canonicalJson, colorId,
-      transportMethod, fulfillmentType, warrantyPlanId, qty
-    )
-    .run();
+  try {
+    await c.env.DB.batch([
+      // The confirmed "empty the cart first", in the same transaction as the
+      // line that replaces it (B15).
+      ...replacing,
+      c.env.DB.prepare(
+        `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
+                                 shipping_method_id, transport_method, fulfillment_type, warranty_plan_id, qty)
+         VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
+         ON CONFLICT DO UPDATE SET qty = MIN(99, qty + excluded.qty),
+                       option_value_ids = excluded.option_value_ids,
+                       transport_method = excluded.transport_method,
+                       fulfillment_type = excluded.fulfillment_type,
+                       warranty_plan_id = CASE WHEN excluded.warranty_plan_id = ''
+                                               THEN cart_items.warranty_plan_id
+                                               ELSE excluded.warranty_plan_id END`
+      ).bind(
+        newId('ci'), user.id, productId, primaryOption, canonicalJson, colorId,
+        transportMethod, fulfillmentType, warrantyPlanId, qty
+      ),
+    ]);
+  } catch (e) {
+    // A store line landed between this door's read and its write; the 0114
+    // trigger refused the mix inside the statement.
+    if (isCartSellerAbort(e)) throw await sellerConflictRefusal(c, PLATFORM_SCOPE, 'LEVONIS');
+    throw e;
+  }
 
   const { items, tier: t, tierActive: ta } = await loadCart(c);
 
@@ -2132,8 +2217,19 @@ cartRoutes.delete('/items/:id', async (c) => {
 // posts `price_iqd` is ignored, not trusted and not rejected-with-a-hint.
 // ---------------------------------------------------------------------------
 
-/** Loads a merchant product that is actually buyable right now. */
+/**
+ * Loads a merchant product that is actually buyable right now — by THIS
+ * customer, from a store that may take THIS order (B11, B17).
+ *
+ * Each refusal names only what a shopper needs to know. "This store is not
+ * taking orders" is true whether the merchant paused it, an admin suspended
+ * it, or their subscription lapsed — a customer has no business being told
+ * which, and a probe learns nothing about another account's billing. The
+ * rule itself is the store's owner's own (`storeTakesOrders`), the one the
+ * checkout asks too, so the cart and the checkout cannot disagree.
+ */
 async function loadBuyableMerchantProduct(c: Context<AppContext>, productId: string) {
+  const user = c.get('user')!;
   const row = await c.env.DB.prepare(
     `SELECT p.*, s.id AS s_id, s.slug AS s_slug, s.name AS s_name, s.status AS s_status,
             m.id AS m_id, m.name AS m_name, m.status AS m_status
@@ -2144,12 +2240,15 @@ async function loadBuyableMerchantProduct(c: Context<AppContext>, productId: str
   ).bind(productId).first<Record<string, unknown>>();
 
   if (!row) throw notFound('Product not found');
-  // Each refusal names only what a shopper needs to know. "This store is not
-  // taking orders" is true whether the merchant paused it, an admin suspended
-  // it, or their subscription lapsed — a customer has no business being told
-  // which, and a probe learns nothing about another account's billing.
   if (row.lifecycle !== 'active' || row.status !== 'active') throw notFound('Product not found');
-  if (row.s_status !== 'active' || row.m_status === 'suspended') {
+  const ctx = await storeById(c.env.DB, String(row.s_id));
+  if (!ctx || ctx.merchant.id !== String(row.m_id)) {
+    throw badRequest('This store is not taking orders right now', 'STORE_CLOSED');
+  }
+  if (isOwnStore(ctx, user.id)) {
+    throw new HttpError(403, 'A store cannot buy from itself', 'OWN_STORE_PURCHASE');
+  }
+  if (!(await storeTakesOrders(c.env.DB, ctx)).ok) {
     throw badRequest('This store is not taking orders right now', 'STORE_CLOSED');
   }
   return row;
@@ -2165,54 +2264,76 @@ cartRoutes.post('/merchant-items', async (c) => {
   const replaceCart = body.replaceCart === true;
 
   const product = await loadBuyableMerchantProduct(c, productId);
-  const incoming = merchantScope(String(product.m_id), String(product.s_id));
 
-  const { results: existingLines } = await c.env.DB
-    .prepare('SELECT seller_type, merchant_id, store_id FROM cart_items WHERE user_id = ?')
-    .bind(user.id)
-    .all<SellerLine>();
-
-  const clash = sellerConflict(existingLines, incoming);
-  if (clash && !replaceCart) {
-    // Name BOTH shops. "Items from another store" leaves the customer
-    // guessing which of the shops they were browsing is in the way.
-    const currentName = clash.current.seller_type === 'levonis'
-      ? 'LEVONIS'
-      : (await c.env.DB.prepare('SELECT name FROM community_merchants WHERE id = ?')
-          .bind(clash.current.merchant_id)
-          .first<{ name: string }>())?.name ?? null;
+  // AN OPTION OR COLOUR IS AN ENTRY THE MERCHANT PUT ON THE PRODUCT (B16).
+  // These ids used to be any 60 characters a client sent, and reached the
+  // merchant's order as the chosen variant — «GOLD PLATED (paid +20000)» at
+  // the base price. Nothing chosen is still fine: the storefront offers no
+  // picker today, and a product sells as itself.
+  const variant = merchantVariantLabel(product.options, product.colors, optionId, colorId);
+  if (!variant.ok) {
     throw badRequest(
-      'Your cart holds items from a different seller. Empty it to shop from this store.',
-      CART_SELLER_CONFLICT,
-      conflictDetails(clash, { current: currentName, incoming: String(product.m_name) })
+      `That ${variant.which} is not offered for this product`,
+      variant.which === 'option' ? 'OPTION_INVALID' : 'COLOR_INVALID'
     );
   }
-  if (clash && replaceCart) {
-    // One request, one confirmed intent — so the cart can never be left
-    // emptied with nothing added because a second call failed.
-    await c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id).run();
-  }
 
-  // Stock, from the row that was just read under the same request.
-  if (product.track_stock && Number(product.stock) < qty) {
+  const incoming = merchantScope(String(product.m_id), String(product.s_id));
+  const { results: existingLines } = await c.env.DB
+    .prepare('SELECT seller_type, merchant_id, store_id, community_product_id, qty FROM cart_items WHERE user_id = ? ORDER BY created_at, id')
+    .bind(user.id)
+    .all<SellerLine & { community_product_id: string | null; qty: number }>();
+
+  // Name BOTH shops. "Items from another store" leaves the customer guessing
+  // which of the shops they were browsing is in the way.
+  const clash = sellerConflict(existingLines, incoming);
+  if (clash && !replaceCart) throw await sellerConflictRefusal(c, incoming, String(product.m_name));
+  const replacing = !!clash && replaceCart;
+
+  // STOCK, OVER EVERY LINE OF THIS PRODUCT (B5). Two colours of a product with
+  // one unit left were two lines of one unit each, and each passed a check
+  // that only looked at itself. After a replace the cart holds nothing else.
+  const alreadyInCart = replacing
+    ? 0
+    : existingLines
+        .filter((l) => String(l.community_product_id ?? '') === productId)
+        .reduce((n, l) => n + (Number(l.qty) || 0), 0);
+  if (product.track_stock && Number(product.stock) < alreadyInCart + qty) {
     throw badRequest('Not enough stock for that quantity', 'OUT_OF_STOCK', {
-      available: Number(product.stock),
+      available: Math.max(0, Number(product.stock) - alreadyInCart),
     });
   }
 
+  // VALIDATED FIRST, EMPTIED IN THE SAME BATCH AS THE ADD (B15). The confirmed
+  // "empty the cart and shop here" used to delete the cart before the stock
+  // check above, so a refused add left the customer with no cart at all —
+  // the one outcome SellerConflictDialog promises cannot happen.
   const id = newId('ci');
-  await c.env.DB.prepare(
-    `INSERT INTO cart_items
-       (id, user_id, seller_type, merchant_id, store_id, community_product_id, option_id, color_id, qty)
-     VALUES (?, ?, 'merchant', ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (user_id, community_product_id, option_id, color_id)
-       WHERE community_product_id IS NOT NULL
-     DO UPDATE SET qty = MIN(99, cart_items.qty + excluded.qty)`
-  ).bind(id, user.id, product.m_id, product.s_id, productId, optionId, colorId, qty).run();
+  try {
+    await c.env.DB.batch([
+      ...(replacing ? [c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id)] : []),
+      c.env.DB.prepare(
+        `INSERT INTO cart_items
+           (id, user_id, seller_type, merchant_id, store_id, community_product_id, option_id, color_id, qty)
+         VALUES (?, ?, 'merchant', ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (user_id, community_product_id, option_id, color_id)
+           WHERE community_product_id IS NOT NULL
+         DO UPDATE SET qty = MIN(99, cart_items.qty + excluded.qty)`
+      ).bind(id, user.id, product.m_id, product.s_id, productId, optionId, colorId, qty),
+    ]);
+  } catch (e) {
+    // Another seller's line landed between the read above and this write; the
+    // 0114 trigger refused the mix inside the statement (B8).
+    if (isCartSellerAbort(e)) throw await sellerConflictRefusal(c, incoming, String(product.m_name));
+    throw e;
+  }
 
   const cart = await loadMerchantCart(c);
   return c.json({ success: true, ...cart }, 201);
 });
+
+/** Why a merchant cart line cannot be bought right now — the reason the cart shows beside it. */
+type MerchantLineBlock = 'unavailable' | 'out_of_stock' | 'option_gone' | 'store_closed' | 'own_store' | 'other_store';
 
 /**
  * The merchant half of the cart, priced from the database.
@@ -2223,13 +2344,20 @@ cartRoutes.post('/merchant-items', async (c) => {
  * to a merchant's own goods. Forcing one function to do both would make the
  * platform path harder to read in order to serve a path that needs almost
  * none of it. The two never run together anyway: a cart is one seller.
+ *
+ * `available` IS THE CHECKOUT'S OWN ANSWER, asked early (B25): a hidden
+ * product, a store that stopped taking orders, a choice the merchant removed,
+ * or too few units across the product's lines — each one the checkout would
+ * refuse, now said beside the line with its reason instead of discovered at
+ * the last tap.
  */
 async function loadMerchantCart(c: Context<AppContext>) {
   const user = c.get('user')!;
   const { results } = await c.env.DB.prepare(
-    `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.color_id,
+    `SELECT ci.id AS cart_item_id, ci.qty, ci.option_id, ci.color_id, ci.created_at AS added_at,
             p.id, p.name, p.name_ar, p.images, p.price_iqd, p.original_price_iqd,
-            p.stock, p.track_stock, p.lifecycle, p.prep_days,
+            p.stock, p.track_stock, p.lifecycle, p.status AS product_status, p.prep_days,
+            p.options, p.colors, p.store_id AS product_store_id,
             s.id AS store_id, s.slug AS store_slug, s.name AS store_name,
             m.id AS merchant_id, m.name AS merchant_name
        FROM cart_items ci
@@ -2237,8 +2365,26 @@ async function loadMerchantCart(c: Context<AppContext>) {
        JOIN merchant_stores s ON s.id = ci.store_id
        JOIN community_merchants m ON m.id = ci.merchant_id
       WHERE ci.user_id = ? AND ci.seller_type = 'merchant'
-      ORDER BY ci.created_at DESC`
+      ORDER BY ci.created_at DESC, ci.id DESC`
   ).bind(user.id).all<Record<string, unknown>>();
+
+  // The cart belongs to its OLDEST line's seller — the one every door compares
+  // an add against. A cart the 0114 guard predates may still hold a second
+  // store; those lines are shown, flagged, and removable, never checked out.
+  const oldest = results.length ? results[results.length - 1] : null;
+  const ctx = oldest ? await storeById(c.env.DB, String(oldest.store_id)) : null;
+  const storeBlock: MerchantLineBlock | null = !ctx
+    ? oldest ? 'store_closed' : null
+    : isOwnStore(ctx, user.id)
+      ? 'own_store'
+      : (await storeTakesOrders(c.env.DB, ctx)).ok
+        ? null
+        : 'store_closed';
+
+  const unitsPerProduct = new Map<string, number>();
+  for (const r of results) {
+    unitsPerProduct.set(String(r.id), (unitsPerProduct.get(String(r.id)) ?? 0) + (Number(r.qty) || 0));
+  }
 
   let subtotal = 0;
   const items = results.map((r) => {
@@ -2246,6 +2392,20 @@ async function loadMerchantCart(c: Context<AppContext>) {
     const qty = Number(r.qty) || 1;
     const line = unit * qty;
     subtotal += line;
+    const tracked = !!Number(r.track_stock);
+    const block: MerchantLineBlock | null =
+      String(r.merchant_id) !== String(oldest?.merchant_id)
+        ? 'other_store'
+        : storeBlock
+          ? storeBlock
+          : r.lifecycle !== 'active' || r.product_status !== 'active' || String(r.product_store_id) !== String(r.store_id)
+            ? 'unavailable'
+            : !merchantVariantLabel(r.options, r.colors, String(r.option_id ?? ''), String(r.color_id ?? '')).ok
+              ? 'option_gone'
+              : tracked && Number(r.stock) < (unitsPerProduct.get(String(r.id)) ?? qty)
+                ? 'out_of_stock'
+                : null;
+    const variant = merchantVariantLabel(r.options, r.colors, String(r.option_id ?? ''), String(r.color_id ?? ''));
     return {
       cart_item_id: r.cart_item_id,
       product_id: r.id,
@@ -2255,25 +2415,28 @@ async function loadMerchantCart(c: Context<AppContext>) {
       qty,
       option_id: r.option_id,
       color_id: r.color_id,
+      /** The merchant's own words for the choice, never an id a client typed. */
+      variant: variant.ok ? variant.label : '',
       unit_price_iqd: unit,
       original_price_iqd: r.original_price_iqd,
       line_total_iqd: line,
       prep_days: r.prep_days,
+      store_name: r.store_name,
       // Whether this line can still be bought. A product hidden or sold out
       // after it was added stays visible in the cart, flagged, rather than
       // vanishing without explanation.
-      available: r.lifecycle === 'active' && (!r.track_stock || Number(r.stock) >= qty),
-      stock: r.track_stock ? Number(r.stock) : null,
+      available: block === null,
+      unavailable_reason: block,
+      stock: tracked ? Number(r.stock) : null,
     };
   });
 
-  const first = results[0];
   return {
     scope: cartSellerScope(
-      results.map((r) => ({ seller_type: 'merchant', merchant_id: r.merchant_id, store_id: r.store_id }))
+      [...results].reverse().map((r) => ({ seller_type: 'merchant', merchant_id: r.merchant_id, store_id: r.store_id }))
     ),
-    store: first
-      ? { id: first.store_id, slug: first.store_slug, name: first.store_name, merchant_id: first.merchant_id }
+    store: oldest
+      ? { id: oldest.store_id, slug: oldest.store_slug, name: oldest.store_name, merchant_id: oldest.merchant_id }
       : null,
     items,
     subtotal_iqd: subtotal,
@@ -2322,7 +2485,10 @@ cartRoutes.patch('/merchant-items/:id', async (c) => {
   const qty = int(body.qty, 'qty', { min: 1, max: 99 });
 
   const line = await c.env.DB.prepare(
-    `SELECT ci.id, p.stock, p.track_stock, p.lifecycle, p.status
+    `SELECT ci.id, ci.community_product_id, p.stock, p.track_stock, p.lifecycle, p.status,
+            (SELECT COALESCE(SUM(o.qty), 0) FROM cart_items o
+              WHERE o.user_id = ci.user_id AND o.community_product_id = ci.community_product_id
+                AND o.id <> ci.id) AS other_units
        FROM cart_items ci JOIN community_products p ON p.id = ci.community_product_id
       WHERE ci.id = ? AND ci.user_id = ? AND ci.seller_type = 'merchant'`
   ).bind(id, user.id).first<Record<string, unknown>>();
@@ -2330,8 +2496,13 @@ cartRoutes.patch('/merchant-items/:id', async (c) => {
   if (line.lifecycle !== 'active' || line.status !== 'active') {
     throw badRequest('This product is no longer available', 'UNAVAILABLE');
   }
-  if (line.track_stock && Number(line.stock) < qty) {
-    throw badRequest('Not enough stock for that quantity', 'OUT_OF_STOCK', { available: Number(line.stock) });
+  // The product's OTHER lines (another colour, another option) hold units of
+  // the same stock (B5): the new quantity is judged together with them.
+  const otherUnits = Number(line.other_units) || 0;
+  if (line.track_stock && Number(line.stock) < otherUnits + qty) {
+    throw badRequest('Not enough stock for that quantity', 'OUT_OF_STOCK', {
+      available: Math.max(0, Number(line.stock) - otherUnits),
+    });
   }
 
   await c.env.DB.prepare('UPDATE cart_items SET qty = ? WHERE id = ? AND user_id = ?')

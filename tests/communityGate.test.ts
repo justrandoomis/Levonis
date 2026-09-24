@@ -325,12 +325,27 @@ test('a merchant keeps running their own shop while the community is shut', asyn
   const status = await merchant.request('/api/community/profile-status');
   assert.equal(status.status, 200, '/profile-status decides what a merchant is shown at all');
 
-  const added = await post(merchant, '/api/community/my-store/products', { name: 'New thing', price_iqd: 7000 });
-  assert.equal(added.status, 200, 'a merchant may still add to their own catalogue');
+  // The legacy product doors are RETIRED onto the store API (audit 01 B10):
+  // the same request is handed on with a 307, never walled with 503.
+  const handed = await post(merchant, '/api/community/my-store/products', { name: 'New thing', price_iqd: 7000 });
+  assert.equal(handed.status, 307, 'a merchant may still add to their own catalogue — through the store API');
+  assert.equal(handed.headers.get('location'), '/api/merchant/products');
+
+  // …which is outside the wall, and runs the store rules: with a store and a
+  // live PLUS, the product is added while the community is shut.
+  raw.exec(`
+    INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('st1','cm1','u2','aliprints','Ali Prints');
+    INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,starts_at,expires_at)
+      VALUES ('mem_u2','u2','plus_12mo','plus','active',12,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
+  `);
+  const added = await post(merchant, '/api/merchant/products', { name: 'New thing', price_iqd: 7000 });
+  assert.equal(added.status, 201, 'the store API is not behind the community wall');
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_products'), 2);
 
-  const del = await merchant.request(`/api/community/my-store/products/${(await json(added)).id}`, { method: 'DELETE' });
-  assert.equal(del.status, 200);
+  const id = (await json(added)).product.id;
+  const del = await merchant.request(`/api/community/my-store/products/${id}`, { method: 'DELETE' });
+  assert.equal(del.status, 307);
+  assert.equal(del.headers.get('location'), `/api/merchant/products/${id}`);
 });
 
 test('running trade finishes: marketplace orders and complaints answer while the community is shut', async () => {

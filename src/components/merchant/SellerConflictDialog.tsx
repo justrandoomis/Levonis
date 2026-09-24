@@ -11,7 +11,8 @@
  *     which of the shops they were browsing is in the way.
  *   - Offer both real ways out — go back to what is already there, or clear
  *     it and start here — and make the destructive one the one you have to
- *     choose deliberately.
+ *     choose deliberately. The two labels are the owner's own words
+ *     (docs/MERCHANT_PLATFORM.md §2 decision 1).
  *
  * The clearing happens as ONE request (the add is re-sent with replaceCart),
  * so a cart can never be left emptied with nothing added because a second
@@ -94,7 +95,7 @@ export default function SellerConflictDialog({
               className="w-full min-h-[48px] rounded-2xl bg-olive text-white font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
             >
               <ShoppingBag className="w-4 h-4" />
-              {loc('العودة إلى سلتي', 'Go to my cart', 'گەڕانەوە بۆ سەبەتەکەم')}
+              {loc('العودة إلى السلة الحالية', 'Back to my current cart', 'گەڕانەوە بۆ سەبەتەکەم')}
             </Link>
 
             {/* Destructive, and deliberately not the default. */}
@@ -105,7 +106,7 @@ export default function SellerConflictDialog({
             >
               {busy
                 ? loc('جارٍ…', 'Working…', 'لە کارکردندا…')
-                : loc('أفرغ السلة وابدأ من هنا', 'Clear the cart and shop here', 'سەبەتە بەتاڵ بکە و لێرە دەست پێ بکە')}
+                : loc('إفراغ السلة والتحول للبائع الجديد', 'Empty the cart and switch to this seller', 'سەبەتە بەتاڵ بکە و لێرە دەست پێ بکە')}
             </button>
 
             <button

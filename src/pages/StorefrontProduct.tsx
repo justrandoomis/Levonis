@@ -26,15 +26,17 @@ import {
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
+import { apiRefusal } from '../lib/refusalStrings';
 import { storefrontApi, iqd, type MerchantProduct, type MerchantStore } from '../lib/merchant';
 import SellerConflictDialog, { type SellerConflict } from '../components/merchant/SellerConflictDialog';
 import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
+import StoreUnavailable from '../components/merchant/StoreUnavailable';
 import { useStore } from '../StoreContext';
 
 export default function StorefrontProduct() {
   const { slug: routeSlug, productSlug } = useParams<{ slug: string; productSlug: string }>();
-  const { store: hostStore } = useStore();
-  const { loc } = useLanguage();
+  const { store: hostStore, unknownStore: hostUnknown, unavailableStore: hostUnavailable } = useStore();
+  const { loc, lang } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -44,7 +46,9 @@ export default function StorefrontProduct() {
 
   const [product, setProduct] = useState<MerchantProduct | null>(null);
   const [store, setStore] = useState<MerchantStore | null>(hostStore ?? null);
-  const [loading, setLoading] = useState(true);
+  // Nothing to fetch on a host already answered "unknown" or "unavailable".
+  const [loading, setLoading] = useState(!hostUnknown && !hostUnavailable);
+  const [unavailable, setUnavailable] = useState(false);
   const [qty, setQty] = useState(1);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
@@ -61,7 +65,13 @@ export default function StorefrontProduct() {
         setProduct(d.product);
         setStore(d.store);
       })
-      .catch(() => alive && setProduct(null))
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setProduct(null);
+        // An admin-suspended store: the product is not served, and neither is
+        // anything else of the shop (owner decision 2026-09-24).
+        if (e instanceof ApiError && e.code === 'STORE_UNAVAILABLE') setUnavailable(true);
+      })
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
@@ -89,15 +99,19 @@ export default function StorefrontProduct() {
       if (e instanceof ApiError && e.code === 'CART_SELLER_CONFLICT') {
         // The server named both shops in `details`; the dialogue uses them.
         setConflict((e.details ?? {}) as unknown as SellerConflict);
-      } else if (e instanceof ApiError) {
-        setError(e.message);
       } else {
-        setError(loc('تعذّرت الإضافة', 'Could not add to cart', 'نەتوانرا زیاد بکرێت'));
+        // The CODE, in the customer's language — OWN_STORE_PURCHASE,
+        // STORE_CLOSED, OUT_OF_STOCK (with how many are left), OPTION_INVALID…
+        // — never the server's English sentence (src/lib/refusalStrings.ts).
+        const fallback = loc('تعذّرت الإضافة', 'Could not add to cart', 'نەتوانرا زیاد بکرێت');
+        setError(e instanceof ApiError ? apiRefusal(e, lang, fallback) : fallback);
       }
     } finally {
       setAdding(false);
     }
   }
+
+  if (hostUnavailable || unavailable) return <StoreUnavailable />;
 
   if (loading) {
     return (
@@ -204,16 +218,20 @@ export default function StorefrontProduct() {
             </p>
           )}
 
-          {error && (
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 mb-4">
-              <p className="text-red-300 text-[12.5px]">{error}</p>
-            </div>
-          )}
         </div>
       </div>
 
       {/* Buy bar */}
       <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl px-4 sm:px-6 py-3">
+        {/* The refusal sits beside the button that caused it: in the page body
+            it could be scrolled away under this fixed bar and never seen. */}
+        <p
+          role="alert"
+          aria-live="assertive"
+          className={error ? 'max-w-2xl mx-auto mb-2 text-red-300 text-[12.5px] leading-snug' : 'sr-only'}
+        >
+          {error}
+        </p>
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <div className="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/[0.03] shrink-0">
             <button
