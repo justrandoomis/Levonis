@@ -290,9 +290,12 @@ export function offerAcceptedNotification(
 }
 
 /**
- * «تغيّر الطلب» — one notification per merchant whose PENDING offer priced an
- * older revision of the job (audit 03 §10 K). Keyed per offer AND revision, so
- * a second change is a second message and a replay of the same change is not.
+ * «تغيّر الطلب» — one notification per merchant whose offer priced an older
+ * revision of the job (audit 03 §10 K). Since print requests v2 (W5-A) such an
+ * offer is `superseded` in the same batch as the change; an offer still
+ * `pending` behind the revision is a row written before 0130 and is told the
+ * same thing. Keyed per offer AND revision, so a second change is a second
+ * message and a replay of the same change is not.
  */
 export async function staleOfferNotifications(
   db: D1Database,
@@ -303,7 +306,7 @@ export async function staleOfferNotifications(
     .prepare(
       `SELECT o.id, m.user_id FROM community_offers o
          JOIN community_merchants m ON m.id = o.merchant_id
-        WHERE o.request_id = ? AND o.state = 'pending' AND o.request_revision < ?`
+        WHERE o.request_id = ? AND o.state IN ('pending','superseded') AND o.request_revision < ?`
     )
     .bind(requestId, revision)
     .all<{ id: string; user_id: string }>();
@@ -314,8 +317,8 @@ export async function staleOfferNotifications(
         kind: 'offer_stale',
         title_ar: 'تغيّر طلب قدّمت عليه عرضًا',
         title_en: 'A request you offered on has changed',
-        body_ar: `عدّل العميل تفاصيل الطلب ${requestId}. عرضك معلّق ولا يمكن قبوله حتى تؤكده من جديد أو تسحبه.`,
-        body_en: `The customer changed request ${requestId}. Your offer is on hold and cannot be accepted until you re-confirm or withdraw it.`,
+        body_ar: `عدّل العميل تفاصيل الطلب ${requestId} بعد عرضك، فلم يعد عرضك قابلًا للقبول. راجع التغيير ثم أكّد عرضك أو عدّله أو اسحبه.`,
+        body_en: `The customer changed request ${requestId} after your offer, so it can no longer be accepted. Review the change, then re-confirm, edit or withdraw your offer.`,
         link: merchantHref.request(requestId),
         entity_type: 'offer',
         entity_id: o.id,
@@ -323,6 +326,74 @@ export async function staleOfferNotifications(
         eventKey: `offer_stale:${o.id}:${revision}`,
       }).stmt
   );
+}
+
+/**
+ * «لم يُختر عرضك» — every merchant whose offer on this request was closed as
+ * `rejected` by the write stamped `ts`: a rival accepted, the customer
+ * declined it, or the customer cancelled the request (W5-A: merchants are
+ * told on accept, reject and supersede — they used to learn nothing). A
+ * merchant kind (`offer_rejected`), linking to the request at its workspace
+ * address; keyed per offer, so a replay is silent.
+ */
+export async function offerRejectedNotifications(
+  db: D1Database,
+  requestId: string,
+  ts: string,
+  why: 'other_accepted' | 'declined' | 'request_cancelled'
+): Promise<D1PreparedStatement[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT o.id, m.user_id FROM community_offers o
+         JOIN community_merchants m ON m.id = o.merchant_id
+        WHERE o.request_id = ? AND o.state = 'rejected' AND o.updated_at = ?`
+    )
+    .bind(requestId, ts)
+    .all<{ id: string; user_id: string }>();
+  const body =
+    why === 'other_accepted'
+      ? {
+          ar: `اختار العميل عرضًا آخر على الطلب ${requestId}. شكرًا على عرضك.`,
+          en: `The customer chose another offer on request ${requestId}. Thank you for your offer.`,
+        }
+      : why === 'declined'
+        ? {
+            ar: `اعتذر العميل عن عرضك على الطلب ${requestId}. يمكنك متابعة طلبات أخرى تناسب ورشتك.`,
+            en: `The customer declined your offer on request ${requestId}. Other requests that fit your workshop are waiting.`,
+          }
+        : {
+            ar: `ألغى العميل الطلب ${requestId}، فأُغلق عرضك عليه.`,
+            en: `The customer cancelled request ${requestId}, so your offer on it is closed.`,
+          };
+  return (results ?? []).map((o) =>
+    merchantNotificationStatement(db, o.user_id, {
+      kind: 'offer_rejected',
+      title_ar: why === 'request_cancelled' ? 'أُلغي طلب قدّمت عليه عرضًا' : 'لم يُختر عرضك',
+      title_en: why === 'request_cancelled' ? 'A request you offered on was cancelled' : 'Your offer was not chosen',
+      body_ar: body.ar,
+      body_en: body.en,
+      link: merchantHref.request(requestId),
+      entity_type: 'offer',
+      entity_id: o.id,
+      meta: { request_id: requestId, why },
+      eventKey: `offer_rejected:${o.id}`,
+    })
+  );
+}
+
+/** Write the notices above; never throws (a notice must not undo the business write). */
+export async function notifyOffersRejected(
+  db: D1Database,
+  requestId: string,
+  ts: string,
+  why: 'other_accepted' | 'declined' | 'request_cancelled'
+): Promise<void> {
+  try {
+    const stmts = await offerRejectedNotifications(db, requestId, ts, why);
+    if (stmts.length) await db.batch(stmts);
+  } catch (e) {
+    console.error('offer-rejected notices not written for', requestId, e instanceof Error ? e.message : String(e));
+  }
 }
 
 // ------------------------------------------------------------------ sweeps
@@ -336,6 +407,8 @@ export interface CommunitySweepReport {
   expired_requests: number;
   /** Pending offers past their own `expires_at`. */
   expired_offers: number;
+  /** Drafts nobody touched for `DRAFT_TTL_DAYS` (W5-A), moved to `expired`. */
+  expired_drafts: number;
   /** Requests found stranded in `offer_selected` with no live order, reopened. */
   reopened_requests: number;
   /** Orders stranded in `accepted` by the pre-0116 acceptance, healed. */
@@ -350,6 +423,7 @@ export const emptyCommunitySweepReport = (): CommunitySweepReport => ({
   auto_complete_skipped: 0,
   expired_requests: 0,
   expired_offers: 0,
+  expired_drafts: 0,
   reopened_requests: 0,
   healed_orders: 0,
   released_holds: 0,
@@ -495,6 +569,37 @@ export async function sweepCommunityExpiry(
       ).bind(JSON.stringify(ids), now),
     ]);
     report.expired_requests += Number(res[2]?.meta.changes ?? 0);
+  }
+
+  /**
+   * ABANDONED DRAFTS EXPIRE (W5-A). A draft is invisible to everyone but its
+   * customer, so nothing leaks while it waits — but a wizard left half-done
+   * must not wait for ever. Every save of a draft pushes its `expires_at`
+   * `DRAFT_TTL_DAYS` ahead (worker/routes/printRequests.ts), so this reads
+   * «untouched that long». The move is conditional on the row still being a
+   * draft past its expiry: a publish a moment earlier (which moves it to
+   * `open` with a fresh clock) is never undone. Its preview links go with it.
+   */
+  const { results: drafts } = await env.DB.prepare(
+    `SELECT id FROM community_requests
+      WHERE state = 'draft' AND expires_at IS NOT NULL AND expires_at <> '' AND expires_at <= ?
+      ORDER BY expires_at LIMIT ?`
+  )
+    .bind(now, limit)
+    .all<{ id: string }>();
+  const draftIds = (drafts ?? []).map((r) => r.id);
+  if (draftIds.length) {
+    const dueDraft = `SELECT id FROM community_requests
+                       WHERE id IN (SELECT value FROM json_each(?1)) AND state = 'draft' AND expires_at <= ?2`;
+    const res = await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE model_view_tokens SET revoked_at = ?2 WHERE revoked_at IS NULL AND request_id IN (${dueDraft})`
+      ).bind(JSON.stringify(draftIds), now),
+      env.DB.prepare(
+        `UPDATE community_requests SET state = 'expired', status = 'closed', updated_at = ?2 WHERE id IN (${dueDraft})`
+      ).bind(JSON.stringify(draftIds), now),
+    ]);
+    report.expired_drafts += Number(res[1]?.meta.changes ?? 0);
   }
 
   // Offers with their own validity. Only a well-formed ISO date is read as

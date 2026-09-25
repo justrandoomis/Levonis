@@ -349,6 +349,8 @@ const WORKSPACE_SCREENS = [
   'CommandCenter', 'SalesTabs', 'CatalogTabs', 'ProductsManager', 'PrintersTab', 'CostingTab', 'StoreSettingsTab',
   'StoreDesignPanel', 'MerchantFinance', 'DeliverySettingsEditor', 'MerchantInbox', 'AnalyticsSection', 'ReviewsSection',
   'CustomersSection', 'RequestsSection', 'NotificationsSection', 'CommandPalette', 'MoreSheet',
+  // W3-B: the orders address picks the list or the order's own screen, each lazy.
+  'OrdersSection', 'OrderDetailScreen',
 ];
 
 test('the merchant workspace shell is small, stays out of every customer closure, and loads each screen lazily', () => {
@@ -379,6 +381,34 @@ test('the merchant workspace shell is small, stays out of every customer closure
   for (const name of ['MerchantDashboardPage', ...WORKSPACE_SCREENS]) {
     const f = chunk(name)!;
     assert.equal(storefront.has(f), false, `${name} is a static import of a storefront page`);
+  }
+});
+
+/**
+ * THE ANALYTICS SCREEN DRAWS ITS OWN CHARTS (W3-B). Its charts are in-house
+ * SVG (src/components/merchant/analytics/charts.tsx), so the screen must never
+ * pull the storefront's chart library (`vendor-charts`, ~120 KB gzip) or any
+ * other chart package into the workspace. Measured at W3-B: the screen chunk
+ * 11.0 KB gzip; 16 KB leaves room to work, and fails the day a library
+ * arrives. The order screen measured 7.4 KB (budget 12 KB).
+ */
+const ANALYTICS_SCREEN_BUDGET = 16 * KB;
+const ORDER_SCREEN_BUDGET = 12 * KB;
+
+test('the analytics and order screens stay small and never pull in a chart library', () => {
+  const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
+  const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
+  const shell = chunk('MerchantDashboardPage')!;
+  const initial = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
+  const shellClosure = staticClosure(shell);
+  for (const [name, budget] of [['AnalyticsSection', ANALYTICS_SCREEN_BUDGET], ['OrderDetailScreen', ORDER_SCREEN_BUDGET]] as const) {
+    const f = chunk(name);
+    assert.ok(f, `${name} has no chunk of its own`);
+    const own = gz(join(ASSETS, f!));
+    const beyond = [...staticClosure(f!)].filter((x) => !initial.has(x) && !shellClosure.has(x));
+    console.log(`bundle: ${name} ${kb(own)} gzip; beyond the shell: ${beyond.join(', ')}`);
+    assert.ok(own <= budget, `${name} is ${kb(own)} gzip, over ${kb(budget)}`);
+    assert.equal(beyond.some((x) => /^vendor-charts-/.test(x)), false, `${name} pulls the chart library in`);
   }
 });
 

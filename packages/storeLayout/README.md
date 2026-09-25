@@ -17,8 +17,11 @@ W2-C). Pure: no I/O, no Cloudflare bindings, no imports outside this package
 | `normalize` | `normalizeLayout(input, {ownerUserId})` → `{layout, issues, ok}` — the ONE gate, run by the Worker on write and read, by the builder, and by the storefront before rendering; `makeBlock`, `applyTheme` |
 | `defaults` | `defaultLayoutFromStore(store)` — the classic page, so a store with no published revision renders exactly as before |
 | `data` | `collectDataNeeds(layout)` — the batched reads a layout's visible blocks need (product lists, picked and LINKED products, collections, services, showcase, reviews, printers, coupons) — and the public data shapes |
+| `starters` | `starterLayout(theme)` — the seven presets as whole starting pages for the builder's «ابدأ من قالب», built only from the store's own data (no words, pictures or links of ours); written to the draft only |
 | `verify` | `collectLayoutRefs` / `dropLayoutRefs` — the media keys and product / collection / coupon ids a layout names, for the Worker to check against the store's own rows, and their removal with an issue at each place |
 
 `tests/storeLayoutSchema.test.ts` and `tests/storeLayoutMalicious.test.ts` pin
-the schema and the refusals; `tests/storeLayoutRoutes.test.ts` pins the
+the schema and the refusals; `tests/storeDesignEditor.test.ts` pins that every
+value the store builder's forms emit round-trips through `normalizeLayout` and
+that the starters are canonical; `tests/storeLayoutRoutes.test.ts` pins the
 draft / publish / restore contract built on it.

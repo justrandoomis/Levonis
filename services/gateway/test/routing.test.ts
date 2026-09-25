@@ -82,6 +82,8 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/merchant/payouts': 'MARKETPLACE',
   '/api/merchant/attention': 'MARKETPLACE',
   '/api/merchant/search': 'MARKETPLACE',
+  '/api/merchant/customers': 'MARKETPLACE',
+  '/api/merchant/orders': 'MARKETPLACE',
   '/api/storefront/events': 'MARKETPLACE',
   '/api/storefront': 'MARKETPLACE',
   '/api/marketplace/print': 'MARKETPLACE',

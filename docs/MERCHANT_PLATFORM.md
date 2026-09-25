@@ -164,6 +164,11 @@ never trusts an id from the client for ownership.
   in-page with container queries (the CSP forbids iframes: `frame-ancestors 'none'`).
 - The first published layout of every existing store is generated from its current
   settings, so the switch-over is visually lossless.
+- **The builder** (wave 4, W4-A; DECISIONS row 129) edits that layout block by block
+  at `/merchant/store/design`: forms generated from the block registry, every change
+  run through the same `normalizeLayout` (issues shown next to the field), an
+  autosaved version-fenced draft, publish with a changes summary, and seven starter
+  pages. It saves only the gate's output and nothing while a fatal issue stands.
 
 ### 4.5 Store identity: subdomain + PWA
 - Keep `hosts.ts` classification, reserved lists, normalisation and slug parking;

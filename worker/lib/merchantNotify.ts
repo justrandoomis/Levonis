@@ -62,6 +62,7 @@ export const MERCHANT_KINDS = [
   'print_request_match',
   'offer_accepted',
   'offer_stale',
+  'offer_rejected',
   'low_stock',
   'new_review',
   'dispute_opened',
@@ -114,6 +115,8 @@ export const KIND_PREF: Readonly<Record<MerchantKind, NotificationPrefKey>> = {
   matching_request: 'request_opportunities',
   print_request_match: 'request_opportunities',
   offer_stale: 'request_opportunities',
+  // «لم يُختر عرضك» (W5-A): the answer to an opportunity the merchant took up.
+  offer_rejected: 'request_opportunities',
   low_stock: 'low_stock',
   new_review: 'new_reviews',
   dispute_opened: 'complaints',

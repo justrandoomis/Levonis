@@ -28,6 +28,17 @@
  *                 order without one is counted apart as `unspecified`.
  *   requests      matching decisions, notifications, offers sent and accepted,
  *                 custom orders completed — from the community tables.
+ *   previous      THE PERIOD OF EQUAL LENGTH JUST BEFORE (W3-B), for the
+ *                 period-over-period deltas — only where BOTH periods have a
+ *                 source: `previous.orders` only when the store already
+ *                 existed on the first day of the previous period (a store
+ *                 opened last week had no «last month», it did not sell zero
+ *                 in it), `previous.traffic` only when traffic was counted on
+ *                 every day of BOTH periods (a half-counted period compared
+ *                 with a whole one is a fake drop). An absent side means no
+ *                 delta, never a delta against 0.
+ *   products.most_viewed  the store's live products by views over the counted
+ *                 days, views > 0 only (W3-B); with traffic.
  *
  * Traffic sources are coarse (direct / search / social / other) and only the
  * referrer's host was ever looked at.
@@ -38,7 +49,7 @@ import { HttpError, badRequest, requireAuth } from '../lib/http';
 import { requireStoreOwner } from '../lib/merchantAuth';
 import { getTierStatus, benefits } from '../lib/entitlements';
 import { addDays, baghdadDay } from '../lib/baghdadTime';
-import { BAGHDAD_SQL_SHIFT, resolveRange, utcWindowFor } from '../lib/financeReport';
+import { BAGHDAD_SQL_SHIFT, previousRangeOf, resolveRange, utcWindowFor } from '../lib/financeReport';
 
 export const merchantAnalyticsRoutes = new Hono<AppContext>();
 merchantAnalyticsRoutes.use('*', requireAuth);
@@ -79,8 +90,10 @@ merchantAnalyticsRoutes.get('/report', async (c) => {
   const db = c.env.DB;
   const storeId = ctx.store.id;
   const merchantId = ctx.merchant.id;
+  const prevRange = previousRangeOf(range);
+  const prevWindow = utcWindowFor(prevRange);
 
-  const [sinceRow, traffic, orderDays, cancelled, top, customers, coupons, govs, matches, offers, custom] = await Promise.all([
+  const [sinceRow, traffic, orderDays, cancelled, top, customers, coupons, govs, matches, offers, custom, storeRow, prevOrders, prevTraffic] = await Promise.all([
     db.prepare('SELECT MIN(day) AS d FROM merchant_store_analytics_daily').first<{ d: string | null }>(),
     db
       .prepare(
@@ -194,6 +207,25 @@ merchantAnalyticsRoutes.get('/report', async (c) => {
       )
       .bind(merchantId, startIso, endIso)
       .first<{ completed: number; receivable: number }>(),
+    // ---- the previous period of equal length (W3-B): what the deltas compare with.
+    db.prepare('SELECT created_at FROM merchant_stores WHERE id = ?').bind(storeId).first<{ created_at: string | null }>(),
+    db
+      .prepare(
+        `SELECT COUNT(*) AS orders, COALESCE(SUM(o.total_iqd), 0) AS gross, COALESCE(SUM(o.merchant_receivable_iqd), 0) AS receivable
+           FROM orders o
+          WHERE o.merchant_id = ? AND o.created_at >= ? AND o.created_at < ? AND ${COUNTED}`
+      )
+      .bind(merchantId, prevWindow.startIso, prevWindow.endIso)
+      .first<{ orders: number; gross: number; receivable: number }>(),
+    db
+      .prepare(
+        `SELECT COALESCE(SUM(visitors), 0) AS visitors, COALESCE(SUM(product_views), 0) AS product_views,
+                COALESCE(SUM(add_to_cart), 0) AS add_to_cart, COALESCE(SUM(checkout_started), 0) AS checkout_started
+           FROM merchant_store_analytics_daily
+          WHERE store_id = ? AND day >= ? AND day <= ?`
+      )
+      .bind(storeId, prevRange.from, prevRange.to)
+      .first<{ visitors: number; product_views: number; add_to_cart: number; checkout_started: number }>(),
   ]);
 
   // ---- orders: every day of the range, because `orders` has always existed.
@@ -232,6 +264,7 @@ merchantAnalyticsRoutes.get('/report', async (c) => {
   let trafficBlock: Record<string, unknown> | undefined;
   let funnel: Record<string, unknown> | undefined;
   let leastViewed: Array<Record<string, unknown>> | undefined;
+  let mostViewed: Array<Record<string, unknown>> | undefined;
   if (trafficAvailable) {
     const totals = {
       visitors: sum('visitors'),
@@ -279,7 +312,56 @@ merchantAnalyticsRoutes.get('/report', async (c) => {
       .bind(storeId, countedFrom, range.to)
       .all<{ id: string; name: string; views: number; add_to_cart: number }>();
     leastViewed = (views ?? []).map((v) => ({ id: v.id, name: v.name, views: num(v.views), add_to_cart: num(v.add_to_cart) }));
+    // The other end of the same list (W3-B): what visitors looked at most. A
+    // product nobody viewed is not «most viewed», so zeros are left out.
+    const { results: most } = await db
+      .prepare(
+        `SELECT a.product_id AS id, MAX(p.name) AS name, SUM(a.views) AS views, SUM(a.add_to_cart) AS add_to_cart
+           FROM merchant_product_analytics_daily a
+           JOIN community_products p ON p.id = a.product_id AND p.store_id = ?1
+          WHERE a.store_id = ?1 AND a.day >= ?2 AND a.day <= ?3
+          GROUP BY a.product_id
+         HAVING SUM(a.views) > 0
+          ORDER BY views DESC, a.product_id
+          LIMIT 5`
+      )
+      .bind(storeId, countedFrom, range.to)
+      .all<{ id: string; name: string | null; views: number; add_to_cart: number }>();
+    mostViewed = (most ?? []).map((v) => ({ id: v.id, name: v.name ?? '', views: num(v.views), add_to_cart: num(v.add_to_cart) }));
   }
+
+  // ---- the previous period, only where both sides have a real source.
+  const storeDay = storeRow?.created_at ? baghdadDay(Date.parse(storeRow.created_at)) : '';
+  const prevOrdersKnown = !!storeDay && storeDay <= prevRange.from;
+  const prevTrafficKnown = trafficAvailable && !!since && since <= prevRange.from;
+  const prevOrderCount = num(prevOrders?.orders);
+  const previous: Record<string, unknown> = {
+    range: { from: prevRange.from, to: prevRange.to, days: prevRange.days },
+    ...(prevOrdersKnown
+      ? {
+          orders: {
+            orders: prevOrderCount,
+            gross_iqd: num(prevOrders?.gross),
+            receivable_iqd: num(prevOrders?.receivable),
+            ...(prevOrderCount ? { average_order_iqd: Math.round(num(prevOrders?.gross) / prevOrderCount) } : {}),
+          },
+        }
+      : {}),
+    ...(prevTrafficKnown
+      ? {
+          traffic: {
+            visitors: num(prevTraffic?.visitors),
+            product_views: num(prevTraffic?.product_views),
+            add_to_cart: num(prevTraffic?.add_to_cart),
+            checkout_started: num(prevTraffic?.checkout_started),
+            ...(prevOrdersKnown ? { orders: prevOrderCount } : {}),
+            ...(prevOrdersKnown && num(prevTraffic?.visitors) > 0
+              ? { conversion_percent: Math.round((prevOrderCount / num(prevTraffic?.visitors)) * 1000) / 10 }
+              : {}),
+          },
+        }
+      : {}),
+  };
 
   const govRows = govs.results ?? [];
   const sent = num(offers?.sent);
@@ -309,6 +391,7 @@ merchantAnalyticsRoutes.get('/report', async (c) => {
         orders: num(t.orders),
       })),
       ...(leastViewed ? { least_viewed: leastViewed } : {}),
+      ...(mostViewed ? { most_viewed: mostViewed } : {}),
     },
     customers: {
       customers: num(customers?.customers),
@@ -344,5 +427,6 @@ merchantAnalyticsRoutes.get('/report', async (c) => {
       custom_orders_completed: num(custom?.completed),
       custom_orders_receivable_iqd: num(custom?.receivable),
     },
+    previous,
   });
 });

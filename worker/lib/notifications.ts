@@ -99,6 +99,8 @@ export type NotificationKind =
    */
   | 'new_order'
   | 'order_needs_action'
+  /** «لم يُختر عرضك» — a rival was accepted, the customer declined, or cancelled (W5-A). */
+  | 'offer_rejected'
   | 'new_message'
   | 'matching_request'
   | 'low_stock'

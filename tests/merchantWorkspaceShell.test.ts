@@ -295,18 +295,19 @@ test('the shell mounts the Toaster once, owns one scroll area, and the page moun
 
 // ------------------------------------------------------------------ source rules
 
-test('NO NATIVE DIALOGS in the merchant workspace or the community admin: no confirm(), alert() or window.confirm', () => {
+test('NO NATIVE DIALOGS in the merchant workspace or the community admin: no confirm(), alert(), prompt() or window.confirm/prompt', () => {
   const files = [...walk('src/components/merchant'), ...walk('src/components/adminCommunity'), 'src/pages/MerchantDashboardPage.tsx'];
   const offenders: string[] = [];
   for (const f of files) {
     const src = code(f);
-    for (const m of src.matchAll(/(^|[^.\w])(window\.)?(confirm|alert)\s*\(/g)) {
-      // `await confirm({…})` is useConfirm's function, not the browser's.
+    for (const m of src.matchAll(/(^|[^.\w])(window\.)?(confirm|alert|prompt)\s*\(/g)) {
+      // `await confirm({…})` / `await prompt({…})` are useConfirm's and
+      // usePrompt's functions (W3-B), not the browser's.
       const after = src.slice(m.index! + m[0].length).trimStart();
-      if (m[3] === 'confirm' && !m[2] && after.startsWith('{')) continue;
+      if ((m[3] === 'confirm' || m[3] === 'prompt') && !m[2] && after.startsWith('{')) continue;
       offenders.push(`${f}: ${m[0].trim()}`);
     }
-    if (/window\.(confirm|alert)\b/.test(src)) offenders.push(`${f}: window.${/window\.(confirm|alert)/.exec(src)![1]}`);
+    if (/window\.(confirm|alert|prompt)\b/.test(src)) offenders.push(`${f}: window.${/window\.(confirm|alert|prompt)/.exec(src)![1]}`);
   }
   assert.deepEqual(offenders, []);
 });

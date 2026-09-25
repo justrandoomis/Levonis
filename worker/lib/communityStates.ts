@@ -34,7 +34,9 @@ export type RequestState = (typeof REQUEST_STATES)[number];
  * probably fine" path.
  */
 export const REQUEST_TRANSITIONS: Record<RequestState, readonly RequestState[]> = {
-  draft: ['open', 'cancelled'],
+  // An abandoned draft expires (the sweep, worker/lib/communityRequests.ts):
+  // it was never on the board, so nothing else has to move with it.
+  draft: ['open', 'cancelled', 'expired'],
   open: ['receiving_offers', 'cancelled', 'expired'],
   // A request can go straight from open to selected when the customer accepts
   // the first offer that arrives.

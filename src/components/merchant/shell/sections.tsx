@@ -41,10 +41,9 @@ function section<M>(load: () => Promise<M>, render: (m: M, props: SectionProps, 
 export const SECTIONS: Readonly<Record<MerchantSection, Section>> = {
   home: lazy(() => import('./sections/CommandCenter')),
 
-  orders: section(
-    () => import('../dashboard/SalesTabs'),
-    (m, { id }, ws) => <m.OrdersTab focusOrderId={id ?? null} initialStatus={ws.query.status ?? ''} />
-  ),
+  // `/orders` is the list; `/orders/<id>` is the order's own screen (W3-B),
+  // its own chunk — the list does not download it, nor it the list.
+  orders: lazy(() => import('./sections/OrdersSection')),
   custom_orders: section(() => import('../dashboard/SalesTabs'), (m) => <m.CustomOrdersTab />),
   requests: lazy(() => import('./sections/RequestsSection')),
   customers: lazy(() => import('./sections/CustomersSection')),

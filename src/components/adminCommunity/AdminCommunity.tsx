@@ -37,6 +37,7 @@ import ReasonSheet, { type ReasonRequest } from './ReasonSheet';
 import PayoutSheet from './PayoutSheet';
 import PayoutQueue from './PayoutQueue';
 import { useConfirm } from '../ui/ConfirmDialog';
+import { usePrompt } from '../ui/PromptDialog';
 import { toast } from '../ui/Toast';
 import { refusalText } from '../../lib/refusalStrings';
 import {
@@ -868,6 +869,8 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
   const [d, setD] = useState<Awaited<ReturnType<typeof adminCommunityApi.request>> | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
+  // The admin's reasons are asked in the panel's own dialog, never the browser's own (W3-B).
+  const [prompt, promptDialog] = usePrompt();
 
   const load = useCallback(() => {
     adminCommunityApi
@@ -996,10 +999,18 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
                       icon={<Ban className="w-3.5 h-3.5" />}
                       danger
                       disabled={busy === o.id}
-                      onClick={() => {
-                        const reason = window.prompt(t('سبب الرفض (مطلوب):', 'Reason for rejecting (required):'));
-                        if (!reason?.trim()) return;
-                        act(o.id, () => adminCommunityApi.rejectOffer(o.id, reason.trim()));
+                      onClick={async () => {
+                        const reason = await prompt({
+                          title: t('رفض العرض؟', 'Reject this offer?'),
+                          label: t('سبب الرفض', 'Reason for rejecting'),
+                          required: true,
+                          multiline: true,
+                          maxLength: 500,
+                          confirmLabel: t('رفض العرض', 'Reject offer'),
+                          destructive: true,
+                        });
+                        if (reason === null) return;
+                        act(o.id, () => adminCommunityApi.rejectOffer(o.id, reason));
                       }}
                     />
                   )}
@@ -1041,11 +1052,23 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
             icon={<Ban className="w-3.5 h-3.5" />}
             danger
             disabled={busy === 'remove'}
-            onClick={() => {
-              const reason = window.prompt(t('سبب الإزالة (مطلوب):', 'Reason for removal (required):'));
-              if (!reason?.trim()) return;
+            onClick={async () => {
+              const reason = await prompt({
+                title: t('إزالة الطلب من اللوحة؟', 'Remove the request from the board?'),
+                description: t(
+                  'الإزالة تُلغي الطلب ولا تحذفه — يبقى في السجل مع سببه.',
+                  'Removal cancels the request; nothing is deleted. It stays on the record with its reason.'
+                ),
+                label: t('سبب الإزالة', 'Reason for removal'),
+                required: true,
+                multiline: true,
+                maxLength: 500,
+                confirmLabel: t('إزالة الطلب', 'Remove request'),
+                destructive: true,
+              });
+              if (reason === null) return;
               act('remove', async () => {
-                await adminCommunityApi.removeRequest(id, reason.trim());
+                await adminCommunityApi.removeRequest(id, reason);
                 onBack();
               });
             }}
@@ -1058,6 +1081,7 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
           </p>
         </div>
       )}
+      {promptDialog}
     </div>
   );
 }
@@ -1213,6 +1237,7 @@ function MerchantReputation({
   const [d, setD] = useState<AdminReputation | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [prompt, promptDialog] = usePrompt();
 
   const load = useCallback(() => {
     adminCommunityApi
@@ -1314,15 +1339,30 @@ function MerchantReputation({
 
       <Section title={t('سجل السمعة', 'Reputation log')}>
         <button
-          onClick={() => {
-            const raw = window.prompt(
-              t('النقاط (موجبة أو سالبة):', 'Points (positive or negative):')
-            );
-            const points = Number(raw);
-            if (!Number.isFinite(points) || points === 0) return;
-            const note = window.prompt(t('السبب (مطلوب):', 'Reason (required):'));
-            if (!note?.trim()) return;
-            act(() => adminCommunityApi.adjustReputation(id, Math.trunc(points), note.trim()));
+          onClick={async () => {
+            const raw = await prompt({
+              title: t('تعديل إداري على السمعة', 'An admin reputation adjustment'),
+              label: t('النقاط (موجبة أو سالبة)', 'Points (positive or negative)'),
+              inputMode: 'numeric',
+              required: true,
+              validate: (v) =>
+                /^[-+]?\d{1,6}$/.test(v) && Number(v) !== 0
+                  ? null
+                  : t('أدخل عددًا صحيحًا غير الصفر، مثل 10 أو ‎-5.', 'Enter a whole number other than zero, like 10 or -5.'),
+              confirmLabel: t('التالي', 'Next'),
+            });
+            if (raw === null) return;
+            const note = await prompt({
+              title: t('سبب التعديل', 'Reason for the adjustment'),
+              description: t('يُسجَّل مع الحدث ولا يُحذف.', 'It is recorded with the event and never deleted.'),
+              label: t('السبب', 'Reason'),
+              required: true,
+              multiline: true,
+              maxLength: 500,
+              confirmLabel: t('إضافة التعديل', 'Add adjustment'),
+            });
+            if (note === null) return;
+            act(() => adminCommunityApi.adjustReputation(id, Math.trunc(Number(raw)), note));
           }}
           disabled={busy}
           className="w-full min-h-[42px] rounded-2xl border border-zinc-700/50 bg-zinc-800/40 text-zinc-300 text-[12.5px] font-semibold mb-3 disabled:opacity-40"
@@ -1357,6 +1397,7 @@ function MerchantReputation({
           </div>
         )}
       </Section>
+      {promptDialog}
     </div>
   );
 }
@@ -1467,6 +1508,7 @@ function Disputes({ t }: { t: T }) {
 
 function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void }) {
   const [confirm, confirmDialog] = useConfirm();
+  const [prompt, promptDialog] = usePrompt();
   const [d, setD] = useState<Awaited<ReturnType<typeof adminCommunityApi.complaint>> | null>(null);
   const [busy, setBusy] = useState(false);
   /**
@@ -1545,21 +1587,36 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
   async function settle(decision: 'release' | 'refund' | 'partial_refund') {
     if (!d?.escrow) return;
     // A reason is REQUIRED, and it goes on the record with the decision.
-    const reason = window.prompt(
-      t('سبب القرار (يُسجَّل بشكل دائم):', 'Reason for this decision (recorded permanently):')
-    );
-    if (!reason?.trim()) return;
+    const gross = d.escrow.gross_iqd;
+    const reason = await prompt({
+      title: t('سبب القرار', 'Reason for this decision'),
+      description: t('يُسجَّل بشكل دائم مع القرار.', 'It is recorded permanently with the decision.'),
+      label: t('السبب', 'Reason'),
+      required: true,
+      multiline: true,
+      maxLength: 500,
+      confirmLabel: t('التالي', 'Next'),
+    });
+    if (reason === null) return;
 
     let amount: number | undefined;
     if (decision === 'partial_refund') {
-      const raw = window.prompt(
-        t(
-          `المبلغ المُعاد للعميل (الإجمالي ${d.escrow.gross_iqd} د.ع):`,
-          `Amount to refund to the customer (total ${d.escrow.gross_iqd} IQD):`
-        )
-      );
-      amount = Number(raw);
-      if (!Number.isFinite(amount) || amount <= 0 || amount > d.escrow.gross_iqd) return;
+      const raw = await prompt({
+        title: t('المبلغ المُعاد للعميل', 'Amount to refund to the customer'),
+        description: t(`الإجمالي ${gross} د.ع.`, `The total is ${gross} IQD.`),
+        label: t('المبلغ بالدينار', 'Amount in IQD'),
+        inputMode: 'numeric',
+        required: true,
+        validate: (v) => {
+          const n = Number(v.replace(/[,\s]/g, ''));
+          return /^\d[\d,\s]*$/.test(v) && n > 0 && n <= gross
+            ? null
+            : t(`أدخل مبلغًا بين 1 و${gross} د.ع.`, `Enter an amount between 1 and ${gross} IQD.`);
+        },
+        confirmLabel: t('التالي', 'Next'),
+      });
+      if (raw === null) return;
+      amount = Number(raw.replace(/[,\s]/g, ''));
     }
 
     const confirmText =
@@ -1585,9 +1642,9 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
 
     setBusy(true);
     try {
-      const r = await adminCommunityApi.resolveEscrow(d.escrow.id, decision, reason.trim(), amount);
+      const r = await adminCommunityApi.resolveEscrow(d.escrow.id, decision, reason, amount);
       if (r.replayed) toast.info(t('هذا القرار مسجّل مسبقًا.', 'That decision was already recorded.'));
-      await adminCommunityApi.setComplaintStatus(id, 'resolved', `${decision}: ${reason.trim()}`);
+      await adminCommunityApi.setComplaintStatus(id, 'resolved', `${decision}: ${reason}`);
       load();
     } catch (e) {
       toast.error(refused(e, t));
@@ -1912,7 +1969,16 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
               key={s}
               disabled={busy}
               onClick={async () => {
-                const note = window.prompt(t('ملاحظة (اختياري):', 'Note (optional):')) ?? '';
+                // Cancel now means «do not change the status» — the native
+                // prompt's Cancel used to change it anyway, with no note.
+                const note = await prompt({
+                  title: complaintStatusLabel(s, t),
+                  label: t('ملاحظة', 'Note'),
+                  multiline: true,
+                  maxLength: 500,
+                  confirmLabel: t('تغيير الحالة', 'Change status'),
+                });
+                if (note === null) return;
                 setBusy(true);
                 try {
                   await adminCommunityApi.setComplaintStatus(id, s, note);
@@ -1929,6 +1995,7 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
         </div>
       </Section>
       {confirmDialog}
+      {promptDialog}
     </div>
   );
 }

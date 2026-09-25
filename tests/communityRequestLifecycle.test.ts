@@ -136,7 +136,7 @@ test('E: publishing is the one door onto the board — it opens the request, sta
   assert.equal((await post(as(raw, 'owner'), `/api/marketplace/requests/${id}/offers`, { price_iqd: 12_000 })).status, 201);
 });
 
-test('E: «إعادة الطلب» — the copy goes through matching instead of landing unmatched on the board', async () => {
+test('E: «إعادة الطلب» — the copy is a DRAFT, and goes through matching when it is published', async () => {
   const raw = seed();
   const source = await newPublished(raw);
   const before = count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'matching_request'");
@@ -144,9 +144,15 @@ test('E: «إعادة الطلب» — the copy goes through matching instead of
   const res = await post(as(raw, 'buyer'), `/api/marketplace/print/requests/${source}/repeat`);
   assert.equal(res.status, 201);
   const body = await json(res);
-  assert.equal(body.published, true, JSON.stringify(body));
+  // W5-A (audit 03 §11 item 9): /repeat creates a draft — invisible, unmatched.
+  assert.equal(body.published, false, JSON.stringify(body));
+  assert.equal(body.draft, true);
   const copy = body.request_id as string;
   assert.notEqual(copy, source);
+  assert.equal(row<{ state: string }>(raw, 'SELECT state FROM community_requests WHERE id = ?', copy)?.state, 'draft');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM community_request_matches WHERE request_id = ?', copy), 0);
+  // Publishing the copy as stored is the one door onto the board.
+  assert.equal((await post(as(raw, 'buyer'), `/api/marketplace/print/requests/${copy}/publish`, {})).status, 200);
   assert.equal(row<{ state: string }>(raw, 'SELECT state FROM community_requests WHERE id = ?', copy)?.state, 'open');
   // The matcher ran for the COPY: a decision row per merchant, and the shop
   // that can make it was told about the new request, by its own id.

@@ -48,14 +48,14 @@ test('the calculator\'s «send a print request» step disappears while the commu
 });
 
 test('the wizard opens on the link source with the carried link, and checks it', () => {
-  const wizard = read('src/components/print/PrintRequestWizard.tsx');
+  // Wizard v2 (W5-A, src/components/community/requests/RequestWizard.tsx):
+  // the carried link fills the LINK source in the initial state and is
+  // checked once on arrival.
+  const wizard = read('src/components/community/requests/RequestWizard.tsx');
   assert.match(wizard, /initialLink\?: string;/);
-  const effect = wizard.slice(wizard.indexOf('const initialLinkTaken'), wizard.indexOf('// ------------------------------------------------------- create + measure'));
-  assert.match(effect, /setSource\('link'\)/);
-  assert.match(effect, /setLinkUrl\(initialLink\.trim\(\)\)/);
-  assert.match(effect, /checkLink\(initialLink\.trim\(\)\)/);
-  // The button no longer hands its click event to checkLink as a URL.
-  assert.match(wizard, /onClick=\{\(\) => void checkLink\(\)\}/);
+  assert.match(wizard, /initialLink \? \{ \.\.\.EMPTY_WIZARD, source_type: 'link', source_url: initialLink \}/);
+  const effect = wizard.slice(wizard.indexOf('const initialLinkTaken'), wizard.indexOf('function validateStep1'));
+  assert.match(effect, /void checkLink\(\)/);
 
   const requests = read('src/pages/Requests.tsx');
   assert.match(requests, /printLink/);

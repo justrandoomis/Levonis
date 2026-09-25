@@ -86,7 +86,67 @@ const REPORT = {
   traffic: { since: day(40), counted_from: day(29), totals: { visitors: 1840, store_views: 2300, product_views: 3900, add_to_cart: 210, checkout_started: 96 }, sources: { direct: 900, search: 400, social: 480, other: 60 }, series: series.map((s, i) => ({ day: s.day, visitors: 40 + i * 2, store_views: 60, product_views: 120, add_to_cart: 7, checkout_started: 3 })) },
   orders: { totals: { orders: 49, gross_iqd: 1_151_500, receivable_iqd: 1_093_925, cancelled: 2, average_order_iqd: 23_500 }, series },
   funnel: { from: day(29), visitors: 1840, product_views: 3900, add_to_cart: 210, checkout_started: 96, orders: 49, conversion_percent: 2.7 },
+  // W3-B: the analytics page's other sections.
+  products: {
+    top: [
+      { id: 'p1', name: en ? 'Articulated dragon' : 'تنين مفصلي مطبوع', units: 31, revenue_iqd: 558_000, orders: 27 },
+      { id: 'p2', name: en ? 'Phone stand' : 'حامل هاتف', units: 22, revenue_iqd: 198_000, orders: 18 },
+      { id: 'p3', name: en ? 'Planter pot' : 'أصيص نباتات', units: 9, revenue_iqd: 112_500, orders: 8 },
+    ],
+    most_viewed: [
+      { id: 'p1', name: en ? 'Articulated dragon' : 'تنين مفصلي مطبوع', views: 1620, add_to_cart: 96 },
+      { id: 'p2', name: en ? 'Phone stand' : 'حامل هاتف', views: 910, add_to_cart: 51 },
+      { id: 'p3', name: en ? 'Planter pot' : 'أصيص نباتات', views: 402, add_to_cart: 12 },
+    ],
+    least_viewed: [
+      { id: 'p9', name: en ? 'Cable clips (set of 10)' : 'مشابك أسلاك (10 قطع)', views: 4, add_to_cart: 0 },
+      { id: 'p3', name: en ? 'Planter pot' : 'أصيص نباتات', views: 402, add_to_cart: 12 },
+    ],
+  },
+  customers: { customers: 41, returning: 12, new: 29 },
+  coupons: [
+    { code: 'SUMMER25', orders: 9, discount_iqd: 52_000, gross_iqd: 211_000, coupon_id: 'cpn1', used_count: 14, max_uses: 100, ends_at: ago(-3), active: true },
+    { code: 'WELCOME', orders: 3, discount_iqd: 6_000, gross_iqd: 57_000 },
+  ],
+  governorates: [
+    { governorate: 'baghdad', orders: 29, gross_iqd: 690_000 },
+    { governorate: 'basra', orders: 9, gross_iqd: 201_000 },
+    { governorate: 'erbil', orders: 6, gross_iqd: 142_000 },
+    { governorate: 'najaf', orders: 3, gross_iqd: 70_500 },
+  ],
+  governorates_unspecified: 2,
+  requests: { matched: 18, notified: 11, offers_sent: 14, offers_accepted: 6, win_rate_percent: 43, custom_orders_completed: 4, custom_orders_receivable_iqd: 190_000 },
+  previous: {
+    range: { from: day(59), to: day(30), days: 30 },
+    orders: { orders: 38, gross_iqd: 870_000, receivable_iqd: 826_500, average_order_iqd: 22_895 },
+    traffic: { visitors: 1510, product_views: 3400, add_to_cart: 190, checkout_started: 88, orders: 38, conversion_percent: 2.5 },
+  },
 };
+const TIMELINE = {
+  order_id: 'ORD-22EE1B07', status: 'delivered', credit_state: 'pending', disputed: false, commission_percent: 5,
+  events: [
+    { kind: 'placed', at: ago(4, 3), actor: 'customer', total_iqd: 26000 },
+    { kind: 'credit_recorded', at: ago(4, 3), bucket: 'pending', lines: [{ kind: 'sale_gross', amount_iqd: 23000 }, { kind: 'commission', amount_iqd: -1150 }, { kind: 'delivery_fee', amount_iqd: 3000 }] },
+    { kind: 'chat_started', at: ago(4, 2) },
+    { kind: 'status', at: ago(4, 1), status: 'confirmed', stage: 'confirmed', actor: 'store' },
+    { kind: 'status', at: ago(3, 5), status: 'processing', stage: 'processing', actor: 'store' },
+    { kind: 'status', at: ago(2, 6), status: 'shipped', stage: 'shipped', actor: 'store' },
+    { kind: 'status', at: ago(1, 4), status: 'delivered', stage: 'delivered', actor: 'courier' },
+    { kind: 'release_due', at: ago(-2, 4), expected: true, frozen: false },
+  ],
+  money: { gross_iqd: 23000, commission_iqd: -1150, delivery_fee_iqd: 3000, reversed_iqd: 0, adjustments_iqd: 0, net_iqd: 24850, pending_iqd: 24850, available_iqd: 0 },
+  delivery: { recorded: true, fulfilment: 'delivery', governorate: 'basra', rule: 'override', fee_iqd: 3000, base_fee_iqd: 5000, free_over_iqd: 50000, prep_days: 2, shipping_type: 'direct' },
+  items: [
+    { id: 'i1', product_id: 'p1', variant_id: 'v1', name: en ? 'Articulated dragon' : 'تنين مفصلي مطبوع', image: null, option: en ? 'Gold / Large' : 'ذهبي / كبير', sku: 'DR-01-GL', qty: 1, unit_price_iqd: 18000, line_total_iqd: 18000 },
+    { id: 'i2', product_id: 'p2', variant_id: null, name: en ? 'Phone stand' : 'حامل هاتف', image: null, option: '', sku: 'PS-01', qty: 1, unit_price_iqd: 5000, line_total_iqd: 5000 },
+  ],
+  chat: { id: 'chat_1', link: '/merchant/inbox/chat_1' },
+};
+const CUSTOMERS = [
+  { key: 'ORD-22EE1B07', name: en ? 'Zainab K.' : 'زينب كريم', order_count: 3, spent_iqd: 87_000, last_order_at: ago(1), first_order_at: ago(60), governorate: 'basra', link: '/merchant/customers/ORD-22EE1B07' },
+  { key: 'ORD-7F3A21C9', name: en ? 'Sara Ahmed' : 'سارة أحمد', order_count: 2, spent_iqd: 61_000, last_order_at: ago(0, 2), first_order_at: ago(20), governorate: 'baghdad', link: '/merchant/customers/ORD-7F3A21C9' },
+  { key: 'ORD-91BC04D2', name: 'Omar Najm', order_count: 1, spent_iqd: 16_000, last_order_at: ago(1), first_order_at: ago(1), link: '/merchant/customers/ORD-91BC04D2' },
+];
 const ORDERS = [
   { id: 'ORD-7F3A21C9', status: 'pending', stage: 'placed', origin: 'store_product', total_iqd: 45000, subtotal_iqd: 42000, shipping_iqd: 3000, platform_fee_iqd: 2100, merchant_receivable_iqd: 42900, created_at: ago(0, 2), customer_name: en ? 'Sara Ahmed' : 'سارة أحمد', item_count: 2, credit_state: 'pending', release_after: null },
   { id: 'ORD-91BC04D2', status: 'confirmed', stage: 'placed', origin: 'store_product', total_iqd: 16000, subtotal_iqd: 14000, shipping_iqd: 2000, platform_fee_iqd: 700, merchant_receivable_iqd: 15300, created_at: ago(1), customer_name: 'Omar Najm', item_count: 1, credit_state: 'pending', release_after: null },
@@ -139,10 +199,16 @@ function answer(p: string, q: URLSearchParams, method: string): { status: number
     const st = q.get('status');
     return ok({ orders: st ? ORDERS.filter((o) => o.status === st) : ORDERS, next_cursor: null });
   }
+  if (p.startsWith('/api/merchant/orders/') && p.endsWith('/timeline')) {
+    const o = ORDERS.find((x) => p.includes(x.id)) ?? ORDERS[2];
+    return ok({ ...TIMELINE, order_id: o.id, status: o.status, ...(o.status === 'delivered' ? {} : { credit_state: 'pending', events: TIMELINE.events.slice(0, 4) }) });
+  }
   if (p.startsWith('/api/merchant/orders/')) {
     const o = ORDERS.find((x) => p.endsWith(x.id)) ?? ORDERS[0];
     return ok({ order: { ...o, customer_phone: '07701234567', address: { governorate: 'baghdad', city: en ? 'Karrada' : 'الكرادة', line1: en ? 'Street 62' : 'شارع 62', phone: '07701234567' }, coupon_code: '', coupon_discount_iqd: 0, payment_method_id: 'wallet', due_on_delivery_iqd: 0 }, items: [{ id: 'i1', name_snapshot: PRODUCTS[0].name, qty: 1, unit_price_iqd: 18000, line_total_iqd: 18000, option_snapshot: '' }] });
   }
+  // «عروضي» on /merchant/requests (W5-A): GET /api/marketplace/my-offers, the real shape.
+  if (p === '/api/marketplace/my-offers') return ok({ offers: [{ id: 'off_1', request_id: 'req_1', merchant_id: 'm1', price_iqd: 18000, completion_days: 3, delivery_method: 'merchant_delivery', message: '', materials: '', material_ids: ['petg'], included: '', warranty_terms: '', state: 'superseded', expires_at: ago(-5), created_at: ago(2), updated_at: ago(1), revision: 1, request_revision: 1, stale: true, expired: false, merchant: null, request: { id: 'req_1', title: en ? 'Car phone holder' : 'حامل هاتف للسيارة', state: 'receiving_offers', revision: 2, expires_at: ago(-20) }, order_id: null }], next_cursor: null });
   if (p === '/api/marketplace/orders') return ok({ orders: [{ id: 'cord_1', state: 'funded', price_iqd: 50000, merchant_receivable_iqd: 47500, created_at: ago(1), delivered_at: null, completed_at: null, auto_complete_at: null, request_title: en ? 'Bracket, PETG ×12' : 'حامل رف PETG ×12', merchant_name: 'Ali', store_slug: 'ali3d', role: 'merchant' }] });
   if (p === '/api/merchant/products/stats') return ok({ totals: { total: 3, published: 2, active: 2, draft: 1, hidden: 0, archived: 0, out_of_stock: 1, low_stock: 1, views: 200, sold: 53 }, weekly: [], categories: [], sales_daily: [] });
   if (p === '/api/merchant/products' && method === 'GET') {
@@ -155,7 +221,19 @@ function answer(p: string, q: URLSearchParams, method: string): { status: number
   if (p === '/api/merchant/showcase') return ok({ items: [] });
   if (p === '/api/merchant/coupons') return ok({ coupons: [{ id: 'cpn1', code: 'SUMMER25', kind: 'percent', value: 25, min_total_iqd: 20000, max_uses: 100, used_count: 14, active: true, starts_at: null, ends_at: ago(-3), created_at: ago(30) }] });
   if (p === '/api/merchant/reviews') return ok({ reviews: [{ id: 'r1', rating: 5, body: en ? 'Great print quality, fast delivery.' : 'جودة طباعة ممتازة وتوصيل سريع.', images: [], customer_name: en ? 'Sara' : 'سارة', merchant_reply: null, merchant_replied_at: null, hidden: false, created_at: ago(2) }] });
-  if (p === '/api/merchant/customers') return ok({ customers: [{ id: 'u1', name: en ? 'Sara Ahmed' : 'سارة أحمد', order_count: 3, lifetime_iqd: 87000, last_order_at: ago(0) }, { id: 'u2', name: 'Omar Najm', order_count: 1, lifetime_iqd: 16000, last_order_at: ago(1) }] });
+  if (p === '/api/merchant/customers') {
+    const s = (q.get('q') ?? '').toLowerCase();
+    return ok({ customers: s ? CUSTOMERS.filter((c) => c.name.toLowerCase().includes(s)) : CUSTOMERS, next_cursor: null });
+  }
+  if (p.startsWith('/api/merchant/customers/')) {
+    const c = CUSTOMERS.find((x) => p.endsWith(x.key));
+    if (!c) return { status: 404, body: { success: false, error: 'Customer not found', code: 'CUSTOMER_NOT_FOUND' } };
+    return ok({
+      customer: { key: c.key, name: c.name, order_count: c.order_count, spent_iqd: c.spent_iqd, cancelled_count: 1, average_order_iqd: Math.round(c.spent_iqd / c.order_count), first_order_at: c.first_order_at, last_order_at: c.last_order_at, returning: c.order_count > 1, governorate: c.governorate ?? 'baghdad', phone: '0770 123 4567' },
+      orders: ORDERS.map((o) => ({ id: o.id, status: o.status, total_iqd: o.total_iqd, merchant_receivable_iqd: o.merchant_receivable_iqd, created_at: o.created_at, item_count: o.item_count, credit_state: o.credit_state, link: `/merchant/orders/${o.id}` })),
+      next_cursor: null,
+    });
+  }
   if (p === '/api/merchant/printers') return ok({ printers: [], materials: [{ id: 'pla', name_en: 'PLA', name_ar: 'PLA' }], technologies: ['fdm', 'resin'], qualities: ['draft', 'standard', 'fine', 'ultra'] });
   if (p === '/api/merchant/request-prefs') return ok({ prefs: null, capability: {} });
   if (p === '/api/merchant/request-matches') return ok({ matches: [] });
@@ -174,6 +252,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   const u = new URL(url, location.origin);
   if (!u.pathname.startsWith('/api/')) return realFetch(input, init);
+  // What the page asked for, for the probes (W3-B: a range preset re-asks the report).
+  ((window as unknown as { __apiCalls?: string[] }).__apiCalls ??= []).push(`${u.pathname}${u.search}`);
   const r = answer(u.pathname, u.searchParams, (init?.method ?? 'GET').toUpperCase());
   await new Promise((res) => setTimeout(res, 50));
   return new Response(JSON.stringify(r.body), { status: r.status, headers: { 'content-type': 'application/json' } });

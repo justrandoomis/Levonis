@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ChevronDown, Copy, Loader2, MapPin, MessageCircle, Phone, Plus, Tag, Trash2,
   ExternalLink, Hammer, Check,
@@ -25,6 +25,7 @@ import {
   merchantApi, communityOrdersApi, iqd,
   type CommunityOrderRow, type MerchantCoupon,
 } from '../../../lib/merchant';
+import OrderContactCard from '../../community/offers/OrderContactCard';
 import { Btn, Card, Chip, Empty, Input, Notice, Spinner, Toggle, useMainSiteHref, type Loc } from './ui';
 import { Sheet } from '../../ui/Overlay';
 import { apiRefusal } from '../../../lib/refusalStrings';
@@ -107,10 +108,13 @@ function creditText(o: Record<string, unknown>, loc: Loc, lang: string): string 
 export function OrdersTab({
   focusOrderId = null,
   initialStatus = '',
+  orderHref,
 }: {
   focusOrderId?: string | null;
   /** The list opened on one status — a workspace address's `?status=` (W3-A). */
   initialStatus?: string;
+  /** The order's own screen (W3-B): an open row links to it. */
+  orderHref?: (orderId: string) => string;
 } = {}) {
   const { loc, lang } = useLanguage();
   const [orders, setOrders] = useState<Record<string, unknown>[] | null>(null);
@@ -313,6 +317,14 @@ export function OrdersTab({
 
               {/* Keyed on the status, so a move re-reads the sheet's money rows. */}
               {open && <OrderDetail key={`${id}:${status}`} id={id} />}
+              {open && orderHref && (
+                <div className="px-3 pb-3">
+                  <Link to={orderHref(id)} data-open-order={id} className="inline-flex min-h-11 items-center text-[12.5px] font-semibold text-gold underline-offset-2 hover:underline">
+                    {/* OWNER: Sorani to be written by hand. */}
+                    {loc('صفحة الطلب كاملة: المال والخط الزمني والطباعة', 'The full order: money, timeline and printing')}
+                  </Link>
+                </div>
+              )}
 
               {next.length > 0 && (
                 <div className="px-3 pb-3 space-y-1.5">
@@ -635,6 +647,17 @@ export function CustomOrdersTab() {
               {loc('لك', 'You get', 'بۆ تۆ')}: <span className="text-gold font-semibold" dir="ltr">{iqd(o.merchant_receivable_iqd)}</span>
             </span>
           </div>
+
+          {/* W5-A: the customer's contact and delivery details, revealed by the
+              acceptance, and the request's conversation. */}
+          {['funded', 'in_progress', 'merchant_marked_delivered', 'disputed'].includes(o.state) && (
+            <details className="mb-2" data-custom-order-contact={o.id}>
+              <summary className="min-h-[44px] flex items-center cursor-pointer text-[12px] font-semibold text-gold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
+                {loc('بيانات الزبون والتسليم', 'Customer and delivery details')}
+              </summary>
+              <OrderContactCard orderId={o.id} compact />
+            </details>
+          )}
 
           {o.state === 'funded' && (
             <Btn

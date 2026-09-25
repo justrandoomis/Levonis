@@ -3,7 +3,9 @@
  *
  * On top — only when there are any — how many open requests match this
  * workshop and have no offer from it yet (the attention API's count, from the
- * matcher's own decisions), as a door to the request board. Below, the custom orders those requests became —
+ * matcher's own decisions), as a door to the request board. Then the
+ * workshop's own offers («عروضي», W5-A) — what to re-confirm, what stands,
+ * what won. Below, the custom orders those requests became —
  * the old dashboard's «طلبات مخصصة» tab, mounted unchanged.
  *
  * The board is Levo Community (DECISIONS 110): while the community is shut to
@@ -15,6 +17,8 @@ import { useLanguage } from '../../../../LanguageContext';
 import { useCommunityAccess } from '../../../../pages/community/access';
 import { formatFigure } from '../../../../lib/localeNumber';
 import { CustomOrdersTab } from '../../dashboard/SalesTabs';
+// The workshop's offers across requests (print requests v2, W5-A).
+import MyOffersList from '../../../community/offers/MyOffersList';
 import { useWorkspace } from '../context';
 
 export default function RequestsSection() {
@@ -45,6 +49,9 @@ export default function RequestsSection() {
             </a>
           )}
         </>
+      )}
+      {communityAccess?.may_enter !== false && (
+        <MyOffersList requestHref={(id) => mainHref(`/requests?request=${encodeURIComponent(id)}`)} />
       )}
       <CustomOrdersTab />
     </div>

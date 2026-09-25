@@ -508,9 +508,18 @@ contain someone they have traded with. There is no user search.
   `400 COLLECTION_KIND_EXISTS`, `COLLECTIONS_LIMIT`)
 - **catalogue:** the same four for `/services`, `/showcase` and `/coupons`
 - **orders:** `GET /orders` · `GET /orders/:id` · `POST /orders/:id/status` ·
-  `GET /custom-orders/summary`
+  `GET /custom-orders/summary` · `GET /orders/:id/timeline` (W3-B,
+  worker/routes/merchantOrders.ts) — the order's recorded events oldest first
+  (placed, status moves by role, cancellation and refund, receipt, ledger
+  credit / release / reversal, complaints, chat; the automatic release as
+  `expected`), its money from its own ledger lines, the delivery snapshot and
+  the lines with variant/SKU; no free text or staff id; `404 ORDER_NOT_FOUND`
 - **money and people:** `GET /analytics` (sales only — cancelled orders are
-  counted apart, never as revenue) · `GET /customers` ·
+  counted apart, never as revenue) ·
+  `GET /customers?q=&cursor=&limit=` · `GET /customers/:key?cursor=` (W3-B,
+  worker/routes/merchantCustomers.ts — buyers of THIS store only, keyed by an
+  order id of the store, never a user id; the phone only on the detail, as the
+  store sees it on their orders; `404 CUSTOMER_NOT_FOUND`, `400 BAD_CURSOR`) ·
   `GET /followers` · `GET /reviews` · `POST /reviews/:id/reply`
 - **notifications:** `GET|PATCH /notifications` (`wired` names the switches a
   sender actually reads; the rest show «قريبًا». A switch governs the OUTSIDE
@@ -526,7 +535,9 @@ contain someone they have traded with. There is no user search.
   `GET /analytics/report?from=&to=` (Baghdad days, ≤366) — traffic from the
   beacon (absent before counting began), orders live from `orders`, funnel,
   top/least-viewed products, returning customers, coupons, governorates,
-  requests/offers; `403 ANALYTICS_NOT_INCLUDED`, `400 BAD_RANGE`
+  requests/offers, most-viewed products, and `previous` — the equal-length
+  period before, present only where both periods have a source (W3-B);
+  `403 ANALYTICS_NOT_INCLUDED`, `400 BAD_RANGE`
 - **printers** (worker/routes/merchantPrinters.ts, same prefix): `GET|POST /printers` ·
   `PUT|DELETE /printers/:id` · `GET|PUT /request-prefs` · `GET /request-matches`
 - **finance** (worker/routes/merchantFinance.ts): `GET /finance/summary` ·

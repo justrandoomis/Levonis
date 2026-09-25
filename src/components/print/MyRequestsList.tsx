@@ -83,12 +83,12 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
       setAsking(null);
       load();
       if (!d.published) {
-        // The copy exists as a draft only — say so before opening it.
+        // W5-A: a repeat is always a DRAFT — reviewed, then published.
         // OWNER: Sorani to be written by hand.
         setNotice(
           loc(
-            'نُسخ الطلب لكنه لم يُنشر بعد — افتحه واضغط «نشر».',
-            'The request was copied but not published yet — open it and press Publish.'
+            'نُسخ الطلب مسودةً — راجعه (الموعد والكمية) ثم انشره.',
+            'The request was copied as a draft — review it (deadline, quantity), then publish it.'
           )
         );
       }
@@ -143,7 +143,7 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
         title={loc('إعادة هذا الطلب؟', 'Repeat this request?')}
         confirmLabel={loc('إعادة الطلب', 'Repeat', 'دووبارە')}
         // OWNER: Sorani to be written by hand.
-        busyLabel={loc('جارٍ النسخ والنشر…', 'Copying and publishing…')}
+        busyLabel={loc('جارٍ النسخ…', 'Copying…')}
         busy={!!asking && repeating === asking.id}
         error={error}
         onConfirm={() => asking && repeat(asking)}
@@ -152,8 +152,8 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
         {/* OWNER: Sorani to be written by hand. */}
         {asking &&
           loc(
-            `سيُنشأ طلب جديد بنفس تفاصيل «${asking.title}» وبنسخة من ملفاته، ويُنشر فورًا ليصل إلى التجار المناسبين بتقدير سعر جديد.`,
-            `A new request will be created with the same details as “${asking.title}” and a copy of its files, and published straight away to the merchants who can make it, with a fresh estimate.`
+            `سيُنشأ طلب جديد مسودةً بنفس تفاصيل «${asking.title}» وبنسخة من ملفاته. تراجعه وتختار موعدًا جديدًا، ثم تنشره ليصل إلى التجار المناسبين بتقدير سعر جديد.`,
+            `A new DRAFT will be created with the same details as “${asking.title}” and a copy of its files. You review it and pick a new deadline, then publish it to the merchants who can make it, with a fresh estimate.`
           )}
       </ConfirmSheet>
 

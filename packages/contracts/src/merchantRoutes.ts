@@ -75,6 +75,9 @@ export const SECTION_PATHS: Readonly<Record<MerchantSection, string>> = {
 export const SECTIONS_WITH_ID: ReadonlySet<MerchantSection> = new Set<MerchantSection>([
   'orders',
   'products',
+  // A customer is addressed by their first order with the store — an order
+  // id, never a user id (W3-B, worker/routes/merchantCustomers.ts).
+  'customers',
   'inbox',
   'coupons',
   'requests',
@@ -109,6 +112,7 @@ export const merchantHref = {
   products: () => at('products'),
   product: (productId: string) => at('products', productId),
   customers: () => at('customers'),
+  customer: (customerKey: string) => at('customers', customerKey),
   inbox: () => at('inbox'),
   thread: (chatId: string) => at('inbox', chatId),
   coupons: () => at('coupons'),

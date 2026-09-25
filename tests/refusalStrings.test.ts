@@ -145,6 +145,12 @@ test('every code the table translates is one the server can actually emit', () =
     // The store checkout's delivery by governorate (wave 2, W2-A): the address
     // and delivery refusals are raised from the saved address here.
     'worker/lib/merchantDelivery.ts',
+    // The workspace's analytics page, order screen and customers (W3-B), and
+    // the palette search whose length refusals the customers search shares.
+    'worker/routes/merchantAnalytics.ts',
+    'worker/routes/merchantOrders.ts',
+    'worker/routes/merchantCustomers.ts',
+    'worker/routes/merchantWorkspace.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

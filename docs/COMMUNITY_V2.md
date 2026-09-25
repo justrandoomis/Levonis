@@ -36,6 +36,7 @@ truthful.
 draft → open → receiving_offers → offer_selected → in_progress
                                                  → delivered → completed
                     ↘ cancelled / expired            ↘ disputed → completed|cancelled
+draft → expired   (an abandoned draft, by the sweep — W5-A)
 ```
 
 Transitions are declared as data in `worker/lib/communityStates.ts`. **Absence
@@ -46,10 +47,16 @@ has already settled could move again.
 **`draft` is real (wave 1).** `POST /api/marketplace/requests` creates a
 **draft** — invisible to everyone but its customer and not biddable — and
 publishing (`POST /api/marketplace/print/requests/:id/publish`) is the one move
-to `open`; it runs the matching and starts the expiry clock. «إعادة الطلب»
-copies are published the same way. A re-publish that changes what merchants
-priced moves the request's `revision` and makes standing offers **stale** (not
-acceptable until their merchant re-confirms). **Expiry is a state**: a request
+to `open`; it runs the matching ONCE and starts the expiry clock (a re-publish
+that changes nothing merchants priced answers `replayed: true` and matches
+nobody). «إعادة الطلب» creates a DRAFT the customer reviews and publishes the
+same way (W5-A). A draft untouched for 14 days expires in the sweep. A change to
+what merchants priced **after the first offer** moves the request's `revision`,
+records the new revision (`community_request_revisions`, migration 0130) and
+makes standing offers **`superseded`** in the same batch (not acceptable —
+`OFFER_STALE` — until their merchant re-confirms or edits them; they are told
+and can read what changed); a change nobody priced rewrites the current
+revision in place. **Expiry is a state**: a request
 past `expires_at` takes no offers and no acceptance, is not served to strangers,
 and a scheduled sweep moves it (and its pending offers) to `expired`. The
 customer cancels a request only while it is a draft or taking offers — once a
@@ -61,7 +68,12 @@ dispute). (`docs/merchant-platform/audit/03` §10 E, I, J, K; migration 0116.)
 The job, and a display name. **Never** a phone, an email or an address, and
 that is enforced by the server's `SELECT` list rather than by the frontend
 choosing what to render (§24). A merchant learns how to reach the customer when
-their offer is accepted, and not before.
+their offer is accepted, and not before: the acceptance batch writes the
+order's `contact_snapshot` (the customer's name, phone and chosen delivery
+address — name and phone only for a pickup — for the merchant; the store's
+phone for the customer), and `GET /api/marketplace/orders/:id` returns each side
+only the OTHER side's contact, with the request's conversation one tap away
+(W5-A, `docs/PRINT_REQUESTS.md` §5).
 
 ---
 

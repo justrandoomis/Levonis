@@ -74,6 +74,8 @@ import { storefrontRoutes } from './routes/storefront';
 import { merchantNotificationRoutes } from './routes/merchantNotifications';
 import { merchantInboxRoutes } from './routes/merchantInbox';
 import { merchantAnalyticsRoutes } from './routes/merchantAnalytics';
+import { merchantOrderRoutes } from './routes/merchantOrders';
+import { merchantCustomerRoutes } from './routes/merchantCustomers';
 import { storefrontEventRoutes } from './routes/storefrontEvents';
 import { marketplaceRoutes } from './routes/marketplace';
 import { storeOrderRoutes } from './routes/storeOrders';
@@ -369,6 +371,10 @@ app.route('/api/referrals', referralRoutes);
 app.route('/api/studio', studioRoutes);
 // Merchant store administration. Scoped to the caller's OWN store on every
 // route — deliberately not under /api/admin, which is the platform's.
+// The store's customers (W3-B): mounted BEFORE merchantRoutes so its paged,
+// searchable list answers GET /api/merchant/customers (the older unpaged
+// handler in merchant.ts stays for the routers mounted alone in tests).
+app.route('/api/merchant/customers', merchantCustomerRoutes);
 app.route('/api/merchant', merchantRoutes);
 // Printers and request-notification preferences: what a shop can make, and
 // which of those jobs it wants to hear about.
@@ -387,6 +393,8 @@ app.route('/api/merchant/store/layout', storeLayoutRoutes);
 app.route('/api/merchant/notifications', merchantNotificationRoutes);
 app.route('/api/merchant/inbox', merchantInboxRoutes);
 app.route('/api/merchant/analytics', merchantAnalyticsRoutes);
+// One store order as a story — its timeline, ledger lines and delivery snapshot (W3-B).
+app.route('/api/merchant/orders', merchantOrderRoutes);
 // The merchant's money (W2-B): the finance summary and ledger, and payout
 // requests — beside the append-only ledger they read (worker/lib/merchantLedger.ts).
 app.route('/api/merchant/finance', merchantFinanceRoutes);

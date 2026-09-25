@@ -21,6 +21,8 @@
  *   GET    /preview             the draft (or ?revision=) with the rows its
  *                               blocks show — owner only, never cached, never
  *                               public
+ *   GET    /media               ?kind=image|video — the owner's own uploads a
+ *                               layout may hold, for the builder's picker (W4-A)
  *
  * EVERY WRITE NORMALISES (packages/storeLayout) with the owner's id and then
  * checks the references against the store's own rows (worker/lib/storeLayout).
@@ -47,6 +49,7 @@ import { normalizeLayout, renderableBlocks, type LayoutIssue } from '@levonis/st
 import { defaultLayoutFromStore } from '@levonis/storeLayout/defaults';
 import { MAX_BLOCKS, MAX_LAYOUT_BYTES, MAX_REQUEST_BYTES, SCHEMA_VERSION, type StoreLayout } from '@levonis/storeLayout/schema';
 import { THEME_NAMES } from '@levonis/storeLayout/tokens';
+import { mediaKey, type MediaKind } from '@levonis/storeLayout/refs';
 
 export const storeLayoutRoutes = new Hono<AppContext>();
 
@@ -564,4 +567,52 @@ storeLayoutRoutes.get('/preview', async (c) => {
   if (!layout.blocks.length && source !== 'draft') layout = defaultLayoutFromStore(ctx.store);
   c.header('Cache-Control', 'private, no-store');
   return c.json({ success: true, source, layout, blocks_data: await blockDataFor(db, ctx, layout) });
+});
+
+/**
+ * THE BUILDER'S MEDIA LIBRARY (W4-A) — the pictures or videos this store's
+ * owner uploaded, newest first, for the block inspector's picker.
+ *
+ *   GET /media?kind=image|video&cursor=<created_at|key>&limit=
+ *
+ * Read-only, and only what a layout could hold: rows under the owner's id in
+ * the `merchants` domain, not deleted, of the asked kind by the LEDGER's mime
+ * (a `.webp` recorded as video is not offered as a picture), and whose key
+ * passes the schema's own `mediaKey` for this owner — so every key offered is
+ * one `verifyLayoutRefs` will accept. Keyset paging on the owner index.
+ */
+storeLayoutRoutes.get('/media', async (c) => {
+  const ctx = await requireStoreOwner(c);
+  const kind: MediaKind = c.req.query('kind') === 'video' ? 'video' : 'image';
+  const limitRaw = Number(c.req.query('limit') ?? 36);
+  const limit = Number.isInteger(limitRaw) ? Math.min(60, Math.max(1, limitRaw)) : 36;
+  const cursorRaw = String(c.req.query('cursor') ?? '');
+  const bar = cursorRaw.indexOf('|');
+  const cursor = bar > 0 && cursorRaw.length <= 300 ? { at: cursorRaw.slice(0, bar), key: cursorRaw.slice(bar + 1) } : null;
+  const owner = ctx.store.user_id;
+  const { results } = await c.env.DB.prepare(
+    `SELECT object_key, mime_type, width, height, created_at FROM file_objects
+      WHERE owner_id = ?1 AND domain = 'merchants' AND deleted_at IS NULL AND mime_type LIKE ?2
+        AND (?3 = '' OR created_at < ?3 OR (created_at = ?3 AND object_key < ?4))
+      ORDER BY created_at DESC, object_key DESC LIMIT ?5`
+  )
+    .bind(owner, kind === 'video' ? 'video/%' : 'image/%', cursor?.at ?? '', cursor?.key ?? '', limit)
+    .all<{ object_key: string; mime_type: string; width: number | null; height: number | null; created_at: string }>();
+  const rows = results ?? [];
+  const items = rows
+    .filter((r) => {
+      const v = mediaKey(r.object_key, kind, owner);
+      return !!v && v.ok && v.key === r.object_key;
+    })
+    .map((r) => ({
+      key: r.object_key,
+      kind,
+      mime: r.mime_type,
+      width: r.width === null ? null : Number(r.width),
+      height: r.height === null ? null : Number(r.height),
+      created_at: r.created_at,
+    }));
+  const last = rows[rows.length - 1];
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true, items, next_cursor: rows.length === limit && last ? `${last.created_at}|${last.object_key}` : null });
 });

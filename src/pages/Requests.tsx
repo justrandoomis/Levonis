@@ -18,22 +18,28 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import {
-  Plus, Loader2, PackageSearch, Clock, MapPin, Star, BadgeCheck, ShieldCheck,
-  ChevronLeft, Send, X, AlertTriangle, FilePen,
-} from 'lucide-react';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { Plus, Loader2, PackageSearch, MapPin, ChevronLeft, FilePen, PencilLine } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
 import { api, ApiError } from '../lib/api';
-import { iqd, badgeLabel, merchantApi, communityOrdersApi, type MerchantMe, type CommunityOrderRow } from '../lib/merchant';
+import { iqd, merchantApi, communityOrdersApi, type MerchantMe, type CommunityOrderRow } from '../lib/merchant';
 import { GOVERNORATE_LABELS } from '../lib/governorates';
 import { AttachmentList, type RequestFile } from '../components/media/RequestAttachments';
-import PrintRequestWizard from '../components/print/PrintRequestWizard';
 import PrintSummary from '../components/print/PrintSummary';
 import MyRequestsList from '../components/print/MyRequestsList';
-import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
+/**
+ * PRINT REQUESTS v2 (stream W5-A): the four-step wizard with drafts, and the
+ * offers — compared side by side by the customer, composed and edited by the
+ * merchant, and the contact both receive once one is accepted.
+ */
+import RequestWizard from '../components/community/requests/RequestWizard';
+import { requestsApi, type CatalogMaterial } from '../components/community/requests/api';
+import OfferCompare from '../components/community/offers/OfferCompare';
+import MerchantOfferPanel from '../components/community/offers/MerchantOfferPanel';
+import OrderContactCard from '../components/community/offers/OrderContactCard';
+import type { OfferV2 } from '../components/community/offers/types';
 /**
  * A PUBLISHED REQUEST IS A PROMISE OF OFFERS, and offers arrive hours later
  * from merchants the customer has never met. For an account with no outbound
@@ -41,7 +47,6 @@ import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
  * customer just wrote sits there collecting answers nobody tells them about.
  */
 import ChannelNudge from '../components/notify/ChannelNudge';
-import { CommunityStoreLink } from './community/access';
 import Spinner from '../components/ui/Spinner';
 import ConfirmSheet from '../components/print/ConfirmSheet';
 import { apiRefusal } from '../lib/refusalStrings';
@@ -64,33 +69,9 @@ interface RequestRow {
   created_at: string;
   customer_name: string | null;
   expires_at?: string | null;
-}
-
-interface OfferRow {
-  id: string;
-  price_iqd: number;
-  completion_days: number;
-  delivery_method: string;
-  message: string;
-  warranty_terms: string;
-  state: string;
-  /** The version on screen. Accepting sends it back, so only THIS version can
-   *  be accepted — never one the merchant edited after the customer read it. */
-  revision: number;
-  /** The customer changed the request after this offer priced it; it cannot be
-   *  accepted until its merchant re-confirms it. */
-  stale: boolean;
-  merchant: {
-    id: string;
-    name: string;
-    verified: boolean;
-    pro_badge?: boolean;
-    badge: string;
-    rating: number | null;
-    rating_count: number;
-    completed_orders: number;
-    store_slug: string | null;
-  } | null;
+  /** Notes the customer wrote for the merchants (0130). */
+  customer_notes?: string;
+  revision?: number;
 }
 
 type View = 'board' | 'mine' | 'orders' | 'new';
@@ -125,6 +106,8 @@ export default function Requests() {
    * on the wrong screen.
    */
   const [requestJustCreated, setRequestJustCreated] = useState(false);
+  /** A draft to finish, or a published request to edit, in the wizard. */
+  const [editing, setEditing] = useState('');
 
   useEffect(() => {
     if (!user) return;
@@ -232,7 +215,16 @@ export default function Requests() {
   return (
     <>
       {open ? (
-        <RequestDetail request={open} me={me} onBack={closeRequest} />
+        <RequestDetail
+          request={open}
+          me={me}
+          onBack={closeRequest}
+          onEdit={(id) => {
+            // The wizard takes the screen; the request re-opens when it is done.
+            setEditing(id);
+            closeRequest();
+          }}
+        />
       ) : (
         <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 pb-28">
           <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[380px] bg-olive/15 rounded-full blur-[120px] pointer-events-none z-0" />
@@ -285,22 +277,27 @@ export default function Requests() {
               )}
             </div>
 
-            {view === 'new' ? (
-              /* THE WIZARD REPLACED THE FORM. `NewRequest` asked for eighteen
-                 fields before it would create anything; the wizard asks for a file
-                 and a sentence, measures the model itself, prices it, and only
-                 then offers the rest behind "خيارات متقدمة". It still creates the
-                 SAME `community_requests` row through the same endpoint — the
-                 print side hangs off it, and publishing is what notifies the
-                 merchants who can make it. */
-              <PrintRequestWizard
+            {view === 'new' || editing ? (
+              /* WIZARD v2 (W5-A). Four steps, a DRAFT all the way until «انشر»,
+                 and «احفظ كمسودة» at any point. The same component finishes a
+                 draft or edits a published request (`editing`); either way it
+                 is the same `community_requests` row, and publishing is what
+                 notifies the merchants who can make it. */
+              <RequestWizard
+                key={editing || 'new'}
+                requestId={editing || undefined}
                 initialLink={carriedLink || undefined}
-                onCreated={(id) => {
+                onDone={(id, how) => {
+                  setEditing('');
                   setView('mine');
+                  setOpen(null);
                   openRequestId(id);
-                  setRequestJustCreated(true);
+                  if (how === 'published') setRequestJustCreated(true);
                 }}
-                onCancel={() => setView('board')}
+                onCancel={() => {
+                  setEditing('');
+                  if (view === 'new') setView('board');
+                }}
               />
             ) : view === 'orders' ? (
               <MyCommunityOrders />
@@ -398,17 +395,18 @@ function RequestDetail({
   request,
   me,
   onBack,
+  onEdit,
 }: {
   request: RequestRow;
   me: MerchantMe | null;
   onBack: () => void;
+  /** Open the wizard on this request (a draft to finish, or a published one to edit). */
+  onEdit?: (id: string) => void;
 }) {
   const { loc, lang } = useLanguage();
-  const [offers, setOffers] = useState<OfferRow[] | null>(null);
+  const [offers, setOffers] = useState<OfferV2[] | null>(null);
   const [isCustomer, setIsCustomer] = useState(false);
-  /** The offer the customer is about to accept — the sheet reads it. */
-  const [accepting, setAccepting] = useState<OfferRow | null>(null);
-  const [offering, setOffering] = useState(false);
+  const [materials, setMaterials] = useState<CatalogMaterial[]>([]);
   const [files, setFiles] = useState<RequestFile[]>([]);
   const [isOwner, setIsOwner] = useState(false);
   /**
@@ -427,7 +425,7 @@ function RequestDetail({
 
   const load = useCallback(() => {
     api
-      .get<{ offers: OfferRow[]; is_customer: boolean }>(`/api/marketplace/requests/${request.id}/offers`)
+      .get<{ offers: OfferV2[]; is_customer: boolean }>(`/api/marketplace/requests/${request.id}/offers`)
       .then((d) => {
         setOffers(d.offers);
         setIsCustomer(d.is_customer);
@@ -450,10 +448,13 @@ function RequestDetail({
 
   useEffect(load, [load]);
   useEffect(loadFiles, [loadFiles]);
+  // The catalogue names the materials an offer lists.
+  useEffect(() => {
+    requestsApi.catalog().then((c) => setMaterials(c.materials)).catch(() => setMaterials([]));
+  }, []);
 
   const open = ['open', 'receiving_offers'].includes(current.state);
   const canOffer = !!me?.can.offers && !isCustomer && open;
-  const alreadyOffered = (offers ?? []).some((o) => o.state === 'pending' || o.state === 'accepted');
   const fallback = loc('تعذّر إتمام العملية', 'Could not complete that', 'نەتوانرا تەواو بکرێت');
 
   /**
@@ -528,6 +529,23 @@ function RequestDetail({
               <Detail label={loc('الموعد', 'Deadline', 'کاتی کۆتایی')} value={current.deadline} />
             )}
           </div>
+          {current.customer_notes && (
+            <div className="mt-3 rounded-xl bg-black/30 border border-white/5 px-3 py-2.5" data-request="customer-notes">
+              <p className="text-zinc-500 text-[11px] mb-0.5">{loc('ملاحظات للتجار', 'Notes for merchants')}</p>
+              <p dir="auto" className="text-zinc-200 text-[12.5px] leading-relaxed whitespace-pre-wrap break-words">{current.customer_notes}</p>
+            </div>
+          )}
+          {isOwner && open && onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(current.id)}
+              data-request="edit"
+              className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl text-[13px] font-semibold text-gold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+            >
+              <PencilLine className="w-4 h-4" aria-hidden="true" />
+              {loc('عدّل الطلب', 'Edit request')}
+            </button>
+          )}
         </div>
 
         {isOwner && current.state === 'draft' && (
@@ -547,6 +565,16 @@ function RequestDetail({
             <p role="alert" aria-live="polite" className="text-red-400 text-[12.5px] mt-2 empty:hidden">
               {draftError}
             </p>
+            {onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit(current.id)}
+                data-requests="continue-draft"
+                className="mt-3 w-full min-h-[44px] rounded-xl border border-white/10 bg-white/[0.03] text-white text-[13px] font-bold hover:bg-white/[0.06] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
+              >
+                {loc('أكمل التعديل', 'Continue editing')}
+              </button>
+            )}
             <div className="flex gap-2 mt-3">
               <button
                 type="button"
@@ -598,27 +626,6 @@ function RequestDetail({
           </div>
         )}
 
-        {canOffer && !alreadyOffered && (
-          <button
-            onClick={() => setOffering(true)}
-            className="w-full min-h-[48px] rounded-2xl bg-olive text-white font-bold text-[14px] flex items-center justify-center gap-2 mb-4"
-          >
-            <Send className="w-4 h-4" />
-            {loc('قدّم عرضًا', 'Submit an offer', 'ئۆفەر پێشکەش بکە')}
-          </button>
-        )}
-
-        {offering && (
-          <OfferForm
-            requestId={current.id}
-            onDone={() => {
-              setOffering(false);
-              load();
-            }}
-            onCancel={() => setOffering(false)}
-          />
-        )}
-
         {/* A draft cannot be offered on, so there is no "no offers yet" to
             wait for — the draft card above already says what happens next. */}
         {current.state !== 'draft' && (
@@ -633,37 +640,30 @@ function RequestDetail({
               <div className="py-8 flex justify-center">
                 <Loader2 className="w-5 h-5 text-gold animate-spin" />
               </div>
-            ) : !offers.length ? (
-              <p className="text-zinc-500 text-[12.5px] py-6 text-center">
-                {loc('لا توجد عروض بعد', 'No offers yet', 'هێشتا ئۆفەر نییە')}
-              </p>
+            ) : isCustomer ? (
+              <OfferCompare
+                requestId={current.id}
+                offers={offers}
+                takingOffers={open}
+                materials={materials}
+                onChanged={() => {
+                  load();
+                  loadFiles();
+                }}
+              />
             ) : (
-              <div className="space-y-3">
-                {offers.map((o) => (
-                  <OfferCard
-                    key={o.id}
-                    offer={o}
-                    mine={!isCustomer}
-                    canAccept={isCustomer && o.state === 'pending' && !o.stale && open}
-                    onAccept={() => setAccepting(o)}
-                    onChanged={load}
-                  />
-                ))}
-              </div>
+              <MerchantOfferPanel
+                requestId={current.id}
+                offers={offers}
+                canOffer={canOffer}
+                takingOffers={open}
+                materials={materials}
+                onChanged={load}
+              />
             )}
           </>
         )}
       </div>
-
-      <AcceptOfferSheet
-        offer={accepting}
-        onClose={() => setAccepting(null)}
-        onAccepted={() => {
-          setAccepting(null);
-          load();
-          loadFiles();
-        }}
-      />
 
       <ConfirmSheet
         open={discardOpen}
@@ -688,448 +688,7 @@ function RequestDetail({
   );
 }
 
-/**
- * ACCEPTING MOVES MONEY, AND ONLY FOR THE OFFER ON SCREEN.
- *
- * The sheet shows the price and the promise, says the money is HELD rather
- * than paid, and sends back exactly the version it showed (`revision` and
- * `price_iqd`). If the merchant changed the offer in the meantime the server
- * answers `OFFER_CHANGED` with the fresh offer — the sheet then shows THAT,
- * says it changed, and the next tap accepts the new terms knowingly. A
- * customer whose wallet cannot cover it is told so here, with the way to fix it.
- */
-function AcceptOfferSheet({
-  offer,
-  onClose,
-  onAccepted,
-}: {
-  offer: OfferRow | null;
-  onClose: () => void;
-  onAccepted: () => void;
-}) {
-  const { loc, lang } = useLanguage();
-  const [shown, setShown] = useState<OfferRow | null>(offer);
-  const [changed, setChanged] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [needsTopUp, setNeedsTopUp] = useState(false);
-
-  useEffect(() => {
-    if (!offer) return;
-    setShown(offer);
-    setChanged(false);
-    setError('');
-    setNeedsTopUp(false);
-    setBusy(false);
-  }, [offer]);
-
-  const o = shown;
-
-  async function confirm() {
-    if (!o || busy) return;
-    setBusy(true);
-    setError('');
-    setNeedsTopUp(false);
-    try {
-      await api.post(`/api/marketplace/offers/${o.id}/accept`, {
-        expected_price_iqd: o.price_iqd,
-        offer_revision: o.revision,
-      });
-      onAccepted();
-    } catch (e) {
-      const fresh = e instanceof ApiError && e.code === 'OFFER_CHANGED' ? (e.details?.offer as OfferRow | undefined) : undefined;
-      if (fresh) {
-        setShown(fresh);
-        setChanged(true);
-      } else {
-        setError(apiRefusal(e, asLang(lang), loc('تعذّر قبول العرض', 'Could not accept the offer', 'نەتوانرا ئۆفەرەکە پەسەند بکرێت')));
-        setNeedsTopUp(e instanceof ApiError && e.code === 'INSUFFICIENT_FUNDS');
-      }
-      setBusy(false);
-    }
-  }
-
-  return (
-    <ConfirmSheet
-      open={!!offer}
-      testId="accept-offer"
-      // OWNER: Sorani to be written by hand.
-      title={loc('قبول هذا العرض؟', 'Accept this offer?')}
-      confirmLabel={loc('اقبل العرض', 'Accept offer', 'ئۆفەر پەسەند بکە')}
-      // OWNER: Sorani to be written by hand.
-      busyLabel={loc('جارٍ حجز المبلغ…', 'Holding the money…')}
-      busy={busy}
-      error={error}
-      onConfirm={confirm}
-      onClose={onClose}
-      footer={
-        needsTopUp ? (
-          <Link
-            to="/wallet"
-            className="mb-1 inline-flex min-h-[44px] items-center text-gold text-[13px] font-semibold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] rounded"
-          >
-            {loc('اشحن المحفظة', 'Top up the wallet', 'جزدان پڕ بکەرەوە')}
-          </Link>
-        ) : null
-      }
-    >
-      {o && (
-        <>
-          {changed && (
-            <p
-              role="status"
-              className="mb-3 flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-amber-200 text-[12.5px]"
-              data-accept="changed"
-            >
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
-              {/* OWNER: Sorani to be written by hand. */}
-              {loc(
-                'غيّر التاجر هذا العرض بعد أن فتحته — هذه شروطه الآن.',
-                'The merchant changed this offer after you opened it — these are its terms now.'
-              )}
-            </p>
-          )}
-          <div className="mb-3 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <span className="min-w-0 truncate text-white text-[13.5px] font-semibold">{o.merchant?.name ?? '—'}</span>
-              <span className="shrink-0 text-gold font-bold text-[15px] tabular-nums" dir="ltr" data-accept="price">
-                {iqd(o.price_iqd)}
-              </span>
-            </div>
-            {o.completion_days > 0 && (
-              <p className="mt-1 flex items-center gap-1.5 text-zinc-400 text-[12px]">
-                <Clock className="w-3.5 h-3.5" aria-hidden="true" />
-                {loc(`خلال ${o.completion_days} يوم`, `In ${o.completion_days} days`, `لە ${o.completion_days} ڕۆژدا`)}
-              </p>
-            )}
-          </div>
-          {loc(
-            `سيُحجز ${iqd(o.price_iqd)} من رصيدك الآن — لن يُدفع للتاجر إلا بعد تأكيدك للاستلام. متابعة؟`,
-            `${iqd(o.price_iqd)} will be HELD from your balance now — the merchant is only paid after you confirm delivery. Continue?`,
-            `${iqd(o.price_iqd)} لە باڵانسەکەت دەگیرێت — تەنها دوای پشتڕاستکردنەوەی وەرگرتن پارە دەدرێت بە بازرگان. بەردەوام بیت؟`
-          )}
-        </>
-      )}
-    </ConfirmSheet>
-  );
-}
-
-function OfferCard({
-  offer,
-  mine,
-  canAccept,
-  onAccept,
-  onChanged,
-}: {
-  offer: OfferRow;
-  /** The viewer is the merchant who made it (a merchant only ever sees their own). */
-  mine: boolean;
-  canAccept: boolean;
-  onAccept: () => void;
-  onChanged: () => void;
-}) {
-  const { loc, lang } = useLanguage();
-  const m = offer.merchant;
-  const [busy, setBusy] = useState<'' | 'reconfirm' | 'withdraw'>('');
-  const [error, setError] = useState('');
-  const [withdrawOpen, setWithdrawOpen] = useState(false);
-  const pending = offer.state === 'pending';
-
-  async function reconfirm() {
-    setBusy('reconfirm');
-    setError('');
-    try {
-      await api.post(`/api/marketplace/offers/${offer.id}/reconfirm`);
-      onChanged();
-    } catch (e) {
-      setError(apiRefusal(e, asLang(lang), loc('تعذّر تأكيد العرض', 'Could not re-confirm the offer')));
-    } finally {
-      setBusy('');
-    }
-  }
-
-  async function withdraw() {
-    setBusy('withdraw');
-    setError('');
-    try {
-      await api.post(`/api/marketplace/offers/${offer.id}/withdraw`);
-      setWithdrawOpen(false);
-      onChanged();
-    } catch (e) {
-      setError(apiRefusal(e, asLang(lang), loc('تعذّر سحب العرض', 'Could not withdraw the offer')));
-    } finally {
-      setBusy('');
-    }
-  }
-
-  return (
-    <div
-      className={`rounded-2xl border p-4 ${
-        offer.state === 'accepted' ? 'border-emerald-500/40 bg-emerald-500/[0.06]' : 'border-white/10 bg-white/[0.03]'
-      }`}
-      data-offer={offer.id}
-      data-offer-stale={offer.stale ? 'true' : undefined}
-    >
-      <div className="flex items-start justify-between gap-3 mb-2.5">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-white font-semibold text-[13.5px] truncate">{m?.name ?? '—'}</span>
-            {m?.verified && <BadgeCheck className="w-3.5 h-3.5 text-gold shrink-0" />}
-            {m?.pro_badge && <ProMerchantBadge compact />}
-          </div>
-          {/* Reputation, so a customer can compare on more than price (§27). */}
-          <div className="flex items-center gap-2 mt-0.5 text-[11.5px] text-zinc-500">
-            {m && <span className="text-gold/80">{badgeLabel(m.badge, loc)}</span>}
-            {m?.rating !== null && m?.rating !== undefined && (
-              <span className="flex items-center gap-0.5">
-                <Star className="w-3 h-3 text-gold fill-gold" />
-                {m.rating.toFixed(1)} ({m.rating_count})
-              </span>
-            )}
-            {!!m?.completed_orders && (
-              <span>{loc(`${m.completed_orders} طلب`, `${m.completed_orders} orders`, `${m.completed_orders} داواکاری`)}</span>
-            )}
-          </div>
-        </div>
-        <span className="text-gold font-bold text-[15px] shrink-0 tabular-nums" dir="ltr">{iqd(offer.price_iqd)}</span>
-      </div>
-
-      {offer.completion_days > 0 && (
-        <div className="flex items-center gap-1.5 text-zinc-400 text-[12px] mb-2">
-          <Clock className="w-3.5 h-3.5" />
-          {loc(`خلال ${offer.completion_days} يوم`, `In ${offer.completion_days} days`, `لە ${offer.completion_days} ڕۆژدا`)}
-        </div>
-      )}
-
-      {offer.message && (
-        <p dir="auto" className="text-zinc-300 text-[12.5px] leading-relaxed mb-2 break-words">
-          {offer.message}
-        </p>
-      )}
-      {offer.warranty_terms && (
-        <div className="flex items-start gap-1.5 text-zinc-400 text-[11.5px] mb-2">
-          <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-          <span dir="auto" className="min-w-0 break-words">
-            {offer.warranty_terms}
-          </span>
-        </div>
-      )}
-
-      {pending && offer.stale && (
-        <p
-          className="mt-2 flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-amber-200 text-[12px] leading-relaxed"
-          data-offer-note="stale"
-        >
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
-          {/* OWNER: Sorani to be written by hand. */}
-          {mine
-            ? loc(
-                'عدّل العميل الطلب بعد عرضك. أكّد عرضك للطلب بصيغته الحالية أو اسحبه — لا يمكن قبوله قبل ذلك.',
-                'The customer changed the request after your offer. Re-confirm it for the request as it is now, or withdraw it — it cannot be accepted until you do.'
-              )
-            : loc(
-                'عدّلتَ الطلب بعد هذا العرض، فهو بانتظار أن يؤكده التاجر من جديد.',
-                'You changed the request after this offer was made, so it is waiting for the merchant to re-confirm it.'
-              )}
-        </p>
-      )}
-
-      <p role="alert" aria-live="polite" className="text-red-400 text-[12px] mt-2 empty:hidden">
-        {error}
-      </p>
-
-      <div className="flex gap-2 mt-3">
-        {m?.store_slug && !mine && (
-          <CommunityStoreLink
-            id={m.store_slug}
-            className="flex-1 min-h-[40px] rounded-xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[12px] font-semibold flex items-center justify-center"
-          >
-            {loc('زيارة المتجر', 'View store', 'بینینی فرۆشگا')}
-          </CommunityStoreLink>
-        )}
-        {canAccept && (
-          <button
-            type="button"
-            onClick={onAccept}
-            data-offer-accept={offer.id}
-            className="flex-1 min-h-[40px] rounded-xl bg-olive text-white text-[12px] font-bold flex items-center justify-center gap-1.5 hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-          >
-            {loc('اقبل العرض', 'Accept offer', 'ئۆفەر پەسەند بکە')}
-          </button>
-        )}
-        {mine && pending && (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                setError('');
-                setWithdrawOpen(true);
-              }}
-              disabled={!!busy}
-              className="flex-1 min-h-[40px] rounded-xl border border-zinc-700 text-zinc-200 text-[12px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369] disabled:opacity-50"
-            >
-              {/* OWNER: Sorani to be written by hand. */}
-              {loc('سحب العرض', 'Withdraw offer')}
-            </button>
-            {offer.stale && (
-              <button
-                type="button"
-                onClick={reconfirm}
-                disabled={!!busy}
-                data-offer-reconfirm={offer.id}
-                className="flex-1 min-h-[40px] rounded-xl bg-olive text-white text-[12px] font-bold inline-flex items-center justify-center gap-1.5 hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60"
-              >
-                {busy === 'reconfirm' && <Spinner size="sm" delayMs={0} decorative className="text-white" />}
-                {/* OWNER: Sorani to be written by hand. */}
-                {loc('أؤكد عرضي', 'Re-confirm offer')}
-              </button>
-            )}
-          </>
-        )}
-        {offer.state === 'accepted' && (
-          <span className="flex-1 min-h-[40px] rounded-xl bg-emerald-500/10 text-emerald-400 text-[12px] font-bold flex items-center justify-center">
-            {loc('مقبول', 'Accepted', 'پەسەندکراو')}
-          </span>
-        )}
-      </div>
-
-      {mine && (
-        <ConfirmSheet
-          open={withdrawOpen}
-          testId="withdraw-offer"
-          tone="danger"
-          // OWNER: Sorani to be written by hand.
-          title={loc('سحب هذا العرض؟', 'Withdraw this offer?')}
-          confirmLabel={loc('سحب العرض', 'Withdraw offer')}
-          busyLabel={loc('جارٍ السحب…', 'Withdrawing…')}
-          busy={busy === 'withdraw'}
-          error={error}
-          onConfirm={withdraw}
-          onClose={() => setWithdrawOpen(false)}
-        >
-          {/* OWNER: Sorani to be written by hand. */}
-          {loc(
-            'لن يستطيع العميل قبوله بعد الآن. يمكنك تقديم عرض جديد ما دام الطلب يستقبل العروض.',
-            'The customer will no longer be able to accept it. You can make a new offer while the request is still taking offers.'
-          )}
-        </ConfirmSheet>
-      )}
-    </div>
-  );
-}
-
-function OfferForm({
-  requestId,
-  onDone,
-  onCancel,
-}: {
-  requestId: string;
-  onDone: () => void;
-  onCancel: () => void;
-}) {
-  const { loc, lang } = useLanguage();
-  const [f, setF] = useState({ price_iqd: '', completion_days: '', message: '', warranty_terms: '' });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  async function submit() {
-    setSaving(true);
-    setError('');
-    try {
-      await api.post(`/api/marketplace/requests/${requestId}/offers`, {
-        price_iqd: Number(f.price_iqd),
-        completion_days: Number(f.completion_days) || 0,
-        message: f.message,
-        warranty_terms: f.warranty_terms,
-      });
-      onDone();
-    } catch (e) {
-      setError(apiRefusal(e, asLang(lang), loc('تعذّر الإرسال', 'Could not submit', 'نەتوانرا بنێردرێت')));
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-4 mb-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-gold font-bold text-[13px]">{loc('عرضك', 'Your offer', 'ئۆفەرەکەت')}</h3>
-        <button
-          type="button"
-          onClick={onCancel}
-          aria-label={loc('إغلاق', 'Close', 'داخستن')}
-          className="text-zinc-500 min-h-[44px] min-w-[44px] -me-3 inline-flex items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]"
-        >
-          <X className="w-4 h-4" aria-hidden="true" />
-        </button>
-      </div>
-
-      <F label={loc('السعر (د.ع)', 'Price (IQD)', 'نرخ')} required>
-        <input
-          type="number"
-          value={f.price_iqd}
-          onChange={(e) => setF({ ...f, price_iqd: e.target.value })}
-          className="w-full min-h-[48px] rounded-2xl bg-black/40 border border-white/10 px-4 text-white text-[14px] outline-none focus:border-gold/40"
-        />
-      </F>
-      <F label={loc('مدة التنفيذ (أيام)', 'Completion (days)', 'ماوەی تەواوکردن')}>
-        <input
-          type="number"
-          value={f.completion_days}
-          onChange={(e) => setF({ ...f, completion_days: e.target.value })}
-          className="w-full min-h-[48px] rounded-2xl bg-black/40 border border-white/10 px-4 text-white text-[14px] outline-none focus:border-gold/40"
-        />
-      </F>
-      <F label={loc('رسالة للعميل', 'Message to the customer', 'نامە بۆ کڕیار')}>
-        <textarea
-          value={f.message}
-          onChange={(e) => setF({ ...f, message: e.target.value })}
-          rows={3}
-          className="w-full rounded-2xl bg-black/40 border border-white/10 px-4 py-3 text-white text-[14px] outline-none focus:border-gold/40 resize-none"
-        />
-      </F>
-      <F label={loc('الضمان (اختياري)', 'Warranty (optional)', 'گەرەنتی')}>
-        <input
-          value={f.warranty_terms}
-          onChange={(e) => setF({ ...f, warranty_terms: e.target.value })}
-          className="w-full min-h-[48px] rounded-2xl bg-black/40 border border-white/10 px-4 text-white text-[14px] outline-none focus:border-gold/40"
-        />
-      </F>
-
-      {error && <p className="text-red-400 text-[12.5px]">{error}</p>}
-
-      <p className="text-zinc-600 text-[11.5px] leading-relaxed">
-        {loc(
-          'بعد قبول العميل لعرضك، لا يمكن تغيير السعر أو المدة.',
-          'Once the customer accepts, the price and timeline cannot be changed.',
-          'دوای پەسەندکردنی کڕیار، نرخ و ماوە ناگۆڕدرێن.'
-        )}
-      </p>
-
-      <button
-        onClick={submit}
-        disabled={saving || !f.price_iqd}
-        className="w-full min-h-[48px] rounded-2xl bg-olive text-white font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-40"
-      >
-        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        {loc('أرسل العرض', 'Send offer', 'ئۆفەر بنێرە')}
-      </button>
-    </div>
-  );
-}
-
 // ------------------------------------------------------------------ bits
-
-function F({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-zinc-400 text-[12.5px] font-semibold mb-2">
-        {label}
-        {required && <span className="text-gold ms-1">*</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
@@ -1295,6 +854,17 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
             {' '}
             {loc('(محجوز لدى Levonis)', '(held by Levonis)', '(لای LEVONIS پارێزراوە)')}
           </p>
+
+          {/* After acceptance each side has the other's contact, and the
+              request's conversation (W5-A, §4.7). */}
+          {['funded', 'in_progress', 'merchant_marked_delivered', 'disputed'].includes(o.state) && (
+            <details className="mb-2 group" data-community-order-contact={o.id}>
+              <summary className="min-h-[44px] flex items-center cursor-pointer text-[12.5px] font-semibold text-gold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAA369]">
+                {loc('التواصل مع التاجر', 'Contact the merchant')}
+              </summary>
+              <OrderContactCard orderId={o.id} compact />
+            </details>
+          )}
 
           {o.state === 'merchant_marked_delivered' && (
             <div className="space-y-2">

@@ -199,8 +199,13 @@ floor = max( priceForMargin(cost, min_margin_percent),
 ولا المسؤول ولا التاجر المنفِّذ) يُرفض بـ503 `COMMUNITY_CLOSED` كما تُرفض اللوحة
 نفسها، ولا يصل إليه بعد انتهاء مدة الطلب (تدقيق 03 §10 G).
 
-**بعد إنشاء الطلب** تُطبَّق قواعد الخصوصية الحالية كما هي — لم يُمسّ مسار
-`accept → order → escrow`.
+**عند القبول، لا قبله** (W5-A، المخطط §4.7): دفعة القبول نفسها تكتب
+`contact_snapshot` — للتاجر المختار اسم الزبون ورقمه وعنوان التسليم الذي اختاره في
+ورقة القبول (أو عنوانه الافتراضي؛ الاسم والرقم فقط إن كان التسليم `pickup`)، وللزبون
+رقم المتجر. `GET /api/marketplace/orders/:id` يعيد لكل طرف تواصل **الطرف الآخر**
+وحده، ولا يعيد الزوج الخام؛ لا يصل شيء منها لتاجر خسر العرض. `customer_notes` يراها
+التجار، والمعالج ينبّه ألّا يُكتب فيها رقم هاتف. مسار `accept → order → escrow` بضماناته
+(سباق القبول، الحجز أولًا، الدفعة المسوّرة) لم يتغيّر.
 
 ---
 
@@ -260,11 +265,20 @@ GET  /api/marketplace/print/my-requests
 POST /api/marketplace/print/requests/:id/files/:fileId/viewer-token   (ساعة واحدة؛ `hours` يُتجاهل)
 GET  /api/marketplace/print/viewer/:token                            (بلا اسم الملف)
 GET  /api/marketplace/print/viewer/:token/mesh
-POST /api/marketplace/print/requests/:id/repeat                      (ينسخ ثم ينشر: يمرّ بالمطابقة)
+POST /api/marketplace/print/requests/:id/repeat                      (ينسخ إلى مسودة فقط؛ النشر يمرّ بالمطابقة)
+PUT  /api/marketplace/print/requests/:id/draft                       (يحفظ إجابات المعالج على المسودة؛ REQUEST_NOT_DRAFT بعد النشر)
+GET  /api/marketplace/print/requests/:id/draft                       (لصاحب الطلب: لإكمال مسودة أو تعديل طلب منشور)
+GET  /api/marketplace/print/requests/:id/revisions                   (نُسخ الطلب وما تغيّر في كل منها)
 
 POST /api/marketplace/requests                  → مسودة (`draft`)، لا تظهر ولا تُعرض عليها عروض
-POST /api/marketplace/offers/:id/accept         { expected_price_iqd, offer_revision }
-POST /api/marketplace/offers/:id/reconfirm      (تاجر يؤكد عرضًا صار قديمًا بعد تعديل الطلب)
+POST /api/marketplace/requests/:id/offers       { price_iqd, completion_days, delivery_method: pickup|merchant_delivery|courier,
+                                                  material_ids[≤5], included, warranty_terms, valid_days 1–60, message }
+PATCH /api/marketplace/offers/:id               (تعديل = نسخة جديدة من العرض يراها الزبون مع سجلها)
+POST /api/marketplace/offers/:id/accept         { expected_price_iqd, offer_revision, address_id? }
+POST /api/marketplace/offers/:id/reconfirm      (تاجر يؤكد عرضًا استُبدل بعد تعديل الطلب)
+POST /api/marketplace/offers/:id/withdraw · /decline (الزبون يعتذر؛ التاجر يُبلَّغ)
+GET  /api/marketplace/my-offers                 (عروض التاجر عبر الطلبات، بمؤشر)
+GET  /api/marketplace/orders/:id                (بعد القبول: `contact` = تواصل الطرف الآخر، و`request_snapshot`)
 
 GET  /api/notifications        ·  GET /api/notifications/unread-count  ·  POST /api/notifications/read
 
@@ -280,7 +294,7 @@ GET                 /api/merchant/request-matches
 
 صف `community_requests` يُنشأ في نهاية الخطوة الأولى، قبل أن يختار العميل مادةً
 أو محافظة — والمالك رفض أن تكون تلك الحقول إجبارية، فمكانها الخطوة الثانية.
-لذلك يكتبها النشر على **الصف نفسه** قبل المطابقة مباشرة، لا على جدول آخر:
+لذلك يكتبها النشر (أو «احفظ كمسودة») على **الصف نفسه** قبل المطابقة مباشرة، لا على جدول آخر:
 المطابقة تقرأ `governorate` و`delivery_pref` من هناك وهما يقرران من هو مؤهَّل
 أصلًا، ولوحة الطلبات العامة تقرأ `material` و`color` و`dimensions` و`budget_iqd`
 من هناك أيضًا. لو بقيت هذه الإجابات في الجانب الطباعي وحده، لكان عميلٌ اختار
@@ -288,11 +302,17 @@ GET                 /api/merchant/request-matches
 
 هذا ليس إنشاءً ثانيًا: الصف نفسه، والمالك نفسه — وهو **مسودة** (`draft`) منذ
 الخطوة الأولى، لا تراه اللوحة ولا يقبل عرضًا، والنشر هو الانتقال الوحيد إلى
-`open` ويبدأ عنده عدّاد الصلاحية. **إعادة النشر تعديل**: إن تغيّر ما سعّره التاجر
-(المادة، العملية، الجودة، الكمية، الملف، المحافظة، التسليم، الموعد) — أو أُضيف
-مرفق أو حُذف بعد النشر — ارتفع `revision` الطلب، وصار كل عرض معلّق سعّر النسخة
-السابقة **قديمًا** لا يُقبل حتى يؤكده تاجره (`/offers/:id/reconfirm`) أو يعدّله،
-ويُبلَّغ التاجر بإشعار `offer_stale` (الهجرة 0116، تدقيق 03 §10 E وK).
+`open` ويبدأ عنده عدّاد الصلاحية، وتجري المطابقة **مرة واحدة**: إعادة نشر لم تغيّر
+شيئًا مما سُعّر تعود `replayed: true` بلا مطابقة. المسودة التي لم تُلمس 14 يومًا تنتهي
+في الكنس. **إعادة النشر تعديل**: إن تغيّر ما سعّره التاجر (المصدر، العملية، المادة،
+اللون، الجودة، الكمية، الملف أو الرابط، المقاس المكتوب، المحافظة، التسليم، الموعد،
+ملاحظات التجار) — أو أُضيف مرفق أو حُذف — **بعد أول عرض**، ارتفع `revision` الطلب
+وسُجّلت نسخة جديدة في `community_request_revisions` (المواصفة والملفات والتقدير
+وبصمتها)، وصار كل عرض معلّق سعّر نسخة أقدم **`superseded`** في الدفعة نفسها: لا
+يُقبل (`OFFER_STALE`) حتى يؤكده تاجره (`/offers/:id/reconfirm`) أو يعدّله، ويُبلَّغ
+التاجر بإشعار `offer_stale` ويرى ما الذي تغيّر (`/revisions`). تغيير لم يسعّره أحد
+بعد يُعيد كتابة النسخة الحالية مكانها. الطلب المقبول يحفظ نسخته (`request_snapshot`)
+(الهجرتان 0116 و0130، تدقيق 03 §10 E وK، المسار W5-A).
 
 ### `my-requests` منفصل عن اللوحة العامة
 
@@ -327,7 +347,9 @@ GET                 /api/merchant/request-matches
 
 | | |
 | --- | --- |
-| `src/components/print/PrintRequestWizard.tsx` | ثلاث خطوات: ملفك أو رابطك · تفاصيل الطباعة · السعر والنشر |
+| `src/components/community/requests/RequestWizard.tsx` | المعالج v2 (W5-A): أربع خطوات — ماذا (ملف · رابط · صور · وصف فقط) · كيف («لست متأكدًا» للطريقة والمادة، مقاس مكتوب، ملاحظات للتجار) · أين ومتى (موعد بتاريخ، ميزانية) · مراجعة؛ «احفظ كمسودة» و«انشر»، ويعدّل الطلب المنشور |
+| `src/components/community/offers/*` | العروض v2: مقارنة جنبًا إلى جنب وقبول بتأكيد (الزبون)، إنشاء وتعديل وسحب وتأكيد (التاجر)، «عروضي» في مساحة التاجر، والتواصل بعد القبول |
+| `src/components/print/PrintRequestWizard.tsx` | المعالج القديم بثلاث خطوات — لم يعد مركّبًا في `/requests` |
 | `src/components/print/PrintSummary.tsx` | ما قرأناه من الملف، على صفحة الطلب، للطرفين |
 | `src/components/print/MyRequestsList.tsx` | «طلباتي» بالتقدير والتاجر المختار و«إعادة الطلب» |
 | `src/pages/ModelViewer.tsx` | `/model-viewer/:token` — مشهد مستقل، `ogl` وحدها، شبكة مشتقّة لا الملف |

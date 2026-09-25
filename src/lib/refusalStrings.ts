@@ -449,6 +449,48 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The 3D preview is available to the request’s owner and to merchants who can make an offer on it.',
     ckb: 'المعاينة ثلاثية الأبعاد متاحة لصاحب الطلب وللتجار الذين يمكنهم تقديم عرض عليه.',
   },
+  // ---- print requests v2 (stream W5-A). OWNER: Sorani to be written by hand —
+  // the ckb slot carries the Arabic until then (docs/DECISIONS.md row 11).
+  SOURCE_FILE_REQUIRED: {
+    ar: 'أرفق ملف المجسم الذي يدور حوله الطلب، أو اختر مصدرًا آخر.',
+    en: 'Attach the model file this request is about, or choose another source.',
+    ckb: 'أرفق ملف المجسم الذي يدور حوله الطلب، أو اختر مصدرًا آخر.',
+  },
+  SOURCE_LINK_REQUIRED: {
+    ar: 'أضف رابط المجسم، أو اختر مصدرًا آخر.',
+    en: 'Add the link to the model, or choose another source.',
+    ckb: 'أضف رابط المجسم، أو اختر مصدرًا آخر.',
+  },
+  SOURCE_IMAGES_REQUIRED: {
+    ar: 'أرفق صورة واحدة على الأقل لما تريد طباعته، أو اختر مصدرًا آخر.',
+    en: 'Attach at least one picture of what you want printed, or choose another source.',
+    ckb: 'أرفق صورة واحدة على الأقل لما تريد طباعته، أو اختر مصدرًا آخر.',
+  },
+  DEADLINE_INVALID: {
+    ar: 'اختر موعدًا من اليوم حتى سنة قادمة.',
+    en: 'Choose a deadline from today to a year ahead.',
+    ckb: 'اختر موعدًا من اليوم حتى سنة قادمة.',
+  },
+  DIMENSIONS_INVALID: {
+    ar: 'كل بُعد بين 1 و5000 ملم. اترك الثلاثة فارغة إن لم تكن متأكدًا.',
+    en: 'Each dimension must be between 1 and 5000 mm. Leave all three empty if unsure.',
+    ckb: 'كل بُعد بين 1 و5000 ملم. اترك الثلاثة فارغة إن لم تكن متأكدًا.',
+  },
+  REQUEST_NOT_DRAFT: {
+    ar: 'نُشر هذا الطلب بالفعل. حدّث الصفحة وعدّله من صفحته.',
+    en: 'This request is already published. Refresh and edit it from its page.',
+    ckb: 'نُشر هذا الطلب بالفعل. حدّث الصفحة وعدّله من صفحته.',
+  },
+  OFFER_DELIVERY_INVALID: {
+    ar: 'اختر طريقة التسليم من القائمة.',
+    en: 'Choose the handover method from the list.',
+    ckb: 'اختر طريقة التسليم من القائمة.',
+  },
+  OFFER_MATERIAL_INVALID: {
+    ar: 'اختر حتى 5 مواد من القائمة.',
+    en: 'Choose up to 5 materials from the list.',
+    ckb: 'اختر حتى 5 مواد من القائمة.',
+  },
   BAD_URL: {
     ar: 'الرابط غير صالح. الصق رابط التصميم كاملًا مع ‎https://‎.',
     en: 'That link is not valid. Paste the full design link, including https://.',
@@ -676,6 +718,46 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ar: 'هذا الاختيار لم يعد معروضًا للبيع. اختر خيارًا آخر.',
     en: 'That choice is no longer for sale. Choose another option.',
     ckb: 'هذا الاختيار لم يعد معروضًا للبيع. اختر خيارًا آخر.',
+  },
+  // Wave 3 (W3-B): the analytics page, the order screen and the customers
+  // screen (worker/routes/merchantAnalytics.ts, merchantOrders.ts,
+  // merchantCustomers.ts). Merchant-facing; the ckb column carries the Arabic
+  // until the owner writes the Sorani by hand (DECISIONS row 11).
+  // OWNER: Sorani to be written by hand for every entry in this block.
+  ORDER_NOT_FOUND: {
+    ar: 'لا يوجد طلب بهذا الرقم في متجرك.',
+    en: 'There is no order with this number in your store.',
+    ckb: 'لا يوجد طلب بهذا الرقم في متجرك.',
+  },
+  CUSTOMER_NOT_FOUND: {
+    ar: 'هذا الشخص ليس من زبائن متجرك.',
+    en: 'This person is not a customer of your store.',
+    ckb: 'هذا الشخص ليس من زبائن متجرك.',
+  },
+  BAD_CURSOR: {
+    ar: 'تغيّرت القائمة. حدّث الصفحة وحاول مرة أخرى.',
+    en: 'The list changed. Refresh the page and try again.',
+    ckb: 'تغيّرت القائمة. حدّث الصفحة وحاول مرة أخرى.',
+  },
+  BAD_RANGE: {
+    ar: 'هذه الفترة غير صالحة: اختر بدايةً قبل النهاية، وبحدّ أقصى 366 يومًا.',
+    en: 'That range is not valid: choose a start before the end, at most 366 days.',
+    ckb: 'هذه الفترة غير صالحة: اختر بدايةً قبل النهاية، وبحدّ أقصى 366 يومًا.',
+  },
+  ANALYTICS_NOT_INCLUDED: {
+    ar: 'الأرقام جزء من LEVO PLUS. جدّد الاشتراك لتعود.',
+    en: 'The figures are part of LEVO PLUS. Renew to see them again.',
+    ckb: 'الأرقام جزء من LEVO PLUS. جدّد الاشتراك لتعود.',
+  },
+  SEARCH_QUERY_TOO_SHORT: {
+    ar: 'اكتب حرفين على الأقل للبحث.',
+    en: 'Type at least 2 characters to search.',
+    ckb: 'اكتب حرفين على الأقل للبحث.',
+  },
+  SEARCH_QUERY_TOO_LONG: {
+    ar: 'نص البحث طويل جدًا — 60 حرفًا على الأكثر.',
+    en: 'The search is too long — at most 60 characters.',
+    ckb: 'نص البحث طويل جدًا — 60 حرفًا على الأكثر.',
   },
 };
 

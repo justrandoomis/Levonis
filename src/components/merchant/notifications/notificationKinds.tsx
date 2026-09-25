@@ -5,7 +5,7 @@
  */
 import {
   AlertTriangle, Banknote, Bell, CircleCheck, MessageCircle, PackageMinus, Printer, RefreshCw,
-  ShieldAlert, ShoppingBag, Star, Store, Tag, Wallet, type LucideIcon,
+  ShieldAlert, ShoppingBag, Star, Store, Tag, Wallet, XCircle, type LucideIcon,
 } from 'lucide-react';
 
 export type Loc = (ar: string, en: string, ckb?: string) => string;
@@ -40,6 +40,7 @@ const ICONS: Record<string, LucideIcon> = {
   print_request_match: Printer,
   offer_accepted: CircleCheck,
   offer_stale: RefreshCw,
+  offer_rejected: XCircle,
   low_stock: PackageMinus,
   new_review: Star,
   dispute_opened: ShieldAlert,

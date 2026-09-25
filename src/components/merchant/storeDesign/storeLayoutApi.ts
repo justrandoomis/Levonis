@@ -58,4 +58,19 @@ export const storeLayoutApi = {
     ),
   preview: (revision?: number) =>
     api.get<{ source: string; layout: StoreLayout; blocks_data: BlockData }>(`${BASE}/preview${revision ? `?revision=${revision}` : ''}`),
+  revision: (revision: number) => api.get<{ revision: LayoutRevision & { layout: StoreLayout } }>(`${BASE}/revisions/${revision}`),
+  /** The owner's own uploads a layout may hold (the builder's media picker). */
+  media: (kind: 'image' | 'video', cursor?: string | null) =>
+    api.get<{ items: MediaItem[]; next_cursor: string | null }>(
+      `${BASE}/media?kind=${kind}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
+    ),
 };
+
+export interface MediaItem {
+  key: string;
+  kind: 'image' | 'video';
+  mime: string;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+}

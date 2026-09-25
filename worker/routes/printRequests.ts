@@ -39,11 +39,36 @@ import {
   isEngagedMerchant,
   isPast,
   mayQuoteOnBoard,
+  offerCountStatement,
   onPublicBoard,
   requestFileAccess,
   staleOfferNotifications,
   type RequestForAccess,
 } from '../lib/communityRequests';
+import {
+  DRAFT_TTL_DAYS,
+  SOURCE_TYPES,
+  bumpRevisionIfOfferedSql,
+  canonicalFacts,
+  effectiveMaterial,
+  effectiveProcess,
+  effectiveSourceType,
+  factsFromRows,
+  factsHash,
+  parseDims,
+  publicEstimate,
+  readDims,
+  readRevisionFiles,
+  recordRevisionStatement,
+  snapshotSpec,
+  supersedeStatement,
+  type Dims,
+  type PricedFacts,
+  type RevisionFile,
+  type SourceType,
+} from '../lib/requestRevisions';
+import type { MatchDecision, MatchWeights } from '../lib/printMatching';
+import type { Quote } from '../lib/printPricing';
 
 /**
  * THE PRINT REQUEST JOURNEY — upload, measure, estimate, publish, notify.
@@ -163,12 +188,10 @@ const parseJson = <T>(raw: unknown, fallback: T): T => {
   }
 };
 
-/** The request row plus its print side, for the owner of the request. */
+/** The request row, for the owner of the request — nobody else gets it. */
 async function ownedRequest(c: { env: Env }, requestId: string, userId: string) {
   const row = await c.env.DB.prepare(
-    `SELECT id, customer_id, state, title, governorate, delivery_pref, quantity, deadline, revision,
-            expires_at, visibility
-       FROM community_requests WHERE id = ?`
+    `SELECT * FROM community_requests WHERE id = ?`
   )
     .bind(requestId)
     .first<Record<string, unknown>>();
@@ -349,13 +372,42 @@ function readAccessories(raw: unknown): AccessorySelection[] {
   return out;
 }
 
+/**
+ * «لست متأكدًا» (wizard v2, audit 03 G2). The old wizard auto-picked the first
+ * FDM material, so a customer who did not care was matched only to PLA shops.
+ * Now "not sure" is an answer: `process: 'unsure'` (or `process_unsure`) and
+ * `material_id: 'unsure'` (or `material_unsure`). A CHOSEN material fixes the
+ * process — a material is either FDM or resin — so an unsure process with a
+ * known material is not unsure at all (`normalizeChoices`).
+ */
+interface Choices {
+  processUnsure: boolean;
+  materialUnsure: boolean;
+}
+
+function readChoices(body: Record<string, unknown>): Choices {
+  return {
+    processUnsure: body.process === 'unsure' || body.process_unsure === true,
+    materialUnsure: body.material_id === 'unsure' || body.material_unsure === true,
+  };
+}
+
+function normalizeChoices(spec: SpecBody, choices: Choices, mats: PrintMaterial[]): Choices {
+  if (choices.materialUnsure || !spec.material_id) return choices;
+  const m = mats.find((x) => x.id === spec.material_id);
+  if (!m) return choices;
+  spec.process = m.process;
+  return { processUnsure: false, materialUnsure: false };
+}
+
 function readSpec(body: Record<string, unknown>): SpecBody {
   const process = PROCESSES.includes(body.process as PrintProcess) ? (body.process as PrintProcess) : 'fdm';
   const quality = QUALITIES.includes(body.quality as PrintQuality) ? (body.quality as PrintQuality) : 'standard';
   const hex = str(body.color_hex, 'color_hex', { max: 9, required: false }) ?? '';
+  const materialUnsure = body.material_id === 'unsure' || body.material_unsure === true;
   return {
     process,
-    material_id: str(body.material_id, 'material_id', { max: 60, required: false }) ?? '',
+    material_id: materialUnsure ? '' : (str(body.material_id, 'material_id', { max: 60, required: false }) ?? ''),
     quality,
     infill_percent: int(body.infill_percent, 'infill_percent', { min: 0, max: 100, def: 20 }),
     supports: body.supports !== false,
@@ -369,6 +421,53 @@ function readSpec(body: Record<string, unknown>): SpecBody {
 }
 
 /**
+ * THE ESTIMATE, INCLUDING FOR A CUSTOMER WHO IS NOT SURE.
+ *
+ * With a material chosen it is `quotePrint`, unchanged. With the material (or
+ * the process) left open, no material is assumed — the owner's rule is no
+ * auto-PLA — so the job is priced with EVERY active material it could be made
+ * in (of the chosen process, or of both) and the answer is the honest range:
+ * the cheapest one's low end to the dearest one's high end, confidence low,
+ * `range_basis: 'materials'`. Per-material facts that depend on the material
+ * (grams, time) are zeroed rather than reported for a material nobody chose.
+ */
+function estimateFor(
+  spec: SpecBody,
+  choices: Choices,
+  base: Omit<QuoteInput, 'materialId'>,
+  mats: PrintMaterial[],
+  cfg: PrintPricingConfig
+): Quote & { range_basis?: 'materials' } {
+  if (!choices.materialUnsure && !choices.processUnsure) {
+    return quotePrint({ ...base, materialId: spec.material_id }, mats, cfg);
+  }
+  const candidates = mats.filter((m) => m.active !== false && (choices.processUnsure || m.process === spec.process));
+  const quotes = candidates.map((m) => quotePrint({ ...base, materialId: m.id }, mats, cfg));
+  const priced = quotes.filter((q) => q.priced);
+  if (!priced.length) {
+    return { ...(quotes[0] ?? quotePrint({ ...base, materialId: '' }, mats, cfg)), material_id: '' };
+  }
+  const low = priced.reduce((a, b) => (b.price_low_iqd < a.price_low_iqd ? b : a));
+  const high = Math.max(...priced.map((q) => q.price_high_iqd));
+  const mid = Math.round((low.price_low_iqd + high) / 2);
+  return {
+    ...low,
+    process: choices.processUnsure ? low.process : spec.process,
+    material_id: '',
+    material_grams: 0,
+    print_time_minutes: 0,
+    total_time_minutes: 0,
+    price_iqd: mid,
+    price_low_iqd: low.price_low_iqd,
+    price_high_iqd: high,
+    unit_price_iqd: Math.round(mid / Math.max(1, spec.quantity)),
+    confidence: 'low',
+    confidence_reasons: [...new Set([...low.confidence_reasons, 'MATERIAL_NOT_CHOSEN'])],
+    range_basis: 'materials',
+  };
+}
+
+/**
  * The Levonis estimate. Computes, stores nothing, and is deliberately callable
  * over and over as the customer moves a slider — the wizard's price updates
  * live, and every recomputation goes through the SAME engine the published
@@ -378,6 +477,7 @@ printRequestRoutes.post('/quote', requireAuth, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const spec = readSpec(body);
   const [mats, cfg, accs] = await Promise.all([materials(c.env), pricingConfig(c.env), accessories(c.env)]);
+  const choices = normalizeChoices(spec, readChoices(body), mats);
 
   // The geometry may come from an analysed file (the honest path) or from a
   // volume the customer typed because their link could not be measured.
@@ -400,9 +500,8 @@ printRequestRoutes.post('/quote', requireAuth, async (c) => {
     analysis = body.analysis as ModelAnalysis;
   }
 
-  const input: QuoteInput = {
+  const input: Omit<QuoteInput, 'materialId'> = {
     analysis,
-    materialId: spec.material_id,
     quality: spec.quality,
     infill: spec.infill_percent / 100,
     quantity: spec.quantity,
@@ -414,7 +513,7 @@ printRequestRoutes.post('/quote', requireAuth, async (c) => {
     fallback_volume_cm3:
       typeof body.volume_cm3 === 'number' && body.volume_cm3 > 0 ? body.volume_cm3 : undefined,
   };
-  const quote = quotePrint(input, mats, cfg);
+  const quote = estimateFor(spec, choices, input, mats, cfg);
 
   // The cost breakdown is the shop's business, not the customer's. What the
   // customer gets is the range, the confidence and why.
@@ -655,15 +754,17 @@ export function printMatchNotification(f: PrintMatchFacts): { title: Trilingual;
 // -------------------------------------------------------------- 5. publishing
 
 /**
- * The spec a request was last published with, as the body a publish takes —
- * so a request can be (re)published AS STORED: the «إعادة الطلب» copy, and a
- * draft published from its own page, carry no wizard state to send.
+ * The spec a request was last published (or saved) with, as the body a
+ * publish takes — so a request can be (re)published AS STORED: the «إعادة
+ * الطلب» copy, and a draft published from its own page, carry no wizard state
+ * to send.
  */
 function storedPublishBody(stored: Record<string, unknown>, request: Record<string, unknown>): Record<string, unknown> {
   const estimate = parseJson<{ accessory_lines?: Array<{ id?: unknown; qty?: unknown }> }>(stored.estimate, {});
+  const dims = parseDims(stored.stated_dims);
   return {
-    process: stored.process,
-    material_id: stored.material_id,
+    process: Number(stored.process_unsure ?? 0) === 1 ? 'unsure' : stored.process,
+    material_id: Number(stored.material_unsure ?? 0) === 1 ? 'unsure' : stored.material_id,
     quality: stored.quality,
     infill_percent: Number(stored.infill_percent ?? 20),
     supports: Number(stored.supports ?? 1) === 1,
@@ -675,26 +776,287 @@ function storedPublishBody(stored: Record<string, unknown>, request: Record<stri
     accessories: (estimate.accessory_lines ?? []).map((l) => ({ id: l.id, qty: l.qty })),
     primary_file_id: stored.primary_file_id ?? undefined,
     source_kind: stored.source_kind,
+    ...((SOURCE_TYPES as readonly string[]).includes(String(stored.source_type ?? '')) ? { source_type: stored.source_type } : {}),
     source_url: stored.source_url ?? '',
     source_meta: parseJson<Record<string, unknown>>(stored.source_meta, {}),
+    ...(dims ? { stated_dimensions_mm: dims } : {}),
   };
 }
 
-/** The facts a merchant priced, in a form two publishes can be compared by. */
-const jobFacts = (p: Record<string, unknown> | null, r: Record<string, unknown>) =>
-  JSON.stringify([
-    p?.process ?? null, p?.material_id ?? null, p?.color_hex ?? null, p?.color_name ?? null,
-    p?.quality ?? null, Number(p?.infill_percent ?? -1), Number(p?.supports ?? -1), Number(p?.colors_count ?? -1),
-    Number(p?.post_processing_minutes ?? -1), p?.primary_file_id ?? null, p?.source_url ?? null,
-    Number(r.quantity ?? 1), String(r.governorate ?? ''), String(r.delivery_pref ?? ''), String(r.deadline ?? ''),
-  ]);
+/**
+ * A DEADLINE IS A DATE (wizard v2, audit 03 G5). The column took forty
+ * characters of free text; a new write takes `YYYY-MM-DD`, from today to a
+ * year ahead, or nothing. Rows written before keep what they hold.
+ */
+function readDeadline(raw: unknown): string {
+  const v = str(raw, 'deadline', { max: 40, required: false }) ?? '';
+  if (!v) return '';
+  const today = new Date().toISOString().slice(0, 10);
+  const limit = new Date(Date.now() + 366 * 86_400_000).toISOString().slice(0, 10);
+  const ok = /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(`${v}T00:00:00Z`)) &&
+    new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v && v >= today && v <= limit;
+  if (!ok) throw badRequest('The deadline must be a date from today to a year ahead', 'DEADLINE_INVALID');
+  return v;
+}
+
+/**
+ * EVERYTHING THE WIZARD SENDS, READ ONCE — for a publish and for a draft save.
+ *
+ * `strict` (publish) also checks that the chosen SOURCE is really there: a
+ * model request has a model file, a link request a valid link, an images
+ * request at least one image. A draft may be half-filled; a published job may
+ * not claim a source it does not have. A caller that names no `source_type`
+ * (the older wizard, the community page, a repeat) is not held to it — its
+ * source is derived from what it has, exactly as before.
+ */
+interface WizardInput {
+  body: Record<string, unknown>;
+  asStored: boolean;
+  spec: SpecBody;
+  choices: Choices;
+  primaryFileId: string;
+  analysis: ModelAnalysis | null;
+  sourceKind: 'upload' | 'link';
+  sourceType: SourceType;
+  sourceUrl: string;
+  sourceProvider: string;
+  sourceMeta: Record<string, string | boolean>;
+  statedDims: Dims | null;
+  files: RevisionFile[];
+  governorate?: string;
+  deliveryPref?: string;
+  deadline?: string;
+  budget?: number | null;
+  customerNotes?: string;
+}
+
+async function readWizardInput(
+  env: Env,
+  requestId: string,
+  input: Record<string, unknown>,
+  stored: Record<string, unknown> | null,
+  request: Record<string, unknown>,
+  mats: PrintMaterial[],
+  opts: { strict: boolean }
+): Promise<WizardInput> {
+  // A body with no spec at all publishes the spec already stored, when there
+  // is one — the repeat copy and a draft published from its own page.
+  const asStored = !!stored && input.process === undefined && input.material_id === undefined;
+  const body = asStored ? { ...storedPublishBody(stored!, request), ...input } : input;
+  const spec = readSpec(body);
+  const choices = normalizeChoices(spec, readChoices(body), mats);
+  const files = await readRevisionFiles(env.DB, requestId);
+
+  // ---- the model: whichever attachment is the model, measured -------------
+  const primaryFileId = str(body.primary_file_id, 'primary_file_id', { max: 60, required: false }) ?? '';
+  let analysis: ModelAnalysis | null = null;
+  if (primaryFileId) {
+    const row = await env.DB.prepare(
+      'SELECT analysis, kind FROM community_request_files WHERE id = ? AND request_id = ?'
+    )
+      .bind(primaryFileId, requestId)
+      .first<{ analysis: string; kind: string }>();
+    if (!row) throw badRequest('That file does not belong to this request', 'FILE_NOT_FOUND');
+    // THE STORED analysis, never one supplied in the body. This is the number
+    // the price is built on, so it comes from the server's own measurement.
+    analysis = parseJson<ModelAnalysis | null>(row.analysis, null);
+  }
+
+  const explicitType = (SOURCE_TYPES as readonly string[]).includes(String(body.source_type ?? ''))
+    ? (String(body.source_type) as SourceType)
+    : null;
+  const sourceKind: 'upload' | 'link' = explicitType ? (explicitType === 'link' ? 'link' : 'upload') : body.source_kind === 'link' ? 'link' : 'upload';
+  const providers = await getSetting(env.DB, 'printLinkProviders');
+  /**
+   * THE LINK IS VALIDATED, NOT JUST STORED (audit 03 §10 W). `source_url` was
+   * 600 characters of whatever arrived, shown to merchants — one `<a href>`
+   * away from a `javascript:` sink. It now passes the same outbound-URL guard
+   * the link step itself uses and is stored in its canonical form. A caller
+   * sending a bad one is told; a stored legacy value that no longer passes is
+   * dropped rather than blocking the republish of an old request.
+   */
+  const rawSourceUrl = str(body.source_url, 'source_url', { max: 600, required: false }) ?? '';
+  const parsedLink = rawSourceUrl ? parseModelLink(rawSourceUrl, providers) : null;
+  if (rawSourceUrl && !parsedLink && !asStored) {
+    throw badRequest('That link is not a valid https address', 'BAD_URL');
+  }
+  const sourceUrl = sourceKind === 'link' ? (parsedLink?.canonical_url ?? '') : '';
+  const sourceMeta = sanitizeSourceMeta(body.source_meta);
+  const sourceType = explicitType ?? effectiveSourceType({ source_kind: sourceKind, primary_file_id: primaryFileId || null }, files.map((f) => f.kind));
+
+  if (opts.strict && explicitType) {
+    const model = primaryFileId ? files.find((f) => f.id === primaryFileId) : undefined;
+    if (explicitType === 'model' && (!model || model.kind !== 'model')) {
+      throw badRequest('Attach the model file this request is about', 'SOURCE_FILE_REQUIRED');
+    }
+    if (explicitType === 'link' && !sourceUrl) {
+      throw badRequest('Add the link to the model this request is about', 'SOURCE_LINK_REQUIRED');
+    }
+    if (explicitType === 'images' && !files.some((f) => f.kind === 'reference')) {
+      throw badRequest('Attach at least one picture of what you want made', 'SOURCE_IMAGES_REQUIRED');
+    }
+  }
+
+  // Typed dimensions: only meaningful when nothing was measured. A value that
+  // is there but not three edges of 1–5000 mm is refused, not dropped.
+  let statedDims: Dims | null = null;
+  const rawDims = body.stated_dimensions_mm;
+  if (rawDims !== undefined && rawDims !== null && rawDims !== '') {
+    statedDims = readDims(rawDims);
+    if (!statedDims) throw badRequest('Each dimension must be between 1 and 5000 mm', 'DIMENSIONS_INVALID');
+  }
+
+  // `str` answers '' for an absent value, so "supplied" is asked of the body
+  // itself — a republish that omits a field must not blank it.
+  const supplied = (k: string) => body[k] !== undefined;
+  return {
+    body,
+    asStored,
+    spec,
+    choices,
+    primaryFileId,
+    analysis,
+    sourceKind,
+    sourceType,
+    sourceUrl,
+    sourceProvider: sourceKind === 'link' ? (parsedLink?.provider ?? '') : '',
+    sourceMeta: sourceKind === 'link' ? sourceMeta : sanitizeSourceMeta({}),
+    statedDims,
+    files,
+    governorate: supplied('governorate') ? str(body.governorate, 'governorate', { max: 60, required: false }) : undefined,
+    deliveryPref: supplied('delivery_pref') ? str(body.delivery_pref, 'delivery_pref', { max: 40, required: false }) : undefined,
+    deadline: supplied('deadline') ? readDeadline(body.deadline) : undefined,
+    budget:
+      body.budget_iqd === undefined || body.budget_iqd === ''
+        ? undefined
+        : body.budget_iqd === null
+          ? null
+          : int(body.budget_iqd, 'budget_iqd', { min: 0, max: 1_000_000_000 }),
+    customerNotes: supplied('customer_notes')
+      ? str(body.customer_notes, 'customer_notes', { max: 1000, required: false })
+      : undefined,
+  };
+}
+
+/** The priced facts the wizard input describes, for the revision hash. */
+function factsFromInput(w: WizardInput, request: Record<string, unknown>): PricedFacts {
+  return {
+    quantity: w.spec.quantity,
+    source_type: w.sourceType,
+    process: w.choices.processUnsure ? null : w.spec.process,
+    material_id: w.choices.materialUnsure ? null : w.spec.material_id || null,
+    color_hex: w.spec.color_hex,
+    color_name: w.spec.color_name,
+    quality: w.spec.quality,
+    infill_percent: w.spec.infill_percent,
+    supports: w.spec.supports,
+    colors_count: w.spec.colors_count,
+    post_processing_minutes: w.spec.post_processing_minutes,
+    primary_file_id: w.primaryFileId || null,
+    source_url: w.sourceUrl,
+    stated_dims: w.statedDims,
+    governorate: String(w.governorate ?? request.governorate ?? ''),
+    delivery_pref: String(w.deliveryPref ?? request.delivery_pref ?? ''),
+    deadline: String(w.deadline !== undefined ? w.deadline : (request.deadline ?? '')),
+    customer_notes: String(w.customerNotes ?? request.customer_notes ?? ''),
+    file_ids: w.files.map((f) => f.id),
+  };
+}
+
+/** The print side row, written by a publish and by a draft save alike. */
+function printRowStatement(
+  db: D1Database,
+  requestId: string,
+  w: WizardInput,
+  quote: Quote | null,
+  completeness: number,
+  ts: string
+): D1PreparedStatement {
+  return db.prepare(
+    `INSERT INTO community_print_requests
+       (request_id, process, material_id, color_hex, color_name, quality, infill_percent,
+        supports, colors_count, post_processing_minutes, primary_file_id,
+        source_kind, source_provider, source_url, source_meta,
+        analysis, estimate, estimate_low_iqd, estimate_high_iqd, estimate_confidence,
+        completeness, updated_at, source_type, process_unsure, material_unsure, stated_dims)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+     ON CONFLICT (request_id) DO UPDATE SET
+       process=excluded.process, material_id=excluded.material_id, color_hex=excluded.color_hex,
+       color_name=excluded.color_name, quality=excluded.quality, infill_percent=excluded.infill_percent,
+       supports=excluded.supports, colors_count=excluded.colors_count,
+       post_processing_minutes=excluded.post_processing_minutes, primary_file_id=excluded.primary_file_id,
+       source_kind=excluded.source_kind, source_provider=excluded.source_provider,
+       source_url=excluded.source_url, source_meta=excluded.source_meta,
+       analysis=excluded.analysis, estimate=excluded.estimate,
+       estimate_low_iqd=excluded.estimate_low_iqd, estimate_high_iqd=excluded.estimate_high_iqd,
+       estimate_confidence=excluded.estimate_confidence, completeness=excluded.completeness,
+       updated_at=excluded.updated_at, source_type=excluded.source_type,
+       process_unsure=excluded.process_unsure, material_unsure=excluded.material_unsure,
+       stated_dims=excluded.stated_dims`
+  ).bind(
+    requestId, w.spec.process, w.spec.material_id, w.spec.color_hex, w.spec.color_name, w.spec.quality,
+    w.spec.infill_percent, w.spec.supports ? 1 : 0, w.spec.colors_count, w.spec.post_processing_minutes,
+    w.primaryFileId || null,
+    w.sourceKind, w.sourceProvider, w.sourceUrl, JSON.stringify(w.sourceMeta),
+    w.analysis ? JSON.stringify(w.analysis) : '{}',
+    quote ? JSON.stringify(quote) : '{}',
+    quote?.priced ? quote.price_low_iqd : null,
+    quote?.priced ? quote.price_high_iqd : null,
+    quote?.priced ? quote.confidence : '',
+    completeness,
+    ts,
+    w.sourceType,
+    w.choices.processUnsure ? 1 : 0,
+    w.choices.materialUnsure ? 1 : 0,
+    w.statedDims ? JSON.stringify(w.statedDims) : ''
+  );
+}
+
+/**
+ * MATCHING FOR A CUSTOMER WHO IS NOT SURE OF THE PROCESS — at the call site
+ * (capability matching v2 is a later stream). The matcher asks one process;
+ * an open process is asked both ways and each merchant keeps their better
+ * answer: eligible beats rejected, and between two eligible answers the
+ * higher score. A material left open is already "any material" to the
+ * matcher (`printerFits` skips the check for an empty id).
+ */
+function matchForChoices(
+  candidates: MerchantCandidate[],
+  req: MatchRequest,
+  material: PrintMaterial | null,
+  weights: MatchWeights,
+  now: number,
+  limit: number,
+  processUnsure: boolean
+): { decisions: MatchDecision[]; notify: MatchDecision[] } {
+  if (!processUnsure) return matchMerchants(candidates, req, material, weights, now, limit);
+  const everyone = Math.max(1, candidates.length);
+  const fdm = matchMerchants(candidates, { ...req, process: 'fdm' }, null, weights, now, everyone).decisions;
+  const resin = matchMerchants(candidates, { ...req, process: 'resin' }, null, weights, now, everyone).decisions;
+  const byId = new Map(resin.map((d) => [d.merchant_id, d]));
+  const decisions = fdm.map((a) => {
+    const b = byId.get(a.merchant_id);
+    if (!b) return a;
+    if (a.eligible !== b.eligible) return a.eligible ? a : b;
+    return b.score > a.score ? b : a;
+  });
+  const notify = decisions
+    .filter((d) => d.eligible)
+    .sort((a, b) => b.score - a.score || a.merchant_id.localeCompare(b.merchant_id))
+    .slice(0, limit);
+  return { decisions, notify };
+}
 
 export interface PublishOutcome {
   quote: Record<string, unknown>;
   completeness: number;
   matching: { considered: number; eligible: number; notified: number };
-  /** The job changed under standing offers, which are now stale. */
+  /** A new revision was created and the offers that priced the old one are superseded. */
   revised: boolean;
+  /** The job's revision after this call. */
+  revision: number;
+  /** A re-publish that changed none of the priced facts: nothing was re-matched. */
+  replayed: boolean;
 }
 
 /**
@@ -705,13 +1067,21 @@ export interface PublishOutcome {
  * requests` creates a DRAFT; this is the one transition to `open`, taken in
  * the same write that fixes the job's facts, and the expiry clock starts here.
  *
- * A RE-PUBLISH IS AN EDIT, AND AN EDIT IS A REVISION (§10 K). Re-publishing an
- * open request used to rewrite the job — PLA×1 to resin×50 ultra — under the
- * offers already priced against it. When the facts a merchant priced change,
- * the request's `revision` moves in the same write, every pending offer priced
- * against the old one is stale (unacceptable until its merchant re-confirms),
- * and those merchants are told. A re-publish that changes nothing revises
- * nothing.
+ * MATCHING RUNS WHEN THE JOB IS NEW OR CHANGED, ONCE. The first publish
+ * matches and notifies. A re-publish that changes none of the priced facts
+ * (`canonicalFacts`) re-matches nobody and answers `replayed: true`; one that
+ * changes them matches again for the job as it now is (a merchant already
+ * told about this request is not told twice — the notification key is the
+ * request's).
+ *
+ * A RE-PUBLISH IS AN EDIT, AND AN EDIT AFTER THE FIRST OFFER IS A REVISION
+ * (§10 K, W5-A). When the priced facts change and somebody has a pending
+ * offer on the current revision, the revision moves in the same write, every
+ * pending offer on an older one is `superseded` (unacceptable; its merchant is
+ * told and may re-confirm, edit or withdraw), and the new revision's snapshot
+ * is recorded. A change nobody priced yet rewrites the current revision's
+ * snapshot in place. The decision is made inside the UPDATE, so an offer
+ * landing a moment before it is counted.
  *
  * ONE REQUEST. Nothing here inserts into `community_requests`, and the
  * matching engine has no ability to (worker/lib/printMatching.ts returns
@@ -736,57 +1106,21 @@ export async function publishRequest(
   const stored = await env.DB.prepare('SELECT * FROM community_print_requests WHERE request_id = ?')
     .bind(requestId)
     .first<Record<string, unknown>>();
-  // A body with no spec at all publishes the spec already stored, when there
-  // is one — the repeat copy and a draft published from its own page.
-  const asStored = !!stored && input.process === undefined && input.material_id === undefined;
-  const body = asStored ? { ...storedPublishBody(stored!, request), ...input } : input;
-
-  const spec = readSpec(body);
-  const [mats, cfg, weights, notifyLimit] = await Promise.all([
+  const [mats, cfg, weights, notifyLimit, accs] = await Promise.all([
     materials(env),
     pricingConfig(env),
     getSetting(env.DB, 'printMatchWeights'),
     getSetting(env.DB, 'printMatchNotifyLimit'),
+    accessories(env),
   ]);
+  const w = await readWizardInput(env, requestId, input, stored ?? null, request, mats, { strict: true });
+  const { spec, choices, analysis } = w;
 
-  // ---- the model: whichever attachment is the model, measured -------------
-  const primaryFileId = str(body.primary_file_id, 'primary_file_id', { max: 60, required: false }) ?? '';
-  let analysis: ModelAnalysis | null = null;
-  if (primaryFileId) {
-    const row = await env.DB.prepare(
-      'SELECT analysis FROM community_request_files WHERE id = ? AND request_id = ?'
-    )
-      .bind(primaryFileId, requestId)
-      .first<{ analysis: string }>();
-    if (!row) throw badRequest('That file does not belong to this request', 'FILE_NOT_FOUND');
-    // THE STORED analysis, never one supplied in the body. This is the number
-    // the price is built on, so it comes from the server's own measurement.
-    analysis = parseJson<ModelAnalysis | null>(row.analysis, null);
-  }
-
-  const sourceKind = body.source_kind === 'link' ? 'link' : 'upload';
-  const providers = await getSetting(env.DB, 'printLinkProviders');
-  /**
-   * THE LINK IS VALIDATED, NOT JUST STORED (audit 03 §10 W). `source_url` was
-   * 600 characters of whatever arrived, shown to merchants — one `<a href>`
-   * away from a `javascript:` sink. It now passes the same outbound-URL guard
-   * the link step itself uses and is stored in its canonical form. A caller
-   * sending a bad one is told; a stored legacy value that no longer passes is
-   * dropped rather than blocking the republish of an old request.
-   */
-  const rawSourceUrl = str(body.source_url, 'source_url', { max: 600, required: false }) ?? '';
-  const parsedLink = rawSourceUrl ? parseModelLink(rawSourceUrl, providers) : null;
-  if (rawSourceUrl && !parsedLink && !asStored) {
-    throw badRequest('That link is not a valid https address', 'BAD_URL');
-  }
-  const sourceUrl = parsedLink?.canonical_url ?? '';
-  const sourceMeta = sanitizeSourceMeta(body.source_meta);
-  const sourceProvider = parsedLink?.provider ?? '';
-
-  const quote = quotePrint(
+  const quote = estimateFor(
+    spec,
+    choices,
     {
       analysis,
-      materialId: spec.material_id,
       quality: spec.quality,
       infill: spec.infill_percent / 100,
       quantity: spec.quantity,
@@ -794,73 +1128,40 @@ export async function publishRequest(
       supports: spec.supports,
       post_processing_minutes: spec.post_processing_minutes,
       accessories: spec.accessories,
-      accessory_catalogue: await accessories(env),
+      accessory_catalogue: accs,
       fallback_volume_cm3:
-        typeof body.volume_cm3 === 'number' && body.volume_cm3 > 0 ? body.volume_cm3 : undefined,
+        typeof w.body.volume_cm3 === 'number' && w.body.volume_cm3 > 0 ? w.body.volume_cm3 : undefined,
     },
     mats,
     cfg
   );
 
-  const completeness = completenessOf(spec, analysis, sourceKind, sourceUrl, quote.priced);
+  const completeness = completenessOf(spec, analysis, w.sourceKind, w.sourceUrl, quote.priced);
 
   /**
    * THE REQUEST ROW CATCHES UP WITH THE WIZARD.
    *
-   * The row is created at the end of step 1, before the customer has chosen a
-   * material or a governorate — and `POST /api/marketplace/requests` is the
-   * only route that writes those fields. So without this, everything picked in
-   * step 2 would exist on the print side only, and two things that matter would
-   * silently be empty: the public board card (`publicRequest()` reads
-   * `material`, `color`, `dimensions`, `budget_iqd`, `governorate` from HERE),
-   * and — worse — the matcher's `governorate` and `delivery_pref`, which decide
-   * which merchants are eligible at all. A customer who picked Baghdad would
-   * have been matched as though they had picked nowhere.
-   *
-   * This is not a second create. It is the same row, the same owner, written
+   * The public board card (`publicRequest()` reads `material`, `color`,
+   * `dimensions`, `budget_iqd`, `governorate` from the row) and the matcher's
+   * `governorate` and `delivery_pref` — which decide which merchants are
+   * eligible at all — live on the request row, so the publish writes them there
    * in the same commit that makes it public. Only fields the caller actually
    * supplied are touched; a republish that sends nothing leaves them as they are.
    */
-  // `str` answers '' for an absent value, so "supplied" is asked of the body
-  // itself — a republish that omits a field must not blank it.
-  const supplied = (k: string) => body[k] !== undefined;
-  const governorate = supplied('governorate') ? str(body.governorate, 'governorate', { max: 60, required: false }) : undefined;
-  const deliveryPref = supplied('delivery_pref')
-    ? str(body.delivery_pref, 'delivery_pref', { max: 40, required: false })
-    : undefined;
-  const deadline = supplied('deadline') ? str(body.deadline, 'deadline', { max: 40, required: false }) : undefined;
-  const budget =
-    body.budget_iqd === undefined || body.budget_iqd === null || body.budget_iqd === ''
-      ? undefined
-      : int(body.budget_iqd, 'budget_iqd', { min: 0, max: 1_000_000_000 });
-
-  // What the board shows about the job, written from what was actually chosen
-  // and measured rather than asked for a second time in prose.
-  const materialLabel = mats.find((m) => m.id === spec.material_id)?.name_en ?? spec.material_id;
+  const material = mats.find((m) => m.id === spec.material_id) ?? null;
+  const materialLabel = choices.materialUnsure ? '' : (material?.name_en ?? spec.material_id);
   const colorLabel = spec.color_name || spec.color_hex;
-  const dimsLabel = analysis?.measured
-    ? `${Math.round(analysis.dimensions_mm.x)}×${Math.round(analysis.dimensions_mm.y)}×${Math.round(analysis.dimensions_mm.z)} mm`
-    : '';
+  const measuredDims = analysis?.measured ? analysis.dimensions_mm : null;
+  const dimsFrom = measuredDims ?? w.statedDims;
+  const dimsLabel = dimsFrom ? `${Math.round(dimsFrom.x)}×${Math.round(dimsFrom.y)}×${Math.round(dimsFrom.z)} mm` : '';
 
   // Did the facts a merchant priced change? Only a PUBLISHED request can be
   // revised: nobody has priced a draft.
-  const nextRow = {
-    quantity: spec.quantity,
-    governorate: governorate ?? request.governorate,
-    delivery_pref: deliveryPref ?? request.delivery_pref,
-    deadline: deadline !== undefined ? deadline || null : request.deadline,
-  };
-  const nextSpec = {
-    process: spec.process, material_id: spec.material_id, color_hex: spec.color_hex, color_name: spec.color_name,
-    quality: spec.quality, infill_percent: spec.infill_percent, supports: spec.supports ? 1 : 0,
-    colors_count: spec.colors_count, post_processing_minutes: spec.post_processing_minutes,
-    primary_file_id: primaryFileId || null, source_url: sourceUrl,
-  };
-  const revised = !firstPublish && jobFacts(stored ?? null, request) !== jobFacts(nextSpec, nextRow);
+  const nextFacts = factsFromInput(w, request);
+  const changed = !firstPublish && canonicalFacts(factsFromRows(request, stored ?? null, w.files)) !== canonicalFacts(nextFacts);
 
   const ts = new Date().toISOString();
   const readRevision = Number(request.revision ?? 1);
-  const nextRevision = revised ? readRevision + 1 : readRevision;
   const expiryDays = Number(await getSetting(env.DB, 'communityRequestExpiryDays')) || 30;
   const expiresAt = new Date(Date.now() + expiryDays * 86_400_000).toISOString();
 
@@ -871,15 +1172,29 @@ export async function publishRequest(
     "state = CASE WHEN state = 'draft' THEN 'open' ELSE state END",
     "status = 'open'",
     "expires_at = CASE WHEN state = 'draft' THEN ? ELSE expires_at END",
-    'revision = ?',
+    "published_at = CASE WHEN state = 'draft' THEN ? ELSE published_at END",
+    // `changed` is the server's own boolean, spliced as a literal 1/0.
+    `revision = ${bumpRevisionIfOfferedSql(changed ? '1' : '0')}`,
     'updated_at = ?',
   ];
-  const vals: Array<string | number | null> = [materialLabel, colorLabel, spec.quantity, expiresAt, nextRevision, ts];
+  const vals: Array<string | number | null> = [materialLabel, colorLabel, spec.quantity, expiresAt, ts, ts];
   if (dimsLabel) { sets.splice(2, 0, 'dimensions = ?'); vals.splice(2, 0, dimsLabel); }
-  if (governorate !== undefined) { sets.push('governorate = ?'); vals.push(governorate); }
-  if (deliveryPref !== undefined) { sets.push('delivery_pref = ?'); vals.push(deliveryPref); }
-  if (deadline !== undefined) { sets.push('deadline = ?'); vals.push(deadline || null); }
-  if (budget !== undefined) { sets.push('budget_iqd = ?'); vals.push(budget); }
+  if (w.governorate !== undefined) { sets.push('governorate = ?'); vals.push(w.governorate); }
+  if (w.deliveryPref !== undefined) { sets.push('delivery_pref = ?'); vals.push(w.deliveryPref); }
+  if (w.deadline !== undefined) { sets.push('deadline = ?'); vals.push(w.deadline || null); }
+  if (w.budget !== undefined) { sets.push('budget_iqd = ?'); vals.push(w.budget); }
+  if (w.customerNotes !== undefined) { sets.push('customer_notes = ?'); vals.push(w.customerNotes); }
+
+  const snapshot = {
+    spec: snapshotSpec(
+      { title: request.title, description: request.description, budget_iqd: w.budget !== undefined ? w.budget : request.budget_iqd },
+      nextFacts,
+      measuredDims
+    ),
+    files: w.files,
+    estimate: publicEstimate(JSON.stringify(quote)),
+    hash: await factsHash(nextFacts),
+  };
 
   try {
     await env.DB.batch([
@@ -892,41 +1207,15 @@ export async function publishRequest(
       // Nothing below is written unless the line above really was.
       env.DB.prepare(
         `UPDATE community_requests
-            SET updated_at = CASE WHEN updated_at = ?2 AND revision = ?3 THEN updated_at ELSE NULL END
+            SET updated_at = CASE WHEN updated_at = ?2 THEN updated_at ELSE NULL END
           WHERE id = ?1`
-      ).bind(requestId, ts, nextRevision),
-      env.DB.prepare(
-        `INSERT INTO community_print_requests
-           (request_id, process, material_id, color_hex, color_name, quality, infill_percent,
-            supports, colors_count, post_processing_minutes, primary_file_id,
-            source_kind, source_provider, source_url, source_meta,
-            analysis, estimate, estimate_low_iqd, estimate_high_iqd, estimate_confidence,
-            completeness, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-         ON CONFLICT (request_id) DO UPDATE SET
-           process=excluded.process, material_id=excluded.material_id, color_hex=excluded.color_hex,
-           color_name=excluded.color_name, quality=excluded.quality, infill_percent=excluded.infill_percent,
-           supports=excluded.supports, colors_count=excluded.colors_count,
-           post_processing_minutes=excluded.post_processing_minutes, primary_file_id=excluded.primary_file_id,
-           source_kind=excluded.source_kind, source_provider=excluded.source_provider,
-           source_url=excluded.source_url, source_meta=excluded.source_meta,
-           analysis=excluded.analysis, estimate=excluded.estimate,
-           estimate_low_iqd=excluded.estimate_low_iqd, estimate_high_iqd=excluded.estimate_high_iqd,
-           estimate_confidence=excluded.estimate_confidence, completeness=excluded.completeness,
-           updated_at=excluded.updated_at`
-      ).bind(
-        requestId, spec.process, spec.material_id, spec.color_hex, spec.color_name, spec.quality,
-        spec.infill_percent, spec.supports ? 1 : 0, spec.colors_count, spec.post_processing_minutes,
-        primaryFileId || null,
-        sourceKind, sourceProvider, sourceUrl, JSON.stringify(sourceMeta),
-        analysis ? JSON.stringify(analysis) : '{}',
-        JSON.stringify(quote),
-        quote.priced ? quote.price_low_iqd : null,
-        quote.priced ? quote.price_high_iqd : null,
-        quote.priced ? quote.confidence : '',
-        completeness,
-        ts
-      ),
+      ).bind(requestId, ts),
+      printRowStatement(env.DB, requestId, w, quote, completeness, ts),
+      // Offers that priced a revision the line above left behind.
+      supersedeStatement(env.DB, requestId, ts),
+      offerCountStatement(env.DB, requestId),
+      // The revision as it now stands: a new row after a bump, else in place.
+      recordRevisionStatement(env.DB, requestId, snapshot, firstPublish ? 'publish' : 'edit', userId, ts),
     ]);
   } catch (e) {
     if (!/constraint/i.test(e instanceof Error ? e.message : String(e))) throw e;
@@ -938,10 +1227,9 @@ export async function publishRequest(
   // `deadline` and `budget_iqd` join the re-read because the merchant's
   // notification is composed from the ROW, not from this call's payload. A
   // republish that does not resend them must still tell merchants the deadline
-  // and budget the customer set the first time round, rather than quietly
-  // dropping two of the facts an offer is priced against.
+  // and budget the customer set the first time round.
   const forMatching = await env.DB.prepare(
-    'SELECT governorate, delivery_pref, deadline, budget_iqd FROM community_requests WHERE id = ?'
+    'SELECT governorate, delivery_pref, deadline, budget_iqd, revision FROM community_requests WHERE id = ?'
   )
     .bind(requestId)
     .first<{
@@ -949,48 +1237,66 @@ export async function publishRequest(
       delivery_pref: string;
       deadline: string | null;
       budget_iqd: number | null;
+      revision: number;
     }>();
+  const revision = Number(forMatching?.revision ?? readRevision);
+  const revised = revision > readRevision;
+  const { cost_lines, cost_iqd, floor_iqd, margin_percent, ...publicQuote } = quote;
+  void cost_lines; void cost_iqd; void floor_iqd; void margin_percent;
+
+  // ---- nothing a merchant priced changed: nobody is matched again -----------
+  if (!firstPublish && !changed) {
+    await audit(env.DB, userId, 'print.request_republished', requestId, { revision, revised: false, replayed: true });
+    return {
+      quote: publicQuote as unknown as Record<string, unknown>,
+      completeness,
+      matching: { considered: 0, eligible: 0, notified: 0 },
+      revised: false,
+      revision,
+      replayed: true,
+    };
+  }
 
   // ---- who can make it ----------------------------------------------------
   const matchReq: MatchRequest = {
     id: requestId,
     process: spec.process,
-    material_id: spec.material_id,
+    material_id: choices.materialUnsure ? '' : spec.material_id,
     color_hex: spec.color_hex,
     quality: spec.quality,
     colors_count: spec.colors_count,
-    dimensions_mm: analysis?.measured ? analysis.dimensions_mm : { x: 0, y: 0, z: 0 },
+    // Measured geometry first; the customer's typed size when there is none.
+    dimensions_mm: dimsFrom ?? { x: 0, y: 0, z: 0 },
     governorate: String(forMatching?.governorate ?? request.governorate ?? ''),
     delivery_pref: String(forMatching?.delivery_pref ?? request.delivery_pref ?? ''),
-    estimate_iqd: quote.priced ? quote.price_iqd : null,
+    // A range across materials nobody chose is not a job value to filter on.
+    estimate_iqd: quote.priced && !choices.materialUnsure && !choices.processUnsure ? quote.price_iqd : null,
     quantity: spec.quantity,
   };
-  const material = mats.find((m) => m.id === spec.material_id) ?? null;
   const candidates = await loadCandidates(env);
-  const { decisions, notify } = matchMerchants(
+  const { decisions, notify } = matchForChoices(
     candidates,
     matchReq,
-    material,
+    choices.materialUnsure ? null : material,
     weights,
     Date.now(),
-    Math.max(1, Number(notifyLimit) || 25)
+    Math.max(1, Number(notifyLimit) || 25),
+    choices.processUnsure
   );
 
   // ---- tell them. ONE notification each, and nothing else ------------------
   //
-  // THE MESSAGE IS COMPOSED, NEVER COPIED. `request.title` used to be assigned
-  // to `body_ar` and `body_en` both, which handed an English-reading merchant
-  // the customer's Arabic sentence and called it English.
-  // `printMatchNotification` builds each language out of the structured fields
-  // instead and quotes the customer's own words only where their script fits;
-  // its comment explains why translating that sentence is not on the table.
+  // THE MESSAGE IS COMPOSED, NEVER COPIED. `printMatchNotification` builds each
+  // language out of the structured fields and quotes the customer's own words
+  // only where their script fits; its comment explains why translating that
+  // sentence is not on the table.
   const text = printMatchNotification({
     title: String(request.title ?? ''),
     process: spec.process,
     quality: spec.quality,
     quantity: spec.quantity,
-    material,
-    material_id: spec.material_id,
+    material: choices.materialUnsure ? null : material,
+    material_id: choices.materialUnsure ? '' : spec.material_id,
     color_hex: spec.color_hex,
     dimensions: dimsLabel,
     governorate: matchReq.governorate,
@@ -1017,14 +1323,8 @@ export async function publishRequest(
         /**
          * THE KURDISH TEXT HAS NOWHERE ELSE TO GO. `user_notifications` (0045)
          * has title_ar/title_en and body_ar/body_en and no ckb column at all,
-         * and adding one is a migration this change is not permitted to make.
-         * So the composed Sorani rides in `meta`, which is already free-form
-         * JSON and costs nothing. Nothing reads it yet — GET /api/notifications
-         * does not return `meta`, and NotificationBell.tsx still shows a
-         * Kurdish merchant the ARABIC row — but the text now EXISTS, so
-         * finishing the job is a read-path change rather than a second pass at
-         * translating everything. Composing it and throwing it away was the
-         * only worse option available.
+         * so the composed Sorani rides in `meta`, which is already free-form
+         * JSON — the text EXISTS, so finishing the job is a read-path change.
          */
         title_ckb: text.title.ckb,
         body_ckb: text.body.ckb,
@@ -1062,9 +1362,10 @@ export async function publishRequest(
       )
     );
   }
-  // The merchants whose offers the change left behind hear about it.
-  if (revised) stmts.push(...(await staleOfferNotifications(env.DB, requestId, nextRevision)));
-  if (stmts.length) await env.DB.batch(stmts);
+  // The merchants whose offers the change superseded hear about it.
+  if (revised) stmts.push(...(await staleOfferNotifications(env.DB, requestId, revision)));
+  // D1 caps a batch's statements, not a chunk of them: send in slices.
+  for (let i = 0; i < stmts.length; i += 90) await env.DB.batch(stmts.slice(i, i + 90));
   // …and on their outside channels, per each merchant's `request_opportunities` switch (W2-E).
   await Promise.all(notify.map((d) => fanOutMerchantNotice(env, { merchant_id: d.merchant_id, user_id: d.user_id }, matchingRequestNotice(requestId, text))));
 
@@ -1073,12 +1374,12 @@ export async function publishRequest(
     eligible: decisions.filter((d) => d.eligible).length,
     notified: notify.length,
     confidence: quote.confidence,
-    revision: nextRevision,
+    revision,
     revised,
+    process_unsure: choices.processUnsure,
+    material_unsure: choices.materialUnsure,
   });
 
-  const { cost_lines, cost_iqd, floor_iqd, margin_percent, ...publicQuote } = quote;
-  void cost_lines; void cost_iqd; void floor_iqd; void margin_percent;
   return {
     quote: publicQuote as unknown as Record<string, unknown>,
     completeness,
@@ -1088,6 +1389,8 @@ export async function publishRequest(
       notified: notify.length,
     },
     revised,
+    revision,
+    replayed: false,
   };
 }
 
@@ -1098,6 +1401,203 @@ printRequestRoutes.post('/requests/:id/publish', requireCommunityOpen, requireAu
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const out = await publishRequest(c.env, user.id, requestId, body);
   return c.json({ success: true, request_id: requestId, published: true, ...out });
+});
+
+// ------------------------------------------------------------ 5b. the draft
+
+/**
+ * «احفظ كمسودة» — the wizard's answers kept on the DRAFT, without publishing.
+ *
+ * Only while the request IS a draft (`REQUEST_NOT_DRAFT` otherwise — a
+ * published job changes through the publish door, which revises it). Nothing
+ * here is visible to anyone but the customer, nothing is matched, and the
+ * abandoned-draft clock is pushed `DRAFT_TTL_DAYS` ahead: a draft someone is
+ * still working on is not abandoned. The conditional `state = 'draft'` in the
+ * write means a publish that won a race is never overwritten by a late save.
+ */
+printRequestRoutes.put('/requests/:id/draft', requireAuth, async (c) => {
+  await rateLimit(c, 'print-draft', 120, 3600);
+  const user = c.get('user')!;
+  const requestId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const request = await ownedRequest(c, requestId, user.id);
+  if (request.state !== 'draft') throw conflict('Only a draft can be saved this way', 'REQUEST_NOT_DRAFT');
+
+  const stored = await c.env.DB.prepare('SELECT * FROM community_print_requests WHERE request_id = ?')
+    .bind(requestId)
+    .first<Record<string, unknown>>();
+  const mats = await materials(c.env);
+  // A draft save always carries the wizard's state; an empty body is not "as stored".
+  const w = await readWizardInput(c.env, requestId, { process: body.process ?? 'unsure', ...body }, stored ?? null, request, mats, { strict: false });
+
+  const title = body.title === undefined ? undefined : str(body.title, 'title', { min: 4, max: 140 });
+  const description = body.description === undefined ? undefined : str(body.description, 'description', { min: 10, max: 6000 });
+  const sets: string[] = ['quantity = ?', 'material = ?', 'color = ?', 'expires_at = ?', 'updated_at = ?'];
+  const ts = new Date().toISOString();
+  const vals: Array<string | number | null> = [
+    w.spec.quantity,
+    w.choices.materialUnsure ? '' : (mats.find((m) => m.id === w.spec.material_id)?.name_en ?? w.spec.material_id),
+    w.spec.color_name || w.spec.color_hex,
+    new Date(Date.now() + DRAFT_TTL_DAYS * 86_400_000).toISOString(),
+    ts,
+  ];
+  if (title !== undefined) { sets.push('title = ?'); vals.push(title); }
+  if (description !== undefined) { sets.push('description = ?'); vals.push(description); }
+  if (w.governorate !== undefined) { sets.push('governorate = ?'); vals.push(w.governorate); }
+  if (w.deliveryPref !== undefined) { sets.push('delivery_pref = ?'); vals.push(w.deliveryPref); }
+  if (w.deadline !== undefined) { sets.push('deadline = ?'); vals.push(w.deadline || null); }
+  if (w.budget !== undefined) { sets.push('budget_iqd = ?'); vals.push(w.budget); }
+  if (w.customerNotes !== undefined) { sets.push('customer_notes = ?'); vals.push(w.customerNotes); }
+
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `UPDATE community_requests SET ${sets.join(', ')} WHERE id = ? AND customer_id = ? AND state = 'draft'`
+      ).bind(...vals, requestId, user.id),
+      // A publish that landed first leaves this save with nothing to write.
+      c.env.DB.prepare(
+        `UPDATE community_requests SET updated_at = CASE WHEN state = 'draft' AND updated_at = ?2 THEN updated_at ELSE NULL END
+          WHERE id = ?1`
+      ).bind(requestId, ts),
+      printRowStatement(c.env.DB, requestId, w, null, 0, ts),
+    ]);
+  } catch (e) {
+    if (!/constraint/i.test(e instanceof Error ? e.message : String(e))) throw e;
+    throw conflict('This request is no longer a draft — reload it', 'REQUEST_NOT_DRAFT');
+  }
+  return c.json({ success: true, draft: await draftShape(c.env, requestId) });
+});
+
+/**
+ * EVERYTHING THE WIZARD NEEDS TO PICK UP WHERE THE CUSTOMER LEFT OFF — a
+ * draft to finish, or a published request to edit. Owner only (a stranger's
+ * id is a 404, never a refusal that confirms it exists). `live_offers` lets
+ * the wizard warn that a material change will supersede standing offers.
+ */
+async function draftShape(env: Env, requestId: string) {
+  const r = await env.DB.prepare('SELECT * FROM community_requests WHERE id = ?').bind(requestId).first<Record<string, unknown>>();
+  const p = await env.DB.prepare('SELECT * FROM community_print_requests WHERE request_id = ?')
+    .bind(requestId)
+    .first<Record<string, unknown>>();
+  const { results: files } = await env.DB.prepare(
+    `SELECT id, file_name, content_type, size_bytes, kind, analysis FROM community_request_files
+      WHERE request_id = ? ORDER BY created_at, id`
+  )
+    .bind(requestId)
+    .all<Record<string, unknown>>();
+  const live = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM community_offers WHERE request_id = ? AND state = 'pending'`
+  )
+    .bind(requestId)
+    .first<{ n: number }>();
+  return {
+    id: String(r?.id ?? requestId),
+    state: String(r?.state ?? ''),
+    revision: Number(r?.revision ?? 1),
+    title: String(r?.title ?? ''),
+    description: String(r?.description ?? ''),
+    customer_notes: String(r?.customer_notes ?? ''),
+    quantity: Number(r?.quantity ?? 1),
+    governorate: String(r?.governorate ?? ''),
+    delivery_pref: String(r?.delivery_pref ?? ''),
+    deadline: r?.deadline ? String(r.deadline) : '',
+    budget_iqd: r?.budget_iqd === null || r?.budget_iqd === undefined ? null : Number(r.budget_iqd),
+    expires_at: (r?.expires_at as string | null) ?? null,
+    live_offers: Number(live?.n ?? 0),
+    print: p
+      ? {
+          source_type: effectiveSourceType(p, (files ?? []).map((f) => String(f.kind))),
+          process: effectiveProcess(p) ?? 'unsure',
+          material_id: effectiveMaterial(p) ?? (Number(p.material_unsure ?? 0) === 1 ? 'unsure' : ''),
+          quality: String(p.quality ?? 'standard'),
+          infill_percent: Number(p.infill_percent ?? 20),
+          supports: Number(p.supports ?? 1) === 1,
+          colors_count: Number(p.colors_count ?? 1),
+          post_processing_minutes: Number(p.post_processing_minutes ?? 0),
+          color_hex: String(p.color_hex ?? ''),
+          color_name: String(p.color_name ?? ''),
+          primary_file_id: (p.primary_file_id as string | null) ?? null,
+          source_url: String(p.source_url ?? ''),
+          source_meta: parseJson<Record<string, unknown>>(p.source_meta, {}),
+          stated_dimensions_mm: parseDims(p.stated_dims),
+        }
+      : null,
+    files: (files ?? []).map((f) => ({
+      id: String(f.id),
+      file_name: String(f.file_name ?? ''),
+      content_type: String(f.content_type ?? ''),
+      size_bytes: Number(f.size_bytes ?? 0),
+      kind: String(f.kind ?? ''),
+      inline: String(f.content_type ?? '').startsWith('image/'),
+      url: `/api/marketplace/requests/${requestId}/files/${String(f.id)}`,
+      analysis: parseJson<ModelAnalysis | null>(f.analysis, null),
+    })),
+  };
+}
+
+printRequestRoutes.get('/requests/:id/draft', requireAuth, async (c) => {
+  const user = c.get('user')!;
+  const requestId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  await ownedRequest(c, requestId, user.id);
+  return c.json({ success: true, draft: await draftShape(c.env, requestId) });
+});
+
+// --------------------------------------------------------- 5c. the revisions
+
+/** Which snapshot fields moved between two revisions — named, never diffed as text. */
+const REVISION_FIELDS = [
+  'quantity', 'source_type', 'process', 'material_id', 'color_hex', 'color_name', 'quality', 'infill_percent',
+  'supports', 'colors_count', 'post_processing_minutes', 'primary_file_id', 'source_url', 'stated_dims',
+  'governorate', 'delivery_pref', 'deadline', 'customer_notes', 'file_ids',
+] as const;
+
+/**
+ * THE JOB'S HISTORY — what each revision said, and what moved. For whoever may
+ * read the request's print facts (the customer, a merchant while it is on the
+ * board and the community lets them in, the engaged merchant): a merchant
+ * whose offer was superseded sees exactly what changed before re-pricing.
+ */
+printRequestRoutes.get('/requests/:id/revisions', async (c) => {
+  const requestId = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const user = c.get('user');
+  const request = await c.env.DB.prepare(
+    'SELECT id, customer_id, state, visibility, expires_at, revision FROM community_requests WHERE id = ?'
+  )
+    .bind(requestId)
+    .first<RequestForAccess & { revision: number }>();
+  if (!request) throw notFound('Request not found');
+  const isOwner = !!user && user.id === request.customer_id;
+  const publicBoard = onPublicBoard(request);
+  const boardShut = publicBoard && !isOwner && !communityMayEnter(await readCommunityGate(c.env.DB), user);
+  if (!isOwner && !(publicBoard && !boardShut)) {
+    const engaged = user ? await isEngagedMerchant(c.env.DB, requestId, user.id) : false;
+    if (!engaged) throw boardShut ? communityClosedRefusal() : notFound('Request not found');
+  }
+  const { results } = await c.env.DB.prepare(
+    `SELECT revision, spec, files, estimate, hash, reason, created_at FROM community_request_revisions
+      WHERE request_id = ? ORDER BY revision ASC LIMIT 100`
+  )
+    .bind(requestId)
+    .all<Record<string, unknown>>();
+  let prev: Record<string, unknown> | null = null;
+  const revisions = (results ?? []).map((row) => {
+    const spec = parseJson<Record<string, unknown>>(row.spec, {});
+    const changes = prev
+      ? REVISION_FIELDS.filter((k) => JSON.stringify(spec[k] ?? null) !== JSON.stringify(prev![k] ?? null))
+      : [];
+    prev = spec;
+    return {
+      revision: Number(row.revision),
+      reason: String(row.reason ?? ''),
+      created_at: String(row.created_at ?? ''),
+      hash: String(row.hash ?? ''),
+      spec,
+      files: parseJson<RevisionFile[]>(row.files, []).map((f) => ({ id: f.id, kind: f.kind, file_name: f.file_name })),
+      estimate: publicEstimate(row.estimate),
+      changes,
+    };
+  });
+  return c.json({ success: true, current: Number(request.revision ?? 1), revisions });
 });
 
 /**
@@ -1292,22 +1792,31 @@ printRequestRoutes.get('/requests/:id', async (c) => {
       source_provider: row.source_provider,
       source_url: row.source_url,
       source_meta: parseJson<Record<string, unknown>>(row.source_meta, {}),
+      // Wizard v2 (W5-A): where the job came from, «لست متأكدًا» as an answer,
+      // and the size the customer typed when there is no model to measure.
+      source_type: effectiveSourceType(row),
+      process_unsure: Number(row.process_unsure ?? 0) === 1,
+      material_unsure: Number(row.material_unsure ?? 0) === 1,
+      stated_dimensions_mm: parseDims(row.stated_dims),
+      range_basis: estimate.range_basis ?? null,
       analysis,
       estimate,
       estimate_low_iqd: row.estimate_low_iqd,
       estimate_high_iqd: row.estimate_high_iqd,
       estimate_confidence: row.estimate_confidence,
       completeness: row.completeness,
-      required_capabilities: analysis
+      // `analysis` is '{}' when nothing was measured (a link, pictures, words):
+      // capabilities then come from the size the customer typed, or none.
+      required_capabilities: analysis?.dimensions_mm || parseDims(row.stated_dims)
         ? requiredCapabilities(
             {
               id: requestId,
               process: (row.process === 'resin' ? 'resin' : 'fdm') as PrintProcess,
-              material_id: String(row.material_id ?? ''),
+              material_id: effectiveMaterial(row) ?? '',
               color_hex: String(row.color_hex ?? ''),
               quality: (row.quality ?? 'standard') as PrintQuality,
               colors_count: Number(row.colors_count ?? 1),
-              dimensions_mm: analysis.dimensions_mm,
+              dimensions_mm: analysis?.dimensions_mm ?? parseDims(row.stated_dims) ?? { x: 0, y: 0, z: 0 },
               governorate: '',
               delivery_pref: '',
               estimate_iqd: null,
@@ -1508,21 +2017,21 @@ async function viewerToken(env: Env, raw: string | undefined) {
 // -------------------------------------------------------- 8. repeat a request
 
 /**
- * "اطلب مرة أخرى" — copy a finished request into a NEW one, and publish it.
+ * "اطلب مرة أخرى" — copy a request into a NEW DRAFT.
  *
  * A new request row, a new id, and the files RE-COPIED in R2 rather than shared:
  * two requests pointing at one object means deleting the old one breaks the new
  * one, and a customer who repeats an order in March should not lose it because
  * they tidied up in January.
  *
- * THE COPY GOES THROUGH MATCHING (audit 03 §10 E). It used to be inserted
- * straight onto the board — `open`, public, offerable — and never published,
- * so no merchant was ever told and no estimate was ever made. Now it is born a
- * DRAFT like every other request and published by the same `publishRequest`
- * the wizard uses, with the spec it was copied from: a fresh estimate at
- * today's prices, the matching, the notifications. If publishing fails, the
- * copy stays a draft (invisible, and publishable from its own page) and the
- * answer says so — `published: false` — rather than pretending.
+ * THE COPY IS A DRAFT, AND ONLY A DRAFT (audit 03 §10 E, §11 item 9; W5-A).
+ * It used to be inserted straight onto the board — `open`, public, offerable
+ * — and never matched. Wave 1 made it a draft published at once; print
+ * requests v2 stops there: a repeat is a starting point the customer reviews
+ * (a new deadline, a different quantity, today's price) and publishes through
+ * the one publish door, which prices it again and runs the matching. Until
+ * then nobody but the customer can see it, and an untouched copy expires with
+ * the other abandoned drafts. The answer says `published: false, draft: true`.
  */
 printRequestRoutes.post('/requests/:id/repeat', requireCommunityOpen, requireAuth, async (c) => {
   await rateLimit(c, 'request-repeat', 20, 3600);
@@ -1531,32 +2040,33 @@ printRequestRoutes.post('/requests/:id/repeat', requireCommunityOpen, requireAut
 
   const src = await c.env.DB.prepare(
     `SELECT id, customer_id, title, description, category, quantity, material, color, dimensions,
-            budget_iqd, deadline, governorate, delivery_pref, notes, visibility
+            budget_iqd, deadline, governorate, delivery_pref, notes, visibility, customer_notes
        FROM community_requests WHERE id = ? AND customer_id = ?`
   )
     .bind(sourceId, user.id)
     .first<Record<string, unknown>>();
   if (!src) throw notFound('Request not found');
 
-  const expiryDays = Number(await getSetting(c.env.DB, 'communityRequestExpiryDays')) || 30;
   const newRequestId = newId('req');
   const now = new Date().toISOString();
-  const expires = new Date(Date.now() + expiryDays * 86_400_000).toISOString();
+  // The abandoned-draft clock, not the board's: nothing is published here.
+  const expires = new Date(Date.now() + DRAFT_TTL_DAYS * 86_400_000).toISOString();
 
   await c.env.DB.prepare(
     `INSERT INTO community_requests
        (id, customer_id, title, description, status, state, category, quantity, material, color,
         dimensions, budget_iqd, deadline, governorate, delivery_pref, notes, visibility,
-        created_at, updated_at, expires_at)
-     VALUES (?,?,?,?,'closed','draft',?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+        created_at, updated_at, expires_at, customer_notes)
+     VALUES (?,?,?,?,'closed','draft',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
   )
     .bind(
       newRequestId, user.id, String(src.title ?? ''), String(src.description ?? ''),
       String(src.category ?? ''), Number(src.quantity ?? 1), String(src.material ?? ''),
       String(src.color ?? ''), String(src.dimensions ?? ''),
-      src.budget_iqd ?? null, src.deadline ?? null, String(src.governorate ?? ''),
+      // The old deadline has usually passed: the customer sets a new one.
+      src.budget_iqd ?? null, null, String(src.governorate ?? ''),
       String(src.delivery_pref ?? ''), String(src.notes ?? ''), String(src.visibility ?? 'public'),
-      now, now, expires
+      now, now, expires, String(src.customer_notes ?? '')
     )
     .run();
 
@@ -1638,8 +2148,9 @@ printRequestRoutes.post('/requests/:id/repeat', requireCommunityOpen, requireAut
       `INSERT INTO community_print_requests
          (request_id, process, material_id, color_hex, color_name, quality, infill_percent,
           supports, colors_count, post_processing_minutes, primary_file_id,
-          source_kind, source_provider, source_url, source_meta, analysis, completeness)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+          source_kind, source_provider, source_url, source_meta, analysis, completeness,
+          estimate, source_type, process_unsure, material_unsure, stated_dims)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     )
       .bind(
         newRequestId, spec.process, spec.material_id, spec.color_hex, spec.color_name,
@@ -1648,38 +2159,23 @@ printRequestRoutes.post('/requests/:id/repeat', requireCommunityOpen, requireAut
         spec.primary_file_id ? (fileIdMap.get(String(spec.primary_file_id)) ?? null) : null,
         spec.source_kind, spec.source_provider, spec.source_url, spec.source_meta,
         String(spec.analysis ?? '{}'),
-        // The estimate is deliberately NOT copied: prices move, and showing a
-        // customer January's number on a March request would be a quote nobody
-        // can honour. The publish below prices it again, today.
-        Number(spec.completeness ?? 0)
+        Number(spec.completeness ?? 0),
+        // The PRICE is deliberately NOT copied — prices move, and the publish
+        // prices it again, today. Only the hardware list rides along (its
+        // itemised lines are where the accessory choice lives), so publishing
+        // the copy as stored keeps the magnets the source asked for.
+        JSON.stringify({ accessory_lines: parseJson<{ accessory_lines?: unknown[] }>(spec.estimate, {}).accessory_lines ?? [] }),
+        String(spec.source_type ?? ''), Number(spec.process_unsure ?? 0), Number(spec.material_unsure ?? 0),
+        String(spec.stated_dims ?? '')
       )
       .run();
   }
 
-  await audit(c.env.DB, user.id, 'print.request_repeated', newRequestId, { from: sourceId });
-
-  // The hardware the source carried is in its estimate's itemised lines — the
-  // one thing the copied spec row does not hold.
-  const sourceAccessories = parseJson<{ accessory_lines?: Array<{ id?: unknown; qty?: unknown }> }>(spec?.estimate, {})
-    .accessory_lines ?? [];
-  try {
-    const out = await publishRequest(c.env, user.id, newRequestId, {
-      ...(sourceAccessories.length ? { accessories: sourceAccessories.map((l) => ({ id: l.id, qty: l.qty })) } : {}),
-    });
-    return c.json(
-      { success: true, request_id: newRequestId, files: fileIdMap.size, published: true, ...out },
-      201
-    );
-  } catch (e) {
-    // The copy exists and is safe — a draft nobody else can see. Say that it
-    // was NOT published and why, rather than reporting a success that isn't.
-    const code = e instanceof HttpError ? e.code ?? 'PUBLISH_FAILED' : 'PUBLISH_FAILED';
-    console.error('repeat: the copy was made but not published', newRequestId, e instanceof Error ? e.message : String(e));
-    return c.json(
-      { success: true, request_id: newRequestId, files: fileIdMap.size, published: false, publish_error: code },
-      201
-    );
-  }
+  await audit(c.env.DB, user.id, 'print.request_repeated', newRequestId, { from: sourceId, state: 'draft' });
+  return c.json(
+    { success: true, request_id: newRequestId, files: fileIdMap.size, published: false, draft: true },
+    201
+  );
 });
 
 // ------------------------------------------------------------ 9. my requests
@@ -1706,7 +2202,8 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT r.id, r.title, r.state, r.status, r.quantity, r.material, r.color,
             r.budget_iqd, r.deadline, r.governorate, r.offer_count, r.created_at,
-            r.accepted_offer_id, r.community_order_id,
+            r.accepted_offer_id, r.community_order_id, r.revision, r.expires_at, r.published_at,
+            p.process_unsure, p.material_unsure, p.source_type,
             p.material_id, p.color_hex, p.color_name, p.process, p.quality,
             p.estimate_low_iqd, p.estimate_high_iqd, p.estimate_confidence,
             p.completeness, p.primary_file_id, p.source_kind, p.source_provider,
@@ -1742,6 +2239,9 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
       offer_count: Number(r.offer_count ?? 0),
       file_count: Number(r.file_count ?? 0),
       created_at: String(r.created_at ?? ''),
+      revision: Number(r.revision ?? 1),
+      expires_at: (r.expires_at as string | null) ?? null,
+      published_at: (r.published_at as string | null) ?? null,
       // The print side is null for a request made before this system, or one
       // that was never published through the wizard. The UI renders the plain
       // card for those rather than pretending there is a measurement.
@@ -1764,6 +2264,9 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
             has_preview: !!String(r.preview_key ?? ''),
             source_kind: String(r.source_kind ?? 'upload'),
             source_provider: String(r.source_provider ?? ''),
+            source_type: effectiveSourceType(r),
+            process_unsure: Number(r.process_unsure ?? 0) === 1,
+            material_unsure: Number(r.material_unsure ?? 0) === 1,
           },
       // Present only once the customer has chosen. Before that the merchant is
       // nobody's business, including the customer's own list.
